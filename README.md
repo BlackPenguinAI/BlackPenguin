@@ -1,6 +1,6 @@
-# Black Penguin - Documentación de Avances (Semanas 1 y 2)
+# Black Penguin - Documentación de Avances (Semanas 1, 2, 3 y 4)
 
-Este repositorio contiene el código fuente y la arquitectura técnica del Backend Core de **Black Penguin**, una infraestructura de ventas inmobiliarias impulsada por Inteligencia Artificial y diseñada bajo un esquema SaaS Multi-tenant estricto.
+Este repositorio contiene el código fuente y la arquitectura técnica del Backend Core de **Black Penguin**, diseñada bajo un esquema SaaS Multi-tenant estricto.
 
 ---
 
