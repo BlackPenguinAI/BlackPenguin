@@ -1,45 +1,13 @@
 version: '3.8'
 
 services:
-  # Base de Datos Transaccional (Aislada localmente en el Droplet)
-  postgres_bp:
+  postgres_local:
     image: postgres:17-alpine
-    container_name: bp_postgres
+    container_name: bp_postgres_local
     restart: always
     environment:
       POSTGRES_USER: superadmin_bp
       POSTGRES_PASSWORD: bp_secure_password_2026!
       POSTGRES_DB: blackpenguin_core
     ports:
-      - "127.0.0.1:5432:5432" # Bloqueado al exterior, solo escucha a K3s local
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-
-  # Base de Datos Conversacional y Auditoría
-  mongodb_bp:
-    image: mongo:8.0
-    container_name: bp_mongo
-    restart: always
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: superadmin_bp
-      MONGO_INITDB_ROOT_PASSWORD: bp_secure_password_2026!
-    ports:
-      - "127.0.0.1:27017:27017" # Bloqueado al exterior
-    volumes:
-      - mongodata:/data/db
-
-  # Gestor de Colas Asíncronas (Redis para Celery)
-  redis_bp:
-    image: redis:7.2-alpine
-    container_name: bp_redis
-    restart: always
-    command: redis-server --requirepass bp_redis_secret_2026
-    ports:
-      - "127.0.0.1:6379:6379" # Bloqueado al exterior
-    volumes:
-      - redisdata:/data
-
-volumes:
-  pgdata:
-  mongodata:
-  redisdata:
+      - "5433:5432"
