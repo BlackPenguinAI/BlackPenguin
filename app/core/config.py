@@ -27,5 +27,15 @@ class Settings(BaseSettings):
         extra="ignore"  # Ignora variables adicionales que estén en el .env pero no use la app
     )
 
+    # Credenciales iniciales
+    FIRST_SUPERADMIN_EMAIL: str
+    FIRST_SUPERADMIN_PASSWORD: str
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore"
+    )
+
 # Instancia global inyectable en toda la aplicación
 settings = Settings()
