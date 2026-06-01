@@ -56,41 +56,56 @@ Este repositorio contiene el código fuente y la arquitectura técnica del Backe
 
 ---
 
+## Semana 5: Autorización Estricta (RBAC) y Despliegue en Producción
+**Objetivo:** Finalizar la base de seguridad perimetral de roles y realizar el despliegue del entorno core unificado en la nube.
+
+### Logros Técnicos:
+* **Mapeo de Autorización (JWT + RBAC):** Implementación de la dependencia centralizada de seguridad (`app/api/deps.py`) que decodifica tokens JWT y valida en tiempo real los roles corporativos (`Superadmin`, `Admin`, `MKT`, `Sales`), emitiendo respuestas HTTP 403 automáticas ante intentos de violación de privilegios.
+* **Gestión de Secretos en Entornos Seguros:** Migración absoluta de credenciales en texto plano (*hardcoded*) hacia el estándar de inyección por entorno (`.env` a través de Pydantic `BaseSettings`), protegiendo llaves criptográficas (`SECRET_KEY`) y contraseñas de bases de datos tanto en Git como en el servidor.
+* **Contenerización y Despliegue Cloud (DigitalOcean):** * Creación del `Dockerfile` optimizado para empaquetar el código fuente sobre `python:3.11-slim`.
+    * Actualización del `docker-compose.yml` para orquestar la compilación en vivo y conectar de forma interna la API (Uvicorn) con los contenedores persistentes de PostgreSQL, MongoDB y Redis en la nube.
+* **Networking y Firewall:** Configuración de llaves de despliegue SSH (`Deploy Keys`) para la clonación segura del repositorio y apertura controlada de puertos a nivel de sistema operativo (`UFW`) en preparación para las reglas Inbound del Cloud Firewall.
+
+---
+
 ## Estructura del Proyecto
 El proyecto mantiene un diseño modular guiado por las mejores prácticas de la industria:
 
 ```text
 blackpenguin-backend/
-├── requirements.txt
-├── docker-compose.yml (Para levantar base de datos local)
+├── .env                    # (Ignorado en git) Variables de entorno, secretos y credenciales
+├── requirements.txt        # Dependencias estrictas del sistema
+├── Dockerfile              # Instrucciones de compilación de la API para la nube
+├── docker-compose.yml      # Orquestador maestro de contenedores (API + DBs + Cache)
+├── ddl_v2.0.sql            # Diccionario de datos y arquitectura relacional física
 └── app/
     ├── __init__.py
-    ├── main.py
+    ├── main.py             # Punto de entrada de FastAPI y ensamblaje de rutas
     ├── core/
     │   ├── __init__.py
-    │   ├── config.py
-    │   ├── security.py
-    │   ├── rbac.py
-    │   └── middleware.py
+    │   ├── config.py       # Pydantic Settings (Lectura de .env)
+    │   ├── security.py     # Hasheo de contraseñas y firmas JWT
+    │   ├── rbac.py         # Clases de jerarquía funcional
+    │   └── middleware.py   # Guardián interceptor Multi-tenant
     ├── models/
     │   ├── __init__.py
-    │   ├── pg_models.py
-    │   └── mongo_models.py
+    │   ├── pg_models.py    # Esquemas SQLAlchemy (PostgreSQL)
+    │   └── mongo_models.py # Esquemas Motor/Beanie (MongoDB)
     └── api/
         ├── __init__.py
+        ├── deps.py         # Inyectables (RoleChecker, get_db, get_current_user)
         └── v1/
             ├── __init__.py
-            ├── auth.py
-            └── superadmin.py
+            ├── auth.py         # Login y aprovisionamiento master
+            └── superadmin.py   # Gestión SaaS de empresas cliente
 ```
 
 ---
 
 ## Stack Tecnológico Actualizado
 * **Lenguajes:** Python 3.12+, Node.js 24 LTS.
-* **Backend:** FastAPI.
+* **Backend:** FastAPI (con Pydantic v2 y Uvicorn).
 * **Infraestructura:** K3s, Docker, DigitalOcean Droplets.
-* **Bases de Datos:** PostgreSQL (Estructurado), MongoDB (NoSQL), Redis (Caché).
-* **Automatización:** Jenkins.
-
+* **Bases de Datos:** PostgreSQL 16 (Relacional), MongoDB 8.0 (Documental NoSQL), Redis 7.2 (Caché y Colas).
+* **Seguridad y CI/CD:** JWT, Bcrypt, UFW, Jenkins.
 ---
