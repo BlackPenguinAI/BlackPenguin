@@ -42,7 +42,9 @@ class Company(Base):
     is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
+    # Relaciones
     users = relationship("User", back_populates="company", cascade="all, delete-orphan")
+    projects = relationship("Project", back_populates="company", cascade="all, delete-orphan")
 
 class User(Base):
     __tablename__ = "users"
@@ -55,9 +57,31 @@ class User(Base):
     is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     
+    # Relaciones
     company = relationship("Company", back_populates="users")
 
-# Dependencia local para inyectar la sesión de la base de datos
+# =========================================================
+# NUEVA TABLA: PROYECTOS INMOBILIARIOS
+# =========================================================
+class Project(Base):
+    __tablename__ = "projects"
+    
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    company_id = Column(String(36), ForeignKey("companies.id", ondelete="CASCADE"), nullable=False)
+    name = Column(String(150), nullable=False)
+    description = Column(Text, nullable=True)
+    address = Column(String(255), nullable=True)
+    city = Column(String(100), nullable=True)
+    country = Column(String(100), nullable=True)
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    
+    # Relaciones
+    company = relationship("Company", back_populates="projects")
+
+# =========================================================
+# GENERADOR DE SESIONES DE BASE DE DATOS
+# =========================================================
 def get_db():
     db = SessionLocal()
     try:

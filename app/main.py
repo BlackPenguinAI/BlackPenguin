@@ -1,7 +1,8 @@
 from fastapi import FastAPI
 from app.core.config import settings
 from app.core.middleware import MultiTenantMiddleware
-from app.api.v1 import auth, superadmin
+# 1. Importamos el nuevo archivo 'projects'
+from app.api.v1 import auth, superadmin, projects
 
 app = FastAPI(
     title=settings.PROJECT_NAME, 
@@ -26,6 +27,13 @@ app.include_router(
     superadmin.router, 
     prefix=f"{settings.API_V1_STR}/superadmin", 
     tags=["2. Gestión de Plataforma (SaaS Admin)"]
+)
+
+# 2. NUEVO: Conectamos el módulo de Proyectos Inmobiliarios
+app.include_router(
+    projects.router, 
+    prefix=f"{settings.API_V1_STR}/projects", 
+    tags=["3. Proyectos Inmobiliarios"]
 )
 
 @app.get("/", tags=["Sistema"])
