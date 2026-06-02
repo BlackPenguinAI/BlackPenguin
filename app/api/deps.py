@@ -3,10 +3,10 @@ from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, JWTError
 from sqlalchemy.orm import Session
 from app.core.config import settings
-from app.core.database import get_db # Asegúrate de que apunte a tu generador de sesión de SQLAlchemy
-from app.models.user import User # Asegúrate de importar tu modelo de usuario de SQLAlchemy
+from app.models.pg_models import User, get_db
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login")
+# 1. Usamos la ruta estática para asegurar que Swagger dibuje el botón verde
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
 def get_current_user(db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)) -> User:
     credentials_exception = HTTPException(
@@ -22,7 +22,9 @@ def get_current_user(db: Session = Depends(get_db), token: str = Depends(oauth2_
     except JWTError:
         raise credentials_exception
         
-    user = db.query(User).filter(User.id == int(user_id)).first()
+    # CORRECCIÓN VITAL: Quitamos el int() porque ahora usamos UUIDs de alta seguridad
+    user = db.query(User).filter(User.id == user_id).first()
+    
     if user is None:
         raise credentials_exception
     if not user.is_active:
@@ -33,7 +35,7 @@ def get_current_user(db: Session = Depends(get_db), token: str = Depends(oauth2_
 # CONTROLADOR RBAC (Role-Based Access Control)
 # =============================================================================
 class RoleChecker:
-    def __init__(self, allowed_roles: list[str]):
+    def __init__(self, allowed_roles: list):
         self.allowed_roles = allowed_roles
 
     def __call__(self, current_user: User = Depends(get_current_user)):
@@ -41,6 +43,6 @@ class RoleChecker:
         if current_user.role not in self.allowed_roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Acceso denegado. Se requieren permisos de: {', '.join(self.allowed_roles)}"
+                detail=f"Acceso denegado. Se requieren permisos de: {', '.join([str(r) for r in self.allowed_roles])}"
             )
         return current_user

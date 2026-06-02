@@ -3,8 +3,9 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from app.models.pg_models import Company, User, get_db, PlanTier, UserRole
 from app.core.security import get_password_hash
-from app.core.rbac import require_superadmin
-from datetime import date, datetime
+# IMPORTANTE: Eliminamos el rbac antiguo e importamos el nuevo RoleChecker
+from app.api.deps import RoleChecker 
+from datetime import date, datetime, timedelta
 
 router = APIRouter()
 
@@ -14,7 +15,8 @@ class ProvisionCompanyRequest(BaseModel):
     admin_email: str
     admin_password: str
 
-@router.post("/companies/", dependencies=[Depends(require_superadmin)])
+# IMPORTANTE: Inyectamos la dependencia de seguridad correctamente para que Swagger la detecte
+@router.post("/companies/", dependencies=[Depends(RoleChecker([UserRole.SUPERADMIN]))], status_code=201)
 def provision_new_tenant(data: ProvisionCompanyRequest, db: Session = Depends(get_db)):
     # 1. Reglas lógicas del Plan según Pricing Columns
     if data.plan_tier == PlanTier.ENTERPRISE:
@@ -54,10 +56,8 @@ def provision_new_tenant(data: ProvisionCompanyRequest, db: Session = Depends(ge
     )
     db.add(company_admin)
     db.commit()
-
+    
     return {
         "status": "success",
-        "company_id": new_company.id,
-        "provisioned_plan": data.plan_tier.value,
-        "max_projects": max_projects
+        "message": f"Empresa {data.name} y usuario administrador creados correctamente."
     }
