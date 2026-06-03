@@ -32,7 +32,8 @@ Este repositorio contiene el código fuente y la arquitectura técnica del Backe
 **Objetivo:** Diseñar y programar los esquemas de persistencia relacional, documental y de objetos adaptados a los planes comerciales de precios y al Gateway Multi-LLM.
 
 ### Logros Técnicos:
-* **Persistencia Relacional (PostgreSQL + SQLAlchemy 2.0):** * Mapeo declarativo moderno del Diccionario de Datos v2.0 (`companies`, `company_specialized_agents`, `users`, `projects`, `inventory_units`, `leads`, `appointments`, `llm_global_configs`).
+* **Persistencia Relacional (PostgreSQL + SQLAlchemy 2.0):**
+    * Mapeo declarativo moderno del Diccionario de Datos v2.0 (`companies`, `company_specialized_agents`, `users`, `projects`, `inventory_units`, `leads`, `appointments`, `llm_global_configs`).
     * Adaptación comercial nativa: Inyección de columnas en la tabla de inquilinos para el control de planes (`Core` y `Enterprise`), límites de proyectos (`max_projects_allowed`), bolsas de minutos de llamadas telefónicas (`voice_minutes_allowance`) y feature flags de activación.
     * Integración de llaves foráneas indexadas y cascadas de borrado seguras (`ondelete="CASCADE"`) para evitar fugas de información.
 * **Persistencia Documental (MongoDB + Motor/Pydantic):**
@@ -62,7 +63,8 @@ Este repositorio contiene el código fuente y la arquitectura técnica del Backe
 ### Logros Técnicos:
 * **Mapeo de Autorización (JWT + RBAC):** Implementación de la dependencia centralizada de seguridad (`app/api/deps.py`) que decodifica tokens JWT y valida en tiempo real los roles corporativos (`Superadmin`, `Admin`, `MKT`, `Sales`), emitiendo respuestas HTTP 403 automáticas ante intentos de violación de privilegios.
 * **Gestión de Secretos en Entornos Seguros:** Migración absoluta de credenciales en texto plano (*hardcoded*) hacia el estándar de inyección por entorno (`.env` a través de Pydantic `BaseSettings`), protegiendo llaves criptográficas (`SECRET_KEY`) y contraseñas de bases de datos tanto en Git como en el servidor.
-* **Contenerización y Despliegue Cloud (DigitalOcean):** * Creación del `Dockerfile` optimizado para empaquetar el código fuente sobre `python:3.11-slim`.
+* **Contenerización y Despliegue Cloud (DigitalOcean):**
+    * Creación del `Dockerfile` optimizado para empaquetar el código fuente sobre `python:3.11-slim`.
     * Actualización del `docker-compose.yml` para orquestar la compilación en vivo y conectar de forma interna la API (Uvicorn) con los contenedores persistentes de PostgreSQL, MongoDB y Redis en la nube.
 * **Networking y Firewall:** Configuración de llaves de despliegue SSH (`Deploy Keys`) para la clonación segura del repositorio y apertura controlada de puertos a nivel de sistema operativo (`UFW`) en preparación para las reglas Inbound del Cloud Firewall.
 
