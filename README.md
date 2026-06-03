@@ -68,6 +68,20 @@ Este repositorio contiene el código fuente y la arquitectura técnica del Backe
 
 ---
 
+## Entornos y Accesos
+La API cuenta con documentación interactiva autogenerada (Swagger UI) para facilitar la visualización y prueba de los endpoints:
+
+* **Entorno Local (Desarrollo):**
+  * **API Base:** [http://127.0.0.1:8000](http://127.0.0.1:8000)
+  * **Documentación (Swagger UI):** [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+
+* **Entorno Cloud (Producción en DigitalOcean):**
+  * **API Base:** `http://206.189.118.99`
+  * **Documentación (Swagger UI):** `http://206.189.118.99/docs`
+  *(Nota: El acceso a producción está supeditado a la apertura de puertos HTTP/HTTPS en el Cloud Firewall de DigitalOcean).*
+
+---
+
 ## Estructura del Proyecto
 El proyecto mantiene un diseño modular guiado por las mejores prácticas de la industria:
 
