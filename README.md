@@ -90,8 +90,8 @@ La API cuenta con documentación interactiva autogenerada (Swagger UI) para faci
   * **Documentación (Swagger UI):** [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
 
 * **Entorno Cloud (Producción en DigitalOcean):**
-  * **API Base:** `http://206.189.118.99`
-  * **Documentación (Swagger UI):** `http://206.189.118.99/docs`
+  * **API Base:** [http://206.189.118.99](http://206.189.118.99)
+  * **Documentación (Swagger UI):** [http://206.189.118.99/docs](http://206.189.118.99/docs)
   *(Nota: El acceso a producción está supeditado a la apertura de puertos HTTP/HTTPS en el Cloud Firewall de DigitalOcean).*
 
 ---
