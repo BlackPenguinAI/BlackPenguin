@@ -25,6 +25,17 @@ class UserRole(str, enum.Enum):
     MKT = "mkt"
     SALES = "sales"
 
+# =========================================================
+# ETAPAS DEL EMBUDO DE VENTAS (LEADS)
+# =========================================================
+class FunnelStage(str, enum.Enum):
+    NEW = "new"
+    CONTACTED = "contacted"
+    QUALIFIED = "qualified"
+    APPOINTMENT_SET = "appointment_set"
+    CLOSED = "closed"
+    LOST = "lost"
+
 class Company(Base):
     __tablename__ = "companies"
     
@@ -61,7 +72,7 @@ class User(Base):
     company = relationship("Company", back_populates="users")
 
 # =========================================================
-# NUEVA TABLA: PROYECTOS INMOBILIARIOS
+# TABLA: PROYECTOS INMOBILIARIOS
 # =========================================================
 class Project(Base):
     __tablename__ = "projects"
@@ -78,6 +89,44 @@ class Project(Base):
     
     # Relaciones
     company = relationship("Company", back_populates="projects")
+
+# =========================================================
+# NUEVA TABLA: ENRUTAMIENTO INTELIGENTE DE META ADS
+# =========================================================
+class MetaFormMapping(Base):
+    __tablename__ = "meta_form_mappings"
+    
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    company_id = Column(String(36), ForeignKey("companies.id", ondelete="CASCADE"), nullable=False)
+    project_id = Column(String(36), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
+    meta_form_id = Column(String(100), unique=True, nullable=False, index=True) # ID del form de Facebook
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    
+    # Relaciones
+    company = relationship("Company")
+    project = relationship("Project")
+
+# =========================================================
+# TABLA: LEADS (PROSPECTOS)
+# =========================================================
+class Lead(Base):
+    __tablename__ = "leads"
+    
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    company_id = Column(String(36), ForeignKey("companies.id", ondelete="CASCADE"), nullable=False)
+    project_id = Column(String(36), ForeignKey("projects.id", ondelete="SET NULL"), nullable=True)
+    full_name = Column(String(150), nullable=False)
+    phone = Column(String(50), nullable=False)
+    email = Column(String(150), nullable=True)
+    source = Column(String(50), nullable=False) # ej. 'meta_ads', 'google_ads', 'landing_page'
+    intent_score = Column(Numeric(5,2), default=0.0, nullable=False)
+    is_opt_out = Column(Boolean, default=False, nullable=False)
+    funnel_stage = Column(SqlaEnum(FunnelStage), default=FunnelStage.NEW, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    
+    # Relaciones
+    company = relationship("Company")
+    project = relationship("Project")
 
 # =========================================================
 # GENERADOR DE SESIONES DE BASE DE DATOS
