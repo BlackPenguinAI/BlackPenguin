@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from app.core.config import settings
 from app.core.middleware import MultiTenantMiddleware
 # Importamos todos los routers incluyendo los nuevos webhooks de la Semana 6
-from app.api.v1 import auth, superadmin, projects, webhooks
+from app.api.v1 import auth, superadmin, projects, webhooks, leads
 
 app = FastAPI(
     title=settings.PROJECT_NAME, 
@@ -40,6 +40,13 @@ app.include_router(
     webhooks.router, 
     prefix=f"{settings.API_V1_STR}/webhooks", 
     tags=["4. Ingesta de Leads y Webhooks"]
+)
+
+# NUEVO: Panel de control de Leads para el equipo comercial
+app.include_router(
+    leads.router, 
+    prefix=f"{settings.API_V1_STR}/leads", 
+    tags=["5. Gestión de Leads (Ventas)"]
 )
 
 @app.get("/", tags=["Sistema"])

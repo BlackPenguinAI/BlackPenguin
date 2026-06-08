@@ -70,6 +70,18 @@ Este repositorio contiene el código fuente y la arquitectura técnica del Backe
 
 ---
 
+## Semana 6: Ingesta Omnicanal de Leads y Webhooks
+**Objetivo:** Capturar prospectos en tiempo real desde distintas fuentes publicitarias y normalizarlos para inyectarlos de forma segura en la base de datos aislada.
+
+### Logros Técnicos:
+* **Modelado de Prospectos y Diccionarios:** Creación de las tablas `leads` con control de etapas de embudo (`FunnelStage`) y `meta_form_mappings` para el control de orígenes.
+* **Extracción de Datos Reales (Meta Graph API):** Implementación de peticiones asíncronas (`httpx`) para canjear identificadores de Meta Ads por datos reales de contacto de los prospectos.
+* **Validación Criptográfica (X-Hub-Signature):** Blindaje del webhook mediante firmas matemáticas HMAC-SHA256 en FastAPI para prevenir ataques y la inyección de leads fraudulentos.
+* **Enrutamiento Inteligente:** Mapeo automático de formularios de origen de campañas (`form_id`) hacia los proyectos inmobiliarios (`project_id`) correspondientes para cada constructora.
+* **Panel de Gestión Comercial (CRUD):** Creación de endpoints (`GET /leads/` y `PUT /leads/{id}`) con aislamiento Multi-tenant estricto para que el equipo de ventas visualice sus prospectos y modifique los estados del embudo.
+
+---
+
 ## Entornos y Accesos
 La API cuenta con documentación interactiva autogenerada (Swagger UI) para facilitar la visualización y prueba de los endpoints:
 
@@ -113,7 +125,10 @@ blackpenguin-backend/
         └── v1/
             ├── __init__.py
             ├── auth.py         # Login y aprovisionamiento master
-            └── superadmin.py   # Gestión SaaS de empresas cliente
+            ├── superadmin.py   # Gestión SaaS de empresas cliente
+            ├── projects.py     # Gestión de proyectos inmobiliarios aislados
+            ├── webhooks.py     # Recepción e ingesta de leads (Meta Ads)
+            └── leads.py        # Listado y actualización de embudos de ventas
 ```
 
 ---

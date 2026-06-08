@@ -31,6 +31,11 @@ class Settings(BaseSettings):
     FIRST_SUPERADMIN_EMAIL: str
     FIRST_SUPERADMIN_PASSWORD: str
 
+    # Credenciales de Meta
+    META_ACCESS_TOKEN: str = "token_de_prueba_pendiente"
+    META_VERIFY_TOKEN: str = "blackpenguin_meta_token_2026"
+    META_APP_SECRET: str = "app_secret_de_meta_pendiente"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

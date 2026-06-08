@@ -91,6 +91,22 @@ class Project(Base):
     company = relationship("Company", back_populates="projects")
 
 # =========================================================
+# NUEVA TABLA: ENRUTAMIENTO INTELIGENTE DE META ADS
+# =========================================================
+class MetaFormMapping(Base):
+    __tablename__ = "meta_form_mappings"
+    
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    company_id = Column(String(36), ForeignKey("companies.id", ondelete="CASCADE"), nullable=False)
+    project_id = Column(String(36), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
+    meta_form_id = Column(String(100), unique=True, nullable=False, index=True) # ID del form de Facebook
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    
+    # Relaciones
+    company = relationship("Company")
+    project = relationship("Project")
+
+# =========================================================
 # TABLA: LEADS (PROSPECTOS)
 # =========================================================
 class Lead(Base):
