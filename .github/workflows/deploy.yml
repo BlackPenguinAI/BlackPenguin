@@ -19,8 +19,8 @@ jobs:
         key: ${{ secrets.DO_SSH_KEY }}
         # Este script se ejecuta directamente adentro de tu consola de DigitalOcean
         script: |
-          # 1. Navegamos a la carpeta de tu proyecto (ajusta esta ruta si es diferente)
-          cd /opt/BlackPenguinBackend
+          # 1. Navegamos a la carpeta REAL de tu proyecto
+          cd /home/jorge/BlackPenguinBackend
           
           # 2. Descargamos tu código más nuevo de GitHub
           git pull origin main
