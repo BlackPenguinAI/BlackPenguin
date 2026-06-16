@@ -1,13 +1,54 @@
 version: '3.8'
 
 services:
+  # =================================================================
+  # SERVICE 1: POSTGRESQL (Base de Datos Relacional - Tenants & Core)
+  # =================================================================
   postgres_local:
     image: postgres:17-alpine
     container_name: bp_postgres_local
     restart: always
+    env_file:
+      - .env
     environment:
-      POSTGRES_USER: superadmin_bp
-      POSTGRES_PASSWORD: bp_secure_password_2026!
-      POSTGRES_DB: blackpenguin_core
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 1234
+      POSTGRES_DB: blackpenguin_db
     ports:
-      - "5433:5432"
+      - "5432:5432" # Mapeado al puerto estándar para tu local
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # =================================================================
+  # SERVICE 2: MONGODB (Base de Datos Documental - IA & Auditoría)
+  # =================================================================
+  mongodb_local:
+    image: mongo:8.0
+    container_name: bp_mongodb_local
+    restart: always
+    env_file:
+      - .env
+    ports:
+      - "27017:27017" # Puerto estándar de MongoDB que lee tu backend
+    volumes:
+      - mongo_data:/data/db
+
+  # =================================================================
+  # SERVICE 3: REDIS (Caché de alta velocidad y Colas de Tareas)
+  # =================================================================
+  redis_local:
+    image: redis:7.2-alpine
+    container_name: bp_redis_local
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+# =================================================================
+# VOLÚMENES PERSISTENTES (Evitan que tus datos se borren al apagar Docker)
+# =================================================================
+volumes:
+  postgres_data:
+  mongo_data:
+  redis_data:

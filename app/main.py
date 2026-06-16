@@ -1,54 +1,50 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from app.core.config import settings
 from app.core.middleware import MultiTenantMiddleware
-# Importamos todos los routers incluyendo los nuevos webhooks de la Semana 6
-from app.api.v1 import auth, superadmin, projects, webhooks, leads
+
+# Importamos las rutas
+from app.api.v1 import auth, superadmin, projects, webhooks, leads, conversations
+# Importamos el gestor de MongoDB
+from app.models.mongo_models import connect_to_mongo, close_mongo_connection
+
+# =================================================================
+# GESTOR DEL CICLO DE VIDA DEL SERVIDOR (STARTUP / SHUTDOWN)
+# =================================================================
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Se ejecuta al iniciar Uvicorn
+    await connect_to_mongo()
+    yield
+    # Se ejecuta al detener Uvicorn (Ctrl+C)
+    await close_mongo_connection()
 
 app = FastAPI(
     title=settings.PROJECT_NAME, 
     version=settings.VERSION,
-    description="API Core para la gestión Multi-tenant, ingesta omnicanal de leads y enrutamiento de IA en ventas inmobiliarias."
+    description="API Core para la gestión Multi-tenant, ingesta omnicanal de leads y enrutamiento de IA en ventas inmobiliarias.",
+    lifespan=lifespan # Conectamos el ciclo de vida aquí
 )
 
 # Registrar el Middleware de Aislamiento Perimetral Multi-tenant
 app.add_middleware(MultiTenantMiddleware)
 
 # =================================================================
-# RUTAS DE LA API (Con nombres estructurados y ordenados para Swagger UI)
+# RUTAS DE LA API
 # =================================================================
-
-app.include_router(
-    auth.router, 
-    prefix=f"{settings.API_V1_STR}/auth", 
-    tags=["1. Seguridad y Autenticación"]
-)
-
-app.include_router(
-    superadmin.router, 
-    prefix=f"{settings.API_V1_STR}/superadmin", 
-    tags=["2. Gestión de Plataforma (SaaS Admin)"]
-)
-
-app.include_router(
-    projects.router, 
-    prefix=f"{settings.API_V1_STR}/projects", 
-    tags=["3. Proyectos Inmobiliarios"]
-)
-
-# NUEVO: Conectamos el módulo de Ingesta Omnicanal y Webhooks (Semana 6)
-app.include_router(
-    webhooks.router, 
-    prefix=f"{settings.API_V1_STR}/webhooks", 
-    tags=["4. Ingesta de Leads y Webhooks"]
-)
-
-# NUEVO: Panel de control de Leads para el equipo comercial
-app.include_router(
-    leads.router, 
-    prefix=f"{settings.API_V1_STR}/leads", 
-    tags=["5. Gestión de Leads (Ventas)"]
-)
+app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["1. Seguridad y Autenticación"])
+app.include_router(superadmin.router, prefix=f"{settings.API_V1_STR}/superadmin", tags=["2. Gestión de Plataforma (SaaS Admin)"])
+app.include_router(projects.router, prefix=f"{settings.API_V1_STR}/projects", tags=["3. Proyectos Inmobiliarios"])
+app.include_router(webhooks.router, prefix=f"{settings.API_V1_STR}/webhooks", tags=["4. Ingesta de Leads y Webhooks"])
+app.include_router(leads.router, prefix=f"{settings.API_V1_STR}/leads", tags=["5. Gestión de Leads (Ventas)"])
 
 @app.get("/", tags=["Sistema"])
 def health_check():
     return {"status": "online", "environment": settings.ENVIRONMENT, "version": settings.VERSION}
+
+# NUEVO: Cerebro NoSQL y memoria persistente para Agentes de IA (Semana 8)
+app.include_router(
+    conversations.router, 
+    prefix=f"{settings.API_V1_STR}/conversations", 
+    tags=["6. Memoria Cognitiva (Historiales de IA)"]
+)
