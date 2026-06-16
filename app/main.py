@@ -43,6 +43,7 @@ def health_check():
     return {"status": "online", "environment": settings.ENVIRONMENT, "version": settings.VERSION}
 
 # NUEVO: Cerebro NoSQL y memoria persistente para Agentes de IA (Semana 8)
+
 app.include_router(
     conversations.router, 
     prefix=f"{settings.API_V1_STR}/conversations", 
