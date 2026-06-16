@@ -82,6 +82,30 @@ Este repositorio contiene el código fuente y la arquitectura técnica del Backe
 
 ---
 
+## Semana 7: Gestión de Leads y Pipeline de Ventas
+**Objetivo:** Transformar los prospectos capturados en oportunidades de negocio reales mediante un flujo de trabajo estructurado, permisos granulares y gestión documental.
+
+### Logros Técnicos:
+* **Máquina de Estados de Ventas:** Definición e implementación de FunnelStage con transiciones validadas para garantizar la integridad del ciclo comercial desde el primer contacto hasta el cierre, evitando inconsistencias en los datos.
+* **Control de Acceso Basado en Roles (RBAC):** Integración de la capa de seguridad (rbac.py) para limitar qué información de los leads puede visualizar, editar o exportar el asesor comercial frente a los permisos del gerente.
+* **Servicio de Almacenamiento Dinámico (storage_service):** Desarrollo de la lógica para la gestión de archivos adjuntos (cotizaciones, planos, contratos) vinculados al expediente de cada prospecto dentro de la plataforma.
+* **Consultas de Alto Rendimiento:** Optimización de queries complejas mediante SQLAlchemy para permitir el filtrado masivo de prospectos por fecha, origen, proyecto y estado del embudo, asegurando la escalabilidad del CRM.
+* **Serialización Avanzada (Pydantic v2):** Refactorización de esquemas de respuesta para manejar la carga útil de los leads de forma eficiente, incluyendo campos calculados y relaciones de datos entre los proyectos inmobiliarios y los clientes.
+
+---
+
+## Semana 8: Memoria Cognitiva de IA y Optimización de CI/CD
+**Objetivo:** Integrar persistencia documental asíncrona para el historial conversacional de la IA y estabilizar el pipeline de despliegue continuo (CI/CD) para entornos de producción.
+
+### Logros Técnicos:
+* **Integración Asíncrona de MongoDB (Motor):** Implementación de un db_manager (patrón Singleton) para la conexión asíncrona no bloqueante con MongoDB, permitiendo manejar el historial de la IA sin impactar el rendimiento del API Core.
+* **Despliegue Automatizado Nativo (Docker):** Refactorización del flujo de CI/CD en GitHub Actions, migrando de una orquestación compleja (K3s) a un despliegue nativo con Docker, garantizando Zero-Downtime y sincronización exacta entre el repositorio y el servidor.
+* **Persistencia de Memoria Cognitiva:** Diseño y registro de esquemas de datos (Pydantic v2) para Conversations y ChatMessages, integrando el aislamiento perimetral mediante tenant_id para asegurar la privacidad entre clientes.
+* **Resolución de Conflictos de Dependencias:** Limpieza profunda de la estructura de paquetes, resolviendo problemas de rutas y conflictos de importación (clonación de modelos) para asegurar que la arquitectura de la API sea escalable y mantenible.
+* **Sincronización de Entorno de Producción:** Implementación de flujos de trabajo de sincronización forzada (git reset --hard) y gestión de variables de entorno sin comillas, garantizando que el servidor de producción refleje fielmente los cambios realizados en el entorno local.
+
+---
+
 ## Entornos y Accesos
 La API cuenta con documentación interactiva autogenerada (Swagger UI) para facilitar la visualización y prueba de los endpoints:
 
@@ -100,35 +124,43 @@ La API cuenta con documentación interactiva autogenerada (Swagger UI) para faci
 El proyecto mantiene un diseño modular guiado por las mejores prácticas de la industria:
 
 ```text
-blackpenguin-backend/
-├── .env                    # (Ignorado en git) Variables de entorno, secretos y credenciales
-├── requirements.txt        # Dependencias estrictas del sistema
-├── Dockerfile              # Instrucciones de compilación de la API para la nube
-├── docker-compose.yml      # Orquestador maestro de contenedores (API + DBs + Cache)
-├── ddl_v2.0.sql            # Diccionario de datos y arquitectura relacional física
-└── app/
-    ├── __init__.py
-    ├── main.py             # Punto de entrada de FastAPI y ensamblaje de rutas
-    ├── core/
-    │   ├── __init__.py
-    │   ├── config.py       # Pydantic Settings (Lectura de .env)
-    │   ├── security.py     # Hasheo de contraseñas y firmas JWT
-    │   ├── rbac.py         # Clases de jerarquía funcional
-    │   └── middleware.py   # Guardián interceptor Multi-tenant
-    ├── models/
-    │   ├── __init__.py
-    │   ├── pg_models.py    # Esquemas SQLAlchemy (PostgreSQL)
-    │   └── mongo_models.py # Esquemas Motor/Beanie (MongoDB)
-    └── api/
-        ├── __init__.py
-        ├── deps.py         # Inyectables (RoleChecker, get_db, get_current_user)
-        └── v1/
-            ├── __init__.py
-            ├── auth.py         # Login y aprovisionamiento master
-            ├── superadmin.py   # Gestión SaaS de empresas cliente
-            ├── projects.py     # Gestión de proyectos inmobiliarios aislados
-            ├── webhooks.py     # Recepción e ingesta de leads (Meta Ads)
-            └── leads.py        # Listado y actualización de embudos de ventas
+BlackPenguinBackend/
+│
+├── .github/
+│   └── workflows/
+│       └── deploy.yml           # Pipeline de CI/CD para producción
+│
+├── app/
+│   ├── api/
+│   │   ├── deps.py              # Inyección de dependencias (Auth, DB)
+│   │   └── v1/                  # Controladores / Endpoints
+│   │       ├── auth.py          # (1) Seguridad y Autenticación
+│   │       ├── superadmin.py    # (2) Gestión SaaS
+│   │       ├── projects.py      # (3) Proyectos Inmobiliarios
+│   │       ├── webhooks.py      # (4) Ingesta Meta/Landing
+│   │       ├── leads.py         # (5) Gestión de Ventas
+│   │       └── conversations.py # (6) Memoria Cognitiva IA
+│   │
+│   ├── core/                    # Lógica de Negocio Central y Seguridad
+│   │   ├── config.py            # Variables de entorno (.env)
+│   │   ├── middleware.py        # Aislamiento Multi-tenant
+│   │   ├── rbac.py              # Control de Roles y Permisos
+│   │   ├── security.py          # Hashing y JWT
+│   │   └── security_ans.py
+│   │
+│   ├── models/                  # Entidades de Datos
+│   │   ├── pg_models.py         # Modelos SQLAlchemy (Postgres)
+│   │   └── mongo_models.py      # Modelos Pydantic/BSON y Motor Async (Mongo)
+│   │
+│   ├── services/
+│   │   └── storage_service.py   # Gestión de archivos y multimedia
+│   │
+│   └── main.py                  # Entrypoint: Configuración y Registro de Rutas
+│
+├── Dockerfile                   # Receta de construcción de la API
+├── docker-compose.yml           # Orquestación local (PG, Mongo, Redis)
+├── requirements.txt             # Dependencias de Python
+└── README.md                    # Documentación del proyecto
 ```
 
 ---
