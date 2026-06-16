@@ -1,0 +1,38 @@
+name: Deploy Black Penguin API to DigitalOcean
+
+# Esto le dice a GitHub que se ejecute SOLO cuando subas cambios a la rama "main"
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: 🚀 Conectando al Droplet y Desplegando
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.DO_HOST }}
+        username: ${{ secrets.DO_USER }}
+        key: ${{ secrets.DO_SSH_KEY }}
+        # Este script se ejecuta directamente adentro de tu consola de DigitalOcean
+        script: |
+          # 1. Navegamos a la carpeta de tu proyecto (ajusta esta ruta si es diferente)
+          cd /opt/BlackPenguinBackend
+          
+          # 2. Descargamos tu código más nuevo de GitHub
+          git pull origin main
+          
+          # 3. Construimos la nueva imagen de Docker con tus cambios
+          echo "🏗️ Construyendo imagen de FastAPI..."
+          docker build -t blackpenguin/core-api:latest .
+          
+          # 4. Le decimos a K3s/Kubernetes que actualice los contenedores sin apagar la API
+          echo "🚢 Desplegando en clúster K3s (Zero-Downtime)..."
+          kubectl set image deployment/bp-backend-deployment bp-backend=blackpenguin/core-api:latest --namespace=staging
+          
+          # 5. Esperamos a que todo esté en verde
+          kubectl rollout status deployment/bp-backend-deployment --namespace=staging
+          echo "🎉 ¡Despliegue exitoso!"
