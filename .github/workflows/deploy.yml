@@ -1,6 +1,5 @@
 name: Deploy Black Penguin API to DigitalOcean
 
-# Esto le dice a GitHub que se ejecute SOLO cuando subas cambios a la rama "main"
 on:
   push:
     branches:
@@ -17,22 +16,29 @@ jobs:
         host: ${{ secrets.DO_HOST }}
         username: ${{ secrets.DO_USER }}
         key: ${{ secrets.DO_SSH_KEY }}
-        # Este script se ejecuta directamente adentro de tu consola de DigitalOcean
         script: |
-          # 1. Navegamos a la carpeta REAL de tu proyecto
+          # 1. Navegamos a la carpeta de tu proyecto
           cd /home/jorge/BlackPenguinBackend
           
           # 2. Descargamos tu código más nuevo de GitHub
           git pull origin main
           
-          # 3. Construimos la nueva imagen de Docker con tus cambios
+          # 3. Construimos la nueva imagen de Docker
           echo "🏗️ Construyendo imagen de FastAPI..."
-          docker build -t blackpenguin/core-api:latest .
+          docker build -t blackpenguinbackend-api:latest .
           
-          # 4. FORZAMOS a K3s a reiniciar los contenedores para absorber la nueva imagen
-          echo "🚢 Reiniciando pods en K3s (Zero-Downtime)..."
-          kubectl rollout restart deployment/bp-backend-deployment --namespace=staging
+          # 4. Detenemos y borramos la versión vieja de la API
+          echo "🛑 Reemplazando contenedor antiguo..."
+          docker stop bp_api_prod || true
+          docker rm bp_api_prod || true
           
-          # 5. Esperamos a que todo esté en verde
-          kubectl rollout status deployment/bp-backend-deployment --namespace=staging
-          echo "🎉 ¡Despliegue exitoso!"
+          # 5. Encendemos el nuevo motor exactamente como estaba pero con código fresco
+          echo "🚀 Iniciando la nueva API..."
+          docker run -d \
+            --name bp_api_prod \
+            -p 80:8000 \
+            --env-file .env \
+            --restart always \
+            blackpenguinbackend-api:latest
+            
+          echo "🎉 ¡Despliegue exitoso con Docker Puro!"
