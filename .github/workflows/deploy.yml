@@ -29,9 +29,9 @@ jobs:
           echo "🏗️ Construyendo imagen de FastAPI..."
           docker build -t blackpenguin/core-api:latest .
           
-          # 4. Le decimos a K3s/Kubernetes que actualice los contenedores sin apagar la API
-          echo "🚢 Desplegando en clúster K3s (Zero-Downtime)..."
-          kubectl set image deployment/bp-backend-deployment bp-backend=blackpenguin/core-api:latest --namespace=staging
+          # 4. FORZAMOS a K3s a reiniciar los contenedores para absorber la nueva imagen
+          echo "🚢 Reiniciando pods en K3s (Zero-Downtime)..."
+          kubectl rollout restart deployment/bp-backend-deployment --namespace=staging
           
           # 5. Esperamos a que todo esté en verde
           kubectl rollout status deployment/bp-backend-deployment --namespace=staging
