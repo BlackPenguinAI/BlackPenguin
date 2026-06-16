@@ -1,4 +1,4 @@
-# Black Penguin - Documentación de Avances (Semanas 1, 2, 3, 4, 5 y 6)
+# Black Penguin - Documentación de Avances (Semanas 1, 2, 3, 4, 5, 6, 7 y 8)
 
 Este repositorio contiene el código fuente y la arquitectura técnica del Backend Core de **Black Penguin**, diseñada bajo un esquema SaaS Multi-tenant estricto.
 
