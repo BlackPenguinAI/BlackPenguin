@@ -16,8 +16,6 @@ Este repositorio contiene el código fuente y la arquitectura técnica del Backe
 * **CI/CD con Jenkins:** Configuración de un pipeline de integración y despliegue continuo (Zero-Downtime) en el archivo `Jenkinsfile` que automatiza la construcción de imágenes Docker y su despliegue controlado en K3s (`staging`/`production`).
 * **Storage Cloud:** Configuración inicial para la integración nativa con **DigitalOcean Spaces** (S3 Compatible) para el almacenamiento masivo de archivos multimedia.
 
----
-
 ## Semana 2: Backend Core y Seguridad Multi-tenant
 **Objetivo:** Desarrollar la columna vertebral lógica de la aplicación y garantizar el aislamiento inicial.
 
@@ -25,8 +23,6 @@ Este repositorio contiene el código fuente y la arquitectura técnica del Backe
 * **Estructura FastAPI Base:** Configuración del punto de entrada asíncrono asilado en Python, utilizando Pydantic v2 para la validación de contratos de entrada y salida de datos.
 * **Autenticación Centralizada:** Implementación de flujos criptográficos para contraseñas usando **Bcrypt** y generación de tokens **JWT** seguros que viajan con los claims de `role` y `company_id`.
 * **Módulo Superadmin (Fase Inicial):** Creación del módulo maestro de control que permite el aprovisionamiento de nuevas desarrolladoras mediante la validación de pagos offline (manuales).
-
----
 
 ## Semana 3: Capa de Datos Híbrida y Modelo de Persistencia (v2.0)
 **Objetivo:** Diseñar y programar los esquemas de persistencia relacional, documental y de objetos adaptados a los planes comerciales de precios y al Gateway Multi-LLM.
@@ -44,8 +40,6 @@ Este repositorio contiene el código fuente y la arquitectura técnica del Backe
     * Definición de una estructura lógica de carpetas estrictamente condicionada al ID de la empresa (`/tenants/{company_id}/`).
     * Implementación de métodos asíncronos para la carga de archivos multimedia públicos (renders, brochures comerciales, tours virtuales) y archivos de audio privados (grabaciones de llamadas MP3 de agentes de voz accesibles solo mediante URLs firmadas temporalmente).
 
----
-
 ## Semana 4: Middleware Guardian y Aislamiento Perimetral Completo
 **Objetivo:** Validar y forzar de forma automatizada las fronteras lógicas de datos (Multi-tenancy) y estabilizar el entorno de ejecución en local.
 
@@ -54,8 +48,6 @@ Este repositorio contiene el código fuente y la arquitectura técnica del Backe
 * **Control de Accesos Jerárquico (RBAC):** Creación de dependencias inyectables limpias (`Depends(require_superadmin)`, `Depends(require_admin)`) utilizando el patrón funcional `RoleChecker` para blindar las rutas del sistema en cascada.
 * **Resolución de Compatibilidad con Python 3.13:** Parcheo y actualización del stack técnico para corregir el error crítico de variables enumeradas en el ORM (`TypeError: Can't replace canonical symbol for '__firstlineno__'`), estabilizando SQLAlchemy a versiones compatibles con entornos modernos de compilación en Windows/Unix.
 * **Entorno de Pruebas Locales Exitoso:** Configuración de un orquestador local dockerizado y rutas de utilidad técnica (`/api/v1/auth/setup-master`) para la autogeneración de esquemas de tablas e inserción automática de un Superadmin global de pruebas listo para demostraciones en vivo.
-
----
 
 ## Semana 5: Autorización Estricta (RBAC) y Despliegue en Producción
 **Objetivo:** Finalizar la base de seguridad perimetral de roles y realizar el despliegue del entorno core unificado en la nube.
@@ -68,8 +60,6 @@ Este repositorio contiene el código fuente y la arquitectura técnica del Backe
     * Actualización del `docker-compose.yml` para orquestar la compilación en vivo y conectar de forma interna la API (Uvicorn) con los contenedores persistentes de PostgreSQL, MongoDB y Redis en la nube.
 * **Networking y Firewall:** Configuración de llaves de despliegue SSH (`Deploy Keys`) para la clonación segura del repositorio y apertura controlada de puertos a nivel de sistema operativo (`UFW`) en preparación para las reglas Inbound del Cloud Firewall.
 
----
-
 ## Semana 6: Ingesta Omnicanal de Leads y Webhooks
 **Objetivo:** Capturar prospectos en tiempo real desde distintas fuentes publicitarias y normalizarlos para inyectarlos de forma segura en la base de datos aislada.
 
@@ -80,8 +70,6 @@ Este repositorio contiene el código fuente y la arquitectura técnica del Backe
 * **Enrutamiento Inteligente:** Mapeo automático de formularios de origen de campañas (`form_id`) hacia los proyectos inmobiliarios (`project_id`) correspondientes para cada constructora.
 * **Panel de Gestión Comercial (CRUD):** Creación de endpoints (`GET /leads/` y `PUT /leads/{id}`) con aislamiento Multi-tenant estricto para que el equipo de ventas visualice sus prospectos y modifique los estados del embudo.
 
----
-
 ## Semana 7: Gestión de Leads y Pipeline de Ventas
 **Objetivo:** Transformar los prospectos capturados en oportunidades de negocio reales mediante un flujo de trabajo estructurado, permisos granulares y gestión documental.
 
@@ -91,8 +79,6 @@ Este repositorio contiene el código fuente y la arquitectura técnica del Backe
 * **Servicio de Almacenamiento Dinámico (storage_service):** Desarrollo de la lógica para la gestión de archivos adjuntos (cotizaciones, planos, contratos) vinculados al expediente de cada prospecto dentro de la plataforma.
 * **Consultas de Alto Rendimiento:** Optimización de queries complejas mediante SQLAlchemy para permitir el filtrado masivo de prospectos por fecha, origen, proyecto y estado del embudo, asegurando la escalabilidad del CRM.
 * **Serialización Avanzada (Pydantic v2):** Refactorización de esquemas de respuesta para manejar la carga útil de los leads de forma eficiente, incluyendo campos calculados y relaciones de datos entre los proyectos inmobiliarios y los clientes.
-
----
 
 ## Semana 8: Memoria Cognitiva de IA y Optimización de CI/CD
 **Objetivo:** Integrar persistencia documental asíncrona para el historial conversacional de la IA y estabilizar el pipeline de despliegue continuo (CI/CD) para entornos de producción.
