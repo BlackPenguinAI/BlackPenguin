@@ -28,6 +28,10 @@ class Settings(BaseSettings):
     META_APP_SECRET: str = "app_secret_de_meta_pendiente"
     META_API_VERSION: str = "v20.0"
 
+    # Inteligencia Artificial
+    OPENROUTER_API_KEY=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
+    DEFAULT_AI_MODEL: str = "openai/gpt-4o-mini"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

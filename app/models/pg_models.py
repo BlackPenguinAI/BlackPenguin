@@ -137,3 +137,18 @@ def get_db():
         yield db
     finally:
         db.close()
+
+# =========================================================
+# TABLA: MESSAGES (HISTORIAL DE CONVERSACIONES IA)
+# =========================================================
+class ChatMessage(Base):
+    __tablename__ = "chat_messages"
+    
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    lead_id = Column(String(36), ForeignKey("leads.id", ondelete="CASCADE"), nullable=False)
+    role = Column(String(20), nullable=False) # 'system', 'user', 'assistant'
+    content = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    
+    # Relación inversa opcional hacia el Lead
+    lead = relationship("Lead")

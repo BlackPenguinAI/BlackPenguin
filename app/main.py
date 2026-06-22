@@ -13,24 +13,24 @@ from app.models.mongo_models import connect_to_mongo, close_mongo_connection
 # =================================================================
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Se ejecuta al iniciar Uvicorn
+    # Se ejecuta al iniciar Uvicorn / Docker
     await connect_to_mongo()
     yield
-    # Se ejecuta al detener Uvicorn (Ctrl+C)
+    # Se ejecuta al detener el servidor (Ctrl+C o detención de contenedor)
     await close_mongo_connection()
 
 app = FastAPI(
     title=settings.PROJECT_NAME, 
     version=settings.VERSION,
     description="API Core para la gestión Multi-tenant, ingesta omnicanal de leads y enrutamiento de IA en ventas inmobiliarias.",
-    lifespan=lifespan # Conectamos el ciclo de vida aquí
+    lifespan=lifespan # Conectamos el ciclo de vida de bases de datos
 )
 
 # Registrar el Middleware de Aislamiento Perimetral Multi-tenant
 app.add_middleware(MultiTenantMiddleware)
 
 # =================================================================
-# RUTAS DE LA API
+# RUTAS DE LA API (V1)
 # =================================================================
 app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["1. Seguridad y Autenticación"])
 app.include_router(superadmin.router, prefix=f"{settings.API_V1_STR}/superadmin", tags=["2. Gestión de Plataforma (SaaS Admin)"])
@@ -38,14 +38,14 @@ app.include_router(projects.router, prefix=f"{settings.API_V1_STR}/projects", ta
 app.include_router(webhooks.router, prefix=f"{settings.API_V1_STR}/webhooks", tags=["4. Ingesta de Leads y Webhooks"])
 app.include_router(leads.router, prefix=f"{settings.API_V1_STR}/leads", tags=["5. Gestión de Leads (Ventas)"])
 
+# REGISTRO DEL MOTOR DE IA (SEMANA 6 - CONVERSATIONS)
+app.include_router(conversations.router, prefix=f"{settings.API_V1_STR}/conversations", tags=["6. Memoria Cognitiva IA"])
+
 @app.get("/", tags=["Sistema"])
 def health_check():
-    return {"status": "online", "environment": settings.ENVIRONMENT, "version": settings.VERSION}
-
-# NUEVO: Cerebro NoSQL y memoria persistente para Agentes de IA (Semana 8)
-
-app.include_router(
-    conversations.router, 
-    prefix=f"{settings.API_V1_STR}/conversations", 
-    tags=["6. Memoria Cognitiva (Historiales de IA)"]
-)
+    return {
+        "status": "online", 
+        "environment": settings.ENVIRONMENT, 
+        "version": settings.VERSION,
+        "message": "Black Penguin Core Core Engine running smoothly."
+    }
