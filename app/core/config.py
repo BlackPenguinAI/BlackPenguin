@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int
     DATABASE_URL: str
-    MONGO_URL: str = "mongodb://localhost:27017/blackpenguin_db" # <-- NUEVA LÍNEA
+    MONGO_URL: str = "mongodb://localhost:27017/blackpenguin_db"
     ENVIRONMENT: str
 
     # Credenciales iniciales
@@ -23,9 +23,10 @@ class Settings(BaseSettings):
     FIRST_SUPERADMIN_PASSWORD: str
 
     # Credenciales de Meta
-    META_ACCESS_TOKEN: str = "token_de_prueba_pendiente"
+    META_ACCESS_TOKEN: str
     META_VERIFY_TOKEN: str = "blackpenguin_meta_token_2026"
     META_APP_SECRET: str = "app_secret_de_meta_pendiente"
+    META_API_VERSION: str = "v20.0"
 
     model_config = SettingsConfigDict(
         env_file=".env",

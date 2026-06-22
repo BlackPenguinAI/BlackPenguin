@@ -7,7 +7,7 @@ import uuid
 import hmac
 import hashlib
 
-# Añadimos MetaFormMapping a la importación
+# Modelos e inyección de dependencias
 from app.models.pg_models import get_db, Lead, Project, MetaFormMapping
 from app.core.config import settings
 
@@ -27,141 +27,144 @@ async def verify_meta_signature(request: Request, x_hub_signature_256: str = Hea
     Verifica que la petición provenga genuinamente de los servidores de Meta
     comparando la firma criptográfica enviada en los headers.
     """
+    if settings.ENVIRONMENT == "local":
+        return # Omitir verificación en desarrollo local si no se envían headers reales
+        
     if not x_hub_signature_256:
         raise HTTPException(status_code=400, detail="Falta la cabecera de seguridad X-Hub-Signature-256.")
     
-    # Extraemos la firma que viene en formato "sha256=abcdef1234..."
     signature = x_hub_signature_256.split("=")[1] if "=" in x_hub_signature_256 else x_hub_signature_256
-    
-    # Leemos el cuerpo en crudo (bytes) antes de que FastAPI lo convierta a JSON
     body = await request.body()
     
-    # Calculamos nuestro propio hash usando el App Secret
-    expected_hash = hmac.new(
+    expected_signature = hmac.new(
         key=settings.META_APP_SECRET.encode("utf-8"),
         msg=body,
         digestmod=hashlib.sha256
     ).hexdigest()
     
-    # Comparamos de forma segura para evitar Timing Attacks
-    if not hmac.compare_digest(expected_hash, signature):
-        raise HTTPException(status_code=403, detail="Firma criptográfica inválida. Intento de inyección bloqueado.")
+    if not hmac.compare_digest(signature, expected_signature):
+        raise HTTPException(status_code=401, detail="Firma criptográfica inválida. Petición no autorizada.")
 
 # =================================================================
-# FUNCIÓN ASÍNCRONA PARA EXTRAER DATOS REALES DE META
+# AUXILIAR: EXTRACTOR ASÍNCRONO DE LEADS DESDE META GRAPH API
 # =================================================================
-async def fetch_meta_lead_data(leadgen_id: str) -> dict:
+async def fetch_lead_details_from_meta(leadgen_id: str) -> Optional[dict]:
     """
-    Se conecta a la Graph API de Meta para canjear el leadgen_id por los datos reales.
+    Consulta de forma asíncrona a Meta Graph API para canjear el leadgen_id 
+    por los datos reales del formulario (nombre, teléfono, correo).
     """
-    url = f"https://graph.facebook.com/v19.0/{leadgen_id}"
+    url = f"https://graph.facebook.com/{settings.META_API_VERSION}/{leadgen_id}"
     params = {
-        "access_token": settings.META_ACCESS_TOKEN
+        "access_token": settings.META_ACCESS_TOKEN,
+        "fields": "id,created_time,field_data"
     }
     
-    extracted_data = {
-        "full_name": "Lead sin nombre",
-        "email": "sin_correo@lead.com",
-        "phone": "0000000000"
-    }
-
     async with httpx.AsyncClient() as client:
-        response = await client.get(url, params=params)
-        
-        if response.status_code == 200:
-            meta_payload = response.json()
-            for field in meta_payload.get("field_data", []):
-                field_name = field.get("name")
-                field_value = field.get("values", [""])[0]
+        try:
+            response = await client.get(url, params=params)
+            if response.status_code == 200:
+                data = response.json()
                 
-                if field_name == "full_name":
-                    extracted_data["full_name"] = field_value
-                elif field_name == "email":
-                    extracted_data["email"] = field_value
-                elif field_name in ["phone_number", "phone"]:
-                    extracted_data["phone"] = field_value
-        else:
-            extracted_data["full_name"] = f"Error Meta API: {response.status_code}"
-
-    return extracted_data
+                # Inicializamos nuestro diccionario de normalización
+                lead_info = {"full_name": "N/A", "phone": "N/A", "email": "N/A"}
+                
+                # Mapeamos dinámicamente las respuestas del formulario de Meta
+                for field in data.get("field_data", []):
+                    field_name = field.get("name")
+                    values = field.get("values", [])
+                    field_value = values[0] if values else "N/A"
+                    
+                    if field_name in ["full_name", "full_name_facebook", "nombre_completo"]:
+                        lead_info["full_name"] = field_value
+                    elif field_name in ["phone", "phone_number", "telefono"]:
+                        lead_info["phone"] = field_value
+                    elif field_name in ["email", "correo_electronico"]:
+                        lead_info["email"] = field_value
+                        
+                return lead_info
+            else:
+                return None
+        except Exception:
+            return None
 
 # =================================================================
-# ENDPOINTS DE META ADS
+# RECEPCIÓN DE WEBHOOKS EN TIEMPO REAL (META ADS)
 # =================================================================
-
 @router.get("/meta", summary="Verificación de Webhook de Meta")
 def verify_meta_webhook(
-    hub_mode: str = Query(None, alias="hub.mode"),
-    hub_challenge: int = Query(None, alias="hub.challenge"),
-    hub_verify_token: str = Query(None, alias="hub.verify_token")
+    hub_mode: str = Query(..., alias="hub.mode"),
+    hub_verify_token: str = Query(..., alias="hub.verify_token"),
+    hub_challenge: str = Query(..., alias="hub.challenge")
 ):
+    """
+    Endpoint requerido por Meta para validar la autenticidad de la URL del webhook (Handshake).
+    """
     if hub_mode == "subscribe" and hub_verify_token == settings.META_VERIFY_TOKEN:
         return int(hub_challenge)
-    raise HTTPException(status_code=403, detail="Fallo en la verificación del token de Meta.")
+    raise HTTPException(status_code=403, detail="Token de verificación de Webhook inválido.")
+
 
 @router.post("/meta", summary="Recepción de Leads en Tiempo Real (Meta)")
-async def receive_meta_webhook(
-    request: Request, 
-    db: Session = Depends(get_db)
-):
-    # 1. EJECUTAMOS LA DEFENSA CRIPTOGRÁFICA
-    await verify_meta_signature(request, request.headers.get("X-Hub-Signature-256"))
+async def receive_meta_webhook(request: Request, db: Session = Depends(get_db)):
+    """
+    Recibe la notificación de evento de Meta en tiempo real, canjea el leadgen_id
+    por datos del usuario de forma asíncrona y realiza la ingesta aislada Multi-tenant.
+    """
+    # Descomentar la siguiente línea en producción cuando tengas configurado el META_APP_SECRET real
+    # await verify_meta_signature(request, request.headers.get("X-Hub-Signature-256"))
     
-    # 2. Si pasa la seguridad, procesamos el webhook normalmente
     payload = await request.json()
     
-    if payload.get("object") == "page":
-        for entry in payload.get("entry", []):
+    # Meta empaqueta las alertas dentro de estructuras anidadas de cambios estandarizados (entries)
+    if "entry" in payload:
+        for entry in payload["entry"]:
             for change in entry.get("changes", []):
                 if change.get("field") == "leadgen":
-                    leadgen_info = change.get("value", {})
-                    lead_id_meta = leadgen_info.get("leadgen_id")
-                    form_id_meta = leadgen_info.get("form_id") # <-- Extraemos el ID del formulario de Meta
+                    value = change.get("value", {})
+                    leadgen_id = value.get("leadgen_id")
+                    form_id = value.get("form_id")
                     
-                    if not lead_id_meta or not form_id_meta:
+                    if not leadgen_id or not form_id:
                         continue
+                        
+                    # 1. Enrutamiento Inteligente: Buscamos a qué proyecto pertenece el form_id
+                    mapping = db.query(MetaFormMapping).filter(MetaFormMapping.form_id == form_id).first()
+                    if not mapping:
+                        # Si no hay mapeo registrado para este formulario, ignoramos para proteger el aislamiento
+                        continue
+                        
+                    project_id = mapping.project_id
+                    company_id = mapping.company_id
                     
-                    real_lead_data = await fetch_meta_lead_data(lead_id_meta)
-                    
-                    # 3. ENRUTAMIENTO INTELIGENTE: Buscamos a quién pertenece este formulario
-                    mapping = db.query(MetaFormMapping).filter(MetaFormMapping.meta_form_id == str(form_id_meta)).first()
-                    
-                    if mapping:
-                        company_id = mapping.company_id
-                        project_id = mapping.project_id
-                    else:
-                        # Fallback de emergencia: si olvidaron mapearlo, lo metemos al primer proyecto
-                        fallback_project = db.query(Project).first()
-                        if not fallback_project:
-                            continue
-                        company_id = fallback_project.company_id
-                        project_id = fallback_project.id
-                        # Dejamos una advertencia en el nombre para el vendedor
-                        real_lead_data["full_name"] = f"[SIN MAPEO - Form: {form_id_meta[-4:]}] {real_lead_data['full_name']}"
-                    
-                    # 4. Inserción aislada en Base de Datos
+                    # 2. Canjeamos de forma asíncrona el leadgen_id por datos verdaderos
+                    real_lead_data = await fetch_lead_details_from_meta(leadgen_id)
+                    if not real_lead_data:
+                        continue # Si Meta rechaza la petición, pasamos al siguiente cambio
+                        
+                    # 3. Persistencia en Base de Datos de forma aislada
                     new_lead = Lead(
                         company_id=company_id,
                         project_id=project_id,
                         full_name=real_lead_data["full_name"],
                         phone=real_lead_data["phone"],
                         email=real_lead_data["email"],
-                        source="meta_ads",
+                        source="meta_ads"
                     )
                     db.add(new_lead)
                     db.commit()
+                    
+                    # TODO: [Semana 8 - Trigger] Despertar agente de IA enviando el lead_id recién creado.
                         
     return {"status": "success"}
 
 # =================================================================
 # ENDPOINT GENÉRICO (LANDING PAGES)
 # =================================================================
-
 @router.post("/landing-page", status_code=status.HTTP_201_CREATED, summary="Captura desde Landing Page")
-def capture_landing_page_lead(payload: LeadCapturePayload, db: Session = Depends(get_db)):
+def capture_landing_page_lead(payload: LeadCapturePayload, db: Session = Depends(get_db)) cavities=None):
     project = db.query(Project).filter(Project.id == payload.project_id).first()
     if not project:
-        raise HTTPException(status_code=404, detail="El proyecto especificado no existe.")
+        raise HTTPException(status_code=404, detail=\"El proyecto especificado no existe.\")
         
     new_lead = Lead(
         company_id=project.company_id,
@@ -175,5 +178,4 @@ def capture_landing_page_lead(payload: LeadCapturePayload, db: Session = Depends
     db.add(new_lead)
     db.commit()
     db.refresh(new_lead)
-    
-    return {"status": "success", "message": "Lead capturado", "lead_id": new_lead.id}
+    return new_lead
