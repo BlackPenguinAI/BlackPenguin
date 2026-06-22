@@ -90,6 +90,22 @@ Este repositorio contiene el código fuente y la arquitectura técnica del Backe
 * **Resolución de Conflictos de Dependencias:** Limpieza profunda de la estructura de paquetes, resolviendo problemas de rutas y conflictos de importación (clonación de modelos) para asegurar que la arquitectura de la API sea escalable y mantenible.
 * **Sincronización de Entorno de Producción:** Implementación de flujos de trabajo de sincronización forzada (git reset --hard) y gestión de variables de entorno sin comillas, garantizando que el servidor de producción refleje fielmente los cambios realizados en el entorno local.
 
+## Semana 9: Integración Cognitiva y Extracción Automatizada (Meta + OpenRouter)
+**Objetivo:** Conectar el backend con APIs externas críticas para automatizar la captura de prospectos y dotar a la plataforma de inteligencia artificial conversacional mediante DeepSeek.
+
+### Logros Técnicos:
+* **Extracción Automatizada (Meta Graph API):**
+    * Refactorización del script de pruebas aislado hacia una integración nativa en FastAPI usando `httpx` para peticiones asíncronas no bloqueantes.
+    * Implementación del canje en tiempo real: El webhook recibe el `leadgen_id` de Meta y el backend consulta automáticamente la Graph API (v20.0) para extraer el teléfono, correo y nombre real del prospecto.
+    * Resolución de políticas estrictas de privacidad de Meta: Configuración avanzada en *Meta for Developers* para habilitar el permiso `leads_retrieval` y vinculación del *System User* con la Fanpage (ej. *I9framework* y *GHL Golf*) para sortear el error de acceso `(#100)`.
+* **Memoria Cognitiva IA (PostgreSQL + MongoDB):**
+    * Creación del modelo relacional `ChatMessage` en PostgreSQL, vinculado mediante llave foránea a la tabla `leads` para garantizar la persistencia del contexto histórico de cada cliente.
+    * Mantenimiento de la estrategia híbrida: Los hilos interactivos en tiempo real viven en PostgreSQL, mientras que las transcripciones masivas consolidadas se respaldan en MongoDB bajo estricto aislamiento *Multi-tenant* (`company_id`).
+* **Integración de DeepSeek (vía OpenRouter API):**
+    * Desarrollo de la capa de servicio `ai_service.py` para abstraer la comunicación con OpenRouter.
+    * Creación del endpoint interactivo `POST /api/v1/conversations/chat` que inyecta un *Prompt de Sistema Maestro* (personalidad de asesor de inversiones de alto nivel), adjunta el historial cronológico del prospecto recuperado de la base de datos, y consume el modelo `deepseek/gpt-4o-mini`.
+    * Lógica de embudo dinámica: Al interactuar con la IA, el estado del Lead (prospecto) avanza automáticamente en la base de datos (de `NEW` a `CONTACTED`).
+
 ---
 
 ## Entornos y Accesos
