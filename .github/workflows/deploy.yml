@@ -1,4 +1,4 @@
-name: Deploy Black Penguin API to DigitalOcean
+name: Deploy Black Penguin API & Frontend to DigitalOcean
 
 on:
   push:
@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - 'backend/**'
+      - 'frontend/**'     # 🚀 AÑADIDO: También se dispara si hay cambios en Angular
       - '.github/workflows/deploy.yml'
 
 jobs:
@@ -16,7 +17,6 @@ jobs:
     - name: 🚀 Conectando al Droplet y Desplegando
       uses: appleboy/ssh-action@v1.0.3
       env:
-        # 1. Capturamos los secretos de GitHub y los convertimos en variables de entorno para el Runner
         DB_URL: ${{ secrets.DATABASE_URL }}
         META_TOKEN: ${{ secrets.META_ACCESS_TOKEN }}
         OPENROUTER_KEY: ${{ secrets.OPENROUTER_API_KEY }}
@@ -27,7 +27,6 @@ jobs:
         host: ${{ secrets.DO_HOST }}
         username: ${{ secrets.DO_USER }}
         key: ${{ secrets.DO_SSH_KEY }}
-        # 2. Le pasamos las variables explícitamente al script remoto
         envs: DB_URL,META_TOKEN,OPENROUTER_KEY,JWT_SECRET,SA_EMAIL,SA_PASS
         script: |
           cd /home/jorge/BlackPenguin
@@ -36,7 +35,7 @@ jobs:
           echo "Creando archivo .env de producción de forma segura..."
           rm -f backend/.env
           
-          # 3. Inyectamos las variables (FastAPI exige todas estas para no crashear)
+          # Inyectamos las variables para el Backend
           echo "ENVIRONMENT=production" >> backend/.env
           echo "ALGORITHM=HS256" >> backend/.env
           echo "ACCESS_TOKEN_EXPIRE_MINUTES=10080" >> backend/.env
@@ -46,20 +45,31 @@ jobs:
           echo "OPENROUTER_API_KEY=$OPENROUTER_KEY" >> backend/.env
           echo "FIRST_SUPERADMIN_EMAIL=$SA_EMAIL" >> backend/.env
           echo "FIRST_SUPERADMIN_PASSWORD=$SA_PASS" >> backend/.env
-          
-          # Apuntamos a la IP del host para que encuentre MongoDB
           echo "MONGO_URL=mongodb://172.17.0.1:27017/blackpenguin_db" >> backend/.env
 
+          # ==========================================
+          # 🚀 DESPLIEGUE DEL BACKEND (FastAPI)
+          # ==========================================
           echo "🏗️ Construyendo imagen de FastAPI..."
           docker build -t blackpenguin-api:latest ./backend
           
-          echo "🛑 Deteniendo contenedor anterior..."
+          echo "🛑 Deteniendo contenedor anterior de backend..."
           docker stop bp_api_prod || true
           docker rm bp_api_prod || true
 
-          echo "🚀 Encendiendo contenedor de producción..."
-          docker run -d \
-            --name bp_api_prod \
-            -p 80:8000 \
-            --env-file ./backend/.env \
-            blackpenguin-api:latest
+          echo "🚀 Encendiendo backend..."
+          # Agregamos la línea de ejecución que faltaba en tu snippet
+          docker run -d --name bp_api_prod --restart always --env-file backend/.env -p 8000:8000 blackpenguin-api:latest
+
+          # ==========================================
+          # 🚀 DESPLIEGUE DEL FRONTEND (Angular + Nginx)
+          # ==========================================
+          echo "🏗️ Construyendo imagen de Angular..."
+          docker build -t blackpenguin-frontend:latest ./frontend
+          
+          echo "🛑 Deteniendo contenedor anterior de frontend..."
+          docker stop bp_frontend_prod || true
+          docker rm bp_frontend_prod || true
+
+          echo "🚀 Encendiendo frontend en el puerto 80..."
+          docker run -d --name bp_frontend_prod --restart always -p 80:80 blackpenguin-frontend:latest
