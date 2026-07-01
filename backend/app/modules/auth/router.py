@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
+from pydantic import BaseModel
 import uuid
 
 from app.db.postgres import get_db, Base, engine
@@ -12,6 +13,16 @@ from app.modules.tenants.models import Company
 from app.modules.auth.models import User, UserRole
 
 router = APIRouter()
+
+# --- SCHEMAS DE PYDANTIC (Validan los datos que envía Angular) ---
+class UserCreate(BaseModel):
+    full_name: str  # 🚀 Nuevo campo obligatorio
+    email: str
+    password: str
+    role: str = "admin"
+    is_active: bool = True
+
+# --- ENDPOINTS ---
 
 @router.post("/setup-master", status_code=201)
 def setup_initial_database(db: Session = Depends(get_db)):
@@ -32,18 +43,37 @@ def setup_initial_database(db: Session = Depends(get_db)):
     
     return {"status": "success", "message": "Superadmin maestro registrado."}
 
+@router.post("/register", status_code=status.HTTP_201_CREATED)
+def register(user_data: UserCreate, db: Session = Depends(get_db)):
+    existing_user = db.query(User).filter(User.email == user_data.email).first()
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Este correo ya está registrado.")
+        
+    new_user = User(
+        full_name=user_data.full_name, # 🚀 Guardamos el nombre
+        email=user_data.email,
+        hashed_password=get_password_hash(user_data.password),
+        role=user_data.role,
+        is_active=user_data.is_active
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    return {"message": "Cuenta creada exitosamente", "user_id": new_user.id}
+
 @router.post("/login")
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == form_data.username).first()
-    if not user or not verify_password(form_data.password, user.hashed_password):
-        raise HTTPException(status_code=401, detail="Credenciales incorrectas")
+    
+    # 🚀 Separamos los errores exactamente como pediste
+    if not user:
+        raise HTTPException(status_code=404, detail="Este correo no está registrado.")
+    if not verify_password(form_data.password, user.hashed_password):
+        raise HTTPException(status_code=401, detail="Contraseña incorrecta.")
     if not user.is_active:
         raise HTTPException(status_code=400, detail="Usuario inactivo.")
         
-    token_payload = {
-        "sub": str(user.id),
-        "role": user.role,
-        "company_id": str(user.company_id) if user.company_id else None
-    }
-    access_token = create_access_token(data=token_payload)
-    return {"access_token": access_token, "token_type": "bearer"}
+    access_token = create_access_token(data={"sub": str(user.id)}) 
+    
+    # 🚀 Retornamos el nombre junto con el token
+    return {"access_token": access_token, "token_type": "bearer", "name": user.full_name}

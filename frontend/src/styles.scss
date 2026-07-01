@@ -1,1 +1,110 @@
-/* You can add global styles to this file, and also import other style files */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+// ==========================================
+// CONFIGURACIÓN BASE BLACK PENGUIN
+// ==========================================
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  min-h: 100vh;
+  background-color: #0A0A0A;
+  color: #e4e2e1;
+  font-family: 'Space Grotesk', sans-serif;
+  overflow-x: hidden;
+}
+
+// Clases utilitarias personalizadas exigidas por la UI
+.px-margin-mobile {
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+}
+
+.px-margin-desktop {
+  padding-left: 4rem;
+  padding-right: 4rem;
+}
+
+.gap-gutter {
+  gap: 2rem;
+}
+
+.mb-stack-md {
+  margin-bottom: 2rem;
+}
+
+// Efecto Liquid Glass de la Barra de Navegación y Paneles (Corregido)
+.liquid-glass {
+  position: relative;
+  background: rgba(22, 22, 22, 0.45);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-radius: 1rem; // 🌟 CORRECCIÓN: De 9999px a 1rem para evitar deformidades en móvil
+  overflow: hidden;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+
+  // 🚀 Restauración del borde de gradiente iluminado original del equipo de diseño
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    padding: 1px;
+    border-radius: inherit;
+    background: linear-gradient(
+        135deg,
+        rgba(255, 255, 255, 0.2) 0%,
+        rgba(255, 255, 255, 0.05) 40%,
+        rgba(255, 255, 255, 0) 50%,
+        rgba(255, 255, 255, 0.05) 60%,
+        rgba(255, 255, 255, 0.2) 100%
+    );
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+}
+
+// Estilos de los ítems de navegación
+.nav-item {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #999999;
+  text-decoration: none;
+  transition: color 0.2s ease;
+  text-transform: lowercase;
+
+  &:hover {
+    color: #ffffff;
+  }
+}
+
+// ==========================================
+// INFRAESTRUCTURA DE ANIMACIONES CSS
+// ==========================================
+.fade-in {
+  opacity: 0;
+  transform: translateY(16px);
+  transition: opacity 1s cubic-bezier(0.16, 1, 0.3, 1), transform 1s cubic-bezier(0.16, 1, 0.3, 1);
+  
+  &.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+// Animación letra por letra inyectada dinámicamente
+::ng-deep .char-animate {
+  opacity: 0;
+  display: inline-block;
+  transform: translateY(12px);
+  transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1), transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  
+  &.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

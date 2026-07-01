@@ -1,0 +1,66 @@
+{
+  "NAV": {
+    "HOME": "home",
+    "PLATFORM": "platform",
+    "SOLUTIONS": "solutions",
+    "REQUEST_ACCESS": "Request Access"
+  },
+  "HERO": {
+    "STATUS": "system active: v2.4.0 deploy",
+    "TITLE": "commercial ai for\nreal estate projects",
+    "SUBTITLE": "Black Penguin uses AI-powered commercial intelligence to help B2B companies detect buying intent, prioritize opportunities, and accelerate revenue before competitors even know prospects are in-market.",
+    "PLACEHOLDER": "Join the Private Waitlist",
+    "SUCCESS": "Access requested successfully! You have been added to the exclusive waitlist."
+  },
+  "FEATURES": {
+    "TITLE_1": "Buying Intent Detection",
+    "DESC_1": "Identify organizations actively researching solutions before they submit a form.",
+    "TITLE_2": "AI Lead Prioritization",
+    "DESC_2": "Surface the highest-value opportunities automatically using behavioral and intent signals.",
+    "TITLE_3": "Commercial Intelligence",
+    "DESC_3": "Equip revenue teams with actionable insights to engage prospects earlier and close faster."
+  },
+  "SOLUTIONS": {
+    "TITLE": "Multi-Tenant Perimeter Ecosystem",
+    "DESC": "Designed for large-scale developers. Manage multiple real estate projects, handle roles for marketing teams, sales advisors, and deploy AI voice agents in a shielded and completely isolated environment per Tenant."
+  },
+  "FOOTER": {
+    "RIGHTS": "© 2026 Black Penguin AI",
+    "WHAT_IS": "what is black penguin"
+  },
+  "AUTH": {
+    "FULL_NAME": "First Name(s)",
+    "WELCOME_BACK": "Welcome Back",
+    "CREATE_ACCOUNT": "Create Account",
+    "SUBTITLE_LOGIN": "Enter your credentials to access your AI copilot.",
+    "SUBTITLE_REGISTER": "Get started with the definitive real estate commercial intelligence.",
+    "EMAIL": "Email Address",
+    "PASSWORD": "Password",
+    "CONFIRM_PASSWORD": "Confirm Password",
+    "REMEMBER_ME": "Remember device",
+    "FORGOT_PASSWORD": "Forgot password?",
+    "SIGN_IN": "Sign In",
+    "SIGN_UP": "Create Account",
+    "DONT_HAVE_ACCOUNT": "Don't have an account?",
+    "ALREADY_HAVE_ACCOUNT": "Already have an account?",
+    "REGISTER_NOW": "Register here",
+    "LOGIN_NOW": "Log in here",
+    "ERROR_MATCH": "Passwords do not match."
+  },
+  "CHAT": {
+    "NEW_ANALYSIS": "New Analysis",
+    "RECENT": "Recent Activity",
+    "SETTINGS": "Settings",
+    "HELP": "Help & Support",
+    "GREETING": "Welcome back",
+    "QUESTION": "What would you like to analyze today?",
+    "INPUT_PLACEHOLDER": "Enter website URL or describe your real estate project...",
+    "BTN_ANALYZE": "Analyze",
+    "SUGGESTION_1": "Analyze competitor",
+    "SUGGESTION_2": "Market research",
+    "SUGGESTION_3": "Generate leads",
+    "FOOTER_PRIVACY": "Privacy Policy",
+    "FOOTER_TERMS": "Terms of Service",
+    "FOOTER_CONTACT": "Contact Support"
+  }
+}

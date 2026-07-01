@@ -1,33 +1,60 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
+  darkMode: "class", // Activa el modo oscuro nativo que tienen tus HTML
   content: [
-    "./src/**/*.{html,ts}", // Angular detectará las clases en templates HTML y componentes TS
+    "./src/**/*.{html,ts}",
   ],
   theme: {
     extend: {
-      fontFamily: {
-        sans: ['Poppins', 'sans-serif'], // Establecemos Poppins como la tipografía base predeterminada
-      },
       colors: {
-        // Paleta Dark Luxury extraída de los diseños de Black Penguin
-        brand: {
-          bg: '#050506',       // Fondo maestro ultra oscuro de la interfaz (casi negro terminal)
-          surface: '#111113',  // Superficie de tarjetas, cajas de texto y paneles internos
-          border: '#222226',   // Gris metálico sutil para divisores, grillas Bloomberg y bordes
-          muted: '#8A8A93',    // Gris atenuado ideal para subtextos o placeholders
-          white: '#F5F5F7',    // Blanco premium de alto contraste para textos y lectura descansada
-          
-          // Acentos y estados dinámicos del "Ice Blue"
-          accent: '#00D2FF',   // Azul Hielo / Cyan brillante para botones CTA ("Request Access Key", etc.)
-          'accent-hover': '#00B4DC',
-          glow: 'rgba(0, 210, 255, 0.15)', // Sombra con brillo para efectos de enfoque (foco de inputs)
-        }
+        // ==========================================
+        // PALETA UNIFICADA BLACK PENGUIN (ÁMBAR/DARK)
+        // ==========================================
+        
+        // Fondos y Superficies
+        "background": "#0A0A0A",
+        "primary-container": "#0a0a0a",
+        "surface-dim": "#131313",
+        "surface-level-1": "#161616",
+        "surface-variant": "#353535",
+        
+        // Textos y Grises (Tipografía)
+        "primary": "#c9c6c5",
+        "on-surface": "#e4e2e1",
+        "inverse-surface": "#e4e2e1",
+        "surface-tint": "#c9c6c5",
+        "on-surface-variant": "#c4c7c7",
+        "gray-custom": "#999999",
+        "on-primary-container": "#7b7979",
+        "on-tertiary-container": "#7a7979",
+        
+        // Acentos (Ámbar / Oro)
+        "secondary": "#E99E10",
+        "on-secondary": "#452b00",
+        "secondary-fixed-dim": "#ffb94e",
+        
+        // Terciarios y Variantes
+        "tertiary": "#c8c6c5",
+        "tertiary-fixed": "#e5e2e1",
+        "tertiary-fixed-dim": "#c8c6c5",
+        "on-tertiary-fixed-variant": "#474746",
+        "on-primary-fixed-variant": "#474646",
+        
+        // Bordes y Líneas
+        "border-level-2": "#2E2E2E",
+        "outline-variant": "#474746"
       },
-      boxShadow: {
-        // Efecto Bloomberg Terminal / Premium Glow
-        'brand-glow': '0 0 20px rgba(0, 210, 255, 0.15)',
+      fontFamily: {
+        // Unificamos la fuente a Space Grotesk para todo el proyecto
+        "sans": ["Space Grotesk", "sans-serif"],
+        "caption": ["Space Grotesk", "sans-serif"],
+        "label-ui": ["Space Grotesk", "sans-serif"]
       }
-    },
+    }
   },
-  plugins: [],
+  plugins: [
+    // El diseño usó plugins nativos de tailwind, si te da error en consola más adelante los instalamos
+    // require('@tailwindcss/forms'),
+    // require('@tailwindcss/container-queries')
+  ],
 }

@@ -1,0 +1,181 @@
+<div class="flex h-screen bg-background text-on-surface overflow-hidden relative selection:bg-secondary/30">
+  
+  <div *ngIf="isSidebarOpen" class="md:hidden fixed inset-0 bg-black/60 z-30 backdrop-blur-sm" (click)="toggleSidebar()"></div>
+
+  <aside 
+    class="fixed md:relative z-40 h-full w-72 flex flex-col border-r border-white/10 bg-surface-level-1/95 backdrop-blur-xl transition-transform duration-300 ease-in-out"
+    [class.-translate-x-full]="!isSidebarOpen"
+    [class.translate-x-0]="isSidebarOpen"
+    [class.md:translate-x-0]="true">
+    
+    <div class="h-20 flex items-center px-6 border-b border-white/5 justify-between">
+      <div class="flex items-center gap-3 cursor-pointer" routerLink="/">
+        <img alt="Logo" class="h-7 w-7 object-contain" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDxl2QxLaz1QVZlAWP1ksa3Vsw8hnGkq7DN9pIFoivY_s0ANfwB6_2SUVcF-XuzZxv_QkfH-yYy0Zc1TjmtQ9hP1gQTJB2TYxp1DFMuGtCSL7fddgkgG8ENFAvecOdZ0uABF1CY5yR7_VUrse9PALCGMFUALu0wLsTml1PYbq2FbNq3FTatmSUOjSFUiuhDInqKQifEP-apKuFd0djcZrYKCm-40vcNvQSEutAVuANBR8keQgsajYWdrcIrDHDKew0a7QkZVGOKBUM">
+        <div class="font-wordmark text-lg tracking-tighter">
+          <span class="text-white font-light">black</span><span class="text-secondary font-medium">penguin</span>
+        </div>
+      </div>
+      <button class="md:hidden text-gray-custom hover:text-white" (click)="toggleSidebar()">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+
+    <div class="p-4">
+      <button class="w-full bg-white/5 hover:bg-white/10 border border-white/10 text-white flex items-center gap-3 px-4 py-3 rounded-xl transition-all active:scale-[0.98]">
+        <span class="material-symbols-outlined text-secondary text-lg">add_circle</span>
+        <span class="font-medium text-sm">{{ 'CHAT.NEW_ANALYSIS' | translate }}</span>
+      </button>
+    </div>
+
+    <div class="flex-1 overflow-y-auto px-4 py-2 flex flex-col gap-1">
+      <h3 class="text-[10px] uppercase tracking-widest text-surface-variant font-bold mb-2 px-2">{{ 'CHAT.RECENT' | translate }}</h3>
+      <a class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/5 text-gray-custom hover:text-white transition-colors cursor-pointer text-sm truncate">
+        <span class="material-symbols-outlined text-[18px]">chat_bubble</span>
+        Análisis Proyecto "Ocean View"
+      </a>
+    </div>
+
+    <div class="p-4 border-t border-white/5 flex flex-col gap-2">
+      <div class="flex items-center justify-center gap-2 mb-2 p-2 bg-black/30 rounded-lg border border-white/5">
+        <button (click)="switchLanguage('en')" [class.text-secondary]="currentLang === 'en'" class="text-xs font-bold text-gray-custom hover:text-white transition-colors">EN</button>
+        <span class="text-gray-custom text-xs">/</span>
+        <button (click)="switchLanguage('es')" [class.text-secondary]="currentLang === 'es'" class="text-xs font-bold text-gray-custom hover:text-white transition-colors">ES</button>
+      </div>
+
+      <a class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/5 text-gray-custom hover:text-white transition-colors cursor-pointer text-sm">
+        <span class="material-symbols-outlined text-[18px]">settings</span> {{ 'CHAT.SETTINGS' | translate }}
+      </a>
+      <a routerLink="/login" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-red-500/10 text-gray-custom hover:text-red-400 transition-colors cursor-pointer text-sm mt-2">
+        <span class="material-symbols-outlined text-[18px]">logout</span> Salir
+      </a>
+    </div>
+  </aside>
+
+  <main class="flex-1 flex flex-col relative overflow-hidden h-full">
+    
+    <div class="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-secondary/5 rounded-full blur-[150px] pointer-events-none z-0"></div>
+
+    <div class="md:hidden absolute top-4 left-4 z-20">
+      <button class="text-gray-custom hover:text-white p-2 bg-surface-level-1/80 border border-white/10 rounded-lg backdrop-blur-md" (click)="toggleSidebar()">
+        <span class="material-symbols-outlined">menu</span>
+      </button>
+    </div>
+
+    <div #chatScroll class="flex-1 overflow-y-auto z-10 flex flex-col p-4 md:p-8 scroll-smooth">
+      <div class="max-w-4xl mx-auto w-full flex-1 flex flex-col">
+        
+        <div *ngIf="messages.length === 0" class="text-center my-auto fade-in visible">
+          <h1 class="text-3xl md:text-5xl font-light text-white tracking-tight mb-3">
+            {{ 'CHAT.GREETING' | translate }}, <span class="font-medium text-secondary">{{ userName }}</span>
+          </h1>
+          <p class="text-gray-custom text-lg">{{ 'CHAT.QUESTION' | translate }}</p>
+
+          <div class="flex flex-wrap justify-center gap-3 mt-8 fade-in visible delay-200">
+            <button (click)="setPrompt('CHAT.SUGGESTION_1')" class="px-4 py-2 rounded-full border border-white/10 bg-white/5 text-gray-custom text-sm hover:bg-white/10 hover:text-white hover:border-white/20 transition-all">
+              {{ 'CHAT.SUGGESTION_1' | translate }}
+            </button>
+            <button (click)="setPrompt('CHAT.SUGGESTION_2')" class="px-4 py-2 rounded-full border border-white/10 bg-white/5 text-gray-custom text-sm hover:bg-white/10 hover:text-white hover:border-white/20 transition-all">
+              {{ 'CHAT.SUGGESTION_2' | translate }}
+            </button>
+            <button (click)="setPrompt('CHAT.SUGGESTION_3')" class="px-4 py-2 rounded-full border border-white/10 bg-white/5 text-gray-custom text-sm hover:bg-white/10 hover:text-white hover:border-white/20 transition-all">
+              {{ 'CHAT.SUGGESTION_3' | translate }}
+            </button>
+          </div>
+        </div>
+
+        <div *ngIf="messages.length > 0" class="flex flex-col gap-6 pb-20 mt-10">
+          <div *ngFor="let msg of messages" class="flex w-full fade-in visible" [class.justify-end]="msg.role === 'user'">
+            
+            <div class="max-w-[85%] md:max-w-[75%] p-5 rounded-2xl flex flex-col gap-3"
+                 [class.bg-secondary]="msg.role === 'user'"
+                 [class.text-black]="msg.role === 'user'"
+                 [class.bg-surface-level-1]="msg.role === 'ai'"
+                 [class.border]="msg.role === 'ai'"
+                 [class.border-white/10]="msg.role === 'ai'"
+                 [class.text-white]="msg.role === 'ai'">
+              
+              <div *ngIf="msg.file" class="flex items-center gap-2 bg-black/20 p-2 rounded-lg text-xs w-fit">
+                <span class="material-symbols-outlined text-base">picture_as_pdf</span>
+                <span class="font-medium">{{ msg.file }}</span>
+              </div>
+              
+              <span class="whitespace-pre-wrap leading-relaxed text-[15px]">{{ msg.content }}</span>
+            </div>
+
+          </div>
+          
+          <div *ngIf="isAnalyzing" class="flex w-full fade-in visible">
+            <div class="bg-surface-level-1 border border-white/10 p-5 rounded-2xl flex items-center gap-2">
+              <div class="w-2 h-2 rounded-full bg-secondary animate-bounce"></div>
+              <div class="w-2 h-2 rounded-full bg-secondary animate-bounce" style="animation-delay: 0.1s"></div>
+              <div class="w-2 h-2 rounded-full bg-secondary animate-bounce" style="animation-delay: 0.2s"></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="w-full max-w-4xl mx-auto px-4 pb-4 md:px-8 z-20">
+      
+      <div *ngIf="selectedFile" class="mb-2 flex items-center gap-2 bg-secondary/20 text-secondary w-fit px-3 py-1.5 rounded-lg border border-secondary/30 text-xs fade-in visible">
+        <span class="material-symbols-outlined text-sm">description</span>
+        <span class="truncate max-w-[200px]">{{ selectedFile.name }}</span>
+        <button (click)="removeFile()" class="hover:text-white transition-colors flex items-center focus:outline-none"><span class="material-symbols-outlined text-sm">close</span></button>
+      </div>
+
+      <div class="relative group transition-all duration-300 rounded-2xl"
+           [class.ring-2]="isDragOver" [class.ring-secondary]="isDragOver"
+           (dragover)="onDragOver($event)" (dragleave)="onDragLeave($event)" (drop)="onDrop($event)">
+           
+        <div *ngIf="isDragOver" class="absolute inset-0 bg-secondary/10 backdrop-blur-md z-50 rounded-2xl border-2 border-dashed border-secondary flex flex-col items-center justify-center pointer-events-none">
+          <span class="material-symbols-outlined text-secondary text-3xl mb-2">upload_file</span>
+          <span class="text-secondary font-medium tracking-wide">Suelta tu PDF aquí</span>
+        </div>
+
+        <div class="absolute -inset-0.5 bg-gradient-to-r from-secondary/40 via-white/10 to-secondary/40 rounded-2xl blur opacity-30 group-hover:opacity-60 transition duration-500"></div>
+        <div class="liquid-glass relative w-full flex flex-col p-2">
+          
+          <textarea 
+            [(ngModel)]="prompt" 
+            (keydown.enter)="startAnalysis($event)"
+            rows="2" 
+            class="w-full bg-transparent border-none text-white px-4 py-3 resize-none focus:ring-0 placeholder:text-surface-variant text-base"
+            [placeholder]="'CHAT.INPUT_PLACEHOLDER' | translate"></textarea>
+          
+          <div class="flex items-center justify-between px-2 pt-2 pb-1 border-t border-white/5">
+            <div class="flex items-center gap-2">
+              
+              <input type="file" #fileInput (change)="onFileSelected($event)" accept="application/pdf" class="hidden">
+              <button (click)="fileInput.click()" class="p-2 text-gray-custom hover:text-white hover:bg-white/10 rounded-lg transition-colors tooltip-trigger focus:outline-none" title="Subir PDF">
+                <span class="material-symbols-outlined text-[20px]">attach_file</span>
+              </button>
+
+            </div>
+            
+            <button 
+              (click)="startAnalysis()"
+              [disabled]="isAnalyzing || (!prompt.trim() && !selectedFile)"
+              class="bg-secondary hover:bg-secondary-fixed-dim text-black font-semibold px-6 py-2 rounded-lg transition-all active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-2">
+              <span *ngIf="isAnalyzing" class="material-symbols-outlined animate-spin text-sm">sync</span>
+              <span *ngIf="!isAnalyzing" class="material-symbols-outlined text-sm">send</span>
+              {{ 'CHAT.BTN_ANALYZE' | translate }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <footer class="w-full p-4 flex flex-col md:flex-row items-center justify-between text-[11px] text-surface-variant border-t border-white/5 z-10 bg-background/80 backdrop-blur-md">
+      <div class="flex gap-4">
+        <a class="hover:text-secondary transition-colors cursor-pointer">{{ 'CHAT.FOOTER_PRIVACY' | translate }}</a>
+        <a class="hover:text-secondary transition-colors cursor-pointer">{{ 'CHAT.FOOTER_TERMS' | translate }}</a>
+      </div>
+      <div class="flex items-center gap-3 mt-2 md:mt-0">
+        <span>© 2026 BlackPenguin.ai</span>
+        <div class="w-1 h-1 rounded-full bg-outline-variant"></div>
+        <span>Enterprise AI Division</span>
+      </div>
+    </footer>
+  </main>
+</div>

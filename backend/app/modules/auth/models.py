@@ -16,6 +16,7 @@ class User(Base):
     
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     company_id = Column(String(36), ForeignKey("companies.id", ondelete="CASCADE"), nullable=True)
+    full_name = Column(String(150), nullable=True) # 🚀 NUEVA COLUMNA
     email = Column(String(150), unique=True, index=True, nullable=False)
     hashed_password = Column(String(255), nullable=False)
     role = Column(SqlaEnum(UserRole), default=UserRole.SALES, nullable=False)

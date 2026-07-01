@@ -1,0 +1,66 @@
+{
+  "NAV": {
+    "HOME": "inicio",
+    "PLATFORM": "plataforma",
+    "SOLUTIONS": "soluciones",
+    "REQUEST_ACCESS": "Solicitar Acceso"
+  },
+  "HERO": {
+    "STATUS": "sistema activo: v2.4.0 despliegue",
+    "TITLE": "ia comercial para\nproyectos inmobiliarios",
+    "SUBTITLE": "Black Penguin utiliza inteligencia comercial y copilotos avanzados de IA para detectar intenciones de compra reales, calificar prospectos automáticamente y acelerar el cierre de tus proyectos inmobiliarios.",
+    "PLACEHOLDER": "Únete a la Lista de Espera Privada",
+    "SUCCESS": "¡Acceso solicitado! Te hemos añadido a la lista de espera exclusiva."
+  },
+  "FEATURES": {
+    "TITLE_1": "Detección de Intención",
+    "DESC_1": "Identifica qué organizaciones e inversionistas están investigando activamente tus desarrollos antes de que envíen un formulario.",
+    "TITLE_2": "Calificación Inmobiliaria con IA",
+    "DESC_2": "Filtra y prioriza automáticamente los leads de mayor valor utilizando modelos LLM avanzados integrados a tus canales de Meta Ads.",
+    "TITLE_3": "Inteligencia Comercial",
+    "DESC_3": "Equipa a tus equipos de marketing y ventas con datos de comportamiento en tiempo real para cerrar tratos con mayor velocidad."
+  },
+  "SOLUTIONS": {
+    "TITLE": "Ecosistema Perimetral Multi-Tenant",
+    "DESC": "Diseñado para desarrolladoras de gran escala. Administra múltiples proyectos inmobiliarios, gestiona roles para equipos de marketing, asesores de ventas, y despliega agentes de voz con IA en un entorno blindado y completamente aislado por Tenant."
+  },
+  "FOOTER": {
+    "RIGHTS": "© 2026 Black Penguin AI",
+    "WHAT_IS": "qué es black penguin"
+  },
+  "AUTH": {
+    "FULL_NAME": "Nombre(s)",
+    "WELCOME_BACK": "Bienvenido de Vuelta",
+    "CREATE_ACCOUNT": "Crear Cuenta",
+    "SUBTITLE_LOGIN": "Ingresa tus credenciales para acceder a tu copiloto de IA.",
+    "SUBTITLE_REGISTER": "Comienza con la inteligencia comercial inmobiliaria definitiva.",
+    "EMAIL": "Correo Electrónico",
+    "PASSWORD": "Contraseña",
+    "CONFIRM_PASSWORD": "Confirmar Contraseña",
+    "REMEMBER_ME": "Recordar dispositivo",
+    "FORGOT_PASSWORD": "¿Olvidaste tu contraseña?",
+    "SIGN_IN": "Iniciar Sesión",
+    "SIGN_UP": "Registrarse",
+    "DONT_HAVE_ACCOUNT": "¿No tienes una cuenta?",
+    "ALREADY_HAVE_ACCOUNT": "¿Ya tienes una cuenta?",
+    "REGISTER_NOW": "Regístrate aquí",
+    "LOGIN_NOW": "Inicia sesión aquí",
+    "ERROR_MATCH": "Las contraseñas no coinciden."
+  },
+  "CHAT": {
+    "NEW_ANALYSIS": "Nuevo Análisis",
+    "RECENT": "Actividad Reciente",
+    "SETTINGS": "Ajustes",
+    "HELP": "Ayuda y Soporte",
+    "GREETING": "Bienvenido de vuelta",
+    "QUESTION": "¿Qué te gustaría analizar hoy?",
+    "INPUT_PLACEHOLDER": "Ingresa la URL del sitio o describe tu proyecto inmobiliario...",
+    "BTN_ANALYZE": "Analizar",
+    "SUGGESTION_1": "Analizar competidor",
+    "SUGGESTION_2": "Investigación de mercado",
+    "SUGGESTION_3": "Generar leads",
+    "FOOTER_PRIVACY": "Política de Privacidad",
+    "FOOTER_TERMS": "Términos de Servicio",
+    "FOOTER_CONTACT": "Contactar Soporte"
+  }
+}

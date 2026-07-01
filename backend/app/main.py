@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware # 🚀 ¡ESTA ES LA LÍNEA QUE FALTABA!
 from app.core.config import settings
 from app.core.middleware import MultiTenantMiddleware
 
@@ -27,7 +28,14 @@ app = FastAPI(
     lifespan=lifespan 
 )
 
-app.add_middleware(MultiTenantMiddleware)
+# 🚀 CONFIGURACIÓN DE CORS (Debe ser el primer middleware)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:4200"], # Permite que Angular se conecte
+    allow_credentials=True,
+    allow_methods=["*"], # Esto es clave: Permite OPTIONS, POST, GET, etc.
+    allow_headers=["*"], # Permite que Angular envíe cualquier cabecera
+)
 
 # =================================================================
 # REGISTRO DE RUTAS POR DOMINIO
