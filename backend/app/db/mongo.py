@@ -25,7 +25,18 @@ class MongoDBManager:
 # Instancia global del manager
 db_manager = MongoDBManager()
 
-# Modelo Base para esquemas de Mongo (Manejo de ObjectIds)
+# =================================================================
+# FUNCIONES PUENTE PARA EL CICLO DE VIDA (LIFESPAN) EN main.py
+# =================================================================
+async def connect_to_mongo():
+    await db_manager.connect_to_mongo()
+
+async def close_mongo_connection():
+    await db_manager.close_mongo_connection()
+
+# =================================================================
+# CONFIGURACIÓN BASE PARA MONGODB (BSON)
+# =================================================================
 class MongoBaseModel(BaseModel):
     model_config = ConfigDict(
         populate_by_name=True,
