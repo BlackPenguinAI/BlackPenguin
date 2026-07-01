@@ -1,3 +1,4 @@
+import { Injectable, isDevMode } from '@angular/core'; // 🚀 IMPORTANTE: Añadir isDevMode
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
@@ -6,7 +7,9 @@ import { Observable } from 'rxjs';
   providedIn: 'root',
 })
 export class ChatService {
-  private apiUrl = 'http://localhost:8000/api/v1/conversations';
+  private apiUrl = isDevMode() 
+    ? 'http://localhost:8000/api/v1/conversations' 
+    : 'http://206.189.118.99:8000/api/v1/conversations';
 
   constructor(private http: HttpClient) {}
 

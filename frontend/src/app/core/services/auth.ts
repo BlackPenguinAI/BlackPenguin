@@ -1,3 +1,4 @@
+import { Injectable, isDevMode } from '@angular/core'; // 🚀 IMPORTANTE: Añadir isDevMode
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, tap, catchError, throwError } from 'rxjs';
@@ -6,8 +7,11 @@ import { Observable, tap, catchError, throwError } from 'rxjs';
   providedIn: 'root'
 })
 export class AuthService {
-  #private apiUrl = 'http://localhost:8000/api/v1';
   
+  // 🚀 URL DINÁMICA: Local vs Producción
+  private apiUrl = isDevMode() 
+    ? 'http://localhost:8000/api/v1' 
+    : 'http://206.189.118.99:8000/api/v1';
 
   constructor(private http: HttpClient) {}
 
