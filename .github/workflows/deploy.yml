@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'backend/**'                    # 🚀 MAGIA MONOREPO: Solo se ejecuta si cambias el backend
+      - '.github/workflows/deploy.yml'
 
 jobs:
   deploy:
@@ -17,28 +20,25 @@ jobs:
         username: ${{ secrets.DO_USER }}
         key: ${{ secrets.DO_SSH_KEY }}
         script: |
-          # 1. Navegamos a la carpeta de tu proyecto
-          cd /home/jorge/BlackPenguinBackend
+          # 1. Navegamos a la nueva carpeta del monorepo
+          cd /home/jorge/BlackPenguin
           
           # 2. Descargamos tu código más nuevo de GitHub
           git pull origin main
           
-          # 3. Construimos la nueva imagen de Docker
+          # 3. Construimos la nueva imagen de Docker apuntando a la carpeta backend
           echo "🏗️ Construyendo imagen de FastAPI..."
-          docker build -t blackpenguinbackend-api:latest .
+          docker build -t blackpenguin-api:latest ./backend
           
           # 4. Detenemos y borramos la versión vieja de la API
           echo "🛑 Reemplazando contenedor antiguo..."
           docker stop bp_api_prod || true
           docker rm bp_api_prod || true
           
-          # 5. Encendemos el nuevo motor exactamente como estaba pero con código fresco
+          # 5. Encendemos el nuevo motor asegurando la ruta correcta del .env
           echo "🚀 Iniciando la nueva API..."
           docker run -d \
             --name bp_api_prod \
             -p 80:8000 \
-            --env-file .env \
-            --restart always \
-            blackpenguinbackend-api:latest
-            
-          echo "🎉 ¡Despliegue exitoso con Docker Puro!"
+            --env-file ./backend/.env \
+            blackpenguin-api:latest
