@@ -5,7 +5,7 @@ on:
     branches:
       - main
     paths:
-      - 'backend/**'                    # 🚀 MAGIA MONOREPO: Solo se ejecuta si cambias el backend
+      - 'backend/**'
       - '.github/workflows/deploy.yml'
 
 jobs:
@@ -15,27 +15,51 @@ jobs:
     steps:
     - name: 🚀 Conectando al Droplet y Desplegando
       uses: appleboy/ssh-action@v1.0.3
+      env:
+        # 1. Capturamos los secretos de GitHub y los convertimos en variables de entorno para el Runner
+        DB_URL: ${{ secrets.DATABASE_URL }}
+        META_TOKEN: ${{ secrets.META_ACCESS_TOKEN }}
+        OPENROUTER_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        JWT_SECRET: ${{ secrets.SECRET_KEY }}
+        SA_EMAIL: ${{ secrets.FIRST_SUPERADMIN_EMAIL }}
+        SA_PASS: ${{ secrets.FIRST_SUPERADMIN_PASSWORD }}
       with:
         host: ${{ secrets.DO_HOST }}
         username: ${{ secrets.DO_USER }}
         key: ${{ secrets.DO_SSH_KEY }}
+        # 2. Le pasamos las variables explícitamente al script remoto
+        envs: DB_URL,META_TOKEN,OPENROUTER_KEY,JWT_SECRET,SA_EMAIL,SA_PASS
         script: |
           cd /home/jorge/BlackPenguin
           git pull origin main
-          
-          # 1. Borramos el .env viejo y creamos uno nuevo inyectando secretos
-          echo "Creando archivo .env de producción..."
+
+          echo "Creando archivo .env de producción de forma segura..."
           rm -f backend/.env
-          echo "ENVIRONMENT=production" >> backend/.env
-          echo "DATABASE_URL=${{ secrets.PROD_DATABASE_URL }}" >> backend/.env
-          echo "META_ACCESS_TOKEN=${{ secrets.PROD_META_TOKEN }}" >> backend/.env
-          echo "OPENROUTER_API_KEY=${{ secrets.PROD_OPENROUTER_KEY }}" >> backend/.env
-          # ... (agregas todas tus variables aquí)
           
-          # 2. Construimos y corremos Docker
+          # 3. Inyectamos las variables (FastAPI exige todas estas para no crashear)
+          echo "ENVIRONMENT=production" >> backend/.env
+          echo "ALGORITHM=HS256" >> backend/.env
+          echo "ACCESS_TOKEN_EXPIRE_MINUTES=10080" >> backend/.env
+          echo "SECRET_KEY=$JWT_SECRET" >> backend/.env
+          echo "DATABASE_URL=$DB_URL" >> backend/.env
+          echo "META_ACCESS_TOKEN=$META_TOKEN" >> backend/.env
+          echo "OPENROUTER_API_KEY=$OPENROUTER_KEY" >> backend/.env
+          echo "FIRST_SUPERADMIN_EMAIL=$SA_EMAIL" >> backend/.env
+          echo "FIRST_SUPERADMIN_PASSWORD=$SA_PASS" >> backend/.env
+          
+          # Apuntamos a la IP del host para que encuentre MongoDB
+          echo "MONGO_URL=mongodb://172.17.0.1:27017/blackpenguin_db" >> backend/.env
+
+          echo "🏗️ Construyendo imagen de FastAPI..."
           docker build -t blackpenguin-api:latest ./backend
+          
+          echo "🛑 Deteniendo contenedor anterior..."
           docker stop bp_api_prod || true
           docker rm bp_api_prod || true
-          
-          # Docker leerá el .env recién fabricado
-          docker run -d --name bp_api_prod -p 80:8000 --env-file ./backend/.env blackpenguin-api:latest
+
+          echo "🚀 Encendiendo contenedor de producción..."
+          docker run -d \
+            --name bp_api_prod \
+            -p 80:8000 \
+            --env-file ./backend/.env \
+            blackpenguin-api:latest
