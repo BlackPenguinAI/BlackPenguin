@@ -1,6 +1,6 @@
-# Black Penguin - Documentación de Avances (Semanas 1, 2, 3, 4, 5, 6, 7 y 8)
+# # Black Penguin - Documentación de Avances (Semanas 1 a 10)
 
-Este repositorio contiene el código fuente y la arquitectura técnica del Backend Core de **Black Penguin**, diseñada bajo un esquema SaaS Multi-tenant estricto.
+Este repositorio contiene el código fuente, la arquitectura técnica y la documentación del proyecto **Black Penguin**, una plataforma SaaS Multi-tenant impulsada por Inteligencia Artificial y diseñada bajo un esquema de Monorepositorio (Frontend + Backend)
 
 ---
 
@@ -106,19 +106,34 @@ Este repositorio contiene el código fuente y la arquitectura técnica del Backe
     * Creación del endpoint interactivo `POST /api/v1/conversations/chat` que inyecta un *Prompt de Sistema Maestro* (personalidad de asesor de inversiones de alto nivel), adjunta el historial cronológico del prospecto recuperado de la base de datos, y consume el modelo `openai/gpt-4o-mini`.
     * Lógica de embudo dinámica: Al interactuar con la IA, el estado del Lead (prospecto) avanza automáticamente en la base de datos (de `NEW` a `CONTACTED`).
 
+### Semanas 10: Monorepo, Interfaz de Usuario y Despliegue CI/CD
+**Objetivo:** Integrar el cliente web, conectar el modelo de Inteligencia Artificial y automatizar el despliegue a producción en DigitalOcean.
+* **Estructura Monorepo:** Refactorización del repositorio para contener tanto el `frontend` como el `backend` en un mismo lugar, facilitando el control de versiones y el despliegue sincronizado.
+* **Desarrollo Frontend (Angular 17+):**
+  * **Landing Page:** Diseño y maquetación de la página comercial de presentación.
+  * **Módulo de Autenticación:** Flujos completos de Registro (`register`) y Acceso (`login`) con manejo visual de errores (Toasts) y persistencia de sesión JWT.
+  * **Chatbot UI:** Construcción de la interfaz conversacional del Copiloto de IA, incluyendo soporte nativo para **Drag & Drop** de archivos PDF y renderizado dinámico de respuestas con markdown.
+* **Integración de IA (OpenRouter):** Conexión del backend con modelos de lenguaje de última generación (`gpt-4o-mini`) mediante OpenRouter, integrando la extracción en memoria de texto desde PDFs (`pypdf`) y aplicación de *Prompt Engineering* avanzado para estructurar datos comerciales en tiempo real.
+* **Infraestructura y CI/CD (GitHub Actions):** * Migración del pipeline de despliegue a GitHub Actions (`deploy.yml`).
+  * Contenerización del frontend en Docker usando Nginx para servir la SPA.
+  * Configuración dinámica de URLs de API (`isDevMode()`) para soportar entornos locales y de producción sin cambios manuales.
+  * Apertura de puertos (UFW y Cloud Firewalls) para despliegue exitoso en Droplets de DigitalOcean.
+
 ---
 
 ## Entornos y Accesos
-La API cuenta con documentación interactiva autogenerada (Swagger UI) para facilitar la visualización y prueba de los endpoints:
+La plataforma está estructurada como un Monorepo modular, distribuyendo de forma independiente el acceso a la aplicación de interfaz y al motor de servicios del ecosistema:
 
 * **Entorno Local (Desarrollo):**
-  * **API Base:** [http://127.0.0.1:8000](http://127.0.0.1:8000)
-  * **Documentación (Swagger UI):** [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+  * **Aplicación Web (Frontend):** [http://localhost:4200](http://localhost:4200)
+  * **API Base (Backend):** [http://127.0.0.1:8000](http://127.0.0.1:8000)
+  * **Documentación Interactiva (Swagger UI):** [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
 
 * **Entorno Cloud (Producción en DigitalOcean):**
-  * **API Base:** [http://206.189.118.99](http://206.189.118.99)
-  * **Documentación (Swagger UI):** [http://206.189.118.99/docs](http://206.189.118.99/docs)
-  *(Nota: El acceso a producción está supeditado a la apertura de puertos HTTP/HTTPS en el Cloud Firewall de DigitalOcean).*
+  * **Aplicación Web (Frontend):** [http://206.189.118.99](http://206.189.118.99) *(Puerto default 80 / Servido por Nginx)*
+  * **API Base (Backend):** [http://206.189.118.99:8000](http://206.189.118.99:8000) *(Puerto 8000 / Servido por Uvicorn)*
+  * **Documentación Interactiva (Swagger UI):** [http://206.189.118.99:8000/docs](http://206.189.118.99:8000/docs)
+  *(Nota: La conectividad de las peticiones HTTP desde el frontend hacia la API en producción está supeditada a la apertura definitiva del puerto de entrada 8000 en el Cloud Firewall perimetral de DigitalOcean).*
 
 ---
 
@@ -126,51 +141,42 @@ La API cuenta con documentación interactiva autogenerada (Swagger UI) para faci
 El proyecto mantiene un diseño modular guiado por las mejores prácticas de la industria:
 
 ```text
-BlackPenguinBackend/
-│
-├── .github/
-│   └── workflows/
-│       └── deploy.yml           # Pipeline de CI/CD para producción
-│
-├── app/
-│   ├── api/
-│   │   ├── deps.py              # Inyección de dependencias (Auth, DB)
-│   │   └── v1/                  # Controladores / Endpoints
-│   │       ├── auth.py          # (1) Seguridad y Autenticación
-│   │       ├── superadmin.py    # (2) Gestión SaaS
-│   │       ├── projects.py      # (3) Proyectos Inmobiliarios
-│   │       ├── webhooks.py      # (4) Ingesta Meta/Landing
-│   │       ├── leads.py         # (5) Gestión de Ventas
-│   │       └── conversations.py # (6) Memoria Cognitiva IA
-│   │
-│   ├── core/                    # Lógica de Negocio Central y Seguridad
-│   │   ├── config.py            # Variables de entorno (.env)
-│   │   ├── middleware.py        # Aislamiento Multi-tenant
-│   │   ├── rbac.py              # Control de Roles y Permisos
-│   │   ├── security.py          # Hashing y JWT
-│   │   └── security_ans.py
-│   │
-│   ├── models/                  # Entidades de Datos
-│   │   ├── pg_models.py         # Modelos SQLAlchemy (Postgres)
-│   │   └── mongo_models.py      # Modelos Pydantic/BSON y Motor Async (Mongo)
-│   │
-│   ├── services/
-│   │   └── storage_service.py   # Gestión de archivos y multimedia
-│   │
-│   └── main.py                  # Entrypoint: Configuración y Registro de Rutas
-│
-├── Dockerfile                   # Receta de construcción de la API
-├── docker-compose.yml           # Orquestación local (PG, Mongo, Redis)
-├── requirements.txt             # Dependencias de Python
+BlackPenguin/
+├── .github/workflows/
+│   └── deploy.yml               # Pipeline CI/CD automatizado hacia DigitalOcean
+├── backend/                     # Backend API (FastAPI)
+│   ├── Dockerfile               # Receta de construcción del Backend
+│   ├── requirements.txt         # Dependencias de Python
+│   └── app/
+│       ├── main.py              # Entrypoint y configuración CORS
+│       ├── core/                # Seguridad, Middlewares, Settings
+│       ├── db/                  # Conexiones Mongo y Postgres
+│       └── modules/             # Dominios (auth, ai, properties, sales...)
+├── frontend/                    # Cliente Web (Angular 17+)
+│   ├── Dockerfile               # Receta Multi-etapa (Node.js + Nginx)
+│   ├── nginx.conf               # Configuración de Nginx para enrutamiento SPA
+│   ├── package.json
+│   ├── tailwind.config.js       # Diseño y sistema de clases
+│   └── src/app/
+│       ├── core/services/       # Lógica de conexión HTTP (auth.ts, chat.ts, toast.ts)
+│       └── pages/               # Vistas de la aplicación
+│           ├── landing/         # Página comercial inicial
+│           ├── login/           # Interfaz de inicio de sesión
+│           ├── register/        # Creación de cuentas maestras
+│           └── chat/            # Interfaz interactiva de IA (Soporte PDF)
+├── docker-compose.yml           # Orquestación local de Bases de Datos
 └── README.md                    # Documentación del proyecto
 ```
 
 ---
 
 ## Stack Tecnológico Actualizado
-* **Lenguajes:** Python 3.12+, Node.js 24 LTS.
-* **Backend:** FastAPI (con Pydantic v2 y Uvicorn).
-* **Infraestructura:** K3s, Docker, DigitalOcean Droplets.
-* **Bases de Datos:** PostgreSQL 16 (Relacional), MongoDB 8.0 (Documental NoSQL), Redis 7.2 (Caché y Colas).
-* **Seguridad y CI/CD:** JWT, Bcrypt, UFW, Jenkins.
+* **Lenguajes:** Python 3.12+, TypeScript (Node.js 20+).
+* **Backend:** FastAPI (con Pydantic v2 y servidor asíncrono Uvicorn).
+* **Frontend:** Angular (v17+) optimizado con maquetación en Tailwind CSS y SCSS.
+* **Inteligencia Artificial:** Conexión vía OpenRouter empleando modelos avanzados (`openai/gpt-4o-mini`) con procesamiento y extracción en memoria de texto desde archivos PDF (`pypdf`).
+* **Bases de Datos:** PostgreSQL 17 (Aislamiento de datos relacionales/SaaS Multi-tenant), MongoDB 8.0 (Datos no estructurados/Logs conversacionales e historial de auditoría de IA) y Redis 7.2 (Caché de alta velocidad y colas de tareas).
+* **Infraestructura y DevOps:** Docker (Contenerización multiplataforma), Docker Compose (Orquestación local), Nginx Alpine (Servidor proxy inverso para la SPA) y Droplets VPS de DigitalOcean.
+* **Seguridad y CI/CD:** Autenticación por Tokens JWT, Encriptación Bcrypt, UFW (Ubuntu Firewall), DigitalOcean Cloud Firewalls y automatización de despliegues por medio de **GitHub Actions** (`deploy.yml`).
+
 ---
