@@ -20,25 +20,22 @@ jobs:
         username: ${{ secrets.DO_USER }}
         key: ${{ secrets.DO_SSH_KEY }}
         script: |
-          # 1. Navegamos a la nueva carpeta del monorepo
           cd /home/jorge/BlackPenguin
-          
-          # 2. Descargamos tu código más nuevo de GitHub
           git pull origin main
           
-          # 3. Construimos la nueva imagen de Docker apuntando a la carpeta backend
-          echo "🏗️ Construyendo imagen de FastAPI..."
-          docker build -t blackpenguin-api:latest ./backend
+          # 1. Borramos el .env viejo y creamos uno nuevo inyectando secretos
+          echo "Creando archivo .env de producción..."
+          rm -f backend/.env
+          echo "ENVIRONMENT=production" >> backend/.env
+          echo "DATABASE_URL=${{ secrets.PROD_DATABASE_URL }}" >> backend/.env
+          echo "META_ACCESS_TOKEN=${{ secrets.PROD_META_TOKEN }}" >> backend/.env
+          echo "OPENROUTER_API_KEY=${{ secrets.PROD_OPENROUTER_KEY }}" >> backend/.env
+          # ... (agregas todas tus variables aquí)
           
-          # 4. Detenemos y borramos la versión vieja de la API
-          echo "🛑 Reemplazando contenedor antiguo..."
+          # 2. Construimos y corremos Docker
+          docker build -t blackpenguin-api:latest ./backend
           docker stop bp_api_prod || true
           docker rm bp_api_prod || true
           
-          # 5. Encendemos el nuevo motor asegurando la ruta correcta del .env
-          echo "🚀 Iniciando la nueva API..."
-          docker run -d \
-            --name bp_api_prod \
-            -p 80:8000 \
-            --env-file ./backend/.env \
-            blackpenguin-api:latest
+          # Docker leerá el .env recién fabricado
+          docker run -d --name bp_api_prod -p 80:8000 --env-file ./backend/.env blackpenguin-api:latest
