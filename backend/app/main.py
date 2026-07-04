@@ -1,6 +1,6 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware # 🚀 ¡ESTA ES LA LÍNEA QUE FALTABA!
+from fastapi.middleware.cors import CORSMiddleware 
 from app.core.config import settings
 from app.core.middleware import MultiTenantMiddleware
 
@@ -28,13 +28,17 @@ app = FastAPI(
     lifespan=lifespan 
 )
 
-# 🚀 CONFIGURACIÓN DE CORS (Debe ser el primer middleware)
+# 🚀 CONFIGURACIÓN DE CORS (Actualizada para Producción Segura)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:4200"], # Permite que Angular se conecte
+    allow_origins=[
+        "http://localhost:4200",         # Para tu desarrollo local
+        "https://blackpenguin.ai",       # Dominio principal
+        "https://www.blackpenguin.ai"    # Dominio con www
+    ], 
     allow_credentials=True,
-    allow_methods=["*"], # Esto es clave: Permite OPTIONS, POST, GET, etc.
-    allow_headers=["*"], # Permite que Angular envíe cualquier cabecera
+    allow_methods=["*"], 
+    allow_headers=["*"], 
 )
 
 # =================================================================
@@ -44,9 +48,5 @@ app.include_router(auth_router, prefix=f"{settings.API_V1_STR}/auth", tags=["1. 
 app.include_router(tenants_router, prefix=f"{settings.API_V1_STR}/superadmin", tags=["2. SaaS / Tenants"])
 app.include_router(properties_router, prefix=f"{settings.API_V1_STR}/projects", tags=["3. Proyectos"])
 app.include_router(sales_router, prefix=f"{settings.API_V1_STR}/leads", tags=["4. Ventas (Leads)"])
-app.include_router(ai_router, prefix=f"{settings.API_V1_STR}/conversations", tags=["5. IA / OpenRouter"])
-app.include_router(webhooks_router, prefix=f"{settings.API_V1_STR}/webhooks", tags=["6. Integraciones (Meta)"])
-
-@app.get("/", tags=["Sistema"])
-def health_check():
-    return {"status": "online", "environment": settings.ENVIRONMENT, "version": settings.VERSION}
+app.include_router(ai_router, prefix=f"{settings.API_V1_STR}/conversations", tags=["5. IA & Chat"])
+app.include_router(webhooks_router, prefix=f"{settings.API_V1_STR}/webhooks", tags=["6. Integraciones"])
