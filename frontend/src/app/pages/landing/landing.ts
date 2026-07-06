@@ -1,13 +1,14 @@
-import { Component, AfterViewInit, ViewChild, ElementRef, ViewChildren, QueryList, HostListener } from '@angular/core';
+import { Component, AfterViewInit, ViewChild, ElementRef, ViewChildren, QueryList, HostListener, isDevMode } from '@angular/core'; // 🚀 Agregamos isDevMode al final
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router'; // 🚀 ¡CRÍTICO: Importación agregada para habilitar routerLink!
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { HttpClient } from '@angular/common/http'; // 🚀 IMPORTANTE: Añadir HttpClient
 
 @Component({
   selector: 'app-landing',
   standalone: true,
-  imports: [CommonModule, FormsModule, TranslateModule, RouterModule], // 🚀 ¡Agregado aquí también!
+  imports: [CommonModule, FormsModule, TranslateModule, RouterModule],
   templateUrl: './landing.html',
   styleUrl: './landing.scss'
 })
@@ -15,6 +16,7 @@ export class LandingComponent implements AfterViewInit {
   email: string = '';
   isSubmitting: boolean = false;
   showSuccess: boolean = false;
+  errorMessage: string = ''; // 🚀 Variable para errores
   currentLang: string = 'en';
   isMobileMenuOpen: boolean = false;
 
@@ -25,12 +27,13 @@ export class LandingComponent implements AfterViewInit {
   @ViewChild('heroCta') heroCta!: ElementRef<HTMLDivElement>;
   @ViewChildren('featureCard') featureCards!: QueryList<ElementRef<HTMLDivElement>>;
 
-  constructor(private translate: TranslateService) {
+  constructor(
+    private translate: TranslateService,
+    private http: HttpClient // 🚀 Inyectamos el cliente HTTP
+  ) {
     this.currentLang = localStorage.getItem('bp_lang') || 'en';
-    
     this.translate.onLangChange.subscribe((event) => {
       this.currentLang = event.lang;
-      this.animateHeroText(); 
     });
   }
 
@@ -115,6 +118,34 @@ export class LandingComponent implements AfterViewInit {
           this.heroHeading.nativeElement.appendChild(wordSpan);
         }
       });
+    });
+  }
+
+  // 🚀 LÓGICA DE ENVÍO DE MAILCHIMP A TRAVÉS DE FASTAPI
+  onSubmit() {
+    if (!this.email || this.isSubmitting) return;
+    
+    this.isSubmitting = true;
+    this.errorMessage = '';
+
+    const apiUrl = isDevMode() 
+      ? 'http://localhost:8000/api/v1/leads/waitlist' 
+      : 'https://blackpenguin.ai/api/v1/leads/waitlist';
+
+    this.http.post(apiUrl, { email: this.email }).subscribe({
+      next: (res: any) => {
+        this.isSubmitting = false;
+        this.showSuccess = true;
+        this.email = ''; // Limpiar el input
+        
+        // El éxito desaparece después de 5 segundos
+        setTimeout(() => this.showSuccess = false, 5000);
+      },
+      error: (err) => {
+        this.isSubmitting = false;
+        this.errorMessage = err.error?.detail || 'Ocurrió un error. Intenta de nuevo.';
+        setTimeout(() => this.errorMessage = '', 5000);
+      }
     });
   }
 

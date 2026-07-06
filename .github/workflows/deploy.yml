@@ -23,6 +23,9 @@ jobs:
         JWT_SECRET: ${{ secrets.SECRET_KEY }}
         SA_EMAIL: ${{ secrets.FIRST_SUPERADMIN_EMAIL }}
         SA_PASS: ${{ secrets.FIRST_SUPERADMIN_PASSWORD }}
+        MAILCHIMP_KEY: ${{ secrets.MAILCHIMP_API_KEY }}
+        MAILCHIMP_LIST: ${{ secrets.MAILCHIMP_LIST_ID }}
+        MAILCHIMP_SERVER: ${{ secrets.MAILCHIMP_SERVER }}
       with:
         host: ${{ secrets.DO_HOST }}
         username: ${{ secrets.DO_USER }}
@@ -46,6 +49,9 @@ jobs:
           echo "FIRST_SUPERADMIN_EMAIL=$SA_EMAIL" >> backend/.env
           echo "FIRST_SUPERADMIN_PASSWORD=$SA_PASS" >> backend/.env
           echo "MONGO_URL=mongodb://172.17.0.1:27017/blackpenguin_db" >> backend/.env
+          echo "MAILCHIMP_API_KEY=$MAILCHIMP_KEY" >> backend/.env
+          echo "MAILCHIMP_LIST_ID=$MAILCHIMP_LIST" >> backend/.env
+          echo "MAILCHIMP_SERVER=$MAILCHIMP_SERVER" >> backend/.env
 
           # ==========================================
           # 🚀 DESPLIEGUE DEL BACKEND (FastAPI)

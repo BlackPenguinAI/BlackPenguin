@@ -26,9 +26,11 @@
         <button (click)="switchLanguage('es')" [class.text-secondary]="currentLang === 'es'" class="text-xs font-bold text-gray-custom hover:text-white transition-colors">ES</button>
       </div>
 
+      <!--
       <button routerLink="/register" class="bg-white text-black px-6 py-2.5 rounded-full font-medium text-sm transition-transform active:scale-95 hover:bg-secondary hover:text-white">
         {{ 'NAV.REQUEST_ACCESS' | translate }}
       </button>
+      -->
     </div>
 
     <button class="md:hidden text-white p-1 focus:outline-none transition-transform active:scale-95" (click)="toggleMobileMenu()">
@@ -53,9 +55,11 @@
       <button (click)="switchLanguage('es'); toggleMobileMenu()" [class.text-secondary]="currentLang === 'es'" class="text-sm font-bold text-gray-custom hover:text-white transition-colors">ESPAÑOL</button>
     </div>
 
+    <!--
     <button routerLink="/register" (click)="toggleMobileMenu()" class="w-full bg-secondary text-black px-6 py-4 rounded-xl font-bold text-base transition-transform active:scale-95 shadow-lg mt-2">
       {{ 'NAV.REQUEST_ACCESS' | translate }}
     </button>
+    -->
   </div>
 
 </nav>

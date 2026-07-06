@@ -26,6 +26,8 @@ export class ChatComponent {
   isDragOver: boolean = false;
   messages: { role: 'user' | 'ai', content: string, file?: string }[] = [];
 
+  sessionId: string = ''; // 🚀 Asegúrate de tener esta variable creada
+
   constructor(
     private translate: TranslateService,
     private chatService: ChatService,
@@ -121,7 +123,8 @@ export class ChatComponent {
 
     if (this.selectedFile) {
        // 1. MODO EXTRACCIÓN (Usuario sube el PDF inicial)
-       this.chatService.analyzeDocument(this.selectedFile, currentPrompt).subscribe({
+       //this.chatService.analyzeDocument(this.selectedFile, currentPrompt).subscribe({
+       this.chatService.analyzeDocument(this.sessionId, this.selectedFile, currentPrompt).subscribe({
          next: (res) => {
            this.isAnalyzing = false;
            this.messages.push({ role: 'ai', content: res.message });
@@ -145,7 +148,7 @@ export class ChatComponent {
          content: m.content 
        }));
        
-       this.chatService.sendMessage(history).subscribe({
+       this.chatService.sendMessage(this.sessionId, history).subscribe({
          next: (res) => {
            this.isAnalyzing = false;
            this.messages.push({ role: 'ai', content: res.message });
