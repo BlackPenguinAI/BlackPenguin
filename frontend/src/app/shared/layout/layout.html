@@ -1,0 +1,77 @@
+<div class="flex h-screen bg-black text-white font-sans overflow-hidden">
+  
+  <aside class="w-64 border-r border-white/10 liquid-glass flex flex-col justify-between relative z-20">
+    
+    <div class="p-6 border-b border-white/10 flex flex-col gap-1 cursor-pointer select-none" [routerLink]="userRole === 'superadmin' ? '/admin' : '/app'">
+      
+      <div class="flex items-center gap-3">
+        <img alt="Black Penguin Logo" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDxl2QxLaz1QVZlAWP1ksa3Vsw8hnGkq7DN9pIFoivY_s0ANfwB6_2SUVcF-XuzZxv_QkfH-yYy0Zc1TjmtQ9hP1gQTJB2TYxp1DFMuGtCSL7fddgkgG8ENFAvecOdZ0uABF1CY5yR7_VUrse9PALCGMFUALu0wLsTml1PYbq2FbNq3FTatmSUOjSFUiuhDInqKQifEP-apKuFd0djcZrYKCm-40vcNvQSEutAVuANBR8keQgsajYWdrcIrDHDKew0a7QkZVGOKBUM" class="h-8 w-8 object-contain">
+        <div class="font-wordmark text-xl flex items-center tracking-tighter">
+          <span class="text-white font-light">black</span><span class="text-secondary font-medium">penguin</span><span class="text-gray-400 font-light">.ai</span>
+        </div>
+      </div>
+      
+      <div *ngIf="userRole === 'superadmin'" class="pl-11 mt-1">
+        <span class="bg-white/5 text-gray-400 border border-white/10 text-[9px] px-2 py-0.5 rounded text-center font-bold uppercase tracking-widest shadow-sm">
+          Staff Console
+        </span>
+      </div>
+
+    </div>
+
+    <nav class="flex-1 p-4 flex flex-col gap-1 overflow-y-auto text-sm">
+      
+      <ng-container *ngIf="userRole === 'superadmin'">
+        <p class="text-[10px] text-gray-500 mb-2 px-3 uppercase tracking-widest font-medium mt-2">{{ 'ADMIN.MENU_MAIN' | translate }}</p>
+        <a routerLink="/admin" routerLinkActive="bg-white/10 text-white" [routerLinkActiveOptions]="{exact: true}" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors block mb-4 flex items-center gap-2">
+          <span class="material-symbols-outlined text-[18px]">dashboard</span>
+          {{ 'ADMIN.DASHBOARD' | translate }}
+        </a>
+        
+        <p class="text-[10px] text-gray-500 mb-2 px-3 uppercase tracking-widest font-medium">{{ 'ADMIN.MENU_SYSTEM' | translate }}</p>
+        <a routerLink="/admin/profile" routerLinkActive="bg-white/10 text-white" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors block flex items-center gap-2">
+          <span class="material-symbols-outlined text-[18px]">person</span>
+          {{ 'ADMIN.PROFILE' | translate }}
+        </a>
+        <a routerLink="/admin/clients" routerLinkActive="bg-white/10 text-white" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors block flex items-center gap-2">
+          <span class="material-symbols-outlined text-[18px]">group</span>
+          {{ 'ADMIN.CLIENTS_CRUD' | translate }}
+        </a>
+        
+        <p class="text-[10px] text-secondary mb-2 px-3 uppercase tracking-widest font-medium mt-4">{{ 'ADMIN.MENU_AI_CORE' | translate }}</p>
+        <a routerLink="/admin/emails" routerLinkActive="bg-white/10 text-white" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors block flex items-center gap-2">
+          <span class="material-symbols-outlined text-[18px]">mail</span>
+          {{ 'ADMIN.WAITLIST_DATA' | translate }}
+        </a>
+        <a routerLink="/admin/ai-config" routerLinkActive="bg-white/10 text-white" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors block flex items-center gap-2">
+          <span class="material-symbols-outlined text-[18px]">psychology</span>
+          {{ 'ADMIN.AI_TUNER' | translate }}
+        </a>
+      </ng-container>
+
+      <ng-container *ngIf="userRole !== 'superadmin' && userRole !== ''">
+         <p class="text-[10px] text-gray-500 mb-2 px-3 uppercase tracking-widest font-medium mt-2">App Menu</p>
+         <a routerLink="/app/chat" routerLinkActive="bg-white/10 text-white" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors block flex items-center gap-2">
+           <span class="material-symbols-outlined text-[18px]">chat</span>
+           Copiloto AI (Chat)
+         </a>
+      </ng-container>
+    </nav>
+
+    <div class="p-4 border-t border-white/10 flex flex-col gap-3">
+      <div class="flex items-center justify-center gap-2 p-1.5 bg-black/40 rounded-lg border border-white/5">
+        <button (click)="switchLanguage('en')" [class.bg-white/10]="currentLang === 'en'" [class.text-white]="currentLang === 'en'" class="flex-1 py-1 text-xs font-bold text-gray-500 hover:text-white rounded-md transition-colors">EN</button>
+        <button (click)="switchLanguage('es')" [class.bg-white/10]="currentLang === 'es'" [class.text-white]="currentLang === 'es'" class="flex-1 py-1 text-xs font-bold text-gray-500 hover:text-white rounded-md transition-colors">ES</button>
+      </div>
+
+      <button (click)="logout()" class="w-full text-left px-3 py-2 text-red-400 hover:bg-white/5 rounded-lg transition-colors text-sm font-medium flex items-center gap-2">
+        <span class="material-symbols-outlined text-[18px]">logout</span>
+        {{ 'ADMIN.LOGOUT' | translate }}
+      </button>
+    </div>
+  </aside>
+
+  <main class="flex-1 relative overflow-y-auto bg-black">
+    <router-outlet></router-outlet>
+  </main>
+</div>

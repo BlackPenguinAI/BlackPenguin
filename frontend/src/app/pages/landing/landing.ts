@@ -1,9 +1,9 @@
-import { Component, AfterViewInit, ViewChild, ElementRef, ViewChildren, QueryList, HostListener, isDevMode } from '@angular/core'; // 🚀 Agregamos isDevMode al final
+import { Component, AfterViewInit, ViewChild, ElementRef, ViewChildren, QueryList, HostListener, isDevMode } from '@angular/core'; 
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { RouterModule } from '@angular/router'; // 🚀 ¡CRÍTICO: Importación agregada para habilitar routerLink!
+import { RouterModule } from '@angular/router'; 
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
-import { HttpClient } from '@angular/common/http'; // 🚀 IMPORTANTE: Añadir HttpClient
+import { HttpClient } from '@angular/common/http'; 
 
 @Component({
   selector: 'app-landing',
@@ -16,7 +16,7 @@ export class LandingComponent implements AfterViewInit {
   email: string = '';
   isSubmitting: boolean = false;
   showSuccess: boolean = false;
-  errorMessage: string = ''; // 🚀 Variable para errores
+  errorMessage: string = ''; 
   currentLang: string = 'en';
   isMobileMenuOpen: boolean = false;
 
@@ -29,16 +29,14 @@ export class LandingComponent implements AfterViewInit {
 
   constructor(
     private translate: TranslateService,
-    private http: HttpClient // 🚀 Inyectamos el cliente HTTP
+    private http: HttpClient 
   ) {
-    this.currentLang = localStorage.getItem('bp_lang') || 'en';
-    this.translate.onLangChange.subscribe((event) => {
-      this.currentLang = event.lang;
-    });
+    this.currentLang = this.translate.currentLang || localStorage.getItem('bp_lang') || 'en';
   }
 
   switchLanguage(lang: string) {
     this.translate.use(lang);
+    this.currentLang = lang;
     localStorage.setItem('bp_lang', lang);
   }
 
@@ -46,99 +44,39 @@ export class LandingComponent implements AfterViewInit {
     this.isMobileMenuOpen = !this.isMobileMenuOpen;
   }
 
+  // 🚀 FUNCIÓN AÑADIDA: Permite deslizarse suavemente por las secciones del Landing
   scrollToSection(sectionId: string) {
     const element = document.getElementById(sectionId);
     if (element) {
-      const elementPosition = element.getBoundingClientRect().top + window.scrollY;
-      const offsetPosition = elementPosition - 120;
-
-      window.scrollTo({
-        top: offsetPosition,
-        behavior: 'smooth'
-      });
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
+  }
+
+  ngAfterViewInit() {
+    if (this.bgVideo?.nativeElement) {
+      this.bgVideo.nativeElement.muted = true;
+      this.bgVideo.nativeElement.play().catch(() => {});
+    }
+    this.triggerFadeIns();
+    this.setupScrollObserver();
   }
 
   joinWaitlist() {
     if (!this.email) return;
 
     this.isSubmitting = true;
-    this.showSuccess = false;
-
-    setTimeout(() => {
-      this.isSubmitting = false;
-      this.showSuccess = true;
-      this.email = '';
-
-      setTimeout(() => this.showSuccess = false, 5000);
-    }, 1500);
-  }
-
-  ngAfterViewInit() {
-    this.animateHeroText();
-    this.triggerFadeIns();
-    this.setupScrollObserver();
-
-    if (this.bgVideo && this.bgVideo.nativeElement) {
-      this.bgVideo.nativeElement.muted = true;
-      this.bgVideo.nativeElement.play().catch(err => console.log('Autoplay bloqueado temporalmente:', err));
-    }
-  }
-
-  private animateHeroText() {
-    if (!this.heroHeading) return;
-    this.heroHeading.nativeElement.innerHTML = ''; 
-
-    this.translate.get('HERO.TITLE').subscribe((translatedText: string) => {
-      const initialDelay = 150;
-      const stagger = 35;
-      const words = translatedText.split(/(\s+)/);
-      let charIndex = 0;
-      
-      words.forEach(word => {
-        if (word === '\n') {
-          this.heroHeading.nativeElement.appendChild(document.createElement('br'));
-        } else if (word.trim() === '') {
-          this.heroHeading.nativeElement.appendChild(document.createTextNode(' '));
-        } else {
-          const wordSpan = document.createElement('span');
-          wordSpan.className = 'whitespace-nowrap';
-          
-          word.split('').forEach(char => {
-            const charSpan = document.createElement('span');
-            charSpan.textContent = char;
-            charSpan.className = 'char-animate';
-            wordSpan.appendChild(charSpan);
-            
-            setTimeout(() => {
-              charSpan.classList.add('visible');
-            }, initialDelay + (charIndex * stagger));
-            charIndex++;
-          });
-          this.heroHeading.nativeElement.appendChild(wordSpan);
-        }
-      });
-    });
-  }
-
-  // 🚀 LÓGICA DE ENVÍO DE MAILCHIMP A TRAVÉS DE FASTAPI
-  onSubmit() {
-    if (!this.email || this.isSubmitting) return;
-    
-    this.isSubmitting = true;
-    this.errorMessage = '';
+    this.errorMessage = ''; 
 
     const apiUrl = isDevMode() 
       ? 'http://localhost:8000/api/v1/leads/waitlist' 
       : 'https://blackpenguin.ai/api/v1/leads/waitlist';
 
     this.http.post(apiUrl, { email: this.email }).subscribe({
-      next: (res: any) => {
+      next: () => {
         this.isSubmitting = false;
         this.showSuccess = true;
-        this.email = ''; // Limpiar el input
+        this.email = ''; 
         
-        // El éxito desaparece después de 5 segundos
         setTimeout(() => this.showSuccess = false, 5000);
       },
       error: (err) => {

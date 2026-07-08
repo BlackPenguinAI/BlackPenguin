@@ -13,6 +13,13 @@ class FunnelStage(str, enum.Enum):
     CLOSED = "closed"
     LOST = "lost"
 
+# 🚀 NUEVA TABLA: Correos de la Lista de Espera
+class WaitlistEmail(Base):
+    __tablename__ = "waitlist_emails"
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    email = Column(String(150), unique=True, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
 class Lead(Base):
     __tablename__ = "leads"
     
@@ -27,6 +34,3 @@ class Lead(Base):
     is_opt_out = Column(Boolean, default=False, nullable=False)
     funnel_stage = Column(SqlaEnum(FunnelStage), default=FunnelStage.NEW, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    
-    company = relationship("Company")
-    project = relationship("Project")

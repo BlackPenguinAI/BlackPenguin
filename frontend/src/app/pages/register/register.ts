@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterModule, Router } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { AuthService } from '../../core/services/auth'; 
-import { ToastService } from '../../core/services/toast'; // 🚀 Importamos
+import { ToastService } from '../../core/services/toast';
 
 @Component({
   selector: 'app-register',
@@ -16,7 +16,6 @@ import { ToastService } from '../../core/services/toast'; // 🚀 Importamos
 export class RegisterComponent implements AfterViewInit {
   @ViewChild('bgVideo') bgVideo!: ElementRef<HTMLVideoElement>;
 
-  // 🚀 Se añade fullName al objeto
   form = { fullName: '', email: '', password: '', confirmPassword: '' };
   isSubmitting = false;
   currentLang: string = 'en';
@@ -25,7 +24,7 @@ export class RegisterComponent implements AfterViewInit {
     private router: Router, 
     private translate: TranslateService, 
     private authService: AuthService,
-    private toastService: ToastService // 🚀 Inyectamos
+    private toastService: ToastService
   ) {
     this.currentLang = this.translate.currentLang || localStorage.getItem('bp_lang') || 'en';
   }
@@ -49,14 +48,16 @@ export class RegisterComponent implements AfterViewInit {
     this.isSubmitting = true;
 
     this.authService.registerAdmin(this.form).subscribe({
-      next: (response) => {
+      // 🚀 SOLUCIÓN: Agregamos ": any" aquí
+      next: (response: any) => {
         this.isSubmitting = false;
-        this.toastService.showSuccess('Cuenta de administrador creada con éxito'); // 🚀 Éxito
+        this.toastService.showSuccess('Cuenta de administrador creada con éxito'); 
         this.router.navigate(['/login']); 
       },
-      error: (err) => {
+      // 🚀 SOLUCIÓN: Agregamos ": any" aquí
+      error: (err: any) => {
         this.isSubmitting = false;
-        this.toastService.showError(err.message); // 🚀 Muestra: "Este correo ya está registrado"
+        this.toastService.showError(err.message); 
       }
     });
   }

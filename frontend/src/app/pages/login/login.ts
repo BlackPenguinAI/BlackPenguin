@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterModule, Router } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { AuthService } from '../../core/services/auth';
-import { ToastService } from '../../core/services/toast'; // 🚀 Importamos el Toast
+import { ToastService } from '../../core/services/toast';
 
 @Component({
   selector: 'app-login',
@@ -24,7 +24,7 @@ export class LoginComponent implements AfterViewInit {
     private router: Router, 
     private translate: TranslateService, 
     private authService: AuthService,
-    private toastService: ToastService // 🚀 Inyectamos el servicio
+    private toastService: ToastService
   ) {
     this.currentLang = this.translate.currentLang || localStorage.getItem('bp_lang') || 'en';
   }
@@ -46,14 +46,23 @@ export class LoginComponent implements AfterViewInit {
     this.isSubmitting = true;
 
     this.authService.login(this.credentials).subscribe({
-      next: (response) => {
+      next: (response: any) => {
         this.isSubmitting = false;
-        this.toastService.showSuccess('Access granted'); // 🚀 Notificación de éxito
-        this.router.navigate(['/chat']); 
+        this.toastService.showSuccess('Access granted'); 
+        
+        // 🚀 Extraemos el rol procesado por el AuthService
+        const userRole = response.role || localStorage.getItem('bp_role') || 'admin';
+
+        // 🚀 REDIRECCIÓN LIMPIA Y EXCLUSIVA
+        if (userRole === 'superadmin') {
+          this.router.navigate(['/admin']); // Destino Staff Master Home
+        } else {
+          this.router.navigate(['/app']);   // Destino Clientes Home
+        }
       },
       error: (err) => {
         this.isSubmitting = false;
-        this.toastService.showError(err.message); // 🚀 Muestra el error exacto del backend (ej: Contraseña incorrecta)
+        this.toastService.showError(err.message); 
       }
     });
   }

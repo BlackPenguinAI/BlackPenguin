@@ -7,7 +7,6 @@ import { Observable, tap, catchError, throwError } from 'rxjs';
 })
 export class AuthService {
   
-  // 🚀 URL DINÁMICA: Local vs Producción (Usando el dominio seguro)
   private apiUrl = isDevMode() 
     ? 'http://localhost:8000/api/v1' 
     : 'https://blackpenguin.ai/api/v1';
@@ -39,6 +38,10 @@ export class AuthService {
       tap((response: any) => {
         if (response && response.access_token) {
           localStorage.setItem('bp_token', response.access_token);
+          
+          const role = response.role || 'admin';
+          localStorage.setItem('bp_role', role);
+          
           if (response.name) {
             localStorage.setItem('bp_name', response.name); 
           }
@@ -50,6 +53,7 @@ export class AuthService {
 
   logout() {
     localStorage.removeItem('bp_token');
+    localStorage.removeItem('bp_role');
     localStorage.removeItem('bp_name'); 
   }
 
@@ -59,6 +63,6 @@ export class AuthService {
 
   private handleError(error: any) {
     console.error('Error en AuthService:', error);
-    return throwError(() => new Error('Hubo un error en la autenticación. Verifica tus credenciales.'));
+    return throwError(() => new Error(error.error?.detail || 'Error en la autenticación.'));
   }
 }

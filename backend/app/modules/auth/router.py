@@ -8,7 +8,7 @@ from app.db.postgres import get_db, Base, engine
 from app.core.security import verify_password, get_password_hash, create_access_token
 from app.core.config import settings
 
-# Importamos los modelos para asegurar que SQLAlchemy los construya en setup-master
+# Importamos los modelos
 from app.modules.tenants.models import Company
 from app.modules.auth.models import User, UserRole
 
@@ -16,7 +16,7 @@ router = APIRouter()
 
 # --- SCHEMAS DE PYDANTIC (Validan los datos que envía Angular) ---
 class UserCreate(BaseModel):
-    full_name: str  # 🚀 Nuevo campo obligatorio
+    full_name: str  
     email: str
     password: str
     role: str = "admin"
@@ -65,7 +65,6 @@ def register(user_data: UserCreate, db: Session = Depends(get_db)):
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == form_data.username).first()
     
-    # 🚀 Separamos los errores exactamente como pediste
     if not user:
         raise HTTPException(status_code=404, detail="Este correo no está registrado.")
     if not verify_password(form_data.password, user.hashed_password):
@@ -73,7 +72,12 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     if not user.is_active:
         raise HTTPException(status_code=400, detail="Usuario inactivo.")
         
-    access_token = create_access_token(data={"sub": str(user.id)}) 
+    access_token = create_access_token(data={"sub": user.email})
     
-    # 🚀 Retornamos el nombre junto con el token
-    return {"access_token": access_token, "token_type": "bearer", "name": user.full_name}
+    # 🚀 ENTRGA CRÍTICA: Añadimos role y name en la respuesta raíz para Angular
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "role": user.role.value if hasattr(user.role, 'value') else str(user.role),
+        "name": user.full_name
+    }

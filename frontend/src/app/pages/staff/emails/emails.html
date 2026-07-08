@@ -1,0 +1,74 @@
+<div class="min-h-screen bg-black text-white font-sans p-6 md:p-12 relative overflow-hidden">
+  <div class="absolute top-0 right-0 w-96 h-96 bg-secondary/10 rounded-full blur-[120px] pointer-events-none"></div>
+
+  <div class="max-w-6xl mx-auto relative z-10">
+    <div class="flex items-center justify-between mb-8">
+      <div>
+        <h1 class="text-3xl font-light tracking-tight">Staff <span class="text-secondary font-medium">Control</span></h1>
+        <p class="text-sm text-gray-400 mt-1">{{ 'ADMIN.WAITLIST_SUBTITLE' | translate }}</p>
+      </div>
+      <div class="flex items-center gap-4">
+        <span class="px-4 py-1.5 bg-white/5 border border-white/10 rounded-full text-xs font-mono text-gray-300 select-none">
+          Total Leads: {{ emails.length }}
+        </span>
+        <button (click)="exportToExcel()" class="bg-secondary hover:bg-yellow-500 text-black px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider flex items-center gap-2 transition-colors focus:outline-none">
+          <span class="material-symbols-outlined text-[16px]">download</span>
+          {{ 'ADMIN.EXPORT_EXCEL' | translate }}
+        </button>
+      </div>
+    </div>
+
+    <div *ngIf="isLoading" class="flex flex-col items-center justify-center py-24 gap-4">
+      <div class="animate-spin h-8 w-8 border-2 border-secondary border-t-transparent rounded-full"></div>
+      <p class="text-sm text-gray-400 font-light">{{ 'ADMIN.SYNCING' | translate }}</p>
+    </div>
+
+    <div *ngIf="!isLoading && !errorMsg" class="liquid-glass border border-white/5 rounded-2xl overflow-hidden shadow-2xl">
+      <table class="w-full border-collapse text-left">
+        <thead>
+          <tr class="border-b border-white/10 bg-white/5 text-gray-300 font-medium text-sm">
+            <th class="p-4 pl-6">{{ 'ADMIN.COL_ID' | translate }}</th>
+            <th class="p-4">{{ 'ADMIN.COL_EMAIL' | translate }}</th>
+            <th class="p-4">{{ 'ADMIN.COL_DATE' | translate }}</th>
+            <th class="p-4 pr-6 text-right">{{ 'ADMIN.ACTIONS' | translate }}</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-white/5 text-sm font-light">
+          <tr *ngFor="let item of emails" class="hover:bg-white/5 transition-colors duration-200">
+            <td class="p-4 pl-6 font-mono text-xs text-gray-500">{{ item.id }}</td>
+            
+            <td class="p-4 text-white font-medium">
+              <ng-container *ngIf="editingId !== item.id">{{ item.email }}</ng-container>
+              <input *ngIf="editingId === item.id" type="email" [(ngModel)]="editEmailValue" class="bg-black/50 border border-secondary text-white px-3 py-1.5 rounded-lg w-full outline-none text-sm focus:ring-1 focus:ring-secondary/50">
+            </td>
+            
+            <td class="p-4 text-gray-400">{{ item.created_at | date:'medium' }}</td>
+            
+            <td class="p-4 pr-6 text-right flex justify-end gap-3">
+              <ng-container *ngIf="editingId !== item.id">
+                <button (click)="startEdit(item)" class="text-gray-400 hover:text-secondary transition-colors focus:outline-none" [title]="'ADMIN.EDIT' | translate">
+                  <span class="material-symbols-outlined text-[18px]">edit</span>
+                </button>
+                <button (click)="deleteEmail(item.id)" class="text-gray-400 hover:text-red-400 transition-colors focus:outline-none" [title]="'ADMIN.DELETE' | translate">
+                  <span class="material-symbols-outlined text-[18px]">delete</span>
+                </button>
+              </ng-container>
+              
+              <ng-container *ngIf="editingId === item.id">
+                <button (click)="saveEdit(item.id)" class="text-green-400 hover:text-green-300 transition-colors focus:outline-none" [title]="'ADMIN.SAVE' | translate">
+                  <span class="material-symbols-outlined text-[18px]">check</span>
+                </button>
+                <button (click)="cancelEdit()" class="text-red-400 hover:text-red-300 transition-colors focus:outline-none" [title]="'ADMIN.CANCEL' | translate">
+                  <span class="material-symbols-outlined text-[18px]">close</span>
+                </button>
+              </ng-container>
+            </td>
+          </tr>
+          <tr *ngIf="emails.length === 0">
+            <td colspan="4" class="p-8 text-center text-gray-500 font-light">{{ 'ADMIN.NO_RECORDS' | translate }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

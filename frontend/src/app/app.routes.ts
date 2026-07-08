@@ -2,12 +2,46 @@ import { Routes } from '@angular/router';
 import { LandingComponent } from './pages/landing/landing';
 import { LoginComponent } from './pages/login/login';
 import { RegisterComponent } from './pages/register/register';
-import { ChatComponent } from './pages/chat/chat'; // <-- Importar
+import { ChatComponent } from './pages/chat/chat'; 
+import { StaffEmailsComponent } from './pages/staff/emails/emails';
+import { StaffAiConfigComponent } from './pages/staff/ai-config/ai-config';
+import { LayoutComponent } from './shared/layout/layout'; // 🚀 Importamos el Layout
 
 export const routes: Routes = [
+  // 🌍 ZONAS LIBRES (No tienen Menú Lateral)
   { path: '', component: LandingComponent },
   { path: 'login', component: LoginComponent },
   { path: 'register', component: RegisterComponent },
-  { path: 'chat', component: ChatComponent }, // <-- Nueva ruta
+
+  // 🛡️ ZONAS PROTEGIDAS (Envueltas en el Sidebar Layout)
+  {
+    path: '',
+    component: LayoutComponent, // 🚀 El componente maestro envuelve todo esto
+    children: [
+      
+      // 1. Panel de Control Black Penguin
+      {
+        path: 'admin',
+        children: [
+          { path: '', redirectTo: 'emails', pathMatch: 'full' },
+          { path: 'emails', component: StaffEmailsComponent },
+          { path: 'ai-config', component: StaffAiConfigComponent },
+        ]
+      },
+
+      // 2. Panel de Clientes
+      {
+        path: 'app',
+        children: [
+          { path: '', redirectTo: 'chat', pathMatch: 'full' },
+          { path: 'chat', component: ChatComponent },
+          // Los demás módulos los irás agregando aquí...
+        ]
+      }
+
+    ]
+  },
+
+  // 🔄 Redirección por defecto
   { path: '**', redirectTo: '' }
 ];
