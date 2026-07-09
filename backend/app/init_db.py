@@ -2,10 +2,14 @@ import os
 from sqlalchemy.orm import Session
 from app.db.postgres import engine, Base, SessionLocal
 
-# 🚀 IMPORTANTE: Importa todos tus modelos aquí para que SQLAlchemy sepa que existen
+# 🚀 IMPORTANTE: Importa absolutamente TODOS tus modelos aquí
 from app.modules.auth.models import User, UserRole
 from app.modules.sales.models import WaitlistEmail, Lead
-from app.core.security import get_password_hash # Tu función para encriptar contraseñas
+
+# 👇 ESTA ES LA LÍNEA QUE FALTA (Ajusta la ruta según dónde esté tu modelo de Empresa)
+from app.modules.empresas.models import Company # o la ruta donde tengas tu modelo
+
+from app.core.security import get_password_hash
 
 def init_db():
     # 1. Crear todas las tablas que falten en la base de datos
