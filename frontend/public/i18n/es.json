@@ -212,5 +212,9 @@
   "APP": {
     "MENU_SECTION": "Espacio de Trabajo",
     "MENU_ONBOARDING": "Onboarding de Empresa"
+  },
+  "LANDING": {
+    "WAITLIST_DUPLICATE": "Este correo ya se encuentra en la lista de espera.",
+    "WAITLIST_ERROR": "Ocurrió un error. Intenta de nuevo."
   }
 }

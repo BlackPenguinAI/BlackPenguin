@@ -9,6 +9,7 @@ from app.modules.sales.models import Lead, WaitlistEmail
 from app.modules.sales.schemas import LeadResponse, LeadUpdate
 from app.modules.auth.models import User, UserRole
 from app.modules.auth.deps import RoleChecker
+from app.core.email import send_email
 
 router = APIRouter()
 
@@ -17,6 +18,7 @@ router = APIRouter()
 # =================================================================
 class WaitlistRequest(BaseModel):
     email: EmailStr
+    language: str = "en" # 🚀 NUEVO: Recibimos el idioma desde el Landing Page
 
 class WaitlistResponse(BaseModel):
     id: str
@@ -27,14 +29,60 @@ class WaitlistResponse(BaseModel):
 
 @router.post("/waitlist", summary="Unirse a la lista de espera")
 def join_waitlist(payload: WaitlistRequest, db: Session = Depends(get_db)):
+    # 1. Validar si el correo ya existe
     existing_email = db.query(WaitlistEmail).filter(WaitlistEmail.email == payload.email).first()
     if existing_email:
-        raise HTTPException(status_code=400, detail="Este correo ya se encuentra en la lista de espera.")
+        error_msg = "Este correo ya se encuentra en la lista de espera." if payload.language == 'es' else "This email is already on the waitlist."
+        raise HTTPException(status_code=400, detail=error_msg)
     
+    # 2. Guardar en Base de Datos
     new_email = WaitlistEmail(email=payload.email)
     db.add(new_email)
     db.commit()
-    return {"message": "¡Suscrito exitosamente a la lista de espera!"}
+
+    # 3. 🚀 PREPARAR EL CONTENIDO DEL CORREO SEGÚN EL IDIOMA
+    if payload.language == 'es':
+        subject = "¡Bienvenido a la Lista de Espera! | Black Penguin"
+        title = "Estás en la lista"
+        message = "Gracias por unirte a la lista de espera de <strong>Black Penguin</strong>. Estamos preparando todo para revolucionar el desarrollo inmobiliario con Inteligencia Artificial. Te notificaremos tan pronto como abramos nuevos cupos para el onboarding."
+        footer = "El equipo de Black Penguin"
+        success_msg = "Suscripción exitosa"
+    else:
+        subject = "Welcome to the Waitlist! | Black Penguin"
+        title = "You're on the list"
+        message = "Thank you for joining the <strong>Black Penguin</strong> waitlist. We are preparing everything to revolutionize real estate development with Artificial Intelligence. We will notify you as soon as we open new spots for onboarding."
+        footer = "The Black Penguin Team"
+        success_msg = "Successfully subscribed"
+
+    # 4. 🚀 PLANTILLA HTML CORPORATIVA (Estilo Liquid Glass oscuro)
+    html_content = f"""
+    <div style="background-color: #000000; color: #ffffff; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 50px 20px; text-align: center;">
+        <div style="max-width: 500px; margin: 0 auto; background-color: #111111; border: 1px solid rgba(255,255,255,0.1); border-radius: 24px; padding: 40px 30px; box-shadow: 0 0 40px rgba(234, 179, 8, 0.05);">
+            <div style="margin-bottom: 24px;">
+                <span style="font-size: 24px; font-weight: 600; color: #ffffff; letter-spacing: -0.5px;">Black</span><span style="font-size: 24px; font-weight: 300; color: #EAB308; letter-spacing: -0.5px;">Penguin</span>
+            </div>
+            <h2 style="font-size: 22px; font-weight: 300; margin-bottom: 16px; color: #ffffff;">{title}</h2>
+            <p style="font-size: 15px; color: #9ca3af; line-height: 1.6; margin-bottom: 32px;">
+                {message}
+            </p>
+            <div style="border-top: 1px solid rgba(255,255,255,0.05); padding-top: 24px; margin-top: 24px;">
+                <p style="font-size: 12px; color: #6b7280;">{footer}<br>© 2026 Black Penguin AI. All rights reserved.</p>
+            </div>
+        </div>
+    </div>
+    """
+
+    # 5. 🚀 ENVIAR CORREO (Protegido con Try/Except para no romper el registro si falla el SMTP)
+    try:
+        send_email(
+            to_email=payload.email,
+            subject=subject,
+            html_content=html_content
+        )
+    except Exception as e:
+        print(f"⚠️ Error enviando correo de confirmación a {payload.email}: {e}")
+
+    return {"message": success_msg}
 
 @router.get("/waitlist", response_model=List[WaitlistResponse], summary="Obtener correos (Solo Admin)")
 def get_waitlist(

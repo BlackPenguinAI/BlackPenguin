@@ -212,5 +212,9 @@
   "APP": {
     "MENU_SECTION": "Workspace",
     "MENU_ONBOARDING": "Company Onboarding"
+  },
+  "LANDING": {
+    "WAITLIST_DUPLICATE": "This email is already on the waitlist.",
+    "WAITLIST_ERROR": "An error occurred. Please try again."
   }
 }

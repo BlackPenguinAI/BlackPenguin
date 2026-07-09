@@ -1,4 +1,4 @@
-import { Component, AfterViewInit, ViewChild, ElementRef, ViewChildren, QueryList, HostListener, isDevMode } from '@angular/core'; 
+import { Component, AfterViewInit, ViewChild, ElementRef, ViewChildren, QueryList, HostListener, isDevMode, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router'; 
@@ -29,7 +29,8 @@ export class LandingComponent implements AfterViewInit {
 
   constructor(
     private translate: TranslateService,
-    private http: HttpClient 
+    private http: HttpClient,
+    private cdr: ChangeDetectorRef // 🚀 NUEVO: Inyectamos el actualizador de vista
   ) {
     this.currentLang = this.translate.currentLang || localStorage.getItem('bp_lang') || 'en';
   }
@@ -65,23 +66,40 @@ export class LandingComponent implements AfterViewInit {
     if (!this.email) return;
 
     this.isSubmitting = true;
-    this.errorMessage = ''; 
+    this.errorMessage = '';
 
     const apiUrl = isDevMode() 
       ? 'http://localhost:8000/api/v1/leads/waitlist' 
       : 'https://blackpenguin.ai/api/v1/leads/waitlist';
 
-    this.http.post(apiUrl, { email: this.email }).subscribe({
+    const payload = { 
+      email: this.email, 
+      language: this.currentLang 
+    };
+
+    this.http.post(apiUrl, payload).subscribe({
       next: () => {
         this.isSubmitting = false;
         this.showSuccess = true;
         this.email = ''; 
+        this.cdr.detectChanges(); // 🚀 Obligamos a renderizar el éxito
         
         setTimeout(() => this.showSuccess = false, 5000);
       },
       error: (err) => {
         this.isSubmitting = false;
-        this.errorMessage = err.error?.detail || 'Ocurrió un error. Intenta de nuevo.';
+        
+        // 🚀 MAPEO DE ERRORES CON TRADUCCIÓN (Inglés por defecto como fallback)
+        if (err.status === 400) {
+          // Captura el error de duplicado (400)
+          this.errorMessage = this.translate.instant('LANDING.WAITLIST_DUPLICATE') || 'This email is already on the waitlist.';
+        } else {
+          // Captura cualquier otro error de servidor (500, etc)
+          this.errorMessage = this.translate.instant('LANDING.WAITLIST_ERROR') || 'An error occurred. Please try again.';
+        }
+        
+        this.cdr.detectChanges(); // 🚀 OBLIGAMOS A ANGULAR A MOSTRAR EL ERROR
+        
         setTimeout(() => this.errorMessage = '', 5000);
       }
     });
