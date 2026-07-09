@@ -79,4 +79,4 @@ jobs:
 
           # 🚀 EL CAMBIO ESTÁ AQUÍ: Cambiamos -p 80:80 por -p 8080:80
           echo "🌱 Ejecutando Data Seeding (Tablas y Superadmin)..."
-          docker exec bp_api_prod python -m init_db
+          docker exec bp_api_prod python -m app.init_db
