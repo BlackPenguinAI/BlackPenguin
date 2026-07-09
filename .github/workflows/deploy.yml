@@ -54,7 +54,7 @@ jobs:
           echo "MAILCHIMP_SERVER=$MAILCHIMP_SERVER" >> backend/.env
 
           # ==========================================
-          # 🚀 DESPLIEGUE DEL BACKEND (FastAPI)
+          # 🚀 DESPLIEGUE DEL BACKEND (FastAPI) **
           # ==========================================
           echo "🏗️ Construyendo imagen de FastAPI..."
           docker build -t blackpenguin-api:latest ./backend
