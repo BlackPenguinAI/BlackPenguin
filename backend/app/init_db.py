@@ -3,8 +3,12 @@ from sqlalchemy.orm import Session
 from app.db.postgres import engine, Base, SessionLocal
 
 # 🚀 IMPORTANTE: Importa absolutamente TODOS tus modelos aquí
-from app.modules.auth.models import User, UserRole
-from app.modules.sales.models import WaitlistEmail, Lead
+from app.modules.ai.models import *
+from app.modules.auth.models import *
+from app.modules.integrations.models import *
+from app.modules.properties.models import *
+from app.modules.sales.models import *
+from app.modules.tenants.models import *
 
 # 👇 ESTA ES LA LÍNEA QUE FALTA (Ajusta la ruta según dónde esté tu modelo de Empresa)
 from app.modules.empresas.models import Company # o la ruta donde tengas tu modelo
