@@ -54,7 +54,7 @@ jobs:
           echo "MAILCHIMP_SERVER=$MAILCHIMP_SERVER" >> backend/.env
 
           # ==========================================
-          # 🚀 DESPLIEGUE DEL BACKEND (FastAPI) **
+          # 🚀 DESPLIEGUE DEL BACKEND (FastAPI)
           # ==========================================
           echo "🏗️ Construyendo imagen de FastAPI..."
           docker build -t blackpenguin-api:latest ./backend
@@ -78,9 +78,5 @@ jobs:
           docker rm bp_frontend_prod || true
 
           # 🚀 EL CAMBIO ESTÁ AQUÍ: Cambiamos -p 80:80 por -p 8080:80
-          echo "🚀 Encendiendo frontend en el puerto interno 8080..."
-          docker run -d --name bp_frontend_prod --restart always -p 8080:80 blackpenguin-frontend:latest
-
-          echo "🔄 Ejecutando migraciones de base de datos de forma segura..."
-          # Este comando ocurre dentro del servidor, sin exponer ningún endpoint a internet
-          docker exec bp_api_prod alembic upgrade head
+          echo "🌱 Ejecutando Data Seeding (Tablas y Superadmin)..."
+          docker exec bp_api_prod python -m init_db
