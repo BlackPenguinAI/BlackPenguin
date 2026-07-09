@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session  # 🚀 ESTA ES LA LÍNEA QUE FALTA
 import urllib.request
 import json
 from pydantic import BaseModel
