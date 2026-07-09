@@ -1,7 +1,5 @@
 import os
 from sqlalchemy.orm import Session
-from app.db.postgres import engine, Base, SessionLocal
-
 from app.db.base import Base  # Al importar esto, Python lee TODOS los modelos automáticamente
 from app.db.postgres import engine, SessionLocal
 
