@@ -4,6 +4,7 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { FormsModule } from '@angular/forms'; // 🚀 Necesario para el [(ngModel)] de edición
 import { TranslateModule, TranslateService } from '@ngx-translate/core'; // 🚀 Para idiomas
 import * as XLSX from 'xlsx'; // 🚀 Librería de Excel
+import { ToastService } from '../../../core/services/toast'; // 🚀 Importar el servicio Toast de tu app
 
 @Component({
   selector: 'app-staff-emails',
@@ -21,9 +22,14 @@ export class StaffEmailsComponent implements OnInit {
   editingId: string | null = null;
   editEmailValue: string = '';
 
+  showDeleteModal: boolean = false;
+  emailToDelete: string | null = null;
+  isDeleting: boolean = false;
+
   constructor(
     private http: HttpClient,
     private translate: TranslateService,
+    private toast: ToastService, // 🚀 Inyectar servicio de Toasts,
     @Inject(PLATFORM_ID) private platformId: Object // 🚀 Inyectamos el detector de entorno
   ) {}
 
@@ -86,18 +92,34 @@ export class StaffEmailsComponent implements OnInit {
     });
   }
 
-  deleteEmail(id: string) {
-    const confirmMessage = this.translate.instant('ADMIN.CONFIRM_DELETE') || 'Are you sure?';
-    if (confirm(confirmMessage)) {
-      this.http.delete(`${this.apiUrl}/${id}`, { headers: this.headers }).subscribe({
-        next: () => {
-          this.loadData(); // Recarga la tabla tras eliminar
-        },
-        error: (err) => {
-          alert('Error al eliminar');
-        }
-      });
-    }
+  openDeleteModal(id: string) {
+    this.emailToDelete = id;
+    this.showDeleteModal = true;
+  }
+
+  closeDeleteModal() {
+    this.showDeleteModal = false;
+    this.emailToDelete = null;
+  }
+
+  confirmDelete() {
+    if (!this.emailToDelete) return;
+    this.isDeleting = true;
+
+    // Asegúrate de que esta sea la ruta correcta a tu API de emails/waitlist
+    this.http.delete(`${this.apiUrl}/${this.emailToDelete}`, { headers: this.headers }).subscribe({
+      next: () => {
+        this.isDeleting = false;
+        this.closeDeleteModal();
+        this.loadData(); // O como se llame tu función que recarga la tabla
+        this.toast.showSuccess('Registro eliminado exitosamente.');
+      },
+      error: (err) => {
+        this.isDeleting = false;
+        this.closeDeleteModal();
+        this.toast.showError(err.error?.detail || 'Error al eliminar el registro');
+      }
+    });
   }
 
   // --- EXPORTACIÓN A EXCEL ---

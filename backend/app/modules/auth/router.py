@@ -15,6 +15,8 @@ from app.modules.auth.models import User, UserRole
 from app.modules.auth.schemas import UserProfileUpdate, UserProfileResponse
 from app.modules.auth.deps import get_current_user
 
+from app.core.security import verify_email_token
+
 router = APIRouter()
 
 # --- SCHEMAS DE PYDANTIC (Validan los datos que envía Angular) ---
@@ -25,6 +27,13 @@ class UserCreate(BaseModel):
     role: str = "admin"
     is_active: bool = True
 
+class PasswordUpdatePayload(BaseModel):
+    current_password: str
+    new_password: str
+
+class SetPasswordPayload(BaseModel):
+    token: str
+    new_password: str
 # --- ENDPOINTS ---
 
 @router.post("/setup-master", status_code=201)
@@ -102,3 +111,42 @@ def update_my_profile(
     db.commit()
     db.refresh(current_user)
     return current_user
+
+@router.put("/change-password", summary="Actualizar contraseña del usuario actual")
+def change_password(
+    payload: PasswordUpdatePayload, 
+    db: Session = Depends(get_db), 
+    current_user: User = Depends(get_current_user)
+):
+    # 1. Verificar contraseña actual
+    if not verify_password(payload.current_password, current_user.hashed_password):
+        raise HTTPException(status_code=400, detail="La contraseña actual es incorrecta.")
+    
+    # 2. Encriptar y guardar nueva contraseña
+    current_user.hashed_password = get_password_hash(payload.new_password)
+    db.commit()
+    
+    return {"message": "Contraseña actualizada de forma segura."}
+
+@router.post("/set-password", summary="Establecer contraseña y consumir token")
+def set_password(payload: SetPasswordPayload, db: Session = Depends(get_db)):
+    # 1. Verificar si es un JWT válido y no ha expirado (24h)
+    token_data = verify_email_token(payload.token)
+    if not token_data:
+        raise HTTPException(status_code=400, detail="El enlace es inválido o ha expirado.")
+
+    # 2. Buscar al usuario
+    user = db.query(User).filter(User.email == token_data.get("sub")).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+
+    # 3. VERIFICACIÓN DE UN SOLO USO (La magia ocurre aquí)
+    expected_sec = user.hashed_password[-10:] if user.hashed_password else ""
+    if token_data.get("sec") != expected_sec:
+        raise HTTPException(status_code=400, detail="Este enlace ya fue utilizado para cambiar la contraseña.")
+
+    # 4. Actualizar la contraseña (esto cambia el hash, invalidando el token actual)
+    user.hashed_password = get_password_hash(payload.new_password)
+    db.commit()
+    
+    return {"message": "Contraseña establecida con éxito."}

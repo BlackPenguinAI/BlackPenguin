@@ -11,12 +11,16 @@ import { StaffDashboardComponent } from './pages/staff/dashboard/dashboard';
 import { StaffProfileComponent } from './pages/staff/profile/profile';
 import { StaffDevelopersComponent } from './pages/staff/developers/developers';
 
+import { StaffPlansComponent } from './pages/staff/plans/plans';
+import { SetPasswordComponent } from './pages/set-password/set-password';
+
 export const routes: Routes = [
   // 🌍 ZONAS LIBRES (No tienen Menú Lateral)
   { path: '', component: LandingComponent },
   { path: 'login', component: LoginComponent },
   { path: 'register', component: RegisterComponent },
-
+  { path: 'set-password', component: SetPasswordComponent }, // 🚀 NUEVA RUTA AQUÍ
+  
   // 🛡️ ZONAS PROTEGIDAS (Envueltas en el Sidebar Layout)
   {
     path: '',
@@ -33,6 +37,7 @@ export const routes: Routes = [
           { path: 'developers', component: StaffDevelopersComponent },
           { path: 'emails', component: StaffEmailsComponent },
           { path: 'ai-config', component: StaffAiConfigComponent },
+          { path: 'plans', component: StaffPlansComponent },
         ]
       },
 

@@ -22,3 +22,21 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
     return encoded_jwt
+
+# 🚀 NUEVO: Tokens para Correos (Activación y Recuperación)
+def create_email_token(email: str, user_hash: str = "", expires_delta: timedelta = timedelta(hours=24)) -> str:
+    """Crea un token que expira en 24h y se amarra al hash actual de la contraseña (Un solo uso)."""
+    expire = datetime.now(timezone.utc) + expires_delta
+    # Guardamos los últimos 10 caracteres del hash. Si la contraseña cambia, el hash cambia.
+    to_encode = {"exp": expire, "sub": email, "type": "email_action", "sec": user_hash[-10:] if user_hash else ""}
+    return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+
+def verify_email_token(token: str) -> dict | None:
+    """Verifica el token y devuelve el diccionario completo si es válido."""
+    try:
+        decoded_token = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        if decoded_token.get("type") != "email_action":
+            return None
+        return decoded_token
+    except jwt.JWTError:
+        return None

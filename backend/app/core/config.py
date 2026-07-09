@@ -23,6 +23,14 @@ class Settings(BaseSettings):
     OPENROUTER_API_KEY: str
     DEFAULT_AI_MODEL: str = "deepseek/deepseek-chat"
 
+    # 🚀 NUEVO: Configuraciones de Correo (SMTP)
+    SMTP_SERVER: str = "smtp.gmail.com"
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    EMAILS_FROM_EMAIL: str = "info@blackpenguin.ai"
+    EMAILS_FROM_NAME: str = "Black Penguin"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

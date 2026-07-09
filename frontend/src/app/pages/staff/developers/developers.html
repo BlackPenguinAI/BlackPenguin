@@ -2,8 +2,6 @@
   <div class="absolute top-1/4 left-0 w-96 h-96 bg-secondary/5 rounded-full blur-[120px] pointer-events-none"></div>
 
   <div class="max-w-7xl mx-auto relative z-10">
-    
-    <!-- HEADER -->
     <div class="flex items-center justify-between mb-8 border-b border-white/10 pb-6">
       <div>
         <h1 class="text-3xl font-light tracking-tight">{{ 'ADMIN.DEV_TITLE' | translate }}</h1>
@@ -15,71 +13,54 @@
       </button>
     </div>
 
-    <!-- SPINNER -->
     <div *ngIf="isLoading" class="flex flex-col items-center justify-center py-24 gap-4">
       <div class="animate-spin h-8 w-8 border-2 border-secondary border-t-transparent rounded-full"></div>
     </div>
 
-    <!-- TABLA MAESTRA DE EMPRESAS -->
     <div *ngIf="!isLoading" class="liquid-glass border border-white/5 rounded-2xl overflow-hidden shadow-2xl">
       <table class="w-full border-collapse text-left">
         <thead>
           <tr class="border-b border-white/10 bg-white/5 text-gray-300 font-medium text-xs uppercase tracking-wider">
             <th class="p-4 pl-6">{{ 'DEV_PAGE.TABLE_NAME' | translate }}</th>
             <th class="p-4">{{ 'DEV_PAGE.TABLE_PLAN' | translate }}</th>
-            <th class="p-4">{{ 'DEV_PAGE.TABLE_PROJECTS' | translate }}</th>
+            <th class="p-4">{{ 'DEV_PAGE.TABLE_DURATION' | translate }}</th>
             <th class="p-4">{{ 'DEV_PAGE.TABLE_EXPIRATION' | translate }}</th>
             <th class="p-4 text-center">{{ 'DEV_PAGE.TABLE_STATUS' | translate }}</th>
             <th class="p-4 pr-6 text-right">{{ 'ADMIN.ACTIONS' | translate }}</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-white/5 text-sm font-light">
-          <tr *ngFor="let company of companies" class="hover:bg-white/5 transition-colors duration-200">
-            <!-- Nombre de Empresa -->
+          <tr *ngFor="let dev of developers" class="hover:bg-white/5 transition-colors duration-200">
             <td class="p-4 pl-6 font-medium text-white flex items-center gap-3">
               <div class="h-8 w-8 rounded bg-white/10 flex items-center justify-center text-secondary font-bold font-mono">
-                {{ company.name.charAt(0) | uppercase }}
+                {{ dev.name.charAt(0) | uppercase }}
               </div>
-              {{ company.name }}
+              {{ dev.name }}
             </td>
-            
-            <!-- Plan (Badge) -->
             <td class="p-4">
-              <span [ngClass]="{'bg-gray-500/20 text-gray-300 border-gray-500/30': company.plan_tier === 'core', 'bg-secondary/20 text-secondary border-secondary/30': company.plan_tier === 'enterprise'}" 
-                    class="px-3 py-1 border rounded-full text-xs font-bold uppercase tracking-widest">
-                {{ company.plan_tier }}
+              <span class="px-3 py-1 border rounded-full text-[10px] font-bold uppercase tracking-widest bg-secondary/10 text-secondary border-secondary/30">
+                {{ getPlanName(dev.plan_id) }}
               </span>
             </td>
-
-            <!-- Proyectos (Límite) -->
-            <td class="p-4 font-mono text-gray-400">
-              <span class="material-symbols-outlined text-[16px] align-middle mr-1">location_city</span>
-              Max: {{ company.max_projects_allowed }}
-            </td>
-
-            <!-- Expiración de Licencia -->
-            <td class="p-4 text-gray-400">
-              {{ company.license_end | date:'mediumDate' }}
-            </td>
-
-            <!-- Estatus -->
+            <td class="p-4 text-gray-400">{{ dev.plan_duration_months }} {{ 'DEV_PAGE.MONTHS' | translate }}</td>
+            <td class="p-4 text-gray-400">{{ dev.license_end | date:'mediumDate' }}</td>
             <td class="p-4 text-center">
-              <span *ngIf="company.is_active" class="h-2.5 w-2.5 rounded-full bg-green-500 inline-block shadow-[0_0_8px_rgba(34,197,94,0.8)]" title="Active"></span>
-              <span *ngIf="!company.is_active" class="h-2.5 w-2.5 rounded-full bg-red-500 inline-block" title="Suspended"></span>
+              <span *ngIf="dev.is_active" class="h-2.5 w-2.5 rounded-full bg-green-500 inline-block shadow-[0_0_8px_rgba(34,197,94,0.8)]"></span>
+              <span *ngIf="!dev.is_active" class="h-2.5 w-2.5 rounded-full bg-red-500 inline-block"></span>
             </td>
-
-            <!-- Acciones -->
-            <td class="p-4 pr-6 text-right">
-              <button (click)="openModal(company)" class="text-gray-400 hover:text-white transition-colors p-2 focus:outline-none" [title]="'ADMIN.EDIT' | translate">
+            <td class="p-4 pr-6 text-right flex justify-end gap-1">
+              <button (click)="resendActivation(dev.id)" [disabled]="resendingId === dev.id" class="text-blue-400 hover:text-blue-300 transition-colors p-2 disabled:opacity-50" [title]="'DEV_PAGE.RESEND_LINK' | translate">
+                <span class="material-symbols-outlined text-[20px] shadow-sm">forward_to_inbox</span>
+              </button>
+              <button (click)="openModal(dev)" class="text-gray-400 hover:text-white transition-colors p-2" [title]="'ADMIN.EDIT' | translate">
                 <span class="material-symbols-outlined text-[20px]">edit</span>
               </button>
-              <button (click)="deleteCompany(company.id)" class="text-gray-400 hover:text-red-400 transition-colors p-2 focus:outline-none" [title]="'ADMIN.DELETE' | translate">
+              <button (click)="openDeleteModal(dev.id)" class="text-gray-400 hover:text-red-400 transition-colors p-2" [title]="'ADMIN.DELETE' | translate">
                 <span class="material-symbols-outlined text-[20px]">delete</span>
               </button>
             </td>
           </tr>
-          
-          <tr *ngIf="companies.length === 0">
+          <tr *ngIf="developers.length === 0">
             <td colspan="6" class="p-12 text-center text-gray-500 font-light">{{ 'ADMIN.NO_RECORDS' | translate }}</td>
           </tr>
         </tbody>
@@ -87,79 +68,100 @@
     </div>
   </div>
 
-  <!-- MODAL DE CREACIÓN / EDICIÓN -->
-  <div *ngIf="showModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-    <div class="bg-[#111111] border border-white/10 rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden animate-fade-in">
-      
+  <div *ngIf="showModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
+    <div class="bg-[#111111] border border-white/10 rounded-2xl w-full max-w-2xl shadow-2xl my-auto animate-fade-in">
       <div class="p-6 border-b border-white/10 flex justify-between items-center bg-white/5">
         <h2 class="text-xl font-medium text-white">{{ isEditing ? ('DEV_PAGE.MODAL_TITLE_EDIT' | translate) : ('DEV_PAGE.MODAL_TITLE_ADD' | translate) }}</h2>
-        <button type="button" (click)="closeModal()" class="text-gray-400 hover:text-white focus:outline-none">
-          <span class="material-symbols-outlined">close</span>
-        </button>
+        <button type="button" (click)="closeModal()" class="text-gray-400 hover:text-white"><span class="material-symbols-outlined">close</span></button>
       </div>
 
-      <form (ngSubmit)="saveCompany()" class="p-6 flex flex-col gap-6">
-        
+      <form (ngSubmit)="saveDeveloper()" class="p-6 flex flex-col gap-6">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-          <!-- Nombre -->
           <div class="flex flex-col gap-1.5 md:col-span-2">
             <label class="text-xs text-gray-400 uppercase">{{ 'DEV_PAGE.FIELD_NAME' | translate }} *</label>
-            <input type="text" name="name" [(ngModel)]="form.name" required class="bg-black/50 border border-white/10 focus:border-secondary rounded-lg px-4 py-2.5 text-sm text-white outline-none">
+            <input type="text" name="name" [(ngModel)]="form.company_name" required class="bg-black/50 border border-white/10 focus:border-secondary rounded-lg px-4 py-2.5 text-sm text-white outline-none">
           </div>
-
-          <!-- Plan y Proyectos -->
           <div class="flex flex-col gap-1.5">
-            <label class="text-xs text-gray-400 uppercase">{{ 'DEV_PAGE.FIELD_PLAN' | translate }}</label>
-            <select name="plan" [(ngModel)]="form.plan_tier" class="bg-black/50 border border-white/10 focus:border-secondary rounded-lg px-4 py-2.5 text-sm text-white outline-none cursor-pointer appearance-none">
-              <option value="core">CORE</option>
-              <option value="enterprise">ENTERPRISE</option>
+            <label class="text-xs text-gray-400 uppercase">{{ 'DEV_PAGE.FIELD_PLAN' | translate }} *</label>
+            <select name="plan" [(ngModel)]="form.plan_id" required class="bg-black/50 border border-white/10 focus:border-secondary rounded-lg px-4 py-2.5 text-sm text-white outline-none cursor-pointer">
+              <option value="" disabled selected>{{ 'DEV_PAGE.SEL_PLAN' | translate }}</option>
+              <option *ngFor="let p of plans" [value]="p.id">{{ p.name }}</option>
             </select>
           </div>
           <div class="flex flex-col gap-1.5">
-            <label class="text-xs text-gray-400 uppercase">{{ 'DEV_PAGE.FIELD_PROJECTS' | translate }}</label>
-            <input type="number" name="maxProj" [(ngModel)]="form.max_projects_allowed" min="1" class="bg-black/50 border border-white/10 focus:border-secondary rounded-lg px-4 py-2.5 text-sm text-white outline-none">
+            <label class="text-xs text-gray-400 uppercase">{{ 'DEV_PAGE.FIELD_DURATION' | translate }}</label>
+            <input type="number" name="duration" [(ngModel)]="form.duration_months" min="1" required class="bg-black/50 border border-white/10 focus:border-secondary rounded-lg px-4 py-2.5 text-sm text-white outline-none">
           </div>
-
-          <!-- Fechas y Estatus -->
-          <div class="flex flex-col gap-1.5">
-            <label class="text-xs text-gray-400 uppercase">{{ 'DEV_PAGE.FIELD_LICENSE' | translate }} *</label>
-            <input type="date" name="licenseEnd" [(ngModel)]="form.license_end" required class="bg-black/50 border border-white/10 focus:border-secondary rounded-lg px-4 py-2.5 text-sm text-white outline-none">
-          </div>
-          <div class="flex flex-col gap-1.5 justify-center mt-6">
-            <label class="flex items-center gap-3 cursor-pointer">
-              <input type="checkbox" name="isActive" [(ngModel)]="form.is_active" class="w-4 h-4 accent-secondary bg-black/50 border-white/10 rounded">
-              <span class="text-sm text-white">{{ 'DEV_PAGE.FIELD_ACTIVE' | translate }}</span>
+          <div class="flex flex-col gap-1.5 md:col-span-2">
+            <label class="text-xs text-gray-400 uppercase flex justify-between">
+              <span>{{ 'DEV_PAGE.FIELD_RECEIPT' | translate }}</span>
             </label>
+            <input type="text" name="receipt" [(ngModel)]="form.payment_receipt_url" placeholder="https://..." class="bg-black/50 border border-white/10 focus:border-secondary rounded-lg px-4 py-2.5 text-sm text-white outline-none">
           </div>
         </div>
 
-        <!-- Toggles de Características -->
-        <div class="border-t border-white/10 pt-5 mt-2 flex flex-col gap-3">
-          <h3 class="text-xs text-secondary font-bold uppercase tracking-widest">{{ 'DEV_PAGE.FEATURES_TITLE' | translate }}</h3>
-          <div class="flex items-center gap-8">
-            <label class="flex items-center gap-2 cursor-pointer text-sm text-gray-300">
-              <input type="checkbox" name="hasVoice" [(ngModel)]="form.has_voice_agents" class="w-4 h-4 accent-secondary rounded bg-black/50">
-              {{ 'DEV_PAGE.FIELD_VOICE' | translate }}
-            </label>
-            <label class="flex items-center gap-2 cursor-pointer text-sm text-gray-300">
-              <input type="checkbox" name="hasIntegrations" [(ngModel)]="form.has_enterprise_integrations" class="w-4 h-4 accent-secondary rounded bg-black/50">
-              {{ 'DEV_PAGE.FIELD_INTEGRATIONS' | translate }}
-            </label>
+        <div class="border-t border-white/10 pt-5 mt-2 flex flex-col gap-4">
+          <h3 class="text-xs text-secondary font-bold uppercase tracking-widest">{{ 'DEV_PAGE.ADMIN_SECTION' | translate }}</h3>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="flex flex-col gap-1.5">
+              <label class="text-xs text-gray-400 uppercase">{{ 'PROFILE_PAGE.FIRST_NAME' | translate }} *</label>
+              <input type="text" name="admFn" [(ngModel)]="form.admin_first_name" required class="bg-black/50 border border-white/10 focus:border-secondary rounded-lg px-3 py-2 text-sm text-white outline-none">
+            </div>
+            <div class="flex flex-col gap-1.5">
+              <label class="text-xs text-gray-400 uppercase">{{ 'PROFILE_PAGE.LAST_NAME_P' | translate }} *</label>
+              <input type="text" name="admLp" [(ngModel)]="form.admin_paternal_last_name" required class="bg-black/50 border border-white/10 focus:border-secondary rounded-lg px-3 py-2 text-sm text-white outline-none">
+            </div>
+            <div class="flex flex-col gap-1.5">
+              <label class="text-xs text-gray-400 uppercase">{{ 'PROFILE_PAGE.LAST_NAME_M' | translate }}</label>
+              <input type="text" name="admLm" [(ngModel)]="form.admin_maternal_last_name" class="bg-black/50 border border-white/10 focus:border-secondary rounded-lg px-3 py-2 text-sm text-white outline-none">
+            </div>
+            <div class="flex flex-col gap-1.5 md:col-span-3">
+              <label class="text-xs text-gray-400 uppercase">{{ 'AUTH.EMAIL' | translate }} *</label>
+              <input type="email" name="admEmail" [(ngModel)]="form.admin_email" required class="bg-black/50 border border-white/10 focus:border-secondary rounded-lg px-4 py-2.5 text-sm text-white outline-none">
+            </div>
           </div>
+          <p *ngIf="!isEditing" class="text-xs text-blue-400 bg-blue-500/10 p-3 rounded-lg flex gap-2 items-start border border-blue-500/20">
+            <span class="material-symbols-outlined text-[16px]">info</span>
+            {{ 'DEV_PAGE.EMAIL_INFO' | translate }}
+          </p>
+          <label class="flex items-center gap-3 cursor-pointer mt-2">
+            <input type="checkbox" name="isActive" [(ngModel)]="form.is_active" class="w-4 h-4 accent-secondary bg-black/50 border-white/10 rounded">
+            <span class="text-sm text-gray-300">{{ 'DEV_PAGE.FIELD_ACTIVE' | translate }}</span>
+          </label>
         </div>
 
-        <!-- Botones -->
-        <div class="flex justify-end gap-4 mt-4">
-          <button type="button" (click)="closeModal()" class="px-5 py-2.5 text-sm font-medium text-gray-400 hover:text-white transition-colors focus:outline-none">
+        <div class="flex justify-end gap-4 mt-2">
+          <button type="button" (click)="closeModal()" class="px-5 py-2.5 text-sm font-medium text-gray-400 hover:text-white transition-colors">
             {{ 'ADMIN.CANCEL' | translate }}
           </button>
-          <button type="submit" [disabled]="isSaving || !form.name || !form.license_end" class="px-6 py-2.5 bg-secondary text-black font-bold text-sm rounded-lg hover:bg-yellow-500 transition-colors focus:outline-none disabled:opacity-50 flex items-center gap-2">
+          <button type="submit" [disabled]="isSaving || !form.company_name || !form.plan_id || !form.admin_first_name || !form.admin_paternal_last_name || !form.admin_email" class="px-6 py-2.5 bg-secondary text-black font-bold text-sm rounded-lg hover:bg-yellow-500 transition-colors flex items-center gap-2">
             <span *ngIf="isSaving" class="material-symbols-outlined animate-spin text-sm">sync</span>
             {{ 'ADMIN.SAVE' | translate }}
           </button>
         </div>
-
       </form>
+    </div>
+  </div>
+
+  <div *ngIf="showDeleteModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+    <div class="bg-[#111111] border border-red-500/20 rounded-3xl w-full max-w-sm shadow-[0_0_50px_rgba(239,68,68,0.1)] p-8 flex flex-col items-center text-center animate-fade-in">
+      
+      <div class="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center mb-5 border border-red-500/20">
+        <span class="material-symbols-outlined text-red-500 text-4xl">warning</span>
+      </div>
+      
+      <h2 class="text-2xl font-light text-white mb-2">{{ 'DEV_PAGE.DELETE_TITLE' | translate }}</h2>
+      <p class="text-sm text-gray-400 mb-8 leading-relaxed">{{ 'DEV_PAGE.DELETE_DESC' | translate }}</p>
+      
+      <div class="flex flex-col md:flex-row items-center gap-3 w-full">
+        <button (click)="closeDeleteModal()" [disabled]="isDeleting" class="w-full md:w-1/2 py-3.5 bg-white/5 hover:bg-white/10 text-white text-sm font-medium rounded-xl transition-colors disabled:opacity-50">
+          {{ 'ADMIN.CANCEL' | translate }}
+        </button>
+        <button (click)="confirmDelete()" [disabled]="isDeleting" class="w-full md:w-1/2 py-3.5 bg-red-500 hover:bg-red-600 text-white text-sm font-bold rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-red-500/20">
+          <span *ngIf="isDeleting" class="material-symbols-outlined animate-spin text-sm">sync</span>
+          {{ 'ADMIN.DELETE' | translate }}
+        </button>
+      </div>
     </div>
   </div>
 </div>

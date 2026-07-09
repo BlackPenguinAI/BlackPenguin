@@ -24,6 +24,12 @@
            <span class="material-symbols-outlined text-[18px]">person</span>
            {{ 'ADMIN.PROFILE' | translate }}
          </a>
+
+         <a routerLink="/admin/plans" routerLinkActive="bg-white/10 text-white" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors block flex items-center gap-2">
+          <span class="material-symbols-outlined text-[18px]">workspace_premium</span>
+          {{ 'ADMIN.PLANS' | translate }}
+        </a>
+        
          <a routerLink="/admin/developers" routerLinkActive="bg-white/10 text-white" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors block flex items-center gap-2">
            <span class="material-symbols-outlined text-[18px]">business_center</span>
            {{ 'ADMIN.CLIENTS_CRUD' | translate }}
@@ -41,10 +47,10 @@
       </ng-container>
 
       <ng-container *ngIf="userRole !== 'superadmin'">
-         <p class="px-3 text-[10px] text-gray-500 uppercase tracking-widest font-medium mt-2">App Menu</p>
+         <p class="px-3 text-[10px] text-gray-500 uppercase tracking-widest font-medium mt-2">{{ 'APP.MENU_SECTION' | translate }}</p>
          <a routerLink="/app/chat" routerLinkActive="bg-white/10 text-white" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors block flex items-center gap-2">
-           <span class="material-symbols-outlined text-[18px]">chat</span>
-           Copiloto AI (Chat)
+           <span class="material-symbols-outlined text-[18px]">support_agent</span>
+           {{ 'APP.MENU_ONBOARDING' | translate }}
          </a>
       </ng-container>
     </nav>

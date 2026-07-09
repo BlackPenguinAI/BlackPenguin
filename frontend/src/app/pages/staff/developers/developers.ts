@@ -3,6 +3,7 @@ import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { ToastService } from '../../../core/services/toast'; // 🚀 Importar el servicio Toast de tu app
 
 @Component({
   selector: 'app-staff-developers',
@@ -13,36 +14,46 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
   styleUrl: './developers.scss'
 })
 export class StaffDevelopersComponent implements OnInit {
-  companies: any[] = [];
+  developers: any[] = [];
+  plans: any[] = [];
+  
   isLoading: boolean = true;
   isSaving: boolean = false;
+  resendingId: string | null = null;
   
-  // Control del Modal
   showModal: boolean = false;
   isEditing: boolean = false;
-  currentCompanyId: string | null = null;
+  currentDevId: string | null = null;
+
+  showDeleteModal: boolean = false;
+  developerToDelete: string | null = null;
+  isDeleting: boolean = false;
   
-  // Formulario
-  form = {
-    name: '',
-    plan_tier: 'core',
-    max_projects_allowed: 3,
-    license_end: '',
-    has_voice_agents: false,
-    has_enterprise_integrations: false,
+  form: any = {
+    company_name: '',
+    plan_id: '',
+    duration_months: 12,
+    admin_email: '',
+    admin_first_name: '',        // 🚀 Campos atómicos requeridos
+    admin_paternal_last_name: '',  // 🚀 Campos atómicos requeridos
+    admin_maternal_last_name: '',  // 🚀 Campos atómicos requeridos
+    payment_receipt_url: '',
     is_active: true
   };
 
   constructor(
     private http: HttpClient, 
     private translate: TranslateService,
-    private datePipe: DatePipe
+    private datePipe: DatePipe,
+    private toast: ToastService // 🚀 Inyectar servicio de Toasts
   ) {}
 
   private get apiUrl() {
-    return isDevMode() 
-      ? 'http://localhost:8000/api/v1/tenants/' 
-      : 'https://blackpenguin.ai/api/v1/tenants/';
+    return isDevMode() ? 'http://localhost:8000/api/v1/tenants/developers' : 'https://blackpenguin.ai/api/v1/tenants/developers';
+  }
+
+  private get plansUrl() {
+    return isDevMode() ? 'http://localhost:8000/api/v1/tenants/plans' : 'https://blackpenguin.ai/api/v1/tenants/plans';
   }
 
   private get headers() {
@@ -51,51 +62,60 @@ export class StaffDevelopersComponent implements OnInit {
   }
 
   ngOnInit() {
-    this.loadCompanies();
+    this.loadPlansAndDevelopers();
   }
 
-  loadCompanies() {
+  loadPlansAndDevelopers() {
     this.isLoading = true;
-    this.http.get<any[]>(this.apiUrl, { headers: this.headers }).subscribe({
-      next: (data) => {
-        this.companies = data;
-        this.isLoading = false;
+    this.http.get<any[]>(this.plansUrl, { headers: this.headers }).subscribe({
+      next: (plansData) => {
+        this.plans = plansData;
+        this.http.get<any[]>(this.apiUrl, { headers: this.headers }).subscribe({
+          next: (devData) => {
+            this.developers = devData;
+            this.isLoading = false;
+          },
+          error: () => this.isLoading = false
+        });
       },
-      error: (err) => {
-        console.error('Error loading developers:', err);
-        this.isLoading = false;
-      }
+      error: () => this.isLoading = false
     });
   }
 
-  openModal(company?: any) {
-    if (company) {
+  getPlanName(planId: string): string {
+    const plan = this.plans.find(p => p.id === planId);
+    return plan ? plan.name : 'Sin Plan';
+  }
+
+  openModal(dev?: any) {
+    if (dev) {
       this.isEditing = true;
-      this.currentCompanyId = company.id;
+      this.currentDevId = dev.id;
+      
+      // 🚀 CARGA AUTOMÁTICA: Mapeamos los datos exactos que vienen de la base de datos
       this.form = {
-        name: company.name,
-        plan_tier: company.plan_tier,
-        max_projects_allowed: company.max_projects_allowed,
-        // Formatear fecha para el input type="date"
-        license_end: this.datePipe.transform(company.license_end, 'yyyy-MM-dd') || '',
-        has_voice_agents: company.has_voice_agents,
-        has_enterprise_integrations: company.has_enterprise_integrations,
-        is_active: company.is_active
+        company_name: dev.name,
+        plan_id: dev.plan_id || '',
+        duration_months: dev.plan_duration_months,
+        admin_email: dev.admin_email || '', 
+        admin_first_name: dev.admin_first_name || '',
+        admin_paternal_last_name: dev.admin_paternal_last_name || '',
+        admin_maternal_last_name: dev.admin_maternal_last_name || '',
+        payment_receipt_url: dev.payment_receipt_url || '',
+        is_active: dev.is_active
       };
     } else {
       this.isEditing = false;
-      this.currentCompanyId = null;
-      // Default: licencia de 1 año
-      const nextYear = new Date();
-      nextYear.setFullYear(nextYear.getFullYear() + 1);
-      
+      this.currentDevId = null;
       this.form = {
-        name: '',
-        plan_tier: 'core',
-        max_projects_allowed: 3,
-        license_end: this.datePipe.transform(nextYear, 'yyyy-MM-dd') || '',
-        has_voice_agents: false,
-        has_enterprise_integrations: false,
+        company_name: '',
+        plan_id: this.plans.length > 0 ? this.plans[0].id : '',
+        duration_months: 12,
+        admin_email: '',
+        admin_first_name: '',
+        admin_paternal_last_name: '',
+        admin_maternal_last_name: '',
+        payment_receipt_url: '',
         is_active: true
       };
     }
@@ -106,27 +126,34 @@ export class StaffDevelopersComponent implements OnInit {
     this.showModal = false;
   }
 
-  saveCompany() {
-    if (!this.form.name || !this.form.license_end) return;
-
+  saveDeveloper() {
+    if (!this.form.company_name || !this.form.plan_id) return;
     this.isSaving = true;
-    
-    // Transformar fecha al formato ISO que espera FastAPI
+
+    // Aseguramos limpieza estricta de strings antes de enviar la carga útil
     const payload = {
       ...this.form,
-      license_end: new Date(this.form.license_end).toISOString()
+      company_name: this.form.company_name.trim(),
+      admin_first_name: this.form.admin_first_name.trim(),
+      admin_paternal_last_name: this.form.admin_paternal_last_name.trim(),
+      admin_maternal_last_name: this.form.admin_maternal_last_name ? this.form.admin_maternal_last_name.trim() : '',
+      admin_email: this.form.admin_email.trim(),
+      language: this.translate.currentLang
     };
 
-    if (this.isEditing && this.currentCompanyId) {
-      this.http.put(`${this.apiUrl}${this.currentCompanyId}`, payload, { headers: this.headers }).subscribe({
+    if (!payload.payment_receipt_url) delete payload.payment_receipt_url;
+
+    if (this.isEditing && this.currentDevId) {
+      this.http.put(`${this.apiUrl}/${this.currentDevId}`, payload, { headers: this.headers }).subscribe({
         next: () => {
           this.isSaving = false;
           this.closeModal();
-          this.loadCompanies();
+          this.loadPlansAndDevelopers();
+          this.toast.showSuccess(this.translate.instant('DEV_PAGE.MSG_UPDATED_SUCCESS') || 'Developer profile updated!');
         },
         error: (err) => {
           this.isSaving = false;
-          alert('Error al actualizar: ' + (err.error?.detail || err.message));
+          this.toast.showError(err.error?.detail || 'Error updating developer profile');
         }
       });
     } else {
@@ -134,23 +161,60 @@ export class StaffDevelopersComponent implements OnInit {
         next: () => {
           this.isSaving = false;
           this.closeModal();
-          this.loadCompanies();
+          this.loadPlansAndDevelopers();
+          this.toast.showSuccess(this.translate.instant('DEV_PAGE.MSG_CREATED_SUCCESS') || 'Developer onboarded successfully!');
         },
         error: (err) => {
           this.isSaving = false;
-          alert('Error al crear: ' + (err.error?.detail || err.message));
+          this.toast.showError(err.error?.detail || 'Error during developer onboarding');
         }
       });
     }
   }
 
-  deleteCompany(id: string) {
-    const confirmMsg = this.translate.instant('ADMIN.CONFIRM_DELETE') || 'Are you sure?';
-    if (confirm(confirmMsg)) {
-      this.http.delete(`${this.apiUrl}${id}`, { headers: this.headers }).subscribe({
-        next: () => this.loadCompanies(),
-        error: (err) => alert('Error al eliminar')
-      });
-    }
+  resendActivation(companyId: string) {
+    this.resendingId = companyId;
+    const url = `${this.apiUrl}/${companyId}/resend-activation?lang=${this.translate.currentLang}`;
+    
+    this.http.post(url, {}, { headers: this.headers }).subscribe({
+      next: () => {
+        this.resendingId = null;
+        this.toast.showSuccess(this.translate.instant('DEV_PAGE.MSG_RESEND_SUCCESS') || 'Activation link sent.');
+      },
+      error: (err) => {
+        this.resendingId = null;
+        this.toast.showError(err.error?.detail || 'Failed to resend token.');
+      }
+    });
+  }
+
+  // 🚀 NUEVAS FUNCIONES PARA EL MODAL DE ELIMINAR
+  openDeleteModal(id: string) {
+    this.developerToDelete = id;
+    this.showDeleteModal = true;
+  }
+
+  closeDeleteModal() {
+    this.showDeleteModal = false;
+    this.developerToDelete = null;
+  }
+
+  confirmDelete() {
+    if (!this.developerToDelete) return;
+    this.isDeleting = true;
+
+    this.http.delete(`${this.apiUrl}/${this.developerToDelete}`, { headers: this.headers }).subscribe({
+      next: () => {
+        this.isDeleting = false;
+        this.closeDeleteModal();
+        this.loadPlansAndDevelopers();
+        this.toast.showSuccess(this.translate.instant('DEV_PAGE.MSG_DELETE_SUCCESS') || 'Developer removed successfully.');
+      },
+      error: (err) => {
+        this.isDeleting = false;
+        this.closeDeleteModal();
+        this.toast.showError(err.error?.detail || 'Error removing developer');
+      }
+    });
   }
 }

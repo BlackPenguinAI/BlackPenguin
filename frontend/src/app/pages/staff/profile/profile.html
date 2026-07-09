@@ -7,14 +7,12 @@
       <p class="text-sm text-gray-400 mt-1">{{ 'ADMIN.PROFILE_SUBTITLE' | translate }}</p>
     </div>
 
-    <!-- Spinner de Carga -->
     <div *ngIf="isLoading" class="flex flex-col items-center justify-center py-24 gap-4">
       <div class="animate-spin h-8 w-8 border-2 border-secondary border-t-transparent rounded-full"></div>
     </div>
 
     <form *ngIf="!isLoading" (ngSubmit)="saveProfile()" class="flex flex-col gap-8">
       
-      <!-- 1. IDENTIDAD DEL ADMINISTRADOR -->
       <div class="liquid-glass border border-white/5 p-6 rounded-2xl">
         <h2 class="text-sm font-medium text-secondary uppercase tracking-widest mb-6">{{ 'PROFILE_PAGE.SECTION_IDENTITY' | translate }}</h2>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -51,13 +49,11 @@
         </div>
       </div>
 
-      <!-- 2. CONTACTO -->
       <div class="liquid-glass border border-white/5 p-6 rounded-2xl">
         <h2 class="text-sm font-medium text-secondary uppercase tracking-widest mb-6">{{ 'PROFILE_PAGE.SECTION_CONTACT' | translate }}</h2>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
           <div class="flex flex-col gap-1.5">
             <label class="text-xs text-gray-400 uppercase">{{ 'PROFILE_PAGE.EMAIL' | translate }}</label>
-            <!-- Este campo es Read-Only -->
             <input type="email" name="email" [(ngModel)]="user.email" readonly class="bg-white/5 text-gray-500 border border-white/5 rounded-lg px-4 py-2.5 text-sm outline-none cursor-not-allowed">
           </div>
           <div class="flex flex-col gap-1.5">
@@ -67,7 +63,6 @@
         </div>
       </div>
 
-      <!-- 3. UBICACIÓN -->
       <div class="liquid-glass border border-white/5 p-6 rounded-2xl">
         <h2 class="text-sm font-medium text-secondary uppercase tracking-widest mb-6">{{ 'PROFILE_PAGE.SECTION_LOCATION' | translate }}</h2>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -86,8 +81,42 @@
         </div>
       </div>
 
-      <!-- BARRA DE ACCIÓN -->
-      <div class="flex items-center justify-between border-t border-white/10 pt-6">
+      <div class="liquid-glass border border-white/5 p-6 rounded-2xl mt-4">
+        <div class="flex items-center gap-3 mb-6">
+          <span class="material-symbols-outlined text-secondary">lock</span>
+          <h2 class="text-sm font-medium text-secondary uppercase tracking-widest">{{ 'PROFILE_PAGE.SECTION_SECURITY' | translate }}</h2>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+          <div class="flex flex-col gap-1.5">
+            <label class="text-xs text-gray-400 uppercase">{{ 'PROFILE_PAGE.CURR_PASSWORD' | translate }}</label>
+            <input type="password" [(ngModel)]="passForm.current_password" name="currPass" class="bg-black/50 border border-white/10 focus:border-secondary rounded-lg px-4 py-2.5 text-sm outline-none transition-colors">
+          </div>
+          <div class="flex flex-col gap-1.5">
+            <label class="text-xs text-gray-400 uppercase">{{ 'PROFILE_PAGE.NEW_PASSWORD' | translate }}</label>
+            <input type="password" [(ngModel)]="passForm.new_password" name="newPass" class="bg-black/50 border border-white/10 focus:border-secondary rounded-lg px-4 py-2.5 text-sm outline-none transition-colors">
+          </div>
+          <div class="flex flex-col gap-1.5">
+            <label class="text-xs text-gray-400 uppercase">{{ 'PROFILE_PAGE.CONFIRM_PASSWORD' | translate }}</label>
+            <input type="password" [(ngModel)]="passForm.confirm_password" name="confPass" class="bg-black/50 border border-white/10 focus:border-secondary rounded-lg px-4 py-2.5 text-sm outline-none transition-colors">
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between mt-5 pt-5 border-t border-white/5">
+          <p *ngIf="passMessage" [class.text-green-400]="!isPassError" [class.text-red-500]="isPassError" class="text-xs font-medium animate-fade-in flex items-center gap-2">
+            <span class="material-symbols-outlined text-sm">{{ isPassError ? 'error' : 'check_circle' }}</span>
+            {{ passMessage }}
+          </p>
+          <div *ngIf="!passMessage"></div>
+
+          <button type="button" (click)="changePassword()" [disabled]="isChangingPass || !passForm.current_password || !passForm.new_password" class="px-6 py-2 bg-white/10 text-white font-medium text-sm rounded-lg hover:bg-white/20 transition-all duration-300 disabled:opacity-50 flex items-center gap-2">
+            <span *ngIf="isChangingPass" class="material-symbols-outlined animate-spin text-sm">sync</span>
+            {{ 'PROFILE_PAGE.BTN_UPDATE_PASS' | translate }}
+          </button>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-between border-t border-white/10 pt-6 mt-4">
         <p *ngIf="statusMessage" [class.text-green-400]="!isError" [class.text-red-500]="isError" class="text-xs font-medium animate-fade-in flex items-center gap-2">
           <span class="material-symbols-outlined text-sm">{{ isError ? 'error' : 'check_circle' }}</span>
           {{ statusMessage }}

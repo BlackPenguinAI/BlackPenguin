@@ -49,7 +49,7 @@
                 <button (click)="startEdit(item)" class="text-gray-400 hover:text-secondary transition-colors focus:outline-none" [title]="'ADMIN.EDIT' | translate">
                   <span class="material-symbols-outlined text-[18px]">edit</span>
                 </button>
-                <button (click)="deleteEmail(item.id)" class="text-gray-400 hover:text-red-400 transition-colors focus:outline-none" [title]="'ADMIN.DELETE' | translate">
+                <button (click)="openDeleteModal(item.id)" class="text-gray-400 hover:text-red-400 transition-colors focus:outline-none" [title]="'ADMIN.DELETE' | translate">
                   <span class="material-symbols-outlined text-[18px]">delete</span>
                 </button>
               </ng-container>
@@ -70,5 +70,25 @@
         </tbody>
       </table>
     </div>
+
+    <div *ngIf="showDeleteModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+    <div class="bg-[#111111] border border-red-500/20 rounded-3xl w-full max-w-sm shadow-[0_0_50px_rgba(239,68,68,0.1)] p-8 flex flex-col items-center text-center animate-fade-in">
+      <div class="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center mb-5 border border-red-500/20">
+        <span class="material-symbols-outlined text-red-500 text-4xl">warning</span>
+      </div>
+      <h2 class="text-2xl font-light text-white mb-2">Eliminar Registro</h2>
+      <p class="text-sm text-gray-400 mb-8 leading-relaxed">¿Estás seguro de que deseas eliminar permanentemente este registro? Esta acción no se puede deshacer.</p>
+      
+      <div class="flex flex-col md:flex-row items-center gap-3 w-full">
+        <button (click)="closeDeleteModal()" [disabled]="isDeleting" class="w-full md:w-1/2 py-3.5 bg-white/5 hover:bg-white/10 text-white text-sm font-medium rounded-xl transition-colors disabled:opacity-50">
+          {{ 'ADMIN.CANCEL' | translate }}
+        </button>
+        <button (click)="confirmDelete()" [disabled]="isDeleting" class="w-full md:w-1/2 py-3.5 bg-red-500 hover:bg-red-600 text-white text-sm font-bold rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-red-500/20">
+          <span *ngIf="isDeleting" class="material-symbols-outlined animate-spin text-sm">sync</span>
+          {{ 'ADMIN.DELETE' | translate }}
+        </button>
+      </div>
+    </div>
+  </div>
   </div>
 </div>

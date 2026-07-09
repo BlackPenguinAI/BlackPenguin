@@ -31,6 +31,12 @@ export class StaffProfileComponent implements OnInit {
   statusMessage: string = '';
   isError: boolean = false;
 
+  // Variables para Seguridad
+  passForm = { current_password: '', new_password: '', confirm_password: '' };
+  isChangingPass: boolean = false;
+  passMessage: string = '';
+  isPassError: boolean = false;
+
   constructor(private http: HttpClient, private translate: TranslateService) {}
 
   private get apiUrl() {
@@ -90,6 +96,41 @@ export class StaffProfileComponent implements OnInit {
         this.isSaving = false;
         this.isError = true;
         this.statusMessage = this.translate.instant('PROFILE_PAGE.MSG_ERROR') || 'Ocurrió un error al actualizar.';
+      }
+    });
+  }
+
+  // Función para cambiar contraseña
+  changePassword() {
+    if (this.passForm.new_password !== this.passForm.confirm_password) {
+      this.isPassError = true;
+      this.passMessage = this.translate.instant('PROFILE_PAGE.MSG_PASS_MISMATCH') || 'Las contraseñas nuevas no coinciden.';
+      return;
+    }
+
+    this.isChangingPass = true;
+    this.passMessage = '';
+
+    const url = isDevMode() ? 'http://localhost:8000/api/v1/auth/change-password' : 'https://blackpenguin.ai/api/v1/auth/change-password';
+
+    this.http.put(url, {
+      current_password: this.passForm.current_password,
+      new_password: this.passForm.new_password
+    }, { headers: this.headers }).subscribe({
+      next: () => {
+        this.isChangingPass = false;
+        this.isPassError = false;
+        this.passMessage = this.translate.instant('PROFILE_PAGE.MSG_PASS_SUCCESS') || '¡Contraseña actualizada exitosamente!';
+        this.passForm = { current_password: '', new_password: '', confirm_password: '' };
+        setTimeout(() => this.passMessage = '', 4000);
+      },
+      error: (err) => {
+        this.isChangingPass = false;
+        this.isPassError = true;
+        
+        // Si el backend envía un error detallado (ej. "Contraseña actual incorrecta"), lo mostramos.
+        // Si no, usamos el error genérico traducido.
+        this.passMessage = err.error?.detail || this.translate.instant('PROFILE_PAGE.MSG_PASS_ERROR') || 'Error al cambiar la contraseña.';
       }
     });
   }

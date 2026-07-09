@@ -1,9 +1,9 @@
-import { Component, ElementRef, ViewChild, ChangeDetectorRef } from '@angular/core'; 
+import { Component, ElementRef, ViewChild, ChangeDetectorRef, OnInit, isDevMode } from '@angular/core'; 
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
-import { ChatService } from '../../core/services/chat';
 import { ToastService } from '../../core/services/toast';
 
 @Component({
@@ -13,7 +13,7 @@ import { ToastService } from '../../core/services/toast';
   templateUrl: './chat.html',
   styleUrl: './chat.scss'
 })
-export class ChatComponent {
+export class ChatComponent implements OnInit {
   @ViewChild('chatScroll') chatScroll!: ElementRef;
 
   prompt: string = '';
@@ -23,13 +23,16 @@ export class ChatComponent {
 
   selectedFile: File | null = null;
   isDragOver: boolean = false;
+  
+  // Mantenemos tu estructura original para no romper el HTML
   messages: { role: 'user' | 'ai', content: string, file?: string }[] = [];
 
-  sessionId: string = ''; 
+  // Nuevo estado para saber si el onboarding ya finalizó
+  isCompleted: boolean = false; 
 
   constructor(
     private translate: TranslateService,
-    private chatService: ChatService,
+    private http: HttpClient,         // 🚀 Usamos HttpClient directo para el onboarding
     private toastService: ToastService,
     private cdr: ChangeDetectorRef 
   ) {
@@ -37,21 +40,129 @@ export class ChatComponent {
     this.userName = localStorage.getItem('bp_name') || 'Admin';
   }
 
-  // --- MÉTODOS DE IDIOMAS ---
+  // ==========================================
+  // 🚀 RUTAS DEL BACKEND DE ONBOARDING
+  // ==========================================
+  private get sessionUrl() {
+    return isDevMode() 
+      ? 'http://localhost:8000/api/v1/tenants/onboarding/session' 
+      : 'https://blackpenguin.ai/api/v1/tenants/onboarding/session';
+  }
+
+  private get chatUrl() {
+    return isDevMode() 
+      ? 'http://localhost:8000/api/v1/tenants/onboarding/chat' 
+      : 'https://blackpenguin.ai/api/v1/tenants/onboarding/chat';
+  }
+
+  private get headers() {
+    const token = localStorage.getItem('bp_token');
+    return new HttpHeaders().set('Authorization', `Bearer ${token}`);
+  }
+
+  ngOnInit() {
+    this.loadSession();
+  }
+
+  // ==========================================
+  // 🧠 LÓGICA CORE: CARGA Y ENVÍO DE MENSAJES
+  // ==========================================
+  loadSession() {
+    this.isAnalyzing = true;
+    this.http.get<any>(this.sessionUrl, { headers: this.headers }).subscribe({
+      next: (data) => {
+        this.isCompleted = data.is_completed;
+        
+        // Mapeamos los mensajes de la BD al formato que usa tu HTML
+        this.messages = (data.messages || []).map((m: any) => ({
+          role: m.sender === 'user' ? 'user' : 'ai',
+          content: m.content
+        }));
+        
+        this.isAnalyzing = false;
+        this.scrollToBottom();
+        this.cdr.detectChanges();
+      },
+      error: (err) => {
+        this.isAnalyzing = false;
+        this.toastService.showError(err.error?.detail || 'Error al cargar la sesión de onboarding.');
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
+  sendMessage() {
+    if (!this.prompt.trim() || this.isAnalyzing || this.isCompleted) return;
+
+    // Validación temporal: En Onboarding no usamos PDFs por ahora
+    if (this.selectedFile) {
+       this.toastService.showError('El envío de archivos no está habilitado en esta fase de Onboarding.');
+       return;
+    }
+
+    const userText = this.prompt.trim();
+    
+    // 1. Agregar el mensaje visualmente de inmediato
+    this.messages.push({ role: 'user', content: userText });
+    this.prompt = '';
+    this.isAnalyzing = true;
+    this.scrollToBottom();
+    this.cdr.detectChanges();
+
+    // 2. Enviar el mensaje al motor de IA en el backend
+    this.http.post<any>(this.chatUrl, { message: userText }, { headers: this.headers }).subscribe({
+      next: (aiMsg) => {
+        this.isAnalyzing = false;
+        // La IA nos responde y lo agregamos a la pantalla
+        this.messages.push({ role: 'ai', content: aiMsg.content });
+        this.scrollToBottom();
+        this.cdr.detectChanges(); 
+      },
+      error: (err) => {
+        this.isAnalyzing = false;
+        this.toastService.showError(err.error?.detail || 'Error en la comunicación con la IA.');
+        this.messages.push({ role: 'ai', content: '❌ Hubo un problema de conexión. Intenta de nuevo.' });
+        this.scrollToBottom();
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
+  // ==========================================
+  // 🔗 MÉTODOS PUENTE PARA LA VISTA (HTML)
+  // ==========================================
+
+  setPrompt(textKey: string) {
+    // Toma la llave de traducción de las sugerencias y la pone en el input
+    this.prompt = this.translate.instant(textKey);
+  }
+
+  startAnalysis(event?: any) {
+    // Si el usuario presionó la tecla "Enter", evitamos que haga un salto de línea
+    if (event) {
+      event.preventDefault();
+    }
+    // Llamamos a la lógica maestra del chat que construimos antes
+    this.sendMessage();
+  }
+
+  scrollToBottom() {
+    setTimeout(() => {
+      if (this.chatScroll) {
+        this.chatScroll.nativeElement.scrollTop = this.chatScroll.nativeElement.scrollHeight;
+      }
+    }, 100);
+  }
+
+  // ==========================================
+  // 📎 MÉTODOS DE IDIOMAS Y ARCHIVOS (UI Original)
+  // ==========================================
   switchLanguage(lang: string) {
     this.translate.use(lang);
     this.currentLang = lang;
     localStorage.setItem('bp_lang', lang);
   }
 
-  setPrompt(translateKey: string) {
-    this.translate.get(translateKey).subscribe((text: string) => {
-      this.prompt = text;
-      this.startAnalysis();
-    });
-  }
-
-  // --- MÉTODOS DE DRAG & DROP ---
   onDragOver(event: DragEvent) {
     event.preventDefault();
     this.isDragOver = true;
@@ -65,98 +176,18 @@ export class ChatComponent {
   onDrop(event: DragEvent) {
     event.preventDefault();
     this.isDragOver = false;
-    const files = event.dataTransfer?.files;
-    this.handleFiles(files);
+    if (event.dataTransfer && event.dataTransfer.files.length > 0) {
+      this.selectedFile = event.dataTransfer.files[0];
+    }
   }
 
   onFileSelected(event: any) {
-    this.handleFiles(event.target.files);
-  }
-
-  private handleFiles(files: FileList | null | undefined) {
-    if (files && files.length > 0) {
-      if (files[0].type === 'application/pdf') {
-        this.selectedFile = files[0];
-        this.toastService.showSuccess(`PDF Listo para analizar: ${this.selectedFile.name}`);
-        this.cdr.detectChanges(); 
-      } else {
-        this.toastService.showError('Solo se permiten archivos en formato PDF.');
-      }
+    if (event.target.files.length > 0) {
+      this.selectedFile = event.target.files[0];
     }
   }
 
   removeFile() {
     this.selectedFile = null;
-  }
-
-  // --- LÓGICA MAESTRA DEL CHAT REACTIVO ---
-  startAnalysis(event?: Event) {
-    if (event) {
-      const keyboardEvent = event as KeyboardEvent;
-      if (keyboardEvent.key === 'Enter' && !keyboardEvent.shiftKey) {
-        keyboardEvent.preventDefault();
-      } else {
-        return;
-      }
-    }
-
-    if ((!this.prompt.trim() && !this.selectedFile) || this.isAnalyzing) return;
-
-    const userMessage = this.prompt.trim() || 'Por favor procesa los datos y dime qué encontraste.';
-    this.messages.push({ role: 'user', content: userMessage, file: this.selectedFile?.name });
-    
-    const currentPrompt = this.prompt;
-    this.prompt = '';
-    this.isAnalyzing = true;
-    this.scrollToBottom();
-    this.cdr.detectChanges(); 
-
-    if (this.selectedFile) {
-       this.chatService.analyzeDocument(this.sessionId, this.selectedFile, currentPrompt).subscribe({
-         next: (res) => {
-           this.isAnalyzing = false;
-           this.messages.push({ role: 'ai', content: res.message });
-           this.selectedFile = null; 
-           this.scrollToBottom();
-           this.cdr.detectChanges(); 
-         },
-         error: (err) => {
-           this.isAnalyzing = false;
-           this.toastService.showError('Error al analizar el PDF con la IA.');
-           this.messages.push({ role: 'ai', content: '❌ Ocurrió un error conectando con el servidor. Intenta de nuevo.' });
-           this.scrollToBottom();
-           this.cdr.detectChanges();
-         }
-       });
-    } else {
-       const history = this.messages.map(m => ({ 
-         role: m.role === 'ai' ? 'assistant' : m.role, 
-         content: m.content 
-       }));
-       
-       this.chatService.sendMessage(this.sessionId, history).subscribe({
-         next: (res) => {
-           this.isAnalyzing = false;
-           this.messages.push({ role: 'ai', content: res.message });
-           this.scrollToBottom();
-           this.cdr.detectChanges(); 
-         },
-         error: (err) => {
-           this.isAnalyzing = false;
-           this.toastService.showError('Error en la comunicación.');
-           this.messages.push({ role: 'ai', content: '❌ Hubo un problema al enviar tu mensaje.' });
-           this.scrollToBottom();
-           this.cdr.detectChanges();
-         }
-       });
-    }
-  }
-
-  scrollToBottom() {
-    setTimeout(() => {
-      if (this.chatScroll) {
-        this.chatScroll.nativeElement.scrollTop = this.chatScroll.nativeElement.scrollHeight;
-      }
-    }, 100);
   }
 }
