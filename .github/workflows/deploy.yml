@@ -77,6 +77,7 @@ jobs:
           docker stop bp_frontend_prod || true
           docker rm bp_frontend_prod || true
 
-          # 🚀 EL CAMBIO ESTÁ AQUÍ: Cambiamos -p 80:80 por -p 8080:80
-          echo "🌱 Ejecutando Data Seeding (Tablas y Superadmin)..."
-          docker exec bp_api_prod python -m app.init_db
+          # 🚀 RECUPERAMOS LA LÍNEA QUE ENCENDÍA EL FRONTEND
+          echo "🚀 Encendiendo frontend en el puerto interno 8080..."
+          docker run -d --name bp_frontend_prod --restart always -p 8080:80 blackpenguin-frontend:latest
+          
