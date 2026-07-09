@@ -24,5 +24,7 @@ class Company(Base):
     offline_payment_verified = Column(Boolean, default=False, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
     
-    # Relación inversa hacia usuarios (String reference para evitar dependencias circulares)
+    # Relaciones
     users = relationship("User", back_populates="company", cascade="all, delete-orphan")
+    # Referencia a los proyectos de tu módulo properties
+    projects = relationship("Project", overlaps="company", cascade="all, delete-orphan")

@@ -25,14 +25,12 @@
     "DESC": "Designed for large-scale developers. Manage multiple real estate projects, handle roles for marketing teams, sales advisors, and deploy AI voice agents in a shielded and completely isolated environment per Tenant."
   },
   "FOOTER": {
-    "RIGHTS": "© 2026 Black Penguin AI",
-    "WHAT_IS": "what is black penguin"
+    "RIGHTS": "© 2026 Black Penguin. All rights reserved."
   },
   "AUTH": {
-    "FULL_NAME": "First Name(s)",
-    "WELCOME_BACK": "Welcome Back",
-    "CREATE_ACCOUNT": "Create Account",
-    "SUBTITLE_LOGIN": "Enter your credentials to access your AI copilot.",
+    "TITLE_LOGIN": "Log in to your account",
+    "SUBTITLE_LOGIN": "Welcome back! Please enter your details.",
+    "TITLE_REGISTER": "Create an account",
     "SUBTITLE_REGISTER": "Get started with the definitive real estate commercial intelligence.",
     "EMAIL": "Email Address",
     "PASSWORD": "Password",
@@ -75,7 +73,7 @@
     "LOGOUT": "Log Out",
     "WAITLIST_SUBTITLE": "Real-time audit of the global waitlist.",
     "EXPORT_EXCEL": "Export Excel",
-    "SYNCING": "Syncing records with Postgres...",
+    "SYNCING": "Syncing records...",
     "COL_ID": "Record ID",
     "COL_EMAIL": "Email Address",
     "COL_DATE": "Capture Date & Time (UTC)",
@@ -85,7 +83,13 @@
     "SAVE": "Save",
     "CANCEL": "Cancel",
     "CONFIRM_DELETE": "Are you sure you want to delete this record? This action cannot be undone.",
-    "NO_RECORDS": "No subscribers registered in the database yet."
+    "NO_RECORDS": "No records found.",
+    "PROFILE_TITLE": "Identity & Contact",
+    "PROFILE_SUBTITLE": "Manage your administrative details and location.",
+    "DEV_TITLE": "Developer Clients",
+    "DEV_SUBTITLE": "Manage Real Estate Developers, Projects, and Teams.",
+    "DASH_TITLE": "Global Operations",
+    "DASH_SUBTITLE": "Overview of platform usage and general statistics."
   },
   "AI_CONFIG": {
     "TITLE": "AI Brain Tuner",
@@ -111,5 +115,57 @@
     "BTN_SAVING": "Updating Core...",
     "MSG_SUCCESS": "Multi-Agent configuration updated successfully!",
     "MSG_ERROR": "Critical error saving configuration."
+  },
+  "PROFILE_PAGE": {
+    "SECTION_IDENTITY": "Administrator Identity",
+    "FIRST_NAME": "First Name",
+    "LAST_NAME_P": "Paternal Last Name",
+    "LAST_NAME_M": "Maternal Last Name",
+    "DOC_TYPE": "Document Type",
+    "DOC_NUMBER": "Document Number",
+    "DOB": "Date of Birth",
+    "SECTION_CONTACT": "Contact",
+    "EMAIL": "Email Address (Read-only)",
+    "PHONE": "Mobile Number",
+    "SECTION_LOCATION": "Location",
+    "COUNTRY": "Country",
+    "CITY": "City",
+    "ADDRESS": "Exact Address",
+    "BTN_SAVE": "Save Profile",
+    "BTN_SAVING": "Saving...",
+    "MSG_SUCCESS": "Profile updated successfully!",
+    "MSG_ERROR": "Error saving profile."
+  },
+  "DEV_PAGE": {
+    "ADD_NEW": "Add Developer",
+    "TABLE_NAME": "Company Name",
+    "TABLE_PLAN": "License Tier",
+    "TABLE_PROJECTS": "Allowed Projects",
+    "TABLE_EXPIRATION": "License Ends",
+    "TABLE_STATUS": "Status",
+    "MODAL_TITLE_ADD": "Register New Developer",
+    "MODAL_TITLE_EDIT": "Edit Developer Profile",
+    "FIELD_NAME": "Legal / Commercial Name",
+    "FIELD_PLAN": "Subscription Plan",
+    "FIELD_PROJECTS": "Max. Concurrent Projects",
+    "FIELD_LICENSE": "License Expiration Date",
+    "FIELD_ACTIVE": "Account is Active",
+    "FEATURES_TITLE": "Enterprise Modules",
+    "FIELD_VOICE": "Enable Voice Agents",
+    "FIELD_INTEGRATIONS": "Enable CRM Integrations"
+  },
+  "DASHBOARD_PAGE": {
+    "CARD1_TITLE": "Developers",
+    "CARD1_DESC": "Active Licenses",
+    "CARD2_TITLE": "Core Projects",
+    "CARD2_DESC": "Managed developments",
+    "CARD3_TITLE": "Waitlist Leads",
+    "CARD3_DESC": "Emails captured on Landing",
+    "CARD4_TITLE": "App Users",
+    "CARD4_DESC": "Registered Staff, MKT & Sales",
+    "QUICK_ACCESS": "Quick Access",
+    "QA_DEV": "Manage Developers",
+    "QA_WAITLIST": "Audit Waitlist",
+    "QA_TUNER": "Multi-Agent Tuner"
   }
 }

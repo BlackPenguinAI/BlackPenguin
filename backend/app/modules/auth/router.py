@@ -12,6 +12,9 @@ from app.core.config import settings
 from app.modules.tenants.models import Company
 from app.modules.auth.models import User, UserRole
 
+from app.modules.auth.schemas import UserProfileUpdate, UserProfileResponse
+from app.modules.auth.deps import get_current_user
+
 router = APIRouter()
 
 # --- SCHEMAS DE PYDANTIC (Validan los datos que envía Angular) ---
@@ -81,3 +84,21 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
         "role": user.role.value if hasattr(user.role, 'value') else str(user.role),
         "name": user.full_name
     }
+
+@router.get("/me", response_model=UserProfileResponse, summary="Obtener mi perfil")
+def get_my_profile(current_user: User = Depends(get_current_user)):
+    return current_user
+
+@router.put("/me", response_model=UserProfileResponse, summary="Actualizar mi perfil")
+def update_my_profile(
+    payload: UserProfileUpdate, 
+    db: Session = Depends(get_db), 
+    current_user: User = Depends(get_current_user)
+):
+    update_data = payload.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(current_user, key, value)
+        
+    db.commit()
+    db.refresh(current_user)
+    return current_user

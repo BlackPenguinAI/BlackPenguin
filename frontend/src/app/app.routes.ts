@@ -7,6 +7,10 @@ import { StaffEmailsComponent } from './pages/staff/emails/emails';
 import { StaffAiConfigComponent } from './pages/staff/ai-config/ai-config';
 import { LayoutComponent } from './shared/layout/layout'; // 🚀 Importamos el Layout
 
+import { StaffDashboardComponent } from './pages/staff/dashboard/dashboard';
+import { StaffProfileComponent } from './pages/staff/profile/profile';
+import { StaffDevelopersComponent } from './pages/staff/developers/developers';
+
 export const routes: Routes = [
   // 🌍 ZONAS LIBRES (No tienen Menú Lateral)
   { path: '', component: LandingComponent },
@@ -23,7 +27,10 @@ export const routes: Routes = [
       {
         path: 'admin',
         children: [
-          { path: '', redirectTo: 'emails', pathMatch: 'full' },
+          { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
+          { path: 'dashboard', component: StaffDashboardComponent },
+          { path: 'profile', component: StaffProfileComponent },
+          { path: 'developers', component: StaffDevelopersComponent },
           { path: 'emails', component: StaffEmailsComponent },
           { path: 'ai-config', component: StaffAiConfigComponent },
         ]

@@ -1,1 +1,105 @@
-<p>profile works!</p>
+<div class="min-h-screen bg-black text-white font-sans p-6 md:p-12 relative overflow-hidden">
+  <div class="absolute top-0 right-0 w-96 h-96 bg-secondary/10 rounded-full blur-[120px] pointer-events-none"></div>
+
+  <div class="max-w-4xl mx-auto relative z-10">
+    <div class="mb-8 border-b border-white/10 pb-6">
+      <h1 class="text-3xl font-light tracking-tight">{{ 'ADMIN.PROFILE_TITLE' | translate }}</h1>
+      <p class="text-sm text-gray-400 mt-1">{{ 'ADMIN.PROFILE_SUBTITLE' | translate }}</p>
+    </div>
+
+    <!-- Spinner de Carga -->
+    <div *ngIf="isLoading" class="flex flex-col items-center justify-center py-24 gap-4">
+      <div class="animate-spin h-8 w-8 border-2 border-secondary border-t-transparent rounded-full"></div>
+    </div>
+
+    <form *ngIf="!isLoading" (ngSubmit)="saveProfile()" class="flex flex-col gap-8">
+      
+      <!-- 1. IDENTIDAD DEL ADMINISTRADOR -->
+      <div class="liquid-glass border border-white/5 p-6 rounded-2xl">
+        <h2 class="text-sm font-medium text-secondary uppercase tracking-widest mb-6">{{ 'PROFILE_PAGE.SECTION_IDENTITY' | translate }}</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div class="flex flex-col gap-1.5">
+            <label class="text-xs text-gray-400 uppercase">{{ 'PROFILE_PAGE.FIRST_NAME' | translate }}</label>
+            <input type="text" name="firstName" [(ngModel)]="user.full_name" class="bg-black/50 border border-white/10 focus:border-secondary rounded-lg px-4 py-2.5 text-sm outline-none transition-colors">
+          </div>
+          <div class="flex flex-col gap-1.5">
+            <label class="text-xs text-gray-400 uppercase">{{ 'PROFILE_PAGE.LAST_NAME_P' | translate }}</label>
+            <input type="text" name="lastNameP" [(ngModel)]="user.last_name_paternal" class="bg-black/50 border border-white/10 focus:border-secondary rounded-lg px-4 py-2.5 text-sm outline-none transition-colors">
+          </div>
+          <div class="flex flex-col gap-1.5">
+            <label class="text-xs text-gray-400 uppercase">{{ 'PROFILE_PAGE.LAST_NAME_M' | translate }}</label>
+            <input type="text" name="lastNameM" [(ngModel)]="user.last_name_maternal" class="bg-black/50 border border-white/10 focus:border-secondary rounded-lg px-4 py-2.5 text-sm outline-none transition-colors">
+          </div>
+          <div class="flex flex-col gap-1.5">
+            <label class="text-xs text-gray-400 uppercase">{{ 'PROFILE_PAGE.DOC_TYPE' | translate }}</label>
+            <select name="docType" [(ngModel)]="user.document_type" class="bg-black/80 border border-white/10 focus:border-secondary rounded-lg px-4 py-2.5 text-sm outline-none transition-colors cursor-pointer">
+              <option value="" disabled selected>Seleccionar...</option>
+              <option value="DNI">DNI / ID</option>
+              <option value="CE">Carnet de Extranjería</option>
+              <option value="PASSPORT">Pasaporte</option>
+              <option value="RUT">RUT</option>
+            </select>
+          </div>
+          <div class="flex flex-col gap-1.5">
+            <label class="text-xs text-gray-400 uppercase">{{ 'PROFILE_PAGE.DOC_NUMBER' | translate }}</label>
+            <input type="text" name="docNum" [(ngModel)]="user.document_number" class="bg-black/50 border border-white/10 focus:border-secondary rounded-lg px-4 py-2.5 text-sm outline-none transition-colors">
+          </div>
+          <div class="flex flex-col gap-1.5">
+            <label class="text-xs text-gray-400 uppercase">{{ 'PROFILE_PAGE.DOB' | translate }}</label>
+            <input type="date" name="dob" [(ngModel)]="user.birth_date" class="bg-black/50 border border-white/10 focus:border-secondary rounded-lg px-4 py-2.5 text-sm outline-none transition-colors cursor-text">
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. CONTACTO -->
+      <div class="liquid-glass border border-white/5 p-6 rounded-2xl">
+        <h2 class="text-sm font-medium text-secondary uppercase tracking-widest mb-6">{{ 'PROFILE_PAGE.SECTION_CONTACT' | translate }}</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div class="flex flex-col gap-1.5">
+            <label class="text-xs text-gray-400 uppercase">{{ 'PROFILE_PAGE.EMAIL' | translate }}</label>
+            <!-- Este campo es Read-Only -->
+            <input type="email" name="email" [(ngModel)]="user.email" readonly class="bg-white/5 text-gray-500 border border-white/5 rounded-lg px-4 py-2.5 text-sm outline-none cursor-not-allowed">
+          </div>
+          <div class="flex flex-col gap-1.5">
+            <label class="text-xs text-gray-400 uppercase">{{ 'PROFILE_PAGE.PHONE' | translate }}</label>
+            <input type="tel" name="phone" [(ngModel)]="user.phone" placeholder="+1 ..." class="bg-black/50 border border-white/10 focus:border-secondary rounded-lg px-4 py-2.5 text-sm outline-none transition-colors">
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. UBICACIÓN -->
+      <div class="liquid-glass border border-white/5 p-6 rounded-2xl">
+        <h2 class="text-sm font-medium text-secondary uppercase tracking-widest mb-6">{{ 'PROFILE_PAGE.SECTION_LOCATION' | translate }}</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div class="flex flex-col gap-1.5">
+            <label class="text-xs text-gray-400 uppercase">{{ 'PROFILE_PAGE.COUNTRY' | translate }}</label>
+            <input type="text" name="country" [(ngModel)]="user.country" class="bg-black/50 border border-white/10 focus:border-secondary rounded-lg px-4 py-2.5 text-sm outline-none transition-colors">
+          </div>
+          <div class="flex flex-col gap-1.5">
+            <label class="text-xs text-gray-400 uppercase">{{ 'PROFILE_PAGE.CITY' | translate }}</label>
+            <input type="text" name="city" [(ngModel)]="user.city" class="bg-black/50 border border-white/10 focus:border-secondary rounded-lg px-4 py-2.5 text-sm outline-none transition-colors">
+          </div>
+          <div class="flex flex-col gap-1.5 md:col-span-2">
+            <label class="text-xs text-gray-400 uppercase">{{ 'PROFILE_PAGE.ADDRESS' | translate }}</label>
+            <input type="text" name="address" [(ngModel)]="user.address" class="bg-black/50 border border-white/10 focus:border-secondary rounded-lg px-4 py-2.5 text-sm outline-none transition-colors">
+          </div>
+        </div>
+      </div>
+
+      <!-- BARRA DE ACCIÓN -->
+      <div class="flex items-center justify-between border-t border-white/10 pt-6">
+        <p *ngIf="statusMessage" [class.text-green-400]="!isError" [class.text-red-500]="isError" class="text-xs font-medium animate-fade-in flex items-center gap-2">
+          <span class="material-symbols-outlined text-sm">{{ isError ? 'error' : 'check_circle' }}</span>
+          {{ statusMessage }}
+        </p>
+        <div *ngIf="!statusMessage"></div>
+
+        <button type="submit" [disabled]="isSaving" class="px-8 py-3 bg-white text-black font-semibold text-sm rounded-xl hover:bg-secondary transition-all duration-300 disabled:opacity-50 flex items-center gap-2 shadow-lg focus:outline-none">
+          <span *ngIf="isSaving" class="material-symbols-outlined animate-spin text-sm">sync</span>
+          {{ isSaving ? ('PROFILE_PAGE.BTN_SAVING' | translate) : ('PROFILE_PAGE.BTN_SAVE' | translate) }}
+        </button>
+      </div>
+
+    </form>
+  </div>
+</div>

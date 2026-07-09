@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Enum as SqlaEnum
+from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Enum as SqlaEnum, Date
 from sqlalchemy.orm import relationship
 import enum
 import uuid
@@ -16,8 +16,25 @@ class User(Base):
     
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     company_id = Column(String(36), ForeignKey("companies.id", ondelete="CASCADE"), nullable=True)
-    full_name = Column(String(150), nullable=True) # 🚀 NUEVA COLUMNA
+    
+    # --- IDENTIDAD ---
+    full_name = Column(String(150), nullable=True)
+    last_name_paternal = Column(String(100), nullable=True)
+    last_name_maternal = Column(String(100), nullable=True)
+    document_type = Column(String(20), nullable=True) # DNI, Pasaporte, RUT, etc.
+    document_number = Column(String(50), nullable=True)
+    birth_date = Column(Date, nullable=True)
+    
+    # --- CONTACTO ---
     email = Column(String(150), unique=True, index=True, nullable=False)
+    phone = Column(String(50), nullable=True)
+    
+    # --- UBICACIÓN ---
+    country = Column(String(100), nullable=True)
+    city = Column(String(100), nullable=True)
+    address = Column(String(255), nullable=True)
+    
+    # --- SISTEMA ---
     hashed_password = Column(String(255), nullable=False)
     role = Column(SqlaEnum(UserRole), default=UserRole.SALES, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)

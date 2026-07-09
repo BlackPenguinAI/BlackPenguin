@@ -22,17 +22,15 @@
   },
   "SOLUTIONS": {
     "TITLE": "Ecosistema Perimetral Multi-Tenant",
-    "DESC": "Diseñado para desarrolladoras de gran escala. Administra múltiples proyectos inmobiliarios, gestiona roles para equipos de marketing, asesores de ventas, y despliega agentes de voz con IA en un entorno blindado y completamente aislado por Tenant."
+    "DESC": "Diseñado para grandes desarrolladoras. Administra múltiples proyectos inmobiliarios, maneja roles de equipos de marketing, asesores de ventas, y despliega agentes de voz con IA en un entorno blindado y completamente aislado por Tenant."
   },
   "FOOTER": {
-    "RIGHTS": "© 2026 Black Penguin AI",
-    "WHAT_IS": "qué es black penguin"
+    "RIGHTS": "© 2026 Black Penguin. Todos los derechos reservados."
   },
   "AUTH": {
-    "FULL_NAME": "Nombre(s)",
-    "WELCOME_BACK": "Bienvenido de Vuelta",
-    "CREATE_ACCOUNT": "Crear Cuenta",
-    "SUBTITLE_LOGIN": "Ingresa tus credenciales para acceder a tu copiloto de IA.",
+    "TITLE_LOGIN": "Ingresa a tu cuenta",
+    "SUBTITLE_LOGIN": "¡Bienvenido de nuevo! Por favor, ingresa tus datos.",
+    "TITLE_REGISTER": "Crea una cuenta",
     "SUBTITLE_REGISTER": "Comienza con la inteligencia comercial inmobiliaria definitiva.",
     "EMAIL": "Correo Electrónico",
     "PASSWORD": "Contraseña",
@@ -75,7 +73,7 @@
     "LOGOUT": "Cerrar Sesión",
     "WAITLIST_SUBTITLE": "Auditoría en tiempo real de la lista de espera global.",
     "EXPORT_EXCEL": "Exportar Excel",
-    "SYNCING": "Sincronizando registros con Postgres...",
+    "SYNCING": "Sincronizando registros...",
     "COL_ID": "ID de Registro",
     "COL_EMAIL": "Correo Electrónico",
     "COL_DATE": "Fecha & Hora de Captura (UTC)",
@@ -85,7 +83,13 @@
     "SAVE": "Guardar",
     "CANCEL": "Cancelar",
     "CONFIRM_DELETE": "¿Estás seguro de eliminar este registro? Esta acción no se puede deshacer.",
-    "NO_RECORDS": "Aún no hay suscriptores registrados en la base de datos."
+    "NO_RECORDS": "No se encontraron registros.",
+    "PROFILE_TITLE": "Identidad y Contacto",
+    "PROFILE_SUBTITLE": "Gestiona tus datos administrativos y de ubicación.",
+    "DEV_TITLE": "Clientes Desarrolladores",
+    "DEV_SUBTITLE": "Gestiona Inmobiliarias, Proyectos y Equipos.",
+    "DASH_TITLE": "Operaciones Globales",
+    "DASH_SUBTITLE": "Vista general de uso de la plataforma y estadísticas."
   },
   "AI_CONFIG": {
     "TITLE": "Sintonizador Maestro IA",
@@ -111,5 +115,57 @@
     "BTN_SAVING": "Actualizando Núcleo...",
     "MSG_SUCCESS": "¡Configuración Multi-Agente actualizada con éxito!",
     "MSG_ERROR": "Error crítico al guardar la configuración."
+  },
+  "PROFILE_PAGE": {
+    "SECTION_IDENTITY": "Identidad del Administrador",
+    "FIRST_NAME": "Nombres",
+    "LAST_NAME_P": "A. Paterno",
+    "LAST_NAME_M": "A. Materno",
+    "DOC_TYPE": "Tipo de Documento",
+    "DOC_NUMBER": "N° de Documento",
+    "DOB": "Fecha de Nacimiento",
+    "SECTION_CONTACT": "Contacto",
+    "EMAIL": "Correo Electrónico (Solo Lectura)",
+    "PHONE": "Número de Celular",
+    "SECTION_LOCATION": "Ubicación",
+    "COUNTRY": "País",
+    "CITY": "Ciudad",
+    "ADDRESS": "Dirección Exacta",
+    "BTN_SAVE": "Guardar Perfil",
+    "BTN_SAVING": "Guardando...",
+    "MSG_SUCCESS": "¡Perfil actualizado con éxito!",
+    "MSG_ERROR": "Error al guardar el perfil."
+  },
+  "DEV_PAGE": {
+    "ADD_NEW": "Nueva Desarrolladora",
+    "TABLE_NAME": "Nombre de Empresa",
+    "TABLE_PLAN": "Plan de Licencia",
+    "TABLE_PROJECTS": "Proyectos Permitidos",
+    "TABLE_EXPIRATION": "Expiración de Licencia",
+    "TABLE_STATUS": "Estatus",
+    "MODAL_TITLE_ADD": "Registrar Nueva Desarrolladora",
+    "MODAL_TITLE_EDIT": "Editar Perfil Inmobiliario",
+    "FIELD_NAME": "Razón Social / Nombre Comercial",
+    "FIELD_PLAN": "Plan de Suscripción",
+    "FIELD_PROJECTS": "Máx. Proyectos Simultáneos",
+    "FIELD_LICENSE": "Fecha de Expiración",
+    "FIELD_ACTIVE": "Cuenta Activa (Habilitada)",
+    "FEATURES_TITLE": "Módulos Enterprise",
+    "FIELD_VOICE": "Habilitar Agentes de Voz",
+    "FIELD_INTEGRATIONS": "Habilitar Integración CRM"
+  },
+  "DASHBOARD_PAGE": {
+    "CARD1_TITLE": "Inmobiliarias",
+    "CARD1_DESC": "Licencias Activas",
+    "CARD2_TITLE": "Proyectos Base",
+    "CARD2_DESC": "Desarrollos administrados",
+    "CARD3_TITLE": "Waitlist Leads",
+    "CARD3_DESC": "Correos capturados en la Landing",
+    "CARD4_TITLE": "Usuarios App",
+    "CARD4_DESC": "Staff, MKT y Sales registrados",
+    "QUICK_ACCESS": "Accesos Rápidos",
+    "QA_DEV": "Gestionar Desarrolladoras",
+    "QA_WAITLIST": "Auditar Waitlist",
+    "QA_TUNER": "Sintonizador Multi-Agente"
   }
 }
