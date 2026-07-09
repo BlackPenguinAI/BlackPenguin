@@ -3,9 +3,6 @@ from sqlalchemy.orm import Session
 from app.db.base import Base  # Al importar esto, Python lee TODOS los modelos automáticamente
 from app.db.postgres import engine, SessionLocal
 
-# 👇 ESTA ES LA LÍNEA QUE FALTA (Ajusta la ruta según dónde esté tu modelo de Empresa)
-from app.modules.empresas.models import Company # o la ruta donde tengas tu modelo
-
 from app.core.security import get_password_hash
 
 def init_db():
