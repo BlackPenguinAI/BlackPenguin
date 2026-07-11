@@ -1,18 +1,18 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
-import httpx  # 🚀 NUEVO: Herramienta para peticiones asíncronas al LLM
+import httpx  
 from app.core.config import settings
 
 from app.db.postgres import get_db
 
-# 1. Modelos de Base de Datos
 from app.modules.tenants.models import (
     Company, 
     SubscriptionPlan,
-    OnboardingProtocol,     # 🚀 AQUÍ VA EL PROTOCOLO
-    OnboardingSession,      # 🚀 Y LA SESIÓN
-    OnboardingMessage,      # 🚀 Y EL MENSAJE
+    OnboardingProtocol,     
+    OnboardingSession,      
+    OnboardingMessage,      
+    CompanyProfile,         # 🚀 AÑADIDO EL PERFIL
     SenderType
 )
 
@@ -20,9 +20,6 @@ from app.modules.properties.models import Project
 from app.modules.auth.models import User, UserRole
 from app.modules.sales.models import WaitlistEmail 
 
-
-
-# 2. Esquemas (AQUÍ ESTÁ LA CLAVE PARA EL ERROR)
 from app.modules.tenants.schemas import (
     CompanyCreate, 
     CompanyUpdate, 
@@ -33,19 +30,20 @@ from app.modules.tenants.schemas import (
     DeveloperCreate,
     DeveloperUpdate,
     DeveloperResponse,
-    ChatMessagePayload,       # 🚀 AQUÍ VAN LOS DEL CHAT
-    ChatMessageResponse,      # 🚀 AQUÍ VAN LOS DEL CHAT
-    OnboardingSessionStatus   # 🚀 AQUÍ VAN LOS DEL CHAT
+    ChatMessagePayload,       
+    ChatMessageResponse,      
+    OnboardingSessionStatus,
+    CompanyProfileUpdate,     # 🚀 AÑADIDO EL PERFIL
+    CompanyProfileResponse    # 🚀 AÑADIDO EL PERFIL
 )
 
-# 3. Dependencias
 from app.modules.auth.deps import RoleChecker
 
 from datetime import timedelta
 from app.core.security import create_email_token, get_password_hash
 from app.core.email import send_email
 
-from app.modules.auth.deps import get_current_user # Asumiendo tu inyector de sesión token
+from app.modules.auth.deps import get_current_user 
 
 router = APIRouter()
 
@@ -54,7 +52,6 @@ router = APIRouter()
 # =========================================================
 @router.get("/stats", summary="Estadísticas globales para el Dashboard")
 def get_global_stats(db: Session = Depends(get_db), current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN]))):
-    """Devuelve el conteo maestro de la plataforma para el Superadmin."""
     return {
         "total_companies": db.query(Company).count(),
         "active_companies": db.query(Company).filter(Company.is_active == True).count(),
@@ -99,7 +96,6 @@ def delete_plan(plan_id: str, db: Session = Depends(get_db), current_user: User 
     if not plan:
         raise HTTPException(status_code=404, detail="Plan no encontrado")
     
-    # Validar si hay empresas usando este plan
     empresas_activas = db.query(Company).filter(Company.plan_id == plan_id).count()
     if empresas_activas > 0:
         raise HTTPException(status_code=400, detail="No se puede eliminar: hay empresas usando este plan.")
@@ -158,26 +154,21 @@ def get_developers(db: Session = Depends(get_db), current_user: User = Depends(R
     for company in companies:
         admin = db.query(User).filter(User.company_id == company.id, User.role == UserRole.ADMIN).first()
         
-        # 🚀 CORRECCIÓN DE EXTRACCIÓN DE NOMBRES LIMPÍOS
         first_name_clean = ""
         paternal_clean = ""
         maternal_clean = ""
         
         if admin:
-            # Si ya tenemos datos guardados en las columnas de apellidos individuales, las usamos directamente
             if admin.last_name_paternal or admin.last_name_maternal:
-                # Intentamos limpiar el full_name quitando los apellidos para dejar SOLAMENTE el nombre/s solo
                 first_name_clean = admin.full_name if admin.full_name else ""
                 if admin.last_name_paternal and first_name_clean:
                     first_name_clean = first_name_clean.replace(admin.last_name_paternal, "").strip()
                 if admin.last_name_maternal and first_name_clean:
                     first_name_clean = first_name_clean.replace(admin.last_name_maternal, "").strip()
                 
-                # Si por algún motivo la limpieza dejó el campo vacío, usamos las columnas individuales directo
                 paternal_clean = admin.last_name_paternal or ""
                 maternal_clean = admin.last_name_maternal or ""
             else:
-                # Fallback: Si es un registro antiguo donde solo se llenó full_name, separamos por espacios
                 parts = admin.full_name.split(' ') if admin.full_name else []
                 if len(parts) > 0: first_name_clean = parts[0]
                 if len(parts) > 1: paternal_clean = parts[1]
@@ -185,7 +176,7 @@ def get_developers(db: Session = Depends(get_db), current_user: User = Depends(R
 
         dev_data = {
             "id": company.id,
-            "name": company.name, # 🚀 CORRECCIÓN AQUÍ: antes decía "company_name"
+            "name": company.name, 
             "license_start": company.license_start,
             "license_end": company.license_end,
             "plan_duration_months": company.plan_duration_months,
@@ -193,7 +184,6 @@ def get_developers(db: Session = Depends(get_db), current_user: User = Depends(R
             "payment_receipt_url": company.payment_receipt_url,
             "plan_id": company.plan_id,
             
-            # Datos limpios y aislados enviados al frontend
             "admin_email": admin.email if admin else "",
             "admin_first_name": first_name_clean,
             "admin_paternal_last_name": paternal_clean,
@@ -227,7 +217,11 @@ def create_developer(payload: DeveloperCreate, db: Session = Depends(get_db), cu
     db.commit()
     db.refresh(new_company)
     
-    # Unimos las piezas para guardar el full_name y guardamos apellidos en columnas individuales
+    # 🚀 NUEVO: Crear automáticamente el Perfil Cognitivo vacío para la IA
+    new_profile = CompanyProfile(company_id=new_company.id)
+    db.add(new_profile)
+    db.commit()
+
     full_name_compiled = f"{payload.admin_first_name} {payload.admin_paternal_last_name} {payload.admin_maternal_last_name}".strip()
 
     new_user = User(
@@ -243,11 +237,9 @@ def create_developer(payload: DeveloperCreate, db: Session = Depends(get_db), cu
     db.add(new_user)
     db.commit()
 
-    # Generación de Correo Multilingüe con Token Seguro
     token = create_email_token(payload.admin_email, new_user.hashed_password)
     activation_link = f"http://localhost:4200/set-password?token={token}"
     
-    # Compilar saludo amigable
     saludo_name = f"{payload.admin_first_name} {payload.admin_paternal_last_name}"
 
     if payload.language == "es":
@@ -276,7 +268,6 @@ def create_developer(payload: DeveloperCreate, db: Session = Depends(get_db), cu
     send_email(payload.admin_email, subject, html_content)
     return new_company
 
-# 🚀 NUEVO PARÁMETRO: lang (para reenviar en el idioma correcto)
 @router.post("/developers/{company_id}/resend-activation", summary="Re-enviar link de recuperación/activación")
 def resend_activation_link(company_id: str, lang: str = "en", db: Session = Depends(get_db), current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN]))):
     admin_user = db.query(User).filter(User.company_id == company_id, User.role == UserRole.ADMIN).first()
@@ -316,7 +307,6 @@ def update_developer(company_id: str, payload: DeveloperUpdate, db: Session = De
     
     update_data = payload.model_dump(exclude_unset=True)
     
-    # 1. Actualizar datos de la Empresa
     if "company_name" in update_data and update_data["company_name"] is not None:
         company.name = update_data["company_name"]
     for key in ["plan_id", "duration_months", "is_active", "payment_receipt_url"]:
@@ -327,19 +317,14 @@ def update_developer(company_id: str, payload: DeveloperUpdate, db: Session = De
         from datetime import datetime, timedelta
         company.license_end = company.license_start + timedelta(days=30 * update_data["duration_months"])
         
-    # 2. Actualizar Identidad y Contacto del Administrador Asociado
     admin_user = db.query(User).filter(User.company_id == company_id, User.role == UserRole.ADMIN).first()
     if admin_user:
-        
-        # 🚀 NUEVO: Validación elegante al editar el correo
         if "admin_email" in update_data and update_data["admin_email"] != admin_user.email:
             existing_email = db.query(User).filter(User.email == update_data["admin_email"]).first()
             if existing_email:
-                # Lanzamos el error 400 para que Angular dispare el Toast de error
                 raise HTTPException(status_code=400, detail="El correo del administrador ya está en uso.")
             admin_user.email = update_data["admin_email"]
             
-        # Sincronización estricta de columnas atómicas
         if "admin_first_name" in update_data or "admin_paternal_last_name" in update_data or "admin_maternal_last_name" in update_data:
             fn = update_data.get("admin_first_name") or admin_user.full_name.split(' ')[0] if admin_user.full_name else ""
             ap = update_data.get("admin_paternal_last_name") or admin_user.last_name_paternal or ""
@@ -365,30 +350,79 @@ def delete_developer(company_id: str, db: Session = Depends(get_db), current_use
     db.commit()
     return {"message": "Empresa y todos sus proyectos/usuarios eliminados con éxito"}
 
+
 # =========================================================
-# 🧠 ENTORNO CLIENTE: CHAT DE COMPANY ONBOARDING
+# 🧠 ENTORNO CLIENTE: CHAT DE COMPANY ONBOARDING Y PERFIL
 # =========================================================
+
+@router.get("/onboarding/profile", response_model=CompanyProfileResponse, summary="Obtener el Perfil de la Empresa")
+def get_company_profile(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Devuelve el progreso actual del perfil de la empresa (Para Angular Progress Tracker)."""
+    if not current_user.company_id:
+        raise HTTPException(status_code=400, detail="Usuario sin empresa.")
+        
+    profile = db.query(CompanyProfile).filter(CompanyProfile.company_id == current_user.company_id).first()
+    if not profile:
+        profile = CompanyProfile(company_id=current_user.company_id)
+        db.add(profile)
+        db.commit()
+        db.refresh(profile)
+        
+    return profile
+
+@router.put("/onboarding/profile", response_model=CompanyProfileResponse, summary="Actualizar Perfil (Por IA o Manual)")
+def update_company_profile(payload: CompanyProfileUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Este endpoint será llamado por la IA o el usuario cuando se confirme nueva información."""
+    if not current_user.company_id:
+        raise HTTPException(status_code=400, detail="Usuario sin empresa.")
+        
+    profile = db.query(CompanyProfile).filter(CompanyProfile.company_id == current_user.company_id).first()
+    if not profile:
+        raise HTTPException(status_code=404, detail="Perfil no encontrado.")
+
+    # Guardar nuevos datos extraídos
+    update_data = payload.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(profile, key, value)
+
+    # Actualizar heurísticas de compleción automáticamente
+    profile.is_identity_completed = bool(profile.legal_name and profile.headquarters)
+    profile.is_team_completed = bool(len(profile.executive_team) > 0)
+    profile.is_focus_completed = bool(len(profile.asset_classes) > 0)
+    profile.is_market_completed = bool(profile.market_coverage)
+    profile.is_strategy_completed = bool(profile.investment_strategy)
+    profile.is_value_prop_completed = bool(profile.value_proposition)
+    profile.is_brand_completed = bool(profile.tone_of_voice and profile.key_messaging)
+
+    # Marcar el milestone global
+    profile.is_profile_fully_completed = all([
+        profile.is_identity_completed, profile.is_team_completed, profile.is_focus_completed, 
+        profile.is_market_completed, profile.is_strategy_completed, profile.is_value_prop_completed, 
+        profile.is_brand_completed
+    ])
+
+    db.commit()
+    db.refresh(profile)
+    return profile
 
 @router.get("/onboarding/session", response_model=OnboardingSessionStatus, summary="Obtener o iniciar sesión de chat")
 def get_or_create_onboarding_session(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    """Verifica si la empresa tiene una sesión abierta; si no, la crea e inicia con el saludo de la IA."""
     if not current_user.company_id:
         raise HTTPException(status_code=400, detail="El usuario no pertenece a ninguna empresa desarrolladora.")
 
     session = db.query(OnboardingSession).filter(OnboardingSession.company_id == current_user.company_id).first()
     
     if not session:
-        # Crear nueva sesión limpia
         session = OnboardingSession(company_id=current_user.company_id)
         db.add(session)
         db.commit()
         db.refresh(session)
         
-        # Insertar el primer mensaje de bienvenida de la IA por defecto
+        # 🚀 Adaptado al nuevo flujo "Wow Effect" (Inglés)
         welcome_message = OnboardingMessage(
             session_id=session.id,
             sender=SenderType.AI,
-            content="¡Hola! Bienvenido al Onboarding Corporativo de Black Penguin. Estoy aquí para conocer a profundidad los pilares comerciales de tu desarrolladora inmobiliaria. Para empezar, ¿podrías indicarme cuál es el nombre comercial oficial de tu empresa y cuántos años llevan operando en el mercado?"
+            content="Welcome to Black Penguin! I am your AI Corporate Onboarding Specialist. I am currently analyzing your company footprint to set up your cognitive workspace. To start, could you provide your official website URL or upload a company brochure?"
         )
         db.add(welcome_message)
         db.commit()
@@ -399,11 +433,9 @@ def get_or_create_onboarding_session(db: Session = Depends(get_db), current_user
 
 @router.post("/onboarding/chat", response_model=ChatMessageResponse, summary="Enviar mensaje al Copiloto de Onboarding")
 async def send_onboarding_message(payload: ChatMessagePayload, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    """Recibe el mensaje del cliente, fusiona los 3 niveles de prompt del Staff y procesa con Deepseek."""
     if not current_user.company_id:
         raise HTTPException(status_code=400, detail="Acceso denegado.")
 
-    # 1. Obtener la sesión activa
     session = db.query(OnboardingSession).filter(OnboardingSession.company_id == current_user.company_id).first()
     if not session:
         raise HTTPException(status_code=400, detail="Sesión no inicializada. Llame primero a /onboarding/session")
@@ -411,19 +443,15 @@ async def send_onboarding_message(payload: ChatMessagePayload, db: Session = Dep
     if session.is_completed:
         raise HTTPException(status_code=400, detail="Este onboarding ya fue completado y cerrado.")
 
-    # 2. Guardar el mensaje del usuario en la base de datos
     user_msg = OnboardingMessage(session_id=session.id, sender=SenderType.USER, content=payload.message)
     db.add(user_msg)
     db.commit()
 
-    # 3. Obtener el Protocolo Maestro con los 3 niveles de prompt seteados por Staff
     protocol = db.query(OnboardingProtocol).filter(OnboardingProtocol.is_active == True).order_by(OnboardingProtocol.created_at.desc()).first()
     
     if not protocol:
-        # Fallback de emergencia si el Staff no ha creado ningún protocolo aún
-        system_instructions = "Eres un asistente de Onboarding Inmobiliario para la plataforma Black Penguin. Haz preguntas ordenadas."
+        system_instructions = "You are a Real Estate Onboarding Assistant. Ask questions to fill the corporate profile."
     else:
-        # 🚀 COMPOSICIÓN JERÁRQUICA DE LOS 3 NIVELES DE PROMPT
         system_instructions = f"""
         === LEVEL 1: IDENTITY (SYSTEM ROLE) ===
         {protocol.system_role_prompt}
@@ -435,7 +463,6 @@ async def send_onboarding_message(payload: ChatMessagePayload, db: Session = Dep
         {protocol.guardrails_prompt}
         """
 
-    # 4. Construir el historial completo de la conversación para el LLM
     history = db.query(OnboardingMessage).filter(OnboardingMessage.session_id == session.id).order_by(OnboardingMessage.created_at.asc()).all()
     
     messages_payload = [{"role": "system", "content": system_instructions}]
@@ -443,8 +470,7 @@ async def send_onboarding_message(payload: ChatMessagePayload, db: Session = Dep
         role_label = "user" if msg.sender == SenderType.USER else "assistant"
         messages_payload.append({"role": role_label, "content": msg.content})
 
-    # 5. Consumir el LLM de OpenRouter (Deepseek) configurado en tu config.py
-    ai_response_text = "Lo siento, estoy experimentando dificultades técnicas para procesar tu solicitud."
+    ai_response_text = "I apologize, but I am experiencing technical difficulties processing your request."
     
     try:
         async with httpx.AsyncClient() as client:
@@ -464,13 +490,11 @@ async def send_onboarding_message(payload: ChatMessagePayload, db: Session = Dep
                 resp_json = response.json()
                 ai_response_text = resp_json["choices"][0]["message"]["content"]
             else:
-                # 🚀 NUEVO: Imprimimos el motivo exacto del rechazo
                 print(f"❌ OpenRouter rechazó la petición. Status: {response.status_code} | Detalle: {response.text}")
                 
     except Exception as e:
         print(f"❌ Error conectando al LLM: {e}")
 
-    # 6. Guardar la respuesta de la IA en la base de datos
     ai_msg = OnboardingMessage(session_id=session.id, sender=SenderType.AI, content=ai_response_text)
     db.add(ai_msg)
     db.commit()

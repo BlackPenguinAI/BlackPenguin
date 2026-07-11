@@ -1,5 +1,5 @@
-from pydantic import BaseModel, EmailStr
-from typing import Optional, List
+from pydantic import BaseModel, EmailStr, HttpUrl, ConfigDict
+from typing import Optional, List, Dict
 from datetime import datetime
 
 # ==========================================
@@ -23,21 +23,20 @@ class SubscriptionPlanUpdate(SubscriptionPlanBase):
 
 class SubscriptionPlanResponse(SubscriptionPlanBase):
     id: str
-
     class Config:
         from_attributes = True
 
 # ==========================================
-# ESQUEMAS DE DESARROLLADORES (ONBOARDING)
+# ESQUEMAS DE DESARROLLADORES 
 # ==========================================
 class DeveloperCreate(BaseModel):
     company_name: str
     plan_id: str
     duration_months: int = 12
     admin_email: EmailStr
-    admin_first_name: str       # 🚀 NUEVO
-    admin_paternal_last_name: str # 🚀 NUEVO
-    admin_maternal_last_name: Optional[str] = "" # 🚀 NUEVO
+    admin_first_name: str       
+    admin_paternal_last_name: str 
+    admin_maternal_last_name: Optional[str] = "" 
     is_active: bool = True
     language: str = "en"
 
@@ -48,9 +47,9 @@ class DeveloperUpdate(BaseModel):
     is_active: Optional[bool] = None
     payment_receipt_url: Optional[str] = None
     admin_email: Optional[EmailStr] = None
-    admin_first_name: Optional[str] = None        # 🚀 NUEVO
-    admin_paternal_last_name: Optional[str] = None  # 🚀 NUEVO
-    admin_maternal_last_name: Optional[str] = None  # 🚀 NUEVO
+    admin_first_name: Optional[str] = None        
+    admin_paternal_last_name: Optional[str] = None  
+    admin_maternal_last_name: Optional[str] = None  
 
 class DeveloperResponse(BaseModel):
     id: str
@@ -62,7 +61,6 @@ class DeveloperResponse(BaseModel):
     payment_receipt_url: Optional[str] = None
     plan_id: Optional[str] = None
     
-    # 🚀 NUEVO: Campos del administrador mapeados en la respuesta
     admin_email: Optional[str] = None
     admin_first_name: Optional[str] = None
     admin_paternal_last_name: Optional[str] = None
@@ -70,7 +68,6 @@ class DeveloperResponse(BaseModel):
     
     class Config:
         from_attributes = True
-
 
 class CompanyBase(BaseModel):
     name: str
@@ -93,9 +90,61 @@ class CompanyResponse(CompanyBase):
     id: str
     license_start: datetime
     license_end: datetime
-
     class Config:
         from_attributes = True
+
+# =========================================================================
+# 🚀 NUEVOS: ESQUEMAS DEL PERFIL COGNITIVO (COMPANY PROFILE)
+# =========================================================================
+class ExecutiveContactSchema(BaseModel):
+    name: str
+    role: str
+    email: Optional[str] = None
+
+class CompanyProfileBase(BaseModel):
+    scraped_source_url: Optional[str] = None
+    
+    legal_name: Optional[str] = None
+    dba: Optional[str] = None
+    headquarters: Optional[str] = None
+    year_established: Optional[int] = None
+    
+    executive_team: List[ExecutiveContactSchema] = []
+    
+    asset_classes: List[str] = []
+    core_focus_description: Optional[str] = None
+    
+    market_coverage: Optional[str] = None
+    target_demographics: Optional[str] = None
+    
+    portfolio_size_aum: Optional[str] = None
+    investment_strategy: Optional[str] = None
+    
+    value_proposition: Optional[str] = None
+    key_differentiators: Optional[str] = None
+    
+    tone_of_voice: Optional[str] = None
+    key_messaging: Optional[str] = None
+
+class CompanyProfileUpdate(CompanyProfileBase):
+    # La IA enviará los campos que haya descubierto
+    pass
+
+class CompanyProfileResponse(CompanyProfileBase):
+    id: str
+    company_id: str
+    
+    is_identity_completed: bool
+    is_team_completed: bool
+    is_focus_completed: bool
+    is_market_completed: bool
+    is_strategy_completed: bool
+    is_value_prop_completed: bool
+    is_brand_completed: bool
+    is_profile_fully_completed: bool
+    
+    updated_at: datetime
+    model_config = ConfigDict(from_attributes=True)
 
 # ==========================================
 # ESQUEMAS DEL CHAT DE ONBOARDING
@@ -107,7 +156,6 @@ class ChatMessageResponse(BaseModel):
     sender: str
     content: str
     created_at: datetime
-
     class Config:
         from_attributes = True
 

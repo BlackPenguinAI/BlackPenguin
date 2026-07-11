@@ -4,6 +4,8 @@ from app.db.base import Base  # Al importar esto, Python lee TODOS los modelos a
 from app.db.postgres import engine, SessionLocal
 
 from app.core.security import get_password_hash
+# 👇 ESTA ES LA LÍNEA QUE FALTABA
+from app.modules.auth.models import User, UserRole
 
 def init_db():
     # 1. Crear todas las tablas que falten en la base de datos

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Text, Integer, Enum as SqlaEnum
+from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Text, Integer, Enum as SqlaEnum, JSON
 from sqlalchemy.orm import relationship
 import enum
 import uuid
@@ -55,9 +55,67 @@ class Company(Base):
     # Relaciones
     users = relationship("User", back_populates="company", cascade="all, delete-orphan")
     projects = relationship("Project", overlaps="company", cascade="all, delete-orphan")
+    
+    # 🚀 NUEVO: Relación 1:1 con el Perfil Cognitivo
+    profile = relationship("CompanyProfile", back_populates="company", uselist=False, cascade="all, delete-orphan")
+
+# =========================================================================
+# 🏢 3. THE COGNITIVE BRAIN: DETAILED CORPORATE PROFILE (7 SECTIONS)
+# =========================================================================
+class CompanyProfile(Base):
+    __tablename__ = "company_profiles"
+    
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    company_id = Column(String(36), ForeignKey("companies.id", ondelete="CASCADE"), unique=True, nullable=False)
+    
+    # 🔗 Web Scraping Tracking
+    scraped_source_url = Column(String(255), nullable=True)
+    
+    # 📊 SECTION 1: Company Identity
+    legal_name = Column(String(205), nullable=True)
+    dba = Column(String(150), nullable=True)
+    headquarters = Column(String(255), nullable=True)
+    year_established = Column(Integer, nullable=True)
+    
+    # 👥 SECTION 2: Executive Team & Key Contacts
+    executive_team = Column(JSON, default=list)
+    
+    # 🏗️ SECTION 3: Core Focus & Asset Classes
+    asset_classes = Column(JSON, default=list)
+    core_focus_description = Column(Text, nullable=True)
+    
+    # 🗺️ SECTION 4: Market Coverage & Target Demographics
+    market_coverage = Column(Text, nullable=True)
+    target_demographics = Column(Text, nullable=True)
+    
+    # 💰 SECTION 5: Investment Strategy & Portfolio Size
+    portfolio_size_aum = Column(String(100), nullable=True)
+    investment_strategy = Column(Text, nullable=True)
+    
+    # 🏆 SECTION 6: Value Proposition & Differentiators
+    value_proposition = Column(Text, nullable=True)
+    key_differentiators = Column(Text, nullable=True)
+    
+    # 🎨 SECTION 7: Brand Guidelines
+    tone_of_voice = Column(String(100), nullable=True)
+    key_messaging = Column(Text, nullable=True)
+    
+    # 🏁 Onboarding Milestone Tracking
+    is_identity_completed = Column(Boolean, default=False, nullable=False)
+    is_team_completed = Column(Boolean, default=False, nullable=False)
+    is_focus_completed = Column(Boolean, default=False, nullable=False)
+    is_market_completed = Column(Boolean, default=False, nullable=False)
+    is_strategy_completed = Column(Boolean, default=False, nullable=False)
+    is_value_prop_completed = Column(Boolean, default=False, nullable=False)
+    is_brand_completed = Column(Boolean, default=False, nullable=False)
+    
+    is_profile_fully_completed = Column(Boolean, default=False, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    company = relationship("Company", back_populates="profile")
 
 # =========================================================
-# 🧠 1. PROTOCOLOS DE ONBOARDING (Configurados por Staff)
+# 🧠 4. PROTOCOLOS DE ONBOARDING (Configurados por Staff)
 # =========================================================
 class OnboardingProtocol(Base):
     __tablename__ = "onboarding_protocols"
@@ -66,16 +124,15 @@ class OnboardingProtocol(Base):
     version = Column(Integer, default=1, nullable=False)
     description = Column(String(255), nullable=True)
     
-    # 🚀 Los 3 niveles de Prompt Estrictos
-    system_role_prompt = Column(Text, nullable=False)   # Nivel 1: Identidad
-    protocol_flow_prompt = Column(Text, nullable=False) # Nivel 2: Flujo de Atención
-    guardrails_prompt = Column(Text, nullable=False)    # Nivel 3: Contexto Estricto
+    system_role_prompt = Column(Text, nullable=False)   
+    protocol_flow_prompt = Column(Text, nullable=False) 
+    guardrails_prompt = Column(Text, nullable=False)    
     
     is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
 # =========================================================
-# 💬 2. SESIONES Y MENSAJES DEL CHAT (Historial por Cliente)
+# 💬 5. SESIONES Y MENSAJES DEL CHAT (Historial por Cliente)
 # =========================================================
 class OnboardingSession(Base):
     __tablename__ = "onboarding_sessions"
@@ -85,7 +142,6 @@ class OnboardingSession(Base):
     is_completed = Column(Boolean, default=False, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     
-    # Relaciones
     messages = relationship("OnboardingMessage", back_populates="session", cascade="all, delete-orphan")
 
 class OnboardingMessage(Base):
@@ -93,7 +149,7 @@ class OnboardingMessage(Base):
     
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     session_id = Column(String(36), ForeignKey("onboarding_sessions.id", ondelete="CASCADE"), nullable=False)
-    sender = Column(SqlaEnum(SenderType), nullable=False) # 'user' o 'ai'
+    sender = Column(SqlaEnum(SenderType), nullable=False) 
     content = Column(Text, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     
