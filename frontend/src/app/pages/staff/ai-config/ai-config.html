@@ -3,109 +3,83 @@
 
   <div class="max-w-5xl mx-auto relative z-10">
     <div class="mb-8">
-      <h1 class="text-3xl font-light tracking-tight">{{ 'AI_CONFIG.TITLE' | translate }}</h1>
-      <p class="text-sm text-gray-400 mt-1">{{ 'AI_CONFIG.SUBTITLE' | translate }}</p>
+      <h1 class="text-3xl font-light tracking-tight">Specialized <span class="text-secondary font-medium">Agents</span></h1>
+      <p class="text-sm text-gray-400 mt-1">Sintoniza los protocolos, comportamientos y restricciones de los agentes de Inteligencia Artificial.</p>
     </div>
 
-    <form (ngSubmit)="onSave()" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <form (ngSubmit)="onSave()" class="liquid-glass border border-white/5 p-8 rounded-2xl flex flex-col shadow-2xl">
       
-      <div class="flex flex-col gap-6 lg:col-span-1">
+      <div class="flex flex-wrap gap-2 border-b border-white/10 pb-5 mb-6">
+        <button type="button" (click)="setTab('empresa')" 
+                [class.bg-secondary]="activeTab === 'empresa'" [class.text-black]="activeTab === 'empresa'" 
+                [class.bg-white_5]="activeTab !== 'empresa'" [class.text-gray-400]="activeTab !== 'empresa'" 
+                class="px-5 py-2.5 rounded-xl text-sm font-bold transition-all border border-white/5 hover:border-secondary">
+          Onboarding Empresa
+        </button>
+
+        <button type="button" (click)="setTab('proyectos')" 
+                [class.bg-secondary]="activeTab === 'proyectos'" [class.text-black]="activeTab === 'proyectos'" 
+                [class.bg-white_5]="activeTab !== 'proyectos'" [class.text-gray-400]="activeTab !== 'proyectos'" 
+                class="px-5 py-2.5 rounded-xl text-sm font-bold transition-all border border-white/5 hover:border-secondary">
+          Onboarding Proyectos
+        </button>
+
+        <button type="button" (click)="setTab('ventas')" 
+                [class.bg-secondary]="activeTab === 'ventas'" [class.text-black]="activeTab === 'ventas'" 
+                [class.bg-white_5]="activeTab !== 'ventas'" [class.text-gray-400]="activeTab !== 'ventas'" 
+                class="px-5 py-2.5 rounded-xl text-sm font-bold transition-all border border-white/5 hover:border-secondary">
+          Ventas (Copiloto)
+        </button>
+
+        <button type="button" (click)="setTab('reporteria')" 
+                [class.bg-secondary]="activeTab === 'reporteria'" [class.text-black]="activeTab === 'reporteria'" 
+                [class.bg-white_5]="activeTab !== 'reporteria'" [class.text-gray-400]="activeTab !== 'reporteria'" 
+                class="px-5 py-2.5 rounded-xl text-sm font-bold transition-all border border-white/5 hover:border-secondary">
+          Reportería (Analista)
+        </button>
+      </div>
+
+      <div class="flex flex-col gap-6">
         
-        <div class="liquid-glass border border-white/5 p-5 rounded-2xl flex flex-col gap-4">
-          <h2 class="text-sm font-medium text-gray-200 uppercase tracking-widest">{{ 'AI_CONFIG.API_KEY_SEC' | translate }}</h2>
+        <div class="flex flex-col gap-2">
+          <label class="text-xs font-medium text-gray-400 uppercase tracking-widest">Modelo Base de IA</label>
+          <select name="activeModel" [(ngModel)]="activeAgent.model" class="bg-black/80 border border-white/10 focus:border-secondary rounded-xl px-4 py-3 text-sm text-white focus:outline-none appearance-none cursor-pointer max-w-sm">
+            <option value="" disabled>{{ 'AI_CONFIG.SEL_PLACEHOLDER' | translate }}</option>
+            <option *ngFor="let model of config.available_models" [value]="model">{{ model }}</option>
+          </select>
+        </div>
+
+        <div class="grid grid-cols-1 gap-6">
           <div class="flex flex-col gap-2">
-            <input type="password" name="apiKey" [(ngModel)]="config.openrouter_api_key" placeholder="sk-or-v1-..." class="bg-black/50 border border-white/10 focus:border-secondary rounded-lg px-4 py-2 text-sm text-white focus:outline-none transition-colors">
-            
-            <div *ngIf="config.openrouter_api_key" class="mt-2 bg-secondary/10 border border-secondary/20 p-3 rounded-lg flex items-center justify-between text-xs">
-              <span class="text-gray-400 font-medium">{{ 'AI_CONFIG.USAGE' | translate }}</span>
-              <span class="text-secondary font-mono font-bold">${{ consumption.usage | number:'1.2-4' }} <span *ngIf="consumption.limit">/ ${{ consumption.limit }}</span></span>
-            </div>
-          </div>
-        </div>
-
-        <div class="liquid-glass border border-white/5 p-5 rounded-2xl flex flex-col gap-4 h-full">
-          <h2 class="text-sm font-medium text-gray-200 uppercase tracking-widest">{{ 'AI_CONFIG.MODELS_SEC' | translate }}</h2>
-          
-          <div class="flex gap-2">
-            <input type="text" name="newModel" [(ngModel)]="newModelName" [placeholder]="'openai/gpt-4o-mini'" class="flex-1 bg-black/50 border border-white/10 focus:border-secondary rounded-lg px-3 py-2 text-sm text-white focus:outline-none transition-colors">
-            <button type="button" (click)="addModel()" class="bg-white/10 hover:bg-secondary hover:text-black text-white px-3 py-2 rounded-lg transition-colors focus:outline-none flex items-center">
-              <span class="material-symbols-outlined text-sm">add</span>
-            </button>
+            <label class="text-sm font-medium text-secondary uppercase tracking-wider flex items-center gap-2"><span>●</span> System Identity (Rol)</label>
+            <textarea rows="5" name="sysPrompt" [(ngModel)]="activeAgent.system_prompt" placeholder="Ej: Eres el asistente principal de la plataforma..." class="bg-black/50 border border-white/10 focus:border-secondary rounded-xl p-4 text-sm text-white focus:outline-none font-mono resize-y leading-relaxed"></textarea>
           </div>
 
-          <div class="flex flex-col gap-2 overflow-y-auto max-h-[300px] mt-2">
-            <div *ngFor="let model of config.available_models; let i = index" class="flex items-center justify-between bg-white/5 px-3 py-2 rounded-md border border-white/5 group">
-              <span class="text-xs font-mono text-gray-300 truncate">{{ model }}</span>
-              <button type="button" (click)="removeModel(i)" class="text-gray-600 hover:text-red-400 transition-colors focus:outline-none">
-                <span class="material-symbols-outlined text-sm">close</span>
-              </button>
-            </div>
-            <p *ngIf="config.available_models.length === 0" class="text-xs text-gray-600 text-center py-4">{{ 'AI_CONFIG.NO_MODELS' | translate }}</p>
+          <div class="flex flex-col gap-2">
+            <label class="text-sm font-medium text-secondary uppercase tracking-wider flex items-center gap-2"><span>●</span> Protocol Flow (Atención)</label>
+            <textarea rows="5" name="protoPrompt" [(ngModel)]="activeAgent.protocol_prompt" placeholder="Ej: Sigue esta secuencia: 1. Saluda, 2. Pregunta el nombre de la empresa..." class="bg-black/50 border border-white/10 focus:border-secondary rounded-xl p-4 text-sm text-white focus:outline-none font-mono resize-y leading-relaxed"></textarea>
+          </div>
+
+          <div class="flex flex-col gap-2 mb-4">
+            <label class="text-sm font-medium text-secondary uppercase tracking-wider flex items-center gap-2"><span>●</span> Guardrails (Restricciones)</label>
+            <textarea rows="5" name="guardPrompt" [(ngModel)]="activeAgent.guardrails_prompt" placeholder="Ej: Nunca respondas preguntas fuera del contexto inmobiliario..." class="bg-black/50 border border-white/10 focus:border-secondary rounded-xl p-4 text-sm text-white focus:outline-none font-mono resize-y leading-relaxed"></textarea>
           </div>
         </div>
       </div>
 
-      <div class="liquid-glass border border-white/5 p-6 rounded-2xl flex flex-col lg:col-span-2">
-        <h2 class="text-sm font-medium text-gray-200 uppercase tracking-widest mb-4">{{ 'AI_CONFIG.AGENTS_SEC' | translate }}</h2>
-        
-        <div class="flex flex-wrap gap-2 border-b border-white/10 pb-4 mb-5">
-          <button type="button" (click)="setTab('empresa')" [class.bg-secondary]="activeTab === 'empresa'" [class.text-black]="activeTab === 'empresa'" [class.bg-white_5]="activeTab !== 'empresa'" [class.text-gray-400]="activeTab !== 'empresa'" class="px-4 py-2 rounded-full text-xs font-bold transition-all border border-white/5 hover:border-secondary">
-            {{ 'AI_CONFIG.TAB_COMPANY' | translate }}
-          </button>
-          <button type="button" (click)="setTab('proyectos')" [class.bg-secondary]="activeTab === 'proyectos'" [class.text-black]="activeTab === 'proyectos'" [class.bg-white_5]="activeTab !== 'proyectos'" [class.text-gray-400]="activeTab !== 'proyectos'" class="px-4 py-2 rounded-full text-xs font-bold transition-all border border-white/5 hover:border-secondary">
-            {{ 'AI_CONFIG.TAB_PROJECT' | translate }}
-          </button>
-          <button type="button" (click)="setTab('ventas')" [class.bg-secondary]="activeTab === 'ventas'" [class.text-black]="activeTab === 'ventas'" [class.bg-white_5]="activeTab !== 'ventas'" [class.text-gray-400]="activeTab !== 'ventas'" class="px-4 py-2 rounded-full text-xs font-bold transition-all border border-white/5 hover:border-secondary">
-            {{ 'AI_CONFIG.TAB_SALES' | translate }}
-          </button>
-          <button type="button" (click)="setTab('reporteria')" [class.bg-secondary]="activeTab === 'reporteria'" [class.text-black]="activeTab === 'reporteria'" [class.bg-white_5]="activeTab !== 'reporteria'" [class.text-gray-400]="activeTab !== 'reporteria'" class="px-4 py-2 rounded-full text-xs font-bold transition-all border border-white/5 hover:border-secondary">
-            {{ 'AI_CONFIG.TAB_REPORTING' | translate }}
-          </button>
-        </div>
+      <div class="flex items-center justify-between border-t border-white/10 pt-6 mt-4">
+        <p *ngIf="statusMessage" [class.text-green-400]="!isError" [class.text-red-500]="isError" class="text-sm font-medium animate-fade-in flex items-center gap-2">
+          <span class="material-symbols-outlined text-[18px]">{{ isError ? 'error' : 'check_circle' }}</span>
+          {{ statusMessage }}
+        </p>
+        <div *ngIf="!statusMessage"></div>
 
-        <div class="flex flex-col gap-5 flex-1">
-          
-          <div class="flex flex-col gap-1.5">
-            <label class="text-xs font-medium text-gray-400 uppercase tracking-wider">{{ 'AI_CONFIG.SEL_MODEL' | translate }}</label>
-            <select name="activeModel" [(ngModel)]="activeAgent.model" class="bg-black/80 border border-white/10 focus:border-secondary rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none appearance-none cursor-pointer">
-              <option value="" disabled>{{ 'AI_CONFIG.SEL_PLACEHOLDER' | translate }}</option>
-              <option *ngFor="let model of config.available_models" [value]="model">{{ model }}</option>
-            </select>
-          </div>
-
-          <div class="flex flex-col gap-1.5">
-            <label class="text-xs font-medium text-secondary uppercase tracking-wider flex items-center gap-2"><span>●</span> {{ 'AI_CONFIG.SYS_PROMPT' | translate }}</label>
-            <p class="text-xs text-gray-500">{{ 'AI_CONFIG.SYS_PROMPT_DESC' | translate }}</p>
-            <textarea rows="3" name="sysPrompt" [(ngModel)]="activeAgent.system_prompt" class="bg-black/50 border border-white/10 focus:border-secondary rounded-xl p-4 text-sm text-white focus:outline-none font-mono resize-y"></textarea>
-          </div>
-
-          <div class="flex flex-col gap-1.5">
-            <label class="text-xs font-medium text-secondary uppercase tracking-wider flex items-center gap-2"><span>●</span> {{ 'AI_CONFIG.PROTO_PROMPT' | translate }}</label>
-            <p class="text-xs text-gray-500">{{ 'AI_CONFIG.PROTO_PROMPT_DESC' | translate }}</p>
-            <textarea rows="3" name="protoPrompt" [(ngModel)]="activeAgent.protocol_prompt" class="bg-black/50 border border-white/10 focus:border-secondary rounded-xl p-4 text-sm text-white focus:outline-none font-mono resize-y"></textarea>
-          </div>
-
-          <div class="flex flex-col gap-1.5 mb-4">
-            <label class="text-xs font-medium text-secondary uppercase tracking-wider flex items-center gap-2"><span>●</span> {{ 'AI_CONFIG.GUARD_PROMPT' | translate }}</label>
-            <p class="text-xs text-gray-500">{{ 'AI_CONFIG.GUARD_PROMPT_DESC' | translate }}</p>
-            <textarea rows="3" name="guardPrompt" [(ngModel)]="activeAgent.guardrails_prompt" class="bg-black/50 border border-white/10 focus:border-secondary rounded-xl p-4 text-sm text-white focus:outline-none font-mono resize-y"></textarea>
-          </div>
-        </div>
-
-        <div class="flex items-center justify-between border-t border-white/10 pt-5 mt-auto">
-          <p *ngIf="statusMessage" [class.text-green-400]="!isError" [class.text-red-500]="isError" class="text-xs font-medium animate-fade-in flex items-center gap-1">
-            <span class="material-symbols-outlined text-sm">{{ isError ? 'error' : 'check_circle' }}</span>
-            {{ statusMessage }}
-          </p>
-          <div *ngIf="!statusMessage"></div>
-
-          <button type="submit" [disabled]="isSaving" class="px-6 py-2.5 bg-white text-black font-semibold text-sm rounded-xl hover:bg-secondary hover:text-black transition-all duration-300 disabled:opacity-40 flex items-center gap-2 focus:outline-none shadow-lg">
-            <span *ngIf="isSaving" class="material-symbols-outlined animate-spin text-sm">sync</span>
-            {{ isSaving ? ('AI_CONFIG.BTN_SAVING' | translate) : ('AI_CONFIG.BTN_SAVE' | translate) }}
-          </button>
-        </div>
-
+        <button type="submit" [disabled]="isSaving" class="px-8 py-3 bg-white text-black font-semibold text-sm rounded-xl hover:bg-secondary transition-all duration-300 disabled:opacity-40 flex items-center gap-2 shadow-lg">
+          <span *ngIf="isSaving" class="material-symbols-outlined animate-spin text-[18px]">sync</span>
+          Guardar Protocolos
+        </button>
       </div>
+
     </form>
   </div>
 </div>

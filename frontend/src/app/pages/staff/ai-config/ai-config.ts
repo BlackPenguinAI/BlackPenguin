@@ -8,14 +8,11 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
   selector: 'app-staff-ai-config',
   standalone: true,
   imports: [CommonModule, FormsModule, TranslateModule],
-  templateUrl: './ai-config.html',
-  styleUrl: './ai-config.scss'
+  templateUrl: './ai-config.html'
 })
 export class StaffAiConfigComponent implements OnInit {
   
-  // 🚀 Estructura base de los 4 Agentes
   config = {
-    openrouter_api_key: '',
     available_models: [] as string[],
     agent_onboarding_empresa: { model: '', system_prompt: '', protocol_prompt: '', guardrails_prompt: '' },
     agent_onboarding_proyectos: { model: '', system_prompt: '', protocol_prompt: '', guardrails_prompt: '' },
@@ -23,19 +20,15 @@ export class StaffAiConfigComponent implements OnInit {
     agent_reporteria: { model: '', system_prompt: '', protocol_prompt: '', guardrails_prompt: '' }
   };
   
-  newModelName: string = '';
-  activeTab: string = 'empresa'; // 'empresa' | 'proyectos' | 'ventas' | 'reporteria'
-  consumption: { usage: number, limit: number | null, error?: string } = { usage: 0, limit: 0 };
-  
+  activeTab: string = 'empresa';
   isSaving: boolean = false;
   statusMessage: string = '';
   isError: boolean = false;
 
   constructor(private http: HttpClient, private translate: TranslateService) {}
 
-  private getUrl(endpoint: string = '') {
-    const base = isDevMode() ? 'http://localhost:8000/api/v1' : 'https://blackpenguin.ai/api/v1';
-    return `${base}/conversations/config${endpoint}`; 
+  private getUrl() {
+    return isDevMode() ? 'http://localhost:8000/api/v1/conversations/config' : 'https://blackpenguin.ai/api/v1/conversations/config'; 
   }
 
   private getHeaders() {
@@ -44,40 +37,12 @@ export class StaffAiConfigComponent implements OnInit {
   }
 
   ngOnInit() {
-    // 1. Cargar la Configuración
     this.http.get<any>(this.getUrl(), { headers: this.getHeaders() }).subscribe({
-      next: (data) => {
-        if (data) this.config = { ...this.config, ...data };
-        this.checkConsumption(); // 2. Comprobar créditos
-      }
+      next: (data) => { if (data) this.config = { ...this.config, ...data }; }
     });
   }
 
-  // --- COMPROBAR CONSUMO OPENROUTER ---
-  checkConsumption() {
-    if (!this.config.openrouter_api_key) return;
-    this.http.get<any>(this.getUrl('/consumption'), { headers: this.getHeaders() }).subscribe({
-      next: (res) => this.consumption = res
-    });
-  }
-
-  // --- CRUD DE MODELOS ---
-  addModel() {
-    const m = this.newModelName.trim().toLowerCase();
-    if (m && !this.config.available_models.includes(m)) {
-      this.config.available_models.push(m);
-      this.newModelName = '';
-    }
-  }
-
-  removeModel(index: number) {
-    this.config.available_models.splice(index, 1);
-  }
-
-  // --- CAMBIO DE PESTAÑAS ---
-  setTab(tab: string) {
-    this.activeTab = tab;
-  }
+  setTab(tab: string) { this.activeTab = tab; }
 
   get activeAgent() {
     switch(this.activeTab) {
@@ -89,7 +54,6 @@ export class StaffAiConfigComponent implements OnInit {
     }
   }
 
-  // --- GUARDADO ---
   onSave() {
     this.isSaving = true;
     this.statusMessage = '';
@@ -98,14 +62,13 @@ export class StaffAiConfigComponent implements OnInit {
       next: () => {
         this.isSaving = false;
         this.isError = false;
-        this.statusMessage = this.translate.instant('AI_CONFIG.MSG_SUCCESS') || '🧠 ¡Actualizado con éxito!';
-        this.checkConsumption();
+        this.statusMessage = '¡Protocolos de IA actualizados con éxito!';
         setTimeout(() => this.statusMessage = '', 4000);
       },
       error: () => {
         this.isSaving = false;
         this.isError = true;
-        this.statusMessage = this.translate.instant('AI_CONFIG.MSG_ERROR') || 'Error crítico al salvar.';
+        this.statusMessage = 'Error crítico al salvar.';
       }
     });
   }

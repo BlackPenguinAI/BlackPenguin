@@ -8,3 +8,4 @@ class MetaFormMapping(Base):
     form_id = Column(String(100), unique=True, nullable=False)
     company_id = Column(String(36), ForeignKey("companies.id", ondelete="CASCADE"), nullable=False)
     project_id = Column(String(36), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
+    

@@ -14,35 +14,53 @@
     <nav class="flex-1 overflow-y-auto p-4 flex flex-col gap-1.5 scrollbar-hide">
       
       <ng-container *ngIf="userRole === 'superadmin'">
+         
+         <p class="px-3 text-[10px] text-gray-500 uppercase tracking-widest font-medium mt-2">📊 Core Analytics</p>
+         
          <a routerLink="/admin/dashboard" routerLinkActive="bg-white/10 text-white" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors block flex items-center gap-2">
            <span class="material-symbols-outlined text-[18px]">space_dashboard</span>
-           {{ 'ADMIN.DASHBOARD' | translate }}
+           Dashboard
          </a>
 
-         <p class="px-3 text-[10px] text-gray-500 uppercase tracking-widest font-medium mt-2">{{ 'ADMIN.MENU_SYSTEM' | translate }}</p>
-         <a routerLink="/admin/profile" routerLinkActive="bg-white/10 text-white" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors block flex items-center gap-2">
-           <span class="material-symbols-outlined text-[18px]">person</span>
-           {{ 'ADMIN.PROFILE' | translate }}
+         <p class="px-3 text-[10px] text-gray-500 uppercase tracking-widest font-medium mt-4">👥 Management</p>
+         
+         <a routerLink="/admin/developers" routerLinkActive="bg-white/10 text-white" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors block flex items-center gap-2">
+           <span class="material-symbols-outlined text-[18px]">business_center</span>
+           Developers (CRUD)
+         </a>
+
+         <a routerLink="/admin/emails" routerLinkActive="bg-white/10 text-white" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors block flex items-center gap-2">
+           <span class="material-symbols-outlined text-[18px]">mail</span>
+           Waitlist Leads
+         </a>
+
+         <p class="px-3 text-[10px] text-gray-500 uppercase tracking-widest font-medium mt-4">🤖 AI Engineering</p>
+         
+         <a routerLink="/admin/ai-config" routerLinkActive="bg-white/10 text-white" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors block flex items-center gap-2">
+           <span class="material-symbols-outlined text-[18px]">memory</span>
+           AI Brain Tuner
+         </a>
+
+         <a routerLink="/admin/ai-keys" routerLinkActive="bg-white/10 text-white" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors block flex items-center gap-2">
+           <span class="material-symbols-outlined text-[18px]">key</span>
+           Infrastructure & Keys
+         </a>
+
+         <p class="px-3 text-[10px] text-gray-500 uppercase tracking-widest font-medium mt-4">⚙️ System & Settings</p>
+         
+         <a routerLink="/admin/smtp-config" routerLinkActive="bg-white/10 text-white" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors block flex items-center gap-2">
+           <span class="material-symbols-outlined text-[18px]">alternate_email</span>
+           SMTP Configuration
          </a>
 
          <a routerLink="/admin/plans" routerLinkActive="bg-white/10 text-white" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors block flex items-center gap-2">
           <span class="material-symbols-outlined text-[18px]">workspace_premium</span>
-          {{ 'ADMIN.PLANS' | translate }}
+          Subscription Plans
         </a>
-        
-         <a routerLink="/admin/developers" routerLinkActive="bg-white/10 text-white" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors block flex items-center gap-2">
-           <span class="material-symbols-outlined text-[18px]">business_center</span>
-           {{ 'ADMIN.CLIENTS_CRUD' | translate }}
-         </a>
 
-         <p class="px-3 text-[10px] text-gray-500 uppercase tracking-widest font-medium mt-2">{{ 'ADMIN.MENU_AI_CORE' | translate }}</p>
-         <a routerLink="/admin/emails" routerLinkActive="bg-white/10 text-white" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors block flex items-center gap-2">
-           <span class="material-symbols-outlined text-[18px]">mail</span>
-           {{ 'ADMIN.WAITLIST_DATA' | translate }}
-         </a>
-         <a routerLink="/admin/ai-config" routerLinkActive="bg-white/10 text-white" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors block flex items-center gap-2">
-           <span class="material-symbols-outlined text-[18px]">memory</span>
-           {{ 'ADMIN.AI_TUNER' | translate }}
+         <a routerLink="/admin/profile" routerLinkActive="bg-white/10 text-white" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors block flex items-center gap-2">
+           <span class="material-symbols-outlined text-[18px]">person</span>
+           My Profile
          </a>
       </ng-container>
 

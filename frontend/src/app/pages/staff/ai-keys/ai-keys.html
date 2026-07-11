@@ -1,1 +1,66 @@
-<p>ai-keys works!</p>
+<div class="min-h-screen bg-black text-white font-sans p-6 md:p-12 relative overflow-hidden">
+  <div class="max-w-4xl mx-auto relative z-10">
+    <div class="mb-8">
+      <h1 class="text-3xl font-light tracking-tight">AI <span class="text-secondary font-medium">Infrastructure</span></h1>
+      <p class="text-sm text-gray-400 mt-1">Configura las credenciales maestras y gestiona el consumo del modelo.</p>
+    </div>
+
+    <form (ngSubmit)="onSave()" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      
+      <div class="liquid-glass border border-white/5 p-6 rounded-2xl flex flex-col gap-5">
+        <h2 class="text-sm font-medium text-gray-200 uppercase tracking-widest flex items-center gap-2">
+          <span class="material-symbols-outlined text-secondary text-[18px]">key</span> 
+          OpenRouter API Key
+        </h2>
+        
+        <div class="flex flex-col gap-2">
+          <input type="password" name="apiKey" [(ngModel)]="config.openrouter_api_key" placeholder="sk-or-v1-..." class="bg-black/50 border border-white/10 focus:border-secondary rounded-lg px-4 py-3 text-sm text-white focus:outline-none transition-colors w-full">
+          
+          <div *ngIf="config.openrouter_api_key" class="mt-4 bg-secondary/10 border border-secondary/20 p-4 rounded-xl flex items-center justify-between">
+            <div class="flex flex-col">
+              <span class="text-gray-400 text-xs font-medium uppercase tracking-widest">Consumo Actual</span>
+              <span class="text-secondary text-2xl font-mono font-bold">${{ consumption.usage | number:'1.2-4' }}</span>
+            </div>
+            <div *ngIf="consumption.limit" class="text-right flex flex-col">
+              <span class="text-gray-500 text-xs font-medium uppercase tracking-widest">Límite Mensual</span>
+              <span class="text-gray-300 text-sm font-mono font-bold">${{ consumption.limit }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="liquid-glass border border-white/5 p-6 rounded-2xl flex flex-col gap-5">
+        <h2 class="text-sm font-medium text-gray-200 uppercase tracking-widest flex items-center gap-2">
+          <span class="material-symbols-outlined text-secondary text-[18px]">dataset</span> 
+          Modelos Disponibles
+        </h2>
+        
+        <div class="flex gap-2">
+          <input type="text" name="newModel" [(ngModel)]="newModelName" placeholder="Ej: openai/gpt-4o" class="flex-1 bg-black/50 border border-white/10 focus:border-secondary rounded-lg px-4 py-2 text-sm text-white focus:outline-none transition-colors">
+          <button type="button" (click)="addModel()" class="bg-white/10 hover:bg-secondary hover:text-black text-white px-4 py-2 rounded-lg transition-colors focus:outline-none flex items-center justify-center">
+            <span class="material-symbols-outlined text-[18px]">add</span>
+          </button>
+        </div>
+
+        <div class="flex flex-col gap-2 overflow-y-auto max-h-[300px] mt-2 pr-2 scrollbar-hide">
+          <div *ngFor="let model of config.available_models; let i = index" class="flex items-center justify-between bg-white/5 px-4 py-3 rounded-lg border border-white/5 group hover:border-white/20 transition-colors">
+            <span class="text-sm font-mono text-gray-300 truncate">{{ model }}</span>
+            <button type="button" (click)="removeModel(i)" class="text-gray-600 hover:text-red-400 transition-colors focus:outline-none">
+              <span class="material-symbols-outlined text-[18px]">delete</span>
+            </button>
+          </div>
+          <p *ngIf="config.available_models?.length === 0" class="text-sm text-gray-600 text-center py-6">No hay modelos registrados.</p>
+        </div>
+      </div>
+
+      <div class="md:col-span-2 flex items-center justify-end border-t border-white/10 pt-6 mt-4">
+        <p *ngIf="statusMessage" [class.text-green-400]="!isError" [class.text-red-500]="isError" class="text-sm font-medium animate-fade-in mr-4">{{ statusMessage }}</p>
+        <button type="submit" [disabled]="isSaving" class="px-8 py-3 bg-white text-black font-semibold rounded-xl hover:bg-secondary hover:text-black transition-all duration-300 disabled:opacity-40 flex items-center gap-2">
+          <span *ngIf="isSaving" class="material-symbols-outlined animate-spin text-[18px]">sync</span>
+          Guardar Infraestructura
+        </button>
+      </div>
+
+    </form>
+  </div>
+</div>

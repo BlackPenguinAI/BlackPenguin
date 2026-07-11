@@ -8,3 +8,4 @@ from app.modules.integrations.models import *
 from app.modules.properties.models import *
 from app.modules.sales.models import *
 from app.modules.tenants.models import *
+from app.modules.system.models import *

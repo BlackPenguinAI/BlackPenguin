@@ -14,6 +14,9 @@ import { StaffDevelopersComponent } from './pages/staff/developers/developers';
 import { StaffPlansComponent } from './pages/staff/plans/plans';
 import { SetPasswordComponent } from './pages/set-password/set-password';
 
+import { StaffAiKeysComponent } from './pages/staff/ai-keys/ai-keys'; // 🚀 NUEVO
+import { SmtpConfigComponent } from './pages/staff/smtp-config/smtp-config';
+
 export const routes: Routes = [
   // 🌍 ZONAS LIBRES (No tienen Menú Lateral)
   { path: '', component: LandingComponent },
@@ -38,6 +41,10 @@ export const routes: Routes = [
           { path: 'emails', component: StaffEmailsComponent },
           { path: 'ai-config', component: StaffAiConfigComponent },
           { path: 'plans', component: StaffPlansComponent },
+          { path: 'emails', component: StaffEmailsComponent },
+          { path: 'ai-keys', component: StaffAiKeysComponent }, // 🚀 NUEVA RUTA AQUÍ
+          { path: 'ai-config', component: StaffAiConfigComponent },
+          { path: 'smtp-config', component: SmtpConfigComponent },
         ]
       },
 

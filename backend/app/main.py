@@ -15,6 +15,7 @@ from app.modules.sales.router import router as sales_router
 from app.modules.ai.router import router as ai_router
 from app.modules.integrations.webhooks import router as webhooks_router
 from app.modules.tenants.router import router as tenants_router
+from app.modules.system.router import router as system_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -52,3 +53,4 @@ app.include_router(sales_router, prefix=f"{settings.API_V1_STR}/leads", tags=["4
 app.include_router(ai_router, prefix=f"{settings.API_V1_STR}/conversations", tags=["5. IA & Chat"])
 app.include_router(webhooks_router, prefix=f"{settings.API_V1_STR}/webhooks", tags=["6. Integraciones"])
 app.include_router(tenants_router, prefix="/api/v1/tenants", tags=["Tenants"])
+app.include_router(system_router, prefix="/api/v1/system", tags=["System & Settings"])
