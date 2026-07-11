@@ -39,6 +39,8 @@ class DeveloperCreate(BaseModel):
     admin_maternal_last_name: Optional[str] = "" 
     is_active: bool = True
     language: str = "en"
+    # 🚀 NUEVO: El link que activará la magia del "Wow Effect"
+    website_url: Optional[str] = None
 
 class DeveloperUpdate(BaseModel):
     company_name: Optional[str] = None
