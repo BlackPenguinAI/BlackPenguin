@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy.orm import Session
 from typing import List
 import httpx  
@@ -6,13 +6,14 @@ from app.core.config import settings
 
 from app.db.postgres import get_db
 
+# 1. Modelos de Base de Datos
 from app.modules.tenants.models import (
     Company, 
     SubscriptionPlan,
     OnboardingProtocol,     
     OnboardingSession,      
     OnboardingMessage,      
-    CompanyProfile,         # 🚀 AÑADIDO EL PERFIL
+    CompanyProfile,         # 🚀 Integrado el Perfil Cognitivo
     SenderType
 )
 
@@ -20,6 +21,7 @@ from app.modules.properties.models import Project
 from app.modules.auth.models import User, UserRole
 from app.modules.sales.models import WaitlistEmail 
 
+# 2. Esquemas de validación
 from app.modules.tenants.schemas import (
     CompanyCreate, 
     CompanyUpdate, 
@@ -33,10 +35,14 @@ from app.modules.tenants.schemas import (
     ChatMessagePayload,       
     ChatMessageResponse,      
     OnboardingSessionStatus,
-    CompanyProfileUpdate,     # 🚀 AÑADIDO EL PERFIL
-    CompanyProfileResponse    # 🚀 AÑADIDO EL PERFIL
+    CompanyProfileUpdate,     # 🚀 Esquemas de perfil cognitivo
+    CompanyProfileResponse    
 )
 
+# 3. Tareas en segundo plano (Web Scraping Maestro)
+from app.modules.tenants.scraper import scrape_and_enrich_profile
+
+# 4. Dependencias
 from app.modules.auth.deps import RoleChecker
 
 from datetime import timedelta
@@ -52,6 +58,7 @@ router = APIRouter()
 # =========================================================
 @router.get("/stats", summary="Estadísticas globales para el Dashboard")
 def get_global_stats(db: Session = Depends(get_db), current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN]))):
+    """Devuelve el conteo maestro de la plataforma para el Superadmin."""
     return {
         "total_companies": db.query(Company).count(),
         "active_companies": db.query(Company).filter(Company.is_active == True).count(),
@@ -96,6 +103,7 @@ def delete_plan(plan_id: str, db: Session = Depends(get_db), current_user: User 
     if not plan:
         raise HTTPException(status_code=404, detail="Plan no encontrado")
     
+    # Validar si hay empresas usando este plan
     empresas_activas = db.query(Company).filter(Company.plan_id == plan_id).count()
     if empresas_activas > 0:
         raise HTTPException(status_code=400, detail="No se puede eliminar: hay empresas usando este plan.")
@@ -154,6 +162,7 @@ def get_developers(db: Session = Depends(get_db), current_user: User = Depends(R
     for company in companies:
         admin = db.query(User).filter(User.company_id == company.id, User.role == UserRole.ADMIN).first()
         
+        # CORRECCIÓN DE EXTRACCIÓN DE NOMBRES LIMPÍOS
         first_name_clean = ""
         paternal_clean = ""
         maternal_clean = ""
@@ -193,8 +202,13 @@ def get_developers(db: Session = Depends(get_db), current_user: User = Depends(R
         
     return results
 
-@router.post("/developers", response_model=DeveloperResponse, summary="Registrar Nuevo Desarrollador")
-def create_developer(payload: DeveloperCreate, db: Session = Depends(get_db), current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN]))):
+@router.post("/developers", response_model=DeveloperResponse, status_code=status.HTTP_201_CREATED, summary="Registrar Nuevo Desarrollador")
+def create_developer(
+    payload: DeveloperCreate, 
+    background_tasks: BackgroundTasks, # 🚀 INYECTADO: Para habilitar tareas asíncronas
+    db: Session = Depends(get_db), 
+    current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN]))
+):
     from datetime import datetime, timedelta
     import uuid
 
@@ -217,10 +231,17 @@ def create_developer(payload: DeveloperCreate, db: Session = Depends(get_db), cu
     db.commit()
     db.refresh(new_company)
     
-    # 🚀 NUEVO: Crear automáticamente el Perfil Cognitivo vacío para la IA
-    new_profile = CompanyProfile(company_id=new_company.id)
+    # 🚀 Inicialización automática del Perfil Cognitivo (CompanyProfile)
+    new_profile = CompanyProfile(
+        company_id=new_company.id, 
+        scraped_source_url=payload.website_url
+    )
     db.add(new_profile)
     db.commit()
+
+    # 🚀 WOW EFFECT GATILLADO: Si se ingresó una URL, el Scraper se ejecuta en segundo plano
+    if payload.website_url:
+        background_tasks.add_task(scrape_and_enrich_profile, new_company.id, payload.website_url)
 
     full_name_compiled = f"{payload.admin_first_name} {payload.admin_paternal_last_name} {payload.admin_maternal_last_name}".strip()
 
@@ -237,9 +258,11 @@ def create_developer(payload: DeveloperCreate, db: Session = Depends(get_db), cu
     db.add(new_user)
     db.commit()
 
+    # Generación de Correo Multilingüe con Token Seguro
     token = create_email_token(payload.admin_email, new_user.hashed_password)
     activation_link = f"http://localhost:4200/set-password?token={token}"
     
+    comp_name = payload.company_name
     saludo_name = f"{payload.admin_first_name} {payload.admin_paternal_last_name}"
 
     if payload.language == "es":
@@ -247,7 +270,7 @@ def create_developer(payload: DeveloperCreate, db: Session = Depends(get_db), cu
         html_content = f"""
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #111; color: white; border-radius: 10px;">
             <h2 style="color: #facc15;">Bienvenido a Black Penguin, {saludo_name}</h2>
-            <p>Su empresa <b>{payload.company_name}</b> ha sido habilitada exitosamente en nuestro ecosistema.</p>
+            <p>Su empresa <b>{comp_name}</b> ha sido habilitada exitosamente en nuestro ecosistema.</p>
             <p>Para activar su cuenta administrativa y configurar su clave de acceso, haga clic en el botón inferior:</p>
             <br>
             <a href="{activation_link}" style="display: inline-block; padding: 12px 24px; background-color: #facc15; color: black; font-weight: bold; text-decoration: none; border-radius: 6px;">Activar Mi Cuenta</a>
@@ -258,7 +281,7 @@ def create_developer(payload: DeveloperCreate, db: Session = Depends(get_db), cu
         html_content = f"""
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #111; color: white; border-radius: 10px;">
             <h2 style="color: #facc15;">Welcome to Black Penguin, {saludo_name}</h2>
-            <p>Your company <b>{payload.company_name}</b> has been successfully provisioned in our real estate ecosystem.</p>
+            <p>Your company <b>{comp_name}</b> has been successfully provisioned in our real estate ecosystem.</p>
             <p>To activate your account and set up your access password, please click below:</p>
             <br>
             <a href="{activation_link}" style="display: inline-block; padding: 12px 24px; background-color: #facc15; color: black; font-weight: bold; text-decoration: none; border-radius: 6px;">Activate My Account</a>
@@ -307,6 +330,7 @@ def update_developer(company_id: str, payload: DeveloperUpdate, db: Session = De
     
     update_data = payload.model_dump(exclude_unset=True)
     
+    # 1. Actualizar datos de la Empresa
     if "company_name" in update_data and update_data["company_name"] is not None:
         company.name = update_data["company_name"]
     for key in ["plan_id", "duration_months", "is_active", "payment_receipt_url"]:
@@ -317,14 +341,18 @@ def update_developer(company_id: str, payload: DeveloperUpdate, db: Session = De
         from datetime import datetime, timedelta
         company.license_end = company.license_start + timedelta(days=30 * update_data["duration_months"])
         
+    # 2. Actualizar Identidad y Contacto del Administrador Asociado
     admin_user = db.query(User).filter(User.company_id == company_id, User.role == UserRole.ADMIN).first()
     if admin_user:
+        
+        # Validación elegante al editar el correo
         if "admin_email" in update_data and update_data["admin_email"] != admin_user.email:
             existing_email = db.query(User).filter(User.email == update_data["admin_email"]).first()
             if existing_email:
                 raise HTTPException(status_code=400, detail="El correo del administrador ya está en uso.")
             admin_user.email = update_data["admin_email"]
             
+        # Sincronización estricta de columnas atómicas
         if "admin_first_name" in update_data or "admin_paternal_last_name" in update_data or "admin_maternal_last_name" in update_data:
             fn = update_data.get("admin_first_name") or admin_user.full_name.split(' ')[0] if admin_user.full_name else ""
             ap = update_data.get("admin_paternal_last_name") or admin_user.last_name_paternal or ""
@@ -351,15 +379,14 @@ def delete_developer(company_id: str, db: Session = Depends(get_db), current_use
     return {"message": "Empresa y todos sus proyectos/usuarios eliminados con éxito"}
 
 
-# =========================================================
-# 🧠 ENTORNO CLIENTE: CHAT DE COMPANY ONBOARDING Y PERFIL
-# =========================================================
-
+# =========================================================================
+# ⚙️ ENTORNO CLIENTE: ENDPOINTS DEL PERFIL COGNITIVO (tracker del UI)
+# =========================================================================
 @router.get("/onboarding/profile", response_model=CompanyProfileResponse, summary="Obtener el Perfil de la Empresa")
 def get_company_profile(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """Devuelve el progreso actual del perfil de la empresa (Para Angular Progress Tracker)."""
     if not current_user.company_id:
-        raise HTTPException(status_code=400, detail="Usuario sin empresa.")
+        raise HTTPException(status_code=400, detail="Usuario sin empresa vinculada.")
         
     profile = db.query(CompanyProfile).filter(CompanyProfile.company_id == current_user.company_id).first()
     if not profile:
@@ -372,20 +399,20 @@ def get_company_profile(db: Session = Depends(get_db), current_user: User = Depe
 
 @router.put("/onboarding/profile", response_model=CompanyProfileResponse, summary="Actualizar Perfil (Por IA o Manual)")
 def update_company_profile(payload: CompanyProfileUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    """Este endpoint será llamado por la IA o el usuario cuando se confirme nueva información."""
+    """Llamado por la IA o el usuario cuando se completa/extrae nueva información."""
     if not current_user.company_id:
-        raise HTTPException(status_code=400, detail="Usuario sin empresa.")
+        raise HTTPException(status_code=400, detail="Usuario sin empresa vinculada.")
         
     profile = db.query(CompanyProfile).filter(CompanyProfile.company_id == current_user.company_id).first()
     if not profile:
         raise HTTPException(status_code=404, detail="Perfil no encontrado.")
 
-    # Guardar nuevos datos extraídos
+    # Mapeo dinámico de datos de entrada
     update_data = payload.model_dump(exclude_unset=True)
     for key, value in update_data.items():
         setattr(profile, key, value)
 
-    # Actualizar heurísticas de compleción automáticamente
+    # Actualización automática de banderas de completitud de las 7 secciones
     profile.is_identity_completed = bool(profile.legal_name and profile.headquarters)
     profile.is_team_completed = bool(len(profile.executive_team) > 0)
     profile.is_focus_completed = bool(len(profile.asset_classes) > 0)
@@ -394,7 +421,7 @@ def update_company_profile(payload: CompanyProfileUpdate, db: Session = Depends(
     profile.is_value_prop_completed = bool(profile.value_proposition)
     profile.is_brand_completed = bool(profile.tone_of_voice and profile.key_messaging)
 
-    # Marcar el milestone global
+    # Milestone general
     profile.is_profile_fully_completed = all([
         profile.is_identity_completed, profile.is_team_completed, profile.is_focus_completed, 
         profile.is_market_completed, profile.is_strategy_completed, profile.is_value_prop_completed, 
@@ -405,20 +432,26 @@ def update_company_profile(payload: CompanyProfileUpdate, db: Session = Depends(
     db.refresh(profile)
     return profile
 
+
+# =========================================================
+# 🧠 ENTORNO CLIENTE: CHAT DE COMPANY ONBOARDING
+# =========================================================
 @router.get("/onboarding/session", response_model=OnboardingSessionStatus, summary="Obtener o iniciar sesión de chat")
 def get_or_create_onboarding_session(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Verifica si la empresa tiene una sesión abierta; si no, la crea e inicia con el saludo de la IA."""
     if not current_user.company_id:
         raise HTTPException(status_code=400, detail="El usuario no pertenece a ninguna empresa desarrolladora.")
 
     session = db.query(OnboardingSession).filter(OnboardingSession.company_id == current_user.company_id).first()
     
     if not session:
+        # Crear nueva sesión limpia
         session = OnboardingSession(company_id=current_user.company_id)
         db.add(session)
         db.commit()
         db.refresh(session)
         
-        # 🚀 Adaptado al nuevo flujo "Wow Effect" (Inglés)
+        # 🚀 Mensaje adaptado al nuevo flujo "Wow Effect" corporativo (Inglés)
         welcome_message = OnboardingMessage(
             session_id=session.id,
             sender=SenderType.AI,
@@ -430,12 +463,13 @@ def get_or_create_onboarding_session(db: Session = Depends(get_db), current_user
 
     return session
 
-
 @router.post("/onboarding/chat", response_model=ChatMessageResponse, summary="Enviar mensaje al Copiloto de Onboarding")
 async def send_onboarding_message(payload: ChatMessagePayload, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Recibe el mensaje del cliente, fusiona los 3 niveles de prompt del Staff y procesa con Deepseek."""
     if not current_user.company_id:
         raise HTTPException(status_code=400, detail="Acceso denegado.")
 
+    # 1. Obtener la sesión activa
     session = db.query(OnboardingSession).filter(OnboardingSession.company_id == current_user.company_id).first()
     if not session:
         raise HTTPException(status_code=400, detail="Sesión no inicializada. Llame primero a /onboarding/session")
@@ -443,15 +477,18 @@ async def send_onboarding_message(payload: ChatMessagePayload, db: Session = Dep
     if session.is_completed:
         raise HTTPException(status_code=400, detail="Este onboarding ya fue completado y cerrado.")
 
+    # 2. Guardar el mensaje del usuario en la base de datos
     user_msg = OnboardingMessage(session_id=session.id, sender=SenderType.USER, content=payload.message)
     db.add(user_msg)
     db.commit()
 
+    # 3. Obtener el Protocolo Maestro con los 3 niveles de prompt seteados por Staff
     protocol = db.query(OnboardingProtocol).filter(OnboardingProtocol.is_active == True).order_by(OnboardingProtocol.created_at.desc()).first()
     
     if not protocol:
         system_instructions = "You are a Real Estate Onboarding Assistant. Ask questions to fill the corporate profile."
     else:
+        # COMPOSICIÓN JERÁRQUICA DE LOS 3 NIVELES DE PROMPT (Inglés)
         system_instructions = f"""
         === LEVEL 1: IDENTITY (SYSTEM ROLE) ===
         {protocol.system_role_prompt}
@@ -463,6 +500,7 @@ async def send_onboarding_message(payload: ChatMessagePayload, db: Session = Dep
         {protocol.guardrails_prompt}
         """
 
+    # 4. Construir el historial completo de la conversación para el LLM
     history = db.query(OnboardingMessage).filter(OnboardingMessage.session_id == session.id).order_by(OnboardingMessage.created_at.asc()).all()
     
     messages_payload = [{"role": "system", "content": system_instructions}]
@@ -470,6 +508,7 @@ async def send_onboarding_message(payload: ChatMessagePayload, db: Session = Dep
         role_label = "user" if msg.sender == SenderType.USER else "assistant"
         messages_payload.append({"role": role_label, "content": msg.content})
 
+    # 5. Consumir el LLM de OpenRouter (Deepseek) configurado en tu config.py
     ai_response_text = "I apologize, but I am experiencing technical difficulties processing your request."
     
     try:
@@ -495,6 +534,7 @@ async def send_onboarding_message(payload: ChatMessagePayload, db: Session = Dep
     except Exception as e:
         print(f"❌ Error conectando al LLM: {e}")
 
+    # 6. Guardar la respuesta de la IA en la base de datos
     ai_msg = OnboardingMessage(session_id=session.id, sender=SenderType.AI, content=ai_response_text)
     db.add(ai_msg)
     db.commit()
