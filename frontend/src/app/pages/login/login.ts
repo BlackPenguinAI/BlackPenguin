@@ -26,7 +26,17 @@ export class LoginComponent implements AfterViewInit {
     private authService: AuthService,
     private toastService: ToastService
   ) {
-    this.currentLang = this.translate.currentLang || localStorage.getItem('bp_lang') || 'en';
+    // 1. Configuramos los idiomas disponibles y el predeterminado
+    this.translate.addLangs(['en', 'es']);
+    this.translate.setDefaultLang('en');
+    
+    // 2. Buscamos si el usuario ya había elegido un idioma antes, si no, forzamos Inglés
+    const storedLang = localStorage.getItem('bp_lang');
+    this.currentLang = storedLang === 'es' ? 'es' : 'en';
+    
+    // 3. Aplicamos el idioma y lo guardamos
+    this.translate.use(this.currentLang);
+    localStorage.setItem('bp_lang', this.currentLang);
   }
 
   switchLanguage(lang: string) {

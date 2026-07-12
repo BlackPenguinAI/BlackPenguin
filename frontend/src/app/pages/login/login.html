@@ -20,7 +20,9 @@
     
     <div class="text-center flex flex-col items-center gap-2 mt-2">
       <img alt="Black Penguin Logo" class="h-10 w-10 object-contain cursor-pointer transition-transform hover:scale-105" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDxl2QxLaz1QVZlAWP1ksa3Vsw8hnGkq7DN9pIFoivY_s0ANfwB6_2SUVcF-XuzZxv_QkfH-yYy0Zc1TjmtQ9hP1gQTJB2TYxp1DFMuGtCSL7fddgkgG8ENFAvecOdZ0uABF1CY5yR7_VUrse9PALCGMFUALu0wLsTml1PYbq2FbNq3FTatmSUOjSFUiuhDInqKQifEP-apKuFd0djcZrYKCm-40vcNvQSEutAVuANBR8keQgsajYWdrcIrDHDKew0a7QkZVGOKBUM" routerLink="/">
-      <h2 class="text-2xl font-medium text-white tracking-tight mt-2">{{ 'AUTH.WELCOME_BACK' | translate }}</h2>
+      <h2 class="text-2xl font-wordmark tracking-tighter mt-2 flex items-center justify-center">
+        <span class="text-white font-semibold">Black</span><span class="text-secondary font-light">Penguin</span>
+      </h2>
       <p class="text-xs text-gray-custom leading-relaxed">{{ 'AUTH.SUBTITLE_LOGIN' | translate }}</p>
     </div>
 
@@ -56,21 +58,7 @@
       </button>
     </form>
 
-    <div class="flex items-center gap-4 my-2">
-      <div class="flex-grow h-px bg-white/5"></div>
-      <span class="text-[10px] text-surface-variant uppercase tracking-widest">or</span>
-      <div class="flex-grow h-px bg-white/5"></div>
-    </div>
-
-    <div class="grid grid-cols-2 gap-3">
-      <button class="flex items-center justify-center gap-2 py-2.5 border border-white/10 bg-white/5 rounded-xl text-xs text-white hover:bg-white/10 transition-colors">
-        <img src="https://www.google.com/favicon.ico" class="h-3 w-3 brightness-90" alt="Google"> Google
-      </button>
-      <button class="flex items-center justify-center gap-2 py-2.5 border border-white/10 bg-white/5 rounded-xl text-xs text-white hover:bg-white/10 transition-colors">
-        <span class="material-symbols-outlined text-sm">phone_iphone</span> Apple
-      </button>
-    </div>
-
+    
     <p class="text-xs text-center text-gray-custom mt-2">
       {{ 'AUTH.DONT_HAVE_ACCOUNT' | translate }} 
       <a routerLink="/register" class="text-secondary font-medium hover:underline cursor-pointer">{{ 'AUTH.REGISTER_NOW' | translate }}</a>

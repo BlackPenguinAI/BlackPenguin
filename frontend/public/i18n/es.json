@@ -25,7 +25,9 @@
     "DESC": "Diseñado para grandes desarrolladoras. Administra múltiples proyectos inmobiliarios, maneja roles de equipos de marketing, asesores de ventas, y despliega agentes de voz con IA en un entorno blindado y completamente aislado por Tenant."
   },
   "FOOTER": {
-    "RIGHTS": "© 2026 Black Penguin. Todos los derechos reservados."
+    "RIGHTS": "© 2026 Black Penguin. Todos los derechos reservados.",
+    "PRIVACY_POLICY": "Políticas de Privacidad y Uso de Datos",
+    "TERMS_CONDITIONS": "Términos y Condiciones"
   },
   "AUTH": {
     "TITLE_LOGIN": "Ingresa a tu cuenta",

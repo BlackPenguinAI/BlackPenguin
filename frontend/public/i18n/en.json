@@ -25,7 +25,9 @@
     "DESC": "Designed for large-scale developers. Manage multiple real estate projects, handle roles for marketing teams, sales advisors, and deploy AI voice agents in a shielded and completely isolated environment per Tenant."
   },
   "FOOTER": {
-    "RIGHTS": "© 2026 Black Penguin. All rights reserved."
+    "RIGHTS": "© 2026 Black Penguin AI. All rights reserved.",
+    "PRIVACY_POLICY": "Privacy Policy & Data Use",
+    "TERMS_CONDITIONS": "Terms and Conditions"
   },
   "AUTH": {
     "TITLE_LOGIN": "Log in to your account",
