@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Integer, DateTime, Text
+from sqlalchemy import Column, String, Integer, DateTime, Text, JSON
 import uuid
 from datetime import datetime
 from app.db.postgres import Base
@@ -35,3 +35,18 @@ class LegalDocument(Base):
     
     content_markdown = Column(Text, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class AiConfig(Base):
+    __tablename__ = "system_ai_config"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    
+    # Infraestructura
+    openrouter_api_key = Column(String(255), nullable=True)
+    available_models = Column(JSON, default=list)
+
+    # Configuración de Agentes (JSON para almacenar dicts con model, system_prompt, etc.)
+    agent_onboarding_empresa = Column(JSON, default=dict)
+    agent_onboarding_proyectos = Column(JSON, default=dict)
+    agent_ventas = Column(JSON, default=dict)
+    agent_reporteria = Column(JSON, default=dict)
