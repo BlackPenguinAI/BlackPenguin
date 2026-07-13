@@ -60,50 +60,41 @@
     </div>
 
     <!-- Caja de Entrada (Input Multimodal) -->
-    <div class="p-4 md:p-6 bg-black/60 backdrop-blur-xl border-t border-white/5 z-20">
-      <div class="max-w-4xl mx-auto w-full">
+    <div class="p-4 bg-[#050505] border-t border-white/5 z-10 relative">
+      <div class="max-w-4xl mx-auto">
         
-        <!-- Píldora de Archivo Adjunto -->
-        <div *ngIf="selectedFile" class="mb-3 flex items-center gap-3 bg-white/5 border border-white/10 p-2 px-4 rounded-lg w-max animate-fade-in">
-          <span class="material-symbols-outlined text-secondary text-[18px]">description</span>
-          <span class="text-xs text-gray-300">{{ selectedFile.name }}</span>
-          <button (click)="removeFile()" class="text-gray-500 hover:text-red-400 ml-2 focus:outline-none">
+        <div *ngIf="selectedFile" class="mb-3 flex items-center gap-3 bg-white/5 border border-white/10 px-4 py-2 rounded-xl w-max animate-fade-in">
+          <span class="material-symbols-outlined text-secondary">draft</span>
+          <span class="text-xs text-gray-300 truncate max-w-[200px]">{{ selectedFile.name }}</span>
+          <button (click)="removeFile()" class="text-gray-500 hover:text-red-400 flex items-center justify-center">
             <span class="material-symbols-outlined text-[16px]">close</span>
           </button>
         </div>
 
-        <div class="relative flex items-end gap-2 bg-[#111111] border border-white/10 focus-within:border-secondary rounded-2xl p-2 transition-colors shadow-2xl">
+        <div class="p-4 bg-[#111] rounded-2xl border border-white/5 shadow-2xl relative transition-all duration-300" [ngClass]="{'border-secondary/50 shadow-[0_0_15px_rgba(234,179,8,0.1)]': isDragOver}">
           
-          <!-- Input Archivo Oculto -->
-          <input type="file" #fileInput (change)="onFileSelected($event)" class="hidden" accept=".pdf,.doc,.docx,.txt">
-          
-          <!-- Botón Adjuntar (Clip) -->
-          <button (click)="fileInput.click()" class="p-2 text-gray-400 hover:text-white transition-colors rounded-xl hover:bg-white/5 focus:outline-none" title="Adjuntar documento o link">
-            <span class="material-symbols-outlined">attach_file</span>
-          </button>
+          <textarea
+            [(ngModel)]="prompt"
+            (keydown)="handleKeyDown($event)"
+            [disabled]="isAnalyzing || isRecording"
+            rows="1"
+            placeholder="{{ isRecording ? '🎙️ Escuchando...' : 'Ask me anything or drop a link...' }}"
+            class="w-full bg-transparent text-white text-sm focus:outline-none resize-none overflow-hidden placeholder-gray-500 py-3 pl-4 pr-24"
+            style="min-height: 48px; max-height: 150px;"
+          ></textarea>
 
-          <!-- Textarea -->
-          <textarea 
-            [(ngModel)]="prompt" 
-            (keydown.enter)="startAnalysis($event)"
-            rows="1" 
-            class="flex-1 bg-transparent border-none text-white text-sm font-light resize-none py-3 px-2 focus:ring-0 placeholder-gray-600 outline-none max-h-32 overflow-y-auto scrollbar-hide" 
-            placeholder="Escribe tu mensaje, pega una URL o adjunta un archivo...">
-          </textarea>
+          <div class="absolute right-2 bottom-2 flex items-center gap-1">
+            <button (click)="toggleRecording()" [disabled]="isAnalyzing" class="p-2 text-gray-400 hover:text-white transition-colors disabled:opacity-50">
+              <span class="material-symbols-outlined text-[20px]">{{ isRecording ? 'stop_circle' : 'mic' }}</span>
+            </button>
+            
+            <button (click)="sendMessage()" [disabled]="!canSend" class="p-2 bg-white rounded-xl hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:bg-white/20 group">
+              <span class="material-symbols-outlined text-[20px] transition-colors" [ngClass]="{'text-black': canSend, 'text-gray-400': !canSend}">arrow_upward</span>
+            </button>
+          </div>
 
-          <!-- Botón de Micrófono (Voz) -->
-          <button (click)="toggleRecording()" [ngClass]="{'text-red-500 bg-red-500/10 animate-pulse': isRecording, 'text-gray-400 hover:text-white hover:bg-white/5': !isRecording}" class="p-2 transition-colors rounded-xl focus:outline-none" title="Enviar audio de voz">
-            <span class="material-symbols-outlined">{{ isRecording ? 'mic' : 'mic_none' }}</span>
-          </button>
-
-          <!-- Botón Enviar -->
-          <button 
-            (click)="startAnalysis()"
-            [disabled]="isAnalyzing || (!prompt.trim() && !selectedFile)"
-            class="p-2 ml-1 bg-secondary text-black rounded-xl hover:bg-yellow-500 transition-transform active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center shadow-lg">
-            <span class="material-symbols-outlined">{{ isAnalyzing ? 'hourglass_empty' : 'send' }}</span>
-          </button>
         </div>
+        <p class="text-center text-[10px] text-gray-600 mt-3 font-mono">Black Penguin AI can make mistakes. Verify important facts.</p>
       </div>
     </div>
   </div>

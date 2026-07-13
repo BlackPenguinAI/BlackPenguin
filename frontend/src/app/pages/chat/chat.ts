@@ -31,12 +31,11 @@ export class ChatComponent implements OnInit {
   constructor(
     private translate: TranslateService,
     private http: HttpClient,
-    private cdr: ChangeDetectorRef // 🚀 Control nativo de renderizado inyectado
+    private cdr: ChangeDetectorRef
   ) {
-    // 🚀 FORZAR INGLÉS POR DEFECTO (Si no hay idioma, siempre será 'en')
     this.currentLang = localStorage.getItem('bp_lang') || 'en';
     this.translate.use(this.currentLang);
-    localStorage.setItem('bp_lang', this.currentLang); // Lo fijamos
+    localStorage.setItem('bp_lang', this.currentLang); 
   }
 
   private get baseUrl() {
@@ -60,7 +59,6 @@ export class ChatComponent implements OnInit {
     this.http.get<any>(`${this.baseUrl}/profile`, { headers: this.headers }).subscribe({
       next: (data) => {
         this.profile = data;
-        // 🚀 OBLIGAMOS AL TRACKER LATERAL A PINTAR LOS CHECKMARKS AL INSTANTE
         this.cdr.detectChanges(); 
       },
       error: (err) => {
@@ -84,17 +82,34 @@ export class ChatComponent implements OnInit {
     });
   }
 
-  sendMessage() {
-    if (!this.prompt.trim() && !this.selectedFile) return;
+  // 🚀 GETTER A PRUEBA DE BALAS: Verifica si el botón debe estar activo
+  get canSend(): boolean {
+    const hasText = this.prompt && this.prompt.trim().length > 0;
+    const hasFile = this.selectedFile !== null;
+    return (hasText || hasFile) && !this.isAnalyzing && !this.isRecording;
+  }
 
-    const userText = this.prompt;
-    this.prompt = '';
+  // 🚀 MANEJO DE TECLADO: Enter envía, Shift+Enter hace salto de línea
+  handleKeyDown(event: KeyboardEvent) {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault(); // Evita el salto de línea
+      if (this.canSend) {
+        this.sendMessage();
+      }
+    }
+  }
+
+  sendMessage() {
+    if (!this.canSend) return;
+
+    const userText = this.prompt.trim();
+    this.prompt = ''; // Limpiamos el input de inmediato
     
     // 1. Mostrar mensaje del usuario en la UI instantáneamente
     this.messages.push({ sender: 'user', content: userText, created_at: new Date() });
     this.isAnalyzing = true;
     this.scrollToBottom();
-    this.cdr.detectChanges(); // 🚀 Forzar repintado del chat
+    this.cdr.detectChanges(); 
 
     const payload = { message: userText };
 
@@ -104,15 +119,12 @@ export class ChatComponent implements OnInit {
         this.messages.push(aiResponse);
         this.isAnalyzing = false;
         this.scrollToBottom();
-        
-        // 🚀 WOW EFFECT: Recargamos el perfil para que el Tracker Lateral (Derecho) 
-        // marque las palomitas verdes si la IA acaba de extraer nueva información
-        this.loadProfile(); 
+        this.loadProfile(); // Refrescar tracker visual
       },
       error: (err) => {
         console.error('Error sending message', err);
         this.isAnalyzing = false;
-        this.cdr.detectChanges();
+        this.cdr.detectChanges(); // Liberar la interfaz en caso de error
       }
     });
   }

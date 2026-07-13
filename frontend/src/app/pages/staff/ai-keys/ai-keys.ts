@@ -1,4 +1,4 @@
-import { Component, OnInit, isDevMode } from '@angular/core';
+import { Component, OnInit, isDevMode, ChangeDetectorRef } from '@angular/core'; // 🚀 Añadido ChangeDetectorRef
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
@@ -20,7 +20,11 @@ export class StaffAiKeysComponent implements OnInit {
   statusMessage: string = '';
   isError: boolean = false;
 
-  constructor(private http: HttpClient, private translate: TranslateService) {}
+  constructor(
+    private http: HttpClient, 
+    private translate: TranslateService,
+    private cdr: ChangeDetectorRef // 🚀 Control nativo de renderizado inyectado
+  ) {}
 
   private getUrl(endpoint: string = '') {
     const base = isDevMode() ? 'http://localhost:8000/api/v1' : 'https://blackpenguin.ai/api/v1';
@@ -35,8 +39,15 @@ export class StaffAiKeysComponent implements OnInit {
   ngOnInit() {
     this.http.get<any>(this.getUrl(), { headers: this.getHeaders() }).subscribe({
       next: (data) => {
-        if (data) this.config = { ...this.config, ...data };
+        if (data) {
+          this.config = { ...this.config, ...data };
+        }
+        this.cdr.detectChanges(); // 🚀 Obligamos a pintar la info que llegó del servidor en el acto
         this.checkConsumption();
+      },
+      error: (err) => {
+        console.error('Error cargando las credenciales AI', err);
+        this.cdr.detectChanges();
       }
     });
   }
@@ -44,7 +55,14 @@ export class StaffAiKeysComponent implements OnInit {
   checkConsumption() {
     if (!this.config.openrouter_api_key) return;
     this.http.get<any>(this.getUrl('/consumption'), { headers: this.getHeaders() }).subscribe({
-      next: (res) => this.consumption = res
+      next: (res) => {
+        this.consumption = res;
+        this.cdr.detectChanges(); // 🚀 Actualizamos el uso mensual de la API al instante
+      },
+      error: (err) => {
+        console.error('Error consultando consumo de la API', err);
+        this.cdr.detectChanges();
+      }
     });
   }
 
@@ -53,29 +71,37 @@ export class StaffAiKeysComponent implements OnInit {
     if (m && !this.config.available_models.includes(m)) {
       this.config.available_models.push(m);
       this.newModelName = '';
+      this.cdr.detectChanges(); // 🚀 Refrescamos la lista de modelos de forma síncrona
     }
   }
 
   removeModel(index: number) {
     this.config.available_models.splice(index, 1);
+    this.cdr.detectChanges(); // 🚀 Refrescamos la lista al eliminar un modelo
   }
 
   onSave() {
     this.isSaving = true;
     this.statusMessage = '';
+    this.cdr.detectChanges(); // 🚀 Mostramos visualmente que está "Guardando..."
     
     this.http.put(this.getUrl(), this.config, { headers: this.getHeaders() }).subscribe({
       next: () => {
         this.isSaving = false;
         this.isError = false;
-        this.statusMessage = 'Infraestructura guardada con éxito.';
-        this.checkConsumption();
-        setTimeout(() => this.statusMessage = '', 4000);
+        this.statusMessage = 'Infraestructura guardada correctamente.';
+        this.cdr.detectChanges(); // 🚀 Mostramos mensaje de éxito
+        
+        setTimeout(() => {
+          this.statusMessage = '';
+          this.cdr.detectChanges(); // 🚀 Limpiamos el mensaje de éxito de forma limpia
+        }, 4000);
       },
-      error: () => {
+      error: (err) => {
         this.isSaving = false;
         this.isError = true;
-        this.statusMessage = 'Error al guardar.';
+        this.statusMessage = err.error?.detail || 'Error al guardar la infraestructura.';
+        this.cdr.detectChanges(); // 🚀 Mostramos el error si el backend falla
       }
     });
   }
