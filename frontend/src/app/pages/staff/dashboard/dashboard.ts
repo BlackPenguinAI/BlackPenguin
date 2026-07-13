@@ -44,6 +44,10 @@ export class StaffDashboardComponent implements OnInit {
 
   loadStats() {
     this.isLoading = true;
+
+    // 🚀 Sincronizamos preventivamente el nombre desde el localStorage actualizado
+    this.adminName = localStorage.getItem('bp_name') || 'Staff';
+    
     const token = localStorage.getItem('bp_token');
     const headers = new HttpHeaders().set('Authorization', `Bearer ${token}`);
 
@@ -57,6 +61,16 @@ export class StaffDashboardComponent implements OnInit {
           total_users: data.total_users || 0,
           system_status: data.system_status || 'Operational'
         };
+
+        // 🚀 Si el backend en las estadísticas incluyera opcionalmente el nombre del admin conectado, lo leemos
+        if (data.admin_name) {
+          this.adminName = data.admin_name;
+          localStorage.setItem('bp_name', data.admin_name);
+        } else {
+          // Si no, volvemos a leer la llave para asegurar consistencia tras el guardado
+          this.adminName = localStorage.getItem('bp_name') || 'Staff';
+        }
+        
         this.isLoading = false;
         
         // 🚀 OBLIGAMOS A ANGULAR A OCULTAR EL SPINNER Y MOSTRAR LOS DATOS EN VIVO

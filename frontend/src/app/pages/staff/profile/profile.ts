@@ -96,6 +96,12 @@ export class StaffProfileComponent implements OnInit {
         this.user = updatedData;
         this.isSaving = false;
         this.isError = false;
+
+        // 🚀 LA SOLUCIÓN: Actualizamos el localStorage con el nombre recién guardado
+        if (updatedData && updatedData.full_name) {
+          localStorage.setItem('bp_name', updatedData.full_name);
+        }
+
         this.statusMessage = this.translate.instant('PROFILE_PAGE.MSG_SAVE_SUCCESS') || '¡Perfil actualizado exitosamente!';
         this.cdr.detectChanges();
         

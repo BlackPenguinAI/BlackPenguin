@@ -1,4 +1,4 @@
-import { Component, ElementRef, ViewChild, OnInit, isDevMode } from '@angular/core'; 
+import { Component, ElementRef, ViewChild, OnInit, isDevMode, ChangeDetectorRef } from '@angular/core'; 
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
@@ -20,21 +20,23 @@ export class ChatComponent implements OnInit {
   currentLang: string = 'en';
   userName: string = '';
 
-  // Interfaz Multimodal
   selectedFile: File | null = null;
   isDragOver: boolean = false;
-  isRecording: boolean = false; // Estado para la futura capa de voz
+  isRecording: boolean = false; 
 
-  // Estados Cognitivos
   messages: any[] = [];
   profile: any = {};
   isCompleted: boolean = false;
 
   constructor(
     private translate: TranslateService,
-    private http: HttpClient
+    private http: HttpClient,
+    private cdr: ChangeDetectorRef // 🚀 Control nativo de renderizado inyectado
   ) {
-    this.currentLang = this.translate.currentLang || localStorage.getItem('bp_lang') || 'en';
+    // 🚀 FORZAR INGLÉS POR DEFECTO (Si no hay idioma, siempre será 'en')
+    this.currentLang = localStorage.getItem('bp_lang') || 'en';
+    this.translate.use(this.currentLang);
+    localStorage.setItem('bp_lang', this.currentLang); // Lo fijamos
   }
 
   private get baseUrl() {
@@ -49,99 +51,88 @@ export class ChatComponent implements OnInit {
   }
 
   ngOnInit() {
-    this.userName = localStorage.getItem('bp_name') || 'Executive';
-    this.loadSession();
+    this.userName = localStorage.getItem('bp_name') || 'User';
     this.loadProfile();
-  }
-
-  loadSession() {
-    this.http.get<any>(`${this.baseUrl}/session`, { headers: this.headers }).subscribe({
-      next: (data) => {
-        this.messages = data.messages || [];
-        this.isCompleted = data.is_completed;
-        this.scrollToBottom();
-      },
-      error: (err) => console.error('Error loading session', err)
-    });
+    this.loadChatHistory();
   }
 
   loadProfile() {
     this.http.get<any>(`${this.baseUrl}/profile`, { headers: this.headers }).subscribe({
       next: (data) => {
         this.profile = data;
+        // 🚀 OBLIGAMOS AL TRACKER LATERAL A PINTAR LOS CHECKMARKS AL INSTANTE
+        this.cdr.detectChanges(); 
       },
-      error: (err) => console.error('Error loading profile', err)
+      error: (err) => {
+        console.error('Error loading profile', err);
+        this.cdr.detectChanges();
+      }
     });
   }
 
-  startAnalysis(event?: any) {
-    if (event) {
-      event.preventDefault(); // Prevenir salto de línea con Enter
-    }
-    this.sendMessage();
+  loadChatHistory() {
+    this.http.get<any[]>(`${this.baseUrl}/chat`, { headers: this.headers }).subscribe({
+      next: (data) => {
+        this.messages = data;
+        this.scrollToBottom();
+        this.cdr.detectChanges();
+      },
+      error: (err) => {
+        console.error('Error loading history', err);
+        this.cdr.detectChanges();
+      }
+    });
   }
 
   sendMessage() {
     if (!this.prompt.trim() && !this.selectedFile) return;
 
-    // 1. Ensamblar mensaje con adjunto (MVP)
-    let finalMessage = this.prompt;
-    if (this.selectedFile) {
-      finalMessage = `[Documento adjunto: ${this.selectedFile.name}]\n` + finalMessage;
-    }
-
-    // 2. Reflejar instantáneamente en la interfaz
-    this.messages.push({
-      sender: 'user',
-      content: finalMessage,
-      created_at: new Date().toISOString()
-    });
-
-    const payload = { message: finalMessage };
-    
-    // Limpiar input
+    const userText = this.prompt;
     this.prompt = '';
-    this.selectedFile = null;
+    
+    // 1. Mostrar mensaje del usuario en la UI instantáneamente
+    this.messages.push({ sender: 'user', content: userText, created_at: new Date() });
     this.isAnalyzing = true;
     this.scrollToBottom();
+    this.cdr.detectChanges(); // 🚀 Forzar repintado del chat
 
-    // 3. Enviar al Backend (Deepseek IA)
+    const payload = { message: userText };
+
+    // 2. Enviar al Backend (Deepseek IA)
     this.http.post<any>(`${this.baseUrl}/chat`, payload, { headers: this.headers }).subscribe({
       next: (aiResponse) => {
         this.messages.push(aiResponse);
         this.isAnalyzing = false;
         this.scrollToBottom();
         
-        // 🚀 WOW EFFECT: Refrescar el Tracker para ver si la IA descubrió nuevos datos
-        this.loadProfile();
+        // 🚀 WOW EFFECT: Recargamos el perfil para que el Tracker Lateral (Derecho) 
+        // marque las palomitas verdes si la IA acaba de extraer nueva información
+        this.loadProfile(); 
       },
       error: (err) => {
         console.error('Error sending message', err);
         this.isAnalyzing = false;
+        this.cdr.detectChanges();
       }
     });
   }
 
-  // ==========================================
-  // 📎 MÉTODOS MULTIMODALES (Archivos y Voz)
-  // ==========================================
   onFileSelected(event: any) {
     if (event.target.files && event.target.files.length > 0) {
       this.selectedFile = event.target.files[0];
+      this.cdr.detectChanges();
     }
   }
 
   removeFile() {
     this.selectedFile = null;
+    this.cdr.detectChanges();
   }
 
   toggleRecording() {
     this.isRecording = !this.isRecording;
-    if (this.isRecording) {
-      this.prompt = "🎙️ Escuchando... (Hable ahora)";
-    } else {
-      this.prompt = "";
-    }
+    this.prompt = this.isRecording ? "🎙️ Escuchando... (Hable ahora)" : "";
+    this.cdr.detectChanges();
   }
 
   scrollToBottom() {
@@ -150,11 +141,5 @@ export class ChatComponent implements OnInit {
         this.chatScroll.nativeElement.scrollTop = this.chatScroll.nativeElement.scrollHeight;
       }
     }, 100);
-  }
-
-  switchLanguage(lang: string) {
-    this.translate.use(lang);
-    this.currentLang = lang;
-    localStorage.setItem('bp_lang', lang);
   }
 }
