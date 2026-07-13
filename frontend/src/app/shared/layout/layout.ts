@@ -1,8 +1,9 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterModule, Router } from '@angular/router';
+import { RouterModule, Router, NavigationEnd } from '@angular/router';
 import { AuthService } from '../../core/services/auth';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { filter } from 'rxjs/operators';
 
 @Component({
   selector: 'app-layout',
@@ -18,14 +19,21 @@ export class LayoutComponent implements OnInit {
   constructor(
     private router: Router, 
     private authService: AuthService,
-    private translate: TranslateService
+    private translate: TranslateService,
+    private cdr: ChangeDetectorRef // 🚀 Obligará al cascarón a repintar el Outlet
   ) {
     this.currentLang = localStorage.getItem('bp_lang') || 'en';
     this.translate.use(this.currentLang);
+
+    // 🚀 Cada vez que la URL cambie, obligamos a la pantalla a actualizarse
+    this.router.events.pipe(
+      filter(event => event instanceof NavigationEnd)
+    ).subscribe(() => {
+      this.cdr.detectChanges();
+    });
   }
 
   ngOnInit() {
-    // 🚀 Sincronización de Rol al arrancar el contenedor maestro
     this.userRole = localStorage.getItem('bp_role') || '';
   }
 
@@ -33,6 +41,7 @@ export class LayoutComponent implements OnInit {
     this.translate.use(lang);
     this.currentLang = lang;
     localStorage.setItem('bp_lang', lang);
+    this.cdr.detectChanges();
   }
 
   logout() {

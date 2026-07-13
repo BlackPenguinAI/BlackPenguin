@@ -5,7 +5,7 @@ import { RegisterComponent } from './pages/register/register';
 import { ChatComponent } from './pages/chat/chat'; 
 import { StaffEmailsComponent } from './pages/staff/emails/emails';
 import { StaffAiConfigComponent } from './pages/staff/ai-config/ai-config';
-import { LayoutComponent } from './shared/layout/layout'; // 🚀 Importamos el Layout
+import { LayoutComponent } from './shared/layout/layout'; 
 
 import { StaffDashboardComponent } from './pages/staff/dashboard/dashboard';
 import { StaffProfileComponent } from './pages/staff/profile/profile';
@@ -14,7 +14,7 @@ import { StaffDevelopersComponent } from './pages/staff/developers/developers';
 import { StaffPlansComponent } from './pages/staff/plans/plans';
 import { SetPasswordComponent } from './pages/set-password/set-password';
 
-import { StaffAiKeysComponent } from './pages/staff/ai-keys/ai-keys'; // 🚀 NUEVO
+import { StaffAiKeysComponent } from './pages/staff/ai-keys/ai-keys'; 
 import { SmtpConfigComponent } from './pages/staff/smtp-config/smtp-config';
 
 import { PrivacyPolicyComponent } from './pages/legal/privacy-policy/privacy-policy';
@@ -23,12 +23,13 @@ import { TermsConditionsComponent } from './pages/legal/terms-conditions/terms-c
 import { LegalEditorComponent } from './pages/admin/legal-editor/legal-editor';
 
 export const routes: Routes = [
-  // 🌍 ZONAS LIBRES (No tienen Menú Lateral)
+  // 🌍 ZONAS LIBRES 
   { path: '', component: LandingComponent },
   { path: 'login', component: LoginComponent },
   { path: 'register', component: RegisterComponent },
-  { path: 'set-password', component: SetPasswordComponent }, // 🚀 NUEVA RUTA AQUÍ
-  
+  { path: 'set-password', component: SetPasswordComponent },
+
+  // 📄 ZONA LEGAL (PÚBLICA)
   {
     path: 'legal',
     children: [
@@ -37,12 +38,11 @@ export const routes: Routes = [
     ]
   },
 
-  // 🛡️ ZONAS PROTEGIDAS (Envueltas en el Sidebar Layout)
+  // 🔒 ZONAS PROTEGIDAS (Envueltas en el Sidebar Layout)
   {
     path: '',
-    component: LayoutComponent, // 🚀 El componente maestro envuelve todo esto
+    component: LayoutComponent, 
     children: [
-      
       // 1. Panel de Control Black Penguin
       {
         path: 'admin',
@@ -51,14 +51,12 @@ export const routes: Routes = [
           { path: 'dashboard', component: StaffDashboardComponent },
           { path: 'profile', component: StaffProfileComponent },
           { path: 'developers', component: StaffDevelopersComponent },
-          { path: 'emails', component: StaffEmailsComponent },
-          { path: 'ai-config', component: StaffAiConfigComponent },
           { path: 'plans', component: StaffPlansComponent },
           { path: 'emails', component: StaffEmailsComponent },
-          { path: 'ai-keys', component: StaffAiKeysComponent }, // 🚀 NUEVA RUTA AQUÍ
+          { path: 'ai-keys', component: StaffAiKeysComponent }, 
           { path: 'ai-config', component: StaffAiConfigComponent },
           { path: 'smtp-config', component: SmtpConfigComponent },
-          { path: 'legal-editor', component: LegalEditorComponent }, // 🚀 NUEVA RUTA
+          { path: 'legal-editor', component: LegalEditorComponent } 
         ]
       },
 
@@ -67,13 +65,12 @@ export const routes: Routes = [
         path: 'app',
         children: [
           { path: '', redirectTo: 'chat', pathMatch: 'full' },
-          { path: 'chat', component: ChatComponent },
-          // Los demás módulos los irás agregando aquí...
+          { path: 'chat', component: ChatComponent }
         ]
       }
     ]
   },
-
-  // 🔄 Redirección por defecto
+  
+  // Rutas comodín
   { path: '**', redirectTo: '' }
 ];

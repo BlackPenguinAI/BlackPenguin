@@ -92,7 +92,17 @@
     "DEV_TITLE": "Developer Clients",
     "DEV_SUBTITLE": "Manage Real Estate Developers, Projects, and Teams.",
     "DASH_TITLE": "Global Operations",
-    "DASH_SUBTITLE": "Overview of platform usage and general statistics."
+    "DASH_SUBTITLE": "Overview of platform usage and general statistics.",
+    "MENU_SECTION_MAIN": "Main",
+    "MENU_DASHBOARD": "Dashboard",
+    "MENU_PROFILE": "My Profile",
+    "MENU_SECTION_ECOSYSTEM": "Ecosystem",
+    "MENU_DEVELOPERS": "Developers",
+    "MENU_PLANS": "Subscriptions",
+    "MENU_SECTION_SYSTEM": "System Config",
+    "MENU_AI_CONFIG": "AI Configuration",
+    "MENU_SMTP": "SMTP Settings",
+    "MENU_LOGOUT": "Log out"
   },
   "AI_CONFIG": {
     "TITLE": "AI Brain Tuner",

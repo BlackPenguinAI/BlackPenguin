@@ -1,4 +1,4 @@
-import { Component, OnInit, isDevMode } from '@angular/core';
+import { Component, OnInit, isDevMode, ChangeDetectorRef } from '@angular/core'; // 🚀 IMPORTANTE: Añadido ChangeDetectorRef
 import { CommonModule } from '@angular/common';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { TranslateModule } from '@ngx-translate/core';
@@ -8,7 +8,7 @@ import { RouterModule } from '@angular/router';
   selector: 'app-staff-dashboard',
   standalone: true,
   imports: [CommonModule, TranslateModule, RouterModule],
-  templateUrl: './dashboard.html', // <-- Asegúrate de que este nombre coincida con tu archivo HTML
+  templateUrl: './dashboard.html', 
   styleUrl: './dashboard.scss'
 })
 export class StaffDashboardComponent implements OnInit {
@@ -25,7 +25,11 @@ export class StaffDashboardComponent implements OnInit {
   isLoading: boolean = true;
   currentDate: Date = new Date();
 
-  constructor(private http: HttpClient) {}
+  // 🚀 INYECCIÓN: Agregamos cdr al constructor maestro
+  constructor(
+    private http: HttpClient,
+    private cdr: ChangeDetectorRef 
+  ) {}
 
   private get apiUrl() {
     return isDevMode() 
@@ -45,13 +49,26 @@ export class StaffDashboardComponent implements OnInit {
 
     this.http.get<any>(this.apiUrl, { headers }).subscribe({
       next: (data) => {
-        this.stats = data;
+        this.stats = {
+          total_companies: data.total_companies || 0,
+          active_companies: data.active_companies || 0,
+          total_projects: data.total_projects || 0,
+          total_waitlist: data.total_waitlist || 0,
+          total_users: data.total_users || 0,
+          system_status: data.system_status || 'Operational'
+        };
         this.isLoading = false;
+        
+        // 🚀 OBLIGAMOS A ANGULAR A OCULTAR EL SPINNER Y MOSTRAR LOS DATOS EN VIVO
+        this.cdr.detectChanges(); 
       },
       error: (err) => {
-        console.error('Error al cargar métricas', err);
-        this.stats.system_status = 'Desconectado';
+        console.error('❌ Error al consultar métricas del Dashboard global:', err); // ✅ ESTO ES TYPESCRIPT
+        this.stats.system_status = 'Error';
         this.isLoading = false;
+        
+        // 🚀 OBLIGAMOS A ANGULAR A ACTUALIZAR EN CASO DE FALLA
+        this.cdr.detectChanges(); 
       }
     });
   }

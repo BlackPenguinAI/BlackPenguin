@@ -1,9 +1,9 @@
-import { Component, OnInit, isDevMode } from '@angular/core';
+import { Component, OnInit, isDevMode, ChangeDetectorRef } from '@angular/core'; // 🚀 Importado ChangeDetectorRef
 import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
-import { ToastService } from '../../../core/services/toast'; // 🚀 Importar el servicio Toast de tu app
+import { ToastService } from '../../../core/services/toast';
 
 @Component({
   selector: 'app-staff-developers',
@@ -34,9 +34,9 @@ export class StaffDevelopersComponent implements OnInit {
     plan_id: '',
     duration_months: 12,
     admin_email: '',
-    admin_first_name: '',        // 🚀 Campos atómicos requeridos
-    admin_paternal_last_name: '',  // 🚀 Campos atómicos requeridos
-    admin_maternal_last_name: '',  // 🚀 Campos atómicos requeridos
+    admin_first_name: '',        
+    admin_paternal_last_name: '',  
+    admin_maternal_last_name: '',  
     payment_receipt_url: '',
     is_active: true
   };
@@ -45,7 +45,8 @@ export class StaffDevelopersComponent implements OnInit {
     private http: HttpClient, 
     private translate: TranslateService,
     private datePipe: DatePipe,
-    private toast: ToastService // 🚀 Inyectar servicio de Toasts
+    private toast: ToastService,
+    private cdr: ChangeDetectorRef // 🚀 Inyectamos el control de renderizado
   ) {}
 
   private get apiUrl() {
@@ -67,18 +68,29 @@ export class StaffDevelopersComponent implements OnInit {
 
   loadPlansAndDevelopers() {
     this.isLoading = true;
+    this.cdr.detectChanges(); // 🚀 Forzamos a mostrar el loader
+
     this.http.get<any[]>(this.plansUrl, { headers: this.headers }).subscribe({
       next: (plansData) => {
         this.plans = plansData;
+        
+        // Llamada anidada para asegurar que tenemos los planes antes que los developers
         this.http.get<any[]>(this.apiUrl, { headers: this.headers }).subscribe({
           next: (devData) => {
             this.developers = devData;
             this.isLoading = false;
+            this.cdr.detectChanges(); // 🚀 Mostramos la tabla al instante
           },
-          error: () => this.isLoading = false
+          error: () => {
+            this.isLoading = false;
+            this.cdr.detectChanges(); // 🚀 Ocultamos el loader si falla
+          }
         });
       },
-      error: () => this.isLoading = false
+      error: () => {
+        this.isLoading = false;
+        this.cdr.detectChanges(); // 🚀 Ocultamos el loader si falla la carga de planes
+      }
     });
   }
 
@@ -92,7 +104,6 @@ export class StaffDevelopersComponent implements OnInit {
       this.isEditing = true;
       this.currentDevId = dev.id;
       
-      // 🚀 CARGA AUTOMÁTICA: Mapeamos los datos exactos que vienen de la base de datos
       this.form = {
         company_name: dev.name,
         plan_id: dev.plan_id || '',
@@ -120,17 +131,19 @@ export class StaffDevelopersComponent implements OnInit {
       };
     }
     this.showModal = true;
+    this.cdr.detectChanges(); // 🚀 Forzamos que el modal aparezca de inmediato
   }
 
   closeModal() {
     this.showModal = false;
+    this.cdr.detectChanges(); // 🚀 Forzamos que el modal desaparezca de inmediato
   }
 
   saveDeveloper() {
     if (!this.form.company_name || !this.form.plan_id) return;
     this.isSaving = true;
+    this.cdr.detectChanges();
 
-    // Aseguramos limpieza estricta de strings antes de enviar la carga útil
     const payload = {
       ...this.form,
       company_name: this.form.company_name.trim(),
@@ -153,6 +166,7 @@ export class StaffDevelopersComponent implements OnInit {
         },
         error: (err) => {
           this.isSaving = false;
+          this.cdr.detectChanges(); // 🚀 Actualizamos el botón si hubo error
           this.toast.showError(err.error?.detail || 'Error updating developer profile');
         }
       });
@@ -166,6 +180,7 @@ export class StaffDevelopersComponent implements OnInit {
         },
         error: (err) => {
           this.isSaving = false;
+          this.cdr.detectChanges(); // 🚀 Actualizamos el botón si hubo error
           this.toast.showError(err.error?.detail || 'Error during developer onboarding');
         }
       });
@@ -174,34 +189,40 @@ export class StaffDevelopersComponent implements OnInit {
 
   resendActivation(companyId: string) {
     this.resendingId = companyId;
+    this.cdr.detectChanges(); // 🚀 Mostramos el spinner en el botón de reenviar
+
     const url = `${this.apiUrl}/${companyId}/resend-activation?lang=${this.translate.currentLang}`;
     
     this.http.post(url, {}, { headers: this.headers }).subscribe({
       next: () => {
         this.resendingId = null;
+        this.cdr.detectChanges(); // 🚀 Restauramos el botón
         this.toast.showSuccess(this.translate.instant('DEV_PAGE.MSG_RESEND_SUCCESS') || 'Activation link sent.');
       },
       error: (err) => {
         this.resendingId = null;
+        this.cdr.detectChanges(); // 🚀 Restauramos el botón
         this.toast.showError(err.error?.detail || 'Failed to resend token.');
       }
     });
   }
 
-  // 🚀 NUEVAS FUNCIONES PARA EL MODAL DE ELIMINAR
   openDeleteModal(id: string) {
     this.developerToDelete = id;
     this.showDeleteModal = true;
+    this.cdr.detectChanges(); // 🚀 Mostramos el modal de advertencia
   }
 
   closeDeleteModal() {
     this.showDeleteModal = false;
     this.developerToDelete = null;
+    this.cdr.detectChanges(); // 🚀 Ocultamos el modal de advertencia
   }
 
   confirmDelete() {
     if (!this.developerToDelete) return;
     this.isDeleting = true;
+    this.cdr.detectChanges(); // 🚀 Mostramos spinner en el botón eliminar
 
     this.http.delete(`${this.apiUrl}/${this.developerToDelete}`, { headers: this.headers }).subscribe({
       next: () => {

@@ -2,76 +2,63 @@
   
   <aside class="w-64 border-r border-white/10 liquid-glass flex flex-col justify-between relative z-20">
     
-    <div class="p-6 border-b border-white/10 flex flex-col gap-1 cursor-pointer select-none" [routerLink]="userRole === 'superadmin' ? '/admin' : '/app'">
+    <a [routerLink]="userRole === 'superadmin' ? '/admin' : '/app'" class="p-6 border-b border-white/10 flex flex-col gap-1 cursor-pointer select-none block hover:bg-white/5 transition-colors">
       <div class="flex items-center gap-3">
         <img alt="Black Penguin Logo" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDxl2QxLaz1QVZlAWP1ksa3Vsw8hnGkq7DN9pIFoivY_s0ANfwB6_2SUVcF-XuzZxv_QkfH-yYy0Zc1TjmtQ9hP1gQTJB2TYxp1DFMuGtCSL7fddgkgG8ENFAvecOdZ0uABF1CY5yR7_VUrse9PALCGMFUALu0wLsTml1PYbq2FbNq3FTatmSUOjSFUiuhDInqKQifEP-apKuFd0djcZrYKCm-40vcNvQSEutAVuANBR8keQgsajYWdrcIrDHDKew0a7QkZVGOKBUM" class="h-8 w-8 object-contain">
         <div class="font-wordmark text-xl flex items-center tracking-tighter">
-          <span class="text-white font-semibold">Black</span><span class="text-secondary font-light">Penguin</span>
+          <span class="text-white font-semibold">black</span><span class="text-secondary font-light">penguin</span>
         </div>
       </div>
-    </div>
+    </a>
 
-    <nav class="flex-1 overflow-y-auto p-4 flex flex-col gap-1.5 scrollbar-hide">
+    <nav class="flex-1 overflow-y-auto p-4 flex flex-col gap-2 scrollbar-hide">
       
       <ng-container *ngIf="userRole === 'superadmin'">
-         
-         <p class="px-3 text-[10px] text-gray-500 uppercase tracking-widest font-medium mt-2">📊 Core Analytics</p>
-         
-         <a routerLink="/admin/dashboard" routerLinkActive="bg-white/10 text-white" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors block flex items-center gap-2">
+         <p class="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1 mt-2 px-2">{{ 'ADMIN.MENU_SECTION_MAIN' | translate }}</p>
+
+         <a routerLink="/admin/dashboard" routerLinkActive="bg-white/10 text-white" [routerLinkActiveOptions]="{exact: true}" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors flex items-center gap-2 cursor-pointer">
            <span class="material-symbols-outlined text-[18px]">space_dashboard</span>
-           Dashboard
+           {{ 'ADMIN.MENU_DASHBOARD' | translate }}
          </a>
-
-         <p class="px-3 text-[10px] text-gray-500 uppercase tracking-widest font-medium mt-4">👥 Management</p>
          
-         <a routerLink="/admin/developers" routerLinkActive="bg-white/10 text-white" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors block flex items-center gap-2">
-           <span class="material-symbols-outlined text-[18px]">business_center</span>
-           Developers (CRUD)
+         <a routerLink="/admin/profile" routerLinkActive="bg-white/10 text-white" [routerLinkActiveOptions]="{exact: true}" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors flex items-center gap-2 cursor-pointer">
+           <span class="material-symbols-outlined text-[18px]">admin_panel_settings</span>
+           {{ 'ADMIN.MENU_PROFILE' | translate }}
          </a>
 
-         <a routerLink="/admin/emails" routerLinkActive="bg-white/10 text-white" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors block flex items-center gap-2">
+         <p class="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1 mt-4 px-2">{{ 'ADMIN.MENU_SECTION_ECOSYSTEM' | translate }}</p>
+
+         <a routerLink="/admin/developers" routerLinkActive="bg-white/10 text-white" [routerLinkActiveOptions]="{exact: true}" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors flex items-center gap-2 cursor-pointer">
+           <span class="material-symbols-outlined text-[18px]">domain</span>
+           {{ 'ADMIN.MENU_DEVELOPERS' | translate }}
+         </a>
+
+         <a routerLink="/admin/plans" routerLinkActive="bg-white/10 text-white" [routerLinkActiveOptions]="{exact: true}" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors flex items-center gap-2 cursor-pointer">
+           <span class="material-symbols-outlined text-[18px]">workspace_premium</span>
+           {{ 'ADMIN.MENU_PLANS' | translate }}
+         </a>
+
+         <p class="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1 mt-4 px-2">{{ 'ADMIN.MENU_SECTION_SYSTEM' | translate }}</p>
+         
+         <a routerLink="/admin/ai-config" routerLinkActive="bg-white/10 text-white" [routerLinkActiveOptions]="{exact: true}" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors flex items-center gap-2 cursor-pointer">
+           <span class="material-symbols-outlined text-[18px]">smart_toy</span>
+           {{ 'ADMIN.MENU_AI_CONFIG' | translate }}
+         </a>
+
+         <a routerLink="/admin/smtp-config" routerLinkActive="bg-white/10 text-white" [routerLinkActiveOptions]="{exact: true}" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors flex items-center gap-2 cursor-pointer">
            <span class="material-symbols-outlined text-[18px]">mail</span>
-           Waitlist Leads
+           {{ 'ADMIN.MENU_SMTP' | translate }}
          </a>
 
-         <a routerLink="/admin/legal-editor" routerLinkActive="bg-white/10 text-white" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors block flex items-center gap-2">
-          <span class="material-symbols-outlined text-[18px]">gavel</span>
-          Legal & Compliance
-        </a>
-
-         <p class="px-3 text-[10px] text-gray-500 uppercase tracking-widest font-medium mt-4">🤖 AI Engineering</p>
-         
-         <a routerLink="/admin/ai-config" routerLinkActive="bg-white/10 text-white" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors block flex items-center gap-2">
-           <span class="material-symbols-outlined text-[18px]">memory</span>
-           AI Brain Tuner
-         </a>
-
-         <a routerLink="/admin/ai-keys" routerLinkActive="bg-white/10 text-white" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors block flex items-center gap-2">
-           <span class="material-symbols-outlined text-[18px]">key</span>
-           Infrastructure & Keys
-         </a>
-
-         <p class="px-3 text-[10px] text-gray-500 uppercase tracking-widest font-medium mt-4">⚙️ System & Settings</p>
-         
-         <a routerLink="/admin/smtp-config" routerLinkActive="bg-white/10 text-white" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors block flex items-center gap-2">
-           <span class="material-symbols-outlined text-[18px]">alternate_email</span>
-           SMTP Configuration
-         </a>
-
-         <a routerLink="/admin/plans" routerLinkActive="bg-white/10 text-white" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors block flex items-center gap-2">
-          <span class="material-symbols-outlined text-[18px]">workspace_premium</span>
-          Subscription Plans
-        </a>
-
-         <a routerLink="/admin/profile" routerLinkActive="bg-white/10 text-white" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors block flex items-center gap-2">
-           <span class="material-symbols-outlined text-[18px]">person</span>
-           My Profile
+         <a routerLink="/admin/legal-editor" routerLinkActive="bg-white/10 text-white" [routerLinkActiveOptions]="{exact: true}" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors flex items-center gap-2 cursor-pointer">
+           <span class="material-symbols-outlined text-[18px]">gavel</span>
+           Legal & Compliance
          </a>
       </ng-container>
 
       <ng-container *ngIf="userRole !== 'superadmin'">
-         <p class="px-3 text-[10px] text-gray-500 uppercase tracking-widest font-medium mt-2">{{ 'APP.MENU_SECTION' | translate }}</p>
-         <a routerLink="/app/chat" routerLinkActive="bg-white/10 text-white" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors block flex items-center gap-2">
+         <p class="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1 mt-2 px-2">{{ 'APP.MENU_SECTION' | translate }}</p>
+         <a routerLink="/app/chat" routerLinkActive="bg-white/10 text-white" [routerLinkActiveOptions]="{exact: true}" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors flex items-center gap-2 cursor-pointer">
            <span class="material-symbols-outlined text-[18px]">support_agent</span>
            {{ 'APP.MENU_ONBOARDING' | translate }}
          </a>
@@ -79,20 +66,20 @@
     </nav>
 
     <div class="p-4 border-t border-white/10 flex flex-col gap-3">
-      
       <div class="flex items-center justify-center gap-2 p-1.5 bg-black/40 rounded-lg border border-white/5">
         <button (click)="switchLanguage('en')" [class.bg-white_10]="currentLang === 'en'" [class.text-white]="currentLang === 'en'" class="flex-1 py-1 text-xs font-bold text-gray-500 hover:text-white rounded-md transition-colors">EN</button>
         <button (click)="switchLanguage('es')" [class.bg-white_10]="currentLang === 'es'" [class.text-white]="currentLang === 'es'" class="flex-1 py-1 text-xs font-bold text-gray-500 hover:text-white rounded-md transition-colors">ES</button>
       </div>
 
-      <button (click)="logout()" class="w-full text-left px-3 py-2 text-red-400 hover:bg-white/5 rounded-lg transition-colors flex items-center gap-2">
+      <button (click)="logout()" class="w-full text-left px-3 py-2 text-red-400 hover:bg-white/5 rounded-lg transition-colors flex items-center gap-2 cursor-pointer">
         <span class="material-symbols-outlined text-[18px]">logout</span>
-        {{ 'ADMIN.LOGOUT' | translate }}
+        {{ 'ADMIN.MENU_LOGOUT' | translate }}
       </button>
     </div>
   </aside>
 
-  <main class="flex-1 bg-[#0a0a0a] relative overflow-y-auto">
+  <main class="flex-1 overflow-y-auto relative z-10 bg-black/40 backdrop-blur-3xl">
     <router-outlet></router-outlet>
   </main>
+
 </div>

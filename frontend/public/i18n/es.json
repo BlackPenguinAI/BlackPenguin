@@ -92,7 +92,17 @@
     "DEV_TITLE": "Clientes Desarrolladores",
     "DEV_SUBTITLE": "Gestiona Inmobiliarias, Proyectos y Equipos.",
     "DASH_TITLE": "Operaciones Globales",
-    "DASH_SUBTITLE": "Vista general de uso de la plataforma y estadísticas."
+    "DASH_SUBTITLE": "Vista general de uso de la plataforma y estadísticas.",
+    "MENU_SECTION_MAIN": "Principal",
+    "MENU_DASHBOARD": "Panel de Control",
+    "MENU_PROFILE": "Mi Perfil",
+    "MENU_SECTION_ECOSYSTEM": "Ecosistema",
+    "MENU_DEVELOPERS": "Desarrolladoras",
+    "MENU_PLANS": "Suscripciones",
+    "MENU_SECTION_SYSTEM": "Sistema",
+    "MENU_AI_CONFIG": "Configuración de IA",
+    "MENU_SMTP": "Ajustes SMTP",
+    "MENU_LOGOUT": "Cerrar sesión"
   },
   "AI_CONFIG": {
     "TITLE": "Sintonizador Maestro IA",
