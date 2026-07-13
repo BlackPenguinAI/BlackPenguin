@@ -1,0 +1,23 @@
+<div class="min-h-screen bg-black text-white font-sans relative overflow-hidden select-none">
+  <div class="absolute top-0 right-0 w-[500px] h-[500px] bg-secondary/5 rounded-full blur-[150px] pointer-events-none"></div>
+
+  <div class="fixed top-6 right-6 z-50 bg-white/5 backdrop-blur-md border border-white/10 px-4 py-2 rounded-full flex items-center gap-2">
+    <button (click)="switchLanguage('en')" [class.text-secondary]="currentLang === 'en'" class="text-xs font-bold text-gray-400 hover:text-white transition-colors">EN</button>
+    <span class="text-gray-600 text-xs">/</span>
+    <button (click)="switchLanguage('es')" [class.text-secondary]="currentLang === 'es'" class="text-xs font-bold text-gray-400 hover:text-white transition-colors">ES</button>
+  </div>
+
+  <div class="max-w-3xl mx-auto px-6 py-20 relative z-10">
+    <button routerLink="/" class="text-gray-400 hover:text-white transition-colors flex items-center gap-1 text-xs mb-8 focus:outline-none">
+      <span class="material-symbols-outlined text-sm">arrow_back</span> Back to Home
+    </button>
+
+    <div class="mb-10">
+      <h1 class="text-4xl font-light tracking-tight">Terms & <span class="text-secondary font-medium">Conditions</span></h1>
+      <p class="text-xs text-gray-500 mt-2 font-mono uppercase tracking-wider">Last updated: {{ lastUpdated }}</p>
+    </div>
+
+    <div class="liquid-glass p-8 md:p-12 rounded-2xl border border-white/5 font-light text-gray-300 leading-relaxed text-sm shadow-2xl" [innerHTML]="legalHTMLContent">
+    </div>
+  </div>
+</div>

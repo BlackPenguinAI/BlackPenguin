@@ -1,0 +1,71 @@
+<div class="p-6 md:p-8 max-w-5xl mx-auto animate-fade-in text-white select-none">
+  
+  <div class="mb-8">
+    <h1 class="text-2xl font-light tracking-tight">Legal <span class="font-medium text-secondary">Compliance</span> Editor</h1>
+    <p class="text-xs text-gray-400 mt-1">Gestiona los textos legales (Markdown) y la fecha de vigencia.</p>
+  </div>
+
+  <div class="flex flex-col md:flex-row justify-between gap-4 mb-6">
+    
+    <div class="flex bg-white/5 border border-white/10 rounded-lg p-1 w-max">
+      <button (click)="setDocType('privacy')" [class.bg-white_10]="activeDoc === 'privacy'" [class.text-white]="activeDoc === 'privacy'" class="px-4 py-1.5 text-xs font-medium text-gray-500 rounded-md transition-colors flex items-center gap-2">
+        <span class="material-symbols-outlined text-[16px]">policy</span> Privacy Policy
+      </button>
+      <button (click)="setDocType('terms')" [class.bg-white_10]="activeDoc === 'terms'" [class.text-white]="activeDoc === 'terms'" class="px-4 py-1.5 text-xs font-medium text-gray-500 rounded-md transition-colors flex items-center gap-2">
+        <span class="material-symbols-outlined text-[16px]">gavel</span> Terms & Conditions
+      </button>
+    </div>
+
+    <div class="flex bg-white/5 border border-white/10 rounded-lg p-1 w-max">
+      <button (click)="setLang('en')" [class.bg-secondary]="activeLang === 'en'" [class.text-black]="activeLang === 'en'" class="px-4 py-1.5 text-xs font-bold text-gray-500 rounded-md transition-colors uppercase tracking-wider">
+        English
+      </button>
+      <button (click)="setLang('es')" [class.bg-secondary]="activeLang === 'es'" [class.text-black]="activeLang === 'es'" class="px-4 py-1.5 text-xs font-bold text-gray-500 rounded-md transition-colors uppercase tracking-wider">
+        Español
+      </button>
+    </div>
+
+  </div>
+
+  <div class="liquid-glass border border-white/10 rounded-2xl p-6 relative">
+    
+    <div *ngIf="isLoading" class="absolute inset-0 z-10 bg-black/50 backdrop-blur-sm rounded-2xl flex items-center justify-center">
+      <span class="material-symbols-outlined animate-spin text-secondary text-4xl">sync</span>
+    </div>
+
+    <div class="flex flex-col gap-6 relative z-0">
+      
+      <div class="flex flex-col gap-2">
+        <label class="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
+          <span class="material-symbols-outlined text-[16px]">calendar_today</span> Last Updated Label
+        </label>
+        <input type="text" [(ngModel)]="documentData.last_updated_label" placeholder="e.g., July 2026" 
+          class="w-full bg-[#111] border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:border-secondary focus:ring-0 outline-none transition-colors">
+        <p class="text-[10px] text-gray-600">Este texto se mostrará justo debajo del título principal.</p>
+      </div>
+
+      <div class="flex flex-col gap-2">
+        <label class="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center justify-between">
+          <div class="flex items-center gap-2"><span class="material-symbols-outlined text-[16px]">markdown</span> Content (Markdown)</div>
+          <a href="https://www.markdownguide.org/cheat-sheet/" target="_blank" class="text-secondary hover:underline text-[10px] lowercase flex items-center gap-1">
+            Ver guía de markdown <span class="material-symbols-outlined text-[12px]">open_in_new</span>
+          </a>
+        </label>
+        <textarea [(ngModel)]="documentData.content_markdown" rows="15" 
+          class="w-full bg-[#111] border border-white/10 rounded-xl px-4 py-3 text-white text-sm font-mono focus:border-secondary focus:ring-0 outline-none transition-colors scrollbar-hide resize-y leading-relaxed"
+          placeholder="# Escribe aquí tus políticas...\n\nPuedes usar **negritas** y listas."></textarea>
+      </div>
+
+    </div>
+
+  </div>
+
+  <div class="mt-6 flex justify-end">
+    <button (click)="saveDocument()" [disabled]="isSaving || isLoading" class="bg-secondary hover:bg-yellow-500 text-black font-semibold px-8 py-2.5 rounded-xl transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-[0_0_15px_rgba(234,179,8,0.2)]">
+      <span *ngIf="isSaving" class="material-symbols-outlined animate-spin text-[18px]">sync</span>
+      <span *ngIf="!isSaving" class="material-symbols-outlined text-[18px]">save</span>
+      Guardar Cambios
+    </button>
+  </div>
+
+</div>

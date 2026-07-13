@@ -17,6 +17,11 @@ import { SetPasswordComponent } from './pages/set-password/set-password';
 import { StaffAiKeysComponent } from './pages/staff/ai-keys/ai-keys'; // 🚀 NUEVO
 import { SmtpConfigComponent } from './pages/staff/smtp-config/smtp-config';
 
+import { PrivacyPolicyComponent } from './pages/legal/privacy-policy/privacy-policy';
+import { TermsConditionsComponent } from './pages/legal/terms-conditions/terms-conditions';
+
+import { LegalEditorComponent } from './pages/admin/legal-editor/legal-editor';
+
 export const routes: Routes = [
   // 🌍 ZONAS LIBRES (No tienen Menú Lateral)
   { path: '', component: LandingComponent },
@@ -24,6 +29,14 @@ export const routes: Routes = [
   { path: 'register', component: RegisterComponent },
   { path: 'set-password', component: SetPasswordComponent }, // 🚀 NUEVA RUTA AQUÍ
   
+  {
+    path: 'legal',
+    children: [
+      { path: 'privacy', component: PrivacyPolicyComponent },
+      { path: 'terms', component: TermsConditionsComponent }
+    ]
+  },
+
   // 🛡️ ZONAS PROTEGIDAS (Envueltas en el Sidebar Layout)
   {
     path: '',
@@ -45,6 +58,7 @@ export const routes: Routes = [
           { path: 'ai-keys', component: StaffAiKeysComponent }, // 🚀 NUEVA RUTA AQUÍ
           { path: 'ai-config', component: StaffAiConfigComponent },
           { path: 'smtp-config', component: SmtpConfigComponent },
+          { path: 'legal-editor', component: LegalEditorComponent }, // 🚀 NUEVA RUTA
         ]
       },
 
@@ -57,7 +71,6 @@ export const routes: Routes = [
           // Los demás módulos los irás agregando aquí...
         ]
       }
-
     ]
   },
 
