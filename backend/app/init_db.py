@@ -46,7 +46,7 @@ def init_db():
             db.add(ai_config)
 
         # Cargar llave de OpenRouter (REEMPLAZA AQUÍ TU LLAVE REAL)
-        ai_config.openrouter_api_key = "sk-or-v1-PON_TU_LLAVE_REAL_AQUI" 
+        ai_config.openrouter_api_key = "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" 
         ai_config.available_models = ["openai/gpt-4o-mini"]
 
         print("🤖 Sembrando Inteligencia Artificial (Prompts & Keys)...")
