@@ -576,18 +576,33 @@ def get_chat_history(db: Session = Depends(get_db), current_user: User = Depends
     # 2. Buscar la sesión activa de Onboarding
     session = db.query(OnboardingSession).filter(OnboardingSession.company_id == current_user.company_id).first()
     
-    # 3. Si no hay sesión, devolvemos una lista vacía
+    # 🚀 FAIL-SAFE: Si no hay sesión (por fallos de red previos), la creamos
     if not session:
-        return []
+        session = OnboardingSession(company_id=current_user.company_id)
+        db.add(session)
+        db.commit()
+        db.refresh(session)
 
-    # 4. Extraer los mensajes ordenados por fecha de creación
+    # 3. Extraer los mensajes ordenados por fecha de creación
     history = db.query(OnboardingMessage).filter(OnboardingMessage.session_id == session.id).order_by(OnboardingMessage.created_at.asc()).all()
     
-    # 5. Formatear la respuesta para que empate con la interfaz (Angular)
+    # 🚀 SOLUCIÓN ANTI-FANTASMAS: Si la historia está vacía, creamos el saludo inicial aquí mismo
+    if not history:
+        welcome_message = OnboardingMessage(
+            session_id=session.id,
+            sender=SenderType.AI,
+            content="Welcome to Black Penguin! I am your AI Corporate Onboarding Specialist. I am currently analyzing your company footprint to set up your cognitive workspace. To start, could you provide your official website URL or upload a company brochure?"
+        )
+        db.add(welcome_message)
+        db.commit()
+        db.refresh(welcome_message)
+        history = [welcome_message] # Inyectamos el mensaje a la lista
+
+    # 4. Formatear la respuesta para que empate con la interfaz (Angular)
     formatted_history = []
     for msg in history:
         # Transformar SenderType (ENUM) en el string esperado por el UI ('user' o 'ai')
-        sender_label = "user" if msg.sender == SenderType.USER else "assistant"
+        sender_label = "user" if msg.sender == SenderType.USER else "ai"
         
         formatted_history.append({
             "sender": sender_label,
