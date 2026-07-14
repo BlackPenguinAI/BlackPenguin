@@ -1,51 +1,52 @@
 # backend/app/core/email.py
 import smtplib
+import socket # 🚀 IMPORTANTE: Librería nativa de red
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
-# 🚀 NUEVAS IMPORTACIONES PARA LEER LA BASE DE DATOS
 from app.db.postgres import SessionLocal
 from app.modules.system.models import SmtpConfig
+
+# ==============================================================================
+# 🚀 HACK PARA DOCKER: Forzar IPv4
+# Evita el error "[Errno 101] Network is unreachable" cuando Gmail devuelve IPv6
+# ==============================================================================
+old_getaddrinfo = socket.getaddrinfo
+def ipv4_getaddrinfo(*args, **kwargs):
+    responses = old_getaddrinfo(*args, **kwargs)
+    # Filtramos para que solo devuelva rutas de la familia IPv4 (AF_INET)
+    return [r for r in responses if r[0] == socket.AF_INET]
+socket.getaddrinfo = ipv4_getaddrinfo
+# ==============================================================================
 
 def send_email(to_email: str, subject: str, html_content: str):
     """
     Motor de envío de correos. 
     Lee la configuración dinámica desde PostgreSQL (Angular Panel).
-    Si no hay credenciales SMTP, imprime el correo en consola (Modo Dev).
     """
-    # 1. Abrimos una sesión a la base de datos
     db = SessionLocal()
     try:
-        # 2. Consultamos la configuración guardada por el Superadmin
         smtp_config = db.query(SmtpConfig).first()
 
-        # 3. Si no hay configuración o faltan credenciales, simulamos en consola
         if not smtp_config or not smtp_config.smtp_user or not smtp_config.smtp_password:
             print(f"\n--- 📧 SIMULACIÓN DE CORREO A: {to_email} ---")
             print(f"ASUNTO: {subject}")
-            print(f"CONTENIDO:\n{html_content}")
-            print("------------------------------------------\n")
             return
 
-        # 4. Extraemos las variables vivas
         smtp_host = smtp_config.smtp_host
         smtp_port = smtp_config.smtp_port
         smtp_user = smtp_config.smtp_user
         smtp_password = smtp_config.smtp_password
         sender_email = smtp_config.sender_email or smtp_user
-        
-        # Si el modelo tiene la columna sender_name, la usamos, si no "Black Penguin"
         sender_name = getattr(smtp_config, 'sender_name', 'Black Penguin')
 
-        # 5. Preparamos el Mensaje
         msg = MIMEMultipart("alternative")
         msg["Subject"] = subject
         msg["From"] = f"{sender_name} <{sender_email}>"
         msg["To"] = to_email
         msg.attach(MIMEText(html_content, "html"))
 
-        # 6. Conectamos al Servidor y Enviamos
-        # Verificamos si usa SSL explícito (Puerto 465) o TLS (Puerto 587)
+        # Conexión forzada a IPv4 (gracias al parche de arriba)
         if smtp_config.smtp_security == "SSL":
             server = smtplib.SMTP_SSL(smtp_host, smtp_port)
         else:
@@ -62,5 +63,4 @@ def send_email(to_email: str, subject: str, html_content: str):
     except Exception as e:
         print(f"❌ Error crítico enviando correo a {to_email}: {e}")
     finally:
-        # 7. Siempre cerramos la conexión a la BD
         db.close()
