@@ -270,11 +270,12 @@ def create_developer(
         </div>
         """
     
-    send_email(payload.admin_email, subject, html_content)
+    #send_email(payload.admin_email, subject, html_content)
+    background_tasks.add_task(send_email, payload.admin_email, subject, html_content)
     return new_company
 
 @router.post("/developers/{company_id}/resend-activation", summary="Re-enviar link de recuperación/activación")
-def resend_activation_link(company_id: str, lang: str = "en", db: Session = Depends(get_db), current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN]))):
+def resend_activation_link(company_id: str, background_tasks: BackgroundTasks, lang: str = "en", db: Session = Depends(get_db), current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN]))):
     admin_user = db.query(User).filter(User.company_id == company_id, User.role == UserRole.ADMIN).first()
     if not admin_user:
         raise HTTPException(status_code=404, detail="No se encontró un administrador para esta empresa.")
@@ -301,7 +302,8 @@ def resend_activation_link(company_id: str, lang: str = "en", db: Session = Depe
         </div>
         """
         
-    send_email(admin_user.email, subject, html_content)
+    #send_email(admin_user.email, subject, html_content)
+    background_tasks.add_task(send_email, admin_user.email, subject, html_content)
     return {"message": "Correo enviado con éxito."}
 
 @router.put("/developers/{company_id}", response_model=DeveloperResponse, summary="Actualizar Desarrollador")
