@@ -122,3 +122,106 @@ async def scrape_and_enrich_profile(company_id: str, url: str):
                 print(f"❌ Error en OpenRouter al procesar el Scrape. Status: {ai_response.status_code}")
     except Exception as e:
         print(f"❌ Error en la extracción LLM o Base de Datos: {e}")
+
+async def extract_and_enrich_from_chat(company_id: str, message: str, pdf_text: str):
+    """
+    Background Task: Escucha lo que el usuario habla o sube en el chat (PDF), 
+    y extrae en JSON para actualizar la barra lateral en tiempo real.
+    """
+    if not message.strip() and not pdf_text.strip():
+        return
+
+    print(f"🕵️‍♂️ Iniciando extracción silenciosa desde chat/PDF...")
+    
+    combined_text = f"Mensaje del usuario: {message}\n\n"
+    if pdf_text:
+        combined_text += f"Texto del documento adjunto:\n{pdf_text}\n"
+
+    prompt = f"""
+    Eres un analista de datos de Black Penguin. Lee el siguiente texto extraído de una conversación y/o documento de una desarrolladora inmobiliaria y extrae la información en un formato JSON estricto. 
+    Si no encuentras un dato, déjalo como null o lista vacía []. SOLO extrae lo que sea evidente en el texto provisto.
+    NO agregues texto fuera del JSON (ni siquiera formato markdown). Solo devuelve el JSON puro.
+    
+    FORMATO JSON REQUERIDO:
+    {{
+        "legal_name": "Nombre de la empresa",
+        "dba": "Nombre comercial",
+        "headquarters": "Sede principal",
+        "year_established": 2000,
+        "executive_team": [{{"name": "Juan Perez", "role": "CEO"}}],
+        "asset_classes": ["Multi-family", "Commercial"],
+        "core_focus_description": "Breve resumen de enfoque",
+        "market_coverage": "Zonas o estados donde operan",
+        "target_demographics": "A quién le venden",
+        "portfolio_size_aum": "Tamaño del portafolio si se menciona",
+        "investment_strategy": "Estrategia de inversión",
+        "value_proposition": "Propuesta de valor",
+        "key_differentiators": "Diferenciadores clave",
+        "tone_of_voice": "Tono de la marca",
+        "key_messaging": "Mensaje principal"
+    }}
+    
+    TEXTO PARA ANALIZAR:
+    {combined_text}
+    """
+
+    try:
+        async with httpx.AsyncClient() as client:
+            ai_body = {
+                "model": settings.DEFAULT_AI_MODEL,
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0.1
+            }
+            
+            ai_response = await client.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={"Authorization": f"Bearer {settings.OPENROUTER_API_KEY}"},
+                json=ai_body, 
+                timeout=40.0
+            )
+            
+            if ai_response.status_code == 200:
+                ai_text = ai_response.json()["choices"][0]["message"]["content"].strip()
+                
+                # Limpiamos markdown por si acaso
+                if ai_text.startswith("```json"): 
+                    ai_text = ai_text[7:]
+                if ai_text.endswith("```"): 
+                    ai_text = ai_text[:-3]
+                
+                try:
+                    extracted_data = json.loads(ai_text)
+                except json.JSONDecodeError:
+                    print("❌ Extractor Silencioso: La IA no devolvió un JSON válido.")
+                    return
+                
+                db = SessionLocal()
+                try:
+                    profile = db.query(CompanyProfile).filter(CompanyProfile.company_id == company_id).first()
+                    if profile:
+                        for key, value in extracted_data.items():
+                            if hasattr(profile, key) and value:
+                                setattr(profile, key, value)
+                        
+                        profile.is_identity_completed = bool(profile.legal_name and profile.headquarters)
+                        profile.is_team_completed = bool(len(profile.executive_team) > 0)
+                        profile.is_focus_completed = bool(len(profile.asset_classes) > 0)
+                        profile.is_market_completed = bool(profile.market_coverage)
+                        profile.is_strategy_completed = bool(profile.investment_strategy)
+                        profile.is_value_prop_completed = bool(profile.value_proposition)
+                        profile.is_brand_completed = bool(profile.tone_of_voice and profile.key_messaging)
+                        
+                        profile.is_profile_fully_completed = all([
+                            profile.is_identity_completed, profile.is_team_completed, profile.is_focus_completed, 
+                            profile.is_market_completed, profile.is_strategy_completed, profile.is_value_prop_completed, 
+                            profile.is_brand_completed
+                        ])
+
+                        db.commit()
+                        print(f"✨ WOW EFFECT COMPLETADO: Perfil actualizado silenciosamente vía Chat/PDF.")
+                finally:
+                    db.close()
+            else:
+                print(f"❌ Extractor Silencioso: Error en OpenRouter ({ai_response.status_code})")
+    except Exception as e:
+        print(f"❌ Error en la extracción silenciosa: {e}")

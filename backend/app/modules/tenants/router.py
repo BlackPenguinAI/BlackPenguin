@@ -33,8 +33,9 @@ from app.modules.tenants.schemas import (
     CompanyProfileUpdate, CompanyProfileResponse    
 )
 
-# 3. Tareas en segundo plano (Web Scraping Maestro)
-from app.modules.tenants.scraper import scrape_and_enrich_profile
+# 3. Tareas en segundo plano (Web Scraping Maestro y Extractor Silencioso)
+# 🚀 CAMBIO 1: Importamos el nuevo extractor silencioso
+from app.modules.tenants.scraper import scrape_and_enrich_profile, extract_and_enrich_from_chat
 
 # 4. Dependencias
 from app.modules.auth.deps import RoleChecker, get_current_user
@@ -557,6 +558,10 @@ async def send_onboarding_message(
         first_url = urls[0]
         background_tasks.add_task(scrape_and_enrich_profile, current_user.company_id, first_url)
 
+    # 🚀 CAMBIO 2: Aquí agregamos la llamada para que el Extractor Silencioso corra de fondo
+    if message.strip() or extracted_text.strip():
+        background_tasks.add_task(extract_and_enrich_from_chat, current_user.company_id, message, extracted_text)
+
     return ai_msg
 
 # =========================================================================
@@ -582,7 +587,7 @@ def get_chat_history(db: Session = Depends(get_db), current_user: User = Depends
     formatted_history = []
     for msg in history:
         # Transformar SenderType (ENUM) en el string esperado por el UI ('user' o 'ai')
-        sender_label = "user" if msg.sender == SenderType.USER else "ai"
+        sender_label = "user" if msg.sender == SenderType.USER else "assistant"
         
         formatted_history.append({
             "sender": sender_label,
