@@ -36,11 +36,20 @@
         </div>
 
         <!-- Burbuja Usuario -->
-        <div *ngIf="msg.sender === 'user'" class="flex gap-4 max-w-[90%] md:max-w-[80%] flex-row-reverse">
-          <div class="w-8 h-8 rounded-full bg-gray-800 border border-gray-600 flex items-center justify-center shrink-0 mt-1">
-            <span class="material-symbols-outlined text-gray-400 text-[18px]">person</span>
+        <div *ngIf="msg.sender === 'user'" class="flex flex-col items-end max-w-[80%]">
+          <span class="text-[10px] text-gray-500 mb-1 mr-2">{{ userName }}</span>
+          
+          <div *ngIf="msg.file_name" class="mb-2 flex items-center gap-3 bg-white/10 border border-white/20 px-4 py-2.5 rounded-xl w-max shadow-md">
+            <div class="p-1.5 bg-red-500/20 rounded-md">
+              <span class="material-symbols-outlined text-red-400 text-[20px] block">picture_as_pdf</span>
+            </div>
+            <div class="flex flex-col">
+              <span class="text-xs text-gray-200 font-medium truncate max-w-[200px]">{{ msg.file_name }}</span>
+              <span class="text-[10px] text-gray-500">Document Upload</span>
+            </div>
           </div>
-          <div class="bg-gray-800/80 border border-gray-700 rounded-2xl rounded-tr-sm p-4 md:p-5 text-sm font-light text-white leading-relaxed whitespace-pre-wrap shadow-lg">
+          
+          <div *ngIf="msg.content" class="bg-white/10 border border-white/10 text-white px-5 py-3 rounded-2xl rounded-tr-sm text-sm font-light leading-relaxed shadow-lg">
             {{ msg.content }}
           </div>
         </div>
@@ -78,19 +87,26 @@
             (keydown)="handleKeyDown($event)"
             [disabled]="isAnalyzing || isRecording"
             rows="1"
-            placeholder="{{ isRecording ? '🎙️ Escuchando...' : 'Ask me anything or drop a link...' }}"
-            class="w-full bg-transparent text-white text-sm focus:outline-none resize-none overflow-hidden placeholder-gray-500 py-3 pl-4 pr-24"
+            placeholder="{{ isRecording ? '🎙️ Escuchando...' : 'Ask me anything or drop a link or file...' }}"
+            class="w-full bg-transparent text-white text-sm focus:outline-none resize-none overflow-hidden placeholder-gray-500 py-3 pl-4 pr-32"
             style="min-height: 48px; max-height: 150px;"
           ></textarea>
 
           <div class="absolute right-2 bottom-2 flex items-center gap-1">
-            <button (click)="toggleRecording()" [disabled]="isAnalyzing" class="p-2 text-gray-400 hover:text-white transition-colors disabled:opacity-50">
+            
+            <input type="file" class="hidden" #fileInput (change)="onFileSelected($event)" accept=".pdf,.doc,.docx,.txt">
+            <button (click)="fileInput.click()" [disabled]="isAnalyzing" class="p-2 text-gray-400 hover:text-white transition-colors disabled:opacity-50" title="Upload Document">
+              <span class="material-symbols-outlined text-[20px]">attach_file</span>
+            </button>
+
+            <button (click)="toggleRecording()" [disabled]="isAnalyzing" class="p-2 text-gray-400 hover:text-white transition-colors disabled:opacity-50" title="Voice Message">
               <span class="material-symbols-outlined text-[20px]">{{ isRecording ? 'stop_circle' : 'mic' }}</span>
             </button>
             
             <button (click)="sendMessage()" [disabled]="!canSend" class="p-2 bg-white rounded-xl hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:bg-white/20 group">
               <span class="material-symbols-outlined text-[20px] transition-colors" [ngClass]="{'text-black': canSend, 'text-gray-400': !canSend}">arrow_upward</span>
             </button>
+            
           </div>
 
         </div>

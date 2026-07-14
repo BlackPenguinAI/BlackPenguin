@@ -1,9 +1,10 @@
-import { Component, ElementRef, ViewChild, OnInit, isDevMode, ChangeDetectorRef } from '@angular/core'; 
+import { Component, ElementRef, ViewChild, OnInit, OnDestroy, isDevMode, ChangeDetectorRef } from '@angular/core'; 
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { interval, Subscription } from 'rxjs'; // 🚀 IMPORTACIONES NUEVAS
 
 @Component({
   selector: 'app-chat',
@@ -12,7 +13,7 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
   templateUrl: './chat.html',
   styleUrl: './chat.scss'
 })
-export class ChatComponent implements OnInit {
+export class ChatComponent implements OnInit, OnDestroy {
   @ViewChild('chatScroll') chatScroll!: ElementRef;
 
   prompt: string = '';
@@ -27,6 +28,8 @@ export class ChatComponent implements OnInit {
   messages: any[] = [];
   profile: any = {};
   isCompleted: boolean = false;
+
+  private profilePollSub?: Subscription; // 🚀 CONTROLADOR DEL POLLING
 
   constructor(
     private translate: TranslateService,
@@ -52,20 +55,29 @@ export class ChatComponent implements OnInit {
   ngOnInit() {
     this.userName = localStorage.getItem('bp_name') || 'User';
     this.loadProfile();
-    this.initSession(); // 🚀 Primero inicializamos la sesión en BD
+    this.initSession(); 
+    this.startProfilePolling(); // 🚀 INICIAR MAGIA EN TIEMPO REAL
   }
 
-  // 🚀 NUEVA FUNCIÓN: Llama al endpoint que crea la sala de chat en PostgreSQL
+  ngOnDestroy() {
+    // 🚀 Limpiar el polling al salir de la pantalla para evitar fugas de memoria
+    if (this.profilePollSub) this.profilePollSub.unsubscribe();
+  }
+
+  startProfilePolling() {
+    // Consultar silenciosamente la BD cada 4 segundos si el perfil no está al 100%
+    this.profilePollSub = interval(4000).subscribe(() => {
+      if (!this.profile.is_profile_fully_completed) {
+        this.loadProfile();
+      }
+    });
+  }
+
   initSession() {
     this.http.get<any>(`${this.baseUrl}/session`, { headers: this.headers }).subscribe({
       next: (sessionData) => {
         this.isCompleted = sessionData.is_completed;
-        // Una vez que la sesión fue creada, cargamos los mensajes (incluirá el Welcome Message)
         this.loadChatHistory();
-      },
-      error: (err) => {
-        console.error('Error inicializando la sesión', err);
-        this.cdr.detectChanges();
       }
     });
   }
@@ -75,10 +87,6 @@ export class ChatComponent implements OnInit {
       next: (data) => {
         this.profile = data;
         this.cdr.detectChanges(); 
-      },
-      error: (err) => {
-        console.error('Error loading profile', err);
-        this.cdr.detectChanges();
       }
     });
   }
@@ -88,10 +96,6 @@ export class ChatComponent implements OnInit {
       next: (data) => {
         this.messages = data;
         this.scrollToBottom();
-        this.cdr.detectChanges();
-      },
-      error: (err) => {
-        console.error('Error loading history', err);
         this.cdr.detectChanges();
       }
     });
@@ -116,21 +120,36 @@ export class ChatComponent implements OnInit {
     if (!this.canSend) return;
 
     const userText = this.prompt.trim();
-    this.prompt = ''; 
+    const fileToUpload = this.selectedFile; // 🚀 Capturamos el archivo
     
-    this.messages.push({ sender: 'user', content: userText, created_at: new Date() });
+    this.prompt = ''; 
+    this.selectedFile = null; // 🚀 Desaparece del input visualmente
+    
+    // 1. Mostrar en UI el texto y el archivo asociado a esta burbuja
+    this.messages.push({ 
+      sender: 'user', 
+      content: userText, 
+      file_name: fileToUpload ? fileToUpload.name : null, // 🚀 Adjuntamos el nombre
+      created_at: new Date() 
+    });
+    
     this.isAnalyzing = true;
     this.scrollToBottom();
     this.cdr.detectChanges(); 
 
-    const payload = { message: userText };
+    // 2. 🚀 Usar FormData en lugar de JSON para enviar el archivo físico
+    const formData = new FormData();
+    formData.append('message', userText);
+    if (fileToUpload) {
+      formData.append('file', fileToUpload);
+    }
 
-    this.http.post<any>(`${this.baseUrl}/chat`, payload, { headers: this.headers }).subscribe({
+    this.http.post<any>(`${this.baseUrl}/chat`, formData, { headers: this.headers }).subscribe({
       next: (aiResponse) => {
         this.messages.push(aiResponse);
         this.isAnalyzing = false;
         this.scrollToBottom();
-        this.loadProfile(); 
+        this.loadProfile(); // Refresco inmediato
       },
       error: (err) => {
         console.error('Error sending message', err);

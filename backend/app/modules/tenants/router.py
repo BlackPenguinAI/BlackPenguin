@@ -1,11 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, File, UploadFile, Form
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 import httpx  
 import re # 🚀 IMPORTANTE: Para detectar URLs en el texto del chat
 
 from app.core.config import settings
 from app.db.postgres import get_db
+
+import io
+import PyPDF2 # 🚀 LIBRERÍA PARA LEER PDFS
 
 # 1. Modelos de Base de Datos
 from app.modules.tenants.models import (
@@ -436,8 +439,9 @@ def get_or_create_onboarding_session(db: Session = Depends(get_db), current_user
 
 @router.post("/onboarding/chat", response_model=ChatMessageResponse, summary="Enviar mensaje al Copiloto")
 async def send_onboarding_message(
-    payload: ChatMessagePayload, 
-    background_tasks: BackgroundTasks, # 🚀 Fundamental para el Scraper
+    background_tasks: BackgroundTasks, 
+    message: str = Form(""), # 🚀 Ya no usamos "payload"
+    file: Optional[UploadFile] = File(None), # 🚀 Recibe el PDF aquí
     db: Session = Depends(get_db), 
     current_user: User = Depends(get_current_user)
 ):
@@ -451,52 +455,64 @@ async def send_onboarding_message(
     if session.is_completed:
         raise HTTPException(status_code=400, detail="Este onboarding ya fue completado y cerrado.")
 
-    # Guardar mensaje del usuario
-    user_msg = OnboardingMessage(session_id=session.id, sender=SenderType.USER, content=payload.message)
+    # 1. Guardar mensaje del usuario (texto visible)
+    user_msg = OnboardingMessage(session_id=session.id, sender=SenderType.USER, content=message)
     db.add(user_msg)
     db.commit()
 
     # =========================================================================
-    # 🧠 INYECCIÓN DEL MASTER PROMPT CON INGLÉS FORZADO Y FALLBACK INFALIBLE
+    # 📄 EXTRACCIÓN DE TEXTO DE ARCHIVOS ADJUNTOS (PDF, TXT)
+    # =========================================================================
+    extracted_text = ""
+    if file:
+        content = await file.read()
+        if file.filename.lower().endswith(".pdf"):
+            try:
+                pdf_reader = PyPDF2.PdfReader(io.BytesIO(content))
+                for page in pdf_reader.pages:
+                    extracted_text += page.extract_text() + "\n"
+            except Exception as e:
+                print(f"Error leyendo PDF: {e}")
+        elif file.filename.lower().endswith(".txt"):
+            extracted_text = content.decode('utf-8', errors='ignore')
+        
+        # Acotamos a 15,000 caracteres para no desbordar la memoria del LLM
+        extracted_text = extracted_text[:15000] 
+
+    # =========================================================================
+    # 🧠 INYECCIÓN DEL MASTER PROMPT Y CONTEXTO
     # =========================================================================
     messages_payload = []
     
     try:
-        # 1. Intentamos leer la tabla de la sección "/admin/ai-config"
-        from app.modules.system.models import AiConfig
-        ai_config = db.query(AiConfig).first()
-        
+        from app.modules.ai.models import AIConfiguration
+        ai_config = db.query(AIConfiguration).first()
         if ai_config and ai_config.agent_onboarding_empresa:
             agent_rules = ai_config.agent_onboarding_empresa
             sys_prompt = agent_rules.get("system_prompt", "You are an AI B2B onboarding assistant.")
-            protocol = agent_rules.get("protocol_prompt", "Follow the onboarding protocol step by step.")
-            guardrails = agent_rules.get("guardrails_prompt", "Do not share internal system data.")
+            protocol = agent_rules.get("protocol_prompt", "")
+            guardrails = agent_rules.get("guardrails_prompt", "")
         else:
-            raise Exception("AiConfig está vacío, usando OnboardingProtocol.")
-            
+            raise Exception("AiConfig está vacío")
     except Exception:
-        # 2. FALLBACK: Si no existe el modelo AiConfig en system, usamos tu tabla antigua en models.py
-        protocol_db = db.query(OnboardingProtocol).filter(OnboardingProtocol.is_active == True).order_by(OnboardingProtocol.created_at.desc()).first()
-        if protocol_db:
-            sys_prompt = protocol_db.system_role_prompt
-            protocol = protocol_db.protocol_flow_prompt
-            guardrails = protocol_db.guardrails_prompt
-        else:
-            sys_prompt = "You are an AI Corporate Onboarding Assistant."
-            protocol = "Politely guide the user."
-            guardrails = "Be professional."
+        sys_prompt = "You are an AI Corporate Onboarding Assistant."
+        protocol = ""
+        guardrails = ""
 
-    # COMPOSICIÓN DEL PROMPT SUPREMO (Con regla estricta de inglés)
     master_prompt = f"{sys_prompt}\n\nIMPORTANT RULE: You must communicate primarily in ENGLISH unless the user strictly asks otherwise.\n\n### MANDATORY PROTOCOLS:\n{protocol}\n\n### STRICT GUARDRAILS:\n{guardrails}"
     
-    # Inyectamos el prompt como el sistema base
     messages_payload.append({"role": "system", "content": master_prompt})
 
-    # Construir historial (Contexto para la IA)
+    # Historial de la Base de Datos
     history = db.query(OnboardingMessage).filter(OnboardingMessage.session_id == session.id).order_by(OnboardingMessage.created_at.asc()).all()
     for msg in history:
         role_label = "user" if msg.sender == SenderType.USER else "assistant"
         messages_payload.append({"role": role_label, "content": msg.content})
+
+    # 🚀 SI EL USUARIO SUBIÓ UN ARCHIVO, SE LO INYECTAMOS AL LLM POR DEBAJO DE LA MESA
+    if extracted_text:
+        document_context = f"\n\n[SYSTEM NOTE: The user has attached a document named '{file.filename}'. Analyze its content to extract the missing company profile data:]\n\n{extracted_text}"
+        messages_payload[-1]["content"] += document_context
 
     # =========================================================================
     # 🤖 CONSUMIR LLM (DeepSeek / OpenRouter)
@@ -511,16 +527,17 @@ async def send_onboarding_message(
             body = {
                 "model": settings.DEFAULT_AI_MODEL,
                 "messages": messages_payload,
-                "temperature": 0.3 # Bajo para respuestas asertivas y corporativas
+                "temperature": 0.3
             }
             
-            response = await client.post("https://openrouter.ai/api/v1/chat/completions", json=body, headers=headers, timeout=30.0)
+            # Subimos el timeout a 40s porque leer documentos tarda un poco más
+            response = await client.post("https://openrouter.ai/api/v1/chat/completions", json=body, headers=headers, timeout=40.0)
             
             if response.status_code == 200:
                 resp_json = response.json()
                 ai_response_text = resp_json["choices"][0]["message"]["content"]
             else:
-                print(f"❌ OpenRouter rechazó la petición. Status: {response.status_code}")
+                print(f"❌ OpenRouter rechazó la petición: {response.text}")
                 
     except Exception as e:
         print(f"❌ Error conectando al LLM: {e}")
@@ -532,12 +549,12 @@ async def send_onboarding_message(
     db.refresh(ai_msg)
 
     # =========================================================================
-    # ✨ WOW EFFECT: DISPARAR EL SCRAPER SI EL USUARIO MANDA UNA WEB
+    # ✨ WOW EFFECT: DISPARAR EL SCRAPER
     # =========================================================================
-    urls = re.findall(r'(https?://[^\s]+)', payload.message)
+    # 🚀 CORRECCIÓN DEL BUG: Usamos `message` en lugar de `payload.message`
+    urls = re.findall(r'(https?://[^\s]+)', message)
     if urls:
         first_url = urls[0]
-        # El scraping correrá por detrás en segundo plano sin congelar el endpoint
         background_tasks.add_task(scrape_and_enrich_profile, current_user.company_id, first_url)
 
     return ai_msg
