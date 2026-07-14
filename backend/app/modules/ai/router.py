@@ -44,11 +44,11 @@ def get_ai_config(db: Session = Depends(get_db), current_user: User = Depends(Ro
     return config
 
 @router.put("/config")
-def update_ai_config(payload: AIConfigSchema, db: Session = Depends(get_db), current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN, UserRole.ADMIN]))):
-    """Actualiza la configuración maestra de inteligencia."""
-    config = db.query(AIConfiguration).filter(AIConfiguration.company_id == current_user.company_id).first()
+def update_ai_config(payload: AIConfigSchema, db: Session = Depends(get_db), current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN]))):
+    config = db.query(AIConfiguration).first()
     if not config:
-        raise HTTPException(status_code=404, detail="Configuración no encontrada")
+        config = AIConfiguration()
+        db.add(config)
         
     config.openrouter_api_key = payload.openrouter_api_key
     config.available_models = payload.available_models
@@ -56,6 +56,13 @@ def update_ai_config(payload: AIConfigSchema, db: Session = Depends(get_db), cur
     config.agent_onboarding_proyectos = payload.agent_onboarding_proyectos.model_dump()
     config.agent_ventas = payload.agent_ventas.model_dump()
     config.agent_reporteria = payload.agent_reporteria.model_dump()
+    
+    # 🚀 MAGIA: Obligamos a PostgreSQL a sobreescribir los JSON anidados
+    flag_modified(config, "available_models")
+    flag_modified(config, "agent_onboarding_empresa")
+    flag_modified(config, "agent_onboarding_proyectos")
+    flag_modified(config, "agent_ventas")
+    flag_modified(config, "agent_reporteria")
     
     db.commit()
     return {"message": "Configuración Multi-Agente actualizada con éxito."}
