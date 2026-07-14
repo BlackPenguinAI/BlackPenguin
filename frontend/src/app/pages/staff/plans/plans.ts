@@ -1,4 +1,4 @@
-import { Component, OnInit, isDevMode, ChangeDetectorRef } from '@angular/core'; // 🚀 Importado ChangeDetectorRef
+import { Component, OnInit, isDevMode, ChangeDetectorRef } from '@angular/core'; 
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
@@ -40,13 +40,14 @@ export class StaffPlansComponent implements OnInit {
     private http: HttpClient,
     private translate: TranslateService,
     private toast: ToastService,
-    private cdr: ChangeDetectorRef // 🚀 Inyectamos el control de renderizado
+    private cdr: ChangeDetectorRef
   ) {}
 
+  // 🚀 CORRECCIÓN: Quitamos la barra final '/'
   private get apiUrl() {
     return isDevMode() 
-      ? 'http://localhost:8000/api/v1/tenants/plans/' 
-      : 'https://blackpenguin.ai/api/v1/tenants/plans/';
+      ? 'http://localhost:8000/api/v1/tenants/plans' 
+      : 'https://blackpenguin.ai/api/v1/tenants/plans';
   }
 
   private get headers() {
@@ -60,18 +61,18 @@ export class StaffPlansComponent implements OnInit {
 
   loadPlans() {
     this.isLoading = true;
-    this.cdr.detectChanges(); // 🚀 Mostramos el spinner
+    this.cdr.detectChanges(); 
 
     this.http.get<any[]>(this.apiUrl, { headers: this.headers }).subscribe({
       next: (data) => {
         this.plans = data;
         this.isLoading = false;
-        this.cdr.detectChanges(); // 🚀 Mostramos los planes al instante
+        this.cdr.detectChanges(); 
       },
       error: (err) => {
         console.error('Error loading plans:', err);
         this.isLoading = false;
-        this.cdr.detectChanges(); // 🚀 Ocultamos el spinner si falla
+        this.cdr.detectChanges(); 
       }
     });
   }
@@ -96,21 +97,22 @@ export class StaffPlansComponent implements OnInit {
       };
     }
     this.showModal = true;
-    this.cdr.detectChanges(); // 🚀 Abrimos el modal instantáneamente
+    this.cdr.detectChanges(); 
   }
 
   closeModal() {
     this.showModal = false;
     this.currentPlanId = null;
-    this.cdr.detectChanges(); // 🚀 Cerramos el modal instantáneamente
+    this.cdr.detectChanges(); 
   }
 
   savePlan() {
     this.isSaving = true;
-    this.cdr.detectChanges(); // 🚀 Mostramos el estado "Guardando..." en el botón
+    this.cdr.detectChanges(); 
 
     if (this.isEditing && this.currentPlanId) {
-      this.http.put(`${this.apiUrl}${this.currentPlanId}`, this.form, { headers: this.headers }).subscribe({
+      // 🚀 CORRECCIÓN: Añadimos la barra explícitamente en la URL de edición
+      this.http.put(`${this.apiUrl}/${this.currentPlanId}`, this.form, { headers: this.headers }).subscribe({
         next: () => {
           this.isSaving = false;
           this.closeModal();
@@ -119,8 +121,8 @@ export class StaffPlansComponent implements OnInit {
         },
         error: (err) => {
           this.isSaving = false;
-          this.cdr.detectChanges(); // 🚀 Restauramos el botón si hubo error
-          this.toast.showError(err.error?.detail || 'Error al actualizar el plan.'); // 🚀 Reemplazamos alert() por Toast
+          this.cdr.detectChanges(); 
+          this.toast.showError(err.error?.detail || 'Error al actualizar el plan.'); 
         }
       });
     } else {
@@ -133,8 +135,8 @@ export class StaffPlansComponent implements OnInit {
         },
         error: (err) => {
           this.isSaving = false;
-          this.cdr.detectChanges(); // 🚀 Restauramos el botón si hubo error
-          this.toast.showError(err.error?.detail || 'Error al crear el plan.'); // 🚀 Reemplazamos alert() por Toast
+          this.cdr.detectChanges(); 
+          this.toast.showError(err.error?.detail || 'Error al crear el plan.'); 
         }
       });
     }
@@ -143,21 +145,22 @@ export class StaffPlansComponent implements OnInit {
   openDeleteModal(id: string) {
     this.planToDelete = id;
     this.showDeleteModal = true;
-    this.cdr.detectChanges(); // 🚀 Mostramos modal de alerta al instante
+    this.cdr.detectChanges(); 
   }
 
   closeDeleteModal() {
     this.showDeleteModal = false;
     this.planToDelete = null;
-    this.cdr.detectChanges(); // 🚀 Ocultamos modal de alerta al instante
+    this.cdr.detectChanges(); 
   }
 
   confirmDelete() {
     if (!this.planToDelete) return;
     this.isDeleting = true;
-    this.cdr.detectChanges(); // 🚀 Mostramos el spinner en el botón de borrar
+    this.cdr.detectChanges(); 
 
-    this.http.delete(`${this.apiUrl}${this.planToDelete}`, { headers: this.headers }).subscribe({
+    // 🚀 CORRECCIÓN: Añadimos la barra explícitamente en la URL de borrado
+    this.http.delete(`${this.apiUrl}/${this.planToDelete}`, { headers: this.headers }).subscribe({
       next: () => {
         this.isDeleting = false;
         this.closeDeleteModal();
