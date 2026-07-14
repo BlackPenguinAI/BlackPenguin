@@ -76,8 +76,8 @@ def init_db():
         print("📧 Sembrando credenciales SMTP...")
         smtp_config.smtp_host = "smtp.gmail.com"
         smtp_config.smtp_port = 587
-        smtp_config.smtp_user = "info@blackpenguin.ai"
-        smtp_config.smtp_password = "mimbak-venwat-9hobpY"
+        smtp_config.smtp_user = "jorgektch@gmail.com"
+        smtp_config.smtp_password = "yfox wzxs qmbe zqss"
         smtp_config.smtp_security = "TLS"
         smtp_config.sender_email = "info@blackpenguin.ai"
         
