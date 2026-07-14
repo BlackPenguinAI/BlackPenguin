@@ -10,6 +10,7 @@ from app.modules.auth.models import User, UserRole
 # 🚀 IMPORTAMOS DESDE TUS MÓDULOS CORRECTOS
 from app.modules.ai.models import AIConfiguration 
 from app.modules.system.models import SmtpConfig
+from app.modules.tenants.models import SubscriptionPlan # 🚀 NUEVO: Modelo de Planes
 
 def init_db():
     print("🔄 Verificando tablas en la base de datos...")
@@ -41,7 +42,6 @@ def init_db():
         # 🧠 2. SEMBRAR AI KEYS & AI CONFIG (Agent Onboarding)
         # =======================================================
         print("🤖 Sembrando Inteligencia Artificial (Prompts & Keys)...")
-        # Usamos tu modelo AIConfiguration (Buscamos el global donde company_id es nulo o el primero)
         ai_config = db.query(AIConfiguration).first()
         if not ai_config:
             ai_config = AIConfiguration()
@@ -59,7 +59,6 @@ def init_db():
             "guardrails_prompt": """1. NO DATA HALLUCINATION: If a field is missing, ask for it. Never invent company history, financial figures, or brand guidelines.\n2. CONCISENESS: Real estate executives are busy. Keep your responses under 150 words unless summarizing large data dumps. Use bullet points for readability.\n3. STRICT SCOPE: This agent handles ONLY the "Company" profile. If the user starts talking about a specific building, pricing, or an individual lead, politely redirect them: "I have noted that for your upcoming projects. For now, let's finish your overarching Company Profile."\n4. FILE PROCESSING AWARENESS: If the user uploads a file or shares a URL, explicitly acknowledge receipt: "I am analyzing the document you just uploaded..."\n5. PROGRESSIVE OVERLOAD AVOIDANCE: Never ask more than two questions at the same time. Gather the missing data progressively."""
         }
         
-        # 🚀 OBLIGAMOS A SQLALCHEMY A RECONOCER EL CAMBIO EN LOS JSON
         flag_modified(ai_config, "available_models")
         flag_modified(ai_config, "agent_onboarding_empresa")
         
@@ -87,6 +86,29 @@ def init_db():
 
         db.commit()
         print("✅ Credenciales SMTP cargadas con éxito.")
+
+        # =======================================================
+        # 💼 4. SEMBRAR PLAN BÁSICO DE SUSCRIPCIÓN
+        # =======================================================
+        print("💼 Sembrando Plan de Suscripción Base...")
+        existing_plan = db.query(SubscriptionPlan).filter(SubscriptionPlan.name == "Basic").first()
+        
+        if not existing_plan:
+            basic_plan = SubscriptionPlan(
+                name="Basic",
+                description="Basic Plan",
+                max_admins=5,
+                max_mkt_users=5,
+                max_sales_users=5,
+                max_projects=5,
+                max_properties_per_project=5,
+                is_active=True
+            )
+            db.add(basic_plan)
+            db.commit()
+            print("✅ Plan 'Basic' creado con éxito.")
+        else:
+            print("✅ El plan 'Basic' ya existe en la base de datos.")
 
     except Exception as e:
         print(f"❌ Error crítico durante el Data Seeding: {e}")
