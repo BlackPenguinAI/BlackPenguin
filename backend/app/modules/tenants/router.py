@@ -237,7 +237,7 @@ def create_developer(
         full_name=full_name_compiled,
         last_name_paternal=payload.admin_paternal_last_name,
         last_name_maternal=payload.admin_maternal_last_name,
-        hashed_password=get_password_hash(str(uuid.uuid4())), 
+        hashed_password=get_password_hash(payload.admin_password), # 🚀 CAMBIO: Usamos la contraseña escrita en el UI
         role=UserRole.ADMIN,
         company_id=new_company.id,
         is_active=True
@@ -275,7 +275,7 @@ def create_developer(
         """
     
     #send_email(payload.admin_email, subject, html_content)
-    background_tasks.add_task(send_email, payload.admin_email, subject, html_content)
+    # background_tasks.add_task(send_email, payload.admin_email, subject, html_content)
     return new_company
 
 @router.post("/developers/{company_id}/resend-activation", summary="Re-enviar link de recuperación/activación")

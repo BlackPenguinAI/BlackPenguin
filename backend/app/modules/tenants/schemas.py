@@ -34,12 +34,12 @@ class DeveloperCreate(BaseModel):
     plan_id: str
     duration_months: int = 12
     admin_email: EmailStr
+    admin_password: str  # 🚀 NUEVO CAMPO: Recibe la contraseña manual
     admin_first_name: str       
     admin_paternal_last_name: str 
     admin_maternal_last_name: Optional[str] = "" 
     is_active: bool = True
     language: str = "en"
-    # 🚀 NUEVO: El link que activará la magia del "Wow Effect"
     website_url: Optional[str] = None
 
 class DeveloperUpdate(BaseModel):
