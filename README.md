@@ -1,4 +1,4 @@
-# # Black Penguin - Documentación de Avances (Semanas 1 a 10)
+# # Black Penguin - Documentación de Avances (Semanas 1 a 12)
 
 Este repositorio contiene el código fuente, la arquitectura técnica y la documentación del proyecto **Black Penguin**, una plataforma SaaS Multi-tenant impulsada por Inteligencia Artificial y diseñada bajo un esquema de Monorepositorio (Frontend + Backend)
 
@@ -118,6 +118,22 @@ Este repositorio contiene el código fuente, la arquitectura técnica y la docum
   * Contenerización del frontend en Docker usando Nginx para servir la SPA.
   * Configuración dinámica de URLs de API (`isDevMode()`) para soportar entornos locales y de producción sin cambios manuales.
   * Apertura de puertos (UFW y Cloud Firewalls) para despliegue exitoso en Droplets de DigitalOcean.
+
+## Semana 11: Endpoints Públicos, Autenticación Stateless y Pipeline de Despliegue Incremental
+**Objetivo:** Orquestar los puntos de entrada públicos (SPA), implementar el flujo de autenticación segura basada en tokens y consolidar el pipeline de CI/CD del frontend para habilitar despliegues iterativos en producción.
+
+### Logros Técnicos y Arquitectónicos:
+* **Despliegue Incremental y Continuous Delivery (`https://blackpenguin.ai/`):** Refactorización del pipeline en GitHub Actions (`deploy.yml`) para aislar la construcción de la imagen Docker del frontend. Configuración del proxy inverso (Nginx) con soporte SPA (Single Page Application) y enrutamiento dinámico (`try_files`), permitiendo al **Staff de Black Penguin** validar componentes funcionales en un entorno de producción real mediante despliegues *Zero-Downtime*.
+* **Landing Page y Motor de Whitelist Nativo:** Desarrollo de los componentes estructurales de la landing page bajo arquitectura *Standalone* en Angular v17+. Se reemplazó la dependencia de servicios de terceros mediante la construcción de un motor de *Waitlist* nativo, con esquemas de validación estricta (Pydantic) en FastAPI y persistencia directa en PostgreSQL para reducir latencia y asegurar la soberanía de los datos.
+* **Autenticación Stateless y Seguridad (Auth Flow):** Implementación de un sistema de control de acceso basado en JSON Web Tokens (JWT). El backend gestiona el ciclo de vida de la sesión sin estado y protege las contraseñas mediante hashing unidireccional (Bcrypt). En el frontend, se integraron *HttpInterceptors* para la inyección automática de *Bearer tokens* en los headers y *Route Guards* para aislar y proteger las vistas privadas.
+
+## Semana 12: Arquitectura Multi-Tenant y Paneles de Control (Backoffice & Developer Dashboard)
+**Objetivo:** Construir e integrar las interfaces de administración bajo un esquema estricto de Role-Based Access Control (RBAC), aislando lógicamente los entornos del Superadmin y de los Tenants (Empresas Desarrolladoras).
+
+### Logros Técnicos y Arquitectónicos:
+* **Admin Panel del Staff (Superadmin UI):** Implementación de la capa de gestión con privilegios de nivel de sistema. Se expusieron endpoints RESTful en FastAPI para el consumo de telemetría global, gestión del ciclo de vida de suscripciones y operaciones CRUD sobre los Tenants. El frontend maneja el estado de estas tablas de datos empleando flujos reactivos, optimizando las peticiones HTTP y la renderización en el DOM.
+* **Developer Tenant Dashboard (Aislamiento de Contexto):** Despliegue del entorno operativo particionado lógicamente por `company_id`. La interfaz consume los endpoints del perfil cognitivo y renderiza dinámicamente el progreso del *onboarding*. Se integraron flujos de red asíncronos para canalizar *prompts* e inyectar el contexto de la empresa hacia la infraestructura de IA (LLMs) en tiempo real.
+* **Sincronización del Pipeline y Ajustes de Proxy:** Ambos módulos se unificaron dentro de la build principal de la SPA. Como respuesta a pruebas en vivo del Staff, se actualizaron las directivas de Nginx (`client_max_body_size`) a través del pipeline automatizado, garantizando la correcta transferencia de payloads grandes (PDFs para entrenamiento del modelo cognitivo) superando las restricciones del proxy inverso.
 
 ---
 
