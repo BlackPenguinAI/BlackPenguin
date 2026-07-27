@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../../core/services/auth';
@@ -7,7 +7,7 @@ import { ToastService } from '../../../core/services/toast';
 @Component({
   selector: 'app-profile',
   standalone: true,
-  imports: [CommonModule, FormsModule], // 🚀 Necesario para ngModel
+  imports: [CommonModule, FormsModule],
   templateUrl: './profile.html',
   styleUrls: ['./profile.scss']
 })
@@ -23,7 +23,7 @@ export class ProfileComponent implements OnInit {
     last_name_paternal: '',
     last_name_maternal: '',
     company_name: '',
-    plan_name: 'Loading...',
+    plan_name: 'No active plan',
     license_start: null,
     license_end: null
   };
@@ -36,7 +36,8 @@ export class ProfileComponent implements OnInit {
 
   constructor(
     private authService: AuthService,
-    private toastService: ToastService
+    private toastService: ToastService,
+    private cdr: ChangeDetectorRef // 🚀 Inyectamos ChangeDetectorRef para forzar el renderizado
   ) {}
 
   ngOnInit(): void {
@@ -44,14 +45,17 @@ export class ProfileComponent implements OnInit {
   }
 
   loadProfile() {
+    this.isLoading = true;
     this.authService.getMyProfile().subscribe({
       next: (data) => {
         this.profileData = { ...this.profileData, ...data };
         this.isLoading = false;
+        this.cdr.detectChanges(); // 🚀 Obligamos a Angular a ocultar el spinner de inmediato
       },
-      error: () => {
+      error: (err) => {
         this.toastService.showError('Error loading profile data');
         this.isLoading = false;
+        this.cdr.detectChanges(); // 🚀 Obligamos a Angular a repintar en caso de error
       }
     });
   }
@@ -69,10 +73,12 @@ export class ProfileComponent implements OnInit {
       next: () => {
         this.toastService.showSuccess('Profile updated successfully');
         this.isSaving = false;
+        this.cdr.detectChanges();
       },
       error: (err) => {
         this.toastService.showError('Could not update profile');
         this.isSaving = false;
+        this.cdr.detectChanges();
       }
     });
   }
@@ -84,12 +90,14 @@ export class ProfileComponent implements OnInit {
     this.authService.changePassword(this.passForm).subscribe({
       next: () => {
         this.toastService.showSuccess('Password updated successfully');
-        this.passForm = { current_password: '', new_password: '' }; // Limpiar
+        this.passForm = { current_password: '', new_password: '' };
         this.isChangingPass = false;
+        this.cdr.detectChanges();
       },
       error: (err) => {
         this.toastService.showError('Incorrect current password');
         this.isChangingPass = false;
+        this.cdr.detectChanges();
       }
     });
   }

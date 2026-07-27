@@ -19,6 +19,8 @@ from app.core.security import verify_email_token
 
 from app.modules.auth.schemas import MyProfileResponse, MyProfileUpdate
 
+from sqlalchemy.orm import joinedload # 🚀 Importación necesaria para cargar la relación 'plan'
+
 router = APIRouter()
 
 # --- SCHEMAS DE PYDANTIC (Validan los datos que envía Angular) ---
@@ -96,23 +98,44 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
         "name": user.full_name
     }
 
-@router.get("/me", response_model=UserProfileResponse, summary="Obtener mi perfil")
-def get_my_profile(current_user: User = Depends(get_current_user)):
-    return current_user
+@router.get("/me", response_model=MyProfileResponse, summary="Obtener perfil del usuario y compañía")
+def get_my_profile(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    profile_data = {
+        "email": current_user.email,
+        "full_name": current_user.full_name,
+        "last_name_paternal": current_user.last_name_paternal,
+        "last_name_maternal": current_user.last_name_maternal,
+        "company_name": None,
+        "plan_name": None,
+        "license_start": None,
+        "license_end": None
+    }
+    
+    # 🚀 Eager loading de Company y SubscriptionPlan
+    if current_user.company_id:
+        company = db.query(Company).options(joinedload(Company.plan)).filter(Company.id == current_user.company_id).first()
+        if company:
+            profile_data["company_name"] = company.name
+            profile_data["license_start"] = company.license_start
+            profile_data["license_end"] = company.license_end
+            if company.plan:
+                profile_data["plan_name"] = company.plan.name
+                
+    return profile_data
 
-@router.put("/me", response_model=UserProfileResponse, summary="Actualizar mi perfil")
-def update_my_profile(
-    payload: UserProfileUpdate, 
-    db: Session = Depends(get_db), 
-    current_user: User = Depends(get_current_user)
-):
-    update_data = payload.model_dump(exclude_unset=True)
-    for key, value in update_data.items():
-        setattr(current_user, key, value)
-        
+@router.put("/me", summary="Actualizar perfil del usuario y compañía")
+def update_my_profile(payload: MyProfileUpdate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    current_user.full_name = payload.full_name
+    current_user.last_name_paternal = payload.last_name_paternal
+    current_user.last_name_maternal = payload.last_name_maternal
+    
+    if current_user.company_id and payload.company_name:
+        company = db.query(Company).filter(Company.id == current_user.company_id).first()
+        if company:
+            company.name = payload.company_name
+
     db.commit()
-    db.refresh(current_user)
-    return current_user
+    return {"message": "Perfil actualizado correctamente."}
 
 @router.put("/change-password", summary="Actualizar contraseña del usuario actual")
 def change_password(
