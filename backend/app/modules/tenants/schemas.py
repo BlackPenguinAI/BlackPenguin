@@ -111,12 +111,11 @@ class CompanyProfileBase(BaseModel):
     headquarters: Optional[str] = None
     year_established: Optional[int] = None
     
-    #executive_team: List[ExecutiveContactSchema] = []
-    executive_team: Optional[List[ExecutiveContactSchema]] = []
+    # 🚀 SOLUCIÓN: Optional en las listas para aceptar NULL de PostgreSQL
+    executive_team: Optional[List[ExecutiveContactSchema]] = None
+    asset_classes: Optional[List[str]] = None
     
-    asset_classes: List[str] = []
     core_focus_description: Optional[str] = None
-    
     market_coverage: Optional[str] = None
     target_demographics: Optional[str] = None
     
@@ -137,16 +136,16 @@ class CompanyProfileResponse(CompanyProfileBase):
     id: str
     company_id: str
     
-    is_identity_completed: bool = False
-    is_team_completed: bool = False
-    is_focus_completed: bool = False
-    is_market_completed: bool = False
-    is_strategy_completed: bool = False
-    is_value_prop_completed: bool = False
-    is_brand_completed: bool = False
-    is_profile_fully_completed: bool = False
+    # 🚀 SOLUCIÓN: Optional[bool] evita que Pydantic colapse si recibe NULL
+    is_identity_completed: Optional[bool] = False
+    is_team_completed: Optional[bool] = False
+    is_focus_completed: Optional[bool] = False
+    is_market_completed: Optional[bool] = False
+    is_strategy_completed: Optional[bool] = False
+    is_value_prop_completed: Optional[bool] = False
+    is_brand_completed: Optional[bool] = False
+    is_profile_fully_completed: Optional[bool] = False
     
-    #updated_at: datetime
     updated_at: Optional[datetime] = None
     
     model_config = ConfigDict(from_attributes=True)
