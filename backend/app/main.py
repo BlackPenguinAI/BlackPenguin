@@ -48,7 +48,7 @@ app.add_middleware(
 # =================================================================
 app.include_router(auth_router, prefix=f"{settings.API_V1_STR}/auth", tags=["1. Seguridad"])
 app.include_router(tenants_router, prefix=f"{settings.API_V1_STR}/superadmin", tags=["2. SaaS / Tenants"])
-app.include_router(properties_router, prefix=f"{settings.API_V1_STR}/projects", tags=["3. Proyectos"])
+app.include_router(properties_router, prefix=f"{settings.API_V1_STR}/properties", tags=["3. Proyectos"])
 app.include_router(sales_router, prefix=f"{settings.API_V1_STR}/leads", tags=["4. Ventas (Leads)"])
 app.include_router(ai_router, prefix=f"{settings.API_V1_STR}/conversations", tags=["5. IA & Chat"])
 app.include_router(webhooks_router, prefix=f"{settings.API_V1_STR}/webhooks", tags=["6. Integraciones"])
