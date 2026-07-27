@@ -1,59 +1,103 @@
 <div class="min-h-screen bg-black text-white font-sans p-6 md:p-12 relative overflow-hidden">
-  
   <div class="absolute top-0 right-0 w-96 h-96 bg-secondary/10 rounded-full blur-[120px] pointer-events-none z-0"></div>
 
   <div class="max-w-4xl mx-auto relative z-10">
-    
-    <div class="mb-8 border-b border-white/10 pb-6">
-      <h1 class="text-3xl font-light tracking-tight">My <span class="text-secondary font-medium">Profile</span></h1>
-      <p class="text-sm text-gray-400 mt-1">Manage your personal settings and account security.</p>
+    <div class="mb-8 border-b border-white/10 pb-6 flex justify-between items-end">
+      <div>
+        <h1 class="text-3xl font-light tracking-tight">My <span class="text-secondary font-medium">Profile</span></h1>
+        <p class="text-sm text-gray-400 mt-1">Manage your corporate identity and account security.</p>
+      </div>
     </div>
 
-    <div class="flex flex-col gap-8">
+    <div *ngIf="isLoading" class="flex justify-center py-24">
+      <div class="animate-spin h-8 w-8 border-2 border-secondary border-t-transparent rounded-full"></div>
+    </div>
+
+    <div *ngIf="!isLoading" class="flex flex-col gap-8">
       
       <div class="liquid-glass border border-white/5 p-6 md:p-8 rounded-2xl">
-        <h2 class="text-sm font-medium text-secondary uppercase tracking-widest mb-6">Identity</h2>
+        <h2 class="text-sm font-medium text-secondary uppercase tracking-widest mb-6">Company Identity</h2>
         
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
+          <div class="flex flex-col gap-1.5 md:col-span-2">
+            <label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold ml-1">Legal / Commercial Name <span class="text-secondary">*</span></label>
+            <input type="text" [(ngModel)]="profileData.company_name" class="w-full bg-surface-level-1/40 border border-white/10 focus:border-secondary rounded-xl px-4 py-3 text-sm text-white outline-none transition-colors">
+          </div>
+
           <div class="flex flex-col gap-1.5">
-            <label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold ml-1">Email Address</label>
+            <label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold ml-1">Subscription Plan</label>
             <div class="w-full bg-black/50 border border-white/5 rounded-xl px-4 py-3 text-sm text-gray-400 cursor-not-allowed flex items-center justify-between">
-              {{ userEmail || 'Loading...' }}
+              {{ profileData.plan_name || 'No active plan' }}
               <span class="material-symbols-outlined text-[16px] text-gray-600">lock</span>
             </div>
           </div>
 
           <div class="flex flex-col gap-1.5">
-            <label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold ml-1">Account Role</label>
+            <label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold ml-1">Active Duration</label>
             <div class="w-full bg-black/50 border border-white/5 rounded-xl px-4 py-3 text-sm text-gray-400 cursor-not-allowed">
-              Tenant Admin
+              <span *ngIf="profileData.license_start">{{ profileData.license_start | date:'MMM dd, yyyy' }} - {{ profileData.license_end | date:'MMM dd, yyyy' }}</span>
+              <span *ngIf="!profileData.license_start">N/A</span>
             </div>
           </div>
         </div>
       </div>
 
-      <div class="liquid-glass border border-white/5 p-6 md:p-8 rounded-2xl relative overflow-hidden">
-        <div class="absolute inset-0 bg-black/50 z-10 flex flex-col items-center justify-center backdrop-blur-sm">
-          <span class="material-symbols-outlined text-gray-400 text-3xl mb-2">construction</span>
-          <p class="text-sm text-gray-300 font-medium">Password update flow coming soon.</p>
-        </div>
+      <div class="liquid-glass border border-white/5 p-6 md:p-8 rounded-2xl">
+        <h2 class="text-sm font-medium text-secondary uppercase tracking-widest mb-6">Administrator Identity</h2>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-6">
+          <div class="flex flex-col gap-1.5">
+            <label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold ml-1">First Name <span class="text-secondary">*</span></label>
+            <input type="text" [(ngModel)]="profileData.full_name" class="w-full bg-surface-level-1/40 border border-white/10 focus:border-secondary rounded-xl px-4 py-3 text-sm text-white outline-none transition-colors">
+          </div>
 
-        <div class="opacity-30 pointer-events-none">
-          <h2 class="text-sm font-medium text-secondary uppercase tracking-widest mb-6 flex items-center justify-between">
-            Security Settings
-          </h2>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-6">
-            <div class="flex flex-col gap-1.5">
-              <label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold ml-1">Current Password</label>
-              <input type="password" placeholder="••••••••" disabled class="w-full bg-surface-level-1/40 border border-white/10 rounded-xl px-4 py-3 text-sm">
-            </div>
-            <div class="flex flex-col gap-1.5">
-              <label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold ml-1">New Password</label>
-              <input type="password" placeholder="••••••••" disabled class="w-full bg-surface-level-1/40 border border-white/10 rounded-xl px-4 py-3 text-sm">
+          <div class="flex flex-col gap-1.5">
+            <label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold ml-1">Email Address</label>
+            <div class="w-full bg-black/50 border border-white/5 rounded-xl px-4 py-3 text-sm text-gray-400 cursor-not-allowed flex items-center justify-between">
+              {{ profileData.email }}
+              <span class="material-symbols-outlined text-[16px] text-gray-600">lock</span>
             </div>
           </div>
-          <button disabled class="px-6 py-2 bg-white/10 text-white font-medium text-sm rounded-lg">Update Password</button>
+
+          <div class="flex flex-col gap-1.5">
+            <label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold ml-1">Paternal Last Name <span class="text-secondary">*</span></label>
+            <input type="text" [(ngModel)]="profileData.last_name_paternal" class="w-full bg-surface-level-1/40 border border-white/10 focus:border-secondary rounded-xl px-4 py-3 text-sm text-white outline-none transition-colors">
+          </div>
+
+          <div class="flex flex-col gap-1.5">
+            <label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold ml-1">Maternal Last Name <span class="text-secondary">*</span></label>
+            <input type="text" [(ngModel)]="profileData.last_name_maternal" class="w-full bg-surface-level-1/40 border border-white/10 focus:border-secondary rounded-xl px-4 py-3 text-sm text-white outline-none transition-colors">
+          </div>
         </div>
+
+        <div class="flex justify-end pt-4 border-t border-white/10">
+          <button (click)="saveProfile()" [disabled]="isSaving || !profileData.company_name || !profileData.full_name" class="px-8 py-2.5 bg-white text-black font-semibold text-sm rounded-xl hover:bg-secondary transition-all disabled:opacity-50 flex items-center gap-2">
+            <span *ngIf="isSaving" class="material-symbols-outlined animate-spin text-sm">sync</span>
+            Save Profile Changes
+          </button>
+        </div>
+      </div>
+
+      <div class="liquid-glass border border-white/5 p-6 md:p-8 rounded-2xl">
+        <h2 class="text-sm font-medium text-secondary uppercase tracking-widest mb-6 flex items-center justify-between">
+          Security Settings
+        </h2>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-6">
+          <div class="flex flex-col gap-1.5">
+            <label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold ml-1">Current Password</label>
+            <input type="password" [(ngModel)]="passForm.current_password" placeholder="••••••••" class="w-full bg-surface-level-1/40 border border-white/10 focus:border-secondary rounded-xl px-4 py-3 text-sm text-white outline-none transition-colors">
+          </div>
+          <div class="flex flex-col gap-1.5">
+            <label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold ml-1">New Password</label>
+            <input type="password" [(ngModel)]="passForm.new_password" placeholder="••••••••" class="w-full bg-surface-level-1/40 border border-white/10 focus:border-secondary rounded-xl px-4 py-3 text-sm text-white outline-none transition-colors">
+          </div>
+        </div>
+
+        <button (click)="updatePassword()" [disabled]="isChangingPass || !passForm.current_password || !passForm.new_password" class="px-6 py-2.5 bg-white/10 border border-white/10 text-white font-medium text-sm rounded-xl hover:bg-white/20 transition-all disabled:opacity-50 flex items-center gap-2">
+          <span *ngIf="isChangingPass" class="material-symbols-outlined animate-spin text-sm">sync</span>
+          Update Password
+        </button>
       </div>
 
     </div>

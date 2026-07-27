@@ -1,5 +1,5 @@
 import { Injectable, isDevMode } from '@angular/core'; 
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Observable, tap, catchError, throwError } from 'rxjs';
 
 @Injectable({
@@ -64,5 +64,32 @@ export class AuthService {
   private handleError(error: any) {
     console.error('Error en AuthService:', error);
     return throwError(() => new Error(error.error?.detail || 'Error en la autenticación.'));
+  }
+
+  // Helper para inyectar el token en las peticiones seguras
+  private getHeaders() {
+    const token = this.getToken();
+    return { headers: new HttpHeaders({ 'Authorization': `Bearer ${token}` }) };
+  }
+
+  // 1. Obtener Perfil Completo
+  getMyProfile(): Observable<any> {
+    return this.http.get(`${this.apiUrl}/auth/me`, this.getHeaders()).pipe(
+      catchError(this.handleError)
+    );
+  }
+
+  // 2. Actualizar Perfil
+  updateMyProfile(profileData: any): Observable<any> {
+    return this.http.put(`${this.apiUrl}/auth/me`, profileData, this.getHeaders()).pipe(
+      catchError(this.handleError)
+    );
+  }
+
+  // 3. Cambiar Contraseña
+  changePassword(passwordData: any): Observable<any> {
+    return this.http.put(`${this.apiUrl}/auth/change-password`, passwordData, this.getHeaders()).pipe(
+      catchError(this.handleError)
+    );
   }
 }

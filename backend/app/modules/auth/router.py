@@ -17,6 +17,8 @@ from app.modules.auth.deps import get_current_user
 
 from app.core.security import verify_email_token
 
+from app.modules.auth.schemas import MyProfileResponse, MyProfileUpdate
+
 router = APIRouter()
 
 # --- SCHEMAS DE PYDANTIC (Validan los datos que envía Angular) ---
@@ -150,3 +152,40 @@ def set_password(payload: SetPasswordPayload, db: Session = Depends(get_db)):
     db.commit()
     
     return {"message": "Contraseña establecida con éxito."}
+
+@router.get("/me", response_model=MyProfileResponse, summary="Obtener perfil del usuario y compañía")
+def get_my_profile(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    profile_data = {
+        "email": current_user.email,
+        "full_name": current_user.full_name,
+        "last_name_paternal": current_user.last_name_paternal,
+        "last_name_maternal": current_user.last_name_maternal,
+    }
+    
+    # Si el usuario pertenece a una compañía, extraemos sus datos
+    if current_user.company_id:
+        company = db.query(Company).filter(Company.id == current_user.company_id).first()
+        if company:
+            profile_data["company_name"] = company.name
+            profile_data["license_start"] = company.license_start
+            profile_data["license_end"] = company.license_end
+            if company.plan:
+                profile_data["plan_name"] = company.plan.name
+                
+    return profile_data
+
+@router.put("/me", summary="Actualizar perfil del usuario y compañía")
+def update_my_profile(payload: MyProfileUpdate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    # Actualizamos al usuario
+    current_user.full_name = payload.full_name
+    current_user.last_name_paternal = payload.last_name_paternal
+    current_user.last_name_maternal = payload.last_name_maternal
+    
+    # Actualizamos la compañía si existe
+    if current_user.company_id and payload.company_name:
+        company = db.query(Company).filter(Company.id == current_user.company_id).first()
+        if company:
+            company.name = payload.company_name
+
+    db.commit()
+    return {"message": "Perfil actualizado correctamente."}
