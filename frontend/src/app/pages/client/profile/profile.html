@@ -1,47 +1,61 @@
-<div class="flex-1 h-full w-full bg-[#050505] text-white overflow-y-auto p-4 md:p-8 relative">
+<div class="min-h-screen bg-black text-white font-sans p-6 md:p-12 relative overflow-hidden">
+  
+  <div class="absolute top-0 right-0 w-96 h-96 bg-secondary/10 rounded-full blur-[120px] pointer-events-none z-0"></div>
 
-  <div class="absolute top-0 left-0 w-[400px] h-[400px] bg-blue-500/10 rounded-full blur-[150px] pointer-events-none z-0"></div>
-
-  <div class="relative z-10 mb-8">
-    <h1 class="text-2xl md:text-3xl font-light tracking-tight">My <span class="font-medium text-blue-400">Profile</span></h1>
-    <p class="text-sm text-gray-400 mt-2">Manage your personal settings and account security.</p>
-  </div>
-
-  <div class="max-w-3xl relative z-10 space-y-6">
+  <div class="max-w-4xl mx-auto relative z-10">
     
-    <div class="bg-white/5 border border-white/10 rounded-2xl p-6 shadow-lg">
-      <h2 class="text-sm font-bold uppercase tracking-widest text-white mb-6 flex items-center gap-2">
-        <span class="material-symbols-outlined text-gray-400">account_circle</span>
-        Account Information
-      </h2>
-      
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div class="space-y-1">
-          <label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold">Email Address</label>
-          <div class="w-full bg-black/50 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-gray-300">
-            {{ userEmail || 'Loading...' }}
-          </div>
-        </div>
+    <div class="mb-8 border-b border-white/10 pb-6">
+      <h1 class="text-3xl font-light tracking-tight">My <span class="text-secondary font-medium">Profile</span></h1>
+      <p class="text-sm text-gray-400 mt-1">Manage your personal settings and account security.</p>
+    </div>
 
-        <div class="space-y-1">
-          <label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold">Role</label>
-          <div class="w-full bg-black/50 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-blue-400 font-medium">
-            Tenant Admin
+    <div class="flex flex-col gap-8">
+      
+      <div class="liquid-glass border border-white/5 p-6 md:p-8 rounded-2xl">
+        <h2 class="text-sm font-medium text-secondary uppercase tracking-widest mb-6">Identity</h2>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div class="flex flex-col gap-1.5">
+            <label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold ml-1">Email Address</label>
+            <div class="w-full bg-black/50 border border-white/5 rounded-xl px-4 py-3 text-sm text-gray-400 cursor-not-allowed flex items-center justify-between">
+              {{ userEmail || 'Loading...' }}
+              <span class="material-symbols-outlined text-[16px] text-gray-600">lock</span>
+            </div>
+          </div>
+
+          <div class="flex flex-col gap-1.5">
+            <label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold ml-1">Account Role</label>
+            <div class="w-full bg-black/50 border border-white/5 rounded-xl px-4 py-3 text-sm text-gray-400 cursor-not-allowed">
+              Tenant Admin
+            </div>
           </div>
         </div>
       </div>
-    </div>
 
-    <div class="bg-white/5 border border-white/10 rounded-2xl p-6 shadow-lg opacity-60">
-      <h2 class="text-sm font-bold uppercase tracking-widest text-white mb-6 flex items-center gap-2">
-        <span class="material-symbols-outlined text-gray-400">lock</span>
-        Security Settings
-      </h2>
-      <p class="text-sm text-gray-400 mb-4">Password management will be available shortly.</p>
-      <button disabled class="px-4 py-2 bg-white/10 text-gray-400 rounded-lg text-sm font-medium cursor-not-allowed">
-        Change Password
-      </button>
-    </div>
+      <div class="liquid-glass border border-white/5 p-6 md:p-8 rounded-2xl relative overflow-hidden">
+        <div class="absolute inset-0 bg-black/50 z-10 flex flex-col items-center justify-center backdrop-blur-sm">
+          <span class="material-symbols-outlined text-gray-400 text-3xl mb-2">construction</span>
+          <p class="text-sm text-gray-300 font-medium">Password update flow coming soon.</p>
+        </div>
 
+        <div class="opacity-30 pointer-events-none">
+          <h2 class="text-sm font-medium text-secondary uppercase tracking-widest mb-6 flex items-center justify-between">
+            Security Settings
+          </h2>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-6">
+            <div class="flex flex-col gap-1.5">
+              <label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold ml-1">Current Password</label>
+              <input type="password" placeholder="••••••••" disabled class="w-full bg-surface-level-1/40 border border-white/10 rounded-xl px-4 py-3 text-sm">
+            </div>
+            <div class="flex flex-col gap-1.5">
+              <label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold ml-1">New Password</label>
+              <input type="password" placeholder="••••••••" disabled class="w-full bg-surface-level-1/40 border border-white/10 rounded-xl px-4 py-3 text-sm">
+            </div>
+          </div>
+          <button disabled class="px-6 py-2 bg-white/10 text-white font-medium text-sm rounded-lg">Update Password</button>
+        </div>
+      </div>
+
+    </div>
   </div>
 </div>
