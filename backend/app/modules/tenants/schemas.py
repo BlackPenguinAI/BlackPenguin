@@ -146,7 +146,9 @@ class CompanyProfileResponse(CompanyProfileBase):
     is_brand_completed: bool = False
     is_profile_fully_completed: bool = False
     
-    updated_at: datetime
+    #updated_at: datetime
+    updated_at: Optional[datetime] = None
+    
     model_config = ConfigDict(from_attributes=True)
 
 # ==========================================
