@@ -2,7 +2,11 @@ import { Routes } from '@angular/router';
 import { LandingComponent } from './pages/landing/landing';
 import { LoginComponent } from './pages/login/login';
 import { RegisterComponent } from './pages/register/register';
-import { ChatComponent } from './pages/chat/chat'; 
+
+import { ChatComponent } from './pages/chat/chat';
+import { ClientDashboardComponent } from './pages/client/dashboard';
+import { ClientProfileComponent } from './pages/client/profile';
+
 import { StaffEmailsComponent } from './pages/staff/emails/emails';
 import { StaffAiConfigComponent } from './pages/staff/ai-config/ai-config';
 import { LayoutComponent } from './shared/layout/layout'; 
@@ -64,8 +68,16 @@ export const routes: Routes = [
       {
         path: 'app',
         children: [
-          { path: '', redirectTo: 'chat', pathMatch: 'full' },
-          { path: 'chat', component: ChatComponent }
+          // 🚀 1. REDIRECCIÓN POR DEFECTO AL INICIAR SESIÓN
+          { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
+          
+          // 🚀 2. NUEVAS RUTAS DEL OPERADOR (Tenant)
+          // Nota: Deberás importar estos componentes arriba cuando los creemos
+          { path: 'dashboard', component: ClientDashboardComponent },
+          { path: 'profile', component: ClientProfileComponent },
+          
+          // 🚀 3. EL CHAT DE ONBOARDING AHORA VIVE EN /company
+          { path: 'company', component: ChatComponent } 
         ]
       }
     ]
