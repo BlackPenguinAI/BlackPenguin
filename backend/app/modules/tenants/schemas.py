@@ -137,14 +137,14 @@ class CompanyProfileResponse(CompanyProfileBase):
     id: str
     company_id: str
     
-    is_identity_completed: bool
-    is_team_completed: bool
-    is_focus_completed: bool
-    is_market_completed: bool
-    is_strategy_completed: bool
-    is_value_prop_completed: bool
-    is_brand_completed: bool
-    is_profile_fully_completed: bool
+    is_identity_completed: bool = False
+    is_team_completed: bool = False
+    is_focus_completed: bool = False
+    is_market_completed: bool = False
+    is_strategy_completed: bool = False
+    is_value_prop_completed: bool = False
+    is_brand_completed: bool = False
+    is_profile_fully_completed: bool = False
     
     updated_at: datetime
     model_config = ConfigDict(from_attributes=True)
