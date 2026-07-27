@@ -111,7 +111,8 @@ class CompanyProfileBase(BaseModel):
     headquarters: Optional[str] = None
     year_established: Optional[int] = None
     
-    executive_team: List[ExecutiveContactSchema] = []
+    #executive_team: List[ExecutiveContactSchema] = []
+    executive_team: Optional[List[ExecutiveContactSchema]] = []
     
     asset_classes: List[str] = []
     core_focus_description: Optional[str] = None
