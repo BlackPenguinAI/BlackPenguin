@@ -99,8 +99,8 @@ class CompanyResponse(CompanyBase):
 # 🚀 NUEVOS: ESQUEMAS DEL PERFIL COGNITIVO (COMPANY PROFILE)
 # =========================================================================
 class ExecutiveContactSchema(BaseModel):
-    name: str
-    role: str
+    name: Optional[str] = "Desconocido" # 🚀 Tolerancia a IA
+    role: Optional[str] = "No especificado" # 🚀 Tolerancia a IA
     email: Optional[str] = None
 
 class CompanyProfileBase(BaseModel):
