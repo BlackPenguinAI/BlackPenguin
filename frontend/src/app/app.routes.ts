@@ -4,8 +4,8 @@ import { LoginComponent } from './pages/login/login';
 import { RegisterComponent } from './pages/register/register';
 
 import { ChatComponent } from './pages/chat/chat';
-import { ClientDashboardComponent } from './pages/client/dashboard';
-import { ClientProfileComponent } from './pages/client/profile';
+import { Dashboard } from './pages/client/dashboard/dashboard';
+import { ProfileComponent } from './pages/client/profile/profile';
 
 import { StaffEmailsComponent } from './pages/staff/emails/emails';
 import { StaffAiConfigComponent } from './pages/staff/ai-config/ai-config';
@@ -73,8 +73,8 @@ export const routes: Routes = [
           
           // 🚀 2. NUEVAS RUTAS DEL OPERADOR (Tenant)
           // Nota: Deberás importar estos componentes arriba cuando los creemos
-          { path: 'dashboard', component: ClientDashboardComponent },
-          { path: 'profile', component: ClientProfileComponent },
+          { path: 'dashboard', component: Dashboard },
+          { path: 'profile', component: ProfileComponent },
           
           // 🚀 3. EL CHAT DE ONBOARDING AHORA VIVE EN /company
           { path: 'company', component: ChatComponent } 
