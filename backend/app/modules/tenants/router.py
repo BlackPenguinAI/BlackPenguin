@@ -43,6 +43,9 @@ from datetime import timedelta
 from app.core.security import create_email_token, get_password_hash
 from app.core.email import send_email
 
+from sqlalchemy import func
+from app.modules.properties.models import Project
+
 router = APIRouter()
 
 # =========================================================
@@ -611,3 +614,29 @@ def get_chat_history(db: Session = Depends(get_db), current_user: User = Depends
         })
 
     return formatted_history
+
+@router.get("/dashboard-stats", summary="Métricas principales del Dashboard del Tenant")
+def get_tenant_dashboard_stats(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if not current_user.company_id:
+        return {"projects_count": 0, "leads_count": 0, "ai_interactions_count": 0}
+
+    # 1. Contar Proyectos Reales de esta compañía
+    projects_count = db.query(func.count(Project.id)).filter(Project.company_id == current_user.company_id).scalar()
+
+    # 2. Contar Interacciones de IA (Mensajes de la IA en la sesión de la compañía)
+    ai_interactions = 0
+    session = db.query(OnboardingSession).filter(OnboardingSession.company_id == current_user.company_id).first()
+    if session:
+        ai_interactions = db.query(func.count(OnboardingMessage.id)).filter(
+            OnboardingMessage.session_id == session.id,
+            OnboardingMessage.sender == SenderType.AI
+        ).scalar()
+
+    # 3. Leads (Dejamos el contador listo en 0 hasta que conectemos Meta Ads)
+    leads_count = 0
+
+    return {
+        "projects_count": projects_count or 0,
+        "leads_count": leads_count,
+        "ai_interactions_count": ai_interactions or 0
+    }
