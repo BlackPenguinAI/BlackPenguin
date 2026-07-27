@@ -26,6 +26,9 @@ import { TermsConditionsComponent } from './pages/legal/terms-conditions/terms-c
 
 import { LegalEditorComponent } from './pages/admin/legal-editor/legal-editor';
 
+import { ProjectListComponent } from './pages/client/projects/project-list/project-list';
+import { ProjectChatComponent } from './pages/client/projects/project-chat/project-chat';
+
 export const routes: Routes = [
   // 🌍 ZONAS LIBRES 
   { path: '', component: LandingComponent },
@@ -77,7 +80,11 @@ export const routes: Routes = [
           { path: 'profile', component: ProfileComponent },
           
           // 🚀 3. EL CHAT DE ONBOARDING AHORA VIVE EN /company
-          { path: 'company', component: ChatComponent } 
+          { path: 'company', component: ChatComponent },
+
+          // 🚀 NUEVAS RUTAS DE PROYECTOS
+          { path: 'projects', component: ProjectListComponent },
+          { path: 'projects/:id/onboarding', component: ProjectChatComponent }
         ]
       }
     ]
