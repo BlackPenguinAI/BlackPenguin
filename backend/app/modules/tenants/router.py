@@ -393,8 +393,8 @@ def update_company_profile(payload: CompanyProfileUpdate, db: Session = Depends(
         setattr(profile, key, value)
 
     profile.is_identity_completed = bool(profile.legal_name and profile.headquarters)
-    profile.is_team_completed = bool(len(profile.executive_team) > 0)
-    profile.is_focus_completed = bool(len(profile.asset_classes) > 0)
+    profile.is_team_completed = bool(profile.executive_team and len(profile.executive_team) > 0)
+    profile.is_focus_completed = bool(profile.asset_classes and len(profile.asset_classes) > 0)
     profile.is_market_completed = bool(profile.market_coverage)
     profile.is_strategy_completed = bool(profile.investment_strategy)
     profile.is_value_prop_completed = bool(profile.value_proposition)
