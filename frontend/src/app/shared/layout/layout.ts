@@ -20,15 +20,16 @@ export class LayoutComponent implements OnInit {
     private router: Router, 
     private authService: AuthService,
     private translate: TranslateService,
-    private cdr: ChangeDetectorRef // 🚀 Obligará al cascarón a repintar el Outlet
+    private cdr: ChangeDetectorRef
   ) {
     this.currentLang = localStorage.getItem('bp_lang') || 'en';
     this.translate.use(this.currentLang);
 
-    // 🚀 Cada vez que la URL cambie, obligamos a la pantalla a actualizarse
+    // Escuchamos los cambios de ruta para refrescar el rol del usuario dinámicamente
     this.router.events.pipe(
       filter(event => event instanceof NavigationEnd)
     ).subscribe(() => {
+      this.userRole = localStorage.getItem('bp_role') || '';
       this.cdr.detectChanges();
     });
   }
@@ -41,7 +42,6 @@ export class LayoutComponent implements OnInit {
     this.translate.use(lang);
     this.currentLang = lang;
     localStorage.setItem('bp_lang', lang);
-    this.cdr.detectChanges();
   }
 
   logout() {
