@@ -4,53 +4,73 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.middleware import MultiTenantMiddleware
 
-# Importamos la conexión de Mongo
-from app.db.mongo import connect_to_mongo, close_mongo_connection
-
-# Importamos los Módulos de Dominio (Routers)
+# =================================================================
+# 🚀 IMPORTACIÓN DE MICRO-MÓDULOS PLANOS (DDD - 100% POSTGRESQL)
+# =================================================================
 from app.modules.auth.router import router as auth_router
-from app.modules.tenants.router import router as tenants_router
-from app.modules.properties.router import router as properties_router
-from app.modules.sales.router import router as sales_router
-from app.modules.ai.router import router as ai_router
-from app.modules.integrations.webhooks import router as webhooks_router
-from app.modules.tenants.router import router as tenants_router
-from app.modules.system.router import router as system_router
+from app.modules.waitlist.router import router as waitlist_router
+from app.modules.subscriptions.router import router as subscriptions_router
+from app.modules.companies.router import router as companies_router
+from app.modules.users.router import router as users_router
+from app.modules.system_settings.router import router as system_settings_router
+from app.modules.ai_core.router import router as ai_core_router
+from app.modules.company_onboarding.router import router as company_onboarding_router
+from app.modules.projects.router import router as projects_router
+from app.modules.brokers.router import router as brokers_router
+from app.modules.sales_crm.router import router as sales_crm_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await connect_to_mongo()
     yield
-    await close_mongo_connection()
 
 app = FastAPI(
     title=settings.PROJECT_NAME, 
     version=settings.VERSION,
-    description="SaaS Core Backend modular con arquitectura DDD.",
+    description="Black Penguin Core API v2 - DDD Flat Architecture.",
     lifespan=lifespan 
 )
 
-# 🚀 CONFIGURACIÓN DE CORS (Actualizada para Producción Segura)
+# 🚀 CONFIGURACIÓN DE CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:4200",         # Para tu desarrollo local
-        "https://blackpenguin.ai",       # Dominio principal
-        "https://www.blackpenguin.ai"    # Dominio con www
+        "http://localhost:4200",         
+        "https://blackpenguin.ai",       
+        "https://www.blackpenguin.ai"    
     ], 
     allow_credentials=True,
     allow_methods=["*"], 
     allow_headers=["*"], 
 )
 
+# 🚀 MIDDLEWARE MULTI-TENANT
+app.add_middleware(MultiTenantMiddleware)
+
 # =================================================================
-# REGISTRO DE RUTAS POR DOMINIO
+# REGISTRO DE RUTAS POR MICRO-MÓDULO
 # =================================================================
-app.include_router(auth_router, prefix=f"{settings.API_V1_STR}/auth", tags=["1. Seguridad"])
-app.include_router(tenants_router, prefix=f"{settings.API_V1_STR}/superadmin", tags=["2. SaaS / Tenants"])
-app.include_router(properties_router, prefix=f"{settings.API_V1_STR}/properties", tags=["3. Proyectos"])
-app.include_router(sales_router, prefix=f"{settings.API_V1_STR}/leads", tags=["4. Ventas (Leads)"])
-app.include_router(ai_router, prefix=f"{settings.API_V1_STR}/conversations", tags=["5. IA & Chat"])
-app.include_router(webhooks_router, prefix=f"{settings.API_V1_STR}/webhooks", tags=["6. Integraciones"])
-app.include_router(tenants_router, prefix="/api/v1/tenants", tags=["Tenants"])
-app.include_router(system_router, prefix="/api/v1/system", tags=["System & Settings"])
+
+# 1. Autenticación y Captación Pública
+app.include_router(auth_router, prefix=f"{settings.API_V1_STR}/auth", tags=["1. Autenticación"])
+app.include_router(waitlist_router, prefix=f"{settings.API_V1_STR}/waitlist", tags=["2. Waitlist"])
+
+# 2. Gestión de Suscripciones y Clientes Corporativos
+app.include_router(subscriptions_router, prefix=f"{settings.API_V1_STR}/plans", tags=["3. Suscripciones"])
+app.include_router(companies_router, prefix=f"{settings.API_V1_STR}/companies", tags=["4. Compañías"])
+app.include_router(users_router, prefix=f"{settings.API_V1_STR}/users", tags=["5. Usuarios"])
+
+# 3. Configuraciones e Infraestructura de IA
+app.include_router(system_settings_router, prefix=f"{settings.API_V1_STR}/system", tags=["6. Configuración Sistema"])
+app.include_router(ai_core_router, prefix=f"{settings.API_V1_STR}/ai", tags=["7. Motor de IA"])
+
+# 4. Onboarding y Core Inmobiliario
+app.include_router(company_onboarding_router, prefix=f"{settings.API_V1_STR}/company-onboarding", tags=["8. Onboarding Empresa"])
+app.include_router(projects_router, prefix=f"{settings.API_V1_STR}/projects", tags=["9. Proyectos Inmobiliarios"])
+app.include_router(brokers_router, prefix=f"{settings.API_V1_STR}/brokers", tags=["10. Brokers"])
+
+# 5. CRM, Agente de Ventas y Citas
+app.include_router(sales_crm_router, prefix=f"{settings.API_V1_STR}/sales", tags=["11. CRM & Ventas"])
+
+@app.get("/", tags=["Health"])
+def health_check():
+    return {"status": "ok", "message": "Black Penguin API v2 (DDD PostgreSQL) is operational."}

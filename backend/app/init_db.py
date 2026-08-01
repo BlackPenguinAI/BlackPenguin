@@ -1,16 +1,16 @@
 import os
 from sqlalchemy.orm import Session
-from app.db.base import Base  
-from app.db.postgres import engine, SessionLocal
 from sqlalchemy.orm.attributes import flag_modified # 🚀 TRUCO PARA GUARDAR JSON
 
+from app.db.base import Base
+from app.db.postgres import engine, SessionLocal
 from app.core.security import get_password_hash
-from app.modules.auth.models import User, UserRole
 
-# 🚀 IMPORTAMOS DESDE TUS MÓDULOS CORRECTOS
-from app.modules.ai.models import AIConfiguration 
-from app.modules.system.models import SmtpConfig
-from app.modules.tenants.models import SubscriptionPlan # 🚀 NUEVO: Modelo de Planes
+# 🚀 IMPORTACIONES ACTUALIZADAS (ARQUITECTURA DDD PLANAS)
+from app.modules.users.models import User, UserRole
+from app.modules.ai_core.models import AIConfiguration 
+from app.modules.system_settings.models import FirebaseConfig, TwilioConfig
+from app.modules.subscriptions.models import SubscriptionPlan
 
 def init_db():
     print("🔄 Verificando tablas en la base de datos...")
@@ -39,53 +39,83 @@ def init_db():
             print("✅ El Superadmin ya existe.")
 
         # =======================================================
-        # 🧠 2. SEMBRAR AI KEYS & AI CONFIG (Agent Onboarding)
+        # 🧠 2. SEMBRAR AI KEYS & AI CONFIG (Multi-Agente)
         # =======================================================
         print("🤖 Sembrando Inteligencia Artificial (Prompts & Keys)...")
-        ai_config = db.query(AIConfiguration).first()
+        ai_config = db.query(AIConfiguration).filter(AIConfiguration.company_id == None).first()
         if not ai_config:
             ai_config = AIConfiguration()
             db.add(ai_config)
 
-        ai_config.openrouter_api_key = "sk-or-v1-PON_TU_LLAVE_REAL_AQUI" 
-        ai_config.available_models = ["openai/gpt-4o-mini"]
+        ai_config.openrouter_api_key = os.getenv("OPENROUTER_API_KEY", "sk-or-v1-PON_TU_LLAVE_REAL_AQUI")
+        ai_config.available_models = ["openai/gpt-4o-mini", "openai/gpt-4o", "anthropic/claude-3-5-sonnet"]
 
+        # --- A. PROMPTS DE LA EMPRESA ---
         ai_config.agent_onboarding_empresa = {
             "model": "openai/gpt-4o-mini",
             "system_prompt": """You are the Elite Corporate Onboarding Specialist for Black Penguin, a premium AI SaaS for Real Estate Developers. \n\nYour mission is to extract, validate, and structure the official "Company Profile" based on the Black Penguin USA Real Estate Developer Client Record. You are conversing with a high-level executive (Admin) of a Real Estate Development firm.\n\nYour tone must be highly professional, consultative, proactive, and efficient. You do not wait for the client to do all the work; you propose, summarize, and confirm. \n\nThe essential data points you must gather to complete the onboarding are:\n1. Company Identity (Legal Name, DBA, Headquarters, Year Established).\n2. Executive Team & Key Contacts.\n3. Core Focus & Asset Classes (e.g., Multi-family, Commercial, Mixed-use).\n4. Market Coverage & Target Demographics.\n5. Investment Strategy & Portfolio Size (AUM).\n6. Value Proposition & Key Differentiators.\n7. Brand Guidelines (Tone of voice, key messaging).\n\nYou have access to a background system that parses website URLs and uploaded documents (PDFs, DOCX).""",
-            
-            "protocol_prompt": """Follow these sequential steps to ensure a frictionless "Wow Effect" onboarding:\n\nSTEP 1: PROACTIVE GREETING & SCRAPED DATA PRESENTATION\nIf the system provides you with data scraped from the client's registered website URL, start the conversation by warmly welcoming them and presenting a concise summary of what you have already learned about their company. \nExample: "Welcome to Black Penguin! I've taken the liberty of reviewing your website [URL]. Based on my analysis, I understand [Company Name] specializes in [Asset Classes] in the [Market] area. Here is a brief summary of the corporate profile I've built so far: [Summary]. Could you review this and let me know if it accurately reflects your current operations?"\n\nSTEP 2: GAP ANALYSIS & MULTI-MODAL DATA GATHERING\nCross-reference the confirmed data with the 7 essential data points from your System Role. Identify exactly what is missing. \nPolitely ask the client to provide the missing information. Suggest the easiest ways for them to do this: "To complete your corporate profile, we are missing details regarding your [Missing Field, e.g., Brand Guidelines and Executive Team]. You can simply type the answers, paste a URL to a specific page, or upload your corporate brochures/PDFs right here in the chat, and I will extract the data for you."\n\nSTEP 3: ITERATIVE CONFIRMATION & REAL-TIME UI SYNC\nEvery time the client provides new information (via text, URL, or file), immediately acknowledge it, summarize the extracted data, and explicitly state that you are saving it to their profile. This triggers the real-time UI progress bar on their screen.\n\nSTEP 4: ONBOARDING COMPLETION & HANDOFF\nOnce all 7 essential data points are collected and validated, congratulate the client. Inform them that their AI Corporate Brain is now fully synchronized with their company's identity and ready for the next phase (Project Onboarding).""",
-            
-            "guardrails_prompt": """1. NO DATA HALLUCINATION: If a field is missing, ask for it. Never invent company history, financial figures, or brand guidelines.\n2. CONCISENESS: Real estate executives are busy. Keep your responses under 150 words unless summarizing large data dumps. Use bullet points for readability.\n3. STRICT SCOPE: This agent handles ONLY the "Company" profile. If the user starts talking about a specific building, pricing, or an individual lead, politely redirect them: "I have noted that for your upcoming projects. For now, let's finish your overarching Company Profile."\n4. FILE PROCESSING AWARENESS: If the user uploads a file or shares a URL, explicitly acknowledge receipt: "I am analyzing the document you just uploaded..."\n5. PROGRESSIVE OVERLOAD AVOIDANCE: Never ask more than two questions at the same time. Gather the missing data progressively."""
+            "protocol_prompt": """Follow these sequential steps to ensure a frictionless "Wow Effect" onboarding:\n\nSTEP 1: PROACTIVE GREETING & SCRAPED DATA PRESENTATION\nIf the system provides you with data scraped from the client's registered website URL, start the conversation by warmly welcoming them and presenting a concise summary of what you have already learned about their company.\n\nSTEP 2: GAP ANALYSIS & MULTI-MODAL DATA GATHERING\nCross-reference the confirmed data with the 7 essential data points from your System Role. Identify exactly what is missing.\n\nSTEP 3: ITERATIVE CONFIRMATION & REAL-TIME UI SYNC\nEvery time the client provides new information (via text, URL, or file), immediately acknowledge it, summarize the extracted data, and explicitly state that you are saving it to their profile.\n\nSTEP 4: ONBOARDING COMPLETION & HANDOFF\nOnce all 7 essential data points are collected and validated, congratulate the client.""",
+            "guardrails_prompt": """1. NO DATA HALLUCINATION: If a field is missing, ask for it. Never invent company history, financial figures, or brand guidelines.\n2. CONCISENESS: Real estate executives are busy. Keep your responses under 150 words unless summarizing large data dumps.\n3. STRICT SCOPE: This agent handles ONLY the "Company" profile.\n4. FILE PROCESSING AWARENESS: If the user uploads a file or shares a URL, explicitly acknowledge receipt.\n5. PROGRESSIVE OVERLOAD AVOIDANCE: Never ask more than two questions at the same time."""
+        }
+
+        # --- B. PROMPTS DEL PROYECTO (3 PILARES) ---
+        ai_config.agent_onboarding_proyectos = {
+            "model": "openai/gpt-4o-mini",
+            "system_prompt": """Eres el Arquitecto de Datos Inmobiliarios IA de Black Penguin. Tu misión es extraer, procesar y estructurar meticulosamente los detalles técnicos, comerciales y de inventario de los proyectos autorizados del desarrollador. Tienes un perfil altamente analítico. Comprendes perfectamente términos como "tipologías", "amenidades", "inventario disponible", "ROI" y "etapas de entrega".""",
+            "protocol_prompt": """1. Solicita al usuario el nombre del proyecto y su ubicación geográfica exacta.
+2. Pide que el usuario proporcione (mediante texto o documentos) los detalles del proyecto.
+3. Extrae y estructura obligatoriamente tres pilares: 
+   A) Detalles Técnicos: Tipologías (m2, habitaciones, baños), amenidades y características de construcción. 
+   B) Detalles Comerciales: Precios desde, formas de pago, bonos o descuentos aplicables y fechas de entrega. 
+   C) Inventario: Unidades disponibles o fases de venta actuales.
+4. Si falta información en alguno de los 3 pilares, pregúntale al usuario proactivamente para completarla.
+5. Presenta la información extraída en formato JSON o Markdown estructurado para su validación final en el sistema.""",
+            "guardrails_prompt": """NUNCA inventes precios, amenidades, fechas de entrega ni unidades en inventario. NO asumas datos que no estén explícitamente en el texto o documento proporcionado por el usuario. Si la información proporcionada es contradictoria, detente y pide una aclaración inmediata. Tu única función es estructurar datos, no vender el proyecto."""
+        }
+
+        # --- C. PROMPTS DE VENTAS ---
+        ai_config.agent_ventas = {
+            "model": "openai/gpt-4o-mini",
+            "system_prompt": """Eres el Agente IA de Ventas Inmobiliarias de Black Penguin. Tu objetivo es calificar prospectos que llegan vía SMS y agendar reuniones con los brokers asignados al proyecto.""",
+            "protocol_prompt": """1. Saluda cordialmente al prospecto y confirma su interés en el proyecto.
+2. Califica el presupuesto, tiempo de compra y preferencia de tipología.
+3. Consulta la disponibilidad del broker y propone fecha/hora para la cita.""",
+            "guardrails_prompt": """No des información no confirmada sobre precios finales o descuentos sin validación."""
+        }
+
+        # --- D. PROMPTS DE REPORTERÍA ---
+        ai_config.agent_reporteria = {
+            "model": "openai/gpt-4o-mini",
+            "system_prompt": """Eres el Analista de Datos de Ventas IA de Black Penguin.""",
+            "protocol_prompt": """Genera resúmenes ejecutivos sobre el embudo de ventas, tasa de conversión y desempeño de inventario.""",
+            "guardrails_prompt": """Basa tus análisis únicamente en las métricas reales del sistema."""
         }
         
         flag_modified(ai_config, "available_models")
         flag_modified(ai_config, "agent_onboarding_empresa")
+        flag_modified(ai_config, "agent_onboarding_proyectos")
+        flag_modified(ai_config, "agent_ventas")
+        flag_modified(ai_config, "agent_reporteria")
         
         db.commit()
         print("✅ Configuración de IA y Prompts inyectados con éxito.")
 
         # =======================================================
-        # 📧 3. SEMBRAR CONFIGURACIÓN SMTP (Notificaciones)
+        # ⚙️ 3. SEMBRAR CONFIGURACIÓN DE SERVICIOS EXTERNOS (Firebase / Twilio)
         # =======================================================
-        smtp_config = db.query(SmtpConfig).first()
-        if not smtp_config:
-            smtp_config = SmtpConfig()
-            db.add(smtp_config)
+        firebase_config = db.query(FirebaseConfig).first()
+        if not firebase_config:
+            firebase_config = FirebaseConfig()
+            db.add(firebase_config)
+            print("⚙️ Configuración inicial de Firebase creada.")
 
-        print("📧 Sembrando credenciales SMTP...")
-        smtp_config.smtp_host = "smtp.gmail.com"
-        smtp_config.smtp_port = 587
-        smtp_config.smtp_user = "info@blackpenguin.ai"
-        smtp_config.smtp_password = "puyh jiev rugu ngnp"
-        smtp_config.smtp_security = "TLS"
-        smtp_config.sender_email = "info@blackpenguin.ai"
-        
-        if hasattr(smtp_config, 'sender_name'):
-            smtp_config.sender_name = "Black Penguin"
+        twilio_config = db.query(TwilioConfig).first()
+        if not twilio_config:
+            twilio_config = TwilioConfig()
+            db.add(twilio_config)
+            print("⚙️ Configuración inicial de Twilio creada.")
 
         db.commit()
-        print("✅ Credenciales SMTP cargadas con éxito.")
 
         # =======================================================
         # 💼 4. SEMBRAR PLAN BÁSICO DE SUSCRIPCIÓN
@@ -97,11 +127,11 @@ def init_db():
             basic_plan = SubscriptionPlan(
                 name="Basic",
                 description="Basic Plan",
-                max_admins=5,
+                max_admins=1,
                 max_mkt_users=5,
                 max_sales_users=5,
                 max_projects=5,
-                max_properties_per_project=5,
+                max_properties_per_project=50,
                 is_active=True
             )
             db.add(basic_plan)
