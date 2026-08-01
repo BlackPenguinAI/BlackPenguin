@@ -1,95 +1,185 @@
 import { Routes } from '@angular/router';
-import { LandingComponent } from './pages/landing/landing';
-import { LoginComponent } from './pages/login/login';
-import { RegisterComponent } from './pages/register/register';
-
-import { ChatComponent } from './pages/chat/chat';
-import { Dashboard } from './pages/client/dashboard/dashboard';
-import { ProfileComponent } from './pages/client/profile/profile';
-
-import { StaffEmailsComponent } from './pages/staff/emails/emails';
-import { StaffAiConfigComponent } from './pages/staff/ai-config/ai-config';
-import { LayoutComponent } from './shared/layout/layout'; 
-
-import { StaffDashboardComponent } from './pages/staff/dashboard/dashboard';
-import { StaffProfileComponent } from './pages/staff/profile/profile';
-import { StaffDevelopersComponent } from './pages/staff/developers/developers';
-
-import { StaffPlansComponent } from './pages/staff/plans/plans';
-import { SetPasswordComponent } from './pages/set-password/set-password';
-
-import { StaffAiKeysComponent } from './pages/staff/ai-keys/ai-keys'; 
-import { SmtpConfigComponent } from './pages/staff/smtp-config/smtp-config';
-
-import { PrivacyPolicyComponent } from './pages/legal/privacy-policy/privacy-policy';
-import { TermsConditionsComponent } from './pages/legal/terms-conditions/terms-conditions';
-
-import { LegalEditorComponent } from './pages/admin/legal-editor/legal-editor';
-
-import { ProjectListComponent } from './pages/client/projects/project-list/project-list';
-import { ProjectChatComponent } from './pages/client/projects/project-chat/project-chat';
 
 export const routes: Routes = [
-  // 🌍 ZONAS LIBRES 
-  { path: '', component: LandingComponent },
-  { path: 'login', component: LoginComponent },
-  { path: 'register', component: RegisterComponent },
-  { path: 'set-password', component: SetPasswordComponent },
-
-  // 📄 ZONA LEGAL (PÚBLICA)
-  {
-    path: 'legal',
-    children: [
-      { path: 'privacy', component: PrivacyPolicyComponent },
-      { path: 'terms', component: TermsConditionsComponent }
-    ]
-  },
-
-  // 🔒 ZONAS PROTEGIDAS (Envueltas en el Sidebar Layout)
+  // ==========================================
+  // 1. ZONA PÚBLICA (Landing, Auth & Legales)
+  // ==========================================
   {
     path: '',
-    component: LayoutComponent, 
+    loadComponent: () =>
+      import('./pages/landing/landing').then((m) => m.LandingComponent),
+  },
+  {
+    path: 'login',
+    loadComponent: () =>
+      import('./pages/login/login').then((m) => m.LoginComponent),
+  },
+  {
+    path: 'register',
+    loadComponent: () =>
+      import('./pages/register/register').then((m) => m.RegisterComponent),
+  },
+  {
+    path: 'set-password',
+    loadComponent: () =>
+      import('./pages/set-password/set-password').then(
+        (m) => m.SetPasswordComponent
+      ),
+  },
+  {
+    path: 'privacy-policy',
+    loadComponent: () =>
+      import('./pages/legal/privacy-policy/privacy-policy').then(
+        (m) => m.PrivacyPolicyComponent
+      ),
+  },
+  {
+    path: 'terms-conditions',
+    loadComponent: () =>
+      import('./pages/legal/terms-conditions/terms-conditions').then(
+        (m) => m.TermsConditionsComponent
+      ),
+  },
+
+  // ==========================================
+  // 2. ZONA MASTER STAFF / SUPERADMIN (DDD)
+  // ==========================================
+  {
+    path: 'admin',
+    loadComponent: () =>
+      import('./shared/layout/layout').then((m) => m.LayoutComponent),
     children: [
-      // 1. Panel de Control Black Penguin
+      { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
+
+      // 🚀 Pantallas Refactorizadas
       {
-        path: 'admin',
-        children: [
-          { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
-          { path: 'dashboard', component: StaffDashboardComponent },
-          { path: 'profile', component: StaffProfileComponent },
-          { path: 'developers', component: StaffDevelopersComponent },
-          { path: 'plans', component: StaffPlansComponent },
-          { path: 'emails', component: StaffEmailsComponent },
-          { path: 'ai-keys', component: StaffAiKeysComponent }, 
-          { path: 'ai-config', component: StaffAiConfigComponent },
-          { path: 'smtp-config', component: SmtpConfigComponent },
-          { path: 'legal-editor', component: LegalEditorComponent } 
-        ]
+        path: 'dashboard',
+        loadComponent: () =>
+          import('./features/admin-panel/dashboard/dashboard-page/dashboard-page').then(
+            (m) => m.DashboardPageComponent
+          ),
+      },
+      {
+        path: 'profile',
+        loadComponent: () =>
+          import('./features/admin-panel/profile/profile-page/profile-page').then(
+            (m) => m.ProfilePageComponent
+          ),
+      },
+      {
+        path: 'companies',
+        loadComponent: () =>
+          import('./features/admin-panel/companies/companies-page/companies-page').then(
+            (m) => m.CompaniesPageComponent
+          ),
+      },
+      {
+        path: 'plans',
+        loadComponent: () =>
+          import('./features/admin-panel/plans/plans-page/plans-page').then(
+            (m) => m.PlansPageComponent
+          ),
+      },
+      {
+        path: 'ai-infrastructure',
+        loadComponent: () =>
+          import(
+            './features/admin-panel/ai-infrastructure/ai-infra-page/ai-infra-page'
+          ).then((m) => m.AiInfraPageComponent),
+      },
+      {
+        path: 'ai-settings',
+        loadComponent: () =>
+          import('./features/admin-panel/ai-settings/ai-settings-page/ai-settings-page').then(
+            (m) => m.AiSettingsPageComponent
+          ),
       },
 
-      // 2. Panel de Clientes
+      // 🚧 Pantallas Pendientes (Auntadas temporalmente al Dashboard para no expulsarte)
       {
-        path: 'app',
-        children: [
-          // 🚀 1. REDIRECCIÓN POR DEFECTO AL INICIAR SESIÓN
-          { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
-          
-          // 🚀 2. NUEVAS RUTAS DEL OPERADOR (Tenant)
-          // Nota: Deberás importar estos componentes arriba cuando los creemos
-          { path: 'dashboard', component: Dashboard },
-          { path: 'profile', component: ProfileComponent },
-          
-          // 🚀 3. EL CHAT DE ONBOARDING AHORA VIVE EN /company
-          { path: 'company', component: ChatComponent },
+        path: 'users',
+        loadComponent: () =>
+          import('./features/admin-panel/dashboard/dashboard-page/dashboard-page').then(
+            (m) => m.DashboardPageComponent
+          ),
+      },
+      {
+        path: 'email-settings',
+        loadComponent: () =>
+          import('./features/admin-panel/dashboard/dashboard-page/dashboard-page').then(
+            (m) => m.DashboardPageComponent
+          ),
+      },
+      {
+        path: 'messaging-settings',
+        loadComponent: () =>
+          import('./features/admin-panel/dashboard/dashboard-page/dashboard-page').then(
+            (m) => m.DashboardPageComponent
+          ),
+      },
+      {
+        path: 'legal-compliance',
+        loadComponent: () =>
+          import('./features/admin-panel/dashboard/dashboard-page/dashboard-page').then(
+            (m) => m.DashboardPageComponent
+          ),
+      },
 
-          // 🚀 NUEVAS RUTAS DE PROYECTOS
-          { path: 'projects', component: ProjectListComponent },
-          { path: 'projects/:id/onboarding', component: ProjectChatComponent }
-        ]
-      }
-    ]
+      // Redirección de compatibilidad para viejas URLs
+      { path: 'developers', redirectTo: 'companies', pathMatch: 'full' },
+      { path: 'emails', redirectTo: 'dashboard', pathMatch: 'full' },
+      { path: 'ai-keys', redirectTo: 'ai-infrastructure', pathMatch: 'full' },
+      { path: 'ai-config', redirectTo: 'ai-settings', pathMatch: 'full' },
+    ],
   },
-  
-  // Rutas comodín
-  { path: '**', redirectTo: '' }
+
+  // ==========================================
+  // 3. ZONA CLIENTES / TENANTS
+  // ==========================================
+  {
+    path: 'app',
+    loadComponent: () =>
+      import('./shared/layout/layout').then((m) => m.LayoutComponent),
+    children: [
+      { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
+      {
+        path: 'dashboard',
+        loadComponent: () =>
+          import('./pages/client/dashboard/dashboard').then(
+            (m) => m.Dashboard
+          ),
+      },
+      {
+        path: 'profile',
+        loadComponent: () =>
+          import('./pages/client/profile/profile').then(
+            (m) => m.ProfileComponent
+          ),
+      },
+      {
+        path: 'company',
+        loadComponent: () =>
+          import('./pages/chat/chat').then((m) => m.ChatComponent),
+      },
+      {
+        path: 'projects',
+        loadComponent: () =>
+          import('./pages/client/projects/project-list/project-list').then(
+            (m) => m.ProjectListComponent
+          ),
+      },
+      {
+        path: 'projects/:id/onboarding',
+        loadComponent: () =>
+          import('./pages/client/projects/project-chat/project-chat').then(
+            (m) => m.ProjectChatComponent
+          ),
+      },
+    ],
+  },
+
+  // ==========================================
+  // 4. WILDCARD (Comodín)
+  // ==========================================
+  { path: '**', redirectTo: '' },
 ];
