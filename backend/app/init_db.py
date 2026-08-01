@@ -19,6 +19,14 @@ def init_db():
     db: Session = SessionLocal()
     try:
         # =======================================================
+        # 🔧 0. PARCHE REPARADOR DE COLUMNA FALTANTE
+        # =======================================================
+        print("🔧 Asegurando columnas faltantes en PostgreSQL...")
+        db.execute(text("ALTER TABLE companies ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;"))
+        db.commit()
+        print("✅ Columna 'created_at' asegurada en la tabla companies.")
+        
+        # =======================================================
         # 👑 1. SEMBRAR SUPERADMIN
         # =======================================================
         sa_email = os.getenv("FIRST_SUPERADMIN_EMAIL", "superadmin@blackpenguin.ai")
