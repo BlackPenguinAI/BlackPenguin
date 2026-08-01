@@ -124,9 +124,15 @@ class OnboardingProtocol(Base):
     version = Column(Integer, default=1, nullable=False)
     description = Column(String(255), nullable=True)
     
+    # Prompts para la Empresa (Company)
     system_role_prompt = Column(Text, nullable=False)   
     protocol_flow_prompt = Column(Text, nullable=False) 
     guardrails_prompt = Column(Text, nullable=False)    
+    
+    # 🚀 NUEVO: Prompts para Proyectos Inmobiliarios (Technical/Commercial/Inventory)
+    project_system_prompt = Column(Text, nullable=True)
+    project_protocol_prompt = Column(Text, nullable=True)
+    project_guardrails_prompt = Column(Text, nullable=True)
     
     is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
