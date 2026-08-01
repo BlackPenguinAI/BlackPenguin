@@ -1,0 +1,58 @@
+<div class="min-h-screen bg-black text-white font-sans p-6 md:p-12 relative overflow-hidden">
+  <div class="max-w-4xl mx-auto relative z-10">
+    
+    <div class="mb-8">
+      <h1 class="text-3xl font-light tracking-tight">AI <span class="text-secondary font-medium">Infrastructure</span></h1>
+      <p class="text-sm text-gray-400 mt-1">Configura las credenciales maestras y gestiona el consumo del modelo.</p>
+    </div>
+
+    <div *ngIf="isLoading" class="flex justify-center py-24">
+      <div class="animate-spin h-8 w-8 border-2 border-secondary border-t-transparent rounded-full"></div>
+    </div>
+
+    <form *ngIf="!isLoading" (ngSubmit)="saveConfig()" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      
+      <app-glass-card title="OpenRouter API Key" icon="key" class="flex flex-col gap-5">
+        <app-input type="password" [(ngModel)]="config.openrouter_api_key" name="apiKey" placeholder="sk-or-v1-..."></app-input>
+        
+        <div *ngIf="config.openrouter_api_key" class="mt-4 p-4 rounded-xl border border-white/5 bg-black/40 flex items-center justify-between">
+          <div>
+            <p class="text-xs text-gray-500 font-bold uppercase tracking-widest mb-1">Consumo Actual</p>
+            <h3 class="text-2xl font-light text-white">${{ (consumption.usage || 0) | number:'1.2-4' }}</h3>
+          </div>
+          <div class="text-right">
+            <p class="text-xs text-gray-500 font-bold uppercase tracking-widest mb-1">Límite</p>
+            <h3 class="text-sm font-medium text-gray-300">{{ consumption.limit ? '$' + consumption.limit : 'Sin límite' }}</h3>
+          </div>
+        </div>
+        <p *ngIf="consumption.error" class="text-[10px] text-red-400 mt-2 px-1">Error de lectura: {{ consumption.error }}</p>
+      </app-glass-card>
+
+      <app-glass-card title="Modelos Soportados" icon="memory" class="flex flex-col gap-4">
+        <div class="flex gap-2">
+          <app-input type="text" [(ngModel)]="newModelName" name="newModel" placeholder="Ej: openai/gpt-4o" class="flex-1"></app-input>
+          <app-button type="button" variant="secondary" (onClick)="addModel()" [disabled]="!newModelName" class="mt-[20px]">
+            Añadir
+          </app-button>
+        </div>
+
+        <div class="flex flex-col gap-2 overflow-y-auto max-h-[300px] mt-2 scrollbar-hide">
+          <div *ngFor="let model of config.available_models; let i = index" class="flex items-center justify-between bg-white/5 px-4 py-3 rounded-lg border border-white/5 group hover:border-white/20 transition-colors">
+            <span class="text-sm font-mono text-gray-300 truncate">{{ model }}</span>
+            <button type="button" (click)="removeModel(i)" class="text-gray-600 hover:text-red-400 transition-colors focus:outline-none">
+              <span class="material-symbols-outlined text-[18px]">delete</span>
+            </button>
+          </div>
+          <p *ngIf="config.available_models?.length === 0" class="text-sm text-gray-600 text-center py-6">No hay modelos registrados.</p>
+        </div>
+      </app-glass-card>
+
+      <div class="md:col-span-2 flex justify-end border-t border-white/10 pt-6 mt-4">
+        <app-button type="submit" variant="primary" [isLoading]="isSaving">
+          Guardar Infraestructura
+        </app-button>
+      </div>
+
+    </form>
+  </div>
+</div>
