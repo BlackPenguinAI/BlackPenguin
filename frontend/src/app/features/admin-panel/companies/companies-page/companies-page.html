@@ -5,12 +5,12 @@
     
     <div class="flex items-center justify-between mb-8 border-b border-white/10 pb-6">
       <div>
-        <h1 class="text-3xl font-light tracking-tight">{{ 'ADMIN.DEV_TITLE' | translate }}</h1>
-        <p class="text-sm text-gray-400 mt-1">{{ 'ADMIN.DEV_SUBTITLE' | translate }}</p>
+        <h1 class="text-3xl font-light tracking-tight">Companies Management</h1>
+        <p class="text-sm text-gray-400 mt-1">Register and monitor enterprise clients and their AI consumption.</p>
       </div>
 
       <app-button variant="primary" icon="domain_add" (onClick)="openModal()">
-        {{ 'DEV_PAGE.ADD_NEW' | translate }}
+        Add Company
       </app-button>
     </div>
 
@@ -19,17 +19,17 @@
     </div>
 
     <app-glass-card *ngIf="!isLoading" paddingClass="p-0 overflow-hidden">
-      
       <div class="overflow-x-auto">
         <table class="w-full text-left text-sm text-gray-300">
           <thead class="bg-white/5 border-b border-white/10 text-xs font-mono uppercase tracking-widest text-gray-400">
             <tr>
-              <th class="py-4 px-6">{{ 'DEV_PAGE.COL_DEV' | translate }}</th>
-              <th class="py-4 px-6">{{ 'DEV_PAGE.COL_PLAN' | translate }}</th>
-              <th class="py-4 px-6">{{ 'DEV_PAGE.COL_PERIOD' | translate }}</th>
-              <th class="py-4 px-6 text-center">{{ 'DEV_PAGE.COL_RECEIPT' | translate }}</th>
-              <th class="py-4 px-6 text-center">{{ 'DEV_PAGE.COL_STATUS' | translate }}</th>
-              <th class="py-4 px-6 text-right">{{ 'DEV_PAGE.COL_ACTIONS' | translate }}</th>
+              <th class="py-4 px-6">Company</th>
+              <th class="py-4 px-6">Subscription Plan</th>
+              <th class="py-4 px-6">License Period</th>
+              <th class="py-4 px-6 text-center">OpenRouter Usage</th>
+              <th class="py-4 px-6 text-center">Proof of Payment</th>
+              <th class="py-4 px-6 text-center">Status</th>
+              <th class="py-4 px-6 text-right">Actions</th>
             </tr>
           </thead>
 
@@ -46,7 +46,7 @@
               </td>
 
               <td class="py-4 px-6 font-mono text-xs text-secondary">
-                {{ item.plan_name || 'Standard' }}
+                {{ item.plan?.name || 'Standard' }}
               </td>
 
               <td class="py-4 px-6 text-xs text-gray-400">
@@ -56,10 +56,17 @@
               </td>
 
               <td class="py-4 px-6 text-center">
+                <div class="flex flex-col items-center font-mono text-xs">
+                  <span class="text-white font-medium">$ {{ (item.ai_cost_usd || 0) | number:'1.2-4' }}</span>
+                  <span class="text-[10px] text-gray-500">{{ (item.ai_tokens_used || 0) | number }} tokens</span>
+                </div>
+              </td>
+
+              <td class="py-4 px-6 text-center">
                 <a *ngIf="item.payment_receipt_url" [href]="item.payment_receipt_url" target="_blank" 
                    class="inline-flex items-center gap-1 text-xs text-secondary hover:underline">
                   <span class="material-symbols-outlined text-[16px]">receipt_long</span>
-                  {{ 'DEV_PAGE.VIEW_RECEIPT' | translate }}
+                  View Receipt
                 </a>
                 <span *ngIf="!item.payment_receipt_url" class="text-xs text-gray-600">—</span>
               </td>
@@ -67,23 +74,22 @@
               <td class="py-4 px-6 text-center">
                 <span [ngClass]="item.is_active ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-red-500/10 text-red-400 border-red-500/20'"
                       class="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border">
-                  {{ item.is_active ? ('ADMIN.ACTIVE' | translate) : ('ADMIN.INACTIVE' | translate) }}
+                  {{ item.is_active ? 'ACTIVE' : 'INACTIVE' }}
                 </span>
               </td>
 
               <td class="py-4 px-6 text-right">
                 <div class="flex items-center justify-end gap-2">
-                  
                   <button (click)="resendActivationToken(item.id)" [disabled]="resendingId === item.id"
                           class="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white transition-colors focus:outline-none disabled:opacity-40"
-                          [title]="'DEV_PAGE.RESEND_LINK' | translate">
+                          title="Resend Activation Link">
                     <span *ngIf="resendingId === item.id" class="material-symbols-outlined animate-spin text-[18px]">sync</span>
                     <span *ngIf="resendingId !== item.id" class="material-symbols-outlined text-[18px]">send</span>
                   </button>
 
                   <button (click)="openDeleteModal(item.id)" 
                           class="p-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-colors focus:outline-none"
-                          [title]="'ADMIN.DELETE' | translate">
+                          title="Delete Company">
                     <span class="material-symbols-outlined text-[18px]">delete</span>
                   </button>
                 </div>
@@ -91,26 +97,25 @@
             </tr>
 
             <tr *ngIf="companies.length === 0">
-              <td colspan="6" class="py-12 text-center text-gray-500 text-sm">
-                No hay empresas registradas actualmente.
+              <td colspan="7" class="py-12 text-center text-gray-500 text-sm">
+                No companies registered yet.
               </td>
             </tr>
           </tbody>
         </table>
       </div>
     </app-glass-card>
-
   </div>
 </div>
 
-<app-modal [isOpen]="showModal" [title]="'DEV_PAGE.ADD_NEW' | translate" maxWidthClass="max-w-2xl" (close)="closeModal()">
+<app-modal [isOpen]="showModal" title="Register New Company & Administrator" maxWidthClass="max-w-2xl" (close)="closeModal()">
   <form (ngSubmit)="saveCompany()" class="flex flex-col gap-4">
     
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <app-input label="Nombre de la Empresa" placeholder="Ej. Constructora Capital" [(ngModel)]="form.company_name" name="company_name"></app-input>
+      <app-input label="Company Name" placeholder="Ej. Capital Real Estate" [(ngModel)]="form.name" name="name"></app-input>
 
       <div class="flex flex-col gap-1.5 w-full">
-        <label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold ml-1">Plan de Suscripción</label>
+        <label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold ml-1">Subscription Plan</label>
         <select [(ngModel)]="form.plan_id" name="plan_id" 
                 class="w-full bg-black/50 border border-white/10 focus:border-secondary rounded-xl py-3 px-4 text-sm text-white outline-none transition-colors">
           <option *ngFor="let p of plans" [value]="p.id" class="bg-[#111] text-white">{{ p.name }}</option>
@@ -119,40 +124,61 @@
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-      <app-input label="Nombre Admin" placeholder="Juan" [(ngModel)]="form.admin_first_name" name="admin_first_name"></app-input>
-      <app-input label="Apellido Paterno" placeholder="Pérez" [(ngModel)]="form.admin_paternal_last_name" name="admin_paternal_last_name"></app-input>
-      <app-input label="Apellido Materno" placeholder="García" [(ngModel)]="form.admin_maternal_last_name" name="admin_maternal_last_name"></app-input>
+      <app-input label="Start Date" type="text" [disabled]="true" [(ngModel)]="form.start_date" name="start_date"></app-input>
+      
+      <div class="flex flex-col gap-1.5 w-full">
+        <label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold ml-1">Duration</label>
+        <select [(ngModel)]="form.duration_months" name="duration_months" 
+                class="w-full bg-black/50 border border-white/10 focus:border-secondary rounded-xl py-3 px-4 text-sm text-white outline-none transition-colors">
+          <option *ngFor="let m of [1,2,3,4,5,6,7,8,9,10,11,12]" [value]="m">{{ m }} Month{{ m > 1 ? 's' : '' }}</option>
+        </select>
+      </div>
+
+      <div class="flex flex-col gap-1.5 w-full">
+        <label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold ml-1">Calculated End Date</label>
+        <input type="text" [value]="calculatedEndDate" [disabled]="true" 
+               class="w-full bg-black/30 border border-white/10 rounded-xl py-3 px-4 text-sm text-gray-400 cursor-not-allowed">
+      </div>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <app-input label="Correo Admin" type="email" placeholder="admin@empresa.com" [(ngModel)]="form.admin_email" name="admin_email"></app-input>
-      <app-input label="Contraseña Inicial" type="password" placeholder="••••••••" [(ngModel)]="form.admin_password" name="admin_password"></app-input>
+    <div class="border-t border-white/10 pt-4 mt-2">
+      <h3 class="text-xs uppercase font-mono tracking-widest text-secondary mb-3">Company Administrator Account</h3>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <app-input label="First Name" placeholder="John" [(ngModel)]="form.admin_first_name" name="admin_first_name"></app-input>
+        <app-input label="Last Name" placeholder="Doe" [(ngModel)]="form.admin_last_name" name="admin_last_name"></app-input>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <app-input label="Admin Email" type="email" placeholder="admin@company.com" [(ngModel)]="form.admin_email" name="admin_email"></app-input>
+      <app-input label="Password" type="password" placeholder="••••••••" [(ngModel)]="form.admin_password" name="admin_password"></app-input>
+      <app-input label="Repeat Password" type="password" placeholder="••••••••" [(ngModel)]="form.admin_confirm_password" name="admin_confirm_password"></app-input>
     </div>
 
     <div class="flex flex-col gap-1.5 w-full">
-      <label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold ml-1">Comprobante de Pago (Opcional)</label>
+      <label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold ml-1">Proof of Payment (Optional)</label>
       <div class="relative w-full border border-dashed border-white/20 rounded-xl p-4 text-center hover:border-secondary transition-colors bg-black/30">
         <input type="file" (change)="onFileSelected($event)" accept="image/*,.pdf" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
         <span class="material-symbols-outlined text-secondary text-2xl">upload_file</span>
         <p class="text-xs text-gray-400 mt-1">
-          {{ selectedFile ? selectedFile.name : 'Haz clic o arrastra aquí el comprobante (PDF o Imagen)' }}
+          {{ selectedFile ? selectedFile.name : 'Click or drag receipt here (PDF, JPG, PNG)' }}
         </p>
       </div>
     </div>
 
     <div class="flex justify-end gap-3 mt-6 border-t border-white/10 pt-4">
-      <app-button variant="ghost" (onClick)="closeModal()">{{ 'ADMIN.CANCEL' | translate }}</app-button>
-      <app-button type="submit" variant="secondary" [isLoading]="isSaving">{{ 'ADMIN.SAVE' | translate }}</app-button>
+      <app-button variant="ghost" (onClick)="closeModal()">Cancel</app-button>
+      <app-button type="submit" variant="secondary" [isLoading]="isSaving">Register Company</app-button>
     </div>
 
   </form>
 </app-modal>
 
-<app-modal [isOpen]="showDeleteModal" variant="danger" [title]="'DEV_PAGE.DELETE_TITLE' | translate" (close)="closeDeleteModal()">
-  <p class="text-sm text-gray-400 mb-8 leading-relaxed">{{ 'DEV_PAGE.DELETE_DESC' | translate }}</p>
+<app-modal [isOpen]="showDeleteModal" variant="danger" title="Delete Company Workspace" (close)="closeDeleteModal()">
+  <p class="text-sm text-gray-400 mb-8 leading-relaxed">Are you sure you want to delete this company workspace? All associated projects and data will be permanently removed.</p>
   
   <div class="flex gap-3 w-full">
-    <app-button variant="ghost" class="w-1/2" (onClick)="closeDeleteModal()">{{ 'ADMIN.CANCEL' | translate }}</app-button>
-    <app-button variant="danger" class="w-1/2" [isLoading]="isDeleting" (onClick)="confirmDelete()">{{ 'ADMIN.DELETE' | translate }}</app-button>
+    <app-button variant="ghost" [fullWidth]="true" (onClick)="closeDeleteModal()">Cancel</app-button>
+    <app-button variant="danger" [fullWidth]="true" [isLoading]="isDeleting" (onClick)="confirmDelete()">Delete</app-button>
   </div>
 </app-modal>

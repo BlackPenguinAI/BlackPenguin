@@ -3,10 +3,9 @@ import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 
-import { CompanyService } from './../services/company';
+import { CompanyService } from '../services/company';
 import { ToastService } from '../../../../core/services/toast';
 
-// 🚀 IMPORTAMOS LOS COMPONENTES ATÓMICOS
 import { GlassCardComponent } from '../../../../shared/ui/glass-card/glass-card';
 import { InputComponent } from '../../../../shared/ui/input/input';
 import { ButtonComponent } from '../../../../shared/ui/button/button';
@@ -42,14 +41,16 @@ export class CompaniesPageComponent implements OnInit {
   selectedFile: File | null = null;
 
   form: any = {
-    company_name: '',
+    name: '',
     plan_id: '',
+    start_date: new Date().toISOString().split('T')[0],
     duration_months: 12,
+    admin_first_name: '',
+    admin_last_name: '',
     admin_email: '',
     admin_password: '',
-    admin_first_name: '',
-    admin_paternal_last_name: '',
-    admin_maternal_last_name: ''
+    admin_confirm_password: '',
+    is_active: true
   };
 
   constructor(
@@ -75,30 +76,39 @@ export class CompaniesPageComponent implements OnInit {
             this.cdr.detectChanges();
           },
           error: (err) => {
-            this.toast.showError(err.error?.detail || 'Error al cargar empresas.');
+            this.toast.showError(err.error?.detail || 'Error loading companies.');
             this.isLoading = false;
             this.cdr.detectChanges();
           }
         });
       },
       error: (err) => {
-        this.toast.showError(err.error?.detail || 'Error al cargar planes.');
+        this.toast.showError(err.error?.detail || 'Error loading subscription plans.');
         this.isLoading = false;
         this.cdr.detectChanges();
       }
     });
   }
 
+  get calculatedEndDate(): string {
+    if (!this.form.start_date || !this.form.duration_months) return '';
+    const start = new Date(this.form.start_date);
+    start.setMonth(start.getMonth() + Number(this.form.duration_months));
+    return start.toISOString().split('T')[0];
+  }
+
   openModal(): void {
     this.form = {
-      company_name: '',
+      name: '',
       plan_id: this.plans.length > 0 ? this.plans[0].id : '',
+      start_date: new Date().toISOString().split('T')[0],
       duration_months: 12,
+      admin_first_name: '',
+      admin_last_name: '',
       admin_email: '',
       admin_password: '',
-      admin_first_name: '',
-      admin_paternal_last_name: '',
-      admin_maternal_last_name: ''
+      admin_confirm_password: '',
+      is_active: true
     };
     this.selectedFile = null;
     this.showModal = true;
@@ -118,8 +128,13 @@ export class CompaniesPageComponent implements OnInit {
   }
 
   saveCompany(): void {
-    if (!this.form.company_name || !this.form.admin_email || !this.form.admin_password || !this.form.plan_id) {
-      this.toast.showError('Por favor completa todos los campos requeridos.');
+    if (!this.form.name || !this.form.admin_email || !this.form.admin_password || !this.form.plan_id) {
+      this.toast.showError('Please complete all required fields.');
+      return;
+    }
+
+    if (this.form.admin_password !== this.form.admin_confirm_password) {
+      this.toast.showError('Passwords do not match.');
       return;
     }
 
@@ -127,12 +142,16 @@ export class CompaniesPageComponent implements OnInit {
     this.cdr.detectChanges();
 
     const formData = new FormData();
-    Object.keys(this.form).forEach(key => {
-      formData.append(key, this.form[key]);
-    });
+    formData.append('name', this.form.name);
+    formData.append('plan_id', this.form.plan_id);
+    formData.append('duration_months', this.form.duration_months);
+    formData.append('admin_first_name', this.form.admin_first_name);
+    formData.append('admin_last_name', this.form.admin_last_name);
+    formData.append('admin_email', this.form.admin_email);
+    formData.append('admin_password', this.form.admin_password);
 
     if (this.selectedFile) {
-      formData.append('payment_receipt', this.selectedFile);
+      formData.append('receipt_file', this.selectedFile);
     }
 
     this.companyService.createCompany(formData).subscribe({
@@ -140,12 +159,12 @@ export class CompaniesPageComponent implements OnInit {
         this.isSaving = false;
         this.closeModal();
         this.loadData();
-        this.toast.showSuccess(this.translate.instant('DEV_PAGE.MSG_CREATE_SUCCESS') || 'Empresa registrada con éxito.');
+        this.toast.showSuccess('Company registered successfully.');
       },
       error: (err) => {
         this.isSaving = false;
         this.cdr.detectChanges();
-        this.toast.showError(err.error?.detail || 'Error al registrar la empresa.');
+        this.toast.showError(err.error?.detail || 'Error registering the company.');
       }
     });
   }
@@ -158,12 +177,12 @@ export class CompaniesPageComponent implements OnInit {
       next: () => {
         this.resendingId = null;
         this.cdr.detectChanges();
-        this.toast.showSuccess(this.translate.instant('DEV_PAGE.MSG_RESEND_SUCCESS') || 'Enlace de activación enviado.');
+        this.toast.showSuccess('Activation link sent successfully.');
       },
       error: (err) => {
         this.resendingId = null;
         this.cdr.detectChanges();
-        this.toast.showError(err.error?.detail || 'Error al reenviar la activación.');
+        this.toast.showError(err.error?.detail || 'Error sending activation link.');
       }
     });
   }
@@ -190,12 +209,12 @@ export class CompaniesPageComponent implements OnInit {
         this.isDeleting = false;
         this.closeDeleteModal();
         this.loadData();
-        this.toast.showSuccess(this.translate.instant('DEV_PAGE.MSG_DELETE_SUCCESS') || 'Empresa eliminada exitosamente.');
+        this.toast.showSuccess('Company removed successfully.');
       },
       error: (err) => {
         this.isDeleting = false;
         this.closeDeleteModal();
-        this.toast.showError(err.error?.detail || 'Error al eliminar la empresa.');
+        this.toast.showError(err.error?.detail || 'Error deleting company.');
       }
     });
   }
