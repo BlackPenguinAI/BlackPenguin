@@ -124,7 +124,12 @@
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-      <app-input label="Start Date" type="text" [(ngModel)]="form.start_date" name="start_date"></app-input>
+      
+      <div class="flex flex-col gap-1.5 w-full">
+        <label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold ml-1">Start Date</label>
+        <input type="date" [(ngModel)]="form.start_date" name="start_date"
+               class="w-full bg-black/50 border border-white/10 focus:border-secondary rounded-xl py-3 px-4 text-sm text-white outline-none transition-colors color-scheme-dark">
+      </div>
       
       <div class="flex flex-col gap-1.5 w-full">
         <label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold ml-1">Duration</label>

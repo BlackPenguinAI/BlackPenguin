@@ -43,7 +43,7 @@ export class CompaniesPageComponent implements OnInit {
   form: any = {
     name: '',
     plan_id: '',
-    start_date: new Date().toISOString().split('T')[0],
+    start_date: new Date().toISOString().split('T')[0], // 🚀 Fecha de hoy por defecto
     duration_months: 12,
     admin_first_name: '',
     admin_last_name: '',
@@ -90,9 +90,11 @@ export class CompaniesPageComponent implements OnInit {
     });
   }
 
+  // 🚀 Cálculo dinámico de la fecha de fin al cambiar Start Date o Duration
   get calculatedEndDate(): string {
     if (!this.form.start_date || !this.form.duration_months) return '';
     const start = new Date(this.form.start_date);
+    if (isNaN(start.getTime())) return ''; // Manejo de fecha inválida si el usuario escribe mal
     start.setMonth(start.getMonth() + Number(this.form.duration_months));
     return start.toISOString().split('T')[0];
   }
@@ -149,6 +151,11 @@ export class CompaniesPageComponent implements OnInit {
     formData.append('admin_last_name', this.form.admin_last_name);
     formData.append('admin_email', this.form.admin_email);
     formData.append('admin_password', this.form.admin_password);
+    
+    // Si tu backend necesita recibir la fecha de inicio personalizada:
+    if (this.form.start_date) {
+      formData.append('start_date', this.form.start_date);
+    }
 
     if (this.selectedFile) {
       formData.append('receipt_file', this.selectedFile);
