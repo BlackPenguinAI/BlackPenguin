@@ -1,0 +1,56 @@
+<div class="min-h-screen bg-black text-white font-sans p-6 md:p-12 relative overflow-hidden">
+  <div class="absolute top-0 right-0 w-96 h-96 bg-secondary/10 rounded-full blur-[120px] pointer-events-none"></div>
+
+  <div class="max-w-4xl mx-auto relative z-10">
+    <div class="mb-8 border-b border-white/10 pb-6">
+      <h1 class="text-3xl font-light tracking-tight">My <span class="text-secondary font-medium">Profile</span></h1>
+      <p class="text-sm text-gray-400 mt-1">Manage your administrative credentials and security settings.</p>
+    </div>
+
+    <div *ngIf="isLoading" class="flex justify-center py-24">
+      <div class="animate-spin h-8 w-8 border-2 border-secondary border-t-transparent rounded-full"></div>
+    </div>
+
+    <div *ngIf="!isLoading" class="flex flex-col gap-8">
+      
+      <form (ngSubmit)="saveProfile()">
+        <app-glass-card title="Personal Identity" icon="badge">
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <app-input label="First & Middle Name" [(ngModel)]="user.full_name" name="full_name" placeholder="John"></app-input>
+            <app-input label="Paternal Surname" [(ngModel)]="user.last_name_paternal" name="last_name_paternal" placeholder="Doe"></app-input>
+            <app-input label="Maternal Surname" [(ngModel)]="user.last_name_maternal" name="last_name_maternal" placeholder="Smith"></app-input>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <app-input label="Email Address" type="email" [(ngModel)]="user.email" name="email" [disabled]="true"></app-input>
+            <app-input label="Phone Number" [(ngModel)]="user.phone" name="phone" placeholder="+1 555 0192"></app-input>
+            <app-input label="Country" [(ngModel)]="user.country" name="country" placeholder="United States"></app-input>
+          </div>
+
+          <div class="flex justify-end border-t border-white/10 pt-6 mt-6">
+            <app-button type="submit" variant="primary" [isLoading]="isSaving">
+              Save Profile
+            </app-button>
+          </div>
+        </app-glass-card>
+      </form>
+
+      <app-glass-card title="Security Settings" icon="lock">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+          <app-input label="Current Password" type="password" [(ngModel)]="passForm.current_password" name="currentPass" placeholder="••••••••"></app-input>
+          <app-input label="New Password" type="password" [(ngModel)]="passForm.new_password" name="newPass" placeholder="••••••••"></app-input>
+          <app-input label="Confirm New Password" type="password" [(ngModel)]="passForm.confirm_password" name="confPass" placeholder="••••••••"></app-input>
+        </div>
+
+        <div class="flex justify-end border-t border-white/10 pt-6 mt-2">
+          <app-button variant="secondary" [isLoading]="isChangingPass" 
+                      [disabled]="!passForm.current_password || !passForm.new_password || !passForm.confirm_password"
+                      (onClick)="changePassword()">
+            Update Password
+          </app-button>
+        </div>
+      </app-glass-card>
+
+    </div>
+  </div>
+</div>
