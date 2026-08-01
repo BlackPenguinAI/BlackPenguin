@@ -9,8 +9,8 @@ export class PlanService {
   
   private get apiUrl(): string {
     return isDevMode() 
-      ? 'http://localhost:8000/api/v1/plans' 
-      : 'https://blackpenguin.ai/api/v1/plans';
+      ? 'http://localhost:8000/api/v1/plans/' 
+      : 'https://blackpenguin.ai/api/v1/plans/';
   }
 
   private get headers(): HttpHeaders {

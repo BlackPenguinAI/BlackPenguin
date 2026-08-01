@@ -9,8 +9,8 @@ export class DashboardService {
   
   private get apiUrl(): string {
     return isDevMode() 
-      ? 'http://localhost:8000/api/v1/system/stats' 
-      : 'https://blackpenguin.ai/api/v1/system/stats';
+      ? 'http://localhost:8000/api/v1/system/stats/' 
+      : 'https://blackpenguin.ai/api/v1/system/stats/';
   }
 
   private get headers(): HttpHeaders {
