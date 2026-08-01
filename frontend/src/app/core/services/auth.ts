@@ -74,14 +74,14 @@ export class AuthService {
 
   // 1. Obtener Perfil Completo
   getMyProfile(): Observable<any> {
-    return this.http.get(`${this.apiUrl}/auth/me`, this.getHeaders()).pipe(
+    return this.http.get(`${this.apiUrl}/users/me`, this.getHeaders()).pipe(
       catchError(this.handleError)
     );
   }
 
   // 2. Actualizar Perfil
   updateMyProfile(profileData: any): Observable<any> {
-    return this.http.put(`${this.apiUrl}/auth/me`, profileData, this.getHeaders()).pipe(
+    return this.http.put(`${this.apiUrl}/users/me`, profileData, this.getHeaders()).pipe(
       catchError(this.handleError)
     );
   }

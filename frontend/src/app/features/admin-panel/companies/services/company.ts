@@ -28,8 +28,8 @@ export class CompanyService {
   // 2. Listar planes disponibles para el selector
   getPlans(): Observable<any[]> {
     const url = isDevMode() 
-      ? 'http://localhost:8000/api/v1/plans/' 
-      : 'https://blackpenguin.ai/api/v1/plans/';
+      ? 'http://localhost:8000/api/v1/plans' 
+      : 'https://blackpenguin.ai/api/v1/plans';
     return this.http.get<any[]>(url, { headers: this.headers });
   }
 
