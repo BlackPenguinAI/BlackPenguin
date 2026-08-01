@@ -13,7 +13,11 @@ from app.modules.system_settings.models import FirebaseConfig, TwilioConfig
 from app.modules.subscriptions.models import SubscriptionPlan
 
 def init_db():
-    print("🔄 Verificando tablas en la base de datos...")
+    print("🛑 ATENCIÓN: MODO 'CLEAN SLATE' ACTIVADO")
+    print("🗑️ Destruyendo tablas deprecadas...")
+    Base.metadata.drop_all(bind=engine)
+    
+    print("✨ Reconstruyendo base de datos desde cero...")
     Base.metadata.create_all(bind=engine)
 
     db: Session = SessionLocal()
@@ -25,7 +29,7 @@ def init_db():
         db.execute(text("ALTER TABLE companies ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;"))
         db.commit()
         print("✅ Columna 'created_at' asegurada en la tabla companies.")
-        
+
         # =======================================================
         # 👑 1. SEMBRAR SUPERADMIN
         # =======================================================
