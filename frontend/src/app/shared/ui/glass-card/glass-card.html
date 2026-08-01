@@ -1,0 +1,13 @@
+<div 
+  class="liquid-glass border border-white/5 rounded-2xl shadow-2xl"
+  [ngClass]="paddingClass">
+  
+  <div *ngIf="title" class="mb-6">
+    <h2 class="text-sm font-medium text-secondary uppercase tracking-widest flex items-center gap-2">
+      <span *ngIf="icon" class="material-symbols-outlined text-secondary text-[18px]">{{ icon }}</span> 
+      {{ title }}
+    </h2>
+  </div>
+
+  <ng-content></ng-content>
+</div>

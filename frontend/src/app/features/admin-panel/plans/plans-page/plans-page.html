@@ -1,0 +1,103 @@
+<div class="min-h-screen bg-black text-white font-sans p-6 md:p-12 relative overflow-hidden">
+  <div class="absolute top-1/4 right-0 w-96 h-96 bg-secondary/5 rounded-full blur-[120px] pointer-events-none z-0"></div>
+
+  <div class="max-w-7xl mx-auto relative z-10">
+    
+    <div class="flex items-center justify-between mb-8 border-b border-white/10 pb-6">
+      <div>
+        <h1 class="text-3xl font-light tracking-tight">{{ 'PLANS_PAGE.TITLE' | translate }}</h1>
+        <p class="text-sm text-gray-400 mt-1">{{ 'PLANS_PAGE.SUBTITLE' | translate }}</p>
+      </div>
+      <app-button variant="primary" icon="add_circle" (onClick)="openModal()">
+        {{ 'PLANS_PAGE.ADD_NEW' | translate }}
+      </app-button>
+    </div>
+
+    <div *ngIf="isLoading" class="flex justify-center py-24">
+      <div class="animate-spin h-8 w-8 border-2 border-secondary border-t-transparent rounded-full"></div>
+    </div>
+
+    <div *ngIf="!isLoading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      
+      <app-glass-card *ngFor="let plan of plans" class="flex flex-col h-full relative group">
+        <div class="absolute top-6 right-6">
+          <span [ngClass]="plan.is_active ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-red-500/10 text-red-400 border-red-500/20'"
+                class="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border">
+            {{ plan.is_active ? 'ACTIVE' : 'INACTIVE' }}
+          </span>
+        </div>
+
+        <h3 class="text-2xl font-semibold text-white mb-2">{{ plan.name }}</h3>
+        <p class="text-sm text-gray-400 mb-6 flex-1">{{ plan.description || 'No description provided.' }}</p>
+
+        <div class="space-y-3 mb-8">
+          <div class="flex justify-between items-center text-sm border-b border-white/5 pb-2">
+            <span class="text-gray-500">{{ 'PLANS_PAGE.LBL_ADMINS' | translate }}</span>
+            <span class="text-white font-mono">{{ plan.max_admins }}</span>
+          </div>
+          <div class="flex justify-between items-center text-sm border-b border-white/5 pb-2">
+            <span class="text-gray-500">{{ 'PLANS_PAGE.LBL_MKT' | translate }}</span>
+            <span class="text-white font-mono">{{ plan.max_mkt_users }}</span>
+          </div>
+          <div class="flex justify-between items-center text-sm border-b border-white/5 pb-2">
+            <span class="text-gray-500">{{ 'PLANS_PAGE.LBL_SALES' | translate }}</span>
+            <span class="text-white font-mono">{{ plan.max_sales_users }}</span>
+          </div>
+          <div class="flex justify-between items-center text-sm border-b border-white/5 pb-2">
+            <span class="text-gray-500">{{ 'PLANS_PAGE.LBL_PROJECTS' | translate }}</span>
+            <span class="text-white font-mono">{{ plan.max_projects }}</span>
+          </div>
+          <div class="flex justify-between items-center text-sm">
+            <span class="text-gray-500">{{ 'PLANS_PAGE.LBL_PROPS' | translate }}</span>
+            <span class="text-white font-mono">{{ plan.max_properties_per_project }}</span>
+          </div>
+        </div>
+
+        <app-button variant="danger" [fullWidth]="true" icon="delete" (onClick)="openDeleteModal(plan.id)">
+          {{ 'ADMIN.DELETE' | translate }}
+        </app-button>
+      </app-glass-card>
+
+    </div>
+  </div>
+</div>
+
+<app-modal [isOpen]="showModal" [title]="'PLANS_PAGE.ADD_NEW' | translate" maxWidthClass="max-w-2xl" (close)="closeModal()">
+  <form (ngSubmit)="savePlan()" class="flex flex-col gap-5">
+    
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <app-input label="Nombre del Plan" placeholder="Ej. Premium" [(ngModel)]="form.name" name="name"></app-input>
+      <app-input label="Descripción (Opcional)" placeholder="Breve detalle..." [(ngModel)]="form.description" name="description"></app-input>
+    </div>
+
+    <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+      <app-input label="Máx Admins" type="number" [(ngModel)]="form.max_admins" name="max_admins"></app-input>
+      <app-input label="Máx MKT Users" type="number" [(ngModel)]="form.max_mkt_users" name="max_mkt_users"></app-input>
+      <app-input label="Máx Sales Users" type="number" [(ngModel)]="form.max_sales_users" name="max_sales_users"></app-input>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <app-input label="Máx Proyectos" type="number" [(ngModel)]="form.max_projects" name="max_projects"></app-input>
+      <app-input label="Máx Propiedades (por proyecto)" type="number" [(ngModel)]="form.max_properties_per_project" name="max_properties_per_project"></app-input>
+    </div>
+
+    <div class="flex items-center gap-2 mt-2">
+      <input type="checkbox" [(ngModel)]="form.is_active" name="is_active" id="activeToggle" class="w-4 h-4 rounded bg-black border-white/20 text-secondary focus:ring-0">
+      <label for="activeToggle" class="text-sm text-gray-300 cursor-pointer">Plan Activo</label>
+    </div>
+
+    <div class="flex justify-end gap-3 mt-6 border-t border-white/10 pt-4">
+      <app-button variant="ghost" (onClick)="closeModal()">{{ 'ADMIN.CANCEL' | translate }}</app-button>
+      <app-button type="submit" variant="secondary" [isLoading]="isSaving">{{ 'ADMIN.SAVE' | translate }}</app-button>
+    </div>
+  </form>
+</app-modal>
+
+<app-modal [isOpen]="showDeleteModal" variant="danger" [title]="'PLANS_PAGE.DELETE_TITLE' | translate" (close)="closeDeleteModal()">
+  <p class="text-sm text-gray-400 mb-8 leading-relaxed">{{ 'PLANS_PAGE.DELETE_DESC' | translate }}</p>
+  
+  <div class="flex gap-3 w-full">
+    <app-button variant="ghost" [fullWidth]="true" (onClick)="closeDeleteModal()">{{ 'ADMIN.CANCEL' | translate }}</app-button>
+    <app-button variant="danger" [fullWidth]="true" [isLoading]="isDeleting" (onClick)="confirmDelete()">{{ 'ADMIN.DELETE' | translate }}</app-button>
+  </div>
+</app-modal>
