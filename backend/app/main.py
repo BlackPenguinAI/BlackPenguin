@@ -19,6 +19,9 @@ from app.modules.projects.router import router as projects_router
 from app.modules.brokers.router import router as brokers_router
 from app.modules.sales_crm.router import router as sales_crm_router
 
+from sqlalchemy import text
+from app.db.postgres import engine
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     yield
@@ -74,3 +77,13 @@ app.include_router(sales_crm_router, prefix=f"{settings.API_V1_STR}/sales", tags
 @app.get("/", tags=["Health"])
 def health_check():
     return {"status": "ok", "message": "Black Penguin API v2 (DDD PostgreSQL) is operational."}
+
+# Inyectamos el reparador en el evento de inicio del servidor
+@app.on_event("startup")
+def fix_database_schema():
+    with engine.begin() as conn:
+        try:
+            conn.execute(text("ALTER TABLE companies ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;"))
+            print("✅ EXCELENTE: Columna 'created_at' inyectada forzosamente en PostgreSQL")
+        except Exception as e:
+            pass
