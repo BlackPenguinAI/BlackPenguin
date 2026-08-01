@@ -1,0 +1,106 @@
+<div class="min-h-screen bg-black text-white font-sans p-6 md:p-12 relative overflow-hidden">
+  <div class="absolute top-0 left-1/4 w-96 h-96 bg-secondary/10 rounded-full blur-[120px] pointer-events-none"></div>
+
+  <div class="max-w-7xl mx-auto relative z-10">
+    
+    <div class="flex flex-col md:flex-row md:items-center justify-between mb-10 border-b border-white/10 pb-6 gap-4 animate-fade-in">
+      <div>
+        <h1 class="text-3xl font-light tracking-tight">{{ 'CHAT.GREETING' | translate }}, <span class="text-secondary font-medium">{{ adminName }}</span></h1>
+        <p class="text-sm text-gray-400 mt-1">{{ 'ADMIN.DASH_SUBTITLE' | translate }}</p>
+      </div>
+      <div class="flex flex-col items-end">
+        <span class="text-sm font-mono text-gray-300">{{ currentDate | date:'fullDate' }}</span>
+        <div class="flex items-center gap-2 mt-2 bg-white/5 border border-white/10 px-3 py-1 rounded-full">
+          <span [class.bg-green-500]="stats.system_status === 'Operational'" [class.bg-red-500]="stats.system_status !== 'Operational'" class="h-2 w-2 rounded-full shadow-[0_0_8px_rgba(34,197,94,0.6)] animate-pulse"></span>
+          <span class="text-xs text-gray-300 font-medium">{{ stats.system_status }}</span>
+        </div>
+      </div>
+    </div>
+
+    <div *ngIf="isLoading" class="flex justify-center py-24">
+      <div class="animate-spin h-8 w-8 border-2 border-secondary border-t-transparent rounded-full"></div>
+    </div>
+
+    <div *ngIf="!isLoading" class="flex flex-col gap-10">
+      
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 animate-fade-in">
+        
+        <app-glass-card paddingClass="p-6">
+          <div class="flex items-center justify-between mb-4">
+            <span class="text-gray-400 text-xs font-bold uppercase tracking-widest">{{ 'DASHBOARD_PAGE.CARD_TENANTS' | translate }}</span>
+            <span class="material-symbols-outlined text-secondary bg-secondary/10 p-2 rounded-lg">domain</span>
+          </div>
+          <div class="flex items-end gap-3">
+            <h2 class="text-4xl font-light text-white">{{ stats.total_companies }}</h2>
+            <span class="text-sm text-green-400 font-medium mb-1">{{ stats.active_companies }} Active</span>
+          </div>
+        </app-glass-card>
+
+        <app-glass-card paddingClass="p-6">
+          <div class="flex items-center justify-between mb-4">
+            <span class="text-gray-400 text-xs font-bold uppercase tracking-widest">{{ 'DASHBOARD_PAGE.CARD_WAITLIST' | translate }}</span>
+            <span class="material-symbols-outlined text-secondary bg-secondary/10 p-2 rounded-lg">hourglass_empty</span>
+          </div>
+          <h2 class="text-4xl font-light text-white">{{ stats.total_waitlist }}</h2>
+        </app-glass-card>
+
+        <app-glass-card paddingClass="p-6">
+          <div class="flex items-center justify-between mb-4">
+            <span class="text-gray-400 text-xs font-bold uppercase tracking-widest">{{ 'DASHBOARD_PAGE.CARD_USERS' | translate }}</span>
+            <span class="material-symbols-outlined text-secondary bg-secondary/10 p-2 rounded-lg">group</span>
+          </div>
+          <h2 class="text-4xl font-light text-white">{{ stats.total_users }}</h2>
+        </app-glass-card>
+
+        <app-glass-card paddingClass="p-6">
+          <div class="flex items-center justify-between mb-4">
+            <span class="text-gray-400 text-xs font-bold uppercase tracking-widest">{{ 'DASHBOARD_PAGE.CARD_PROJECTS' | translate }}</span>
+            <span class="material-symbols-outlined text-secondary bg-secondary/10 p-2 rounded-lg">real_estate_agent</span>
+          </div>
+          <h2 class="text-4xl font-light text-white">{{ stats.total_projects }}</h2>
+        </app-glass-card>
+
+      </div>
+
+      <div>
+        <h3 class="text-sm font-medium text-gray-500 uppercase tracking-widest mb-4 ml-1">{{ 'DASHBOARD_PAGE.QUICK_ACTIONS' | translate }}</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 animate-fade-in" style="animation-delay: 100ms;">
+          
+          <a routerLink="/admin/companies" class="liquid-glass border border-white/5 hover:border-secondary/50 rounded-xl p-4 flex items-center justify-between transition-all duration-300 group cursor-pointer">
+            <div class="flex items-center gap-3">
+              <span class="material-symbols-outlined text-secondary">business_center</span>
+              <span class="text-sm font-medium text-white">{{ 'DASHBOARD_PAGE.QA_DEV' | translate }}</span>
+            </div>
+            <span class="material-symbols-outlined text-gray-500 group-hover:text-secondary transition-colors">arrow_forward</span>
+          </a>
+
+          <a routerLink="/admin/waitlist" class="liquid-glass border border-white/5 hover:border-secondary/50 rounded-xl p-4 flex items-center justify-between transition-all duration-300 group cursor-pointer">
+            <div class="flex items-center gap-3">
+              <span class="material-symbols-outlined text-secondary">database</span>
+              <span class="text-sm font-medium text-white">{{ 'DASHBOARD_PAGE.QA_WAITLIST' | translate }}</span>
+            </div>
+            <span class="material-symbols-outlined text-gray-500 group-hover:text-secondary transition-colors">arrow_forward</span>
+          </a>
+
+          <a routerLink="/admin/ai-settings" class="liquid-glass border border-white/5 hover:border-secondary/50 rounded-xl p-4 flex items-center justify-between transition-all duration-300 group cursor-pointer">
+            <div class="flex items-center gap-3">
+              <span class="material-symbols-outlined text-secondary">memory</span>
+              <span class="text-sm font-medium text-white">{{ 'DASHBOARD_PAGE.QA_TUNER' | translate }}</span>
+            </div>
+            <span class="material-symbols-outlined text-gray-500 group-hover:text-secondary transition-colors">arrow_forward</span>
+          </a>
+
+          <a routerLink="/admin/plans" class="liquid-glass border border-white/5 hover:border-secondary/50 rounded-xl p-4 flex items-center justify-between transition-all duration-300 group cursor-pointer">
+            <div class="flex items-center gap-3">
+              <span class="material-symbols-outlined text-secondary">settings</span>
+              <span class="text-sm font-medium text-white">Manage Plans</span>
+            </div>
+            <span class="material-symbols-outlined text-gray-500 group-hover:text-secondary transition-colors">arrow_forward</span>
+          </a>
+
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
