@@ -22,8 +22,7 @@ def create_company_workspace(
     plan_id: str = Form(...),
     duration_months: int = Form(...),
     admin_first_name: str = Form(...),
-    admin_last_name_paternal: str = Form(...),
-    admin_last_name_maternal: str = Form(...),
+    admin_last_name: str = Form(...),
     admin_email: str = Form(...),
     admin_password: str = Form(...),
     receipt_file: Optional[UploadFile] = File(None),
@@ -55,9 +54,8 @@ def create_company_workspace(
     # 3. Crear Admin
     new_admin = User(
         email=admin_email, hashed_password=get_password_hash(admin_password),
-        full_name=admin_first_name, last_name_paternal=admin_last_name_paternal,
-        last_name_maternal=admin_last_name_maternal, role=UserRole.ADMIN,
-        company_id=new_company.id, is_active=True
+        first_name=admin_first_name, last_name=admin_last_name,
+        role=UserRole.ADMIN, company_id=new_company.id, is_active=True
     )
     db.add(new_admin)
     db.commit()

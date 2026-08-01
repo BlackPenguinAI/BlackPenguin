@@ -14,9 +14,8 @@ router = APIRouter()
 def get_my_profile(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     profile_data = {
         "email": current_user.email,
-        "full_name": current_user.full_name,
-        "last_name_paternal": current_user.last_name_paternal,
-        "last_name_maternal": current_user.last_name_maternal,
+        "first name": current_user.first_name,
+        "last_name": current_user.last_name,
     }
     if current_user.company_id:
         company = db.query(Company).options(joinedload(Company.plan)).filter(Company.id == current_user.company_id).first()
@@ -31,9 +30,8 @@ def get_my_profile(current_user: User = Depends(get_current_user), db: Session =
 
 @router.put("/me")
 def update_my_profile(payload: MyProfileUpdate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    current_user.full_name = payload.full_name
-    current_user.last_name_paternal = payload.last_name_paternal
-    current_user.last_name_maternal = payload.last_name_maternal
+    current_user.first_name = payload.first_name
+    current_user.last_name = payload.last_name
     
     if current_user.company_id and payload.company_name:
         company = db.query(Company).filter(Company.id == current_user.company_id).first()
