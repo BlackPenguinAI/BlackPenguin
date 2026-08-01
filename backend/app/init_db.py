@@ -1,24 +1,29 @@
 import os
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified 
+from sqlalchemy import text # 🚀 ASEGÚRATE DE IMPORTAR 'text'
 
 from app.db.base import Base
 from app.db.postgres import engine, SessionLocal
 from app.core.security import get_password_hash
 
-# 🚀 IMPORTACIONES DE MODELOS
+# Tus importaciones de modelos...
 from app.modules.users.models import User, UserRole
 from app.modules.ai_core.models import AIConfiguration 
 from app.modules.system_settings.models import FirebaseConfig, TwilioConfig
 from app.modules.subscriptions.models import SubscriptionPlan
-from app.modules.companies.models import Company # Asegúrate de importar esto para que lo reconozca
+from app.modules.companies.models import Company 
 
 def init_db():
     print("🛑 ATENCIÓN: MODO 'CLEAN SLATE' ACTIVADO")
-    print("🗑️ Destruyendo tablas deprecadas...")
-    Base.metadata.drop_all(bind=engine)
+    print("🗑️ Destruyendo esquema completo con CASCADE...")
     
-    print("✨ Reconstruyendo base de datos desde cero...")
+    # 🚀 LA VERDADERA OPCIÓN NUCLEAR DE POSTGRESQL
+    with engine.begin() as conn:
+        conn.execute(text("DROP SCHEMA public CASCADE;"))
+        conn.execute(text("CREATE SCHEMA public;"))
+        
+    print("✨ Reconstruyendo base de datos desde un lienzo en blanco...")
     Base.metadata.create_all(bind=engine)
 
     db: Session = SessionLocal()
