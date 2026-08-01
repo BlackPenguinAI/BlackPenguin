@@ -3,8 +3,8 @@ import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { TranslateModule } from '@ngx-translate/core';
 
-import { DashboardService } from './services/dashboard';
-import { GlassCardComponent } from '../../../shared/ui/glass-card/glass-card';
+import { DashboardService } from './../services/dashboard';
+import { GlassCardComponent } from '../../../../shared/ui/glass-card/glass-card';
 
 @Component({
   selector: 'app-admin-dashboard-page',
