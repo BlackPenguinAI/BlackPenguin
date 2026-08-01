@@ -1,16 +1,17 @@
 import os
 from sqlalchemy.orm import Session
-from sqlalchemy.orm.attributes import flag_modified # 🚀 TRUCO PARA GUARDAR JSON
+from sqlalchemy.orm.attributes import flag_modified 
 
 from app.db.base import Base
 from app.db.postgres import engine, SessionLocal
 from app.core.security import get_password_hash
 
-# 🚀 IMPORTACIONES ACTUALIZADAS (ARQUITECTURA DDD PLANAS)
+# 🚀 IMPORTACIONES DE MODELOS
 from app.modules.users.models import User, UserRole
 from app.modules.ai_core.models import AIConfiguration 
 from app.modules.system_settings.models import FirebaseConfig, TwilioConfig
 from app.modules.subscriptions.models import SubscriptionPlan
+from app.modules.companies.models import Company # Asegúrate de importar esto para que lo reconozca
 
 def init_db():
     print("🛑 ATENCIÓN: MODO 'CLEAN SLATE' ACTIVADO")
