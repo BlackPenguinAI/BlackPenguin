@@ -54,10 +54,16 @@
 
       </div>
 
-      <app-glass-card title="Recently Registered Companies" icon="history" paddingClass="p-0 overflow-hidden">
+      <app-glass-card paddingClass="p-0 overflow-hidden">
+        
+        <div class="p-6 border-b border-white/10 flex items-center gap-3 bg-white/5">
+          <span class="material-symbols-outlined text-secondary">history</span>
+          <h2 class="text-lg font-medium text-white tracking-wide">Recently Registered Companies</h2>
+        </div>
+
         <div class="overflow-x-auto">
           <table class="w-full text-left text-sm text-gray-300">
-            <thead class="bg-white/5 border-b border-white/10 text-xs font-mono uppercase tracking-widest text-gray-400">
+            <thead class="bg-black/20 border-b border-white/10 text-xs font-mono uppercase tracking-widest text-gray-400">
               <tr>
                 <th class="py-4 px-6">Company</th>
                 <th class="py-4 px-6">Plan</th>
@@ -68,7 +74,7 @@
             <tbody class="divide-y divide-white/5">
               <tr *ngFor="let company of stats.recent_companies" class="hover:bg-white/5 transition-colors">
                 <td class="py-4 px-6 font-medium text-white flex items-center gap-3">
-                  <div class="w-8 h-8 rounded-full bg-secondary/10 border border-secondary/20 flex items-center justify-center text-secondary font-bold text-xs">
+                  <div class="w-8 h-8 rounded-full bg-secondary/10 border border-secondary/20 flex items-center justify-center text-secondary font-bold text-xs shadow-inner">
                     {{ company.name.substring(0,2).toUpperCase() }}
                   </div>
                   {{ company.name }}
@@ -77,7 +83,7 @@
                 <td class="py-4 px-6 text-xs text-gray-400">{{ company.created_at | date:'mediumDate' }}</td>
                 <td class="py-4 px-6 text-center">
                   <span [ngClass]="company.status === 'Active' ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-red-500/10 text-red-400 border-red-500/20'"
-                        class="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border">
+                        class="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border shadow-sm">
                     {{ company.status }}
                   </span>
                 </td>
