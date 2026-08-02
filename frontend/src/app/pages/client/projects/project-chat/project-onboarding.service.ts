@@ -18,10 +18,19 @@ export class ProjectOnboardingService {
   getHistory(id: string): Observable<ChatMessage[]> { return this.http.get<ChatMessage[]>(`${this.baseUrl}/${id}/chat`); }
   startChat(id: string): Observable<ChatTurn> { return this.http.post<ChatTurn>(`${this.baseUrl}/${id}/chat/start`, {}); }
   sendMessage(id: string, message: string): Observable<ChatTurn> { return this.http.post<ChatTurn>(`${this.baseUrl}/${id}/chat`, { message }); }
+  sendMessageWithFiles(id: string, message: string, files: File[]): Observable<ChatTurn> {
+    const body = new FormData();
+    body.append('message', message);
+    files.forEach((file) => body.append('files', file, file.name));
+    return this.http.post<ChatTurn>(`${this.baseUrl}/${id}/chat/with-files`, body);
+  }
   getSources(id: string): Observable<ProjectSource[]> { return this.http.get<ProjectSource[]>(`${this.baseUrl}/${id}/sources`); }
   uploadFiles(id: string, files: File[]): Observable<ProjectSource[]> {
     const body = new FormData(); files.forEach((file) => body.append('files', file, file.name));
     return this.http.post<ProjectSource[]>(`${this.baseUrl}/${id}/sources/files`, body);
+  }
+  downloadAttachment(url: string): Observable<Blob> {
+    return this.http.get(url, { responseType: 'blob' });
   }
   decideProposal(id: string, proposalId: string, action: 'confirm' | 'correct' | 'reject', value?: unknown): Observable<{ proposal: SourceProposal; profile: ProjectProfile }> {
     return this.http.post<{ proposal: SourceProposal; profile: ProjectProfile }>(`${this.baseUrl}/${id}/proposals/${proposalId}/decision`, { action, value });

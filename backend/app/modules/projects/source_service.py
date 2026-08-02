@@ -6,6 +6,7 @@ import hashlib
 from io import BytesIO
 import ipaddress
 import json
+from pathlib import Path
 import re
 import socket
 from typing import Any
@@ -21,7 +22,7 @@ from sqlalchemy.orm import Session
 from app.integrations.openrouter_client import generate_llm_response
 from app.modules.ai_core.services import get_ai_config
 
-from . import services
+from . import services, storage_service
 from .completion import FIELD_BY_KEY
 from .models import (
     ProjectOnboardingProposal, ProjectOnboardingSource, ProjectProposalStatus,
@@ -52,10 +53,12 @@ def validate_public_url(url: str) -> None:
         raise HTTPException(status_code=400, detail="Private or local network URLs are not allowed.")
 
 
-async def ingest_url(db: Session, *, project_id: str, user_id: str, url: str) -> ProjectOnboardingSource:
+async def ingest_url(
+    db: Session, *, project_id: str, user_id: str, url: str, message_id: str | None = None,
+) -> ProjectOnboardingSource:
     validate_public_url(url)
     source = ProjectOnboardingSource(
-        project_id=project_id, uploaded_by_user_id=user_id, kind=ProjectSourceKind.URL,
+        project_id=project_id, message_id=message_id, uploaded_by_user_id=user_id, kind=ProjectSourceKind.URL,
         status=ProjectSourceStatus.PROCESSING, name=(urlparse(url).hostname or url)[:255], url=url,
     )
     db.add(source); db.commit(); db.refresh(source)
@@ -88,18 +91,21 @@ async def _get_public_url(client: httpx.AsyncClient, url: str) -> httpx.Response
     raise ValueError("The source redirected too many times.")
 
 
-async def ingest_file(db: Session, *, project_id: str, user_id: str, upload: UploadFile) -> ProjectOnboardingSource:
+async def ingest_file(
+    db: Session, *, project_id: str, company_id: str, user_id: str, upload: UploadFile,
+    message_id: str | None = None,
+) -> ProjectOnboardingSource:
     content = await upload.read(MAX_FILE_BYTES + 1)
-    mime_type = (upload.content_type or "application/octet-stream").lower()
-    filename = (upload.filename or "project-document")[:255]
+    mime_type = (upload.content_type or "application/octet-stream").split(";", 1)[0].lower()
+    filename = (Path(upload.filename or "project-document").name or "project-document")[:255]
     kind = ProjectSourceKind.IMAGE if mime_type.startswith("image/") else (
         ProjectSourceKind.SPREADSHEET if mime_type in {"text/csv", "application/csv", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}
         else ProjectSourceKind.UPLOADED_FILE
     )
     source = ProjectOnboardingSource(
-        project_id=project_id, uploaded_by_user_id=user_id, kind=kind,
+        project_id=project_id, message_id=message_id, uploaded_by_user_id=user_id, kind=kind,
         status=ProjectSourceStatus.PROCESSING, name=filename, mime_type=mime_type,
-        size_bytes=len(content), sha256=hashlib.sha256(content).hexdigest(),
+        size_bytes=len(content), sha256=hashlib.sha256(content).hexdigest(), original_filename=filename,
     )
     db.add(source); db.commit(); db.refresh(source)
     try:
@@ -108,6 +114,13 @@ async def ingest_file(db: Session, *, project_id: str, user_id: str, upload: Upl
         if mime_type not in ALLOWED_FILE_TYPES:
             raise ValueError("Unsupported file type. Use PDF, DOCX, TXT, CSV, XLSX, JPG, PNG, or WEBP.")
         _validate_signature(content, mime_type)
+        stored = storage_service.store_project_file(
+            company_id=company_id, project_id=project_id, source_id=source.id,
+            original_filename=filename, content=content,
+        )
+        source.storage_path = stored.relative_path
+        source.stored_filename = stored.stored_filename
+        db.add(source); db.commit(); db.refresh(source)
         if mime_type.startswith("image/"):
             await _finish_source(db, source, image_content=content)
         else:
@@ -123,7 +136,7 @@ async def _finish_source(
     normalized = re.sub(r"\s+", " ", text or "").strip()[:MAX_SOURCE_TEXT]
     if image_content is None and len(normalized) < 20:
         raise ValueError("The source did not contain enough readable information.")
-    source.extracted_text = normalized or "[Image analyzed; binary not retained]"
+    source.extracted_text = normalized or "[Image analyzed; original retained in protected storage]"
     for proposal in await _extract_proposals(db, source, normalized, image_content):
         db.add(proposal)
     source.status, source.error_message = ProjectSourceStatus.READY, None
@@ -204,6 +217,11 @@ def serialize_source(source: ProjectOnboardingSource) -> dict[str, Any]:
     return {
         "id": source.id, "kind": source.kind.value, "status": source.status.value, "name": source.name,
         "url": source.url, "mime_type": source.mime_type, "size_bytes": source.size_bytes,
+        "message_id": source.message_id,
+        "download_url": (
+            f"/api/v1/projects/{source.project_id}/sources/{source.id}/file"
+            if source.storage_path else None
+        ),
         "error_message": source.error_message,
         "proposals": [serialize_proposal(item) for item in source.proposals],
         "created_at": source.created_at, "updated_at": source.updated_at,

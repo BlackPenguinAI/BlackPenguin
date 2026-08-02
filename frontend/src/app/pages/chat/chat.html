@@ -122,7 +122,7 @@
             [disabled]="isAnalyzing || isCompleted"
             rows="1"
             placeholder="Enter company information, a correction, or a confirmation..."
-            class="min-h-12 max-h-36 w-full resize-none overflow-hidden bg-transparent py-3 pl-12 pr-14 text-sm text-white placeholder-gray-500 focus:outline-none"
+            class="min-h-12 max-h-36 w-full resize-none overflow-hidden bg-transparent py-3 pl-12 pr-24 text-sm text-white placeholder-gray-500 focus:outline-none"
           ></textarea>
           <label
             class="absolute bottom-3 left-3 flex cursor-pointer items-center justify-center rounded-lg p-2 text-gray-400 transition hover:bg-white/10 hover:text-white"
@@ -140,6 +140,15 @@
               (change)="onFilesSelected($event)"
             />
           </label>
+          <button
+            (click)="toggleRecording()"
+            [disabled]="!speechSupported || isAnalyzing || isCompleted"
+            class="absolute bottom-2 right-12 rounded-xl p-2 transition disabled:opacity-30"
+            [ngClass]="isRecording ? 'bg-red-500/20 text-red-300' : 'text-gray-400 hover:bg-white/10 hover:text-white'"
+            [title]="speechSupported ? (isRecording ? 'Stop dictation' : 'Dictate message') : 'Speech recognition is not supported in this browser'"
+          >
+            <span class="material-symbols-outlined text-[20px]">{{ isRecording ? 'stop_circle' : 'mic' }}</span>
+          </button>
           <button
             (click)="sendMessage()"
             [disabled]="!canSend"

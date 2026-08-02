@@ -11,7 +11,11 @@ from sqlalchemy.orm.attributes import flag_modified
 from app.modules.companies.models import Company
 
 from .completion import FIELD_BY_KEY, VALID_STATUSES, calculate_completion, field_progress, normalize_field_key
-from .models import Project, ProjectMessage, ProjectProfile, ProjectSession, SenderType
+from . import storage_service
+from .models import (
+    Project, ProjectCampaign, ProjectMessage, ProjectOnboardingSource, ProjectProfile,
+    ProjectSession, SenderType,
+)
 
 
 @dataclass
@@ -24,7 +28,9 @@ def check_project_limits(db: Session, company_id: str) -> None:
     company = db.query(Company).filter(Company.id == company_id).first()
     if not company or not company.plan:
         raise HTTPException(status_code=400, detail="The company does not have an assigned plan.")
-    current_count = db.query(Project).filter(Project.company_id == company_id).count()
+    current_count = db.query(Project).filter(
+        Project.company_id == company_id, Project.is_active.is_(True)
+    ).count()
     if current_count >= company.plan.max_projects:
         raise HTTPException(status_code=400, detail=f"Your plan allows {company.plan.max_projects} projects.")
 
@@ -144,6 +150,92 @@ def serialize_project(project: Project) -> dict[str, Any]:
         "country": project.country, "is_active": project.is_active,
         "profile": serialize_profile(project.profile) if project.profile else None,
     }
+
+
+def serialize_attachment(source: ProjectOnboardingSource) -> dict[str, Any]:
+    return {
+        "id": source.id,
+        "kind": source.kind.value,
+        "name": source.name,
+        "mime_type": source.mime_type,
+        "size_bytes": source.size_bytes,
+        "status": source.status.value,
+        "url": source.url,
+        "download_url": (
+            f"/api/v1/projects/{source.project_id}/sources/{source.id}/file"
+            if source.storage_path else None
+        ),
+    }
+
+
+def serialize_message(message: ProjectMessage) -> dict[str, Any]:
+    return {
+        "id": message.id,
+        "sender": "user" if message.sender == SenderType.USER else "ai",
+        "content": message.content,
+        "created_at": message.created_at,
+        "attachments": [serialize_attachment(source) for source in message.attachments],
+    }
+
+
+def deletion_impact(db: Session, project: Project) -> dict[str, Any]:
+    # Local imports avoid coupling the project model module to CRM and broker models.
+    from app.modules.brokers.models import Broker
+    from app.modules.sales_crm.models import Lead, Meeting
+
+    leads = db.query(Lead).filter(Lead.project_id == project.id).count()
+    meetings = db.query(Meeting).filter(Meeting.project_id == project.id).count()
+    campaigns = db.query(ProjectCampaign).filter(ProjectCampaign.project_id == project.id).count()
+    active_campaigns = db.query(ProjectCampaign).filter(
+        ProjectCampaign.project_id == project.id,
+        ProjectCampaign.status == "active",
+    ).count()
+    brokers = db.query(Broker).filter(Broker.project_id == project.id).count()
+    sources = db.query(ProjectOnboardingSource).filter(
+        ProjectOnboardingSource.project_id == project.id
+    ).count()
+    files = db.query(ProjectOnboardingSource).filter(
+        ProjectOnboardingSource.project_id == project.id,
+        ProjectOnboardingSource.storage_path.isnot(None),
+    ).count()
+    can_delete = leads == 0 and meetings == 0 and active_campaigns == 0
+    return {
+        "can_delete": can_delete,
+        "leads": leads,
+        "meetings": meetings,
+        "campaigns": campaigns,
+        "active_campaigns": active_campaigns,
+        "brokers": brokers,
+        "sources": sources,
+        "files": files,
+        "recommended_action": "delete" if can_delete else "archive",
+    }
+
+
+def archive_project(db: Session, project: Project) -> Project:
+    project.is_active = False
+    db.add(project); db.commit(); db.refresh(project)
+    return project
+
+
+def delete_project(db: Session, project: Project, *, confirm_name: str) -> None:
+    if confirm_name.strip() != project.name:
+        raise HTTPException(status_code=422, detail="Type the exact project name to confirm deletion.")
+    impact = deletion_impact(db, project)
+    if not impact["can_delete"]:
+        raise HTTPException(
+            status_code=409,
+            detail={"message": "This project has commercial activity and should be archived.", "impact": impact},
+        )
+    quarantined = storage_service.quarantine_project_files(project.company_id, project.id)
+    try:
+        db.delete(project)
+        db.commit()
+    except Exception:
+        db.rollback()
+        storage_service.restore_quarantined_files(quarantined)
+        raise
+    storage_service.purge_quarantined_files(quarantined)
 
 
 def save_message(db: Session, session_id: str, sender: SenderType, content: str) -> ProjectMessage:

@@ -65,6 +65,22 @@ class ProjectResponse(ProjectCreate):
     model_config = ConfigDict(from_attributes=True)
 
 
+class ProjectDeletionImpact(BaseModel):
+    can_delete: bool
+    leads: int
+    meetings: int
+    campaigns: int
+    active_campaigns: int
+    brokers: int
+    sources: int
+    files: int
+    recommended_action: Literal["delete", "archive"]
+
+
+class ProjectDeleteRequest(BaseModel):
+    confirm_name: str = Field(min_length=1, max_length=150)
+
+
 class FieldUpdate(BaseModel):
     field: str
     value: Any = None
@@ -84,10 +100,23 @@ class ChatMessagePayload(BaseModel):
     message: str = Field(min_length=1, max_length=20000)
 
 
+class ChatAttachmentResponse(BaseModel):
+    id: str
+    kind: str
+    name: str
+    mime_type: str | None = None
+    size_bytes: int | None = None
+    status: str
+    url: str | None = None
+    download_url: str | None = None
+
+
 class ChatMessageResponse(BaseModel):
+    id: str
     sender: str
     content: str
     created_at: datetime
+    attachments: list[ChatAttachmentResponse] = Field(default_factory=list)
 
 
 class SourceProposalResponse(BaseModel):
@@ -108,6 +137,8 @@ class SourceResponse(BaseModel):
     url: str | None = None
     mime_type: str | None = None
     size_bytes: int | None = None
+    message_id: str | None = None
+    download_url: str | None = None
     error_message: str | None = None
     proposals: list[SourceProposalResponse] = Field(default_factory=list)
     created_at: datetime
@@ -116,6 +147,7 @@ class SourceResponse(BaseModel):
 
 class ChatTurnResponse(BaseModel):
     message: ChatMessageResponse
+    user_message: ChatMessageResponse | None = None
     profile: ProjectProfileResponse
     accepted_fields: list[str] = Field(default_factory=list)
     rejected_updates: list[dict[str, Any]] = Field(default_factory=list)

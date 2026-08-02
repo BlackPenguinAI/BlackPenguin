@@ -39,7 +39,23 @@ export interface ProjectProfile {
   updated_at: string | null;
 }
 
-export interface ChatMessage { sender: 'user' | 'ai'; content: string; created_at: string | Date; }
+export interface ChatAttachment {
+  id: string;
+  kind: string;
+  name: string;
+  mime_type: string | null;
+  size_bytes: number | null;
+  status: 'processing' | 'ready' | 'failed';
+  url: string | null;
+  download_url: string | null;
+}
+export interface ChatMessage {
+  id?: string;
+  sender: 'user' | 'ai';
+  content: string;
+  created_at: string | Date;
+  attachments: ChatAttachment[];
+}
 export interface SourceProposal {
   id: string; field: string; label: string; value: unknown; evidence: string | null;
   confidence: string | null; status: 'pending' | 'confirmed' | 'corrected' | 'rejected'; draftValue?: string;
@@ -47,10 +63,11 @@ export interface SourceProposal {
 export interface ProjectSource {
   id: string; kind: string; status: 'processing' | 'ready' | 'failed'; name: string;
   url: string | null; mime_type: string | null; size_bytes: number | null; error_message: string | null;
+  message_id: string | null; download_url: string | null;
   proposals: SourceProposal[]; created_at: string; updated_at: string;
 }
 export interface ChatTurn {
-  message: ChatMessage; profile: ProjectProfile; accepted_fields: string[];
+  message: ChatMessage; user_message: ChatMessage | null; profile: ProjectProfile; accepted_fields: string[];
   rejected_updates: Array<{ field: string | null; reason: string }>; sources: ProjectSource[];
 }
 export interface Campaign {

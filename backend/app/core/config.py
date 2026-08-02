@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     OPENROUTER_API_KEY: str
     DEFAULT_AI_MODEL: str = "deepseek/deepseek-chat"
 
+    # Persistent project documents live on a host-mounted volume in production.
+    # Store only relative paths in PostgreSQL; never expose this root through Nginx.
+    PROJECT_UPLOAD_ROOT: str = "./var/uploads"
+
     # 🚀 NUEVO: Configuraciones de Correo (SMTP)
     SMTP_SERVER: str = "smtp.gmail.com"
     SMTP_PORT: int = 587

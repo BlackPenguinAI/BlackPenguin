@@ -2,6 +2,7 @@ import {
   ChangeDetectorRef,
   Component,
   ElementRef,
+  OnDestroy,
   OnInit,
   ViewChild,
 } from '@angular/core';
@@ -11,6 +12,9 @@ import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { marked } from 'marked';
+import { Subscription } from 'rxjs';
+
+import { SpeechRecognitionService } from '../../core/services/speech-recognition.service';
 
 import {
   ChatMessage,
@@ -32,7 +36,7 @@ import { CompanyOnboardingService } from './company-onboarding.service';
   templateUrl: './chat.html',
   styleUrl: './chat.scss',
 })
-export class ChatComponent implements OnInit {
+export class ChatComponent implements OnInit, OnDestroy {
   @ViewChild('chatScroll') chatScroll!: ElementRef<HTMLElement>;
 
   prompt = '';
@@ -40,6 +44,7 @@ export class ChatComponent implements OnInit {
   currentLang = 'en';
   userName = '';
   isRecording = false;
+  readonly speechSupported: boolean;
   isCompleted = false;
   isUploading = false;
   errorMessage = '';
@@ -47,14 +52,18 @@ export class ChatComponent implements OnInit {
   sources: OnboardingSource[] = [];
   profile: CompanyProfileResponse = EMPTY_COMPANY_PROFILE;
   private readonly markdownCache = new Map<string, string>();
+  private readonly speechSubscriptions = new Subscription();
+  private speechBase = '';
 
   constructor(
     private readonly translate: TranslateService,
     private readonly onboarding: CompanyOnboardingService,
     private readonly cdr: ChangeDetectorRef,
+    private readonly speech: SpeechRecognitionService,
   ) {
     this.currentLang = localStorage.getItem('bp_lang') || 'en';
     this.translate.use(this.currentLang);
+    this.speechSupported = speech.isSupported;
   }
 
   ngOnInit(): void {
@@ -62,6 +71,24 @@ export class ChatComponent implements OnInit {
     this.loadProfile();
     this.loadChatHistory();
     this.loadSources();
+    this.speechSubscriptions.add(this.speech.state$.subscribe((state) => {
+      this.isRecording = state === 'listening';
+      this.cdr.detectChanges();
+    }));
+    this.speechSubscriptions.add(this.speech.transcript$.subscribe(({ finalText, interimText }) => {
+      this.prompt = [this.speechBase, finalText, interimText]
+        .filter(Boolean).join(' ').replace(/\s+/g, ' ').trimStart();
+      this.cdr.detectChanges();
+    }));
+    this.speechSubscriptions.add(this.speech.error$.subscribe((message) => {
+      this.errorMessage = message;
+      this.cdr.detectChanges();
+    }));
+  }
+
+  ngOnDestroy(): void {
+    this.speech.abort();
+    this.speechSubscriptions.unsubscribe();
   }
 
   loadProfile(): void {
@@ -182,6 +209,7 @@ export class ChatComponent implements OnInit {
 
   sendMessage(): void {
     if (!this.canSend) return;
+    if (this.isRecording) this.speech.stop();
     const content = this.prompt.trim();
     this.prompt = '';
     this.messages.push({ sender: 'user', content, created_at: new Date() });
@@ -286,7 +314,14 @@ export class ChatComponent implements OnInit {
   }
 
   toggleRecording(): void {
-    this.isRecording = !this.isRecording;
+    if (!this.speechSupported || this.isAnalyzing || this.isCompleted) return;
+    if (this.isRecording) {
+      this.speech.stop();
+      return;
+    }
+    this.errorMessage = '';
+    this.speechBase = this.prompt.trim();
+    this.speech.start(this.currentLang === 'es' ? 'es-PE' : 'en-US');
   }
 
   trackField(_: number, field: CompanyFieldProgress): string {

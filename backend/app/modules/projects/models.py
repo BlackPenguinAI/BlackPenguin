@@ -107,6 +107,7 @@ class ProjectMessage(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     session = relationship("ProjectSession", back_populates="messages")
+    attachments = relationship("ProjectOnboardingSource", back_populates="message", passive_deletes=True)
 
 
 class ProjectOnboardingSource(Base):
@@ -114,6 +115,7 @@ class ProjectOnboardingSource(Base):
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     project_id = Column(String(36), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
+    message_id = Column(String(36), ForeignKey("project_messages.id", ondelete="SET NULL"), nullable=True, index=True)
     uploaded_by_user_id = Column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     kind = Column(SqlaEnum(ProjectSourceKind, name="projectsourcekind"), nullable=False)
     status = Column(SqlaEnum(ProjectSourceStatus, name="projectsourcestatus"), default=ProjectSourceStatus.PROCESSING, nullable=False)
@@ -122,12 +124,16 @@ class ProjectOnboardingSource(Base):
     mime_type = Column(String(150), nullable=True)
     size_bytes = Column(Integer, nullable=True)
     sha256 = Column(String(64), nullable=True, index=True)
+    original_filename = Column(String(255), nullable=True)
+    stored_filename = Column(String(255), nullable=True)
+    storage_path = Column(Text, nullable=True)
     extracted_text = Column(Text, nullable=True)
     error_message = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
     project = relationship("Project", back_populates="sources")
+    message = relationship("ProjectMessage", back_populates="attachments")
     proposals = relationship("ProjectOnboardingProposal", back_populates="source", cascade="all, delete-orphan")
 
 
