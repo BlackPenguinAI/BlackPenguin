@@ -69,8 +69,8 @@ export class LandingComponent implements AfterViewInit {
     this.errorMessage = '';
 
     const apiUrl = isDevMode() 
-      ? 'http://localhost:8000/api/v1/leads/waitlist' 
-      : 'https://blackpenguin.ai/api/v1/leads/waitlist';
+      ? 'http://localhost:8000/api/v1/waitlist/' 
+      : 'https://blackpenguin.ai/api/v1/waitlist/';
 
     const payload = { 
       email: this.email, 
