@@ -5,6 +5,9 @@ from app.db.postgres import get_db
 from app.modules.auth.deps import RoleChecker
 from app.modules.users.models import User, UserRole
 
+from sqlalchemy import func
+from app.modules.companies.models import Company
+
 from .schemas import (
     FirebaseConfigSchema, FirebaseConfigUpdate,
     TwilioConfigSchema, TwilioConfigUpdate,
@@ -69,3 +72,40 @@ def update_legal_document(
     current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN]))
 ):
     return services.update_legal_document(db, doc_type, payload, lang)
+
+# ==========================================
+# DASHBOARD STATS
+# ==========================================
+@router.get("/stats/")
+def get_dashboard_stats(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN]))
+):
+    """Devuelve las métricas globales para el Dashboard del Superadmin."""
+    
+    # 1. Total de Empresas
+    total_companies = db.query(func.count(Company.id)).scalar() or 0
+    
+    # 2. Total de Tokens y Costo (Usando func.sum)
+    total_tokens = db.query(func.sum(Company.ai_tokens_used)).scalar() or 0
+    total_usd = db.query(func.sum(Company.ai_cost_usd)).scalar() or 0.0
+    
+    # 3. Últimas 5 empresas
+    recent_companies_query = db.query(Company).order_by(Company.created_at.desc()).limit(5).all()
+    
+    recent_companies = []
+    for c in recent_companies_query:
+        recent_companies.append({
+            "id": c.id,
+            "name": c.name,
+            "plan_name": c.plan.name if c.plan else "Standard",
+            "status": "Active" if c.is_active else "Inactive",
+            "created_at": c.created_at
+        })
+        
+    return {
+        "total_companies": total_companies,
+        "total_tokens": total_tokens,
+        "total_usd": total_usd,
+        "recent_companies": recent_companies
+    }

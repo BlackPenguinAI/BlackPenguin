@@ -1,67 +1,60 @@
-import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { RouterModule } from '@angular/router';
-import { TranslateModule } from '@ngx-translate/core';
+import { Component, OnInit, ChangeDetectorRef, isDevMode } from '@angular/core';
+import { CommonModule, DatePipe, DecimalPipe } from '@angular/common';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { ToastService } from '../../../../core/services/toast';
 
-import { DashboardService } from './../services/dashboard';
 import { GlassCardComponent } from '../../../../shared/ui/glass-card/glass-card';
 
 @Component({
-  selector: 'app-admin-dashboard-page',
+  selector: 'app-dashboard-page',
   standalone: true,
-  imports: [CommonModule, RouterModule, TranslateModule, GlassCardComponent],
+  imports: [CommonModule, GlassCardComponent],
+  providers: [DatePipe, DecimalPipe],
   templateUrl: './dashboard-page.html'
 })
 export class DashboardPageComponent implements OnInit {
   stats: any = {
     total_companies: 0,
-    active_companies: 0,
-    total_projects: 0,
-    total_waitlist: 0,
-    total_users: 0,
-    system_status: 'Cargando...'
+    total_tokens: 0,
+    total_usd: 0,
+    recent_companies: []
   };
   
-  adminName: string = '';
   isLoading: boolean = true;
-  currentDate: Date = new Date();
 
   constructor(
-    private dashboardService: DashboardService,
-    private cdr: ChangeDetectorRef 
+    private http: HttpClient,
+    private toast: ToastService,
+    private cdr: ChangeDetectorRef
   ) {}
 
-  ngOnInit() {
-    this.adminName = localStorage.getItem('bp_name') || 'Staff';
+  ngOnInit(): void {
     this.loadStats();
   }
 
-  loadStats() {
-    this.isLoading = true;
-    this.dashboardService.getAdminStats().subscribe({
-      next: (data) => {
-        this.stats = {
-          total_companies: data.total_companies || 0,
-          active_companies: data.active_companies || 0,
-          total_projects: data.total_projects || 0,
-          total_waitlist: data.total_waitlist || 0,
-          total_users: data.total_users || 0,
-          system_status: data.system_status || 'Operational'
-        };
+  private get baseUrl() {
+    return isDevMode() ? 'http://localhost:8000' : 'https://blackpenguin.ai';
+  }
 
-        if (data.admin_name) {
-          this.adminName = data.admin_name;
-          localStorage.setItem('bp_name', data.admin_name);
+  private get headers() {
+    const token = localStorage.getItem('bp_token');
+    return new HttpHeaders().set('Authorization', `Bearer ${token}`);
+  }
+
+  loadStats(): void {
+    this.isLoading = true;
+    this.http.get<any>(`${this.baseUrl}/api/v1/system/stats/`, { headers: this.headers }).subscribe({
+      next: (data) => {
+        if (data) {
+          this.stats = data;
         }
-        
         this.isLoading = false;
-        this.cdr.detectChanges(); 
+        this.cdr.detectChanges();
       },
       error: (err) => {
-        console.error('Error al consultar métricas del Dashboard global:', err);
-        this.stats.system_status = 'Error';
+        this.toast.showError('Failed to load dashboard statistics.');
         this.isLoading = false;
-        this.cdr.detectChanges(); 
+        this.cdr.detectChanges();
       }
     });
   }
