@@ -1,0 +1,65 @@
+<div class="min-h-screen bg-black text-white font-sans p-6 md:p-12 relative overflow-hidden">
+  <div class="absolute top-0 right-1/4 w-96 h-96 bg-secondary/5 rounded-full blur-[120px] pointer-events-none"></div>
+
+  <div class="max-w-4xl mx-auto relative z-10">
+    
+    <div class="mb-8 border-b border-white/10 pb-6">
+      <h1 class="text-3xl font-light tracking-tight">Messaging <span class="text-secondary font-medium">Settings</span></h1>
+      <p class="text-sm text-gray-400 mt-1">Configure Twilio integration for automated SMS and WhatsApp communications.</p>
+    </div>
+
+    <div *ngIf="isLoading" class="flex justify-center py-24">
+      <div class="animate-spin h-8 w-8 border-2 border-secondary border-t-transparent rounded-full"></div>
+    </div>
+
+    <div *ngIf="!isLoading" class="flex flex-col gap-8 animate-fade-in">
+      <form (ngSubmit)="saveConfig()">
+        
+        <app-glass-card title="Twilio API Credentials" icon="sms" class="mb-6 block">
+          <p class="text-xs text-gray-400 mb-6 leading-relaxed">
+            Enter your Twilio API credentials to enable the platform to send real-time notifications, 2FA codes, and marketing messages to users and administrators.
+          </p>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <app-input 
+              label="Account SID" 
+              [(ngModel)]="twilioConfig.account_sid" 
+              name="account_sid" 
+              placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
+            </app-input>
+
+            <div class="flex flex-col gap-1">
+              <app-input 
+                label="Auth Token" 
+                [type]="showToken ? 'text' : 'password'" 
+                [(ngModel)]="twilioConfig.auth_token" 
+                name="auth_token" 
+                placeholder="your_auth_token_here">
+              </app-input>
+              <label class="flex items-center gap-2 mt-1 ml-1 cursor-pointer w-max">
+                <input type="checkbox" (change)="toggleTokenVisibility()" class="rounded bg-black border-white/20 text-secondary focus:ring-0 w-3.5 h-3.5">
+                <span class="text-[10px] text-gray-500 font-bold uppercase tracking-widest hover:text-white transition-colors">Show Auth Token</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <app-input 
+              label="From Phone Number (WhatsApp / SMS)" 
+              [(ngModel)]="twilioConfig.from_phone_number" 
+              name="from_phone_number" 
+              placeholder="+1234567890">
+            </app-input>
+          </div>
+
+          <div class="flex justify-end border-t border-white/10 pt-6 mt-8">
+            <app-button type="submit" variant="primary" icon="save" [isLoading]="isSaving">
+              Save Messaging Config
+            </app-button>
+          </div>
+        </app-glass-card>
+
+      </form>
+    </div>
+  </div>
+</div>
