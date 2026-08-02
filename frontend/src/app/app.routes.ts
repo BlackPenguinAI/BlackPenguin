@@ -122,6 +122,13 @@ export const routes: Routes = [
             './features/admin-panel/legal-compliance/legal-compliance-page/legal-compliance-page'
           ).then((m) => m.LegalCompliancePageComponent),
       },
+      {
+        path: 'waitlist',
+        loadComponent: () =>
+          import(
+            './features/admin-panel/waitlist/waitlist-page/waitlist-page'
+          ).then((m) => m.WaitlistPageComponent),
+      },
     ],
   },
 
