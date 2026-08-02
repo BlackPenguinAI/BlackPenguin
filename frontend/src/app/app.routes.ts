@@ -99,9 +99,9 @@ export const routes: Routes = [
       {
         path: 'users',
         loadComponent: () =>
-          import('./features/admin-panel/dashboard/dashboard-page/dashboard-page').then(
-            (m) => m.DashboardPageComponent
-          ),
+          import(
+            './features/admin-panel/users/users-page/users-page'
+          ).then((m) => m.UsersPageComponent),
       },
       {
         path: 'email-settings',

@@ -27,7 +27,7 @@ export class UsersPageComponent implements OnInit {
   
   isLoading: boolean = true;
 
-  // Filtros
+  // Filtros reactivos
   filters = {
     company_id: '',
     role: '',
@@ -77,7 +77,7 @@ export class UsersPageComponent implements OnInit {
     this.isLoading = true;
     this.cdr.detectChanges();
 
-    // Construcción de Query Params
+    // Construcción dinámica de Query Params
     let params: string[] = [];
     if (this.filters.company_id) params.push(`company_id=${this.filters.company_id}`);
     if (this.filters.role) params.push(`role=${this.filters.role}`);

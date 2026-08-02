@@ -52,7 +52,7 @@
     <app-glass-card *ngIf="!isLoading" paddingClass="p-0 overflow-hidden">
       <div class="overflow-x-auto">
         <table class="w-full text-left text-sm text-gray-300">
-          <thead class="bg-white/5 border-b border-white/10 text-xs font-mono uppercase tracking-widest text-gray-400">
+          <thead class="bg-black/20 border-b border-white/10 text-xs font-mono uppercase tracking-widest text-gray-400">
             <tr>
               <th class="py-4 px-6">User</th>
               <th class="py-4 px-6">Company</th>
@@ -67,7 +67,7 @@
               
               <td class="py-4 px-6">
                 <div class="flex items-center gap-3">
-                  <div class="w-8 h-8 rounded-full bg-secondary/10 border border-secondary/20 flex items-center justify-center text-secondary font-bold text-xs uppercase">
+                  <div class="w-8 h-8 rounded-full bg-secondary/10 border border-secondary/20 flex items-center justify-center text-secondary font-bold text-xs uppercase shadow-inner">
                     {{ (u.first_name?.substring(0,1) || u.email.substring(0,1)) }}
                   </div>
                   <div class="flex flex-col">
@@ -96,7 +96,7 @@
 
               <td class="py-4 px-6 text-center">
                 <span [ngClass]="u.is_active ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-red-500/10 text-red-400 border-red-500/20'"
-                      class="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border">
+                      class="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border shadow-sm">
                   {{ u.is_active ? 'ACTIVE' : 'INACTIVE' }}
                 </span>
               </td>
