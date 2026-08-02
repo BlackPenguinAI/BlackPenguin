@@ -24,11 +24,17 @@ export class PlanService {
     return this.http.get<any[]>(this.apiUrl, { headers: this.headers });
   }
 
-  createPlan(planData: any): Observable<any> {
-    return this.http.post<any>(this.apiUrl, planData, { headers: this.headers });
+  createPlan(data: any): Observable<any> {
+    return this.http.post<any>(this.apiUrl, data, { headers: this.headers });
   }
 
-  deletePlan(planId: string): Observable<any> {
-    return this.http.delete<any>(`${this.apiUrl}/${planId}`, { headers: this.headers });
+  // 🚀 NUEVO: ACTUALIZAR PLAN
+  updatePlan(id: string, data: any): Observable<any> {
+    return this.http.put<any>(`${this.apiUrl}${id}/`, data, { headers: this.headers });
+  }
+
+  // 🚀 CORREGIDO: SE AGREGÓ LA BARRA AL FINAL
+  deletePlan(id: string): Observable<any> {
+    return this.http.delete<any>(`${this.apiUrl}${id}/`, { headers: this.headers });
   }
 }
