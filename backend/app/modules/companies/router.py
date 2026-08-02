@@ -28,12 +28,14 @@ def create_company_workspace(
     admin_last_name: str = Form(...),
     admin_email: str = Form(...),
     admin_password: str = Form(...),
+    is_active: str = Form('true'),       # 🚀 Company Status (default 'true')
+    admin_is_active: str = Form('true'), # 🚀 User Status (default 'true')
     start_date: Optional[str] = Form(None),
     receipt_file: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN]))
 ):
-    """Crea una Compañía (Status: Active) y su Administrador (Status: Active)."""
+    """Crea una Compañía y su Administrador con sus respectivos estados."""
     
     if db.query(User).filter(User.email == admin_email).first():
         raise HTTPException(status_code=400, detail="The email is already registered.")
@@ -50,16 +52,22 @@ def create_company_workspace(
         except ValueError:
             pass
 
+    is_active_bool = str(is_active).lower() == 'true'
+    admin_is_active_bool = str(admin_is_active).lower() == 'true'
+
+    # Crear Compañía con su estado seleccionado
     new_company = Company(
         name=name, plan_id=plan_id, 
         license_start=parsed_start_date, 
         license_end=parsed_start_date + relativedelta(months=duration_months),
-        payment_receipt_url=receipt_url, is_active=True
+        payment_receipt_url=receipt_url, 
+        is_active=is_active_bool
     )
     db.add(new_company)
     db.commit()
     db.refresh(new_company)
 
+    # Crear Admin con su estado seleccionado
     new_admin = User(
         email=admin_email, 
         hashed_password=get_password_hash(admin_password),
@@ -67,7 +75,7 @@ def create_company_workspace(
         last_name=admin_last_name,
         role=UserRole.ADMIN, 
         company_id=new_company.id, 
-        is_active=True # Default User Status: Active
+        is_active=admin_is_active_bool
     )
     db.add(new_admin)
     db.commit()
@@ -99,8 +107,8 @@ def update_company(
     admin_first_name: str = Form(...),
     admin_last_name: str = Form(...),
     admin_email: str = Form(...),
-    is_active: str = Form('true'),       # Company Status
-    admin_is_active: str = Form('true'), # User Status
+    is_active: str = Form('true'),       
+    admin_is_active: str = Form('true'), 
     start_date: Optional[str] = Form(None),
     admin_password: Optional[str] = Form(None),
     receipt_file: Optional[UploadFile] = File(None),
@@ -118,7 +126,6 @@ def update_company(
     is_active_bool = str(is_active).lower() == 'true'
     admin_is_active_bool = str(admin_is_active).lower() == 'true'
 
-    # 1. Actualizar datos de la Compañía
     company.name = name
     company.plan_id = plan_id
     company.is_active = is_active_bool
@@ -134,7 +141,6 @@ def update_company(
     if company.license_start:
         company.license_end = company.license_start + relativedelta(months=duration_months)
 
-    # 2. Actualizar datos del Administrador
     admin_user = db.query(User).filter(User.company_id == company_id, User.role == UserRole.ADMIN).first()
     if admin_user:
         if admin_user.email != admin_email:
@@ -146,7 +152,6 @@ def update_company(
         admin_user.email = admin_email
         admin_user.is_active = admin_is_active_bool
 
-        # Solo se cambia el password si se ingresa uno nuevo
         if admin_password and admin_password.strip():
             admin_user.hashed_password = get_password_hash(admin_password)
 

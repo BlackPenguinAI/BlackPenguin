@@ -51,7 +51,8 @@ export class CompaniesPageComponent implements OnInit {
     admin_email: '',
     admin_password: '',
     admin_confirm_password: '',
-    is_active: true
+    is_active: true,      // Company Status
+    admin_is_active: true // User Status
   };
 
   editForm: any = {
@@ -65,8 +66,8 @@ export class CompaniesPageComponent implements OnInit {
     admin_email: '',
     admin_password: '',
     admin_confirm_password: '',
-    is_active: true,      // Company Status
-    admin_is_active: true // User Status
+    is_active: true,      
+    admin_is_active: true 
   };
 
   constructor(
@@ -133,7 +134,8 @@ export class CompaniesPageComponent implements OnInit {
       admin_email: '',
       admin_password: '',
       admin_confirm_password: '',
-      is_active: true
+      is_active: true,
+      admin_is_active: true
     };
     this.selectedFile = null;
     this.showModal = true;
@@ -203,6 +205,8 @@ export class CompaniesPageComponent implements OnInit {
     formData.append('admin_last_name', this.form.admin_last_name);
     formData.append('admin_email', this.form.admin_email);
     formData.append('admin_password', this.form.admin_password);
+    formData.append('is_active', this.form.is_active.toString());
+    formData.append('admin_is_active', this.form.admin_is_active.toString());
     
     if (this.form.start_date) {
       formData.append('start_date', this.form.start_date);
