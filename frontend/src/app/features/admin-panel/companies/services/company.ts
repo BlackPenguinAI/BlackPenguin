@@ -35,15 +35,17 @@ export class CompanyService {
     return this.http.post<any>(this.apiUrl, formData, { headers: this.headers });
   }
 
-  updateCompany(id: string, data: any): Observable<any> {
-    return this.http.put<any>(`${this.apiUrl}${id}`, data, { headers: this.headers });
+  // 🚀 CORREGIDO: AÑADIDA BARRA FINAL (/)
+  updateCompany(id: string, formData: FormData): Observable<any> {
+    return this.http.put<any>(`${this.apiUrl}${id}/`, formData, { headers: this.headers });
   }
 
   resendActivation(companyId: string): Observable<any> {
     return this.http.post<any>(`${this.apiUrl}${companyId}/resend-activation/`, {}, { headers: this.headers });
   }
 
+  // 🚀 CORREGIDO: AÑADIDA BARRA FINAL (/)
   deleteCompany(companyId: string): Observable<any> {
-    return this.http.delete<any>(`${this.apiUrl}${companyId}`, { headers: this.headers });
+    return this.http.delete<any>(`${this.apiUrl}${companyId}/`, { headers: this.headers });
   }
 }
