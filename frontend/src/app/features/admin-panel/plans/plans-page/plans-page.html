@@ -1,12 +1,12 @@
 <div class="min-h-screen bg-black text-white font-sans p-6 md:p-12 relative overflow-hidden">
   <div class="absolute top-1/3 right-1/4 w-96 h-96 bg-secondary/5 rounded-full blur-[120px] pointer-events-none"></div>
 
-  <div class="max-w-5xl mx-auto relative z-10">
+  <div class="max-w-7xl mx-auto relative z-10">
     
     <div class="flex items-center justify-between mb-8 border-b border-white/10 pb-6">
       <div>
         <h1 class="text-3xl font-light tracking-tight">Subscription <span class="text-secondary font-medium">Plans</span></h1>
-        <p class="text-sm text-gray-400 mt-1">Manage the available tiers, user limits, and pricing for enterprise clients.</p>
+        <p class="text-sm text-gray-400 mt-1">Manage platform tiers, seat allocations, and project limits for enterprise clients.</p>
       </div>
 
       <app-button variant="primary" icon="add_box" (onClick)="openModal()">
@@ -24,29 +24,42 @@
           <table class="w-full text-left text-sm text-gray-300">
             <thead class="bg-black/20 border-b border-white/10 text-xs font-mono uppercase tracking-widest text-gray-400">
               <tr>
-                <th class="py-4 px-6">Plan Name</th>
-                <th class="py-4 px-6 text-center">Max Users</th>
-                <th class="py-4 px-6 text-center">Base Price (USD)</th>
+                <th class="py-4 px-6">Plan Info</th>
+                <th class="py-4 px-6 text-center">User Seats (Adm / Mkt / Sales)</th>
+                <th class="py-4 px-6 text-center">Platform Limits (Proj / Prop)</th>
+                <th class="py-4 px-6 text-center">Status</th>
                 <th class="py-4 px-6 text-right">Actions</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-white/5">
               <tr *ngFor="let plan of plans" class="hover:bg-white/5 transition-colors group">
-                <td class="py-4 px-6 font-medium text-white flex items-center gap-3">
-                  <div class="w-8 h-8 rounded-full bg-secondary/10 border border-secondary/20 flex items-center justify-center text-secondary font-bold text-xs shadow-inner">
-                    <span class="material-symbols-outlined text-[16px]">stars</span>
+                <td class="py-4 px-6">
+                  <div class="flex flex-col">
+                    <span class="font-medium text-white text-base">{{ plan.name }}</span>
+                    <span class="text-xs text-gray-500">{{ plan.description || 'No description provided' }}</span>
                   </div>
-                  {{ plan.name }}
                 </td>
-                <td class="py-4 px-6 text-center font-mono text-gray-400">
-                  {{ plan.max_users }} Seats
+                
+                <td class="py-4 px-6 text-center font-mono text-gray-400 text-xs">
+                  <span class="text-white">{{ plan.max_admins }}</span> Adm • 
+                  <span class="text-white">{{ plan.max_mkt_users }}</span> Mkt • 
+                  <span class="text-white">{{ plan.max_sales_users }}</span> Sls
                 </td>
+
+                <td class="py-4 px-6 text-center font-mono text-gray-400 text-xs">
+                  <span class="text-white">{{ plan.max_projects }}</span> Proj • 
+                  <span class="text-white">{{ plan.max_properties_per_project }}</span> Prop/Proj
+                </td>
+
                 <td class="py-4 px-6 text-center">
-                  <span class="text-green-400 font-mono font-medium">{{ plan.base_price | currency:'USD' }}</span> / month
+                  <span [ngClass]="plan.is_active ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-red-500/10 text-red-400 border-red-500/20'"
+                        class="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border">
+                    {{ plan.is_active ? 'ACTIVE' : 'INACTIVE' }}
+                  </span>
                 </td>
+
                 <td class="py-4 px-6 text-right">
                   <div class="flex items-center justify-end gap-2">
-                    
                     <button (click)="openEditModal(plan)" 
                             class="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white transition-colors focus:outline-none"
                             title="Edit Plan">
@@ -62,7 +75,7 @@
                 </td>
               </tr>
               <tr *ngIf="plans.length === 0">
-                <td colspan="4" class="py-12 text-center text-gray-500 text-sm">
+                <td colspan="5" class="py-12 text-center text-gray-500 text-sm">
                   No subscription plans created yet.
                 </td>
               </tr>
@@ -74,32 +87,80 @@
   </div>
 </div>
 
-<app-modal [isOpen]="showModal" title="Create Subscription Plan" (close)="closeModal()" maxWidthClass="max-w-md">
+<app-modal [isOpen]="showModal" title="Create Subscription Plan" (close)="closeModal()" maxWidthClass="max-w-2xl">
   <form (ngSubmit)="savePlan()" class="flex flex-col gap-5">
-    <app-input label="Plan Name" placeholder="e.g. Enterprise Plus" [(ngModel)]="form.name" name="name"></app-input>
     
-    <div class="grid grid-cols-2 gap-4">
-      <app-input label="Max Users" type="number" placeholder="10" [(ngModel)]="form.max_users" name="max_users"></app-input>
-      <app-input label="Base Price (USD)" type="number" placeholder="99.99" [(ngModel)]="form.base_price" name="base_price"></app-input>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <app-input label="Plan Name" placeholder="e.g. Enterprise Plus" [(ngModel)]="form.name" name="name"></app-input>
+      <app-input label="Short Description" placeholder="Key benefits" [(ngModel)]="form.description" name="desc"></app-input>
     </div>
 
-    <div class="flex justify-end gap-3 mt-4 pt-4 border-t border-white/10">
+    <div class="p-4 rounded-xl border border-white/10 bg-white/5">
+      <h3 class="text-xs uppercase font-mono tracking-widest text-secondary mb-3">User Allocations (Seats)</h3>
+      <div class="grid grid-cols-3 gap-4">
+        <app-input label="Max Admins" type="number" [(ngModel)]="form.max_admins" name="adm"></app-input>
+        <app-input label="Max Marketing" type="number" [(ngModel)]="form.max_mkt_users" name="mkt"></app-input>
+        <app-input label="Max Sales" type="number" [(ngModel)]="form.max_sales_users" name="sls"></app-input>
+      </div>
+    </div>
+
+    <div class="p-4 rounded-xl border border-white/10 bg-white/5">
+      <h3 class="text-xs uppercase font-mono tracking-widest text-secondary mb-3">System Limits</h3>
+      <div class="grid grid-cols-2 gap-4">
+        <app-input label="Max Projects" type="number" [(ngModel)]="form.max_projects" name="proj"></app-input>
+        <app-input label="Max Properties / Project" type="number" [(ngModel)]="form.max_properties_per_project" name="prop"></app-input>
+      </div>
+    </div>
+
+    <div class="flex items-center justify-between p-3 bg-white/5 border border-white/10 rounded-xl">
+      <span class="text-xs font-mono uppercase tracking-widest text-gray-300">Plan Status (Active)</span>
+      <label class="relative inline-flex items-center cursor-pointer">
+        <input type="checkbox" [(ngModel)]="form.is_active" name="is_active" class="sr-only peer">
+        <div class="w-9 h-5 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-secondary"></div>
+      </label>
+    </div>
+
+    <div class="flex justify-end gap-3 mt-2 border-t border-white/10 pt-4">
       <app-button variant="ghost" (onClick)="closeModal()">Cancel</app-button>
       <app-button type="submit" variant="secondary" [isLoading]="isSaving">Create Plan</app-button>
     </div>
   </form>
 </app-modal>
 
-<app-modal [isOpen]="showEditModal" title="Edit Subscription Plan" (close)="closeEditModal()" maxWidthClass="max-w-md">
+<app-modal [isOpen]="showEditModal" title="Edit Subscription Plan" (close)="closeEditModal()" maxWidthClass="max-w-2xl">
   <form (ngSubmit)="updatePlan()" class="flex flex-col gap-5">
-    <app-input label="Plan Name" placeholder="e.g. Enterprise Plus" [(ngModel)]="editForm.name" name="edit_name"></app-input>
     
-    <div class="grid grid-cols-2 gap-4">
-      <app-input label="Max Users" type="number" placeholder="10" [(ngModel)]="editForm.max_users" name="edit_max_users"></app-input>
-      <app-input label="Base Price (USD)" type="number" placeholder="99.99" [(ngModel)]="editForm.base_price" name="edit_base_price"></app-input>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <app-input label="Plan Name" placeholder="e.g. Enterprise Plus" [(ngModel)]="editForm.name" name="edit_name"></app-input>
+      <app-input label="Short Description" placeholder="Key benefits" [(ngModel)]="editForm.description" name="edit_desc"></app-input>
     </div>
 
-    <div class="flex justify-end gap-3 mt-4 pt-4 border-t border-white/10">
+    <div class="p-4 rounded-xl border border-white/10 bg-white/5">
+      <h3 class="text-xs uppercase font-mono tracking-widest text-secondary mb-3">User Allocations (Seats)</h3>
+      <div class="grid grid-cols-3 gap-4">
+        <app-input label="Max Admins" type="number" [(ngModel)]="editForm.max_admins" name="edit_adm"></app-input>
+        <app-input label="Max Marketing" type="number" [(ngModel)]="editForm.max_mkt_users" name="edit_mkt"></app-input>
+        <app-input label="Max Sales" type="number" [(ngModel)]="editForm.max_sales_users" name="edit_sls"></app-input>
+      </div>
+    </div>
+
+    <div class="p-4 rounded-xl border border-white/10 bg-white/5">
+      <h3 class="text-xs uppercase font-mono tracking-widest text-secondary mb-3">System Limits</h3>
+      <div class="grid grid-cols-2 gap-4">
+        <app-input label="Max Projects" type="number" [(ngModel)]="editForm.max_projects" name="edit_proj"></app-input>
+        <app-input label="Max Properties / Project" type="number" [(ngModel)]="editForm.max_properties_per_project" name="edit_prop"></app-input>
+      </div>
+    </div>
+
+    <div class="flex items-center justify-between p-3 bg-white/5 border border-white/10 rounded-xl">
+      <span class="text-xs font-mono uppercase tracking-widest text-gray-300">Plan Status (Active)</span>
+      <label class="relative inline-flex items-center cursor-pointer">
+        <input type="checkbox" [(ngModel)]="editForm.is_active" name="edit_is_active" class="sr-only peer">
+        <div class="w-9 h-5 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-secondary"></div>
+      </label>
+    </div>
+
+    <div class="flex justify-end gap-3 mt-2 border-t border-white/10 pt-4">
       <app-button variant="ghost" (onClick)="closeEditModal()">Cancel</app-button>
       <app-button type="submit" variant="secondary" [isLoading]="isSaving">Save Changes</app-button>
     </div>

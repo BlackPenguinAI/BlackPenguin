@@ -1,5 +1,6 @@
 from pydantic import BaseModel, ConfigDict
 from typing import Optional
+from datetime import datetime
 
 class SubscriptionPlanBase(BaseModel):
     name: str
@@ -11,18 +12,12 @@ class SubscriptionPlanBase(BaseModel):
     max_properties_per_project: int = 50
     is_active: bool = True
 
-class SubscriptionPlanCreate(SubscriptionPlanBase):
+# Renombrados para compatibilidad exacta con el Router
+class PlanCreate(SubscriptionPlanBase):
     pass
 
-class SubscriptionPlanUpdate(BaseModel):
-    name: Optional[str] = None
-    description: Optional[str] = None
-    max_mkt_users: Optional[int] = None
-    max_sales_users: Optional[int] = None
-    max_projects: Optional[int] = None
-    max_properties_per_project: Optional[int] = None
-    is_active: Optional[bool] = None
-
-class SubscriptionPlanResponse(SubscriptionPlanBase):
+class PlanResponse(SubscriptionPlanBase):
     id: str
+    created_at: Optional[datetime] = None
+    
     model_config = ConfigDict(from_attributes=True)

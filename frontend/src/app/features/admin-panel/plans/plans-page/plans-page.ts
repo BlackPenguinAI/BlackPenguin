@@ -1,7 +1,7 @@
 import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
-import { CommonModule, CurrencyPipe } from '@angular/common';
+import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { TranslateModule } from '@ngx-translate/core';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 
 import { PlanService } from '../services/plan';
 import { ToastService } from '../../../../core/services/toast';
@@ -23,7 +23,6 @@ import { ModalComponent } from '../../../../shared/ui/modal/modal';
     ButtonComponent,
     ModalComponent
   ],
-  providers: [CurrencyPipe],
   templateUrl: './plans-page.html'
 })
 export class PlansPageComponent implements OnInit {
@@ -40,22 +39,32 @@ export class PlansPageComponent implements OnInit {
 
   form: any = {
     name: '',
-    max_users: 10,
-    base_price: 99.99
+    description: '',
+    max_admins: 1,
+    max_mkt_users: 0,
+    max_sales_users: 0,
+    max_projects: 1,
+    max_properties_per_project: 50,
+    is_active: true
   };
 
-  // 🚀 NUEVO: FORMULARIO DE EDICIÓN
   editForm: any = {
     id: '',
     name: '',
-    max_users: 10,
-    base_price: 99.99
+    description: '',
+    max_admins: 1,
+    max_mkt_users: 0,
+    max_sales_users: 0,
+    max_projects: 1,
+    max_properties_per_project: 50,
+    is_active: true
   };
 
   constructor(
     private planService: PlanService,
     private toast: ToastService,
-    private cdr: ChangeDetectorRef
+    private cdr: ChangeDetectorRef,
+    private translate: TranslateService
   ) {}
 
   ngOnInit(): void {
@@ -70,7 +79,7 @@ export class PlansPageComponent implements OnInit {
         this.isLoading = false;
         this.cdr.detectChanges();
       },
-      error: (err) => {
+      error: () => {
         this.toast.showError('Failed to load plans.');
         this.isLoading = false;
         this.cdr.detectChanges();
@@ -79,7 +88,7 @@ export class PlansPageComponent implements OnInit {
   }
 
   openModal(): void {
-    this.form = { name: '', max_users: 10, base_price: 99.99 };
+    this.form = { name: '', description: '', max_admins: 1, max_mkt_users: 0, max_sales_users: 0, max_projects: 1, max_properties_per_project: 50, is_active: true };
     this.showModal = true;
   }
 
@@ -87,14 +96,8 @@ export class PlansPageComponent implements OnInit {
     this.showModal = false;
   }
 
-  // 🚀 NUEVO: ABRIR/CERRAR MODAL DE EDICIÓN
   openEditModal(plan: any): void {
-    this.editForm = {
-      id: plan.id,
-      name: plan.name,
-      max_users: plan.max_users,
-      base_price: plan.base_price
-    };
+    this.editForm = { ...plan };
     this.showEditModal = true;
   }
 
@@ -133,7 +136,6 @@ export class PlansPageComponent implements OnInit {
     });
   }
 
-  // 🚀 NUEVO: FUNCIÓN PARA ACTUALIZAR PLAN
   updatePlan(): void {
     if (!this.editForm.name) {
       this.toast.showError('Plan name is required.');

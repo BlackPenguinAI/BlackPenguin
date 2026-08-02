@@ -16,15 +16,19 @@ def create_plan(
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN]))
 ):
-    # Verificar si el plan ya existe por nombre
     existing = db.query(SubscriptionPlan).filter(SubscriptionPlan.name == plan_in.name).first()
     if existing:
         raise HTTPException(status_code=400, detail="Plan with this name already exists")
     
     new_plan = SubscriptionPlan(
         name=plan_in.name,
-        max_users=plan_in.max_users,
-        base_price=plan_in.base_price
+        description=plan_in.description,
+        max_admins=plan_in.max_admins,
+        max_mkt_users=plan_in.max_mkt_users,
+        max_sales_users=plan_in.max_sales_users,
+        max_projects=plan_in.max_projects,
+        max_properties_per_project=plan_in.max_properties_per_project,
+        is_active=plan_in.is_active
     )
     db.add(new_plan)
     db.commit()
@@ -39,7 +43,6 @@ def get_plans(
     plans = db.query(SubscriptionPlan).order_by(SubscriptionPlan.created_at.desc()).all()
     return plans
 
-# 🚀 NUEVO: ACTUALIZAR PLAN
 @router.put("/{plan_id}/", response_model=PlanResponse, status_code=status.HTTP_200_OK)
 def update_plan(
     plan_id: str,
@@ -52,14 +55,18 @@ def update_plan(
         raise HTTPException(status_code=404, detail="Plan not found")
         
     plan.name = plan_in.name
-    plan.max_users = plan_in.max_users
-    plan.base_price = plan_in.base_price
+    plan.description = plan_in.description
+    plan.max_admins = plan_in.max_admins
+    plan.max_mkt_users = plan_in.max_mkt_users
+    plan.max_sales_users = plan_in.max_sales_users
+    plan.max_projects = plan_in.max_projects
+    plan.max_properties_per_project = plan_in.max_properties_per_project
+    plan.is_active = plan_in.is_active
     
     db.commit()
     db.refresh(plan)
     return plan
 
-# 🚀 NUEVO: ELIMINAR PLAN
 @router.delete("/{plan_id}/", status_code=status.HTTP_200_OK)
 def delete_plan(
     plan_id: str,
