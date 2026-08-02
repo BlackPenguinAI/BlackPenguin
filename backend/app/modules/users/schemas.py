@@ -6,6 +6,8 @@ class MyProfileResponse(BaseModel):
     email: str
     first_name: Optional[str] = None
     last_name: Optional[str] = None
+    phone: Optional[str] = None      # 🚀 AÑADIDO
+    country: Optional[str] = None    # 🚀 AÑADIDO
     company_name: Optional[str] = None
     plan_name: Optional[str] = None
     license_start: Optional[datetime] = None
@@ -14,6 +16,8 @@ class MyProfileResponse(BaseModel):
 class MyProfileUpdate(BaseModel):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
+    phone: Optional[str] = None      # 🚀 AÑADIDO
+    country: Optional[str] = None    # 🚀 AÑADIDO
     company_name: Optional[str] = None
 
 class PasswordUpdatePayload(BaseModel):

@@ -19,6 +19,10 @@ class User(Base):
     first_name = Column(String(150), nullable=True)
     last_name = Column(String(100), nullable=True)
     
+    # 🚀 NUEVOS CAMPOS AÑADIDOS
+    phone = Column(String(50), nullable=True)
+    country = Column(String(100), nullable=True)
+    
     email = Column(String(150), unique=True, index=True, nullable=False)
     hashed_password = Column(String(255), nullable=False)
     

@@ -14,9 +14,12 @@ router = APIRouter()
 def get_my_profile(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     profile_data = {
         "email": current_user.email,
-        "first name": current_user.first_name,
+        "first_name": current_user.first_name, # 🚀 CORREGIDO (antes decía "first name")
         "last_name": current_user.last_name,
+        "phone": current_user.phone,           # 🚀 AÑADIDO
+        "country": current_user.country,       # 🚀 AÑADIDO
     }
+    
     if current_user.company_id:
         company = db.query(Company).options(joinedload(Company.plan)).filter(Company.id == current_user.company_id).first()
         if company:
@@ -30,35 +33,40 @@ def get_my_profile(current_user: User = Depends(get_current_user), db: Session =
 
 @router.put("/me")
 def update_my_profile(payload: MyProfileUpdate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    # 🚀 ACTUALIZAMOS TODOS LOS CAMPOS
     current_user.first_name = payload.first_name
     current_user.last_name = payload.last_name
+    current_user.phone = payload.phone
+    current_user.country = payload.country
     
     if current_user.company_id and payload.company_name:
         company = db.query(Company).filter(Company.id == current_user.company_id).first()
-        if company: company.name = payload.company_name
+        if company: 
+            company.name = payload.company_name
 
     db.commit()
-    return {"message": "Perfil actualizado."}
+    return {"message": "Profile updated successfully."}
 
+# ... (Las rutas de change-password y set-password se mantienen idénticas)
 @router.put("/change-password")
 def change_password(payload: PasswordUpdatePayload, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     if not verify_password(payload.current_password, current_user.hashed_password):
-        raise HTTPException(status_code=400, detail="Contraseña actual incorrecta.")
+        raise HTTPException(status_code=400, detail="Current password incorrect.")
     current_user.hashed_password = get_password_hash(payload.new_password)
     db.commit()
-    return {"message": "Contraseña actualizada."}
+    return {"message": "Password updated successfully."}
 
 @router.post("/set-password")
 def set_password(payload: SetPasswordPayload, db: Session = Depends(get_db)):
     token_data = verify_email_token(payload.token)
-    if not token_data: raise HTTPException(status_code=400, detail="Enlace inválido o expirado.")
+    if not token_data: raise HTTPException(status_code=400, detail="Invalid or expired link.")
     user = db.query(User).filter(User.email == token_data.get("sub")).first()
-    if not user: raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+    if not user: raise HTTPException(status_code=404, detail="User not found.")
     
     expected_sec = user.hashed_password[-10:] if user.hashed_password else ""
     if token_data.get("sec") != expected_sec:
-        raise HTTPException(status_code=400, detail="Este enlace ya fue utilizado.")
+        raise HTTPException(status_code=400, detail="This link was already used.")
         
     user.hashed_password = get_password_hash(payload.new_password)
     db.commit()
-    return {"message": "Contraseña establecida con éxito."}
+    return {"message": "Password set successfully."}
