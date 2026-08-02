@@ -42,7 +42,7 @@ export const routes: Routes = [
   },
 
   // ==========================================
-  // 2. ZONA MASTER STAFF / SUPERADMIN (DDD)
+  // 2. ZONA SUPERADMIN / PANEL ADMIN
   // ==========================================
   {
     path: 'admin',
@@ -50,52 +50,20 @@ export const routes: Routes = [
       import('./shared/layout/layout').then((m) => m.LayoutComponent),
     children: [
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
-
-      // 🚀 Pantallas Refactorizadas
       {
         path: 'dashboard',
         loadComponent: () =>
-          import('./features/admin-panel/dashboard/dashboard-page/dashboard-page').then(
-            (m) => m.DashboardPageComponent
-          ),
-      },
-      {
-        path: 'profile',
-        loadComponent: () =>
-          import('./features/admin-panel/profile/profile-page/profile-page').then(
-            (m) => m.ProfilePageComponent
-          ),
+          import(
+            './features/admin-panel/dashboard/dashboard-page/dashboard-page'
+          ).then((m) => m.DashboardPageComponent),
       },
       {
         path: 'companies',
         loadComponent: () =>
-          import('./features/admin-panel/companies/companies-page/companies-page').then(
-            (m) => m.CompaniesPageComponent
-          ),
-      },
-      {
-        path: 'plans',
-        loadComponent: () =>
-          import('./features/admin-panel/plans/plans-page/plans-page').then(
-            (m) => m.PlansPageComponent
-          ),
-      },
-      {
-        path: 'ai-infrastructure',
-        loadComponent: () =>
           import(
-            './features/admin-panel/ai-infrastructure/ai-infra-page/ai-infra-page'
-          ).then((m) => m.AiInfraPageComponent),
+            './features/admin-panel/companies/companies-page/companies-page'
+          ).then((m) => m.CompaniesPageComponent),
       },
-      {
-        path: 'ai-settings',
-        loadComponent: () =>
-          import('./features/admin-panel/ai-settings/ai-settings-page/ai-settings-page').then(
-            (m) => m.AiSettingsPageComponent
-          ),
-      },
-
-      // 🚧 Pantallas Pendientes (Auntadas temporalmente al Dashboard para no expulsarte)
       {
         path: 'users',
         loadComponent: () =>
@@ -104,32 +72,26 @@ export const routes: Routes = [
           ).then((m) => m.UsersPageComponent),
       },
       {
+        path: 'plans',
+        loadComponent: () =>
+          import(
+            './features/admin-panel/plans/plans-page/plans-page'
+          ).then((m) => m.PlansPageComponent),
+      },
+      {
         path: 'email-settings',
         loadComponent: () =>
-          import('./features/admin-panel/dashboard/dashboard-page/dashboard-page').then(
-            (m) => m.DashboardPageComponent
-          ),
+          import(
+            './features/admin-panel/email-settings/email-settings-page/email-settings-page'
+          ).then((m) => m.EmailSettingsPageComponent),
       },
       {
-        path: 'messaging-settings',
+        path: 'profile',
         loadComponent: () =>
-          import('./features/admin-panel/dashboard/dashboard-page/dashboard-page').then(
-            (m) => m.DashboardPageComponent
-          ),
+          import(
+            './features/admin-panel/profile/profile-page/profile-page'
+          ).then((m) => m.ProfilePageComponent),
       },
-      {
-        path: 'legal-compliance',
-        loadComponent: () =>
-          import('./features/admin-panel/dashboard/dashboard-page/dashboard-page').then(
-            (m) => m.DashboardPageComponent
-          ),
-      },
-
-      // Redirección de compatibilidad para viejas URLs
-      { path: 'developers', redirectTo: 'companies', pathMatch: 'full' },
-      { path: 'emails', redirectTo: 'dashboard', pathMatch: 'full' },
-      { path: 'ai-keys', redirectTo: 'ai-infrastructure', pathMatch: 'full' },
-      { path: 'ai-config', redirectTo: 'ai-settings', pathMatch: 'full' },
     ],
   },
 
@@ -178,8 +140,6 @@ export const routes: Routes = [
     ],
   },
 
-  // ==========================================
-  // 4. WILDCARD (Comodín)
-  // ==========================================
+  // Fallback
   { path: '**', redirectTo: '' },
 ];
