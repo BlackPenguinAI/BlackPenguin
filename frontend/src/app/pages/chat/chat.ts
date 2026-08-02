@@ -1,187 +1,209 @@
-import { Component, ElementRef, ViewChild, OnInit, OnDestroy, isDevMode, ChangeDetectorRef } from '@angular/core'; 
+import {
+  ChangeDetectorRef,
+  Component,
+  ElementRef,
+  OnDestroy,
+  OnInit,
+  ViewChild,
+  isDevMode,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { RouterModule } from '@angular/router';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { RouterModule } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
-import { interval, Subscription } from 'rxjs'; // 🚀 IMPORTACIONES NUEVAS
+import { Subscription, interval } from 'rxjs';
+
+import {
+  ChatMessage,
+  CompanyFieldProgress,
+  CompanyProfileResponse,
+  EMPTY_COMPANY_PROFILE,
+  Requirement,
+  ValidationStatus,
+} from './company-onboarding.models';
+
 
 @Component({
   selector: 'app-chat',
   standalone: true,
   imports: [CommonModule, FormsModule, RouterModule, TranslateModule],
   templateUrl: './chat.html',
-  styleUrl: './chat.scss'
+  styleUrl: './chat.scss',
 })
 export class ChatComponent implements OnInit, OnDestroy {
-  @ViewChild('chatScroll') chatScroll!: ElementRef;
+  @ViewChild('chatScroll') chatScroll!: ElementRef<HTMLElement>;
 
-  prompt: string = '';
-  isAnalyzing: boolean = false;
-  currentLang: string = 'en';
-  userName: string = '';
+  prompt = '';
+  isAnalyzing = false;
+  currentLang = 'en';
+  userName = '';
+  isRecording = false;
+  isCompleted = false;
+  messages: ChatMessage[] = [];
+  profile: CompanyProfileResponse = EMPTY_COMPANY_PROFILE;
 
-  selectedFile: File | null = null;
-  isDragOver: boolean = false;
-  isRecording: boolean = false; 
-
-  messages: any[] = [];
-  profile: any = {};
-  isCompleted: boolean = false;
-
-  private profilePollSub?: Subscription; // 🚀 CONTROLADOR DEL POLLING
+  private profilePollSub?: Subscription;
 
   constructor(
-    private translate: TranslateService,
-    private http: HttpClient,
-    private cdr: ChangeDetectorRef
+    private readonly translate: TranslateService,
+    private readonly http: HttpClient,
+    private readonly cdr: ChangeDetectorRef,
   ) {
     this.currentLang = localStorage.getItem('bp_lang') || 'en';
     this.translate.use(this.currentLang);
-    localStorage.setItem('bp_lang', this.currentLang); 
   }
 
-  private get baseUrl() {
-    return isDevMode() 
-      ? 'http://localhost:8000/api/v1/tenants/onboarding' 
-      : 'https://blackpenguin.ai/api/v1/tenants/onboarding';
+  private get baseUrl(): string {
+    return isDevMode()
+      ? 'http://localhost:8000/api/v1/company-onboarding'
+      : '/api/v1/company-onboarding';
   }
 
-  private get headers() {
+  private get headers(): HttpHeaders {
     const token = localStorage.getItem('bp_token');
-    return new HttpHeaders().set('Authorization', `Bearer ${token}`);
+    return token
+      ? new HttpHeaders().set('Authorization', `Bearer ${token}`)
+      : new HttpHeaders();
   }
 
-  ngOnInit() {
+  ngOnInit(): void {
     this.userName = localStorage.getItem('bp_name') || 'User';
     this.loadProfile();
-    this.initSession(); 
-    this.startProfilePolling(); // 🚀 INICIAR MAGIA EN TIEMPO REAL
+    this.initSession();
+    this.profilePollSub = interval(4000).subscribe(() => this.loadProfile());
   }
 
-  ngOnDestroy() {
-    // 🚀 Limpiar el polling al salir de la pantalla para evitar fugas de memoria
-    if (this.profilePollSub) this.profilePollSub.unsubscribe();
+  ngOnDestroy(): void {
+    this.profilePollSub?.unsubscribe();
   }
 
-  startProfilePolling() {
-    // Consultar silenciosamente la BD cada 4 segundos si el perfil no está al 100%
-    this.profilePollSub = interval(4000).subscribe(() => {
-      if (!this.profile.is_profile_fully_completed) {
-        this.loadProfile();
-      }
-    });
+  initSession(): void {
+    this.http
+      .get<{ is_completed: boolean }>(`${this.baseUrl}/session`, { headers: this.headers })
+      .subscribe({
+        next: ({ is_completed }) => {
+          this.isCompleted = is_completed;
+          this.loadChatHistory();
+        },
+      });
   }
 
-  initSession() {
-    this.http.get<any>(`${this.baseUrl}/session`, { headers: this.headers }).subscribe({
-      next: (sessionData) => {
-        this.isCompleted = sessionData.is_completed;
-        this.loadChatHistory();
-      }
-    });
+  loadProfile(): void {
+    this.http
+      .get<CompanyProfileResponse>(`${this.baseUrl}/profile`, { headers: this.headers })
+      .subscribe({
+        next: (profile) => {
+          this.profile = profile;
+          this.isCompleted = profile.completion.can_complete;
+          this.cdr.detectChanges();
+        },
+      });
   }
 
-  loadProfile() {
-    this.http.get<any>(`${this.baseUrl}/profile`, { headers: this.headers }).subscribe({
-      next: (data) => {
-        this.profile = data;
-        this.cdr.detectChanges(); 
-      }
-    });
+  loadChatHistory(): void {
+    this.http
+      .get<ChatMessage[]>(`${this.baseUrl}/chat`, { headers: this.headers })
+      .subscribe({
+        next: (messages) => {
+          this.messages = messages;
+          this.scrollToBottom();
+        },
+      });
   }
 
-  loadChatHistory() {
-    this.http.get<any[]>(`${this.baseUrl}/chat`, { headers: this.headers }).subscribe({
-      next: (data) => {
-        this.messages = data;
-        this.scrollToBottom();
-        this.cdr.detectChanges();
-      }
-    });
+  fieldsByRequirement(requirement: Requirement): CompanyFieldProgress[] {
+    return this.profile.fields.filter((field) => field.requirement === requirement);
+  }
+
+  get requiredFields(): CompanyFieldProgress[] {
+    return this.fieldsByRequirement('required');
+  }
+
+  get conditionalFields(): CompanyFieldProgress[] {
+    return this.fieldsByRequirement('conditionally_required');
   }
 
   get canSend(): boolean {
-    const hasText = this.prompt && this.prompt.trim().length > 0;
-    const hasFile = this.selectedFile !== null;
-    return (hasText || hasFile) && !this.isAnalyzing && !this.isRecording && !this.isCompleted;
+    return this.prompt.trim().length > 0 && !this.isAnalyzing && !this.isCompleted;
   }
 
-  handleKeyDown(event: KeyboardEvent) {
+  statusIcon(status: ValidationStatus): string {
+    const icons: Record<ValidationStatus, string> = {
+      confirmed: 'check_circle',
+      corrected_by_user: 'check_circle',
+      not_applicable: 'remove_circle',
+      conflicting: 'error',
+      pending_confirmation: 'schedule',
+      extracted: 'manage_search',
+      missing: 'radio_button_unchecked',
+    };
+    return icons[status];
+  }
+
+  statusClass(status: ValidationStatus): string {
+    if (status === 'confirmed' || status === 'corrected_by_user') return 'text-green-500';
+    if (status === 'conflicting') return 'text-red-400';
+    if (status === 'pending_confirmation' || status === 'extracted') return 'text-secondary';
+    return 'text-gray-600';
+  }
+
+  statusLabel(status: ValidationStatus): string {
+    const labels: Record<ValidationStatus, string> = {
+      missing: 'Faltante',
+      extracted: 'Extraído',
+      pending_confirmation: 'Pendiente de confirmación',
+      confirmed: 'Confirmado',
+      corrected_by_user: 'Corregido por el usuario',
+      conflicting: 'En conflicto',
+      not_applicable: 'No aplica',
+    };
+    return labels[status];
+  }
+
+  handleKeyDown(event: KeyboardEvent): void {
     if (event.key === 'Enter' && !event.shiftKey) {
-      event.preventDefault(); 
-      if (this.canSend) {
-        this.sendMessage();
-      }
+      event.preventDefault();
+      if (this.canSend) this.sendMessage();
     }
   }
 
-  sendMessage() {
+  sendMessage(): void {
     if (!this.canSend) return;
-
-    const userText = this.prompt.trim();
-    const fileToUpload = this.selectedFile; // 🚀 Capturamos el archivo
-    
-    this.prompt = ''; 
-    this.selectedFile = null; // 🚀 Desaparece del input visualmente
-    
-    // 1. Mostrar en UI el texto y el archivo asociado a esta burbuja
-    this.messages.push({ 
-      sender: 'user', 
-      content: userText, 
-      file_name: fileToUpload ? fileToUpload.name : null, // 🚀 Adjuntamos el nombre
-      created_at: new Date() 
-    });
-    
+    const content = this.prompt.trim();
+    this.prompt = '';
+    this.messages.push({ sender: 'user', content, created_at: new Date() });
     this.isAnalyzing = true;
     this.scrollToBottom();
-    this.cdr.detectChanges(); 
 
-    // 2. 🚀 Usar FormData en lugar de JSON para enviar el archivo físico
-    const formData = new FormData();
-    formData.append('message', userText);
-    if (fileToUpload) {
-      formData.append('file', fileToUpload);
-    }
-
-    this.http.post<any>(`${this.baseUrl}/chat`, formData, { headers: this.headers }).subscribe({
-      next: (aiResponse) => {
-        this.messages.push(aiResponse);
-        this.isAnalyzing = false;
-        this.scrollToBottom();
-        this.loadProfile(); // Refresco inmediato
-      },
-      error: (err) => {
-        console.error('Error sending message', err);
-        this.isAnalyzing = false;
-        this.cdr.detectChanges(); 
-      }
-    });
+    this.http
+      .post<ChatMessage>(`${this.baseUrl}/chat`, { message: content }, { headers: this.headers })
+      .subscribe({
+        next: (message) => {
+          this.messages.push(message);
+          this.isAnalyzing = false;
+          this.loadProfile();
+          this.scrollToBottom();
+        },
+        error: () => {
+          this.isAnalyzing = false;
+          this.cdr.detectChanges();
+        },
+      });
   }
 
-  onFileSelected(event: any) {
-    if (event.target.files && event.target.files.length > 0) {
-      this.selectedFile = event.target.files[0];
-      this.cdr.detectChanges();
-    }
-  }
-
-  removeFile() {
-    this.selectedFile = null;
-    this.cdr.detectChanges();
-  }
-
-  toggleRecording() {
+  toggleRecording(): void {
     this.isRecording = !this.isRecording;
-    this.prompt = this.isRecording ? "🎙️ Escuchando... (Hable ahora)" : "";
-    this.cdr.detectChanges();
   }
 
-  scrollToBottom() {
+  trackField(_: number, field: CompanyFieldProgress): string {
+    return field.key;
+  }
+
+  private scrollToBottom(): void {
     setTimeout(() => {
-      if (this.chatScroll) {
-        this.chatScroll.nativeElement.scrollTop = this.chatScroll.nativeElement.scrollHeight;
-      }
+      const element = this.chatScroll?.nativeElement;
+      if (element) element.scrollTop = element.scrollHeight;
     }, 100);
   }
 }

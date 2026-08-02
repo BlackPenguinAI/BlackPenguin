@@ -1,273 +1,191 @@
-<div class="flex flex-col md:flex-row h-full w-full bg-[#050505] text-white font-sans overflow-hidden">
-
-  <div class="flex-1 min-w-0 flex flex-col relative h-full">
-
-    <div
-      class="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-secondary/5 rounded-full blur-[150px] pointer-events-none z-0">
-    </div>
-
-    <div class="p-4 md:p-6 border-b border-white/5 flex items-center justify-between z-10 bg-black/40 backdrop-blur-md">
+<div class="flex h-full w-full flex-col overflow-hidden bg-[#050505] font-sans text-white md:flex-row">
+  <section class="relative flex h-full min-w-0 flex-1 flex-col">
+    <header class="z-10 flex items-center justify-between border-b border-white/5 bg-black/40 p-4 backdrop-blur-md md:p-6">
       <div>
-        <h1 class="text-xl md:text-2xl font-light tracking-tight">AI Corporate <span
-            class="font-medium text-secondary">Onboarding</span></h1>
-        <p class="text-xs text-gray-400 mt-1">Basic configuration and business identity analysis.</p>
+        <h1 class="text-xl font-light tracking-tight md:text-2xl">
+          AI Corporate <span class="font-medium text-secondary">Onboarding</span>
+        </h1>
+        <p class="mt-1 text-xs text-gray-400">Configuración y validación del perfil corporativo.</p>
       </div>
-    </div>
+    </header>
 
-    <div #chatScroll class="flex-1 overflow-y-auto z-10 flex flex-col p-4 md:p-8 gap-6 scroll-smooth">
-      <div *ngFor="let msg of messages" class="flex w-full animate-fade-in"
-        [ngClass]="{'justify-end': msg.sender === 'user', 'justify-start': msg.sender === 'ai' || msg.sender !== 'user'}">
-
-        <div *ngIf="msg.sender !== 'user'" class="flex gap-4 max-w-[90%] md:max-w-[80%]">
-          <div class="w-8 h-8 rounded-full bg-secondary/20 border border-secondary/50 flex items-center justify-center shrink-0 mt-1 shadow-[0_0_10px_rgba(234,179,8,0.2)]">
-            <span class="material-symbols-outlined text-secondary text-[18px]">smart_toy</span>
+    <div #chatScroll class="z-10 flex flex-1 flex-col gap-6 overflow-y-auto p-4 scroll-smooth md:p-8">
+      <div
+        *ngFor="let msg of messages"
+        class="flex w-full"
+        [ngClass]="msg.sender === 'user' ? 'justify-end' : 'justify-start'"
+      >
+        <div *ngIf="msg.sender === 'ai'" class="flex max-w-[90%] gap-4 md:max-w-[80%]">
+          <div class="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-secondary/50 bg-secondary/20">
+            <span class="material-symbols-outlined text-[18px] text-secondary">smart_toy</span>
           </div>
-          
-          <div class="flex flex-col items-start w-full min-w-0">
-            <div class="bg-white/5 border border-white/10 rounded-2xl rounded-tl-sm p-4 md:p-5 text-sm font-light text-gray-200 leading-relaxed whitespace-pre-wrap shadow-lg w-full break-words">
+          <div>
+            <div class="whitespace-pre-wrap rounded-2xl rounded-tl-sm border border-white/10 bg-white/5 p-4 text-sm leading-relaxed text-gray-200">
               {{ msg.content }}
-
-              <div class="mt-3 flex justify-end">
-                <button class="text-gray-500 hover:text-secondary transition-colors"
-                  title="Escuchar respuesta (Configurar API)">
-                  <span class="material-symbols-outlined text-[16px]">volume_up</span>
-                </button>
-              </div>
             </div>
-            
-            <span *ngIf="msg.created_at" class="text-[10px] text-gray-500 mt-1.5 px-1 flex items-center gap-1 select-none">
-              <span>{{ msg.created_at | date:'dd/MM/yyyy' }}</span>
-              <span class="text-gray-700">•</span>
-              <span class="text-gray-400 font-medium">{{ msg.created_at | date:'HH:mm' }}</span>
+            <span class="mt-1.5 block px-1 text-[10px] text-gray-500">
+              {{ msg.created_at | date: 'dd/MM/yyyy HH:mm' }}
             </span>
           </div>
         </div>
 
-        <div *ngIf="msg.sender === 'user'" class="flex flex-col items-end max-w-[85%] md:max-w-[80%] min-w-0">
-          <span class="text-[10px] text-gray-500 mb-1 mr-2">{{ userName }}</span>
-
-          <div *ngIf="msg.file_name" class="mb-2 flex items-center gap-3 bg-white/10 border border-white/20 px-4 py-2.5 rounded-xl max-w-full shadow-md">
-            <div class="p-1.5 bg-red-500/20 rounded-md shrink-0">
-              <span class="material-symbols-outlined text-red-400 text-[20px] block">picture_as_pdf</span>
-            </div>
-            <div class="flex flex-col min-w-0">
-              <span class="text-xs text-gray-200 font-medium truncate w-full">{{ msg.file_name }}</span>
-              <span class="text-[10px] text-gray-500">Document Upload</span>
-            </div>
-          </div>
-
-          <div *ngIf="msg.content" class="bg-white/10 border border-white/10 text-white px-5 py-3 rounded-2xl rounded-tr-sm text-sm font-light leading-relaxed shadow-lg break-words max-w-full">
+        <div *ngIf="msg.sender === 'user'" class="flex max-w-[85%] flex-col items-end md:max-w-[80%]">
+          <span class="mb-1 mr-2 text-[10px] text-gray-500">{{ userName }}</span>
+          <div class="rounded-2xl rounded-tr-sm border border-white/10 bg-white/10 px-5 py-3 text-sm leading-relaxed">
             {{ msg.content }}
           </div>
-
-          <span *ngIf="msg.created_at" class="text-[10px] text-gray-500 mt-1.5 px-1 flex items-center gap-1 select-none">
-            <span>{{ msg.created_at | date:'dd/MM/yyyy' }}</span>
-            <span class="text-gray-700">•</span>
-            <span class="text-gray-400 font-medium">{{ msg.created_at | date:'HH:mm' }}</span>
+          <span class="mt-1.5 px-1 text-[10px] text-gray-500">
+            {{ msg.created_at | date: 'dd/MM/yyyy HH:mm' }}
           </span>
         </div>
       </div>
 
-      <div *ngIf="isAnalyzing" class="flex gap-4 max-w-[80%] animate-fade-in">
-        <div class="w-8 h-8 rounded-full bg-secondary/20 border border-secondary/50 flex items-center justify-center shrink-0 mt-1 shadow-[0_0_10px_rgba(234,179,8,0.2)]">
-          <span class="material-symbols-outlined text-secondary text-[18px]">smart_toy</span>
+      <div *ngIf="isAnalyzing" class="flex max-w-[80%] gap-4">
+        <div class="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-secondary/50 bg-secondary/20">
+          <span class="material-symbols-outlined text-[18px] text-secondary">smart_toy</span>
         </div>
-        <div class="bg-white/5 border border-white/10 rounded-2xl rounded-tl-sm p-4 flex items-center gap-2 shadow-lg">
-          <span class="h-2 w-2 bg-secondary rounded-full animate-bounce"></span>
-          <span class="h-2 w-2 bg-secondary rounded-full animate-bounce" style="animation-delay: 0.2s"></span>
-          <span class="h-2 w-2 bg-secondary rounded-full animate-bounce" style="animation-delay: 0.4s"></span>
+        <div class="flex items-center gap-2 rounded-2xl rounded-tl-sm border border-white/10 bg-white/5 p-4">
+          <span class="h-2 w-2 animate-bounce rounded-full bg-secondary"></span>
+          <span class="h-2 w-2 animate-bounce rounded-full bg-secondary [animation-delay:0.2s]"></span>
+          <span class="h-2 w-2 animate-bounce rounded-full bg-secondary [animation-delay:0.4s]"></span>
         </div>
       </div>
-      
     </div>
 
-    <div class="p-4 bg-[#050505] border-t border-white/5 z-10 relative">
-      <div class="max-w-4xl mx-auto">
-
-        <div *ngIf="selectedFile"
-          class="mb-3 flex items-center gap-3 bg-white/5 border border-white/10 px-4 py-2 rounded-xl w-max animate-fade-in">
-          <span class="material-symbols-outlined text-secondary">draft</span>
-          <span class="text-xs text-gray-300 truncate max-w-[200px]">{{ selectedFile.name }}</span>
-          <button (click)="removeFile()" class="text-gray-500 hover:text-red-400 flex items-center justify-center">
-            <span class="material-symbols-outlined text-[16px]">close</span>
+    <footer class="z-10 border-t border-white/5 bg-[#050505] p-4">
+      <div class="mx-auto max-w-4xl">
+        <div class="relative rounded-2xl border border-white/5 bg-[#111] p-4 shadow-2xl">
+          <textarea
+            [(ngModel)]="prompt"
+            (keydown)="handleKeyDown($event)"
+            [disabled]="isAnalyzing || isCompleted"
+            rows="1"
+            placeholder="Escribe información, una corrección o una confirmación..."
+            class="min-h-12 max-h-36 w-full resize-none overflow-hidden bg-transparent py-3 pl-4 pr-14 text-sm text-white placeholder-gray-500 focus:outline-none"
+          ></textarea>
+          <button
+            (click)="sendMessage()"
+            [disabled]="!canSend"
+            class="absolute bottom-2 right-2 rounded-xl bg-white p-2 transition-colors disabled:bg-white/20 disabled:opacity-50"
+          >
+            <span class="material-symbols-outlined text-[20px]" [ngClass]="canSend ? 'text-black' : 'text-gray-400'">
+              arrow_upward
+            </span>
           </button>
         </div>
-
-        <div class="p-4 bg-[#111] rounded-2xl border border-white/5 shadow-2xl relative transition-all duration-300"
-          [ngClass]="{'border-secondary/50 shadow-[0_0_15px_rgba(234,179,8,0.1)]': isDragOver}">
-
-          <textarea [(ngModel)]="prompt" (keydown)="handleKeyDown($event)" [disabled]="isAnalyzing || isRecording"
-            rows="1" placeholder="{{ isRecording ? '🎙️ Escuchando...' : 'Ask me anything or drop a link or file...' }}"
-            class="w-full bg-transparent text-white text-sm focus:outline-none resize-none overflow-hidden placeholder-gray-500 py-3 pl-4 pr-32"
-            style="min-height: 48px; max-height: 150px;"></textarea>
-
-          <div class="absolute right-2 bottom-2 flex items-center gap-1">
-
-            <input type="file" class="hidden" #fileInput (change)="onFileSelected($event)"
-              accept=".pdf,.doc,.docx,.txt">
-            <button (click)="fileInput.click()" [disabled]="isAnalyzing"
-              class="p-2 text-gray-400 hover:text-white transition-colors disabled:opacity-50" title="Upload Document">
-              <span class="material-symbols-outlined text-[20px]">attach_file</span>
-            </button>
-
-            <button (click)="toggleRecording()" [disabled]="isAnalyzing"
-              class="p-2 text-gray-400 hover:text-white transition-colors disabled:opacity-50" title="Voice Message">
-              <span class="material-symbols-outlined text-[20px]">{{ isRecording ? 'stop_circle' : 'mic' }}</span>
-            </button>
-
-            <button (click)="sendMessage()" [disabled]="!canSend"
-              class="p-2 bg-white rounded-xl hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:bg-white/20 group">
-              <span class="material-symbols-outlined text-[20px] transition-colors"
-                [ngClass]="{'text-black': canSend, 'text-gray-400': !canSend}">arrow_upward</span>
-            </button>
-
-          </div>
-
-        </div>
-        <p class="text-center text-[10px] text-gray-600 mt-3 font-mono">Black Penguin AI can make mistakes. Verify important facts.</p>
+        <p class="mt-3 text-center font-mono text-[10px] text-gray-600">
+          La información extraída debe ser confirmada antes de completar el perfil.
+        </p>
       </div>
-    </div>
-  </div>
+    </footer>
+  </section>
 
-  <div
-    class="w-full md:w-80 lg:w-96 shrink-0 border-l border-white/10 bg-[#0a0a0a] flex flex-col z-20 shadow-[-10px_0_30px_rgba(0,0,0,0.5)] h-full">
-
-    <div class="p-6 border-b border-white/10">
-      <h2 class="text-sm font-bold uppercase tracking-widest text-white flex items-center gap-2">
-        <span class="material-symbols-outlined text-secondary text-[20px]">radar</span>
-        Data Extractor
-      </h2>
-      <p class="text-xs text-gray-400 mt-2 leading-relaxed">El Agente IA analizará las respuestas, textos y enlaces para
-        completar el perfil corporativo automáticamente.</p>
-
-      <div *ngIf="profile.scraped_source_url"
-        class="mt-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl flex items-center gap-3">
-        <span class="material-symbols-outlined text-blue-400 text-[18px]">language</span>
-        <div class="flex-1 overflow-hidden">
-          <span class="text-[10px] text-blue-300 uppercase font-bold block tracking-wider">Scraped Web Source</span>
-          <a [href]="profile.scraped_source_url" target="_blank"
-            class="text-xs text-blue-200 hover:underline truncate block w-full">{{ profile.scraped_source_url }}</a>
-        </div>
+  <aside class="z-20 flex h-full w-full shrink-0 flex-col border-l border-white/10 bg-[#0a0a0a] md:w-80 lg:w-96">
+    <header class="border-b border-white/10 p-6">
+      <div class="flex items-center justify-between gap-4">
+        <h2 class="flex items-center gap-2 text-sm font-bold uppercase tracking-widest">
+          <span class="material-symbols-outlined text-[20px] text-secondary">radar</span>
+          Perfil de empresa
+        </h2>
+        <span class="text-2xl font-semibold text-secondary">{{ profile.completion.percentage }}%</span>
       </div>
-    </div>
+      <div class="mt-4 h-2 overflow-hidden rounded-full bg-white/10">
+        <div
+          class="h-full rounded-full bg-secondary transition-[width] duration-500"
+          [style.width.%]="profile.completion.percentage"
+        ></div>
+      </div>
+      <p class="mt-3 text-[11px] leading-relaxed text-gray-500">
+        Obligatorios: 90%. Condicionales aplicables: 10%. El enriquecimiento no bloquea la finalización.
+      </p>
+    </header>
 
-    <div class="flex-1 overflow-y-auto p-6 flex flex-col gap-6 scrollbar-hide">
-
-      <div class="flex gap-4 items-start transition-opacity duration-500"
-        [ngClass]="{'opacity-40': !profile.is_identity_completed}">
-        <span class="material-symbols-outlined mt-0.5"
-          [ngClass]="profile.is_identity_completed ? 'text-green-500 drop-shadow-[0_0_5px_rgba(34,197,94,0.5)]' : 'text-gray-600'">
-          {{ profile.is_identity_completed ? 'check_circle' : 'radio_button_unchecked' }}
-        </span>
-        <div>
-          <h3 class="text-sm font-medium" [ngClass]="profile.is_identity_completed ? 'text-white' : 'text-gray-300'">1.
-            Company Identity</h3>
-          <p class="text-[11px] text-gray-500 mt-1">Legal name, DBA, headquarters & year established.</p>
-          <div *ngIf="profile.is_identity_completed"
-            class="mt-2 text-[10px] text-secondary font-mono bg-white/5 px-2 py-1 rounded border border-white/10 inline-block uppercase tracking-wider">
-            {{ profile.legal_name || 'N/A' }}
+    <div class="flex-1 space-y-7 overflow-y-auto p-6">
+      <section>
+        <div class="mb-3 flex items-center justify-between">
+          <h3 class="text-xs font-bold uppercase tracking-wider text-white">Obligatorios</h3>
+          <span class="text-[11px] text-gray-400">
+            {{ profile.completion.required.completed }} de {{ profile.completion.required.total }}
+          </span>
+        </div>
+        <div class="space-y-3">
+          <div *ngFor="let field of requiredFields; trackBy: trackField" class="flex items-start gap-3">
+            <span class="material-symbols-outlined mt-0.5 text-[18px]" [ngClass]="statusClass(field.status)">
+              {{ statusIcon(field.status) }}
+            </span>
+            <div class="min-w-0">
+              <p class="text-xs text-gray-200">{{ field.label }}</p>
+              <p class="text-[10px]" [ngClass]="statusClass(field.status)">{{ statusLabel(field.status) }}</p>
+            </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      <div class="flex gap-4 items-start transition-opacity duration-500"
-        [ngClass]="{'opacity-40': !profile.is_team_completed}">
-        <span class="material-symbols-outlined mt-0.5"
-          [ngClass]="profile.is_team_completed ? 'text-green-500 drop-shadow-[0_0_5px_rgba(34,197,94,0.5)]' : 'text-gray-600'">
-          {{ profile.is_team_completed ? 'check_circle' : 'radio_button_unchecked' }}
-        </span>
-        <div>
-          <h3 class="text-sm font-medium" [ngClass]="profile.is_team_completed ? 'text-white' : 'text-gray-300'">2.
-            Executive Team</h3>
-          <p class="text-[11px] text-gray-500 mt-1">Key contacts and leadership roles.</p>
+      <section>
+        <div class="mb-3 flex items-center justify-between">
+          <h3 class="text-xs font-bold uppercase tracking-wider text-white">Condicionales</h3>
+          <span class="text-[11px] text-gray-400">
+            {{ profile.completion.conditional.evaluated }} de {{ profile.completion.conditional.total }} evaluados
+          </span>
         </div>
-      </div>
-
-      <div class="flex gap-4 items-start transition-opacity duration-500"
-        [ngClass]="{'opacity-40': !profile.is_focus_completed}">
-        <span class="material-symbols-outlined mt-0.5"
-          [ngClass]="profile.is_focus_completed ? 'text-green-500 drop-shadow-[0_0_5px_rgba(34,197,94,0.5)]' : 'text-gray-600'">
-          {{ profile.is_focus_completed ? 'check_circle' : 'radio_button_unchecked' }}
-        </span>
-        <div>
-          <h3 class="text-sm font-medium" [ngClass]="profile.is_focus_completed ? 'text-white' : 'text-gray-300'">3.
-            Asset Classes</h3>
-          <p class="text-[11px] text-gray-500 mt-1">Multi-family, Commercial, Mixed-use, etc.</p>
+        <div class="space-y-3">
+          <div *ngFor="let field of conditionalFields; trackBy: trackField" class="flex items-start gap-3">
+            <span class="material-symbols-outlined mt-0.5 text-[18px]" [ngClass]="statusClass(field.status)">
+              {{ statusIcon(field.status) }}
+            </span>
+            <div class="min-w-0">
+              <p class="text-xs text-gray-200">{{ field.label }}</p>
+              <p class="text-[10px]" [ngClass]="statusClass(field.status)">
+                {{ field.applicable === null ? 'Aplicabilidad pendiente' : statusLabel(field.status) }}
+              </p>
+            </div>
+          </div>
         </div>
-      </div>
+      </section>
 
-      <div class="flex gap-4 items-start transition-opacity duration-500"
-        [ngClass]="{'opacity-40': !profile.is_market_completed}">
-        <span class="material-symbols-outlined mt-0.5"
-          [ngClass]="profile.is_market_completed ? 'text-green-500 drop-shadow-[0_0_5px_rgba(34,197,94,0.5)]' : 'text-gray-600'">
-          {{ profile.is_market_completed ? 'check_circle' : 'radio_button_unchecked' }}
-        </span>
-        <div>
-          <h3 class="text-sm font-medium" [ngClass]="profile.is_market_completed ? 'text-white' : 'text-gray-300'">4.
-            Market Coverage</h3>
-          <p class="text-[11px] text-gray-500 mt-1">Geographic footprint and target demographics.</p>
+      <section class="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+        <h3 class="text-xs font-bold uppercase tracking-wider text-white">Enriquecimiento</h3>
+        <div class="mt-3 space-y-2 text-[11px] text-gray-400">
+          <div class="flex justify-between">
+            <span>Recomendados capturados</span>
+            <span>{{ profile.completion.recommended.captured }} / {{ profile.completion.recommended.total }}</span>
+          </div>
+          <div class="flex justify-between">
+            <span>Opcionales capturados</span>
+            <span>{{ profile.completion.optional.captured }} / {{ profile.completion.optional.total }}</span>
+          </div>
+          <p class="pt-1 text-[10px] text-gray-600">No afecta la finalización.</p>
         </div>
-      </div>
+      </section>
 
-      <div class="flex gap-4 items-start transition-opacity duration-500"
-        [ngClass]="{'opacity-40': !profile.is_strategy_completed}">
-        <span class="material-symbols-outlined mt-0.5"
-          [ngClass]="profile.is_strategy_completed ? 'text-green-500 drop-shadow-[0_0_5px_rgba(34,197,94,0.5)]' : 'text-gray-600'">
-          {{ profile.is_strategy_completed ? 'check_circle' : 'radio_button_unchecked' }}
-        </span>
-        <div>
-          <h3 class="text-sm font-medium" [ngClass]="profile.is_strategy_completed ? 'text-white' : 'text-gray-300'">5.
-            Investment Strategy</h3>
-          <p class="text-[11px] text-gray-500 mt-1">AUM and core investment goals.</p>
-        </div>
-      </div>
-
-      <div class="flex gap-4 items-start transition-opacity duration-500"
-        [ngClass]="{'opacity-40': !profile.is_value_prop_completed}">
-        <span class="material-symbols-outlined mt-0.5"
-          [ngClass]="profile.is_value_prop_completed ? 'text-green-500 drop-shadow-[0_0_5px_rgba(34,197,94,0.5)]' : 'text-gray-600'">
-          {{ profile.is_value_prop_completed ? 'check_circle' : 'radio_button_unchecked' }}
-        </span>
-        <div>
-          <h3 class="text-sm font-medium" [ngClass]="profile.is_value_prop_completed ? 'text-white' : 'text-gray-300'">
-            6. Value Proposition</h3>
-          <p class="text-[11px] text-gray-500 mt-1">Key differentiators against competitors.</p>
-        </div>
-      </div>
-
-      <div class="flex gap-4 items-start transition-opacity duration-500"
-        [ngClass]="{'opacity-40': !profile.is_brand_completed}">
-        <span class="material-symbols-outlined mt-0.5"
-          [ngClass]="profile.is_brand_completed ? 'text-green-500 drop-shadow-[0_0_5px_rgba(34,197,94,0.5)]' : 'text-gray-600'">
-          {{ profile.is_brand_completed ? 'check_circle' : 'radio_button_unchecked' }}
-        </span>
-        <div>
-          <h3 class="text-sm font-medium" [ngClass]="profile.is_brand_completed ? 'text-white' : 'text-gray-300'">7.
-            Brand Guidelines</h3>
-          <p class="text-[11px] text-gray-500 mt-1">Tone of voice and key messaging.</p>
-        </div>
-      </div>
-
+      <section *ngIf="profile.completion.blockers.length" class="rounded-xl border border-red-500/20 bg-red-500/5 p-4">
+        <h3 class="text-xs font-bold uppercase tracking-wider text-red-300">Pendiente para completar</h3>
+        <ul class="mt-3 space-y-2 text-[11px] text-red-200/80">
+          <li *ngFor="let blocker of profile.completion.blockers.slice(0, 5)">• {{ blocker.label }}</li>
+        </ul>
+      </section>
     </div>
 
-    <div class="p-6 border-t border-white/10 bg-black/60 backdrop-blur-md">
-      <div *ngIf="profile.is_profile_fully_completed"
-        class="flex items-center gap-3 p-4 bg-green-500/10 border border-green-500/30 rounded-xl text-green-400 shadow-[0_0_15px_rgba(34,197,94,0.1)]">
+    <footer class="border-t border-white/10 bg-black/60 p-6">
+      <div
+        *ngIf="profile.completion.can_complete; else incomplete"
+        class="flex items-center gap-3 rounded-xl border border-green-500/30 bg-green-500/10 p-4 text-green-400"
+      >
         <span class="material-symbols-outlined text-[28px]">verified</span>
         <div class="text-xs">
-          <span class="block text-green-300 font-bold uppercase tracking-wider mb-0.5">Profile Complete</span>
-          Ready for Project Onboarding Phase.
+          <span class="mb-0.5 block font-bold uppercase tracking-wider text-green-300">Perfil completo</span>
+          Listo para iniciar el onboarding de proyectos.
         </div>
       </div>
-      <div *ngIf="!profile.is_profile_fully_completed"
-        class="flex items-center gap-3 p-4 bg-secondary/10 border border-secondary/20 rounded-xl text-secondary">
-        <span class="material-symbols-outlined text-[28px]">pending_actions</span>
-        <div class="text-xs">
-          <span class="block text-yellow-300 font-bold uppercase tracking-wider mb-0.5">Incomplete Profile</span>
-          Provide missing details to the AI.
+      <ng-template #incomplete>
+        <div class="flex items-center gap-3 rounded-xl border border-secondary/20 bg-secondary/10 p-4 text-secondary">
+          <span class="material-symbols-outlined text-[28px]">pending_actions</span>
+          <div class="text-xs">
+            <span class="mb-0.5 block font-bold uppercase tracking-wider text-yellow-300">Perfil en progreso</span>
+            {{ profile.completion.final_approved ? 'Resuelve los campos pendientes.' : 'Aún requiere validación y aprobación final.' }}
+          </div>
         </div>
-      </div>
-    </div>
-
-  </div>
+      </ng-template>
+    </footer>
+  </aside>
 </div>

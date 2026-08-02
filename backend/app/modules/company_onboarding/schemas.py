@@ -1,48 +1,104 @@
-from pydantic import BaseModel, ConfigDict, HttpUrl
-from typing import Optional, List
 from datetime import datetime
+from typing import Any, Literal
 
-class CompanyProfileBase(BaseModel):
-    legal_name: Optional[str] = None
-    dba: Optional[str] = None
-    headquarters: Optional[str] = None
-    year_established: Optional[str] = None
-    executive_team: Optional[List[dict]] = []
-    asset_classes: Optional[List[str]] = []
-    market_coverage: Optional[str] = None
-    target_demographics: Optional[str] = None
-    aum: Optional[str] = None
-    investment_strategy: Optional[str] = None
-    value_proposition: Optional[str] = None
-    key_differentiators: Optional[str] = None
-    tone_of_voice: Optional[str] = None
-    key_messaging: Optional[str] = None
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 
-class CompanyProfileUpdate(CompanyProfileBase):
-    pass
 
-class CompanyProfileResponse(CompanyProfileBase):
+ValidationStatus = Literal[
+    "missing",
+    "extracted",
+    "pending_confirmation",
+    "confirmed",
+    "corrected_by_user",
+    "conflicting",
+    "not_applicable",
+]
+Requirement = Literal["required", "conditionally_required", "recommended", "optional"]
+
+
+class FieldProgress(BaseModel):
+    key: str
+    label: str
+    requirement: Requirement
+    status: ValidationStatus
+    applicable: bool | None = None
+
+
+class ProgressCount(BaseModel):
+    completed: int
+    total: int
+    remaining: int
+
+
+class ConditionalProgress(BaseModel):
+    completed: int
+    total: int
+    evaluated: int
+    applicable: int
+    remaining: int
+
+
+class EnrichmentProgress(BaseModel):
+    captured: int
+    total: int
+
+
+class CompletionBlocker(BaseModel):
+    field: str
+    label: str
+    status: str
+
+
+class CompletionSummary(BaseModel):
+    percentage: int
+    can_complete: bool
+    final_approved: bool
+    required: ProgressCount
+    conditional: ConditionalProgress
+    recommended: EnrichmentProgress
+    optional: EnrichmentProgress
+    blockers: list[CompletionBlocker] = Field(default_factory=list)
+
+
+class CompanyProfileResponse(BaseModel):
     id: str
     company_id: str
-    is_identity_completed: Optional[bool] = False
-    is_team_completed: Optional[bool] = False
-    is_focus_completed: Optional[bool] = False
-    is_market_completed: Optional[bool] = False
-    is_strategy_completed: Optional[bool] = False
-    is_value_prop_completed: Optional[bool] = False
-    is_brand_completed: Optional[bool] = False
-    is_profile_fully_completed: Optional[bool] = False
-    updated_at: Optional[datetime] = None
-    
+    data: dict[str, Any] = Field(default_factory=dict)
+    fields: list[FieldProgress] = Field(default_factory=list)
+    completion: CompletionSummary
+    updated_at: datetime | None = None
+
     model_config = ConfigDict(from_attributes=True)
 
+
+class FieldUpdate(BaseModel):
+    field: str
+    value: Any = None
+    status: ValidationStatus
+    applicable: bool | None = None
+    source_type: str | None = None
+    source_reference: str | None = None
+    confidence: Literal["high", "medium", "low"] | None = None
+
+
+class CompanyProfilePatch(BaseModel):
+    updates: list[FieldUpdate] = Field(default_factory=list)
+    final_approved: bool | None = None
+
+
 class ChatMessagePayload(BaseModel):
-    message: str
+    message: str = Field(min_length=1, max_length=20000)
+
 
 class ChatMessageResponse(BaseModel):
     sender: str
     content: str
     created_at: datetime
-    
+
+
+class SessionResponse(BaseModel):
+    is_completed: bool
+
+
 class ScrapeRequest(BaseModel):
     url: HttpUrl
