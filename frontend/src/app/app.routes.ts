@@ -26,15 +26,16 @@ export const routes: Routes = [
         (m) => m.SetPasswordComponent
       ),
   },
+  // 🚀 CORREGIDO: Ahora las rutas coinciden con los links de tu Landing Page
   {
-    path: 'privacy-policy',
+    path: 'legal/privacy',
     loadComponent: () =>
       import('./pages/legal/privacy-policy/privacy-policy').then(
         (m) => m.PrivacyPolicyComponent
       ),
   },
   {
-    path: 'terms-conditions',
+    path: 'legal/terms',
     loadComponent: () =>
       import('./pages/legal/terms-conditions/terms-conditions').then(
         (m) => m.TermsConditionsComponent
