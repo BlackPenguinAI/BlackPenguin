@@ -4,7 +4,7 @@ from app.db.postgres import Base
 # 🚀 IMPORTAMOS TODOS LOS MODELOS DE LOS MICRO-MÓDULOS DDD
 # Esto es vital para que SQLAlchemy cree todas las tablas con Base.metadata.create_all()
 
-from app.modules.waitlist.models import WaitlistEmail
+from app.modules.waitlist.models import WaitlistEntry
 from app.modules.subscriptions.models import SubscriptionPlan
 from app.modules.companies.models import Company
 from app.modules.users.models import User
