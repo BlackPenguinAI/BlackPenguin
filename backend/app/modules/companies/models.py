@@ -18,10 +18,9 @@ class Company(Base):
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    # 🚀 AÑADE ESTAS DOS LÍNEAS PARA GUARDAR EL CONSUMO DE OPENROUTER
+    # 🚀 ESTAS SON LAS DOS LÍNEAS QUE PYTHON NO ENCUENTRA:
     ai_tokens_used = Column(Integer, default=0)
     ai_cost_usd = Column(Float, default=0.0)
 
-    # Relaciones
     plan = relationship("SubscriptionPlan")
     users = relationship("User", back_populates="company", cascade="all, delete-orphan")
