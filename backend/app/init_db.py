@@ -14,6 +14,7 @@ from app.modules.system_settings.models import FirebaseConfig, TwilioConfig
 from app.modules.subscriptions.models import SubscriptionPlan
 from app.modules.companies.models import Company 
 from app.modules.company_onboarding.prompts import COMPANY_ONBOARDING_AGENT_CONFIG
+from app.modules.projects.prompts import PROJECT_ONBOARDING_AGENT_CONFIG, SALES_AGENT_CONFIG
 
 def init_db():
     print("🛑 ATENCIÓN: MODO 'CLEAN SLATE' ACTIVADO")
@@ -2944,6 +2945,10 @@ A complete Project Profile does not automatically mean the project is ready for 
             "guardrails_prompt": """Basa tus análisis únicamente en las métricas reales del sistema."""
         }
         
+        # Canonical prompt modules override the legacy inline blocks above.
+        ai_config.agent_onboarding_proyectos = dict(PROJECT_ONBOARDING_AGENT_CONFIG)
+        ai_config.agent_ventas = dict(SALES_AGENT_CONFIG)
+
         flag_modified(ai_config, "available_models")
         flag_modified(ai_config, "agent_onboarding_empresa")
         flag_modified(ai_config, "agent_onboarding_proyectos")

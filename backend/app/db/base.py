@@ -17,6 +17,15 @@ from app.modules.company_onboarding.models import (
     OnboardingMessage,
     OnboardingSession,
 )
-from app.modules.projects.models import Project, ProjectProfile, ProjectSession, ProjectMessage
+from app.modules.projects.models import (
+    MetaConnection,
+    Project,
+    ProjectCampaign,
+    ProjectMessage,
+    ProjectOnboardingProposal,
+    ProjectOnboardingSource,
+    ProjectProfile,
+    ProjectSession,
+)
 from app.modules.brokers.models import Broker
 from app.modules.sales_crm.models import Lead, SmsChatMessage, Meeting

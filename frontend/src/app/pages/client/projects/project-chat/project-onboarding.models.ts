@@ -1,0 +1,74 @@
+export type ValidationStatus =
+  | 'missing' | 'extracted' | 'pending_confirmation' | 'confirmed'
+  | 'corrected_by_user' | 'conflicting' | 'stale' | 'expired' | 'not_applicable';
+
+export interface ProjectFieldProgress {
+  key: string;
+  label: string;
+  section: string;
+  requirement: string;
+  status: ValidationStatus;
+  applicable: boolean | null;
+}
+
+export interface SectionProgress {
+  key: string;
+  label: string;
+  completed: number;
+  total: number;
+  percentage: number;
+}
+
+export interface ProjectProfile {
+  id: string;
+  project_id: string;
+  data: Record<string, unknown>;
+  fields: ProjectFieldProgress[];
+  completion: {
+    percentage: number;
+    can_complete: boolean;
+    final_approved: boolean;
+    completed: number;
+    total: number;
+    remaining: number;
+    sections: SectionProgress[];
+    blockers: Array<{ field: string; label: string; section: string; status: string }>;
+    sales_activation_status: 'ready' | 'not_ready';
+    sales_activation_blockers: Array<{ field: string; label: string; section: string; status: string }>;
+  };
+  updated_at: string | null;
+}
+
+export interface ChatMessage { sender: 'user' | 'ai'; content: string; created_at: string | Date; }
+export interface SourceProposal {
+  id: string; field: string; label: string; value: unknown; evidence: string | null;
+  confidence: string | null; status: 'pending' | 'confirmed' | 'corrected' | 'rejected'; draftValue?: string;
+}
+export interface ProjectSource {
+  id: string; kind: string; status: 'processing' | 'ready' | 'failed'; name: string;
+  url: string | null; mime_type: string | null; size_bytes: number | null; error_message: string | null;
+  proposals: SourceProposal[]; created_at: string; updated_at: string;
+}
+export interface ChatTurn {
+  message: ChatMessage; profile: ProjectProfile; accepted_fields: string[];
+  rejected_updates: Array<{ field: string | null; reason: string }>; sources: ProjectSource[];
+}
+export interface Campaign {
+  id: string; project_id: string; name: string; platform: string; objective: string | null;
+  status: string; external_campaign_id: string | null; lead_form_id: string | null;
+  audience_notes: string | null; meta_connection_id: string | null; created_at: string; updated_at: string;
+}
+export interface MetaConnection {
+  id: string; label: string; business_account_id: string | null; ad_account_id: string | null;
+  page_id: string | null; token_hint: string; scopes: string[]; expires_at: string | null;
+  verified_at: string | null; created_at: string;
+}
+
+export const EMPTY_PROJECT_PROFILE: ProjectProfile = {
+  id: '', project_id: '', data: {}, fields: [], updated_at: null,
+  completion: {
+    percentage: 0, can_complete: false, final_approved: false,
+    completed: 0, total: 0, remaining: 0, sections: [], blockers: [],
+    sales_activation_status: 'not_ready', sales_activation_blockers: [],
+  },
+};

@@ -7,7 +7,7 @@ import httpx
 async def generate_llm_response(
     api_key: str,
     model: str,
-    messages: List[Dict[str, str]],
+    messages: List[Dict[str, Any]],
     app_name: str = "Black Penguin",
     *,
     response_format: dict[str, Any] | None = None,

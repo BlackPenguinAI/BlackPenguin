@@ -29,27 +29,25 @@
         <div>
           <div class="flex justify-between items-start mb-4">
             <h3 class="text-lg font-medium text-white">{{ p.name }}</h3>
-            <span *ngIf="p.profile?.is_fully_completed" class="material-symbols-outlined text-green-400 text-sm bg-green-400/10 p-1.5 rounded-md">verified</span>
-            <span *ngIf="!p.profile?.is_fully_completed" class="material-symbols-outlined text-yellow-400 text-sm bg-yellow-400/10 p-1.5 rounded-md">pending</span>
+            <span *ngIf="p.profile?.completion?.can_complete" class="material-symbols-outlined text-green-400 text-sm bg-green-400/10 p-1.5 rounded-md">verified</span>
+            <span *ngIf="!p.profile?.completion?.can_complete" class="material-symbols-outlined text-yellow-400 text-sm bg-yellow-400/10 p-1.5 rounded-md">pending</span>
           </div>
           <p class="text-xs text-gray-400 mb-4 flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">location_on</span> {{ p.city || 'No city defined' }}</p>
           
           <div class="space-y-2 mb-6">
             <div class="flex justify-between text-[10px] uppercase tracking-wider">
-              <span [class.text-green-400]="p.profile?.is_technical_completed" [class.text-gray-500]="!p.profile?.is_technical_completed">Technical</span>
-              <span [class.text-green-400]="p.profile?.is_commercial_completed" [class.text-gray-500]="!p.profile?.is_commercial_completed">Commercial</span>
-              <span [class.text-green-400]="p.profile?.is_inventory_completed" [class.text-gray-500]="!p.profile?.is_inventory_completed">Inventory</span>
+              <span class="text-gray-400">Project profile</span>
+              <span class="text-secondary">{{ p.profile?.completion?.percentage || 0 }}%</span>
+              <span [class.text-green-400]="p.profile?.completion?.sales_activation_status === 'ready'" [class.text-gray-500]="p.profile?.completion?.sales_activation_status !== 'ready'">Sales {{ p.profile?.completion?.sales_activation_status === 'ready' ? 'ready' : 'not ready' }}</span>
             </div>
             <div class="w-full h-1.5 bg-black rounded-full overflow-hidden flex">
-              <div class="h-full bg-green-500 transition-all" [style.width]="p.profile?.is_technical_completed ? '33.3%' : '0%'"></div>
-              <div class="h-full bg-green-500 transition-all border-l border-black" [style.width]="p.profile?.is_commercial_completed ? '33.3%' : '0%'"></div>
-              <div class="h-full bg-green-500 transition-all border-l border-black" [style.width]="p.profile?.is_inventory_completed ? '33.3%' : '0%'"></div>
+              <div class="h-full bg-green-500 transition-all" [style.width.%]="p.profile?.completion?.percentage || 0"></div>
             </div>
           </div>
         </div>
 
         <a [routerLink]="['/app/projects', p.id, 'onboarding']" class="w-full py-2.5 bg-black/50 border border-white/10 hover:border-secondary/50 hover:text-secondary text-white text-sm font-medium rounded-xl transition-colors text-center cursor-pointer block">
-          {{ p.profile?.is_fully_completed ? 'Review Data' : 'Continue Onboarding' }}
+          {{ p.profile?.completion?.can_complete ? 'Review Project' : 'Continue Onboarding' }}
         </a>
       </div>
     </div>

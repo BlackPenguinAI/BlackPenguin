@@ -2,7 +2,7 @@ import { Component, OnInit, isDevMode } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { ToastService } from '../../../../core/services/toast';
 
 @Component({
@@ -20,7 +20,7 @@ export class ProjectListComponent implements OnInit {
 
   newProject = { name: '', address: '', city: '' };
 
-  private apiUrl = isDevMode() ? 'http://localhost:8000/api/v1/properties' : 'https://blackpenguin.ai/api/v1/properties';
+  private apiUrl = isDevMode() ? 'http://localhost:8000/api/v1/projects' : '/api/v1/projects';
 
   constructor(private http: HttpClient, private toastService: ToastService) {}
 
@@ -28,13 +28,9 @@ export class ProjectListComponent implements OnInit {
     this.loadProjects();
   }
 
-  private getHeaders() {
-    return { headers: new HttpHeaders({ 'Authorization': `Bearer ${localStorage.getItem('bp_token')}` }) };
-  }
-
   loadProjects() {
     this.isLoading = true;
-    this.http.get<any[]>(this.apiUrl, this.getHeaders()).subscribe({
+    this.http.get<any[]>(this.apiUrl).subscribe({
       next: (data) => {
         this.projects = data;
         this.isLoading = false;
@@ -50,7 +46,7 @@ export class ProjectListComponent implements OnInit {
     if (!this.newProject.name) return;
     this.isCreating = true;
     
-    this.http.post<any>(this.apiUrl, this.newProject, this.getHeaders()).subscribe({
+    this.http.post<any>(this.apiUrl, this.newProject).subscribe({
       next: (created) => {
         this.projects.push(created);
         this.toastService.showSuccess('Project created successfully');

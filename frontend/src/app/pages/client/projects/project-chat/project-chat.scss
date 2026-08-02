@@ -1,0 +1,19 @@
+:host { display: block; height: 100%; }
+.assistant-markdown {
+  overflow-wrap: anywhere;
+  :where(p, ul, ol, blockquote) + :where(p, ul, ol, blockquote) { margin-top: .75rem; }
+  :where(ul, ol) { padding-left: 1.25rem; }
+  ul { list-style: disc; } ol { list-style: decimal; }
+  strong { color: #fff; font-weight: 650; }
+  a { color: #00a5b6; text-decoration: underline; }
+}
+.proposal-status { border-radius: 999px; background: rgba(255,255,255,.07); padding: .2rem .5rem; font-size: .58rem; text-transform: uppercase; letter-spacing: .08em;
+  &[data-status='confirmed'], &[data-status='corrected'] { background: rgba(34,197,94,.12); color: #86efac; }
+  &[data-status='rejected'] { background: rgba(239,68,68,.1); color: #fca5a5; }
+}
+.proposal-action { border: 1px solid rgba(255,255,255,.12); border-radius: .55rem; padding: .4rem .7rem; color: #d1d5db; font-size: .7rem;
+  &:hover { background: rgba(255,255,255,.08); } &.primary { border-color: rgba(0,165,182,.5); color: #67e8f9; } &.danger { color: #fca5a5; }
+}
+.secure-input { width: 100%; border: 1px solid rgba(255,255,255,.1); border-radius: .6rem; background: rgba(255,255,255,.04); padding: .55rem .7rem; color: #fff; font-size: .7rem; outline: none;
+  &:focus { border-color: rgba(0,165,182,.6); }
+}
