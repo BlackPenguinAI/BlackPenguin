@@ -1,1 +1,67 @@
-<p>email-settings-page works!</p>
+<div class="min-h-screen bg-black text-white font-sans p-6 md:p-12 relative overflow-hidden">
+  <div class="absolute top-0 right-0 w-96 h-96 bg-secondary/5 rounded-full blur-[120px] pointer-events-none"></div>
+
+  <div class="max-w-4xl mx-auto relative z-10">
+    <div class="mb-8 border-b border-white/10 pb-6">
+      <h1 class="text-3xl font-light tracking-tight">Email <span class="text-secondary font-medium">Settings</span></h1>
+      <p class="text-sm text-gray-400 mt-1">Configure Firebase Admin SDK to handle system emails and notifications.</p>
+    </div>
+
+    <div *ngIf="isLoading" class="flex justify-center py-24">
+      <div class="animate-spin h-8 w-8 border-2 border-secondary border-t-transparent rounded-full"></div>
+    </div>
+
+    <div *ngIf="!isLoading" class="flex flex-col gap-8">
+      
+      <form (ngSubmit)="saveConfig()">
+        
+        <app-glass-card title="Firebase Project Details" icon="cloud" class="mb-6 block">
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <app-input label="Project ID" [(ngModel)]="firebaseConfig.project_id" name="project_id" placeholder="my-firebase-project-123"></app-input>
+            <app-input label="Web API Key (Optional)" [(ngModel)]="firebaseConfig.api_key" name="api_key" placeholder="AIzaSyA..."></app-input>
+            <app-input label="Auth Domain (Optional)" [(ngModel)]="firebaseConfig.auth_domain" name="auth_domain" placeholder="project.firebaseapp.com"></app-input>
+          </div>
+        </app-glass-card>
+
+        <app-glass-card title="Service Account Credentials" icon="key">
+          <p class="text-xs text-gray-400 mb-4 leading-relaxed">
+            Upload your Firebase Service Account JSON file or paste its contents directly below. This allows Black Penguin to securely authenticate with Firebase on the server side.
+          </p>
+
+          <div class="mb-4">
+            <label class="relative inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-white/5 hover:bg-secondary/10 border border-white/10 hover:border-secondary/30 rounded-lg text-sm text-gray-200 transition-colors cursor-pointer group">
+              <span class="material-symbols-outlined text-secondary group-hover:scale-110 transition-transform">upload_file</span>
+              Upload JSON File
+              <input type="file" accept=".json" (change)="onFileSelected($event)" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
+            </label>
+            <button type="button" (click)="formatJson()" class="ml-3 text-xs text-gray-500 hover:text-white underline">
+              Format JSON Code
+            </button>
+          </div>
+
+          <div class="relative w-full rounded-xl overflow-hidden border border-white/10 focus-within:border-secondary/50 bg-black/50 transition-colors">
+            <div class="bg-white/5 border-b border-white/10 px-4 py-2 flex items-center justify-between">
+              <span class="text-[10px] font-mono uppercase tracking-widest text-gray-400">credentials.json</span>
+              <span class="material-symbols-outlined text-[16px] text-green-400" *ngIf="firebaseConfig.credentials_json && firebaseConfig.credentials_json.includes('private_key')">check_circle</span>
+            </div>
+            <textarea 
+              [(ngModel)]="firebaseConfig.credentials_json" 
+              name="credentials_json" 
+              rows="14" 
+              spellcheck="false"
+              class="w-full bg-transparent p-4 text-xs font-mono text-gray-300 outline-none resize-y"
+              placeholder="{\n  &quot;type&quot;: \"service_account\",\n  &quot;project_id&quot;: \"...\",\n  &quot;private_key&quot;: \"...\"\n}">
+            </textarea>
+          </div>
+
+          <div class="flex justify-end border-t border-white/10 pt-6 mt-6">
+            <app-button type="submit" variant="primary" icon="save" [isLoading]="isSaving">
+              Save Firebase Config
+            </app-button>
+          </div>
+        </app-glass-card>
+
+      </form>
+    </div>
+  </div>
+</div>
