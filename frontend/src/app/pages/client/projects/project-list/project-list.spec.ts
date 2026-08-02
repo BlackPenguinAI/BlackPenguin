@@ -1,22 +1,50 @@
-import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { TestBed } from '@angular/core/testing';
 
-import { ProjectList } from './project-list';
+import { API_V1_URL } from '../../../../core/config/api.config';
+import { ToastService } from '../../../../core/services/toast';
+import { ProjectListComponent } from './project-list';
 
-describe('ProjectList', () => {
-  let component: ProjectList;
-  let fixture: ComponentFixture<ProjectList>;
+describe('ProjectListComponent', () => {
+  let http: HttpTestingController;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [ProjectList],
+      imports: [ProjectListComponent],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        {
+          provide: ToastService,
+          useValue: { showError: vi.fn(), showSuccess: vi.fn() },
+        },
+      ],
     }).compileComponents();
 
-    fixture = TestBed.createComponent(ProjectList);
-    component = fixture.componentInstance;
-    await fixture.whenStable();
+    http = TestBed.inject(HttpTestingController);
   });
 
-  it('should create', () => {
-    expect(component).toBeTruthy();
+  afterEach(() => http.verify());
+
+  it('loads the canonical collection URL with a trailing slash', () => {
+    const fixture = TestBed.createComponent(ProjectListComponent);
+    fixture.detectChanges();
+
+    const request = http.expectOne(`${API_V1_URL}/projects/`);
+    expect(request.request.method).toBe('GET');
+    request.flush([]);
+  });
+
+  it('creates projects through the canonical collection URL', () => {
+    const fixture = TestBed.createComponent(ProjectListComponent);
+    const component = fixture.componentInstance;
+    component.newProject = { name: 'Demo', address: 'Av. Demo 123', city: 'Lima' };
+
+    component.createProject();
+
+    const request = http.expectOne(`${API_V1_URL}/projects/`);
+    expect(request.request.method).toBe('POST');
+    request.flush({ id: 'project-1', ...component.newProject });
   });
 });

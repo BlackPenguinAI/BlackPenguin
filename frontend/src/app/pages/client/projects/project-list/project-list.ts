@@ -1,9 +1,10 @@
-import { Component, OnInit, isDevMode } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { ToastService } from '../../../../core/services/toast';
+import { API_V1_URL } from '../../../../core/config/api.config';
 
 @Component({
   selector: 'app-project-list',
@@ -20,7 +21,9 @@ export class ProjectListComponent implements OnInit {
 
   newProject = { name: '', address: '', city: '' };
 
-  private apiUrl = isDevMode() ? 'http://localhost:8000/api/v1/projects' : '/api/v1/projects';
+  // FastAPI declares the collection route as "/". Keep the trailing slash so
+  // GET and POST do not receive a 307 redirect from the backend.
+  private readonly apiUrl = `${API_V1_URL}/projects/`;
 
   constructor(private http: HttpClient, private toastService: ToastService) {}
 

@@ -1,6 +1,8 @@
 import { HttpClient } from '@angular/common/http';
-import { Injectable, isDevMode } from '@angular/core';
+import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
+
+import { API_V1_URL } from '../../../../core/config/api.config';
 
 import {
   Campaign, ChatMessage, ChatTurn, MetaConnection, ProjectProfile, ProjectSource,
@@ -9,7 +11,7 @@ import {
 
 @Injectable({ providedIn: 'root' })
 export class ProjectOnboardingService {
-  private readonly baseUrl = isDevMode() ? 'http://localhost:8000/api/v1/projects' : '/api/v1/projects';
+  private readonly baseUrl = `${API_V1_URL}/projects`;
   constructor(private readonly http: HttpClient) {}
 
   getProfile(id: string): Observable<ProjectProfile> { return this.http.get<ProjectProfile>(`${this.baseUrl}/${id}/profile`); }
