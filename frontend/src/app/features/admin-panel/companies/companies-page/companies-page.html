@@ -184,17 +184,19 @@
   </form>
 </app-modal>
 
-<app-modal [isOpen]="showEditModal" title="Edit Company Details" maxWidthClass="max-w-lg" (close)="closeEditModal()">
+<app-modal [isOpen]="showEditModal" title="Edit Company & Administrator" maxWidthClass="max-w-2xl" (close)="closeEditModal()">
   <form (ngSubmit)="updateCompany()" class="flex flex-col gap-4">
     
-    <app-input label="Company Name" placeholder="Ej. Capital Real Estate" [(ngModel)]="editForm.name" name="edit_name"></app-input>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <app-input label="Company Name" placeholder="Ej. Capital Real Estate" [(ngModel)]="editForm.name" name="edit_name"></app-input>
 
-    <div class="flex flex-col gap-1.5 w-full">
-      <label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold ml-1">Subscription Plan</label>
-      <select [(ngModel)]="editForm.plan_id" name="edit_plan_id" 
-              class="w-full bg-black/50 border border-white/10 focus:border-secondary rounded-xl py-3 px-4 text-sm text-white outline-none transition-colors">
-        <option *ngFor="let p of plans" [value]="p.id" class="bg-[#111] text-white">{{ p.name }}</option>
-      </select>
+      <div class="flex flex-col gap-1.5 w-full">
+        <label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold ml-1">Subscription Plan</label>
+        <select [(ngModel)]="editForm.plan_id" name="edit_plan_id" 
+                class="w-full bg-black/50 border border-white/10 focus:border-secondary rounded-xl py-3 px-4 text-sm text-white outline-none transition-colors">
+          <option *ngFor="let p of plans" [value]="p.id" class="bg-[#111] text-white">{{ p.name }}</option>
+        </select>
+      </div>
     </div>
 
     <div class="flex items-center justify-between p-3 bg-white/5 border border-white/10 rounded-xl">
@@ -203,6 +205,53 @@
         <input type="checkbox" [(ngModel)]="editForm.is_active" name="edit_is_active" class="sr-only peer">
         <div class="w-11 h-6 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-secondary"></div>
       </label>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div class="flex flex-col gap-1.5 w-full">
+        <label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold ml-1">Start Date</label>
+        <input type="date" [(ngModel)]="editForm.start_date" name="edit_start_date"
+               class="w-full bg-black/50 border border-white/10 focus:border-secondary rounded-xl py-3 px-4 text-sm text-white outline-none transition-colors cursor-pointer color-scheme-dark">
+      </div>
+      
+      <div class="flex flex-col gap-1.5 w-full">
+        <label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold ml-1">Duration</label>
+        <select [(ngModel)]="editForm.duration_months" name="edit_duration_months" 
+                class="w-full bg-black/50 border border-white/10 focus:border-secondary rounded-xl py-3 px-4 text-sm text-white outline-none transition-colors">
+          <option *ngFor="let m of [1,2,3,4,5,6,7,8,9,10,11,12]" [value]="m">{{ m }} Month{{ m > 1 ? 's' : '' }}</option>
+        </select>
+      </div>
+
+      <div class="flex flex-col gap-1.5 w-full">
+        <label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold ml-1">Calculated End Date</label>
+        <input type="text" [value]="editCalculatedEndDate" [disabled]="true" 
+               class="w-full bg-black/30 border border-white/10 rounded-xl py-3 px-4 text-sm text-gray-400 cursor-not-allowed">
+      </div>
+    </div>
+
+    <div class="border-t border-white/10 pt-4 mt-2">
+      <h3 class="text-xs uppercase font-mono tracking-widest text-secondary mb-3">Company Administrator Account</h3>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <app-input label="First Name" placeholder="John" [(ngModel)]="editForm.admin_first_name" name="edit_admin_first_name"></app-input>
+        <app-input label="Last Name" placeholder="Doe" [(ngModel)]="editForm.admin_last_name" name="edit_admin_last_name"></app-input>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <app-input label="Admin Email" type="email" placeholder="admin@company.com" [(ngModel)]="editForm.admin_email" name="edit_admin_email"></app-input>
+      <app-input label="New Password (Optional)" type="password" placeholder="••••••••" [(ngModel)]="editForm.admin_password" name="edit_admin_password"></app-input>
+      <app-input label="Repeat Password" type="password" placeholder="••••••••" [(ngModel)]="editForm.admin_confirm_password" name="edit_admin_confirm_password"></app-input>
+    </div>
+
+    <div class="flex flex-col gap-1.5 w-full">
+      <label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold ml-1">New Proof of Payment (Optional)</label>
+      <div class="relative w-full border border-dashed border-white/20 rounded-xl p-4 text-center hover:border-secondary transition-colors bg-black/30">
+        <input type="file" (change)="onFileSelected($event)" accept="image/*,.pdf" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
+        <span class="material-symbols-outlined text-secondary text-2xl">upload_file</span>
+        <p class="text-xs text-gray-400 mt-1">
+          {{ selectedFile ? selectedFile.name : 'Click or drag a new receipt here to replace the current one' }}
+        </p>
+      </div>
     </div>
 
     <div class="flex justify-end gap-3 mt-6 border-t border-white/10 pt-4">

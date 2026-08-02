@@ -35,7 +35,6 @@ export class CompaniesPageComponent implements OnInit {
   isDeleting: boolean = false;
   resendingId: string | null = null;
   
-  // Modales
   showModal: boolean = false;
   showEditModal: boolean = false;
   showDeleteModal: boolean = false;
@@ -55,10 +54,18 @@ export class CompaniesPageComponent implements OnInit {
     is_active: true
   };
 
+  // 🚀 FORMULARIO DE EDICIÓN IDÉNTICO
   editForm: any = {
     id: '',
     name: '',
     plan_id: '',
+    start_date: '',
+    duration_months: 12,
+    admin_first_name: '',
+    admin_last_name: '',
+    admin_email: '',
+    admin_password: '', // Opcional al editar
+    admin_confirm_password: '',
     is_active: true
   };
 
@@ -107,6 +114,14 @@ export class CompaniesPageComponent implements OnInit {
     return start.toISOString().split('T')[0];
   }
 
+  get editCalculatedEndDate(): string {
+    if (!this.editForm.start_date || !this.editForm.duration_months) return '';
+    const start = new Date(this.editForm.start_date);
+    if (isNaN(start.getTime())) return '';
+    start.setMonth(start.getMonth() + Number(this.editForm.duration_months));
+    return start.toISOString().split('T')[0];
+  }
+
   openModal(): void {
     this.form = {
       name: '',
@@ -130,13 +145,25 @@ export class CompaniesPageComponent implements OnInit {
     this.cdr.detectChanges();
   }
 
+  // 🚀 CARGAR DATOS COMPLETOS AL EDITAR
   openEditModal(item: any): void {
+    // Intentamos extraer datos del primer administrador si existe
+    const admin = item.users && item.users.length > 0 ? item.users[0] : null;
+
     this.editForm = {
       id: item.id,
       name: item.name,
       plan_id: item.plan_id || (this.plans.length > 0 ? this.plans[0].id : ''),
+      start_date: item.license_start ? item.license_start.split('T')[0] : new Date().toISOString().split('T')[0],
+      duration_months: 12, // Por defecto al editar si el backend no envía los meses exactos
+      admin_first_name: admin ? admin.first_name : '',
+      admin_last_name: admin ? admin.last_name : '',
+      admin_email: admin ? admin.email : '',
+      admin_password: '', // Se deja vacío por seguridad
+      admin_confirm_password: '',
       is_active: item.is_active
     };
+    this.selectedFile = null;
     this.showEditModal = true;
     this.cdr.detectChanges();
   }
@@ -201,18 +228,41 @@ export class CompaniesPageComponent implements OnInit {
 
   updateCompany(): void {
     if (!this.editForm.name || !this.editForm.plan_id) {
-      this.toast.showError('Please complete all required fields.');
+      this.toast.showError('Company name and plan are required.');
+      return;
+    }
+
+    if (this.editForm.admin_password && this.editForm.admin_password !== this.editForm.admin_confirm_password) {
+      this.toast.showError('Passwords do not match.');
       return;
     }
 
     this.isSaving = true;
     this.cdr.detectChanges();
 
-    this.companyService.updateCompany(this.editForm.id, {
-      name: this.editForm.name,
-      plan_id: this.editForm.plan_id,
-      is_active: this.editForm.is_active
-    }).subscribe({
+    const formData = new FormData();
+    formData.append('name', this.editForm.name);
+    formData.append('plan_id', this.editForm.plan_id);
+    formData.append('duration_months', this.editForm.duration_months);
+    formData.append('admin_first_name', this.editForm.admin_first_name);
+    formData.append('admin_last_name', this.editForm.admin_last_name);
+    formData.append('admin_email', this.editForm.admin_email);
+    formData.append('is_active', this.editForm.is_active.toString());
+    
+    // Solo enviamos el password si lo llenaron (para actualizarlo)
+    if (this.editForm.admin_password) {
+      formData.append('admin_password', this.editForm.admin_password);
+    }
+
+    if (this.editForm.start_date) {
+      formData.append('start_date', this.editForm.start_date);
+    }
+
+    if (this.selectedFile) {
+      formData.append('receipt_file', this.selectedFile);
+    }
+
+    this.companyService.updateCompany(this.editForm.id, formData).subscribe({
       next: () => {
         this.isSaving = false;
         this.closeEditModal();
