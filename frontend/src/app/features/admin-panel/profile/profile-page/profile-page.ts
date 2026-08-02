@@ -18,13 +18,11 @@ import { ButtonComponent } from '../../../../shared/ui/button/button';
 })
 export class ProfilePageComponent implements OnInit {
   user: any = {
-    full_name: '',
-    last_name_paternal: '',
-    last_name_maternal: '',
+    first_name: '',
+    last_name: '',
     email: '',
     phone: '',
-    country: '',
-    city: ''
+    country: ''
   };
 
   passForm = { current_password: '', new_password: '', confirm_password: '' };
@@ -47,7 +45,14 @@ export class ProfilePageComponent implements OnInit {
     this.isLoading = true;
     this.authService.getMyProfile().subscribe({
       next: (data) => {
-        this.user = { ...this.user, ...data };
+        // Aseguramos que los campos mapeen correctamente
+        this.user = { 
+          first_name: data.first_name || '',
+          last_name: data.last_name || '',
+          email: data.email || '',
+          phone: data.phone || '',
+          country: data.country || ''
+        };
         this.isLoading = false;
         this.cdr.detectChanges();
       },

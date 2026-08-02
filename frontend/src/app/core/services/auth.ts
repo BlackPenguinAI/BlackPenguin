@@ -87,8 +87,9 @@ export class AuthService {
   }
 
   // 3. Cambiar Contraseña
-  changePassword(passwordData: any): Observable<any> {
-    return this.http.put(`${this.apiUrl}/auth/change-password`, passwordData, this.getHeaders()).pipe(
+  changePassword(data: any): Observable<any> {
+    // 🚀 OJO AQUÍ: Debe terminar en /change-password/
+    return this.http.put(`${this.apiUrl}/auth/change-password/`, data, this.getHeaders()).pipe(
       catchError(this.handleError)
     );
   }

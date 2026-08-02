@@ -4,7 +4,7 @@
   <div class="max-w-4xl mx-auto relative z-10">
     <div class="mb-8 border-b border-white/10 pb-6">
       <h1 class="text-3xl font-light tracking-tight">My <span class="text-secondary font-medium">Profile</span></h1>
-      <p class="text-sm text-gray-400 mt-1">Manage your administrative credentials and security settings.</p>
+      <p class="text-sm text-gray-400 mt-1">Manage your administrative credentials and personal details.</p>
     </div>
 
     <div *ngIf="isLoading" class="flex justify-center py-24">
@@ -15,10 +15,10 @@
       
       <form (ngSubmit)="saveProfile()">
         <app-glass-card title="Personal Identity" icon="badge">
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-            <app-input label="First & Middle Name" [(ngModel)]="user.full_name" name="full_name" placeholder="John"></app-input>
-            <app-input label="Paternal Surname" [(ngModel)]="user.last_name_paternal" name="last_name_paternal" placeholder="Doe"></app-input>
-            <app-input label="Maternal Surname" [(ngModel)]="user.last_name_maternal" name="last_name_maternal" placeholder="Smith"></app-input>
+          
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <app-input label="First Name" [(ngModel)]="user.first_name" name="first_name" placeholder="John"></app-input>
+            <app-input label="Last Name" [(ngModel)]="user.last_name" name="last_name" placeholder="Doe"></app-input>
           </div>
 
           <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
