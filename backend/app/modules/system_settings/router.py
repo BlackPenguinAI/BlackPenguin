@@ -56,20 +56,24 @@ def update_messaging_settings(
 # =========================================================
 # 📄 DOCUMENTOS LEGALES (PRIVACY & TERMS)
 # =========================================================
-@router.get("/legal/{doc_type}", response_model=LegalDocumentResponse, summary="Obtener documento legal")
-def get_legal_document(doc_type: str, lang: str = "en", db: Session = Depends(get_db)):
-    """Endpoint público para leer Políticas de Privacidad y Términos."""
-    if doc_type not in ["privacy", "terms"]:
-        raise HTTPException(status_code=400, detail="Tipo de documento inválido.")
+@router.get("/legal/{doc_type}", response_model=LegalDocumentResponse, summary="Obtener un documento legal")
+def get_legal_document(
+    doc_type: str,
+    lang: str = "en",
+    db: Session = Depends(get_db)
+    # 🚀 AQUÍ ELIMINAMOS EL DEPENDS DEL USUARIO SUPERADMIN
+):
     return services.get_legal_document(db, doc_type, lang)
 
-@router.put("/legal/{doc_type}", response_model=LegalDocumentResponse, summary="Actualizar documento legal")
+
+@router.put("/legal/{doc_type}", response_model=LegalDocumentResponse, summary="Actualizar un documento legal")
 def update_legal_document(
     doc_type: str,
     payload: LegalDocumentPayload,
     lang: str = "en",
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN]))
+    current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN])) 
+    # 🔒 ESTE LO MANTENEMOS: Solo el Superadmin puede guardar/editar el documento
 ):
     return services.update_legal_document(db, doc_type, payload, lang)
 

@@ -7,9 +7,15 @@ from app.core.config import settings
 class MultiTenantMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         path = request.url.path
-        if path in ["/", "/docs", "/openapi.json", f"{settings.API_V1_STR}/auth/login", f"{settings.API_V1_STR}/auth/setup-master"]:
+        
+        # 🚀 NUEVO: Permitir acceso público a las rutas legales SOLO para lectura (GET)
+        is_public_legal_route = request.method == "GET" and path.startswith(f"{settings.API_V1_STR}/system/legal/")
+
+        # Rutas exentas de token (Login, Configuración inicial, Docs y Legales Públicos)
+        if path in ["/", "/docs", "/openapi.json", f"{settings.API_V1_STR}/auth/login", f"{settings.API_V1_STR}/auth/setup-master"] or is_public_legal_route:
             return await call_next(request)
 
+        # Validación del token para todo el resto de la aplicación
         auth_header = request.headers.get("Authorization")
         if not auth_header or not auth_header.startswith("Bearer "):
             return JSONResponse(status_code=401, content={"detail": "No autorizado. Token Bearer ausente."})
