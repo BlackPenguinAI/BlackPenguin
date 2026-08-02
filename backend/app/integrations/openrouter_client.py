@@ -1,9 +1,15 @@
 import httpx
 import urllib.request
 import json
-from typing import List, Dict
+from typing import Any, Dict, List
 
-async def generate_llm_response(api_key: str, model: str, messages: List[Dict[str, str]], app_name: str = "Black Penguin") -> str:
+async def generate_llm_response(
+    api_key: str,
+    model: str,
+    messages: List[Dict[str, str]],
+    app_name: str = "Black Penguin",
+    response_format: dict[str, Any] | None = None,
+) -> str:
     """Envía la solicitud asíncrona al LLM para generar texto."""
     url = "https://openrouter.ai/api/v1/chat/completions"
     headers = {
@@ -15,8 +21,10 @@ async def generate_llm_response(api_key: str, model: str, messages: List[Dict[st
     payload = {
         "model": model,
         "messages": messages,
-        "temperature": 0.7
+        "temperature": 0.2 if response_format else 0.7,
     }
+    if response_format:
+        payload["response_format"] = response_format
     
     async with httpx.AsyncClient() as client:
         try:

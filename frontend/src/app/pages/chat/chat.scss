@@ -1,0 +1,84 @@
+:host ::ng-deep .assistant-markdown {
+  overflow-wrap: anywhere;
+
+  > :first-child {
+    margin-top: 0;
+  }
+
+  > :last-child {
+    margin-bottom: 0;
+  }
+
+  p {
+    margin: 0 0 0.75rem;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    margin: 1rem 0 0.45rem;
+    color: #ffffff;
+    font-weight: 650;
+    line-height: 1.3;
+  }
+
+  h1,
+  h2 {
+    font-size: 1rem;
+  }
+
+  h3,
+  h4 {
+    font-size: 0.9rem;
+  }
+
+  strong {
+    color: #ffffff;
+    font-weight: 650;
+  }
+
+  em {
+    color: #d1d5db;
+  }
+
+  ul,
+  ol {
+    margin: 0.5rem 0 0.8rem 1.15rem;
+  }
+
+  ul {
+    list-style: disc;
+  }
+
+  ol {
+    list-style: decimal;
+  }
+
+  li {
+    margin: 0.28rem 0;
+    padding-left: 0.15rem;
+  }
+
+  a {
+    color: #00a5b6;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  blockquote {
+    margin: 0.75rem 0;
+    border-left: 3px solid rgb(0 165 182 / 65%);
+    padding-left: 0.85rem;
+    color: #cbd5e1;
+  }
+
+  code {
+    border: 1px solid rgb(255 255 255 / 10%);
+    border-radius: 0.3rem;
+    background: rgb(0 0 0 / 35%);
+    padding: 0.1rem 0.3rem;
+    color: #e5e7eb;
+    font-size: 0.8rem;
+  }
+}

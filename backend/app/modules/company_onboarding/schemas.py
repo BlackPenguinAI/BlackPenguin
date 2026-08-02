@@ -1,7 +1,9 @@
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
+
+from .completion import normalize_field_key
 
 
 ValidationStatus = Literal[
@@ -79,6 +81,22 @@ class FieldUpdate(BaseModel):
     source_type: str | None = None
     source_reference: str | None = None
     confidence: Literal["high", "medium", "low"] | None = None
+
+    @field_validator("field", mode="before")
+    @classmethod
+    def validate_and_normalize_field(cls, value: Any) -> str:
+        canonical_key = normalize_field_key(value)
+        if canonical_key is None:
+            raise ValueError("Unsupported Company Profile field key")
+        return canonical_key
+
+
+class AgentResponsePayload(BaseModel):
+    """Internal LLM envelope. It is never returned directly to the frontend."""
+
+    assistant_message: str = Field(min_length=1, max_length=10000)
+    verified_updates: list[Any] = Field(default_factory=list)
+    final_approved: bool | None = None
 
 
 class CompanyProfilePatch(BaseModel):

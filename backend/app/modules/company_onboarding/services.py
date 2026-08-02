@@ -1,12 +1,19 @@
 from __future__ import annotations
 
 from datetime import datetime
+import logging
 from typing import Any
 
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
-from .completion import FIELD_BY_KEY, VALID_STATUSES, calculate_completion, field_progress
+from .completion import (
+    FIELD_BY_KEY,
+    VALID_STATUSES,
+    calculate_completion,
+    field_progress,
+    normalize_field_key,
+)
 from .models import CompanyProfile, OnboardingMessage, OnboardingSession, SenderType
 
 
@@ -21,6 +28,8 @@ LEGACY_FIELD_MAP = {
     "key_differentiators": "corporate_differentiators",
     "aum": "assets_under_management",
 }
+
+logger = logging.getLogger(__name__)
 
 
 def get_or_create_profile(db: Session, company_id: str) -> CompanyProfile:
@@ -85,9 +94,15 @@ def apply_field_updates(
     sources = dict(profile.field_sources or {})
 
     for update in updates:
-        field_key = update.get("field")
+        original_field = update.get("field")
+        field_key = normalize_field_key(original_field)
         status = update.get("status", "extracted")
         if field_key not in FIELD_BY_KEY or status not in VALID_STATUSES:
+            logger.warning(
+                "Rejected Company Profile update: field=%r status=%r",
+                original_field,
+                status,
+            )
             continue
         if status in {"confirmed", "corrected_by_user", "not_applicable"} and not allow_authoritative_statuses:
             status = "pending_confirmation"
@@ -96,9 +111,18 @@ def apply_field_updates(
         if status != "not_applicable" and value is not None:
             data[field_key] = value
 
+        applicable = update.get("applicable")
+        if (
+            applicable is None
+            and FIELD_BY_KEY[field_key].requirement == "conditionally_required"
+            and status != "not_applicable"
+            and value is not None
+        ):
+            applicable = True
+
         states[field_key] = {
             "status": status,
-            "applicable": update.get("applicable"),
+            "applicable": applicable,
         }
         if status == "not_applicable":
             states[field_key]["applicable"] = False

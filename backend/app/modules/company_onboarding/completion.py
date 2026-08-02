@@ -107,6 +107,45 @@ OPTIONAL_FIELDS = tuple(
 ALL_FIELDS = REQUIRED_FIELDS + CONDITIONAL_FIELDS + RECOMMENDED_FIELDS + OPTIONAL_FIELDS
 FIELD_BY_KEY = {field.key: field for field in ALL_FIELDS}
 
+# Temporary compatibility aliases for older prompts and model variations.
+# Canonical snake_case keys remain the only keys persisted by the application.
+FIELD_ALIASES = {
+    "legal name": "official_company_name",
+    "company name": "official_company_name",
+    "official company name": "official_company_name",
+    "display name": "preferred_display_name",
+    "preferred display name": "preferred_display_name",
+    "official website": "official_corporate_website",
+    "corporate website": "official_corporate_website",
+    "dba": "dba",
+    "headquarters": "headquarters",
+    "year established": "year_established",
+    "business model": "primary_business_model",
+    "core focus": "primary_business_model",
+    "asset classes": "core_asset_classes",
+    "market coverage": "current_operating_footprint",
+    "operating footprint": "current_operating_footprint",
+    "short company description": "approved_short_company_description",
+    "value proposition": "corporate_value_proposition",
+    "key differentiators": "corporate_differentiators",
+    "differentiators": "corporate_differentiators",
+}
+
+
+def normalize_field_key(value: Any) -> str | None:
+    """Return a canonical field key or ``None`` when the key is unsupported."""
+    if not isinstance(value, str):
+        return None
+
+    candidate = value.strip()
+    if candidate in FIELD_BY_KEY:
+        return candidate
+
+    normalized = " ".join(
+        candidate.replace("_", " ").replace("-", " ").casefold().split()
+    )
+    return FIELD_ALIASES.get(normalized)
+
 
 def _is_resolved(status: str) -> bool:
     return status in RESOLVED_STATUSES
