@@ -90,8 +90,8 @@ export const routes: Routes = [
         path: 'ai-infrastructure',
         loadComponent: () =>
           import(
-            './features/admin-panel/ai-infrastructure/ai-infrastructure-page/ai-infrastructure-page'
-          ).then((m) => m.AiInfrastructurePageComponent),
+            './features/admin-panel/ai-infrastructure/ai-infra-page/ai-infra-page'
+          ).then((m) => m.AiInfraPageComponent),
       },
       {
         path: 'ai-settings',
