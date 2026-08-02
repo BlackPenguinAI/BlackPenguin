@@ -1,11 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session, joinedload
+from typing import List, Optional
 
 from app.db.postgres import get_db
-from app.modules.auth.deps import get_current_user
+from app.modules.auth.deps import get_current_user, RoleChecker
 from app.core.security import verify_password, get_password_hash, verify_email_token
-from .models import User
-from .schemas import MyProfileUpdate, MyProfileResponse, PasswordUpdatePayload, SetPasswordPayload
+from .models import User, UserRole
+from .schemas import MyProfileUpdate, MyProfileResponse, PasswordUpdatePayload, SetPasswordPayload, UserAdminListResponse
 from app.modules.companies.models import Company
 
 router = APIRouter()
@@ -70,3 +71,32 @@ def set_password(payload: SetPasswordPayload, db: Session = Depends(get_db)):
     user.hashed_password = get_password_hash(payload.new_password)
     db.commit()
     return {"message": "Password set successfully."}
+
+# ==========================================
+# LISTAR TODOS LOS USUARIOS (SUPERADMIN)
+# ==========================================
+@router.get("/all", response_model=List[UserAdminListResponse])
+def get_all_users_for_admin(
+    company_id: Optional[str] = Query(None),
+    role: Optional[str] = Query(None),
+    first_name: Optional[str] = Query(None),
+    last_name: Optional[str] = Query(None),
+    email: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN]))
+):
+    """Retorna el listado global de usuarios filtrable por compañía, rol y datos personales."""
+    query = db.query(User).options(joinedload(User.company))
+
+    if company_id:
+        query = query.filter(User.company_id == company_id)
+    if role:
+        query = query.filter(User.role == role)
+    if first_name:
+        query = query.filter(User.first_name.ilike(f"%{first_name}%"))
+    if last_name:
+        query = query.filter(User.last_name.ilike(f"%{last_name}%"))
+    if email:
+        query = query.filter(User.email.ilike(f"%{email}%"))
+
+    return query.order_by(User.email.asc()).all()

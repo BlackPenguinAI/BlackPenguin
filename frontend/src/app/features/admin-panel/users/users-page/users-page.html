@@ -1,0 +1,117 @@
+<div class="min-h-screen bg-black text-white font-sans p-6 md:p-12 relative overflow-hidden">
+  <div class="absolute top-0 right-1/4 w-96 h-96 bg-secondary/5 rounded-full blur-[120px] pointer-events-none"></div>
+
+  <div class="max-w-7xl mx-auto relative z-10">
+    
+    <div class="mb-8 border-b border-white/10 pb-6">
+      <h1 class="text-3xl font-light tracking-tight">Users <span class="text-secondary font-medium">Directory</span></h1>
+      <p class="text-sm text-gray-400 mt-1">Manage platform users across all companies and track their individual AI token consumption.</p>
+    </div>
+
+    <app-glass-card paddingClass="p-6 mb-8">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-xs uppercase font-mono tracking-widest text-secondary flex items-center gap-2">
+          <span class="material-symbols-outlined text-base">filter_list</span>
+          Filter Directory
+        </h2>
+        <button (click)="resetFilters()" class="text-xs text-gray-400 hover:text-white transition-colors underline">
+          Reset Filters
+        </button>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <div class="flex flex-col gap-1.5 w-full">
+          <label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold ml-1">Company</label>
+          <select [(ngModel)]="filters.company_id" (change)="loadUsers()"
+                  class="w-full bg-black/50 border border-white/10 focus:border-secondary rounded-xl py-2.5 px-3 text-xs text-white outline-none transition-colors">
+            <option value="" class="bg-[#111] text-white">All Companies</option>
+            <option *ngFor="let c of companies" [value]="c.id" class="bg-[#111] text-white">{{ c.name }}</option>
+          </select>
+        </div>
+
+        <div class="flex flex-col gap-1.5 w-full">
+          <label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold ml-1">Role</label>
+          <select [(ngModel)]="filters.role" (change)="loadUsers()"
+                  class="w-full bg-black/50 border border-white/10 focus:border-secondary rounded-xl py-2.5 px-3 text-xs text-white outline-none transition-colors">
+            <option *ngFor="let r of roles" [value]="r.value" class="bg-[#111] text-white">{{ r.label }}</option>
+          </select>
+        </div>
+
+        <app-input label="First Name" placeholder="Search..." [(ngModel)]="filters.first_name" (ngModelChange)="loadUsers()"></app-input>
+
+        <app-input label="Last Name" placeholder="Search..." [(ngModel)]="filters.last_name" (ngModelChange)="loadUsers()"></app-input>
+
+        <app-input label="Email" placeholder="Search email..." [(ngModel)]="filters.email" (ngModelChange)="loadUsers()"></app-input>
+      </div>
+    </app-glass-card>
+
+    <div *ngIf="isLoading" class="flex justify-center py-24">
+      <div class="animate-spin h-8 w-8 border-2 border-secondary border-t-transparent rounded-full"></div>
+    </div>
+
+    <app-glass-card *ngIf="!isLoading" paddingClass="p-0 overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-sm text-gray-300">
+          <thead class="bg-white/5 border-b border-white/10 text-xs font-mono uppercase tracking-widest text-gray-400">
+            <tr>
+              <th class="py-4 px-6">User</th>
+              <th class="py-4 px-6">Company</th>
+              <th class="py-4 px-6 text-center">Role</th>
+              <th class="py-4 px-6 text-center">OpenRouter Usage</th>
+              <th class="py-4 px-6 text-center">Status</th>
+            </tr>
+          </thead>
+
+          <tbody class="divide-y divide-white/5">
+            <tr *ngFor="let u of users" class="hover:bg-white/5 transition-colors">
+              
+              <td class="py-4 px-6">
+                <div class="flex items-center gap-3">
+                  <div class="w-8 h-8 rounded-full bg-secondary/10 border border-secondary/20 flex items-center justify-center text-secondary font-bold text-xs uppercase">
+                    {{ (u.first_name?.substring(0,1) || u.email.substring(0,1)) }}
+                  </div>
+                  <div class="flex flex-col">
+                    <span class="font-medium text-white">{{ u.first_name }} {{ u.last_name }}</span>
+                    <span class="text-xs text-gray-500 font-mono">{{ u.email }}</span>
+                  </div>
+                </div>
+              </td>
+
+              <td class="py-4 px-6 font-mono text-xs text-gray-300">
+                {{ u.company?.name || 'System / Platform' }}
+              </td>
+
+              <td class="py-4 px-6 text-center font-mono text-xs">
+                <span class="px-2.5 py-1 rounded-md bg-white/5 border border-white/10 uppercase tracking-wider text-secondary">
+                  {{ u.role }}
+                </span>
+              </td>
+
+              <td class="py-4 px-6 text-center">
+                <div class="flex flex-col items-center font-mono text-xs">
+                  <span class="text-white font-medium">$ {{ (u.ai_cost_usd || 0) | number:'1.2-4' }}</span>
+                  <span class="text-[10px] text-gray-500">{{ (u.ai_tokens_used || 0) | number }} tokens</span>
+                </div>
+              </td>
+
+              <td class="py-4 px-6 text-center">
+                <span [ngClass]="u.is_active ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-red-500/10 text-red-400 border-red-500/20'"
+                      class="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border">
+                  {{ u.is_active ? 'ACTIVE' : 'INACTIVE' }}
+                </span>
+              </td>
+
+            </tr>
+
+            <tr *ngIf="users.length === 0">
+              <td colspan="5" class="py-12 text-center text-gray-500 text-sm">
+                No users found matching the selected filters.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </app-glass-card>
+
+  </div>
+</div>

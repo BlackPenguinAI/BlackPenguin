@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr, ConfigDict
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 
 class MyProfileResponse(BaseModel):
@@ -27,3 +27,24 @@ class PasswordUpdatePayload(BaseModel):
 class SetPasswordPayload(BaseModel):
     token: str
     new_password: str
+
+class CompanyBasicResponse(BaseModel):
+    id: str
+    name: str
+    model_config = ConfigDict(from_attributes=True)
+
+class UserAdminListResponse(BaseModel):
+    id: str
+    email: str
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    phone: Optional[str] = None
+    country: Optional[str] = None
+    role: str
+    is_active: bool
+    company_id: Optional[str] = None
+    company: Optional[CompanyBasicResponse] = None
+    ai_tokens_used: Optional[int] = 0
+    ai_cost_usd: Optional[float] = 0.0
+
+    model_config = ConfigDict(from_attributes=True)

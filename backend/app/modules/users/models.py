@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Boolean, ForeignKey, Enum as SqlaEnum, Date
+from sqlalchemy import Column, String, Boolean, ForeignKey, Enum as SqlaEnum, Integer, Float
 from sqlalchemy.orm import relationship
 import enum
 import uuid
@@ -18,8 +18,6 @@ class User(Base):
     
     first_name = Column(String(150), nullable=True)
     last_name = Column(String(100), nullable=True)
-    
-    # 🚀 NUEVOS CAMPOS AÑADIDOS
     phone = Column(String(50), nullable=True)
     country = Column(String(100), nullable=True)
     
@@ -28,6 +26,9 @@ class User(Base):
     
     role = Column(SqlaEnum(UserRole), default=UserRole.ADMIN, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
+
+    # 🚀 CONSUMO INDIVIDUAL DE OPENROUTER
+    ai_tokens_used = Column(Integer, default=0)
+    ai_cost_usd = Column(Float, default=0.0)
     
-    # string-based relationship para evitar ciclos
     company = relationship("Company", back_populates="users")
