@@ -61,6 +61,24 @@ export class AuthService {
     return localStorage.getItem('bp_token');
   }
 
+  hasValidToken(): boolean {
+    const token = this.getToken();
+    if (!token) return false;
+
+    try {
+      const parts = token.split('.');
+      if (parts.length !== 3) return false;
+
+      const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+      const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, '=');
+      const payload = JSON.parse(atob(padded));
+
+      return typeof payload.exp === 'number' && payload.exp * 1000 > Date.now();
+    } catch {
+      return false;
+    }
+  }
+
   private handleError(error: any) {
     console.error('Error en AuthService:', error);
     return throwError(() => new Error(error.error?.detail || 'Error en la autenticación.'));

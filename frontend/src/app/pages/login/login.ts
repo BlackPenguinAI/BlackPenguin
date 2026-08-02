@@ -1,7 +1,7 @@
 import { Component, AfterViewInit, ViewChild, ElementRef, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { RouterModule, Router } from '@angular/router';
+import { ActivatedRoute, RouterModule, Router } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { AuthService } from '../../core/services/auth';
 import { ToastService } from '../../core/services/toast';
@@ -22,6 +22,7 @@ export class LoginComponent implements AfterViewInit {
 
   constructor(
     private router: Router, 
+    private route: ActivatedRoute,
     private translate: TranslateService, 
     private authService: AuthService,
     private toastService: ToastService
@@ -63,18 +64,33 @@ export class LoginComponent implements AfterViewInit {
         // 🚀 Extraemos el rol procesado por el AuthService
         const userRole = response.role || localStorage.getItem('bp_role') || 'admin';
 
-        // 🚀 REDIRECCIÓN LIMPIA Y EXCLUSIVA
-        if (userRole === 'superadmin') {
-          this.router.navigate(['/admin']); // Destino Staff Master Home
-        } else {
-          this.router.navigate(['/app']);   // Destino Clientes Home
-        }
+        const returnUrl = this.getSafeReturnUrl(userRole);
+        void this.router.navigateByUrl(returnUrl, { replaceUrl: true });
       },
       error: (err) => {
         this.isSubmitting = false;
         this.toastService.showError(err.message); 
       }
     });
+  }
+
+  private getSafeReturnUrl(userRole: string): string {
+    const requestedUrl = this.route.snapshot.queryParamMap.get('returnUrl');
+    const defaultUrl = userRole === 'superadmin' ? '/admin' : '/app';
+
+    if (!requestedUrl || !requestedUrl.startsWith('/') || requestedUrl.startsWith('//')) {
+      return defaultUrl;
+    }
+
+    if (userRole === 'superadmin' && requestedUrl.startsWith('/admin')) {
+      return requestedUrl;
+    }
+
+    if (userRole !== 'superadmin' && requestedUrl.startsWith('/app')) {
+      return requestedUrl;
+    }
+
+    return defaultUrl;
   }
 
   @HostListener('document:mousemove', ['$event'])

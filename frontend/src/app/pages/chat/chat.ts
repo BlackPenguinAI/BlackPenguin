@@ -6,6 +6,7 @@ import {
   ViewChild,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
@@ -70,6 +71,11 @@ export class ChatComponent implements OnInit {
           this.isCompleted = profile.completion.can_complete;
           this.cdr.detectChanges();
         },
+        error: (error: HttpErrorResponse) => {
+          if (error.status !== 401) {
+            this.errorMessage = 'The company profile could not be loaded.';
+          }
+        },
       });
   }
 
@@ -80,12 +86,22 @@ export class ChatComponent implements OnInit {
           if (messages.length === 0) this.startConversation();
           else this.scrollToBottom();
         },
+        error: (error: HttpErrorResponse) => {
+          if (error.status !== 401) {
+            this.errorMessage = 'The conversation history could not be loaded.';
+          }
+        },
       });
   }
 
   loadSources(): void {
     this.onboarding.getSources().subscribe({
       next: (sources) => (this.sources = this.prepareSources(sources)),
+      error: (error: HttpErrorResponse) => {
+        if (error.status !== 401) {
+          this.errorMessage = 'The onboarding sources could not be loaded.';
+        }
+      },
     });
   }
 
@@ -99,9 +115,11 @@ export class ChatComponent implements OnInit {
         this.isAnalyzing = false;
         this.scrollToBottom();
       },
-      error: () => {
+      error: (error: HttpErrorResponse) => {
         this.isAnalyzing = false;
-        this.errorMessage = 'The onboarding assistant could not start. Please refresh and try again.';
+        if (error.status !== 401) {
+          this.errorMessage = 'The onboarding assistant could not start. Please refresh and try again.';
+        }
       },
     });
   }
