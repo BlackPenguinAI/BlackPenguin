@@ -55,4 +55,14 @@ describe('ChatComponent', () => {
     expect(component.statusIcon('pending_confirmation')).toBe('schedule');
     expect(component.statusIcon('conflicting')).toBe('error');
   });
+
+  it('should expose onboarding status labels in English', () => {
+    expect(component.statusLabel('missing')).toBe('Missing');
+    expect(component.statusLabel('pending_confirmation')).toBe('Pending confirmation');
+    expect(component.statusLabel('not_applicable')).toBe('Not applicable');
+  });
+
+  it('should not expose the removed session initializer', () => {
+    expect((component as unknown as { initSession?: unknown }).initSession).toBeUndefined();
+  });
 });

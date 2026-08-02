@@ -124,7 +124,7 @@ async def send_chat_message(
     profile = services.get_or_create_profile(db, current_user.company_id)
     ai_config = get_ai_config(db, current_user.company_id)
     if not ai_config.openrouter_api_key:
-        raise HTTPException(status_code=500, detail="Configuración de IA incompleta.")
+        raise HTTPException(status_code=500, detail="AI configuration is incomplete.")
 
     services.save_message(db, session.id, SenderType.USER, payload.message)
     agent_config = ai_config.agent_onboarding_empresa or {}
@@ -195,4 +195,4 @@ def trigger_scrape(
     current_user: User = Depends(RoleChecker([UserRole.ADMIN])),
 ):
     background_tasks.add_task(scrape_and_enrich_profile, current_user.company_id, str(payload.url))
-    return {"message": "El análisis del sitio web comenzó en segundo plano."}
+    return {"message": "Website analysis started in the background."}

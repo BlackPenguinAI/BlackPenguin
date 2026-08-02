@@ -2,7 +2,6 @@ import {
   ChangeDetectorRef,
   Component,
   ElementRef,
-  OnDestroy,
   OnInit,
   ViewChild,
   isDevMode,
@@ -12,7 +11,6 @@ import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { RouterModule } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
-import { Subscription, interval } from 'rxjs';
 
 import {
   ChatMessage,
@@ -31,7 +29,7 @@ import {
   templateUrl: './chat.html',
   styleUrl: './chat.scss',
 })
-export class ChatComponent implements OnInit, OnDestroy {
+export class ChatComponent implements OnInit {
   @ViewChild('chatScroll') chatScroll!: ElementRef<HTMLElement>;
 
   prompt = '';
@@ -42,8 +40,6 @@ export class ChatComponent implements OnInit, OnDestroy {
   isCompleted = false;
   messages: ChatMessage[] = [];
   profile: CompanyProfileResponse = EMPTY_COMPANY_PROFILE;
-
-  private profilePollSub?: Subscription;
 
   constructor(
     private readonly translate: TranslateService,
@@ -70,23 +66,7 @@ export class ChatComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.userName = localStorage.getItem('bp_name') || 'User';
     this.loadProfile();
-    this.initSession();
-    this.profilePollSub = interval(4000).subscribe(() => this.loadProfile());
-  }
-
-  ngOnDestroy(): void {
-    this.profilePollSub?.unsubscribe();
-  }
-
-  initSession(): void {
-    this.http
-      .get<{ is_completed: boolean }>(`${this.baseUrl}/session`, { headers: this.headers })
-      .subscribe({
-        next: ({ is_completed }) => {
-          this.isCompleted = is_completed;
-          this.loadChatHistory();
-        },
-      });
+    this.loadChatHistory();
   }
 
   loadProfile(): void {
@@ -150,13 +130,13 @@ export class ChatComponent implements OnInit, OnDestroy {
 
   statusLabel(status: ValidationStatus): string {
     const labels: Record<ValidationStatus, string> = {
-      missing: 'Faltante',
-      extracted: 'Extraído',
-      pending_confirmation: 'Pendiente de confirmación',
-      confirmed: 'Confirmado',
-      corrected_by_user: 'Corregido por el usuario',
-      conflicting: 'En conflicto',
-      not_applicable: 'No aplica',
+      missing: 'Missing',
+      extracted: 'Extracted',
+      pending_confirmation: 'Pending confirmation',
+      confirmed: 'Confirmed',
+      corrected_by_user: 'Corrected by user',
+      conflicting: 'Conflicting',
+      not_applicable: 'Not applicable',
     };
     return labels[status];
   }
