@@ -1,8 +1,26 @@
 from pydantic import BaseModel, ConfigDict
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 
-# Schema para la respuesta. (La creación es vía Form Data, no Pydantic)
+# Schema simplificado para el plan anidado
+class PlanBasicResponse(BaseModel):
+    id: str
+    name: str
+    description: Optional[str] = None
+    
+    model_config = ConfigDict(from_attributes=True)
+
+# Schema simplificado para el usuario administrador anidado
+class UserBasicResponse(BaseModel):
+    id: str
+    email: str
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    role: str
+    is_active: bool
+    
+    model_config = ConfigDict(from_attributes=True)
+
 class CompanyResponse(BaseModel):
     id: str
     name: str
@@ -10,5 +28,10 @@ class CompanyResponse(BaseModel):
     license_start: datetime
     license_end: datetime
     payment_receipt_url: Optional[str] = None
+    plan_id: Optional[str] = None
+    created_at: Optional[datetime] = None
+    
+    plan: Optional[PlanBasicResponse] = None
+    users: List[UserBasicResponse] = []
     
     model_config = ConfigDict(from_attributes=True)

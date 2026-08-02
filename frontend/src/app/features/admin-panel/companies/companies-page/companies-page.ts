@@ -54,7 +54,6 @@ export class CompaniesPageComponent implements OnInit {
     is_active: true
   };
 
-  // 🚀 FORMULARIO DE EDICIÓN IDÉNTICO
   editForm: any = {
     id: '',
     name: '',
@@ -64,9 +63,10 @@ export class CompaniesPageComponent implements OnInit {
     admin_first_name: '',
     admin_last_name: '',
     admin_email: '',
-    admin_password: '', // Opcional al editar
+    admin_password: '',
     admin_confirm_password: '',
-    is_active: true
+    is_active: true,      // Company Status
+    admin_is_active: true // User Status
   };
 
   constructor(
@@ -145,23 +145,24 @@ export class CompaniesPageComponent implements OnInit {
     this.cdr.detectChanges();
   }
 
-  // 🚀 CARGAR DATOS COMPLETOS AL EDITAR
   openEditModal(item: any): void {
-    // Intentamos extraer datos del primer administrador si existe
-    const admin = item.users && item.users.length > 0 ? item.users[0] : null;
+    const admin = item.users && item.users.length > 0 
+      ? item.users.find((u: any) => u.role === 'admin') || item.users[0]
+      : null;
 
     this.editForm = {
       id: item.id,
       name: item.name,
-      plan_id: item.plan_id || (this.plans.length > 0 ? this.plans[0].id : ''),
+      plan_id: item.plan_id || (item.plan?.id) || (this.plans.length > 0 ? this.plans[0].id : ''),
       start_date: item.license_start ? item.license_start.split('T')[0] : new Date().toISOString().split('T')[0],
-      duration_months: 12, // Por defecto al editar si el backend no envía los meses exactos
+      duration_months: 12,
       admin_first_name: admin ? admin.first_name : '',
       admin_last_name: admin ? admin.last_name : '',
       admin_email: admin ? admin.email : '',
-      admin_password: '', // Se deja vacío por seguridad
+      admin_password: '',
       admin_confirm_password: '',
-      is_active: item.is_active
+      is_active: item.is_active !== undefined ? item.is_active : true,
+      admin_is_active: admin ? (admin.is_active !== undefined ? admin.is_active : true) : true
     };
     this.selectedFile = null;
     this.showEditModal = true;
@@ -248,8 +249,8 @@ export class CompaniesPageComponent implements OnInit {
     formData.append('admin_last_name', this.editForm.admin_last_name);
     formData.append('admin_email', this.editForm.admin_email);
     formData.append('is_active', this.editForm.is_active.toString());
+    formData.append('admin_is_active', this.editForm.admin_is_active.toString());
     
-    // Solo enviamos el password si lo llenaron (para actualizarlo)
     if (this.editForm.admin_password) {
       formData.append('admin_password', this.editForm.admin_password);
     }

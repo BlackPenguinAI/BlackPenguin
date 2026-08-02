@@ -28,7 +28,7 @@
               <th class="py-4 px-6">License Period</th>
               <th class="py-4 px-6 text-center">OpenRouter Usage</th>
               <th class="py-4 px-6 text-center">Proof of Payment</th>
-              <th class="py-4 px-6 text-center">Status</th>
+              <th class="py-4 px-6 text-center">Company Status</th>
               <th class="py-4 px-6 text-right">Actions</th>
             </tr>
           </thead>
@@ -45,7 +45,7 @@
                 </div>
               </td>
 
-              <td class="py-4 px-6 font-mono text-xs text-secondary">
+              <td class="py-4 px-6 font-mono text-xs text-secondary font-bold">
                 {{ item.plan?.name || 'Standard' }}
               </td>
 
@@ -184,7 +184,7 @@
   </form>
 </app-modal>
 
-<app-modal [isOpen]="showEditModal" title="Edit Company & Administrator" maxWidthClass="max-w-2xl" (close)="closeEditModal()">
+<app-modal [isOpen]="showEditModal" title="Edit Company Details" maxWidthClass="max-w-2xl" (close)="closeEditModal()">
   <form (ngSubmit)="updateCompany()" class="flex flex-col gap-4">
     
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -200,7 +200,10 @@
     </div>
 
     <div class="flex items-center justify-between p-3 bg-white/5 border border-white/10 rounded-xl">
-      <span class="text-xs font-mono uppercase tracking-widest text-gray-300">Workspace Status</span>
+      <div class="flex flex-col">
+        <span class="text-xs font-mono uppercase tracking-widest text-gray-200">Company Status</span>
+        <span class="text-[10px] text-gray-500">Enable or disable company access to the platform</span>
+      </div>
       <label class="relative inline-flex items-center cursor-pointer">
         <input type="checkbox" [(ngModel)]="editForm.is_active" name="edit_is_active" class="sr-only peer">
         <div class="w-11 h-6 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-secondary"></div>
@@ -211,7 +214,7 @@
       <div class="flex flex-col gap-1.5 w-full">
         <label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold ml-1">Start Date</label>
         <input type="date" [(ngModel)]="editForm.start_date" name="edit_start_date"
-               class="w-full bg-black/50 border border-white/10 focus:border-secondary rounded-xl py-3 px-4 text-sm text-white outline-none transition-colors cursor-pointer color-scheme-dark">
+               class="w-full bg-black/50 border border-white/10 focus:border-secondary rounded-xl py-3 px-4 text-sm text-white outline-none transition-colors cursor-pointer">
       </div>
       
       <div class="flex flex-col gap-1.5 w-full">
@@ -230,17 +233,31 @@
     </div>
 
     <div class="border-t border-white/10 pt-4 mt-2">
-      <h3 class="text-xs uppercase font-mono tracking-widest text-secondary mb-3">Company Administrator Account</h3>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-xs uppercase font-mono tracking-widest text-secondary">Company Administrator Account</h3>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
         <app-input label="First Name" placeholder="John" [(ngModel)]="editForm.admin_first_name" name="edit_admin_first_name"></app-input>
         <app-input label="Last Name" placeholder="Doe" [(ngModel)]="editForm.admin_last_name" name="edit_admin_last_name"></app-input>
       </div>
-    </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-      <app-input label="Admin Email" type="email" placeholder="admin@company.com" [(ngModel)]="editForm.admin_email" name="edit_admin_email"></app-input>
-      <app-input label="New Password (Optional)" type="password" placeholder="••••••••" [(ngModel)]="editForm.admin_password" name="edit_admin_password"></app-input>
-      <app-input label="Repeat Password" type="password" placeholder="••••••••" [(ngModel)]="editForm.admin_confirm_password" name="edit_admin_confirm_password"></app-input>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+        <app-input label="Admin Email" type="email" placeholder="admin@company.com" [(ngModel)]="editForm.admin_email" name="edit_admin_email"></app-input>
+        
+        <div class="flex items-center justify-between p-2.5 bg-white/5 border border-white/10 rounded-xl h-[46px] self-end">
+          <span class="text-xs font-mono uppercase tracking-widest text-gray-300">User Status</span>
+          <label class="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox" [(ngModel)]="editForm.admin_is_active" name="edit_admin_is_active" class="sr-only peer">
+            <div class="w-9 h-5 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-secondary"></div>
+          </label>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <app-input label="New Password (Optional)" type="password" placeholder="Leave empty to keep current" [(ngModel)]="editForm.admin_password" name="edit_admin_password"></app-input>
+        <app-input label="Repeat New Password" type="password" placeholder="••••••••" [(ngModel)]="editForm.admin_confirm_password" name="edit_admin_confirm_password"></app-input>
+      </div>
     </div>
 
     <div class="flex flex-col gap-1.5 w-full">

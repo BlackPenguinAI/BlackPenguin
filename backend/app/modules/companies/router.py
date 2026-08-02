@@ -33,18 +33,16 @@ def create_company_workspace(
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN]))
 ):
-    """Crea una Compañía y su primer Administrador simultáneamente."""
+    """Crea una Compañía (Status: Active) y su Administrador (Status: Active)."""
     
     if db.query(User).filter(User.email == admin_email).first():
-        raise HTTPException(status_code=400, detail="El correo ya está registrado por otro usuario.")
+        raise HTTPException(status_code=400, detail="The email is already registered.")
         
     if not db.query(SubscriptionPlan).filter(SubscriptionPlan.id == plan_id).first():
-        raise HTTPException(status_code=400, detail="Plan de suscripción no válido.")
+        raise HTTPException(status_code=400, detail="Invalid subscription plan.")
 
-    # Guardar recibo
     receipt_url = services.save_receipt_file(admin_email, receipt_file) if receipt_file else None
 
-    # Procesar fecha de inicio
     parsed_start_date = datetime.utcnow()
     if start_date:
         try:
@@ -52,7 +50,6 @@ def create_company_workspace(
         except ValueError:
             pass
 
-    # Crear Compañía
     new_company = Company(
         name=name, plan_id=plan_id, 
         license_start=parsed_start_date, 
@@ -63,11 +60,14 @@ def create_company_workspace(
     db.commit()
     db.refresh(new_company)
 
-    # Crear Admin
     new_admin = User(
-        email=admin_email, hashed_password=get_password_hash(admin_password),
-        first_name=admin_first_name, last_name=admin_last_name,
-        role=UserRole.ADMIN, company_id=new_company.id, is_active=True
+        email=admin_email, 
+        hashed_password=get_password_hash(admin_password),
+        first_name=admin_first_name, 
+        last_name=admin_last_name,
+        role=UserRole.ADMIN, 
+        company_id=new_company.id, 
+        is_active=True # Default User Status: Active
     )
     db.add(new_admin)
     db.commit()
@@ -82,7 +82,10 @@ def get_companies(
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN]))
 ):
-    return db.query(Company).options(joinedload(Company.plan)).order_by(Company.created_at.desc()).all()
+    return db.query(Company).options(
+        joinedload(Company.plan),
+        joinedload(Company.users)
+    ).order_by(Company.created_at.desc()).all()
 
 # ==========================================
 # 3. ACTUALIZAR EMPRESA Y ADMIN (EDIT)
@@ -96,52 +99,55 @@ def update_company(
     admin_first_name: str = Form(...),
     admin_last_name: str = Form(...),
     admin_email: str = Form(...),
-    is_active: str = Form(...), # FastAPI recibe booleanos de FormData como strings
+    is_active: str = Form('true'),       # Company Status
+    admin_is_active: str = Form('true'), # User Status
     start_date: Optional[str] = Form(None),
     admin_password: Optional[str] = Form(None),
     receipt_file: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN]))
 ):
-    """Actualiza los datos de la compañía y su administrador principal."""
-    company = db.query(Company).filter(Company.id == company_id).first()
+    company = db.query(Company).options(
+        joinedload(Company.plan), 
+        joinedload(Company.users)
+    ).filter(Company.id == company_id).first()
+    
     if not company:
-        raise HTTPException(status_code=404, detail="Compañía no encontrada.")
+        raise HTTPException(status_code=404, detail="Company not found.")
 
-    # Parsear booleano
     is_active_bool = str(is_active).lower() == 'true'
+    admin_is_active_bool = str(admin_is_active).lower() == 'true'
 
-    # Actualizar datos de empresa
+    # 1. Actualizar datos de la Compañía
     company.name = name
     company.plan_id = plan_id
     company.is_active = is_active_bool
 
-    # Manejar comprobante nuevo (si se sube uno)
     if receipt_file:
         company.payment_receipt_url = services.save_receipt_file(admin_email, receipt_file)
 
-    # Manejar fechas
     if start_date:
         try:
             company.license_start = datetime.strptime(start_date, '%Y-%m-%d')
         except ValueError:
             pass
-    company.license_end = company.license_start + relativedelta(months=duration_months)
+    if company.license_start:
+        company.license_end = company.license_start + relativedelta(months=duration_months)
 
-    # Actualizar usuario Admin
+    # 2. Actualizar datos del Administrador
     admin_user = db.query(User).filter(User.company_id == company_id, User.role == UserRole.ADMIN).first()
     if admin_user:
-        # Validar colisión de email si lo cambió
         if admin_user.email != admin_email:
             if db.query(User).filter(User.email == admin_email).first():
-                raise HTTPException(status_code=400, detail="El correo ya está registrado por otro usuario.")
+                raise HTTPException(status_code=400, detail="The email is already registered.")
         
         admin_user.first_name = admin_first_name
         admin_user.last_name = admin_last_name
         admin_user.email = admin_email
-        admin_user.is_active = is_active_bool
+        admin_user.is_active = admin_is_active_bool
 
-        if admin_password: # Solo actualiza la contraseña si se ingresó una nueva
+        # Solo se cambia el password si se ingresa uno nuevo
+        if admin_password and admin_password.strip():
             admin_user.hashed_password = get_password_hash(admin_password)
 
     db.commit()
@@ -149,7 +155,7 @@ def update_company(
     return company
 
 # ==========================================
-# 4. ELIMINAR EMPRESA (DELETE)
+# 4. ELIMINAR EMPRESA
 # ==========================================
 @router.delete("/{company_id}/", status_code=status.HTTP_200_OK)
 def delete_company(
@@ -157,14 +163,13 @@ def delete_company(
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN]))
 ):
-    """Elimina permanentemente una compañía y sus usuarios (Cascade en DB)."""
     company = db.query(Company).filter(Company.id == company_id).first()
     if not company:
-        raise HTTPException(status_code=404, detail="Compañía no encontrada.")
+        raise HTTPException(status_code=404, detail="Company not found.")
     
     db.delete(company)
     db.commit()
-    return {"detail": "Compañía eliminada exitosamente"}
+    return {"detail": "Company deleted successfully"}
 
 # ==========================================
 # 5. REENVIAR ACTIVACIÓN
@@ -177,7 +182,6 @@ def resend_activation(
 ):
     company = db.query(Company).filter(Company.id == company_id).first()
     if not company:
-        raise HTTPException(status_code=404, detail="Compañía no encontrada.")
+        raise HTTPException(status_code=404, detail="Company not found.")
     
-    # Aquí irá tu lógica de envío de correos (Resend / SMTP)
-    return {"detail": "Enlace de activación enviado"}
+    return {"detail": "Activation link sent"}
