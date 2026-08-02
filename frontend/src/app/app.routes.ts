@@ -42,7 +42,7 @@ export const routes: Routes = [
   },
 
   // ==========================================
-  // 2. ZONA SUPERADMIN / PANEL ADMIN
+  // 2. ZONA SUPERADMIN / PANEL ADMIN (10 RUTAS)
   // ==========================================
   {
     path: 'admin',
@@ -56,6 +56,13 @@ export const routes: Routes = [
           import(
             './features/admin-panel/dashboard/dashboard-page/dashboard-page'
           ).then((m) => m.DashboardPageComponent),
+      },
+      {
+        path: 'profile',
+        loadComponent: () =>
+          import(
+            './features/admin-panel/profile/profile-page/profile-page'
+          ).then((m) => m.ProfilePageComponent),
       },
       {
         path: 'companies',
@@ -78,6 +85,21 @@ export const routes: Routes = [
             './features/admin-panel/plans/plans-page/plans-page'
           ).then((m) => m.PlansPageComponent),
       },
+      // 🚀 RESTAURADAS: RUTAS DE IA
+      {
+        path: 'ai-infrastructure',
+        loadComponent: () =>
+          import(
+            './features/admin-panel/ai-infrastructure/ai-infrastructure-page/ai-infrastructure-page'
+          ).then((m) => m.AiInfrastructurePageComponent),
+      },
+      {
+        path: 'ai-settings',
+        loadComponent: () =>
+          import(
+            './features/admin-panel/ai-settings/ai-settings-page/ai-settings-page'
+          ).then((m) => m.AiSettingsPageComponent),
+      },
       {
         path: 'email-settings',
         loadComponent: () =>
@@ -92,20 +114,12 @@ export const routes: Routes = [
             './features/admin-panel/messaging-settings/messaging-settings-page/messaging-settings-page'
           ).then((m) => m.MessagingSettingsPageComponent),
       },
-      // 🚀 AQUI ESTÁ LA NUEVA RUTA LEGAL COMPLIANCE
       {
         path: 'legal-compliance',
         loadComponent: () =>
           import(
             './features/admin-panel/legal-compliance/legal-compliance-page/legal-compliance-page'
           ).then((m) => m.LegalCompliancePageComponent),
-      },
-      {
-        path: 'profile',
-        loadComponent: () =>
-          import(
-            './features/admin-panel/profile/profile-page/profile-page'
-          ).then((m) => m.ProfilePageComponent),
       },
     ],
   },
