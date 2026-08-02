@@ -85,13 +85,20 @@ export const routes: Routes = [
             './features/admin-panel/email-settings/email-settings-page/email-settings-page'
           ).then((m) => m.EmailSettingsPageComponent),
       },
-      // 🚀 AÑADE ESTO:
       {
         path: 'messaging-settings',
         loadComponent: () =>
           import(
             './features/admin-panel/messaging-settings/messaging-settings-page/messaging-settings-page'
           ).then((m) => m.MessagingSettingsPageComponent),
+      },
+      // 🚀 AQUI ESTÁ LA NUEVA RUTA LEGAL COMPLIANCE
+      {
+        path: 'legal-compliance',
+        loadComponent: () =>
+          import(
+            './features/admin-panel/legal-compliance/legal-compliance-page/legal-compliance-page'
+          ).then((m) => m.LegalCompliancePageComponent),
       },
       {
         path: 'profile',
