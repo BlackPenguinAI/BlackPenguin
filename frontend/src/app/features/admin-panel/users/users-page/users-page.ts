@@ -6,7 +6,6 @@ import { ToastService } from '../../../../core/services/toast';
 
 import { GlassCardComponent } from '../../../../shared/ui/glass-card/glass-card';
 import { InputComponent } from '../../../../shared/ui/input/input';
-import { ButtonComponent } from '../../../../shared/ui/button/button';
 
 @Component({
   selector: 'app-users-page',
@@ -15,8 +14,8 @@ import { ButtonComponent } from '../../../../shared/ui/button/button';
     CommonModule, 
     FormsModule, 
     GlassCardComponent, 
-    InputComponent, 
-    ButtonComponent
+    InputComponent
+    // ButtonComponent eliminado de aquí
   ],
   providers: [DecimalPipe],
   templateUrl: './users-page.html'
