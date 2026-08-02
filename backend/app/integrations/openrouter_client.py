@@ -1,14 +1,18 @@
-import httpx
-import urllib.request
 import json
 from typing import Any, Dict, List
+import urllib.request
+
+import httpx
 
 async def generate_llm_response(
     api_key: str,
     model: str,
     messages: List[Dict[str, str]],
     app_name: str = "Black Penguin",
+    *,
     response_format: dict[str, Any] | None = None,
+    temperature: float = 0.3,
+    raise_on_error: bool = False,
 ) -> str:
     """Envía la solicitud asíncrona al LLM para generar texto."""
     url = "https://openrouter.ai/api/v1/chat/completions"
@@ -21,19 +25,26 @@ async def generate_llm_response(
     payload = {
         "model": model,
         "messages": messages,
-        "temperature": 0.2 if response_format else 0.7,
+        "temperature": temperature,
     }
-    if response_format:
+    if response_format is not None:
         payload["response_format"] = response_format
     
-    async with httpx.AsyncClient() as client:
-        try:
-            response = await client.post(url, headers=headers, json=payload, timeout=30.0)
-            if response.status_code == 200:
-                return response.json()["choices"][0]["message"]["content"]
-            return f"⚠️ Error IA ({response.status_code}): No se pudo contactar al LLM."
-        except Exception as e:
-            return f"❌ Error Servidor: {str(e)}"
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, headers=headers, json=payload, timeout=45.0)
+            response.raise_for_status()
+            try:
+                content = response.json()["choices"][0]["message"]["content"]
+            except (KeyError, IndexError, TypeError, json.JSONDecodeError) as exc:
+                raise ValueError("OpenRouter returned an unexpected response.") from exc
+            if not isinstance(content, str) or not content.strip():
+                raise ValueError("OpenRouter returned an empty response.")
+            return content
+    except (httpx.HTTPError, ValueError) as exc:
+        if raise_on_error:
+            raise
+        return f"⚠️ AI service unavailable: {exc}"
 
 def check_openrouter_consumption(api_key: str) -> dict:
     """Consulta síncrona para obtener el saldo y límite de la API Key."""

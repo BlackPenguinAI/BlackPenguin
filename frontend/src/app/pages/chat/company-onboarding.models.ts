@@ -53,6 +53,54 @@ export interface ChatMessage {
   created_at: string | Date;
 }
 
+export type SourceKind =
+  | 'official_website'
+  | 'social_profile'
+  | 'online_document'
+  | 'third_party'
+  | 'uploaded_file';
+
+export type SourceStatus = 'processing' | 'ready' | 'failed';
+export type ProposalStatus = 'pending' | 'confirmed' | 'corrected' | 'rejected';
+
+export interface SourceProposal {
+  id: string;
+  field: string;
+  label: string;
+  value: unknown;
+  evidence: string | null;
+  confidence: 'high' | 'medium' | 'low' | null;
+  status: ProposalStatus;
+  draftValue?: string;
+}
+
+export interface OnboardingSource {
+  id: string;
+  kind: SourceKind;
+  status: SourceStatus;
+  name: string;
+  url: string | null;
+  mime_type: string | null;
+  size_bytes: number | null;
+  error_message: string | null;
+  proposals: SourceProposal[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ChatTurnResponse {
+  message: ChatMessage;
+  profile: CompanyProfileResponse;
+  accepted_fields: string[];
+  rejected_updates: Array<{ field: string | null; reason: string }>;
+  sources: OnboardingSource[];
+}
+
+export interface ProposalDecisionResponse {
+  proposal: SourceProposal;
+  profile: CompanyProfileResponse;
+}
+
 export const EMPTY_COMPANY_PROFILE: CompanyProfileResponse = {
   id: '',
   company_id: '',

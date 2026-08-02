@@ -13,6 +13,27 @@ class SenderType(str, enum.Enum):
     AI = "ai"
 
 
+class SourceKind(str, enum.Enum):
+    OFFICIAL_WEBSITE = "official_website"
+    SOCIAL_PROFILE = "social_profile"
+    ONLINE_DOCUMENT = "online_document"
+    THIRD_PARTY = "third_party"
+    UPLOADED_FILE = "uploaded_file"
+
+
+class SourceStatus(str, enum.Enum):
+    PROCESSING = "processing"
+    READY = "ready"
+    FAILED = "failed"
+
+
+class ProposalStatus(str, enum.Enum):
+    PENDING = "pending"
+    CONFIRMED = "confirmed"
+    CORRECTED = "corrected"
+    REJECTED = "rejected"
+
+
 class CompanyProfile(Base):
     __tablename__ = "company_profiles"
 
@@ -76,3 +97,50 @@ class OnboardingMessage(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     session = relationship("OnboardingSession", back_populates="messages")
+
+
+class CompanyOnboardingSource(Base):
+    __tablename__ = "company_onboarding_sources"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    company_id = Column(String(36), ForeignKey("companies.id", ondelete="CASCADE"), nullable=False, index=True)
+    uploaded_by_user_id = Column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    kind = Column(SqlaEnum(SourceKind), nullable=False)
+    status = Column(SqlaEnum(SourceStatus), default=SourceStatus.PROCESSING, nullable=False)
+    name = Column(String(255), nullable=False)
+    url = Column(Text, nullable=True)
+    mime_type = Column(String(150), nullable=True)
+    size_bytes = Column(Integer, nullable=True)
+    sha256 = Column(String(64), nullable=True, index=True)
+    extracted_text = Column(Text, nullable=True)
+    error_message = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    proposals = relationship(
+        "CompanyOnboardingProposal",
+        back_populates="source",
+        cascade="all, delete-orphan",
+    )
+
+
+class CompanyOnboardingProposal(Base):
+    __tablename__ = "company_onboarding_proposals"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    source_id = Column(
+        String(36),
+        ForeignKey("company_onboarding_sources.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    field_key = Column(String(100), nullable=False)
+    value = Column(JSON, nullable=True)
+    evidence = Column(Text, nullable=True)
+    confidence = Column(String(20), nullable=True)
+    status = Column(SqlaEnum(ProposalStatus), default=ProposalStatus.PENDING, nullable=False)
+    reviewed_by_user_id = Column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    reviewed_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    source = relationship("CompanyOnboardingSource", back_populates="proposals")

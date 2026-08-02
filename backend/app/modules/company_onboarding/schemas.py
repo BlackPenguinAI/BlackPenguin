@@ -1,9 +1,7 @@
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
-
-from .completion import normalize_field_key
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 
 
 ValidationStatus = Literal[
@@ -82,22 +80,6 @@ class FieldUpdate(BaseModel):
     source_reference: str | None = None
     confidence: Literal["high", "medium", "low"] | None = None
 
-    @field_validator("field", mode="before")
-    @classmethod
-    def validate_and_normalize_field(cls, value: Any) -> str:
-        canonical_key = normalize_field_key(value)
-        if canonical_key is None:
-            raise ValueError("Unsupported Company Profile field key")
-        return canonical_key
-
-
-class AgentResponsePayload(BaseModel):
-    """Internal LLM envelope. It is never returned directly to the frontend."""
-
-    assistant_message: str = Field(min_length=1, max_length=10000)
-    verified_updates: list[Any] = Field(default_factory=list)
-    final_approved: bool | None = None
-
 
 class CompanyProfilePatch(BaseModel):
     updates: list[FieldUpdate] = Field(default_factory=list)
@@ -114,9 +96,67 @@ class ChatMessageResponse(BaseModel):
     created_at: datetime
 
 
+class RejectedUpdate(BaseModel):
+    field: str | None = None
+    reason: str
+
+
+class ChatTurnResponse(BaseModel):
+    message: ChatMessageResponse
+    profile: CompanyProfileResponse
+    accepted_fields: list[str] = Field(default_factory=list)
+    rejected_updates: list[RejectedUpdate] = Field(default_factory=list)
+    sources: list["SourceResponse"] = Field(default_factory=list)
+
+
 class SessionResponse(BaseModel):
     is_completed: bool
 
 
 class ScrapeRequest(BaseModel):
     url: HttpUrl
+
+
+SourceKind = Literal[
+    "official_website",
+    "social_profile",
+    "online_document",
+    "third_party",
+    "uploaded_file",
+]
+SourceStatus = Literal["processing", "ready", "failed"]
+ProposalStatus = Literal["pending", "confirmed", "corrected", "rejected"]
+
+
+class SourceProposalResponse(BaseModel):
+    id: str
+    field: str
+    label: str
+    value: Any = None
+    evidence: str | None = None
+    confidence: str | None = None
+    status: ProposalStatus
+
+
+class SourceResponse(BaseModel):
+    id: str
+    kind: SourceKind
+    status: SourceStatus
+    name: str
+    url: str | None = None
+    mime_type: str | None = None
+    size_bytes: int | None = None
+    error_message: str | None = None
+    proposals: list[SourceProposalResponse] = Field(default_factory=list)
+    created_at: datetime
+    updated_at: datetime
+
+
+class ProposalDecision(BaseModel):
+    action: Literal["confirm", "correct", "reject"]
+    value: Any = None
+
+
+class ProposalDecisionResponse(BaseModel):
+    proposal: SourceProposalResponse
+    profile: CompanyProfileResponse

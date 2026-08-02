@@ -1,62 +1,39 @@
-<div
-  class="flex h-full w-full flex-col overflow-hidden bg-[#050505] font-sans text-white md:flex-row"
->
+<div class="flex h-full w-full flex-col overflow-hidden bg-[#050505] font-sans text-white md:flex-row">
   <section class="relative flex h-full min-w-0 flex-1 flex-col">
-    <header
-      class="z-10 flex items-center justify-between border-b border-white/5 bg-black/40 p-4 backdrop-blur-md md:p-6"
-    >
+    <header class="z-10 flex items-center justify-between border-b border-white/5 bg-black/40 p-4 backdrop-blur-md md:p-6">
       <div>
         <h1 class="text-xl font-light tracking-tight md:text-2xl">
-          AI Corporate
-          <span class="font-medium text-secondary">Onboarding</span>
+          AI Corporate <span class="font-medium text-secondary">Onboarding</span>
         </h1>
-        <p class="mt-1 text-xs text-gray-400">
-          Set up and validate your corporate profile.
-        </p>
+        <p class="mt-1 text-xs text-gray-400">Set up and validate your corporate profile.</p>
       </div>
     </header>
 
-    <div
-      #chatScroll
-      class="z-10 flex flex-1 flex-col gap-6 overflow-y-auto p-4 scroll-smooth md:p-8"
-    >
+    <div #chatScroll class="z-10 flex flex-1 flex-col gap-6 overflow-y-auto p-4 scroll-smooth md:p-8">
       <div
         *ngFor="let msg of messages"
         class="flex w-full"
         [ngClass]="msg.sender === 'user' ? 'justify-end' : 'justify-start'"
       >
-        <div
-          *ngIf="msg.sender === 'ai'"
-          class="flex max-w-[90%] gap-4 md:max-w-[80%]"
-        >
-          <div
-            class="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-secondary/50 bg-secondary/20"
-          >
-            <span class="material-symbols-outlined text-[18px] text-secondary"
-              >smart_toy</span
-            >
+        <div *ngIf="msg.sender === 'ai'" class="flex max-w-[90%] gap-4 md:max-w-[80%]">
+          <div class="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-secondary/50 bg-secondary/20">
+            <span class="material-symbols-outlined text-[18px] text-secondary">smart_toy</span>
           </div>
           <div>
             <div
               class="assistant-markdown rounded-2xl rounded-tl-sm border border-white/10 bg-white/5 p-4 text-sm leading-relaxed text-gray-200"
               [innerHTML]="renderMarkdown(msg.content)"
-            ></div>
+            >
+            </div>
             <span class="mt-1.5 block px-1 text-[10px] text-gray-500">
               {{ msg.created_at | date: 'dd/MM/yyyy HH:mm' }}
             </span>
           </div>
         </div>
 
-        <div
-          *ngIf="msg.sender === 'user'"
-          class="flex max-w-[85%] flex-col items-end md:max-w-[80%]"
-        >
-          <span class="mb-1 mr-2 text-[10px] text-gray-500"
-            >{{ userName }}</span
-          >
-          <div
-            class="rounded-2xl rounded-tr-sm border border-white/10 bg-white/10 px-5 py-3 text-sm leading-relaxed"
-          >
+        <div *ngIf="msg.sender === 'user'" class="flex max-w-[85%] flex-col items-end md:max-w-[80%]">
+          <span class="mb-1 mr-2 text-[10px] text-gray-500">{{ userName }}</span>
+          <div class="rounded-2xl rounded-tr-sm border border-white/10 bg-white/10 px-5 py-3 text-sm leading-relaxed">
             {{ msg.content }}
           </div>
           <span class="mt-1.5 px-1 text-[10px] text-gray-500">
@@ -65,78 +42,129 @@
         </div>
       </div>
 
-      <div *ngIf="isAnalyzing" class="flex max-w-[80%] gap-4">
-        <div
-          class="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-secondary/50 bg-secondary/20"
-        >
-          <span class="material-symbols-outlined text-[18px] text-secondary"
-            >smart_toy</span
-          >
+      <section
+        *ngFor="let source of sources; trackBy: trackSource"
+        class="source-card ml-12 max-w-3xl rounded-2xl border border-white/10 bg-white/[0.035] p-4"
+      >
+        <div class="flex items-start justify-between gap-4">
+          <div class="min-w-0">
+            <p class="truncate text-sm font-medium text-white">{{ source.name }}</p>
+            <p class="mt-1 text-[11px] uppercase tracking-wider text-gray-500">
+              {{ source.kind.replace('_', ' ') }} · {{ source.status }}
+            </p>
+          </div>
+          <span class="material-symbols-outlined text-secondary">
+            {{ source.kind === 'uploaded_file' ? 'description' : 'language' }}
+          </span>
         </div>
-        <div
-          class="flex items-center gap-2 rounded-2xl rounded-tl-sm border border-white/10 bg-white/5 p-4"
-        >
+
+        <p *ngIf="source.status === 'failed'" class="mt-3 text-xs text-red-300">
+          {{ source.error_message }}
+        </p>
+        <p *ngIf="source.status === 'ready' && source.proposals.length === 0" class="mt-3 text-xs text-gray-400">
+          No reliable company details were found in this source.
+        </p>
+
+        <div *ngIf="source.proposals.length" class="mt-4 space-y-3">
+          <p class="text-xs font-semibold uppercase tracking-wider text-secondary">Details ready for review</p>
+          <article
+            *ngFor="let proposal of source.proposals"
+            class="rounded-xl border border-white/10 bg-black/30 p-3"
+          >
+            <div class="flex items-center justify-between gap-3">
+              <label class="text-xs font-semibold text-gray-200">{{ proposal.label }}</label>
+              <span class="proposal-status" [attr.data-status]="proposal.status">{{ proposal.status }}</span>
+            </div>
+            <input
+              [(ngModel)]="proposal.draftValue"
+              [disabled]="proposal.status !== 'pending'"
+              class="mt-2 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white outline-none focus:border-secondary/60 disabled:opacity-60"
+            />
+            <p *ngIf="proposal.evidence" class="mt-2 text-[11px] leading-relaxed text-gray-500">
+              {{ proposal.evidence }}
+            </p>
+            <div *ngIf="proposal.status === 'pending'" class="mt-3 flex flex-wrap gap-2">
+              <button (click)="decideProposal(source, proposal, 'confirm')" class="proposal-action primary">
+                Confirm
+              </button>
+              <button (click)="decideProposal(source, proposal, 'correct')" class="proposal-action">
+                Save edit
+              </button>
+              <button (click)="decideProposal(source, proposal, 'reject')" class="proposal-action danger">
+                Reject
+              </button>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <div *ngIf="isAnalyzing" class="flex max-w-[80%] gap-4">
+        <div class="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-secondary/50 bg-secondary/20">
+          <span class="material-symbols-outlined text-[18px] text-secondary">smart_toy</span>
+        </div>
+        <div class="flex items-center gap-2 rounded-2xl rounded-tl-sm border border-white/10 bg-white/5 p-4">
           <span class="h-2 w-2 animate-bounce rounded-full bg-secondary"></span>
-          <span
-            class="h-2 w-2 animate-bounce rounded-full bg-secondary [animation-delay:0.2s]"
-          ></span>
-          <span
-            class="h-2 w-2 animate-bounce rounded-full bg-secondary [animation-delay:0.4s]"
-          ></span>
+          <span class="h-2 w-2 animate-bounce rounded-full bg-secondary [animation-delay:0.2s]"></span>
+          <span class="h-2 w-2 animate-bounce rounded-full bg-secondary [animation-delay:0.4s]"></span>
         </div>
       </div>
     </div>
 
     <footer class="z-10 border-t border-white/5 bg-[#050505] p-4">
       <div class="mx-auto max-w-4xl">
-        <div
-          class="relative rounded-2xl border border-white/5 bg-[#111] p-4 shadow-2xl"
-        >
+        <div *ngIf="errorMessage" class="mb-3 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-xs text-red-200">
+          {{ errorMessage }}
+        </div>
+        <div class="relative rounded-2xl border border-white/5 bg-[#111] p-4 shadow-2xl">
           <textarea
             [(ngModel)]="prompt"
             (keydown)="handleKeyDown($event)"
             [disabled]="isAnalyzing || isCompleted"
             rows="1"
             placeholder="Enter company information, a correction, or a confirmation..."
-            class="min-h-12 max-h-36 w-full resize-none overflow-hidden bg-transparent py-3 pl-4 pr-14 text-sm text-white placeholder-gray-500 focus:outline-none"
+            class="min-h-12 max-h-36 w-full resize-none overflow-hidden bg-transparent py-3 pl-12 pr-14 text-sm text-white placeholder-gray-500 focus:outline-none"
           ></textarea>
+          <label
+            class="absolute bottom-3 left-3 flex cursor-pointer items-center justify-center rounded-lg p-2 text-gray-400 transition hover:bg-white/10 hover:text-white"
+            [class.pointer-events-none]="isUploading || isCompleted"
+            [class.opacity-40]="isUploading || isCompleted"
+            title="Attach company documents"
+          >
+            <span class="material-symbols-outlined text-[20px]">{{ isUploading ? 'progress_activity' : 'attach_file' }}</span>
+            <input
+              type="file"
+              multiple
+              accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+              class="hidden"
+              [disabled]="isUploading || isCompleted"
+              (change)="onFilesSelected($event)"
+            />
+          </label>
           <button
             (click)="sendMessage()"
             [disabled]="!canSend"
             class="absolute bottom-2 right-2 rounded-xl bg-white p-2 transition-colors disabled:bg-white/20 disabled:opacity-50"
           >
-            <span
-              class="material-symbols-outlined text-[20px]"
-              [ngClass]="canSend ? 'text-black' : 'text-gray-400'"
-            >
+            <span class="material-symbols-outlined text-[20px]" [ngClass]="canSend ? 'text-black' : 'text-gray-400'">
               arrow_upward
             </span>
           </button>
         </div>
         <p class="mt-3 text-center font-mono text-[10px] text-gray-600">
-          Extracted information must be confirmed before the profile can be
-          completed.
+          Paste a website or social URL, or attach up to 10 PDF, DOCX, or TXT files. Extracted details require your confirmation.
         </p>
       </div>
     </footer>
   </section>
 
-  <aside
-    class="z-20 flex h-full w-full shrink-0 flex-col border-l border-white/10 bg-[#0a0a0a] md:w-80 lg:w-96"
-  >
+  <aside class="z-20 flex h-full w-full shrink-0 flex-col border-l border-white/10 bg-[#0a0a0a] md:w-80 lg:w-96">
     <header class="border-b border-white/10 p-6">
       <div class="flex items-center justify-between gap-4">
-        <h2
-          class="flex items-center gap-2 text-sm font-bold uppercase tracking-widest"
-        >
-          <span class="material-symbols-outlined text-[20px] text-secondary"
-            >radar</span
-          >
+        <h2 class="flex items-center gap-2 text-sm font-bold uppercase tracking-widest">
+          <span class="material-symbols-outlined text-[20px] text-secondary">radar</span>
           Company Profile
         </h2>
-        <span class="text-2xl font-semibold text-secondary"
-          >{{ profile.completion.percentage }}%</span
-        >
+        <span class="text-2xl font-semibold text-secondary">{{ profile.completion.percentage }}%</span>
       </div>
       <div class="mt-4 h-2 overflow-hidden rounded-full bg-white/10">
         <div
@@ -145,38 +173,26 @@
         ></div>
       </div>
       <p class="mt-3 text-[11px] leading-relaxed text-gray-500">
-        Required fields: 90%. Applicable conditional fields: 10%. Enrichment
-        does not block completion.
+        Required fields: 90%. Applicable conditional fields: 10%. Enrichment does not block completion.
       </p>
     </header>
 
     <div class="flex-1 space-y-7 overflow-y-auto p-6">
       <section>
         <div class="mb-3 flex items-center justify-between">
-          <h3 class="text-xs font-bold uppercase tracking-wider text-white">
-            Required
-          </h3>
+          <h3 class="text-xs font-bold uppercase tracking-wider text-white">Required</h3>
           <span class="text-[11px] text-gray-400">
-            {{ profile.completion.required.completed }} of {{
-            profile.completion.required.total }}
+            {{ profile.completion.required.completed }} of {{ profile.completion.required.total }}
           </span>
         </div>
         <div class="space-y-3">
-          <div
-            *ngFor="let field of requiredFields; trackBy: trackField"
-            class="flex items-start gap-3"
-          >
-            <span
-              class="material-symbols-outlined mt-0.5 text-[18px]"
-              [ngClass]="statusClass(field.status)"
-            >
+          <div *ngFor="let field of requiredFields; trackBy: trackField" class="flex items-start gap-3">
+            <span class="material-symbols-outlined mt-0.5 text-[18px]" [ngClass]="statusClass(field.status)">
               {{ statusIcon(field.status) }}
             </span>
             <div class="min-w-0">
               <p class="text-xs text-gray-200">{{ field.label }}</p>
-              <p class="text-[10px]" [ngClass]="statusClass(field.status)">
-                {{ statusLabel(field.status) }}
-              </p>
+              <p class="text-[10px]" [ngClass]="statusClass(field.status)">{{ statusLabel(field.status) }}</p>
             </div>
           </div>
         </div>
@@ -184,30 +200,20 @@
 
       <section>
         <div class="mb-3 flex items-center justify-between">
-          <h3 class="text-xs font-bold uppercase tracking-wider text-white">
-            Conditional
-          </h3>
+          <h3 class="text-xs font-bold uppercase tracking-wider text-white">Conditional</h3>
           <span class="text-[11px] text-gray-400">
-            {{ profile.completion.conditional.evaluated }} of {{
-            profile.completion.conditional.total }} evaluated
+            {{ profile.completion.conditional.evaluated }} of {{ profile.completion.conditional.total }} evaluated
           </span>
         </div>
         <div class="space-y-3">
-          <div
-            *ngFor="let field of conditionalFields; trackBy: trackField"
-            class="flex items-start gap-3"
-          >
-            <span
-              class="material-symbols-outlined mt-0.5 text-[18px]"
-              [ngClass]="statusClass(field.status)"
-            >
+          <div *ngFor="let field of conditionalFields; trackBy: trackField" class="flex items-start gap-3">
+            <span class="material-symbols-outlined mt-0.5 text-[18px]" [ngClass]="statusClass(field.status)">
               {{ statusIcon(field.status) }}
             </span>
             <div class="min-w-0">
               <p class="text-xs text-gray-200">{{ field.label }}</p>
               <p class="text-[10px]" [ngClass]="statusClass(field.status)">
-                {{ field.applicable === null ? 'Applicability pending' :
-                statusLabel(field.status) }}
+                {{ field.applicable === null ? 'Applicability pending' : statusLabel(field.status) }}
               </p>
             </div>
           </div>
@@ -215,41 +221,24 @@
       </section>
 
       <section class="rounded-xl border border-white/10 bg-white/[0.03] p-4">
-        <h3 class="text-xs font-bold uppercase tracking-wider text-white">
-          Profile Enrichment
-        </h3>
+        <h3 class="text-xs font-bold uppercase tracking-wider text-white">Profile Enrichment</h3>
         <div class="mt-3 space-y-2 text-[11px] text-gray-400">
           <div class="flex justify-between">
             <span>Recommended fields captured</span>
-            <span
-              >{{ profile.completion.recommended.captured }} / {{
-              profile.completion.recommended.total }}</span
-            >
+            <span>{{ profile.completion.recommended.captured }} / {{ profile.completion.recommended.total }}</span>
           </div>
           <div class="flex justify-between">
             <span>Optional fields captured</span>
-            <span
-              >{{ profile.completion.optional.captured }} / {{
-              profile.completion.optional.total }}</span
-            >
+            <span>{{ profile.completion.optional.captured }} / {{ profile.completion.optional.total }}</span>
           </div>
-          <p class="pt-1 text-[10px] text-gray-600">
-            Does not affect completion.
-          </p>
+          <p class="pt-1 text-[10px] text-gray-600">Does not affect completion.</p>
         </div>
       </section>
 
-      <section
-        *ngIf="profile.completion.blockers.length"
-        class="rounded-xl border border-red-500/20 bg-red-500/5 p-4"
-      >
-        <h3 class="text-xs font-bold uppercase tracking-wider text-red-300">
-          Required to complete
-        </h3>
+      <section *ngIf="profile.completion.blockers.length" class="rounded-xl border border-red-500/20 bg-red-500/5 p-4">
+        <h3 class="text-xs font-bold uppercase tracking-wider text-red-300">Required to complete</h3>
         <ul class="mt-3 space-y-2 text-[11px] text-red-200/80">
-          <li *ngFor="let blocker of profile.completion.blockers.slice(0, 5)">
-            • {{ blocker.label }}
-          </li>
+          <li *ngFor="let blocker of profile.completion.blockers.slice(0, 5)">• {{ blocker.label }}</li>
         </ul>
       </section>
     </div>
@@ -261,27 +250,16 @@
       >
         <span class="material-symbols-outlined text-[28px]">verified</span>
         <div class="text-xs">
-          <span
-            class="mb-0.5 block font-bold uppercase tracking-wider text-green-300"
-            >Profile complete</span
-          >
+          <span class="mb-0.5 block font-bold uppercase tracking-wider text-green-300">Profile complete</span>
           Ready to begin project onboarding.
         </div>
       </div>
       <ng-template #incomplete>
-        <div
-          class="flex items-center gap-3 rounded-xl border border-secondary/20 bg-secondary/10 p-4 text-secondary"
-        >
-          <span class="material-symbols-outlined text-[28px]"
-            >pending_actions</span
-          >
+        <div class="flex items-center gap-3 rounded-xl border border-secondary/20 bg-secondary/10 p-4 text-secondary">
+          <span class="material-symbols-outlined text-[28px]">pending_actions</span>
           <div class="text-xs">
-            <span
-              class="mb-0.5 block font-bold uppercase tracking-wider text-yellow-300"
-              >Profile in progress</span
-            >
-            {{ profile.completion.final_approved ? 'Resolve the remaining
-            fields.' : 'Validation and final approval are still required.' }}
+            <span class="mb-0.5 block font-bold uppercase tracking-wider text-yellow-300">Profile in progress</span>
+            {{ profile.completion.final_approved ? 'Resolve the remaining fields.' : 'Validation and final approval are still required.' }}
           </div>
         </div>
       </ng-template>

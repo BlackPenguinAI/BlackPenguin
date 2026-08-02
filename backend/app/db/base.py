@@ -10,7 +10,13 @@ from app.modules.companies.models import Company
 from app.modules.users.models import User
 from app.modules.system_settings.models import FirebaseConfig, TwilioConfig, LegalDocument
 from app.modules.ai_core.models import AIConfiguration
-from app.modules.company_onboarding.models import CompanyProfile, OnboardingSession, OnboardingMessage
+from app.modules.company_onboarding.models import (
+    CompanyOnboardingProposal,
+    CompanyOnboardingSource,
+    CompanyProfile,
+    OnboardingMessage,
+    OnboardingSession,
+)
 from app.modules.projects.models import Project, ProjectProfile, ProjectSession, ProjectMessage
 from app.modules.brokers.models import Broker
 from app.modules.sales_crm.models import Lead, SmsChatMessage, Meeting
