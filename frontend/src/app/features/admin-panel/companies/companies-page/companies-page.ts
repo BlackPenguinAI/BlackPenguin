@@ -35,7 +35,9 @@ export class CompaniesPageComponent implements OnInit {
   isDeleting: boolean = false;
   resendingId: string | null = null;
   
+  // Modales
   showModal: boolean = false;
+  showEditModal: boolean = false;
   showDeleteModal: boolean = false;
   companyToDeleteId: string | null = null;
   selectedFile: File | null = null;
@@ -43,13 +45,20 @@ export class CompaniesPageComponent implements OnInit {
   form: any = {
     name: '',
     plan_id: '',
-    start_date: new Date().toISOString().split('T')[0], // 🚀 Fecha de hoy por defecto
+    start_date: new Date().toISOString().split('T')[0],
     duration_months: 12,
     admin_first_name: '',
     admin_last_name: '',
     admin_email: '',
     admin_password: '',
     admin_confirm_password: '',
+    is_active: true
+  };
+
+  editForm: any = {
+    id: '',
+    name: '',
+    plan_id: '',
     is_active: true
   };
 
@@ -90,11 +99,10 @@ export class CompaniesPageComponent implements OnInit {
     });
   }
 
-  // 🚀 Cálculo dinámico de la fecha de fin al cambiar Start Date o Duration
   get calculatedEndDate(): string {
     if (!this.form.start_date || !this.form.duration_months) return '';
     const start = new Date(this.form.start_date);
-    if (isNaN(start.getTime())) return ''; // Manejo de fecha inválida si el usuario escribe mal
+    if (isNaN(start.getTime())) return '';
     start.setMonth(start.getMonth() + Number(this.form.duration_months));
     return start.toISOString().split('T')[0];
   }
@@ -119,6 +127,22 @@ export class CompaniesPageComponent implements OnInit {
 
   closeModal(): void {
     this.showModal = false;
+    this.cdr.detectChanges();
+  }
+
+  openEditModal(item: any): void {
+    this.editForm = {
+      id: item.id,
+      name: item.name,
+      plan_id: item.plan_id || (this.plans.length > 0 ? this.plans[0].id : ''),
+      is_active: item.is_active
+    };
+    this.showEditModal = true;
+    this.cdr.detectChanges();
+  }
+
+  closeEditModal(): void {
+    this.showEditModal = false;
     this.cdr.detectChanges();
   }
 
@@ -152,7 +176,6 @@ export class CompaniesPageComponent implements OnInit {
     formData.append('admin_email', this.form.admin_email);
     formData.append('admin_password', this.form.admin_password);
     
-    // Si tu backend necesita recibir la fecha de inicio personalizada:
     if (this.form.start_date) {
       formData.append('start_date', this.form.start_date);
     }
@@ -172,6 +195,34 @@ export class CompaniesPageComponent implements OnInit {
         this.isSaving = false;
         this.cdr.detectChanges();
         this.toast.showError(err.error?.detail || 'Error registering the company.');
+      }
+    });
+  }
+
+  updateCompany(): void {
+    if (!this.editForm.name || !this.editForm.plan_id) {
+      this.toast.showError('Please complete all required fields.');
+      return;
+    }
+
+    this.isSaving = true;
+    this.cdr.detectChanges();
+
+    this.companyService.updateCompany(this.editForm.id, {
+      name: this.editForm.name,
+      plan_id: this.editForm.plan_id,
+      is_active: this.editForm.is_active
+    }).subscribe({
+      next: () => {
+        this.isSaving = false;
+        this.closeEditModal();
+        this.loadData();
+        this.toast.showSuccess('Company updated successfully.');
+      },
+      error: (err) => {
+        this.isSaving = false;
+        this.cdr.detectChanges();
+        this.toast.showError(err.error?.detail || 'Error updating company.');
       }
     });
   }

@@ -80,6 +80,12 @@
 
               <td class="py-4 px-6 text-right">
                 <div class="flex items-center justify-end gap-2">
+                  <button (click)="openEditModal(item)" 
+                          class="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white transition-colors focus:outline-none"
+                          title="Edit Company">
+                    <span class="material-symbols-outlined text-[18px]">edit</span>
+                  </button>
+
                   <button (click)="resendActivationToken(item.id)" [disabled]="resendingId === item.id"
                           class="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white transition-colors focus:outline-none disabled:opacity-40"
                           title="Resend Activation Link">
@@ -124,11 +130,10 @@
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-      
       <div class="flex flex-col gap-1.5 w-full">
         <label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold ml-1">Start Date</label>
         <input type="date" [(ngModel)]="form.start_date" name="start_date"
-               class="w-full bg-black/50 border border-white/10 focus:border-secondary rounded-xl py-3 px-4 text-sm text-white outline-none transition-colors color-scheme-dark">
+               class="w-full bg-black/50 border border-white/10 focus:border-secondary rounded-xl py-3 px-4 text-sm text-white outline-none transition-colors cursor-pointer">
       </div>
       
       <div class="flex flex-col gap-1.5 w-full">
@@ -174,6 +179,35 @@
     <div class="flex justify-end gap-3 mt-6 border-t border-white/10 pt-4">
       <app-button variant="ghost" (onClick)="closeModal()">Cancel</app-button>
       <app-button type="submit" variant="secondary" [isLoading]="isSaving">Register Company</app-button>
+    </div>
+
+  </form>
+</app-modal>
+
+<app-modal [isOpen]="showEditModal" title="Edit Company Details" maxWidthClass="max-w-lg" (close)="closeEditModal()">
+  <form (ngSubmit)="updateCompany()" class="flex flex-col gap-4">
+    
+    <app-input label="Company Name" placeholder="Ej. Capital Real Estate" [(ngModel)]="editForm.name" name="edit_name"></app-input>
+
+    <div class="flex flex-col gap-1.5 w-full">
+      <label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold ml-1">Subscription Plan</label>
+      <select [(ngModel)]="editForm.plan_id" name="edit_plan_id" 
+              class="w-full bg-black/50 border border-white/10 focus:border-secondary rounded-xl py-3 px-4 text-sm text-white outline-none transition-colors">
+        <option *ngFor="let p of plans" [value]="p.id" class="bg-[#111] text-white">{{ p.name }}</option>
+      </select>
+    </div>
+
+    <div class="flex items-center justify-between p-3 bg-white/5 border border-white/10 rounded-xl">
+      <span class="text-xs font-mono uppercase tracking-widest text-gray-300">Workspace Status</span>
+      <label class="relative inline-flex items-center cursor-pointer">
+        <input type="checkbox" [(ngModel)]="editForm.is_active" name="edit_is_active" class="sr-only peer">
+        <div class="w-11 h-6 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-secondary"></div>
+      </label>
+    </div>
+
+    <div class="flex justify-end gap-3 mt-6 border-t border-white/10 pt-4">
+      <app-button variant="ghost" (onClick)="closeEditModal()">Cancel</app-button>
+      <app-button type="submit" variant="secondary" [isLoading]="isSaving">Save Changes</app-button>
     </div>
 
   </form>

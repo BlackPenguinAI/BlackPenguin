@@ -7,7 +7,6 @@ import { Observable } from 'rxjs';
 })
 export class CompanyService {
   
-  // 🚀 AÑADIMOS LA BARRA FINAL PARA EVITAR EL REDIRECT 307 DE FASTAPI
   private get apiUrl(): string {
     return isDevMode() 
       ? 'http://localhost:8000/api/v1/companies/' 
@@ -21,33 +20,30 @@ export class CompanyService {
 
   constructor(private http: HttpClient) {}
 
-  // 1. Listar todas las empresas con sus planes
   getCompanies(): Observable<any[]> {
     return this.http.get<any[]>(this.apiUrl, { headers: this.headers });
   }
 
-  // 2. Listar planes disponibles para el selector
   getPlans(): Observable<any[]> {
-    // 🚀 AÑADIMOS LA BARRA FINAL AQUÍ TAMBIÉN
     const url = isDevMode() 
       ? 'http://localhost:8000/api/v1/plans/' 
       : 'https://blackpenguin.ai/api/v1/plans/';
     return this.http.get<any[]>(url, { headers: this.headers });
   }
 
-  // 3. Crear empresa con administrador y comprobante (FormData / Multipart)
   createCompany(formData: FormData): Observable<any> {
     return this.http.post<any>(this.apiUrl, formData, { headers: this.headers });
   }
 
-  // 4. Reenviar enlace de activación
+  updateCompany(id: string, data: any): Observable<any> {
+    return this.http.put<any>(`${this.apiUrl}${id}`, data, { headers: this.headers });
+  }
+
   resendActivation(companyId: string): Observable<any> {
-    // Como apiUrl ya termina en '/', concatenamos directamente el ID
     return this.http.post<any>(`${this.apiUrl}${companyId}/resend-activation/`, {}, { headers: this.headers });
   }
 
-  // 5. Eliminar empresa
   deleteCompany(companyId: string): Observable<any> {
-    return this.http.delete<any>(`${this.apiUrl}${companyId}/`, { headers: this.headers });
+    return this.http.delete<any>(`${this.apiUrl}${companyId}`, { headers: this.headers });
   }
 }
