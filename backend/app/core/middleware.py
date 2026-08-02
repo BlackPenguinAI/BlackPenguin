@@ -10,6 +10,7 @@ class MultiTenantMiddleware(BaseHTTPMiddleware):
         
         # 🚀 NUEVO: Permitir acceso público a las rutas legales SOLO para lectura (GET)
         is_public_legal_route = request.method == "GET" and path.startswith(f"{settings.API_V1_STR}/system/legal/")
+        is_waitlist_post = request.method == "POST" and path == f"{settings.API_V1_STR}/waitlist/"
 
         # Rutas exentas de token (Login, Configuración inicial, Docs y Legales Públicos)
         if path in ["/", "/docs", "/openapi.json", f"{settings.API_V1_STR}/auth/login", f"{settings.API_V1_STR}/auth/setup-master"] or is_public_legal_route:
