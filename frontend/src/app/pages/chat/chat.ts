@@ -13,8 +13,11 @@ import { RouterModule } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { marked } from 'marked';
 import { Subscription } from 'rxjs';
+import { switchMap } from 'rxjs/operators';
 
 import { SpeechRecognitionService } from '../../core/services/speech-recognition.service';
+import { OnboardingResponseOptionsComponent, OnboardingQuestion } from '../../shared/ui/onboarding-response-options/onboarding-response-options';
+import { OnboardingWelcomeComponent } from '../../shared/ui/onboarding-welcome/onboarding-welcome';
 
 import {
   ChatMessage,
@@ -32,7 +35,7 @@ import { CompanyOnboardingService } from './company-onboarding.service';
 @Component({
   selector: 'app-chat',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, TranslateModule],
+  imports: [CommonModule, FormsModule, RouterModule, TranslateModule, OnboardingResponseOptionsComponent, OnboardingWelcomeComponent],
   templateUrl: './chat.html',
   styleUrl: './chat.scss',
 })
@@ -51,6 +54,8 @@ export class ChatComponent implements OnInit, OnDestroy {
   messages: ChatMessage[] = [];
   sources: OnboardingSource[] = [];
   profile: CompanyProfileResponse = EMPTY_COMPANY_PROFILE;
+  showWelcome = false;
+  nextQuestion: OnboardingQuestion | null = null;
   private readonly markdownCache = new Map<string, string>();
   private readonly speechSubscriptions = new Subscription();
   private speechBase = '';
@@ -110,8 +115,11 @@ export class ChatComponent implements OnInit, OnDestroy {
     this.onboarding.getHistory().subscribe({
         next: (messages) => {
           this.messages = messages;
-          if (messages.length === 0) this.startConversation();
-          else this.scrollToBottom();
+          this.showWelcome = messages.length === 0 && this.sources.length === 0;
+          if (messages.length) {
+            this.refreshQuestion();
+            this.scrollToBottom();
+          }
         },
         error: (error: HttpErrorResponse) => {
           if (error.status !== 401) {
@@ -133,12 +141,14 @@ export class ChatComponent implements OnInit, OnDestroy {
   }
 
   startConversation(): void {
+    this.showWelcome = false;
     this.isAnalyzing = true;
     this.onboarding.startChat().subscribe({
       next: (turn) => {
         this.messages.push(turn.message);
         this.profile = turn.profile;
         this.isCompleted = turn.profile.completion.can_complete;
+        this.nextQuestion = turn.next_question;
         this.isAnalyzing = false;
         this.scrollToBottom();
       },
@@ -149,6 +159,27 @@ export class ChatComponent implements OnInit, OnDestroy {
         }
       },
     });
+  }
+
+  beginWithWebsite(url: string): void {
+    this.showWelcome = false;
+    this.isAnalyzing = true;
+    this.onboarding.startChat().pipe(switchMap(() => this.onboarding.sendMessage(url))).subscribe({
+      next: (turn) => {
+        if (turn.user_message) this.messages.push(turn.user_message);
+        else this.messages.push({ sender: 'user', content: url, created_at: new Date(), attachments: [] });
+        this.messages.push(turn.message); this.profile = turn.profile; this.nextQuestion = turn.next_question;
+        this.mergeSources(turn.sources); this.isAnalyzing = false; this.scrollToBottom();
+      },
+      error: () => { this.showWelcome = true; this.isAnalyzing = false; this.errorMessage = 'The website could not be processed. You can retry or continue without it.'; },
+    });
+  }
+
+  chooseAnswer(value: string): void { this.prompt = value; }
+  writeCustomAnswer(): void { this.prompt = ''; }
+
+  private refreshQuestion(): void {
+    this.onboarding.startChat().subscribe({ next: (turn) => this.nextQuestion = turn.next_question });
   }
 
   fieldsByRequirement(requirement: Requirement): CompanyFieldProgress[] {
@@ -212,7 +243,7 @@ export class ChatComponent implements OnInit, OnDestroy {
     if (this.isRecording) this.speech.stop();
     const content = this.prompt.trim();
     this.prompt = '';
-    this.messages.push({ sender: 'user', content, created_at: new Date() });
+    this.messages.push({ sender: 'user', content, created_at: new Date(), attachments: [] });
     this.isAnalyzing = true;
     this.scrollToBottom();
 
@@ -222,6 +253,7 @@ export class ChatComponent implements OnInit, OnDestroy {
           this.messages.push(turn.message);
           this.profile = turn.profile;
           this.isCompleted = turn.profile.completion.can_complete;
+          this.nextQuestion = turn.next_question;
           this.mergeSources(turn.sources);
           this.isAnalyzing = false;
           this.scrollToBottom();
@@ -259,11 +291,7 @@ export class ChatComponent implements OnInit, OnDestroy {
           ready ? `${ready} source${ready === 1 ? '' : 's'} ready for review` : '',
           failed ? `${failed} could not be processed` : '',
         ].filter(Boolean).join('; ');
-        this.messages.push({
-          sender: 'ai',
-          content: `**Document review:** ${summary}. Please review the proposed details below.`,
-          created_at: new Date(),
-        });
+        this.messages.push({ sender: 'user', content: `Attached ${files.length} company file${files.length === 1 ? '' : 's'}.`, created_at: new Date(), attachments: sources.map((source) => ({ id: source.id, kind: source.kind, name: source.name, mime_type: source.mime_type, size_bytes: source.size_bytes, status: source.status, url: source.url, download_url: source.download_url })) });
         this.scrollToBottom();
       },
       error: () => {
@@ -299,6 +327,24 @@ export class ChatComponent implements OnInit, OnDestroy {
     if (typeof value === 'string') return value;
     if (value === null || value === undefined) return '';
     return JSON.stringify(value);
+  }
+
+  formatBytes(bytes: number | null): string {
+    if (bytes == null) return '';
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  downloadAttachment(attachment: { download_url: string | null; name: string }): void {
+    if (!attachment.download_url) return;
+    this.onboarding.downloadAttachment(attachment.download_url).subscribe({
+      next: (blob) => {
+        const url = URL.createObjectURL(blob); const anchor = document.createElement('a');
+        anchor.href = url; anchor.download = attachment.name; anchor.click(); URL.revokeObjectURL(url);
+      },
+      error: () => this.errorMessage = 'The attached file could not be downloaded.',
+    });
   }
 
   private parseDraftValue(value: string): unknown {

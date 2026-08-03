@@ -8,6 +8,8 @@ from typing import Any
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
+from app.modules.onboarding_questions import is_too_short
+
 from .completion import FIELD_BY_KEY, VALID_STATUSES, calculate_completion, field_progress
 from .models import CompanyProfile, OnboardingMessage, OnboardingSession, SenderType
 
@@ -143,6 +145,9 @@ def apply_field_updates(
         value = update.get("value")
         if status not in {"missing", "not_applicable"} and value in (None, "", []):
             rejected.append({"update": raw_update, "reason": "missing_value"})
+            continue
+        if is_too_short(field_key, value):
+            rejected.append({"update": raw_update, "reason": "answer_too_short"})
             continue
         if status != "not_applicable" and value is not None:
             data[field_key] = value

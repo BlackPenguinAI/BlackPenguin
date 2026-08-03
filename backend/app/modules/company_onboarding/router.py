@@ -6,16 +6,18 @@ from typing import Any
 
 import httpx
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from sqlalchemy.orm import Session
+from fastapi.responses import FileResponse
+from sqlalchemy.orm import Session, joinedload
 
 from app.db.postgres import get_db
 from app.integrations.openrouter_client import generate_llm_response
 from app.modules.ai_core.services import get_ai_config
 from app.modules.auth.deps import RoleChecker
 from app.modules.companies.models import Company
+from app.modules.onboarding_questions import build_next_question
 from app.modules.users.models import User, UserRole
 
-from . import services, source_service
+from . import services, source_service, storage_service
 from .completion import FIELD_BY_KEY
 from .models import CompanyOnboardingProposal, CompanyOnboardingSource, OnboardingMessage, SenderType
 from .schemas import (
@@ -69,15 +71,36 @@ def _rejected_payload(items: list[dict[str, Any]]) -> list[dict[str, str | None]
 
 
 def _message_payload(message: OnboardingMessage) -> dict[str, Any]:
-    return {"sender": "ai", "content": message.content, "created_at": message.created_at}
+    return {
+        "id": message.id,
+        "sender": "user" if message.sender == SenderType.USER else "ai",
+        "content": message.content,
+        "created_at": message.created_at,
+        "attachments": [
+            {
+                "id": source.id, "kind": source.kind.value, "name": source.name,
+                "mime_type": source.mime_type, "size_bytes": source.size_bytes,
+                "status": source.status.value, "url": source.url,
+                "download_url": f"/api/v1/company-onboarding/sources/{source.id}/file" if source.storage_path else None,
+            }
+            for source in message.attachments
+        ],
+    }
 
 
 def _next_prompt(profile) -> str:
-    completion = services.serialize_profile(profile)["completion"]
-    if not completion["blockers"]:
-        return "Please review the profile summary and confirm whether it is ready for final approval."
-    label = completion["blockers"][0]["label"]
-    return f"Let's continue with **{label}**. What should I record for this item?"
+    question = _next_question(profile)
+    choices = question["options"] or question["examples"]
+    suffix = "\n\n" + "\n".join(f"- {item}" for item in choices) if choices else ""
+    return question["prompt"] + suffix
+
+
+def _next_question(profile) -> dict[str, Any]:
+    blockers = services.serialize_profile(profile)["completion"]["blockers"]
+    return build_next_question(
+        blockers,
+        final_prompt="Review the Company Profile and choose whether to approve it or make changes.",
+    )
 
 
 def _accepted_response(first_name: str | None, accepted: list[dict[str, Any]], profile) -> str:
@@ -143,18 +166,12 @@ def get_chat_history(
     session = services.get_or_create_session(db, current_user.company_id)
     messages = (
         db.query(OnboardingMessage)
+        .options(joinedload(OnboardingMessage.attachments))
         .filter(OnboardingMessage.session_id == session.id)
         .order_by(OnboardingMessage.created_at.asc())
         .all()
     )
-    return [
-        {
-            "sender": "user" if message.sender == SenderType.USER else "ai",
-            "content": message.content,
-            "created_at": message.created_at,
-        }
-        for message in messages
-    ]
+    return [_message_payload(message) for message in messages]
 
 
 @router.post("/chat/start", response_model=ChatTurnResponse)
@@ -199,6 +216,7 @@ def start_chat(
         "accepted_fields": [],
         "rejected_updates": [],
         "sources": [],
+        "next_question": _next_question(profile),
     }
 
 
@@ -214,7 +232,7 @@ async def send_chat_message(
     if not ai_config.openrouter_api_key:
         raise HTTPException(status_code=500, detail="AI configuration is incomplete.")
 
-    services.save_message(db, session.id, SenderType.USER, payload.message)
+    user_message = services.save_message(db, session.id, SenderType.USER, payload.message)
     deterministic = services.deterministic_context_update(payload.message, profile)
     deterministic_result = services.apply_field_updates(
         db,
@@ -234,6 +252,7 @@ async def send_chat_message(
                     company_id=current_user.company_id,
                     user_id=current_user.id,
                     url=url,
+                    message_id=user_message.id,
                 )
             )
         except HTTPException as exc:
@@ -338,10 +357,12 @@ async def send_chat_message(
     ai_message = services.save_message(db, session.id, SenderType.AI, assistant_text)
     return {
         "message": _message_payload(ai_message),
+        "user_message": _message_payload(user_message),
         "profile": services.serialize_profile(profile),
         "accepted_fields": [item["field"] for item in accepted],
         "rejected_updates": _rejected_payload(rejected),
         "sources": [source_service.serialize_source(source) for source in source_results],
+        "next_question": _next_question(profile),
     }
 
 
@@ -357,6 +378,29 @@ def list_sources(
         .all()
     )
     return [source_service.serialize_source(source) for source in sources]
+
+
+@router.get("/sources/{source_id}/file")
+def download_source_file(
+    source_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker(ALLOWED_ROLES)),
+):
+    source = db.query(CompanyOnboardingSource).filter(
+        CompanyOnboardingSource.id == source_id,
+        CompanyOnboardingSource.company_id == current_user.company_id,
+        CompanyOnboardingSource.storage_path.isnot(None),
+    ).first()
+    if not source:
+        raise HTTPException(status_code=404, detail="File not found.")
+    try: path = storage_service.resolve_company_file(source.storage_path)
+    except ValueError as exc: raise HTTPException(status_code=404, detail="File not found.") from exc
+    if not path.is_file(): raise HTTPException(status_code=404, detail="File not found.")
+    return FileResponse(
+        path, media_type=source.mime_type or "application/octet-stream",
+        filename=source.original_filename or source.name,
+        headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"},
+    )
 
 
 @router.post("/sources/url", response_model=SourceResponse)
@@ -382,6 +426,11 @@ async def add_file_sources(
 ):
     if not files or len(files) > source_service.MAX_FILES:
         raise HTTPException(status_code=422, detail=f"Upload between 1 and {source_service.MAX_FILES} files.")
+    session = services.get_or_create_session(db, current_user.company_id)
+    user_message = services.save_message(
+        db, session.id, SenderType.USER,
+        f"Attached {len(files)} company file{'s' if len(files) != 1 else ''}.",
+    )
     sources = []
     for upload in files:
         sources.append(
@@ -390,6 +439,7 @@ async def add_file_sources(
                 company_id=current_user.company_id,
                 user_id=current_user.id,
                 upload=upload,
+                message_id=user_message.id,
             )
         )
     return [source_service.serialize_source(source) for source in sources]

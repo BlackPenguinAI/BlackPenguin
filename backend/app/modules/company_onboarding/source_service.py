@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 from app.integrations.openrouter_client import generate_llm_response
 from app.modules.ai_core.services import get_ai_config
 
-from . import services
+from . import services, storage_service
 from .completion import FIELD_BY_KEY
 from .models import (
     CompanyOnboardingProposal,
@@ -74,10 +74,12 @@ async def ingest_url(
     company_id: str,
     user_id: str,
     url: str,
+    message_id: str | None = None,
 ) -> CompanyOnboardingSource:
     validate_public_url(url)
     source = CompanyOnboardingSource(
         company_id=company_id,
+        message_id=message_id,
         uploaded_by_user_id=user_id,
         kind=classify_url(url),
         status=SourceStatus.PROCESSING,
@@ -130,12 +132,14 @@ async def ingest_file(
     company_id: str,
     user_id: str,
     upload: UploadFile,
+    message_id: str | None = None,
 ) -> CompanyOnboardingSource:
     content = await upload.read(MAX_FILE_BYTES + 1)
     mime_type = (upload.content_type or "application/octet-stream").lower()
     filename = (upload.filename or "company-document")[:255]
     source = CompanyOnboardingSource(
         company_id=company_id,
+        message_id=message_id,
         uploaded_by_user_id=user_id,
         kind=SourceKind.UPLOADED_FILE,
         status=SourceStatus.PROCESSING,
@@ -143,6 +147,7 @@ async def ingest_file(
         mime_type=mime_type,
         size_bytes=len(content),
         sha256=hashlib.sha256(content).hexdigest(),
+        original_filename=filename,
     )
     db.add(source)
     db.commit()
@@ -154,6 +159,12 @@ async def ingest_file(
         if mime_type not in ALLOWED_FILE_TYPES:
             raise ValueError("Unsupported file type. Upload PDF, DOCX, or TXT files.")
         _validate_signature(content, mime_type)
+        stored = storage_service.store_company_file(
+            company_id=company_id, source_id=source.id,
+            original_filename=filename, content=content,
+        )
+        source.storage_path = stored.relative_path
+        source.stored_filename = stored.stored_filename
         text = _extract_bytes(content, mime_type, filename)
         await _finish_source(db, source, text)
     except Exception as exc:
@@ -304,6 +315,8 @@ def serialize_source(source: CompanyOnboardingSource) -> dict[str, Any]:
         "url": source.url,
         "mime_type": source.mime_type,
         "size_bytes": source.size_bytes,
+        "message_id": source.message_id,
+        "download_url": f"/api/v1/company-onboarding/sources/{source.id}/file" if source.storage_path else None,
         "error_message": source.error_message,
         "proposals": [serialize_proposal(proposal) for proposal in source.proposals],
         "created_at": source.created_at,

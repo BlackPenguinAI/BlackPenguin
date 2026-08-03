@@ -69,6 +69,11 @@ export interface ProjectSource {
 export interface ChatTurn {
   message: ChatMessage; user_message: ChatMessage | null; profile: ProjectProfile; accepted_fields: string[];
   rejected_updates: Array<{ field: string | null; reason: string }>; sources: ProjectSource[];
+  next_question: NextQuestion;
+}
+export interface NextQuestion {
+  field: string | null; label: string; prompt: string; input_type: string;
+  options: string[]; examples: string[]; allow_custom: boolean; minimum_words: number | null;
 }
 export interface Campaign {
   id: string; project_id: string; name: string; platform: string; objective: string | null;

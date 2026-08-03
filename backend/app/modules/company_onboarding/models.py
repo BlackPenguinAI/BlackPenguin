@@ -97,6 +97,7 @@ class OnboardingMessage(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     session = relationship("OnboardingSession", back_populates="messages")
+    attachments = relationship("CompanyOnboardingSource", back_populates="message", passive_deletes=True)
 
 
 class CompanyOnboardingSource(Base):
@@ -104,6 +105,7 @@ class CompanyOnboardingSource(Base):
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     company_id = Column(String(36), ForeignKey("companies.id", ondelete="CASCADE"), nullable=False, index=True)
+    message_id = Column(String(36), ForeignKey("onboarding_messages.id", ondelete="SET NULL"), nullable=True, index=True)
     uploaded_by_user_id = Column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     kind = Column(SqlaEnum(SourceKind), nullable=False)
     status = Column(SqlaEnum(SourceStatus), default=SourceStatus.PROCESSING, nullable=False)
@@ -112,6 +114,9 @@ class CompanyOnboardingSource(Base):
     mime_type = Column(String(150), nullable=True)
     size_bytes = Column(Integer, nullable=True)
     sha256 = Column(String(64), nullable=True, index=True)
+    original_filename = Column(String(255), nullable=True)
+    stored_filename = Column(String(255), nullable=True)
+    storage_path = Column(Text, nullable=True)
     extracted_text = Column(Text, nullable=True)
     error_message = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
@@ -122,6 +127,7 @@ class CompanyOnboardingSource(Base):
         back_populates="source",
         cascade="all, delete-orphan",
     )
+    message = relationship("OnboardingMessage", back_populates="attachments")
 
 
 class CompanyOnboardingProposal(Base):

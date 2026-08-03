@@ -14,6 +14,7 @@ from app.integrations.openrouter_client import generate_llm_response
 from app.modules.ai_core.services import get_ai_config
 from app.modules.auth.deps import RoleChecker
 from app.modules.company_onboarding.models import CompanyProfile
+from app.modules.onboarding_questions import build_next_question
 from app.modules.users.models import User, UserRole
 
 from . import meta_service, services, source_service, storage_service
@@ -56,10 +57,18 @@ def _message(message: ProjectMessage) -> dict[str, Any]:
 
 
 def _next_prompt(profile) -> str:
+    question = _next_question(profile)
+    choices = question["options"] or question["examples"]
+    suffix = "\n\n" + "\n".join(f"- {item}" for item in choices) if choices else ""
+    return question["prompt"] + suffix
+
+
+def _next_question(profile) -> dict[str, Any]:
     blockers = services.serialize_profile(profile)["completion"]["blockers"]
-    if blockers:
-        return f"Let's continue with **{blockers[0]['label']}**. What should I record?"
-    return "Please review the Project Profile and explicitly approve it when it is accurate."
+    return build_next_question(
+        blockers,
+        final_prompt="Review the Project Profile and choose whether to approve it or make changes.",
+    )
 
 
 def _system_instruction(config: dict[str, Any]) -> str:
@@ -146,6 +155,7 @@ async def _complete_chat_turn(
             for item in result.rejected
         ],
         "sources": [source_service.serialize_source(source) for source in sources],
+        "next_question": _next_question(profile),
     }
 
 
@@ -240,7 +250,7 @@ def start_chat(project_id: str, db: Session = Depends(get_db), current_user: Use
             f"I already have the details used when this project was created. {_next_prompt(profile)} You can also paste a project URL or attach brochures, price lists, inventory spreadsheets, floor plans, or photos; extracted details will stay pending until you review them."
         )
         message = services.save_message(db, project.session.id, SenderType.AI, intro)
-    return {"message": _message(message), "profile": services.serialize_profile(profile), "accepted_fields": [], "rejected_updates": [], "sources": []}
+    return {"message": _message(message), "profile": services.serialize_profile(profile), "accepted_fields": [], "rejected_updates": [], "sources": [], "next_question": _next_question(profile)}
 
 
 @router.post("/{project_id}/chat", response_model=ChatTurnResponse)

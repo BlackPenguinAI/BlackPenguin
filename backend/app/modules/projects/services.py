@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
 from app.modules.companies.models import Company
+from app.modules.onboarding_questions import is_too_short
 
 from .completion import FIELD_BY_KEY, VALID_STATUSES, calculate_completion, field_progress, normalize_field_key
 from . import storage_service
@@ -108,6 +109,8 @@ def apply_field_updates(
         value = update.get("value")
         if status not in {"missing", "not_applicable"} and value in (None, "", []):
             rejected.append({"update": raw, "reason": "missing_value"}); continue
+        if is_too_short(key, value):
+            rejected.append({"update": raw, "reason": "answer_too_short"}); continue
         if status != "not_applicable" and value is not None:
             data[key] = value
         states[key] = {"status": status, "applicable": False if status == "not_applicable" else update.get("applicable", True)}

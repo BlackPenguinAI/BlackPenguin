@@ -48,9 +48,21 @@ export interface CompanyProfileResponse {
 }
 
 export interface ChatMessage {
+  id?: string;
   sender: 'user' | 'ai';
   content: string;
   created_at: string | Date;
+  attachments: ChatAttachment[];
+}
+
+export interface ChatAttachment {
+  id: string; kind: string; name: string; mime_type: string | null; size_bytes: number | null;
+  status: SourceStatus; url: string | null; download_url: string | null;
+}
+
+export interface NextQuestion {
+  field: string | null; label: string; prompt: string; input_type: string;
+  options: string[]; examples: string[]; allow_custom: boolean; minimum_words: number | null;
 }
 
 export type SourceKind =
@@ -82,6 +94,8 @@ export interface OnboardingSource {
   url: string | null;
   mime_type: string | null;
   size_bytes: number | null;
+  message_id: string | null;
+  download_url: string | null;
   error_message: string | null;
   proposals: SourceProposal[];
   created_at: string;
@@ -90,10 +104,12 @@ export interface OnboardingSource {
 
 export interface ChatTurnResponse {
   message: ChatMessage;
+  user_message?: ChatMessage | null;
   profile: CompanyProfileResponse;
   accepted_fields: string[];
   rejected_updates: Array<{ field: string | null; reason: string }>;
   sources: OnboardingSource[];
+  next_question: NextQuestion;
 }
 
 export interface ProposalDecisionResponse {

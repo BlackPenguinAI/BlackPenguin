@@ -5,8 +5,11 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterModule } from '@angular/router';
 import { marked } from 'marked';
 import { Subscription } from 'rxjs';
+import { switchMap } from 'rxjs/operators';
 
 import { SpeechRecognitionService } from '../../../../core/services/speech-recognition.service';
+import { OnboardingResponseOptionsComponent, OnboardingQuestion } from '../../../../shared/ui/onboarding-response-options/onboarding-response-options';
+import { OnboardingWelcomeComponent } from '../../../../shared/ui/onboarding-welcome/onboarding-welcome';
 
 import {
   Campaign, ChatAttachment, ChatMessage, EMPTY_PROJECT_PROFILE, MetaConnection, ProjectFieldProgress,
@@ -16,7 +19,7 @@ import { ProjectOnboardingService } from './project-onboarding.service';
 
 @Component({
   selector: 'app-project-chat', standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule],
+  imports: [CommonModule, FormsModule, RouterModule, OnboardingResponseOptionsComponent, OnboardingWelcomeComponent],
   templateUrl: './project-chat.html', styleUrls: ['./project-chat.scss'],
 })
 export class ProjectChatComponent implements OnInit, OnDestroy {
@@ -35,6 +38,8 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   campaigns: Campaign[] = [];
   metaConnections: MetaConnection[] = [];
   profile: ProjectProfile = EMPTY_PROJECT_PROFILE;
+  showWelcome = false;
+  nextQuestion: OnboardingQuestion | null = null;
   showCampaignForm = false;
   showMetaForm = false;
   newCampaign: Partial<Campaign> = { name: '', platform: 'meta', status: 'draft' };
@@ -85,7 +90,10 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   }
   loadHistory(): void {
     this.onboarding.getHistory(this.projectId).subscribe({
-      next: (messages) => { this.messages = messages; messages.length ? this.scrollToBottom() : this.startConversation(); },
+      next: (messages) => {
+        this.messages = messages; this.showWelcome = messages.length === 0;
+        if (messages.length) { this.refreshQuestion(); this.scrollToBottom(); }
+      },
       error: (error: HttpErrorResponse) => { if (error.status !== 401) this.errorMessage = 'The project conversation could not be loaded.'; },
     });
   }
@@ -94,12 +102,29 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   loadMetaConnections(): void { this.onboarding.getMetaConnections().subscribe({ next: (items) => this.metaConnections = items }); }
 
   startConversation(): void {
+    this.showWelcome = false;
     this.isAnalyzing = true;
     this.onboarding.startChat(this.projectId).subscribe({
-      next: (turn) => { this.messages.push(turn.message); this.profile = turn.profile; this.isAnalyzing = false; this.scrollToBottom(); },
+      next: (turn) => { this.messages.push(turn.message); this.profile = turn.profile; this.nextQuestion = turn.next_question; this.isAnalyzing = false; this.scrollToBottom(); },
       error: () => { this.isAnalyzing = false; this.errorMessage = 'The Project Assistant could not start.'; },
     });
   }
+  beginWithWebsite(url: string): void {
+    this.showWelcome = false; this.isAnalyzing = true;
+    this.onboarding.startChat(this.projectId).pipe(
+      switchMap(() => this.onboarding.sendMessage(this.projectId, url)),
+    ).subscribe({
+      next: (turn) => {
+        if (turn.user_message) this.messages.push(turn.user_message);
+        this.messages.push(turn.message); this.profile = turn.profile; this.nextQuestion = turn.next_question;
+        this.mergeSources(turn.sources); this.isAnalyzing = false; this.scrollToBottom();
+      },
+      error: () => { this.showWelcome = true; this.isAnalyzing = false; this.errorMessage = 'The website could not be processed. You can retry or continue without it.'; },
+    });
+  }
+  chooseAnswer(value: string): void { this.prompt = value; }
+  writeCustomAnswer(): void { this.prompt = ''; }
+  private refreshQuestion(): void { this.onboarding.startChat(this.projectId).subscribe({ next: (turn) => this.nextQuestion = turn.next_question }); }
   handleKeyDown(event: KeyboardEvent): void { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); if (this.canSend) this.sendMessage(); } }
   sendMessage(): void {
     if (!this.canSend) return;
@@ -124,7 +149,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     request.subscribe({
       next: (turn) => {
         if (turn.user_message) Object.assign(optimistic, turn.user_message);
-        this.messages.push(turn.message); this.profile = turn.profile; this.mergeSources(turn.sources);
+        this.messages.push(turn.message); this.profile = turn.profile; this.nextQuestion = turn.next_question; this.mergeSources(turn.sources);
         this.isAnalyzing = false; this.isUploading = false; this.scrollToBottom();
       },
       error: () => {

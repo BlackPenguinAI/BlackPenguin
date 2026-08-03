@@ -1,0 +1,29 @@
+<div class="welcome-shell">
+  <div class="welcome-card">
+    <div class="brand-mark"><span class="material-symbols-outlined">smart_toy</span></div>
+    <p class="eyebrow">Black Penguin onboarding</p>
+    <h1>Hi {{ firstName || 'there' }}, let’s get your {{ kind }} ready.</h1>
+    <p class="lead">
+      Start with the {{ kind === 'company' ? 'corporate' : 'project' }} website. I’ll extract an initial draft for your review,
+      then we can enrich it with more URLs, documents, images, text, or dictation.
+    </p>
+    <form (ngSubmit)="submit()" novalidate>
+      <label for="onboarding-url">{{ kind === 'company' ? 'Company' : 'Project' }} website</label>
+      <div class="url-row" [class.invalid]="touched && !valid">
+        <span class="material-symbols-outlined">language</span>
+        <input id="onboarding-url" name="url" [(ngModel)]="url" [disabled]="busy" placeholder="https://example.com" autocomplete="url" />
+        <button type="submit" [disabled]="busy || !url.trim()">
+          <span *ngIf="!busy">Continue</span><span *ngIf="busy" class="material-symbols-outlined spin">progress_activity</span>
+        </button>
+      </div>
+      <p *ngIf="touched && !valid" class="error">Enter a valid public HTTP or HTTPS URL.</p>
+    </form>
+    <button type="button" class="skip" [disabled]="busy" (click)="skip.emit()">I don’t have a website</button>
+    <div class="steps" aria-label="Onboarding progress">
+      <div class="step active"><span>1</span><small>Website</small></div>
+      <div class="line"></div><div class="step"><span>2</span><small>Review</small></div>
+      <div class="line"></div><div class="step"><span>3</span><small>Complete</small></div>
+      <div class="line"></div><div class="step"><span>4</span><small>Approve</small></div>
+    </div>
+  </div>
+</div>

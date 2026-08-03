@@ -90,10 +90,34 @@ class ChatMessagePayload(BaseModel):
     message: str = Field(min_length=1, max_length=20000)
 
 
+class ChatAttachmentResponse(BaseModel):
+    id: str
+    kind: str
+    name: str
+    mime_type: str | None = None
+    size_bytes: int | None = None
+    status: str
+    url: str | None = None
+    download_url: str | None = None
+
+
 class ChatMessageResponse(BaseModel):
+    id: str
     sender: str
     content: str
     created_at: datetime
+    attachments: list[ChatAttachmentResponse] = Field(default_factory=list)
+
+
+class NextQuestionResponse(BaseModel):
+    field: str | None = None
+    label: str
+    prompt: str
+    input_type: str
+    options: list[str] = Field(default_factory=list)
+    examples: list[str] = Field(default_factory=list)
+    allow_custom: bool = True
+    minimum_words: int | None = None
 
 
 class RejectedUpdate(BaseModel):
@@ -103,10 +127,12 @@ class RejectedUpdate(BaseModel):
 
 class ChatTurnResponse(BaseModel):
     message: ChatMessageResponse
+    user_message: ChatMessageResponse | None = None
     profile: CompanyProfileResponse
     accepted_fields: list[str] = Field(default_factory=list)
     rejected_updates: list[RejectedUpdate] = Field(default_factory=list)
     sources: list["SourceResponse"] = Field(default_factory=list)
+    next_question: NextQuestionResponse
 
 
 class SessionResponse(BaseModel):
@@ -146,6 +172,8 @@ class SourceResponse(BaseModel):
     url: str | None = None
     mime_type: str | None = None
     size_bytes: int | None = None
+    message_id: str | None = None
+    download_url: str | None = None
     error_message: str | None = None
     proposals: list[SourceProposalResponse] = Field(default_factory=list)
     created_at: datetime

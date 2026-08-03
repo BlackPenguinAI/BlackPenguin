@@ -13,6 +13,9 @@ from app.modules.ai_core.models import AIConfiguration
 from app.modules.system_settings.models import FirebaseConfig, TwilioConfig
 from app.modules.subscriptions.models import SubscriptionPlan
 from app.modules.companies.models import Company 
+# These imported defaults are the single source of truth shared with the safe
+# update scripts. New databases and existing installations therefore receive
+# the same onboarding behavior.
 from app.modules.company_onboarding.prompts import COMPANY_ONBOARDING_AGENT_CONFIG
 from app.modules.projects.prompts import PROJECT_ONBOARDING_AGENT_CONFIG, SALES_AGENT_CONFIG
 

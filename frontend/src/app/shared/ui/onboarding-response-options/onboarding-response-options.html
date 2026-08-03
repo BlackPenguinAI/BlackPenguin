@@ -1,0 +1,24 @@
+<section *ngIf="choices.length || question.allow_custom" class="question-options" aria-label="Suggested responses">
+  <p class="question-prompt">{{ question.prompt }}</p>
+  <div class="choice-list" [class.choice-list--examples]="!question.options.length">
+    <button
+      *ngFor="let choice of choices"
+      type="button"
+      class="choice"
+      [disabled]="disabled"
+      (click)="selected.emit(choice)"
+    >
+      {{ choice }}
+    </button>
+    <button
+      *ngIf="question.allow_custom"
+      type="button"
+      class="choice choice--custom"
+      [disabled]="disabled"
+      (click)="custom.emit()"
+    >
+      Other / write my own
+    </button>
+  </div>
+  <p *ngIf="question.minimum_words" class="hint">Use at least {{ question.minimum_words }} words for a complete answer.</p>
+</section>

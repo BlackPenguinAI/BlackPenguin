@@ -119,6 +119,17 @@ class ChatMessageResponse(BaseModel):
     attachments: list[ChatAttachmentResponse] = Field(default_factory=list)
 
 
+class NextQuestionResponse(BaseModel):
+    field: str | None = None
+    label: str
+    prompt: str
+    input_type: str
+    options: list[str] = Field(default_factory=list)
+    examples: list[str] = Field(default_factory=list)
+    allow_custom: bool = True
+    minimum_words: int | None = None
+
+
 class SourceProposalResponse(BaseModel):
     id: str
     field: str
@@ -152,6 +163,7 @@ class ChatTurnResponse(BaseModel):
     accepted_fields: list[str] = Field(default_factory=list)
     rejected_updates: list[dict[str, Any]] = Field(default_factory=list)
     sources: list[SourceResponse] = Field(default_factory=list)
+    next_question: NextQuestionResponse
 
 
 class UrlSourceRequest(BaseModel):
