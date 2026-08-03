@@ -13,7 +13,6 @@ import { RouterModule } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { marked } from 'marked';
 import { Subscription } from 'rxjs';
-import { switchMap } from 'rxjs/operators';
 
 import { SpeechRecognitionService } from '../../core/services/speech-recognition.service';
 import { OnboardingResponseOptionsComponent, OnboardingQuestion } from '../../shared/ui/onboarding-response-options/onboarding-response-options';
@@ -21,10 +20,12 @@ import { OnboardingWelcomeComponent } from '../../shared/ui/onboarding-welcome/o
 
 import {
   ChatMessage,
+  ChatTurnResponse,
   CompanyFieldProgress,
   CompanyProfileResponse,
   EMPTY_COMPANY_PROFILE,
   OnboardingSource,
+  OnboardingState,
   Requirement,
   SourceProposal,
   ValidationStatus,
@@ -59,6 +60,7 @@ export class ChatComponent implements OnInit, OnDestroy {
   private readonly markdownCache = new Map<string, string>();
   private readonly speechSubscriptions = new Subscription();
   private speechBase = '';
+  private pollingTimer?: ReturnType<typeof setTimeout>;
 
   constructor(
     private readonly translate: TranslateService,
@@ -73,9 +75,7 @@ export class ChatComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.userName = localStorage.getItem('bp_name') || 'User';
-    this.loadProfile();
-    this.loadChatHistory();
-    this.loadSources();
+    this.syncState();
     this.speechSubscriptions.add(this.speech.state$.subscribe((state) => {
       this.isRecording = state === 'listening';
       this.cdr.detectChanges();
@@ -94,6 +94,7 @@ export class ChatComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.speech.abort();
     this.speechSubscriptions.unsubscribe();
+    if (this.pollingTimer) clearTimeout(this.pollingTimer);
   }
 
   loadProfile(): void {
@@ -117,7 +118,6 @@ export class ChatComponent implements OnInit, OnDestroy {
           this.messages = messages;
           this.showWelcome = messages.length === 0 && this.sources.length === 0;
           if (messages.length) {
-            this.refreshQuestion();
             this.scrollToBottom();
           }
         },
@@ -145,10 +145,7 @@ export class ChatComponent implements OnInit, OnDestroy {
     this.isAnalyzing = true;
     this.onboarding.startChat().subscribe({
       next: (turn) => {
-        this.messages.push(turn.message);
-        this.profile = turn.profile;
-        this.isCompleted = turn.profile.completion.can_complete;
-        this.nextQuestion = turn.next_question;
+        this.applyTurn(turn);
         this.isAnalyzing = false;
         this.scrollToBottom();
       },
@@ -164,23 +161,14 @@ export class ChatComponent implements OnInit, OnDestroy {
   beginWithWebsite(url: string): void {
     this.showWelcome = false;
     this.isAnalyzing = true;
-    this.onboarding.startChat().pipe(switchMap(() => this.onboarding.sendMessage(url))).subscribe({
-      next: (turn) => {
-        if (turn.user_message) this.messages.push(turn.user_message);
-        else this.messages.push({ sender: 'user', content: url, created_at: new Date(), attachments: [] });
-        this.messages.push(turn.message); this.profile = turn.profile; this.nextQuestion = turn.next_question;
-        this.mergeSources(turn.sources); this.isAnalyzing = false; this.scrollToBottom();
-      },
+    this.onboarding.bootstrap(url).subscribe({
+      next: (turn) => { this.applyTurn(turn); this.isAnalyzing = false; this.scrollToBottom(); },
       error: () => { this.showWelcome = true; this.isAnalyzing = false; this.errorMessage = 'The website could not be processed. You can retry or continue without it.'; },
     });
   }
 
   chooseAnswer(value: string): void { this.prompt = value; }
   writeCustomAnswer(): void { this.prompt = ''; }
-
-  private refreshQuestion(): void {
-    this.onboarding.startChat().subscribe({ next: (turn) => this.nextQuestion = turn.next_question });
-  }
 
   fieldsByRequirement(requirement: Requirement): CompanyFieldProgress[] {
     return this.profile.fields.filter((field) => field.requirement === requirement);
@@ -243,22 +231,22 @@ export class ChatComponent implements OnInit, OnDestroy {
     if (this.isRecording) this.speech.stop();
     const content = this.prompt.trim();
     this.prompt = '';
-    this.messages.push({ sender: 'user', content, created_at: new Date(), attachments: [] });
+    const optimistic: ChatMessage = { sender: 'user', content, created_at: new Date(), attachments: [] };
+    this.messages = [...this.messages, optimistic];
     this.isAnalyzing = true;
     this.scrollToBottom();
 
     this.errorMessage = '';
     this.onboarding.sendMessage(content).subscribe({
         next: (turn) => {
-          this.messages.push(turn.message);
-          this.profile = turn.profile;
-          this.isCompleted = turn.profile.completion.can_complete;
-          this.nextQuestion = turn.next_question;
-          this.mergeSources(turn.sources);
+          this.messages = this.messages.filter((message) => message !== optimistic);
+          this.applyTurn(turn);
           this.isAnalyzing = false;
           this.scrollToBottom();
         },
         error: () => {
+          this.messages = this.messages.filter((message) => message !== optimistic);
+          this.prompt = content;
           this.isAnalyzing = false;
           this.errorMessage = 'I could not send that message. Your profile was not changed.';
           this.cdr.detectChanges();
@@ -283,16 +271,9 @@ export class ChatComponent implements OnInit, OnDestroy {
     this.isUploading = true;
     this.onboarding.uploadFiles(files).subscribe({
       next: (sources) => {
-        this.mergeSources(sources);
         this.isUploading = false;
-        const ready = sources.filter((source) => source.status === 'ready').length;
-        const failed = sources.length - ready;
-        const summary = [
-          ready ? `${ready} source${ready === 1 ? '' : 's'} ready for review` : '',
-          failed ? `${failed} could not be processed` : '',
-        ].filter(Boolean).join('; ');
-        this.messages.push({ sender: 'user', content: `Attached ${files.length} company file${files.length === 1 ? '' : 's'}.`, created_at: new Date(), attachments: sources.map((source) => ({ id: source.id, kind: source.kind, name: source.name, mime_type: source.mime_type, size_bytes: source.size_bytes, status: source.status, url: source.url, download_url: source.download_url })) });
-        this.scrollToBottom();
+        this.mergeSources(sources);
+        this.syncState(true);
       },
       error: () => {
         this.isUploading = false;
@@ -306,19 +287,30 @@ export class ChatComponent implements OnInit, OnDestroy {
     proposal: SourceProposal,
     action: 'confirm' | 'correct' | 'reject',
   ): void {
+    if (proposal.submitting || proposal.status !== 'pending') return;
     const value = action === 'correct' ? this.parseDraftValue(proposal.draftValue || '') : undefined;
+    this.updateProposal(source.id, proposal.id, { submitting: true });
     this.onboarding.decideProposal(proposal.id, action, value).subscribe({
       next: (result) => {
-        const index = source.proposals.findIndex((item) => item.id === proposal.id);
-        if (index >= 0) source.proposals[index] = {
+        this.updateProposal(source.id, proposal.id, {
           ...result.proposal,
           draftValue: this.formatValue(result.proposal.value),
-        };
+          submitting: false,
+        });
         this.profile = result.profile;
         this.isCompleted = result.profile.completion.can_complete;
+        this.cdr.detectChanges();
       },
-      error: () => {
-        this.errorMessage = 'That proposal could not be updated. It may already have been reviewed.';
+      error: (error: HttpErrorResponse) => {
+        if (error.status === 409) {
+          this.errorMessage = 'This proposal changed in another request. The current state was reloaded.';
+          this.syncState();
+        } else {
+          this.updateProposal(source.id, proposal.id, { submitting: false });
+          this.errorMessage = error.status === 422
+            ? 'The proposed value is not valid. Review it and try again.'
+            : 'That proposal could not be updated.';
+        }
       },
     });
   }
@@ -389,11 +381,59 @@ export class ChatComponent implements OnInit, OnDestroy {
   }
 
   private mergeSources(sources: OnboardingSource[]): void {
-    for (const source of this.prepareSources(sources)) {
-      const index = this.sources.findIndex((item) => item.id === source.id);
-      if (index >= 0) this.sources[index] = source;
-      else this.sources.unshift(source);
+    const merged = new Map(this.sources.map((source) => [source.id, source]));
+    for (const source of this.prepareSources(sources)) merged.set(source.id, source);
+    this.sources = Array.from(merged.values());
+  }
+
+  private syncState(scroll = false): void {
+    this.onboarding.getState().subscribe({
+      next: (state) => {
+        this.applyState(state);
+        if (scroll) this.scrollToBottom();
+      },
+      error: (error: HttpErrorResponse) => {
+        if (error.status !== 401) this.errorMessage = 'The onboarding state could not be synchronized.';
+      },
+    });
+  }
+
+  private applyState(state: OnboardingState): void {
+    this.messages = [...state.messages];
+    this.profile = state.profile;
+    this.sources = this.prepareSources(state.sources);
+    this.nextQuestion = state.next_question;
+    this.isCompleted = state.profile.completion.can_complete;
+    this.showWelcome = state.stage === 'website';
+    if (this.pollingTimer) clearTimeout(this.pollingTimer);
+    if (state.stage === 'processing') {
+      this.pollingTimer = setTimeout(() => this.syncState(), 2500);
     }
+    this.cdr.detectChanges();
+  }
+
+  private applyTurn(turn: ChatTurnResponse): void {
+    const additions = [turn.user_message, turn.message].filter((message): message is ChatMessage => !!message);
+    const merged = new Map(this.messages.filter((message) => message.id).map((message) => [message.id!, message]));
+    for (const message of additions) {
+      if (message.id) merged.set(message.id, message);
+      else this.messages = [...this.messages, message];
+    }
+    const withoutIds = this.messages.filter((message) => !message.id);
+    this.messages = [...merged.values(), ...withoutIds];
+    this.profile = turn.profile;
+    this.isCompleted = turn.profile.completion.can_complete;
+    this.nextQuestion = turn.next_question;
+    this.mergeSources(turn.sources);
+    this.cdr.detectChanges();
+  }
+
+  private updateProposal(sourceId: string, proposalId: string, patch: Partial<SourceProposal>): void {
+    this.sources = this.sources.map((source) => source.id !== sourceId ? source : ({
+      ...source,
+      proposals: source.proposals.map((item) => item.id === proposalId ? { ...item, ...patch } : item),
+    }));
+    this.cdr.detectChanges();
   }
 
   private scrollToBottom(): void {

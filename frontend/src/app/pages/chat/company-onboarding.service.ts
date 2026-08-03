@@ -7,6 +7,7 @@ import {
   ChatTurnResponse,
   CompanyProfileResponse,
   OnboardingSource,
+  OnboardingState,
   ProposalDecisionResponse,
 } from './company-onboarding.models';
 
@@ -28,6 +29,17 @@ export class CompanyOnboardingService {
 
   startChat(): Observable<ChatTurnResponse> {
     return this.http.post<ChatTurnResponse>(`${this.baseUrl}/chat/start`, {});
+  }
+
+  bootstrap(initialUrl: string): Observable<ChatTurnResponse> {
+    return this.http.post<ChatTurnResponse>(`${this.baseUrl}/chat/bootstrap`, {
+      initial_url: initialUrl,
+      skip_website: false,
+    });
+  }
+
+  getState(): Observable<OnboardingState> {
+    return this.http.get<OnboardingState>(`${this.baseUrl}/chat/state`);
   }
 
   sendMessage(message: string): Observable<ChatTurnResponse> {

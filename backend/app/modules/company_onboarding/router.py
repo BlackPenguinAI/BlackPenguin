@@ -21,11 +21,13 @@ from . import services, source_service, storage_service
 from .completion import FIELD_BY_KEY
 from .models import CompanyOnboardingProposal, CompanyOnboardingSource, OnboardingMessage, SenderType
 from .schemas import (
+    ChatBootstrapRequest,
     ChatMessagePayload,
     ChatMessageResponse,
     ChatTurnResponse,
     CompanyProfilePatch,
     CompanyProfileResponse,
+    OnboardingStateResponse,
     ProposalDecision,
     ProposalDecisionResponse,
     ScrapeRequest,
@@ -119,6 +121,51 @@ def _accepted_response(first_name: str | None, accepted: list[dict[str, Any]], p
     return f"{greeting} I updated the profile with:\n\n" + "\n".join(lines) + "\n\n" + _next_prompt(profile)
 
 
+def _state_payload(db: Session, company_id: str) -> dict[str, Any]:
+    session = services.get_or_create_session(db, company_id)
+    profile = services.get_or_create_profile(db, company_id)
+    messages = (
+        db.query(OnboardingMessage)
+        .options(joinedload(OnboardingMessage.attachments))
+        .filter(OnboardingMessage.session_id == session.id)
+        .order_by(OnboardingMessage.created_at.asc())
+        .all()
+    )
+    sources = (
+        db.query(CompanyOnboardingSource)
+        .filter(CompanyOnboardingSource.company_id == company_id)
+        .order_by(CompanyOnboardingSource.created_at.desc())
+        .all()
+    )
+    serialized_profile = services.serialize_profile(profile)
+    processing = any(source.status.value == "processing" for source in sources)
+    pending_review = any(
+        proposal.status.value == "pending"
+        for source in sources
+        for proposal in source.proposals
+    )
+    if serialized_profile["completion"]["can_complete"]:
+        stage = "complete"
+    elif processing:
+        stage = "processing"
+    elif pending_review:
+        stage = "review"
+    elif not messages and not sources:
+        stage = "website"
+    else:
+        stage = "conversation"
+    timestamps = [profile.updated_at, *[item.created_at for item in messages], *[item.updated_at for item in sources]]
+    version = int(max((item.timestamp() for item in timestamps if item), default=0) * 1000)
+    return {
+        "messages": [_message_payload(message) for message in messages],
+        "profile": serialized_profile,
+        "sources": [source_service.serialize_source(source) for source in sources],
+        "next_question": _next_question(profile),
+        "stage": stage,
+        "version": version,
+    }
+
+
 @router.get("/profile", response_model=CompanyProfileResponse)
 def get_company_profile(
     db: Session = Depends(get_db),
@@ -172,6 +219,62 @@ def get_chat_history(
         .all()
     )
     return [_message_payload(message) for message in messages]
+
+
+@router.get("/chat/state", response_model=OnboardingStateResponse)
+def get_chat_state(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker(ALLOWED_ROLES)),
+):
+    return _state_payload(db, current_user.company_id)
+
+
+@router.post("/chat/bootstrap", response_model=ChatTurnResponse)
+async def bootstrap_chat(
+    payload: ChatBootstrapRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker(ALLOWED_ROLES)),
+):
+    session = services.get_or_create_session(db, current_user.company_id)
+    existing = (
+        db.query(OnboardingMessage)
+        .options(joinedload(OnboardingMessage.attachments))
+        .filter(OnboardingMessage.session_id == session.id)
+        .order_by(OnboardingMessage.created_at.desc())
+        .first()
+    )
+    if existing:
+        if existing.sender != SenderType.AI:
+            raise HTTPException(status_code=409, detail="The initial message is still being processed.")
+        profile = services.get_or_create_profile(db, current_user.company_id)
+        previous_user = (
+            db.query(OnboardingMessage)
+            .options(joinedload(OnboardingMessage.attachments))
+            .filter(
+                OnboardingMessage.session_id == session.id,
+                OnboardingMessage.sender == SenderType.USER,
+                OnboardingMessage.created_at <= existing.created_at,
+            )
+            .order_by(OnboardingMessage.created_at.desc())
+            .first()
+        )
+        sources = (
+            db.query(CompanyOnboardingSource)
+            .filter(CompanyOnboardingSource.message_id == previous_user.id)
+            .all()
+        ) if previous_user else []
+        return {
+            "message": _message_payload(existing), "profile": services.serialize_profile(profile),
+            "user_message": _message_payload(previous_user) if previous_user else None,
+            "accepted_fields": [], "rejected_updates": [],
+            "sources": [source_service.serialize_source(source) for source in sources],
+            "next_question": _next_question(profile),
+        }
+    if payload.initial_url and not payload.skip_website:
+        return await send_chat_message(
+            ChatMessagePayload(message=str(payload.initial_url)), db, current_user,
+        )
+    return start_chat(db, current_user)
 
 
 @router.post("/chat/start", response_model=ChatTurnResponse)

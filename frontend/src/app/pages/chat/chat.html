@@ -82,20 +82,20 @@
             </div>
             <input
               [(ngModel)]="proposal.draftValue"
-              [disabled]="proposal.status !== 'pending'"
+              [disabled]="proposal.status !== 'pending' || proposal.submitting === true"
               class="mt-2 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white outline-none focus:border-secondary/60 disabled:opacity-60"
             />
             <p *ngIf="proposal.evidence" class="mt-2 text-[11px] leading-relaxed text-gray-500">
               {{ proposal.evidence }}
             </p>
             <div *ngIf="proposal.status === 'pending'" class="mt-3 flex flex-wrap gap-2">
-              <button (click)="decideProposal(source, proposal, 'confirm')" class="proposal-action primary">
+              <button (click)="decideProposal(source, proposal, 'confirm')" [disabled]="proposal.submitting === true" class="proposal-action primary disabled:opacity-50">
                 Confirm
               </button>
-              <button (click)="decideProposal(source, proposal, 'correct')" class="proposal-action">
+              <button (click)="decideProposal(source, proposal, 'correct')" [disabled]="proposal.submitting === true" class="proposal-action disabled:opacity-50">
                 Save edit
               </button>
-              <button (click)="decideProposal(source, proposal, 'reject')" class="proposal-action danger">
+              <button (click)="decideProposal(source, proposal, 'reject')" [disabled]="proposal.submitting === true" class="proposal-action danger disabled:opacity-50">
                 Reject
               </button>
             </div>

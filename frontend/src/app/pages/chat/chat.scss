@@ -18,9 +18,9 @@
   ol { list-style: decimal; }
   strong { color: #fff; font-weight: 650; }
   em { color: #d1d5db; }
-  a { color: #00a5b6; text-decoration: underline; }
+  a { color: #e99e10; text-decoration: underline; }
   blockquote {
-    border-left: 2px solid rgba(0, 165, 182, 0.65);
+    border-left: 2px solid rgba(233, 158, 16, 0.65);
     padding-left: 0.75rem;
     color: #9ca3af;
   }
@@ -68,6 +68,6 @@
   transition: background 150ms ease, border-color 150ms ease;
 
   &:hover { background: rgba(255, 255, 255, 0.08); }
-  &.primary { border-color: rgba(0, 165, 182, 0.5); color: #67e8f9; }
+  &.primary { border-color: rgba(233, 158, 16, 0.5); color: #e99e10; }
   &.danger { color: #fca5a5; }
 }

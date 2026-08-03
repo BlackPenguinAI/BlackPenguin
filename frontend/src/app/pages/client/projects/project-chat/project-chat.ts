@@ -5,15 +5,14 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterModule } from '@angular/router';
 import { marked } from 'marked';
 import { Subscription } from 'rxjs';
-import { switchMap } from 'rxjs/operators';
 
 import { SpeechRecognitionService } from '../../../../core/services/speech-recognition.service';
 import { OnboardingResponseOptionsComponent, OnboardingQuestion } from '../../../../shared/ui/onboarding-response-options/onboarding-response-options';
 import { OnboardingWelcomeComponent } from '../../../../shared/ui/onboarding-welcome/onboarding-welcome';
 
 import {
-  Campaign, ChatAttachment, ChatMessage, EMPTY_PROJECT_PROFILE, MetaConnection, ProjectFieldProgress,
-  ProjectProfile, ProjectSource, SourceProposal, ValidationStatus,
+  Campaign, ChatAttachment, ChatMessage, ChatTurn, EMPTY_PROJECT_PROFILE, MetaConnection, OnboardingState,
+  ProjectFieldProgress, ProjectProfile, ProjectSource, SourceProposal, ValidationStatus,
 } from './project-onboarding.models';
 import { ProjectOnboardingService } from './project-onboarding.service';
 
@@ -47,6 +46,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   private readonly markdownCache = new Map<string, string>();
   private readonly speechSubscriptions = new Subscription();
   private speechBase = '';
+  private pollingTimer?: ReturnType<typeof setTimeout>;
 
   constructor(
     private readonly route: ActivatedRoute,
@@ -58,7 +58,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.projectId = this.route.snapshot.paramMap.get('id') || '';
     this.userName = localStorage.getItem('bp_name') || 'User';
-    this.loadProfile(); this.loadHistory(); this.loadSources(); this.loadCampaigns(); this.loadMetaConnections();
+    this.syncState(); this.loadCampaigns(); this.loadMetaConnections();
     this.speechSubscriptions.add(this.speech.state$.subscribe((state) => {
       this.isRecording = state === 'listening';
       this.cdr.detectChanges();
@@ -76,6 +76,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.speech.abort();
     this.speechSubscriptions.unsubscribe();
+    if (this.pollingTimer) clearTimeout(this.pollingTimer);
   }
 
   get canSend(): boolean { return (!!this.prompt.trim() || !!this.selectedFiles.length) && !this.isAnalyzing && !this.profile.completion.can_complete; }
@@ -92,7 +93,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     this.onboarding.getHistory(this.projectId).subscribe({
       next: (messages) => {
         this.messages = messages; this.showWelcome = messages.length === 0;
-        if (messages.length) { this.refreshQuestion(); this.scrollToBottom(); }
+        if (messages.length) this.scrollToBottom();
       },
       error: (error: HttpErrorResponse) => { if (error.status !== 401) this.errorMessage = 'The project conversation could not be loaded.'; },
     });
@@ -105,26 +106,21 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     this.showWelcome = false;
     this.isAnalyzing = true;
     this.onboarding.startChat(this.projectId).subscribe({
-      next: (turn) => { this.messages.push(turn.message); this.profile = turn.profile; this.nextQuestion = turn.next_question; this.isAnalyzing = false; this.scrollToBottom(); },
+      next: (turn) => { this.applyTurn(turn); this.isAnalyzing = false; this.scrollToBottom(); },
       error: () => { this.isAnalyzing = false; this.errorMessage = 'The Project Assistant could not start.'; },
     });
   }
   beginWithWebsite(url: string): void {
     this.showWelcome = false; this.isAnalyzing = true;
-    this.onboarding.startChat(this.projectId).pipe(
-      switchMap(() => this.onboarding.sendMessage(this.projectId, url)),
-    ).subscribe({
+    this.onboarding.bootstrap(this.projectId, url).subscribe({
       next: (turn) => {
-        if (turn.user_message) this.messages.push(turn.user_message);
-        this.messages.push(turn.message); this.profile = turn.profile; this.nextQuestion = turn.next_question;
-        this.mergeSources(turn.sources); this.isAnalyzing = false; this.scrollToBottom();
+        this.applyTurn(turn); this.isAnalyzing = false; this.scrollToBottom();
       },
       error: () => { this.showWelcome = true; this.isAnalyzing = false; this.errorMessage = 'The website could not be processed. You can retry or continue without it.'; },
     });
   }
   chooseAnswer(value: string): void { this.prompt = value; }
   writeCustomAnswer(): void { this.prompt = ''; }
-  private refreshQuestion(): void { this.onboarding.startChat(this.projectId).subscribe({ next: (turn) => this.nextQuestion = turn.next_question }); }
   handleKeyDown(event: KeyboardEvent): void { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); if (this.canSend) this.sendMessage(); } }
   sendMessage(): void {
     if (!this.canSend) return;
@@ -142,14 +138,14 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
       })),
     };
     this.prompt = ''; this.selectedFiles = []; this.errorMessage = '';
-    this.messages.push(optimistic); this.isAnalyzing = true; this.isUploading = !!files.length; this.scrollToBottom();
+    this.messages = [...this.messages, optimistic]; this.isAnalyzing = true; this.isUploading = !!files.length; this.scrollToBottom();
     const request = files.length
       ? this.onboarding.sendMessageWithFiles(this.projectId, content, files)
       : this.onboarding.sendMessage(this.projectId, content);
     request.subscribe({
       next: (turn) => {
-        if (turn.user_message) Object.assign(optimistic, turn.user_message);
-        this.messages.push(turn.message); this.profile = turn.profile; this.nextQuestion = turn.next_question; this.mergeSources(turn.sources);
+        this.messages = this.messages.filter((message) => message !== optimistic);
+        this.applyTurn(turn);
         this.isAnalyzing = false; this.isUploading = false; this.scrollToBottom();
       },
       error: () => {
@@ -202,10 +198,23 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   }
   decideProposal(source: ProjectSource, proposal: SourceProposal, action: 'confirm' | 'correct' | 'reject'): void {
+    if (proposal.submitting || proposal.status !== 'pending') return;
     const value = action === 'correct' ? this.parseValue(proposal.draftValue || '') : undefined;
+    this.updateProposal(source.id, proposal.id, { submitting: true });
     this.onboarding.decideProposal(this.projectId, proposal.id, action, value).subscribe({
-      next: (result) => { const index = source.proposals.findIndex((item) => item.id === proposal.id); if (index >= 0) source.proposals[index] = { ...result.proposal, draftValue: this.formatValue(result.proposal.value) }; this.profile = result.profile; },
-      error: () => this.errorMessage = 'That proposal could not be updated.',
+      next: (result) => {
+        this.updateProposal(source.id, proposal.id, { ...result.proposal, draftValue: this.formatValue(result.proposal.value), submitting: false });
+        this.profile = result.profile; this.cdr.detectChanges();
+      },
+      error: (error: HttpErrorResponse) => {
+        if (error.status === 409) {
+          this.errorMessage = 'This proposal changed in another request. The current state was reloaded.';
+          this.syncState();
+        } else {
+          this.updateProposal(source.id, proposal.id, { submitting: false });
+          this.errorMessage = error.status === 422 ? 'The proposed value is not valid. Review it and try again.' : 'That proposal could not be updated.';
+        }
+      },
     });
   }
 
@@ -243,6 +252,38 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     return [base, finalText, interimText].filter(Boolean).join(' ').replace(/\s+/g, ' ').trimStart();
   }
   private prepareSources(items: ProjectSource[]): ProjectSource[] { return items.map((source) => ({ ...source, proposals: source.proposals.map((proposal) => ({ ...proposal, draftValue: this.formatValue(proposal.value) })) })); }
-  private mergeSources(items: ProjectSource[]): void { for (const source of this.prepareSources(items)) { const index = this.sources.findIndex((item) => item.id === source.id); index >= 0 ? this.sources[index] = source : this.sources.unshift(source); } }
+  private mergeSources(items: ProjectSource[]): void {
+    const merged = new Map(this.sources.map((source) => [source.id, source]));
+    for (const source of this.prepareSources(items)) merged.set(source.id, source);
+    this.sources = Array.from(merged.values());
+  }
+  private syncState(scroll = false): void {
+    this.onboarding.getState(this.projectId).subscribe({
+      next: (state) => { this.applyState(state); if (scroll) this.scrollToBottom(); },
+      error: (error: HttpErrorResponse) => { if (error.status !== 401) this.errorMessage = 'The Project Onboarding state could not be synchronized.'; },
+    });
+  }
+  private applyState(state: OnboardingState): void {
+    this.messages = [...state.messages]; this.profile = state.profile;
+    this.sources = this.prepareSources(state.sources); this.nextQuestion = state.next_question;
+    this.showWelcome = state.stage === 'website';
+    if (this.pollingTimer) clearTimeout(this.pollingTimer);
+    if (state.stage === 'processing') this.pollingTimer = setTimeout(() => this.syncState(), 2500);
+    this.cdr.detectChanges();
+  }
+  private applyTurn(turn: ChatTurn): void {
+    const additions = [turn.user_message, turn.message].filter((message): message is ChatMessage => !!message);
+    const withIds = new Map(this.messages.filter((message) => message.id).map((message) => [message.id!, message]));
+    for (const message of additions) if (message.id) withIds.set(message.id, message);
+    this.messages = [...withIds.values(), ...this.messages.filter((message) => !message.id), ...additions.filter((message) => !message.id)];
+    this.profile = turn.profile; this.nextQuestion = turn.next_question; this.mergeSources(turn.sources); this.cdr.detectChanges();
+  }
+  private updateProposal(sourceId: string, proposalId: string, patch: Partial<SourceProposal>): void {
+    this.sources = this.sources.map((source) => source.id !== sourceId ? source : ({
+      ...source,
+      proposals: source.proposals.map((item) => item.id === proposalId ? { ...item, ...patch } : item),
+    }));
+    this.cdr.detectChanges();
+  }
   private scrollToBottom(): void { setTimeout(() => { const element = this.chatScroll?.nativeElement; if (element) element.scrollTop = element.scrollHeight; this.cdr.detectChanges(); }, 100); }
 }

@@ -24,10 +24,10 @@ from .models import (
     ProjectOnboardingSource, SenderType,
 )
 from .schemas import (
-    CampaignCreate, CampaignResponse, ChatMessagePayload, ChatMessageResponse, ChatTurnResponse,
+    CampaignCreate, CampaignResponse, ChatBootstrapRequest, ChatMessagePayload, ChatMessageResponse, ChatTurnResponse,
     MetaConnectionCreate, MetaConnectionResponse, ProjectCreate, ProjectProfilePatch,
     ProjectDeleteRequest, ProjectDeletionImpact, ProjectProfileResponse, ProjectResponse,
-    ProposalDecision, ProposalDecisionResponse,
+    OnboardingStateResponse, ProposalDecision, ProposalDecisionResponse,
     SourceResponse, UrlSourceRequest,
 )
 
@@ -69,6 +69,50 @@ def _next_question(profile) -> dict[str, Any]:
         blockers,
         final_prompt="Review the Project Profile and choose whether to approve it or make changes.",
     )
+
+
+def _state_payload(db: Session, project: Project) -> dict[str, Any]:
+    profile = services.get_profile(project)
+    messages = (
+        db.query(ProjectMessage)
+        .options(joinedload(ProjectMessage.attachments))
+        .filter(ProjectMessage.session_id == project.session.id)
+        .order_by(ProjectMessage.created_at.asc())
+        .all()
+    )
+    sources = (
+        db.query(ProjectOnboardingSource)
+        .filter(ProjectOnboardingSource.project_id == project.id)
+        .order_by(ProjectOnboardingSource.created_at.desc())
+        .all()
+    )
+    serialized_profile = services.serialize_profile(profile)
+    processing = any(source.status.value == "processing" for source in sources)
+    pending_review = any(
+        proposal.status.value == "pending"
+        for source in sources
+        for proposal in source.proposals
+    )
+    if serialized_profile["completion"]["can_complete"]:
+        stage = "complete"
+    elif processing:
+        stage = "processing"
+    elif pending_review:
+        stage = "review"
+    elif not messages and not sources:
+        stage = "website"
+    else:
+        stage = "conversation"
+    timestamps = [profile.updated_at, *[item.created_at for item in messages], *[item.updated_at for item in sources]]
+    version = int(max((item.timestamp() for item in timestamps if item), default=0) * 1000)
+    return {
+        "messages": [_message(message) for message in messages],
+        "profile": serialized_profile,
+        "sources": [source_service.serialize_source(source) for source in sources],
+        "next_question": _next_question(profile),
+        "stage": stage,
+        "version": version,
+    }
 
 
 def _system_instruction(config: dict[str, Any]) -> str:
@@ -232,6 +276,65 @@ def get_chat(project_id: str, db: Session = Depends(get_db), current_user: User 
         joinedload(ProjectMessage.attachments)
     ).filter(ProjectMessage.session_id == project.session.id).order_by(ProjectMessage.created_at.asc()).all()
     return [services.serialize_message(item) for item in messages]
+
+
+@router.get("/{project_id}/chat/state", response_model=OnboardingStateResponse)
+def get_chat_state(
+    project_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker(EDITOR_ROLES)),
+):
+    project = services.get_project(db, project_id, current_user.company_id)
+    return _state_payload(db, project)
+
+
+@router.post("/{project_id}/chat/bootstrap", response_model=ChatTurnResponse)
+async def bootstrap_chat(
+    project_id: str,
+    payload: ChatBootstrapRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker(EDITOR_ROLES)),
+):
+    project = services.get_project(db, project_id, current_user.company_id)
+    existing = (
+        db.query(ProjectMessage)
+        .options(joinedload(ProjectMessage.attachments))
+        .filter(ProjectMessage.session_id == project.session.id)
+        .order_by(ProjectMessage.created_at.desc())
+        .first()
+    )
+    if existing:
+        if existing.sender != SenderType.AI:
+            raise HTTPException(status_code=409, detail="The initial message is still being processed.")
+        profile = services.get_profile(project)
+        previous_user = (
+            db.query(ProjectMessage)
+            .options(joinedload(ProjectMessage.attachments))
+            .filter(
+                ProjectMessage.session_id == project.session.id,
+                ProjectMessage.sender == SenderType.USER,
+                ProjectMessage.created_at <= existing.created_at,
+            )
+            .order_by(ProjectMessage.created_at.desc())
+            .first()
+        )
+        sources = (
+            db.query(ProjectOnboardingSource)
+            .filter(ProjectOnboardingSource.message_id == previous_user.id)
+            .all()
+        ) if previous_user else []
+        return {
+            "message": _message(existing), "profile": services.serialize_profile(profile),
+            "user_message": _message(previous_user) if previous_user else None,
+            "accepted_fields": [], "rejected_updates": [],
+            "sources": [source_service.serialize_source(source) for source in sources],
+            "next_question": _next_question(profile),
+        }
+    if payload.initial_url and not payload.skip_website:
+        return await send_chat(
+            project_id, ChatMessagePayload(message=str(payload.initial_url)), db, current_user,
+        )
+    return start_chat(project_id, db, current_user)
 
 
 @router.post("/{project_id}/chat/start", response_model=ChatTurnResponse)

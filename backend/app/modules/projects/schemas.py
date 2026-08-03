@@ -180,6 +180,20 @@ class ProposalDecisionResponse(BaseModel):
     profile: ProjectProfileResponse
 
 
+class ChatBootstrapRequest(BaseModel):
+    initial_url: HttpUrl | None = None
+    skip_website: bool = False
+
+
+class OnboardingStateResponse(BaseModel):
+    messages: list[ChatMessageResponse] = Field(default_factory=list)
+    profile: ProjectProfileResponse
+    sources: list[SourceResponse] = Field(default_factory=list)
+    next_question: NextQuestionResponse
+    stage: Literal["website", "processing", "review", "conversation", "complete"]
+    version: int
+
+
 class CampaignCreate(BaseModel):
     name: str = Field(min_length=1, max_length=180)
     platform: str = "meta"

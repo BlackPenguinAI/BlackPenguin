@@ -5,7 +5,7 @@ import { Observable } from 'rxjs';
 import { API_V1_URL } from '../../../../core/config/api.config';
 
 import {
-  Campaign, ChatMessage, ChatTurn, MetaConnection, ProjectProfile, ProjectSource,
+  Campaign, ChatMessage, ChatTurn, MetaConnection, OnboardingState, ProjectProfile, ProjectSource,
   SourceProposal,
 } from './project-onboarding.models';
 
@@ -17,6 +17,8 @@ export class ProjectOnboardingService {
   getProfile(id: string): Observable<ProjectProfile> { return this.http.get<ProjectProfile>(`${this.baseUrl}/${id}/profile`); }
   getHistory(id: string): Observable<ChatMessage[]> { return this.http.get<ChatMessage[]>(`${this.baseUrl}/${id}/chat`); }
   startChat(id: string): Observable<ChatTurn> { return this.http.post<ChatTurn>(`${this.baseUrl}/${id}/chat/start`, {}); }
+  bootstrap(id: string, initialUrl: string): Observable<ChatTurn> { return this.http.post<ChatTurn>(`${this.baseUrl}/${id}/chat/bootstrap`, { initial_url: initialUrl, skip_website: false }); }
+  getState(id: string): Observable<OnboardingState> { return this.http.get<OnboardingState>(`${this.baseUrl}/${id}/chat/state`); }
   sendMessage(id: string, message: string): Observable<ChatTurn> { return this.http.post<ChatTurn>(`${this.baseUrl}/${id}/chat`, { message }); }
   sendMessageWithFiles(id: string, message: string, files: File[]): Observable<ChatTurn> {
     const body = new FormData();

@@ -84,6 +84,7 @@ export interface SourceProposal {
   confidence: 'high' | 'medium' | 'low' | null;
   status: ProposalStatus;
   draftValue?: string;
+  submitting?: boolean;
 }
 
 export interface OnboardingSource {
@@ -110,6 +111,15 @@ export interface ChatTurnResponse {
   rejected_updates: Array<{ field: string | null; reason: string }>;
   sources: OnboardingSource[];
   next_question: NextQuestion;
+}
+
+export interface OnboardingState {
+  messages: ChatMessage[];
+  profile: CompanyProfileResponse;
+  sources: OnboardingSource[];
+  next_question: NextQuestion;
+  stage: 'website' | 'processing' | 'review' | 'conversation' | 'complete';
+  version: number;
 }
 
 export interface ProposalDecisionResponse {

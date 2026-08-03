@@ -186,15 +186,37 @@ async def _extract_proposals(
 
 
 def review_proposal(db: Session, *, proposal: ProjectOnboardingProposal, company_id: str, user_id: str, action: str, corrected_value: Any = None):
-    if proposal.source.project.company_id != company_id:
+    proposal = (
+        db.query(ProjectOnboardingProposal)
+        .filter(ProjectOnboardingProposal.id == proposal.id)
+        .populate_existing()
+        .with_for_update()
+        .first()
+    )
+    if not proposal or proposal.source.project.company_id != company_id:
         raise HTTPException(status_code=404, detail="Proposal not found.")
+    expected_status = {
+        "confirm": ProjectProposalStatus.CONFIRMED,
+        "correct": ProjectProposalStatus.CORRECTED,
+        "reject": ProjectProposalStatus.REJECTED,
+    }[action]
+    requested_value = corrected_value if action == "correct" else proposal.value
     if proposal.status != ProjectProposalStatus.PENDING:
-        raise HTTPException(status_code=409, detail="This proposal has already been reviewed.")
+        same_value = action != "correct" or proposal.value == requested_value
+        if proposal.status == expected_status and same_value:
+            return proposal, services.get_profile(proposal.source.project)
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": "This proposal has already been reviewed with a different decision.",
+                "proposal": serialize_proposal(proposal),
+            },
+        )
     profile = services.get_profile(proposal.source.project)
     if action == "reject":
         proposal.status = ProjectProposalStatus.REJECTED
     else:
-        value = corrected_value if action == "correct" else proposal.value
+        value = requested_value
         if action == "correct" and value in (None, "", []):
             raise HTTPException(status_code=422, detail="A corrected value is required.")
         result = services.apply_field_updates(db, profile, [{

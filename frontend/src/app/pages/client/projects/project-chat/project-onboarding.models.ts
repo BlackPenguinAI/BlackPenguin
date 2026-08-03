@@ -59,6 +59,7 @@ export interface ChatMessage {
 export interface SourceProposal {
   id: string; field: string; label: string; value: unknown; evidence: string | null;
   confidence: string | null; status: 'pending' | 'confirmed' | 'corrected' | 'rejected'; draftValue?: string;
+  submitting?: boolean;
 }
 export interface ProjectSource {
   id: string; kind: string; status: 'processing' | 'ready' | 'failed'; name: string;
@@ -70,6 +71,11 @@ export interface ChatTurn {
   message: ChatMessage; user_message: ChatMessage | null; profile: ProjectProfile; accepted_fields: string[];
   rejected_updates: Array<{ field: string | null; reason: string }>; sources: ProjectSource[];
   next_question: NextQuestion;
+}
+export interface OnboardingState {
+  messages: ChatMessage[]; profile: ProjectProfile; sources: ProjectSource[];
+  next_question: NextQuestion; stage: 'website' | 'processing' | 'review' | 'conversation' | 'complete';
+  version: number;
 }
 export interface NextQuestion {
   field: string | null; label: string; prompt: string; input_type: string;
