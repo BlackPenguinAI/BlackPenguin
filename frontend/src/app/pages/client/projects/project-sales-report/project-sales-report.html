@@ -1,0 +1,28 @@
+<main class="min-h-full bg-[#070707] p-5 text-white md:p-10">
+  <div class="mx-auto max-w-7xl">
+    <a [routerLink]="['/app/projects', projectId]" class="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-white"><span class="material-symbols-outlined text-lg">arrow_back</span> Project Overview</a>
+    <div class="mt-7 flex flex-wrap items-end justify-between gap-4 border-b border-white/10 pb-6">
+      <div><p class="text-[10px] font-bold uppercase tracking-[.18em] text-secondary">Market Intelligence</p><h1 class="mt-2 text-3xl font-light md:text-4xl">Sales Intelligence</h1><p class="mt-2 text-sm text-gray-500">Only verified Project data is used in these calculations.</p></div>
+      <span *ngIf="report" class="rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-wider" [ngClass]="report.calculation_status === 'available' ? 'border-green-500/20 bg-green-500/10 text-green-300' : 'border-white/10 bg-white/5 text-gray-500'">{{ report.calculation_status }}</span>
+    </div>
+
+    <div *ngIf="isLoading" class="py-24 text-center text-gray-500">Loading verified sales data...</div>
+    <div *ngIf="errorMessage" class="py-24 text-center text-red-300">{{ errorMessage }}</div>
+
+    <ng-container *ngIf="report as data">
+      <section class="mt-6 grid gap-4 md:grid-cols-3">
+        <article class="report-card"><p>Inventory status</p><strong>{{ data.inventory_status || 'Pending' }}</strong></article>
+        <article class="report-card"><p>Total revenue</p><strong [class.pending]="data.total_revenue == null">{{ formatMoney(data.total_revenue) }}</strong></article>
+        <article class="report-card"><p>Target ROI</p><strong [class.pending]="data.target_roi == null">{{ data.target_roi == null ? 'Pending' : (data.target_roi + '%') }}</strong></article>
+      </section>
+
+      <section class="mt-6 rounded-3xl border border-white/10 bg-[#101010] p-5 md:p-7">
+        <h2 class="text-xl font-light">Unit Inventory</h2>
+        <div *ngIf="data.unit_inventory.length; else pendingInventory" class="mt-5 overflow-x-auto">
+          <table class="w-full min-w-[650px] text-left text-sm"><thead class="text-[10px] uppercase tracking-wider text-gray-600"><tr><th>Unit</th><th>Type</th><th>Price</th><th>Status</th></tr></thead><tbody class="divide-y divide-white/5"><tr *ngFor="let unit of data.unit_inventory"><td>{{ unit.unit }}</td><td>{{ unit.type || 'Pending' }}</td><td>{{ unit.price == null ? 'Pending' : ((unit.currency || '') + ' ' + unit.price) }}</td><td class="capitalize text-secondary">{{ unit.status }}</td></tr></tbody></table>
+        </div>
+        <ng-template #pendingInventory><div class="mt-5 rounded-2xl border border-dashed border-white/10 p-10 text-center"><span class="material-symbols-outlined text-4xl text-gray-700">inventory_2</span><p class="mt-3 text-sm text-gray-500">Connect structured inventory and sales activity to generate this report.</p><a [routerLink]="['/app/projects', projectId, 'onboarding']" class="mt-4 inline-block text-sm text-secondary">Add Project data</a></div></ng-template>
+      </section>
+    </ng-container>
+  </div>
+</main>

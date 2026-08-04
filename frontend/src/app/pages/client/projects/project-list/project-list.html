@@ -7,9 +7,9 @@
         <h1 class="text-3xl font-light tracking-tight">Real Estate <span class="text-secondary font-medium">Projects</span></h1>
         <p class="text-sm text-gray-400 mt-1">Manage your developments and train the AI on their specifics.</p>
       </div>
-      <button (click)="openModal()" class="px-5 py-2.5 bg-white text-black text-sm font-semibold rounded-xl hover:bg-secondary transition-colors flex items-center gap-2">
-        <span class="material-symbols-outlined text-[18px]">add</span>
-        New Project
+      <button (click)="createProject()" [disabled]="isCreating" class="px-5 py-2.5 bg-white text-black text-sm font-semibold rounded-xl hover:bg-secondary transition-colors flex items-center gap-2 disabled:cursor-wait disabled:opacity-60">
+        <span class="material-symbols-outlined text-[18px]" [class.animate-spin]="isCreating">{{ isCreating ? 'progress_activity' : 'add' }}</span>
+        {{ isCreating ? 'Creating workspace...' : 'New Project' }}
       </button>
     </div>
 
@@ -21,7 +21,7 @@
       <span class="material-symbols-outlined text-4xl text-gray-500 mb-3">domain_disabled</span>
       <h3 class="text-lg font-medium text-white mb-1">No projects yet</h3>
       <p class="text-sm text-gray-400 mb-6">Create your first real estate project to start the AI onboarding.</p>
-      <button (click)="openModal()" class="px-5 py-2 bg-secondary/10 text-secondary border border-secondary/20 hover:bg-secondary/20 transition-colors rounded-lg text-sm font-medium">Create First Project</button>
+      <button (click)="createProject()" [disabled]="isCreating" class="px-5 py-2 bg-secondary/10 text-secondary border border-secondary/20 hover:bg-secondary/20 transition-colors rounded-lg text-sm font-medium disabled:opacity-50">{{ isCreating ? 'Creating...' : 'Create First Project' }}</button>
     </div>
 
     <div *ngIf="!isLoading && projects.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -47,42 +47,13 @@
         </div>
 
         <div class="flex gap-2">
-          <a [routerLink]="['/app/projects', p.id, 'onboarding']" class="min-w-0 flex-1 py-2.5 bg-black/50 border border-white/10 hover:border-secondary/50 hover:text-secondary text-white text-sm font-medium rounded-xl transition-colors text-center cursor-pointer block">
-            {{ p.profile?.completion?.can_complete ? 'Review Project' : 'Continue Onboarding' }}
+          <a [routerLink]="p.onboarding_status === 'completed' ? ['/app/projects', p.id] : ['/app/projects', p.id, 'onboarding']" class="min-w-0 flex-1 py-2.5 bg-black/50 border border-white/10 hover:border-secondary/50 hover:text-secondary text-white text-sm font-medium rounded-xl transition-colors text-center cursor-pointer block">
+            {{ p.onboarding_status === 'completed' ? 'View Project' : 'Continue Onboarding' }}
           </a>
           <button *ngIf="canManageProjects" (click)="openDeleteModal(p)" class="flex w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-black/50 text-gray-400 transition hover:border-red-400/40 hover:bg-red-500/10 hover:text-red-300" [attr.aria-label]="'Delete ' + p.name" title="Archive or delete project">
             <span class="material-symbols-outlined text-[19px]">delete</span>
           </button>
         </div>
-      </div>
-    </div>
-  </div>
-
-  <div *ngIf="showModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-    <div class="bg-[#0a0a0a] border border-white/10 rounded-2xl w-full max-w-md p-6 relative shadow-2xl">
-      <h2 class="text-xl font-light text-white mb-6">Create New Project</h2>
-      
-      <div class="space-y-4">
-        <div>
-          <label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold ml-1">Project Name *</label>
-          <input type="text" [(ngModel)]="newProject.name" class="w-full bg-white/5 border border-white/10 focus:border-secondary rounded-xl px-4 py-2.5 text-sm text-white outline-none mt-1">
-        </div>
-        <div>
-          <label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold ml-1">City / Region</label>
-          <input type="text" [(ngModel)]="newProject.city" class="w-full bg-white/5 border border-white/10 focus:border-secondary rounded-xl px-4 py-2.5 text-sm text-white outline-none mt-1">
-        </div>
-        <div>
-          <label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold ml-1">Exact Address</label>
-          <input type="text" [(ngModel)]="newProject.address" class="w-full bg-white/5 border border-white/10 focus:border-secondary rounded-xl px-4 py-2.5 text-sm text-white outline-none mt-1">
-        </div>
-      </div>
-
-      <div class="flex justify-end gap-3 mt-8">
-        <button (click)="closeModal()" class="px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors">Cancel</button>
-        <button (click)="createProject()" [disabled]="!newProject.name || isCreating" class="px-5 py-2 bg-white text-black text-sm font-bold rounded-lg hover:bg-secondary transition-colors disabled:opacity-50 flex items-center gap-2">
-          <span *ngIf="isCreating" class="material-symbols-outlined animate-spin text-[16px]">sync</span>
-          Create Project
-        </button>
       </div>
     </div>
   </div>

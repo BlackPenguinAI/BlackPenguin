@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Form
 from sqlalchemy.orm import Session
 from typing import List, Optional
+from datetime import datetime
 
 from app.db.postgres import get_db
 from app.modules.auth.deps import RoleChecker
@@ -11,6 +12,7 @@ from app.integrations.openrouter_client import generate_llm_response
 from .models import Lead, SmsChatMessage, Meeting, FunnelStage
 from .schemas import LeadResponse, LeadUpdate, SmsChatMessageSchema, MeetingResponse, MeetingCreate, SalesReportResponse
 from . import services
+from app.modules.projects.models import Project, ProjectUnit
 
 router = APIRouter()
 
@@ -51,22 +53,37 @@ def get_sales_report(
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker([UserRole.ADMIN, UserRole.MKT, UserRole.SALES]))
 ):
+    project = db.query(Project).filter(
+        Project.id == project_id, Project.company_id == current_user.company_id,
+    ).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found.")
     leads = db.query(Lead).filter(Lead.project_id == project_id, Lead.company_id == current_user.company_id).all()
+    units = db.query(ProjectUnit).filter(ProjectUnit.project_id == project_id).all()
     
     leads_map = [
         {"id": l.id, "name": l.full_name, "lat": l.latitude, "lng": l.longitude, "stage": l.funnel_stage}
         for l in leads if l.latitude and l.longitude
     ]
     
+    sold_units = [unit for unit in units if unit.status == "sold"]
+    available_units = [unit for unit in units if unit.status == "available"]
+    priced_sold_units = [unit for unit in sold_units if unit.list_price is not None]
+    total_revenue = sum(float(unit.list_price) for unit in priced_sold_units) if priced_sold_units else None
+    inventory_status = (
+        f"{len(available_units)} available / {len(sold_units)} sold" if units else None
+    )
     return {
-        "inventory_status": "75% Available / 25% Reserved",
-        "total_revenue": 1250000.0,
-        "target_roi": 18.5,
-        "unit_inventory": [
-            {"unit": "101", "type": "2 Bed / 2 Bath", "price": 250000, "status": "Available"},
-            {"unit": "102", "type": "1 Bed / 1 Bath", "price": 180000, "status": "Reserved"}
-        ],
-        "leads_map": leads_map
+        "inventory_status": inventory_status,
+        "total_revenue": total_revenue,
+        "target_roi": None,
+        "unit_inventory": [{
+            "unit": unit.unit_code, "type": unit.typology, "price": float(unit.list_price) if unit.list_price is not None else None,
+            "currency": unit.currency, "status": unit.status,
+        } for unit in units],
+        "leads_map": leads_map,
+        "calculation_status": "available" if units else "pending",
+        "generated_at": datetime.utcnow() if units else None,
     }
 
 # =========================================================

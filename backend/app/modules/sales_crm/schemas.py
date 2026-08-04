@@ -47,8 +47,10 @@ class MeetingResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 class SalesReportResponse(BaseModel):
-    inventory_status: str
-    total_revenue: float
-    target_roi: float
+    inventory_status: Optional[str] = None
+    total_revenue: Optional[float] = None
+    target_roi: Optional[float] = None
     unit_inventory: List[dict]
     leads_map: List[dict]
+    calculation_status: str = "pending"
+    generated_at: Optional[datetime] = None

@@ -14,7 +14,8 @@ from app.modules.onboarding_questions import is_too_short
 from .completion import FIELD_BY_KEY, VALID_STATUSES, calculate_completion, field_progress, normalize_field_key
 from . import storage_service
 from .models import (
-    Project, ProjectCampaign, ProjectMessage, ProjectOnboardingSource, ProjectProfile,
+    Project, ProjectCampaign, ProjectMessage, ProjectOnboardingProposal, ProjectOnboardingSource, ProjectProfile,
+    ProjectProposalStatus, ProjectSourceKind, ProjectSourceStatus, ProjectUnit,
     ProjectSession, SenderType,
 )
 
@@ -43,7 +44,7 @@ def get_project(db: Session, project_id: str, company_id: str) -> Project:
     return project
 
 
-def create_project_with_onboarding(db: Session, *, company_id: str, payload: dict[str, Any]) -> Project:
+def create_project_with_onboarding(db: Session, *, company_id: str, payload: dict[str, Any], draft: bool = False) -> Project:
     project = Project(**payload, company_id=company_id, is_active=True)
     db.add(project)
     db.flush()
@@ -54,12 +55,15 @@ def create_project_with_onboarding(db: Session, *, company_id: str, payload: dic
         "project_name": project.name, "short_description": project.description,
         "exact_address": project.address, "city": project.city, "country": project.country,
     }
+    if draft:
+        seed = {}
     profile.profile_data = {key: value for key, value in seed.items() if value not in (None, "")}
     profile.field_states = {
         key: {"status": "confirmed", "applicable": True}
         for key, value in seed.items() if value not in (None, "")
     }
     refresh_completion(profile)
+    project.onboarding_status = "draft" if draft else "in_progress"
     db.commit()
     db.refresh(project)
     return project
@@ -118,8 +122,24 @@ def apply_field_updates(
         if source:
             source["recorded_at"] = datetime.utcnow().isoformat(); sources[key] = source
         accepted.append({"field": key, "value": value, "status": status})
-    if final_approved is not None and allow_authoritative_statuses:
-        profile.final_approved = final_approved
+        if key == "project_name" and value and status in {"confirmed", "corrected_by_user"}:
+            profile.project.name = str(value)[:150]
+        elif key == "short_description" and value:
+            profile.project.description = str(value)
+        elif key == "exact_address" and value:
+            profile.project.address = str(value)[:255]
+        elif key == "city" and value:
+            profile.project.city = str(value)[:100]
+        elif key == "country" and value:
+            profile.project.country = str(value)[:100]
+    if accepted and profile.project.onboarding_status == "completed":
+        profile.final_approved = False
+        profile.approved_for_sales_at = None
+        profile.project.onboarding_status = "awaiting_confirmation"
+        profile.project.onboarding_completed_at = None
+        profile.project.onboarding_approved_by_user_id = None
+    elif accepted and profile.project.onboarding_status == "draft":
+        profile.project.onboarding_status = "in_progress"
     profile.profile_data, profile.field_states, profile.field_sources = data, states, sources
     for name in ("profile_data", "field_states", "field_sources"):
         flag_modified(profile, name)
@@ -139,9 +159,14 @@ def refresh_completion(profile: ProjectProfile) -> dict[str, Any]:
 
 
 def serialize_profile(profile: ProjectProfile) -> dict[str, Any]:
+    completion = refresh_completion(profile)
+    completion["ready_for_confirmation"] = (
+        completion["required_fields_complete"] and not profile.final_approved
+        and profile.project.onboarding_status in {"in_progress", "awaiting_confirmation"}
+    )
     return {
         "id": profile.id, "project_id": profile.project_id, "data": profile.profile_data or {},
-        "fields": field_progress(profile.field_states), "completion": refresh_completion(profile),
+        "fields": field_progress(profile.field_states), "completion": completion,
         "updated_at": profile.updated_at,
     }
 
@@ -151,7 +176,108 @@ def serialize_project(project: Project) -> dict[str, Any]:
         "id": project.id, "company_id": project.company_id, "name": project.name,
         "description": project.description, "address": project.address, "city": project.city,
         "country": project.country, "is_active": project.is_active,
+        "onboarding_status": project.onboarding_status,
         "profile": serialize_profile(project.profile) if project.profile else None,
+    }
+
+
+def readiness_for_confirmation(db: Session, project: Project) -> tuple[bool, list[str]]:
+    completion = refresh_completion(get_profile(project))
+    reasons: list[str] = []
+    if not completion["required_fields_complete"]:
+        reasons.append("required_fields")
+    if db.query(ProjectOnboardingSource).filter(
+        ProjectOnboardingSource.project_id == project.id,
+        ProjectOnboardingSource.status == ProjectSourceStatus.PROCESSING,
+    ).first():
+        reasons.append("processing_sources")
+    if db.query(ProjectOnboardingProposal).join(ProjectOnboardingSource).filter(
+        ProjectOnboardingSource.project_id == project.id,
+        ProjectOnboardingProposal.status == ProjectProposalStatus.PENDING,
+    ).first():
+        reasons.append("pending_proposals")
+    return not reasons, reasons
+
+
+def complete_onboarding(db: Session, project: Project, user_id: str) -> ProjectProfile:
+    profile = get_profile(project)
+    ready, reasons = readiness_for_confirmation(db, project)
+    if project.onboarding_status == "completed" and profile.final_approved:
+        return profile
+    if not ready:
+        raise HTTPException(status_code=409, detail={
+            "message": "The Project Profile is not ready for final confirmation.",
+            "blockers": reasons,
+        })
+    now = datetime.utcnow()
+    profile.final_approved = True
+    profile.approved_for_sales_at = now
+    project.onboarding_status = "completed"
+    project.onboarding_completed_at = now
+    project.onboarding_approved_by_user_id = user_id
+    refresh_completion(profile)
+    db.add_all([profile, project]); db.commit(); db.refresh(profile)
+    return profile
+
+
+def serialize_overview(db: Session, project: Project) -> dict[str, Any]:
+    profile = get_profile(project)
+    data = profile.profile_data or {}
+    units = db.query(ProjectUnit).filter(ProjectUnit.project_id == project.id).all()
+    cover = db.query(ProjectOnboardingSource).filter(
+        ProjectOnboardingSource.project_id == project.id,
+        ProjectOnboardingSource.kind == ProjectSourceKind.IMAGE,
+        ProjectOnboardingSource.status == ProjectSourceStatus.READY,
+        ProjectOnboardingSource.storage_path.isnot(None),
+    ).order_by(ProjectOnboardingSource.is_primary.desc(), ProjectOnboardingSource.created_at.asc()).first()
+    inventory: list[dict[str, Any]] = []
+    if units:
+        typologies = sorted({unit.typology or "Unclassified" for unit in units})
+        for typology in typologies:
+            group = [unit for unit in units if (unit.typology or "Unclassified") == typology]
+            available = [unit for unit in group if unit.status == "available"]
+            sold = [unit for unit in group if unit.status == "sold"]
+            prices = [float(unit.list_price) for unit in group if unit.list_price is not None]
+            inventory.append({
+                "typology": typology, "total": len(group), "sold": len(sold), "available": len(available),
+                "starting_price": min(prices) if prices else None,
+                "currency": next((unit.currency for unit in group if unit.currency), data.get("currency")),
+            })
+    else:
+        raw_typologies = data.get("typologies") or []
+        if isinstance(raw_typologies, str):
+            raw_typologies = [item.strip() for item in raw_typologies.split(",") if item.strip()]
+        inventory = [{"typology": str(item), "total": None, "sold": None, "available": None,
+                      "starting_price": None, "currency": data.get("currency")} for item in raw_typologies]
+
+    available_count = sum(1 for unit in units if unit.status == "available") if units else None
+    revenue = sum(float(unit.list_price) for unit in units if unit.status == "sold" and unit.list_price is not None) if units else None
+    currency = data.get("currency")
+    starting_price = data.get("starting_price")
+    metrics = [
+        {"key": "available_inventory", "label": "Available Inventory", "value": available_count,
+         "display_value": str(available_count) if available_count is not None else str(data.get("available_inventory") or "Pending"),
+         "status": "available" if available_count is not None or data.get("available_inventory") else "pending"},
+        {"key": "starting_price", "label": "Starting Price", "value": starting_price,
+         "display_value": f"{currency or ''} {starting_price}".strip() if starting_price else "Pending",
+         "status": "available" if starting_price else "pending"},
+        {"key": "target_roi", "label": "Target ROI", "value": None, "display_value": "Pending", "status": "pending"},
+    ]
+    address_parts = [data.get("exact_address") or project.address, data.get("city") or project.city, data.get("country") or project.country]
+    address = ", ".join(str(part) for part in address_parts if part)
+    return {
+        "id": project.id, "name": data.get("project_name") or project.name,
+        "status": data.get("project_status"), "description": data.get("short_description") or project.description,
+        "address": data.get("exact_address") or project.address, "city": data.get("city") or project.city,
+        "country": data.get("country") or project.country, "delivery_dates": data.get("delivery_dates"),
+        "cover_image_url": f"/api/v1/projects/{project.id}/sources/{cover.id}/file" if cover else None,
+        "cover_focal_point": {"x": cover.focal_point_x, "y": cover.focal_point_y} if cover else {"x": .5, "y": .5},
+        "metrics": metrics, "inventory": inventory,
+        "location": {"address": address or None, "latitude": project.latitude, "longitude": project.longitude},
+        "market_intelligence": {"report_url": f"/app/projects/{project.id}/sales-report", "total_revenue": revenue,
+                                "target_roi": None, "status": "available" if units else "pending"},
+        "data_completeness": {"percentage": profile.completion_percentage, "onboarding_status": project.onboarding_status,
+                              "last_updated_at": profile.updated_at},
     }
 
 

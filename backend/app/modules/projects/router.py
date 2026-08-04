@@ -21,12 +21,13 @@ from . import meta_service, services, source_service, storage_service
 from .completion import FIELD_BY_KEY
 from .models import (
     MetaConnection, Project, ProjectCampaign, ProjectMessage, ProjectOnboardingProposal,
-    ProjectOnboardingSource, SenderType,
+    ProjectOnboardingSource, ProjectSourceKind, SenderType,
 )
 from .schemas import (
     CampaignCreate, CampaignResponse, ChatBootstrapRequest, ChatMessagePayload, ChatMessageResponse, ChatTurnResponse,
     MetaConnectionCreate, MetaConnectionResponse, ProjectCreate, ProjectProfilePatch,
-    ProjectDeleteRequest, ProjectDeletionImpact, ProjectProfileResponse, ProjectResponse,
+    ProjectCompleteResponse, ProjectDeleteRequest, ProjectDeletionImpact, ProjectDraftResponse,
+    ProjectOverviewResponse, ProjectProfileResponse, ProjectResponse,
     OnboardingStateResponse, ProposalDecision, ProposalDecisionResponse,
     SourceResponse, UrlSourceRequest,
 )
@@ -87,6 +88,8 @@ def _state_payload(db: Session, project: Project) -> dict[str, Any]:
         .all()
     )
     serialized_profile = services.serialize_profile(profile)
+    ready_for_confirmation, _ = services.readiness_for_confirmation(db, project)
+    serialized_profile["completion"]["ready_for_confirmation"] = ready_for_confirmation and not profile.final_approved
     processing = any(source.status.value == "processing" for source in sources)
     pending_review = any(
         proposal.status.value == "pending"
@@ -99,6 +102,11 @@ def _state_payload(db: Session, project: Project) -> dict[str, Any]:
         stage = "processing"
     elif pending_review:
         stage = "review"
+    elif ready_for_confirmation:
+        stage = "awaiting_confirmation"
+        if project.onboarding_status != "awaiting_confirmation":
+            project.onboarding_status = "awaiting_confirmation"
+            db.add(project); db.commit()
     elif not messages and not sources:
         stage = "website"
     else:
@@ -121,6 +129,7 @@ def _system_instruction(config: dict[str, Any]) -> str:
         f"{config.get('system_prompt', '')}\n\nFLOW PROTOCOL:\n{config.get('protocol_prompt', '')}"
         f"\n\nGUARDRAILS:\n{config.get('guardrails_prompt', '')}\n\n"
         "Return only one JSON object with assistant_message, verified_updates, and final_approved. "
+        "Always set final_approved to false; only the application's explicit confirmation action can finish onboarding. "
         "verified_updates items use field, value, status, applicable, source_type, source_reference, confidence. "
         "Use only canonical keys from this catalog. Do not say data was saved; the application validates writes. "
         f"FIELD CATALOG: {json.dumps(catalog)}"
@@ -180,7 +189,7 @@ async def _complete_chat_turn(
         assistant_text, updates, approved = parsed
     result = services.apply_field_updates(
         db, profile, updates, allow_authoritative_statuses=current_user.role == UserRole.ADMIN,
-        final_approved=approved,
+        final_approved=None,
     )
     if result.accepted:
         labels = [FIELD_BY_KEY[item["field"]].label for item in result.accepted]
@@ -215,6 +224,21 @@ def create_project(payload: ProjectCreate, db: Session = Depends(get_db), curren
     return services.serialize_project(project)
 
 
+@router.post("/drafts", response_model=ProjectDraftResponse, status_code=status.HTTP_201_CREATED)
+def create_project_draft(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker(EDITOR_ROLES)),
+):
+    services.check_project_limits(db, current_user.company_id)
+    try:
+        project = services.create_project_with_onboarding(
+            db, company_id=current_user.company_id, payload={"name": "Untitled Project"}, draft=True,
+        )
+    except Exception:
+        db.rollback(); raise
+    return {"id": project.id, "onboarding_url": f"/app/projects/{project.id}/onboarding", "onboarding_status": project.onboarding_status}
+
+
 @router.get("/", response_model=list[ProjectResponse])
 def list_projects(db: Session = Depends(get_db), current_user: User = Depends(RoleChecker(VIEWER_ROLES))):
     projects = db.query(Project).options(joinedload(Project.profile)).filter(
@@ -227,6 +251,48 @@ def list_projects(db: Session = Depends(get_db), current_user: User = Depends(Ro
 @router.get("/{project_id}", response_model=ProjectResponse)
 def get_project(project_id: str, db: Session = Depends(get_db), current_user: User = Depends(RoleChecker(VIEWER_ROLES))):
     return services.serialize_project(services.get_project(db, project_id, current_user.company_id))
+
+
+@router.get("/{project_id}/overview", response_model=ProjectOverviewResponse)
+def get_project_overview(
+    project_id: str, db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker(VIEWER_ROLES)),
+):
+    project = services.get_project(db, project_id, current_user.company_id)
+    return services.serialize_overview(db, project)
+
+
+@router.post("/{project_id}/onboarding/complete", response_model=ProjectCompleteResponse)
+def complete_project_onboarding(
+    project_id: str, db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker(EDITOR_ROLES)),
+):
+    project = services.get_project(db, project_id, current_user.company_id)
+    profile = services.complete_onboarding(db, project, current_user.id)
+    return {"completed": True, "redirect_url": f"/app/projects/{project.id}", "profile": services.serialize_profile(profile)}
+
+
+@router.post("/{project_id}/sources/{source_id}/cover", response_model=SourceResponse)
+def set_project_cover(
+    project_id: str, source_id: str, db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker(EDITOR_ROLES)),
+):
+    services.get_project(db, project_id, current_user.company_id)
+    source = db.query(ProjectOnboardingSource).filter(
+        ProjectOnboardingSource.id == source_id,
+        ProjectOnboardingSource.project_id == project_id,
+        ProjectOnboardingSource.kind == ProjectSourceKind.IMAGE,
+        ProjectOnboardingSource.storage_path.isnot(None),
+    ).first()
+    if not source:
+        raise HTTPException(status_code=404, detail="Project image not found.")
+    db.query(ProjectOnboardingSource).filter(
+        ProjectOnboardingSource.project_id == project_id,
+        ProjectOnboardingSource.kind == ProjectSourceKind.IMAGE,
+    ).update({ProjectOnboardingSource.is_primary: False}, synchronize_session=False)
+    source.is_primary = True
+    db.add(source); db.commit(); db.refresh(source)
+    return source_service.serialize_source(source)
 
 
 @router.get("/{project_id}/deletion-impact", response_model=ProjectDeletionImpact)

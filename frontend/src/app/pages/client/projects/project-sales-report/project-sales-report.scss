@@ -1,0 +1,6 @@
+:host { display: block; min-height: 100%; }
+.report-card { border: 1px solid rgba(255,255,255,.1); border-radius: 1.25rem; background: #101010; padding: 1.4rem; }
+.report-card p { color: #71717a; font-size: .65rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
+.report-card strong { display: block; margin-top: .8rem; font-size: 1.45rem; font-weight: 500; }
+.report-card strong.pending { color: #52525b; }
+th, td { padding: .9rem .75rem; }

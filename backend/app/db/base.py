@@ -26,6 +26,7 @@ from app.modules.projects.models import (
     ProjectOnboardingSource,
     ProjectProfile,
     ProjectSession,
+    ProjectUnit,
 )
 from app.modules.brokers.models import Broker
 from app.modules.sales_crm.models import Lead, SmsChatMessage, Meeting

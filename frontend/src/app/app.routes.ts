@@ -177,6 +177,20 @@ export const routes: Routes = [
             (m) => m.ProjectChatComponent
           ),
       },
+      {
+        path: 'projects/:id/sales-report',
+        loadComponent: () =>
+          import('./pages/client/projects/project-sales-report/project-sales-report').then(
+            (m) => m.ProjectSalesReportComponent
+          ),
+      },
+      {
+        path: 'projects/:id',
+        loadComponent: () =>
+          import('./pages/client/projects/project-overview/project-overview').then(
+            (m) => m.ProjectOverviewComponent
+          ),
+      },
     ],
   },
 

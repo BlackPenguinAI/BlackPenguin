@@ -1,6 +1,6 @@
 import { ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterModule } from '@angular/router';
+import { Router, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { finalize } from 'rxjs';
@@ -29,7 +29,6 @@ interface ProjectDeletionImpact {
 export class ProjectListComponent implements OnInit, OnDestroy {
   projects: any[] = [];
   isLoading: boolean = true;
-  showModal: boolean = false;
   isCreating: boolean = false;
   showDeleteModal = false;
   isCheckingDeletion = false;
@@ -40,8 +39,6 @@ export class ProjectListComponent implements OnInit, OnDestroy {
   readonly canManageProjects = localStorage.getItem('bp_role') === 'admin';
   private destroyed = false;
 
-  newProject = { name: '', address: '', city: '' };
-
   // FastAPI declares the collection route as "/". Keep the trailing slash so
   // GET and POST do not receive a 307 redirect from the backend.
   private readonly apiUrl = `${API_V1_URL}/projects/`;
@@ -50,6 +47,7 @@ export class ProjectListComponent implements OnInit, OnDestroy {
     private http: HttpClient,
     private toastService: ToastService,
     private cdr: ChangeDetectorRef,
+    private router: Router,
   ) {}
 
   ngOnInit(): void {
@@ -76,28 +74,21 @@ export class ProjectListComponent implements OnInit, OnDestroy {
   }
 
   createProject() {
-    if (!this.newProject.name) return;
+    if (this.isCreating) return;
     this.isCreating = true;
-    
-    this.http.post<any>(this.apiUrl, this.newProject).subscribe({
+    this.http.post<{ id: string; onboarding_url: string }>(`${API_V1_URL}/projects/drafts`, {}).pipe(
+      finalize(() => {
+        this.isCreating = false;
+        if (!this.destroyed) this.cdr.detectChanges();
+      }),
+    ).subscribe({
       next: (created) => {
-        this.projects = [created, ...this.projects];
-        this.toastService.showSuccess('Project created successfully');
-        this.closeModal();
-        this.cdr.detectChanges();
+        this.router.navigateByUrl(created.onboarding_url);
       },
       error: (err) => {
         this.toastService.showError(err.error?.detail || 'Error creating project');
-        this.isCreating = false;
       }
     });
-  }
-
-  openModal() { this.showModal = true; }
-  closeModal() {
-    this.showModal = false;
-    this.isCreating = false;
-    this.newProject = { name: '', address: '', city: '' };
   }
 
   openDeleteModal(project: any): void {

@@ -2,7 +2,7 @@ import { ChangeDetectorRef, Component, ElementRef, OnDestroy, OnInit, ViewChild 
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, RouterModule } from '@angular/router';
+import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { marked } from 'marked';
 import { Subscription } from 'rxjs';
 
@@ -29,6 +29,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   isAnalyzing = false;
   isUploading = false;
   isRecording = false;
+  isCompleting = false;
   readonly speechSupported: boolean;
   selectedFiles: File[] = [];
   errorMessage = '';
@@ -53,6 +54,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     private readonly onboarding: ProjectOnboardingService,
     private readonly cdr: ChangeDetectorRef,
     private readonly speech: SpeechRecognitionService,
+    private readonly router: Router,
   ) { this.speechSupported = speech.isSupported; }
 
   ngOnInit(): void {
@@ -79,7 +81,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     if (this.pollingTimer) clearTimeout(this.pollingTimer);
   }
 
-  get canSend(): boolean { return (!!this.prompt.trim() || !!this.selectedFiles.length) && !this.isAnalyzing && !this.profile.completion.can_complete; }
+  get canSend(): boolean { return (!!this.prompt.trim() || !!this.selectedFiles.length) && !this.isAnalyzing; }
   get nextBlocker(): string { return this.profile.completion.blockers[0]?.label || 'Final profile approval'; }
   fieldsForSection(section: string): ProjectFieldProgress[] { return this.profile.fields.filter((field) => field.section === section); }
 
@@ -168,7 +170,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   removeSelectedFile(index: number): void { this.selectedFiles = this.selectedFiles.filter((_, itemIndex) => itemIndex !== index); }
 
   toggleRecording(): void {
-    if (!this.speechSupported || this.isAnalyzing || this.profile.completion.can_complete) return;
+    if (!this.speechSupported || this.isAnalyzing) return;
     if (this.isRecording) {
       this.speech.stop();
       return;
@@ -214,6 +216,33 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
           this.updateProposal(source.id, proposal.id, { submitting: false });
           this.errorMessage = error.status === 422 ? 'The proposed value is not valid. Review it and try again.' : 'That proposal could not be updated.';
         }
+      },
+    });
+  }
+
+  setCover(source: ProjectSource): void {
+    if (source.kind !== 'image' || source.is_primary) return;
+    this.onboarding.setCover(this.projectId, source.id).subscribe({
+      next: () => {
+        this.sources = this.sources.map((item) => ({ ...item, is_primary: item.id === source.id }));
+        this.cdr.detectChanges();
+      },
+      error: () => { this.errorMessage = 'That image could not be selected as the Project cover.'; },
+    });
+  }
+
+  completeOnboarding(): void {
+    if (!this.profile.completion.ready_for_confirmation || this.isCompleting) return;
+    this.isCompleting = true; this.errorMessage = '';
+    this.onboarding.complete(this.projectId).subscribe({
+      next: (result) => this.router.navigateByUrl(result.redirect_url),
+      error: (error: HttpErrorResponse) => {
+        this.isCompleting = false;
+        this.errorMessage = error.status === 409
+          ? 'The profile changed and needs another review before it can be completed.'
+          : 'The onboarding could not be completed. Please try again.';
+        if (error.status === 409) this.syncState();
+        this.cdr.detectChanges();
       },
     });
   }

@@ -54,6 +54,10 @@
         </summary>
         <p *ngIf="source.status === 'failed'" class="mt-3 text-xs text-red-300">{{ source.error_message }}</p>
         <p *ngIf="source.status === 'ready' && !source.proposals.length" class="mt-3 text-xs text-gray-400">No reliable project details were found.</p>
+        <div *ngIf="source.kind === 'image' && source.status === 'ready'" class="mt-3 flex items-center justify-between rounded-lg border border-white/5 bg-black/20 px-3 py-2">
+          <span class="text-[10px] text-gray-500">Project Overview cover</span>
+          <button (click)="setCover(source)" [disabled]="source.is_primary" class="text-[10px] font-semibold text-secondary disabled:text-green-400">{{ source.is_primary ? 'Selected' : 'Set as cover' }}</button>
+        </div>
         <div *ngIf="source.proposals.length" class="mt-3 space-y-3 border-t border-white/5 pt-3">
           <p class="text-[10px] font-bold uppercase tracking-wider text-secondary">Review {{ source.proposals.length }} extracted proposal{{ source.proposals.length === 1 ? '' : 's' }}</p>
           <article *ngFor="let proposal of source.proposals" class="rounded-xl border border-white/10 bg-black/30 p-3">
@@ -70,12 +74,29 @@
       </details>
 
       <app-onboarding-response-options
-        *ngIf="nextQuestion && messages.length"
+        *ngIf="nextQuestion && messages.length && !profile.completion.ready_for_confirmation && !profile.completion.can_complete"
         [question]="nextQuestion"
-        [disabled]="isAnalyzing || profile.completion.can_complete"
+        [disabled]="isAnalyzing"
         (selected)="chooseAnswer($event)"
         (custom)="writeCustomAnswer()"
       ></app-onboarding-response-options>
+
+      <section *ngIf="profile.completion.ready_for_confirmation" class="completion-card ml-0 max-w-3xl rounded-2xl border border-secondary/30 bg-secondary/[0.07] p-5 md:ml-11">
+        <div class="flex items-start gap-4">
+          <span class="material-symbols-outlined rounded-xl bg-secondary/15 p-2 text-secondary">verified</span>
+          <div class="min-w-0 flex-1">
+            <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-secondary">Final review</p>
+            <h2 class="mt-1 text-lg font-medium text-white">Your Project Profile is ready</h2>
+            <p class="mt-2 text-sm leading-relaxed text-gray-400">All required information is resolved and every extracted proposal has been reviewed. Confirm to finish onboarding and open the Project Overview.</p>
+            <div class="mt-4 flex flex-wrap gap-3">
+              <button (click)="completeOnboarding()" [disabled]="isCompleting" class="rounded-xl bg-secondary px-5 py-2.5 text-sm font-semibold text-black transition hover:brightness-110 disabled:cursor-wait disabled:opacity-60">
+                {{ isCompleting ? 'Finishing...' : 'Confirm and finish' }}
+              </button>
+              <button (click)="prompt = 'I want to update: '" class="rounded-xl border border-white/10 px-5 py-2.5 text-sm text-gray-300 transition hover:border-secondary/40 hover:text-white">Make a change</button>
+            </div>
+          </div>
+        </div>
+      </section>
 
       <div *ngIf="isAnalyzing" class="ml-11 flex w-fit gap-2 rounded-2xl border border-white/10 bg-white/5 p-4"><span class="h-2 w-2 animate-bounce rounded-full bg-secondary"></span><span class="h-2 w-2 animate-bounce rounded-full bg-secondary [animation-delay:0.2s]"></span><span class="h-2 w-2 animate-bounce rounded-full bg-secondary [animation-delay:0.4s]"></span></div>
     </div>
@@ -91,12 +112,12 @@
               <button (click)="removeSelectedFile(index)" [disabled]="isUploading" class="text-gray-500 hover:text-red-300"><span class="material-symbols-outlined text-[14px]">close</span></button>
             </div>
           </div>
-          <textarea [(ngModel)]="prompt" (keydown)="handleKeyDown($event)" [disabled]="isAnalyzing || profile.completion.can_complete" rows="2" class="min-h-14 w-full resize-none bg-transparent py-2 pl-11 pr-24 text-sm outline-none" [placeholder]="'Next: ' + nextBlocker"></textarea>
-          <label class="absolute bottom-3 left-2 cursor-pointer rounded-lg p-2 text-gray-400 hover:bg-white/10 hover:text-white" [class.pointer-events-none]="isUploading || profile.completion.can_complete" [class.opacity-30]="isUploading || profile.completion.can_complete" title="Attach project files">
+          <textarea [(ngModel)]="prompt" (keydown)="handleKeyDown($event)" [disabled]="isAnalyzing" rows="2" class="min-h-14 w-full resize-none bg-transparent py-2 pl-11 pr-24 text-sm outline-none" [placeholder]="profile.completion.can_complete ? 'Describe the Project data you want to update' : ('Next: ' + nextBlocker)"></textarea>
+          <label class="absolute bottom-3 left-2 cursor-pointer rounded-lg p-2 text-gray-400 hover:bg-white/10 hover:text-white" [class.pointer-events-none]="isUploading" [class.opacity-30]="isUploading" title="Attach project files">
             <span class="material-symbols-outlined text-[20px]">{{ isUploading ? 'progress_activity' : 'attach_file' }}</span>
-            <input type="file" multiple accept=".pdf,.docx,.txt,.csv,.xlsx,.jpg,.jpeg,.png,.webp" class="hidden" [disabled]="isUploading || profile.completion.can_complete" (change)="onFilesSelected($event)" />
+            <input type="file" multiple accept=".pdf,.docx,.txt,.csv,.xlsx,.jpg,.jpeg,.png,.webp" class="hidden" [disabled]="isUploading" (change)="onFilesSelected($event)" />
           </label>
-          <button (click)="toggleRecording()" [disabled]="!speechSupported || isAnalyzing || profile.completion.can_complete" class="absolute bottom-3 right-12 rounded-xl p-2 transition disabled:opacity-30" [ngClass]="isRecording ? 'bg-red-500/20 text-red-300' : 'text-gray-400 hover:bg-white/10 hover:text-white'" [title]="speechSupported ? (isRecording ? 'Stop dictation' : 'Dictate message') : 'Speech recognition is not supported in this browser'">
+          <button (click)="toggleRecording()" [disabled]="!speechSupported || isAnalyzing" class="absolute bottom-3 right-12 rounded-xl p-2 transition disabled:opacity-30" [ngClass]="isRecording ? 'bg-red-500/20 text-red-300' : 'text-gray-400 hover:bg-white/10 hover:text-white'" [title]="speechSupported ? (isRecording ? 'Stop dictation' : 'Dictate message') : 'Speech recognition is not supported in this browser'">
             <span class="material-symbols-outlined text-[20px]">{{ isRecording ? 'stop_circle' : 'mic' }}</span>
           </button>
           <button (click)="sendMessage()" [disabled]="!canSend" class="absolute bottom-3 right-2 rounded-xl bg-white p-2 text-black disabled:opacity-30"><span class="material-symbols-outlined text-[20px]">arrow_upward</span></button>

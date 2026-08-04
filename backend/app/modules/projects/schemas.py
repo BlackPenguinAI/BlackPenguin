@@ -37,6 +37,8 @@ class SectionProgress(BaseModel):
 
 class ProjectCompletion(BaseModel):
     percentage: int
+    required_fields_complete: bool
+    ready_for_confirmation: bool
     can_complete: bool
     final_approved: bool
     completed: int
@@ -61,6 +63,7 @@ class ProjectResponse(ProjectCreate):
     id: str
     company_id: str
     is_active: bool
+    onboarding_status: str
     profile: ProjectProfileResponse | None = None
     model_config = ConfigDict(from_attributes=True)
 
@@ -151,6 +154,7 @@ class SourceResponse(BaseModel):
     message_id: str | None = None
     download_url: str | None = None
     error_message: str | None = None
+    is_primary: bool = False
     proposals: list[SourceProposalResponse] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
@@ -190,8 +194,55 @@ class OnboardingStateResponse(BaseModel):
     profile: ProjectProfileResponse
     sources: list[SourceResponse] = Field(default_factory=list)
     next_question: NextQuestionResponse
-    stage: Literal["website", "processing", "review", "conversation", "complete"]
+    stage: Literal["website", "processing", "review", "conversation", "awaiting_confirmation", "complete"]
     version: int
+
+
+class ProjectDraftResponse(BaseModel):
+    id: str
+    onboarding_url: str
+    onboarding_status: str
+
+
+class ProjectCompleteResponse(BaseModel):
+    completed: bool
+    redirect_url: str
+    profile: ProjectProfileResponse
+
+
+class ProjectOverviewMetric(BaseModel):
+    key: str
+    label: str
+    value: Any = None
+    display_value: str
+    status: Literal["available", "pending"]
+
+
+class ProjectInventorySummary(BaseModel):
+    typology: str
+    total: int | None = None
+    sold: int | None = None
+    available: int | None = None
+    starting_price: float | None = None
+    currency: str | None = None
+
+
+class ProjectOverviewResponse(BaseModel):
+    id: str
+    name: str
+    status: str | None = None
+    description: str | None = None
+    address: str | None = None
+    city: str | None = None
+    country: str | None = None
+    delivery_dates: Any = None
+    cover_image_url: str | None = None
+    cover_focal_point: dict[str, float] = Field(default_factory=dict)
+    metrics: list[ProjectOverviewMetric] = Field(default_factory=list)
+    inventory: list[ProjectInventorySummary] = Field(default_factory=list)
+    location: dict[str, Any] = Field(default_factory=dict)
+    market_intelligence: dict[str, Any] = Field(default_factory=dict)
+    data_completeness: dict[str, Any] = Field(default_factory=dict)
 
 
 class CampaignCreate(BaseModel):

@@ -245,6 +245,7 @@ def serialize_source(source: ProjectOnboardingSource) -> dict[str, Any]:
             if source.storage_path else None
         ),
         "error_message": source.error_message,
+        "is_primary": source.is_primary,
         "proposals": [serialize_proposal(item) for item in source.proposals],
         "created_at": source.created_at, "updated_at": source.updated_at,
     }

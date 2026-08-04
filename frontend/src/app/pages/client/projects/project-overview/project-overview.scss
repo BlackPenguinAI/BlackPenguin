@@ -1,0 +1,15 @@
+:host { display: block; min-height: 100%; }
+.overview-shell { background-image: radial-gradient(circle at 75% 0%, rgba(233,158,16,.08), transparent 28%); }
+.hero { animation: reveal .55s ease-out both; }
+.hero-overlay { background: linear-gradient(90deg, rgba(3,3,3,.94) 0%, rgba(3,3,3,.68) 48%, rgba(3,3,3,.15) 100%), linear-gradient(0deg, rgba(3,3,3,.88), transparent 58%); }
+.hero-placeholder { background: radial-gradient(circle at 76% 34%, rgba(233,158,16,.22), transparent 20%), linear-gradient(135deg, #171717, #090909 60%); }
+.hero-placeholder::after { content: ''; position: absolute; inset: 0; opacity: .14; background-image: linear-gradient(rgba(255,255,255,.15) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.15) 1px, transparent 1px); background-size: 54px 54px; transform: perspective(500px) rotateX(58deg) scale(1.5) translateY(15%); }
+.metric-card { transition: transform .22s ease, border-color .22s ease; }
+.metric-card:hover { transform: translateY(-3px); border-color: rgba(233,158,16,.35); }
+.eyebrow { font-size: .65rem; font-weight: 700; letter-spacing: .17em; text-transform: uppercase; color: #71717a; }
+.map-placeholder { background-color: #0b0b0b; background-image: linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px); background-size: 28px 28px; }
+.intelligence-card { background: radial-gradient(circle at 90% 20%, rgba(233,158,16,.18), transparent 32%), #101010; }
+.skeleton { background: linear-gradient(90deg, #111 25%, #1b1b1b 50%, #111 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite; }
+@keyframes reveal { from { opacity: 0; transform: translateY(10px); } }
+@keyframes shimmer { to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .hero, .skeleton { animation: none; } .metric-card { transition: none; } }

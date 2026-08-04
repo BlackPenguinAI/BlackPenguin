@@ -19,6 +19,9 @@ export class ProjectOnboardingService {
   startChat(id: string): Observable<ChatTurn> { return this.http.post<ChatTurn>(`${this.baseUrl}/${id}/chat/start`, {}); }
   bootstrap(id: string, initialUrl: string): Observable<ChatTurn> { return this.http.post<ChatTurn>(`${this.baseUrl}/${id}/chat/bootstrap`, { initial_url: initialUrl, skip_website: false }); }
   getState(id: string): Observable<OnboardingState> { return this.http.get<OnboardingState>(`${this.baseUrl}/${id}/chat/state`); }
+  complete(id: string): Observable<{ completed: boolean; redirect_url: string; profile: ProjectProfile }> {
+    return this.http.post<{ completed: boolean; redirect_url: string; profile: ProjectProfile }>(`${this.baseUrl}/${id}/onboarding/complete`, {});
+  }
   sendMessage(id: string, message: string): Observable<ChatTurn> { return this.http.post<ChatTurn>(`${this.baseUrl}/${id}/chat`, { message }); }
   sendMessageWithFiles(id: string, message: string, files: File[]): Observable<ChatTurn> {
     const body = new FormData();
@@ -36,6 +39,9 @@ export class ProjectOnboardingService {
   }
   decideProposal(id: string, proposalId: string, action: 'confirm' | 'correct' | 'reject', value?: unknown): Observable<{ proposal: SourceProposal; profile: ProjectProfile }> {
     return this.http.post<{ proposal: SourceProposal; profile: ProjectProfile }>(`${this.baseUrl}/${id}/proposals/${proposalId}/decision`, { action, value });
+  }
+  setCover(id: string, sourceId: string): Observable<ProjectSource> {
+    return this.http.post<ProjectSource>(`${this.baseUrl}/${id}/sources/${sourceId}/cover`, {});
   }
   getCampaigns(id: string): Observable<Campaign[]> { return this.http.get<Campaign[]>(`${this.baseUrl}/${id}/campaigns`); }
   createCampaign(id: string, campaign: Partial<Campaign>): Observable<Campaign> { return this.http.post<Campaign>(`${this.baseUrl}/${id}/campaigns`, campaign); }

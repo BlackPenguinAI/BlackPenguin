@@ -108,6 +108,8 @@ def calculate_completion(states: dict[str, Any] | None, *, final_approved: bool 
     activation_blockers = [b for b in blockers if b["section"] in {"inventory", "routing", "campaigns", "approval"}]
     return {
         "percentage": percentage,
+        "required_fields_complete": not blockers,
+        "ready_for_confirmation": not blockers and not final_approved,
         "can_complete": not blockers and final_approved,
         "final_approved": final_approved,
         "completed": len(completed), "total": len(applicable), "remaining": len(blockers),

@@ -26,6 +26,8 @@ export interface ProjectProfile {
   fields: ProjectFieldProgress[];
   completion: {
     percentage: number;
+    required_fields_complete: boolean;
+    ready_for_confirmation: boolean;
     can_complete: boolean;
     final_approved: boolean;
     completed: number;
@@ -65,6 +67,7 @@ export interface ProjectSource {
   id: string; kind: string; status: 'processing' | 'ready' | 'failed'; name: string;
   url: string | null; mime_type: string | null; size_bytes: number | null; error_message: string | null;
   message_id: string | null; download_url: string | null;
+  is_primary: boolean;
   proposals: SourceProposal[]; created_at: string; updated_at: string;
 }
 export interface ChatTurn {
@@ -74,7 +77,7 @@ export interface ChatTurn {
 }
 export interface OnboardingState {
   messages: ChatMessage[]; profile: ProjectProfile; sources: ProjectSource[];
-  next_question: NextQuestion; stage: 'website' | 'processing' | 'review' | 'conversation' | 'complete';
+  next_question: NextQuestion; stage: 'website' | 'processing' | 'review' | 'conversation' | 'awaiting_confirmation' | 'complete';
   version: number;
 }
 export interface NextQuestion {
@@ -95,7 +98,8 @@ export interface MetaConnection {
 export const EMPTY_PROJECT_PROFILE: ProjectProfile = {
   id: '', project_id: '', data: {}, fields: [], updated_at: null,
   completion: {
-    percentage: 0, can_complete: false, final_approved: false,
+    percentage: 0, required_fields_complete: false, ready_for_confirmation: false,
+    can_complete: false, final_approved: false,
     completed: 0, total: 0, remaining: 0, sections: [], blockers: [],
     sales_activation_status: 'not_ready', sales_activation_blockers: [],
   },
