@@ -84,11 +84,25 @@ jobs:
 
             start_worker() {
               local image="$1"
-              docker run -d --name bp_worker_prod --restart always \
-                --env-file backend/.env \
-                -v "${UPLOAD_DIR}:${UPLOAD_DIR}" \
-                "$image" \
-                python -m app.modules.onboarding_jobs.worker
+              local health_mode="${2:-legacy}"
+              if [ "$health_mode" = "healthcheck" ]; then
+                docker run -d --name bp_worker_prod --restart always \
+                  --health-cmd 'python -m app.modules.onboarding_jobs.healthcheck --max-age-seconds 180' \
+                  --health-interval 5s \
+                  --health-timeout 3s \
+                  --health-retries 3 \
+                  --health-start-period 20s \
+                  --env-file backend/.env \
+                  -v "${UPLOAD_DIR}:${UPLOAD_DIR}" \
+                  "$image" \
+                  python -m app.modules.onboarding_jobs.worker
+              else
+                docker run -d --name bp_worker_prod --restart always \
+                  --env-file backend/.env \
+                  -v "${UPLOAD_DIR}:${UPLOAD_DIR}" \
+                  "$image" \
+                  python -m app.modules.onboarding_jobs.worker
+              fi
             }
 
             start_frontend() {
@@ -137,6 +151,32 @@ jobs:
               docker logs --tail 150 bp_api_prod 2>&1 || true
               curl --silent --show-error --include \
                 http://127.0.0.1:8000/api/v1/health/ready || true
+              return 1
+            }
+
+            worker_diagnostics() {
+              docker inspect --format \
+                'running={{.State.Running}} status={{.State.Status}} exit={{.State.ExitCode}} restarting={{.State.Restarting}} restarts={{.RestartCount}} health={{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' \
+                bp_worker_prod 2>/dev/null || true
+              docker logs --tail 200 bp_worker_prod 2>&1 || true
+              docker exec bp_worker_prod python -c \
+                'from sqlalchemy import text; from app.db.postgres import SessionLocal; db=SessionLocal(); db.execute(text("SELECT 1")); db.close(); print("worker_database_connection=ok")' \
+                2>&1 || true
+            }
+
+            wait_for_worker_health() {
+              for attempt in $(seq 1 24); do
+                worker_health="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' bp_worker_prod 2>/dev/null || true)"
+                if [ "$worker_health" = "healthy" ]; then
+                  return 0
+                fi
+                if [ "$(docker inspect --format '{{.State.Running}}' bp_worker_prod 2>/dev/null || true)" != true ]; then
+                  break
+                fi
+                sleep 5
+              done
+              echo "Onboarding worker did not become healthy."
+              worker_diagnostics
               return 1
             }
 
@@ -239,6 +279,9 @@ jobs:
               -t "$FRONTEND_IMAGE" \
               ./frontend
 
+            # Docker creates the bind-mount directory when it does not exist.
+            # The write check runs as the same image user as API and worker and
+            # therefore needs neither sudo nor an interactive password.
             docker run --rm \
               --env-file backend/.env \
               "$API_IMAGE" \
@@ -250,9 +293,6 @@ jobs:
               python -c \
               "import inspect; from app.modules.company_onboarding.services import save_message; assert 'commit' in inspect.signature(save_message).parameters"
 
-            # Docker creates the bind-mount directory when it does not exist.
-            # The write check runs as the same image user as API and worker and
-            # therefore needs neither sudo nor an interactive password.
             docker run --rm \
               -v "${UPLOAD_DIR}:/uploads" \
               "$API_IMAGE" \
@@ -283,16 +323,20 @@ jobs:
                 python -m app.scripts.reconcile_onboarding_jobs --apply
             fi
 
-            start_worker "$API_IMAGE" >/dev/null
+            start_worker "$API_IMAGE" healthcheck >/dev/null
             wait_for_readiness
+            wait_for_worker_health
 
-            test "$(docker inspect --format '{{.State.Running}}' bp_worker_prod)" = true
             test "$(docker inspect --format '{{.State.Running}}' bp_frontend_prod)" = true
             test "$(docker inspect --format '{{.Config.Image}}' bp_api_prod)" = "$API_IMAGE"
             test "$(docker inspect --format '{{.Config.Image}}' bp_worker_prod)" = "$API_IMAGE"
 
-            sleep 5
-            test "$(docker inspect --format '{{.State.Running}}' bp_worker_prod)" = true
+            sleep 15
+            test "$(docker inspect --format '{{.State.Health.Status}}' bp_worker_prod)" = healthy || {
+              echo "Onboarding worker lost health during the stability window."
+              worker_diagnostics
+              false
+            }
 
             RELEASE_STARTED=false
             trap - ERR

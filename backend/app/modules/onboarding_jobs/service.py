@@ -4,6 +4,8 @@ import asyncio
 from datetime import datetime, timedelta
 import hashlib
 import logging
+import re
+import time
 from urllib.parse import urlsplit, urlunsplit
 
 from sqlalchemy.orm import Session
@@ -13,9 +15,26 @@ from app.db.postgres import SessionLocal
 from app.modules.onboarding_questions import build_next_question
 
 from .models import OnboardingSourceJob
+from .healthcheck import write_heartbeat
 
 logger = logging.getLogger(__name__)
 MAX_ATTEMPTS = 3
+
+
+def _safe_error_detail(value: object) -> str:
+    detail = str(value or "source_processing_failed")
+    detail = re.sub(r"https?://\S+", "<url>", detail, flags=re.IGNORECASE)
+    detail = re.sub(
+        r"(?i)(bearer\s+|sk-or-v1-)[a-z0-9._-]+",
+        lambda match: f"{match.group(1)}<redacted>",
+        detail,
+    )
+    return detail[:300]
+
+
+def _safe_exc_info(exc: Exception):
+    redacted = RuntimeError(f"{type(exc).__name__}: {_safe_error_detail(exc)}")
+    return type(redacted), redacted, exc.__traceback__
 
 
 def normalize_url(url: str) -> str:
@@ -113,11 +132,12 @@ def retry_job(db: Session, *, scope: str, source_id: str) -> OnboardingSourceJob
 async def run_worker(stop_event: asyncio.Event) -> None:
     while not stop_event.is_set():
         try:
-            await run_once()
+            await run_iteration()
         except Exception as exc:
             logger.error(
-                "onboarding_worker_iteration_failed",
-                extra={"error_type": type(exc).__name__},
+                "onboarding_worker_iteration_failed error_type=%s",
+                type(exc).__name__,
+                exc_info=_safe_exc_info(exc),
             )
         try:
             await asyncio.wait_for(stop_event.wait(), timeout=1.0)
@@ -125,10 +145,19 @@ async def run_worker(stop_event: asyncio.Event) -> None:
             pass
 
 
+async def run_iteration() -> bool:
+    processed = await run_once()
+    write_heartbeat()
+    return processed
+
+
 async def run_once() -> bool:
     db = SessionLocal()
     try:
         job = _claim(db)
+        # A successful claim query proves that the worker can reach PostgreSQL.
+        # Refresh before processing because scraping and LLM calls can take time.
+        write_heartbeat()
         if not job:
             return False
         await _process(db, job)
@@ -154,10 +183,19 @@ def _claim(db: Session) -> OnboardingSourceJob | None:
     job.started_at = now
     job.error_code = None
     db.add(job); db.commit(); db.refresh(job)
+    logger.info(
+        "onboarding_job_claimed job_id=%s scope=%s source_id=%s attempt=%s",
+        job.id, job.scope, job.source_id, job.attempts,
+    )
     return job
 
 
 async def _process(db: Session, job: OnboardingSourceJob) -> None:
+    started = time.monotonic()
+    logger.info(
+        "onboarding_job_started job_id=%s scope=%s source_id=%s attempt=%s",
+        job.id, job.scope, job.source_id, job.attempts,
+    )
     try:
         if job.scope == "company":
             await _process_company(db, job)
@@ -166,6 +204,11 @@ async def _process(db: Session, job: OnboardingSourceJob) -> None:
         else:
             raise ValueError("unknown_scope")
         job.status = "completed"; job.completed_at = datetime.utcnow(); job.error_detail = None
+        logger.info(
+            "onboarding_job_completed job_id=%s scope=%s source_id=%s attempt=%s duration_ms=%s",
+            job.id, job.scope, job.source_id, job.attempts,
+            int((time.monotonic() - started) * 1000),
+        )
     except Exception as exc:
         db.rollback()
         job = db.query(OnboardingSourceJob).filter(OnboardingSourceJob.id == job.id).first()
@@ -177,20 +220,16 @@ async def _process(db: Session, job: OnboardingSourceJob) -> None:
         if job.status == "failed":
             job.completed_at = datetime.utcnow()
             _mark_source_failed(db, job)
+            _save_terminal_failure_message(db, job)
         else:
             job.available_at = datetime.utcnow() + timedelta(seconds=2 ** job.attempts)
         logger.error(
-            "onboarding_job_failed",
-            extra={
-                "job_id": job.id,
-                "scope": job.scope,
-                "company_id": job.company_id,
-                "project_id": job.project_id,
-                "source_id": job.source_id,
-                "attempt": job.attempts,
-                "error_type": type(exc).__name__,
-                "final": job.status == "failed",
-            },
+            "onboarding_job_failed job_id=%s scope=%s source_id=%s attempt=%s "
+            "error_type=%s final=%s duration_ms=%s",
+            job.id, job.scope, job.source_id, job.attempts,
+            type(exc).__name__, job.status == "failed",
+            int((time.monotonic() - started) * 1000),
+            exc_info=_safe_exc_info(exc),
         )
     db.add(job)
     db.commit()
@@ -219,6 +258,47 @@ def _mark_source_failed(db: Session, job: OnboardingSourceJob) -> None:
         db.add(source)
 
 
+def _save_terminal_failure_message(db: Session, job: OnboardingSourceJob) -> None:
+    content = (
+        "I couldn't process that website after several attempts. "
+        "You can retry the source or continue the onboarding manually."
+    )
+    ui_payload = {
+        "kind": "source_processing_failed",
+        "source_id": job.source_id,
+        "actions": ["retry", "continue"],
+    }
+    try:
+        with db.begin_nested():
+            if job.scope == "company":
+                from app.modules.company_onboarding import services
+                from app.modules.company_onboarding.models import OnboardingSession, SenderType
+
+                session = db.query(OnboardingSession).filter(
+                    OnboardingSession.company_id == job.company_id
+                ).first()
+                if session:
+                    services.save_message(
+                        db, session.id, SenderType.AI, content,
+                        ui_payload=ui_payload, commit=False,
+                    )
+            elif job.scope == "project":
+                from app.modules.projects import services
+                from app.modules.projects.models import SenderType
+
+                project = services.get_project(db, job.project_id or "", job.company_id)
+                services.save_message(
+                    db, project.session.id, SenderType.AI, content,
+                    ui_payload=ui_payload, commit=False,
+                )
+    except Exception as exc:
+        logger.error(
+            "onboarding_terminal_message_failed job_id=%s scope=%s source_id=%s error_type=%s",
+            job.id, job.scope, job.source_id, type(exc).__name__,
+            exc_info=_safe_exc_info(exc),
+        )
+
+
 async def _process_company(db: Session, job: OnboardingSourceJob) -> None:
     from app.modules.company_onboarding import services, source_service
     from app.modules.company_onboarding.models import CompanyOnboardingSource, SenderType
@@ -232,7 +312,8 @@ async def _process_company(db: Session, job: OnboardingSourceJob) -> None:
         source.status = source.status.__class__.PROCESSING; source.error_message = None
         db.add(source); db.commit(); db.refresh(source)
     await source_service.process_url_source(db, source)
-    if source.status.value == "failed": raise ValueError("source_processing_failed")
+    if source.status.value == "failed":
+        raise ValueError(f"source_processing_failed: {_safe_error_detail(source.error_message)}")
     session = services.get_or_create_session(db, job.company_id)
     profile = services.get_or_create_profile(db, job.company_id)
     question = build_next_question(
@@ -261,7 +342,8 @@ async def _process_project(db: Session, job: OnboardingSourceJob) -> None:
         source.status = source.status.__class__.PROCESSING; source.error_message = None
         db.add(source); db.commit(); db.refresh(source)
     await source_service.process_url_source(db, source)
-    if source.status.value == "failed": raise ValueError("source_processing_failed")
+    if source.status.value == "failed":
+        raise ValueError(f"source_processing_failed: {_safe_error_detail(source.error_message)}")
     profile = services.get_profile(project)
     question = build_next_question(
         services.serialize_profile(profile)["completion"]["blockers"],
