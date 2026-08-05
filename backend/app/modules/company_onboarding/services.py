@@ -86,12 +86,39 @@ def get_or_create_session(db: Session, company_id: str) -> OnboardingSession:
     return session
 
 
-def save_message(db: Session, session_id: str, sender: SenderType, content: str) -> OnboardingMessage:
-    message = OnboardingMessage(session_id=session_id, sender=sender, content=content)
+def save_message(
+    db: Session, session_id: str, sender: SenderType, content: str, *,
+    ui_payload: dict[str, Any] | None = None,
+    in_reply_to_message_id: str | None = None,
+) -> OnboardingMessage:
+    message = OnboardingMessage(
+        session_id=session_id, sender=sender, content=content,
+        ui_payload=ui_payload, in_reply_to_message_id=in_reply_to_message_id,
+    )
     db.add(message)
     db.commit()
     db.refresh(message)
     return message
+
+
+def record_message_response(db: Session, session_id: str, message_id: str | None, answer: str) -> None:
+    if not message_id:
+        return
+    message = db.query(OnboardingMessage).filter(
+        OnboardingMessage.id == message_id,
+        OnboardingMessage.session_id == session_id,
+        OnboardingMessage.sender == SenderType.AI,
+    ).first()
+    if not message or message.response_payload:
+        return
+    choices = ((message.ui_payload or {}).get("options") or (message.ui_payload or {}).get("examples") or [])
+    selected = next((item for item in choices if str(item).casefold() == answer.strip().casefold()), None)
+    message.response_payload = {
+        "status": "answered", "answer": answer.strip(),
+        "selected_option": selected, "custom": selected is None,
+    }
+    db.add(message)
+    db.commit()
 
 
 def seed_legacy_values(profile: CompanyProfile) -> None:

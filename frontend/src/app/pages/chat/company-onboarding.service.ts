@@ -42,8 +42,8 @@ export class CompanyOnboardingService {
     return this.http.get<OnboardingState>(`${this.baseUrl}/chat/state`);
   }
 
-  sendMessage(message: string): Observable<ChatTurnResponse> {
-    return this.http.post<ChatTurnResponse>(`${this.baseUrl}/chat`, { message });
+  sendMessage(message: string, inReplyToMessageId?: string | null): Observable<ChatTurnResponse> {
+    return this.http.post<ChatTurnResponse>(`${this.baseUrl}/chat`, { message, in_reply_to_message_id: inReplyToMessageId || null });
   }
 
   getSources(): Observable<OnboardingSource[]> {

@@ -1,14 +1,15 @@
 <section *ngIf="choices.length || question.allow_custom" class="question-options" aria-label="Suggested responses">
-  <p class="question-prompt">{{ question.prompt }}</p>
+  <p *ngIf="showPrompt && !answered" class="question-prompt">{{ question.prompt }}</p>
   <div class="choice-list" [class.choice-list--examples]="!question.options.length">
     <button
       *ngFor="let choice of choices"
       type="button"
       class="choice"
+      [class.choice--selected]="choice === selectedChoice"
       [disabled]="disabled"
       (click)="selected.emit(choice)"
     >
-      {{ choice }}
+      <span *ngIf="choice === selectedChoice" class="material-symbols-outlined">check</span>{{ choice }}
     </button>
     <button
       *ngIf="question.allow_custom"

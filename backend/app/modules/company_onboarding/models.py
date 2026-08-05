@@ -94,6 +94,9 @@ class OnboardingMessage(Base):
     session_id = Column(String(36), ForeignKey("onboarding_sessions.id", ondelete="CASCADE"), nullable=False)
     sender = Column(SqlaEnum(SenderType), nullable=False)
     content = Column(Text, nullable=False)
+    ui_payload = Column(JSON, nullable=True)
+    response_payload = Column(JSON, nullable=True)
+    in_reply_to_message_id = Column(String(36), ForeignKey("onboarding_messages.id", ondelete="SET NULL"), nullable=True, index=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     session = relationship("OnboardingSession", back_populates="messages")

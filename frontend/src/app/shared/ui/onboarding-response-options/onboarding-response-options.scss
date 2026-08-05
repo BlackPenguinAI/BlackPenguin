@@ -1,4 +1,4 @@
-.question-options { margin: .75rem 0 0 2.75rem; max-width: 46rem; }
+.question-options { margin: .75rem 0 0; max-width: 46rem; }
 .question-prompt { margin-bottom: .55rem; color: #9ca3af; font-size: .72rem; }
 .choice-list { display: flex; flex-wrap: wrap; gap: .45rem; }
 .choice-list--examples { flex-direction: column; align-items: flex-start; }
@@ -7,6 +7,13 @@
   background: rgba(233,158,16,.08); padding: .48rem .78rem; color: #f5c96e;
   font-size: .72rem; text-align: left; transition: background 150ms, border-color 150ms;
 }
+.choice--selected, .choice--selected:disabled {
+  border-color: rgba(233, 158, 16, .8);
+  background: rgba(233, 158, 16, .16);
+  color: #f3b43b;
+  opacity: 1;
+}
+.choice .material-symbols-outlined { margin-right: .25rem; font-size: 15px; vertical-align: middle; }
 .choice:hover:not(:disabled) { border-color: rgba(233,158,16,.7); background: rgba(233,158,16,.16); }
 .choice:disabled { cursor: not-allowed; opacity: .45; }
 .choice-list--examples .choice { border-radius: .75rem; line-height: 1.35; }

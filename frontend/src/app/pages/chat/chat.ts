@@ -15,7 +15,8 @@ import { marked } from 'marked';
 import { Subscription } from 'rxjs';
 
 import { SpeechRecognitionService } from '../../core/services/speech-recognition.service';
-import { OnboardingResponseOptionsComponent, OnboardingQuestion } from '../../shared/ui/onboarding-response-options/onboarding-response-options';
+import { OnboardingQuestion } from '../../shared/ui/onboarding-response-options/onboarding-response-options';
+import { OnboardingAiMessageComponent } from '../../shared/ui/onboarding-ai-message/onboarding-ai-message';
 import { OnboardingWelcomeComponent } from '../../shared/ui/onboarding-welcome/onboarding-welcome';
 
 import {
@@ -36,7 +37,7 @@ import { CompanyOnboardingService } from './company-onboarding.service';
 @Component({
   selector: 'app-chat',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, TranslateModule, OnboardingResponseOptionsComponent, OnboardingWelcomeComponent],
+  imports: [CommonModule, FormsModule, RouterModule, TranslateModule, OnboardingAiMessageComponent, OnboardingWelcomeComponent],
   templateUrl: './chat.html',
   styleUrl: './chat.scss',
 })
@@ -61,6 +62,9 @@ export class ChatComponent implements OnInit, OnDestroy {
   private readonly speechSubscriptions = new Subscription();
   private speechBase = '';
   private pollingTimer?: ReturnType<typeof setTimeout>;
+  private replyToMessageId: string | null = null;
+  private lastStateVersion = 0;
+  private pollingStartedAt = 0;
 
   constructor(
     private readonly translate: TranslateService,
@@ -147,6 +151,7 @@ export class ChatComponent implements OnInit, OnDestroy {
       next: (turn) => {
         this.applyTurn(turn);
         this.isAnalyzing = false;
+        this.schedulePolling();
         this.scrollToBottom();
       },
       error: (error: HttpErrorResponse) => {
@@ -162,13 +167,17 @@ export class ChatComponent implements OnInit, OnDestroy {
     this.showWelcome = false;
     this.isAnalyzing = true;
     this.onboarding.bootstrap(url).subscribe({
-      next: (turn) => { this.applyTurn(turn); this.isAnalyzing = false; this.scrollToBottom(); },
+      next: (turn) => { this.applyTurn(turn); this.isAnalyzing = false; this.schedulePolling(); this.scrollToBottom(); },
       error: () => { this.showWelcome = true; this.isAnalyzing = false; this.errorMessage = 'The website could not be processed. You can retry or continue without it.'; },
     });
   }
 
-  chooseAnswer(value: string): void { this.prompt = value; }
-  writeCustomAnswer(): void { this.prompt = ''; }
+  chooseAnswer(value: string, message?: ChatMessage): void { this.prompt = value; this.replyToMessageId = message?.id || null; }
+  writeCustomAnswer(message?: ChatMessage): void { this.prompt = ''; this.replyToMessageId = message?.id || null; }
+  isActiveQuestion(message: ChatMessage): boolean {
+    return message.sender === 'ai' && !!message.ui_payload && !message.response_payload
+      && this.messages.filter((item) => item.sender === 'ai' && !!item.ui_payload && !item.response_payload).at(-1) === message;
+  }
 
   fieldsByRequirement(requirement: Requirement): CompanyFieldProgress[] {
     return this.profile.fields.filter((field) => field.requirement === requirement);
@@ -237,9 +246,12 @@ export class ChatComponent implements OnInit, OnDestroy {
     this.scrollToBottom();
 
     this.errorMessage = '';
-    this.onboarding.sendMessage(content).subscribe({
+    const replyTo = this.replyToMessageId;
+    this.replyToMessageId = null;
+    this.onboarding.sendMessage(content, replyTo).subscribe({
         next: (turn) => {
           this.messages = this.messages.filter((message) => message !== optimistic);
+          this.markReply(replyTo, content);
           this.applyTurn(turn);
           this.isAnalyzing = false;
           this.scrollToBottom();
@@ -248,6 +260,7 @@ export class ChatComponent implements OnInit, OnDestroy {
           this.messages = this.messages.filter((message) => message !== optimistic);
           this.prompt = content;
           this.isAnalyzing = false;
+          this.replyToMessageId = replyTo;
           this.errorMessage = 'I could not send that message. Your profile was not changed.';
           this.cdr.detectChanges();
         },
@@ -399,6 +412,8 @@ export class ChatComponent implements OnInit, OnDestroy {
   }
 
   private applyState(state: OnboardingState): void {
+    if (state.version < this.lastStateVersion) return;
+    this.lastStateVersion = state.version;
     this.messages = [...state.messages];
     this.profile = state.profile;
     this.sources = this.prepareSources(state.sources);
@@ -406,9 +421,8 @@ export class ChatComponent implements OnInit, OnDestroy {
     this.isCompleted = state.profile.completion.can_complete;
     this.showWelcome = state.stage === 'website';
     if (this.pollingTimer) clearTimeout(this.pollingTimer);
-    if (state.stage === 'processing') {
-      this.pollingTimer = setTimeout(() => this.syncState(), 2500);
-    }
+    if (state.stage === 'processing') this.schedulePolling();
+    else this.pollingStartedAt = 0;
     this.cdr.detectChanges();
   }
 
@@ -425,7 +439,25 @@ export class ChatComponent implements OnInit, OnDestroy {
     this.isCompleted = turn.profile.completion.can_complete;
     this.nextQuestion = turn.next_question;
     this.mergeSources(turn.sources);
+    if (turn.sources.some((source) => source.status === 'processing')) this.schedulePolling();
     this.cdr.detectChanges();
+  }
+
+  private schedulePolling(): void {
+    if (this.pollingTimer) clearTimeout(this.pollingTimer);
+    if (!this.pollingStartedAt) this.pollingStartedAt = Date.now();
+    const delay = Date.now() - this.pollingStartedAt > 30_000 ? 5000 : 2000;
+    this.pollingTimer = setTimeout(() => this.syncState(true), delay);
+  }
+
+  private markReply(messageId: string | null, answer: string): void {
+    if (!messageId) return;
+    this.messages = this.messages.map((message) => {
+      if (message.id !== messageId || !message.ui_payload) return message;
+      const choices = message.ui_payload.options.length ? message.ui_payload.options : message.ui_payload.examples;
+      const selected = choices.find((item) => item.toLocaleLowerCase() === answer.toLocaleLowerCase()) || null;
+      return { ...message, response_payload: { status: 'answered', answer, selected_option: selected, custom: !selected } };
+    });
   }
 
   private updateProposal(sourceId: string, proposalId: string, patch: Partial<SourceProposal>): void {

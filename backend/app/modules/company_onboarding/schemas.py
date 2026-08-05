@@ -88,6 +88,7 @@ class CompanyProfilePatch(BaseModel):
 
 class ChatMessagePayload(BaseModel):
     message: str = Field(min_length=1, max_length=20000)
+    in_reply_to_message_id: str | None = None
 
 
 class ChatAttachmentResponse(BaseModel):
@@ -107,6 +108,9 @@ class ChatMessageResponse(BaseModel):
     content: str
     created_at: datetime
     attachments: list[ChatAttachmentResponse] = Field(default_factory=list)
+    ui_payload: dict[str, Any] | None = None
+    response_payload: dict[str, Any] | None = None
+    in_reply_to_message_id: str | None = None
 
 
 class NextQuestionResponse(BaseModel):

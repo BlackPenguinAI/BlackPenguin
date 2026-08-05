@@ -1,0 +1,1 @@
+"""Tenant-safe dashboard metrics."""

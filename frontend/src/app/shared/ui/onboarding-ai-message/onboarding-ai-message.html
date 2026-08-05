@@ -1,0 +1,29 @@
+<div class="ai-row">
+  <div class="avatar"><span class="material-symbols-outlined">smart_toy</span></div>
+  <div class="message-column">
+    <article class="bubble">
+      <div class="assistant-markdown" [innerHTML]="renderMarkdown(message.content)"></div>
+      <app-onboarding-response-options
+        *ngIf="message.ui_payload"
+        [question]="message.ui_payload"
+        [disabled]="disabled || !active || !!message.response_payload"
+        [selectedChoice]="message.response_payload?.selected_option || null"
+        [answered]="!!message.response_payload"
+        [showPrompt]="false"
+        (selected)="selected.emit($event)"
+        (custom)="custom.emit()"
+      ></app-onboarding-response-options>
+      <div *ngIf="message.response_payload?.custom" class="custom-answer">
+        <span class="material-symbols-outlined">check_circle</span>
+        Custom answer: {{ message.response_payload?.answer }}
+      </div>
+    </article>
+    <div class="meta-row">
+      <span>{{ message.created_at | date: 'dd/MM/yyyy HH:mm' }}</span>
+      <button type="button" (click)="toggleSpeech()" [disabled]="!speech.isSupported" [title]="isSpeaking && speechState === 'paused' ? 'Resume audio' : isSpeaking ? 'Pause audio' : 'Play audio'">
+        <span class="material-symbols-outlined">{{ isSpeaking && speechState === 'playing' ? 'pause' : 'volume_up' }}</span>
+      </button>
+      <button *ngIf="isSpeaking" type="button" (click)="stopSpeech()" title="Stop audio"><span class="material-symbols-outlined">stop</span></button>
+    </div>
+  </div>
+</div>

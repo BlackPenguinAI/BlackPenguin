@@ -22,10 +22,13 @@ export class ProjectOnboardingService {
   complete(id: string): Observable<{ completed: boolean; redirect_url: string; profile: ProjectProfile }> {
     return this.http.post<{ completed: boolean; redirect_url: string; profile: ProjectProfile }>(`${this.baseUrl}/${id}/onboarding/complete`, {});
   }
-  sendMessage(id: string, message: string): Observable<ChatTurn> { return this.http.post<ChatTurn>(`${this.baseUrl}/${id}/chat`, { message }); }
-  sendMessageWithFiles(id: string, message: string, files: File[]): Observable<ChatTurn> {
+  sendMessage(id: string, message: string, inReplyToMessageId?: string | null): Observable<ChatTurn> {
+    return this.http.post<ChatTurn>(`${this.baseUrl}/${id}/chat`, { message, in_reply_to_message_id: inReplyToMessageId || null });
+  }
+  sendMessageWithFiles(id: string, message: string, files: File[], inReplyToMessageId?: string | null): Observable<ChatTurn> {
     const body = new FormData();
     body.append('message', message);
+    if (inReplyToMessageId) body.append('in_reply_to_message_id', inReplyToMessageId);
     files.forEach((file) => body.append('files', file, file.name));
     return this.http.post<ChatTurn>(`${this.baseUrl}/${id}/chat/with-files`, body);
   }

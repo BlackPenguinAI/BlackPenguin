@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware 
@@ -18,13 +19,22 @@ from app.modules.company_onboarding.router import router as company_onboarding_r
 from app.modules.projects.router import router as projects_router
 from app.modules.brokers.router import router as brokers_router
 from app.modules.sales_crm.router import router as sales_crm_router
+from app.modules.dashboard.router import router as dashboard_router
+from app.modules.dashboard.legacy_router import router as legacy_dashboard_router
+from app.modules.onboarding_jobs.service import run_worker
 
 from sqlalchemy import text
 from app.db.postgres import engine
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    yield
+    stop_event = asyncio.Event()
+    worker = asyncio.create_task(run_worker(stop_event))
+    try:
+        yield
+    finally:
+        stop_event.set()
+        await worker
 
 app = FastAPI(
     title=settings.PROJECT_NAME, 
@@ -73,6 +83,8 @@ app.include_router(brokers_router, prefix=f"{settings.API_V1_STR}/brokers", tags
 
 # 5. CRM, Agente de Ventas y Citas
 app.include_router(sales_crm_router, prefix=f"{settings.API_V1_STR}/sales", tags=["11. CRM & Ventas"])
+app.include_router(dashboard_router, prefix=f"{settings.API_V1_STR}/dashboard", tags=["12. Dashboard"])
+app.include_router(legacy_dashboard_router, prefix=f"{settings.API_V1_STR}/tenants", tags=["12. Dashboard"])
 
 @app.get("/", tags=["Health"])
 def health_check():

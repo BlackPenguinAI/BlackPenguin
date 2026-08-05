@@ -76,6 +76,38 @@ def get_profile(project: Project) -> ProjectProfile:
     return project.profile
 
 
+def save_message(
+    db: Session, session_id: str, sender: SenderType, content: str, *,
+    ui_payload: dict[str, Any] | None = None,
+    in_reply_to_message_id: str | None = None,
+) -> ProjectMessage:
+    message = ProjectMessage(
+        session_id=session_id, sender=sender, content=content,
+        ui_payload=ui_payload, in_reply_to_message_id=in_reply_to_message_id,
+    )
+    db.add(message); db.commit(); db.refresh(message)
+    return message
+
+
+def record_message_response(db: Session, session_id: str, message_id: str | None, answer: str) -> None:
+    if not message_id:
+        return
+    message = db.query(ProjectMessage).filter(
+        ProjectMessage.id == message_id,
+        ProjectMessage.session_id == session_id,
+        ProjectMessage.sender == SenderType.AI,
+    ).first()
+    if not message or message.response_payload:
+        return
+    choices = ((message.ui_payload or {}).get("options") or (message.ui_payload or {}).get("examples") or [])
+    selected = next((item for item in choices if str(item).casefold() == answer.strip().casefold()), None)
+    message.response_payload = {
+        "status": "answered", "answer": answer.strip(),
+        "selected_option": selected, "custom": selected is None,
+    }
+    db.add(message); db.commit()
+
+
 def seed_legacy_values(profile: ProjectProfile) -> None:
     mapping = {
         "typologies": "typologies", "amenities": "amenities", "construction_details": "construction_details",
@@ -302,6 +334,9 @@ def serialize_message(message: ProjectMessage) -> dict[str, Any]:
         "id": message.id,
         "sender": "user" if message.sender == SenderType.USER else "ai",
         "content": message.content,
+        "ui_payload": message.ui_payload,
+        "response_payload": message.response_payload,
+        "in_reply_to_message_id": message.in_reply_to_message_id,
         "created_at": message.created_at,
         "attachments": [serialize_attachment(source) for source in message.attachments],
     }

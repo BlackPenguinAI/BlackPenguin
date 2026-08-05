@@ -15,6 +15,8 @@ from app.modules.ai_core.services import get_ai_config
 from app.modules.auth.deps import RoleChecker
 from app.modules.companies.models import Company
 from app.modules.onboarding_questions import build_next_question
+from app.modules.onboarding_jobs import service as job_service
+from app.modules.onboarding_jobs.models import OnboardingSourceJob
 from app.modules.users.models import User, UserRole
 
 from . import services, source_service, storage_service
@@ -77,6 +79,9 @@ def _message_payload(message: OnboardingMessage) -> dict[str, Any]:
         "id": message.id,
         "sender": "user" if message.sender == SenderType.USER else "ai",
         "content": message.content,
+        "ui_payload": message.ui_payload,
+        "response_payload": message.response_payload,
+        "in_reply_to_message_id": message.in_reply_to_message_id,
         "created_at": message.created_at,
         "attachments": [
             {
@@ -91,10 +96,7 @@ def _message_payload(message: OnboardingMessage) -> dict[str, Any]:
 
 
 def _next_prompt(profile) -> str:
-    question = _next_question(profile)
-    choices = question["options"] or question["examples"]
-    suffix = "\n\n" + "\n".join(f"- {item}" for item in choices) if choices else ""
-    return question["prompt"] + suffix
+    return _next_question(profile)["prompt"]
 
 
 def _next_question(profile) -> dict[str, Any]:
@@ -138,7 +140,16 @@ def _state_payload(db: Session, company_id: str) -> dict[str, Any]:
         .all()
     )
     serialized_profile = services.serialize_profile(profile)
-    processing = any(source.status.value == "processing" for source in sources)
+    processing = any(source.status.value == "processing" for source in sources) or db.query(OnboardingSourceJob).filter(
+        OnboardingSourceJob.scope == "company",
+        OnboardingSourceJob.company_id == company_id,
+        OnboardingSourceJob.status.in_(["queued", "processing"]),
+    ).first() is not None
+    if not processing:
+        latest_ai = next((item for item in reversed(messages) if item.sender == SenderType.AI), None)
+        if latest_ai and not latest_ai.ui_payload and not latest_ai.response_payload:
+            latest_ai.ui_payload = _next_question(profile)
+            db.add(latest_ai); db.commit(); db.refresh(latest_ai)
     pending_review = any(
         proposal.status.value == "pending"
         for source in sources
@@ -229,7 +240,7 @@ def get_chat_state(
     return _state_payload(db, current_user.company_id)
 
 
-@router.post("/chat/bootstrap", response_model=ChatTurnResponse)
+@router.post("/chat/bootstrap", response_model=ChatTurnResponse, status_code=202)
 async def bootstrap_chat(
     payload: ChatBootstrapRequest,
     db: Session = Depends(get_db),
@@ -271,9 +282,27 @@ async def bootstrap_chat(
             "next_question": _next_question(profile),
         }
     if payload.initial_url and not payload.skip_website:
-        return await send_chat_message(
-            ChatMessagePayload(message=str(payload.initial_url)), db, current_user,
+        profile = services.get_or_create_profile(db, current_user.company_id)
+        url = str(payload.initial_url)
+        user_message = services.save_message(db, session.id, SenderType.USER, url)
+        source = source_service.create_url_source(
+            db, company_id=current_user.company_id, user_id=current_user.id,
+            url=url, message_id=user_message.id,
         )
+        job = job_service.enqueue(
+            db, scope="company", company_id=current_user.company_id,
+            source_id=source.id, url=url, session_id=session.id, message_id=user_message.id,
+        )
+        source = job_service.deduplicate_source(db, job, source)
+        status_message = services.save_message(
+            db, session.id, SenderType.AI,
+            f"I'm processing **{source.name}** now. You can keep this page open or return later; the result will appear automatically.",
+        )
+        return {
+            "message": _message_payload(status_message), "user_message": _message_payload(user_message),
+            "profile": services.serialize_profile(profile), "accepted_fields": [], "rejected_updates": [],
+            "sources": [source_service.serialize_source(source)], "next_question": _next_question(profile),
+        }
     return start_chat(db, current_user)
 
 
@@ -312,7 +341,7 @@ def start_chat(
                 "you complete a long form.\n\nWhat is the **official company name**? You can also paste a website "
                 "or social profile, or attach one or more supporting documents."
             )
-        message = services.save_message(db, session.id, SenderType.AI, intro)
+        message = services.save_message(db, session.id, SenderType.AI, intro, ui_payload=_next_question(profile))
     return {
         "message": _message_payload(message),
         "profile": services.serialize_profile(profile),
@@ -335,7 +364,11 @@ async def send_chat_message(
     if not ai_config.openrouter_api_key:
         raise HTTPException(status_code=500, detail="AI configuration is incomplete.")
 
-    user_message = services.save_message(db, session.id, SenderType.USER, payload.message)
+    services.record_message_response(db, session.id, payload.in_reply_to_message_id, payload.message)
+    user_message = services.save_message(
+        db, session.id, SenderType.USER, payload.message,
+        in_reply_to_message_id=payload.in_reply_to_message_id,
+    )
     deterministic = services.deterministic_context_update(payload.message, profile)
     deterministic_result = services.apply_field_updates(
         db,
@@ -349,15 +382,19 @@ async def send_chat_message(
     for raw_url in URL_PATTERN.findall(payload.message)[:3]:
         url = raw_url.rstrip(".,;:!?)\"]}")
         try:
-            source_results.append(
-                await source_service.ingest_url(
+            source = source_service.create_url_source(
                     db,
                     company_id=current_user.company_id,
                     user_id=current_user.id,
                     url=url,
                     message_id=user_message.id,
                 )
+            job = job_service.enqueue(
+                db, scope="company", company_id=current_user.company_id, source_id=source.id,
+                url=url, session_id=session.id, message_id=user_message.id,
             )
+            source = job_service.deduplicate_source(db, job, source)
+            source_results.append(source)
         except HTTPException as exc:
             source_errors.append({"url": url, "error": exc.detail})
 
@@ -457,7 +494,10 @@ async def send_chat_message(
             "I understood your response, but I couldn't safely apply it to the profile. "
             "Nothing was changed. " + _next_prompt(profile)
         )
-    ai_message = services.save_message(db, session.id, SenderType.AI, assistant_text)
+    ai_message = services.save_message(
+        db, session.id, SenderType.AI, assistant_text,
+        ui_payload=_next_question(profile),
+    )
     return {
         "message": _message_payload(ai_message),
         "user_message": _message_payload(user_message),
@@ -506,18 +546,24 @@ def download_source_file(
     )
 
 
-@router.post("/sources/url", response_model=SourceResponse)
+@router.post("/sources/url", response_model=SourceResponse, status_code=202)
 async def add_url_source(
     payload: ScrapeRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker([UserRole.ADMIN])),
 ):
-    source = await source_service.ingest_url(
+    session = services.get_or_create_session(db, current_user.company_id)
+    source = source_service.create_url_source(
         db,
         company_id=current_user.company_id,
         user_id=current_user.id,
         url=str(payload.url),
     )
+    job = job_service.enqueue(
+        db, scope="company", company_id=current_user.company_id, source_id=source.id,
+        url=str(payload.url), session_id=session.id,
+    )
+    source = job_service.deduplicate_source(db, job, source)
     return source_service.serialize_source(source)
 
 

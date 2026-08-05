@@ -56,15 +56,28 @@ def validate_public_url(url: str) -> None:
 async def ingest_url(
     db: Session, *, project_id: str, user_id: str, url: str, message_id: str | None = None,
 ) -> ProjectOnboardingSource:
+    source = create_url_source(db, project_id=project_id, user_id=user_id, url=url, message_id=message_id)
+    return await process_url_source(db, source)
+
+
+def create_url_source(
+    db: Session, *, project_id: str, user_id: str, url: str, message_id: str | None = None,
+) -> ProjectOnboardingSource:
     validate_public_url(url)
     source = ProjectOnboardingSource(
         project_id=project_id, message_id=message_id, uploaded_by_user_id=user_id, kind=ProjectSourceKind.URL,
         status=ProjectSourceStatus.PROCESSING, name=(urlparse(url).hostname or url)[:255], url=url,
     )
     db.add(source); db.commit(); db.refresh(source)
+    return source
+
+
+async def process_url_source(db: Session, source: ProjectOnboardingSource) -> ProjectOnboardingSource:
+    if source.status != ProjectSourceStatus.PROCESSING or not source.url:
+        return source
     try:
         async with httpx.AsyncClient(follow_redirects=False) as client:
-            response = await _get_public_url(client, url)
+            response = await _get_public_url(client, source.url)
             response.raise_for_status()
             content_type = response.headers.get("content-type", "").split(";", 1)[0].lower()
             source.url, source.mime_type, source.size_bytes = str(response.url), content_type, len(response.content)

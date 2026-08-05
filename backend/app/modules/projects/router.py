@@ -15,6 +15,8 @@ from app.modules.ai_core.services import get_ai_config
 from app.modules.auth.deps import RoleChecker
 from app.modules.company_onboarding.models import CompanyProfile
 from app.modules.onboarding_questions import build_next_question
+from app.modules.onboarding_jobs import service as job_service
+from app.modules.onboarding_jobs.models import OnboardingSourceJob
 from app.modules.users.models import User, UserRole
 
 from . import meta_service, services, source_service, storage_service
@@ -58,10 +60,7 @@ def _message(message: ProjectMessage) -> dict[str, Any]:
 
 
 def _next_prompt(profile) -> str:
-    question = _next_question(profile)
-    choices = question["options"] or question["examples"]
-    suffix = "\n\n" + "\n".join(f"- {item}" for item in choices) if choices else ""
-    return question["prompt"] + suffix
+    return _next_question(profile)["prompt"]
 
 
 def _next_question(profile) -> dict[str, Any]:
@@ -90,7 +89,17 @@ def _state_payload(db: Session, project: Project) -> dict[str, Any]:
     serialized_profile = services.serialize_profile(profile)
     ready_for_confirmation, _ = services.readiness_for_confirmation(db, project)
     serialized_profile["completion"]["ready_for_confirmation"] = ready_for_confirmation and not profile.final_approved
-    processing = any(source.status.value == "processing" for source in sources)
+    processing = any(source.status.value == "processing" for source in sources) or db.query(OnboardingSourceJob).filter(
+        OnboardingSourceJob.scope == "project",
+        OnboardingSourceJob.project_id == project.id,
+        OnboardingSourceJob.company_id == project.company_id,
+        OnboardingSourceJob.status.in_(["queued", "processing"]),
+    ).first() is not None
+    if not processing:
+        latest_ai = next((item for item in reversed(messages) if item.sender == SenderType.AI), None)
+        if latest_ai and not latest_ai.ui_payload and not latest_ai.response_payload:
+            latest_ai.ui_payload = _next_question(profile)
+            db.add(latest_ai); db.commit(); db.refresh(latest_ai)
     pending_review = any(
         proposal.status.value == "pending"
         for source in sources
@@ -196,7 +205,10 @@ async def _complete_chat_turn(
         assistant_text = "I validated and updated: " + ", ".join(f"**{label}**" for label in labels) + ".\n\n" + _next_prompt(profile)
     elif result.rejected:
         assistant_text = "I couldn't safely apply that information, so nothing was changed. " + _next_prompt(profile)
-    ai_message = services.save_message(db, project.session.id, SenderType.AI, assistant_text)
+    ai_message = services.save_message(
+        db, project.session.id, SenderType.AI, assistant_text,
+        ui_payload=_next_question(profile),
+    )
     db.refresh(user_message)
     return {
         "message": _message(ai_message),
@@ -354,7 +366,7 @@ def get_chat_state(
     return _state_payload(db, project)
 
 
-@router.post("/{project_id}/chat/bootstrap", response_model=ChatTurnResponse)
+@router.post("/{project_id}/chat/bootstrap", response_model=ChatTurnResponse, status_code=202)
 async def bootstrap_chat(
     project_id: str,
     payload: ChatBootstrapRequest,
@@ -397,9 +409,26 @@ async def bootstrap_chat(
             "next_question": _next_question(profile),
         }
     if payload.initial_url and not payload.skip_website:
-        return await send_chat(
-            project_id, ChatMessagePayload(message=str(payload.initial_url)), db, current_user,
+        profile = services.get_profile(project)
+        url = str(payload.initial_url)
+        user_message = services.save_message(db, project.session.id, SenderType.USER, url)
+        source = source_service.create_url_source(
+            db, project_id=project.id, user_id=current_user.id, url=url, message_id=user_message.id,
         )
+        job = job_service.enqueue(
+            db, scope="project", company_id=current_user.company_id, project_id=project.id,
+            source_id=source.id, url=url, session_id=project.session.id, message_id=user_message.id,
+        )
+        source = job_service.deduplicate_source(db, job, source)
+        status_message = services.save_message(
+            db, project.session.id, SenderType.AI,
+            f"I'm processing **{source.name}** now. You can keep this page open or return later; the result will appear automatically.",
+        )
+        return {
+            "message": _message(status_message), "user_message": _message(user_message),
+            "profile": services.serialize_profile(profile), "accepted_fields": [], "rejected_updates": [],
+            "sources": [source_service.serialize_source(source)], "next_question": _next_question(profile),
+        }
     return start_chat(project_id, db, current_user)
 
 
@@ -418,22 +447,35 @@ def start_chat(project_id: str, db: Session = Depends(get_db), current_user: Use
             f"Welcome, **{first_name}**. I'll help you prepare **{project.name}** as a reliable Project Profile and then verify what is still needed for sales activation.\n\n"
             f"I already have the details used when this project was created. {_next_prompt(profile)} You can also paste a project URL or attach brochures, price lists, inventory spreadsheets, floor plans, or photos; extracted details will stay pending until you review them."
         )
-        message = services.save_message(db, project.session.id, SenderType.AI, intro)
+        message = services.save_message(
+            db, project.session.id, SenderType.AI, intro,
+            ui_payload=_next_question(profile),
+        )
     return {"message": _message(message), "profile": services.serialize_profile(profile), "accepted_fields": [], "rejected_updates": [], "sources": [], "next_question": _next_question(profile)}
 
 
 @router.post("/{project_id}/chat", response_model=ChatTurnResponse)
 async def send_chat(project_id: str, payload: ChatMessagePayload, db: Session = Depends(get_db), current_user: User = Depends(RoleChecker(EDITOR_ROLES))):
     project = services.get_project(db, project_id, current_user.company_id)
-    user_message = services.save_message(db, project.session.id, SenderType.USER, payload.message)
+    services.record_message_response(db, project.session.id, payload.in_reply_to_message_id, payload.message)
+    user_message = services.save_message(
+        db, project.session.id, SenderType.USER, payload.message,
+        in_reply_to_message_id=payload.in_reply_to_message_id,
+    )
     sources, source_errors = [], []
     for raw_url in URL_PATTERN.findall(payload.message)[:3]:
         url = raw_url.rstrip(".,;:!?)\"]}")
         try:
-            sources.append(await source_service.ingest_url(
+            source = source_service.create_url_source(
                 db, project_id=project.id, user_id=current_user.id, url=url,
                 message_id=user_message.id,
-            ))
+            )
+            job = job_service.enqueue(
+                db, scope="project", company_id=current_user.company_id, project_id=project.id,
+                source_id=source.id, url=url, session_id=project.session.id, message_id=user_message.id,
+            )
+            source = job_service.deduplicate_source(db, job, source)
+            sources.append(source)
         except HTTPException as exc:
             source_errors.append({"url": url, "error": exc.detail})
     return await _complete_chat_turn(
@@ -446,6 +488,7 @@ async def send_chat(project_id: str, payload: ChatMessagePayload, db: Session = 
 async def send_chat_with_files(
     project_id: str,
     message: str = Form(""),
+    in_reply_to_message_id: str | None = Form(None),
     files: list[UploadFile] = File(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker(EDITOR_ROLES)),
@@ -457,7 +500,11 @@ async def send_chat_with_files(
     if len(clean_message) > 20000:
         raise HTTPException(status_code=422, detail="The message is too long.")
     visible_message = clean_message or f"Attached {len(files)} project file{'s' if len(files) != 1 else ''}."
-    user_message = services.save_message(db, project.session.id, SenderType.USER, visible_message)
+    services.record_message_response(db, project.session.id, in_reply_to_message_id, visible_message)
+    user_message = services.save_message(
+        db, project.session.id, SenderType.USER, visible_message,
+        in_reply_to_message_id=in_reply_to_message_id,
+    )
     sources, source_errors = [], []
     for raw_url in URL_PATTERN.findall(clean_message)[:3]:
         url = raw_url.rstrip(".,;:!?)\"]}")
@@ -489,10 +536,16 @@ def list_sources(project_id: str, db: Session = Depends(get_db), current_user: U
     return [source_service.serialize_source(source) for source in sources]
 
 
-@router.post("/{project_id}/sources/url", response_model=SourceResponse)
+@router.post("/{project_id}/sources/url", response_model=SourceResponse, status_code=202)
 async def add_url(project_id: str, payload: UrlSourceRequest, db: Session = Depends(get_db), current_user: User = Depends(RoleChecker([UserRole.ADMIN]))):
-    services.get_project(db, project_id, current_user.company_id)
-    return source_service.serialize_source(await source_service.ingest_url(db, project_id=project_id, user_id=current_user.id, url=str(payload.url)))
+    project = services.get_project(db, project_id, current_user.company_id)
+    source = source_service.create_url_source(db, project_id=project_id, user_id=current_user.id, url=str(payload.url))
+    job = job_service.enqueue(
+        db, scope="project", company_id=current_user.company_id, project_id=project.id,
+        source_id=source.id, url=str(payload.url), session_id=project.session.id,
+    )
+    source = job_service.deduplicate_source(db, job, source)
+    return source_service.serialize_source(source)
 
 
 @router.post("/{project_id}/sources/files", response_model=list[SourceResponse])

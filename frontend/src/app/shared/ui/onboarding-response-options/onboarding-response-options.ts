@@ -22,6 +22,9 @@ export interface OnboardingQuestion {
 export class OnboardingResponseOptionsComponent {
   @Input({ required: true }) question!: OnboardingQuestion;
   @Input() disabled = false;
+  @Input() selectedChoice: string | null = null;
+  @Input() answered = false;
+  @Input() showPrompt = true;
   @Output() selected = new EventEmitter<string>();
   @Output() custom = new EventEmitter<void>();
 

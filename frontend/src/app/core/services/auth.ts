@@ -112,10 +112,4 @@ export class AuthService {
     );
   }
 
-  // Obtener estadísticas del Dashboard del Operador
-  getDashboardStats(): Observable<any> {
-    return this.http.get(`${this.apiUrl}/tenants/dashboard-stats`, this.getHeaders()).pipe(
-      catchError(this.handleError)
-    );
-  }
 }

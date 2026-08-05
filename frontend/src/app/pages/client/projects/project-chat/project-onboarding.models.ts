@@ -57,6 +57,9 @@ export interface ChatMessage {
   content: string;
   created_at: string | Date;
   attachments: ChatAttachment[];
+  ui_payload?: NextQuestion | null;
+  response_payload?: { status: string; answer: string; selected_option?: string | null; custom?: boolean } | null;
+  in_reply_to_message_id?: string | null;
 }
 export interface SourceProposal {
   id: string; field: string; label: string; value: unknown; evidence: string | null;

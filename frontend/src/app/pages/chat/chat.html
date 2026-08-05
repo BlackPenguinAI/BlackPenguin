@@ -24,21 +24,14 @@
         class="flex w-full"
         [ngClass]="msg.sender === 'user' ? 'justify-end' : 'justify-start'"
       >
-        <div *ngIf="msg.sender === 'ai'" class="flex max-w-[90%] gap-4 md:max-w-[80%]">
-          <div class="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-secondary/50 bg-secondary/20">
-            <span class="material-symbols-outlined text-[18px] text-secondary">smart_toy</span>
-          </div>
-          <div>
-            <div
-              class="assistant-markdown rounded-2xl rounded-tl-sm border border-white/10 bg-white/5 p-4 text-sm leading-relaxed text-gray-200"
-              [innerHTML]="renderMarkdown(msg.content)"
-            >
-            </div>
-            <span class="mt-1.5 block px-1 text-[10px] text-gray-500">
-              {{ msg.created_at | date: 'dd/MM/yyyy HH:mm' }}
-            </span>
-          </div>
-        </div>
+        <app-onboarding-ai-message
+          *ngIf="msg.sender === 'ai'"
+          [message]="msg"
+          [active]="isActiveQuestion(msg)"
+          [disabled]="isAnalyzing || isCompleted"
+          (selected)="chooseAnswer($event, msg)"
+          (custom)="writeCustomAnswer(msg)"
+        ></app-onboarding-ai-message>
 
         <div *ngIf="msg.sender === 'user'" class="flex max-w-[85%] flex-col items-end md:max-w-[80%]">
           <span class="mb-1 mr-2 text-[10px] text-gray-500">{{ userName }}</span>
@@ -102,14 +95,6 @@
           </article>
         </div>
       </details>
-
-      <app-onboarding-response-options
-        *ngIf="nextQuestion && messages.length"
-        [question]="nextQuestion"
-        [disabled]="isAnalyzing || isCompleted"
-        (selected)="chooseAnswer($event)"
-        (custom)="writeCustomAnswer()"
-      ></app-onboarding-response-options>
 
       <div *ngIf="isAnalyzing" class="flex max-w-[80%] gap-4">
         <div class="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-secondary/50 bg-secondary/20">
