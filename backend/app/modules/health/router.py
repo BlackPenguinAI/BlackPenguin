@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import inspect, text
 
+from app.core.config import settings
 from app.db.postgres import engine
 from app.db.schema import CURRENT_SCHEMA_VERSION
 
@@ -15,6 +16,15 @@ REQUIRED_COLUMNS = {
         "status", "attempts", "idempotency_key", "available_at",
     },
 }
+
+
+@router.get("/version")
+def version() -> dict[str, str]:
+    return {
+        "service": "api",
+        "commit": settings.APP_COMMIT_SHA,
+        "version": settings.VERSION,
+    }
 
 
 @router.get("/ready")
@@ -54,3 +64,4 @@ def readiness() -> dict[str, str]:
             },
         )
     return {"status": "ready", "schema_version": CURRENT_SCHEMA_VERSION}
+

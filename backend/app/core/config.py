@@ -1,10 +1,12 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+
 class Settings(BaseSettings):
     PROJECT_NAME: str = "Black Penguin Core API"
     VERSION: str = "2.0.0"
     API_V1_STR: str = "/api/v1"
-    
+    APP_COMMIT_SHA: str = "unknown"
+
     SECRET_KEY: str
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int
@@ -23,11 +25,8 @@ class Settings(BaseSettings):
     OPENROUTER_API_KEY: str
     DEFAULT_AI_MODEL: str = "deepseek/deepseek-chat"
 
-    # Persistent project documents live on a host-mounted volume in production.
-    # Store only relative paths in PostgreSQL; never expose this root through Nginx.
     PROJECT_UPLOAD_ROOT: str = "./var/uploads"
 
-    # 🚀 NUEVO: Configuraciones de Correo (SMTP)
     SMTP_SERVER: str = "smtp.gmail.com"
     SMTP_PORT: int = 587
     SMTP_USER: str = ""
@@ -38,7 +37,9 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
-        extra="ignore"
+        extra="ignore",
     )
 
+
 settings = Settings()
+

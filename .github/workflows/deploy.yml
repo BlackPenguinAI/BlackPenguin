@@ -1,4 +1,4 @@
-name: Deploy Black Penguin API & Frontend to DigitalOcean
+name: Deploy Black Penguin API, Worker & Frontend to DigitalOcean
 
 on:
   push:
@@ -6,85 +6,190 @@ on:
       - main
     paths:
       - 'backend/**'
-      - 'frontend/**'     # 🚀 AÑADIDO: También se dispara si hay cambios en Angular
+      - 'frontend/**'
       - '.github/workflows/deploy.yml'
+
+concurrency:
+  group: blackpenguin-production
+  cancel-in-progress: false
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
-    - name: 🚀 Conectando al Droplet y Desplegando
-      uses: appleboy/ssh-action@v1.0.3
-      env:
-        DB_URL: ${{ secrets.DATABASE_URL }}
-        META_TOKEN: ${{ secrets.META_ACCESS_TOKEN }}
-        OPENROUTER_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-        JWT_SECRET: ${{ secrets.SECRET_KEY }}
-        SA_EMAIL: ${{ secrets.FIRST_SUPERADMIN_EMAIL }}
-        SA_PASS: ${{ secrets.FIRST_SUPERADMIN_PASSWORD }}
-        MAILCHIMP_KEY: ${{ secrets.MAILCHIMP_API_KEY }}
-        MAILCHIMP_LIST: ${{ secrets.MAILCHIMP_LIST_ID }}
-        MAILCHIMP_SERVER: ${{ secrets.MAILCHIMP_SERVER }}
-      with:
-        host: ${{ secrets.DO_HOST }}
-        username: ${{ secrets.DO_USER }}
-        key: ${{ secrets.DO_SSH_KEY }}
-        envs: DB_URL,META_TOKEN,OPENROUTER_KEY,JWT_SECRET,SA_EMAIL,SA_PASS,MAILCHIMP_KEY,MAILCHIMP_LIST,MAILCHIMP_SERVER
-        script: |
-          cd /home/jorge/BlackPenguin
-          git pull origin main
+      - name: Deploy immutable production release
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          DEPLOY_SHA: ${{ github.sha }}
+          DB_URL: ${{ secrets.DATABASE_URL }}
+          META_TOKEN: ${{ secrets.META_ACCESS_TOKEN }}
+          OPENROUTER_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          JWT_SECRET: ${{ secrets.SECRET_KEY }}
+          SA_EMAIL: ${{ secrets.FIRST_SUPERADMIN_EMAIL }}
+          SA_PASS: ${{ secrets.FIRST_SUPERADMIN_PASSWORD }}
+          MAILCHIMP_KEY: ${{ secrets.MAILCHIMP_API_KEY }}
+          MAILCHIMP_LIST: ${{ secrets.MAILCHIMP_LIST_ID }}
+          MAILCHIMP_SERVER: ${{ secrets.MAILCHIMP_SERVER }}
+        with:
+          host: ${{ secrets.DO_HOST }}
+          username: ${{ secrets.DO_USER }}
+          key: ${{ secrets.DO_SSH_KEY }}
+          envs: DEPLOY_SHA,DB_URL,META_TOKEN,OPENROUTER_KEY,JWT_SECRET,SA_EMAIL,SA_PASS,MAILCHIMP_KEY,MAILCHIMP_LIST,MAILCHIMP_SERVER
+          command_timeout: 30m
+          script: |
+            set -Eeuo pipefail
 
-          echo "Creando archivo .env de producción de forma segura..."
-          rm -f backend/.env
+            REPOSITORY_DIR=/home/jorge/BlackPenguin
+            UPLOAD_DIR=/var/lib/blackpenguin/uploads
+            API_IMAGE="blackpenguin-api:${DEPLOY_SHA}"
+            FRONTEND_IMAGE="blackpenguin-frontend:${DEPLOY_SHA}"
+            RELEASE_STARTED=false
+            PREVIOUS_API_IMAGE=""
+            PREVIOUS_WORKER_IMAGE=""
+            PREVIOUS_FRONTEND_IMAGE=""
 
-          # Inyectamos las variables para el Backend
-          echo "ENVIRONMENT=production" >> backend/.env
-          echo "ALGORITHM=HS256" >> backend/.env
-          echo "ACCESS_TOKEN_EXPIRE_MINUTES=10080" >> backend/.env
-          echo "SECRET_KEY=$JWT_SECRET" >> backend/.env
-          echo "DATABASE_URL=$DB_URL" >> backend/.env
-          echo "META_ACCESS_TOKEN=$META_TOKEN" >> backend/.env
-          echo "OPENROUTER_API_KEY=$OPENROUTER_KEY" >> backend/.env
-          echo "FIRST_SUPERADMIN_EMAIL=$SA_EMAIL" >> backend/.env
-          echo "FIRST_SUPERADMIN_PASSWORD=$SA_PASS" >> backend/.env
-          echo "MONGO_URL=mongodb://172.17.0.1:27017/blackpenguin_db" >> backend/.env
-          echo "MAILCHIMP_API_KEY=$MAILCHIMP_KEY" >> backend/.env
-          echo "MAILCHIMP_LIST_ID=$MAILCHIMP_LIST" >> backend/.env
-          echo "MAILCHIMP_SERVER=$MAILCHIMP_SERVER" >> backend/.env
-          echo "PROJECT_UPLOAD_ROOT=/var/lib/blackpenguin/uploads" >> backend/.env
+            current_image() {
+              docker inspect --format '{{.Config.Image}}' "$1" 2>/dev/null || true
+            }
 
-          # ==========================================
-          # 🚀 DESPLIEGUE DEL BACKEND (FastAPI)
-          # ==========================================
-          echo "🏗️ Construyendo imagen de FastAPI..."
-          docker build -t blackpenguin-api:latest ./backend
-          
-          echo "🛑 Deteniendo contenedor anterior de backend..."
-          docker stop bp_api_prod || true
-          docker rm bp_api_prod || true
+            start_api() {
+              local image="$1"
+              docker run -d --name bp_api_prod --restart always \
+                --env-file backend/.env \
+                -v "${UPLOAD_DIR}:${UPLOAD_DIR}" \
+                -p 8000:8000 \
+                "$image"
+            }
 
-          echo "🚀 Encendiendo backend..."
-          sudo mkdir -p /var/lib/blackpenguin/uploads
-          sudo chmod 750 /var/lib/blackpenguin/uploads
-          # The host directory survives image and container replacement. It is
-          # intentionally not served by Nginx; downloads pass through FastAPI auth.
-          docker run -d --name bp_api_prod --restart always \
-            --env-file backend/.env \
-            -v /var/lib/blackpenguin/uploads:/var/lib/blackpenguin/uploads \
-            -p 8000:8000 \
-            blackpenguin-api:latest
+            start_worker() {
+              local image="$1"
+              docker run -d --name bp_worker_prod --restart always \
+                --env-file backend/.env \
+                -v "${UPLOAD_DIR}:${UPLOAD_DIR}" \
+                "$image" \
+                python -m app.modules.onboarding_jobs.worker
+            }
 
-          # ==========================================
-          # 🚀 DESPLIEGUE DEL FRONTEND (Angular + Nginx)
-          # ==========================================
-          echo "🏗️ Construyendo imagen de Angular..."
-          docker build -t blackpenguin-frontend:latest ./frontend
-          
-          echo "🛑 Deteniendo contenedor anterior de frontend..."
-          docker stop bp_frontend_prod || true
-          docker rm bp_frontend_prod || true
+            start_frontend() {
+              local image="$1"
+              docker run -d --name bp_frontend_prod --restart always \
+                -p 8080:80 \
+                "$image"
+            }
 
-          # 🚀 RECUPERAMOS LA LÍNEA QUE ENCENDÍA EL FRONTEND
-          echo "🚀 Encendiendo frontend en el puerto interno 8080..."
-          docker run -d --name bp_frontend_prod --restart always -p 8080:80 blackpenguin-frontend:latest
+            remove_container() {
+              docker rm -f "$1" >/dev/null 2>&1 || true
+            }
+
+            rollback() {
+              local exit_code=$?
+              if [ "$RELEASE_STARTED" = true ]; then
+                echo "Deployment failed; restoring the previous release."
+                remove_container bp_api_prod
+                remove_container bp_worker_prod
+                remove_container bp_frontend_prod
+                [ -n "$PREVIOUS_API_IMAGE" ] && start_api "$PREVIOUS_API_IMAGE" >/dev/null || true
+                [ -n "$PREVIOUS_WORKER_IMAGE" ] && start_worker "$PREVIOUS_WORKER_IMAGE" >/dev/null || true
+                [ -n "$PREVIOUS_FRONTEND_IMAGE" ] && start_frontend "$PREVIOUS_FRONTEND_IMAGE" >/dev/null || true
+              fi
+              exit "$exit_code"
+            }
+            trap rollback ERR
+
+            cd "$REPOSITORY_DIR"
+
+            if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+              echo "Tracked local changes detected; refusing a mixed deployment."
+              git status --short --untracked-files=no
+              exit 1
+            fi
+
+            git fetch --prune origin main
+            git cat-file -e "${DEPLOY_SHA}^{commit}"
+            git checkout --detach "$DEPLOY_SHA"
+            test "$(git rev-parse HEAD)" = "$DEPLOY_SHA"
+
+            umask 077
+            rm -f backend/.env
+            {
+              echo "ENVIRONMENT=production"
+              echo "APP_COMMIT_SHA=$DEPLOY_SHA"
+              echo "ALGORITHM=HS256"
+              echo "ACCESS_TOKEN_EXPIRE_MINUTES=10080"
+              echo "SECRET_KEY=$JWT_SECRET"
+              echo "DATABASE_URL=$DB_URL"
+              echo "META_ACCESS_TOKEN=$META_TOKEN"
+              echo "OPENROUTER_API_KEY=$OPENROUTER_KEY"
+              echo "FIRST_SUPERADMIN_EMAIL=$SA_EMAIL"
+              echo "FIRST_SUPERADMIN_PASSWORD=$SA_PASS"
+              echo "MONGO_URL=mongodb://172.17.0.1:27017/blackpenguin_db"
+              echo "MAILCHIMP_API_KEY=$MAILCHIMP_KEY"
+              echo "MAILCHIMP_LIST_ID=$MAILCHIMP_LIST"
+              echo "MAILCHIMP_SERVER=$MAILCHIMP_SERVER"
+              echo "PROJECT_UPLOAD_ROOT=$UPLOAD_DIR"
+            } > backend/.env
+
+            sudo mkdir -p "$UPLOAD_DIR"
+            sudo chmod 750 "$UPLOAD_DIR"
+
+            docker build --pull \
+              --build-arg "APP_COMMIT_SHA=$DEPLOY_SHA" \
+              -t "$API_IMAGE" \
+              ./backend
+            docker build --pull \
+              --build-arg "APP_COMMIT_SHA=$DEPLOY_SHA" \
+              -t "$FRONTEND_IMAGE" \
+              ./frontend
+
+            docker run --rm "$API_IMAGE" python -c \
+              "import inspect; from app.modules.projects.services import save_message; assert 'commit' in inspect.signature(save_message).parameters"
+            docker run --rm "$API_IMAGE" python -c \
+              "import inspect; from app.modules.company_onboarding.services import save_message; assert 'commit' in inspect.signature(save_message).parameters"
+
+            docker run --rm \
+              --env-file backend/.env \
+              "$API_IMAGE" \
+              python -m app.scripts.reconcile_onboarding_jobs --apply
+
+            test "$(docker image inspect --format '{{ index .Config.Labels \"org.opencontainers.image.revision\" }}' "$API_IMAGE")" = "$DEPLOY_SHA"
+            test "$(docker image inspect --format '{{ index .Config.Labels \"org.opencontainers.image.revision\" }}' "$FRONTEND_IMAGE")" = "$DEPLOY_SHA"
+
+            PREVIOUS_API_IMAGE="$(current_image bp_api_prod)"
+            PREVIOUS_WORKER_IMAGE="$(current_image bp_worker_prod)"
+            PREVIOUS_FRONTEND_IMAGE="$(current_image bp_frontend_prod)"
+            RELEASE_STARTED=true
+
+            remove_container bp_api_prod
+            remove_container bp_worker_prod
+            remove_container bp_frontend_prod
+
+            start_api "$API_IMAGE" >/dev/null
+            start_worker "$API_IMAGE" >/dev/null
+            start_frontend "$FRONTEND_IMAGE" >/dev/null
+
+            for attempt in $(seq 1 30); do
+              if curl --fail --silent --show-error \
+                http://127.0.0.1:8000/api/v1/health/ready >/dev/null; then
+                break
+              fi
+              if [ "$attempt" -eq 30 ]; then
+                echo "API readiness check did not pass."
+                exit 1
+              fi
+              sleep 2
+            done
+
+            test "$(curl --fail --silent http://127.0.0.1:8000/api/v1/health/version | python3 -c 'import json,sys; print(json.load(sys.stdin)["commit"])')" = "$DEPLOY_SHA"
+            test "$(docker inspect --format '{{.State.Running}}' bp_worker_prod)" = true
+            test "$(docker inspect --format '{{.State.Running}}' bp_frontend_prod)" = true
+            test "$(docker inspect --format '{{.Config.Image}}' bp_api_prod)" = "$API_IMAGE"
+            test "$(docker inspect --format '{{.Config.Image}}' bp_worker_prod)" = "$API_IMAGE"
+
+            sleep 5
+            test "$(docker inspect --format '{{.State.Running}}' bp_worker_prod)" = true
+
+            RELEASE_STARTED=false
+            trap - ERR
+            echo "Deployment completed successfully: $DEPLOY_SHA"
