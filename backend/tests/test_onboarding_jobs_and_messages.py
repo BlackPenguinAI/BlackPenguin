@@ -7,6 +7,9 @@ from app.db.schema import CURRENT_SCHEMA_VERSION
 from app.modules.company_onboarding.models import OnboardingMessage
 from app.modules.onboarding_jobs.models import OnboardingSourceJob
 from app.modules.onboarding_jobs.service import normalize_url
+from app.modules.onboarding_jobs import service as job_service
+from app.modules.company_onboarding import router as company_router
+from app.modules.projects import router as project_router
 from app.modules.projects import services as project_services
 from app.modules.projects.models import ProjectMessage, SenderType
 
@@ -68,3 +71,33 @@ def test_project_save_message_supports_atomic_job_creation():
     db.flush.assert_called_once_with()
     db.commit.assert_not_called()
     db.refresh.assert_not_called()
+
+
+def test_worker_defers_next_question_when_extracted_proposals_need_review():
+    company_source = inspect.getsource(job_service._process_company)
+    project_source = inspect.getsource(job_service._process_project)
+
+    for function_source in (company_source, project_source):
+        assert "pending_proposals" in function_source
+        assert "Review them before we continue." in function_source
+        assert function_source.index("if pending_proposals:") < function_source.index("build_next_question(")
+        assert "in_reply_to_message_id=job.message_id" in function_source
+
+
+def test_state_does_not_attach_a_question_while_review_is_pending():
+    for state_builder in (company_router._state_payload, project_router._state_payload):
+        function_source = inspect.getsource(state_builder)
+        assert "pending_review" in function_source
+        assert "if not processing and not pending_review:" in function_source
+
+
+def test_last_proposal_decision_uses_an_idempotent_follow_up():
+    for continuation in (
+        company_router._continue_after_source_review,
+        project_router._continue_after_source_review,
+    ):
+        function_source = inspect.getsource(continuation)
+        assert ".with_for_update()" in function_source
+        assert "in_reply_to_message_id" in function_source
+        assert "response_payload.is_(None)" in function_source
+        assert "commit=False" in function_source

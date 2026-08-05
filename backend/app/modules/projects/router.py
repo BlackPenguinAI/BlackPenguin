@@ -23,7 +23,7 @@ from . import meta_service, services, source_service, storage_service
 from .completion import FIELD_BY_KEY
 from .models import (
     MetaConnection, Project, ProjectCampaign, ProjectMessage, ProjectOnboardingProposal,
-    ProjectOnboardingSource, ProjectSourceKind, SenderType,
+    ProjectOnboardingSource, ProjectProposalStatus, ProjectSession, ProjectSourceKind, SenderType,
 )
 from .schemas import (
     CampaignCreate, CampaignResponse, ChatBootstrapRequest, ChatMessagePayload, ChatMessageResponse, ChatTurnResponse,
@@ -71,6 +71,65 @@ def _next_question(profile) -> dict[str, Any]:
     )
 
 
+def _continue_after_source_review(
+    db: Session,
+    *,
+    proposal: ProjectOnboardingProposal,
+    profile,
+) -> ProjectMessage | None:
+    message_id = proposal.source.message_id
+    if not message_id:
+        return None
+    origin = (
+        db.query(ProjectMessage)
+        .filter(ProjectMessage.id == message_id)
+        .first()
+    )
+    if not origin:
+        return None
+    db.query(ProjectSession).filter(
+        ProjectSession.id == origin.session_id
+    ).with_for_update().one()
+    pending = (
+        db.query(ProjectOnboardingProposal)
+        .join(ProjectOnboardingSource)
+        .filter(
+            ProjectOnboardingSource.project_id == proposal.source.project_id,
+            ProjectOnboardingProposal.status == ProjectProposalStatus.PENDING,
+        )
+        .first()
+    )
+    if pending:
+        return None
+    existing = (
+        db.query(ProjectMessage)
+        .filter(
+            ProjectMessage.session_id == origin.session_id,
+            ProjectMessage.sender == SenderType.AI,
+            ProjectMessage.ui_payload.isnot(None),
+            ProjectMessage.response_payload.is_(None),
+            ProjectMessage.created_at >= origin.created_at,
+        )
+        .order_by(ProjectMessage.created_at.asc())
+        .first()
+    )
+    if existing:
+        if not existing.in_reply_to_message_id:
+            existing.in_reply_to_message_id = origin.id
+            db.add(existing)
+        return existing
+    question = _next_question(profile)
+    return services.save_message(
+        db,
+        origin.session_id,
+        SenderType.AI,
+        question["prompt"],
+        ui_payload=question,
+        in_reply_to_message_id=origin.id,
+        commit=False,
+    )
+
+
 def _state_payload(db: Session, project: Project) -> dict[str, Any]:
     profile = services.get_profile(project)
     messages = (
@@ -95,16 +154,16 @@ def _state_payload(db: Session, project: Project) -> dict[str, Any]:
         OnboardingSourceJob.company_id == project.company_id,
         OnboardingSourceJob.status.in_(["queued", "processing"]),
     ).first() is not None
-    if not processing:
-        latest_ai = next((item for item in reversed(messages) if item.sender == SenderType.AI), None)
-        if latest_ai and not latest_ai.ui_payload and not latest_ai.response_payload:
-            latest_ai.ui_payload = _next_question(profile)
-            db.add(latest_ai); db.commit(); db.refresh(latest_ai)
     pending_review = any(
         proposal.status.value == "pending"
         for source in sources
         for proposal in source.proposals
     )
+    if not processing and not pending_review:
+        latest_ai = next((item for item in reversed(messages) if item.sender == SenderType.AI), None)
+        if latest_ai and not latest_ai.ui_payload and not latest_ai.response_payload:
+            latest_ai.ui_payload = _next_question(profile)
+            db.add(latest_ai); db.commit(); db.refresh(latest_ai)
     if serialized_profile["completion"]["can_complete"]:
         stage = "complete"
     elif processing:
@@ -648,6 +707,9 @@ def decide_proposal(project_id: str, proposal_id: str, payload: ProposalDecision
     if not proposal:
         raise HTTPException(status_code=404, detail="Proposal not found.")
     proposal, profile = source_service.review_proposal(db, proposal=proposal, company_id=current_user.company_id, user_id=current_user.id, action=payload.action, corrected_value=payload.value)
+    _continue_after_source_review(db, proposal=proposal, profile=profile)
+    db.commit()
+    db.refresh(proposal)
     return {"proposal": source_service.serialize_proposal(proposal), "profile": services.serialize_profile(profile)}
 
 

@@ -66,6 +66,7 @@ export class ChatComponent implements OnInit, OnDestroy {
   private replyToMessageId: string | null = null;
   private lastStateVersion = 0;
   private pollingStartedAt = 0;
+  private readonly expandedSourceIds = new Set<string>();
 
   constructor(
     private readonly translate: TranslateService,
@@ -182,8 +183,43 @@ export class ChatComponent implements OnInit, OnDestroy {
   chooseAnswer(value: string, message?: ChatMessage): void { this.prompt = value; this.replyToMessageId = message?.id || null; }
   writeCustomAnswer(message?: ChatMessage): void { this.prompt = ''; this.replyToMessageId = message?.id || null; }
   isActiveQuestion(message: ChatMessage): boolean {
-    return message.sender === 'ai' && !!message.ui_payload && !message.response_payload
-      && this.messages.filter((item) => item.sender === 'ai' && !!item.ui_payload && !item.response_payload).at(-1) === message;
+    return !this.hasPendingReview && message.sender === 'ai' && !!message.ui_payload && !message.response_payload
+      && this.visibleMessages.filter((item) => item.sender === 'ai' && !!item.ui_payload && !item.response_payload).at(-1) === message;
+  }
+
+  get hasPendingReview(): boolean {
+    return this.sources.some((source) => this.hasPendingProposals(source));
+  }
+
+  get visibleMessages(): ChatMessage[] {
+    if (!this.hasPendingReview) return this.messages;
+    return this.messages.filter((message) => !(
+      message.sender === 'ai' && !!message.ui_payload && !message.response_payload
+    ));
+  }
+
+  sourcesForMessage(messageId?: string): OnboardingSource[] {
+    return messageId ? this.sources.filter((source) => source.message_id === messageId) : [];
+  }
+
+  get unlinkedSources(): OnboardingSource[] {
+    const messageIds = new Set(this.messages.flatMap((message) => message.id ? [message.id] : []));
+    return this.sources.filter((source) => !source.message_id || !messageIds.has(source.message_id));
+  }
+
+  hasPendingProposals(source: OnboardingSource): boolean {
+    return source.proposals.some((proposal) => proposal.status === 'pending');
+  }
+
+  isSourceExpanded(source: OnboardingSource): boolean {
+    return this.hasPendingProposals(source) || this.expandedSourceIds.has(source.id);
+  }
+
+  onSourceToggle(source: OnboardingSource, event: Event): void {
+    if (this.hasPendingProposals(source)) return;
+    const details = event.currentTarget as HTMLDetailsElement;
+    if (details.open) this.expandedSourceIds.add(source.id);
+    else this.expandedSourceIds.delete(source.id);
   }
 
   fieldsByRequirement(requirement: Requirement): CompanyFieldProgress[] {
@@ -199,7 +235,7 @@ export class ChatComponent implements OnInit, OnDestroy {
   }
 
   get canSend(): boolean {
-    return this.prompt.trim().length > 0 && !this.isAnalyzing && !this.isCompleted;
+    return this.prompt.trim().length > 0 && !this.isAnalyzing && !this.isCompleted && !this.hasPendingReview;
   }
 
   statusIcon(status: ValidationStatus): string {
@@ -319,6 +355,7 @@ export class ChatComponent implements OnInit, OnDestroy {
         });
         this.profile = result.profile;
         this.isCompleted = result.profile.completion.can_complete;
+        this.syncState(true);
         this.cdr.detectChanges();
       },
       error: (error: HttpErrorResponse) => {
@@ -418,6 +455,9 @@ export class ChatComponent implements OnInit, OnDestroy {
     const merged = new Map(this.sources.map((source) => [source.id, source]));
     for (const source of this.prepareSources(sources)) merged.set(source.id, source);
     this.sources = Array.from(merged.values());
+    for (const source of this.sources) {
+      if (this.hasPendingProposals(source)) this.expandedSourceIds.add(source.id);
+    }
   }
 
   private syncState(scroll = false): void {
@@ -443,6 +483,9 @@ export class ChatComponent implements OnInit, OnDestroy {
     this.messages = [...state.messages];
     this.profile = state.profile;
     this.sources = this.prepareSources(state.sources);
+    for (const source of this.sources) {
+      if (this.hasPendingProposals(source)) this.expandedSourceIds.add(source.id);
+    }
     this.nextQuestion = state.next_question;
     this.isCompleted = state.profile.completion.can_complete;
     this.showWelcome = state.stage === 'website';
@@ -491,6 +534,8 @@ export class ChatComponent implements OnInit, OnDestroy {
       ...source,
       proposals: source.proposals.map((item) => item.id === proposalId ? { ...item, ...patch } : item),
     }));
+    const source = this.sources.find((item) => item.id === sourceId);
+    if (source && !this.hasPendingProposals(source)) this.expandedSourceIds.delete(sourceId);
     this.cdr.detectChanges();
   }
 

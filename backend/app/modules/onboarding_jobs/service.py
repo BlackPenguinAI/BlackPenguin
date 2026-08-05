@@ -301,7 +301,12 @@ def _save_terminal_failure_message(db: Session, job: OnboardingSourceJob) -> Non
 
 async def _process_company(db: Session, job: OnboardingSourceJob) -> None:
     from app.modules.company_onboarding import services, source_service
-    from app.modules.company_onboarding.models import CompanyOnboardingSource, SenderType
+    from app.modules.company_onboarding.models import (
+        CompanyOnboardingProposal,
+        CompanyOnboardingSource,
+        ProposalStatus,
+        SenderType,
+    )
 
     source = db.query(CompanyOnboardingSource).filter(
         CompanyOnboardingSource.id == job.source_id,
@@ -315,6 +320,20 @@ async def _process_company(db: Session, job: OnboardingSourceJob) -> None:
     if source.status.value == "failed":
         raise ValueError(f"source_processing_failed: {_safe_error_detail(source.error_message)}")
     session = services.get_or_create_session(db, job.company_id)
+    pending_proposals = db.query(CompanyOnboardingProposal).filter(
+        CompanyOnboardingProposal.source_id == source.id,
+        CompanyOnboardingProposal.status == ProposalStatus.PENDING,
+    ).count()
+    if pending_proposals:
+        services.save_message(
+            db,
+            session.id,
+            SenderType.AI,
+            f"I extracted {pending_proposals} proposal{'s' if pending_proposals != 1 else ''} "
+            f"from **{source.name}**. Review them before we continue.",
+            in_reply_to_message_id=job.message_id,
+        )
+        return
     profile = services.get_or_create_profile(db, job.company_id)
     question = build_next_question(
         services.serialize_profile(profile)["completion"]["blockers"],
@@ -325,12 +344,18 @@ async def _process_company(db: Session, job: OnboardingSourceJob) -> None:
         db, session.id, SenderType.AI,
         f"The website **{source.name}** was {outcome}. {question['prompt']}",
         ui_payload=question,
+        in_reply_to_message_id=job.message_id,
     )
 
 
 async def _process_project(db: Session, job: OnboardingSourceJob) -> None:
     from app.modules.projects import services, source_service
-    from app.modules.projects.models import ProjectOnboardingSource, SenderType
+    from app.modules.projects.models import (
+        ProjectOnboardingProposal,
+        ProjectOnboardingSource,
+        ProjectProposalStatus,
+        SenderType,
+    )
 
     project = services.get_project(db, job.project_id or "", job.company_id)
     source = db.query(ProjectOnboardingSource).filter(
@@ -344,6 +369,20 @@ async def _process_project(db: Session, job: OnboardingSourceJob) -> None:
     await source_service.process_url_source(db, source)
     if source.status.value == "failed":
         raise ValueError(f"source_processing_failed: {_safe_error_detail(source.error_message)}")
+    pending_proposals = db.query(ProjectOnboardingProposal).filter(
+        ProjectOnboardingProposal.source_id == source.id,
+        ProjectOnboardingProposal.status == ProjectProposalStatus.PENDING,
+    ).count()
+    if pending_proposals:
+        services.save_message(
+            db,
+            project.session.id,
+            SenderType.AI,
+            f"I extracted {pending_proposals} proposal{'s' if pending_proposals != 1 else ''} "
+            f"from **{source.name}**. Review them before we continue.",
+            in_reply_to_message_id=job.message_id,
+        )
+        return
     profile = services.get_profile(project)
     question = build_next_question(
         services.serialize_profile(profile)["completion"]["blockers"],
@@ -354,4 +393,5 @@ async def _process_project(db: Session, job: OnboardingSourceJob) -> None:
         db, project.session.id, SenderType.AI,
         f"The website **{source.name}** was {outcome}. {question['prompt']}",
         ui_payload=question,
+        in_reply_to_message_id=job.message_id,
     )

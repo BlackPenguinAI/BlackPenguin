@@ -53,6 +53,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   private replyToMessageId: string | null = null;
   private lastStateVersion = 0;
   private pollingStartedAt = 0;
+  private readonly expandedSourceIds = new Set<string>();
 
   constructor(
     private readonly route: ActivatedRoute,
@@ -86,7 +87,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     if (this.pollingTimer) clearTimeout(this.pollingTimer);
   }
 
-  get canSend(): boolean { return (!!this.prompt.trim() || !!this.selectedFiles.length) && !this.isAnalyzing; }
+  get canSend(): boolean { return (!!this.prompt.trim() || !!this.selectedFiles.length) && !this.isAnalyzing && !this.hasPendingReview; }
   get nextBlocker(): string { return this.profile.completion.blockers[0]?.label || 'Final profile approval'; }
   fieldsForSection(section: string): ProjectFieldProgress[] { return this.profile.fields.filter((field) => field.section === section); }
 
@@ -135,8 +136,37 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   chooseAnswer(value: string, message?: ChatMessage): void { this.prompt = value; this.replyToMessageId = message?.id || null; }
   writeCustomAnswer(message?: ChatMessage): void { this.prompt = ''; this.replyToMessageId = message?.id || null; }
   isActiveQuestion(message: ChatMessage): boolean {
-    return message.sender === 'ai' && !!message.ui_payload && !message.response_payload
-      && this.messages.filter((item) => item.sender === 'ai' && !!item.ui_payload && !item.response_payload).at(-1) === message;
+    return !this.hasPendingReview && message.sender === 'ai' && !!message.ui_payload && !message.response_payload
+      && this.visibleMessages.filter((item) => item.sender === 'ai' && !!item.ui_payload && !item.response_payload).at(-1) === message;
+  }
+
+  get hasPendingReview(): boolean {
+    return this.sources.some((source) => this.hasPendingProposals(source));
+  }
+  get visibleMessages(): ChatMessage[] {
+    if (!this.hasPendingReview) return this.messages;
+    return this.messages.filter((message) => !(
+      message.sender === 'ai' && !!message.ui_payload && !message.response_payload
+    ));
+  }
+  sourcesForMessage(messageId?: string): ProjectSource[] {
+    return messageId ? this.sources.filter((source) => source.message_id === messageId) : [];
+  }
+  get unlinkedSources(): ProjectSource[] {
+    const messageIds = new Set(this.messages.flatMap((message) => message.id ? [message.id] : []));
+    return this.sources.filter((source) => !source.message_id || !messageIds.has(source.message_id));
+  }
+  hasPendingProposals(source: ProjectSource): boolean {
+    return source.proposals.some((proposal) => proposal.status === 'pending');
+  }
+  isSourceExpanded(source: ProjectSource): boolean {
+    return this.hasPendingProposals(source) || this.expandedSourceIds.has(source.id);
+  }
+  onSourceToggle(source: ProjectSource, event: Event): void {
+    if (this.hasPendingProposals(source)) return;
+    const details = event.currentTarget as HTMLDetailsElement;
+    if (details.open) this.expandedSourceIds.add(source.id);
+    else this.expandedSourceIds.delete(source.id);
   }
   handleKeyDown(event: KeyboardEvent): void { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); if (this.canSend) this.sendMessage(); } }
   sendMessage(): void {
@@ -225,7 +255,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     this.onboarding.decideProposal(this.projectId, proposal.id, action, value).subscribe({
       next: (result) => {
         this.updateProposal(source.id, proposal.id, { ...result.proposal, draftValue: this.formatValue(result.proposal.value), submitting: false });
-        this.profile = result.profile; this.cdr.detectChanges();
+        this.profile = result.profile; this.syncState(true); this.cdr.detectChanges();
       },
       error: (error: HttpErrorResponse) => {
         if (error.status === 409) {
@@ -318,6 +348,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     const merged = new Map(this.sources.map((source) => [source.id, source]));
     for (const source of this.prepareSources(items)) merged.set(source.id, source);
     this.sources = Array.from(merged.values());
+    for (const source of this.sources) if (this.hasPendingProposals(source)) this.expandedSourceIds.add(source.id);
   }
   private syncState(scroll = false): void {
     this.onboarding.getState(this.projectId).subscribe({
@@ -340,6 +371,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     this.lastStateVersion = state.version;
     this.messages = [...state.messages]; this.profile = state.profile;
     this.sources = this.prepareSources(state.sources); this.nextQuestion = state.next_question;
+    for (const source of this.sources) if (this.hasPendingProposals(source)) this.expandedSourceIds.add(source.id);
     this.showWelcome = state.stage === 'website';
     if (this.pollingTimer) clearTimeout(this.pollingTimer);
     if (state.stage === 'processing') this.schedulePolling();
@@ -359,6 +391,8 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
       ...source,
       proposals: source.proposals.map((item) => item.id === proposalId ? { ...item, ...patch } : item),
     }));
+    const source = this.sources.find((item) => item.id === sourceId);
+    if (source && !this.hasPendingProposals(source)) this.expandedSourceIds.delete(sourceId);
     this.cdr.detectChanges();
   }
   private schedulePolling(): void {

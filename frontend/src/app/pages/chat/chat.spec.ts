@@ -80,4 +80,28 @@ describe('ChatComponent', () => {
   it('should format structured source values for editing', () => {
     expect(component.formatValue({ exists: false, url: null })).toBe('{"exists":false,"url":null}');
   });
+
+  it('should anchor pending source review to its message and hide the next question', () => {
+    component.messages = [
+      { id: 'message-1', sender: 'user', content: 'https://example.com', created_at: new Date(), attachments: [] },
+      {
+        id: 'question-1', sender: 'ai', content: 'Next question', created_at: new Date(), attachments: [],
+        ui_payload: { field: 'voice', label: 'Voice', prompt: 'Next question', input_type: 'text', options: [], examples: [], allow_custom: true, minimum_words: null },
+      },
+    ];
+    component.sources = [{
+      id: 'source-1', kind: 'official_website', status: 'ready', name: 'example.com',
+      url: 'https://example.com', mime_type: 'text/html', size_bytes: 100,
+      message_id: 'message-1', download_url: null, error_message: null,
+      proposals: [{ id: 'proposal-1', field: 'official_company_name', label: 'Name', value: 'Example', evidence: null, confidence: 'high', status: 'pending' }],
+      created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    }];
+    component.prompt = 'Should not send';
+
+    expect(component.sourcesForMessage('message-1').map((source) => source.id)).toEqual(['source-1']);
+    expect(component.unlinkedSources).toEqual([]);
+    expect(component.visibleMessages.map((message) => message.id)).toEqual(['message-1']);
+    expect(component.isSourceExpanded(component.sources[0])).toBe(true);
+    expect(component.canSend).toBe(false);
+  });
 });

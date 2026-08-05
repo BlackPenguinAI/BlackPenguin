@@ -37,21 +37,21 @@
     </header>
 
     <div #chatScroll class="z-10 flex flex-1 flex-col gap-6 overflow-y-auto p-4 scroll-smooth md:p-8">
-      <div
-        *ngFor="let msg of messages"
-        class="flex w-full"
-        [ngClass]="msg.sender === 'user' ? 'justify-end' : 'justify-start'"
-      >
-        <app-onboarding-ai-message
-          *ngIf="msg.sender === 'ai'"
-          [message]="msg"
-          [active]="isActiveQuestion(msg)"
-          [disabled]="isAnalyzing || isCompleted"
-          (selected)="chooseAnswer($event, msg)"
-          (custom)="writeCustomAnswer(msg)"
-        ></app-onboarding-ai-message>
+      <ng-container *ngFor="let msg of visibleMessages">
+        <div
+          class="flex w-full"
+          [ngClass]="msg.sender === 'user' ? 'justify-end' : 'justify-start'"
+        >
+          <app-onboarding-ai-message
+            *ngIf="msg.sender === 'ai'"
+            [message]="msg"
+            [active]="isActiveQuestion(msg)"
+            [disabled]="isAnalyzing || isCompleted || hasPendingReview"
+            (selected)="chooseAnswer($event, msg)"
+            (custom)="writeCustomAnswer(msg)"
+          ></app-onboarding-ai-message>
 
-        <div *ngIf="msg.sender === 'user'" class="flex max-w-[85%] flex-col items-end md:max-w-[80%]">
+          <div *ngIf="msg.sender === 'user'" class="flex max-w-[85%] flex-col items-end md:max-w-[80%]">
           <span class="mb-1 mr-2 text-[10px] text-gray-500">{{ userName }}</span>
           <div class="rounded-2xl rounded-tr-sm border border-white/10 bg-white/10 px-5 py-3 text-sm leading-relaxed">
             {{ msg.content }}
@@ -69,10 +69,23 @@
           <span class="mt-1.5 px-1 text-[10px] text-gray-500">
             {{ msg.created_at | date: 'dd/MM/yyyy HH:mm' }}
           </span>
+          </div>
         </div>
-      </div>
+        <ng-container *ngFor="let source of sourcesForMessage(msg.id); trackBy: trackSource">
+          <ng-container *ngTemplateOutlet="sourceReview; context: { $implicit: source }"></ng-container>
+        </ng-container>
+      </ng-container>
 
-      <details *ngFor="let source of sources; trackBy: trackSource" class="source-card ml-12 max-w-3xl rounded-xl border border-white/10 bg-white/[0.025] px-3 py-2">
+      <ng-container *ngFor="let source of unlinkedSources; trackBy: trackSource">
+        <ng-container *ngTemplateOutlet="sourceReview; context: { $implicit: source }"></ng-container>
+      </ng-container>
+
+      <ng-template #sourceReview let-source>
+      <details
+        [open]="isSourceExpanded(source)"
+        (toggle)="onSourceToggle(source, $event)"
+        class="source-card ml-12 max-w-3xl rounded-xl border border-white/10 bg-white/[0.025] px-3 py-2"
+      >
         <summary class="flex cursor-pointer list-none items-center gap-2 text-xs text-gray-300">
           <span class="material-symbols-outlined text-[17px] text-secondary">{{ source.kind === 'uploaded_file' ? 'description' : 'language' }}</span>
           <span class="min-w-0 flex-1 truncate">{{ source.name }}</span>
@@ -116,6 +129,7 @@
           </article>
         </div>
       </details>
+      </ng-template>
 
       <div *ngIf="isAnalyzing" class="flex max-w-[80%] gap-4">
         <div class="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-secondary/50 bg-secondary/20">
@@ -138,15 +152,15 @@
           <textarea
             [(ngModel)]="prompt"
             (keydown)="handleKeyDown($event)"
-            [disabled]="isAnalyzing || isCompleted"
+            [disabled]="isAnalyzing || isCompleted || hasPendingReview"
             rows="1"
             placeholder="Enter company information, a correction, or a confirmation..."
             class="min-h-12 max-h-36 w-full resize-none overflow-hidden bg-transparent py-3 pl-12 pr-24 text-sm text-white placeholder-gray-500 focus:outline-none"
           ></textarea>
           <label
             class="absolute bottom-3 left-3 flex cursor-pointer items-center justify-center rounded-lg p-2 text-gray-400 transition hover:bg-white/10 hover:text-white"
-            [class.pointer-events-none]="isUploading || isCompleted"
-            [class.opacity-40]="isUploading || isCompleted"
+            [class.pointer-events-none]="isUploading || isCompleted || hasPendingReview"
+            [class.opacity-40]="isUploading || isCompleted || hasPendingReview"
             title="Attach company documents"
           >
             <span class="material-symbols-outlined text-[20px]">{{ isUploading ? 'progress_activity' : 'attach_file' }}</span>
@@ -155,13 +169,13 @@
               multiple
               accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
               class="hidden"
-              [disabled]="isUploading || isCompleted"
+              [disabled]="isUploading || isCompleted || hasPendingReview"
               (change)="onFilesSelected($event)"
             />
           </label>
           <button
             (click)="toggleRecording()"
-            [disabled]="!speechSupported || isAnalyzing || isCompleted"
+            [disabled]="!speechSupported || isAnalyzing || isCompleted || hasPendingReview"
             class="absolute bottom-2 right-12 rounded-xl p-2 transition disabled:opacity-30"
             [ngClass]="isRecording ? 'bg-red-500/20 text-red-300' : 'text-gray-400 hover:bg-white/10 hover:text-white'"
             [title]="speechSupported ? (isRecording ? 'Stop dictation' : 'Dictate message') : 'Speech recognition is not supported in this browser'"
