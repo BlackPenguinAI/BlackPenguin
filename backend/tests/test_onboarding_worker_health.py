@@ -2,11 +2,67 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime
+import os
 from pathlib import Path
+import subprocess
+import sys
 from unittest.mock import AsyncMock, MagicMock, Mock
 
 from app.modules.onboarding_jobs import service
 from app.modules.onboarding_jobs.healthcheck import is_heartbeat_fresh, write_heartbeat
+
+
+def test_worker_entrypoint_loads_complete_model_registry():
+    """Validate mapper initialization in a clean Python interpreter.
+
+    Running this check in the pytest process could hide a missing worker import,
+    because another test may already have imported the complete model registry.
+    """
+    backend_root = Path(__file__).resolve().parents[1]
+    required_tables = {
+        "subscription_plans",
+        "companies",
+        "users",
+        "company_onboarding_sources",
+        "projects",
+        "project_onboarding_sources",
+        "onboarding_source_jobs",
+    }
+    script = f"""
+from sqlalchemy.orm import configure_mappers
+
+import app.modules.onboarding_jobs.worker
+from app.db.postgres import Base
+
+configure_mappers()
+
+required = {required_tables!r}
+missing = sorted(required.difference(Base.metadata.tables))
+if missing:
+    raise SystemExit(f"Missing model tables: {{missing}}")
+"""
+    env = os.environ.copy()
+    existing_pythonpath = env.get("PYTHONPATH")
+    env["PYTHONPATH"] = (
+        os.pathsep.join((str(backend_root), existing_pythonpath))
+        if existing_pythonpath
+        else str(backend_root)
+    )
+
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        cwd=backend_root,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+
+    assert result.returncode == 0, (
+        "The onboarding worker could not initialize the complete SQLAlchemy "
+        f"model registry.\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
+    )
 
 
 def test_heartbeat_is_fresh_only_inside_allowed_window(tmp_path: Path):
