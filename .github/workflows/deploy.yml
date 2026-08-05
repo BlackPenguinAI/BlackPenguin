@@ -23,6 +23,7 @@ jobs:
         uses: appleboy/ssh-action@v1.0.3
         env:
           DEPLOY_SHA: ${{ github.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
           DB_URL: ${{ secrets.DATABASE_URL }}
           META_TOKEN: ${{ secrets.META_ACCESS_TOKEN }}
           OPENROUTER_KEY: ${{ secrets.OPENROUTER_API_KEY }}
@@ -36,22 +37,40 @@ jobs:
           host: ${{ secrets.DO_HOST }}
           username: ${{ secrets.DO_USER }}
           key: ${{ secrets.DO_SSH_KEY }}
-          envs: DEPLOY_SHA,DB_URL,META_TOKEN,OPENROUTER_KEY,JWT_SECRET,SA_EMAIL,SA_PASS,MAILCHIMP_KEY,MAILCHIMP_LIST,MAILCHIMP_SERVER
+          envs: DEPLOY_SHA,PUSH_BEFORE_SHA,DB_URL,META_TOKEN,OPENROUTER_KEY,JWT_SECRET,SA_EMAIL,SA_PASS,MAILCHIMP_KEY,MAILCHIMP_LIST,MAILCHIMP_SERVER
           command_timeout: 30m
           script: |
             set -Eeuo pipefail
 
             REPOSITORY_DIR=/home/jorge/BlackPenguin
+            DEPLOY_STATE_FILE=/home/jorge/.blackpenguin-production-sha
             UPLOAD_DIR=/var/lib/blackpenguin/uploads
             API_IMAGE="blackpenguin-api:${DEPLOY_SHA}"
             FRONTEND_IMAGE="blackpenguin-frontend:${DEPLOY_SHA}"
             RELEASE_STARTED=false
+            DB_RESET_APPLIED=false
             PREVIOUS_API_IMAGE=""
             PREVIOUS_WORKER_IMAGE=""
             PREVIOUS_FRONTEND_IMAGE=""
+            DATABASE_BASELINE_KNOWN=false
 
             current_image() {
               docker inspect --format '{{.Config.Image}}' "$1" 2>/dev/null || true
+            }
+
+            image_revision() {
+              local image="$1"
+              [ -n "$image" ] || return 0
+              docker image inspect \
+                --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' \
+                "$image" 2>/dev/null || true
+            }
+
+            valid_commit() {
+              local revision="$1"
+              [ -n "$revision" ] && \
+                [ "$revision" != "0000000000000000000000000000000000000000" ] && \
+                git cat-file -e "${revision}^{commit}" 2>/dev/null
             }
 
             start_api() {
@@ -83,10 +102,39 @@ jobs:
               docker rm -f "$1" >/dev/null 2>&1 || true
             }
 
+            wait_for_version() {
+              for attempt in $(seq 1 30); do
+                if [ "$(curl --fail --silent \
+                  http://127.0.0.1:8000/api/v1/health/version 2>/dev/null | \
+                  python3 -c 'import json,sys; print(json.load(sys.stdin)["commit"])' \
+                  2>/dev/null || true)" = "$DEPLOY_SHA" ]; then
+                  return 0
+                fi
+                sleep 2
+              done
+              echo "API version check did not pass for $DEPLOY_SHA."
+              return 1
+            }
+
+            wait_for_readiness() {
+              for attempt in $(seq 1 30); do
+                if curl --fail --silent --show-error \
+                  http://127.0.0.1:8000/api/v1/health/ready >/dev/null; then
+                  return 0
+                fi
+                sleep 2
+              done
+              echo "API readiness check did not pass."
+              return 1
+            }
+
             rollback() {
               local exit_code=$?
               if [ "$RELEASE_STARTED" = true ]; then
-                echo "Deployment failed; restoring the previous release."
+                if [ "$DB_RESET_APPLIED" = true ]; then
+                  echo "WARNING: init_db.py already rebuilt the database; container rollback cannot restore deleted production data."
+                fi
+                echo "Deployment failed; restoring the previous container release."
                 remove_container bp_api_prod
                 remove_container bp_worker_prod
                 remove_container bp_frontend_prod
@@ -106,10 +154,52 @@ jobs:
               exit 1
             fi
 
+            PREVIOUS_API_IMAGE="$(current_image bp_api_prod)"
+            PREVIOUS_WORKER_IMAGE="$(current_image bp_worker_prod)"
+            PREVIOUS_FRONTEND_IMAGE="$(current_image bp_frontend_prod)"
+
+            RUNNING_API_SHA="$(curl --fail --silent \
+              http://127.0.0.1:8000/api/v1/health/version 2>/dev/null | \
+              python3 -c 'import json,sys; print(json.load(sys.stdin)["commit"])' \
+              2>/dev/null || true)"
+
             git fetch --prune origin main
             git cat-file -e "${DEPLOY_SHA}^{commit}"
             git checkout --detach "$DEPLOY_SHA"
             test "$(git rev-parse HEAD)" = "$DEPLOY_SHA"
+
+            PREVIOUS_DEPLOY_SHA="$RUNNING_API_SHA"
+            if ! valid_commit "$PREVIOUS_DEPLOY_SHA" && [ -f "$DEPLOY_STATE_FILE" ]; then
+              PREVIOUS_DEPLOY_SHA="$(tr -d '[:space:]' < "$DEPLOY_STATE_FILE")"
+            fi
+            if ! valid_commit "$PREVIOUS_DEPLOY_SHA"; then
+              PREVIOUS_DEPLOY_SHA="$(image_revision "$PREVIOUS_API_IMAGE")"
+            fi
+            if valid_commit "$PREVIOUS_DEPLOY_SHA"; then
+              DATABASE_BASELINE_KNOWN=true
+            fi
+            if ! valid_commit "$PREVIOUS_DEPLOY_SHA"; then
+              PREVIOUS_DEPLOY_SHA="$PUSH_BEFORE_SHA"
+            fi
+            if ! valid_commit "$PREVIOUS_DEPLOY_SHA"; then
+              PREVIOUS_DEPLOY_SHA="$(git rev-parse "${DEPLOY_SHA}^")"
+            fi
+
+            DB_RESET_REQUIRED=false
+            if [ "$DATABASE_BASELINE_KNOWN" = false ]; then
+              # The first run cannot prove which schema is in production. A
+              # clean rebuild establishes a trustworthy baseline for all
+              # subsequent automatic deployments.
+              DB_RESET_REQUIRED=true
+            elif git diff --name-only "$PREVIOUS_DEPLOY_SHA" "$DEPLOY_SHA" | \
+              grep -Eq '^(backend/app/init_db\.py|backend/app/db/|backend/app/(.*/)?models\.py|backend/app/modules/.+/prompts\.py|backend/alembic\.ini|backend/alembic/|backend/migrations/)'; then
+              DB_RESET_REQUIRED=true
+            fi
+
+            echo "Previously deployed commit: $PREVIOUS_DEPLOY_SHA"
+            echo "Database baseline known: $DATABASE_BASELINE_KNOWN"
+            echo "New deployment commit: $DEPLOY_SHA"
+            echo "Database rebuild required: $DB_RESET_REQUIRED"
 
             umask 077
             rm -f backend/.env
@@ -131,9 +221,6 @@ jobs:
               echo "PROJECT_UPLOAD_ROOT=$UPLOAD_DIR"
             } > backend/.env
 
-            sudo mkdir -p "$UPLOAD_DIR"
-            sudo chmod 750 "$UPLOAD_DIR"
-
             docker build --pull \
               --build-arg "APP_COMMIT_SHA=$DEPLOY_SHA" \
               -t "$API_IMAGE" \
@@ -148,40 +235,42 @@ jobs:
             docker run --rm "$API_IMAGE" python -c \
               "import inspect; from app.modules.company_onboarding.services import save_message; assert 'commit' in inspect.signature(save_message).parameters"
 
+            # Docker creates the bind-mount directory when it does not exist.
+            # The write check runs as the same image user as API and worker and
+            # therefore needs neither sudo nor an interactive password.
             docker run --rm \
-              --env-file backend/.env \
+              -v "${UPLOAD_DIR}:/uploads" \
               "$API_IMAGE" \
-              python -m app.scripts.reconcile_onboarding_jobs --apply
+              sh -c 'set -eu; touch /uploads/.deployment-write-test; rm /uploads/.deployment-write-test'
 
-            test "$(docker image inspect --format '{{ index .Config.Labels \"org.opencontainers.image.revision\" }}' "$API_IMAGE")" = "$DEPLOY_SHA"
-            test "$(docker image inspect --format '{{ index .Config.Labels \"org.opencontainers.image.revision\" }}' "$FRONTEND_IMAGE")" = "$DEPLOY_SHA"
+            test "$(image_revision "$API_IMAGE")" = "$DEPLOY_SHA"
+            test "$(image_revision "$FRONTEND_IMAGE")" = "$DEPLOY_SHA"
 
-            PREVIOUS_API_IMAGE="$(current_image bp_api_prod)"
-            PREVIOUS_WORKER_IMAGE="$(current_image bp_worker_prod)"
-            PREVIOUS_FRONTEND_IMAGE="$(current_image bp_frontend_prod)"
             RELEASE_STARTED=true
-
             remove_container bp_api_prod
             remove_container bp_worker_prod
             remove_container bp_frontend_prod
 
             start_api "$API_IMAGE" >/dev/null
-            start_worker "$API_IMAGE" >/dev/null
             start_frontend "$FRONTEND_IMAGE" >/dev/null
+            wait_for_version
 
-            for attempt in $(seq 1 30); do
-              if curl --fail --silent --show-error \
-                http://127.0.0.1:8000/api/v1/health/ready >/dev/null; then
-                break
-              fi
-              if [ "$attempt" -eq 30 ]; then
-                echo "API readiness check did not pass."
-                exit 1
-              fi
-              sleep 2
-            done
+            if [ "$DB_RESET_REQUIRED" = true ]; then
+              echo "Database-related changes detected; rebuilding with init_db.py."
+              docker exec bp_api_prod python -m app.init_db
+              DB_RESET_APPLIED=true
+              docker restart bp_api_prod >/dev/null
+              wait_for_version
+            else
+              docker run --rm \
+                --env-file backend/.env \
+                "$API_IMAGE" \
+                python -m app.scripts.reconcile_onboarding_jobs --apply
+            fi
 
-            test "$(curl --fail --silent http://127.0.0.1:8000/api/v1/health/version | python3 -c 'import json,sys; print(json.load(sys.stdin)["commit"])')" = "$DEPLOY_SHA"
+            start_worker "$API_IMAGE" >/dev/null
+            wait_for_readiness
+
             test "$(docker inspect --format '{{.State.Running}}' bp_worker_prod)" = true
             test "$(docker inspect --format '{{.State.Running}}' bp_frontend_prod)" = true
             test "$(docker inspect --format '{{.Config.Image}}' bp_api_prod)" = "$API_IMAGE"
@@ -192,4 +281,5 @@ jobs:
 
             RELEASE_STARTED=false
             trap - ERR
+            printf '%s\n' "$DEPLOY_SHA" > "$DEPLOY_STATE_FILE"
             echo "Deployment completed successfully: $DEPLOY_SHA"
