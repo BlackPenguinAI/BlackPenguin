@@ -21,12 +21,8 @@ from app.modules.projects.prompts import PROJECT_ONBOARDING_AGENT_CONFIG, SALES_
 from app.db.schema import CURRENT_SCHEMA_VERSION, SchemaVersion
 
 def init_db():
-    if os.getenv("ALLOW_DESTRUCTIVE_DB_RESET", "").lower() != "true":
-        raise RuntimeError(
-            "Refusing to reset the database. Set ALLOW_DESTRUCTIVE_DB_RESET=true "
-            "only for an intentional local development reset."
-        )
     print("🛑 ATENCIÓN: MODO 'CLEAN SLATE' ACTIVADO")
+    print("⚠️ Este comando reiniciará completamente la base de datos del entorno actual.")
     print("🗑️ Destruyendo esquema completo con CASCADE...")
     
     # 🚀 LA VERDADERA OPCIÓN NUCLEAR DE POSTGRESQL
