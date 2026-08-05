@@ -23,7 +23,6 @@ jobs:
         uses: appleboy/ssh-action@v1.0.3
         env:
           DEPLOY_SHA: ${{ github.sha }}
-          PUSH_BEFORE_SHA: ${{ github.event.before }}
           DB_URL: ${{ secrets.DATABASE_URL }}
           META_TOKEN: ${{ secrets.META_ACCESS_TOKEN }}
           OPENROUTER_KEY: ${{ secrets.OPENROUTER_API_KEY }}
@@ -37,13 +36,14 @@ jobs:
           host: ${{ secrets.DO_HOST }}
           username: ${{ secrets.DO_USER }}
           key: ${{ secrets.DO_SSH_KEY }}
-          envs: DEPLOY_SHA,PUSH_BEFORE_SHA,DB_URL,META_TOKEN,OPENROUTER_KEY,JWT_SECRET,SA_EMAIL,SA_PASS,MAILCHIMP_KEY,MAILCHIMP_LIST,MAILCHIMP_SERVER
+          envs: DEPLOY_SHA,DB_URL,META_TOKEN,OPENROUTER_KEY,JWT_SECRET,SA_EMAIL,SA_PASS,MAILCHIMP_KEY,MAILCHIMP_LIST,MAILCHIMP_SERVER
           command_timeout: 30m
           script: |
             set -Eeuo pipefail
 
             REPOSITORY_DIR=/home/jorge/BlackPenguin
             DEPLOY_STATE_FILE=/home/jorge/.blackpenguin-production-sha
+            LEGACY_DEPLOY_SHA=3871f225855e4a0cb09a4ab149afd2993170552d
             UPLOAD_DIR=/var/lib/blackpenguin/uploads
             API_IMAGE="blackpenguin-api:${DEPLOY_SHA}"
             FRONTEND_IMAGE="blackpenguin-frontend:${DEPLOY_SHA}"
@@ -175,23 +175,20 @@ jobs:
             if ! valid_commit "$PREVIOUS_DEPLOY_SHA"; then
               PREVIOUS_DEPLOY_SHA="$(image_revision "$PREVIOUS_API_IMAGE")"
             fi
+            if ! valid_commit "$PREVIOUS_DEPLOY_SHA"; then
+              # Transitional fallback for the last release confirmed in
+              # production before version labels and the state file existed.
+              PREVIOUS_DEPLOY_SHA="$LEGACY_DEPLOY_SHA"
+            fi
             if valid_commit "$PREVIOUS_DEPLOY_SHA"; then
               DATABASE_BASELINE_KNOWN=true
-            fi
-            if ! valid_commit "$PREVIOUS_DEPLOY_SHA"; then
-              PREVIOUS_DEPLOY_SHA="$PUSH_BEFORE_SHA"
-            fi
-            if ! valid_commit "$PREVIOUS_DEPLOY_SHA"; then
-              PREVIOUS_DEPLOY_SHA="$(git rev-parse "${DEPLOY_SHA}^")"
+            else
+              echo "Unable to identify the deployed database baseline safely."
+              exit 1
             fi
 
             DB_RESET_REQUIRED=false
-            if [ "$DATABASE_BASELINE_KNOWN" = false ]; then
-              # The first run cannot prove which schema is in production. A
-              # clean rebuild establishes a trustworthy baseline for all
-              # subsequent automatic deployments.
-              DB_RESET_REQUIRED=true
-            elif git diff --name-only "$PREVIOUS_DEPLOY_SHA" "$DEPLOY_SHA" | \
+            if git diff --name-only "$PREVIOUS_DEPLOY_SHA" "$DEPLOY_SHA" | \
               grep -Eq '^(backend/app/init_db\.py|backend/app/db/|backend/app/(.*/)?models\.py|backend/app/modules/.+/prompts\.py|backend/alembic\.ini|backend/alembic/|backend/migrations/)'; then
               DB_RESET_REQUIRED=true
             fi
@@ -230,9 +227,15 @@ jobs:
               -t "$FRONTEND_IMAGE" \
               ./frontend
 
-            docker run --rm "$API_IMAGE" python -c \
+            docker run --rm \
+              --env-file backend/.env \
+              "$API_IMAGE" \
+              python -c \
               "import inspect; from app.modules.projects.services import save_message; assert 'commit' in inspect.signature(save_message).parameters"
-            docker run --rm "$API_IMAGE" python -c \
+            docker run --rm \
+              --env-file backend/.env \
+              "$API_IMAGE" \
+              python -c \
               "import inspect; from app.modules.company_onboarding.services import save_message; assert 'commit' in inspect.signature(save_message).parameters"
 
             # Docker creates the bind-mount directory when it does not exist.
