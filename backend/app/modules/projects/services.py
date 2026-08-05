@@ -405,9 +405,3 @@ def delete_project(db: Session, project: Project, *, confirm_name: str) -> None:
         storage_service.restore_quarantined_files(quarantined)
         raise
     storage_service.purge_quarantined_files(quarantined)
-
-
-def save_message(db: Session, session_id: str, sender: SenderType, content: str) -> ProjectMessage:
-    message = ProjectMessage(session_id=session_id, sender=sender, content=content)
-    db.add(message); db.commit(); db.refresh(message)
-    return message
