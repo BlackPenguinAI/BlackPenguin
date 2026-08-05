@@ -30,3 +30,5 @@ from app.modules.projects.models import (
 )
 from app.modules.brokers.models import Broker
 from app.modules.sales_crm.models import Lead, SmsChatMessage, Meeting
+from app.modules.onboarding_jobs.models import OnboardingSourceJob
+from app.db.schema import SchemaVersion

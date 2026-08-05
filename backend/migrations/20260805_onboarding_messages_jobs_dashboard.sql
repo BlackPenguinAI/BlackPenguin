@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS onboarding_source_jobs (
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   started_at TIMESTAMP,
   completed_at TIMESTAMP,
+  available_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT uq_onboarding_source_jobs_idempotency UNIQUE (idempotency_key)
 );
@@ -49,5 +50,16 @@ CREATE INDEX IF NOT EXISTS ix_onboarding_source_jobs_scope ON onboarding_source_
 CREATE INDEX IF NOT EXISTS ix_onboarding_source_jobs_company ON onboarding_source_jobs(company_id);
 CREATE INDEX IF NOT EXISTS ix_onboarding_source_jobs_project ON onboarding_source_jobs(project_id);
 CREATE INDEX IF NOT EXISTS ix_onboarding_source_jobs_source ON onboarding_source_jobs(source_id);
+ALTER TABLE onboarding_source_jobs
+  ADD COLUMN IF NOT EXISTS available_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP;
+CREATE INDEX IF NOT EXISTS ix_onboarding_source_jobs_available_at ON onboarding_source_jobs(available_at);
+
+CREATE TABLE IF NOT EXISTS schema_versions (
+  version VARCHAR(100) PRIMARY KEY,
+  applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+INSERT INTO schema_versions(version)
+VALUES ('20260805_onboarding_jobs_v2')
+ON CONFLICT (version) DO NOTHING;
 
 COMMIT;

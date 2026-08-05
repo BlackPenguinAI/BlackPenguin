@@ -8,6 +8,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copiamos todo el código fuente modular
 COPY ./app /app/app
+COPY ./alembic.ini /app/alembic.ini
+COPY ./alembic /app/alembic
+COPY ./migrations /app/migrations
 
 # Exponer el puerto para K3s y Docker Compose local
 EXPOSE 8000

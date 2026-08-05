@@ -1,22 +1,36 @@
+import { HttpClientTestingModule } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { ActivatedRoute } from '@angular/router';
+import { RouterTestingModule } from '@angular/router/testing';
 
-import { ProjectChat } from './project-chat';
+import { ProjectChatComponent } from './project-chat';
 
-describe('ProjectChat', () => {
-  let component: ProjectChat;
-  let fixture: ComponentFixture<ProjectChat>;
+
+describe('ProjectChatComponent', () => {
+  let component: ProjectChatComponent;
+  let fixture: ComponentFixture<ProjectChatComponent>;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [ProjectChat],
+      imports: [ProjectChatComponent, HttpClientTestingModule, RouterTestingModule],
+      providers: [
+        {
+          provide: ActivatedRoute,
+          useValue: { snapshot: { paramMap: { get: () => 'project-1' } } },
+        },
+      ],
     }).compileComponents();
 
-    fixture = TestBed.createComponent(ProjectChat);
+    fixture = TestBed.createComponent(ProjectChatComponent);
     component = fixture.componentInstance;
-    await fixture.whenStable();
   });
 
   it('should create', () => {
     expect(component).toBeTruthy();
+  });
+
+  it('should wait for state before showing onboarding UI', () => {
+    expect(component.initialState).toBe('loading');
+    expect(component.showWelcome).toBe(false);
   });
 });

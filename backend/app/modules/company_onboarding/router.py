@@ -284,20 +284,31 @@ async def bootstrap_chat(
     if payload.initial_url and not payload.skip_website:
         profile = services.get_or_create_profile(db, current_user.company_id)
         url = str(payload.initial_url)
-        user_message = services.save_message(db, session.id, SenderType.USER, url)
-        source = source_service.create_url_source(
-            db, company_id=current_user.company_id, user_id=current_user.id,
-            url=url, message_id=user_message.id,
-        )
-        job = job_service.enqueue(
-            db, scope="company", company_id=current_user.company_id,
-            source_id=source.id, url=url, session_id=session.id, message_id=user_message.id,
-        )
-        source = job_service.deduplicate_source(db, job, source)
-        status_message = services.save_message(
-            db, session.id, SenderType.AI,
-            f"I'm processing **{source.name}** now. You can keep this page open or return later; the result will appear automatically.",
-        )
+        try:
+            user_message = services.save_message(
+                db, session.id, SenderType.USER, url, commit=False,
+            )
+            source = source_service.create_url_source(
+                db, company_id=current_user.company_id, user_id=current_user.id,
+                url=url, message_id=user_message.id, commit=False,
+            )
+            job = job_service.enqueue(
+                db, scope="company", company_id=current_user.company_id,
+                source_id=source.id, url=url, session_id=session.id,
+                message_id=user_message.id, commit=False,
+            )
+            source = job_service.deduplicate_source(db, job, source, commit=False)
+            status_message = services.save_message(
+                db, session.id, SenderType.AI,
+                f"I'm processing **{source.name}** now. You can keep this page open or return later; the result will appear automatically.",
+                commit=False,
+            )
+            db.commit()
+            for item in (user_message, source, status_message):
+                db.refresh(item)
+        except Exception:
+            db.rollback()
+            raise
         return {
             "message": _message_payload(status_message), "user_message": _message_payload(user_message),
             "profile": services.serialize_profile(profile), "accepted_fields": [], "rejected_updates": [],
@@ -383,20 +394,27 @@ async def send_chat_message(
         url = raw_url.rstrip(".,;:!?)\"]}")
         try:
             source = source_service.create_url_source(
-                    db,
-                    company_id=current_user.company_id,
-                    user_id=current_user.id,
-                    url=url,
-                    message_id=user_message.id,
-                )
+                db,
+                company_id=current_user.company_id,
+                user_id=current_user.id,
+                url=url,
+                message_id=user_message.id,
+                commit=False,
+            )
             job = job_service.enqueue(
                 db, scope="company", company_id=current_user.company_id, source_id=source.id,
-                url=url, session_id=session.id, message_id=user_message.id,
+                url=url, session_id=session.id, message_id=user_message.id, commit=False,
             )
-            source = job_service.deduplicate_source(db, job, source)
+            source = job_service.deduplicate_source(db, job, source, commit=False)
+            db.commit()
+            db.refresh(source)
             source_results.append(source)
         except HTTPException as exc:
+            db.rollback()
             source_errors.append({"url": url, "error": exc.detail})
+        except Exception:
+            db.rollback()
+            raise
 
     agent_config = ai_config.agent_onboarding_empresa or {}
     system_instruction = _system_instruction(agent_config)
@@ -546,6 +564,30 @@ def download_source_file(
     )
 
 
+@router.post("/sources/{source_id}/retry", response_model=SourceResponse, status_code=202)
+def retry_url_source(
+    source_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([UserRole.ADMIN])),
+):
+    source = db.query(CompanyOnboardingSource).filter(
+        CompanyOnboardingSource.id == source_id,
+        CompanyOnboardingSource.company_id == current_user.company_id,
+    ).first()
+    if not source:
+        raise HTTPException(status_code=404, detail="Source not found.")
+    if not source.url:
+        raise HTTPException(status_code=409, detail="This source has no URL to retry.")
+    if not job_service.retry_job(db, scope="company", source_id=source.id):
+        raise HTTPException(status_code=409, detail="This source has no recoverable job.")
+    source.status = source.status.__class__.PROCESSING
+    source.error_message = None
+    db.add(source)
+    db.commit()
+    db.refresh(source)
+    return source_service.serialize_source(source)
+
+
 @router.post("/sources/url", response_model=SourceResponse, status_code=202)
 async def add_url_source(
     payload: ScrapeRequest,
@@ -553,17 +595,24 @@ async def add_url_source(
     current_user: User = Depends(RoleChecker([UserRole.ADMIN])),
 ):
     session = services.get_or_create_session(db, current_user.company_id)
-    source = source_service.create_url_source(
-        db,
-        company_id=current_user.company_id,
-        user_id=current_user.id,
-        url=str(payload.url),
-    )
-    job = job_service.enqueue(
-        db, scope="company", company_id=current_user.company_id, source_id=source.id,
-        url=str(payload.url), session_id=session.id,
-    )
-    source = job_service.deduplicate_source(db, job, source)
+    try:
+        source = source_service.create_url_source(
+            db,
+            company_id=current_user.company_id,
+            user_id=current_user.id,
+            url=str(payload.url),
+            commit=False,
+        )
+        job = job_service.enqueue(
+            db, scope="company", company_id=current_user.company_id, source_id=source.id,
+            url=str(payload.url), session_id=session.id, commit=False,
+        )
+        source = job_service.deduplicate_source(db, job, source, commit=False)
+        db.commit()
+        db.refresh(source)
+    except Exception:
+        db.rollback()
+        raise
     return source_service.serialize_source(source)
 
 

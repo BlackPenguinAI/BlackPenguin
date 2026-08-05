@@ -40,6 +40,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   metaConnections: MetaConnection[] = [];
   profile: ProjectProfile = EMPTY_PROJECT_PROFILE;
   showWelcome = false;
+  initialState: 'loading' | 'ready' | 'error' = 'loading';
   nextQuestion: OnboardingQuestion | null = null;
   showCampaignForm = false;
   showMetaForm = false;
@@ -125,6 +126,11 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
       },
       error: () => { this.showWelcome = true; this.isAnalyzing = false; this.errorMessage = 'The website could not be processed. You can retry or continue without it.'; },
     });
+  }
+  retryInitialState(): void {
+    this.initialState = 'loading';
+    this.errorMessage = '';
+    this.syncState();
   }
   chooseAnswer(value: string, message?: ChatMessage): void { this.prompt = value; this.replyToMessageId = message?.id || null; }
   writeCustomAnswer(message?: ChatMessage): void { this.prompt = ''; this.replyToMessageId = message?.id || null; }
@@ -233,6 +239,20 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     });
   }
 
+  retrySource(source: ProjectSource): void {
+    if (source.status !== 'failed') return;
+    this.errorMessage = '';
+    this.onboarding.retrySource(this.projectId, source.id).subscribe({
+      next: (updated) => {
+        this.mergeSources([updated]);
+        this.schedulePolling();
+      },
+      error: () => {
+        this.errorMessage = 'The website could not be queued again. Check its URL or try later.';
+      },
+    });
+  }
+
   setCover(source: ProjectSource): void {
     if (source.kind !== 'image' || source.is_primary) return;
     this.onboarding.setCover(this.projectId, source.id).subscribe({
@@ -301,8 +321,18 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   }
   private syncState(scroll = false): void {
     this.onboarding.getState(this.projectId).subscribe({
-      next: (state) => { this.applyState(state); if (scroll) this.scrollToBottom(); },
-      error: (error: HttpErrorResponse) => { if (error.status !== 401) this.errorMessage = 'The Project Onboarding state could not be synchronized.'; },
+      next: (state) => {
+        this.initialState = 'ready';
+        this.applyState(state);
+        if (scroll) this.scrollToBottom();
+      },
+      error: (error: HttpErrorResponse) => {
+        if (error.status !== 401) {
+          this.initialState = 'error';
+          this.errorMessage = 'The Project Onboarding state could not be synchronized.';
+          this.cdr.detectChanges();
+        }
+      },
     });
   }
   private applyState(state: OnboardingState): void {

@@ -18,8 +18,14 @@ from app.modules.companies.models import Company
 # the same onboarding behavior.
 from app.modules.company_onboarding.prompts import COMPANY_ONBOARDING_AGENT_CONFIG
 from app.modules.projects.prompts import PROJECT_ONBOARDING_AGENT_CONFIG, SALES_AGENT_CONFIG
+from app.db.schema import CURRENT_SCHEMA_VERSION, SchemaVersion
 
 def init_db():
+    if os.getenv("ALLOW_DESTRUCTIVE_DB_RESET", "").lower() != "true":
+        raise RuntimeError(
+            "Refusing to reset the database. Set ALLOW_DESTRUCTIVE_DB_RESET=true "
+            "only for an intentional local development reset."
+        )
     print("🛑 ATENCIÓN: MODO 'CLEAN SLATE' ACTIVADO")
     print("🗑️ Destruyendo esquema completo con CASCADE...")
     
@@ -33,6 +39,8 @@ def init_db():
 
     db: Session = SessionLocal()
     try:
+        db.merge(SchemaVersion(version=CURRENT_SCHEMA_VERSION))
+        db.commit()
         # =======================================================
         # 🔧 0. PARCHE REPARADOR DE COLUMNA FALTANTE
         # =======================================================

@@ -85,6 +85,7 @@ async def ingest_url(
 def create_url_source(
     db: Session, *, company_id: str, user_id: str, url: str,
     message_id: str | None = None,
+    commit: bool = True,
 ) -> CompanyOnboardingSource:
     validate_public_url(url)
     source = CompanyOnboardingSource(
@@ -97,8 +98,11 @@ def create_url_source(
         url=url,
     )
     db.add(source)
-    db.commit()
-    db.refresh(source)
+    if commit:
+        db.commit()
+        db.refresh(source)
+    else:
+        db.flush()
     return source
 
 

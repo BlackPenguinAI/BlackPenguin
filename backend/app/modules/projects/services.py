@@ -80,12 +80,17 @@ def save_message(
     db: Session, session_id: str, sender: SenderType, content: str, *,
     ui_payload: dict[str, Any] | None = None,
     in_reply_to_message_id: str | None = None,
+    commit: bool = True,
 ) -> ProjectMessage:
     message = ProjectMessage(
         session_id=session_id, sender=sender, content=content,
         ui_payload=ui_payload, in_reply_to_message_id=in_reply_to_message_id,
     )
-    db.add(message); db.commit(); db.refresh(message)
+    db.add(message)
+    if commit:
+        db.commit(); db.refresh(message)
+    else:
+        db.flush()
     return message
 
 

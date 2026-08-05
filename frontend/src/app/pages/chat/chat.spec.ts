@@ -25,6 +25,11 @@ describe('ChatComponent', () => {
     expect(component).toBeTruthy();
   });
 
+  it('should not render the chat before the initial state is loaded', () => {
+    expect(component.initialState).toBe('loading');
+    expect(component.showWelcome).toBe(false);
+  });
+
   it('should expose required and conditional fields separately', () => {
     component.profile = {
       ...EMPTY_COMPANY_PROFILE,

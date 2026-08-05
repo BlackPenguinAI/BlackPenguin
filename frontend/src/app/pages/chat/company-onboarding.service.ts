@@ -50,6 +50,10 @@ export class CompanyOnboardingService {
     return this.http.get<OnboardingSource[]>(`${this.baseUrl}/sources`);
   }
 
+  retrySource(sourceId: string): Observable<OnboardingSource> {
+    return this.http.post<OnboardingSource>(`${this.baseUrl}/sources/${sourceId}/retry`, {});
+  }
+
   uploadFiles(files: File[]): Observable<OnboardingSource[]> {
     const body = new FormData();
     files.forEach((file) => body.append('files', file, file.name));

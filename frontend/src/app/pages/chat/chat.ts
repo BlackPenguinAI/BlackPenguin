@@ -57,6 +57,7 @@ export class ChatComponent implements OnInit, OnDestroy {
   sources: OnboardingSource[] = [];
   profile: CompanyProfileResponse = EMPTY_COMPANY_PROFILE;
   showWelcome = false;
+  initialState: 'loading' | 'ready' | 'error' = 'loading';
   nextQuestion: OnboardingQuestion | null = null;
   private readonly markdownCache = new Map<string, string>();
   private readonly speechSubscriptions = new Subscription();
@@ -170,6 +171,12 @@ export class ChatComponent implements OnInit, OnDestroy {
       next: (turn) => { this.applyTurn(turn); this.isAnalyzing = false; this.schedulePolling(); this.scrollToBottom(); },
       error: () => { this.showWelcome = true; this.isAnalyzing = false; this.errorMessage = 'The website could not be processed. You can retry or continue without it.'; },
     });
+  }
+
+  retryInitialState(): void {
+    this.initialState = 'loading';
+    this.errorMessage = '';
+    this.syncState();
   }
 
   chooseAnswer(value: string, message?: ChatMessage): void { this.prompt = value; this.replyToMessageId = message?.id || null; }
@@ -328,6 +335,20 @@ export class ChatComponent implements OnInit, OnDestroy {
     });
   }
 
+  retrySource(source: OnboardingSource): void {
+    if (source.status !== 'failed') return;
+    this.errorMessage = '';
+    this.onboarding.retrySource(source.id).subscribe({
+      next: (updated) => {
+        this.mergeSources([updated]);
+        this.schedulePolling();
+      },
+      error: () => {
+        this.errorMessage = 'The website could not be queued again. Check its URL or try later.';
+      },
+    });
+  }
+
   formatValue(value: unknown): string {
     if (typeof value === 'string') return value;
     if (value === null || value === undefined) return '';
@@ -402,11 +423,16 @@ export class ChatComponent implements OnInit, OnDestroy {
   private syncState(scroll = false): void {
     this.onboarding.getState().subscribe({
       next: (state) => {
+        this.initialState = 'ready';
         this.applyState(state);
         if (scroll) this.scrollToBottom();
       },
       error: (error: HttpErrorResponse) => {
-        if (error.status !== 401) this.errorMessage = 'The onboarding state could not be synchronized.';
+        if (error.status !== 401) {
+          this.initialState = 'error';
+          this.errorMessage = 'The onboarding state could not be synchronized.';
+          this.cdr.detectChanges();
+        }
       },
     });
   }

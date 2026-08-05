@@ -33,6 +33,9 @@ export class ProjectOnboardingService {
     return this.http.post<ChatTurn>(`${this.baseUrl}/${id}/chat/with-files`, body);
   }
   getSources(id: string): Observable<ProjectSource[]> { return this.http.get<ProjectSource[]>(`${this.baseUrl}/${id}/sources`); }
+  retrySource(id: string, sourceId: string): Observable<ProjectSource> {
+    return this.http.post<ProjectSource>(`${this.baseUrl}/${id}/sources/${sourceId}/retry`, {});
+  }
   uploadFiles(id: string, files: File[]): Observable<ProjectSource[]> {
     const body = new FormData(); files.forEach((file) => body.append('files', file, file.name));
     return this.http.post<ProjectSource[]>(`${this.baseUrl}/${id}/sources/files`, body);

@@ -62,13 +62,18 @@ async def ingest_url(
 
 def create_url_source(
     db: Session, *, project_id: str, user_id: str, url: str, message_id: str | None = None,
+    commit: bool = True,
 ) -> ProjectOnboardingSource:
     validate_public_url(url)
     source = ProjectOnboardingSource(
         project_id=project_id, message_id=message_id, uploaded_by_user_id=user_id, kind=ProjectSourceKind.URL,
         status=ProjectSourceStatus.PROCESSING, name=(urlparse(url).hostname or url)[:255], url=url,
     )
-    db.add(source); db.commit(); db.refresh(source)
+    db.add(source)
+    if commit:
+        db.commit(); db.refresh(source)
+    else:
+        db.flush()
     return source
 
 

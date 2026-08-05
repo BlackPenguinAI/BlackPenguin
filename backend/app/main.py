@@ -1,5 +1,3 @@
-import asyncio
-from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware 
 from app.core.config import settings
@@ -21,26 +19,15 @@ from app.modules.brokers.router import router as brokers_router
 from app.modules.sales_crm.router import router as sales_crm_router
 from app.modules.dashboard.router import router as dashboard_router
 from app.modules.dashboard.legacy_router import router as legacy_dashboard_router
-from app.modules.onboarding_jobs.service import run_worker
+from app.modules.health.router import router as health_router
 
 from sqlalchemy import text
 from app.db.postgres import engine
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    stop_event = asyncio.Event()
-    worker = asyncio.create_task(run_worker(stop_event))
-    try:
-        yield
-    finally:
-        stop_event.set()
-        await worker
 
 app = FastAPI(
     title=settings.PROJECT_NAME, 
     version=settings.VERSION,
     description="Black Penguin Core API v2 - DDD Flat Architecture.",
-    lifespan=lifespan 
 )
 
 # 🚀 CONFIGURACIÓN DE CORS
@@ -85,6 +72,7 @@ app.include_router(brokers_router, prefix=f"{settings.API_V1_STR}/brokers", tags
 app.include_router(sales_crm_router, prefix=f"{settings.API_V1_STR}/sales", tags=["11. CRM & Ventas"])
 app.include_router(dashboard_router, prefix=f"{settings.API_V1_STR}/dashboard", tags=["12. Dashboard"])
 app.include_router(legacy_dashboard_router, prefix=f"{settings.API_V1_STR}/tenants", tags=["12. Dashboard"])
+app.include_router(health_router, prefix=f"{settings.API_V1_STR}/health", tags=["Health"])
 
 @app.get("/", tags=["Health"])
 def health_check():

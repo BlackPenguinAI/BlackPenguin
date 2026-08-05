@@ -1,4 +1,7 @@
+from app.db.base import Base
+from app.db.schema import CURRENT_SCHEMA_VERSION
 from app.modules.company_onboarding.models import OnboardingMessage
+from app.modules.onboarding_jobs.models import OnboardingSourceJob
 from app.modules.onboarding_jobs.service import normalize_url
 from app.modules.projects.models import ProjectMessage
 
@@ -6,6 +9,16 @@ from app.modules.projects.models import ProjectMessage
 def test_url_normalization_supports_idempotent_jobs():
     assert normalize_url("HTTPS://Example.COM/project/#overview") == "https://example.com/project"
     assert normalize_url("https://example.com/project") == "https://example.com/project"
+
+
+def test_create_all_metadata_registers_durable_jobs_and_schema_version():
+    assert OnboardingSourceJob.__tablename__ in Base.metadata.tables
+    assert "schema_versions" in Base.metadata.tables
+    assert CURRENT_SCHEMA_VERSION == "20260805_onboarding_jobs_v2"
+
+
+def test_jobs_include_retry_availability_timestamp():
+    assert "available_at" in OnboardingSourceJob.__table__.columns
 
 
 def test_company_messages_persist_visual_question_and_reply_state():
