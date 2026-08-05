@@ -113,6 +113,12 @@ jobs:
                 sleep 2
               done
               echo "API version check did not pass for $DEPLOY_SHA."
+              docker inspect --format \
+                'running={{.State.Running}} status={{.State.Status}} exit={{.State.ExitCode}}' \
+                bp_api_prod 2>/dev/null || true
+              docker logs --tail 150 bp_api_prod 2>&1 || true
+              curl --silent --show-error --include \
+                http://127.0.0.1:8000/api/v1/health/version || true
               return 1
             }
 
@@ -125,6 +131,12 @@ jobs:
                 sleep 2
               done
               echo "API readiness check did not pass."
+              docker inspect --format \
+                'running={{.State.Running}} status={{.State.Status}} exit={{.State.ExitCode}}' \
+                bp_api_prod 2>/dev/null || true
+              docker logs --tail 150 bp_api_prod 2>&1 || true
+              curl --silent --show-error --include \
+                http://127.0.0.1:8000/api/v1/health/ready || true
               return 1
             }
 

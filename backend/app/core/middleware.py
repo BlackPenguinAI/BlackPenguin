@@ -4,39 +4,78 @@ from starlette.responses import JSONResponse
 from jose import jwt
 from app.core.config import settings
 
+
 class MultiTenantMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         path = request.url.path
-        
-        # 🚀 NUEVO: Permitir acceso público a las rutas legales SOLO para lectura (GET)
-        is_public_legal_route = request.method == "GET" and path.startswith(f"{settings.API_V1_STR}/system/legal/")
-        
-        # 🚀 CORREGIDO: Usamos startswith para flexibilidad con la barra final
-        is_waitlist_post = request.method == "POST" and path.startswith(f"{settings.API_V1_STR}/waitlist")
 
-        # 🚀 CORREGIDO: ¡Agregamos 'or is_waitlist_post' al final de esta línea!
-        if path in ["/", "/docs", "/openapi.json", f"{settings.API_V1_STR}/auth/login", f"{settings.API_V1_STR}/auth/setup-master"] or is_public_legal_route or is_waitlist_post:
+        # Public legal documents remain read-only.
+        is_public_legal_route = request.method == "GET" and path.startswith(
+            f"{settings.API_V1_STR}/system/legal/"
+        )
+
+        # The waitlist only exposes its public registration operation.
+        is_waitlist_post = request.method == "POST" and path.startswith(
+            f"{settings.API_V1_STR}/waitlist"
+        )
+
+        # Deployment probes must be callable locally without a user JWT.
+        # Keep this allow-list exact so no other health route becomes public.
+        is_health_route = request.method == "GET" and path in {
+            f"{settings.API_V1_STR}/health/version",
+            f"{settings.API_V1_STR}/health/ready",
+        }
+
+        if (
+            path
+            in [
+                "/",
+                "/docs",
+                "/openapi.json",
+                f"{settings.API_V1_STR}/auth/login",
+                f"{settings.API_V1_STR}/auth/setup-master",
+            ]
+            or is_public_legal_route
+            or is_waitlist_post
+            or is_health_route
+        ):
             return await call_next(request)
 
-        # Validación del token para todo el resto de la aplicación
+        # Token validation for every other application route.
         auth_header = request.headers.get("Authorization")
         if not auth_header or not auth_header.startswith("Bearer "):
-            return JSONResponse(status_code=401, content={"detail": "No autorizado. Token Bearer ausente."})
+            return JSONResponse(
+                status_code=401,
+                content={"detail": "No autorizado. Token Bearer ausente."},
+            )
 
         token = auth_header.split(" ")[1]
-        
+
         try:
-            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+            payload = jwt.decode(
+                token,
+                settings.SECRET_KEY,
+                algorithms=[settings.ALGORITHM],
+            )
             request.state.user_email = payload.get("sub")
             request.state.role = payload.get("role")
             request.state.company_id = payload.get("company_id")
 
             if request.state.role != "superadmin" and not request.state.company_id:
-                return JSONResponse(status_code=403, content={"detail": "Falta contexto perimetral (company_id)."})
+                return JSONResponse(
+                    status_code=403,
+                    content={"detail": "Falta contexto perimetral (company_id)."},
+                )
 
         except jwt.ExpiredSignatureError:
-            return JSONResponse(status_code=401, content={"detail": "El token ha expirado."})
+            return JSONResponse(
+                status_code=401,
+                content={"detail": "El token ha expirado."},
+            )
         except jwt.JWTError:
-            return JSONResponse(status_code=401, content={"detail": "Token inválido."})
+            return JSONResponse(
+                status_code=401,
+                content={"detail": "Token inválido."},
+            )
 
         return await call_next(request)
