@@ -1,4 +1,4 @@
-import { Component, AfterViewInit, ViewChild, ElementRef, HostListener } from '@angular/core';
+import { Component, AfterViewInit, OnDestroy, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterModule, Router } from '@angular/router';
@@ -13,12 +13,19 @@ import { ToastService } from '../../core/services/toast';
   templateUrl: './login.html',
   styleUrl: './login.scss'
 })
-export class LoginComponent implements AfterViewInit {
+export class LoginComponent implements AfterViewInit, OnDestroy {
+  readonly backgroundVideoSrc = 'https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260403_050628_c4e32401-fab4-4a27-b7a8-6e9291cd5959.mp4';
+
   @ViewChild('bgVideo') bgVideo!: ElementRef<HTMLVideoElement>;
   
   credentials = { email: '', password: '' };
+  rememberDevice = false;
+  showPassword = false;
   isSubmitting = false;
   currentLang: string = 'en';
+  private backgroundSegmentStart = 0;
+  private backgroundSegmentEnd = 0;
+  private backgroundTimeCheck?: number;
 
   constructor(
     private router: Router, 
@@ -49,7 +56,15 @@ export class LoginComponent implements AfterViewInit {
   ngAfterViewInit() {
     if (this.bgVideo?.nativeElement) {
       this.bgVideo.nativeElement.muted = true;
+      this.syncBackgroundVideoSegment();
       this.bgVideo.nativeElement.play().catch(() => {});
+    }
+    this.backgroundTimeCheck = window.setInterval(() => this.syncBackgroundVideoSegment(), 60_000);
+  }
+
+  ngOnDestroy() {
+    if (this.backgroundTimeCheck) {
+      window.clearInterval(this.backgroundTimeCheck);
     }
   }
 
@@ -74,6 +89,10 @@ export class LoginComponent implements AfterViewInit {
     });
   }
 
+  togglePasswordVisibility() {
+    this.showPassword = !this.showPassword;
+  }
+
   private getSafeReturnUrl(userRole: string): string {
     const requestedUrl = this.route.snapshot.queryParamMap.get('returnUrl');
     const defaultUrl = userRole === 'superadmin' ? '/admin' : '/app';
@@ -93,12 +112,43 @@ export class LoginComponent implements AfterViewInit {
     return defaultUrl;
   }
 
-  @HostListener('document:mousemove', ['$event'])
-  onMouseMove(e: MouseEvent) {
-    if (this.bgVideo?.nativeElement) {
-      const moveX = (e.clientX - window.innerWidth / 2) * 0.015;
-      const moveY = (e.clientY - window.innerHeight / 2) * 0.015;
-      this.bgVideo.nativeElement.style.transform = `scale(1.1) translate(${moveX}px, ${moveY}px)`;
+  syncBackgroundVideoSegment() {
+    const video = this.bgVideo?.nativeElement;
+    if (!video || !Number.isFinite(video.duration) || video.duration <= 0) {
+      return;
     }
+
+    const segmentBoundary = video.duration / 2;
+    const isClearSkyTime = this.isClearSkyTime(new Date());
+    const nextStart = isClearSkyTime ? 0 : segmentBoundary;
+    const nextEnd = isClearSkyTime ? segmentBoundary : video.duration;
+    const segmentChanged = nextStart !== this.backgroundSegmentStart || nextEnd !== this.backgroundSegmentEnd;
+
+    this.backgroundSegmentStart = nextStart;
+    this.backgroundSegmentEnd = nextEnd;
+
+    if (segmentChanged || video.currentTime < nextStart || video.currentTime >= nextEnd) {
+      video.currentTime = nextStart;
+    }
+  }
+
+  keepBackgroundInSelectedSegment() {
+    const video = this.bgVideo?.nativeElement;
+    if (!video || !this.backgroundSegmentEnd) {
+      return;
+    }
+
+    if (video.currentTime >= this.backgroundSegmentEnd) {
+      video.currentTime = this.backgroundSegmentStart;
+      video.play().catch(() => {});
+    }
+  }
+
+  private isClearSkyTime(now: Date): boolean {
+    const minutes = now.getHours() * 60 + now.getMinutes();
+    const clearSkyStart = 6 * 60;
+    const clearSkyEnd = 17 * 60;
+
+    return minutes >= clearSkyStart && minutes <= clearSkyEnd;
   }
 }

@@ -20,22 +20,19 @@
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
-        <div class="flex flex-col gap-1.5 w-full">
-          <label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold ml-1">Company</label>
-          <select [(ngModel)]="filters.company_id" (change)="loadUsers()"
-                  class="w-full bg-black/50 border border-white/10 focus:border-secondary rounded-xl py-2.5 px-3 text-xs text-white outline-none transition-colors">
-            <option value="" class="bg-[#111] text-white">All Companies</option>
-            <option *ngFor="let c of companies" [value]="c.id" class="bg-[#111] text-white">{{ c.name }}</option>
-          </select>
-        </div>
+        <app-select
+          label="Company"
+          [options]="companyOptions"
+          [(ngModel)]="filters.company_id"
+          (selectionChange)="loadUsers()">
+        </app-select>
 
-        <div class="flex flex-col gap-1.5 w-full">
-          <label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold ml-1">Role</label>
-          <select [(ngModel)]="filters.role" (change)="loadUsers()"
-                  class="w-full bg-black/50 border border-white/10 focus:border-secondary rounded-xl py-2.5 px-3 text-xs text-white outline-none transition-colors">
-            <option *ngFor="let r of roles" [value]="r.value" class="bg-[#111] text-white">{{ r.label }}</option>
-          </select>
-        </div>
+        <app-select
+          label="Role"
+          [options]="roles"
+          [(ngModel)]="filters.role"
+          (selectionChange)="loadUsers()">
+        </app-select>
 
         <app-input label="First Name" placeholder="Search..." [(ngModel)]="filters.first_name" (ngModelChange)="loadUsers()"></app-input>
 

@@ -41,12 +41,8 @@
 
       <div class="flex flex-col gap-6">
         
-        <div class="flex flex-col gap-2">
-          <label class="text-xs font-medium text-gray-400 uppercase tracking-widest">Modelo Base de IA</label>
-          <select name="activeModel" [(ngModel)]="activeAgent.model" class="bg-black/80 border border-white/10 focus:border-secondary rounded-xl px-4 py-3 text-sm text-white focus:outline-none appearance-none cursor-pointer max-w-sm">
-            <option value="" disabled>{{ 'AI_CONFIG.SEL_PLACEHOLDER' | translate }}</option>
-            <option *ngFor="let model of config.available_models" [value]="model">{{ model }}</option>
-          </select>
+        <div class="max-w-sm">
+          <app-select label="Modelo Base de IA" [options]="modelOptions" [(ngModel)]="activeAgent.model" name="activeModel"></app-select>
         </div>
 
         <div class="grid grid-cols-1 gap-6">

@@ -8,11 +8,12 @@ import { ToastService } from '../../../../core/services/toast';
 
 import { GlassCardComponent } from '../../../../shared/ui/glass-card/glass-card';
 import { ButtonComponent } from '../../../../shared/ui/button/button';
+import { SelectComponent, SelectOption } from '../../../../shared/ui/select/select';
 
 @Component({
   selector: 'app-ai-settings-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, TranslateModule, GlassCardComponent, ButtonComponent],
+  imports: [CommonModule, FormsModule, TranslateModule, GlassCardComponent, ButtonComponent, SelectComponent],
   templateUrl: './ai-settings-page.html'
 })
 export class AiSettingsPageComponent implements OnInit {
@@ -28,6 +29,16 @@ export class AiSettingsPageComponent implements OnInit {
   activeTab: string = 'empresa';
   isLoading: boolean = true;
   isSaving: boolean = false;
+
+  get modelOptions(): SelectOption[] {
+    return [
+      { label: 'Selecciona un modelo base...', value: '', disabled: true },
+      ...this.config.available_models.map((model: string) => ({
+        label: model,
+        value: model
+      }))
+    ];
+  }
 
   constructor(
     private aiService: AiConfigService, 

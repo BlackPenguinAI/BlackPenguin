@@ -3,11 +3,12 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { SelectComponent, SelectOption } from '../../../shared/ui/select/select';
 
 @Component({
   selector: 'app-staff-profile',
   standalone: true,
-  imports: [CommonModule, FormsModule, TranslateModule],
+  imports: [CommonModule, FormsModule, TranslateModule, SelectComponent],
   templateUrl: './profile.html',
   styleUrl: './profile.scss'
 })
@@ -25,6 +26,14 @@ export class StaffProfileComponent implements OnInit {
     city: '',
     address: ''
   };
+
+  readonly documentTypeOptions: SelectOption[] = [
+    { label: 'Seleccionar...', value: '', disabled: true },
+    { label: 'DNI / ID', value: 'DNI' },
+    { label: 'Carnet de Extranjeria', value: 'CE' },
+    { label: 'Pasaporte', value: 'PASSPORT' },
+    { label: 'RUT', value: 'RUT' }
+  ];
 
   isLoading: boolean = true;
   isSaving: boolean = false;

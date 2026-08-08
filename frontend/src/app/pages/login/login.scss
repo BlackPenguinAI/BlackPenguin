@@ -1,0 +1,261 @@
+.login-bg-video {
+    transform: scale(1.1);
+}
+
+.login-glass {
+    background: rgba(255, 255, 255, 0.62);
+    border: 1px solid rgba(255, 255, 255, 0.48);
+    color: rgba(0, 0, 0, 0.72);
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.18);
+    backdrop-filter: blur(22px) saturate(180%);
+    -webkit-backdrop-filter: blur(22px) saturate(180%);
+}
+
+.login-glass button[routerLink="/"] {
+    color: rgba(0, 0, 0, 0.58);
+}
+
+.login-glass button[routerLink="/"]:hover {
+    color: #000;
+}
+
+.login-copy {
+    margin-top: 0.25rem;
+}
+
+.login-copy-title {
+    color: #111;
+    font-size: 0.95rem;
+    font-weight: 700;
+    line-height: 1.25;
+}
+
+.login-copy-detail {
+    margin-top: 0.18rem;
+    color: #4a4a4a;
+    font-size: 0.78rem;
+    line-height: 1.35;
+}
+
+.login-field-label {
+    padding-inline: 0.25rem;
+    color: #000;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.login-input {
+    min-height: 3.55rem;
+    background: #333331;
+    border: 1px solid #3A3A3A;
+    color: #FFFFFF;
+    caret-color: #F5A000;
+}
+
+.login-input:focus {
+    background: #333331;
+    border-color: #F5A000;
+    box-shadow: 0 0 0 2px rgba(245, 160, 0, 0.15);
+}
+
+.login-input::placeholder {
+    color: #8A8A8A;
+}
+
+.password-input-wrap {
+    position: relative;
+}
+
+.password-visibility-button {
+    position: absolute;
+    top: 50%;
+    right: 0.65rem;
+    display: inline-flex;
+    width: 2.25rem;
+    height: 2.25rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    color: rgba(255, 255, 255, 0.72);
+    transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease;
+    transform: translateY(-50%);
+}
+
+.password-visibility-button:hover,
+.password-visibility-button:focus-visible {
+    background: rgba(255, 255, 255, 0.1);
+    color: #DEA13B;
+    outline: none;
+}
+
+.password-visibility-button:active {
+    transform: translateY(-50%) scale(0.96);
+}
+
+.password-visibility-button .material-symbols-outlined {
+    font-size: 1.15rem;
+}
+
+.login-input:-webkit-autofill,
+.login-input:-webkit-autofill:hover,
+.login-input:-webkit-autofill:focus,
+.login-input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 1000px #333331 inset, 0 0 0 2px rgba(245, 160, 0, 0.15) !important;
+    -webkit-text-fill-color: #FFFFFF !important;
+    caret-color: #F5A000;
+    transition: background-color 5000s ease-in-out 0s;
+}
+
+.login-options-row {
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.remember-checkbox {
+    display: inline-flex;
+    min-height: 2rem;
+    cursor: pointer;
+    align-items: center;
+    gap: 0.6rem;
+    color: #4A4A4A;
+    font-size: 0.78rem;
+    font-weight: 500;
+}
+
+.remember-checkbox input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.remember-checkbox-box {
+    display: inline-flex;
+    width: 1.08rem;
+    height: 1.08rem;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #3A3A3A;
+    border-radius: 0.35rem;
+    background: rgba(17, 17, 17, 0.08);
+    color: #111;
+    transition: background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.remember-checkbox-box .material-symbols-outlined {
+    font-size: 0.85rem;
+    font-weight: 700;
+    opacity: 0;
+    transform: scale(0.5) rotate(-12deg);
+    transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.remember-checkbox input:focus-visible + .remember-checkbox-box {
+    box-shadow: 0 0 0 3px rgba(245, 160, 0, 0.22);
+}
+
+.remember-checkbox input:checked + .remember-checkbox-box {
+    border-color: #F5A000;
+    background: #F5A000;
+    transform: translateY(-1px);
+}
+
+.remember-checkbox input:checked + .remember-checkbox-box .material-symbols-outlined {
+    opacity: 1;
+    transform: scale(1) rotate(0);
+}
+
+.forgot-password-link {
+    color: #4A4A4A;
+    font-size: 0.78rem;
+    font-weight: 500;
+    text-decoration: none;
+    transition: color 0.18s ease;
+}
+
+.forgot-password-link:hover,
+.forgot-password-link:focus-visible {
+    color: #111111;
+    text-decoration: underline;
+    outline: none;
+}
+
+.login-demo-copy {
+    color: #4A4A4A;
+}
+
+.request-demo-link {
+    color: #F5A000;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.request-demo-link:hover,
+.request-demo-link:focus-visible {
+    color: #DEA13B;
+    text-decoration: underline;
+    outline: none;
+}
+
+.liquid-sign-in-button {
+    position: relative;
+    isolation: isolate;
+    min-height: 3.4rem;
+    overflow: hidden;
+    border: 1px solid rgba(222, 161, 59, 0.58);
+    border-radius: 999px;
+    background: #F5A000;
+    color: #000;
+    font-weight: 700;
+    line-height: 1;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.42), 0 12px 30px rgba(245, 160, 0, 0.28);
+    transition: transform 0.22s ease, box-shadow 0.22s ease, filter 0.22s ease;
+}
+
+.liquid-sign-in-button::before,
+.liquid-sign-in-button::after {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    width: 16rem;
+    height: 16rem;
+    border-radius: 42%;
+    background: rgba(255, 255, 255, 0.34);
+    transform: translateY(70%) rotate(0deg);
+    transition: transform 0.7s cubic-bezier(0.2, 0.9, 0.25, 1);
+}
+
+.liquid-sign-in-button::before {
+    left: -4rem;
+    bottom: -14rem;
+}
+
+.liquid-sign-in-button::after {
+    right: -4.5rem;
+    bottom: -14.5rem;
+    background: rgba(255, 221, 153, 0.32);
+    transition-delay: 0.05s;
+}
+
+.liquid-sign-in-button:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.52), 0 16px 36px rgba(245, 160, 0, 0.36);
+}
+
+.liquid-sign-in-button:hover:not(:disabled)::before {
+    transform: translateY(-24%) rotate(210deg);
+}
+
+.liquid-sign-in-button:hover:not(:disabled)::after {
+    transform: translateY(-20%) rotate(-190deg);
+}
+
+.liquid-sign-in-button:active:not(:disabled) {
+    transform: translateY(0) scale(0.98);
+}
+
+.liquid-sign-in-button:disabled {
+    cursor: not-allowed;
+    filter: saturate(0.6);
+}

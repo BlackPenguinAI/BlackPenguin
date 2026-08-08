@@ -3,11 +3,12 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { SelectComponent, SelectOption } from '../../../shared/ui/select/select';
 
 @Component({
   selector: 'app-staff-ai-config',
   standalone: true,
-  imports: [CommonModule, FormsModule, TranslateModule],
+  imports: [CommonModule, FormsModule, TranslateModule, SelectComponent],
   templateUrl: './ai-config.html'
 })
 export class StaffAiConfigComponent implements OnInit {
@@ -24,6 +25,16 @@ export class StaffAiConfigComponent implements OnInit {
   isSaving: boolean = false;
   statusMessage: string = '';
   isError: boolean = false;
+
+  get modelOptions(): SelectOption[] {
+    return [
+      { label: this.translate.instant('AI_CONFIG.SEL_PLACEHOLDER'), value: '', disabled: true },
+      ...this.config.available_models.map((model) => ({
+        label: model,
+        value: model
+      }))
+    ];
+  }
 
   constructor(
     private http: HttpClient, 

@@ -39,12 +39,8 @@
 
         <div class="flex flex-col gap-6 animate-fade-in">
           
-          <div class="flex flex-col gap-2 w-full md:w-1/2">
-            <label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold ml-1">Modelo de Lenguaje</label>
-            <select name="modelSelect" [(ngModel)]="activeAgent.model" class="w-full bg-black/50 border border-white/10 focus:border-secondary rounded-xl py-3 px-4 text-sm text-white outline-none transition-colors">
-              <option value="" disabled>Selecciona un modelo base...</option>
-              <option *ngFor="let m of config.available_models" [value]="m" class="bg-[#111]">{{ m }}</option>
-            </select>
+          <div class="w-full md:w-1/2">
+            <app-select label="Modelo de Lenguaje" [options]="modelOptions" [(ngModel)]="activeAgent.model" name="modelSelect"></app-select>
           </div>
 
           <div class="flex flex-col gap-2">

@@ -1,4 +1,4 @@
-import { Component, AfterViewInit, ViewChild, ElementRef, ViewChildren, QueryList, HostListener, isDevMode, ChangeDetectorRef } from '@angular/core';
+import { Component, AfterViewInit, OnDestroy, ViewChild, ElementRef, ViewChildren, QueryList, isDevMode, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router'; 
@@ -12,17 +12,22 @@ import { HttpClient } from '@angular/common/http';
   templateUrl: './landing.html',
   styleUrl: './landing.scss'
 })
-export class LandingComponent implements AfterViewInit {
+export class LandingComponent implements AfterViewInit, OnDestroy {
+  readonly backgroundVideoSrc = 'https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260403_050628_c4e32401-fab4-4a27-b7a8-6e9291cd5959.mp4';
+
   email: string = '';
   isSubmitting: boolean = false;
   showSuccess: boolean = false;
   errorMessage: string = ''; 
   currentLang: string = 'en';
   isMobileMenuOpen: boolean = false;
+  heroSubtitle: string = '';
+  private backgroundSegmentStart = 0;
+  private backgroundSegmentEnd = 0;
+  private backgroundTimeCheck?: number;
 
   @ViewChild('bgVideo') bgVideo!: ElementRef<HTMLVideoElement>;
   @ViewChild('heroHeading') heroHeading!: ElementRef<HTMLHeadingElement>;
-  @ViewChild('statusRow') statusRow!: ElementRef<HTMLDivElement>;
   @ViewChild('heroSubheading') heroSubheading!: ElementRef<HTMLParagraphElement>;
   @ViewChild('heroCta') heroCta!: ElementRef<HTMLDivElement>;
   @ViewChildren('featureCard') featureCards!: QueryList<ElementRef<HTMLDivElement>>;
@@ -32,13 +37,31 @@ export class LandingComponent implements AfterViewInit {
     private http: HttpClient,
     private cdr: ChangeDetectorRef // 🚀 NUEVO: Inyectamos el actualizador de vista
   ) {
-    this.currentLang = this.translate.currentLang || localStorage.getItem('bp_lang') || 'en';
+    this.currentLang = 'en';
+    this.translate.use(this.currentLang).subscribe(() => this.refreshHeroSubtitle());
+    localStorage.setItem('bp_lang', this.currentLang);
   }
 
   switchLanguage(lang: string) {
-    this.translate.use(lang);
     this.currentLang = lang;
     localStorage.setItem('bp_lang', lang);
+    this.translate.use(lang).subscribe(() => {
+      this.refreshHeroSubtitle();
+      this.cdr.detectChanges();
+    });
+  }
+
+  get heroSubtitleWords(): string[] {
+    return this.heroSubtitle.split(' ').filter(Boolean);
+  }
+
+  getRollDelay(index: number, total: number): string {
+    const midpoint = (total - 1) / 2;
+    return `${Math.abs(index - midpoint) * 35}ms`;
+  }
+
+  isInverseHeroWord(word: string): boolean {
+    return ['revenue', 'opportunities'].includes(word.toLowerCase());
   }
 
   toggleMobileMenu() {
@@ -56,10 +79,18 @@ export class LandingComponent implements AfterViewInit {
   ngAfterViewInit() {
     if (this.bgVideo?.nativeElement) {
       this.bgVideo.nativeElement.muted = true;
+      this.syncBackgroundVideoSegment();
       this.bgVideo.nativeElement.play().catch(() => {});
     }
+    this.backgroundTimeCheck = window.setInterval(() => this.syncBackgroundVideoSegment(), 60_000);
     this.triggerFadeIns();
     this.setupScrollObserver();
+  }
+
+  ngOnDestroy() {
+    if (this.backgroundTimeCheck) {
+      window.clearInterval(this.backgroundTimeCheck);
+    }
   }
 
   joinWaitlist() {
@@ -106,9 +137,13 @@ export class LandingComponent implements AfterViewInit {
   }
 
   private triggerFadeIns() {
-    setTimeout(() => this.statusRow.nativeElement.classList.add('visible'), 100);
     setTimeout(() => this.heroSubheading.nativeElement.classList.add('visible'), 1000);
     setTimeout(() => this.heroCta.nativeElement.classList.add('visible'), 1300);
+  }
+
+  private refreshHeroSubtitle() {
+    const subtitle = this.translate.instant('HERO.SUBTITLE');
+    this.heroSubtitle = subtitle === 'HERO.SUBTITLE' ? '' : subtitle;
   }
 
   private setupScrollObserver() {
@@ -124,12 +159,45 @@ export class LandingComponent implements AfterViewInit {
     this.featureCards.forEach(card => observer.observe(card.nativeElement));
   }
 
-  @HostListener('document:mousemove', ['$event'])
-  onMouseMove(e: MouseEvent) {
-    if (this.bgVideo && this.bgVideo.nativeElement) {
-      const moveX = (e.clientX - window.innerWidth / 2) * 0.015;
-      const moveY = (e.clientY - window.innerHeight / 2) * 0.015;
-      this.bgVideo.nativeElement.style.transform = `scale(1.1) translate(${moveX}px, ${moveY}px)`;
+  syncBackgroundVideoSegment() {
+    const video = this.bgVideo?.nativeElement;
+    if (!video || !Number.isFinite(video.duration) || video.duration <= 0) {
+      return;
     }
+
+    const segmentBoundary = video.duration / 2;
+    const segmentPadding = Math.max(1, segmentBoundary * 0.08);
+    const isClearSkyTime = this.isClearSkyTime(new Date());
+    const nextStart = isClearSkyTime ? segmentPadding : segmentBoundary + segmentPadding;
+    const nextEnd = isClearSkyTime ? segmentBoundary : video.duration;
+    const segmentChanged = nextStart !== this.backgroundSegmentStart || nextEnd !== this.backgroundSegmentEnd;
+
+    this.backgroundSegmentStart = nextStart;
+    this.backgroundSegmentEnd = nextEnd;
+
+    if (segmentChanged || video.currentTime < nextStart || video.currentTime >= nextEnd) {
+      video.currentTime = nextStart;
+      video.play().catch(() => {});
+    }
+  }
+
+  keepBackgroundInSelectedSegment() {
+    const video = this.bgVideo?.nativeElement;
+    if (!video || !this.backgroundSegmentEnd) {
+      return;
+    }
+
+    if (video.currentTime >= this.backgroundSegmentEnd) {
+      video.currentTime = this.backgroundSegmentStart;
+      video.play().catch(() => {});
+    }
+  }
+
+  private isClearSkyTime(now: Date): boolean {
+    const minutes = now.getHours() * 60 + now.getMinutes();
+    const clearSkyStart = 6 * 60;
+    const clearSkyEnd = 17 * 60;
+
+    return minutes >= clearSkyStart && minutes <= clearSkyEnd;
   }
 }

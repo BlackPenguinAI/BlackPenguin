@@ -1,3 +1,175 @@
+.landing-bg-shell {
+    background:
+        radial-gradient(circle at 72% 22%, rgba(222, 161, 59, 0.2), transparent 26rem),
+        linear-gradient(145deg, rgba(102, 149, 172, 0.5), rgba(22, 36, 42, 0.92) 52%, #050706);
+}
+
+.landing-bg-video {
+    transform: scale(1.1);
+    opacity: 1;
+}
+
+.landing-nav-glass {
+    background: rgba(255, 255, 255, 0.56);
+    border: 1px solid rgba(255, 255, 255, 0.42);
+    box-shadow: 0 18px 60px rgba(0, 0, 0, 0.16);
+}
+
+.landing-nav-glass .nav-item {
+    color: rgba(0, 0, 0, 0.54);
+}
+
+.landing-nav-glass .nav-item:hover {
+    color: #000;
+}
+
+.liquid-login-button {
+    position: relative;
+    isolation: isolate;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 8.25rem;
+    min-height: 2.35rem;
+    overflow: hidden;
+    border: 1px solid rgba(222, 161, 59, 0.58);
+    border-radius: 999px;
+    background: #DEA13B;
+    color: #000;
+    font-size: 0.8rem;
+    font-weight: 700;
+    line-height: 1;
+    text-decoration: none;
+    text-transform: none;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.42), 0 12px 30px rgba(222, 161, 59, 0.28);
+    transition: transform 0.22s ease, box-shadow 0.22s ease;
+}
+
+.liquid-login-button::before,
+.liquid-login-button::after {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    width: 7rem;
+    height: 7rem;
+    border-radius: 42%;
+    background: rgba(255, 255, 255, 0.34);
+    transform: translateY(68%) rotate(0deg);
+    transition: transform 0.65s cubic-bezier(0.2, 0.9, 0.25, 1);
+}
+
+.liquid-login-button::before {
+    left: -2.4rem;
+    bottom: -5.8rem;
+}
+
+.liquid-login-button::after {
+    right: -2.6rem;
+    bottom: -6.2rem;
+    background: rgba(255, 221, 153, 0.32);
+    transition-delay: 0.05s;
+}
+
+.liquid-login-button:hover {
+    transform: translateY(-1px);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.52), 0 16px 36px rgba(222, 161, 59, 0.36);
+}
+
+.liquid-login-button:hover::before {
+    transform: translateY(-22%) rotate(210deg);
+}
+
+.liquid-login-button:hover::after {
+    transform: translateY(-18%) rotate(-190deg);
+}
+
+.liquid-login-button:active {
+    transform: translateY(0) scale(0.98);
+}
+
+.feature-glass-card {
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(8, 12, 16, 0.56);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 20px 55px rgba(0, 0, 0, 0.22);
+    backdrop-filter: blur(22px) saturate(145%);
+    -webkit-backdrop-filter: blur(22px) saturate(145%);
+}
+
+.feature-card-copy {
+    color: rgba(255, 255, 255, 0.72);
+    font-weight: 400;
+}
+
+.hero-roll-text {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: 58rem;
+    gap: 0.18em 0.34em;
+    color: #000;
+    font-size: clamp(2.25rem, 5vw, 5rem);
+    font-weight: 300;
+    line-height: 0.88;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+.text-roll-word {
+    display: inline-flex;
+    overflow: visible;
+}
+
+.text-roll {
+    position: relative;
+    display: block;
+    overflow: hidden;
+    padding: 0.04em 0;
+}
+
+.text-roll-line {
+    display: block;
+}
+
+.text-roll-line-alt {
+    position: absolute;
+    inset: 0;
+}
+
+.text-roll-char {
+    display: inline-block;
+    color: #000;
+    transform: translateY(0);
+    transition: color 0.2s ease, transform 0.36s cubic-bezier(0.2, 0.9, 0.25, 1);
+    transition-delay: var(--roll-delay);
+    will-change: transform;
+}
+
+.text-roll-line-alt .text-roll-char {
+    color: #DEA13B;
+    transform: translateY(100%);
+}
+
+.text-roll-word:hover .text-roll-line:first-child .text-roll-char {
+    color: #DEA13B;
+    transform: translateY(-100%);
+}
+
+.text-roll-word:hover .text-roll-line-alt .text-roll-char {
+    transform: translateY(0);
+}
+
+.text-roll-word-inverse .text-roll-line:first-child .text-roll-char {
+    color: #DEA13B;
+}
+
+.text-roll-word-inverse .text-roll-line-alt .text-roll-char {
+    color: #000;
+}
+
+.text-roll-word-inverse:hover .text-roll-line:first-child .text-roll-char {
+    color: #000;
+}
+
 /* Animación de entrada general para elementos en bloque */
 .fade-in {
     opacity: 0;

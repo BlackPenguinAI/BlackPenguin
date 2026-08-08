@@ -1,28 +1,31 @@
 {
   "NAV": {
-    "HOME": "home",
-    "PLATFORM": "platform",
-    "SOLUTIONS": "solutions",
+    "HOME": "Home",
+    "PLATFORM": "Platform",
+    "SOLUTIONS": "Solutions",
+    "LOGIN": "Log In",
+    "CLIENT_LOGIN": "Client Login",
+    "REQUEST_DEMO": "Request a Demo",
     "REQUEST_ACCESS": "Request Access"
   },
   "HERO": {
     "STATUS": "system active: v2.4.0 deploy",
     "TITLE": "commercial ai for\nreal estate projects",
-    "SUBTITLE": "Black Penguin uses AI-powered commercial intelligence to help B2B companies detect buying intent, prioritize opportunities, and accelerate revenue before competitors even know prospects are in-market.",
+    "SUBTITLE": "Black Penguin turns market signals into revenue opportunities",
     "PLACEHOLDER": "Join the Private Waitlist",
     "SUCCESS": "Access requested successfully! You have been added to the exclusive waitlist."
   },
   "FEATURES": {
     "TITLE_1": "Buying Intent Detection",
-    "DESC_1": "Identify organizations actively researching solutions before they submit a form.",
-    "TITLE_2": "AI Lead Prioritization",
-    "DESC_2": "Surface the highest-value opportunities automatically using behavioral and intent signals.",
-    "TITLE_3": "Commercial Intelligence",
-    "DESC_3": "Equip revenue teams with actionable insights to engage prospects earlier and close faster."
+    "DESC_1": "Identify prospects showing real interest before they submit a form or speak with sales.",
+    "TITLE_2": "AI Opportunity Prioritization",
+    "DESC_2": "Rank buyers based on intent, behavior, fit, and likelihood to convert.",
+    "TITLE_3": "Intelligent Outreach",
+    "DESC_3": "Engage qualified prospects at the right time and move them toward a sales meeting."
   },
   "SOLUTIONS": {
-    "TITLE": "Multi-Tenant Perimeter Ecosystem",
-    "DESC": "Designed for large-scale developers. Manage multiple real estate projects, handle roles for marketing teams, sales advisors, and deploy AI voice agents in a shielded and completely isolated environment per Tenant."
+    "TITLE": "Built for Real Estate Developers",
+    "DESC": "Manage multiple developments, buyer pipelines, sales teams, and AI agents from one intelligent commercial platform—while keeping every project and dataset completely isolated and secure."
   },
   "FOOTER": {
     "RIGHTS": "© 2026 Black Penguin AI. All rights reserved.",
@@ -31,7 +34,9 @@
   },
   "AUTH": {
     "TITLE_LOGIN": "Log in to your account",
-    "SUBTITLE_LOGIN": "Welcome back! Please enter your details.",
+    "SUBTITLE_LOGIN": "Welcome back",
+    "SUBTITLE_LOGIN_TITLE": "Welcome back",
+    "SUBTITLE_LOGIN_DESC": "Access your commercial intelligence workspace.",
     "TITLE_REGISTER": "Create an account",
     "SUBTITLE_REGISTER": "Get started with the definitive real estate commercial intelligence.",
     "EMAIL": "Email Address",
@@ -43,7 +48,8 @@
     "SIGN_UP": "Create Account",
     "DONT_HAVE_ACCOUNT": "Don't have an account?",
     "ALREADY_HAVE_ACCOUNT": "Already have an account?",
-    "REGISTER_NOW": "Register here",
+    "REGISTER_NOW": "Request a Demo",
+    "REQUEST_DEMO": "Request a Demo",
     "LOGIN_NOW": "Log in here",
     "ERROR_MATCH": "Passwords do not match."
   },

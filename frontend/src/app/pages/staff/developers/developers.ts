@@ -4,11 +4,12 @@ import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { ToastService } from '../../../core/services/toast';
+import { SelectComponent, SelectOption } from '../../../shared/ui/select/select';
 
 @Component({
   selector: 'app-staff-developers',
   standalone: true,
-  imports: [CommonModule, FormsModule, TranslateModule],
+  imports: [CommonModule, FormsModule, TranslateModule, SelectComponent],
   providers: [DatePipe],
   templateUrl: './developers.html',
   styleUrl: './developers.scss'
@@ -41,6 +42,16 @@ export class StaffDevelopersComponent implements OnInit {
     payment_receipt_url: '',
     is_active: true
   };
+
+  get planOptions(): SelectOption[] {
+    return [
+      { label: this.translate.instant('DEV_PAGE.SEL_PLAN'), value: '', disabled: true },
+      ...this.plans.map((plan) => ({
+        label: plan.name,
+        value: plan.id
+      }))
+    ];
+  }
 
   constructor(
     private http: HttpClient, 

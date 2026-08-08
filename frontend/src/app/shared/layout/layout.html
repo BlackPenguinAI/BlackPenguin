@@ -1,122 +1,100 @@
-<div class="flex h-screen bg-black text-white font-sans overflow-hidden">
+<div class="app-shell">
   
-  <aside class="w-64 border-r border-white/10 liquid-glass flex flex-col justify-between relative z-20">
+  <aside class="control-sidebar">
     
-    <a [routerLink]="userRole === 'superadmin' ? '/admin/dashboard' : '/app/dashboard'" class="p-6 border-b border-white/10 flex flex-col gap-1 cursor-pointer select-none block hover:bg-white/5 transition-colors">
-      <div class="flex items-center gap-3">
-        <img _ngcontent-ng-c3323940937="" alt="Black Penguin Logo" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDxl2QxLaz1QVZlAWP1ksa3Vsw8hnGkq7DN9pIFoivY_s0ANfwB6_2SUVcF-XuzZxv_QkfH-yYy0Zc1TjmtQ9hP1gQTJB2TYxp1DFMuGtCSL7fddgkgG8ENFAvecOdZ0uABF1CY5yR7_VUrse9PALCGMFUALu0wLsTml1PYbq2FbNq3FTatmSUOjSFUiuhDInqKQifEP-apKuFd0djcZrYKCm-40vcNvQSEutAVuANBR8keQgsajYWdrcIrDHDKew0a7QkZVGOKBUM" routerlink="/" class="h-8 w-8 object-contain cursor-pointer" tabindex="0">
-        <div class="font-wordmark text-xl flex items-center tracking-tighter">
-          <span class="text-white font-light">black</span><span class="text-secondary font-medium">penguin</span><span class="text-gray-custom font-light">.ai</span>
-        </div>
+    <div class="control-sidebar-brand">
+      <div class="control-sidebar-logo-row">
+        <img alt="Black Penguin Logo" src="/BPicon.png" class="control-sidebar-logo">
       </div>
-      <span class="text-[10px] font-mono uppercase tracking-widest text-secondary mt-1 ml-1">
+      <span class="control-sidebar-kicker">
         {{ userRole === 'superadmin' ? 'Master Control Center' : 'Tenant Workspace' }}
       </span>
-    </a>
+    </div>
 
-    <nav *ngIf="userRole === 'superadmin'" class="flex-1 px-4 py-6 space-y-1.5 overflow-y-auto scrollbar-hide">
+    <nav *ngIf="userRole === 'superadmin'" class="control-sidebar-nav scrollbar-hide">
       
-      <p class="px-3 text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2 mt-2">Main Menu</p>
-      
-      <a routerLink="/admin/dashboard" routerLinkActive="bg-white/10 text-white" [routerLinkActiveOptions]="{exact: true}" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors flex items-center gap-3 cursor-pointer">
-        <span class="material-symbols-outlined text-[18px]">dashboard</span>
+      <a routerLink="/admin/dashboard" routerLinkActive="is-active" [routerLinkActiveOptions]="{exact: true}" class="control-sidebar-link">
         Dashboard
       </a>
       
-      <a routerLink="/admin/profile" routerLinkActive="bg-white/10 text-white" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors flex items-center gap-3 cursor-pointer">
-        <span class="material-symbols-outlined text-[18px]">person</span>
+      <a routerLink="/admin/profile" routerLinkActive="is-active" class="control-sidebar-link">
         My Profile
       </a>
 
-      <p class="px-3 text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2 mt-6">Tenant Management</p>
-      
-      <a routerLink="/admin/companies" routerLinkActive="bg-white/10 text-white" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors flex items-center gap-3 cursor-pointer">
-        <span class="material-symbols-outlined text-[18px]">business_center</span>
+      <a routerLink="/admin/companies" routerLinkActive="is-active" class="control-sidebar-link module-start">
         Companies
       </a>
 
-      <a routerLink="/admin/users" routerLinkActive="bg-white/10 text-white" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors flex items-center gap-3 cursor-pointer">
-        <span class="material-symbols-outlined text-[18px]">group</span>
+      <a routerLink="/admin/users" routerLinkActive="is-active" class="control-sidebar-link">
         Users
       </a>
 
-      <a routerLink="/admin/waitlist" routerLinkActive="bg-white/10 text-white" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors flex items-center gap-2 cursor-pointer">
-        <span class="material-symbols-outlined text-[18px]">list_alt</span>
+      <a routerLink="/admin/waitlist" routerLinkActive="is-active" class="control-sidebar-link">
         Waitlist
       </a>
 
-      <a routerLink="/admin/plans" routerLinkActive="bg-white/10 text-white" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors flex items-center gap-3 cursor-pointer">
-        <span class="material-symbols-outlined text-[18px]">view_list</span>
+      <a routerLink="/admin/plans" routerLinkActive="is-active" class="control-sidebar-link">
         Plans
       </a>
 
-      <p class="px-3 text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2 mt-6">System & AI</p>
-
-      <a routerLink="/admin/ai-infrastructure" routerLinkActive="bg-white/10 text-white" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors flex items-center gap-3 cursor-pointer">
-        <span class="material-symbols-outlined text-[18px]">dns</span>
+      <a routerLink="/admin/ai-infrastructure" routerLinkActive="is-active" class="control-sidebar-link module-start">
         AI Infrastructure
       </a>
 
-      <a routerLink="/admin/ai-settings" routerLinkActive="bg-white/10 text-white" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors flex items-center gap-3 cursor-pointer">
-        <span class="material-symbols-outlined text-[18px]">tune</span>
+      <a routerLink="/admin/ai-settings" routerLinkActive="is-active" class="control-sidebar-link">
         AI Settings
       </a>
 
-      <a routerLink="/admin/email-settings" routerLinkActive="bg-white/10 text-white" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors flex items-center gap-3 cursor-pointer">
-        <span class="material-symbols-outlined text-[18px]">mail</span>
+      <a routerLink="/admin/email-settings" routerLinkActive="is-active" class="control-sidebar-link">
         Email Settings
       </a>
 
-      <a routerLink="/admin/messaging-settings" routerLinkActive="bg-white/10 text-white" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors flex items-center gap-3 cursor-pointer">
-        <span class="material-symbols-outlined text-[18px]">sms</span>
+      <a routerLink="/admin/messaging-settings" routerLinkActive="is-active" class="control-sidebar-link">
         Messaging Settings
-      </a>
-
-      <a routerLink="/admin/legal-compliance" routerLinkActive="bg-white/10 text-white" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors flex items-center gap-3 cursor-pointer">
-        <span class="material-symbols-outlined text-[18px]">gavel</span>
-        Legal & Compliance
       </a>
     </nav>
 
-    <nav *ngIf="userRole !== 'superadmin'" class="flex-1 px-4 py-6 space-y-1.5 overflow-y-auto scrollbar-hide">
-      <p class="px-3 text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">Main</p>
-      
-      <a routerLink="/app/dashboard" routerLinkActive="bg-white/10 text-white" [routerLinkActiveOptions]="{exact: true}" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors flex items-center gap-2 cursor-pointer">
-        <span class="material-symbols-outlined text-[18px]">space_dashboard</span>
+    <nav *ngIf="userRole !== 'superadmin'" class="control-sidebar-nav scrollbar-hide">
+      <a routerLink="/app/dashboard" routerLinkActive="is-active" [routerLinkActiveOptions]="{exact: true}" class="control-sidebar-link">
         Dashboard
       </a>
 
-      <a routerLink="/app/company" routerLinkActive="bg-white/10 text-white" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors flex items-center gap-2 cursor-pointer">
-        <span class="material-symbols-outlined text-[18px]">corporate_fare</span>
+      <a routerLink="/app/company" routerLinkActive="is-active" class="control-sidebar-link">
         Company Onboarding
       </a>
 
-      <a routerLink="/app/projects" routerLinkActive="bg-white/10 text-white" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors flex items-center gap-2 cursor-pointer">
-        <span class="material-symbols-outlined text-[18px]">apartment</span>
+      <a routerLink="/app/projects" routerLinkActive="is-active" class="control-sidebar-link">
         Projects
       </a>
 
-      <a routerLink="/app/profile" routerLinkActive="bg-white/10 text-white" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors flex items-center gap-2 cursor-pointer">
-        <span class="material-symbols-outlined text-[18px]">person</span>
+      <a routerLink="/app/profile" routerLinkActive="is-active" class="control-sidebar-link">
         My Profile
       </a>
     </nav>
 
-    <div class="p-4 border-t border-white/10 flex flex-col gap-3">
-      <div class="flex items-center justify-center gap-2 p-1.5 bg-black/40 rounded-lg border border-white/5">
-        <button (click)="switchLanguage('en')" [class.bg-white/10]="currentLang === 'en'" [class.text-white]="currentLang === 'en'" class="flex-1 py-1 text-xs font-bold text-gray-500 hover:text-white rounded-md transition-colors">EN</button>
-        <button (click)="switchLanguage('es')" [class.bg-white/10]="currentLang === 'es'" [class.text-white]="currentLang === 'es'" class="flex-1 py-1 text-xs font-bold text-gray-500 hover:text-white rounded-md transition-colors">ES</button>
-      </div>
-
-      <button (click)="logout()" class="w-full text-left px-3 py-2 text-red-400 hover:bg-white/5 rounded-lg transition-colors flex items-center gap-2 cursor-pointer">
-        <span class="material-symbols-outlined text-[18px]">logout</span>
-        Logout
+    <div class="control-sidebar-footer">
+      <button (click)="logout()" class="control-logout-button" aria-label="Logout">
+        <img alt="" src="/logout-2-svgrepo-com.svg">
       </button>
     </div>
 
   </aside>
 
-  <main class="flex-1 overflow-y-auto bg-black relative">
+  <main class="app-content">
+    <div class="gravity-stars-bg" aria-hidden="true"></div>
+
+    <div class="profile-menu">
+      <button class="profile-menu-trigger" type="button" aria-label="Logged in user">
+        <img *ngIf="profileImageUrl; else profileInitials" [src]="profileImageUrl" alt="">
+        <ng-template #profileInitials>{{ userInitials }}</ng-template>
+      </button>
+      <div class="profile-menu-card">
+        <p class="profile-menu-name">{{ displayName }}</p>
+        <p class="profile-menu-email">{{ userEmail }}</p>
+        <a [routerLink]="profileRoute" class="profile-menu-link">Profile</a>
+      </div>
+    </div>
+
     <router-outlet></router-outlet>
   </main>
 

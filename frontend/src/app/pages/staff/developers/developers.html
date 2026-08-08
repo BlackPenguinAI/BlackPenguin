@@ -81,13 +81,12 @@
             <label class="text-xs text-gray-400 uppercase">{{ 'DEV_PAGE.FIELD_NAME' | translate }} *</label>
             <input type="text" name="name" [(ngModel)]="form.company_name" required class="bg-black/50 border border-white/10 focus:border-secondary rounded-lg px-4 py-2.5 text-sm text-white outline-none">
           </div>
-          <div class="flex flex-col gap-1.5">
-            <label class="text-xs text-gray-400 uppercase">{{ 'DEV_PAGE.FIELD_PLAN' | translate }} *</label>
-            <select name="plan" [(ngModel)]="form.plan_id" required class="bg-black/50 border border-white/10 focus:border-secondary rounded-lg px-4 py-2.5 text-sm text-white outline-none cursor-pointer">
-              <option value="" disabled selected>{{ 'DEV_PAGE.SEL_PLAN' | translate }}</option>
-              <option *ngFor="let p of plans" [value]="p.id">{{ p.name }}</option>
-            </select>
-          </div>
+          <app-select
+            label="{{ 'DEV_PAGE.FIELD_PLAN' | translate }} *"
+            [options]="planOptions"
+            [(ngModel)]="form.plan_id"
+            name="plan">
+          </app-select>
           <div class="flex flex-col gap-1.5">
             <label class="text-xs text-gray-400 uppercase">{{ 'DEV_PAGE.FIELD_DURATION' | translate }}</label>
             <input type="number" name="duration" [(ngModel)]="form.duration_months" min="1" required class="bg-black/50 border border-white/10 focus:border-secondary rounded-lg px-4 py-2.5 text-sm text-white outline-none">

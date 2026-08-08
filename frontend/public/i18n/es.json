@@ -1,28 +1,31 @@
 {
   "NAV": {
-    "HOME": "inicio",
-    "PLATFORM": "plataforma",
-    "SOLUTIONS": "soluciones",
+    "HOME": "Inicio",
+    "PLATFORM": "Plataforma",
+    "SOLUTIONS": "Soluciones",
+    "LOGIN": "Log In",
+    "CLIENT_LOGIN": "Client Login",
+    "REQUEST_DEMO": "Solicita una Demo",
     "REQUEST_ACCESS": "Solicitar Acceso"
   },
   "HERO": {
     "STATUS": "sistema activo: v2.4.0 despliegue",
     "TITLE": "ia comercial para\nproyectos inmobiliarios",
-    "SUBTITLE": "Black Penguin utiliza inteligencia comercial y copilotos avanzados de IA para detectar intenciones de compra reales, calificar prospectos automáticamente y acelerar el cierre de tus proyectos inmobiliarios.",
+    "SUBTITLE": "Black Penguin convierte señales de mercado en oportunidades de ingresos",
     "PLACEHOLDER": "Únete a la Lista de Espera Privada",
     "SUCCESS": "¡Acceso solicitado! Te hemos añadido a la lista de espera exclusiva."
   },
   "FEATURES": {
-    "TITLE_1": "Detección de Intención",
-    "DESC_1": "Identifica qué organizaciones e inversionistas están investigando activamente tus desarrollos antes de que envíen un formulario.",
-    "TITLE_2": "Calificación Inmobiliaria con IA",
-    "DESC_2": "Filtra y prioriza automáticamente los leads de mayor valor utilizando modelos LLM avanzados integrados a tus canales de Meta Ads.",
-    "TITLE_3": "Inteligencia Comercial",
-    "DESC_3": "Equipa a tus equipos de marketing y ventas con datos de comportamiento en tiempo real para cerrar tratos con mayor velocidad."
+    "TITLE_1": "Detección de Intención de Compra",
+    "DESC_1": "Identifica prospectos con interés real antes de que envíen un formulario o hablen con ventas.",
+    "TITLE_2": "Priorización de Oportunidades con IA",
+    "DESC_2": "Ordena compradores por intención, comportamiento, perfil y probabilidad de conversión.",
+    "TITLE_3": "Outreach Inteligente",
+    "DESC_3": "Activa prospectos calificados en el momento correcto y muévelos hacia una reunión comercial."
   },
   "SOLUTIONS": {
-    "TITLE": "Ecosistema Perimetral Multi-Tenant",
-    "DESC": "Diseñado para grandes desarrolladoras. Administra múltiples proyectos inmobiliarios, maneja roles de equipos de marketing, asesores de ventas, y despliega agentes de voz con IA en un entorno blindado y completamente aislado por Tenant."
+    "TITLE": "Diseñado para Desarrolladoras Inmobiliarias",
+    "DESC": "Gestiona múltiples desarrollos, pipelines de compradores, equipos comerciales y agentes de IA desde una plataforma inteligente—manteniendo cada proyecto y dataset completamente aislado y seguro."
   },
   "FOOTER": {
     "RIGHTS": "© 2026 Black Penguin. Todos los derechos reservados.",
@@ -31,7 +34,9 @@
   },
   "AUTH": {
     "TITLE_LOGIN": "Ingresa a tu cuenta",
-    "SUBTITLE_LOGIN": "¡Bienvenido de nuevo! Por favor, ingresa tus datos.",
+    "SUBTITLE_LOGIN": "Bienvenido de nuevo",
+    "SUBTITLE_LOGIN_TITLE": "Bienvenido de nuevo",
+    "SUBTITLE_LOGIN_DESC": "Accede a tu espacio de inteligencia comercial.",
     "TITLE_REGISTER": "Crea una cuenta",
     "SUBTITLE_REGISTER": "Comienza con la inteligencia comercial inmobiliaria definitiva.",
     "EMAIL": "Correo Electrónico",
@@ -43,7 +48,8 @@
     "SIGN_UP": "Registrarse",
     "DONT_HAVE_ACCOUNT": "¿No tienes una cuenta?",
     "ALREADY_HAVE_ACCOUNT": "¿Ya tienes una cuenta?",
-    "REGISTER_NOW": "Regístrate aquí",
+    "REGISTER_NOW": "Solicita una Demo",
+    "REQUEST_DEMO": "Solicita una Demo",
     "LOGIN_NOW": "Inicia sesión aquí",
     "ERROR_MATCH": "Las contraseñas no coinciden."
   },

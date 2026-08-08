@@ -1,15 +1,14 @@
-import { Injectable, isDevMode } from '@angular/core'; 
+import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Observable, tap, catchError, throwError } from 'rxjs';
+import { API_V1_URL } from '../config/api.config';
 
 @Injectable({
   providedIn: 'root'
 })
 export class AuthService {
   
-  private apiUrl = isDevMode() 
-    ? 'http://localhost:8000/api/v1' 
-    : 'https://blackpenguin.ai/api/v1';
+  private apiUrl = API_V1_URL;
 
   constructor(private http: HttpClient) {}
 

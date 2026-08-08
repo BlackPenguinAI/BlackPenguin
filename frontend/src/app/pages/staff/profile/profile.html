@@ -28,16 +28,12 @@
             <label class="text-xs text-gray-400 uppercase">{{ 'PROFILE_PAGE.LAST_NAME_M' | translate }}</label>
             <input type="text" name="lastNameM" [(ngModel)]="user.last_name_maternal" class="bg-black/50 border border-white/10 focus:border-secondary rounded-lg px-4 py-2.5 text-sm outline-none transition-colors">
           </div>
-          <div class="flex flex-col gap-1.5">
-            <label class="text-xs text-gray-400 uppercase">{{ 'PROFILE_PAGE.DOC_TYPE' | translate }}</label>
-            <select name="docType" [(ngModel)]="user.document_type" class="bg-black/80 border border-white/10 focus:border-secondary rounded-lg px-4 py-2.5 text-sm outline-none transition-colors cursor-pointer">
-              <option value="" disabled selected>Seleccionar...</option>
-              <option value="DNI">DNI / ID</option>
-              <option value="CE">Carnet de Extranjería</option>
-              <option value="PASSPORT">Pasaporte</option>
-              <option value="RUT">RUT</option>
-            </select>
-          </div>
+          <app-select
+            [label]="'PROFILE_PAGE.DOC_TYPE' | translate"
+            [options]="documentTypeOptions"
+            [(ngModel)]="user.document_type"
+            name="docType">
+          </app-select>
           <div class="flex flex-col gap-1.5">
             <label class="text-xs text-gray-400 uppercase">{{ 'PROFILE_PAGE.DOC_NUMBER' | translate }}</label>
             <input type="text" name="docNum" [(ngModel)]="user.document_number" class="bg-black/50 border border-white/10 focus:border-secondary rounded-lg px-4 py-2.5 text-sm outline-none transition-colors">

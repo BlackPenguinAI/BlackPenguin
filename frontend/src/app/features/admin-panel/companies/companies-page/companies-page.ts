@@ -10,6 +10,7 @@ import { GlassCardComponent } from '../../../../shared/ui/glass-card/glass-card'
 import { InputComponent } from '../../../../shared/ui/input/input';
 import { ButtonComponent } from '../../../../shared/ui/button/button';
 import { ModalComponent } from '../../../../shared/ui/modal/modal';
+import { SelectComponent, SelectOption } from '../../../../shared/ui/select/select';
 
 @Component({
   selector: 'app-companies-page',
@@ -21,7 +22,8 @@ import { ModalComponent } from '../../../../shared/ui/modal/modal';
     GlassCardComponent,
     InputComponent,
     ButtonComponent,
-    ModalComponent
+    ModalComponent,
+    SelectComponent
   ],
   providers: [DatePipe],
   templateUrl: './companies-page.html'
@@ -69,6 +71,21 @@ export class CompaniesPageComponent implements OnInit {
     is_active: true,      
     admin_is_active: true 
   };
+
+  readonly durationOptions: SelectOption[] = Array.from({ length: 12 }, (_, index) => {
+    const months = index + 1;
+    return {
+      label: `${months} Month${months > 1 ? 's' : ''}`,
+      value: months
+    };
+  });
+
+  get planOptions(): SelectOption[] {
+    return this.plans.map((plan) => ({
+      label: plan.name,
+      value: plan.id
+    }));
+  }
 
   constructor(
     private companyService: CompanyService,

@@ -1,0 +1,28 @@
+<div class="bp-select">
+  <label *ngIf="label" class="bp-select-label">{{ label }}</label>
+
+  <button
+    type="button"
+    class="bp-select-trigger"
+    [class.is-open]="isOpen"
+    [disabled]="disabled"
+    (click)="toggle()">
+    <span class="bp-select-value">{{ selectedLabel }}</span>
+    <span class="material-symbols-outlined bp-select-icon">expand_more</span>
+  </button>
+
+  <div *ngIf="isOpen" class="bp-select-menu">
+    <button
+      *ngFor="let option of options"
+      type="button"
+      class="bp-select-item"
+      [class.is-selected]="option.value === value"
+      [disabled]="option.disabled"
+      (click)="selectOption(option)">
+      <span class="material-symbols-outlined bp-select-check">
+        {{ option.value === value ? 'check' : '' }}
+      </span>
+      <span>{{ option.label }}</span>
+    </button>
+  </div>
+</div>

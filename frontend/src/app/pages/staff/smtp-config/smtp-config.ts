@@ -2,11 +2,12 @@ import { Component, OnInit, isDevMode, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { SelectComponent, SelectOption } from '../../../shared/ui/select/select';
 
 @Component({
   selector: 'app-smtp-config',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, SelectComponent],
   templateUrl: './smtp-config.html'
 })
 export class SmtpConfigComponent implements OnInit {
@@ -19,6 +20,12 @@ export class SmtpConfigComponent implements OnInit {
     smtp_security: 'TLS',
     sender_email: ''
   };
+
+  readonly securityOptions: SelectOption[] = [
+    { label: 'TLS (Recomendado - Puerto 587)', value: 'TLS' },
+    { label: 'SSL (Puerto 465)', value: 'SSL' },
+    { label: 'Ninguna', value: 'NONE' }
+  ];
   
   isSaving: boolean = false;
   statusMessage: string = '';

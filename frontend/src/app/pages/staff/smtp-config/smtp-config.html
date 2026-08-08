@@ -30,14 +30,7 @@
           <input type="password" name="password" [(ngModel)]="config.smtp_password" placeholder="••••••••••••" class="bg-black/50 border border-white/10 focus:border-blue-500 rounded-xl p-3 text-sm text-white focus:outline-none transition-colors">
         </div>
 
-        <div class="flex flex-col gap-2">
-          <label class="text-xs font-medium text-gray-400 uppercase tracking-wider">Seguridad</label>
-          <select name="security" [(ngModel)]="config.smtp_security" class="bg-black/50 border border-white/10 focus:border-blue-500 rounded-xl p-3 text-sm text-white focus:outline-none transition-colors appearance-none">
-            <option value="TLS">TLS (Recomendado - Puerto 587)</option>
-            <option value="SSL">SSL (Puerto 465)</option>
-            <option value="NONE">Ninguna</option>
-          </select>
-        </div>
+        <app-select label="Seguridad" [options]="securityOptions" [(ngModel)]="config.smtp_security" name="security"></app-select>
 
         <div class="flex flex-col gap-2">
           <label class="text-xs font-medium text-gray-400 uppercase tracking-wider">Email Remitente (From)</label>

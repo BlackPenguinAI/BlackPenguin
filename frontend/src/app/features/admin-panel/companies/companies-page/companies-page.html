@@ -3,7 +3,7 @@
 
   <div class="max-w-7xl mx-auto relative z-10">
     
-    <div class="flex items-center justify-between mb-8 border-b border-white/10 pb-6">
+    <div class="flex items-center justify-between gap-6 pr-20 mb-8 border-b border-white/10 pb-6">
       <div>
         <h1 class="text-3xl font-light tracking-tight">Companies Management</h1>
         <p class="text-sm text-gray-400 mt-1">Register and monitor enterprise clients and their AI consumption.</p>
@@ -120,13 +120,7 @@
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
       <app-input label="Company Name" placeholder="Ej. Capital Real Estate" [(ngModel)]="form.name" name="name"></app-input>
 
-      <div class="flex flex-col gap-1.5 w-full">
-        <label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold ml-1">Subscription Plan</label>
-        <select [(ngModel)]="form.plan_id" name="plan_id" 
-                class="w-full bg-black/50 border border-white/10 focus:border-secondary rounded-xl py-3 px-4 text-sm text-white outline-none transition-colors">
-          <option *ngFor="let p of plans" [value]="p.id" class="bg-[#111] text-white">{{ p.name }}</option>
-        </select>
-      </div>
+      <app-select label="Subscription Plan" [options]="planOptions" [(ngModel)]="form.plan_id" name="plan_id"></app-select>
     </div>
 
     <div class="flex items-center justify-between p-3 bg-white/5 border border-white/10 rounded-xl">
@@ -147,13 +141,7 @@
                class="w-full bg-black/50 border border-white/10 focus:border-secondary rounded-xl py-3 px-4 text-sm text-white outline-none transition-colors cursor-pointer">
       </div>
       
-      <div class="flex flex-col gap-1.5 w-full">
-        <label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold ml-1">Duration</label>
-        <select [(ngModel)]="form.duration_months" name="duration_months" 
-                class="w-full bg-black/50 border border-white/10 focus:border-secondary rounded-xl py-3 px-4 text-sm text-white outline-none transition-colors">
-          <option *ngFor="let m of [1,2,3,4,5,6,7,8,9,10,11,12]" [value]="m">{{ m }} Month{{ m > 1 ? 's' : '' }}</option>
-        </select>
-      </div>
+      <app-select label="Duration" [options]="durationOptions" [(ngModel)]="form.duration_months" name="duration_months"></app-select>
 
       <div class="flex flex-col gap-1.5 w-full">
         <label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold ml-1">Calculated End Date</label>
@@ -213,13 +201,7 @@
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
       <app-input label="Company Name" placeholder="Ej. Capital Real Estate" [(ngModel)]="editForm.name" name="edit_name"></app-input>
 
-      <div class="flex flex-col gap-1.5 w-full">
-        <label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold ml-1">Subscription Plan</label>
-        <select [(ngModel)]="editForm.plan_id" name="edit_plan_id" 
-                class="w-full bg-black/50 border border-white/10 focus:border-secondary rounded-xl py-3 px-4 text-sm text-white outline-none transition-colors">
-          <option *ngFor="let p of plans" [value]="p.id" class="bg-[#111] text-white">{{ p.name }}</option>
-        </select>
-      </div>
+      <app-select label="Subscription Plan" [options]="planOptions" [(ngModel)]="editForm.plan_id" name="edit_plan_id"></app-select>
     </div>
 
     <div class="flex items-center justify-between p-3 bg-white/5 border border-white/10 rounded-xl">
@@ -240,13 +222,7 @@
                class="w-full bg-black/50 border border-white/10 focus:border-secondary rounded-xl py-3 px-4 text-sm text-white outline-none transition-colors cursor-pointer">
       </div>
       
-      <div class="flex flex-col gap-1.5 w-full">
-        <label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold ml-1">Duration</label>
-        <select [(ngModel)]="editForm.duration_months" name="edit_duration_months" 
-                class="w-full bg-black/50 border border-white/10 focus:border-secondary rounded-xl py-3 px-4 text-sm text-white outline-none transition-colors">
-          <option *ngFor="let m of [1,2,3,4,5,6,7,8,9,10,11,12]" [value]="m">{{ m }} Month{{ m > 1 ? 's' : '' }}</option>
-        </select>
-      </div>
+      <app-select label="Duration" [options]="durationOptions" [(ngModel)]="editForm.duration_months" name="edit_duration_months"></app-select>
 
       <div class="flex flex-col gap-1.5 w-full">
         <label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold ml-1">Calculated End Date</label>

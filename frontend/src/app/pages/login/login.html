@@ -1,67 +1,80 @@
 <div class="fixed inset-0 z-0 pointer-events-none">
-  <video #bgVideo [muted]="true" [autoplay]="true" [loop]="true" playsinline class="w-full h-full object-cover brightness-60">
-    <source src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260403_050628_c4e32401-fab4-4a27-b7a8-6e9291cd5959.mp4" type="video/mp4">
+  <video #bgVideo [muted]="true" [autoplay]="true" [loop]="false" playsinline class="login-bg-video w-full h-full object-cover brightness-60" (loadedmetadata)="syncBackgroundVideoSegment()" (timeupdate)="keepBackgroundInSelectedSegment()">
+    <source [src]="backgroundVideoSrc" type="video/mp4">
   </video>
-</div>
-
-<div class="fixed top-6 right-6 z-50 bg-surface-level-1/40 backdrop-blur-md border border-white/10 px-4 py-2 rounded-full flex items-center gap-2">
-  <button (click)="switchLanguage('en')" [class.text-secondary]="currentLang === 'en'" class="text-xs font-bold text-gray-custom hover:text-white transition-colors">EN</button>
-  <span class="text-gray-custom text-xs">/</span>
-  <button (click)="switchLanguage('es')" [class.text-secondary]="currentLang === 'es'" class="text-xs font-bold text-gray-custom hover:text-white transition-colors">ES</button>
 </div>
 
 <div class="min-h-screen flex items-center justify-center p-4 relative z-10 select-none">
   
-  <div class="liquid-glass w-full max-w-md p-8 md:p-10 flex flex-col gap-6 shadow-2xl relative">
+  <div class="liquid-glass login-glass w-full max-w-md p-8 md:p-10 flex flex-col gap-6 shadow-2xl relative">
     
-    <button routerLink="/" class="absolute top-4 left-4 text-gray-custom hover:text-white transition-colors flex items-center gap-1 text-xs focus:outline-none">
+    <button routerLink="/" class="absolute top-4 left-4 transition-colors flex items-center gap-1 text-xs focus:outline-none">
       <span class="material-symbols-outlined text-sm">arrow_back</span>
     </button>
     
     <div class="text-center flex flex-col items-center gap-2 mt-2">
-      <img alt="Black Penguin Logo" class="h-10 w-10 object-contain cursor-pointer transition-transform hover:scale-105" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDxl2QxLaz1QVZlAWP1ksa3Vsw8hnGkq7DN9pIFoivY_s0ANfwB6_2SUVcF-XuzZxv_QkfH-yYy0Zc1TjmtQ9hP1gQTJB2TYxp1DFMuGtCSL7fddgkgG8ENFAvecOdZ0uABF1CY5yR7_VUrse9PALCGMFUALu0wLsTml1PYbq2FbNq3FTatmSUOjSFUiuhDInqKQifEP-apKuFd0djcZrYKCm-40vcNvQSEutAVuANBR8keQgsajYWdrcIrDHDKew0a7QkZVGOKBUM" routerLink="/">
+      <img alt="Black Penguin Logo" class="h-14 w-14 object-contain cursor-pointer transition-transform hover:scale-105" src="/BPicon.png" routerLink="/">
       <h2 class="text-2xl font-wordmark tracking-tighter mt-2 flex items-center justify-center">
-        <span class="text-white font-semibold">Black</span><span class="text-secondary font-light">Penguin</span>
+        <span class="text-black font-semibold">Black</span><span class="text-secondary font-light">Penguin</span>
       </h2>
-      <p class="text-xs text-gray-custom leading-relaxed">{{ 'AUTH.SUBTITLE_LOGIN' | translate }}</p>
+      <div class="login-copy">
+        <p class="login-copy-title">{{ 'AUTH.SUBTITLE_LOGIN_TITLE' | translate }}</p>
+        <p class="login-copy-detail">{{ 'AUTH.SUBTITLE_LOGIN_DESC' | translate }}</p>
+      </div>
     </div>
 
     <form (ngSubmit)="handleLogin()" class="flex flex-col gap-4">
       <div class="flex flex-col gap-1.5">
-        <label class="text-xs font-medium text-gray-custom px-1">{{ 'AUTH.EMAIL' | translate }}</label>
+        <label for="login-email" class="login-field-label">{{ 'AUTH.EMAIL' | translate }}</label>
         <input 
+          id="login-email"
           [(ngModel)]="credentials.email" name="email" type="email" required
-          class="w-full bg-surface-level-1/40 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-secondary focus:ring-0 transition-colors">
+          autocomplete="email"
+          class="login-input w-full rounded-xl px-4 py-3 focus:outline-none transition-colors">
       </div>
 
       <div class="flex flex-col gap-1.5">
-        <label class="text-xs font-medium text-gray-custom px-1">{{ 'AUTH.PASSWORD' | translate }}</label>
-        <input 
-          [(ngModel)]="credentials.password" name="password" type="password" required
-          class="w-full bg-surface-level-1/40 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-secondary focus:ring-0 transition-colors">
+        <label for="login-password" class="login-field-label">{{ 'AUTH.PASSWORD' | translate }}</label>
+        <div class="password-input-wrap">
+          <input
+            id="login-password"
+            [(ngModel)]="credentials.password" name="password" [type]="showPassword ? 'text' : 'password'" required
+            autocomplete="current-password"
+            class="login-input w-full rounded-xl px-4 py-3 pr-12 focus:outline-none transition-colors">
+          <button
+            type="button"
+            class="password-visibility-button"
+            [attr.aria-label]="showPassword ? 'Hide password' : 'Show password'"
+            (click)="togglePasswordVisibility()">
+            <span class="material-symbols-outlined">{{ showPassword ? 'visibility_off' : 'visibility' }}</span>
+          </button>
+        </div>
       </div>
 
-      <div class="flex items-center justify-between px-1 text-xs mt-1">
-        <label class="flex items-center gap-2 text-gray-custom cursor-pointer">
-          <input type="checkbox" class="rounded bg-surface-level-1 border-white/10 text-secondary focus:ring-0">
-          {{ 'AUTH.REMEMBER_ME' | translate }}
+      <div class="login-options-row flex items-center justify-between px-1 text-xs mt-1">
+        <label class="remember-checkbox">
+          <input type="checkbox" [(ngModel)]="rememberDevice" name="rememberDevice" [ngModelOptions]="{ standalone: true }">
+          <span class="remember-checkbox-box" aria-hidden="true">
+            <span class="material-symbols-outlined">check</span>
+          </span>
+          <span>{{ 'AUTH.REMEMBER_ME' | translate }}</span>
         </label>
-        <a class="text-secondary hover:underline cursor-pointer">{{ 'AUTH.FORGOT_PASSWORD' | translate }}</a>
+        <a class="forgot-password-link cursor-pointer">{{ 'AUTH.FORGOT_PASSWORD' | translate }}</a>
       </div>
 
       <button 
         [disabled]="isSubmitting || !credentials.email || !credentials.password"
         type="submit" 
-        class="w-full bg-white text-black font-medium py-3 rounded-full mt-4 flex items-center justify-center gap-2 transition-all active:scale-[0.98] hover:bg-secondary hover:text-white disabled:opacity-40">
+        class="liquid-sign-in-button w-full mt-4 flex items-center justify-center gap-2 disabled:opacity-40">
         <span *ngIf="isSubmitting" class="material-symbols-outlined animate-spin text-sm">sync</span>
         {{ 'AUTH.SIGN_IN' | translate }}
       </button>
     </form>
 
     
-    <p class="text-xs text-center text-gray-custom mt-2">
+    <p class="login-demo-copy text-xs text-center mt-2">
       {{ 'AUTH.DONT_HAVE_ACCOUNT' | translate }} 
-      <a routerLink="/register" class="text-secondary font-medium hover:underline cursor-pointer">{{ 'AUTH.REGISTER_NOW' | translate }}</a>
+      <a routerLink="/" fragment="waitlist" class="request-demo-link">{{ 'AUTH.REQUEST_DEMO' | translate }}</a>
     </p>
 
   </div>

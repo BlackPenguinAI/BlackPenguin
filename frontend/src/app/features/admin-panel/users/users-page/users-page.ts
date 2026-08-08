@@ -6,6 +6,7 @@ import { ToastService } from '../../../../core/services/toast';
 
 import { GlassCardComponent } from '../../../../shared/ui/glass-card/glass-card';
 import { InputComponent } from '../../../../shared/ui/input/input';
+import { SelectComponent, SelectOption } from '../../../../shared/ui/select/select';
 
 @Component({
   selector: 'app-users-page',
@@ -14,7 +15,8 @@ import { InputComponent } from '../../../../shared/ui/input/input';
     CommonModule, 
     FormsModule, 
     GlassCardComponent, 
-    InputComponent
+    InputComponent,
+    SelectComponent
     // ButtonComponent eliminado de aquí
   ],
   providers: [DecimalPipe],
@@ -42,6 +44,16 @@ export class UsersPageComponent implements OnInit {
     { label: 'Marketing', value: 'mkt' },
     { label: 'Sales', value: 'sales' }
   ];
+
+  get companyOptions(): SelectOption[] {
+    return [
+      { label: 'All Companies', value: '' },
+      ...this.companies.map((company) => ({
+        label: company.name,
+        value: company.id
+      }))
+    ];
+  }
 
   constructor(
     private http: HttpClient,

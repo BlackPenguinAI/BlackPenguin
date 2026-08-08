@@ -1,29 +1,28 @@
-<div class="fixed inset-0 z-0 pointer-events-none">
-  <video #bgVideo [muted]="true" [autoplay]="true" [loop]="true" playsinline class="w-full h-full object-cover brightness-60" style="transform: scale(1.1) translate(0px, 0px);">
-    <source src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260403_050628_c4e32401-fab4-4a27-b7a8-6e9291cd5959.mp4" type="video/mp4">
+<div class="landing-bg-shell fixed inset-0 z-0 pointer-events-none">
+  <video #bgVideo [muted]="true" [autoplay]="true" [loop]="false" preload="auto" playsinline class="landing-bg-video w-full h-full object-cover brightness-60" (loadedmetadata)="syncBackgroundVideoSegment()" (canplay)="syncBackgroundVideoSegment()" (timeupdate)="keepBackgroundInSelectedSegment()">
+    <source [src]="backgroundVideoSrc" type="video/mp4">
   </video>
 </div>
 
-<nav class="fixed top-4 md:top-8 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] md:w-full max-w-5xl">
+<nav class="fixed top-4 md:top-8 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] md:w-full max-w-6xl">
   
-  <div class="liquid-glass px-6 md:px-8 py-4 flex items-center justify-between relative z-20">
+  <div class="liquid-glass landing-nav-glass px-6 md:px-8 py-4 flex items-center justify-between relative z-20">
     
     <div class="flex items-center gap-4">
-      <img alt="Black Penguin Logo" class="h-8 w-8 object-contain cursor-pointer" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDxl2QxLaz1QVZlAWP1ksa3Vsw8hnGkq7DN9pIFoivY_s0ANfwB6_2SUVcF-XuzZxv_QkfH-yYy0Zc1TjmtQ9hP1gQTJB2TYxp1DFMuGtCSL7fddgkgG8ENFAvecOdZ0uABF1CY5yR7_VUrse9PALCGMFUALu0wLsTml1PYbq2FbNq3FTatmSUOjSFUiuhDInqKQifEP-apKuFd0djcZrYKCm-40vcNvQSEutAVuANBR8keQgsajYWdrcIrDHDKew0a7QkZVGOKBUM" routerLink="/">
+      <img alt="Black Penguin Logo" class="h-11 w-11 object-contain cursor-pointer" src="/BPicon.png" routerLink="/">
       <div class="font-wordmark text-xl flex items-center tracking-tighter">
-        <span class="text-white font-light">black</span><span class="text-secondary font-medium">penguin</span><span class="text-gray-custom font-light">.ai</span>
+        <span class="text-black font-light">black</span><span class="text-secondary font-medium">penguin</span><span class="text-gray-custom font-light">.ai</span>
       </div>
     </div>
     
-    <div class="hidden md:flex items-center gap-10">
+    <div class="hidden md:flex items-center gap-7">
       <a class="nav-item cursor-pointer" (click)="scrollToSection('inicio')">{{ 'NAV.HOME' | translate }}</a>
       <a class="nav-item cursor-pointer" (click)="scrollToSection('plataforma')">{{ 'NAV.PLATFORM' | translate }}</a>
       <a class="nav-item cursor-pointer" (click)="scrollToSection('soluciones')">{{ 'NAV.SOLUTIONS' | translate }}</a>
+      <a class="nav-item cursor-pointer" (click)="scrollToSection('waitlist')">{{ 'NAV.REQUEST_DEMO' | translate }}</a>
       
-      <div class="flex items-center gap-2 border-l border-white/20 pl-6">
-        <button (click)="switchLanguage('en')" [class.text-secondary]="currentLang === 'en'" class="text-xs font-bold text-gray-custom hover:text-white transition-colors">EN</button>
-        <span class="text-gray-custom text-xs">/</span>
-        <button (click)="switchLanguage('es')" [class.text-secondary]="currentLang === 'es'" class="text-xs font-bold text-gray-custom hover:text-white transition-colors">ES</button>
+      <div class="border-l border-black/15 pl-6">
+        <a routerLink="/login" class="liquid-login-button">{{ 'NAV.LOGIN' | translate }}</a>
       </div>
 
       <!--
@@ -38,7 +37,7 @@
     </button>
   </div>
 
-  <div *ngIf="isMobileMenuOpen" class="md:hidden absolute top-[110%] left-0 w-full liquid-glass p-6 flex flex-col gap-6 z-10 fade-in visible border border-white/10 shadow-2xl">
+  <div *ngIf="isMobileMenuOpen" class="md:hidden absolute top-[110%] left-0 w-full liquid-glass landing-nav-glass p-6 flex flex-col gap-6 z-10 fade-in visible border border-white/10 shadow-2xl">
     
     <a class="nav-item cursor-pointer text-center text-lg" (click)="scrollToSection('inicio'); toggleMobileMenu()">{{ 'NAV.HOME' | translate }}</a>
     <div class="w-full h-px bg-white/5"></div> 
@@ -48,12 +47,11 @@
     
     <a class="nav-item cursor-pointer text-center text-lg" (click)="scrollToSection('soluciones'); toggleMobileMenu()">{{ 'NAV.SOLUTIONS' | translate }}</a>
     <div class="w-full h-px bg-white/5"></div>
+
+    <a class="nav-item cursor-pointer text-center text-lg" (click)="scrollToSection('waitlist'); toggleMobileMenu()">{{ 'NAV.REQUEST_DEMO' | translate }}</a>
+    <div class="w-full h-px bg-white/5"></div>
     
-    <div class="flex items-center justify-center gap-4 py-2">
-      <button (click)="switchLanguage('en'); toggleMobileMenu()" [class.text-secondary]="currentLang === 'en'" class="text-sm font-bold text-gray-custom hover:text-white transition-colors">ENGLISH</button>
-      <span class="text-gray-custom text-sm">/</span>
-      <button (click)="switchLanguage('es'); toggleMobileMenu()" [class.text-secondary]="currentLang === 'es'" class="text-sm font-bold text-gray-custom hover:text-white transition-colors">ESPAÑOL</button>
-    </div>
+    <a routerLink="/login" class="liquid-login-button mx-auto" (click)="toggleMobileMenu()">{{ 'NAV.LOGIN' | translate }}</a>
 
     <!--
     <button routerLink="/register" (click)="toggleMobileMenu()" class="w-full bg-secondary text-black px-6 py-4 rounded-xl font-bold text-base transition-transform active:scale-95 shadow-lg mt-2">
@@ -69,15 +67,32 @@
   <section id="inicio" class="min-h-screen flex items-center px-8 md:px-16">
     <div class="max-w-7xl mx-auto w-full flex flex-col items-center text-center pt-24">
       
-      <div #statusRow class="fade-in flex items-center gap-3 mb-8 border border-white/10 px-4 py-2 rounded-full bg-white/5 backdrop-blur-sm">
-        <span class="w-2 h-2 rounded-full bg-secondary animate-pulse"></span>
-        <span class="text-[10px] font-medium text-gray-custom uppercase tracking-[0.2em]">{{ 'HERO.STATUS' | translate }}</span>
-      </div>
-      
       <h1 #heroHeading class="text-5xl md:text-7xl font-light text-white leading-[1.05] tracking-[-0.04em] max-w-4xl min-h-[150px]"></h1>
       
-      <p #heroSubheading class="fade-in text-lg md:text-xl text-on-surface-variant max-w-2xl mt-8 leading-relaxed">
-        {{ 'HERO.SUBTITLE' | translate }}
+      <p #heroSubheading class="fade-in hero-roll-text mt-8" [attr.aria-label]="heroSubtitle">
+        <span
+          *ngFor="let word of heroSubtitleWords"
+          class="text-roll-word"
+          [class.text-roll-word-inverse]="isInverseHeroWord(word)">
+          <span class="text-roll" aria-hidden="true">
+            <span class="text-roll-line">
+              <span
+                *ngFor="let letter of word.split(''); let i = index"
+                class="text-roll-char"
+                [style.--roll-delay]="getRollDelay(i, word.length)">
+                {{ letter }}
+              </span>
+            </span>
+            <span class="text-roll-line text-roll-line-alt">
+              <span
+                *ngFor="let letter of word.split(''); let i = index"
+                class="text-roll-char"
+                [style.--roll-delay]="getRollDelay(i, word.length)">
+                {{ letter }}
+              </span>
+            </span>
+          </span>
+        </span>
       </p>
 
       <div id="waitlist" #heroCta class="fade-in w-full max-w-[480px] mt-12">
@@ -113,32 +128,32 @@
     <div class="max-w-7xl mx-auto">
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
         
-        <div #featureCard class="fade-in p-8 rounded-2xl flex flex-col gap-4 bg-surface-level-1/30 border border-white/5 transition-transform hover:scale-[1.02]">
+        <div #featureCard class="fade-in feature-glass-card p-8 rounded-2xl flex flex-col gap-4 transition-transform hover:scale-[1.02]">
           <div class="w-12 h-12 rounded-xl bg-secondary/10 flex items-center justify-center mb-2">
             <span class="material-symbols-outlined text-secondary text-[28px]">search</span>
           </div>
           <h3 class="text-white font-medium text-xl">{{ 'FEATURES.TITLE_1' | translate }}</h3>
-          <p class="text-gray-custom text-sm leading-relaxed">
+          <p class="feature-card-copy text-sm leading-relaxed">
             {{ 'FEATURES.DESC_1' | translate }}
           </p>
         </div>
 
-        <div #featureCard class="fade-in p-8 rounded-2xl flex flex-col gap-4 bg-surface-level-1/30 border border-white/5 transition-transform hover:scale-[1.02]">
+        <div #featureCard class="fade-in feature-glass-card p-8 rounded-2xl flex flex-col gap-4 transition-transform hover:scale-[1.02]">
           <div class="w-12 h-12 rounded-xl bg-secondary/10 flex items-center justify-center mb-2">
             <span class="material-symbols-outlined text-secondary text-[28px]">bolt</span>
           </div>
           <h3 class="text-white font-medium text-xl">{{ 'FEATURES.TITLE_2' | translate }}</h3>
-          <p class="text-gray-custom text-sm leading-relaxed">
+          <p class="feature-card-copy text-sm leading-relaxed">
             {{ 'FEATURES.DESC_2' | translate }}
           </p>
         </div>
 
-        <div #featureCard class="fade-in p-8 rounded-2xl flex flex-col gap-4 bg-surface-level-1/30 border border-white/5 transition-transform hover:scale-[1.02]">
+        <div #featureCard class="fade-in feature-glass-card p-8 rounded-2xl flex flex-col gap-4 transition-transform hover:scale-[1.02]">
           <div class="w-12 h-12 rounded-xl bg-secondary/10 flex items-center justify-center mb-2">
             <span class="material-symbols-outlined text-secondary text-[28px]">bar_chart</span>
           </div>
           <h3 class="text-white font-medium text-xl">{{ 'FEATURES.TITLE_3' | translate }}</h3>
-          <p class="text-gray-custom text-sm leading-relaxed">
+          <p class="feature-card-copy text-sm leading-relaxed">
             {{ 'FEATURES.DESC_3' | translate }}
           </p>
         </div>
@@ -158,15 +173,7 @@
 
   <footer class="mt-auto px-8 md:px-16 py-12 border-t border-white/10 bg-black/80 backdrop-blur-md">
     <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-8">
-      <div class="flex items-center gap-6">
-        <div class="flex items-center gap-3">
-          <img alt="Black Penguin Logo" class="h-6 w-6 object-contain grayscale hover:grayscale-0 transition-all" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDxl2QxLaz1QVZlAWP1ksa3Vsw8hnGkq7DN9pIFoivY_s0ANfwB6_2SUVcF-XuzZxv_QkfH-yYy0Zc1TjmtQ9hP1gQTJB2TYxp1DFMuGtCSL7fddgkgG8ENFAvecOdZ0uABF1CY5yR7_VUrse9PALCGMFUALu0wLsTml1PYbq2FbNq3FTatmSUOjSFUiuhDInqKQifEP-apKuFd0djcZrYKCm-40vcNvQSEutAVuANBR8keQgsajYWdrcIrDHDKew0a7QkZVGOKBUM">
-          <div class="font-wordmark text-lg tracking-tight">
-            <span class="text-white font-light">black</span><span class="text-secondary font-medium">penguin</span><span class="text-gray-custom font-light">.ai</span>
-          </div>
-        </div>
-        <span class="text-gray-500 text-xs">{{ 'FOOTER.RIGHTS' | translate }}</span>
-      </div>
+      <span class="text-gray-500 text-xs">{{ 'FOOTER.RIGHTS' | translate }}</span>
       <div class="flex flex-col md:flex-row gap-4 md:gap-8 text-xs text-gray-400 font-light">
         <a routerLink="/legal/privacy" class="hover:text-secondary transition-colors cursor-pointer">
           {{ 'FOOTER.PRIVACY_POLICY' | translate }}

@@ -26,6 +26,7 @@ export class ProfilePageComponent implements OnInit {
   };
 
   passForm = { current_password: '', new_password: '', confirm_password: '' };
+  profileImageUrl: string = '';
 
   isLoading: boolean = true;
   isSaving: boolean = false;
@@ -38,7 +39,32 @@ export class ProfilePageComponent implements OnInit {
   ) {}
 
   ngOnInit() {
+    this.profileImageUrl = localStorage.getItem('bp_profile_image') || '';
     this.loadProfile();
+  }
+
+  onProfileImageSelected(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    if (!file.type.startsWith('image/')) {
+      this.toast.showError('Please upload an image file.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      this.profileImageUrl = String(reader.result || '');
+      localStorage.setItem('bp_profile_image', this.profileImageUrl);
+      window.dispatchEvent(new Event('bp-profile-image-updated'));
+      this.toast.showSuccess('Profile picture updated.');
+      this.cdr.detectChanges();
+    };
+    reader.readAsDataURL(file);
   }
 
   loadProfile() {

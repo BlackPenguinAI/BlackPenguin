@@ -10,6 +10,7 @@ import { SpeechRecognitionService } from '../../../../core/services/speech-recog
 import { OnboardingQuestion } from '../../../../shared/ui/onboarding-response-options/onboarding-response-options';
 import { OnboardingAiMessageComponent } from '../../../../shared/ui/onboarding-ai-message/onboarding-ai-message';
 import { OnboardingWelcomeComponent } from '../../../../shared/ui/onboarding-welcome/onboarding-welcome';
+import { SelectComponent, SelectOption } from '../../../../shared/ui/select/select';
 
 import {
   Campaign, ChatAttachment, ChatMessage, ChatTurn, EMPTY_PROJECT_PROFILE, MetaConnection, OnboardingState,
@@ -19,7 +20,7 @@ import { ProjectOnboardingService } from './project-onboarding.service';
 
 @Component({
   selector: 'app-project-chat', standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, OnboardingAiMessageComponent, OnboardingWelcomeComponent],
+  imports: [CommonModule, FormsModule, RouterModule, OnboardingAiMessageComponent, OnboardingWelcomeComponent, SelectComponent],
   templateUrl: './project-chat.html', styleUrls: ['./project-chat.scss'],
 })
 export class ProjectChatComponent implements OnInit, OnDestroy {
@@ -87,6 +88,16 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
 
   get canSend(): boolean { return (!!this.prompt.trim() || !!this.selectedFiles.length) && !this.isAnalyzing; }
   get nextBlocker(): string { return this.profile.completion.blockers[0]?.label || 'Final profile approval'; }
+  get metaConnectionOptions(): SelectOption[] {
+    return [
+      { label: 'No Meta connection', value: null },
+      ...this.metaConnections.map((connection) => ({
+        label: connection.label,
+        value: connection.id
+      }))
+    ];
+  }
+
   fieldsForSection(section: string): ProjectFieldProgress[] { return this.profile.fields.filter((field) => field.section === section); }
 
   loadProfile(): void {
