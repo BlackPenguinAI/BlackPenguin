@@ -4,6 +4,19 @@ from fastapi import HTTPException
 from .models import AIConfiguration
 from .schemas import AIConfigUpdatePayload
 from app.integrations.openrouter_client import check_openrouter_consumption
+from app.modules.sales_agent.default_prompt import (
+    SALES_AGENT_DEFAULT_CONFIG,
+    needs_sales_agent_default,
+)
+
+
+def _apply_safe_defaults(db: Session, config: AIConfiguration) -> AIConfiguration:
+    if needs_sales_agent_default(config.agent_ventas):
+        config.agent_ventas = dict(SALES_AGENT_DEFAULT_CONFIG)
+        flag_modified(config, "agent_ventas")
+        db.commit()
+        db.refresh(config)
+    return config
 
 def get_ai_config(db: Session, company_id: str = None) -> AIConfiguration:
     # 1. Buscar configuración específica de la empresa
@@ -20,7 +33,7 @@ def get_ai_config(db: Session, company_id: str = None) -> AIConfiguration:
         db.commit()
         db.refresh(config)
         
-    return config
+    return _apply_safe_defaults(db, config)
 
 def update_ai_config(db: Session, payload: AIConfigUpdatePayload, company_id: str = None) -> AIConfiguration:
     config = get_ai_config(db, company_id)

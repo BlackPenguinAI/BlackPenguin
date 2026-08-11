@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 
@@ -23,15 +23,27 @@ export class CompanyUsersComponent implements OnInit {
   saving = false;
   invite = { first_name: '', last_name: '', email: '', role: 'sales' as CompanyUser['role'] };
 
-  constructor(private http: HttpClient, private toast: ToastService) {}
+  constructor(
+    private http: HttpClient,
+    private toast: ToastService,
+    private cdr: ChangeDetectorRef,
+  ) {}
 
   ngOnInit(): void { this.load(); }
 
   load(): void {
     this.loading = true;
     this.http.get<CompanyUser[]>(`${API_V1_URL}/users/company`).subscribe({
-      next: users => { this.users = users; this.loading = false; },
-      error: err => { this.loading = false; this.toast.showError(err.error?.detail || 'Could not load users'); },
+      next: users => {
+        this.users = users;
+        this.loading = false;
+        this.cdr.markForCheck();
+      },
+      error: err => {
+        this.loading = false;
+        this.toast.showError(err.error?.detail || 'Could not load users');
+        this.cdr.markForCheck();
+      },
     });
   }
 
@@ -44,14 +56,22 @@ export class CompanyUsersComponent implements OnInit {
         this.invite = { first_name: '', last_name: '', email: '', role: 'sales' };
         this.saving = false;
         this.toast.showSuccess('Invitation created');
+        this.cdr.markForCheck();
       },
-      error: err => { this.saving = false; this.toast.showError(err.error?.detail || 'Could not invite user'); },
+      error: err => {
+        this.saving = false;
+        this.toast.showError(err.error?.detail || 'Could not invite user');
+        this.cdr.markForCheck();
+      },
     });
   }
 
   setActive(user: CompanyUser, is_active: boolean): void {
     this.http.patch<CompanyUser>(`${API_V1_URL}/users/company/${user.id}`, { is_active }).subscribe({
-      next: updated => Object.assign(user, updated),
+      next: updated => {
+        Object.assign(user, updated);
+        this.cdr.markForCheck();
+      },
       error: err => this.toast.showError(err.error?.detail || 'Could not update user'),
     });
   }

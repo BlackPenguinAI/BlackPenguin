@@ -1,6 +1,6 @@
 <section class="p-8 max-w-7xl mx-auto space-y-8">
   <header>
-    <p class="text-xs uppercase tracking-[0.25em] text-cyan-400">Company access</p>
+    <p class="text-xs uppercase tracking-[0.25em] text-secondary">Company access</p>
     <h1 class="text-3xl font-semibold mt-2">Users</h1>
     <p class="text-gray-400 mt-2">Invite administrators, Marketing and Sales users. Active seats follow the Company plan.</p>
   </header>
@@ -12,7 +12,7 @@
     <select name="role" [(ngModel)]="invite.role" class="bg-black border border-white/10 rounded-lg px-3 py-2">
       <option value="admin">Admin</option><option value="mkt">Marketing</option><option value="sales">Sales</option>
     </select>
-    <button [disabled]="saving" class="rounded-lg bg-cyan-400 text-black font-semibold px-4 py-2 disabled:opacity-50">{{ saving ? 'Creating…' : 'Invite user' }}</button>
+    <button [disabled]="saving" class="rounded-lg bg-secondary text-black font-semibold px-4 py-2 disabled:opacity-50">{{ saving ? 'Creating…' : 'Invite user' }}</button>
   </form>
 
   <div class="rounded-2xl border border-white/10 overflow-hidden">
@@ -23,7 +23,7 @@
         <td class="p-4"><div>{{ user.first_name }} {{ user.last_name }}</div><div class="text-sm text-gray-500">{{ user.email }}</div></td>
         <td class="p-4 uppercase text-sm">{{ user.role }}</td>
         <td class="p-4"><span [class.text-emerald-400]="user.is_active" [class.text-gray-500]="!user.is_active">{{ user.is_active ? 'Active' : 'Inactive' }}</span></td>
-        <td class="p-4 text-right"><button (click)="setActive(user, !user.is_active)" class="text-sm text-cyan-400 hover:text-cyan-300">{{ user.is_active ? 'Deactivate' : 'Activate' }}</button></td>
+        <td class="p-4 text-right"><button (click)="setActive(user, !user.is_active)" class="text-sm text-secondary hover:text-secondary/80">{{ user.is_active ? 'Deactivate' : 'Activate' }}</button></td>
       </tr></tbody>
     </table>
   </div>
