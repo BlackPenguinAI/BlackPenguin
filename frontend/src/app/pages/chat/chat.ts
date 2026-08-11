@@ -213,7 +213,9 @@ export class ChatComponent implements OnInit, OnDestroy {
   }
 
   isSourceExpanded(source: OnboardingSource): boolean {
-    return this.hasPendingProposals(source) || this.expandedSourceIds.has(source.id);
+    return source.status === 'failed'
+      || this.hasPendingProposals(source)
+      || this.expandedSourceIds.has(source.id);
   }
 
   onSourceToggle(source: OnboardingSource, event: Event): void {

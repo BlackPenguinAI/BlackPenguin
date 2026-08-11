@@ -8,6 +8,53 @@ ACCESS_RESTRICTED_MESSAGE = (
     "content automatically. You can upload a document, retry once, or continue manually."
 )
 
+PROTECTED_FILE_MESSAGE = (
+    "I couldn't analyze this file because it is password-protected or encrypted. "
+    "Upload an unlocked copy or continue manually."
+)
+UNREADABLE_FILE_MESSAGE = (
+    "I couldn't read this file because it appears to be damaged or is not a valid "
+    "supported document. Upload another copy or continue manually."
+)
+NO_READABLE_CONTENT_MESSAGE = (
+    "I couldn't find readable text in this document. It may contain scanned pages "
+    "without OCR. Upload a text-searchable copy or continue manually."
+)
+PROTECTED_OR_LEGACY_OFFICE_MESSAGE = (
+    "This Office file appears to be encrypted, password-protected, or saved in an "
+    "older unsupported format. Upload an unlocked DOCX or XLSX copy, or continue manually."
+)
+
+
+class SourceFileError(Exception):
+    """Base class for stable, user-safe file processing failures."""
+
+    code = "source_file_error"
+    default_message = UNREADABLE_FILE_MESSAGE
+
+    def __init__(self, message: str | None = None) -> None:
+        super().__init__(message or self.default_message)
+
+
+class ProtectedFileError(SourceFileError):
+    code = "protected_file"
+    default_message = PROTECTED_FILE_MESSAGE
+
+
+class UnreadableFileError(SourceFileError):
+    code = "unreadable_file"
+    default_message = UNREADABLE_FILE_MESSAGE
+
+
+class NoReadableContentError(SourceFileError):
+    code = "no_readable_content"
+    default_message = NO_READABLE_CONTENT_MESSAGE
+
+
+class ProtectedOrLegacyOfficeError(SourceFileError):
+    code = "protected_or_legacy_office"
+    default_message = PROTECTED_OR_LEGACY_OFFICE_MESSAGE
+
 
 class AccessRestrictedError(Exception):
     """Raised when a remote site returns a browser-verification challenge."""

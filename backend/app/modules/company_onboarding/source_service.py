@@ -15,12 +15,18 @@ from bs4 import BeautifulSoup
 from fastapi import HTTPException, UploadFile
 import httpx
 from pypdf import PdfReader
+from pypdf.errors import FileNotDecryptedError, PdfReadError
 from sqlalchemy.orm import Session
 
 from app.integrations.openrouter_client import generate_llm_response
 from app.modules.ai_core.services import get_ai_config
 from app.modules.onboarding_jobs.errors import (
     AccessRestrictedError,
+    NoReadableContentError,
+    ProtectedFileError,
+    ProtectedOrLegacyOfficeError,
+    SourceFileError,
+    UnreadableFileError,
     raise_for_access_restriction,
 )
 
@@ -189,13 +195,13 @@ async def ingest_file(
             raise ValueError("The file exceeds the 15 MB limit.")
         if mime_type not in ALLOWED_FILE_TYPES:
             raise ValueError("Unsupported file type. Upload PDF, DOCX, or TXT files.")
-        _validate_signature(content, mime_type)
         stored = storage_service.store_company_file(
             company_id=company_id, source_id=source.id,
             original_filename=filename, content=content,
         )
         source.storage_path = stored.relative_path
         source.stored_filename = stored.stored_filename
+        _validate_signature(content, mime_type)
         text = _extract_bytes(content, mime_type, filename)
         await _finish_source(db, source, text)
     except Exception as exc:
@@ -206,7 +212,7 @@ async def ingest_file(
 async def _finish_source(db: Session, source: CompanyOnboardingSource, text: str) -> None:
     normalized = re.sub(r"\s+", " ", text).strip()[:MAX_SOURCE_TEXT]
     if len(normalized) < 20:
-        raise ValueError("The source did not contain enough readable text.")
+        raise NoReadableContentError()
     source.extracted_text = normalized
     proposals = await _extract_proposals(db, source.company_id, source, normalized)
     for proposal in proposals:
@@ -392,11 +398,24 @@ def serialize_proposal(proposal: CompanyOnboardingProposal) -> dict[str, Any]:
 
 def _extract_bytes(content: bytes, mime_type: str, name: str) -> str:
     if mime_type == "application/pdf" or name.lower().endswith(".pdf"):
-        return "\n".join(page.extract_text() or "" for page in PdfReader(BytesIO(content)).pages[:150])
+        try:
+            reader = PdfReader(BytesIO(content))
+            if reader.is_encrypted and not reader.decrypt(""):
+                raise ProtectedFileError()
+            return "\n".join(page.extract_text() or "" for page in reader.pages[:150])
+        except ProtectedFileError:
+            raise
+        except FileNotDecryptedError as exc:
+            raise ProtectedFileError() from exc
+        except (PdfReadError, OSError, ValueError) as exc:
+            raise UnreadableFileError() from exc
     if mime_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document" or name.lower().endswith(".docx"):
-        with ZipFile(BytesIO(content)) as archive:
-            xml = archive.read("word/document.xml").decode("utf-8", errors="ignore")
-        return re.sub(r"<[^>]+>", " ", xml)
+        try:
+            with ZipFile(BytesIO(content)) as archive:
+                xml = archive.read("word/document.xml").decode("utf-8", errors="ignore")
+            return re.sub(r"<[^>]+>", " ", xml)
+        except (BadZipFile, KeyError, OSError, ValueError) as exc:
+            raise UnreadableFileError() from exc
     if mime_type == "text/plain" or name.lower().endswith(".txt"):
         return content.decode("utf-8", errors="replace")
     soup = BeautifulSoup(content, "html.parser")
@@ -407,13 +426,18 @@ def _extract_bytes(content: bytes, mime_type: str, name: str) -> str:
 
 def _validate_signature(content: bytes, mime_type: str) -> None:
     if mime_type == "application/pdf" and not content.startswith(b"%PDF-"):
-        raise ValueError("The file content does not match its PDF type.")
+        raise UnreadableFileError()
     if mime_type.endswith("wordprocessingml.document"):
+        if content.startswith(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"):
+            raise ProtectedOrLegacyOfficeError()
         if not content.startswith(b"PK"):
-            raise ValueError("The file content does not match its DOCX type.")
-        with ZipFile(BytesIO(content)) as archive:
-            if "word/document.xml" not in archive.namelist():
-                raise ValueError("The DOCX file is not valid.")
+            raise UnreadableFileError()
+        try:
+            with ZipFile(BytesIO(content)) as archive:
+                if "word/document.xml" not in archive.namelist():
+                    raise UnreadableFileError()
+        except BadZipFile as exc:
+            raise UnreadableFileError() from exc
 
 
 def _fail_source(db: Session, source: CompanyOnboardingSource, message: str) -> None:
@@ -425,6 +449,8 @@ def _fail_source(db: Session, source: CompanyOnboardingSource, message: str) -> 
 
 
 def _safe_error(exc: Exception) -> str:
+    if isinstance(exc, SourceFileError):
+        return str(exc)
     if isinstance(exc, HTTPException):
         return str(exc.detail)
     if isinstance(exc, httpx.HTTPStatusError):

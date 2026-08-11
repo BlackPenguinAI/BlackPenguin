@@ -11,18 +11,24 @@ import re
 import socket
 from typing import Any
 from urllib.parse import urlparse
-from zipfile import ZipFile
+from zipfile import BadZipFile, ZipFile
 
 from bs4 import BeautifulSoup
 from fastapi import HTTPException, UploadFile
 import httpx
 from pypdf import PdfReader
+from pypdf.errors import FileNotDecryptedError, PdfReadError
 from sqlalchemy.orm import Session
 
 from app.integrations.openrouter_client import generate_llm_response
 from app.modules.ai_core.services import get_ai_config
 from app.modules.onboarding_jobs.errors import (
     AccessRestrictedError,
+    NoReadableContentError,
+    ProtectedFileError,
+    ProtectedOrLegacyOfficeError,
+    SourceFileError,
+    UnreadableFileError,
     raise_for_access_restriction,
 )
 
@@ -143,13 +149,13 @@ async def ingest_file(
             raise ValueError("The file exceeds the 15 MB limit.")
         if mime_type not in ALLOWED_FILE_TYPES:
             raise ValueError("Unsupported file type. Use PDF, DOCX, TXT, CSV, XLSX, JPG, PNG, or WEBP.")
-        _validate_signature(content, mime_type)
         stored = storage_service.store_project_file(
             company_id=company_id, project_id=project_id, source_id=source.id,
             original_filename=filename, content=content,
         )
         source.storage_path = stored.relative_path
         source.stored_filename = stored.stored_filename
+        _validate_signature(content, mime_type)
         db.add(source); db.commit(); db.refresh(source)
         if mime_type.startswith("image/"):
             await _finish_source(db, source, image_content=content)
@@ -165,7 +171,7 @@ async def _finish_source(
 ) -> None:
     normalized = re.sub(r"\s+", " ", text or "").strip()[:MAX_SOURCE_TEXT]
     if image_content is None and len(normalized) < 20:
-        raise ValueError("The source did not contain enough readable information.")
+        raise NoReadableContentError()
     source.extracted_text = normalized or "[Image analyzed; original retained in protected storage]"
     for proposal in await _extract_proposals(db, source, normalized, image_content):
         db.add(proposal)
@@ -292,27 +298,54 @@ def serialize_proposal(proposal: ProjectOnboardingProposal) -> dict[str, Any]:
 def _extract_bytes(content: bytes, mime_type: str, name: str) -> str:
     lower = name.lower()
     if mime_type == "application/pdf" or lower.endswith(".pdf"):
-        return "\n".join(page.extract_text() or "" for page in PdfReader(BytesIO(content)).pages[:150])
+        try:
+            reader = PdfReader(BytesIO(content))
+            if reader.is_encrypted and not reader.decrypt(""):
+                raise ProtectedFileError()
+            return "\n".join(page.extract_text() or "" for page in reader.pages[:150])
+        except ProtectedFileError:
+            raise
+        except FileNotDecryptedError as exc:
+            raise ProtectedFileError() from exc
+        except (PdfReadError, OSError, ValueError) as exc:
+            raise UnreadableFileError() from exc
     if mime_type.endswith("wordprocessingml.document") or lower.endswith(".docx"):
-        with ZipFile(BytesIO(content)) as archive:
-            xml = archive.read("word/document.xml").decode("utf-8", errors="ignore")
-        return re.sub(r"<[^>]+>", " ", xml)
+        try:
+            with ZipFile(BytesIO(content)) as archive:
+                xml = archive.read("word/document.xml").decode("utf-8", errors="ignore")
+            return re.sub(r"<[^>]+>", " ", xml)
+        except (BadZipFile, KeyError, OSError, ValueError) as exc:
+            raise UnreadableFileError() from exc
     if mime_type.endswith("spreadsheetml.sheet") or lower.endswith(".xlsx"):
-        with ZipFile(BytesIO(content)) as archive:
-            shared = []
-            if "xl/sharedStrings.xml" in archive.namelist():
-                soup = BeautifulSoup(archive.read("xl/sharedStrings.xml"), "xml")
-                shared = [item.get_text(" ", strip=True) for item in soup.find_all("si")]
-            rows = []
-            for filename in sorted(n for n in archive.namelist() if n.startswith("xl/worksheets/sheet") and n.endswith(".xml"))[:20]:
-                soup = BeautifulSoup(archive.read(filename), "xml")
-                for row in soup.find_all("row")[:5000]:
-                    values = []
-                    for cell in row.find_all("c"):
-                        raw = cell.v.get_text(strip=True) if cell.v else ""
-                        values.append(shared[int(raw)] if cell.get("t") == "s" and raw.isdigit() and int(raw) < len(shared) else raw)
-                    rows.append(" | ".join(values))
-            return "\n".join(rows)
+        try:
+            with ZipFile(BytesIO(content)) as archive:
+                names = archive.namelist()
+                if "xl/workbook.xml" not in names:
+                    raise UnreadableFileError()
+                shared = []
+                if "xl/sharedStrings.xml" in names:
+                    soup = BeautifulSoup(archive.read("xl/sharedStrings.xml"), "xml")
+                    shared = [item.get_text(" ", strip=True) for item in soup.find_all("si")]
+                sheet_names = sorted(
+                    n for n in names
+                    if n.startswith("xl/worksheets/sheet") and n.endswith(".xml")
+                )[:20]
+                if not sheet_names:
+                    raise UnreadableFileError()
+                rows = []
+                for filename in sheet_names:
+                    soup = BeautifulSoup(archive.read(filename), "xml")
+                    for row in soup.find_all("row")[:5000]:
+                        values = []
+                        for cell in row.find_all("c"):
+                            raw = cell.v.get_text(strip=True) if cell.v else ""
+                            values.append(shared[int(raw)] if cell.get("t") == "s" and raw.isdigit() and int(raw) < len(shared) else raw)
+                        rows.append(" | ".join(values))
+                return "\n".join(rows)
+        except UnreadableFileError:
+            raise
+        except (BadZipFile, KeyError, OSError, ValueError, IndexError) as exc:
+            raise UnreadableFileError() from exc
     if mime_type in {"text/plain", "text/csv", "application/csv"} or lower.endswith((".txt", ".csv")):
         return content.decode("utf-8", errors="replace")
     soup = BeautifulSoup(content, "html.parser")
@@ -323,9 +356,24 @@ def _extract_bytes(content: bytes, mime_type: str, name: str) -> str:
 
 def _validate_signature(content: bytes, mime_type: str) -> None:
     if mime_type == "application/pdf" and not content.startswith(b"%PDF-"):
-        raise ValueError("The file content does not match its PDF type.")
-    if (mime_type.endswith("wordprocessingml.document") or mime_type.endswith("spreadsheetml.sheet")) and not content.startswith(b"PK"):
-        raise ValueError("The file content does not match its Office document type.")
+        raise UnreadableFileError()
+    if mime_type.endswith("wordprocessingml.document") or mime_type.endswith("spreadsheetml.sheet"):
+        if content.startswith(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"):
+            raise ProtectedOrLegacyOfficeError()
+        if not content.startswith(b"PK"):
+            raise UnreadableFileError()
+        try:
+            with ZipFile(BytesIO(content)) as archive:
+                names = archive.namelist()
+                if mime_type.endswith("wordprocessingml.document") and "word/document.xml" not in names:
+                    raise UnreadableFileError()
+                if mime_type.endswith("spreadsheetml.sheet") and (
+                    "xl/workbook.xml" not in names
+                    or not any(name.startswith("xl/worksheets/sheet") and name.endswith(".xml") for name in names)
+                ):
+                    raise UnreadableFileError()
+        except BadZipFile as exc:
+            raise UnreadableFileError() from exc
     if mime_type == "image/jpeg" and not content.startswith(b"\xff\xd8\xff"):
         raise ValueError("The image is not a valid JPEG.")
     if mime_type == "image/png" and not content.startswith(b"\x89PNG\r\n\x1a\n"):
@@ -338,6 +386,7 @@ def _fail_source(db: Session, source: ProjectOnboardingSource, message: str) -> 
 
 
 def _safe_error(exc: Exception) -> str:
+    if isinstance(exc, SourceFileError): return str(exc)
     if isinstance(exc, HTTPException): return str(exc.detail)
     if isinstance(exc, httpx.HTTPStatusError): return f"The source returned HTTP {exc.response.status_code}."
     return str(exc) or "The source could not be processed."

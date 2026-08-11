@@ -16,6 +16,7 @@ from app.modules.auth.deps import RoleChecker
 from app.modules.companies.models import Company
 from app.modules.onboarding_questions import build_next_question
 from app.modules.onboarding_jobs import service as job_service
+from app.modules.onboarding_jobs.continuation import finalize_source_group
 from app.modules.onboarding_jobs.models import OnboardingSourceJob
 from app.modules.users.models import User, UserRole
 
@@ -26,7 +27,6 @@ from .models import (
     CompanyOnboardingSource,
     OnboardingMessage,
     OnboardingSession,
-    ProposalStatus,
     SenderType,
 )
 from .schemas import (
@@ -136,56 +136,11 @@ def _continue_after_source_review(
     proposal: CompanyOnboardingProposal,
     profile,
 ) -> OnboardingMessage | None:
-    message_id = proposal.source.message_id
-    if not message_id:
-        return None
-    origin = (
-        db.query(OnboardingMessage)
-        .filter(OnboardingMessage.id == message_id)
-        .first()
-    )
-    if not origin:
-        return None
-    db.query(OnboardingSession).filter(
-        OnboardingSession.id == origin.session_id
-    ).with_for_update().one()
-    pending = (
-        db.query(CompanyOnboardingProposal)
-        .join(CompanyOnboardingSource)
-        .filter(
-            CompanyOnboardingSource.company_id == proposal.source.company_id,
-            CompanyOnboardingProposal.status == ProposalStatus.PENDING,
-        )
-        .first()
-    )
-    if pending:
-        return None
-    existing = (
-        db.query(OnboardingMessage)
-        .filter(
-            OnboardingMessage.session_id == origin.session_id,
-            OnboardingMessage.sender == SenderType.AI,
-            OnboardingMessage.ui_payload.isnot(None),
-            OnboardingMessage.response_payload.is_(None),
-            OnboardingMessage.created_at >= origin.created_at,
-        )
-        .order_by(OnboardingMessage.created_at.asc())
-        .first()
-    )
-    if existing:
-        if not existing.in_reply_to_message_id:
-            existing.in_reply_to_message_id = origin.id
-            db.add(existing)
-        return existing
-    question = _next_question(profile)
-    return services.save_message(
+    return finalize_source_group(
         db,
-        origin.session_id,
-        SenderType.AI,
-        question["prompt"],
-        ui_payload=question,
-        in_reply_to_message_id=origin.id,
-        commit=False,
+        scope="company",
+        company_id=proposal.source.company_id,
+        message_id=proposal.source.message_id,
     )
 
 
@@ -367,6 +322,7 @@ async def bootstrap_chat(
             status_message = services.save_message(
                 db, session.id, SenderType.AI,
                 f"I'm processing **{source.name}** now. You can keep this page open or return later; the result will appear automatically.",
+                in_reply_to_message_id=user_message.id,
                 commit=False,
             )
             db.commit()
@@ -578,10 +534,18 @@ async def send_chat_message(
             "I understood your response, but I couldn't safely apply it to the profile. "
             "Nothing was changed. " + _next_prompt(profile)
         )
-    ai_message = services.save_message(
-        db, session.id, SenderType.AI, assistant_text,
-        ui_payload=_next_question(profile),
-    )
+    db.query(OnboardingSession).filter(OnboardingSession.id == session.id).with_for_update().one()
+    ai_message = db.query(OnboardingMessage).filter(
+        OnboardingMessage.session_id == session.id,
+        OnboardingMessage.sender == SenderType.AI,
+        OnboardingMessage.in_reply_to_message_id == user_message.id,
+    ).order_by(OnboardingMessage.created_at.desc()).first()
+    if not ai_message:
+        ai_message = services.save_message(
+            db, session.id, SenderType.AI, assistant_text,
+            ui_payload=_next_question(profile),
+            in_reply_to_message_id=user_message.id,
+        )
     return {
         "message": _message_payload(ai_message),
         "user_message": _message_payload(user_message),
@@ -706,6 +670,13 @@ async def add_file_sources(
                 message_id=user_message.id,
             )
         )
+    finalize_source_group(
+        db,
+        scope="company",
+        company_id=current_user.company_id,
+        message_id=user_message.id,
+    )
+    db.commit()
     return [source_service.serialize_source(source) for source in sources]
 
 

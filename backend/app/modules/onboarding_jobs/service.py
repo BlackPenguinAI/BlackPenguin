@@ -12,11 +12,10 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
 from app.db.postgres import SessionLocal
-from app.modules.onboarding_questions import build_next_question
-
 from .models import OnboardingSourceJob
 from .healthcheck import write_heartbeat
 from .errors import AccessRestrictedError
+from .continuation import finalize_source_group
 
 logger = logging.getLogger(__name__)
 MAX_ATTEMPTS = 3
@@ -205,6 +204,15 @@ async def _process(db: Session, job: OnboardingSourceJob) -> None:
         else:
             raise ValueError("unknown_scope")
         job.status = "completed"; job.completed_at = datetime.utcnow(); job.error_detail = None
+        db.add(job)
+        db.flush()
+        finalize_source_group(
+            db,
+            scope=job.scope,
+            company_id=job.company_id,
+            project_id=job.project_id,
+            message_id=job.message_id,
+        )
         logger.info(
             "onboarding_job_completed job_id=%s scope=%s source_id=%s attempt=%s duration_ms=%s",
             job.id, job.scope, job.source_id, job.attempts,
@@ -284,47 +292,17 @@ def _source_domain(db: Session, job: OnboardingSourceJob) -> str:
 
 
 def _save_terminal_failure_message(db: Session, job: OnboardingSourceJob) -> None:
-    if job.error_code == AccessRestrictedError.code:
-        if job.scope == "company":
-            content = (
-                "This website requires browser security verification, so I couldn't read its "
-                "content automatically. You can still use the URL as the official website, "
-                "upload a document, retry once, or continue manually."
-            )
-        else:
-            content = (
-                "This website requires browser security verification, so I couldn't read its "
-                "content automatically. You can upload a project document, retry once, or "
-                "continue manually."
-            )
-    else:
-        content = (
-            "I couldn't process that website after several attempts. "
-            "You can retry the source or continue the onboarding manually."
-        )
     try:
         with db.begin_nested():
-            if job.scope == "company":
-                from app.modules.company_onboarding import services
-                from app.modules.company_onboarding.models import OnboardingSession, SenderType
-
-                session = db.query(OnboardingSession).filter(
-                    OnboardingSession.company_id == job.company_id
-                ).first()
-                if session:
-                    services.save_message(
-                        db, session.id, SenderType.AI, content,
-                        commit=False,
-                    )
-            elif job.scope == "project":
-                from app.modules.projects import services
-                from app.modules.projects.models import SenderType
-
-                project = services.get_project(db, job.project_id or "", job.company_id)
-                services.save_message(
-                    db, project.session.id, SenderType.AI, content,
-                    commit=False,
-                )
+            db.add(job)
+            db.flush()
+            finalize_source_group(
+                db,
+                scope=job.scope,
+                company_id=job.company_id,
+                project_id=job.project_id,
+                message_id=job.message_id,
+            )
     except Exception as exc:
         logger.error(
             "onboarding_terminal_message_failed job_id=%s scope=%s source_id=%s error_type=%s",
@@ -334,13 +312,8 @@ def _save_terminal_failure_message(db: Session, job: OnboardingSourceJob) -> Non
 
 
 async def _process_company(db: Session, job: OnboardingSourceJob) -> None:
-    from app.modules.company_onboarding import services, source_service
-    from app.modules.company_onboarding.models import (
-        CompanyOnboardingProposal,
-        CompanyOnboardingSource,
-        ProposalStatus,
-        SenderType,
-    )
+    from app.modules.company_onboarding import source_service
+    from app.modules.company_onboarding.models import CompanyOnboardingSource
 
     source = db.query(CompanyOnboardingSource).filter(
         CompanyOnboardingSource.id == job.source_id,
@@ -353,43 +326,11 @@ async def _process_company(db: Session, job: OnboardingSourceJob) -> None:
     await source_service.process_url_source(db, source)
     if source.status.value == "failed":
         raise ValueError(f"source_processing_failed: {_safe_error_detail(source.error_message)}")
-    session = services.get_or_create_session(db, job.company_id)
-    pending_proposals = db.query(CompanyOnboardingProposal).filter(
-        CompanyOnboardingProposal.source_id == source.id,
-        CompanyOnboardingProposal.status == ProposalStatus.PENDING,
-    ).count()
-    if pending_proposals:
-        services.save_message(
-            db,
-            session.id,
-            SenderType.AI,
-            f"I extracted {pending_proposals} proposal{'s' if pending_proposals != 1 else ''} "
-            f"from **{source.name}**. Review them before we continue.",
-            in_reply_to_message_id=job.message_id,
-        )
-        return
-    profile = services.get_or_create_profile(db, job.company_id)
-    question = build_next_question(
-        services.serialize_profile(profile)["completion"]["blockers"],
-        final_prompt="Review the Company Profile and choose whether to approve it or make changes.",
-    )
-    outcome = "processed successfully" if source.status.value == "ready" else "could not be processed"
-    services.save_message(
-        db, session.id, SenderType.AI,
-        f"The website **{source.name}** was {outcome}. {question['prompt']}",
-        ui_payload=question,
-        in_reply_to_message_id=job.message_id,
-    )
 
 
 async def _process_project(db: Session, job: OnboardingSourceJob) -> None:
     from app.modules.projects import services, source_service
-    from app.modules.projects.models import (
-        ProjectOnboardingProposal,
-        ProjectOnboardingSource,
-        ProjectProposalStatus,
-        SenderType,
-    )
+    from app.modules.projects.models import ProjectOnboardingSource
 
     project = services.get_project(db, job.project_id or "", job.company_id)
     source = db.query(ProjectOnboardingSource).filter(
@@ -403,29 +344,3 @@ async def _process_project(db: Session, job: OnboardingSourceJob) -> None:
     await source_service.process_url_source(db, source)
     if source.status.value == "failed":
         raise ValueError(f"source_processing_failed: {_safe_error_detail(source.error_message)}")
-    pending_proposals = db.query(ProjectOnboardingProposal).filter(
-        ProjectOnboardingProposal.source_id == source.id,
-        ProjectOnboardingProposal.status == ProjectProposalStatus.PENDING,
-    ).count()
-    if pending_proposals:
-        services.save_message(
-            db,
-            project.session.id,
-            SenderType.AI,
-            f"I extracted {pending_proposals} proposal{'s' if pending_proposals != 1 else ''} "
-            f"from **{source.name}**. Review them before we continue.",
-            in_reply_to_message_id=job.message_id,
-        )
-        return
-    profile = services.get_profile(project)
-    question = build_next_question(
-        services.serialize_profile(profile)["completion"]["blockers"],
-        final_prompt="Review the Project Profile and choose whether to approve it or make changes.",
-    )
-    outcome = "processed successfully" if source.status.value == "ready" else "could not be processed"
-    services.save_message(
-        db, project.session.id, SenderType.AI,
-        f"The website **{source.name}** was {outcome}. {question['prompt']}",
-        ui_payload=question,
-        in_reply_to_message_id=job.message_id,
-    )

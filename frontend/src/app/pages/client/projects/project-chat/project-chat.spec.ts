@@ -57,4 +57,20 @@ describe('ProjectChatComponent', () => {
     expect(component.isSourceExpanded(component.sources[0])).toBe(true);
     expect(component.canSend).toBe(false);
   });
+
+  it('expands a failed uploaded file without treating it as pending review', () => {
+    const source = {
+      id: 'source-failed', kind: 'uploaded_file' as const, status: 'failed' as const,
+      name: 'protected.pdf', url: null, mime_type: 'application/pdf', size_bytes: 100,
+      error_message: "I couldn't analyze this file because it is password-protected.",
+      message_id: 'message-1', download_url: '/file', is_primary: false, proposals: [],
+      created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    };
+    component.sources = [source];
+    component.prompt = 'Continue manually';
+
+    expect(component.isSourceExpanded(source)).toBe(true);
+    expect(component.hasPendingReview).toBe(false);
+    expect(component.canSend).toBe(true);
+  });
 });

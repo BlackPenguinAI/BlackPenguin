@@ -187,26 +187,29 @@ def test_terminal_failure_marks_company_source_and_adds_message(monkeypatch):
         company_id="company-id",
         project_id=None,
         source_id="source-id",
+        message_id="origin-message-id",
+        error_code="ValueError",
     )
     db = MagicMock()
-    source = Mock()
+    source = Mock(error_message=None)
     query = db.query.return_value
     query.filter.return_value.first.return_value = source
 
-    saved = Mock()
-    monkeypatch.setattr(
-        "app.modules.company_onboarding.services.save_message",
-        saved,
-    )
-    query.filter.return_value.first.side_effect = [source, Mock(id="session-id")]
+    finalize = Mock()
+    monkeypatch.setattr(service, "finalize_source_group", finalize)
 
     service._mark_source_failed(db, job)
     service._save_terminal_failure_message(db, job)
 
     assert source.status.value == "failed"
     assert "several attempts" in source.error_message
-    assert saved.call_args.kwargs["commit"] is False
-    assert saved.call_args.kwargs["ui_payload"]["kind"] == "source_processing_failed"
+    finalize.assert_called_once_with(
+        db,
+        scope="company",
+        company_id="company-id",
+        project_id=None,
+        message_id="origin-message-id",
+    )
 
 
 def test_error_details_redact_urls_and_tokens():

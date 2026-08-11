@@ -8,6 +8,7 @@ from app.modules.company_onboarding.models import OnboardingMessage
 from app.modules.onboarding_jobs.models import OnboardingSourceJob
 from app.modules.onboarding_jobs.service import normalize_url
 from app.modules.onboarding_jobs import service as job_service
+from app.modules.onboarding_jobs import continuation as source_continuation
 from app.modules.onboarding_jobs.errors import AccessRestrictedError
 from app.modules.company_onboarding import router as company_router
 from app.modules.projects import router as project_router
@@ -75,14 +76,15 @@ def test_project_save_message_supports_atomic_job_creation():
 
 
 def test_worker_defers_next_question_when_extracted_proposals_need_review():
-    company_source = inspect.getsource(job_service._process_company)
-    project_source = inspect.getsource(job_service._process_project)
+    process_source = inspect.getsource(job_service._process)
+    continuation_source = inspect.getsource(source_continuation.finalize_source_group)
 
-    for function_source in (company_source, project_source):
-        assert "pending_proposals" in function_source
-        assert "Review them before we continue." in function_source
-        assert function_source.index("if pending_proposals:") < function_source.index("build_next_question(")
-        assert "in_reply_to_message_id=job.message_id" in function_source
+    assert 'job.status = "completed"' in process_source
+    assert "finalize_source_group(" in process_source
+    assert 'OnboardingSourceJob.status.in_(["queued", "processing"])' in continuation_source
+    assert 'any(_source_value(source, "status") == "processing"' in continuation_source
+    assert "pending_count" in continuation_source
+    assert "ui_payload = None if pending_count else question" in continuation_source
 
 
 def test_state_does_not_attach_a_question_while_review_is_pending():
@@ -98,10 +100,13 @@ def test_last_proposal_decision_uses_an_idempotent_follow_up():
         project_router._continue_after_source_review,
     ):
         function_source = inspect.getsource(continuation)
-        assert ".with_for_update()" in function_source
-        assert "in_reply_to_message_id" in function_source
-        assert "response_payload.is_(None)" in function_source
-        assert "commit=False" in function_source
+        assert "finalize_source_group(" in function_source
+
+    function_source = inspect.getsource(source_continuation.finalize_source_group)
+    assert ".with_for_update()" in function_source
+    assert "in_reply_to_message_id == origin.id" in function_source
+    assert "response_payload.is_(None)" in function_source
+    assert "commit=False" in function_source
 
 
 def test_access_restrictions_are_terminal_and_do_not_publish_an_action_payload():

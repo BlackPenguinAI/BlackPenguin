@@ -160,7 +160,9 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     return source.proposals.some((proposal) => proposal.status === 'pending');
   }
   isSourceExpanded(source: ProjectSource): boolean {
-    return this.hasPendingProposals(source) || this.expandedSourceIds.has(source.id);
+    return source.status === 'failed'
+      || this.hasPendingProposals(source)
+      || this.expandedSourceIds.has(source.id);
   }
   onSourceToggle(source: ProjectSource, event: Event): void {
     if (this.hasPendingProposals(source)) return;

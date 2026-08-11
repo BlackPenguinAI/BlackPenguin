@@ -16,6 +16,7 @@ from app.modules.auth.deps import RoleChecker
 from app.modules.company_onboarding.models import CompanyProfile
 from app.modules.onboarding_questions import build_next_question
 from app.modules.onboarding_jobs import service as job_service
+from app.modules.onboarding_jobs.continuation import finalize_source_group
 from app.modules.onboarding_jobs.models import OnboardingSourceJob
 from app.modules.users.models import User, UserRole
 
@@ -23,7 +24,7 @@ from . import meta_service, services, source_service, storage_service
 from .completion import FIELD_BY_KEY
 from .models import (
     MetaConnection, Project, ProjectCampaign, ProjectMessage, ProjectOnboardingProposal,
-    ProjectOnboardingSource, ProjectProposalStatus, ProjectSession, ProjectSourceKind, SenderType,
+    ProjectOnboardingSource, ProjectSession, ProjectSourceKind, SenderType,
 )
 from .schemas import (
     CampaignCreate, CampaignResponse, ChatBootstrapRequest, ChatMessagePayload, ChatMessageResponse, ChatTurnResponse,
@@ -77,56 +78,12 @@ def _continue_after_source_review(
     proposal: ProjectOnboardingProposal,
     profile,
 ) -> ProjectMessage | None:
-    message_id = proposal.source.message_id
-    if not message_id:
-        return None
-    origin = (
-        db.query(ProjectMessage)
-        .filter(ProjectMessage.id == message_id)
-        .first()
-    )
-    if not origin:
-        return None
-    db.query(ProjectSession).filter(
-        ProjectSession.id == origin.session_id
-    ).with_for_update().one()
-    pending = (
-        db.query(ProjectOnboardingProposal)
-        .join(ProjectOnboardingSource)
-        .filter(
-            ProjectOnboardingSource.project_id == proposal.source.project_id,
-            ProjectOnboardingProposal.status == ProjectProposalStatus.PENDING,
-        )
-        .first()
-    )
-    if pending:
-        return None
-    existing = (
-        db.query(ProjectMessage)
-        .filter(
-            ProjectMessage.session_id == origin.session_id,
-            ProjectMessage.sender == SenderType.AI,
-            ProjectMessage.ui_payload.isnot(None),
-            ProjectMessage.response_payload.is_(None),
-            ProjectMessage.created_at >= origin.created_at,
-        )
-        .order_by(ProjectMessage.created_at.asc())
-        .first()
-    )
-    if existing:
-        if not existing.in_reply_to_message_id:
-            existing.in_reply_to_message_id = origin.id
-            db.add(existing)
-        return existing
-    question = _next_question(profile)
-    return services.save_message(
+    return finalize_source_group(
         db,
-        origin.session_id,
-        SenderType.AI,
-        question["prompt"],
-        ui_payload=question,
-        in_reply_to_message_id=origin.id,
-        commit=False,
+        scope="project",
+        company_id=proposal.source.project.company_id,
+        project_id=proposal.source.project_id,
+        message_id=proposal.source.message_id,
     )
 
 
@@ -209,6 +166,34 @@ async def _complete_chat_turn(
     sources: list[ProjectOnboardingSource], source_errors: list[dict[str, Any]],
 ) -> dict[str, Any]:
     profile = services.get_profile(project)
+    if any(source.status.value == "processing" for source in sources):
+        processing_names = ", ".join(f"**{source.name}**" for source in sources if source.status.value == "processing")
+        db.query(ProjectSession).filter(
+            ProjectSession.id == project.session.id,
+        ).with_for_update().one()
+        ai_message = db.query(ProjectMessage).filter(
+            ProjectMessage.session_id == project.session.id,
+            ProjectMessage.sender == SenderType.AI,
+            ProjectMessage.in_reply_to_message_id == user_message.id,
+        ).order_by(ProjectMessage.created_at.desc()).first()
+        if not ai_message:
+            ai_message = services.save_message(
+                db,
+                project.session.id,
+                SenderType.AI,
+                f"I'm processing {processing_names}. The result will appear automatically, and the onboarding will continue when every source in this message has finished.",
+                in_reply_to_message_id=user_message.id,
+            )
+        db.refresh(user_message)
+        return {
+            "message": _message(ai_message),
+            "user_message": _message(user_message),
+            "profile": services.serialize_profile(profile),
+            "accepted_fields": [],
+            "rejected_updates": [],
+            "sources": [source_service.serialize_source(source) for source in sources],
+            "next_question": _next_question(profile),
+        }
     ai_config = get_ai_config(db, current_user.company_id)
     if not ai_config.openrouter_api_key:
         raise HTTPException(status_code=500, detail="AI configuration is incomplete.")
@@ -267,6 +252,7 @@ async def _complete_chat_turn(
     ai_message = services.save_message(
         db, project.session.id, SenderType.AI, assistant_text,
         ui_payload=_next_question(profile),
+        in_reply_to_message_id=user_message.id,
     )
     db.refresh(user_message)
     return {
@@ -487,6 +473,7 @@ async def bootstrap_chat(
             status_message = services.save_message(
                 db, project.session.id, SenderType.AI,
                 f"I'm processing **{source.name}** now. You can keep this page open or return later; the result will appear automatically.",
+                in_reply_to_message_id=user_message.id,
                 commit=False,
             )
             db.commit()
@@ -587,12 +574,25 @@ async def send_chat_with_files(
     for raw_url in URL_PATTERN.findall(clean_message)[:3]:
         url = raw_url.rstrip(".,;:!?)\"]}")
         try:
-            sources.append(await source_service.ingest_url(
+            source = source_service.create_url_source(
                 db, project_id=project.id, user_id=current_user.id, url=url,
-                message_id=user_message.id,
-            ))
+                message_id=user_message.id, commit=False,
+            )
+            job = job_service.enqueue(
+                db, scope="project", company_id=current_user.company_id, project_id=project.id,
+                source_id=source.id, url=url, session_id=project.session.id,
+                message_id=user_message.id, commit=False,
+            )
+            source = job_service.deduplicate_source(db, job, source, commit=False)
+            db.commit()
+            db.refresh(source)
+            sources.append(source)
         except HTTPException as exc:
+            db.rollback()
             source_errors.append({"url": url, "error": exc.detail})
+        except Exception:
+            db.rollback()
+            raise
     for upload in files:
         source = await source_service.ingest_file(
             db, project_id=project.id, company_id=current_user.company_id,
@@ -638,13 +638,27 @@ async def add_url(project_id: str, payload: UrlSourceRequest, db: Session = Depe
 
 @router.post("/{project_id}/sources/files", response_model=list[SourceResponse])
 async def add_files(project_id: str, files: list[UploadFile] = File(...), db: Session = Depends(get_db), current_user: User = Depends(RoleChecker([UserRole.ADMIN]))):
-    services.get_project(db, project_id, current_user.company_id)
+    project = services.get_project(db, project_id, current_user.company_id)
     if not files or len(files) > source_service.MAX_FILES:
         raise HTTPException(status_code=422, detail=f"Upload between 1 and {source_service.MAX_FILES} files.")
+    user_message = services.save_message(
+        db,
+        project.session.id,
+        SenderType.USER,
+        f"Attached {len(files)} project file{'s' if len(files) != 1 else ''}.",
+    )
     sources = [await source_service.ingest_file(
         db, project_id=project_id, company_id=current_user.company_id,
-        user_id=current_user.id, upload=file,
+        user_id=current_user.id, upload=file, message_id=user_message.id,
     ) for file in files]
+    finalize_source_group(
+        db,
+        scope="project",
+        company_id=current_user.company_id,
+        project_id=project.id,
+        message_id=user_message.id,
+    )
+    db.commit()
     return [source_service.serialize_source(source) for source in sources]
 
 
