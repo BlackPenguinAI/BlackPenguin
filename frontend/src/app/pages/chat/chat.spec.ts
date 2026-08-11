@@ -104,4 +104,21 @@ describe('ChatComponent', () => {
     expect(component.isSourceExpanded(component.sources[0])).toBe(true);
     expect(component.canSend).toBe(false);
   });
+
+  it('offers a failed official URL as user-confirmed website only until it is saved', () => {
+    const source = {
+      id: 'source-1', kind: 'official_website' as const, status: 'failed' as const,
+      name: 'www.highlandhomes.com', url: 'https://www.highlandhomes.com/',
+      mime_type: 'text/html', size_bytes: 100, message_id: 'message-1', download_url: null,
+      error_message: 'This website requires browser security verification.', proposals: [],
+      created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    };
+
+    expect(component.canUseAsOfficialWebsite(source)).toBe(true);
+    component.profile = {
+      ...EMPTY_COMPANY_PROFILE,
+      data: { official_corporate_website: source.url },
+    };
+    expect(component.canUseAsOfficialWebsite(source)).toBe(false);
+  });
 });

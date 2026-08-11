@@ -67,6 +67,7 @@ export class ChatComponent implements OnInit, OnDestroy {
   private lastStateVersion = 0;
   private pollingStartedAt = 0;
   private readonly expandedSourceIds = new Set<string>();
+  readonly savingWebsiteSourceIds = new Set<string>();
 
   constructor(
     private readonly translate: TranslateService,
@@ -183,8 +184,8 @@ export class ChatComponent implements OnInit, OnDestroy {
   chooseAnswer(value: string, message?: ChatMessage): void { this.prompt = value; this.replyToMessageId = message?.id || null; }
   writeCustomAnswer(message?: ChatMessage): void { this.prompt = ''; this.replyToMessageId = message?.id || null; }
   isActiveQuestion(message: ChatMessage): boolean {
-    return !this.hasPendingReview && message.sender === 'ai' && !!message.ui_payload && !message.response_payload
-      && this.visibleMessages.filter((item) => item.sender === 'ai' && !!item.ui_payload && !item.response_payload).at(-1) === message;
+    return !this.hasPendingReview && message.sender === 'ai' && this.hasQuestionPayload(message) && !message.response_payload
+      && this.visibleMessages.filter((item) => item.sender === 'ai' && this.hasQuestionPayload(item) && !item.response_payload).at(-1) === message;
   }
 
   get hasPendingReview(): boolean {
@@ -386,6 +387,32 @@ export class ChatComponent implements OnInit, OnDestroy {
     });
   }
 
+  canUseAsOfficialWebsite(source: OnboardingSource): boolean {
+    return source.status === 'failed'
+      && source.kind === 'official_website'
+      && !!source.url
+      && this.profile.data['official_corporate_website'] !== source.url;
+  }
+
+  useAsOfficialWebsite(source: OnboardingSource): void {
+    if (!this.canUseAsOfficialWebsite(source) || !source.url || this.savingWebsiteSourceIds.has(source.id)) return;
+    this.errorMessage = '';
+    this.savingWebsiteSourceIds.add(source.id);
+    this.onboarding.useUrlAsOfficialWebsite(source.url).subscribe({
+      next: (profile) => {
+        this.savingWebsiteSourceIds.delete(source.id);
+        this.profile = profile;
+        this.isCompleted = profile.completion.can_complete;
+        this.syncState(true);
+      },
+      error: () => {
+        this.savingWebsiteSourceIds.delete(source.id);
+        this.errorMessage = 'The URL could not be saved as the official website.';
+        this.cdr.detectChanges();
+      },
+    });
+  }
+
   formatValue(value: unknown): string {
     if (typeof value === 'string') return value;
     if (value === null || value === undefined) return '';
@@ -523,10 +550,18 @@ export class ChatComponent implements OnInit, OnDestroy {
     if (!messageId) return;
     this.messages = this.messages.map((message) => {
       if (message.id !== messageId || !message.ui_payload) return message;
-      const choices = message.ui_payload.options.length ? message.ui_payload.options : message.ui_payload.examples;
+      const options = Array.isArray(message.ui_payload.options) ? message.ui_payload.options : [];
+      const examples = Array.isArray(message.ui_payload.examples) ? message.ui_payload.examples : [];
+      const choices = options.length ? options : examples;
       const selected = choices.find((item) => item.toLocaleLowerCase() === answer.toLocaleLowerCase()) || null;
       return { ...message, response_payload: { status: 'answered', answer, selected_option: selected, custom: !selected } };
     });
+  }
+
+  private hasQuestionPayload(message: ChatMessage): boolean {
+    return !!message.ui_payload
+      && typeof message.ui_payload.prompt === 'string'
+      && typeof message.ui_payload.label === 'string';
   }
 
   private updateProposal(sourceId: string, proposalId: string, patch: Partial<SourceProposal>): void {

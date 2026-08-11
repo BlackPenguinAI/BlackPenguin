@@ -16,6 +16,7 @@ from app.modules.onboarding_questions import build_next_question
 
 from .models import OnboardingSourceJob
 from .healthcheck import write_heartbeat
+from .errors import AccessRestrictedError
 
 logger = logging.getLogger(__name__)
 MAX_ATTEMPTS = 3
@@ -214,8 +215,9 @@ async def _process(db: Session, job: OnboardingSourceJob) -> None:
         job = db.query(OnboardingSourceJob).filter(OnboardingSourceJob.id == job.id).first()
         if not job:
             return
-        job.status = "queued" if job.attempts < MAX_ATTEMPTS else "failed"
-        job.error_code = type(exc).__name__[:80]
+        non_retryable = isinstance(exc, AccessRestrictedError)
+        job.status = "failed" if non_retryable or job.attempts >= MAX_ATTEMPTS else "queued"
+        job.error_code = exc.code if non_retryable else type(exc).__name__[:80]
         job.error_detail = "Processing failed; use the job id to correlate server logs."
         if job.status == "failed":
             job.completed_at = datetime.utcnow()
@@ -231,6 +233,12 @@ async def _process(db: Session, job: OnboardingSourceJob) -> None:
             int((time.monotonic() - started) * 1000),
             exc_info=_safe_exc_info(exc),
         )
+        if non_retryable:
+            logger.warning(
+                "onboarding_source_access_restricted scope=%s domain=%s",
+                job.scope,
+                _source_domain(db, job),
+            )
     db.add(job)
     db.commit()
 
@@ -254,20 +262,46 @@ def _mark_source_failed(db: Session, job: OnboardingSourceJob) -> None:
         failed_status = ProjectSourceStatus.FAILED
     if source:
         source.status = failed_status
-        source.error_message = "The website could not be processed after several attempts."
+        if not source.error_message:
+            source.error_message = "The website could not be processed after several attempts."
         db.add(source)
 
 
+def _source_domain(db: Session, job: OnboardingSourceJob) -> str:
+    if job.scope == "company":
+        from app.modules.company_onboarding.models import CompanyOnboardingSource
+
+        source = db.query(CompanyOnboardingSource).filter(
+            CompanyOnboardingSource.id == job.source_id,
+        ).first()
+    else:
+        from app.modules.projects.models import ProjectOnboardingSource
+
+        source = db.query(ProjectOnboardingSource).filter(
+            ProjectOnboardingSource.id == job.source_id,
+        ).first()
+    return (urlsplit(source.url).hostname or "unknown") if source and source.url else "unknown"
+
+
 def _save_terminal_failure_message(db: Session, job: OnboardingSourceJob) -> None:
-    content = (
-        "I couldn't process that website after several attempts. "
-        "You can retry the source or continue the onboarding manually."
-    )
-    ui_payload = {
-        "kind": "source_processing_failed",
-        "source_id": job.source_id,
-        "actions": ["retry", "continue"],
-    }
+    if job.error_code == AccessRestrictedError.code:
+        if job.scope == "company":
+            content = (
+                "This website requires browser security verification, so I couldn't read its "
+                "content automatically. You can still use the URL as the official website, "
+                "upload a document, retry once, or continue manually."
+            )
+        else:
+            content = (
+                "This website requires browser security verification, so I couldn't read its "
+                "content automatically. You can upload a project document, retry once, or "
+                "continue manually."
+            )
+    else:
+        content = (
+            "I couldn't process that website after several attempts. "
+            "You can retry the source or continue the onboarding manually."
+        )
     try:
         with db.begin_nested():
             if job.scope == "company":
@@ -280,7 +314,7 @@ def _save_terminal_failure_message(db: Session, job: OnboardingSourceJob) -> Non
                 if session:
                     services.save_message(
                         db, session.id, SenderType.AI, content,
-                        ui_payload=ui_payload, commit=False,
+                        commit=False,
                     )
             elif job.scope == "project":
                 from app.modules.projects import services
@@ -289,7 +323,7 @@ def _save_terminal_failure_message(db: Session, job: OnboardingSourceJob) -> Non
                 project = services.get_project(db, job.project_id or "", job.company_id)
                 services.save_message(
                     db, project.session.id, SenderType.AI, content,
-                    ui_payload=ui_payload, commit=False,
+                    commit=False,
                 )
     except Exception as exc:
         logger.error(

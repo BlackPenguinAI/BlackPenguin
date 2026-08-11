@@ -8,6 +8,7 @@ from app.modules.company_onboarding.models import OnboardingMessage
 from app.modules.onboarding_jobs.models import OnboardingSourceJob
 from app.modules.onboarding_jobs.service import normalize_url
 from app.modules.onboarding_jobs import service as job_service
+from app.modules.onboarding_jobs.errors import AccessRestrictedError
 from app.modules.company_onboarding import router as company_router
 from app.modules.projects import router as project_router
 from app.modules.projects import services as project_services
@@ -101,3 +102,15 @@ def test_last_proposal_decision_uses_an_idempotent_follow_up():
         assert "in_reply_to_message_id" in function_source
         assert "response_payload.is_(None)" in function_source
         assert "commit=False" in function_source
+
+
+def test_access_restrictions_are_terminal_and_do_not_publish_an_action_payload():
+    process_source = inspect.getsource(job_service._process)
+    terminal_message_source = inspect.getsource(job_service._save_terminal_failure_message)
+    mark_failed_source = inspect.getsource(job_service._mark_source_failed)
+
+    assert "isinstance(exc, AccessRestrictedError)" in process_source
+    assert 'job.status = "failed" if non_retryable' in process_source
+    assert "ui_payload" not in terminal_message_source
+    assert "if not source.error_message" in mark_failed_source
+    assert AccessRestrictedError.code == "access_restricted"

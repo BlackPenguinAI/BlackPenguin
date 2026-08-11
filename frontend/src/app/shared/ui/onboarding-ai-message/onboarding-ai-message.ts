@@ -39,7 +39,9 @@ export class OnboardingAiMessageComponent implements OnInit, OnDestroy {
   get isSpeaking(): boolean { return this.activeMessageId === this.messageId; }
   get choicesText(): string {
     const question = this.message.ui_payload;
-    const choices = question ? (question.options.length ? question.options : question.examples) : [];
+    const options = Array.isArray(question?.options) ? question.options : [];
+    const examples = Array.isArray(question?.examples) ? question.examples : [];
+    const choices = options.length ? options : examples;
     return choices.length ? ` Suggested responses: ${choices.join(', ')}.` : '';
   }
   renderMarkdown(content: string): string { return marked.parse(content, { async: false, breaks: true }) as string; }

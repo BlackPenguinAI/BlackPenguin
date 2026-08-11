@@ -29,6 +29,8 @@ export class OnboardingResponseOptionsComponent {
   @Output() custom = new EventEmitter<void>();
 
   get choices(): string[] {
-    return this.question.options.length ? this.question.options : this.question.examples;
+    const options = Array.isArray(this.question?.options) ? this.question.options : [];
+    const examples = Array.isArray(this.question?.examples) ? this.question.examples : [];
+    return options.length ? options : examples;
   }
 }

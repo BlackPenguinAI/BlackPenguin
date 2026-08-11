@@ -19,6 +19,10 @@ from sqlalchemy.orm import Session
 
 from app.integrations.openrouter_client import generate_llm_response
 from app.modules.ai_core.services import get_ai_config
+from app.modules.onboarding_jobs.errors import (
+    AccessRestrictedError,
+    raise_for_access_restriction,
+)
 
 from . import services, storage_service
 from .completion import FIELD_BY_KEY
@@ -112,6 +116,11 @@ async def process_url_source(db: Session, source: CompanyOnboardingSource) -> Co
     try:
         async with httpx.AsyncClient(follow_redirects=False) as client:
             response = await _get_public_url(client, source.url)
+            raise_for_access_restriction(
+                status_code=response.status_code,
+                headers=response.headers,
+                body=response.content,
+            )
             response.raise_for_status()
             final_url = str(response.url)
             content_type = response.headers.get("content-type", "").split(";", 1)[0].lower()
@@ -122,6 +131,9 @@ async def process_url_source(db: Session, source: CompanyOnboardingSource) -> Co
                 raise ValueError("The remote content exceeds the 15 MB limit.")
             text = _extract_bytes(response.content, content_type, final_url)
         await _finish_source(db, source, text)
+    except AccessRestrictedError as exc:
+        _fail_source(db, source, str(exc))
+        raise
     except Exception as exc:
         _fail_source(db, source, _safe_error(exc))
     return source

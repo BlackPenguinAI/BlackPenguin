@@ -23,6 +23,20 @@ export class CompanyOnboardingService {
     return this.http.get<CompanyProfileResponse>(`${this.baseUrl}/profile`);
   }
 
+  useUrlAsOfficialWebsite(url: string): Observable<CompanyProfileResponse> {
+    return this.http.patch<CompanyProfileResponse>(`${this.baseUrl}/profile`, {
+      updates: [{
+        field: 'official_corporate_website',
+        value: url,
+        status: 'confirmed',
+        applicable: true,
+        source_type: 'user_provided_url',
+        source_reference: url,
+        confidence: 'high',
+      }],
+    });
+  }
+
   getHistory(): Observable<ChatMessage[]> {
     return this.http.get<ChatMessage[]>(`${this.baseUrl}/chat`);
   }
