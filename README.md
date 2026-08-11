@@ -142,30 +142,21 @@ Este repositorio contiene el código fuente, la arquitectura técnica y la docum
 ### Logros Técnicos y Arquitectónicos:
 
 - **Company Onboarding conversacional:** Desarrollo del flujo `/app/company`, mediante el cual el administrador proporciona progresivamente la información legal, comercial y operativa de su empresa.
-
 - **Procesamiento inicial mediante URL:** Implementación de una pantalla que solicita el sitio web de la Company, extrae su contenido y presenta un resumen para validación antes de continuar con el onboarding.
-
 - **Ingesta multimodal de información:** Incorporación de soporte para recibir datos mediante texto, URLs, documentos PDF, archivos e imágenes, centralizando el conocimiento necesario para configurar los agentes de IA.
-
 - **Perfil estructurado de Company:** Organización de la información recopilada en campos requeridos y opcionales, incluyendo:
-
   - Nombre legal y nombre comercial.
   - Ubicación y trayectoria.
   - Descripción institucional.
   - Visión de la empresa.
   - Tono de comunicación.
   - Información comercial y de cumplimiento.
-
 - **Sistema de propuestas y confirmación:** La IA puede identificar datos dentro de las fuentes proporcionadas, proponer actualizaciones y solicitar la aprobación del administrador antes de considerarlas información confirmada.
-
 - **Indicador de progreso:** Incorporación de un panel lateral para mostrar el porcentaje de onboarding completado y distinguir entre información obligatoria, opcional y pendiente.
-
 - **Configuración de prompts especializados:** Definición de los tres prompts principales utilizados por el agente de onboarding:
-
   - `Identity Prompt`: establece la identidad, propósito y comportamiento del asistente.
   - `Flow Protocol Prompt`: controla el orden de recopilación y validación de la información.
   - `Guardrails Prompt`: restringe acciones inseguras, invenciones y uso de datos no confirmados.
-
 - **Aislamiento Multi-tenant:** Toda la información, archivos y sesiones del onboarding quedan asociados a la Company correspondiente, evitando accesos cruzados entre desarrolladoras.
 
 ---
@@ -177,11 +168,8 @@ Este repositorio contiene el código fuente, la arquitectura técnica y la docum
 ### Logros Técnicos y Arquitectónicos:
 
 - **Nuevo flujo de creación de Projects:** Reemplazo del formulario modal por una redirección directa al onboarding conversacional del nuevo Project.
-
 - **Project Onboarding asistido por IA:** Implementación de la ruta `/app/projects/{project_id}/onboarding`, donde el administrador puede proporcionar información mediante texto, enlaces y documentos comerciales.
-
 - **Extracción de información inmobiliaria:** El asistente procesa brochures, páginas web y documentos para identificar información como:
-
   - Nombre y descripción del Project.
   - Tipo y estado del desarrollo.
   - Ubicación.
@@ -192,17 +180,11 @@ Este repositorio contiene el código fuente, la arquitectura técnica y la docum
   - Reglas de calificación de leads.
   - Información legal y de cumplimiento.
   - Campañas y configuración de Meta.
-
 - **Flujo proactivo de recopilación:** El agente identifica los campos pendientes y formula preguntas específicas, evitando que el administrador tenga que determinar manualmente qué información falta.
-
 - **Revisión y aprobación de propuestas:** Los datos extraídos no se incorporan automáticamente al perfil definitivo. Primero se presentan como propuestas que el usuario puede aprobar o rechazar.
-
 - **Confirmación final del Project:** Una vez completada la información obligatoria, el agente solicita una validación final antes de marcar el onboarding como aprobado.
-
 - **Redirección al detalle del Project:** Después de la aprobación, el usuario es dirigido a una vista consolidada con la información comercial recopilada.
-
 - **Almacenamiento organizado de archivos:** Los documentos quedan separados por Company y Project, y vinculados con los mensajes donde fueron proporcionados.
-
 - **Aislamiento de información:** Todas las consultas validan simultáneamente `company_id` y `project_id`, garantizando que cada desarrolladora acceda únicamente a sus propios Projects.
 
 ---
@@ -214,25 +196,15 @@ Este repositorio contiene el código fuente, la arquitectura técnica y la docum
 ### Logros Técnicos y Arquitectónicos:
 
 - **Actualización reactiva sin recargar la página:** Corrección del problema que obligaba a presionar `F5` después de procesar una URL o documento para visualizar los resultados.
-
 - **Estabilización del listado de Projects:** Corrección del indicador de carga que permanecía activo durante la primera navegación y requería volver a seleccionar la opción del menú.
-
 - **Estado vacío de Projects:** Incorporación de una vista informativa cuando una Company todavía no tiene Projects registrados.
-
 - **Gestión de Projects:** Incorporación de acciones para continuar el onboarding y eliminar Projects desde el listado principal.
-
 - **Corrección de URLs de producción:** Ajuste de la configuración del frontend para consumir los endpoints mediante HTTPS y evitar errores de contenido mixto en `blackpenguin.ai`.
-
 - **Persistencia visual de opciones:** Las alternativas presentadas por el asistente permanecen visibles dentro del mensaje original después de que el usuario selecciona una respuesta.
-
 - **Mejora de archivos adjuntos:** Simplificación de la interfaz para mostrar únicamente el nombre y tamaño del archivo, evitando tarjetas grandes que bloqueaban el espacio del chat.
-
 - **Entrada de voz mediante STT:** Incorporación de un botón de micrófono junto al campo de escritura para convertir la voz del usuario en texto.
-
 - **Reproducción de respuestas mediante TTS:** Incorporación de controles para escuchar mediante audio las respuestas generadas por el asistente.
-
 - **Vista detallada del Project:** Preparación de una pantalla para mostrar:
-
   - Imagen principal.
   - Información general.
   - Ubicación y estado.
@@ -240,9 +212,7 @@ Este repositorio contiene el código fuente, la arquitectura técnica y la docum
   - Métricas comerciales.
   - Campañas asociadas.
   - Claves y configuración de Meta.
-
 - **Corrección de conflictos del onboarding:** Estabilización de los flujos de aprobación para evitar respuestas `409 Conflict` causadas por propuestas ya procesadas o estados desactualizados.
-
 - **Mejora de consistencia visual:** Alineación de las pantallas iniciales, el chat, las opciones y los estados de carga con la identidad gráfica de Black Penguin.
 
 ---
@@ -254,34 +224,22 @@ Este repositorio contiene el código fuente, la arquitectura técnica y la docum
 ### Logros Técnicos y Arquitectónicos:
 
 - **Project Demo automático:** Cada Company nueva recibe exactamente un Project Demo con información sintética y onboarding completado al 100%.
-
 - **Aprovisionamiento transaccional:** La creación de la Company, el usuario administrador y el Project Demo se realiza dentro de una única transacción. Si alguna operación falla, se revierte el proceso completo.
-
 - **Creación idempotente del Demo:** El sistema evita generar más de un Project Demo para una misma Company, incluso cuando el proceso se ejecuta varias veces.
-
 - **Control correcto de cuotas:** El atributo `max_projects` permanece exclusivamente en Company. Los Projects Demo se excluyen del cálculo del límite de Projects reales.
-
 - **Seguridad del entorno Demo:** Los datos sintéticos no pueden:
-
   - Contactar personas.
   - Generar mensajes externos.
   - Activar webhooks de salida.
   - Sincronizar calendarios.
   - Consumir recursos comerciales reales.
-
 - **Gestión de usuarios y roles:** Incorporación de la pantalla `/app/users` para administrar usuarios de la Company, roles y futuras asignaciones de Marketing y Sales.
-
 - **Asignación de usuarios a Projects:** Preparación del modelo para determinar qué integrantes del equipo pueden trabajar con cada Project y recibir leads.
-
 - **Módulo de Marketing:** Incorporación de la pantalla `/app/marketing` como base para visualizar campañas, formularios de Meta, atribución y resultados comerciales.
-
 - **Módulo de Sales:** Incorporación de la pantalla `/app/sales` para consultar leads, etapas del funnel, asignaciones, conversaciones, reuniones y actividad del agente.
-
 - **Trazabilidad comercial:** Consolidación de la relación:
-
   ```text
   Company → Project → Campaign → Lead → Conversation
-
 ---
 
 ## Entornos y Accesos
