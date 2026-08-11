@@ -1,6 +1,7 @@
 from pydantic import BaseModel, EmailStr, ConfigDict
 from typing import Optional, List
 from datetime import datetime
+from .models import UserRole
 
 class MyProfileResponse(BaseModel):
     email: str
@@ -47,4 +48,31 @@ class UserAdminListResponse(BaseModel):
     ai_tokens_used: Optional[int] = 0
     ai_cost_usd: Optional[float] = 0.0
 
+    model_config = ConfigDict(from_attributes=True)
+
+
+class TenantUserCreate(BaseModel):
+    email: EmailStr
+    first_name: str
+    last_name: str
+    role: str
+
+
+class TenantUserUpdate(BaseModel):
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    phone: Optional[str] = None
+    country: Optional[str] = None
+    is_active: Optional[bool] = None
+
+
+class TenantUserResponse(BaseModel):
+    id: str
+    email: EmailStr
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    phone: Optional[str] = None
+    country: Optional[str] = None
+    role: UserRole
+    is_active: bool
     model_config = ConfigDict(from_attributes=True)

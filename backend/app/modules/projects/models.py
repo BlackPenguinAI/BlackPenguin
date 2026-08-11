@@ -2,7 +2,7 @@ from datetime import datetime
 import enum
 import uuid
 
-from sqlalchemy import Boolean, Column, DateTime, Enum as SqlaEnum, Float, ForeignKey, Integer, JSON, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, Column, DateTime, Enum as SqlaEnum, Float, ForeignKey, Index, Integer, JSON, Numeric, String, Text, UniqueConstraint, text
 from sqlalchemy.orm import relationship
 
 from app.db.postgres import Base
@@ -35,6 +35,15 @@ class ProjectProposalStatus(str, enum.Enum):
 
 class Project(Base):
     __tablename__ = "projects"
+    __table_args__ = (
+        Index(
+            "uq_projects_one_demo_per_company",
+            "company_id",
+            unique=True,
+            postgresql_where=text("is_demo = true"),
+            sqlite_where=text("is_demo = 1"),
+        ),
+    )
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     company_id = Column(String(36), ForeignKey("companies.id", ondelete="CASCADE"), nullable=False, index=True)
@@ -44,6 +53,8 @@ class Project(Base):
     city = Column(String(100), nullable=True)
     country = Column(String(100), nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
+    is_demo = Column(Boolean, default=False, nullable=False, index=True)
+    demo_template_version = Column(String(30), nullable=True)
     onboarding_status = Column(String(30), default="draft", nullable=False, index=True)
     onboarding_completed_at = Column(DateTime, nullable=True)
     onboarding_approved_by_user_id = Column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)

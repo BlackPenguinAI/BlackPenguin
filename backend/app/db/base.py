@@ -29,6 +29,8 @@ from app.modules.projects.models import (
     ProjectUnit,
 )
 from app.modules.brokers.models import Broker
-from app.modules.sales_crm.models import Lead, SmsChatMessage, Meeting
+from app.modules.sales_crm.models import Lead, LeadStageHistory, SmsChatMessage, Meeting
+from app.modules.project_team.models import ProjectUserAssignment
+from app.modules.sales_agent.models import AgentRun, ExternalWebhookEvent, OutboundMessage, SalesConversation, SalesMessage
 from app.modules.onboarding_jobs.models import OnboardingSourceJob
 from app.db.schema import SchemaVersion

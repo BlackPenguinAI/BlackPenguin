@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/guards/auth.guard';
+import { roleGuard } from './core/guards/role.guard';
 
 export const routes: Routes = [
   // ==========================================
@@ -48,7 +49,8 @@ export const routes: Routes = [
   // ==========================================
   {
     path: 'admin',
-    canActivate: [authGuard],
+    canActivate: [authGuard, roleGuard],
+    data: { roles: ['superadmin'] },
     loadComponent: () =>
       import('./shared/layout/layout').then((m) => m.LayoutComponent),
     children: [
@@ -160,6 +162,8 @@ export const routes: Routes = [
       },
       {
         path: 'company',
+        canActivate: [roleGuard],
+        data: { roles: ['admin'] },
         loadComponent: () =>
           import('./pages/chat/chat').then((m) => m.ChatComponent),
       },
@@ -169,6 +173,27 @@ export const routes: Routes = [
           import('./pages/client/projects/project-list/project-list').then(
             (m) => m.ProjectListComponent
           ),
+      },
+      {
+        path: 'users',
+        canActivate: [roleGuard],
+        data: { roles: ['admin'] },
+        loadComponent: () =>
+          import('./pages/client/users/company-users').then((m) => m.CompanyUsersComponent),
+      },
+      {
+        path: 'marketing',
+        canActivate: [roleGuard],
+        data: { roles: ['admin', 'mkt'] },
+        loadComponent: () =>
+          import('./pages/client/marketing/marketing').then((m) => m.MarketingComponent),
+      },
+      {
+        path: 'sales',
+        canActivate: [roleGuard],
+        data: { roles: ['admin', 'sales'] },
+        loadComponent: () =>
+          import('./pages/client/sales/sales').then((m) => m.SalesComponent),
       },
       {
         path: 'projects/:id/onboarding',

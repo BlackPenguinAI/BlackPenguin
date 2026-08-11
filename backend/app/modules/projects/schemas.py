@@ -63,6 +63,8 @@ class ProjectResponse(ProjectCreate):
     id: str
     company_id: str
     is_active: bool
+    is_demo: bool = False
+    demo_template_version: str | None = None
     onboarding_status: str
     profile: ProjectProfileResponse | None = None
     model_config = ConfigDict(from_attributes=True)

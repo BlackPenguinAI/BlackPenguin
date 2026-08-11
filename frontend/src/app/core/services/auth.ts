@@ -61,6 +61,17 @@ export class AuthService {
     return localStorage.getItem('bp_token');
   }
 
+  getRole(): string | null {
+    return localStorage.getItem('bp_role');
+  }
+
+  defaultRouteForRole(role: string | null = this.getRole()): string {
+    if (role === 'superadmin') return '/admin/dashboard';
+    if (role === 'mkt') return '/app/marketing';
+    if (role === 'sales') return '/app/sales';
+    return '/app/dashboard';
+  }
+
   hasValidToken(): boolean {
     const token = this.getToken();
     if (!token) return false;

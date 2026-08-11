@@ -31,7 +31,9 @@ def check_project_limits(db: Session, company_id: str) -> None:
     if not company or not company.plan:
         raise HTTPException(status_code=400, detail="The company does not have an assigned plan.")
     current_count = db.query(Project).filter(
-        Project.company_id == company_id, Project.is_active.is_(True)
+        Project.company_id == company_id,
+        Project.is_active.is_(True),
+        Project.is_demo.is_(False),
     ).count()
     if current_count >= company.plan.max_projects:
         raise HTTPException(status_code=400, detail=f"Your plan allows {company.plan.max_projects} projects.")
@@ -209,12 +211,17 @@ def serialize_profile(profile: ProjectProfile) -> dict[str, Any]:
 
 
 def serialize_project(project: Project) -> dict[str, Any]:
+    serialized_profile = serialize_profile(project.profile) if project.profile else None
+    if project.is_demo and serialized_profile:
+        serialized_profile["completion"]["sales_activation_status"] = "demo_only"
     return {
         "id": project.id, "company_id": project.company_id, "name": project.name,
         "description": project.description, "address": project.address, "city": project.city,
         "country": project.country, "is_active": project.is_active,
+        "is_demo": project.is_demo,
+        "demo_template_version": project.demo_template_version,
         "onboarding_status": project.onboarding_status,
-        "profile": serialize_profile(project.profile) if project.profile else None,
+        "profile": serialized_profile,
     }
 
 
@@ -382,12 +389,16 @@ def deletion_impact(db: Session, project: Project) -> dict[str, Any]:
 
 
 def archive_project(db: Session, project: Project) -> Project:
+    if project.is_demo:
+        raise HTTPException(status_code=409, detail="The Demo Project cannot be archived. Reset it instead.")
     project.is_active = False
     db.add(project); db.commit(); db.refresh(project)
     return project
 
 
 def delete_project(db: Session, project: Project, *, confirm_name: str) -> None:
+    if project.is_demo:
+        raise HTTPException(status_code=409, detail="The Demo Project cannot be deleted. Reset it instead.")
     if confirm_name.strip() != project.name:
         raise HTTPException(status_code=422, detail="Type the exact project name to confirm deletion.")
     impact = deletion_impact(db, project)

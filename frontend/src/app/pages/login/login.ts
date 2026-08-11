@@ -76,7 +76,7 @@ export class LoginComponent implements AfterViewInit {
 
   private getSafeReturnUrl(userRole: string): string {
     const requestedUrl = this.route.snapshot.queryParamMap.get('returnUrl');
-    const defaultUrl = userRole === 'superadmin' ? '/admin' : '/app';
+    const defaultUrl = this.authService.defaultRouteForRole(userRole);
 
     if (!requestedUrl || !requestedUrl.startsWith('/') || requestedUrl.startsWith('//')) {
       return defaultUrl;

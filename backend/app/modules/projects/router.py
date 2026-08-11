@@ -34,6 +34,7 @@ from .schemas import (
     OnboardingStateResponse, ProposalDecision, ProposalDecisionResponse,
     SourceResponse, UrlSourceRequest,
 )
+from app.modules.demo_projects.service import provision_demo_project
 
 
 router = APIRouter()
@@ -368,6 +369,29 @@ def archive_project(
 ):
     project = services.get_project(db, project_id, current_user.company_id)
     return services.serialize_project(services.archive_project(db, project))
+
+
+@router.post("/{project_id}/demo/reset", response_model=ProjectResponse)
+def reset_demo_project(
+    project_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([UserRole.ADMIN])),
+):
+    project = services.get_project(db, project_id, current_user.company_id)
+    if not project.is_demo:
+        raise HTTPException(status_code=409, detail="Only the Demo Project can be reset.")
+    try:
+        project = provision_demo_project(
+            db,
+            company_id=current_user.company_id,
+            approved_by_user_id=current_user.id,
+        )
+        db.commit()
+        db.refresh(project)
+    except Exception:
+        db.rollback()
+        raise
+    return services.serialize_project(project)
 
 
 @router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)

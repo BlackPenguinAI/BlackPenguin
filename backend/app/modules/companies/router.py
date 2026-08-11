@@ -13,6 +13,7 @@ from .models import Company
 from .schemas import CompanyResponse
 from . import services
 from app.modules.subscriptions.models import SubscriptionPlan
+from app.modules.demo_projects.service import provision_demo_project
 
 router = APIRouter()
 
@@ -64,8 +65,7 @@ def create_company_workspace(
         is_active=is_active_bool
     )
     db.add(new_company)
-    db.commit()
-    db.refresh(new_company)
+    db.flush()
 
     # Crear Admin con su estado seleccionado
     new_admin = User(
@@ -77,8 +77,19 @@ def create_company_workspace(
         company_id=new_company.id, 
         is_active=admin_is_active_bool
     )
-    db.add(new_admin)
-    db.commit()
+    try:
+        db.add(new_admin)
+        db.flush()
+        provision_demo_project(
+            db,
+            company_id=new_company.id,
+            approved_by_user_id=new_admin.id,
+        )
+        db.commit()
+        db.refresh(new_company)
+    except Exception:
+        db.rollback()
+        raise
 
     return new_company
 
