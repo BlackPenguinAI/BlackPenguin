@@ -237,9 +237,7 @@ Este repositorio contiene el código fuente, la arquitectura técnica y la docum
 - **Asignación de usuarios a Projects:** Preparación del modelo para determinar qué integrantes del equipo pueden trabajar con cada Project y recibir leads.
 - **Módulo de Marketing:** Incorporación de la pantalla `/app/marketing` como base para visualizar campañas, formularios de Meta, atribución y resultados comerciales.
 - **Módulo de Sales:** Incorporación de la pantalla `/app/sales` para consultar leads, etapas del funnel, asignaciones, conversaciones, reuniones y actividad del agente.
-- **Trazabilidad comercial:** Consolidación de la relación:
-  ```text
-  Company → Project → Campaign → Lead → Conversation
+- **Trazabilidad comercial:** Consolidación de la relación: `Company → Project → Campaign → Lead → Conversation`
 ---
 
 ## Entornos y Accesos
