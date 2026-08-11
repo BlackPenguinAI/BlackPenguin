@@ -13,13 +13,23 @@ class SmsChatMessageSchema(BaseModel):
 class LeadResponse(BaseModel):
     id: str
     project_id: Optional[str] = None
+    campaign_id: Optional[str] = None
+    assigned_sales_user_id: Optional[str] = None
     full_name: str
     phone: str
     email: Optional[str] = None
     source: str
+    platform: str = "manual"
+    preferred_channel: Optional[str] = None
+    consent_status: str = "unknown"
     intent_score: float
     is_opt_out: bool
     funnel_stage: FunnelStage
+    qualification_summary: Optional[str] = None
+    agent_status: str = "paused"
+    last_interaction_at: Optional[datetime] = None
+    stage_changed_at: Optional[datetime] = None
+    next_action_at: Optional[datetime] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     created_at: datetime
@@ -33,13 +43,23 @@ class MeetingCreate(BaseModel):
     lead_id: str
     broker_id: str
     meeting_time: datetime
+    duration_minutes: int = 45
+    modality: str = "virtual"
+    notes: Optional[str] = None
 
 class MeetingResponse(BaseModel):
     id: str
     project_id: str
     lead_id: str
     broker_id: str
+    assigned_sales_user_id: Optional[str] = None
     meeting_time: datetime
+    duration_minutes: int = 45
+    modality: str = "virtual"
+    confirmation_status: str = "pending"
+    calendar_sync_status: str = "not_connected"
+    meeting_url: Optional[str] = None
+    notes: Optional[str] = None
     status: MeetingStatus
     gcal_event_id: Optional[str] = None
     lead_name: Optional[str] = None

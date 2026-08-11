@@ -25,7 +25,8 @@ def get_leads_report(
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker([UserRole.ADMIN, UserRole.MKT, UserRole.SALES]))
 ):
-    return services.get_project_leads(db, current_user.company_id, project_id)
+    sales_user_id = current_user.id if current_user.role == UserRole.SALES else None
+    return services.get_project_leads(db, current_user.company_id, project_id, sales_user_id)
 
 @router.get("/leads/{lead_id}/chat", response_model=List[SmsChatMessageSchema], summary="Historial de Chat SMS con el Lead")
 def get_lead_chat(
@@ -33,7 +34,7 @@ def get_lead_chat(
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker([UserRole.ADMIN, UserRole.MKT, UserRole.SALES]))
 ):
-    return services.get_lead_sms_chat(db, lead_id)
+    return services.get_lead_sms_chat(db, lead_id, current_user.company_id)
 
 @router.put("/leads/{lead_id}", response_model=LeadResponse, summary="Actualizar Etapa del Embudo del Prospecto")
 def update_lead_status(
@@ -42,7 +43,7 @@ def update_lead_status(
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker([UserRole.ADMIN, UserRole.SALES]))
 ):
-    return services.update_lead(db, lead_id, current_user.company_id, payload)
+    return services.update_lead(db, lead_id, current_user.company_id, payload, current_user.id)
 
 # =========================================================
 # 📈 SALES REPORT (Inventario, Revenue, ROI y Coordenadas Mapa)
@@ -94,9 +95,10 @@ def get_meetings(
     project_id: str,
     broker_id: Optional[str] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([UserRole.ADMIN, UserRole.MKT, UserRole.SALES]))
+    current_user: User = Depends(RoleChecker([UserRole.ADMIN, UserRole.SALES]))
 ):
-    meetings = services.get_project_meetings(db, project_id, broker_id)
+    sales_user_id = current_user.id if current_user.role == UserRole.SALES else None
+    meetings = services.get_project_meetings(db, current_user.company_id, project_id, broker_id, sales_user_id)
     response = []
     for m in meetings:
         item = MeetingResponse.model_validate(m)
@@ -111,7 +113,8 @@ def schedule_meeting(
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker([UserRole.ADMIN, UserRole.SALES]))
 ):
-    return services.create_meeting(db, payload)
+    assigned_sales_user_id = current_user.id if current_user.role == UserRole.SALES else None
+    return services.create_meeting(db, payload, current_user.company_id, assigned_sales_user_id)
 
 # =========================================================
 # 📲 TWILIO SMS WEBHOOK (Entrada de mensajes del prospecto)
