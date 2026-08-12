@@ -9,7 +9,7 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
-from app.modules.onboarding_questions import is_too_short
+from app.modules.onboarding_questions import validate_onboarding_value
 
 from .completion import FIELD_BY_KEY, VALID_STATUSES, calculate_completion, field_progress
 from .models import CompanyProfile, OnboardingMessage, OnboardingSession, SenderType
@@ -259,7 +259,7 @@ def resolve_answer_to_question(
     else:
         value = text
 
-    if is_too_short(field, value):
+    if validate_onboarding_value(field, value):
         return QuestionResolution(True, "rejected", [], "answer_too_short", question)
     existing = (profile.profile_data or {}).get(field)
     status = "corrected_by_user" if existing not in (None, "", []) and existing != value else "confirmed"
@@ -318,8 +318,9 @@ def apply_field_updates(
         if status not in {"missing", "not_applicable"} and value in (None, "", []):
             rejected.append({"update": raw_update, "reason": "missing_value"})
             continue
-        if is_too_short(field_key, value):
-            rejected.append({"update": raw_update, "reason": "answer_too_short"})
+        validation_error = validate_onboarding_value(field_key, value)
+        if validation_error:
+            rejected.append({"update": raw_update, "reason": validation_error["code"], "validation": validation_error})
             continue
         if status != "not_applicable" and value is not None:
             data[field_key] = value

@@ -10,6 +10,7 @@ export interface OnboardingQuestion {
   examples: string[];
   allow_custom: boolean;
   minimum_words: number | null;
+  minimum_characters?: number | null;
 }
 
 @Component({

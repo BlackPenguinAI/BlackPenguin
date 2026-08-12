@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { HttpClientTestingModule } from '@angular/common/http/testing';
+import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
 import { TranslateModule } from '@ngx-translate/core';
+import { provideRouter } from '@angular/router';
 
 import { ChatComponent } from './chat';
 import { EMPTY_COMPANY_PROFILE } from './company-onboarding.models';
@@ -9,17 +10,23 @@ import { EMPTY_COMPANY_PROFILE } from './company-onboarding.models';
 describe('ChatComponent', () => {
   let component: ChatComponent;
   let fixture: ComponentFixture<ChatComponent>;
+  let http: HttpTestingController;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [ChatComponent, HttpClientTestingModule, TranslateModule.forRoot()],
+      providers: [provideRouter([])],
     }).compileComponents();
 
     fixture = TestBed.createComponent(ChatComponent);
     component = fixture.componentInstance;
+    http = TestBed.inject(HttpTestingController);
   });
 
-  afterEach(() => localStorage.clear());
+  afterEach(() => {
+    http.verify();
+    localStorage.clear();
+  });
 
   it('should create', () => {
     expect(component).toBeTruthy();
@@ -77,8 +84,75 @@ describe('ChatComponent', () => {
     expect(html).not.toContain('**Official');
   });
 
-  it('should format structured source values for editing', () => {
+  it('should keep generic structured source values available for editing', () => {
     expect(component.formatValue({ exists: false, url: null })).toBe('{"exists":false,"url":null}');
+  });
+
+  it('should present official website proposals as user-friendly values', () => {
+    expect(component.formatProposalValue({
+      field: 'official_corporate_website', value: { exists: true, url: 'https://cbhhomes.com/' },
+    })).toBe('https://cbhhomes.com/');
+    expect(component.formatProposalValue({
+      field: 'official_corporate_website', value: { exists: false, url: null },
+    })).toBe('No official website');
+  });
+
+  it('should restore the structured website contract when saving an edit', () => {
+    const proposal = {
+      id: 'proposal-website', field: 'official_corporate_website', label: 'Official website',
+      value: { exists: true, url: 'https://old.example.com/' }, draftValue: 'https://cbhhomes.com/',
+      evidence: null, confidence: 'high' as const, status: 'pending' as const,
+    };
+    const source = {
+      id: 'source-website', kind: 'official_website' as const, status: 'ready' as const,
+      name: 'cbhhomes.com', url: 'https://cbhhomes.com/', mime_type: 'text/html', size_bytes: 100,
+      message_id: null, download_url: null, error_message: null, proposals: [proposal],
+      created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    };
+    component.sources = [source];
+
+    component.decideProposal(source, proposal, 'correct');
+
+    const request = http.expectOne('http://localhost:8000/api/v1/company-onboarding/proposals/proposal-website/decision');
+    expect(request.request.body).toEqual({
+      action: 'correct', value: { exists: true, url: 'https://cbhhomes.com/' },
+    });
+    request.flush({
+      proposal: { ...proposal, value: request.request.body.value, status: 'corrected' },
+      profile: EMPTY_COMPANY_PROFILE,
+    });
+    http.expectOne('http://localhost:8000/api/v1/company-onboarding/chat/state').flush({
+      messages: [], profile: EMPTY_COMPANY_PROFILE, sources: [], stage: 'conversation', version: 1,
+      next_question: {
+        field: null, label: 'Final approval', prompt: 'Approve', input_type: 'boolean',
+        options: [], examples: [], allow_custom: true, minimum_words: null,
+      },
+    });
+  });
+
+  it('should keep proposal actions available and show a structured validation error', () => {
+    const proposal = {
+      id: 'proposal-description', field: 'approved_short_company_description', label: 'Description',
+      value: 'Short', draftValue: 'Short', evidence: null, confidence: 'high' as const,
+      status: 'pending' as const,
+    };
+    const source = {
+      id: 'source-description', kind: 'official_website' as const, status: 'ready' as const,
+      name: 'cbhhomes.com', url: 'https://cbhhomes.com/', mime_type: 'text/html', size_bytes: 100,
+      message_id: null, download_url: null, error_message: null, proposals: [proposal],
+      created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    };
+    component.sources = [source];
+
+    component.decideProposal(source, proposal, 'confirm');
+    const request = http.expectOne('http://localhost:8000/api/v1/company-onboarding/proposals/proposal-description/decision');
+    request.flush({
+      detail: { code: 'minimum_characters', message: 'Enter at least 25 characters.' },
+    }, { status: 422, statusText: 'Unprocessable Content' });
+
+    expect(component.sources[0].proposals[0].submitting).toBe(false);
+    expect(component.sources[0].proposals[0].status).toBe('pending');
+    expect(component.sources[0].proposals[0].errorMessage).toBe('Enter at least 25 characters.');
   });
 
   it('should anchor pending source review to its message and hide the next question', () => {

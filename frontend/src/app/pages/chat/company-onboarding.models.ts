@@ -65,7 +65,8 @@ export interface ChatAttachment {
 
 export interface NextQuestion {
   field: string | null; label: string; prompt: string; input_type: string;
-  options: string[]; examples: string[]; allow_custom: boolean; minimum_words: number | null;
+  options: string[]; examples: string[]; allow_custom: boolean;
+  minimum_words: number | null; minimum_characters?: number | null;
 }
 
 export type SourceKind =
@@ -88,6 +89,7 @@ export interface SourceProposal {
   status: ProposalStatus;
   draftValue?: string;
   submitting?: boolean;
+  errorMessage?: string;
 }
 
 export interface OnboardingSource {

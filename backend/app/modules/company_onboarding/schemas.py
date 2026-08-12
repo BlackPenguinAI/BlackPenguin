@@ -122,6 +122,7 @@ class NextQuestionResponse(BaseModel):
     examples: list[str] = Field(default_factory=list)
     allow_custom: bool = True
     minimum_words: int | None = None
+    minimum_characters: int | None = None
 
 
 class RejectedUpdate(BaseModel):

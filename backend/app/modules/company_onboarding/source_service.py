@@ -29,6 +29,7 @@ from app.modules.onboarding_jobs.errors import (
     UnreadableFileError,
     raise_for_access_restriction,
 )
+from app.modules.onboarding_questions import validate_onboarding_value
 
 from . import services, storage_service
 from .completion import FIELD_BY_KEY
@@ -293,14 +294,17 @@ async def _extract_proposals(
     seen = {proposal.field_key for proposal in source.proposals}
     for item in payload.get("proposals", []) if isinstance(payload, dict) else []:
         key = services.normalize_field_key(item.get("field")) if isinstance(item, dict) else None
-        if key is None or key in seen or item.get("value") in (None, "", []):
+        value = item.get("value") if isinstance(item, dict) else None
+        if key is None or key in seen or value in (None, "", []):
+            continue
+        if validate_onboarding_value(key, value):
             continue
         seen.add(key)
         result.append(
             CompanyOnboardingProposal(
                 source_id=source.id,
                 field_key=key,
-                value=item.get("value"),
+                value=value,
                 evidence=str(item.get("evidence") or "")[:1000] or None,
                 confidence=item.get("confidence") if item.get("confidence") in {"high", "medium", "low"} else None,
                 status=ProposalStatus.PENDING,
@@ -368,7 +372,14 @@ def review_proposal(
             allow_authoritative_statuses=True,
         )
         if not result.accepted:
-            raise HTTPException(status_code=422, detail="The proposed value could not be applied.")
+            rejected = result.rejected[0] if result.rejected else {}
+            validation = rejected.get("validation")
+            detail = validation if isinstance(validation, dict) else {
+                "code": rejected.get("reason", "invalid_value"),
+                "field": proposal.field_key,
+                "message": "The proposed value could not be applied.",
+            }
+            raise HTTPException(status_code=422, detail=detail)
         proposal.value = value
         proposal.status = ProposalStatus.CORRECTED if action == "correct" else ProposalStatus.CONFIRMED
     proposal.reviewed_by_user_id = user_id

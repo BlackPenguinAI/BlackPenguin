@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any
+from urllib.parse import urlparse
 
 
 QUESTION_CATALOG: dict[str, dict[str, Any]] = {
@@ -30,7 +31,7 @@ QUESTION_CATALOG: dict[str, dict[str, Any]] = {
             "A real-estate developer focused on thoughtfully designed residential communities in high-growth urban markets.",
             "An integrated property company that develops, owns, and operates distinctive mixed-use destinations.",
         ],
-        "minimum_words": 8,
+        "minimum_characters": 25,
     },
     "corporate_value_proposition": {
         "input_type": "long_text",
@@ -103,6 +104,7 @@ def build_next_question(blockers: list[dict[str, Any]], *, final_prompt: str) ->
             "examples": [],
             "allow_custom": True,
             "minimum_words": None,
+            "minimum_characters": None,
         }
     blocker = blockers[0]
     field = blocker["field"]
@@ -124,9 +126,48 @@ def build_next_question(blockers: list[dict[str, Any]], *, final_prompt: str) ->
         "examples": examples,
         "allow_custom": True,
         "minimum_words": config.get("minimum_words"),
+        "minimum_characters": config.get("minimum_characters"),
     }
 
 
 def is_too_short(field: str, value: Any) -> bool:
-    minimum = QUESTION_CATALOG.get(field, {}).get("minimum_words")
-    return bool(minimum and isinstance(value, str) and len(value.split()) < minimum)
+    validation = validate_onboarding_value(field, value)
+    return bool(validation and validation["code"] in {"minimum_words", "minimum_characters"})
+
+
+def validate_onboarding_value(field: str, value: Any) -> dict[str, Any] | None:
+    """Return a stable validation error shared by chat, extraction and review flows."""
+    if field == "official_corporate_website":
+        exists = value.get("exists") if isinstance(value, dict) else None
+        url = value.get("url") if isinstance(value, dict) else None
+        parsed = urlparse(url) if isinstance(url, str) else None
+        valid_url = bool(parsed and parsed.scheme in {"http", "https"} and parsed.hostname)
+        if exists is False and url is None:
+            return None
+        if exists is not True or not valid_url:
+            return {
+                "code": "invalid_website",
+                "field": field,
+                "message": "Enter a valid HTTP or HTTPS website URL, or select no official website.",
+            }
+    config = QUESTION_CATALOG.get(field, {})
+    if not isinstance(value, str):
+        return None
+    normalized = " ".join(value.split())
+    minimum_words = config.get("minimum_words")
+    if minimum_words and len(normalized.split()) < minimum_words:
+        return {
+            "code": "minimum_words",
+            "field": field,
+            "message": f"Enter at least {minimum_words} words.",
+            "minimum_words": minimum_words,
+        }
+    minimum_characters = config.get("minimum_characters")
+    if minimum_characters and len(normalized) < minimum_characters:
+        return {
+            "code": "minimum_characters",
+            "field": field,
+            "message": f"Enter at least {minimum_characters} characters.",
+            "minimum_characters": minimum_characters,
+        }
+    return None

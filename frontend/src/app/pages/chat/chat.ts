@@ -407,14 +407,18 @@ export class ChatComponent implements OnInit, OnDestroy {
     action: 'confirm' | 'correct' | 'reject',
   ): void {
     if (proposal.submitting || proposal.status !== 'pending') return;
-    const value = action === 'correct' ? this.parseDraftValue(proposal.draftValue || '') : undefined;
-    this.updateProposal(source.id, proposal.id, { submitting: true });
+    this.errorMessage = '';
+    const value = action === 'correct'
+      ? this.parseDraftValue(proposal.field, proposal.draftValue || '')
+      : undefined;
+    this.updateProposal(source.id, proposal.id, { submitting: true, errorMessage: undefined });
     this.onboarding.decideProposal(proposal.id, action, value).subscribe({
       next: (result) => {
         this.updateProposal(source.id, proposal.id, {
           ...result.proposal,
-          draftValue: this.formatValue(result.proposal.value),
+          draftValue: this.formatProposalValue(result.proposal),
           submitting: false,
+          errorMessage: undefined,
         });
         this.profile = result.profile;
         this.isCompleted = result.profile.completion.can_complete;
@@ -426,10 +430,10 @@ export class ChatComponent implements OnInit, OnDestroy {
           this.errorMessage = 'This proposal changed in another request. The current state was reloaded.';
           this.syncState();
         } else {
-          this.updateProposal(source.id, proposal.id, { submitting: false });
-          this.errorMessage = error.status === 422
-            ? 'The proposed value is not valid. Review it and try again.'
+          const message = error.status === 422
+            ? this.proposalErrorMessage(error)
             : 'That proposal could not be updated.';
+          this.updateProposal(source.id, proposal.id, { submitting: false, errorMessage: message });
         }
       },
     });
@@ -485,6 +489,16 @@ export class ChatComponent implements OnInit, OnDestroy {
     return JSON.stringify(value);
   }
 
+  formatProposalValue(proposal: Pick<SourceProposal, 'field' | 'value'>): string {
+    if (proposal.field === 'official_corporate_website'
+      && proposal.value && typeof proposal.value === 'object') {
+      const website = proposal.value as { exists?: boolean; url?: unknown };
+      if (website.exists === false) return 'No official website';
+      if (typeof website.url === 'string') return website.url;
+    }
+    return this.formatValue(proposal.value);
+  }
+
   formatBytes(bytes: number | null): string {
     if (bytes == null) return '';
     if (bytes < 1024) return `${bytes} B`;
@@ -503,8 +517,14 @@ export class ChatComponent implements OnInit, OnDestroy {
     });
   }
 
-  private parseDraftValue(value: string): unknown {
+  private parseDraftValue(field: string, value: string): unknown {
     const trimmed = value.trim();
+    if (field === 'official_corporate_website') {
+      if (/^(no official website|no website|none|no)$/i.test(trimmed)) {
+        return { exists: false, url: null };
+      }
+      return { exists: true, url: trimmed };
+    }
     if (/^[\[{]/.test(trimmed)) {
       try {
         return JSON.parse(trimmed);
@@ -539,9 +559,18 @@ export class ChatComponent implements OnInit, OnDestroy {
       ...source,
       proposals: source.proposals.map((proposal) => ({
         ...proposal,
-        draftValue: this.formatValue(proposal.value),
+        draftValue: this.formatProposalValue(proposal),
       })),
     }));
+  }
+
+  private proposalErrorMessage(error: HttpErrorResponse): string {
+    const detail = error.error?.detail;
+    if (detail && typeof detail === 'object' && typeof detail.message === 'string') {
+      return detail.message;
+    }
+    if (typeof detail === 'string') return detail;
+    return 'The proposed value is not valid. Review it and try again.';
   }
 
   private mergeSources(sources: OnboardingSource[]): void {
