@@ -27,7 +27,7 @@ DROP TYPE IF EXISTS plan_tier CASCADE;
 -- =============================================================================
 CREATE TYPE plan_tier AS ENUM ('core', 'enterprise');
 CREATE TYPE specialized_agent_type AS ENUM ('leasing', 'investor', 'retention', 'financing');
-CREATE TYPE user_role AS ENUM ('superadmin', 'admin', 'mkt', 'sales');
+CREATE TYPE user_role AS ENUM ('superadmin', 'admin', 'assistant', 'mkt', 'sales');
 CREATE TYPE unit_status AS ENUM ('available', 'reserved', 'sold');
 CREATE TYPE funnel_stage AS ENUM ('new', 'contacted', 'qualified', 'appointment_set', 'closed', 'lost');
 CREATE TYPE appointment_status AS ENUM ('scheduled', 'completed', 'canceled');

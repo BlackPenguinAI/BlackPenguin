@@ -28,7 +28,6 @@ REQUIRED_FIELDS = (
     FieldDefinition("preferred_display_name", "Preferred display name", "required"),
     FieldDefinition("official_corporate_website", "Official website or no-website confirmation", "required"),
     FieldDefinition("headquarters", "Headquarters", "required"),
-    FieldDefinition("primary_black_penguin_administrator", "Primary Black Penguin administrator", "required"),
     FieldDefinition("primary_business_model", "Primary business model", "required"),
     FieldDefinition("core_asset_classes", "Core company-wide asset class", "required"),
     FieldDefinition("current_operating_footprint", "Current operating footprint", "required"),

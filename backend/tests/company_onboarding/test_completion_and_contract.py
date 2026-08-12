@@ -4,7 +4,7 @@ from types import SimpleNamespace
 import pytest
 from fastapi import HTTPException
 
-from app.modules.company_onboarding.completion import calculate_completion
+from app.modules.company_onboarding.completion import FIELD_BY_KEY, calculate_completion
 from app.modules.company_onboarding.router import _parse_agent_response
 from app.modules.company_onboarding.services import (
     deterministic_context_update,
@@ -32,8 +32,13 @@ def test_each_confirmed_required_field_advances_completion():
     }
     completion = calculate_completion(states)
     assert completion["required"]["completed"] == 4
-    assert completion["required"]["remaining"] == 7
+    assert completion["required"]["remaining"] == 6
     assert completion["percentage"] > 0
+
+
+def test_application_administrator_is_not_a_company_profile_field():
+    assert "primary_black_penguin_administrator" not in FIELD_BY_KEY
+    assert calculate_completion({})["required"]["total"] == 10
 
 
 def test_same_name_is_resolved_against_pending_display_name():
@@ -52,22 +57,6 @@ def test_experience_is_not_converted_to_year_established():
     assert deterministic_context_update("We have 10 years of experience", profile) == []
 
 
-def test_short_name_answers_pending_administrator_question():
-    resolved_before_admin = {
-        key: {"status": "confirmed"}
-        for key in (
-            "official_company_name",
-            "preferred_display_name",
-            "official_corporate_website",
-            "headquarters",
-        )
-    }
-    profile = SimpleNamespace(profile_data={}, field_states=resolved_before_admin, final_approved=False)
-    updates = deterministic_context_update("Pedro", profile)
-    assert updates[0]["field"] == "primary_black_penguin_administrator"
-    assert updates[0]["value"] == "Pedro"
-
-
 def test_typo_in_no_website_confirmation_is_still_resolved():
     states = {
         "official_company_name": {"status": "confirmed"},
@@ -84,14 +73,14 @@ def test_agent_contract_never_requires_raw_json_as_visible_message():
         {
             "assistant_message": "Thanks, **Pedro**.",
             "verified_updates": [
-                {"field": "primary_black_penguin_administrator", "value": "Pedro", "status": "confirmed"}
+                {"field": "official_company_name", "value": "Petito", "status": "confirmed"}
             ],
             "final_approved": False,
         }
     )
     message, updates, approved = _parse_agent_response(raw)
     assert message == "Thanks, **Pedro**."
-    assert updates[0]["field"] == "primary_black_penguin_administrator"
+    assert updates[0]["field"] == "official_company_name"
     assert approved is False
 
 

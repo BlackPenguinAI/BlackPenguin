@@ -31,7 +31,7 @@
           <div class="space-y-3 mb-6">
             <div class="flex justify-between text-sm">
               <span class="text-gray-400">{{ 'PLANS_PAGE.LBL_ADMINS' | translate }}</span>
-              <span class="font-mono">{{ plan.max_admins }}</span>
+              <span class="font-mono">{{ plan.max_assistants }}</span>
             </div>
             <div class="flex justify-between text-sm">
               <span class="text-gray-400">{{ 'PLANS_PAGE.LBL_MKT' | translate }}</span>
@@ -86,7 +86,7 @@
           <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
             <div class="flex flex-col gap-1.5">
               <label class="text-[10px] text-gray-400 uppercase">{{ 'PLANS_PAGE.LBL_ADMINS' | translate }}</label>
-              <input type="number" [(ngModel)]="form.max_admins" name="mAdmin" min="1" class="bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none">
+              <input type="number" [(ngModel)]="form.max_assistants" name="mAssistants" min="0" class="bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none">
             </div>
             <div class="flex flex-col gap-1.5">
               <label class="text-[10px] text-gray-400 uppercase">{{ 'PLANS_PAGE.LBL_MKT' | translate }}</label>

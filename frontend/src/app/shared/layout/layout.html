@@ -79,37 +79,43 @@
     </nav>
 
     <nav *ngIf="userRole !== 'superadmin'" class="flex-1 px-4 py-6 space-y-1.5 overflow-y-auto scrollbar-hide">
-      <p class="px-3 text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">Main</p>
+      <p class="px-3 text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">Main Menu</p>
       
       <a routerLink="/app/dashboard" routerLinkActive="bg-white/10 text-white" [routerLinkActiveOptions]="{exact: true}" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors flex items-center gap-2 cursor-pointer">
         <span class="material-symbols-outlined text-[18px]">space_dashboard</span>
         Dashboard
       </a>
 
-      <a *ngIf="userRole === 'admin'" routerLink="/app/company" routerLinkActive="bg-white/10 text-white" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors flex items-center gap-2 cursor-pointer">
+      <p class="px-3 text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2 mt-6">Company Management</p>
+
+      <a *ngIf="userRole === 'admin' || userRole === 'assistant'" routerLink="/app/company" routerLinkActive="bg-white/10 text-white" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors flex items-center gap-2 cursor-pointer">
         <span class="material-symbols-outlined text-[18px]">corporate_fare</span>
-        Company Onboarding
-      </a>
-
-      <a *ngIf="userRole === 'admin'" routerLink="/app/users" routerLinkActive="bg-white/10 text-white" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors flex items-center gap-2 cursor-pointer">
-        <span class="material-symbols-outlined text-[18px]">group</span>
-        Users
-      </a>
-
-      <a *ngIf="userRole === 'admin' || userRole === 'mkt'" routerLink="/app/marketing" routerLinkActive="bg-white/10 text-white" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors flex items-center gap-2 cursor-pointer">
-        <span class="material-symbols-outlined text-[18px]">campaign</span>
-        Marketing
-      </a>
-
-      <a *ngIf="userRole === 'admin' || userRole === 'sales'" routerLink="/app/sales" routerLinkActive="bg-white/10 text-white" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors flex items-center gap-2 cursor-pointer">
-        <span class="material-symbols-outlined text-[18px]">calendar_month</span>
-        Sales
+        Company Profile
       </a>
 
       <a routerLink="/app/projects" routerLinkActive="bg-white/10 text-white" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors flex items-center gap-2 cursor-pointer">
         <span class="material-symbols-outlined text-[18px]">apartment</span>
         Projects
       </a>
+
+      <a *ngIf="userRole === 'admin' || userRole === 'assistant'" routerLink="/app/users" routerLinkActive="bg-white/10 text-white" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors flex items-center gap-2 cursor-pointer">
+        <span class="material-symbols-outlined text-[18px]">group</span>
+        Team
+      </a>
+
+      <p class="px-3 text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2 mt-6">Operations</p>
+
+      <a *ngIf="userRole === 'admin' || userRole === 'assistant' || userRole === 'mkt'" routerLink="/app/marketing" routerLinkActive="bg-white/10 text-white" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors flex items-center gap-2 cursor-pointer">
+        <span class="material-symbols-outlined text-[18px]">campaign</span>
+        Marketing
+      </a>
+
+      <a *ngIf="userRole === 'admin' || userRole === 'assistant' || userRole === 'sales'" routerLink="/app/sales" routerLinkActive="bg-white/10 text-white" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors flex items-center gap-2 cursor-pointer">
+        <span class="material-symbols-outlined text-[18px]">calendar_month</span>
+        Sales
+      </a>
+
+      <p class="px-3 text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2 mt-6">Account</p>
 
       <a routerLink="/app/profile" routerLinkActive="bg-white/10 text-white" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors flex items-center gap-2 cursor-pointer">
         <span class="material-symbols-outlined text-[18px]">person</span>

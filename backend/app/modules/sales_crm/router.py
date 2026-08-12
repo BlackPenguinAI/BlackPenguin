@@ -5,7 +5,7 @@ from datetime import datetime
 
 from app.db.postgres import get_db
 from app.modules.auth.deps import RoleChecker
-from app.modules.users.models import User, UserRole
+from app.modules.users.models import TENANT_MANAGER_ROLES, User, UserRole
 from app.modules.ai_core.services import get_ai_config
 from app.integrations.openrouter_client import generate_llm_response
 
@@ -23,7 +23,7 @@ router = APIRouter()
 def get_leads_report(
     project_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([UserRole.ADMIN, UserRole.MKT, UserRole.SALES]))
+    current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.MKT, UserRole.SALES]))
 ):
     sales_user_id = current_user.id if current_user.role == UserRole.SALES else None
     return services.get_project_leads(db, current_user.company_id, project_id, sales_user_id)
@@ -32,7 +32,7 @@ def get_leads_report(
 def get_lead_chat(
     lead_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([UserRole.ADMIN, UserRole.MKT, UserRole.SALES]))
+    current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.MKT, UserRole.SALES]))
 ):
     return services.get_lead_sms_chat(db, lead_id, current_user.company_id)
 
@@ -41,7 +41,7 @@ def update_lead_status(
     lead_id: str,
     payload: LeadUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([UserRole.ADMIN, UserRole.SALES]))
+    current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.SALES]))
 ):
     return services.update_lead(db, lead_id, current_user.company_id, payload, current_user.id)
 
@@ -52,7 +52,7 @@ def update_lead_status(
 def get_sales_report(
     project_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([UserRole.ADMIN, UserRole.MKT, UserRole.SALES]))
+    current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.MKT, UserRole.SALES]))
 ):
     project = db.query(Project).filter(
         Project.id == project_id, Project.company_id == current_user.company_id,
@@ -95,7 +95,7 @@ def get_meetings(
     project_id: str,
     broker_id: Optional[str] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([UserRole.ADMIN, UserRole.SALES]))
+    current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.SALES]))
 ):
     sales_user_id = current_user.id if current_user.role == UserRole.SALES else None
     meetings = services.get_project_meetings(db, current_user.company_id, project_id, broker_id, sales_user_id)
@@ -111,7 +111,7 @@ def get_meetings(
 def schedule_meeting(
     payload: MeetingCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([UserRole.ADMIN, UserRole.SALES]))
+    current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.SALES]))
 ):
     assigned_sales_user_id = current_user.id if current_user.role == UserRole.SALES else None
     return services.create_meeting(db, payload, current_user.company_id, assigned_sales_user_id)

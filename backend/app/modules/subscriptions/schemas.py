@@ -5,7 +5,7 @@ from datetime import datetime
 class SubscriptionPlanBase(BaseModel):
     name: str
     description: Optional[str] = None
-    max_admins: int = 1
+    max_assistants: int = 0
     max_mkt_users: int = 0
     max_sales_users: int = 0
     max_projects: int = 1

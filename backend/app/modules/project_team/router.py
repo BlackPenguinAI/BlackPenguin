@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.db.postgres import get_db
 from app.modules.auth.deps import RoleChecker
 from app.modules.projects.models import Project
-from app.modules.users.models import User, UserRole
+from app.modules.users.models import TENANT_MANAGER_ROLES, User, UserRole
 
 from .models import ProjectUserAssignment
 from .schemas import AssignmentResponse, AssignmentUpsert
@@ -40,7 +40,7 @@ def _serialize(item: ProjectUserAssignment) -> dict:
 def list_team(
     project_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([UserRole.ADMIN, UserRole.MKT, UserRole.SALES])),
+    current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.MKT, UserRole.SALES])),
 ):
     _project(db, project_id, current_user.company_id)
     items = db.query(ProjectUserAssignment).options(joinedload(ProjectUserAssignment.user)).filter(
@@ -55,7 +55,7 @@ def upsert_assignment(
     user_id: str,
     payload: AssignmentUpsert,
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([UserRole.ADMIN])),
+    current_user: User = Depends(RoleChecker(TENANT_MANAGER_ROLES)),
 ):
     _project(db, project_id, current_user.company_id)
     if payload.user_id != user_id:
@@ -87,7 +87,7 @@ def remove_assignment(
     project_id: str,
     user_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([UserRole.ADMIN])),
+    current_user: User = Depends(RoleChecker(TENANT_MANAGER_ROLES)),
 ):
     _project(db, project_id, current_user.company_id)
     db.query(ProjectUserAssignment).filter(

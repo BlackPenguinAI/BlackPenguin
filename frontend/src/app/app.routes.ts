@@ -163,7 +163,7 @@ export const routes: Routes = [
       {
         path: 'company',
         canActivate: [roleGuard],
-        data: { roles: ['admin'] },
+        data: { roles: ['admin', 'assistant'] },
         loadComponent: () =>
           import('./pages/chat/chat').then((m) => m.ChatComponent),
       },
@@ -177,21 +177,21 @@ export const routes: Routes = [
       {
         path: 'users',
         canActivate: [roleGuard],
-        data: { roles: ['admin'] },
+        data: { roles: ['admin', 'assistant'] },
         loadComponent: () =>
           import('./pages/client/users/company-users').then((m) => m.CompanyUsersComponent),
       },
       {
         path: 'marketing',
         canActivate: [roleGuard],
-        data: { roles: ['admin', 'mkt'] },
+        data: { roles: ['admin', 'assistant', 'mkt'] },
         loadComponent: () =>
           import('./pages/client/marketing/marketing').then((m) => m.MarketingComponent),
       },
       {
         path: 'sales',
         canActivate: [roleGuard],
-        data: { roles: ['admin', 'sales'] },
+        data: { roles: ['admin', 'assistant', 'sales'] },
         loadComponent: () =>
           import('./pages/client/sales/sales').then((m) => m.SalesComponent),
       },

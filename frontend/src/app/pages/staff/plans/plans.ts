@@ -28,7 +28,7 @@ export class StaffPlansComponent implements OnInit {
   form: any = {
     name: '',
     description: '',
-    max_admins: 1,
+    max_assistants: 0,
     max_mkt_users: 0,
     max_sales_users: 0,
     max_projects: 1,
@@ -88,7 +88,7 @@ export class StaffPlansComponent implements OnInit {
       this.form = {
         name: '',
         description: '',
-        max_admins: 1,
+        max_assistants: 0,
         max_mkt_users: 0,
         max_sales_users: 0,
         max_projects: 1,

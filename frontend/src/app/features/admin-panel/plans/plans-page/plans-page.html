@@ -41,7 +41,7 @@
                 </td>
                 
                 <td class="py-4 px-6 text-center font-mono text-gray-400 text-xs">
-                  <span class="text-white">{{ plan.max_admins }}</span> Adm • 
+                  <span class="text-white">{{ plan.max_assistants }}</span> Asst •
                   <span class="text-white">{{ plan.max_mkt_users }}</span> Mkt • 
                   <span class="text-white">{{ plan.max_sales_users }}</span> Sls
                 </td>
@@ -98,7 +98,7 @@
     <div class="p-4 rounded-xl border border-white/10 bg-white/5">
       <h3 class="text-xs uppercase font-mono tracking-widest text-secondary mb-3">User Allocations (Seats)</h3>
       <div class="grid grid-cols-3 gap-4">
-        <app-input label="Max Admins" type="number" [(ngModel)]="form.max_admins" name="adm"></app-input>
+        <app-input label="Max Assistants" type="number" [(ngModel)]="form.max_assistants" name="assistants"></app-input>
         <app-input label="Max Marketing" type="number" [(ngModel)]="form.max_mkt_users" name="mkt"></app-input>
         <app-input label="Max Sales" type="number" [(ngModel)]="form.max_sales_users" name="sls"></app-input>
       </div>
@@ -138,7 +138,7 @@
     <div class="p-4 rounded-xl border border-white/10 bg-white/5">
       <h3 class="text-xs uppercase font-mono tracking-widest text-secondary mb-3">User Allocations (Seats)</h3>
       <div class="grid grid-cols-3 gap-4">
-        <app-input label="Max Admins" type="number" [(ngModel)]="editForm.max_admins" name="edit_adm"></app-input>
+        <app-input label="Max Assistants" type="number" [(ngModel)]="editForm.max_assistants" name="edit_assistants"></app-input>
         <app-input label="Max Marketing" type="number" [(ngModel)]="editForm.max_mkt_users" name="edit_mkt"></app-input>
         <app-input label="Max Sales" type="number" [(ngModel)]="editForm.max_sales_users" name="edit_sls"></app-input>
       </div>

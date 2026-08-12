@@ -15,6 +15,11 @@ import { marked } from 'marked';
 import { finalize, Subscription } from 'rxjs';
 
 import { SpeechRecognitionService } from '../../core/services/speech-recognition.service';
+import {
+  CompanyUser,
+  CompanyUserInvite,
+  CompanyUsersService,
+} from '../../core/services/company-users.service';
 import { OnboardingQuestion } from '../../shared/ui/onboarding-response-options/onboarding-response-options';
 import { OnboardingAiMessageComponent } from '../../shared/ui/onboarding-ai-message/onboarding-ai-message';
 import { OnboardingWelcomeComponent } from '../../shared/ui/onboarding-welcome/onboarding-welcome';
@@ -59,6 +64,13 @@ export class ChatComponent implements OnInit, OnDestroy {
   showWelcome = false;
   initialState: 'loading' | 'ready' | 'error' = 'loading';
   nextQuestion: OnboardingQuestion | null = null;
+  teamUsers: CompanyUser[] = [];
+  showTeamSetup = false;
+  teamSaving = false;
+  teamError = '';
+  teamInvite: CompanyUserInvite = {
+    first_name: '', last_name: '', email: '', role: 'assistant',
+  };
   private readonly markdownCache = new Map<string, string>();
   private readonly speechSubscriptions = new Subscription();
   private speechBase = '';
@@ -72,6 +84,7 @@ export class ChatComponent implements OnInit, OnDestroy {
   constructor(
     private readonly translate: TranslateService,
     private readonly onboarding: CompanyOnboardingService,
+    private readonly companyUsers: CompanyUsersService,
     private readonly cdr: ChangeDetectorRef,
     private readonly speech: SpeechRecognitionService,
   ) {
@@ -83,6 +96,7 @@ export class ChatComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.userName = localStorage.getItem('bp_name') || 'User';
     this.syncState();
+    this.loadTeam();
     this.speechSubscriptions.add(this.speech.state$.subscribe((state) => {
       this.isRecording = state === 'listening';
       this.cdr.detectChanges();
@@ -243,6 +257,48 @@ export class ChatComponent implements OnInit, OnDestroy {
 
   get canSend(): boolean {
     return this.prompt.trim().length > 0 && !this.isAnalyzing && !this.isCompleted && !this.hasPendingReview;
+  }
+
+  get companyAdministrator(): CompanyUser | undefined {
+    return this.teamUsers.find(user => user.role === 'admin');
+  }
+
+  get invitedTeamCount(): number {
+    return this.teamUsers.filter(user => user.role !== 'admin').length;
+  }
+
+  loadTeam(): void {
+    this.companyUsers.list().subscribe({
+      next: users => {
+        this.teamUsers = users;
+        this.showTeamSetup = users.every(user => user.role === 'admin');
+        this.cdr.detectChanges();
+      },
+      error: () => {
+        this.teamError = 'Team setup is temporarily unavailable. You can continue onboarding and use Team later.';
+        this.cdr.detectChanges();
+      },
+    });
+  }
+
+  inviteTeamMember(): void {
+    if (this.teamSaving || !this.teamInvite.first_name.trim() || !this.teamInvite.last_name.trim() || !this.teamInvite.email.trim()) return;
+    this.teamSaving = true;
+    this.teamError = '';
+    this.companyUsers.invite(this.teamInvite).pipe(finalize(() => {
+      this.teamSaving = false;
+      this.cdr.detectChanges();
+    })).subscribe({
+      next: user => {
+        this.teamUsers = [...this.teamUsers, user];
+        this.teamInvite = { first_name: '', last_name: '', email: '', role: 'assistant' };
+      },
+      error: (error: HttpErrorResponse) => {
+        this.teamError = typeof error.error?.detail === 'string'
+          ? error.error.detail
+          : 'The team member could not be invited.';
+      },
+    });
   }
 
   statusIcon(status: ValidationStatus): string {

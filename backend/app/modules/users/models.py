@@ -7,8 +7,15 @@ from app.db.postgres import Base
 class UserRole(str, enum.Enum):
     SUPERADMIN = "superadmin"
     ADMIN = "admin"
+    ASSISTANT = "assistant"
     MKT = "mkt"
     SALES = "sales"
+
+
+# Assistants currently share the tenant workspace capabilities of the Company
+# administrator.  The administrator identity itself remains unique and can only
+# be managed through the superadmin Company workflow.
+TENANT_MANAGER_ROLES = [UserRole.ADMIN, UserRole.ASSISTANT]
 
 class User(Base):
     __tablename__ = "users"

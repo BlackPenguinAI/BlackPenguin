@@ -21,7 +21,7 @@ DROP TYPE IF EXISTS user_role CASCADE;
 -- =============================================================================
 -- 1. CREACIÓN DE TIPOS ENUMERADOS (ENUMS)
 -- =============================================================================
-CREATE TYPE user_role AS ENUM ('superadmin', 'admin', 'mkt', 'sales');
+CREATE TYPE user_role AS ENUM ('superadmin', 'admin', 'assistant', 'mkt', 'sales');
 CREATE TYPE unit_status AS ENUM ('available', 'reserved', 'sold');
 CREATE TYPE funnel_stage AS ENUM ('new', 'contacted', 'qualified', 'appointment_set', 'closed', 'lost');
 CREATE TYPE appointment_status AS ENUM ('scheduled', 'completed', 'canceled');
@@ -157,4 +157,3 @@ CREATE TRIGGER trg_update_inventory_units_updated_at
 BEFORE UPDATE ON inventory_units
 FOR EACH ROW
 EXECUTE FUNCTION update_updated_at_column();
-

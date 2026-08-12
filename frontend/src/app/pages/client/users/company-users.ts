@@ -1,15 +1,16 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { HttpClient } from '@angular/common/http';
+import { forkJoin } from 'rxjs';
 
-import { API_V1_URL } from '../../../core/config/api.config';
+import {
+  CompanyUser,
+  CompanyUserInvite,
+  CompanyUserLimits,
+  CompanyUserRole,
+  CompanyUsersService,
+} from '../../../core/services/company-users.service';
 import { ToastService } from '../../../core/services/toast';
-
-interface CompanyUser {
-  id: string; email: string; first_name?: string; last_name?: string;
-  role: 'admin' | 'mkt' | 'sales'; is_active: boolean;
-}
 
 @Component({
   selector: 'app-company-users',
@@ -19,12 +20,13 @@ interface CompanyUser {
 })
 export class CompanyUsersComponent implements OnInit {
   users: CompanyUser[] = [];
+  limits: CompanyUserLimits | null = null;
   loading = true;
   saving = false;
-  invite = { first_name: '', last_name: '', email: '', role: 'sales' as CompanyUser['role'] };
+  invite: CompanyUserInvite = { first_name: '', last_name: '', email: '', role: 'assistant' };
 
   constructor(
-    private http: HttpClient,
+    private companyUsers: CompanyUsersService,
     private toast: ToastService,
     private cdr: ChangeDetectorRef,
   ) {}
@@ -33,9 +35,10 @@ export class CompanyUsersComponent implements OnInit {
 
   load(): void {
     this.loading = true;
-    this.http.get<CompanyUser[]>(`${API_V1_URL}/users/company`).subscribe({
-      next: users => {
+    forkJoin({ users: this.companyUsers.list(), limits: this.companyUsers.limits() }).subscribe({
+      next: ({ users, limits }) => {
         this.users = users;
+        this.limits = limits;
         this.loading = false;
         this.cdr.markForCheck();
       },
@@ -50,12 +53,13 @@ export class CompanyUsersComponent implements OnInit {
   sendInvite(): void {
     if (!this.invite.email || !this.invite.first_name || !this.invite.last_name) return;
     this.saving = true;
-    this.http.post<CompanyUser>(`${API_V1_URL}/users/company`, this.invite).subscribe({
+    this.companyUsers.invite(this.invite).subscribe({
       next: user => {
         this.users = [...this.users, user].sort((a, b) => a.email.localeCompare(b.email));
-        this.invite = { first_name: '', last_name: '', email: '', role: 'sales' };
+        this.invite = { first_name: '', last_name: '', email: '', role: 'assistant' };
         this.saving = false;
         this.toast.showSuccess('Invitation created');
+        this.reloadLimits();
         this.cdr.markForCheck();
       },
       error: err => {
@@ -67,12 +71,38 @@ export class CompanyUsersComponent implements OnInit {
   }
 
   setActive(user: CompanyUser, is_active: boolean): void {
-    this.http.patch<CompanyUser>(`${API_V1_URL}/users/company/${user.id}`, { is_active }).subscribe({
+    this.companyUsers.setActive(user.id, is_active).subscribe({
       next: updated => {
         Object.assign(user, updated);
+        this.reloadLimits();
         this.cdr.markForCheck();
       },
       error: err => this.toast.showError(err.error?.detail || 'Could not update user'),
+    });
+  }
+
+  resendActivation(user: CompanyUser): void {
+    this.companyUsers.resendActivation(user.id).subscribe({
+      next: () => this.toast.showSuccess('Activation link sent'),
+      error: err => this.toast.showError(err.error?.detail || 'Could not resend activation'),
+    });
+  }
+
+  get administrator(): CompanyUser | undefined {
+    return this.users.find(user => user.role === 'admin');
+  }
+
+  get teamUsers(): CompanyUser[] {
+    return this.users.filter(user => user.role !== 'admin');
+  }
+
+  roleLabel(role: CompanyUserRole): string {
+    return ({ admin: 'Administrator', assistant: 'Assistant', mkt: 'Marketing', sales: 'Sales' })[role];
+  }
+
+  private reloadLimits(): void {
+    this.companyUsers.limits().subscribe({
+      next: limits => { this.limits = limits; this.cdr.markForCheck(); },
     });
   }
 }

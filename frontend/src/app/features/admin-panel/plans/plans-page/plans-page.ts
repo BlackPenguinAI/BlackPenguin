@@ -40,7 +40,7 @@ export class PlansPageComponent implements OnInit {
   form: any = {
     name: '',
     description: '',
-    max_admins: 1,
+    max_assistants: 0,
     max_mkt_users: 0,
     max_sales_users: 0,
     max_projects: 1,
@@ -52,7 +52,7 @@ export class PlansPageComponent implements OnInit {
     id: '',
     name: '',
     description: '',
-    max_admins: 1,
+    max_assistants: 0,
     max_mkt_users: 0,
     max_sales_users: 0,
     max_projects: 1,
@@ -88,7 +88,7 @@ export class PlansPageComponent implements OnInit {
   }
 
   openModal(): void {
-    this.form = { name: '', description: '', max_admins: 1, max_mkt_users: 0, max_sales_users: 0, max_projects: 1, max_properties_per_project: 50, is_active: true };
+    this.form = { name: '', description: '', max_assistants: 0, max_mkt_users: 0, max_sales_users: 0, max_projects: 1, max_properties_per_project: 50, is_active: true };
     this.showModal = true;
   }
 

@@ -23,7 +23,7 @@ def create_plan(
     new_plan = SubscriptionPlan(
         name=plan_in.name,
         description=plan_in.description,
-        max_admins=plan_in.max_admins,
+        max_assistants=plan_in.max_assistants,
         max_mkt_users=plan_in.max_mkt_users,
         max_sales_users=plan_in.max_sales_users,
         max_projects=plan_in.max_projects,
@@ -56,7 +56,7 @@ def update_plan(
         
     plan.name = plan_in.name
     plan.description = plan_in.description
-    plan.max_admins = plan_in.max_admins
+    plan.max_assistants = plan_in.max_assistants
     plan.max_mkt_users = plan_in.max_mkt_users
     plan.max_sales_users = plan_in.max_sales_users
     plan.max_projects = plan_in.max_projects

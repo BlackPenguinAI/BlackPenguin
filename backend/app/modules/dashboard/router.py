@@ -13,7 +13,7 @@ from .schemas import DashboardStats
 
 
 router = APIRouter()
-roles = [UserRole.ADMIN, UserRole.MKT, UserRole.SALES]
+roles = [UserRole.ADMIN, UserRole.ASSISTANT, UserRole.MKT, UserRole.SALES]
 
 
 def _stats(db: Session, user: User) -> dict:

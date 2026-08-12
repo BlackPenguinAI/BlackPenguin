@@ -18,7 +18,7 @@ from app.modules.onboarding_questions import build_next_question
 from app.modules.onboarding_jobs import service as job_service
 from app.modules.onboarding_jobs.continuation import finalize_source_group
 from app.modules.onboarding_jobs.models import OnboardingSourceJob
-from app.modules.users.models import User, UserRole
+from app.modules.users.models import TENANT_MANAGER_ROLES, User, UserRole
 
 from . import meta_service, services, source_service, storage_service
 from .completion import FIELD_BY_KEY
@@ -38,8 +38,8 @@ from app.modules.demo_projects.service import provision_demo_project
 
 
 router = APIRouter()
-EDITOR_ROLES = [UserRole.ADMIN, UserRole.MKT]
-VIEWER_ROLES = [UserRole.ADMIN, UserRole.MKT, UserRole.SALES]
+EDITOR_ROLES = [*TENANT_MANAGER_ROLES, UserRole.MKT]
+VIEWER_ROLES = [*TENANT_MANAGER_ROLES, UserRole.MKT, UserRole.SALES]
 URL_PATTERN = re.compile(r"https?://[^\s<>]+", re.IGNORECASE)
 
 
@@ -242,7 +242,7 @@ async def _complete_chat_turn(
     else:
         assistant_text, updates, approved = parsed
     result = services.apply_field_updates(
-        db, profile, updates, allow_authoritative_statuses=current_user.role == UserRole.ADMIN,
+        db, profile, updates, allow_authoritative_statuses=current_user.role in TENANT_MANAGER_ROLES,
         final_approved=None,
     )
     if result.accepted:
@@ -356,7 +356,7 @@ def set_project_cover(
 @router.get("/{project_id}/deletion-impact", response_model=ProjectDeletionImpact)
 def get_deletion_impact(
     project_id: str, db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([UserRole.ADMIN])),
+    current_user: User = Depends(RoleChecker(TENANT_MANAGER_ROLES)),
 ):
     project = services.get_project(db, project_id, current_user.company_id)
     return services.deletion_impact(db, project)
@@ -365,7 +365,7 @@ def get_deletion_impact(
 @router.post("/{project_id}/archive", response_model=ProjectResponse)
 def archive_project(
     project_id: str, db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([UserRole.ADMIN])),
+    current_user: User = Depends(RoleChecker(TENANT_MANAGER_ROLES)),
 ):
     project = services.get_project(db, project_id, current_user.company_id)
     return services.serialize_project(services.archive_project(db, project))
@@ -375,7 +375,7 @@ def archive_project(
 def reset_demo_project(
     project_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([UserRole.ADMIN])),
+    current_user: User = Depends(RoleChecker(TENANT_MANAGER_ROLES)),
 ):
     project = services.get_project(db, project_id, current_user.company_id)
     if not project.is_demo:
@@ -397,7 +397,7 @@ def reset_demo_project(
 @router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_project(
     project_id: str, payload: ProjectDeleteRequest, db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([UserRole.ADMIN])),
+    current_user: User = Depends(RoleChecker(TENANT_MANAGER_ROLES)),
 ):
     project = services.get_project(db, project_id, current_user.company_id)
     services.delete_project(db, project, confirm_name=payload.confirm_name)
@@ -410,7 +410,7 @@ def get_profile(project_id: str, db: Session = Depends(get_db), current_user: Us
 
 
 @router.patch("/{project_id}/profile", response_model=ProjectProfileResponse)
-def patch_profile(project_id: str, payload: ProjectProfilePatch, db: Session = Depends(get_db), current_user: User = Depends(RoleChecker([UserRole.ADMIN]))):
+def patch_profile(project_id: str, payload: ProjectProfilePatch, db: Session = Depends(get_db), current_user: User = Depends(RoleChecker(TENANT_MANAGER_ROLES))):
     profile = services.get_profile(services.get_project(db, project_id, current_user.company_id))
     services.apply_field_updates(db, profile, [item.model_dump() for item in payload.updates], allow_authoritative_statuses=True, final_approved=payload.final_approved)
     return services.serialize_profile(profile)
@@ -639,7 +639,7 @@ def list_sources(project_id: str, db: Session = Depends(get_db), current_user: U
 
 
 @router.post("/{project_id}/sources/url", response_model=SourceResponse, status_code=202)
-async def add_url(project_id: str, payload: UrlSourceRequest, db: Session = Depends(get_db), current_user: User = Depends(RoleChecker([UserRole.ADMIN]))):
+async def add_url(project_id: str, payload: UrlSourceRequest, db: Session = Depends(get_db), current_user: User = Depends(RoleChecker(TENANT_MANAGER_ROLES))):
     project = services.get_project(db, project_id, current_user.company_id)
     try:
         source = source_service.create_url_source(
@@ -661,7 +661,7 @@ async def add_url(project_id: str, payload: UrlSourceRequest, db: Session = Depe
 
 
 @router.post("/{project_id}/sources/files", response_model=list[SourceResponse])
-async def add_files(project_id: str, files: list[UploadFile] = File(...), db: Session = Depends(get_db), current_user: User = Depends(RoleChecker([UserRole.ADMIN]))):
+async def add_files(project_id: str, files: list[UploadFile] = File(...), db: Session = Depends(get_db), current_user: User = Depends(RoleChecker(TENANT_MANAGER_ROLES))):
     project = services.get_project(db, project_id, current_user.company_id)
     if not files or len(files) > source_service.MAX_FILES:
         raise HTTPException(status_code=422, detail=f"Upload between 1 and {source_service.MAX_FILES} files.")
@@ -739,7 +739,7 @@ def download_source_file(
 
 
 @router.post("/{project_id}/proposals/{proposal_id}/decision", response_model=ProposalDecisionResponse)
-def decide_proposal(project_id: str, proposal_id: str, payload: ProposalDecision, db: Session = Depends(get_db), current_user: User = Depends(RoleChecker([UserRole.ADMIN]))):
+def decide_proposal(project_id: str, proposal_id: str, payload: ProposalDecision, db: Session = Depends(get_db), current_user: User = Depends(RoleChecker(TENANT_MANAGER_ROLES))):
     services.get_project(db, project_id, current_user.company_id)
     proposal = db.query(ProjectOnboardingProposal).join(ProjectOnboardingSource).filter(ProjectOnboardingProposal.id == proposal_id, ProjectOnboardingSource.project_id == project_id).first()
     if not proposal:
@@ -779,23 +779,23 @@ def create_campaign(project_id: str, payload: CampaignCreate, db: Session = Depe
         })
     services.apply_field_updates(
         db, services.get_profile(project), updates,
-        allow_authoritative_statuses=current_user.role == UserRole.ADMIN,
+        allow_authoritative_statuses=current_user.role in TENANT_MANAGER_ROLES,
     )
     return campaign
 
 
 @router.get("/integrations/meta/connections", response_model=list[MetaConnectionResponse])
-def list_meta_connections(db: Session = Depends(get_db), current_user: User = Depends(RoleChecker([UserRole.ADMIN]))):
+def list_meta_connections(db: Session = Depends(get_db), current_user: User = Depends(RoleChecker(TENANT_MANAGER_ROLES))):
     return db.query(MetaConnection).filter(MetaConnection.company_id == current_user.company_id).all()
 
 
 @router.post("/integrations/meta/connections", response_model=MetaConnectionResponse, status_code=201)
-def create_meta_connection(payload: MetaConnectionCreate, db: Session = Depends(get_db), current_user: User = Depends(RoleChecker([UserRole.ADMIN]))):
+def create_meta_connection(payload: MetaConnectionCreate, db: Session = Depends(get_db), current_user: User = Depends(RoleChecker(TENANT_MANAGER_ROLES))):
     return meta_service.create_connection(db, company_id=current_user.company_id, payload=payload.model_dump())
 
 
 @router.post("/integrations/meta/connections/{connection_id}/verify", response_model=MetaConnectionResponse)
-async def verify_meta_connection(connection_id: str, db: Session = Depends(get_db), current_user: User = Depends(RoleChecker([UserRole.ADMIN]))):
+async def verify_meta_connection(connection_id: str, db: Session = Depends(get_db), current_user: User = Depends(RoleChecker(TENANT_MANAGER_ROLES))):
     connection = db.query(MetaConnection).filter(MetaConnection.id == connection_id, MetaConnection.company_id == current_user.company_id).first()
     if not connection:
         raise HTTPException(status_code=404, detail="Meta connection not found.")

@@ -11,7 +11,7 @@ class SubscriptionPlan(Base):
     description = Column(String(255), nullable=True)
     
     # Límites de Usuarios
-    max_admins = Column(Integer, default=1)
+    max_assistants = Column(Integer, default=0)
     max_mkt_users = Column(Integer, default=0)
     max_sales_users = Column(Integer, default=0)
     

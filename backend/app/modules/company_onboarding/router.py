@@ -19,7 +19,7 @@ from app.modules.onboarding_questions import build_next_question
 from app.modules.onboarding_jobs import service as job_service
 from app.modules.onboarding_jobs.continuation import finalize_source_group
 from app.modules.onboarding_jobs.models import OnboardingSourceJob
-from app.modules.users.models import User, UserRole
+from app.modules.users.models import TENANT_MANAGER_ROLES, User, UserRole
 
 from . import services, source_service, storage_service
 from .completion import FIELD_BY_KEY
@@ -47,11 +47,11 @@ from .schemas import (
 
 
 router = APIRouter()
-ALLOWED_ROLES = [UserRole.ADMIN, UserRole.MKT]
+ALLOWED_ROLES = [*TENANT_MANAGER_ROLES, UserRole.MKT]
 
 
 def _is_authorized_admin(user: User) -> bool:
-    return user.role == UserRole.ADMIN
+    return user.role in TENANT_MANAGER_ROLES
 
 
 def _parse_agent_response(raw: str) -> tuple[str, list[dict[str, Any]], bool | None] | None:
@@ -212,7 +212,7 @@ def get_company_profile(
 def patch_company_profile(
     payload: CompanyProfilePatch,
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([UserRole.ADMIN])),
+    current_user: User = Depends(RoleChecker(TENANT_MANAGER_ROLES)),
 ):
     profile = services.get_or_create_profile(db, current_user.company_id)
     services.apply_field_updates(
@@ -712,7 +712,7 @@ def download_source_file(
 def retry_url_source(
     source_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([UserRole.ADMIN])),
+    current_user: User = Depends(RoleChecker(TENANT_MANAGER_ROLES)),
 ):
     source = db.query(CompanyOnboardingSource).filter(
         CompanyOnboardingSource.id == source_id,
@@ -736,7 +736,7 @@ def retry_url_source(
 async def add_url_source(
     payload: ScrapeRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([UserRole.ADMIN])),
+    current_user: User = Depends(RoleChecker(TENANT_MANAGER_ROLES)),
 ):
     session = services.get_or_create_session(db, current_user.company_id)
     try:
@@ -764,7 +764,7 @@ async def add_url_source(
 async def add_file_sources(
     files: list[UploadFile] = File(...),
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([UserRole.ADMIN])),
+    current_user: User = Depends(RoleChecker(TENANT_MANAGER_ROLES)),
 ):
     if not files or len(files) > source_service.MAX_FILES:
         raise HTTPException(status_code=422, detail=f"Upload between 1 and {source_service.MAX_FILES} files.")
@@ -799,7 +799,7 @@ def decide_proposal(
     proposal_id: str,
     payload: ProposalDecision,
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([UserRole.ADMIN])),
+    current_user: User = Depends(RoleChecker(TENANT_MANAGER_ROLES)),
 ):
     proposal = db.query(CompanyOnboardingProposal).filter(CompanyOnboardingProposal.id == proposal_id).first()
     if not proposal or proposal.source.company_id != current_user.company_id:
@@ -825,7 +825,7 @@ def decide_proposal(
 async def trigger_scrape(
     payload: ScrapeRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([UserRole.ADMIN])),
+    current_user: User = Depends(RoleChecker(TENANT_MANAGER_ROLES)),
 ):
     source = await source_service.ingest_url(
         db,

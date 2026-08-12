@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.db.postgres import get_db
 from app.modules.auth.deps import RoleChecker
-from app.modules.users.models import User, UserRole
+from app.modules.users.models import TENANT_MANAGER_ROLES, User, UserRole
 
 from .models import AgentRun, OutboundMessage, SalesConversation
 from .schemas import AgentRunResponse, ConversationSummary, DraftDecision, SimulationRequest
@@ -19,7 +19,7 @@ router = APIRouter()
 async def simulate(
     payload: SimulationRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([UserRole.ADMIN, UserRole.SALES])),
+    current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.SALES])),
 ):
     return await simulate_turn(
         db,
@@ -33,7 +33,7 @@ async def simulate(
 @router.get("/conversations", response_model=list[ConversationSummary])
 def conversations(
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([UserRole.ADMIN, UserRole.MKT, UserRole.SALES])),
+    current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.MKT, UserRole.SALES])),
 ):
     query = db.query(SalesConversation).filter(SalesConversation.company_id == current_user.company_id)
     if current_user.role == UserRole.SALES:
@@ -47,7 +47,7 @@ def decide_draft(
     draft_id: str,
     payload: DraftDecision,
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([UserRole.ADMIN, UserRole.SALES])),
+    current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.SALES])),
 ):
     draft = db.query(OutboundMessage).join(SalesConversation).filter(
         OutboundMessage.id == draft_id,

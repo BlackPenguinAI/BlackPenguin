@@ -1,12 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
-import secrets
 
 from app.db.postgres import get_db
 from app.modules.auth.deps import get_current_user, RoleChecker
 from app.core.security import verify_password, get_password_hash, verify_email_token
-from .models import User, UserRole
+from .models import TENANT_MANAGER_ROLES, User, UserRole
+from . import services
 from .schemas import (
     MyProfileUpdate, MyProfileResponse, PasswordUpdatePayload, SetPasswordPayload,
     TenantUserCreate, TenantUserResponse, TenantUserUpdate, UserAdminListResponse,
@@ -15,23 +15,6 @@ from app.modules.companies.models import Company
 
 router = APIRouter()
 
-
-def _enforce_role_limit(db: Session, company: Company, role: UserRole) -> None:
-    if not company.plan:
-        raise HTTPException(status_code=409, detail="The Company does not have an assigned plan.")
-    limit_by_role = {
-        UserRole.ADMIN: company.plan.max_admins,
-        UserRole.MKT: company.plan.max_mkt_users,
-        UserRole.SALES: company.plan.max_sales_users,
-    }
-    limit = limit_by_role[role]
-    used = db.query(User).filter(
-        User.company_id == company.id,
-        User.role == role,
-        User.is_active.is_(True),
-    ).count()
-    if used >= limit:
-        raise HTTPException(status_code=409, detail=f"The plan allows {limit} active {role.value} users.")
 
 @router.get("/me", response_model=MyProfileResponse)
 def get_my_profile(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -127,7 +110,7 @@ def get_all_users_for_admin(
 @router.get("/company", response_model=List[TenantUserResponse])
 def list_company_users(
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([UserRole.ADMIN])),
+    current_user: User = Depends(RoleChecker(TENANT_MANAGER_ROLES)),
 ):
     return db.query(User).filter(User.company_id == current_user.company_id).order_by(User.email.asc()).all()
 
@@ -136,37 +119,47 @@ def list_company_users(
 def invite_company_user(
     payload: TenantUserCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([UserRole.ADMIN])),
+    current_user: User = Depends(RoleChecker(TENANT_MANAGER_ROLES)),
 ):
     try:
         role = UserRole(payload.role)
     except ValueError as exc:
-        raise HTTPException(status_code=422, detail="Role must be admin, mkt or sales.") from exc
-    if role == UserRole.SUPERADMIN:
-        raise HTTPException(status_code=403, detail="Company admins cannot create superadmins.")
-    if db.query(User).filter(User.email == payload.email).first():
-        raise HTTPException(status_code=409, detail="The email is already registered.")
-    company = db.query(Company).options(joinedload(Company.plan)).filter(Company.id == current_user.company_id).first()
-    _enforce_role_limit(db, company, role)
-    user = User(
+        raise HTTPException(status_code=422, detail="Role must be assistant, mkt or sales.") from exc
+    return services.invite_tenant_user(
+        db,
         company_id=current_user.company_id,
-        email=payload.email,
+        email=str(payload.email),
         first_name=payload.first_name,
         last_name=payload.last_name,
         role=role,
-        hashed_password=get_password_hash(secrets.token_urlsafe(32)),
-        is_active=True,
     )
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-    try:
-        from .services import send_user_activation
-        send_user_activation(user)
-    except Exception:
-        # The account remains valid; resend can be retried independently.
-        pass
-    return user
+
+
+@router.get("/company/limits")
+def get_company_user_limits(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker(TENANT_MANAGER_ROLES)),
+):
+    company = db.query(Company).options(joinedload(Company.plan)).filter(
+        Company.id == current_user.company_id,
+    ).first()
+    if not company or not company.plan:
+        raise HTTPException(status_code=409, detail="The Company does not have an assigned plan.")
+    result = {}
+    for role, limit in (
+        (UserRole.ASSISTANT, company.plan.max_assistants),
+        (UserRole.MKT, company.plan.max_mkt_users),
+        (UserRole.SALES, company.plan.max_sales_users),
+    ):
+        result[role.value] = {
+            "used": db.query(User).filter(
+                User.company_id == current_user.company_id,
+                User.role == role,
+                User.is_active.is_(True),
+            ).count(),
+            "limit": limit,
+        }
+    return result
 
 
 @router.patch("/company/{user_id}", response_model=TenantUserResponse)
@@ -174,19 +167,21 @@ def update_company_user(
     user_id: str,
     payload: TenantUserUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([UserRole.ADMIN])),
+    current_user: User = Depends(RoleChecker(TENANT_MANAGER_ROLES)),
 ):
     user = db.query(User).filter(User.id == user_id, User.company_id == current_user.company_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found.")
-    if payload.is_active is False and user.role == UserRole.ADMIN:
-        active_admins = db.query(User).filter(
-            User.company_id == current_user.company_id,
-            User.role == UserRole.ADMIN,
-            User.is_active.is_(True),
-        ).count()
-        if active_admins <= 1:
-            raise HTTPException(status_code=409, detail="The last active Company admin cannot be deactivated.")
+    if user.role == UserRole.ADMIN:
+        raise HTTPException(
+            status_code=403,
+            detail="The Company administrator can only be managed from the superadmin Company panel.",
+        )
+    if payload.is_active is True and not user.is_active:
+        company = db.query(Company).options(joinedload(Company.plan)).filter(
+            Company.id == current_user.company_id,
+        ).first()
+        services.enforce_role_limit(db, company, user.role)
     for key, value in payload.model_dump(exclude_unset=True).items():
         setattr(user, key, value)
     db.commit()
@@ -198,11 +193,15 @@ def update_company_user(
 def resend_company_user_activation(
     user_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([UserRole.ADMIN])),
+    current_user: User = Depends(RoleChecker(TENANT_MANAGER_ROLES)),
 ):
     user = db.query(User).filter(User.id == user_id, User.company_id == current_user.company_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found.")
-    from .services import send_user_activation
-    send_user_activation(user)
+    if user.role == UserRole.ADMIN:
+        raise HTTPException(
+            status_code=403,
+            detail="The Company administrator can only be managed from the superadmin Company panel.",
+        )
+    services.send_user_activation(user)
     return {"detail": "Activation link sent."}

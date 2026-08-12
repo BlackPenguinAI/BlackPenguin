@@ -36,8 +36,6 @@ FIELD_ALIASES = {
     "official website": "official_corporate_website",
     "corporate website": "official_corporate_website",
     "headquarters": "headquarters",
-    "primary administrator": "primary_black_penguin_administrator",
-    "primary black penguin administrator": "primary_black_penguin_administrator",
     "business model": "primary_business_model",
     "asset classes": "core_asset_classes",
     "operating footprint": "current_operating_footprint",
@@ -90,7 +88,24 @@ def get_or_create_profile(db: Session, company_id: str) -> CompanyProfile:
         db.commit()
         db.refresh(profile)
     seed_legacy_values(profile)
+    if purge_deprecated_profile_fields(profile):
+        refresh_completion(profile)
+        db.add(profile)
+        db.commit()
+        db.refresh(profile)
     return profile
+
+
+def purge_deprecated_profile_fields(profile: CompanyProfile) -> bool:
+    """Remove operational user identity mistakenly stored as Company data."""
+    removed = False
+    for attribute in ("profile_data", "field_states", "field_sources"):
+        values = dict(getattr(profile, attribute, {}) or {})
+        if values.pop("primary_black_penguin_administrator", None) is not None:
+            setattr(profile, attribute, values)
+            flag_modified(profile, attribute)
+            removed = True
+    return removed
 
 
 def get_or_create_session(db: Session, company_id: str) -> OnboardingSession:
@@ -379,16 +394,6 @@ def deterministic_context_update(message: str, profile: CompanyProfile) -> list[
     if next_field == "headquarters":
         match = re.fullmatch(r"(?:in|at|en)\s+([a-z][a-z .,'-]{1,80})", text, re.IGNORECASE)
         if match:
-            return [_user_update(next_field, match.group(1).strip().title())]
-
-    if next_field == "primary_black_penguin_administrator":
-        match = re.fullmatch(
-            r"(?:(?:the\s+)?name\s+is\s+)?([a-z][a-z .'-]{1,100})",
-            text,
-            re.IGNORECASE,
-        )
-        excluded = {"hi", "hello", "hey", "yes", "no", "ok", "okay"}
-        if match and text not in excluded and len(match.group(1).split()) <= 5:
             return [_user_update(next_field, match.group(1).strip().title())]
 
     return []

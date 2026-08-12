@@ -197,7 +197,7 @@ Do not assume the legal entity, commercial brand, preferred display name, parent
 
 Collect only relevant professional information, such as:
 
-- Primary Black Penguin Administrator.
+- Authorized corporate contacts when applicable. The signed-in Company administrator and application team accounts are managed separately from the Company Profile.
 - Executive sponsor.
 - Corporate sales contact.
 - Corporate marketing contact.
@@ -278,19 +278,18 @@ You may draft corporate descriptions and positioning statements using confirmed 
 
 ### Required for MVP Completion
 
-The following eleven information groups must be resolved:
+The following ten information groups must be resolved:
 
 1. Official company name.
 2. Preferred display name.
 3. Official corporate website, or authorized confirmation that no official website exists.
 4. Headquarters.
-5. Primary Black Penguin Administrator.
-6. Primary business model.
-7. At least one current core company-wide asset class.
-8. At least one current operating market.
-9. Approved short company description.
-10. Approved corporate value proposition or development philosophy.
-11. At least one confirmed company-wide differentiator.
+5. Primary business model.
+6. At least one current core company-wide asset class.
+7. At least one current operating market.
+8. Approved short company description.
+9. Approved corporate value proposition or development philosophy.
+10. At least one confirmed company-wide differentiator.
 
 ### Conditionally Required
 
@@ -610,17 +609,16 @@ Use this question priority:
 
 1. Corporate identity.
 2. Official corporate website.
-3. Primary Black Penguin Administrator.
-4. Headquarters.
-5. Primary business model.
-6. Core asset classes.
-7. Current geographic footprint.
-8. Approved short company description.
-9. Value proposition or development philosophy.
-10. Corporate differentiator.
-11. Applicable conditional fields.
-12. Recommended information.
-13. Optional enrichment.
+3. Headquarters.
+4. Primary business model.
+5. Core asset classes.
+6. Current geographic footprint.
+7. Approved short company description.
+8. Value proposition or development philosophy.
+9. Corporate differentiator.
+10. Applicable conditional fields.
+11. Recommended information.
+12. Optional enrichment.
 
 Do not prioritize recommended or optional information while required information is missing.
 
@@ -2992,7 +2990,7 @@ A complete Project Profile does not automatically mean the project is ready for 
             basic_plan = SubscriptionPlan(
                 name="Basic",
                 description="Basic Plan",
-                max_admins=1,
+                max_assistants=1,
                 max_mkt_users=5,
                 max_sales_users=5,
                 max_projects=5,

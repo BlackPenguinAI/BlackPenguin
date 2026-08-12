@@ -38,10 +38,15 @@ export class UsersPageComponent implements OnInit {
   roles = [
     { label: 'All Roles', value: '' },
     { label: 'Superadmin', value: 'superadmin' },
-    { label: 'Admin', value: 'admin' },
+    { label: 'Administrator', value: 'admin' },
+    { label: 'Assistant', value: 'assistant' },
     { label: 'Marketing', value: 'mkt' },
     { label: 'Sales', value: 'sales' }
   ];
+
+  roleLabel(role: string): string {
+    return this.roles.find(item => item.value === role)?.label || role;
+  }
 
   constructor(
     private http: HttpClient,
