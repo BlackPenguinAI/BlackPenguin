@@ -20,4 +20,18 @@ describe('OnboardingResponseOptionsComponent', () => {
     component.question = { ...component.question, options: [] };
     expect(component.choices).toEqual(['B']);
   });
+
+  it('keeps explanatory help and typed answer actions in the question contract', () => {
+    const component = new OnboardingResponseOptionsComponent();
+    component.question = {
+      field: 'dba', label: 'DBA (Doing Business As)', prompt: 'Does the company use a DBA?',
+      input_type: 'conditional_text', options: ['No DBA — not applicable'], examples: [],
+      allow_custom: true, minimum_words: null,
+      help_text: 'A DBA (Doing Business As) is a registered trade or business name.',
+      answer_actions: { 'No DBA — not applicable': { kind: 'not_applicable' } },
+    };
+
+    expect(component.question.help_text).toContain('Doing Business As');
+    expect(component.question.answer_actions?.['No DBA — not applicable'].kind).toBe('not_applicable');
+  });
 });

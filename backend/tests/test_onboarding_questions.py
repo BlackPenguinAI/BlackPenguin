@@ -31,6 +31,24 @@ def test_final_question_has_explicit_approval_choices():
     assert question["options"] == ["Approve profile", "I need to make changes"]
 
 
+def test_dba_question_expands_the_acronym_and_exposes_typed_actions():
+    question = build_next_question(
+        [{"field": "dba", "label": "DBA (Doing Business As)"}],
+        final_prompt="Approve",
+        profile_data={"preferred_display_name": "CBH Homes"},
+    )
+
+    assert "DBA (Doing Business As)" in question["prompt"]
+    assert question["help_text"].startswith("A DBA (Doing Business As)")
+    assert question["answer_actions"]["Yes — use CBH Homes"] == {
+        "kind": "copy_field",
+        "source_field": "preferred_display_name",
+    }
+    assert question["answer_actions"]["No DBA — not applicable"] == {
+        "kind": "not_applicable",
+    }
+
+
 def test_company_short_description_accepts_a_concise_complete_sentence():
     value = "Idaho's #1 Builder, building homes since 1992."
 

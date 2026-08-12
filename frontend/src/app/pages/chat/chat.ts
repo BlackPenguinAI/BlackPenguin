@@ -352,7 +352,7 @@ export class ChatComponent implements OnInit, OnDestroy {
     this.scrollToBottom();
 
     this.errorMessage = '';
-    const replyTo = this.replyToMessageId;
+    const replyTo = this.replyToMessageId || this.activeQuestionMessageId();
     this.replyToMessageId = null;
     this.onboarding.sendMessage(content, replyTo).pipe(finalize(() => {
       this.isAnalyzing = false;
@@ -669,6 +669,16 @@ export class ChatComponent implements OnInit, OnDestroy {
     return !!message.ui_payload
       && typeof message.ui_payload.prompt === 'string'
       && typeof message.ui_payload.label === 'string';
+  }
+
+  private activeQuestionMessageId(): string | null {
+    const active = [...this.visibleMessages].reverse().find((message) =>
+      message.sender === 'ai'
+      && this.hasQuestionPayload(message)
+      && !message.response_payload
+      && !!message.id
+    );
+    return active?.id || null;
   }
 
   private updateProposal(sourceId: string, proposalId: string, patch: Partial<SourceProposal>): void {

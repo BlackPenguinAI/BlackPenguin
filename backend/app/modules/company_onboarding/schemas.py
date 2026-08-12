@@ -123,6 +123,8 @@ class NextQuestionResponse(BaseModel):
     allow_custom: bool = True
     minimum_words: int | None = None
     minimum_characters: int | None = None
+    help_text: str | None = None
+    answer_actions: dict[str, dict[str, Any]] = Field(default_factory=dict)
 
 
 class RejectedUpdate(BaseModel):

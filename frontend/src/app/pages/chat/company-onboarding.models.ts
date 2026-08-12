@@ -67,6 +67,8 @@ export interface NextQuestion {
   field: string | null; label: string; prompt: string; input_type: string;
   options: string[]; examples: string[]; allow_custom: boolean;
   minimum_words: number | null; minimum_characters?: number | null;
+  help_text?: string | null;
+  answer_actions?: Record<string, { kind: string; source_field?: string }>;
 }
 
 export type SourceKind =

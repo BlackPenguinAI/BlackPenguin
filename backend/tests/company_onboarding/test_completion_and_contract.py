@@ -9,9 +9,11 @@ from app.modules.company_onboarding.router import _parse_agent_response
 from app.modules.company_onboarding.services import (
     deterministic_context_update,
     extract_urls,
+    get_active_question,
     normalize_field_key,
     normalize_user_url,
     resolve_answer_to_question,
+    supersede_unanswered_questions,
 )
 from app.modules.company_onboarding.models import SenderType
 from app.modules.company_onboarding.source_service import classify_url, validate_public_url
@@ -119,11 +121,11 @@ class _QuestionDb:
         return _QuestionQuery(self.question)
 
 
-def _resolve(field: str, answer: str, *, input_type: str = "text", data=None):
+def _resolve(field: str, answer: str, *, input_type: str = "text", data=None, payload=None):
     question = SimpleNamespace(
         id="question-1",
         sender=SenderType.AI,
-        ui_payload={"field": field, "input_type": input_type},
+        ui_payload={"field": field, "input_type": input_type, **(payload or {})},
         response_payload=None,
         created_at=None,
     )
@@ -164,3 +166,86 @@ def test_chat_url_normalization_removes_tracking_and_detects_bare_domains():
     assert extract_urls("Use davidsonhomes.com and https://www.minto.com/") == [
         "https://davidsonhomes.com/", "https://www.minto.com/",
     ]
+
+
+def test_direct_dba_answer_is_applied_without_model_inference():
+    result = _resolve("dba", "CBH Homes")
+
+    assert result.status == "accepted"
+    assert result.updates[0]["field"] == "dba"
+    assert result.updates[0]["value"] == "CBH Homes"
+    assert result.updates[0]["applicable"] is True
+
+
+def test_dba_typed_choices_copy_a_known_name_or_mark_the_field_not_applicable():
+    actions = {
+        "answer_actions": {
+            "Yes — use CBH Homes": {"kind": "copy_field", "source_field": "preferred_display_name"},
+            "No DBA — not applicable": {"kind": "not_applicable"},
+        }
+    }
+    copied = _resolve(
+        "dba", "Yes — use CBH Homes", data={"preferred_display_name": "CBH Homes"}, payload=actions,
+    )
+    not_applicable = _resolve("dba", "No DBA — not applicable", payload=actions)
+
+    assert copied.updates[0]["value"] == "CBH Homes"
+    assert not_applicable.updates[0]["status"] == "not_applicable"
+    assert not_applicable.updates[0]["applicable"] is False
+
+
+def test_missing_reply_id_recovers_the_latest_server_owned_question():
+    older = SimpleNamespace(id="older", ui_payload={"field": "dba"}, response_payload=None)
+    latest = SimpleNamespace(id="latest", ui_payload={"field": "dba"}, response_payload=None)
+
+    class Query:
+        def filter(self, *args, **kwargs): return self
+        def order_by(self, *args, **kwargs): return self
+        def all(self): return [latest, older]
+
+    db = SimpleNamespace(query=lambda *args, **kwargs: Query())
+
+    assert get_active_question(db, "session-1", None) is latest
+    assert get_active_question(db, "session-1", "older") is latest
+
+
+def test_dba_label_is_explained_in_profile_progress():
+    assert FIELD_BY_KEY["dba"].label == "DBA (Doing Business As)"
+
+
+def test_creating_a_new_question_supersedes_previous_unanswered_questions():
+    previous = SimpleNamespace(
+        id="previous", ui_payload={"field": "dba"}, response_payload=None,
+    )
+
+    class Query:
+        def filter(self, *args, **kwargs): return self
+        def all(self): return [previous]
+
+    added = []
+    db = SimpleNamespace(query=lambda *args, **kwargs: Query(), add=added.append)
+
+    changed = supersede_unanswered_questions(db, "session-1")
+
+    assert changed is True
+    assert previous.response_payload["status"] == "superseded"
+    assert added == [previous]
+
+
+def test_refreshing_state_can_keep_and_upgrade_the_active_question():
+    active = SimpleNamespace(id="active", ui_payload={"field": "dba"}, response_payload=None)
+    older = SimpleNamespace(id="older", ui_payload={"field": "dba"}, response_payload=None)
+
+    class Query:
+        def filter(self, *args, **kwargs): return self
+        def all(self): return [active, older]
+
+    added = []
+    db = SimpleNamespace(query=lambda *args, **kwargs: Query(), add=added.append)
+
+    changed = supersede_unanswered_questions(db, "session-1", keep_message_id="active")
+
+    assert changed is True
+    assert active.response_payload is None
+    assert older.response_payload["status"] == "superseded"
+    assert added == [older]

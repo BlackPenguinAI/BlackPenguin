@@ -124,6 +124,8 @@ def save_message(
     in_reply_to_message_id: str | None = None,
     commit: bool = True,
 ) -> OnboardingMessage:
+    if sender == SenderType.AI and isinstance(ui_payload, dict):
+        supersede_unanswered_questions(db, session_id)
     message = OnboardingMessage(
         session_id=session_id, sender=sender, content=content,
         ui_payload=ui_payload, in_reply_to_message_id=in_reply_to_message_id,
@@ -135,6 +137,55 @@ def save_message(
     else:
         db.flush()
     return message
+
+
+def supersede_unanswered_questions(
+    db: Session,
+    session_id: str,
+    *,
+    keep_message_id: str | None = None,
+) -> bool:
+    """Keep a single server-owned active structured question per session."""
+    candidates = db.query(OnboardingMessage).filter(
+        OnboardingMessage.session_id == session_id,
+        OnboardingMessage.sender == SenderType.AI,
+        OnboardingMessage.response_payload.is_(None),
+    ).all()
+    changed = False
+    for message in candidates:
+        if message.id == keep_message_id or not isinstance(message.ui_payload, dict):
+            continue
+        message.response_payload = {
+            "status": "superseded",
+            "answer": "",
+            "selected_option": None,
+            "custom": False,
+        }
+        db.add(message)
+        changed = True
+    return changed
+
+
+def get_active_question(
+    db: Session,
+    session_id: str,
+    requested_message_id: str | None = None,
+) -> OnboardingMessage | None:
+    """Resolve the current question even when the browser lost its transient reply id."""
+    candidates = [
+        message
+        for message in db.query(OnboardingMessage).filter(
+            OnboardingMessage.session_id == session_id,
+            OnboardingMessage.sender == SenderType.AI,
+            OnboardingMessage.response_payload.is_(None),
+        ).order_by(OnboardingMessage.created_at.desc(), OnboardingMessage.id.desc()).all()
+        if isinstance(message.ui_payload, dict)
+    ]
+    if not candidates:
+        return None
+    if requested_message_id == candidates[0].id:
+        return candidates[0]
+    return candidates[0]
 
 
 def record_message_response(
@@ -224,7 +275,7 @@ def resolve_answer_to_question(
     unanswered = [item for item in db.query(OnboardingMessage).filter(
         OnboardingMessage.session_id == session_id,
         OnboardingMessage.sender == SenderType.AI,
-    ).order_by(OnboardingMessage.created_at.desc()).all()
+    ).order_by(OnboardingMessage.created_at.desc(), OnboardingMessage.id.desc()).all()
         if isinstance(item.ui_payload, dict) and not item.response_payload]
     if unanswered and unanswered[0].id != question.id:
         return QuestionResolution(True, "rejected", [], "stale_question", question)
@@ -237,12 +288,44 @@ def resolve_answer_to_question(
         return QuestionResolution(True, "rejected", [], "empty_answer", question)
 
     input_type = str(question.ui_payload.get("input_type") or "text")
+    answer_actions = question.ui_payload.get("answer_actions")
+    if isinstance(answer_actions, dict):
+        action = next(
+            (value for label, value in answer_actions.items()
+             if str(label).strip().casefold() == text.casefold() and isinstance(value, dict)),
+            None,
+        )
+        if action and action.get("kind") == "not_applicable":
+            return QuestionResolution(
+                True, "accepted", [_user_update(field, None, status="not_applicable", applicable=False)],
+                question=question,
+            )
+        if action and action.get("kind") == "copy_field":
+            source_field = normalize_field_key(action.get("source_field"))
+            copied_value = (profile.profile_data or {}).get(source_field) if source_field else None
+            if copied_value in (None, "", []):
+                return QuestionResolution(True, "rejected", [], "missing_reference_value", question)
+            return QuestionResolution(
+                True, "accepted", [_user_update(field, copied_value)], question=question,
+            )
+
     urls = extract_urls(text)
     lowered = text.casefold()
     no_website = lowered in {
         "none", "no", "no website", "none exists", "non exists", "no existe",
         "does not exist", "we don't have one", "we do not have one",
     }
+    definition = FIELD_BY_KEY[field]
+    not_applicable = lowered in {
+        "none", "no", "not applicable", "n/a", "no aplica", "does not apply",
+        "no dba", "no dba - not applicable", "no dba — not applicable",
+        "same as the official company name", "same as legal company name",
+    }
+    if definition.requirement == "conditionally_required" and not_applicable:
+        return QuestionResolution(
+            True, "accepted", [_user_update(field, None, status="not_applicable", applicable=False)],
+            question=question,
+        )
     if field == "official_corporate_website":
         if no_website:
             value: Any = {"exists": False, "url": None}
@@ -259,8 +342,9 @@ def resolve_answer_to_question(
     else:
         value = text
 
-    if validate_onboarding_value(field, value):
-        return QuestionResolution(True, "rejected", [], "answer_too_short", question)
+    validation_error = validate_onboarding_value(field, value)
+    if validation_error:
+        return QuestionResolution(True, "rejected", [], validation_error["code"], question)
     existing = (profile.profile_data or {}).get(field)
     status = "corrected_by_user" if existing not in (None, "", []) and existing != value else "confirmed"
     return QuestionResolution(True, "accepted", [_user_update(field, value, status=status)], question=question)
@@ -293,6 +377,7 @@ def apply_field_updates(
     *,
     allow_authoritative_statuses: bool,
     final_approved: bool | None = None,
+    commit: bool = True,
 ) -> ApplyUpdatesResult:
     data = dict(profile.profile_data or {})
     states = dict(profile.field_states or {})
@@ -362,8 +447,11 @@ def apply_field_updates(
     refresh_completion(profile)
 
     db.add(profile)
-    db.commit()
-    db.refresh(profile)
+    if commit:
+        db.commit()
+        db.refresh(profile)
+    else:
+        db.flush()
     return ApplyUpdatesResult(profile=profile, accepted=accepted, rejected=rejected)
 
 
@@ -400,12 +488,18 @@ def deterministic_context_update(message: str, profile: CompanyProfile) -> list[
     return []
 
 
-def _user_update(field: str, value: Any, *, status: str = "confirmed") -> dict[str, Any]:
+def _user_update(
+    field: str,
+    value: Any,
+    *,
+    status: str = "confirmed",
+    applicable: bool = True,
+) -> dict[str, Any]:
     return {
         "field": field,
         "value": value,
         "status": status,
-        "applicable": True,
+        "applicable": applicable,
         "source_type": "user_input",
         "source_reference": "current user response",
         "confidence": "high",

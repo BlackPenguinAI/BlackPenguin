@@ -111,6 +111,7 @@ def _next_question(profile) -> dict[str, Any]:
     return build_next_question(
         blockers,
         final_prompt="Review the Company Profile and choose whether to approve it or make changes.",
+        profile_data=profile.profile_data or {},
     )
 
 
@@ -120,7 +121,9 @@ def _accepted_response(first_name: str | None, accepted: list[dict[str, Any]], p
     for item in accepted:
         label = FIELD_BY_KEY[item["field"]].label
         value = item.get("value")
-        if isinstance(value, dict) and value.get("exists") is False:
+        if item.get("status") == "not_applicable":
+            display = "Not applicable"
+        elif isinstance(value, dict) and value.get("exists") is False:
             display = "No official website"
         elif isinstance(value, dict) and value.get("url"):
             display = value["url"]
@@ -174,9 +177,22 @@ def _state_payload(db: Session, company_id: str) -> dict[str, Any]:
         for proposal in source.proposals
     )
     if not processing and not pending_review:
+        next_question = _next_question(profile)
+        active_question = services.get_active_question(db, session.id)
         latest_ai = next((item for item in reversed(messages) if item.sender == SenderType.AI), None)
-        if latest_ai and not latest_ai.ui_payload and not latest_ai.response_payload:
-            latest_ai.ui_payload = _next_question(profile)
+        if active_question:
+            changed = services.supersede_unanswered_questions(
+                db, session.id, keep_message_id=active_question.id,
+            )
+            if active_question.ui_payload != next_question:
+                active_question.ui_payload = next_question
+                db.add(active_question)
+                changed = True
+            if changed:
+                db.commit(); db.refresh(active_question)
+        elif latest_ai and not latest_ai.ui_payload and not latest_ai.response_payload:
+            services.supersede_unanswered_questions(db, session.id)
+            latest_ai.ui_payload = next_question
             db.add(latest_ai); db.commit(); db.refresh(latest_ai)
     if serialized_profile["completion"]["can_complete"]:
         stage = "complete"
@@ -398,15 +414,21 @@ async def send_chat_message(
     response.headers["X-Request-ID"] = request_id
     session = services.get_or_create_session(db, current_user.company_id)
     profile = services.get_or_create_profile(db, current_user.company_id)
+    db.query(OnboardingSession).filter(OnboardingSession.id == session.id).with_for_update().one()
+    active_question = services.get_active_question(
+        db, session.id, payload.in_reply_to_message_id,
+    )
+    resolved_question_id = active_question.id if active_question else payload.in_reply_to_message_id
     user_message = services.save_message(
         db, session.id, SenderType.USER, payload.message,
-        in_reply_to_message_id=payload.in_reply_to_message_id,
+        in_reply_to_message_id=resolved_question_id,
+        commit=False,
     )
 
     resolution = services.resolve_answer_to_question(
         db,
         session_id=session.id,
-        message_id=payload.in_reply_to_message_id,
+        message_id=resolved_question_id,
         answer=payload.message,
         profile=profile,
     )
@@ -422,12 +444,25 @@ async def send_chat_message(
             profile,
             resolution.updates,
             allow_authoritative_statuses=_is_authorized_admin(current_user),
+            commit=False,
         )
         if deterministic_result.accepted:
             services.record_message_response(
-                db, session.id, payload.in_reply_to_message_id, payload.message,
+                db, session.id, resolved_question_id, payload.message,
                 status="accepted",
+                commit=False,
             )
+        elif deterministic_result.rejected:
+            resolution.status = "rejected"
+            resolution.reason = deterministic_result.rejected[0].get("reason")
+
+    db.commit()
+    db.refresh(user_message)
+    if deterministic_result and deterministic_result.accepted:
+        db.refresh(profile)
+
+    accepted = deterministic_result.accepted if deterministic_result else []
+    rejected = deterministic_result.rejected if deterministic_result else []
 
     source_results = []
     source_actions: list[dict[str, Any]] = []
@@ -481,8 +516,6 @@ async def send_chat_message(
             db.rollback()
             source_actions.append({"url": url, "action": "failed_to_queue", "status": "failed", "error": "The source could not be queued."})
 
-    accepted = deterministic_result.accepted if deterministic_result else []
-    rejected = deterministic_result.rejected if deterministic_result else []
     active_source = any(item["action"] in {"queued", "already_processing"} for item in source_actions)
 
     if resolution.handled or source_actions:
@@ -495,7 +528,9 @@ async def send_chat_message(
                 "empty_answer": "Please enter a value before continuing.",
                 "invalid_url": "Please enter a valid public website URL or choose No website.",
                 "url_not_valid_for_field": "A URL cannot be saved as the value for this field.",
-                "answer_too_short": "Please provide a more complete answer.",
+                "minimum_words": "Please provide a more complete answer.",
+                "minimum_characters": "Please provide a more complete answer.",
+                "missing_reference_value": "The referenced profile value is not available. Please enter the value directly.",
             }
             assistant_text = explanations.get(resolution.reason or "", "I couldn't safely apply that answer.")
             assistant_text += " " + _next_prompt(profile)

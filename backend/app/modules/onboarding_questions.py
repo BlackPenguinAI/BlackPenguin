@@ -25,6 +25,17 @@ QUESTION_CATALOG: dict[str, dict[str, Any]] = {
         "input_type": "single_select",
         "options": ["Corporation", "Limited liability company", "Partnership", "Private company", "Public company"],
     },
+    "dba": {
+        "input_type": "conditional_text",
+        "prompt": (
+            "Does the company operate under a **DBA (Doing Business As)**? "
+            "If yes, enter the registered trade or business name."
+        ),
+        "help_text": (
+            "A DBA (Doing Business As) is a registered trade or business name "
+            "used when it differs from the legal company name."
+        ),
+    },
     "approved_short_company_description": {
         "input_type": "long_text",
         "examples": [
@@ -93,7 +104,12 @@ QUESTION_CATALOG: dict[str, dict[str, Any]] = {
 }
 
 
-def build_next_question(blockers: list[dict[str, Any]], *, final_prompt: str) -> dict[str, Any]:
+def build_next_question(
+    blockers: list[dict[str, Any]],
+    *,
+    final_prompt: str,
+    profile_data: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     if not blockers:
         return {
             "field": None,
@@ -105,13 +121,30 @@ def build_next_question(blockers: list[dict[str, Any]], *, final_prompt: str) ->
             "allow_custom": True,
             "minimum_words": None,
             "minimum_characters": None,
+            "help_text": None,
+            "answer_actions": {},
         }
     blocker = blockers[0]
     field = blocker["field"]
     config = QUESTION_CATALOG.get(field, {})
     options = list(config.get("options", []))
     examples = list(config.get("examples", []))
-    if options:
+    answer_actions: dict[str, dict[str, Any]] = {}
+    if field == "dba":
+        preferred_name = str((profile_data or {}).get("preferred_display_name") or "").strip()
+        if preferred_name:
+            copy_label = f"Yes — use {preferred_name}"
+            options.append(copy_label)
+            answer_actions[copy_label] = {
+                "kind": "copy_field",
+                "source_field": "preferred_display_name",
+            }
+        no_dba_label = "No DBA — not applicable"
+        options.append(no_dba_label)
+        answer_actions[no_dba_label] = {"kind": "not_applicable"}
+    if config.get("prompt"):
+        prompt = str(config["prompt"])
+    elif options:
         prompt = f"Choose the best option for **{blocker['label']}**, or suggest a different answer."
     elif examples:
         prompt = f"Choose, edit, or write a complete answer for **{blocker['label']}**."
@@ -127,6 +160,8 @@ def build_next_question(blockers: list[dict[str, Any]], *, final_prompt: str) ->
         "allow_custom": True,
         "minimum_words": config.get("minimum_words"),
         "minimum_characters": config.get("minimum_characters"),
+        "help_text": config.get("help_text"),
+        "answer_actions": answer_actions,
     }
 
 

@@ -50,7 +50,7 @@ describe('ChatComponent', () => {
         },
         {
           key: 'dba',
-          label: 'DBA',
+          label: 'DBA (Doing Business As)',
           requirement: 'conditionally_required',
           status: 'not_applicable',
           applicable: false,
@@ -95,6 +95,26 @@ describe('ChatComponent', () => {
     expect(component.formatProposalValue({
       field: 'official_corporate_website', value: { exists: false, url: null },
     })).toBe('No official website');
+  });
+
+  it('should automatically link typed text to the latest active question', () => {
+    component.messages = [{
+      id: 'question-dba', sender: 'ai', content: 'What is the DBA?', created_at: new Date(), attachments: [],
+      ui_payload: {
+        field: 'dba', label: 'DBA (Doing Business As)', prompt: 'Enter the registered business name.',
+        input_type: 'conditional_text', options: [], examples: [], allow_custom: true,
+        minimum_words: null,
+      },
+    }];
+    component.prompt = 'CBH Homes';
+
+    component.sendMessage();
+
+    const request = http.expectOne('http://localhost:8000/api/v1/company-onboarding/chat');
+    expect(request.request.body).toEqual({
+      message: 'CBH Homes', in_reply_to_message_id: 'question-dba',
+    });
+    request.flush({}, { status: 500, statusText: 'Expected test response' });
   });
 
   it('should restore the structured website contract when saving an edit', () => {

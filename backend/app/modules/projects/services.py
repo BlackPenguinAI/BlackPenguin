@@ -305,7 +305,7 @@ def serialize_overview(db: Session, project: Project) -> dict[str, Any]:
         {"key": "starting_price", "label": "Starting Price", "value": starting_price,
          "display_value": f"{currency or ''} {starting_price}".strip() if starting_price else "Pending",
          "status": "available" if starting_price else "pending"},
-        {"key": "target_roi", "label": "Target ROI", "value": None, "display_value": "Pending", "status": "pending"},
+        {"key": "target_roi", "label": "Target ROI (Return on Investment)", "value": None, "display_value": "Pending", "status": "pending"},
     ]
     address_parts = [data.get("exact_address") or project.address, data.get("city") or project.city, data.get("country") or project.country]
     address = ", ".join(str(part) for part in address_parts if part)

@@ -11,6 +11,8 @@ export interface OnboardingQuestion {
   allow_custom: boolean;
   minimum_words: number | null;
   minimum_characters?: number | null;
+  help_text?: string | null;
+  answer_actions?: Record<string, { kind: string; source_field?: string }>;
 }
 
 @Component({

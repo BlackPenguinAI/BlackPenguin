@@ -38,7 +38,7 @@ REQUIRED_FIELDS = (
 
 CONDITIONAL_FIELDS = (
     FieldDefinition("legal_company_name", "Legal company name", "conditionally_required"),
-    FieldDefinition("dba", "DBA", "conditionally_required"),
+    FieldDefinition("dba", "DBA (Doing Business As)", "conditionally_required"),
     FieldDefinition("parent_company", "Parent company", "conditionally_required"),
     FieldDefinition("primary_corporate_sales_contact", "Primary corporate sales contact", "conditionally_required"),
     FieldDefinition("primary_corporate_marketing_contact", "Primary corporate marketing contact", "conditionally_required"),
@@ -53,7 +53,7 @@ RECOMMENDED_FIELDS = tuple(
         ("general_business_email", "General business email"),
         ("general_business_phone", "General business phone"),
         ("additional_offices", "Additional offices"),
-        ("ceo_or_president", "CEO or president"),
+        ("ceo_or_president", "CEO (Chief Executive Officer) or president"),
         ("founders", "Founder or founders"),
         ("executive_sponsor", "Executive sponsor"),
         ("head_of_development", "Head of development"),

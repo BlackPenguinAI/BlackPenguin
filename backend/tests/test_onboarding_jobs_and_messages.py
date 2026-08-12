@@ -142,3 +142,11 @@ def test_access_restrictions_are_terminal_and_do_not_publish_an_action_payload()
     assert "ui_payload" not in terminal_message_source
     assert "if not source.error_message" in mark_failed_source
     assert AccessRestrictedError.code == "access_restricted"
+
+
+def test_company_chat_initializes_accepted_updates_before_processing_urls():
+    source = inspect.getsource(company_router.send_chat_message)
+
+    assert source.index("accepted = deterministic_result.accepted") < source.index(
+        "for url in services.extract_urls"
+    )
