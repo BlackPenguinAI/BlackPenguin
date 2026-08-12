@@ -130,6 +130,12 @@ class RejectedUpdate(BaseModel):
 
 
 class ChatTurnResponse(BaseModel):
+    request_id: str | None = None
+    message_saved: bool = True
+    profile_changed: bool = False
+    field_update_status: Literal["accepted", "rejected", "not_applicable"] = "not_applicable"
+    assistant_status: Literal["deterministic", "llm", "fallback"] = "deterministic"
+    source_actions: list[dict[str, Any]] = Field(default_factory=list)
     message: ChatMessageResponse
     user_message: ChatMessageResponse | None = None
     profile: CompanyProfileResponse

@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime
 import re
 from typing import Any
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
@@ -53,6 +54,22 @@ class ApplyUpdatesResult:
     profile: CompanyProfile
     accepted: list[dict[str, Any]]
     rejected: list[dict[str, Any]]
+
+
+@dataclass
+class QuestionResolution:
+    handled: bool
+    status: str
+    updates: list[dict[str, Any]]
+    reason: str | None = None
+    question: OnboardingMessage | None = None
+
+
+DOMAIN_PATTERN = re.compile(
+    r"(?<![@\w])(?:https?://)?(?:www\.)?(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}(?::\d+)?(?:/[^\s<>]*)?",
+    re.IGNORECASE,
+)
+TRACKING_PARAMETERS = {"fbclid", "gclid", "dclid", "msclkid"}
 
 
 def normalize_field_key(value: Any) -> str | None:
@@ -105,7 +122,15 @@ def save_message(
     return message
 
 
-def record_message_response(db: Session, session_id: str, message_id: str | None, answer: str) -> None:
+def record_message_response(
+    db: Session,
+    session_id: str,
+    message_id: str | None,
+    answer: str,
+    *,
+    status: str = "accepted",
+    commit: bool = True,
+) -> None:
     if not message_id:
         return
     message = db.query(OnboardingMessage).filter(
@@ -118,11 +143,112 @@ def record_message_response(db: Session, session_id: str, message_id: str | None
     choices = ((message.ui_payload or {}).get("options") or (message.ui_payload or {}).get("examples") or [])
     selected = next((item for item in choices if str(item).casefold() == answer.strip().casefold()), None)
     message.response_payload = {
-        "status": "answered", "answer": answer.strip(),
+        "status": status, "answer": answer.strip(),
         "selected_option": selected, "custom": selected is None,
     }
     db.add(message)
-    db.commit()
+    if commit:
+        db.commit()
+    else:
+        db.flush()
+
+
+def normalize_user_url(value: str) -> str | None:
+    """Return a safe, stable public URL representation for chat input."""
+    candidate = value.strip().rstrip(".,;:!?)\"]}")
+    if not candidate:
+        return None
+    if not re.match(r"^https?://", candidate, re.IGNORECASE):
+        candidate = f"https://{candidate}"
+    try:
+        parts = urlsplit(candidate)
+        host = (parts.hostname or "").lower().rstrip(".")
+        if not host or "." not in host or " " in host:
+            return None
+        port = f":{parts.port}" if parts.port and parts.port not in {80, 443} else ""
+    except ValueError:
+        return None
+    query = urlencode([
+        (key, val) for key, val in parse_qsl(parts.query, keep_blank_values=True)
+        if not key.lower().startswith("utm_") and key.lower() not in TRACKING_PARAMETERS
+    ])
+    path = parts.path.rstrip("/") or "/"
+    return urlunsplit(("https", host + port, path, query, ""))
+
+
+def extract_urls(message: str) -> list[str]:
+    urls: list[str] = []
+    for match in DOMAIN_PATTERN.finditer(message):
+        normalized = normalize_user_url(match.group(0))
+        if normalized and normalized not in urls:
+            urls.append(normalized)
+    return urls[:3]
+
+
+def resolve_answer_to_question(
+    db: Session,
+    *,
+    session_id: str,
+    message_id: str | None,
+    answer: str,
+    profile: CompanyProfile,
+) -> QuestionResolution:
+    """Resolve a structured reply using the persisted question, never model inference."""
+    if not message_id:
+        return QuestionResolution(False, "not_applicable", [])
+    question = db.query(OnboardingMessage).filter(
+        OnboardingMessage.id == message_id,
+        OnboardingMessage.session_id == session_id,
+        OnboardingMessage.sender == SenderType.AI,
+    ).first()
+    if not question or not isinstance(question.ui_payload, dict):
+        return QuestionResolution(True, "rejected", [], "invalid_question", question)
+    if question.response_payload:
+        return QuestionResolution(True, "rejected", [], "stale_question", question)
+
+    unanswered = [item for item in db.query(OnboardingMessage).filter(
+        OnboardingMessage.session_id == session_id,
+        OnboardingMessage.sender == SenderType.AI,
+    ).order_by(OnboardingMessage.created_at.desc()).all()
+        if isinstance(item.ui_payload, dict) and not item.response_payload]
+    if unanswered and unanswered[0].id != question.id:
+        return QuestionResolution(True, "rejected", [], "stale_question", question)
+
+    field = normalize_field_key(question.ui_payload.get("field"))
+    if field is None:
+        return QuestionResolution(False, "not_applicable", [], question=question)
+    text = re.sub(r"\s+", " ", answer).strip()
+    if not text:
+        return QuestionResolution(True, "rejected", [], "empty_answer", question)
+
+    input_type = str(question.ui_payload.get("input_type") or "text")
+    urls = extract_urls(text)
+    lowered = text.casefold()
+    no_website = lowered in {
+        "none", "no", "no website", "none exists", "non exists", "no existe",
+        "does not exist", "we don't have one", "we do not have one",
+    }
+    if field == "official_corporate_website":
+        if no_website:
+            value: Any = {"exists": False, "url": None}
+        elif urls:
+            value = {"exists": True, "url": urls[0]}
+        else:
+            return QuestionResolution(True, "rejected", [], "invalid_url", question)
+    elif urls:
+        return QuestionResolution(True, "rejected", [], "url_not_valid_for_field", question)
+    elif input_type == "multi_select":
+        value = [item.strip() for item in re.split(r"[,;]", text) if item.strip()]
+        if not value:
+            return QuestionResolution(True, "rejected", [], "empty_answer", question)
+    else:
+        value = text
+
+    if is_too_short(field, value):
+        return QuestionResolution(True, "rejected", [], "answer_too_short", question)
+    existing = (profile.profile_data or {}).get(field)
+    status = "corrected_by_user" if existing not in (None, "", []) and existing != value else "confirmed"
+    return QuestionResolution(True, "accepted", [_user_update(field, value, status=status)], question=question)
 
 
 def seed_legacy_values(profile: CompanyProfile) -> None:
@@ -268,11 +394,11 @@ def deterministic_context_update(message: str, profile: CompanyProfile) -> list[
     return []
 
 
-def _user_update(field: str, value: Any) -> dict[str, Any]:
+def _user_update(field: str, value: Any, *, status: str = "confirmed") -> dict[str, Any]:
     return {
         "field": field,
         "value": value,
-        "status": "confirmed",
+        "status": status,
         "applicable": True,
         "source_type": "user_input",
         "source_reference": "current user response",

@@ -4,6 +4,10 @@ from typing import Any
 
 
 QUESTION_CATALOG: dict[str, dict[str, Any]] = {
+    "official_corporate_website": {
+        "input_type": "url",
+        "examples": ["https://example.com", "No website"],
+    },
     "primary_business_model": {
         "input_type": "single_select",
         "options": ["Real-estate development", "Investment and ownership", "Asset management", "Construction", "Brokerage", "Mixed model"],

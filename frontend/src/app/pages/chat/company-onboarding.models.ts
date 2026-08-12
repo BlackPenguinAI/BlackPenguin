@@ -107,6 +107,14 @@ export interface OnboardingSource {
 }
 
 export interface ChatTurnResponse {
+  request_id?: string | null;
+  message_saved: boolean;
+  profile_changed: boolean;
+  field_update_status: 'accepted' | 'rejected' | 'not_applicable';
+  assistant_status: 'deterministic' | 'llm' | 'fallback';
+  source_actions: Array<{
+    url: string; action: string; status: string; error?: string | null;
+  }>;
   message: ChatMessage;
   user_message?: ChatMessage | null;
   profile: CompanyProfileResponse;

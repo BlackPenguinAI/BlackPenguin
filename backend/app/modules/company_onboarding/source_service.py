@@ -95,6 +95,7 @@ async def ingest_url(
 def create_url_source(
     db: Session, *, company_id: str, user_id: str, url: str,
     message_id: str | None = None,
+    propose_official_website: bool = True,
     commit: bool = True,
 ) -> CompanyOnboardingSource:
     validate_public_url(url)
@@ -108,11 +109,19 @@ def create_url_source(
         url=url,
     )
     db.add(source)
+    db.flush()
+    if propose_official_website and source.kind == SourceKind.OFFICIAL_WEBSITE:
+        db.add(CompanyOnboardingProposal(
+            source_id=source.id,
+            field_key="official_corporate_website",
+            value={"exists": True, "url": url},
+            evidence="Website URL provided directly by the user.",
+            confidence="high",
+            status=ProposalStatus.PENDING,
+        ))
     if commit:
         db.commit()
         db.refresh(source)
-    else:
-        db.flush()
     return source
 
 
@@ -151,7 +160,12 @@ async def _get_public_url(client: httpx.AsyncClient, url: str) -> httpx.Response
         validate_public_url(current)
         response = await client.get(
             current,
-            headers={"User-Agent": "BlackPenguinCompanyOnboarding/2.0"},
+            headers={
+                "User-Agent": "Mozilla/5.0 (compatible; BlackPenguinCompanyOnboarding/2.1; +https://blackpenguin.ai)",
+                "Accept": "text/html,application/xhtml+xml,application/pdf;q=0.9,*/*;q=0.8",
+                "Accept-Language": "en-US,en;q=0.9,es;q=0.7",
+                "Accept-Encoding": "gzip, deflate",
+            },
             timeout=20.0,
         )
         if response.status_code not in {301, 302, 303, 307, 308}:
@@ -276,7 +290,7 @@ async def _extract_proposals(
     )
     payload = json.loads(_strip_fences(raw))
     result = []
-    seen = set()
+    seen = {proposal.field_key for proposal in source.proposals}
     for item in payload.get("proposals", []) if isinstance(payload, dict) else []:
         key = services.normalize_field_key(item.get("field")) if isinstance(item, dict) else None
         if key is None or key in seen or item.get("value") in (None, "", []):

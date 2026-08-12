@@ -27,7 +27,7 @@ export class CompanyOnboardingService {
     return this.http.patch<CompanyProfileResponse>(`${this.baseUrl}/profile`, {
       updates: [{
         field: 'official_corporate_website',
-        value: url,
+        value: { exists: true, url },
         status: 'confirmed',
         applicable: true,
         source_type: 'user_provided_url',

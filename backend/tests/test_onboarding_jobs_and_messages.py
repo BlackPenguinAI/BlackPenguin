@@ -6,7 +6,7 @@ from app.db.base import Base
 from app.db.schema import CURRENT_SCHEMA_VERSION
 from app.modules.company_onboarding.models import OnboardingMessage
 from app.modules.onboarding_jobs.models import OnboardingSourceJob
-from app.modules.onboarding_jobs.service import normalize_url
+from app.modules.onboarding_jobs.service import _compatible_idempotency_keys, normalize_url
 from app.modules.onboarding_jobs import service as job_service
 from app.modules.onboarding_jobs import continuation as source_continuation
 from app.modules.onboarding_jobs.errors import AccessRestrictedError
@@ -19,6 +19,29 @@ from app.modules.projects.models import ProjectMessage, SenderType
 def test_url_normalization_supports_idempotent_jobs():
     assert normalize_url("HTTPS://Example.COM/project/#overview") == "https://example.com/project"
     assert normalize_url("https://example.com/project") == "https://example.com/project"
+    assert normalize_url("http://www.example.com/?utm_source=chat") == "https://example.com/"
+    assert len(_compatible_idempotency_keys(
+        scope="company", company_id="company-1", url="https://www.minto.com/", session_id="session-1",
+    )) >= 4
+
+
+def test_repeating_a_failed_url_does_not_implicitly_retry_it():
+    failed_job = Mock(status="failed")
+    db = Mock()
+    db.query.return_value.filter.return_value.first.return_value = failed_job
+
+    returned = job_service.enqueue(
+        db,
+        scope="company",
+        company_id="company-1",
+        source_id="new-source",
+        url="https://www.minto.com/",
+        session_id="session-1",
+    )
+
+    assert returned is failed_job
+    db.add.assert_not_called()
+    db.commit.assert_not_called()
 
 
 def test_create_all_metadata_registers_durable_jobs_and_schema_version():

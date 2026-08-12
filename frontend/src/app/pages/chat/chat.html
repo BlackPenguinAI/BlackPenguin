@@ -92,8 +92,8 @@
           <span *ngIf="source.size_bytes" class="text-[10px] text-gray-500">{{ formatBytes(source.size_bytes) }}</span>
           <span class="text-[9px] uppercase text-gray-600">{{ source.status }}</span>
         </summary>
-        <div *ngIf="source.status === 'failed'" class="mt-3 flex flex-wrap items-center justify-between gap-3">
-          <p class="text-xs text-red-300">{{ source.error_message }}</p>
+        <div *ngIf="source.status === 'failed' || canUseAsOfficialWebsite(source)" class="mt-3 flex flex-wrap items-center justify-between gap-3">
+          <p *ngIf="source.status === 'failed'" class="text-xs text-red-300">{{ source.error_message }}</p>
           <div class="flex flex-wrap gap-2">
             <button
               *ngIf="canUseAsOfficialWebsite(source)"
@@ -103,7 +103,7 @@
             >
               {{ savingWebsiteSourceIds.has(source.id) ? 'Saving...' : 'Use as official website' }}
             </button>
-            <button *ngIf="source.url" (click)="retrySource(source)" class="rounded-lg border border-red-300/30 px-3 py-1.5 text-[10px] font-semibold text-red-200 hover:bg-red-500/10">Retry processing</button>
+            <button *ngIf="source.url && source.status === 'failed'" (click)="retrySource(source)" class="rounded-lg border border-red-300/30 px-3 py-1.5 text-[10px] font-semibold text-red-200 hover:bg-red-500/10">Retry processing</button>
           </div>
         </div>
         <p *ngIf="source.status === 'ready' && source.proposals.length === 0" class="mt-3 text-xs text-gray-400">No reliable company details were found.</p>

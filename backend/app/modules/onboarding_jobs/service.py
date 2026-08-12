@@ -6,7 +6,7 @@ import hashlib
 import logging
 import re
 import time
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
@@ -40,9 +40,74 @@ def _safe_exc_info(exc: Exception):
 def normalize_url(url: str) -> str:
     parts = urlsplit(url.strip())
     host = (parts.hostname or "").lower()
+    if host.startswith("www."):
+        host = host[4:]
     port = f":{parts.port}" if parts.port and parts.port not in {80, 443} else ""
     path = parts.path.rstrip("/") or "/"
-    return urlunsplit((parts.scheme.lower(), host + port, path, parts.query, ""))
+    query = urlencode([
+        (key, value) for key, value in parse_qsl(parts.query, keep_blank_values=True)
+        if not key.lower().startswith("utm_") and key.lower() not in {"fbclid", "gclid", "dclid", "msclkid"}
+    ])
+    return urlunsplit(("https", host + port, path, query, ""))
+
+
+def idempotency_key(*, scope: str, company_id: str, url: str, session_id: str, project_id: str | None = None) -> str:
+    raw_key = "|".join((scope, project_id or company_id, normalize_url(url), session_id))
+    return hashlib.sha256(raw_key.encode()).hexdigest()
+
+
+def _legacy_idempotency_key(
+    *, scope: str, company_id: str, url: str,
+    session_id: str, project_id: str | None = None,
+) -> str:
+    parts = urlsplit(url.strip())
+    host = (parts.hostname or "").lower()
+    port = f":{parts.port}" if parts.port and parts.port not in {80, 443} else ""
+    path = parts.path.rstrip("/") or "/"
+    legacy_url = urlunsplit((parts.scheme.lower(), host + port, path, parts.query, ""))
+    raw_key = "|".join((scope, project_id or company_id, legacy_url, session_id))
+    return hashlib.sha256(raw_key.encode()).hexdigest()
+
+
+def _compatible_idempotency_keys(
+    *, scope: str, company_id: str, url: str,
+    session_id: str, project_id: str | None = None,
+) -> set[str]:
+    parts = urlsplit(url.strip())
+    bare_host = (parts.hostname or "").lower().removeprefix("www.")
+    port = f":{parts.port}" if parts.port and parts.port not in {80, 443} else ""
+    path = parts.path.rstrip("/") or "/"
+    legacy_variants = {
+        url,
+        *(
+            urlunsplit((scheme, host + port, path, parts.query, ""))
+            for scheme in ("http", "https")
+            for host in (bare_host, f"www.{bare_host}")
+            if bare_host
+        ),
+    }
+    keys = {
+        idempotency_key(
+            scope=scope, company_id=company_id, project_id=project_id,
+            url=url, session_id=session_id,
+        )
+    }
+    keys.update(_legacy_idempotency_key(
+            scope=scope, company_id=company_id, project_id=project_id,
+            url=variant, session_id=session_id,
+        ) for variant in legacy_variants)
+    return keys
+
+
+def get_existing_job(
+    db: Session, *, scope: str, company_id: str, url: str,
+    session_id: str, project_id: str | None = None,
+) -> OnboardingSourceJob | None:
+    keys = _compatible_idempotency_keys(
+        scope=scope, company_id=company_id, project_id=project_id,
+        url=url, session_id=session_id,
+    )
+    return db.query(OnboardingSourceJob).filter(OnboardingSourceJob.idempotency_key.in_(keys)).first()
 
 
 def enqueue(
@@ -50,25 +115,20 @@ def enqueue(
     session_id: str, project_id: str | None = None, message_id: str | None = None,
     commit: bool = True,
 ) -> OnboardingSourceJob:
-    raw_key = "|".join((scope, project_id or company_id, normalize_url(url), session_id))
-    key = hashlib.sha256(raw_key.encode()).hexdigest()
-    existing = db.query(OnboardingSourceJob).filter(OnboardingSourceJob.idempotency_key == key).first()
+    key = idempotency_key(
+        scope=scope, company_id=company_id, project_id=project_id,
+        url=url, session_id=session_id,
+    )
+    compatible_keys = _compatible_idempotency_keys(
+        scope=scope, company_id=company_id, project_id=project_id,
+        url=url, session_id=session_id,
+    )
+    existing = db.query(OnboardingSourceJob).filter(
+        OnboardingSourceJob.idempotency_key.in_(compatible_keys)
+    ).first()
     if existing and existing.status in {"queued", "processing", "completed"}:
         return existing
     if existing and existing.status == "failed":
-        existing.status = "queued"
-        existing.attempts = 0
-        existing.available_at = datetime.utcnow()
-        existing.started_at = None
-        existing.completed_at = None
-        existing.error_code = None
-        existing.error_detail = None
-        db.add(existing)
-        if commit:
-            db.commit()
-            db.refresh(existing)
-        else:
-            db.flush()
         return existing
     job = OnboardingSourceJob(
         scope=scope, company_id=company_id, project_id=project_id, source_id=source_id,

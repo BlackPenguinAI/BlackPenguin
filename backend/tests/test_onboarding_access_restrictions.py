@@ -14,6 +14,7 @@ from app.modules.onboarding_jobs.errors import (
         (503, {"cf-mitigated": "challenge"}, b"Service unavailable"),
         (200, {}, b'<script src="/cdn-cgi/challenge-platform/h/g/orchestrate/jsch/v1"></script>'),
         (200, {}, b'<input type="hidden" name="cf-chl-token" value="token">'),
+        (403, {"server": "CloudFront", "x-cache": "Error from cloudfront"}, b"Request blocked"),
     ],
 )
 def test_browser_verification_is_classified_as_access_restricted(status_code, headers, body):

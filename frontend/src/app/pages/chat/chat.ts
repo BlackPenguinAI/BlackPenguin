@@ -12,7 +12,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { marked } from 'marked';
-import { Subscription } from 'rxjs';
+import { finalize, Subscription } from 'rxjs';
 
 import { SpeechRecognitionService } from '../../core/services/speech-recognition.service';
 import { OnboardingQuestion } from '../../shared/ui/onboarding-response-options/onboarding-response-options';
@@ -150,15 +150,16 @@ export class ChatComponent implements OnInit, OnDestroy {
   startConversation(): void {
     this.showWelcome = false;
     this.isAnalyzing = true;
-    this.onboarding.startChat().subscribe({
+    this.onboarding.startChat().pipe(finalize(() => {
+      this.isAnalyzing = false;
+      this.cdr.detectChanges();
+    })).subscribe({
       next: (turn) => {
         this.applyTurn(turn);
-        this.isAnalyzing = false;
         this.schedulePolling();
         this.scrollToBottom();
       },
       error: (error: HttpErrorResponse) => {
-        this.isAnalyzing = false;
         if (error.status !== 401) {
           this.errorMessage = 'The onboarding assistant could not start. Please refresh and try again.';
         }
@@ -169,9 +170,12 @@ export class ChatComponent implements OnInit, OnDestroy {
   beginWithWebsite(url: string): void {
     this.showWelcome = false;
     this.isAnalyzing = true;
-    this.onboarding.bootstrap(url).subscribe({
-      next: (turn) => { this.applyTurn(turn); this.isAnalyzing = false; this.schedulePolling(); this.scrollToBottom(); },
-      error: () => { this.showWelcome = true; this.isAnalyzing = false; this.errorMessage = 'The website could not be processed. You can retry or continue without it.'; },
+    this.onboarding.bootstrap(url).pipe(finalize(() => {
+      this.isAnalyzing = false;
+      this.cdr.detectChanges();
+    })).subscribe({
+      next: (turn) => { this.applyTurn(turn); this.schedulePolling(); this.scrollToBottom(); },
+      error: () => { this.showWelcome = true; this.errorMessage = 'The website could not be processed. You can retry or continue without it.'; },
     });
   }
 
@@ -294,21 +298,21 @@ export class ChatComponent implements OnInit, OnDestroy {
     this.errorMessage = '';
     const replyTo = this.replyToMessageId;
     this.replyToMessageId = null;
-    this.onboarding.sendMessage(content, replyTo).subscribe({
+    this.onboarding.sendMessage(content, replyTo).pipe(finalize(() => {
+      this.isAnalyzing = false;
+      this.cdr.detectChanges();
+    })).subscribe({
         next: (turn) => {
           this.messages = this.messages.filter((message) => message !== optimistic);
-          this.markReply(replyTo, content);
+          if (turn.field_update_status === 'accepted') this.markReply(replyTo, content);
           this.applyTurn(turn);
-          this.isAnalyzing = false;
           this.scrollToBottom();
         },
-        error: () => {
+        error: (error: HttpErrorResponse) => {
           this.messages = this.messages.filter((message) => message !== optimistic);
           this.prompt = content;
-          this.isAnalyzing = false;
           this.replyToMessageId = replyTo;
-          this.errorMessage = 'I could not send that message. Your profile was not changed.';
-          this.cdr.detectChanges();
+          this.errorMessage = this.chatErrorMessage(error);
         },
       });
   }
@@ -390,10 +394,14 @@ export class ChatComponent implements OnInit, OnDestroy {
   }
 
   canUseAsOfficialWebsite(source: OnboardingSource): boolean {
-    return source.status === 'failed'
+    const website = this.profile.data['official_corporate_website'];
+    const currentUrl = typeof website === 'string'
+      ? website
+      : (website && typeof website === 'object' && 'url' in website ? String(website.url || '') : '');
+    return (source.status === 'failed' || source.status === 'ready')
       && source.kind === 'official_website'
       && !!source.url
-      && this.profile.data['official_corporate_website'] !== source.url;
+      && currentUrl !== source.url;
   }
 
   useAsOfficialWebsite(source: OnboardingSource): void {
@@ -556,8 +564,20 @@ export class ChatComponent implements OnInit, OnDestroy {
       const examples = Array.isArray(message.ui_payload.examples) ? message.ui_payload.examples : [];
       const choices = options.length ? options : examples;
       const selected = choices.find((item) => item.toLocaleLowerCase() === answer.toLocaleLowerCase()) || null;
-      return { ...message, response_payload: { status: 'answered', answer, selected_option: selected, custom: !selected } };
+      return { ...message, response_payload: { status: 'accepted', answer, selected_option: selected, custom: !selected } };
     });
+  }
+
+  private chatErrorMessage(error: HttpErrorResponse): string {
+    const detail = typeof error.error?.detail === 'string'
+      ? error.error.detail
+      : (typeof error.error?.detail?.message === 'string' ? error.error.detail.message : '');
+    const requestId = error.headers?.get('X-Request-ID');
+    const suffix = requestId ? ` Reference: ${requestId}.` : '';
+    if (error.status === 0) return `The message could not reach the server. Check your connection and try again.${suffix}`;
+    if (error.status === 422) return `${detail || 'The message is not valid.'}${suffix}`;
+    if (error.status === 502) return `The assistant is temporarily unavailable. Your message may have been saved; refresh the conversation before retrying.${suffix}`;
+    return `${detail || 'The message could not be completed. Refresh the conversation before retrying.'}${suffix}`;
   }
 
   private hasQuestionPayload(message: ChatMessage): boolean {

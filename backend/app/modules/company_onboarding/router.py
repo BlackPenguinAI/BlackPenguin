@@ -3,9 +3,10 @@ from __future__ import annotations
 import json
 import re
 from typing import Any
+import uuid
 
 import httpx
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session, joinedload
 
@@ -47,7 +48,6 @@ from .schemas import (
 
 router = APIRouter()
 ALLOWED_ROLES = [UserRole.ADMIN, UserRole.MKT]
-URL_PATTERN = re.compile(r"https?://[^\s<>]+", re.IGNORECASE)
 
 
 def _is_authorized_admin(user: User) -> bool:
@@ -122,6 +122,8 @@ def _accepted_response(first_name: str | None, accepted: list[dict[str, Any]], p
         value = item.get("value")
         if isinstance(value, dict) and value.get("exists") is False:
             display = "No official website"
+        elif isinstance(value, dict) and value.get("url"):
+            display = value["url"]
         elif isinstance(value, (dict, list)):
             display = json.dumps(value, ensure_ascii=False)
         else:
@@ -388,55 +390,153 @@ def start_chat(
 @router.post("/chat", response_model=ChatTurnResponse)
 async def send_chat_message(
     payload: ChatMessagePayload,
+    response: Response,
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker(ALLOWED_ROLES)),
 ):
+    request_id = f"req_{uuid.uuid4().hex}"
+    response.headers["X-Request-ID"] = request_id
     session = services.get_or_create_session(db, current_user.company_id)
     profile = services.get_or_create_profile(db, current_user.company_id)
-    ai_config = get_ai_config(db, current_user.company_id)
-    if not ai_config.openrouter_api_key:
-        raise HTTPException(status_code=500, detail="AI configuration is incomplete.")
-
-    services.record_message_response(db, session.id, payload.in_reply_to_message_id, payload.message)
     user_message = services.save_message(
         db, session.id, SenderType.USER, payload.message,
         in_reply_to_message_id=payload.in_reply_to_message_id,
     )
-    deterministic = services.deterministic_context_update(payload.message, profile)
-    deterministic_result = services.apply_field_updates(
+
+    resolution = services.resolve_answer_to_question(
         db,
-        profile,
-        deterministic,
-        allow_authoritative_statuses=_is_authorized_admin(current_user),
-    ) if deterministic else None
+        session_id=session.id,
+        message_id=payload.in_reply_to_message_id,
+        answer=payload.message,
+        profile=profile,
+    )
+    if not resolution.handled:
+        fallback_updates = services.deterministic_context_update(payload.message, profile)
+        if fallback_updates:
+            resolution = services.QuestionResolution(True, "accepted", fallback_updates)
+
+    deterministic_result = None
+    if resolution.status == "accepted" and resolution.updates:
+        deterministic_result = services.apply_field_updates(
+            db,
+            profile,
+            resolution.updates,
+            allow_authoritative_statuses=_is_authorized_admin(current_user),
+        )
+        if deterministic_result.accepted:
+            services.record_message_response(
+                db, session.id, payload.in_reply_to_message_id, payload.message,
+                status="accepted",
+            )
 
     source_results = []
-    source_errors = []
-    for raw_url in URL_PATTERN.findall(payload.message)[:3]:
-        url = raw_url.rstrip(".,;:!?)\"]}")
+    source_actions: list[dict[str, Any]] = []
+    for url in services.extract_urls(payload.message):
         try:
-            source = source_service.create_url_source(
-                db,
-                company_id=current_user.company_id,
-                user_id=current_user.id,
-                url=url,
-                message_id=user_message.id,
-                commit=False,
+            existing_job = job_service.get_existing_job(
+                db, scope="company", company_id=current_user.company_id,
+                url=url, session_id=session.id,
             )
-            job = job_service.enqueue(
-                db, scope="company", company_id=current_user.company_id, source_id=source.id,
-                url=url, session_id=session.id, message_id=user_message.id, commit=False,
-            )
-            source = job_service.deduplicate_source(db, job, source, commit=False)
-            db.commit()
-            db.refresh(source)
+            if existing_job:
+                source = db.query(CompanyOnboardingSource).filter(
+                    CompanyOnboardingSource.id == existing_job.source_id,
+                    CompanyOnboardingSource.company_id == current_user.company_id,
+                ).first()
+                if not source:
+                    raise HTTPException(status_code=409, detail="The existing source record is unavailable.")
+                action = {
+                    "completed": "already_processed",
+                    "failed": "already_failed_not_retried",
+                    "queued": "already_processing",
+                    "processing": "already_processing",
+                }.get(existing_job.status, "already_registered")
+            else:
+                source = source_service.create_url_source(
+                    db,
+                    company_id=current_user.company_id,
+                    user_id=current_user.id,
+                    url=url,
+                    message_id=user_message.id,
+                    propose_official_website=not any(
+                        item.get("field") == "official_corporate_website" for item in accepted
+                    ),
+                    commit=False,
+                )
+                job_service.enqueue(
+                    db, scope="company", company_id=current_user.company_id, source_id=source.id,
+                    url=url, session_id=session.id, message_id=user_message.id, commit=False,
+                )
+                db.commit()
+                db.refresh(source)
+                action = "queued"
             source_results.append(source)
+            source_actions.append({
+                "url": url, "action": action, "status": source.status.value,
+                "error": source.error_message,
+            })
         except HTTPException as exc:
             db.rollback()
-            source_errors.append({"url": url, "error": exc.detail})
+            source_actions.append({"url": url, "action": "rejected", "status": "failed", "error": exc.detail})
         except Exception:
             db.rollback()
-            raise
+            source_actions.append({"url": url, "action": "failed_to_queue", "status": "failed", "error": "The source could not be queued."})
+
+    accepted = deterministic_result.accepted if deterministic_result else []
+    rejected = deterministic_result.rejected if deterministic_result else []
+    active_source = any(item["action"] in {"queued", "already_processing"} for item in source_actions)
+
+    if resolution.handled or source_actions:
+        if accepted:
+            assistant_text = _accepted_response(current_user.first_name, accepted, profile)
+        elif resolution.status == "rejected":
+            explanations = {
+                "invalid_question": "That question is no longer available.",
+                "stale_question": "That question is no longer the active step.",
+                "empty_answer": "Please enter a value before continuing.",
+                "invalid_url": "Please enter a valid public website URL or choose No website.",
+                "url_not_valid_for_field": "A URL cannot be saved as the value for this field.",
+                "answer_too_short": "Please provide a more complete answer.",
+            }
+            assistant_text = explanations.get(resolution.reason or "", "I couldn't safely apply that answer.")
+            assistant_text += " " + _next_prompt(profile)
+        else:
+            assistant_text = _next_prompt(profile)
+
+        failed_existing = [item for item in source_actions if item["action"] == "already_failed_not_retried"]
+        if failed_existing:
+            assistant_text = (
+                "This website is already registered and its previous automated analysis failed. "
+                "I did not retry it automatically; use **Retry processing** if you want another attempt.\n\n"
+                + assistant_text
+            )
+        elif active_source:
+            assistant_text = (
+                (assistant_text.rsplit("\n\n", 1)[0] + "\n\n" if accepted else "")
+                + "I'm processing the new source now. The result will appear automatically."
+            )
+
+        ai_message = services.save_message(
+            db, session.id, SenderType.AI, assistant_text,
+            ui_payload=None if active_source else _next_question(profile),
+            in_reply_to_message_id=user_message.id,
+        )
+        return {
+            "request_id": request_id,
+            "message_saved": True,
+            "profile_changed": bool(accepted),
+            "field_update_status": resolution.status,
+            "assistant_status": "deterministic",
+            "source_actions": source_actions,
+            "message": _message_payload(ai_message),
+            "user_message": _message_payload(user_message),
+            "profile": services.serialize_profile(profile),
+            "accepted_fields": [item["field"] for item in accepted],
+            "rejected_updates": _rejected_payload(rejected),
+            "sources": [source_service.serialize_source(source) for source in source_results],
+            "next_question": _next_question(profile),
+        }
+
+    ai_config = get_ai_config(db, current_user.company_id)
 
     agent_config = ai_config.agent_onboarding_empresa or {}
     system_instruction = _system_instruction(agent_config)
@@ -460,7 +560,7 @@ async def send_chat_message(
                     "registered_company_name": company.name if company else None,
                     "profile": services.serialize_profile(profile),
                     "new_sources": [source_service.serialize_source(source) for source in source_results],
-                    "source_errors": source_errors,
+                    "source_errors": [],
                 },
                 ensure_ascii=False,
                 default=str,
@@ -476,7 +576,10 @@ async def send_chat_message(
         )
 
     model = agent_config.get("model", "openai/gpt-4o-mini")
+    assistant_status = "llm"
     try:
+        if not ai_config.openrouter_api_key:
+            raise ValueError("AI configuration is incomplete")
         raw = await generate_llm_response(
             ai_config.openrouter_api_key,
             model,
@@ -504,11 +607,12 @@ async def send_chat_message(
             )
             parsed = _parse_agent_response(repaired)
     except (httpx.HTTPError, ValueError) as exc:
-        raise HTTPException(status_code=502, detail="The onboarding assistant is temporarily unavailable.") from exc
+        parsed = None
+        assistant_status = "fallback"
 
     if parsed is None:
         assistant_text, updates, final_approved = (
-            "I couldn't validate my internal response, so I left your profile unchanged. " + _next_prompt(profile),
+            "I saved your message, but the assistant is temporarily unavailable. " + _next_prompt(profile),
             [],
             None,
         )
@@ -529,6 +633,10 @@ async def send_chat_message(
 
     if accepted:
         assistant_text = _accepted_response(current_user.first_name, accepted, profile)
+        services.record_message_response(
+            db, session.id, payload.in_reply_to_message_id, payload.message,
+            status="accepted",
+        )
     elif rejected:
         assistant_text = (
             "I understood your response, but I couldn't safely apply it to the profile. "
@@ -547,6 +655,12 @@ async def send_chat_message(
             in_reply_to_message_id=user_message.id,
         )
     return {
+        "request_id": request_id,
+        "message_saved": True,
+        "profile_changed": bool(accepted),
+        "field_update_status": "accepted" if accepted else ("rejected" if rejected else "not_applicable"),
+        "assistant_status": assistant_status,
+        "source_actions": source_actions,
         "message": _message_payload(ai_message),
         "user_message": _message_payload(user_message),
         "profile": services.serialize_profile(profile),
