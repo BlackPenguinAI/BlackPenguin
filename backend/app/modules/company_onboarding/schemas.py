@@ -146,7 +146,7 @@ class ChatTurnResponse(BaseModel):
     accepted_fields: list[str] = Field(default_factory=list)
     rejected_updates: list[RejectedUpdate] = Field(default_factory=list)
     sources: list["SourceResponse"] = Field(default_factory=list)
-    next_question: NextQuestionResponse
+    next_question: NextQuestionResponse | None = None
 
 
 class SessionResponse(BaseModel):
@@ -213,7 +213,7 @@ class OnboardingStateResponse(BaseModel):
     messages: list[ChatMessageResponse] = Field(default_factory=list)
     profile: CompanyProfileResponse
     sources: list[SourceResponse] = Field(default_factory=list)
-    next_question: NextQuestionResponse
+    next_question: NextQuestionResponse | None = None
     stage: Literal[
         "website", "processing", "website_review", "required", "team",
         "conditional", "enrichment", "approval", "complete",

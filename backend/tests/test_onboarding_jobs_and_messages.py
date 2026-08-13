@@ -113,7 +113,9 @@ def test_worker_defers_next_question_when_extracted_proposals_need_review():
 def test_state_does_not_attach_a_question_while_review_is_pending():
     company_source = inspect.getsource(company_router._state_payload)
     assert "pending_review" in company_source
-    assert 'stage in {"required", "conditional", "approval"}' in company_source
+    assert "_stage_next_question(stage, profile)" in company_source
+    assert company_router._stage_next_question("website_review", None) is None
+    assert company_router._stage_next_question("team", None) is None
 
     project_source = inspect.getsource(project_router._state_payload)
     assert "pending_review" in project_source

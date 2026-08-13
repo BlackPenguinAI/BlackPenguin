@@ -112,6 +112,26 @@ describe('ChatComponent', () => {
     expect(component.teamStatusLabel('not_applicable')).toBe('Not needed now');
   });
 
+  it('should not keep a chat question active while Team owns the workflow', () => {
+    component.currentStage = 'team';
+    const staleQuestion = {
+      id: 'legal-question',
+      sender: 'ai' as const,
+      content: 'Choose the best option for Legal company name.',
+      created_at: new Date(),
+      attachments: [],
+      ui_payload: {
+        field: 'legal_company_name', label: 'Legal company name', prompt: 'Legal company name?',
+        input_type: 'text' as const, options: [], examples: [], allow_custom: true,
+        minimum_words: null,
+      },
+    };
+    component.messages = [staleQuestion];
+
+    expect(component.isActiveQuestion(staleQuestion)).toBe(false);
+    expect(component.hasExclusiveStep).toBe(true);
+  });
+
   it('should save public contact information as structured lists', () => {
     component.currentStage = 'enrichment';
     component.publicEmails = 'info@example.com, sales@example.com';
@@ -157,7 +177,7 @@ describe('ChatComponent', () => {
     http.expectOne('http://localhost:8000/api/v1/company-onboarding/chat/state').flush({
       messages: [], profile: EMPTY_COMPANY_PROFILE, sources: [], stage: 'team', version: 1,
       team: { administrator: null, members: [{ id: 'user-1', first_name: 'Ana', last_name: 'Sales', email: 'ana@example.com', role: 'sales', is_active: true }], roles: [] },
-      next_question: { field: 'dba', label: 'DBA', prompt: 'DBA?', input_type: 'text', options: [], examples: [], allow_custom: true, minimum_words: null },
+      next_question: null,
     });
     expect(component.team.members[0].email).toBe('ana@example.com');
   });

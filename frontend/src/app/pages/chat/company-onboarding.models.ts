@@ -126,14 +126,14 @@ export interface ChatTurnResponse {
   accepted_fields: string[];
   rejected_updates: Array<{ field: string | null; reason: string }>;
   sources: OnboardingSource[];
-  next_question: NextQuestion;
+  next_question: NextQuestion | null;
 }
 
 export interface OnboardingState {
   messages: ChatMessage[];
   profile: CompanyProfileResponse;
   sources: OnboardingSource[];
-  next_question: NextQuestion;
+  next_question: NextQuestion | null;
   stage: OnboardingStage;
   version: number;
   team?: TeamOnboarding;

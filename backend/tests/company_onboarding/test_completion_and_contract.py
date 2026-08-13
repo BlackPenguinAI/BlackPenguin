@@ -6,10 +6,14 @@ from fastapi import HTTPException
 
 from app.modules.company_onboarding.completion import FIELD_BY_KEY, calculate_completion
 from app.modules.company_onboarding.router import (
+    _accepted_response,
     _format_user_facing_value,
+    _message_payload,
     _next_question,
     _normalize_user_facing_content,
     _parse_agent_response,
+    _stage_continuation,
+    _stage_next_question,
     _workflow_stage,
 )
 from app.modules.company_onboarding.services import (
@@ -85,6 +89,52 @@ def test_company_workflow_waits_for_required_fields_before_team():
     assert _workflow_stage(
         profile, team, processing=False, pending_review=False, pristine=False,
     ) == "team"
+
+
+def test_team_stage_owns_the_interaction_before_conditional_questions():
+    assert _stage_next_question("team", None) is None
+    continuation = _stage_continuation("team", None)
+    assert "set up company users" in continuation
+    assert "Conditional Company Profile questions will continue after this step" in continuation
+
+
+def test_required_acknowledgement_transitions_to_team_without_legal_question():
+    profile = SimpleNamespace(profile_data={}, field_states={}, final_approved=False)
+    accepted = [{
+        "field": "corporate_differentiators",
+        "value": "Integrated development capabilities",
+        "status": "confirmed",
+    }]
+
+    response = _accepted_response(
+        "Test",
+        accepted,
+        profile,
+        continuation=_stage_continuation("team", profile),
+    )
+
+    assert "Integrated development capabilities" in response
+    assert "set up company users" in response
+    assert "Legal company name" not in response
+
+
+def test_superseded_prompt_is_removed_from_existing_conversation_payloads():
+    prompt = "Choose the best option for Legal company name, or suggest a different answer."
+    message = SimpleNamespace(
+        id="message-1",
+        sender=SenderType.AI,
+        content=f"Thanks. I updated the profile.\n\n{prompt}",
+        ui_payload={"prompt": prompt},
+        response_payload={"status": "superseded"},
+        in_reply_to_message_id=None,
+        created_at=None,
+        attachments=[],
+    )
+
+    payload = _message_payload(message)
+
+    assert payload["content"] == "Thanks. I updated the profile."
+    assert payload["response_payload"]["status"] == "superseded"
 
 
 def test_company_workflow_prioritizes_website_review_and_then_enrichment():

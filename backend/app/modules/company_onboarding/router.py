@@ -90,14 +90,25 @@ def _rejected_payload(items: list[dict[str, Any]]) -> list[dict[str, str | None]
 
 
 def _message_payload(message: OnboardingMessage) -> dict[str, Any]:
+    content = (
+        _normalize_user_facing_content(message.content)
+        if message.sender == SenderType.AI
+        else message.content
+    )
+    if (
+        message.sender == SenderType.AI
+        and message.response_payload
+        and message.response_payload.get("status") == "superseded"
+        and message.ui_payload
+        and isinstance(message.ui_payload.get("prompt"), str)
+    ):
+        prompt = message.ui_payload["prompt"].strip()
+        if prompt and content.rstrip().endswith(prompt):
+            content = content.rstrip()[:-len(prompt)].rstrip()
     return {
         "id": message.id,
         "sender": "user" if message.sender == SenderType.USER else "ai",
-        "content": (
-            _normalize_user_facing_content(message.content)
-            if message.sender == SenderType.AI
-            else message.content
-        ),
+        "content": content,
         "ui_payload": message.ui_payload,
         "response_payload": message.response_payload,
         "in_reply_to_message_id": message.in_reply_to_message_id,
@@ -184,7 +195,13 @@ def _normalize_user_facing_content(content: str) -> str:
     return USER_FACING_JSON_VALUE.sub(replace, content)
 
 
-def _accepted_response(first_name: str | None, accepted: list[dict[str, Any]], profile) -> str:
+def _accepted_response(
+    first_name: str | None,
+    accepted: list[dict[str, Any]],
+    profile,
+    *,
+    continuation: str | None = None,
+) -> str:
     greeting = f"Thanks, {first_name}." if first_name else "Thanks."
     lines = []
     for item in accepted:
@@ -195,7 +212,9 @@ def _accepted_response(first_name: str | None, accepted: list[dict[str, Any]], p
         else:
             display = _format_user_facing_value(value)
         lines.append(f"- **{label}:** {display}")
-    return f"{greeting} I updated the profile with:\n\n" + "\n".join(lines) + "\n\n" + _next_prompt(profile)
+    next_step = _next_prompt(profile) if continuation is None else continuation
+    response = f"{greeting} I updated the profile with:\n\n" + "\n".join(lines)
+    return response + (f"\n\n{next_step}" if next_step else "")
 
 
 def _continue_after_source_review(
@@ -247,6 +266,55 @@ def _workflow_stage(
     return "approval"
 
 
+CHAT_QUESTION_STAGES = {"required", "conditional", "approval"}
+
+
+def _stage_next_question(stage: str, profile) -> dict[str, Any] | None:
+    """Expose a chat question only while the chat is the active workflow control."""
+    return _next_question(profile) if stage in CHAT_QUESTION_STAGES else None
+
+
+def _stage_continuation(stage: str, profile) -> str:
+    if stage in CHAT_QUESTION_STAGES:
+        return _next_prompt(profile)
+    if stage == "team":
+        return (
+            "Required Company Profile information is complete. Next, set up company users. "
+            "Conditional Company Profile questions will continue after this step."
+        )
+    if stage == "enrichment":
+        return "Next, review the company's public contact information and social media."
+    if stage == "complete":
+        return "Your Company Profile is approved. Continue to Projects when you are ready."
+    return ""
+
+
+def _runtime_workflow_stage(
+    db: Session,
+    company_id: str,
+    profile,
+    *,
+    processing: bool = False,
+) -> str:
+    sources = (
+        db.query(CompanyOnboardingSource)
+        .filter(CompanyOnboardingSource.company_id == company_id)
+        .all()
+    )
+    pending_review = any(
+        proposal.status.value == "pending"
+        for source in sources
+        for proposal in source.proposals
+    )
+    return _workflow_stage(
+        services.serialize_profile(profile),
+        services.serialize_team(db, company_id, profile),
+        processing=processing or any(source.status.value == "processing" for source in sources),
+        pending_review=pending_review,
+        pristine=False,
+    )
+
+
 def _state_payload(db: Session, company_id: str) -> dict[str, Any]:
     session = services.get_or_create_session(db, company_id)
     profile = services.get_or_create_profile(db, company_id)
@@ -282,8 +350,8 @@ def _state_payload(db: Session, company_id: str) -> dict[str, Any]:
         pending_review=pending_review,
         pristine=not messages and not sources,
     )
-    if stage in {"required", "conditional", "approval"}:
-        next_question = _next_question(profile)
+    next_question = _stage_next_question(stage, profile)
+    if next_question:
         active_question = services.get_active_question(db, session.id)
         latest_ai = next((item for item in reversed(messages) if item.sender == SenderType.AI), None)
         if active_question:
@@ -314,7 +382,7 @@ def _state_payload(db: Session, company_id: str) -> dict[str, Any]:
         "messages": [_message_payload(message) for message in messages],
         "profile": serialized_profile,
         "sources": [source_service.serialize_source(source) for source in sources],
-        "next_question": _next_question(profile),
+        "next_question": next_question,
         "stage": stage,
         "version": version,
         "team": team,
@@ -745,10 +813,17 @@ async def send_chat_message(
             source_actions.append({"url": url, "action": "failed_to_queue", "status": "failed", "error": "The source could not be queued."})
 
     active_source = any(item["action"] in {"queued", "already_processing"} for item in source_actions)
+    stage = _runtime_workflow_stage(
+        db, current_user.company_id, profile, processing=active_source,
+    )
+    next_question = _stage_next_question(stage, profile)
+    continuation = _stage_continuation(stage, profile)
 
     if resolution.handled or source_actions:
         if accepted:
-            assistant_text = _accepted_response(current_user.first_name, accepted, profile)
+            assistant_text = _accepted_response(
+                current_user.first_name, accepted, profile, continuation=continuation,
+            )
         elif resolution.status == "rejected":
             explanations = {
                 "invalid_question": "That question is no longer available.",
@@ -775,13 +850,13 @@ async def send_chat_message(
             )
         elif active_source:
             assistant_text = (
-                (assistant_text.rsplit("\n\n", 1)[0] + "\n\n" if accepted else "")
+                (assistant_text + "\n\n" if accepted else "")
                 + "I'm processing the new source now. The result will appear automatically."
             )
 
         ai_message = services.save_message(
             db, session.id, SenderType.AI, assistant_text,
-            ui_payload=None if active_source else _next_question(profile),
+            ui_payload=next_question,
             in_reply_to_message_id=user_message.id,
         )
         return {
@@ -797,7 +872,7 @@ async def send_chat_message(
             "accepted_fields": [item["field"] for item in accepted],
             "rejected_updates": _rejected_payload(rejected),
             "sources": [source_service.serialize_source(source) for source in source_results],
-            "next_question": _next_question(profile),
+            "next_question": next_question,
         }
 
     ai_config = get_ai_config(db, current_user.company_id)
@@ -898,16 +973,28 @@ async def send_chat_message(
     rejected = (deterministic_result.rejected if deterministic_result else []) + result.rejected
 
     if accepted:
-        assistant_text = _accepted_response(current_user.first_name, accepted, profile)
+        stage = _runtime_workflow_stage(db, current_user.company_id, profile)
+        next_question = _stage_next_question(stage, profile)
+        assistant_text = _accepted_response(
+            current_user.first_name,
+            accepted,
+            profile,
+            continuation=_stage_continuation(stage, profile),
+        )
         services.record_message_response(
             db, session.id, payload.in_reply_to_message_id, payload.message,
             status="accepted",
         )
     elif rejected:
+        stage = _runtime_workflow_stage(db, current_user.company_id, profile)
+        next_question = _stage_next_question(stage, profile)
         assistant_text = (
             "I understood your response, but I couldn't safely apply it to the profile. "
-            "Nothing was changed. " + _next_prompt(profile)
+            "Nothing was changed. " + _stage_continuation(stage, profile)
         )
+    else:
+        stage = _runtime_workflow_stage(db, current_user.company_id, profile)
+        next_question = _stage_next_question(stage, profile)
     db.query(OnboardingSession).filter(OnboardingSession.id == session.id).with_for_update().one()
     ai_message = db.query(OnboardingMessage).filter(
         OnboardingMessage.session_id == session.id,
@@ -917,7 +1004,7 @@ async def send_chat_message(
     if not ai_message:
         ai_message = services.save_message(
             db, session.id, SenderType.AI, assistant_text,
-            ui_payload=_next_question(profile),
+            ui_payload=next_question,
             in_reply_to_message_id=user_message.id,
         )
     return {
@@ -933,7 +1020,7 @@ async def send_chat_message(
         "accepted_fields": [item["field"] for item in accepted],
         "rejected_updates": _rejected_payload(rejected),
         "sources": [source_service.serialize_source(source) for source in source_results],
-        "next_question": _next_question(profile),
+        "next_question": next_question,
     }
 
 
