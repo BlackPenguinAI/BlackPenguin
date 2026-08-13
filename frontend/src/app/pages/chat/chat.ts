@@ -41,7 +41,6 @@ import {
   ValidationStatus,
   TeamMemberInvite,
   TeamOnboarding,
-  TeamRole,
   TeamRoleStatus,
 } from './company-onboarding.models';
 import { CompanyOnboardingService } from './company-onboarding.service';
@@ -75,6 +74,7 @@ export class ChatComponent implements OnInit, OnDestroy {
   currentStage: OnboardingStage = 'website';
   team: TeamOnboarding = EMPTY_TEAM_ONBOARDING;
   teamSaving = false;
+  teamSavingAction: 'add' | 'continue' | null = null;
   teamError = '';
   publicEmails = '';
   publicPhones = '';
@@ -281,9 +281,11 @@ export class ChatComponent implements OnInit, OnDestroy {
   inviteTeamMember(): void {
     if (this.currentStage !== 'team' || this.teamSaving || this.hasPendingReview || this.isCompleted || !this.teamInvite.first_name.trim() || !this.teamInvite.last_name.trim() || !this.teamInvite.email.trim()) return;
     this.teamSaving = true;
+    this.teamSavingAction = 'add';
     this.teamError = '';
     this.onboarding.createTeamMember(this.teamInvite).pipe(finalize(() => {
       this.teamSaving = false;
+      this.teamSavingAction = null;
       this.cdr.detectChanges();
     })).subscribe({
       next: () => {
@@ -338,36 +340,21 @@ export class ChatComponent implements OnInit, OnDestroy {
     });
   }
 
-  decideTeamRole(role: TeamRole, status: 'deferred' | 'not_applicable'): void {
+  continueTeamSetup(): void {
     if (this.currentStage !== 'team' || this.teamSaving || this.hasPendingReview || this.isCompleted) return;
     this.teamSaving = true;
+    this.teamSavingAction = 'continue';
     this.teamError = '';
-    this.onboarding.decideTeamRole(role, status).pipe(finalize(() => {
+    this.onboarding.continueTeamSetup().pipe(finalize(() => {
       this.teamSaving = false;
+      this.teamSavingAction = null;
       this.cdr.detectChanges();
     })).subscribe({
-      next: team => { this.team = team; this.syncState('bottom'); },
+      next: state => { this.applyState(state); this.scrollToBottom(); },
       error: (error: HttpErrorResponse) => {
         this.teamError = typeof error.error?.detail === 'string'
           ? error.error.detail
-          : 'The team decision could not be saved.';
-      },
-    });
-  }
-
-  deferRemainingTeamRoles(): void {
-    if (this.currentStage !== 'team' || this.teamSaving || this.isCompleted) return;
-    this.teamSaving = true;
-    this.teamError = '';
-    this.onboarding.deferRemainingTeamRoles().pipe(finalize(() => {
-      this.teamSaving = false;
-      this.cdr.detectChanges();
-    })).subscribe({
-      next: team => { this.team = team; this.syncState('bottom'); },
-      error: (error: HttpErrorResponse) => {
-        this.teamError = typeof error.error?.detail === 'string'
-          ? error.error.detail
-          : 'The remaining team roles could not be deferred.';
+          : 'The onboarding could not continue. Please try again.';
       },
     });
   }

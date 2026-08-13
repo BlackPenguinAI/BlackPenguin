@@ -189,20 +189,28 @@ describe('ChatComponent', () => {
     })).toBe('https://instagram.com/example, https://linkedin.com/company/example');
   });
 
-  it('should defer all remaining team roles from the Team stage', () => {
+  it('should continue from Team with one state-changing request', () => {
     component.currentStage = 'team';
-    component.deferRemainingTeamRoles();
+    component.continueTeamSetup();
 
-    http.expectOne('http://localhost:8000/api/v1/company-onboarding/team/defer-remaining').flush({
-      administrator: null, members: [],
-      roles: [{ role: 'assistant', label: 'Assistant users', status: 'deferred', active_users: 0 }],
-    });
-    http.expectOne('http://localhost:8000/api/v1/company-onboarding/chat/state').flush({
+    const request = http.expectOne('http://localhost:8000/api/v1/company-onboarding/team/continue');
+    expect(request.request.method).toBe('POST');
+    request.flush({
       messages: [], profile: EMPTY_COMPANY_PROFILE, sources: [], stage: 'conditional', version: 1,
-      team: { administrator: null, members: [], roles: [] },
+      team: {
+        administrator: null, members: [],
+        roles: [
+          { role: 'assistant', label: 'Assistant users', status: 'deferred', active_users: 0 },
+          { role: 'mkt', label: 'Marketing users', status: 'deferred', active_users: 0 },
+          { role: 'sales', label: 'Sales users', status: 'deferred', active_users: 0 },
+        ],
+      },
       next_question: { field: 'dba', label: 'DBA', prompt: 'DBA?', input_type: 'text', options: [], examples: [], allow_custom: true, minimum_words: null },
     });
+
     expect(component.currentStage).toBe('conditional');
+    expect(component.nextQuestion?.field).toBe('dba');
+    expect(component.team.roles.every(role => role.status === 'deferred')).toBe(true);
   });
 
   it('should not expose the removed session initializer', () => {

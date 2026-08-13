@@ -184,7 +184,7 @@
         <section class="w-full rounded-2xl rounded-tl-sm border border-white/10 bg-white/5 p-4 md:p-5">
           <p class="mb-2 text-[9px] font-semibold uppercase tracking-wider text-secondary">Step 2 of 4 · Team</p>
           <h2 class="text-sm font-semibold text-white">Set up company users</h2>
-          <p class="mt-1 text-xs leading-relaxed text-gray-400">Required Company Profile information is complete. Add the people who will access Black Penguin. Conditional Company Profile questions will continue after this step. User login emails are separate from the company's public contact information.</p>
+          <p class="mt-1 text-xs leading-relaxed text-gray-400">Optionally add Assistant, Marketing, or Sales users now. You can also continue and manage them later from Team. User login emails are separate from the company's public contact information.</p>
           <div *ngIf="team.administrator" class="mt-4 rounded-xl border border-green-500/20 bg-green-500/5 p-3 text-xs">
             <span class="font-semibold text-green-300">Company administrator</span>
             <span class="mt-1 block text-gray-300">{{ team.administrator.first_name }} {{ team.administrator.last_name }}</span>
@@ -211,13 +211,11 @@
               <option value="sales">Sales</option>
             </select>
             <div class="flex flex-wrap gap-2 pt-1">
-              <button [disabled]="teamSaving" class="rounded-lg bg-secondary px-3 py-2 text-[10px] font-semibold text-black disabled:opacity-50">{{ teamSaving ? 'Saving...' : 'Add user' }}</button>
-              <button type="button" (click)="decideTeamRole(teamInvite.role, 'deferred')" [disabled]="teamSaving" class="rounded-lg border border-white/10 px-3 py-2 text-[10px] text-gray-300 disabled:opacity-50">Configure this role later</button>
-              <button type="button" (click)="decideTeamRole(teamInvite.role, 'not_applicable')" [disabled]="teamSaving" class="rounded-lg border border-white/10 px-3 py-2 text-[10px] text-gray-400 disabled:opacity-50">This role is not needed now</button>
+              <button [disabled]="teamSaving" class="rounded-lg bg-secondary px-3 py-2 text-[10px] font-semibold text-black disabled:opacity-50">{{ teamSavingAction === 'add' ? 'Adding...' : 'Add user' }}</button>
             </div>
           </form>
-          <button type="button" (click)="deferRemainingTeamRoles()" [disabled]="teamSaving" class="mt-3 rounded-lg border border-secondary/30 px-3 py-2 text-[10px] font-semibold text-secondary disabled:opacity-50">
-            Continue and configure remaining roles later
+          <button type="button" (click)="continueTeamSetup()" [disabled]="teamSaving" class="mt-3 rounded-lg border border-secondary/30 px-3 py-2 text-[10px] font-semibold text-secondary disabled:opacity-50">
+            {{ teamSavingAction === 'continue' ? 'Continuing...' : 'Continue and add users later' }}
           </button>
           <p *ngIf="teamError" class="mt-3 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-[10px] text-red-200">{{ teamError }}</p>
           <a routerLink="/app/users" class="mt-3 inline-flex text-[10px] font-semibold text-secondary hover:underline">Manage all users</a>

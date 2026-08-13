@@ -444,12 +444,18 @@ def defer_remaining_onboarding_team_roles(
     current_user: User = Depends(RoleChecker([UserRole.ADMIN])),
 ):
     profile = services.get_or_create_profile(db, current_user.company_id)
-    team = services.serialize_team(db, current_user.company_id, profile)
-    missing_roles = {item["role"] for item in team["roles"] if item["status"] == "missing"}
-    for role in services.TEAM_ROLE_STATE_KEYS:
-        if role.value in missing_roles:
-            services.set_team_role_decision(db, profile, role, "deferred")
-    return services.serialize_team(db, current_user.company_id, profile)
+    return services.defer_missing_team_roles(db, current_user.company_id, profile)
+
+
+@router.post("/team/continue", response_model=OnboardingStateResponse)
+def continue_company_onboarding_after_team(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([UserRole.ADMIN])),
+):
+    """Finish the optional Team step and return the next workflow state."""
+    profile = services.get_or_create_profile(db, current_user.company_id)
+    services.defer_missing_team_roles(db, current_user.company_id, profile)
+    return _state_payload(db, current_user.company_id)
 
 
 @router.get("/profile", response_model=CompanyProfileResponse)

@@ -4,6 +4,7 @@ from types import SimpleNamespace
 import pytest
 from fastapi import HTTPException
 
+from app.modules.company_onboarding import services as company_services
 from app.modules.company_onboarding.completion import FIELD_BY_KEY, calculate_completion
 from app.modules.company_onboarding.router import (
     _accepted_response,
@@ -18,6 +19,7 @@ from app.modules.company_onboarding.router import (
 )
 from app.modules.company_onboarding.services import (
     approve_profile,
+    defer_missing_team_roles,
     deterministic_context_update,
     extract_urls,
     get_active_question,
@@ -89,6 +91,57 @@ def test_company_workflow_waits_for_required_fields_before_team():
     assert _workflow_stage(
         profile, team, processing=False, pending_review=False, pristine=False,
     ) == "team"
+
+    team["roles"] = [
+        {"role": "assistant", "status": "deferred"},
+        {"role": "mkt", "status": "deferred"},
+        {"role": "sales", "status": "deferred"},
+    ]
+    assert _workflow_stage(
+        profile, team, processing=False, pending_review=False, pristine=False,
+    ) == "conditional"
+
+
+def test_continuing_team_defers_every_missing_role_in_one_commit(monkeypatch):
+    profile = SimpleNamespace(field_states={})
+
+    def serialize_team(_db, _company_id, current_profile):
+        return {
+            "administrator": None,
+            "members": [],
+            "roles": [
+                {
+                    "role": role.value,
+                    "label": role.value,
+                    "status": current_profile.field_states.get(state_key, {}).get("status", "missing"),
+                    "active_users": 0,
+                }
+                for role, state_key in company_services.TEAM_ROLE_STATE_KEYS.items()
+            ],
+        }
+
+    monkeypatch.setattr(company_services, "serialize_team", serialize_team)
+    monkeypatch.setattr(company_services, "flag_modified", lambda *_args: None)
+
+    class Db:
+        commits = 0
+
+        def add(self, _item): pass
+        def commit(self): self.commits += 1
+        def refresh(self, _item): pass
+
+    db = Db()
+    team = defer_missing_team_roles(db, "company-1", profile)
+
+    assert db.commits == 1
+    assert {item["status"] for item in team["roles"]} == {"deferred"}
+    assert all(
+        profile.field_states[state_key] == {"status": "deferred", "applicable": True}
+        for state_key in company_services.TEAM_ROLE_STATE_KEYS.values()
+    )
+
+    defer_missing_team_roles(db, "company-1", profile)
+    assert db.commits == 1
 
 
 def test_team_stage_owns_the_interaction_before_conditional_questions():

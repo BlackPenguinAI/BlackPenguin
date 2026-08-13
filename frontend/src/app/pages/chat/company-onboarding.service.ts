@@ -12,7 +12,6 @@ import {
   TeamMember,
   TeamMemberInvite,
   TeamOnboarding,
-  TeamRole,
 } from './company-onboarding.models';
 
 @Injectable({ providedIn: 'root' })
@@ -93,12 +92,8 @@ export class CompanyOnboardingService {
     return this.http.post<TeamMember>(`${this.baseUrl}/team/members`, payload);
   }
 
-  decideTeamRole(role: TeamRole, status: 'deferred' | 'not_applicable'): Observable<TeamOnboarding> {
-    return this.http.patch<TeamOnboarding>(`${this.baseUrl}/team/roles/${role}`, { status });
-  }
-
-  deferRemainingTeamRoles(): Observable<TeamOnboarding> {
-    return this.http.post<TeamOnboarding>(`${this.baseUrl}/team/defer-remaining`, {});
+  continueTeamSetup(): Observable<OnboardingState> {
+    return this.http.post<OnboardingState>(`${this.baseUrl}/team/continue`, {});
   }
 
   sendMessage(message: string, inReplyToMessageId?: string | null): Observable<ChatTurnResponse> {

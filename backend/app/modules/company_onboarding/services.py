@@ -672,6 +672,33 @@ def set_team_role_decision(
     db.refresh(profile)
 
 
+def defer_missing_team_roles(
+    db: Session,
+    company_id: str,
+    profile: CompanyProfile | None = None,
+) -> dict[str, Any]:
+    """Defer every unconfigured team role atomically and return fresh progress."""
+    profile = profile or get_or_create_profile(db, company_id)
+    team = serialize_team(db, company_id, profile)
+    missing_roles = {
+        item["role"] for item in team["roles"] if item["status"] == "missing"
+    }
+    if not missing_roles:
+        return team
+
+    states = dict(profile.field_states or {})
+    for role, state_key in TEAM_ROLE_STATE_KEYS.items():
+        if role.value in missing_roles:
+            states[state_key] = {"status": "deferred", "applicable": True}
+
+    profile.field_states = states
+    flag_modified(profile, "field_states")
+    db.add(profile)
+    db.commit()
+    db.refresh(profile)
+    return serialize_team(db, company_id, profile)
+
+
 def clear_team_role_decision(db: Session, profile: CompanyProfile, role: UserRole) -> None:
     state_key = TEAM_ROLE_STATE_KEYS.get(role)
     states = dict(profile.field_states or {})
