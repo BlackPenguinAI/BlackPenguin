@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 from urllib.parse import urlparse
 
@@ -20,6 +21,24 @@ QUESTION_CATALOG: dict[str, dict[str, Any]] = {
     "additional_corporate_languages": {
         "input_type": "multi_select",
         "options": ["English", "Spanish", "Portuguese", "French"],
+    },
+    "public_contact_emails": {
+        "input_type": "multi_select",
+        "examples": ["info@example.com", "sales@example.com, support@example.com"],
+        "help_text": "Public-facing addresses shown to customers; these are separate from user login emails.",
+    },
+    "public_contact_phones": {
+        "input_type": "multi_select",
+        "examples": ["+1 305 555 0100", "+51 1 555 0100, +51 999 555 010"],
+        "help_text": "Phone numbers the public can use to contact the company.",
+    },
+    "corporate_social_profiles": {
+        "input_type": "multi_select",
+        "examples": [
+            "https://www.linkedin.com/company/example",
+            "https://www.instagram.com/example",
+        ],
+        "help_text": "Official company profiles on LinkedIn, Instagram, Facebook, X, YouTube, TikTok, or another network.",
     },
     "legal_entity_type": {
         "input_type": "single_select",
@@ -142,6 +161,16 @@ def build_next_question(
         no_dba_label = "No DBA — not applicable"
         options.append(no_dba_label)
         answer_actions[no_dba_label] = {"kind": "not_applicable"}
+    definition_requirement = blocker.get("requirement")
+    if definition_requirement == "conditionally_required" or blocker.get("status") == "applicability_pending":
+        later_label = "Provide later"
+        not_applicable_label = "Not applicable"
+        if later_label not in options:
+            options.append(later_label)
+        if not_applicable_label not in options and field != "dba":
+            options.append(not_applicable_label)
+        answer_actions[later_label] = {"kind": "defer"}
+        answer_actions.setdefault(not_applicable_label, {"kind": "not_applicable"})
     if config.get("prompt"):
         prompt = str(config["prompt"])
     elif options:
@@ -184,6 +213,40 @@ def validate_onboarding_value(field: str, value: Any) -> dict[str, Any] | None:
                 "code": "invalid_website",
                 "field": field,
                 "message": "Enter a valid HTTP or HTTPS website URL, or select no official website.",
+            }
+    if field == "public_contact_emails":
+        values = value if isinstance(value, list) else []
+        email_pattern = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
+        if not values or any(not isinstance(item, str) or not email_pattern.fullmatch(item.strip()) for item in values):
+            return {
+                "code": "invalid_public_contact_emails",
+                "field": field,
+                "message": "Enter one or more valid public contact email addresses.",
+            }
+    if field == "public_contact_phones":
+        values = value if isinstance(value, list) else []
+        if not values or any(
+            not isinstance(item, str) or len(re.sub(r"\D", "", item)) < 7
+            for item in values
+        ):
+            return {
+                "code": "invalid_public_contact_phones",
+                "field": field,
+                "message": "Enter one or more valid public phone numbers.",
+            }
+    if field == "corporate_social_profiles":
+        values = value if isinstance(value, list) else []
+        valid = all(
+            isinstance(item, str)
+            and (parsed := urlparse(item)).scheme in {"http", "https"}
+            and bool(parsed.hostname)
+            for item in values
+        )
+        if not values or not valid:
+            return {
+                "code": "invalid_social_profiles",
+                "field": field,
+                "message": "Enter one or more complete HTTP or HTTPS social profile URLs.",
             }
     config = QUESTION_CATALOG.get(field, {})
     if not isinstance(value, str):

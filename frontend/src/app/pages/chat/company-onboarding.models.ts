@@ -5,7 +5,8 @@ export type ValidationStatus =
   | 'confirmed'
   | 'corrected_by_user'
   | 'conflicting'
-  | 'not_applicable';
+  | 'not_applicable'
+  | 'deferred';
 
 export type Requirement =
   | 'required'
@@ -135,7 +136,50 @@ export interface OnboardingState {
   next_question: NextQuestion;
   stage: 'website' | 'processing' | 'review' | 'conversation' | 'complete';
   version: number;
+  team?: TeamOnboarding;
 }
+
+export type TeamRole = 'assistant' | 'mkt' | 'sales';
+export type TeamRoleStatus = 'missing' | 'confirmed' | 'deferred' | 'not_applicable';
+
+export interface TeamMember {
+  id: string;
+  first_name?: string | null;
+  last_name?: string | null;
+  email: string;
+  role: 'admin' | TeamRole;
+  is_active: boolean;
+}
+
+export interface TeamMemberInvite {
+  first_name: string;
+  last_name: string;
+  email: string;
+  role: TeamRole;
+}
+
+export interface TeamRoleProgress {
+  role: TeamRole;
+  label: string;
+  status: TeamRoleStatus;
+  active_users: number;
+}
+
+export interface TeamOnboarding {
+  administrator: TeamMember | null;
+  members: TeamMember[];
+  roles: TeamRoleProgress[];
+}
+
+export const EMPTY_TEAM_ONBOARDING: TeamOnboarding = {
+  administrator: null,
+  members: [],
+  roles: [
+    { role: 'assistant', label: 'Assistant users', status: 'missing', active_users: 0 },
+    { role: 'mkt', label: 'Marketing users', status: 'missing', active_users: 0 },
+    { role: 'sales', label: 'Sales users', status: 'missing', active_users: 0 },
+  ],
+};
 
 export interface ProposalDecisionResponse {
   proposal: SourceProposal;
@@ -151,10 +195,10 @@ export const EMPTY_COMPANY_PROFILE: CompanyProfileResponse = {
     percentage: 0,
     can_complete: false,
     final_approved: false,
-    required: { completed: 0, total: 11, remaining: 11 },
-    conditional: { completed: 0, total: 7, evaluated: 0, applicable: 0, remaining: 0 },
-    recommended: { captured: 0, total: 26 },
-    optional: { captured: 0, total: 19 },
+    required: { completed: 0, total: 10, remaining: 10 },
+    conditional: { completed: 0, total: 5, evaluated: 0, applicable: 0, remaining: 0 },
+    recommended: { captured: 0, total: 27 },
+    optional: { captured: 0, total: 18 },
     blockers: [],
   },
   updated_at: null,

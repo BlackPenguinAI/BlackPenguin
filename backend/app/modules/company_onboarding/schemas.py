@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, HttpUrl, field_validator
 
 
 ValidationStatus = Literal[
@@ -12,6 +12,7 @@ ValidationStatus = Literal[
     "corrected_by_user",
     "conflicting",
     "not_applicable",
+    "deferred",
 ]
 Requirement = Literal["required", "conditionally_required", "recommended", "optional"]
 
@@ -215,3 +216,52 @@ class OnboardingStateResponse(BaseModel):
     next_question: NextQuestionResponse
     stage: Literal["website", "processing", "review", "conversation", "complete"]
     version: int
+    team: "TeamOnboardingResponse"
+
+
+TeamRole = Literal["assistant", "mkt", "sales"]
+TeamRoleStatus = Literal["missing", "confirmed", "deferred", "not_applicable"]
+
+
+class TeamMemberCreate(BaseModel):
+    first_name: str = Field(min_length=1, max_length=150)
+    last_name: str = Field(min_length=1, max_length=100)
+    email: EmailStr
+    role: TeamRole
+
+    @field_validator("first_name", "last_name")
+    @classmethod
+    def names_must_not_be_blank(cls, value: str) -> str:
+        normalized = " ".join(value.split())
+        if not normalized:
+            raise ValueError("Name fields cannot be blank.")
+        return normalized
+
+
+class TeamMemberResponse(BaseModel):
+    id: str
+    first_name: str | None = None
+    last_name: str | None = None
+    email: str
+    role: str
+    is_active: bool
+
+
+class TeamRoleProgress(BaseModel):
+    role: TeamRole
+    label: str
+    status: TeamRoleStatus
+    active_users: int
+
+
+class TeamOnboardingResponse(BaseModel):
+    administrator: TeamMemberResponse | None = None
+    members: list[TeamMemberResponse] = Field(default_factory=list)
+    roles: list[TeamRoleProgress] = Field(default_factory=list)
+
+
+class TeamRoleDecision(BaseModel):
+    status: Literal["deferred", "not_applicable"]
+
+
+OnboardingStateResponse.model_rebuild()

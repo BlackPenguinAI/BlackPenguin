@@ -16,7 +16,13 @@ from app.modules.company_onboarding.services import (
     supersede_unanswered_questions,
 )
 from app.modules.company_onboarding.models import SenderType
-from app.modules.company_onboarding.source_service import classify_url, validate_public_url
+from app.modules.company_onboarding.source_service import (
+    _extract_bytes,
+    _embedded_link_values,
+    classify_url,
+    validate_public_url,
+)
+from app.modules.onboarding_questions import build_next_question, validate_onboarding_value
 
 
 def test_human_labels_are_normalized_to_canonical_keys():
@@ -41,6 +47,43 @@ def test_each_confirmed_required_field_advances_completion():
 def test_application_administrator_is_not_a_company_profile_field():
     assert "primary_black_penguin_administrator" not in FIELD_BY_KEY
     assert calculate_completion({})["required"]["total"] == 10
+
+
+def test_sales_and_marketing_users_replace_duplicate_contact_fields():
+    assert "primary_corporate_sales_contact" not in FIELD_BY_KEY
+    assert "primary_corporate_marketing_contact" not in FIELD_BY_KEY
+    assert FIELD_BY_KEY["public_contact_emails"].requirement == "recommended"
+    assert FIELD_BY_KEY["public_contact_phones"].requirement == "recommended"
+    assert FIELD_BY_KEY["corporate_social_profiles"].requirement == "recommended"
+    assert calculate_completion({})["conditional"]["total"] == 5
+
+
+def test_deferred_conditional_field_does_not_block_completion():
+    states = {
+        field: {"status": "confirmed"}
+        for field in (
+            "official_company_name", "preferred_display_name", "official_corporate_website",
+            "headquarters", "primary_business_model", "core_asset_classes",
+            "current_operating_footprint", "approved_short_company_description",
+            "corporate_value_proposition", "corporate_differentiators",
+        )
+    }
+    for field in ("legal_company_name", "dba", "parent_company", "additional_corporate_languages", "corporate_compliance_information"):
+        states[field] = {"status": "deferred", "applicable": True}
+
+    completion = calculate_completion(states, final_approved=True)
+
+    assert completion["can_complete"] is True
+    assert completion["percentage"] == 100
+
+
+def test_conditional_questions_offer_later_and_not_applicable_actions():
+    question = build_next_question(
+        [{"field": "parent_company", "label": "Parent company", "status": "applicability_pending", "requirement": "conditionally_required"}],
+        final_prompt="Approve",
+    )
+    assert question["answer_actions"]["Provide later"] == {"kind": "defer"}
+    assert question["answer_actions"]["Not applicable"] == {"kind": "not_applicable"}
 
 
 def test_same_name_is_resolved_against_pending_display_name():
@@ -89,6 +132,28 @@ def test_agent_contract_never_requires_raw_json_as_visible_message():
 def test_urls_are_classified_without_rejecting_supporting_sources():
     assert classify_url("https://www.linkedin.com/company/petito").value == "social_profile"
     assert classify_url("https://es.scribd.com/document/123/form").value == "online_document"
+
+
+def test_html_keeps_public_contact_and_social_links_for_extraction():
+    html = b'''<html><body><a href="mailto:Info@Example.com">Email</a>
+        <a href="tel:+1-305-555-0100">Call</a>
+        <a href="https://www.linkedin.com/company/example"><svg></svg></a></body></html>'''
+    text = _extract_bytes(html, "text/html", "https://example.com")
+    assert "ONBOARDING_LINK:mailto:Info@Example.com" in text
+    assert "ONBOARDING_LINK:tel:+1-305-555-0100" in text
+    assert "ONBOARDING_LINK:https://www.linkedin.com/company/example" in text
+
+    values = _embedded_link_values(text)
+    assert values["public_contact_emails"] == ["info@example.com"]
+    assert values["public_contact_phones"] == ["+1-305-555-0100"]
+    assert values["corporate_social_profiles"] == ["https://www.linkedin.com/company/example"]
+
+
+def test_public_contact_and_social_values_are_validated():
+    assert validate_onboarding_value("public_contact_emails", ["info@example.com"]) is None
+    assert validate_onboarding_value("public_contact_phones", ["+1 305 555 0100"]) is None
+    assert validate_onboarding_value("corporate_social_profiles", ["https://instagram.com/example"]) is None
+    assert validate_onboarding_value("public_contact_emails", ["invalid"])["code"] == "invalid_public_contact_emails"
 
 
 def test_private_urls_are_rejected():

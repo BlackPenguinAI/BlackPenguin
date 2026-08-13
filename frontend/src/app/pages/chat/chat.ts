@@ -15,11 +15,6 @@ import { marked } from 'marked';
 import { finalize, Subscription } from 'rxjs';
 
 import { SpeechRecognitionService } from '../../core/services/speech-recognition.service';
-import {
-  CompanyUser,
-  CompanyUserInvite,
-  CompanyUsersService,
-} from '../../core/services/company-users.service';
 import { OnboardingQuestion } from '../../shared/ui/onboarding-response-options/onboarding-response-options';
 import { OnboardingAiMessageComponent } from '../../shared/ui/onboarding-ai-message/onboarding-ai-message';
 import { OnboardingWelcomeComponent } from '../../shared/ui/onboarding-welcome/onboarding-welcome';
@@ -30,11 +25,16 @@ import {
   CompanyFieldProgress,
   CompanyProfileResponse,
   EMPTY_COMPANY_PROFILE,
+  EMPTY_TEAM_ONBOARDING,
   OnboardingSource,
   OnboardingState,
   Requirement,
   SourceProposal,
   ValidationStatus,
+  TeamMemberInvite,
+  TeamOnboarding,
+  TeamRole,
+  TeamRoleStatus,
 } from './company-onboarding.models';
 import { CompanyOnboardingService } from './company-onboarding.service';
 
@@ -64,11 +64,16 @@ export class ChatComponent implements OnInit, OnDestroy {
   showWelcome = false;
   initialState: 'loading' | 'ready' | 'error' = 'loading';
   nextQuestion: OnboardingQuestion | null = null;
-  teamUsers: CompanyUser[] = [];
-  showTeamSetup = false;
+  team: TeamOnboarding = EMPTY_TEAM_ONBOARDING;
   teamSaving = false;
   teamError = '';
-  teamInvite: CompanyUserInvite = {
+  publicEmails = '';
+  publicPhones = '';
+  socialProfiles = '';
+  publicPresenceSaving = false;
+  publicPresenceSaved = false;
+  publicPresenceError = '';
+  teamInvite: TeamMemberInvite = {
     first_name: '', last_name: '', email: '', role: 'assistant',
   };
   private readonly markdownCache = new Map<string, string>();
@@ -79,12 +84,12 @@ export class ChatComponent implements OnInit, OnDestroy {
   private lastStateVersion = 0;
   private pollingStartedAt = 0;
   private readonly expandedSourceIds = new Set<string>();
+  private publicPresenceInitialized = false;
   readonly savingWebsiteSourceIds = new Set<string>();
 
   constructor(
     private readonly translate: TranslateService,
     private readonly onboarding: CompanyOnboardingService,
-    private readonly companyUsers: CompanyUsersService,
     private readonly cdr: ChangeDetectorRef,
     private readonly speech: SpeechRecognitionService,
   ) {
@@ -96,7 +101,6 @@ export class ChatComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.userName = localStorage.getItem('bp_name') || 'User';
     this.syncState();
-    this.loadTeam();
     this.speechSubscriptions.add(this.speech.state$.subscribe((state) => {
       this.isRecording = state === 'listening';
       this.cdr.detectChanges();
@@ -259,39 +263,17 @@ export class ChatComponent implements OnInit, OnDestroy {
     return this.prompt.trim().length > 0 && !this.isAnalyzing && !this.isCompleted && !this.hasPendingReview;
   }
 
-  get companyAdministrator(): CompanyUser | undefined {
-    return this.teamUsers.find(user => user.role === 'admin');
-  }
-
-  get invitedTeamCount(): number {
-    return this.teamUsers.filter(user => user.role !== 'admin').length;
-  }
-
-  loadTeam(): void {
-    this.companyUsers.list().subscribe({
-      next: users => {
-        this.teamUsers = users;
-        this.showTeamSetup = users.every(user => user.role === 'admin');
-        this.cdr.detectChanges();
-      },
-      error: () => {
-        this.teamError = 'Team setup is temporarily unavailable. You can continue onboarding and use Team later.';
-        this.cdr.detectChanges();
-      },
-    });
-  }
-
   inviteTeamMember(): void {
-    if (this.teamSaving || !this.teamInvite.first_name.trim() || !this.teamInvite.last_name.trim() || !this.teamInvite.email.trim()) return;
+    if (this.teamSaving || this.hasPendingReview || this.isCompleted || !this.teamInvite.first_name.trim() || !this.teamInvite.last_name.trim() || !this.teamInvite.email.trim()) return;
     this.teamSaving = true;
     this.teamError = '';
-    this.companyUsers.invite(this.teamInvite).pipe(finalize(() => {
+    this.onboarding.createTeamMember(this.teamInvite).pipe(finalize(() => {
       this.teamSaving = false;
       this.cdr.detectChanges();
     })).subscribe({
-      next: user => {
-        this.teamUsers = [...this.teamUsers, user];
+      next: () => {
         this.teamInvite = { first_name: '', last_name: '', email: '', role: 'assistant' };
+        this.refreshTeam();
       },
       error: (error: HttpErrorResponse) => {
         this.teamError = typeof error.error?.detail === 'string'
@@ -301,11 +283,73 @@ export class ChatComponent implements OnInit, OnDestroy {
     });
   }
 
+  savePublicPresence(): void {
+    if (this.publicPresenceSaving || this.hasPendingReview || this.isCompleted) return;
+    const emails = this.splitList(this.publicEmails);
+    const phones = this.splitList(this.publicPhones);
+    const socialProfiles = this.splitList(this.socialProfiles);
+    if (!emails.length && !phones.length && !socialProfiles.length) {
+      this.publicPresenceError = 'Enter at least one public email, phone number, or social profile.';
+      return;
+    }
+    this.publicPresenceSaving = true;
+    this.publicPresenceSaved = false;
+    this.publicPresenceError = '';
+    this.onboarding.savePublicPresence(emails, phones, socialProfiles).pipe(finalize(() => {
+      this.publicPresenceSaving = false;
+      this.cdr.detectChanges();
+    })).subscribe({
+      next: profile => {
+        this.profile = profile;
+        this.publicPresenceSaved = true;
+      },
+      error: (error: HttpErrorResponse) => {
+        this.publicPresenceError = this.proposalErrorMessage(error);
+      },
+    });
+  }
+
+  decideTeamRole(role: TeamRole, status: 'deferred' | 'not_applicable'): void {
+    if (this.teamSaving || this.hasPendingReview || this.isCompleted) return;
+    this.teamSaving = true;
+    this.teamError = '';
+    this.onboarding.decideTeamRole(role, status).pipe(finalize(() => {
+      this.teamSaving = false;
+      this.cdr.detectChanges();
+    })).subscribe({
+      next: team => this.team = team,
+      error: (error: HttpErrorResponse) => {
+        this.teamError = typeof error.error?.detail === 'string'
+          ? error.error.detail
+          : 'The team decision could not be saved.';
+      },
+    });
+  }
+
+  teamStatusIcon(status: TeamRoleStatus): string {
+    return ({
+      confirmed: 'check_circle', deferred: 'schedule', not_applicable: 'remove_circle', missing: 'radio_button_unchecked',
+    } as Record<TeamRoleStatus, string>)[status];
+  }
+
+  teamStatusClass(status: TeamRoleStatus): string {
+    if (status === 'confirmed') return 'text-green-500';
+    if (status === 'deferred') return 'text-secondary';
+    return 'text-gray-600';
+  }
+
+  teamStatusLabel(status: TeamRoleStatus): string {
+    return ({
+      confirmed: 'Configured', deferred: 'Configure later', not_applicable: 'Not needed now', missing: 'Pending decision',
+    } as Record<TeamRoleStatus, string>)[status];
+  }
+
   statusIcon(status: ValidationStatus): string {
     const icons: Record<ValidationStatus, string> = {
       confirmed: 'check_circle',
       corrected_by_user: 'check_circle',
       not_applicable: 'remove_circle',
+      deferred: 'schedule',
       conflicting: 'error',
       pending_confirmation: 'schedule',
       extracted: 'manage_search',
@@ -317,7 +361,7 @@ export class ChatComponent implements OnInit, OnDestroy {
   statusClass(status: ValidationStatus): string {
     if (status === 'confirmed' || status === 'corrected_by_user') return 'text-green-500';
     if (status === 'conflicting') return 'text-red-400';
-    if (status === 'pending_confirmation' || status === 'extracted') return 'text-secondary';
+    if (status === 'pending_confirmation' || status === 'extracted' || status === 'deferred') return 'text-secondary';
     return 'text-gray-600';
   }
 
@@ -330,6 +374,7 @@ export class ChatComponent implements OnInit, OnDestroy {
       corrected_by_user: 'Corrected by user',
       conflicting: 'Conflicting',
       not_applicable: 'Not applicable',
+      deferred: 'Provide later',
     };
     return labels[status];
   }
@@ -609,6 +654,8 @@ export class ChatComponent implements OnInit, OnDestroy {
       if (this.hasPendingProposals(source)) this.expandedSourceIds.add(source.id);
     }
     this.nextQuestion = state.next_question;
+    this.team = state.team || EMPTY_TEAM_ONBOARDING;
+    this.initializePublicPresence(state.profile.data);
     this.isCompleted = state.profile.completion.can_complete;
     this.showWelcome = state.stage === 'website';
     if (this.pollingTimer) clearTimeout(this.pollingTimer);
@@ -632,6 +679,28 @@ export class ChatComponent implements OnInit, OnDestroy {
     this.mergeSources(turn.sources);
     if (turn.sources.some((source) => source.status === 'processing')) this.schedulePolling();
     this.cdr.detectChanges();
+  }
+
+  private refreshTeam(): void {
+    this.onboarding.getTeam().subscribe({
+      next: team => { this.team = team; this.cdr.detectChanges(); },
+      error: () => { this.teamError = 'The team status could not be refreshed.'; },
+    });
+  }
+
+  private initializePublicPresence(data: Record<string, unknown>): void {
+    if (this.publicPresenceInitialized) return;
+    const values = (key: string): string => Array.isArray(data[key])
+      ? (data[key] as unknown[]).map(String).join(', ')
+      : (typeof data[key] === 'string' ? String(data[key]) : '');
+    this.publicEmails = values('public_contact_emails');
+    this.publicPhones = values('public_contact_phones');
+    this.socialProfiles = values('corporate_social_profiles');
+    this.publicPresenceInitialized = true;
+  }
+
+  private splitList(value: string): string[] {
+    return Array.from(new Set(value.split(/[\n,;]/).map(item => item.trim()).filter(Boolean)));
   }
 
   private schedulePolling(): void {

@@ -144,6 +144,70 @@
       </details>
       </ng-template>
 
+      <div *ngIf="!isCompleted" class="flex max-w-3xl gap-4">
+        <div class="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-secondary/50 bg-secondary/20">
+          <span class="material-symbols-outlined text-[18px] text-secondary">contact_phone</span>
+        </div>
+        <section class="w-full rounded-2xl rounded-tl-sm border border-white/10 bg-white/5 p-4 md:p-5">
+          <h2 class="text-sm font-semibold text-white">Public contact information and social media</h2>
+          <p class="mt-1 text-xs leading-relaxed text-gray-400">Review what was extracted from the website or enter the channels customers can use. Separate multiple values with commas or line breaks.</p>
+          <form (ngSubmit)="savePublicPresence()" class="mt-4 space-y-2">
+            <input name="public_emails" [(ngModel)]="publicEmails" type="text" placeholder="Public emails, e.g. info@example.com" class="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-xs outline-none focus:border-secondary/50">
+            <input name="public_phones" [(ngModel)]="publicPhones" type="text" placeholder="Public phone numbers" class="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-xs outline-none focus:border-secondary/50">
+            <textarea name="social_profiles" [(ngModel)]="socialProfiles" rows="2" placeholder="Official LinkedIn, Instagram, Facebook, X, YouTube, or TikTok URLs" class="w-full resize-y rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-xs outline-none focus:border-secondary/50"></textarea>
+            <div class="flex items-center gap-3 pt-1">
+              <button [disabled]="publicPresenceSaving" class="rounded-lg bg-secondary px-3 py-2 text-[10px] font-semibold text-black disabled:opacity-50">{{ publicPresenceSaving ? 'Saving...' : 'Save public information' }}</button>
+              <span *ngIf="publicPresenceSaved" class="text-[10px] text-green-400">Saved</span>
+              <span class="text-[10px] text-gray-500">Optional; you can complete it later.</span>
+            </div>
+          </form>
+          <p *ngIf="publicPresenceError" class="mt-3 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-[10px] text-red-200">{{ publicPresenceError }}</p>
+        </section>
+      </div>
+
+      <div *ngIf="!isCompleted" class="flex max-w-3xl gap-4">
+        <div class="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-secondary/50 bg-secondary/20">
+          <span class="material-symbols-outlined text-[18px] text-secondary">group_add</span>
+        </div>
+        <section class="w-full rounded-2xl rounded-tl-sm border border-white/10 bg-white/5 p-4 md:p-5">
+          <h2 class="text-sm font-semibold text-white">Set up company users</h2>
+          <p class="mt-1 text-xs leading-relaxed text-gray-400">Add the people who will access Black Penguin. User login emails are separate from the company's public contact information.</p>
+          <div *ngIf="team.administrator" class="mt-4 rounded-xl border border-green-500/20 bg-green-500/5 p-3 text-xs">
+            <span class="font-semibold text-green-300">Company administrator</span>
+            <span class="mt-1 block text-gray-300">{{ team.administrator.first_name }} {{ team.administrator.last_name }}</span>
+            <span class="block text-gray-500">{{ team.administrator.email }}</span>
+          </div>
+          <div *ngIf="team.members.length" class="mt-3 space-y-2">
+            <div *ngFor="let member of team.members" class="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-xs">
+              <div class="min-w-0">
+                <span class="block truncate text-gray-200">{{ member.first_name }} {{ member.last_name }}</span>
+                <span class="block truncate text-[10px] text-gray-500">{{ member.email }}</span>
+              </div>
+              <span class="rounded-full bg-secondary/10 px-2 py-1 text-[9px] font-semibold uppercase text-secondary">{{ member.role === 'mkt' ? 'Marketing' : member.role }}</span>
+            </div>
+          </div>
+          <form (ngSubmit)="inviteTeamMember()" class="mt-4 space-y-2">
+            <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <input name="team_first_name" [(ngModel)]="teamInvite.first_name" required placeholder="First name" class="rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-xs outline-none focus:border-secondary/50">
+              <input name="team_last_name" [(ngModel)]="teamInvite.last_name" required placeholder="Last name" class="rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-xs outline-none focus:border-secondary/50">
+            </div>
+            <input name="team_email" [(ngModel)]="teamInvite.email" required type="email" placeholder="Business email" class="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-xs outline-none focus:border-secondary/50">
+            <select name="team_role" [(ngModel)]="teamInvite.role" class="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-xs outline-none focus:border-secondary/50">
+              <option value="assistant">Assistant</option>
+              <option value="mkt">Marketing</option>
+              <option value="sales">Sales</option>
+            </select>
+            <div class="flex flex-wrap gap-2 pt-1">
+              <button [disabled]="teamSaving" class="rounded-lg bg-secondary px-3 py-2 text-[10px] font-semibold text-black disabled:opacity-50">{{ teamSaving ? 'Saving...' : 'Add user' }}</button>
+              <button type="button" (click)="decideTeamRole(teamInvite.role, 'deferred')" [disabled]="teamSaving" class="rounded-lg border border-white/10 px-3 py-2 text-[10px] text-gray-300 disabled:opacity-50">Configure this role later</button>
+              <button type="button" (click)="decideTeamRole(teamInvite.role, 'not_applicable')" [disabled]="teamSaving" class="rounded-lg border border-white/10 px-3 py-2 text-[10px] text-gray-400 disabled:opacity-50">This role is not needed now</button>
+            </div>
+          </form>
+          <p *ngIf="teamError" class="mt-3 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-[10px] text-red-200">{{ teamError }}</p>
+          <a routerLink="/app/users" class="mt-3 inline-flex text-[10px] font-semibold text-secondary hover:underline">Manage all users</a>
+        </section>
+      </div>
+
       <div *ngIf="isAnalyzing" class="flex max-w-[80%] gap-4">
         <div class="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-secondary/50 bg-secondary/20">
           <span class="material-symbols-outlined text-[18px] text-secondary">smart_toy</span>
@@ -233,41 +297,29 @@
     </header>
 
     <div class="flex-1 space-y-7 overflow-y-auto p-6">
-      <section class="rounded-xl border border-secondary/20 bg-secondary/5 p-4">
-        <div class="flex items-start justify-between gap-3">
-          <div>
-            <h3 class="text-xs font-bold uppercase tracking-wider text-white">Team Setup</h3>
-            <p *ngIf="companyAdministrator" class="mt-2 text-[11px] text-gray-300">
-              Administrator: {{ companyAdministrator.first_name }} {{ companyAdministrator.last_name }}
-              <span class="block text-gray-500">{{ companyAdministrator.email }}</span>
-            </p>
-            <p class="mt-2 text-[10px] text-gray-500">Optional. You can also manage the team later from Team.</p>
-          </div>
-          <span *ngIf="invitedTeamCount" class="rounded-full bg-secondary/10 px-2 py-1 text-[10px] text-secondary">{{ invitedTeamCount }} invited</span>
+      <section>
+        <div class="mb-3 flex items-center justify-between">
+          <h3 class="text-xs font-bold uppercase tracking-wider text-white">Team users</h3>
+          <a routerLink="/app/users" class="text-[10px] text-secondary hover:underline">Open users</a>
         </div>
-
-        <div *ngIf="!showTeamSetup" class="mt-3 flex gap-2">
-          <button (click)="showTeamSetup = true" class="rounded-lg border border-secondary/40 px-3 py-1.5 text-[10px] font-semibold text-secondary">Add team member</button>
-          <a routerLink="/app/users" class="rounded-lg border border-white/10 px-3 py-1.5 text-[10px] text-gray-300">Open Team</a>
+        <div class="space-y-3">
+          <div class="flex items-start gap-3">
+            <span class="material-symbols-outlined mt-0.5 text-[18px] text-green-500">check_circle</span>
+            <div class="min-w-0">
+              <p class="text-xs text-gray-200">Company administrator</p>
+              <p class="truncate text-[10px] text-green-500">{{ team.administrator?.email || 'Registered administrator' }}</p>
+            </div>
+          </div>
+          <div *ngFor="let role of team.roles" class="flex items-start gap-3">
+            <span class="material-symbols-outlined mt-0.5 text-[18px]" [ngClass]="teamStatusClass(role.status)">{{ teamStatusIcon(role.status) }}</span>
+            <div class="min-w-0">
+              <p class="text-xs text-gray-200">{{ role.label }}</p>
+              <p class="text-[10px]" [ngClass]="teamStatusClass(role.status)">
+                {{ teamStatusLabel(role.status) }}{{ role.active_users ? ' · ' + role.active_users + ' active' : '' }}
+              </p>
+            </div>
+          </div>
         </div>
-
-        <form *ngIf="showTeamSetup" (ngSubmit)="inviteTeamMember()" class="mt-4 space-y-2">
-          <div class="grid grid-cols-2 gap-2">
-            <input name="team_first_name" [(ngModel)]="teamInvite.first_name" required placeholder="First name" class="rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-xs outline-none focus:border-secondary/50">
-            <input name="team_last_name" [(ngModel)]="teamInvite.last_name" required placeholder="Last name" class="rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-xs outline-none focus:border-secondary/50">
-          </div>
-          <input name="team_email" [(ngModel)]="teamInvite.email" required type="email" placeholder="Business email" class="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-xs outline-none focus:border-secondary/50">
-          <select name="team_role" [(ngModel)]="teamInvite.role" class="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-xs outline-none focus:border-secondary/50">
-            <option value="assistant">Assistant</option>
-            <option value="mkt">Marketing</option>
-            <option value="sales">Sales</option>
-          </select>
-          <div class="flex gap-2 pt-1">
-            <button [disabled]="teamSaving" class="rounded-lg bg-secondary px-3 py-2 text-[10px] font-semibold text-black disabled:opacity-50">{{ teamSaving ? 'Inviting...' : 'Invite member' }}</button>
-            <button type="button" (click)="showTeamSetup = false" class="rounded-lg border border-white/10 px-3 py-2 text-[10px] text-gray-400">Do this later</button>
-          </div>
-        </form>
-        <p *ngIf="teamError" class="mt-3 text-[10px] text-red-300">{{ teamError }}</p>
       </section>
 
       <section>

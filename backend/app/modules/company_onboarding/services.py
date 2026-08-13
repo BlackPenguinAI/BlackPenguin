@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
 from app.modules.onboarding_questions import validate_onboarding_value
+from app.modules.users.models import User, UserRole
 
 from .completion import FIELD_BY_KEY, VALID_STATUSES, calculate_completion, field_progress
 from .models import CompanyProfile, OnboardingMessage, OnboardingSession, SenderType
@@ -44,6 +45,25 @@ FIELD_ALIASES = {
     "differentiators": "corporate_differentiators",
     "dba": "dba",
     "year established": "year_established",
+    "general business email": "public_contact_emails",
+    "general business phone": "public_contact_phones",
+    "public contact email": "public_contact_emails",
+    "public contact emails": "public_contact_emails",
+    "public contact phone": "public_contact_phones",
+    "public contact phones": "public_contact_phones",
+    "social profiles": "corporate_social_profiles",
+    "social media profiles": "corporate_social_profiles",
+}
+
+TEAM_ROLE_STATE_KEYS = {
+    UserRole.ASSISTANT: "team_assistant_users",
+    UserRole.MKT: "team_marketing_users",
+    UserRole.SALES: "team_sales_users",
+}
+TEAM_ROLE_LABELS = {
+    UserRole.ASSISTANT: "Assistant users",
+    UserRole.MKT: "Marketing users",
+    UserRole.SALES: "Sales users",
 }
 
 
@@ -300,6 +320,11 @@ def resolve_answer_to_question(
                 True, "accepted", [_user_update(field, None, status="not_applicable", applicable=False)],
                 question=question,
             )
+        if action and action.get("kind") == "defer":
+            return QuestionResolution(
+                True, "accepted", [_user_update(field, None, status="deferred", applicable=True)],
+                question=question,
+            )
         if action and action.get("kind") == "copy_field":
             source_field = normalize_field_key(action.get("source_field"))
             copied_value = (profile.profile_data or {}).get(source_field) if source_field else None
@@ -333,6 +358,8 @@ def resolve_answer_to_question(
             value = {"exists": True, "url": urls[0]}
         else:
             return QuestionResolution(True, "rejected", [], "invalid_url", question)
+    elif field == "corporate_social_profiles" and urls:
+        value = urls
     elif urls:
         return QuestionResolution(True, "rejected", [], "url_not_valid_for_field", question)
     elif input_type == "multi_select":
@@ -354,6 +381,19 @@ def seed_legacy_values(profile: CompanyProfile) -> None:
     data = dict(profile.profile_data or {})
     states = dict(profile.field_states or {})
     changed = False
+
+    # Convert the previous scalar public-contact fields on read. The JSON
+    # representation makes this backward-compatible without a database migration.
+    for old_key, new_key in (
+        ("general_business_email", "public_contact_emails"),
+        ("general_business_phone", "public_contact_phones"),
+    ):
+        old_value = data.get(old_key)
+        if old_value not in (None, "", []) and new_key not in data:
+            data[new_key] = old_value if isinstance(old_value, list) else [old_value]
+            old_state = states.get(old_key, {"status": "pending_confirmation", "applicable": None})
+            states[new_key] = dict(old_state)
+            changed = True
 
     for legacy_key, canonical_key in LEGACY_FIELD_MAP.items():
         value = getattr(profile, legacy_key, None)
@@ -400,14 +440,14 @@ def apply_field_updates(
             status = "pending_confirmation"
 
         value = update.get("value")
-        if status not in {"missing", "not_applicable"} and value in (None, "", []):
+        if status not in {"missing", "not_applicable", "deferred"} and value in (None, "", []):
             rejected.append({"update": raw_update, "reason": "missing_value"})
             continue
         validation_error = validate_onboarding_value(field_key, value)
         if validation_error:
             rejected.append({"update": raw_update, "reason": validation_error["code"], "validation": validation_error})
             continue
-        if status != "not_applicable" and value is not None:
+        if status not in {"not_applicable", "deferred"} and value is not None:
             data[field_key] = value
 
         states[field_key] = {
@@ -526,3 +566,74 @@ def serialize_profile(profile: CompanyProfile) -> dict[str, Any]:
         "completion": completion,
         "updated_at": profile.updated_at,
     }
+
+
+def serialize_team(db: Session, company_id: str, profile: CompanyProfile | None = None) -> dict[str, Any]:
+    """Return onboarding team progress derived from the canonical users table."""
+    profile = profile or get_or_create_profile(db, company_id)
+    users = db.query(User).filter(User.company_id == company_id).order_by(User.email.asc()).all()
+    administrator = next((user for user in users if user.role == UserRole.ADMIN), None)
+    states = profile.field_states or {}
+    roles = []
+    for role, state_key in TEAM_ROLE_STATE_KEYS.items():
+        active_users = sum(user.role == role and user.is_active for user in users)
+        saved_status = states.get(state_key, {}).get("status")
+        status = "confirmed" if active_users else (
+            saved_status if saved_status in {"deferred", "not_applicable"} else "missing"
+        )
+        roles.append({
+            "role": role.value,
+            "label": TEAM_ROLE_LABELS[role],
+            "status": status,
+            "active_users": active_users,
+        })
+
+    def member_payload(user: User | None) -> dict[str, Any] | None:
+        if user is None:
+            return None
+        return {
+            "id": user.id,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "email": user.email,
+            "role": user.role.value,
+            "is_active": user.is_active,
+        }
+
+    return {
+        "administrator": member_payload(administrator),
+        "members": [member_payload(user) for user in users if user.role != UserRole.ADMIN],
+        "roles": roles,
+    }
+
+
+def set_team_role_decision(
+    db: Session,
+    profile: CompanyProfile,
+    role: UserRole,
+    status: str,
+) -> None:
+    if role not in TEAM_ROLE_STATE_KEYS or status not in {"deferred", "not_applicable"}:
+        raise ValueError("Unsupported team onboarding decision.")
+    states = dict(profile.field_states or {})
+    states[TEAM_ROLE_STATE_KEYS[role]] = {
+        "status": status,
+        "applicable": status != "not_applicable",
+    }
+    profile.field_states = states
+    flag_modified(profile, "field_states")
+    db.add(profile)
+    db.commit()
+    db.refresh(profile)
+
+
+def clear_team_role_decision(db: Session, profile: CompanyProfile, role: UserRole) -> None:
+    state_key = TEAM_ROLE_STATE_KEYS.get(role)
+    states = dict(profile.field_states or {})
+    if state_key and state_key in states:
+        states.pop(state_key)
+        profile.field_states = states
+        flag_modified(profile, "field_states")
+        db.add(profile)
+        db.commit()
+        db.refresh(profile)

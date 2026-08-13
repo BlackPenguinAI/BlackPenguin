@@ -72,6 +72,51 @@ describe('ChatComponent', () => {
     expect(component.statusLabel('missing')).toBe('Missing');
     expect(component.statusLabel('pending_confirmation')).toBe('Pending confirmation');
     expect(component.statusLabel('not_applicable')).toBe('Not applicable');
+    expect(component.statusLabel('deferred')).toBe('Provide later');
+  });
+
+  it('should expose team progress labels without duplicating corporate contacts', () => {
+    expect(component.teamStatusLabel('confirmed')).toBe('Configured');
+    expect(component.teamStatusLabel('deferred')).toBe('Configure later');
+    expect(component.teamStatusLabel('not_applicable')).toBe('Not needed now');
+  });
+
+  it('should save public contact information as structured lists', () => {
+    component.publicEmails = 'info@example.com, sales@example.com';
+    component.publicPhones = '+1 305 555 0100';
+    component.socialProfiles = 'https://linkedin.com/company/example\nhttps://instagram.com/example';
+
+    component.savePublicPresence();
+
+    const request = http.expectOne('http://localhost:8000/api/v1/company-onboarding/profile');
+    expect(request.request.method).toBe('PATCH');
+    expect(request.request.body.updates.map((item: { field: string }) => item.field)).toEqual([
+      'public_contact_emails', 'public_contact_phones', 'corporate_social_profiles',
+    ]);
+    expect(request.request.body.updates[0].value).toEqual(['info@example.com', 'sales@example.com']);
+    request.flush(EMPTY_COMPANY_PROFILE);
+    expect(component.publicPresenceSaved).toBe(true);
+  });
+
+  it('should create onboarding users through the shared company user store', () => {
+    component.teamInvite = {
+      first_name: 'Ana', last_name: 'Sales', email: 'ana@example.com', role: 'sales',
+    };
+
+    component.inviteTeamMember();
+
+    const create = http.expectOne('http://localhost:8000/api/v1/company-onboarding/team/members');
+    expect(create.request.body).toEqual(component.teamInvite);
+    create.flush({
+      id: 'user-1', first_name: 'Ana', last_name: 'Sales', email: 'ana@example.com',
+      role: 'sales', is_active: true,
+    });
+    http.expectOne('http://localhost:8000/api/v1/company-onboarding/team').flush({
+      administrator: null,
+      members: [{ id: 'user-1', first_name: 'Ana', last_name: 'Sales', email: 'ana@example.com', role: 'sales', is_active: true }],
+      roles: [{ role: 'sales', label: 'Sales users', status: 'confirmed', active_users: 1 }],
+    });
+    expect(component.team.members[0].email).toBe('ana@example.com');
   });
 
   it('should not expose the removed session initializer', () => {

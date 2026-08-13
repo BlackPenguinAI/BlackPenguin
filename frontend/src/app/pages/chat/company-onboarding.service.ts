@@ -9,6 +9,10 @@ import {
   OnboardingSource,
   OnboardingState,
   ProposalDecisionResponse,
+  TeamMember,
+  TeamMemberInvite,
+  TeamOnboarding,
+  TeamRole,
 } from './company-onboarding.models';
 
 @Injectable({ providedIn: 'root' })
@@ -21,6 +25,22 @@ export class CompanyOnboardingService {
 
   getProfile(): Observable<CompanyProfileResponse> {
     return this.http.get<CompanyProfileResponse>(`${this.baseUrl}/profile`);
+  }
+
+  savePublicPresence(emails: string[], phones: string[], socialProfiles: string[]): Observable<CompanyProfileResponse> {
+    const updates = [
+      { field: 'public_contact_emails', value: emails },
+      { field: 'public_contact_phones', value: phones },
+      { field: 'corporate_social_profiles', value: socialProfiles },
+    ].filter(item => item.value.length).map(item => ({
+      ...item,
+      status: 'confirmed',
+      applicable: true,
+      source_type: 'user_input',
+      source_reference: 'onboarding public presence card',
+      confidence: 'high',
+    }));
+    return this.http.patch<CompanyProfileResponse>(`${this.baseUrl}/profile`, { updates });
   }
 
   useUrlAsOfficialWebsite(url: string): Observable<CompanyProfileResponse> {
@@ -54,6 +74,18 @@ export class CompanyOnboardingService {
 
   getState(): Observable<OnboardingState> {
     return this.http.get<OnboardingState>(`${this.baseUrl}/chat/state`);
+  }
+
+  getTeam(): Observable<TeamOnboarding> {
+    return this.http.get<TeamOnboarding>(`${this.baseUrl}/team`);
+  }
+
+  createTeamMember(payload: TeamMemberInvite): Observable<TeamMember> {
+    return this.http.post<TeamMember>(`${this.baseUrl}/team/members`, payload);
+  }
+
+  decideTeamRole(role: TeamRole, status: 'deferred' | 'not_applicable'): Observable<TeamOnboarding> {
+    return this.http.patch<TeamOnboarding>(`${this.baseUrl}/team/roles/${role}`, { status });
   }
 
   sendMessage(message: string, inReplyToMessageId?: string | null): Observable<ChatTurnResponse> {

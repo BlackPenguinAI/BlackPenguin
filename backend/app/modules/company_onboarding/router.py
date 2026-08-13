@@ -20,6 +20,7 @@ from app.modules.onboarding_jobs import service as job_service
 from app.modules.onboarding_jobs.continuation import finalize_source_group
 from app.modules.onboarding_jobs.models import OnboardingSourceJob
 from app.modules.users.models import TENANT_MANAGER_ROLES, User, UserRole
+from app.modules.users import services as user_services
 
 from . import services, source_service, storage_service
 from .completion import FIELD_BY_KEY
@@ -43,6 +44,10 @@ from .schemas import (
     ScrapeRequest,
     SessionResponse,
     SourceResponse,
+    TeamMemberCreate,
+    TeamMemberResponse,
+    TeamOnboardingResponse,
+    TeamRoleDecision,
 )
 
 
@@ -213,7 +218,57 @@ def _state_payload(db: Session, company_id: str) -> dict[str, Any]:
         "next_question": _next_question(profile),
         "stage": stage,
         "version": version,
+        "team": services.serialize_team(db, company_id, profile),
     }
+
+
+@router.get("/team", response_model=TeamOnboardingResponse)
+def get_onboarding_team(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker(ALLOWED_ROLES)),
+):
+    return services.serialize_team(db, current_user.company_id)
+
+
+@router.post("/team/members", response_model=TeamMemberResponse, status_code=201)
+def create_onboarding_team_member(
+    payload: TeamMemberCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([UserRole.ADMIN])),
+):
+    try:
+        role = UserRole(payload.role)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail="Role must be assistant, mkt or sales.") from exc
+    user = user_services.invite_tenant_user(
+        db,
+        company_id=current_user.company_id,
+        email=payload.email,
+        first_name=payload.first_name,
+        last_name=payload.last_name,
+        role=role,
+    )
+    profile = services.get_or_create_profile(db, current_user.company_id)
+    services.clear_team_role_decision(db, profile, role)
+    return user
+
+
+@router.patch("/team/roles/{role_name}", response_model=TeamOnboardingResponse)
+def decide_onboarding_team_role(
+    role_name: str,
+    payload: TeamRoleDecision,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([UserRole.ADMIN])),
+):
+    try:
+        role = UserRole(role_name)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail="Role must be assistant, mkt or sales.") from exc
+    if role not in services.TEAM_ROLE_STATE_KEYS:
+        raise HTTPException(status_code=422, detail="Role must be assistant, mkt or sales.")
+    profile = services.get_or_create_profile(db, current_user.company_id)
+    services.set_team_role_decision(db, profile, role, payload.status)
+    return services.serialize_team(db, current_user.company_id, profile)
 
 
 @router.get("/profile", response_model=CompanyProfileResponse)

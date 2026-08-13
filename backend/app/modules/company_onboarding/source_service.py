@@ -8,7 +8,7 @@ import json
 import re
 import socket
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 from zipfile import BadZipFile, ZipFile
 
 from bs4 import BeautifulSoup
@@ -245,8 +245,11 @@ async def _extract_proposals(
     source: CompanyOnboardingSource,
     text: str,
 ) -> list[CompanyOnboardingProposal]:
+    deterministic = _proposals_from_embedded_links(source, text)
     config = get_ai_config(db, company_id)
     if not config.openrouter_api_key:
+        if deterministic:
+            return deterministic
         raise ValueError("AI configuration is incomplete.")
     model = (config.agent_onboarding_empresa or {}).get("model", "openai/gpt-4o-mini")
     allowed = [{"key": key, "label": definition.label} for key, definition in FIELD_BY_KEY.items()]
@@ -281,17 +284,24 @@ async def _extract_proposals(
             ),
         },
     ]
-    raw = await generate_llm_response(
-        config.openrouter_api_key,
-        model,
-        messages,
-        response_format={"type": "json_object"},
-        temperature=0.1,
-        raise_on_error=True,
-    )
-    payload = json.loads(_strip_fences(raw))
-    result = []
-    seen = {proposal.field_key for proposal in source.proposals}
+    try:
+        raw = await generate_llm_response(
+            config.openrouter_api_key,
+            model,
+            messages,
+            response_format={"type": "json_object"},
+            temperature=0.1,
+            raise_on_error=True,
+        )
+        payload = json.loads(_strip_fences(raw))
+    except Exception:
+        if deterministic:
+            return deterministic
+        raise
+    result = list(deterministic)
+    seen = {proposal.field_key for proposal in source.proposals} | {
+        proposal.field_key for proposal in deterministic
+    }
     for item in payload.get("proposals", []) if isinstance(payload, dict) else []:
         key = services.normalize_field_key(item.get("field")) if isinstance(item, dict) else None
         value = item.get("value") if isinstance(item, dict) else None
@@ -311,6 +321,66 @@ async def _extract_proposals(
             )
         )
     return result
+
+
+SOCIAL_HOSTS = {
+    "linkedin.com", "instagram.com", "facebook.com", "x.com", "twitter.com",
+    "youtube.com", "youtu.be", "tiktok.com", "pinterest.com", "threads.net",
+}
+
+
+def _social_host(url: str) -> bool:
+    host = (urlparse(url).hostname or "").casefold().removeprefix("www.")
+    return any(host == domain or host.endswith(f".{domain}") for domain in SOCIAL_HOSTS)
+
+
+def _proposals_from_embedded_links(
+    source: CompanyOnboardingSource,
+    text: str,
+) -> list[CompanyOnboardingProposal]:
+    """Extract machine-readable contacts before asking the model to interpret prose."""
+    values = _embedded_link_values(text)
+    return [
+        CompanyOnboardingProposal(
+            source_id=source.id,
+            field_key=field,
+            value=value,
+            evidence="Detected in a link published by the source website.",
+            confidence="high",
+            status=ProposalStatus.PENDING,
+        )
+        for field, value in values.items()
+        if value and not validate_onboarding_value(field, value)
+    ]
+
+
+def _embedded_link_values(text: str) -> dict[str, list[str]]:
+    links = re.findall(r"ONBOARDING_LINK:([^\s]+)", text)
+    emails: list[str] = []
+    phones: list[str] = []
+    social_profiles: list[str] = []
+    for raw_link in links:
+        link = unquote(raw_link).strip()
+        lowered = link.casefold()
+        if lowered.startswith("mailto:"):
+            address_part = link[7:].split("?", 1)[0]
+            for address in re.split(r"[,;]", address_part):
+                normalized = address.strip().casefold()
+                if normalized and normalized not in emails:
+                    emails.append(normalized)
+        elif lowered.startswith("tel:"):
+            number = link[4:].split("?", 1)[0].strip()
+            if number and number not in phones:
+                phones.append(number)
+        elif lowered.startswith(("http://", "https://")) and _social_host(link):
+            if link not in social_profiles:
+                social_profiles.append(link)
+
+    return {
+        "public_contact_emails": emails,
+        "public_contact_phones": phones,
+        "corporate_social_profiles": social_profiles,
+    }
 
 
 def review_proposal(
@@ -444,9 +514,17 @@ def _extract_bytes(content: bytes, mime_type: str, name: str) -> str:
     if mime_type == "text/plain" or name.lower().endswith(".txt"):
         return content.decode("utf-8", errors="replace")
     soup = BeautifulSoup(content, "html.parser")
+    embedded_links = []
+    for anchor in soup.find_all("a", href=True):
+        href = str(anchor.get("href") or "").strip()
+        if href.casefold().startswith(("mailto:", "tel:")) or _social_host(href):
+            marker = f"ONBOARDING_LINK:{href.replace(' ', '%20')}"
+            if marker not in embedded_links:
+                embedded_links.append(marker)
     for element in soup(["script", "style", "noscript", "svg"]):
         element.decompose()
-    return soup.get_text(separator=" ", strip=True)
+    visible_text = soup.get_text(separator=" ", strip=True)
+    return " ".join([visible_text, *embedded_links])
 
 
 def _validate_signature(content: bytes, mime_type: str) -> None:

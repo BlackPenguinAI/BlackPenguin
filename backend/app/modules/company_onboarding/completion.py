@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Any, Iterable
 
 
-RESOLVED_STATUSES = {"confirmed", "corrected_by_user"}
+RESOLVED_STATUSES = {"confirmed", "corrected_by_user", "deferred"}
 VALID_STATUSES = {
     "missing",
     "extracted",
@@ -13,6 +13,7 @@ VALID_STATUSES = {
     "corrected_by_user",
     "conflicting",
     "not_applicable",
+    "deferred",
 }
 
 
@@ -40,8 +41,6 @@ CONDITIONAL_FIELDS = (
     FieldDefinition("legal_company_name", "Legal company name", "conditionally_required"),
     FieldDefinition("dba", "DBA (Doing Business As)", "conditionally_required"),
     FieldDefinition("parent_company", "Parent company", "conditionally_required"),
-    FieldDefinition("primary_corporate_sales_contact", "Primary corporate sales contact", "conditionally_required"),
-    FieldDefinition("primary_corporate_marketing_contact", "Primary corporate marketing contact", "conditionally_required"),
     FieldDefinition("additional_corporate_languages", "Additional corporate languages", "conditionally_required"),
     FieldDefinition("corporate_compliance_information", "Corporate compliance information", "conditionally_required"),
 )
@@ -50,8 +49,9 @@ RECOMMENDED_FIELDS = tuple(
     FieldDefinition(key, label, "recommended")
     for key, label in (
         ("year_established", "Year established"),
-        ("general_business_email", "General business email"),
-        ("general_business_phone", "General business phone"),
+        ("public_contact_emails", "Public contact emails"),
+        ("public_contact_phones", "Public contact phone numbers"),
+        ("corporate_social_profiles", "Corporate social media profiles"),
         ("additional_offices", "Additional offices"),
         ("ceo_or_president", "CEO (Chief Executive Officer) or president"),
         ("founders", "Founder or founders"),
@@ -96,7 +96,6 @@ OPTIONAL_FIELDS = tuple(
         ("organizational_chart", "Organizational chart"),
         ("brand_book", "Brand book"),
         ("corporate_tagline", "Corporate tagline"),
-        ("corporate_social_profiles", "Corporate social media profiles"),
         ("company_history", "Company history"),
         ("corporate_milestones", "Corporate milestones"),
         ("corporate_social_responsibility", "Corporate social-responsibility programs"),
@@ -117,6 +116,16 @@ FIELD_ALIASES = {
     "official website": "official_corporate_website",
     "corporate website": "official_corporate_website",
     "dba": "dba",
+    "general business email": "public_contact_emails",
+    "general business emails": "public_contact_emails",
+    "public contact email": "public_contact_emails",
+    "public contact emails": "public_contact_emails",
+    "general business phone": "public_contact_phones",
+    "general business phones": "public_contact_phones",
+    "public contact phone": "public_contact_phones",
+    "public contact phones": "public_contact_phones",
+    "social profiles": "corporate_social_profiles",
+    "social media profiles": "corporate_social_profiles",
     "headquarters": "headquarters",
     "year established": "year_established",
     "business model": "primary_business_model",
@@ -200,9 +209,9 @@ def calculate_completion(
     for field in applicable:
         status = states.get(field.key, {}).get("status", "missing")
         if not _is_resolved(status):
-            blockers.append({"field": field.key, "label": field.label, "status": status})
+            blockers.append({"field": field.key, "label": field.label, "status": status, "requirement": field.requirement})
     for field in unevaluated:
-        blockers.append({"field": field.key, "label": field.label, "status": "applicability_pending"})
+        blockers.append({"field": field.key, "label": field.label, "status": "applicability_pending", "requirement": field.requirement})
 
     can_complete = not blockers and final_approved
     return {
