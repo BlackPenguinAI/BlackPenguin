@@ -1,14 +1,16 @@
-import { HttpClientTestingModule } from '@angular/common/http/testing';
+import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute } from '@angular/router';
 import { RouterTestingModule } from '@angular/router/testing';
 
 import { ProjectChatComponent } from './project-chat';
+import { EMPTY_PROJECT_PROFILE } from './project-onboarding.models';
 
 
 describe('ProjectChatComponent', () => {
   let component: ProjectChatComponent;
   let fixture: ComponentFixture<ProjectChatComponent>;
+  let http: HttpTestingController;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
@@ -23,7 +25,10 @@ describe('ProjectChatComponent', () => {
 
     fixture = TestBed.createComponent(ProjectChatComponent);
     component = fixture.componentInstance;
+    http = TestBed.inject(HttpTestingController);
   });
+
+  afterEach(() => http.verify());
 
   it('should create', () => {
     expect(component).toBeTruthy();
@@ -72,5 +77,37 @@ describe('ProjectChatComponent', () => {
     expect(component.isSourceExpanded(source)).toBe(true);
     expect(component.hasPendingReview).toBe(false);
     expect(component.canSend).toBe(true);
+  });
+
+  it('should preserve review position and keep the source expanded after the last decision', () => {
+    const proposal = {
+      id: 'proposal-last', field: 'exact_address', label: 'Address', value: 'Lima',
+      draftValue: 'Lima', evidence: null, confidence: 'high', status: 'pending' as const,
+    };
+    const source = {
+      id: 'source-last', kind: 'official_website', status: 'ready' as const, name: 'example.com',
+      url: 'https://example.com', mime_type: 'text/html', size_bytes: 100, error_message: null,
+      message_id: null, download_url: null, is_primary: false, proposals: [proposal],
+      created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    };
+    component.projectId = 'project-1';
+    component.sources = [source];
+    (component as unknown as { expandedSourceIds: Set<string> }).expandedSourceIds.add(source.id);
+    const scrollToBottom = vi.spyOn(component as unknown as { scrollToBottom(): void }, 'scrollToBottom');
+
+    component.decideProposal(source, proposal, 'confirm');
+    http.expectOne('http://localhost:8000/api/v1/projects/project-1/proposals/proposal-last/decision').flush({
+      proposal: { ...proposal, status: 'confirmed' }, profile: EMPTY_PROJECT_PROFILE,
+    });
+    http.expectOne('http://localhost:8000/api/v1/projects/project-1/chat/state').flush({
+      messages: [], profile: EMPTY_PROJECT_PROFILE,
+      sources: [{ ...source, proposals: [{ ...proposal, status: 'confirmed' }] }],
+      stage: 'conversation', version: 1,
+      next_question: { field: 'project_type', label: 'Project type', prompt: 'Project type?', input_type: 'text', options: [], examples: [], allow_custom: true, minimum_words: null },
+    });
+
+    expect(scrollToBottom).not.toHaveBeenCalled();
+    expect(component.sources[0].proposals[0].status).toBe('confirmed');
+    expect(component.isSourceExpanded(component.sources[0])).toBe(true);
   });
 });

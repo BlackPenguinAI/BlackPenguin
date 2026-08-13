@@ -10,6 +10,13 @@ import { SpeechRecognitionService } from '../../../../core/services/speech-recog
 import { OnboardingQuestion } from '../../../../shared/ui/onboarding-response-options/onboarding-response-options';
 import { OnboardingAiMessageComponent } from '../../../../shared/ui/onboarding-ai-message/onboarding-ai-message';
 import { OnboardingWelcomeComponent } from '../../../../shared/ui/onboarding-welcome/onboarding-welcome';
+import {
+  captureReviewScrollAnchor,
+  isNearScrollBottom,
+  OnboardingScrollMode,
+  restoreReviewScrollAnchor,
+  ReviewScrollAnchor,
+} from '../../../../shared/utils/review-scroll-anchor';
 
 import {
   Campaign, ChatAttachment, ChatMessage, ChatTurn, EMPTY_PROJECT_PROFILE, MetaConnection, OnboardingState,
@@ -252,20 +259,22 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   }
   decideProposal(source: ProjectSource, proposal: SourceProposal, action: 'confirm' | 'correct' | 'reject'): void {
     if (proposal.submitting || proposal.status !== 'pending') return;
+    const anchor = captureReviewScrollAnchor(this.chatScroll?.nativeElement, proposal.id);
     const value = action === 'correct' ? this.parseValue(proposal.draftValue || '') : undefined;
     this.updateProposal(source.id, proposal.id, { submitting: true });
     this.onboarding.decideProposal(this.projectId, proposal.id, action, value).subscribe({
       next: (result) => {
         this.updateProposal(source.id, proposal.id, { ...result.proposal, draftValue: this.formatValue(result.proposal.value), submitting: false });
-        this.profile = result.profile; this.syncState(true); this.cdr.detectChanges();
+        this.profile = result.profile; this.syncState('preserve', anchor); this.cdr.detectChanges();
       },
       error: (error: HttpErrorResponse) => {
         if (error.status === 409) {
           this.errorMessage = 'This proposal changed in another request. The current state was reloaded.';
-          this.syncState();
+          this.syncState('preserve', anchor);
         } else {
           this.updateProposal(source.id, proposal.id, { submitting: false });
           this.errorMessage = error.status === 422 ? 'The proposed value is not valid. Review it and try again.' : 'That proposal could not be updated.';
+          this.restoreProposalAnchor(anchor);
         }
       },
     });
@@ -339,25 +348,49 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   statusLabel(status: ValidationStatus): string { return status.replaceAll('_', ' '); }
   formatValue(value: unknown): string { return typeof value === 'string' ? value : value == null ? '' : JSON.stringify(value); }
   trackSource(_: number, item: ProjectSource): string { return item.id; }
+  trackProposal(_: number, item: SourceProposal): string { return item.id; }
   trackField(_: number, item: ProjectFieldProgress): string { return item.key; }
 
   private parseValue(value: string): unknown { const trimmed = value.trim(); try { return /^[\[{]/.test(trimmed) ? JSON.parse(trimmed) : trimmed; } catch { return trimmed; } }
   private joinSpeech(base: string, finalText: string, interimText: string): string {
     return [base, finalText, interimText].filter(Boolean).join(' ').replace(/\s+/g, ' ').trimStart();
   }
-  private prepareSources(items: ProjectSource[]): ProjectSource[] { return items.map((source) => ({ ...source, proposals: source.proposals.map((proposal) => ({ ...proposal, draftValue: this.formatValue(proposal.value) })) })); }
+  private prepareSources(items: ProjectSource[]): ProjectSource[] {
+    const previousProposals = new Map(
+      this.sources.flatMap((source) => source.proposals.map((proposal) => [proposal.id, proposal] as const)),
+    );
+    return items.map((source) => ({
+      ...source,
+      proposals: source.proposals.map((proposal) => {
+        const previous = previousProposals.get(proposal.id);
+        const preserveDraft = proposal.status === 'pending'
+          && previous?.status === 'pending'
+          && previous.draftValue !== undefined;
+        return {
+          ...proposal,
+          draftValue: preserveDraft ? previous.draftValue : this.formatValue(proposal.value),
+        };
+      }),
+    }));
+  }
   private mergeSources(items: ProjectSource[]): void {
     const merged = new Map(this.sources.map((source) => [source.id, source]));
     for (const source of this.prepareSources(items)) merged.set(source.id, source);
     this.sources = Array.from(merged.values());
     for (const source of this.sources) if (this.hasPendingProposals(source)) this.expandedSourceIds.add(source.id);
   }
-  private syncState(scroll = false): void {
+  private syncState(
+    scrollMode: OnboardingScrollMode = 'none',
+    anchor: ReviewScrollAnchor | null = null,
+  ): void {
+    const shouldScrollToBottom = scrollMode === 'bottom'
+      || (scrollMode === 'auto' && isNearScrollBottom(this.chatScroll?.nativeElement));
     this.onboarding.getState(this.projectId).subscribe({
       next: (state) => {
         this.initialState = 'ready';
         this.applyState(state);
-        if (scroll) this.scrollToBottom();
+        if (scrollMode === 'preserve') this.restoreProposalAnchor(anchor);
+        else if (shouldScrollToBottom) this.scrollToBottom();
       },
       error: (error: HttpErrorResponse) => {
         if (error.status !== 401) {
@@ -393,15 +426,20 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
       ...source,
       proposals: source.proposals.map((item) => item.id === proposalId ? { ...item, ...patch } : item),
     }));
-    const source = this.sources.find((item) => item.id === sourceId);
-    if (source && !this.hasPendingProposals(source)) this.expandedSourceIds.delete(sourceId);
     this.cdr.detectChanges();
+  }
+  private restoreProposalAnchor(anchor: ReviewScrollAnchor | null): void {
+    if (!anchor) return;
+    setTimeout(() => {
+      restoreReviewScrollAnchor(this.chatScroll?.nativeElement, anchor);
+      this.cdr.detectChanges();
+    });
   }
   private schedulePolling(): void {
     if (this.pollingTimer) clearTimeout(this.pollingTimer);
     if (!this.pollingStartedAt) this.pollingStartedAt = Date.now();
     const delay = Date.now() - this.pollingStartedAt > 30_000 ? 5000 : 2000;
-    this.pollingTimer = setTimeout(() => this.syncState(true), delay);
+    this.pollingTimer = setTimeout(() => this.syncState('auto'), delay);
   }
   private markReply(messageId: string | null, answer: string): void {
     if (!messageId) return;

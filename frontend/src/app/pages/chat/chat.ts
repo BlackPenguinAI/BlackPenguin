@@ -18,6 +18,13 @@ import { SpeechRecognitionService } from '../../core/services/speech-recognition
 import { OnboardingQuestion } from '../../shared/ui/onboarding-response-options/onboarding-response-options';
 import { OnboardingAiMessageComponent } from '../../shared/ui/onboarding-ai-message/onboarding-ai-message';
 import { OnboardingWelcomeComponent } from '../../shared/ui/onboarding-welcome/onboarding-welcome';
+import {
+  captureReviewScrollAnchor,
+  isNearScrollBottom,
+  OnboardingScrollMode,
+  restoreReviewScrollAnchor,
+  ReviewScrollAnchor,
+} from '../../shared/utils/review-scroll-anchor';
 
 import {
   ChatMessage,
@@ -310,7 +317,7 @@ export class ChatComponent implements OnInit, OnDestroy {
       next: profile => {
         this.profile = profile;
         this.publicPresenceSaved = true;
-        this.syncState(true);
+        this.syncState('bottom');
       },
       error: (error: HttpErrorResponse) => {
         this.publicPresenceError = this.proposalErrorMessage(error);
@@ -326,7 +333,7 @@ export class ChatComponent implements OnInit, OnDestroy {
       this.publicPresenceSaving = false;
       this.cdr.detectChanges();
     })).subscribe({
-      next: profile => { this.profile = profile; this.syncState(true); },
+      next: profile => { this.profile = profile; this.syncState('bottom'); },
       error: (error: HttpErrorResponse) => this.publicPresenceError = this.proposalErrorMessage(error),
     });
   }
@@ -339,7 +346,7 @@ export class ChatComponent implements OnInit, OnDestroy {
       this.teamSaving = false;
       this.cdr.detectChanges();
     })).subscribe({
-      next: team => { this.team = team; this.syncState(true); },
+      next: team => { this.team = team; this.syncState('bottom'); },
       error: (error: HttpErrorResponse) => {
         this.teamError = typeof error.error?.detail === 'string'
           ? error.error.detail
@@ -356,7 +363,7 @@ export class ChatComponent implements OnInit, OnDestroy {
       this.teamSaving = false;
       this.cdr.detectChanges();
     })).subscribe({
-      next: team => { this.team = team; this.syncState(true); },
+      next: team => { this.team = team; this.syncState('bottom'); },
       error: (error: HttpErrorResponse) => {
         this.teamError = typeof error.error?.detail === 'string'
           ? error.error.detail
@@ -476,7 +483,7 @@ export class ChatComponent implements OnInit, OnDestroy {
       next: (sources) => {
         this.isUploading = false;
         this.mergeSources(sources);
-        this.syncState(true);
+        this.syncState('bottom');
       },
       error: () => {
         this.isUploading = false;
@@ -491,6 +498,7 @@ export class ChatComponent implements OnInit, OnDestroy {
     action: 'confirm' | 'correct' | 'reject',
   ): void {
     if (proposal.submitting || proposal.status !== 'pending') return;
+    const anchor = captureReviewScrollAnchor(this.chatScroll?.nativeElement, proposal.id);
     this.errorMessage = '';
     const value = action === 'correct'
       ? this.parseDraftValue(proposal.field, proposal.draftValue || '')
@@ -506,18 +514,19 @@ export class ChatComponent implements OnInit, OnDestroy {
         });
         this.profile = result.profile;
         this.isCompleted = result.profile.completion.can_complete;
-        this.syncState(true);
+        this.syncState('preserve', anchor);
         this.cdr.detectChanges();
       },
       error: (error: HttpErrorResponse) => {
         if (error.status === 409) {
           this.errorMessage = 'This proposal changed in another request. The current state was reloaded.';
-          this.syncState();
+          this.syncState('preserve', anchor);
         } else {
           const message = error.status === 422
             ? this.proposalErrorMessage(error)
             : 'That proposal could not be updated.';
           this.updateProposal(source.id, proposal.id, { submitting: false, errorMessage: message });
+          this.restoreProposalAnchor(anchor);
         }
       },
     });
@@ -526,6 +535,7 @@ export class ChatComponent implements OnInit, OnDestroy {
   confirmAllUnchanged(source: OnboardingSource): void {
     const pending = source.proposals.filter(proposal => proposal.status === 'pending' && !proposal.submitting);
     if (!pending.length || this.confirmingSourceIds.has(source.id)) return;
+    const anchor = captureReviewScrollAnchor(this.chatScroll?.nativeElement, pending[0].id);
     this.confirmingSourceIds.add(source.id);
     for (const proposal of pending) {
       this.updateProposal(source.id, proposal.id, { submitting: true, errorMessage: undefined });
@@ -552,7 +562,7 @@ export class ChatComponent implements OnInit, OnDestroy {
       toArray(),
       finalize(() => {
         this.confirmingSourceIds.delete(source.id);
-        this.syncState(true);
+        this.syncState('preserve', anchor);
         this.cdr.detectChanges();
       }),
     ).subscribe();
@@ -592,7 +602,7 @@ export class ChatComponent implements OnInit, OnDestroy {
         this.savingWebsiteSourceIds.delete(source.id);
         this.profile = profile;
         this.isCompleted = profile.completion.can_complete;
-        this.syncState(true);
+        this.syncState('auto');
       },
       error: () => {
         this.savingWebsiteSourceIds.delete(source.id);
@@ -677,13 +687,26 @@ export class ChatComponent implements OnInit, OnDestroy {
     return source.id;
   }
 
+  trackProposal(_: number, proposal: SourceProposal): string {
+    return proposal.id;
+  }
+
   private prepareSources(sources: OnboardingSource[]): OnboardingSource[] {
+    const previousProposals = new Map(
+      this.sources.flatMap((source) => source.proposals.map((proposal) => [proposal.id, proposal] as const)),
+    );
     return sources.map((source) => ({
       ...source,
-      proposals: source.proposals.map((proposal) => ({
-        ...proposal,
-        draftValue: this.formatProposalValue(proposal),
-      })),
+      proposals: source.proposals.map((proposal) => {
+        const previous = previousProposals.get(proposal.id);
+        const preserveDraft = proposal.status === 'pending'
+          && previous?.status === 'pending'
+          && previous.draftValue !== undefined;
+        return {
+          ...proposal,
+          draftValue: preserveDraft ? previous.draftValue : this.formatProposalValue(proposal),
+        };
+      }),
     }));
   }
 
@@ -705,12 +728,18 @@ export class ChatComponent implements OnInit, OnDestroy {
     }
   }
 
-  private syncState(scroll = false): void {
+  private syncState(
+    scrollMode: OnboardingScrollMode = 'none',
+    anchor: ReviewScrollAnchor | null = null,
+  ): void {
+    const shouldScrollToBottom = scrollMode === 'bottom'
+      || (scrollMode === 'auto' && isNearScrollBottom(this.chatScroll?.nativeElement));
     this.onboarding.getState().subscribe({
       next: (state) => {
         this.initialState = 'ready';
         this.applyState(state);
-        if (scroll) this.scrollToBottom();
+        if (scrollMode === 'preserve') this.restoreProposalAnchor(anchor);
+        else if (shouldScrollToBottom) this.scrollToBottom();
       },
       error: (error: HttpErrorResponse) => {
         if (error.status !== 401) {
@@ -758,14 +787,14 @@ export class ChatComponent implements OnInit, OnDestroy {
     this.mergeSources(turn.sources);
     if (turn.sources.some((source) => source.status === 'processing')) this.schedulePolling();
     this.cdr.detectChanges();
-    this.syncState(true);
+    this.syncState('none');
   }
 
   private refreshTeam(syncStage = false): void {
     this.onboarding.getTeam().subscribe({
       next: team => {
         this.team = team;
-        if (syncStage) this.syncState(true);
+        if (syncStage) this.syncState('bottom');
         this.cdr.detectChanges();
       },
       error: () => { this.teamError = 'The team status could not be refreshed.'; },
@@ -791,7 +820,7 @@ export class ChatComponent implements OnInit, OnDestroy {
     if (this.pollingTimer) clearTimeout(this.pollingTimer);
     if (!this.pollingStartedAt) this.pollingStartedAt = Date.now();
     const delay = Date.now() - this.pollingStartedAt > 30_000 ? 5000 : 2000;
-    this.pollingTimer = setTimeout(() => this.syncState(true), delay);
+    this.pollingTimer = setTimeout(() => this.syncState('auto'), delay);
   }
 
   private markReply(messageId: string | null, answer: string): void {
@@ -839,9 +868,15 @@ export class ChatComponent implements OnInit, OnDestroy {
       ...source,
       proposals: source.proposals.map((item) => item.id === proposalId ? { ...item, ...patch } : item),
     }));
-    const source = this.sources.find((item) => item.id === sourceId);
-    if (source && !this.hasPendingProposals(source)) this.expandedSourceIds.delete(sourceId);
     this.cdr.detectChanges();
+  }
+
+  private restoreProposalAnchor(anchor: ReviewScrollAnchor | null): void {
+    if (!anchor) return;
+    setTimeout(() => {
+      restoreReviewScrollAnchor(this.chatScroll?.nativeElement, anchor);
+      this.cdr.detectChanges();
+    });
   }
 
   private scrollToBottom(): void {

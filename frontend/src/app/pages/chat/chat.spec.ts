@@ -230,6 +230,60 @@ describe('ChatComponent', () => {
     });
   });
 
+  it('should preserve review position and keep the source expanded after the last decision', () => {
+    const proposal = {
+      id: 'proposal-last', field: 'headquarters', label: 'Headquarters',
+      value: 'Miami', draftValue: 'Miami', evidence: null, confidence: 'high' as const,
+      status: 'pending' as const,
+    };
+    const source = {
+      id: 'source-last', kind: 'official_website' as const, status: 'ready' as const,
+      name: 'example.com', url: 'https://example.com', mime_type: 'text/html', size_bytes: 100,
+      message_id: null, download_url: null, error_message: null, proposals: [proposal],
+      created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    };
+    component.sources = [source];
+    (component as unknown as { expandedSourceIds: Set<string> }).expandedSourceIds.add(source.id);
+    const scrollToBottom = vi.spyOn(component as unknown as { scrollToBottom(): void }, 'scrollToBottom');
+
+    component.decideProposal(source, proposal, 'confirm');
+    http.expectOne('http://localhost:8000/api/v1/company-onboarding/proposals/proposal-last/decision').flush({
+      proposal: { ...proposal, status: 'confirmed' }, profile: EMPTY_COMPANY_PROFILE,
+    });
+    http.expectOne('http://localhost:8000/api/v1/company-onboarding/chat/state').flush({
+      messages: [], profile: EMPTY_COMPANY_PROFILE,
+      sources: [{ ...source, proposals: [{ ...proposal, status: 'confirmed' }] }],
+      stage: 'required', version: 1, team: { administrator: null, members: [], roles: [] },
+      next_question: { field: 'primary_business_model', label: 'Business model', prompt: 'Business model?', input_type: 'text', options: [], examples: [], allow_custom: true, minimum_words: null },
+    });
+
+    expect(scrollToBottom).not.toHaveBeenCalled();
+    expect(component.sources[0].proposals[0].status).toBe('confirmed');
+    expect(component.isSourceExpanded(component.sources[0])).toBe(true);
+  });
+
+  it('should keep an unsaved proposal draft while another decision synchronizes state', () => {
+    const preservedDraft = {
+      id: 'proposal-draft', field: 'headquarters', label: 'Headquarters', value: 'Miami',
+      draftValue: 'Lima, Peru', evidence: null, confidence: 'high' as const, status: 'pending' as const,
+    };
+    component.sources = [{
+      id: 'source-draft', kind: 'official_website', status: 'ready', name: 'example.com',
+      url: 'https://example.com', mime_type: 'text/html', size_bytes: 100,
+      message_id: null, download_url: null, error_message: null, proposals: [preservedDraft],
+      created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    }];
+
+    (component as unknown as { applyState(state: unknown): void }).applyState({
+      messages: [], profile: EMPTY_COMPANY_PROFILE,
+      sources: [{ ...component.sources[0], proposals: [{ ...preservedDraft, draftValue: undefined }] }],
+      stage: 'website_review', version: 1, team: { administrator: null, members: [], roles: [] },
+      next_question: { field: null, label: 'Review', prompt: 'Review', input_type: 'text', options: [], examples: [], allow_custom: true, minimum_words: null },
+    });
+
+    expect(component.sources[0].proposals[0].draftValue).toBe('Lima, Peru');
+  });
+
   it('should keep proposal actions available and show a structured validation error', () => {
     const proposal = {
       id: 'proposal-description', field: 'approved_short_company_description', label: 'Description',
