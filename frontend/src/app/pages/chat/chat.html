@@ -223,6 +223,20 @@
         </section>
       </div>
 
+      <div *ngIf="isCompleted" class="flex max-w-3xl gap-4" data-testid="company-onboarding-complete">
+        <div class="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-green-500/40 bg-green-500/10">
+          <span class="material-symbols-outlined text-[18px] text-green-400">verified</span>
+        </div>
+        <section class="w-full rounded-2xl rounded-tl-sm border border-green-500/30 bg-green-500/10 p-5">
+          <h2 class="text-sm font-semibold text-green-300">Company Profile approved</h2>
+          <p class="mt-1 text-xs leading-relaxed text-green-100/70">Your company information is ready. Continue to Projects to create or manage a Project Onboarding.</p>
+          <a routerLink="/app/projects" class="mt-4 inline-flex items-center gap-2 rounded-lg bg-secondary px-4 py-2 text-xs font-semibold text-black transition hover:brightness-110">
+            Continue to Projects
+            <span class="material-symbols-outlined text-[17px]">arrow_forward</span>
+          </a>
+        </section>
+      </div>
+
       <div *ngIf="isAnalyzing" class="flex max-w-[80%] gap-4">
         <div class="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-secondary/50 bg-secondary/20">
           <span class="material-symbols-outlined text-[18px] text-secondary">smart_toy</span>
@@ -240,7 +254,17 @@
         <div *ngIf="errorMessage" class="mb-3 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-xs text-red-200">
           {{ errorMessage }}
         </div>
-        <div class="relative rounded-2xl border border-white/5 bg-[#111] p-4 shadow-2xl">
+        <div *ngIf="isCompleted" class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-green-500/20 bg-green-500/5 p-4 shadow-2xl">
+          <div>
+            <p class="text-sm font-semibold text-green-300">Company Onboarding complete</p>
+            <p class="mt-1 text-xs text-gray-400">The profile is approved and no further confirmation is required.</p>
+          </div>
+          <a routerLink="/app/projects" class="inline-flex items-center gap-2 rounded-xl bg-secondary px-4 py-2.5 text-xs font-semibold text-black transition hover:brightness-110">
+            Continue to Projects
+            <span class="material-symbols-outlined text-[17px]">arrow_forward</span>
+          </a>
+        </div>
+        <div *ngIf="!isCompleted" class="relative rounded-2xl border border-white/5 bg-[#111] p-4 shadow-2xl">
           <textarea
             [(ngModel)]="prompt"
             (keydown)="handleKeyDown($event)"
@@ -414,6 +438,9 @@
         <div class="text-xs">
           <span class="mb-0.5 block font-bold uppercase tracking-wider text-green-300">Profile complete</span>
           Ready to begin project onboarding.
+          <a routerLink="/app/projects" class="mt-2 inline-flex items-center gap-1 font-semibold text-secondary hover:underline">
+            Continue to Projects <span class="material-symbols-outlined text-[14px]">arrow_forward</span>
+          </a>
         </div>
       </div>
       <ng-template #incomplete>

@@ -137,11 +137,14 @@ def build_next_question(
             "input_type": "boolean",
             "options": ["Approve profile", "I need to make changes"],
             "examples": [],
-            "allow_custom": True,
+            "allow_custom": False,
             "minimum_words": None,
             "minimum_characters": None,
             "help_text": None,
-            "answer_actions": {},
+            "answer_actions": {
+                "Approve profile": {"kind": "approve_profile"},
+                "I need to make changes": {"kind": "request_changes"},
+            },
         }
     blocker = blockers[0]
     field = blocker["field"]

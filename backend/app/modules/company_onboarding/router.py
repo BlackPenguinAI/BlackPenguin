@@ -53,6 +53,9 @@ from .schemas import (
 
 router = APIRouter()
 ALLOWED_ROLES = [*TENANT_MANAGER_ROLES, UserRole.MKT]
+USER_FACING_JSON_VALUE = re.compile(
+    r"(?P<prefix>\*\*[^*\n]+:\*\*\s*)(?P<value>\[[^\n]*\]|\{[^\n]*\})"
+)
 
 
 def _is_authorized_admin(user: User) -> bool:
@@ -90,7 +93,11 @@ def _message_payload(message: OnboardingMessage) -> dict[str, Any]:
     return {
         "id": message.id,
         "sender": "user" if message.sender == SenderType.USER else "ai",
-        "content": message.content,
+        "content": (
+            _normalize_user_facing_content(message.content)
+            if message.sender == SenderType.AI
+            else message.content
+        ),
         "ui_payload": message.ui_payload,
         "response_payload": message.response_payload,
         "in_reply_to_message_id": message.in_reply_to_message_id,
@@ -112,12 +119,69 @@ def _next_prompt(profile) -> str:
 
 
 def _next_question(profile) -> dict[str, Any]:
-    blockers = services.serialize_profile(profile)["completion"]["blockers"]
+    completion = services.serialize_profile(profile)["completion"]
+    if completion["can_complete"]:
+        return {
+            "field": None,
+            "label": "Company Profile complete",
+            "prompt": "Your Company Profile is approved. Continue to Projects when you are ready.",
+            "input_type": "complete",
+            "options": [],
+            "examples": [],
+            "allow_custom": False,
+            "minimum_words": None,
+            "minimum_characters": None,
+            "help_text": None,
+            "answer_actions": {},
+        }
     return build_next_question(
-        blockers,
+        completion["blockers"],
         final_prompt="Review the Company Profile and choose whether to approve it or make changes.",
         profile_data=profile.profile_data or {},
     )
+
+
+def _natural_join(values: list[str]) -> str:
+    if not values:
+        return "None provided"
+    if len(values) == 1:
+        return values[0]
+    if len(values) == 2:
+        return f"{values[0]} and {values[1]}"
+    return ", ".join(values[:-1]) + f", and {values[-1]}"
+
+
+def _format_user_facing_value(value: Any) -> str:
+    if isinstance(value, list):
+        return _natural_join([_format_user_facing_value(item) for item in value])
+    if isinstance(value, dict):
+        if value.get("exists") is False:
+            return "No official website"
+        if isinstance(value.get("url"), str):
+            return value["url"]
+        entries = [
+            f"{str(key).replace('_', ' ').capitalize()}: {_format_user_facing_value(item)}"
+            for key, item in value.items()
+            if item is not None
+        ]
+        return "; ".join(entries) if entries else "Not applicable"
+    if isinstance(value, bool):
+        return "Yes" if value else "No"
+    if value is None:
+        return "Not applicable"
+    return str(value)
+
+
+def _normalize_user_facing_content(content: str) -> str:
+    """Hide legacy JSON list/dict syntax in persisted acknowledgement messages."""
+    def replace(match: re.Match[str]) -> str:
+        try:
+            value = json.loads(match.group("value"))
+        except json.JSONDecodeError:
+            return match.group(0)
+        return match.group("prefix") + _format_user_facing_value(value)
+
+    return USER_FACING_JSON_VALUE.sub(replace, content)
 
 
 def _accepted_response(first_name: str | None, accepted: list[dict[str, Any]], profile) -> str:
@@ -128,14 +192,8 @@ def _accepted_response(first_name: str | None, accepted: list[dict[str, Any]], p
         value = item.get("value")
         if item.get("status") == "not_applicable":
             display = "Not applicable"
-        elif isinstance(value, dict) and value.get("exists") is False:
-            display = "No official website"
-        elif isinstance(value, dict) and value.get("url"):
-            display = value["url"]
-        elif isinstance(value, (dict, list)):
-            display = json.dumps(value, ensure_ascii=False)
         else:
-            display = str(value)
+            display = _format_user_facing_value(value)
         lines.append(f"- **{label}:** {display}")
     return f"{greeting} I updated the profile with:\n\n" + "\n".join(lines) + "\n\n" + _next_prompt(profile)
 
@@ -547,6 +605,66 @@ async def send_chat_message(
         if fallback_updates:
             resolution = services.QuestionResolution(True, "accepted", fallback_updates)
 
+    if resolution.action == "approve_profile":
+        if not _is_authorized_admin(current_user):
+            db.rollback()
+            raise HTTPException(
+                status_code=403,
+                detail="Only a Company administrator or assistant can approve the Company Profile.",
+            )
+        try:
+            completion = services.approve_profile(db, profile, commit=False)
+        except ValueError:
+            resolution = services.QuestionResolution(
+                True,
+                "rejected",
+                [],
+                "profile_has_blockers",
+                resolution.question,
+            )
+        else:
+            session.is_completed = completion["can_complete"]
+            db.add(session)
+            services.record_message_response(
+                db,
+                session.id,
+                resolved_question_id,
+                payload.message,
+                status="accepted",
+                commit=False,
+            )
+            ai_message = services.save_message(
+                db,
+                session.id,
+                SenderType.AI,
+                (
+                    "Your **Company Profile has been approved successfully**. "
+                    "You can now continue to Project Onboarding."
+                ),
+                ui_payload=None,
+                in_reply_to_message_id=user_message.id,
+                commit=False,
+            )
+            db.commit()
+            db.refresh(user_message)
+            db.refresh(ai_message)
+            db.refresh(profile)
+            return {
+                "request_id": request_id,
+                "message_saved": True,
+                "profile_changed": True,
+                "field_update_status": "accepted",
+                "assistant_status": "deterministic",
+                "source_actions": [],
+                "message": _message_payload(ai_message),
+                "user_message": _message_payload(user_message),
+                "profile": services.serialize_profile(profile),
+                "accepted_fields": [],
+                "rejected_updates": [],
+                "sources": [],
+                "next_question": _next_question(profile),
+            }
+
     deterministic_result = None
     if resolution.status == "accepted" and resolution.updates:
         deterministic_result = services.apply_field_updates(
@@ -641,6 +759,7 @@ async def send_chat_message(
                 "minimum_words": "Please provide a more complete answer.",
                 "minimum_characters": "Please provide a more complete answer.",
                 "missing_reference_value": "The referenced profile value is not available. Please enter the value directly.",
+                "profile_has_blockers": "The profile changed before approval and still has required information pending.",
             }
             assistant_text = explanations.get(resolution.reason or "", "I couldn't safely apply that answer.")
             assistant_text += " " + _next_prompt(profile)
@@ -771,7 +890,9 @@ async def send_chat_message(
         profile,
         updates,
         allow_authoritative_statuses=_is_authorized_admin(current_user),
-        final_approved=final_approved,
+        # Final approval is a server-owned command resolved above. A model
+        # response can propose field updates but cannot complete onboarding.
+        final_approved=None,
     )
     accepted = (deterministic_result.accepted if deterministic_result else []) + result.accepted
     rejected = (deterministic_result.rejected if deterministic_result else []) + result.rejected

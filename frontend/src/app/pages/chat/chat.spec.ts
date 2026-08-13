@@ -37,6 +37,37 @@ describe('ChatComponent', () => {
     expect(component.showWelcome).toBe(false);
   });
 
+  it('should replace the composer with a Projects action after final approval', () => {
+    const completedProfile = {
+      ...EMPTY_COMPANY_PROFILE,
+      completion: {
+        ...EMPTY_COMPANY_PROFILE.completion,
+        percentage: 100,
+        can_complete: true,
+        final_approved: true,
+        required: { completed: 10, total: 10, remaining: 0 },
+        conditional: { completed: 0, total: 5, evaluated: 5, applicable: 0, remaining: 0 },
+      },
+    };
+    fixture.detectChanges();
+    http.expectOne('http://localhost:8000/api/v1/company-onboarding/chat/state').flush({
+      messages: [], profile: completedProfile, sources: [], stage: 'complete', version: 1,
+      team: { administrator: null, members: [], roles: [] },
+      next_question: {
+        field: null, label: 'Company Profile complete',
+        prompt: 'Your Company Profile is approved. Continue to Projects when you are ready.',
+        input_type: 'complete', options: [], examples: [], allow_custom: false,
+        minimum_words: null,
+      },
+    });
+    fixture.detectChanges();
+
+    const element = fixture.nativeElement as HTMLElement;
+    expect(element.querySelector('[data-testid="company-onboarding-complete"]')).not.toBeNull();
+    expect(element.textContent).toContain('Continue to Projects');
+    expect(element.querySelector('textarea')).toBeNull();
+  });
+
   it('should expose required and conditional fields separately', () => {
     component.profile = {
       ...EMPTY_COMPANY_PROFILE,

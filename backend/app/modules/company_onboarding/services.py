@@ -81,6 +81,7 @@ class QuestionResolution:
     updates: list[dict[str, Any]]
     reason: str | None = None
     question: OnboardingMessage | None = None
+    action: str | None = None
 
 
 DOMAIN_PATTERN = re.compile(
@@ -300,15 +301,37 @@ def resolve_answer_to_question(
     if unanswered and unanswered[0].id != question.id:
         return QuestionResolution(True, "rejected", [], "stale_question", question)
 
-    field = normalize_field_key(question.ui_payload.get("field"))
-    if field is None:
-        return QuestionResolution(False, "not_applicable", [], question=question)
     text = re.sub(r"\s+", " ", answer).strip()
     if not text:
         return QuestionResolution(True, "rejected", [], "empty_answer", question)
 
-    input_type = str(question.ui_payload.get("input_type") or "text")
     answer_actions = question.ui_payload.get("answer_actions")
+    if isinstance(answer_actions, dict):
+        action = next(
+            (value for label, value in answer_actions.items()
+             if str(label).strip().casefold() == text.casefold() and isinstance(value, dict)),
+            None,
+        )
+        if action and action.get("kind") == "approve_profile":
+            return QuestionResolution(
+                True, "accepted", [], question=question, action="approve_profile",
+            )
+        if action and action.get("kind") == "request_changes":
+            return QuestionResolution(
+                False, "not_applicable", [], question=question, action="request_changes",
+            )
+
+    field = normalize_field_key(question.ui_payload.get("field"))
+    if field is None:
+        # Keep approval deterministic for questions persisted before typed
+        # answer actions were introduced.
+        if text.casefold() == "approve profile":
+            return QuestionResolution(
+                True, "accepted", [], question=question, action="approve_profile",
+            )
+        return QuestionResolution(False, "not_applicable", [], question=question)
+
+    input_type = str(question.ui_payload.get("input_type") or "text")
     if isinstance(answer_actions, dict):
         action = next(
             (value for label, value in answer_actions.items()
@@ -553,6 +576,28 @@ def refresh_completion(profile: CompanyProfile) -> dict[str, Any]:
     )
     profile.completion_percentage = completion["percentage"]
     profile.is_profile_fully_completed = completion["can_complete"]
+    return completion
+
+
+def approve_profile(
+    db: Session,
+    profile: CompanyProfile,
+    *,
+    commit: bool = True,
+) -> dict[str, Any]:
+    """Complete onboarding only when the current profile has no blockers."""
+    readiness = calculate_completion(profile.field_states, final_approved=False)
+    if readiness["blockers"]:
+        raise ValueError("profile_has_blockers")
+
+    profile.final_approved = True
+    completion = refresh_completion(profile)
+    db.add(profile)
+    if commit:
+        db.commit()
+        db.refresh(profile)
+    else:
+        db.flush()
     return completion
 
 

@@ -5,8 +5,15 @@ import pytest
 from fastapi import HTTPException
 
 from app.modules.company_onboarding.completion import FIELD_BY_KEY, calculate_completion
-from app.modules.company_onboarding.router import _parse_agent_response, _workflow_stage
+from app.modules.company_onboarding.router import (
+    _format_user_facing_value,
+    _next_question,
+    _normalize_user_facing_content,
+    _parse_agent_response,
+    _workflow_stage,
+)
 from app.modules.company_onboarding.services import (
+    approve_profile,
     deterministic_context_update,
     extract_urls,
     get_active_question,
@@ -179,6 +186,26 @@ def test_agent_contract_never_requires_raw_json_as_visible_message():
     assert approved is False
 
 
+def test_user_facing_lists_never_expose_json_syntax():
+    assert _format_user_facing_value(["Multifamily"]) == "Multifamily"
+    assert _format_user_facing_value(["English"]) == "English"
+    assert _format_user_facing_value(["English", "Spanish"]) == "English and Spanish"
+
+
+def test_legacy_acknowledgements_are_normalized_when_read():
+    content = (
+        "Thanks.\n\n- **Core company-wide asset class:** [\"Multifamily\"]\n"
+        "- **Additional corporate languages:** [\"English\", \"Spanish\"]"
+    )
+
+    normalized = _normalize_user_facing_content(content)
+
+    assert "[" not in normalized
+    assert '"' not in normalized
+    assert "**Core company-wide asset class:** Multifamily" in normalized
+    assert "**Additional corporate languages:** English and Spanish" in normalized
+
+
 def test_urls_are_classified_without_rejecting_supporting_sources():
     assert classify_url("https://www.linkedin.com/company/petito").value == "social_profile"
     assert classify_url("https://es.scribd.com/document/123/form").value == "online_document"
@@ -236,7 +263,7 @@ class _QuestionDb:
         return _QuestionQuery(self.question)
 
 
-def _resolve(field: str, answer: str, *, input_type: str = "text", data=None, payload=None):
+def _resolve(field: str | None, answer: str, *, input_type: str = "text", data=None, payload=None):
     question = SimpleNamespace(
         id="question-1",
         sender=SenderType.AI,
@@ -256,6 +283,93 @@ def test_direct_display_name_is_applied_to_the_linked_question():
     assert result.status == "accepted"
     assert result.updates[0]["field"] == "preferred_display_name"
     assert result.updates[0]["value"] == "Bloomfield Homes"
+
+
+def test_final_approval_is_resolved_as_an_application_action():
+    result = _resolve(
+        None,
+        "Approve profile",
+        input_type="boolean",
+        payload={
+            "answer_actions": {
+                "Approve profile": {"kind": "approve_profile"},
+                "I need to make changes": {"kind": "request_changes"},
+            }
+        },
+    )
+
+    assert result.handled is True
+    assert result.status == "accepted"
+    assert result.action == "approve_profile"
+    assert result.updates == []
+
+
+def test_legacy_final_question_still_resolves_approval_without_the_model():
+    result = _resolve(None, "Approve profile", input_type="boolean")
+
+    assert result.handled is True
+    assert result.action == "approve_profile"
+
+
+def test_profile_approval_is_validated_and_idempotent():
+    states = {
+        definition.key: {
+            "status": "confirmed" if definition.requirement == "required" else "not_applicable",
+            "applicable": False if definition.requirement == "conditionally_required" else None,
+        }
+        for definition in FIELD_BY_KEY.values()
+        if definition.requirement in {"required", "conditionally_required"}
+    }
+    profile = SimpleNamespace(
+        field_states=states,
+        final_approved=False,
+        completion_percentage=0,
+        is_profile_fully_completed=False,
+    )
+
+    class Db:
+        def add(self, item): pass
+        def flush(self): pass
+
+    first = approve_profile(Db(), profile, commit=False)
+    second = approve_profile(Db(), profile, commit=False)
+
+    assert first["can_complete"] is True
+    assert second["can_complete"] is True
+    assert profile.final_approved is True
+
+
+def test_completed_profile_exposes_a_terminal_state_instead_of_approval_again():
+    states = {
+        definition.key: {
+            "status": "confirmed" if definition.requirement == "required" else "not_applicable",
+            "applicable": False if definition.requirement == "conditionally_required" else None,
+        }
+        for definition in FIELD_BY_KEY.values()
+        if definition.requirement in {"required", "conditionally_required"}
+    }
+    profile = SimpleNamespace(
+        id="profile-1", company_id="company-1", profile_data={}, field_states=states,
+        final_approved=True, completion_percentage=100, is_profile_fully_completed=True,
+        updated_at=None,
+    )
+
+    question = _next_question(profile)
+
+    assert question["input_type"] == "complete"
+    assert question["options"] == []
+    assert question["allow_custom"] is False
+    assert "approved" in question["prompt"].lower()
+
+
+def test_profile_cannot_be_approved_with_blockers():
+    profile = SimpleNamespace(
+        field_states={}, final_approved=False,
+        completion_percentage=0, is_profile_fully_completed=False,
+    )
+
+    with pytest.raises(ValueError, match="profile_has_blockers"):
+        approve_profile(SimpleNamespace(), profile, commit=False)
 
 
 def test_headquarters_accepts_numbers_without_a_leading_preposition():

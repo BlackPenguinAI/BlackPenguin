@@ -29,6 +29,11 @@ def test_final_question_has_explicit_approval_choices():
     question = build_next_question([], final_prompt="Review and approve the profile.")
     assert question["field"] is None
     assert question["options"] == ["Approve profile", "I need to make changes"]
+    assert question["allow_custom"] is False
+    assert question["answer_actions"] == {
+        "Approve profile": {"kind": "approve_profile"},
+        "I need to make changes": {"kind": "request_changes"},
+    }
 
 
 def test_dba_question_expands_the_acronym_and_exposes_typed_actions():
