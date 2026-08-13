@@ -65,6 +65,55 @@ if missing:
     )
 
 
+def test_reconciliation_entrypoint_loads_complete_model_registry():
+    """Protect the deployment maintenance command from partial mapper imports."""
+    backend_root = Path(__file__).resolve().parents[1]
+    required_tables = {
+        "subscription_plans",
+        "companies",
+        "users",
+        "company_onboarding_sources",
+        "projects",
+        "project_onboarding_sources",
+        "onboarding_source_jobs",
+    }
+    script = f"""
+from sqlalchemy.orm import configure_mappers
+
+import app.scripts.reconcile_onboarding_jobs
+from app.db.postgres import Base
+
+configure_mappers()
+
+required = {required_tables!r}
+missing = sorted(required.difference(Base.metadata.tables))
+if missing:
+    raise SystemExit(f"Missing model tables: {{missing}}")
+"""
+    env = os.environ.copy()
+    existing_pythonpath = env.get("PYTHONPATH")
+    env["PYTHONPATH"] = (
+        os.pathsep.join((str(backend_root), existing_pythonpath))
+        if existing_pythonpath
+        else str(backend_root)
+    )
+
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        cwd=backend_root,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+
+    assert result.returncode == 0, (
+        "The reconciliation deployment command could not initialize the complete "
+        f"SQLAlchemy model registry.\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
+    )
+
+
 def test_heartbeat_is_fresh_only_inside_allowed_window(tmp_path: Path):
     heartbeat = tmp_path / "worker.heartbeat"
     write_heartbeat(heartbeat)

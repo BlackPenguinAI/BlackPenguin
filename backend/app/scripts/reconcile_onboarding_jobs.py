@@ -4,6 +4,11 @@ import argparse
 import json
 from typing import Any
 
+# Standalone maintenance commands do not import FastAPI's routers, so they must
+# load the canonical model registry explicitly before SQLAlchemy configures any
+# relationship. This keeps User.company, Company.plan, and the onboarding
+# relationships resolvable when this module runs during deployment.
+from app.db import base as _model_registry  # noqa: F401
 from app.db.postgres import SessionLocal
 from app.modules.company_onboarding import services as company_services
 from app.modules.company_onboarding.models import CompanyOnboardingSource, SourceStatus
