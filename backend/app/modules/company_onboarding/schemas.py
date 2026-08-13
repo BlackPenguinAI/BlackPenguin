@@ -214,7 +214,10 @@ class OnboardingStateResponse(BaseModel):
     profile: CompanyProfileResponse
     sources: list[SourceResponse] = Field(default_factory=list)
     next_question: NextQuestionResponse
-    stage: Literal["website", "processing", "review", "conversation", "complete"]
+    stage: Literal[
+        "website", "processing", "website_review", "required", "team",
+        "conditional", "enrichment", "approval", "complete",
+    ]
     version: int
     team: "TeamOnboardingResponse"
 

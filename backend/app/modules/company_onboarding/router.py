@@ -154,6 +154,41 @@ def _continue_after_source_review(
     )
 
 
+def _workflow_stage(
+    serialized_profile: dict[str, Any],
+    team: dict[str, Any],
+    *,
+    processing: bool,
+    pending_review: bool,
+    pristine: bool,
+) -> str:
+    """Return the single server-owned step the Company UI may render."""
+    completion = serialized_profile["completion"]
+    if completion["can_complete"]:
+        return "complete"
+    if processing:
+        return "processing"
+    if pending_review:
+        return "website_review"
+    if pristine:
+        return "website"
+    if completion["required"]["remaining"]:
+        return "required"
+    if any(role["status"] == "missing" for role in team["roles"]):
+        return "team"
+    if completion["blockers"]:
+        return "conditional"
+    presence_keys = {
+        "public_contact_emails", "public_contact_phones", "corporate_social_profiles",
+    }
+    presence_fields = [
+        field for field in serialized_profile["fields"] if field["key"] in presence_keys
+    ]
+    if any(field["status"] == "missing" for field in presence_fields):
+        return "enrichment"
+    return "approval"
+
+
 def _state_payload(db: Session, company_id: str) -> dict[str, Any]:
     session = services.get_or_create_session(db, company_id)
     profile = services.get_or_create_profile(db, company_id)
@@ -181,7 +216,15 @@ def _state_payload(db: Session, company_id: str) -> dict[str, Any]:
         for source in sources
         for proposal in source.proposals
     )
-    if not processing and not pending_review:
+    team = services.serialize_team(db, company_id, profile)
+    stage = _workflow_stage(
+        serialized_profile,
+        team,
+        processing=processing,
+        pending_review=pending_review,
+        pristine=not messages and not sources,
+    )
+    if stage in {"required", "conditional", "approval"}:
         next_question = _next_question(profile)
         active_question = services.get_active_question(db, session.id)
         latest_ai = next((item for item in reversed(messages) if item.sender == SenderType.AI), None)
@@ -199,16 +242,14 @@ def _state_payload(db: Session, company_id: str) -> dict[str, Any]:
             services.supersede_unanswered_questions(db, session.id)
             latest_ai.ui_payload = next_question
             db.add(latest_ai); db.commit(); db.refresh(latest_ai)
-    if serialized_profile["completion"]["can_complete"]:
-        stage = "complete"
-    elif processing:
-        stage = "processing"
-    elif pending_review:
-        stage = "review"
-    elif not messages and not sources:
-        stage = "website"
+        elif not active_question:
+            latest_ai = services.save_message(
+                db, session.id, SenderType.AI, next_question["prompt"], ui_payload=next_question,
+            )
+            messages.append(latest_ai)
     else:
-        stage = "conversation"
+        if services.supersede_unanswered_questions(db, session.id):
+            db.commit()
     timestamps = [profile.updated_at, *[item.created_at for item in messages], *[item.updated_at for item in sources]]
     version = int(max((item.timestamp() for item in timestamps if item), default=0) * 1000)
     return {
@@ -218,7 +259,7 @@ def _state_payload(db: Session, company_id: str) -> dict[str, Any]:
         "next_question": _next_question(profile),
         "stage": stage,
         "version": version,
-        "team": services.serialize_team(db, company_id, profile),
+        "team": team,
     }
 
 
@@ -268,6 +309,20 @@ def decide_onboarding_team_role(
         raise HTTPException(status_code=422, detail="Role must be assistant, mkt or sales.")
     profile = services.get_or_create_profile(db, current_user.company_id)
     services.set_team_role_decision(db, profile, role, payload.status)
+    return services.serialize_team(db, current_user.company_id, profile)
+
+
+@router.post("/team/defer-remaining", response_model=TeamOnboardingResponse)
+def defer_remaining_onboarding_team_roles(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([UserRole.ADMIN])),
+):
+    profile = services.get_or_create_profile(db, current_user.company_id)
+    team = services.serialize_team(db, current_user.company_id, profile)
+    missing_roles = {item["role"] for item in team["roles"] if item["status"] == "missing"}
+    for role in services.TEAM_ROLE_STATE_KEYS:
+        if role.value in missing_roles:
+            services.set_team_role_decision(db, profile, role, "deferred")
     return services.serialize_team(db, current_user.company_id, profile)
 
 

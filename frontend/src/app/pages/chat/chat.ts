@@ -12,7 +12,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { marked } from 'marked';
-import { finalize, Subscription } from 'rxjs';
+import { catchError, concatMap, finalize, from, of, Subscription, tap, toArray } from 'rxjs';
 
 import { SpeechRecognitionService } from '../../core/services/speech-recognition.service';
 import { OnboardingQuestion } from '../../shared/ui/onboarding-response-options/onboarding-response-options';
@@ -27,6 +27,7 @@ import {
   EMPTY_COMPANY_PROFILE,
   EMPTY_TEAM_ONBOARDING,
   OnboardingSource,
+  OnboardingStage,
   OnboardingState,
   Requirement,
   SourceProposal,
@@ -64,6 +65,7 @@ export class ChatComponent implements OnInit, OnDestroy {
   showWelcome = false;
   initialState: 'loading' | 'ready' | 'error' = 'loading';
   nextQuestion: OnboardingQuestion | null = null;
+  currentStage: OnboardingStage = 'website';
   team: TeamOnboarding = EMPTY_TEAM_ONBOARDING;
   teamSaving = false;
   teamError = '';
@@ -86,6 +88,7 @@ export class ChatComponent implements OnInit, OnDestroy {
   private readonly expandedSourceIds = new Set<string>();
   private publicPresenceInitialized = false;
   readonly savingWebsiteSourceIds = new Set<string>();
+  readonly confirmingSourceIds = new Set<string>();
 
   constructor(
     private readonly translate: TranslateService,
@@ -260,11 +263,16 @@ export class ChatComponent implements OnInit, OnDestroy {
   }
 
   get canSend(): boolean {
-    return this.prompt.trim().length > 0 && !this.isAnalyzing && !this.isCompleted && !this.hasPendingReview;
+    return this.prompt.trim().length > 0 && !this.isAnalyzing && !this.isCompleted
+      && !this.hasPendingReview && !this.hasExclusiveStep;
+  }
+
+  get hasExclusiveStep(): boolean {
+    return this.currentStage === 'team' || this.currentStage === 'enrichment';
   }
 
   inviteTeamMember(): void {
-    if (this.teamSaving || this.hasPendingReview || this.isCompleted || !this.teamInvite.first_name.trim() || !this.teamInvite.last_name.trim() || !this.teamInvite.email.trim()) return;
+    if (this.currentStage !== 'team' || this.teamSaving || this.hasPendingReview || this.isCompleted || !this.teamInvite.first_name.trim() || !this.teamInvite.last_name.trim() || !this.teamInvite.email.trim()) return;
     this.teamSaving = true;
     this.teamError = '';
     this.onboarding.createTeamMember(this.teamInvite).pipe(finalize(() => {
@@ -273,7 +281,7 @@ export class ChatComponent implements OnInit, OnDestroy {
     })).subscribe({
       next: () => {
         this.teamInvite = { first_name: '', last_name: '', email: '', role: 'assistant' };
-        this.refreshTeam();
+        this.refreshTeam(true);
       },
       error: (error: HttpErrorResponse) => {
         this.teamError = typeof error.error?.detail === 'string'
@@ -284,7 +292,7 @@ export class ChatComponent implements OnInit, OnDestroy {
   }
 
   savePublicPresence(): void {
-    if (this.publicPresenceSaving || this.hasPendingReview || this.isCompleted) return;
+    if (this.currentStage !== 'enrichment' || this.publicPresenceSaving || this.hasPendingReview || this.isCompleted) return;
     const emails = this.splitList(this.publicEmails);
     const phones = this.splitList(this.publicPhones);
     const socialProfiles = this.splitList(this.socialProfiles);
@@ -302,6 +310,7 @@ export class ChatComponent implements OnInit, OnDestroy {
       next: profile => {
         this.profile = profile;
         this.publicPresenceSaved = true;
+        this.syncState(true);
       },
       error: (error: HttpErrorResponse) => {
         this.publicPresenceError = this.proposalErrorMessage(error);
@@ -309,19 +318,49 @@ export class ChatComponent implements OnInit, OnDestroy {
     });
   }
 
+  deferPublicPresence(): void {
+    if (this.currentStage !== 'enrichment' || this.publicPresenceSaving || this.isCompleted) return;
+    this.publicPresenceSaving = true;
+    this.publicPresenceError = '';
+    this.onboarding.deferPublicPresence().pipe(finalize(() => {
+      this.publicPresenceSaving = false;
+      this.cdr.detectChanges();
+    })).subscribe({
+      next: profile => { this.profile = profile; this.syncState(true); },
+      error: (error: HttpErrorResponse) => this.publicPresenceError = this.proposalErrorMessage(error),
+    });
+  }
+
   decideTeamRole(role: TeamRole, status: 'deferred' | 'not_applicable'): void {
-    if (this.teamSaving || this.hasPendingReview || this.isCompleted) return;
+    if (this.currentStage !== 'team' || this.teamSaving || this.hasPendingReview || this.isCompleted) return;
     this.teamSaving = true;
     this.teamError = '';
     this.onboarding.decideTeamRole(role, status).pipe(finalize(() => {
       this.teamSaving = false;
       this.cdr.detectChanges();
     })).subscribe({
-      next: team => this.team = team,
+      next: team => { this.team = team; this.syncState(true); },
       error: (error: HttpErrorResponse) => {
         this.teamError = typeof error.error?.detail === 'string'
           ? error.error.detail
           : 'The team decision could not be saved.';
+      },
+    });
+  }
+
+  deferRemainingTeamRoles(): void {
+    if (this.currentStage !== 'team' || this.teamSaving || this.isCompleted) return;
+    this.teamSaving = true;
+    this.teamError = '';
+    this.onboarding.deferRemainingTeamRoles().pipe(finalize(() => {
+      this.teamSaving = false;
+      this.cdr.detectChanges();
+    })).subscribe({
+      next: team => { this.team = team; this.syncState(true); },
+      error: (error: HttpErrorResponse) => {
+        this.teamError = typeof error.error?.detail === 'string'
+          ? error.error.detail
+          : 'The remaining team roles could not be deferred.';
       },
     });
   }
@@ -484,6 +523,41 @@ export class ChatComponent implements OnInit, OnDestroy {
     });
   }
 
+  confirmAllUnchanged(source: OnboardingSource): void {
+    const pending = source.proposals.filter(proposal => proposal.status === 'pending' && !proposal.submitting);
+    if (!pending.length || this.confirmingSourceIds.has(source.id)) return;
+    this.confirmingSourceIds.add(source.id);
+    for (const proposal of pending) {
+      this.updateProposal(source.id, proposal.id, { submitting: true, errorMessage: undefined });
+    }
+    from(pending).pipe(
+      concatMap(proposal => this.onboarding.decideProposal(proposal.id, 'confirm').pipe(
+        tap(result => {
+          this.updateProposal(source.id, proposal.id, {
+            ...result.proposal,
+            draftValue: this.formatProposalValue(result.proposal),
+            submitting: false,
+            errorMessage: undefined,
+          });
+          this.profile = result.profile;
+        }),
+        catchError((error: HttpErrorResponse) => {
+          this.updateProposal(source.id, proposal.id, {
+            submitting: false,
+            errorMessage: this.proposalErrorMessage(error),
+          });
+          return of(null);
+        }),
+      )),
+      toArray(),
+      finalize(() => {
+        this.confirmingSourceIds.delete(source.id);
+        this.syncState(true);
+        this.cdr.detectChanges();
+      }),
+    ).subscribe();
+  }
+
   retrySource(source: OnboardingSource): void {
     if (source.status !== 'failed') return;
     this.errorMessage = '';
@@ -541,6 +615,7 @@ export class ChatComponent implements OnInit, OnDestroy {
       if (website.exists === false) return 'No official website';
       if (typeof website.url === 'string') return website.url;
     }
+    if (Array.isArray(proposal.value)) return proposal.value.map(String).join(', ');
     return this.formatValue(proposal.value);
   }
 
@@ -569,6 +644,9 @@ export class ChatComponent implements OnInit, OnDestroy {
         return { exists: false, url: null };
       }
       return { exists: true, url: trimmed };
+    }
+    if (['public_contact_emails', 'public_contact_phones', 'corporate_social_profiles'].includes(field)) {
+      return this.splitList(trimmed);
     }
     if (/^[\[{]/.test(trimmed)) {
       try {
@@ -654,6 +732,7 @@ export class ChatComponent implements OnInit, OnDestroy {
       if (this.hasPendingProposals(source)) this.expandedSourceIds.add(source.id);
     }
     this.nextQuestion = state.next_question;
+    this.currentStage = state.stage;
     this.team = state.team || EMPTY_TEAM_ONBOARDING;
     this.initializePublicPresence(state.profile.data);
     this.isCompleted = state.profile.completion.can_complete;
@@ -679,11 +758,16 @@ export class ChatComponent implements OnInit, OnDestroy {
     this.mergeSources(turn.sources);
     if (turn.sources.some((source) => source.status === 'processing')) this.schedulePolling();
     this.cdr.detectChanges();
+    this.syncState(true);
   }
 
-  private refreshTeam(): void {
+  private refreshTeam(syncStage = false): void {
     this.onboarding.getTeam().subscribe({
-      next: team => { this.team = team; this.cdr.detectChanges(); },
+      next: team => {
+        this.team = team;
+        if (syncStage) this.syncState(true);
+        this.cdr.detectChanges();
+      },
       error: () => { this.teamError = 'The team status could not be refreshed.'; },
     });
   }

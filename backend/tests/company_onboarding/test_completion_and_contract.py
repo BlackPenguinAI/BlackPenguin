@@ -5,7 +5,7 @@ import pytest
 from fastapi import HTTPException
 
 from app.modules.company_onboarding.completion import FIELD_BY_KEY, calculate_completion
-from app.modules.company_onboarding.router import _parse_agent_response
+from app.modules.company_onboarding.router import _parse_agent_response, _workflow_stage
 from app.modules.company_onboarding.services import (
     deterministic_context_update,
     extract_urls,
@@ -56,6 +56,56 @@ def test_sales_and_marketing_users_replace_duplicate_contact_fields():
     assert FIELD_BY_KEY["public_contact_phones"].requirement == "recommended"
     assert FIELD_BY_KEY["corporate_social_profiles"].requirement == "recommended"
     assert calculate_completion({})["conditional"]["total"] == 5
+
+
+def test_company_workflow_waits_for_required_fields_before_team():
+    profile = {
+        "completion": {
+            "can_complete": False,
+            "required": {"remaining": 1},
+            "blockers": [{"field": "official_company_name"}],
+        },
+        "fields": [],
+    }
+    team = {"roles": [{"role": "assistant", "status": "missing"}]}
+
+    assert _workflow_stage(
+        profile, team, processing=False, pending_review=False, pristine=False,
+    ) == "required"
+
+    profile["completion"]["required"]["remaining"] = 0
+    profile["completion"]["blockers"] = [{"field": "dba"}]
+    assert _workflow_stage(
+        profile, team, processing=False, pending_review=False, pristine=False,
+    ) == "team"
+
+
+def test_company_workflow_prioritizes_website_review_and_then_enrichment():
+    profile = {
+        "completion": {
+            "can_complete": False,
+            "required": {"remaining": 0},
+            "blockers": [],
+        },
+        "fields": [
+            {"key": "public_contact_emails", "status": "missing"},
+            {"key": "public_contact_phones", "status": "confirmed"},
+            {"key": "corporate_social_profiles", "status": "deferred"},
+        ],
+    }
+    team = {"roles": [{"role": "assistant", "status": "deferred"}]}
+
+    assert _workflow_stage(
+        profile, team, processing=False, pending_review=True, pristine=False,
+    ) == "website_review"
+    assert _workflow_stage(
+        profile, team, processing=False, pending_review=False, pristine=False,
+    ) == "enrichment"
+
+    profile["fields"][0]["status"] = "deferred"
+    assert _workflow_stage(
+        profile, team, processing=False, pending_review=False, pristine=False,
+    ) == "approval"
 
 
 def test_deferred_conditional_field_does_not_block_completion():

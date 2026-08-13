@@ -82,6 +82,7 @@ describe('ChatComponent', () => {
   });
 
   it('should save public contact information as structured lists', () => {
+    component.currentStage = 'enrichment';
     component.publicEmails = 'info@example.com, sales@example.com';
     component.publicPhones = '+1 305 555 0100';
     component.socialProfiles = 'https://linkedin.com/company/example\nhttps://instagram.com/example';
@@ -95,10 +96,16 @@ describe('ChatComponent', () => {
     ]);
     expect(request.request.body.updates[0].value).toEqual(['info@example.com', 'sales@example.com']);
     request.flush(EMPTY_COMPANY_PROFILE);
+    http.expectOne('http://localhost:8000/api/v1/company-onboarding/chat/state').flush({
+      messages: [], profile: EMPTY_COMPANY_PROFILE, sources: [], stage: 'approval', version: 1,
+      team: { administrator: null, members: [], roles: [] },
+      next_question: { field: null, label: 'Final approval', prompt: 'Approve', input_type: 'boolean', options: [], examples: [], allow_custom: true, minimum_words: null },
+    });
     expect(component.publicPresenceSaved).toBe(true);
   });
 
   it('should create onboarding users through the shared company user store', () => {
+    component.currentStage = 'team';
     component.teamInvite = {
       first_name: 'Ana', last_name: 'Sales', email: 'ana@example.com', role: 'sales',
     };
@@ -116,7 +123,35 @@ describe('ChatComponent', () => {
       members: [{ id: 'user-1', first_name: 'Ana', last_name: 'Sales', email: 'ana@example.com', role: 'sales', is_active: true }],
       roles: [{ role: 'sales', label: 'Sales users', status: 'confirmed', active_users: 1 }],
     });
+    http.expectOne('http://localhost:8000/api/v1/company-onboarding/chat/state').flush({
+      messages: [], profile: EMPTY_COMPANY_PROFILE, sources: [], stage: 'team', version: 1,
+      team: { administrator: null, members: [{ id: 'user-1', first_name: 'Ana', last_name: 'Sales', email: 'ana@example.com', role: 'sales', is_active: true }], roles: [] },
+      next_question: { field: 'dba', label: 'DBA', prompt: 'DBA?', input_type: 'text', options: [], examples: [], allow_custom: true, minimum_words: null },
+    });
     expect(component.team.members[0].email).toBe('ana@example.com');
+  });
+
+  it('should render extracted list proposals without JSON syntax', () => {
+    expect(component.formatProposalValue({
+      field: 'corporate_social_profiles',
+      value: ['https://instagram.com/example', 'https://linkedin.com/company/example'],
+    })).toBe('https://instagram.com/example, https://linkedin.com/company/example');
+  });
+
+  it('should defer all remaining team roles from the Team stage', () => {
+    component.currentStage = 'team';
+    component.deferRemainingTeamRoles();
+
+    http.expectOne('http://localhost:8000/api/v1/company-onboarding/team/defer-remaining').flush({
+      administrator: null, members: [],
+      roles: [{ role: 'assistant', label: 'Assistant users', status: 'deferred', active_users: 0 }],
+    });
+    http.expectOne('http://localhost:8000/api/v1/company-onboarding/chat/state').flush({
+      messages: [], profile: EMPTY_COMPANY_PROFILE, sources: [], stage: 'conditional', version: 1,
+      team: { administrator: null, members: [], roles: [] },
+      next_question: { field: 'dba', label: 'DBA', prompt: 'DBA?', input_type: 'text', options: [], examples: [], allow_custom: true, minimum_words: null },
+    });
+    expect(component.currentStage).toBe('conditional');
   });
 
   it('should not expose the removed session initializer', () => {
@@ -187,7 +222,7 @@ describe('ChatComponent', () => {
       profile: EMPTY_COMPANY_PROFILE,
     });
     http.expectOne('http://localhost:8000/api/v1/company-onboarding/chat/state').flush({
-      messages: [], profile: EMPTY_COMPANY_PROFILE, sources: [], stage: 'conversation', version: 1,
+      messages: [], profile: EMPTY_COMPANY_PROFILE, sources: [], stage: 'required', version: 1,
       next_question: {
         field: null, label: 'Final approval', prompt: 'Approve', input_type: 'boolean',
         options: [], examples: [], allow_custom: true, minimum_words: null,
@@ -218,6 +253,33 @@ describe('ChatComponent', () => {
     expect(component.sources[0].proposals[0].submitting).toBe(false);
     expect(component.sources[0].proposals[0].status).toBe('pending');
     expect(component.sources[0].proposals[0].errorMessage).toBe('Enter at least 25 characters.');
+  });
+
+  it('should confirm every unchanged website proposal sequentially', () => {
+    const proposals = [
+      { id: 'proposal-1', field: 'official_company_name', label: 'Name', value: 'Example', evidence: null, confidence: 'high' as const, status: 'pending' as const },
+      { id: 'proposal-2', field: 'headquarters', label: 'Headquarters', value: 'Miami', evidence: null, confidence: 'high' as const, status: 'pending' as const },
+    ];
+    const source = {
+      id: 'source-1', kind: 'official_website' as const, status: 'ready' as const,
+      name: 'example.com', url: 'https://example.com', mime_type: 'text/html', size_bytes: 100,
+      message_id: null, download_url: null, error_message: null, proposals,
+      created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    };
+    component.sources = [source];
+
+    component.confirmAllUnchanged(source);
+    const first = http.expectOne('http://localhost:8000/api/v1/company-onboarding/proposals/proposal-1/decision');
+    first.flush({ proposal: { ...proposals[0], status: 'confirmed' }, profile: EMPTY_COMPANY_PROFILE });
+    const second = http.expectOne('http://localhost:8000/api/v1/company-onboarding/proposals/proposal-2/decision');
+    second.flush({ proposal: { ...proposals[1], status: 'confirmed' }, profile: EMPTY_COMPANY_PROFILE });
+    http.expectOne('http://localhost:8000/api/v1/company-onboarding/chat/state').flush({
+      messages: [], profile: EMPTY_COMPANY_PROFILE, sources: [], stage: 'required', version: 1,
+      team: { administrator: null, members: [], roles: [] },
+      next_question: { field: 'preferred_display_name', label: 'Display name', prompt: 'Display name?', input_type: 'text', options: [], examples: [], allow_custom: true, minimum_words: null },
+    });
+
+    expect(component.confirmingSourceIds.has(source.id)).toBe(false);
   });
 
   it('should anchor pending source review to its message and hide the next question', () => {

@@ -134,10 +134,21 @@ export interface OnboardingState {
   profile: CompanyProfileResponse;
   sources: OnboardingSource[];
   next_question: NextQuestion;
-  stage: 'website' | 'processing' | 'review' | 'conversation' | 'complete';
+  stage: OnboardingStage;
   version: number;
   team?: TeamOnboarding;
 }
+
+export type OnboardingStage =
+  | 'website'
+  | 'processing'
+  | 'website_review'
+  | 'required'
+  | 'team'
+  | 'conditional'
+  | 'enrichment'
+  | 'approval'
+  | 'complete';
 
 export type TeamRole = 'assistant' | 'mkt' | 'sales';
 export type TeamRoleStatus = 'missing' | 'confirmed' | 'deferred' | 'not_applicable';

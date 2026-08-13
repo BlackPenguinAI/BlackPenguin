@@ -32,13 +32,22 @@ export class CompanyOnboardingService {
       { field: 'public_contact_emails', value: emails },
       { field: 'public_contact_phones', value: phones },
       { field: 'corporate_social_profiles', value: socialProfiles },
-    ].filter(item => item.value.length).map(item => ({
-      ...item,
-      status: 'confirmed',
+    ].map(item => ({
+      field: item.field,
+      value: item.value.length ? item.value : null,
+      status: item.value.length ? 'confirmed' : 'deferred',
       applicable: true,
       source_type: 'user_input',
       source_reference: 'onboarding public presence card',
       confidence: 'high',
+    }));
+    return this.http.patch<CompanyProfileResponse>(`${this.baseUrl}/profile`, { updates });
+  }
+
+  deferPublicPresence(): Observable<CompanyProfileResponse> {
+    const updates = ['public_contact_emails', 'public_contact_phones', 'corporate_social_profiles'].map(field => ({
+      field, value: null, status: 'deferred', applicable: true,
+      source_type: 'user_input', source_reference: 'onboarding public presence deferred', confidence: 'high',
     }));
     return this.http.patch<CompanyProfileResponse>(`${this.baseUrl}/profile`, { updates });
   }
@@ -86,6 +95,10 @@ export class CompanyOnboardingService {
 
   decideTeamRole(role: TeamRole, status: 'deferred' | 'not_applicable'): Observable<TeamOnboarding> {
     return this.http.patch<TeamOnboarding>(`${this.baseUrl}/team/roles/${role}`, { status });
+  }
+
+  deferRemainingTeamRoles(): Observable<TeamOnboarding> {
+    return this.http.post<TeamOnboarding>(`${this.baseUrl}/team/defer-remaining`, {});
   }
 
   sendMessage(message: string, inReplyToMessageId?: string | null): Observable<ChatTurnResponse> {

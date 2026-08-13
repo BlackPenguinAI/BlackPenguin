@@ -111,10 +111,13 @@ def test_worker_defers_next_question_when_extracted_proposals_need_review():
 
 
 def test_state_does_not_attach_a_question_while_review_is_pending():
-    for state_builder in (company_router._state_payload, project_router._state_payload):
-        function_source = inspect.getsource(state_builder)
-        assert "pending_review" in function_source
-        assert "if not processing and not pending_review:" in function_source
+    company_source = inspect.getsource(company_router._state_payload)
+    assert "pending_review" in company_source
+    assert 'stage in {"required", "conditional", "approval"}' in company_source
+
+    project_source = inspect.getsource(project_router._state_payload)
+    assert "pending_review" in project_source
+    assert "if not processing and not pending_review:" in project_source
 
 
 def test_last_proposal_decision_uses_an_idempotent_follow_up():
