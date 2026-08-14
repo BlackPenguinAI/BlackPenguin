@@ -1,7 +1,11 @@
 import ast
+import importlib.util
 import inspect
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock
+
+import sqlalchemy as sa
 
 from app.db.base import Base
 from app.db.schema import CURRENT_SCHEMA_VERSION
@@ -50,6 +54,34 @@ def test_create_all_metadata_registers_durable_jobs_and_schema_version():
     assert OnboardingSourceJob.__tablename__ in Base.metadata.tables
     assert "schema_versions" in Base.metadata.tables
     assert CURRENT_SCHEMA_VERSION == "20260814_project_onboarding_ux"
+
+
+def test_project_onboarding_ux_migration_has_no_accidental_bind_parameters(monkeypatch):
+    migration_path = (
+        Path(__file__).parents[1]
+        / "alembic"
+        / "versions"
+        / "20260814_project_onboarding_ux.py"
+    )
+    spec = importlib.util.spec_from_file_location(
+        "project_onboarding_ux_migration",
+        migration_path,
+    )
+    assert spec is not None and spec.loader is not None
+    migration = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(migration)
+
+    statements = []
+    monkeypatch.setattr(migration.op, "execute", statements.append)
+    migration.upgrade()
+
+    profile_update = next(
+        str(statement)
+        for statement in statements
+        if "UPDATE project_profiles" in str(statement)
+    )
+    assert "jsonb_build_object" in profile_update
+    assert not sa.text(profile_update)._bindparams
 
 
 def test_jobs_include_retry_availability_timestamp():

@@ -33,7 +33,10 @@ def upgrade() -> None:
             field_states = jsonb_set(
                 COALESCE(field_states::jsonb, '{}'::jsonb),
                 '{sales_authorization}',
-                '{"status":"missing","applicable":true}'::jsonb,
+                jsonb_build_object(
+                    'status', 'missing',
+                    'applicable', TRUE
+                ),
                 true
             )::json
         WHERE LOWER(COALESCE(profile_data ->> 'sales_authorization', ''))
