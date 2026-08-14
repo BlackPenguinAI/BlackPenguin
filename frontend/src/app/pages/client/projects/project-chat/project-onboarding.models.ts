@@ -22,6 +22,7 @@ export interface SectionProgress {
 export interface ProjectProfile {
   id: string;
   project_id: string;
+  project_name: string;
   data: Record<string, unknown>;
   fields: ProjectFieldProgress[];
   completion: {
@@ -126,8 +127,27 @@ export interface MetaSetupResult {
   message: string; partner_business_manager_id: string | null;
 }
 
+export type ProjectOnboardingAction =
+  | 'authorize_ai_sales'
+  | 'complete_sales_team'
+  | 'defer_sales_team'
+  | 'complete_meta_setup'
+  | 'defer_meta_setup';
+
+export interface ProjectOnboardingActionPayload {
+  action: ProjectOnboardingAction;
+  question_message_id: string;
+  client_action_id: string;
+  page_id?: string;
+  ad_account_id?: string;
+  lead_form_id?: string;
+  page_access_confirmed?: boolean;
+  ad_account_access_confirmed?: boolean;
+  leads_access_confirmed?: boolean;
+}
+
 export const EMPTY_PROJECT_PROFILE: ProjectProfile = {
-  id: '', project_id: '', data: {}, fields: [], updated_at: null,
+  id: '', project_id: '', project_name: 'Untitled Project', data: {}, fields: [], updated_at: null,
   completion: {
     percentage: 0, required_fields_complete: false, ready_for_confirmation: false,
     can_complete: false, final_approved: false,

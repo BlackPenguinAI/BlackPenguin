@@ -60,6 +60,7 @@ def simulate_project_setup(
     page_access_confirmed: bool,
     ad_account_access_confirmed: bool,
     leads_access_confirmed: bool,
+    commit: bool = True,
 ) -> tuple[MetaConnection, ProjectCampaign]:
     """Persist a resumable Meta setup without inventing or storing credentials."""
     if not all((page_access_confirmed, ad_account_access_confirmed, leads_access_confirmed)):
@@ -118,7 +119,10 @@ def simulate_project_setup(
         )
     campaign.meta_connection_id = connection.id
     db.add(campaign)
-    db.commit()
-    db.refresh(connection)
-    db.refresh(campaign)
+    if commit:
+        db.commit()
+        db.refresh(connection)
+        db.refresh(campaign)
+    else:
+        db.flush()
     return connection, campaign

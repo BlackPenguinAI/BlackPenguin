@@ -53,6 +53,7 @@ class ProjectCompletion(BaseModel):
 class ProjectProfileResponse(BaseModel):
     id: str
     project_id: str
+    project_name: str
     data: dict[str, Any] = Field(default_factory=dict)
     fields: list[ProjectFieldProgress] = Field(default_factory=list)
     completion: ProjectCompletion
@@ -105,6 +106,24 @@ class ChatMessagePayload(BaseModel):
     message: str = Field(min_length=1, max_length=20000)
     in_reply_to_message_id: str | None = None
     client_message_id: str | None = Field(default=None, min_length=36, max_length=36)
+
+
+class ProjectOnboardingActionRequest(BaseModel):
+    action: Literal[
+        "authorize_ai_sales",
+        "complete_sales_team",
+        "defer_sales_team",
+        "complete_meta_setup",
+        "defer_meta_setup",
+    ]
+    question_message_id: str
+    client_action_id: str = Field(min_length=36, max_length=36)
+    page_id: str | None = Field(default=None, min_length=5, max_length=32)
+    ad_account_id: str | None = Field(default=None, min_length=5, max_length=36)
+    lead_form_id: str | None = Field(default=None, min_length=5, max_length=32)
+    page_access_confirmed: bool = False
+    ad_account_access_confirmed: bool = False
+    leads_access_confirmed: bool = False
 
 
 class ChatAttachmentResponse(BaseModel):

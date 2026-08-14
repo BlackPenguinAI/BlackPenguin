@@ -30,7 +30,7 @@
     <header class="flex items-center gap-4 border-b border-white/5 bg-black/40 p-4 backdrop-blur-md md:p-6">
       <a routerLink="/app/projects" class="flex h-9 w-9 items-center justify-center rounded-full text-gray-400 hover:bg-white/10 hover:text-white"><span class="material-symbols-outlined">arrow_back</span></a>
       <div>
-        <h1 class="text-xl font-light">Project <span class="font-medium text-secondary">Onboarding</span></h1>
+        <h1 class="text-xl font-light"><span class="font-medium text-white">{{ projectName }}</span> <span class="font-medium text-secondary">Onboarding</span></h1>
         <p class="mt-1 text-xs text-gray-400">Build, validate, and prepare this project for artificial intelligence (AI)-assisted sales.</p>
       </div>
     </header>
@@ -47,6 +47,20 @@
               (custom)="writeCustomAnswer(msg)"
             ></app-onboarding-ai-message>
 
+            <section *ngIf="isStructuredQuestion(msg, 'ai_sales_authorization')" class="structured-card ml-11 mt-4 max-w-3xl">
+              <div class="flex items-start gap-3">
+                <span class="material-symbols-outlined text-secondary">smart_toy</span>
+                <div>
+                  <h2 class="text-sm font-semibold">Authorize AI-assisted sales</h2>
+                  <p class="mt-1 text-xs leading-relaxed text-gray-400">Black Penguin will contact, qualify, follow up with, and help schedule qualified leads for this project. Your team can always reassign leads and appointments manually.</p>
+                </div>
+              </div>
+              <div class="mt-4 flex flex-wrap gap-2">
+                <button (click)="authorizeAiSales(msg)" [disabled]="authorizationBusy" class="structured-primary">{{ authorizationBusy ? 'Saving authorization...' : 'Authorize AI-assisted sales and continue' }}</button>
+                <a routerLink="/app/projects" class="structured-secondary">Save and exit</a>
+              </div>
+            </section>
+
             <section *ngIf="isStructuredQuestion(msg, 'project_sales_team')" class="structured-card ml-11 mt-4 max-w-3xl">
               <div class="flex items-start justify-between gap-3">
                 <div>
@@ -61,6 +75,7 @@
                   <p class="text-[10px] text-gray-400">{{ assignment.email }} · Receives new leads</p>
                 </div>
               </div>
+              <p *ngIf="teamSetupMessage" class="mt-3 rounded-lg border border-green-500/20 bg-green-500/10 p-3 text-xs text-green-300">{{ teamSetupMessage }}</p>
               <div class="mt-4 grid gap-2 sm:grid-cols-[1fr_auto]">
                 <select [(ngModel)]="selectedSalesUserId" class="secure-input">
                   <option value="">Select an existing Sales user</option>
@@ -76,8 +91,8 @@
               </div>
               <div class="mt-3 flex flex-wrap gap-2">
                 <button (click)="inviteSalesUser(msg)" [disabled]="teamBusy" class="structured-primary">{{ teamBusy ? 'Saving...' : 'Create and assign Sales user' }}</button>
-                <button *ngIf="assignedSalesUsers.length" (click)="deferStructuredStep('Sales team configured', msg)" [disabled]="teamBusy" class="structured-primary">Continue with assigned team</button>
-                <button (click)="deferStructuredStep('Configure sales team later', msg)" [disabled]="teamBusy" class="structured-secondary">Configure later in Users</button>
+                <button *ngIf="assignedSalesUsers.length" (click)="completeSalesTeam(msg)" [disabled]="teamBusy" class="structured-primary">Continue with assigned team</button>
+                <button (click)="deferSalesTeam(msg)" [disabled]="teamBusy" class="structured-secondary">Configure later in Users</button>
               </div>
             </section>
 
@@ -106,7 +121,7 @@
               <p *ngIf="metaSetupMessage" class="mt-3 rounded-lg border border-green-500/20 bg-green-500/10 p-3 text-xs text-green-300">{{ metaSetupMessage }}</p>
               <div class="mt-4 flex flex-wrap gap-2">
                 <button (click)="testMetaSetup(msg)" [disabled]="metaSetupBusy || !metaSetupConfig.configured" class="structured-primary">{{ metaSetupBusy ? 'Testing...' : 'Run simulated connection test' }}</button>
-                <button (click)="deferStructuredStep('Configure Meta later', msg)" [disabled]="metaSetupBusy" class="structured-secondary">Configure Meta later</button>
+                <button (click)="deferMetaSetup(msg)" [disabled]="metaSetupBusy" class="structured-secondary">Configure Meta later</button>
               </div>
             </section>
           </div>
@@ -138,7 +153,15 @@
       </ng-container>
 
       <ng-template #sourceReview let-source>
+      <section *ngIf="source.status === 'processing'" class="processing-source ml-11 max-w-3xl" role="status" aria-live="polite">
+        <span class="processing-source__spinner" aria-hidden="true"></span>
+        <div class="min-w-0">
+          <p class="text-xs font-semibold text-gray-200">Analyzing {{ source.name }}…</p>
+          <p class="mt-1 text-[10px] text-gray-500">Extracting project details. You can keep this page open or return later.</p>
+        </div>
+      </section>
       <details
+        *ngIf="source.status !== 'processing'"
         [open]="isSourceExpanded(source)"
         (toggle)="onSourceToggle(source, $event)"
         class="source-review ml-11 max-w-3xl rounded-xl border border-white/10 bg-white/[0.025] px-3 py-2"
@@ -226,13 +249,13 @@
 
   <aside class="flex h-full w-full shrink-0 flex-col border-l border-white/10 bg-[#0a0a0a] md:w-[390px]">
     <header class="border-b border-white/10 p-5">
-      <div class="flex items-center justify-between"><h2 class="text-xs font-bold uppercase tracking-widest">Project Profile</h2><span class="text-2xl font-semibold text-secondary">{{ profile.completion.percentage }}%</span></div>
-      <div class="mt-3 h-2 overflow-hidden rounded-full bg-white/10"><div class="h-full rounded-full bg-secondary transition-all" [style.width.%]="profile.completion.percentage"></div></div>
-      <p class="mt-3 text-[11px] text-gray-500">{{ profile.completion.completed }} of {{ profile.completion.total }} applicable onboarding fields resolved.</p>
+      <div class="flex items-center justify-between"><h2 class="text-xs font-bold uppercase tracking-widest">Project Profile</h2><span class="text-2xl font-semibold text-secondary">{{ projectProfileProgress.percentage }}%</span></div>
+      <div class="mt-3 h-2 overflow-hidden rounded-full bg-white/10"><div class="h-full rounded-full bg-secondary transition-all" [style.width.%]="projectProfileProgress.percentage"></div></div>
+      <p class="mt-3 text-[11px] text-gray-500">{{ projectProfileProgress.completed }} of {{ projectProfileProgress.total }} Project Profile fields resolved.</p>
     </header>
 
     <div class="flex-1 space-y-5 overflow-y-auto p-5">
-      <section *ngFor="let section of profile.completion.sections" class="rounded-xl border border-white/10 bg-white/[0.025] p-3">
+      <section *ngFor="let section of profileSections" class="rounded-xl border border-white/10 bg-white/[0.025] p-3">
         <div class="flex items-center justify-between"><h3 class="text-[11px] font-semibold text-gray-200">{{ section.label }}</h3><span class="text-[10px] text-gray-500">{{ section.completed }}/{{ section.total }}</span></div>
         <div class="mt-2 h-1 overflow-hidden rounded bg-white/10"><div class="h-full bg-secondary" [style.width.%]="section.percentage"></div></div>
         <div class="mt-3 space-y-2">
@@ -245,9 +268,11 @@
 
       <section class="rounded-xl border border-white/10 bg-white/[0.025] p-4">
         <h3 class="text-xs font-bold uppercase tracking-wider">Sales activation</h3>
+        <div class="mt-3 flex items-center justify-between text-[11px]"><span class="text-gray-400">AI-assisted sales</span><span>{{ aiAuthorizationStatus === 'confirmed' || aiAuthorizationStatus === 'corrected_by_user' ? 'Authorized' : 'Pending' }}</span></div>
         <div class="mt-3 flex items-center justify-between text-[11px]"><span class="text-gray-400">Assigned Sales users</span><span>{{ assignedSalesUsers.length }}</span></div>
-        <div class="mt-2 flex items-center justify-between text-[11px]"><span class="text-gray-400">Routing</span><span>Round robin</span></div>
-        <div class="mt-2 flex items-center justify-between text-[11px]"><span class="text-gray-400">Meta setup</span><span>{{ campaigns.length ? 'Configured' : 'Pending' }}</span></div>
+        <div class="mt-2 flex items-center justify-between text-[11px]"><span class="text-gray-400">Lead distribution</span><span>Round robin · Automatic</span></div>
+        <p class="mt-1 text-[10px] leading-relaxed text-gray-600">Each new lead goes to the next available Sales user. Manual reassignment is always available.</p>
+        <div class="mt-3 flex items-center justify-between text-[11px]"><span class="text-gray-400">Meta Lead Ads</span><span>{{ metaActivationLabel }}</span></div>
         <p class="mt-3 text-[10px] leading-relaxed text-gray-500">Operational configuration is completed through the guided cards in the conversation.</p>
       </section>
     </div>

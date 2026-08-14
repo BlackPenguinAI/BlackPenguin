@@ -48,9 +48,9 @@ FIELDS = (
     FieldDefinition("value_proposition", "Project value proposition", "sales_strategy"),
     FieldDefinition("key_differentiators", "Key differentiators", "sales_strategy"),
     FieldDefinition("qualification_rules", "Lead qualification rules", "sales_strategy"),
-    FieldDefinition("sales_contacts", "Sales contacts", "routing"),
-    FieldDefinition("appointment_routing", "Appointment routing", "routing"),
-    FieldDefinition("campaigns_defined", "Associated campaigns", "campaigns"),
+    FieldDefinition("sales_contacts", "Assigned Sales team", "routing"),
+    FieldDefinition("appointment_routing", "Automatic lead distribution", "routing"),
+    FieldDefinition("campaigns_defined", "Meta Lead Ads setup", "campaigns"),
     FieldDefinition("meta_connection_verified", "Meta connection verified", "campaigns", "conditionally_required"),
     FieldDefinition("compliance_notes", "Project compliance notes", "approval", "conditionally_required"),
 )

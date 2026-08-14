@@ -109,8 +109,14 @@ QUESTION_CATALOG: dict[str, dict[str, Any]] = {
         "options": ["Cash", "Bank financing", "Developer financing", "Installment plan", "Reservation deposit"],
     },
     "sales_authorization": {
-        "input_type": "single_select",
-        "options": ["Authorized", "Not yet authorized", "Human approval required per lead"],
+        "input_type": "ai_sales_authorization",
+        "prompt": "Authorize **AI (Artificial Intelligence)-assisted sales** for this project.",
+        "help_text": (
+            "Black Penguin will contact, qualify, follow up with, and help schedule qualified leads. "
+            "A person can always reassign leads and appointments manually."
+        ),
+        "options": [],
+        "allow_custom": False,
     },
     "target_audience": {
         "input_type": "long_text",
@@ -243,7 +249,7 @@ def build_next_question(
         "input_type": config.get("input_type", "text"),
         "options": options,
         "examples": examples,
-        "allow_custom": True,
+        "allow_custom": bool(config.get("allow_custom", True)),
         "minimum_words": config.get("minimum_words"),
         "minimum_characters": config.get("minimum_characters"),
         "help_text": config.get("help_text"),

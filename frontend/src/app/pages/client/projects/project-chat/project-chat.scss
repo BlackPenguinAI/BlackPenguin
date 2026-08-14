@@ -31,3 +31,7 @@
 .structured-check { display: flex; align-items: flex-start; gap: .6rem; border: 1px solid rgba(255,255,255,.08); border-radius: .6rem; padding: .65rem .75rem; background: rgba(255,255,255,.025);
   input { margin-top: .08rem; accent-color: #e99e10; }
 }
+.processing-source { display: flex; align-items: center; gap: .8rem; border: 1px solid rgba(233,158,16,.22); border-radius: .8rem; background: rgba(233,158,16,.055); padding: .8rem 1rem; }
+.processing-source__spinner { width: 1.1rem; height: 1.1rem; flex: 0 0 auto; border: 2px solid rgba(233,158,16,.25); border-top-color: #e99e10; border-radius: 9999px; animation: processing-spin .8s linear infinite; }
+@keyframes processing-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .processing-source__spinner { animation-duration: 1.8s; } }

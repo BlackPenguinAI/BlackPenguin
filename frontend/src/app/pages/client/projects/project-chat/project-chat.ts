@@ -21,7 +21,7 @@ import {
 import {
   Campaign, ChatAttachment, ChatMessage, ChatTurn, EMPTY_PROJECT_PROFILE, MetaConnection,
   MetaSetupConfiguration, OnboardingState, ProjectAssignment, ProjectFieldProgress, ProjectProfile,
-  ProjectSalesCandidate, ProjectSource, SourceProposal, ValidationStatus,
+  ProjectSalesCandidate, ProjectSource, SectionProgress, SourceProposal, ValidationStatus,
 } from './project-onboarding.models';
 import { ProjectOnboardingService } from './project-onboarding.service';
 
@@ -51,6 +51,8 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   selectedSalesUserId = '';
   salesInvite = { first_name: '', last_name: '', email: '' };
   teamBusy = false;
+  teamSetupMessage = '';
+  authorizationBusy = false;
   metaSetupConfig: MetaSetupConfiguration = { partner_business_manager_id: null, configured: false };
   metaSetup = {
     page_id: '', ad_account_id: '', lead_form_id: '',
@@ -75,6 +77,9 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   private lastStateVersion = 0;
   private pollingStartedAt = 0;
   private readonly expandedSourceIds = new Set<string>();
+  private readonly activationFieldKeys = new Set([
+    'sales_authorization', 'sales_contacts', 'appointment_routing', 'campaigns_defined', 'meta_connection_verified',
+  ]);
 
   constructor(
     private readonly route: ActivatedRoute,
@@ -109,8 +114,41 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   }
 
   get canSend(): boolean { return (!!this.prompt.trim() || !!this.selectedFiles.length) && !this.isAnalyzing && !this.hasPendingReview; }
+  get projectName(): string { return this.profile.project_name || 'Untitled Project'; }
+  get hasProcessingSources(): boolean { return this.sources.some((source) => source.status === 'processing'); }
   get nextBlocker(): string { return this.profile.completion.blockers[0]?.label || 'Final profile approval'; }
-  fieldsForSection(section: string): ProjectFieldProgress[] { return this.profile.fields.filter((field) => field.section === section); }
+  get profileSections(): SectionProgress[] {
+    return this.profile.completion.sections
+      .filter((section) => !['routing', 'campaigns'].includes(section.key))
+      .map((section) => {
+        const fields = this.fieldsForSection(section.key);
+        const completed = fields.filter((field) => this.isResolvedStatus(field.status)).length;
+        return {
+          ...section,
+          completed,
+          total: fields.length,
+          percentage: fields.length ? Math.round(100 * completed / fields.length) : 100,
+        };
+      })
+      .filter((section) => section.total > 0);
+  }
+  fieldsForSection(section: string): ProjectFieldProgress[] {
+    return this.profile.fields.filter((field) => field.section === section && !this.activationFieldKeys.has(field.key));
+  }
+  get projectProfileProgress(): { completed: number; total: number; percentage: number } {
+    const fields = this.profile.fields.filter((field) => !this.activationFieldKeys.has(field.key));
+    const completed = fields.filter((field) => this.isResolvedStatus(field.status)).length;
+    return { completed, total: fields.length, percentage: fields.length ? Math.round(100 * completed / fields.length) : 0 };
+  }
+  get aiAuthorizationStatus(): ValidationStatus {
+    return this.profile.fields.find((field) => field.key === 'sales_authorization')?.status || 'missing';
+  }
+  get metaActivationLabel(): string {
+    if (this.metaConnections.some((item) => item.verification_status === 'succeeded')) return 'Test completed';
+    return this.profile.fields.find((field) => field.key === 'campaigns_defined')?.status === 'deferred'
+      ? 'Configure later'
+      : 'Pending';
+  }
 
   loadProfile(): void {
     this.onboarding.getProfile(this.projectId).subscribe({
@@ -160,7 +198,8 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
       next: (assignment) => {
         this.projectTeam = [...this.projectTeam.filter((item) => item.user_id !== assignment.user_id), assignment];
         this.selectedSalesUserId = ''; this.teamBusy = false;
-        this.submitStructuredAnswer('Sales team configured', message);
+        this.teamSetupMessage = `${assignment.first_name || ''} ${assignment.last_name || ''}`.trim()
+          + ' was assigned. Add another Sales user or continue with this team.';
       },
       error: (error: HttpErrorResponse) => {
         this.teamBusy = false;
@@ -179,7 +218,8 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
           last_name: assignment.last_name || undefined, role: 'sales', is_active: true,
         }];
         this.salesInvite = { first_name: '', last_name: '', email: '' }; this.teamBusy = false;
-        this.submitStructuredAnswer('Sales team configured', message);
+        this.teamSetupMessage = `${assignment.first_name || ''} ${assignment.last_name || ''}`.trim()
+          + ' was created and assigned. Add another Sales user or continue with this team.';
       },
       error: (error: HttpErrorResponse) => {
         this.teamBusy = false;
@@ -187,20 +227,62 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
       },
     });
   }
-  deferStructuredStep(value: string, message: ChatMessage): void { this.submitStructuredAnswer(value, message); }
+  authorizeAiSales(message: ChatMessage): void {
+    if (!message.id || this.authorizationBusy) return;
+    this.authorizationBusy = true; this.errorMessage = '';
+    this.onboarding.applyOnboardingAction(this.projectId, {
+      action: 'authorize_ai_sales', question_message_id: message.id, client_action_id: this.createClientMessageId(),
+    }).subscribe({
+      next: (turn) => { this.authorizationBusy = false; this.applyTurn(turn); this.scrollToBottom(); },
+      error: (error: HttpErrorResponse) => {
+        this.authorizationBusy = false;
+        this.handleStructuredActionError(error, 'The AI-assisted sales authorization could not be recorded.');
+      },
+    });
+  }
+  completeSalesTeam(message: ChatMessage): void { this.applySalesTeamDecision(message, 'complete_sales_team'); }
+  deferSalesTeam(message: ChatMessage): void { this.applySalesTeamDecision(message, 'defer_sales_team'); }
+  private applySalesTeamDecision(message: ChatMessage, action: 'complete_sales_team' | 'defer_sales_team'): void {
+    if (!message.id || this.teamBusy) return;
+    this.teamBusy = true; this.errorMessage = '';
+    this.onboarding.applyOnboardingAction(this.projectId, {
+      action, question_message_id: message.id, client_action_id: this.createClientMessageId(),
+    }).subscribe({
+      next: (turn) => { this.teamBusy = false; this.teamSetupMessage = ''; this.applyTurn(turn); this.scrollToBottom(); },
+      error: (error: HttpErrorResponse) => {
+        this.teamBusy = false;
+        this.handleStructuredActionError(error, 'The Sales-team decision could not be saved.');
+      },
+    });
+  }
   testMetaSetup(message: ChatMessage): void {
-    if (this.metaSetupBusy) return;
+    if (!message.id || this.metaSetupBusy) return;
     this.metaSetupBusy = true; this.metaSetupMessage = ''; this.errorMessage = '';
-    this.onboarding.simulateMetaSetup(this.projectId, this.metaSetup).subscribe({
-      next: (result) => {
-        this.metaSetupBusy = false; this.metaSetupMessage = result.message;
-        this.metaConnections = [...this.metaConnections.filter((item) => item.id !== result.connection.id), result.connection];
-        this.campaigns = [...this.campaigns.filter((item) => item.id !== result.campaign.id), result.campaign];
-        this.submitStructuredAnswer('Meta setup completed', message);
+    this.onboarding.applyOnboardingAction(this.projectId, {
+      action: 'complete_meta_setup', question_message_id: message.id, client_action_id: this.createClientMessageId(),
+      ...this.metaSetup,
+    }).subscribe({
+      next: (turn) => {
+        this.metaSetupBusy = false;
+        this.metaSetupMessage = 'Simulated connection successful. Live Meta access must still be verified before activation.';
+        this.applyTurn(turn); this.loadCampaigns(); this.loadMetaConnections(); this.scrollToBottom();
       },
       error: (error: HttpErrorResponse) => {
         this.metaSetupBusy = false;
-        this.errorMessage = typeof error.error?.detail === 'string' ? error.error.detail : 'The simulated Meta connection test could not be completed.';
+        this.handleStructuredActionError(error, 'The simulated Meta connection test could not be completed.');
+      },
+    });
+  }
+  deferMetaSetup(message: ChatMessage): void {
+    if (!message.id || this.metaSetupBusy) return;
+    this.metaSetupBusy = true; this.errorMessage = '';
+    this.onboarding.applyOnboardingAction(this.projectId, {
+      action: 'defer_meta_setup', question_message_id: message.id, client_action_id: this.createClientMessageId(),
+    }).subscribe({
+      next: (turn) => { this.metaSetupBusy = false; this.applyTurn(turn); this.scrollToBottom(); },
+      error: (error: HttpErrorResponse) => {
+        this.metaSetupBusy = false;
+        this.handleStructuredActionError(error, 'The Meta setup decision could not be saved.');
       },
     });
   }
@@ -488,6 +570,14 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
       ),
     });
   }
+  private handleStructuredActionError(error: HttpErrorResponse, fallback: string): void {
+    this.errorMessage = typeof error.error?.detail === 'string' ? error.error.detail : fallback;
+    if ([0, 409, 502, 504].includes(error.status)) this.syncState();
+    this.cdr.detectChanges();
+  }
+  private isResolvedStatus(status: ValidationStatus): boolean {
+    return ['confirmed', 'corrected_by_user', 'not_applicable', 'deferred'].includes(status);
+  }
   private joinSpeech(base: string, finalText: string, interimText: string): string {
     return [base, finalText, interimText].filter(Boolean).join(' ').replace(/\s+/g, ' ').trimStart();
   }
@@ -586,11 +676,6 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
       const selected = choices.find((item) => item.toLocaleLowerCase() === answer.toLocaleLowerCase()) || null;
       return { ...message, response_payload: { status: 'answered', answer, selected_option: selected, custom: !selected } };
     });
-  }
-  private submitStructuredAnswer(value: string, message: ChatMessage): void {
-    this.prompt = value;
-    this.replyToMessageId = message.id || null;
-    this.sendMessage();
   }
   private scrollToBottom(): void { setTimeout(() => { const element = this.chatScroll?.nativeElement; if (element) element.scrollTop = element.scrollHeight; this.cdr.detectChanges(); }, 100); }
 }

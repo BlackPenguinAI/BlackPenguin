@@ -19,6 +19,7 @@ from app.modules.onboarding_questions import build_next_question
 from app.modules.onboarding_jobs import service as job_service
 from app.modules.onboarding_jobs.continuation import finalize_source_group
 from app.modules.onboarding_jobs.models import OnboardingSourceJob
+from app.modules.onboarding_copy import conversational_acknowledgement
 from app.modules.users.models import TENANT_MANAGER_ROLES, User, UserRole
 from app.modules.users import services as user_services
 
@@ -202,19 +203,14 @@ def _accepted_response(
     *,
     continuation: str | None = None,
 ) -> str:
-    greeting = f"Thanks, {first_name}." if first_name else "Thanks."
-    lines = []
-    for item in accepted:
-        label = FIELD_BY_KEY[item["field"]].label
-        value = item.get("value")
-        if item.get("status") == "not_applicable":
-            display = "Not applicable"
-        else:
-            display = _format_user_facing_value(value)
-        lines.append(f"- **{label}:** {display}")
     next_step = _next_prompt(profile) if continuation is None else continuation
-    response = f"{greeting} I updated the profile with:\n\n" + "\n".join(lines)
-    return response + (f"\n\n{next_step}" if next_step else "")
+    return conversational_acknowledgement(
+        accepted=accepted,
+        label_for=lambda field: FIELD_BY_KEY[field].label,
+        next_prompt=next_step,
+        first_name=first_name,
+        scope="Company Profile",
+    )
 
 
 def _continue_after_source_review(

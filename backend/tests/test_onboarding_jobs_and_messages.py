@@ -1,5 +1,6 @@
 import ast
 import inspect
+from types import SimpleNamespace
 from unittest.mock import Mock
 
 from app.db.base import Base
@@ -48,7 +49,7 @@ def test_repeating_a_failed_url_does_not_implicitly_retry_it():
 def test_create_all_metadata_registers_durable_jobs_and_schema_version():
     assert OnboardingSourceJob.__tablename__ in Base.metadata.tables
     assert "schema_versions" in Base.metadata.tables
-    assert CURRENT_SCHEMA_VERSION == "20260814_project_sales_meta"
+    assert CURRENT_SCHEMA_VERSION == "20260814_project_onboarding_ux"
 
 
 def test_jobs_include_retry_availability_timestamp():
@@ -189,6 +190,71 @@ def test_project_structured_answers_are_resolved_without_an_llm_round_trip(monke
     assert resolution.status == "accepted"
     assert resolution.updates[0]["field"] == "short_description"
     assert resolution.updates[0]["status"] == "confirmed"
+
+
+def test_ai_sales_authorization_rejects_free_text_and_requires_the_typed_action(monkeypatch):
+    question = ProjectMessage(
+        id="authorization-question",
+        session_id="session-id",
+        sender=SenderType.AI,
+        content="Authorize AI-assisted sales",
+        ui_payload={
+            "field": "sales_authorization",
+            "input_type": "ai_sales_authorization",
+            "options": [],
+            "examples": [],
+            "answer_actions": {},
+        },
+    )
+    db = Mock()
+    db.query.return_value.filter.return_value.first.return_value = question
+    monkeypatch.setattr(project_services, "get_active_question", lambda *_args, **_kwargs: question)
+
+    resolution = project_services.resolve_answer_to_question(
+        db,
+        session_id="session-id",
+        message_id=question.id,
+        answer="Authorized",
+        profile=Mock(profile_data={}),
+    )
+
+    assert resolution.status == "rejected"
+    assert resolution.reason == "explicit_consent_required"
+
+
+def test_confirmed_project_name_updates_the_canonical_project_in_the_same_unit_of_work(monkeypatch):
+    project = SimpleNamespace(
+        name="Untitled Project",
+        onboarding_status="draft",
+        onboarding_completed_at=None,
+        onboarding_approved_by_user_id=None,
+    )
+    profile = SimpleNamespace(
+        project=project,
+        profile_data={},
+        field_states={},
+        field_sources={},
+        final_approved=False,
+        approved_for_sales_at=None,
+        completion_percentage=0,
+        is_fully_completed=False,
+        sales_activation_status="not_ready",
+    )
+    db = Mock()
+    monkeypatch.setattr(project_services, "flag_modified", lambda *_args: None)
+
+    result = project_services.apply_field_updates(
+        db,
+        profile,
+        [project_services.user_field_update("project_name", " Riverstone Homes ")],
+        allow_authoritative_statuses=True,
+        commit=False,
+    )
+
+    assert result.accepted[0]["field"] == "project_name"
+    assert project.name == "Riverstone Homes"
+    assert profile.profile_data["project_name"] == "Riverstone Homes"
+    assert db.add.call_args_list[0].args[0] is project
 
 
 def test_project_chat_has_a_bounded_fallback_and_queues_file_extraction():

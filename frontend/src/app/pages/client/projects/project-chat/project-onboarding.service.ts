@@ -6,7 +6,8 @@ import { API_V1_URL } from '../../../../core/config/api.config';
 
 import {
   Campaign, ChatMessage, ChatTurn, MetaConnection, MetaSetupConfiguration, MetaSetupResult,
-  OnboardingState, ProjectAssignment, ProjectProfile, ProjectSalesCandidate, ProjectSource, SourceProposal,
+  OnboardingState, ProjectAssignment, ProjectOnboardingActionPayload, ProjectProfile,
+  ProjectSalesCandidate, ProjectSource, SourceProposal,
 } from './project-onboarding.models';
 
 @Injectable({ providedIn: 'root' })
@@ -73,5 +74,8 @@ export class ProjectOnboardingService {
   }
   simulateMetaSetup(id: string, payload: Record<string, unknown>): Observable<MetaSetupResult> {
     return this.http.post<MetaSetupResult>(`${this.baseUrl}/${id}/meta-setup/simulate`, payload);
+  }
+  applyOnboardingAction(id: string, payload: ProjectOnboardingActionPayload): Observable<ChatTurn> {
+    return this.http.post<ChatTurn>(`${this.baseUrl}/${id}/onboarding/actions`, payload);
   }
 }

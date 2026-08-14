@@ -20,6 +20,8 @@ from app.modules.onboarding_questions import build_next_question
 from app.modules.onboarding_jobs import service as job_service
 from app.modules.onboarding_jobs.continuation import finalize_source_group
 from app.modules.onboarding_jobs.models import OnboardingSourceJob
+from app.modules.onboarding_copy import conversational_acknowledgement
+from app.modules.project_team.models import ProjectUserAssignment
 from app.modules.users.models import TENANT_MANAGER_ROLES, User, UserRole
 
 from . import meta_service, services, source_service, storage_service
@@ -32,6 +34,7 @@ from .schemas import (
     CampaignCreate, CampaignResponse, ChatBootstrapRequest, ChatMessagePayload, ChatMessageResponse, ChatTurnResponse,
     MetaConnectionCreate, MetaConnectionResponse, MetaProjectSetupRequest, MetaProjectSetupResponse,
     MetaSetupConfigurationResponse, ProjectCreate, ProjectProfilePatch,
+    ProjectOnboardingActionRequest,
     ProjectCompleteResponse, ProjectDeleteRequest, ProjectDeletionImpact, ProjectDraftResponse,
     ProjectOverviewResponse, ProjectProfileResponse, ProjectResponse,
     OnboardingStateResponse, ProposalDecision, ProposalDecisionResponse,
@@ -338,8 +341,13 @@ async def _complete_chat_turn(
         final_approved=None,
     )
     if result.accepted:
-        labels = [FIELD_BY_KEY[item["field"]].label for item in result.accepted]
-        assistant_text = "I validated and updated: " + ", ".join(f"**{label}**" for label in labels) + ".\n\n" + _next_prompt(profile)
+        assistant_text = conversational_acknowledgement(
+            accepted=result.accepted,
+            label_for=lambda field: FIELD_BY_KEY[field].label,
+            next_prompt=_next_prompt(profile),
+            first_name=current_user.first_name,
+            scope="Project Profile",
+        )
     elif result.rejected:
         assistant_text = "I couldn't safely apply that information, so nothing was changed. " + _next_prompt(profile)
     db.query(ProjectSession).filter(ProjectSession.id == project.session.id).with_for_update().one()
@@ -539,6 +547,171 @@ def get_chat_state(
     return _state_payload(db, project)
 
 
+@router.post("/{project_id}/onboarding/actions", response_model=ChatTurnResponse)
+def apply_onboarding_action(
+    project_id: str,
+    payload: ProjectOnboardingActionRequest,
+    response: Response,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker(EDITOR_ROLES)),
+):
+    """Resolve UI-owned onboarding steps without routing internal commands through the LLM chat."""
+    request_id = f"req_{uuid.uuid4().hex}"
+    response.headers["X-Request-ID"] = request_id
+    project = services.get_project(db, project_id, current_user.company_id)
+    db.query(ProjectSession).filter(ProjectSession.id == project.session.id).with_for_update().one()
+    existing = _existing_turn(
+        db,
+        project=project,
+        client_message_id=payload.client_action_id,
+        request_id=request_id,
+    )
+    if existing:
+        return existing
+
+    question = services.get_active_question(
+        db,
+        project.session.id,
+        payload.question_message_id,
+    )
+    if not question or question.id != payload.question_message_id:
+        raise HTTPException(status_code=409, detail="That onboarding step is no longer active. Refresh and continue from the current step.")
+    input_type = str((question.ui_payload or {}).get("input_type") or "")
+    expected_input = {
+        "authorize_ai_sales": "ai_sales_authorization",
+        "complete_sales_team": "project_sales_team",
+        "defer_sales_team": "project_sales_team",
+        "complete_meta_setup": "meta_lead_setup",
+        "defer_meta_setup": "meta_lead_setup",
+    }[payload.action]
+    if input_type != expected_input:
+        raise HTTPException(status_code=409, detail="That action does not match the current onboarding step.")
+    if payload.action == "authorize_ai_sales" and current_user.role not in TENANT_MANAGER_ROLES:
+        raise HTTPException(status_code=403, detail="Only a Company administrator or assistant can authorize AI-assisted sales.")
+
+    content_by_action = {
+        "authorize_ai_sales": "Authorize AI-assisted sales and continue",
+        "complete_sales_team": "Continue with the assigned Sales team",
+        "defer_sales_team": "Configure the Sales team later",
+        "complete_meta_setup": "Run the simulated Meta connection test",
+        "defer_meta_setup": "Configure Meta Lead Ads later",
+    }
+    user_message = services.save_message(
+        db,
+        project.session.id,
+        SenderType.USER,
+        content_by_action[payload.action],
+        in_reply_to_message_id=question.id,
+        message_id=payload.client_action_id,
+        commit=False,
+    )
+    profile = services.get_profile(project)
+    updates: list[dict[str, Any]] = []
+    try:
+        if payload.action == "authorize_ai_sales":
+            updates = [services.user_field_update("sales_authorization", True)]
+        elif payload.action == "complete_sales_team":
+            assignments = (
+                db.query(ProjectUserAssignment)
+                .join(User, User.id == ProjectUserAssignment.user_id)
+                .filter(
+                    ProjectUserAssignment.project_id == project.id,
+                    ProjectUserAssignment.responsibility == "sales",
+                    ProjectUserAssignment.is_active.is_(True),
+                    ProjectUserAssignment.accepts_new_leads.is_(True),
+                    User.is_active.is_(True),
+                    User.role == UserRole.SALES,
+                )
+                .all()
+            )
+            if not assignments:
+                raise HTTPException(status_code=422, detail="Assign at least one active Sales user before continuing.")
+            updates = [
+                services.user_field_update("sales_contacts", [item.user_id for item in assignments]),
+                services.user_field_update("appointment_routing", "round_robin"),
+            ]
+        elif payload.action == "defer_sales_team":
+            updates = [
+                services.user_field_update("sales_contacts", None, status="deferred"),
+                services.user_field_update("appointment_routing", "round_robin", status="deferred"),
+            ]
+        elif payload.action == "complete_meta_setup":
+            partner_id = settings.META_BUSINESS_MANAGER_ID.strip() or None
+            if not partner_id:
+                raise HTTPException(status_code=503, detail="Black Penguin's Meta Business Manager ID is not configured yet.")
+            required_ids = (payload.page_id, payload.ad_account_id, payload.lead_form_id)
+            if any(value is None for value in required_ids):
+                raise HTTPException(status_code=422, detail="Page ID, Ad Account ID, and Form ID are required.")
+            meta_service.simulate_project_setup(
+                db,
+                project=project,
+                page_id=payload.page_id or "",
+                ad_account_id=payload.ad_account_id or "",
+                lead_form_id=payload.lead_form_id or "",
+                page_access_confirmed=payload.page_access_confirmed,
+                ad_account_access_confirmed=payload.ad_account_access_confirmed,
+                leads_access_confirmed=payload.leads_access_confirmed,
+                commit=False,
+            )
+            updates = [
+                services.user_field_update("campaigns_defined", True),
+                services.user_field_update("meta_connection_verified", False, status="deferred"),
+            ]
+        else:
+            updates = [
+                services.user_field_update("campaigns_defined", None, status="deferred"),
+                services.user_field_update("meta_connection_verified", None, status="deferred"),
+            ]
+
+        result = services.apply_field_updates(
+            db,
+            profile,
+            updates,
+            allow_authoritative_statuses=True,
+            commit=False,
+        )
+        if result.rejected:
+            raise HTTPException(status_code=422, detail="The onboarding action could not be applied safely.")
+        services.record_message_response(
+            db,
+            project.session.id,
+            question.id,
+            user_message.content,
+            status="accepted",
+            commit=False,
+        )
+        assistant_text = conversational_acknowledgement(
+            accepted=result.accepted,
+            label_for=lambda field: FIELD_BY_KEY[field].label,
+            next_prompt=_next_prompt(profile),
+            first_name=current_user.first_name,
+            scope="sales activation",
+        )
+        ai_message = services.save_message(
+            db,
+            project.session.id,
+            SenderType.AI,
+            assistant_text,
+            ui_payload=_next_question(profile),
+            in_reply_to_message_id=user_message.id,
+            commit=False,
+        )
+        db.commit()
+        for item in (profile, user_message, ai_message):
+            db.refresh(item)
+    except Exception:
+        db.rollback()
+        raise
+
+    return _turn_payload(
+        request_id=request_id,
+        ai_message=ai_message,
+        user_message=user_message,
+        profile=profile,
+        accepted=result.accepted,
+    )
+
+
 @router.post("/{project_id}/chat/bootstrap", response_model=ChatTurnResponse, status_code=202)
 async def bootstrap_chat(
     project_id: str,
@@ -730,12 +903,12 @@ async def send_chat(
             commit=False,
         )
         if accepted:
-            labels = [FIELD_BY_KEY[item["field"]].label for item in accepted]
-            assistant_text = (
-                "I validated and updated: "
-                + ", ".join(f"**{label}**" for label in labels)
-                + ".\n\n"
-                + _next_prompt(profile)
+            assistant_text = conversational_acknowledgement(
+                accepted=accepted,
+                label_for=lambda field: FIELD_BY_KEY[field].label,
+                next_prompt=_next_prompt(profile),
+                first_name=current_user.first_name,
+                scope="Project Profile",
             )
         elif resolution.action == "request_changes":
             assistant_text = "Tell me which Project Profile field you want to change."
@@ -746,6 +919,7 @@ async def send_chat(
                 "empty_answer": "Please enter a value before continuing.",
                 "minimum_words": "Please provide a more complete answer.",
                 "minimum_characters": "Please provide a more complete answer.",
+                "explicit_consent_required": "Use the authorization button so your consent is recorded explicitly.",
                 "sales_team_required": "Assign at least one active Sales user, or choose to configure the team later.",
                 "meta_setup_required": "Complete the guided Meta setup test, or choose to configure Meta later.",
             }

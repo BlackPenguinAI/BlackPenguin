@@ -45,4 +45,15 @@ describe('OnboardingResponseOptionsComponent', () => {
 
     expect(component.isStructuredStep).toBe(true);
   });
+
+  it('delegates explicit AI authorization to its consent card', () => {
+    const component = new OnboardingResponseOptionsComponent();
+    component.question = {
+      field: 'sales_authorization', label: 'AI-assisted sales authorization', prompt: 'Authorize',
+      input_type: 'ai_sales_authorization', options: [], examples: [],
+      allow_custom: false, minimum_words: null,
+    };
+
+    expect(component.isStructuredStep).toBe(true);
+  });
 });

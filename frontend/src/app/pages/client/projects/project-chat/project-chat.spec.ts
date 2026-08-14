@@ -146,4 +146,43 @@ describe('ProjectChatComponent', () => {
     expect(component.statusIcon('deferred')).toBe('schedule');
     expect(component.statusClass('deferred')).toBe('text-gray-600');
   });
+
+  it('uses the confirmed profile name instead of the draft placeholder', () => {
+    component.profile = { ...EMPTY_PROJECT_PROFILE, project_name: 'Riverstone Homes' };
+
+    expect(component.projectName).toBe('Riverstone Homes');
+  });
+
+  it('keeps processing feedback active for background sources', () => {
+    component.isAnalyzing = false;
+    component.sources = [{
+      id: 'source-processing', kind: 'url', status: 'processing', name: 'cbhhomes.com',
+      url: 'https://cbhhomes.com', mime_type: null, size_bytes: null, error_message: null,
+      message_id: null, download_url: null, is_primary: false, proposals: [],
+      created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    }];
+
+    expect(component.hasProcessingSources).toBe(true);
+  });
+
+  it('keeps operational routing and Meta sections out of the Project Profile list', () => {
+    component.profile = {
+      ...EMPTY_PROJECT_PROFILE,
+      fields: [
+        { key: 'project_name', label: 'Project name', section: 'identity', requirement: 'required', status: 'missing', applicable: true },
+        { key: 'sales_contacts', label: 'Assigned Sales team', section: 'routing', requirement: 'required', status: 'missing', applicable: true },
+        { key: 'campaigns_defined', label: 'Meta Lead Ads setup', section: 'campaigns', requirement: 'required', status: 'missing', applicable: true },
+      ],
+      completion: {
+        ...EMPTY_PROJECT_PROFILE.completion,
+        sections: [
+          { key: 'identity', label: 'Project Identity', completed: 0, total: 1, percentage: 0 },
+          { key: 'routing', label: 'Team & Routing', completed: 0, total: 2, percentage: 0 },
+          { key: 'campaigns', label: 'Campaigns & Meta', completed: 0, total: 2, percentage: 0 },
+        ],
+      },
+    };
+
+    expect(component.profileSections.map((section) => section.key)).toEqual(['identity']);
+  });
 });

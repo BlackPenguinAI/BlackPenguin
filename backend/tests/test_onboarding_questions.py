@@ -119,3 +119,15 @@ def test_project_operational_steps_use_structured_contracts():
     )
     assert meta["input_type"] == "meta_lead_setup"
     assert "Page ID" in (meta["help_text"] or "")
+
+
+def test_ai_sales_authorization_requires_the_explicit_consent_card():
+    question = build_next_question(
+        [{"field": "sales_authorization", "label": "Authorization for AI-assisted sales"}],
+        final_prompt="Approve",
+    )
+
+    assert question["input_type"] == "ai_sales_authorization"
+    assert question["options"] == []
+    assert question["allow_custom"] is False
+    assert "contact, qualify, follow up" in (question["help_text"] or "")

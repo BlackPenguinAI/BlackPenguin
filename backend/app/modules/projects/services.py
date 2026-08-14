@@ -191,7 +191,7 @@ def record_message_response(
         db.flush()
 
 
-def _user_update(
+def user_field_update(
     field: str,
     value: Any,
     *,
@@ -266,14 +266,14 @@ def resolve_answer_to_question(
         return QuestionResolution(
             True,
             "accepted",
-            [_user_update(field, None, status="not_applicable", applicable=False)],
+            [user_field_update(field, None, status="not_applicable", applicable=False)],
             question=question,
         )
     if action and action.get("kind") == "defer":
         return QuestionResolution(
             True,
             "accepted",
-            [_user_update(field, None, status="deferred", applicable=True)],
+            [user_field_update(field, None, status="deferred", applicable=True)],
             question=question,
         )
 
@@ -285,19 +285,27 @@ def resolve_answer_to_question(
         return QuestionResolution(
             True,
             "accepted",
-            [_user_update(field, None, status="not_applicable", applicable=False)],
+            [user_field_update(field, None, status="not_applicable", applicable=False)],
             question=question,
         )
 
     input_type = str(question.ui_payload.get("input_type") or "text")
+    if input_type == "ai_sales_authorization":
+        return QuestionResolution(
+            True,
+            "rejected",
+            [],
+            "explicit_consent_required",
+            question,
+        )
     if input_type == "project_sales_team":
         if text.casefold() == "configure sales team later":
             return QuestionResolution(
                 True,
                 "accepted",
                 [
-                    _user_update("sales_contacts", None, status="deferred", applicable=True),
-                    _user_update("appointment_routing", "round_robin", status="deferred", applicable=True),
+                    user_field_update("sales_contacts", None, status="deferred", applicable=True),
+                    user_field_update("appointment_routing", "round_robin", status="deferred", applicable=True),
                 ],
                 question=question,
                 action="defer_sales_team",
@@ -320,8 +328,8 @@ def resolve_answer_to_question(
             True,
             "accepted",
             [
-                _user_update("sales_contacts", user_ids),
-                _user_update("appointment_routing", "round_robin"),
+                user_field_update("sales_contacts", user_ids),
+                user_field_update("appointment_routing", "round_robin"),
             ],
             question=question,
             action="sales_team_configured",
@@ -330,7 +338,7 @@ def resolve_answer_to_question(
         return QuestionResolution(
             True,
             "accepted",
-            [_user_update("appointment_routing", "round_robin")],
+            [user_field_update("appointment_routing", "round_robin")],
             question=question,
             action="round_robin_confirmed",
         )
@@ -340,8 +348,8 @@ def resolve_answer_to_question(
                 True,
                 "accepted",
                 [
-                    _user_update("campaigns_defined", None, status="deferred", applicable=True),
-                    _user_update("meta_connection_verified", None, status="deferred", applicable=True),
+                    user_field_update("campaigns_defined", None, status="deferred", applicable=True),
+                    user_field_update("meta_connection_verified", None, status="deferred", applicable=True),
                 ],
                 question=question,
                 action="defer_meta_setup",
@@ -366,8 +374,8 @@ def resolve_answer_to_question(
             True,
             "accepted",
             [
-                _user_update("campaigns_defined", True),
-                _user_update(
+                user_field_update("campaigns_defined", True),
+                user_field_update(
                     "meta_connection_verified",
                     campaign.meta_connection.verification_mode == "real",
                     status=verification_status,
@@ -399,7 +407,7 @@ def resolve_answer_to_question(
     return QuestionResolution(
         True,
         "accepted",
-        [_user_update(field, value, status=update_status)],
+        [user_field_update(field, value, status=update_status)],
         question=question,
     )
 
@@ -440,6 +448,8 @@ def apply_field_updates(
         if status in {"confirmed", "corrected_by_user", "not_applicable"} and not allow_authoritative_statuses:
             status = "pending_confirmation"
         value = update.get("value")
+        if key == "project_name" and isinstance(value, str):
+            value = value.strip()
         if status not in {"missing", "not_applicable", "deferred"} and value in (None, "", []):
             rejected.append({"update": raw, "reason": "missing_value"}); continue
         if is_too_short(key, value):
@@ -453,6 +463,7 @@ def apply_field_updates(
         accepted.append({"field": key, "value": value, "status": status})
         if key == "project_name" and value and status in {"confirmed", "corrected_by_user"}:
             profile.project.name = str(value)[:150]
+            db.add(profile.project)
         elif key == "short_description" and value:
             profile.project.description = str(value)
         elif key == "exact_address" and value:
@@ -498,7 +509,9 @@ def serialize_profile(profile: ProjectProfile) -> dict[str, Any]:
         and profile.project.onboarding_status in {"in_progress", "awaiting_confirmation"}
     )
     return {
-        "id": profile.id, "project_id": profile.project_id, "data": profile.profile_data or {},
+        "id": profile.id, "project_id": profile.project_id,
+        "project_name": str((profile.profile_data or {}).get("project_name") or profile.project.name),
+        "data": profile.profile_data or {},
         "fields": field_progress(profile.field_states), "completion": completion,
         "updated_at": profile.updated_at,
     }
@@ -508,8 +521,14 @@ def serialize_project(project: Project) -> dict[str, Any]:
     serialized_profile = serialize_profile(project.profile) if project.profile else None
     if project.is_demo and serialized_profile:
         serialized_profile["completion"]["sales_activation_status"] = "demo_only"
+    resolved_name = project.name
+    if project.profile:
+        profile_name = (project.profile.profile_data or {}).get("project_name")
+        profile_name_state = (project.profile.field_states or {}).get("project_name", {}).get("status")
+        if profile_name and profile_name_state in {"confirmed", "corrected_by_user"}:
+            resolved_name = str(profile_name)
     return {
-        "id": project.id, "company_id": project.company_id, "name": project.name,
+        "id": project.id, "company_id": project.company_id, "name": resolved_name,
         "description": project.description, "address": project.address, "city": project.city,
         "country": project.country, "is_active": project.is_active,
         "is_demo": project.is_demo,

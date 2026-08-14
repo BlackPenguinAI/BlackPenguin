@@ -38,6 +38,6 @@ export class OnboardingResponseOptionsComponent {
   }
 
   get isStructuredStep(): boolean {
-    return ['project_sales_team', 'meta_lead_setup'].includes(this.question?.input_type || '');
+    return ['ai_sales_authorization', 'project_sales_team', 'meta_lead_setup'].includes(this.question?.input_type || '');
   }
 }
