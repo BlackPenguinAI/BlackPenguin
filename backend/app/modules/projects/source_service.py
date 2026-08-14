@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 
 from app.integrations.openrouter_client import generate_llm_response
 from app.modules.ai_core.services import get_ai_config
+from app.modules.onboarding_questions import validate_onboarding_value
 from app.modules.onboarding_jobs.errors import (
     AccessRestrictedError,
     NoReadableContentError,
@@ -415,7 +416,14 @@ def review_proposal(db: Session, *, proposal: ProjectOnboardingProposal, company
             "confidence": proposal.confidence,
         }], allow_authoritative_statuses=True)
         if not result.accepted:
-            raise HTTPException(status_code=422, detail="The proposed value could not be applied.")
+            rejected = result.rejected[0] if result.rejected else {}
+            validation = rejected.get("validation")
+            detail = validation if isinstance(validation, dict) else {
+                "code": rejected.get("reason", "invalid_value"),
+                "field": proposal.field_key,
+                "message": "The proposed value could not be applied.",
+            }
+            raise HTTPException(status_code=422, detail=detail)
         proposal.value = value
         proposal.status = ProjectProposalStatus.CORRECTED if action == "correct" else ProjectProposalStatus.CONFIRMED
     proposal.reviewed_by_user_id, proposal.reviewed_at = user_id, datetime.utcnow()
@@ -444,6 +452,7 @@ def serialize_proposal(proposal: ProjectOnboardingProposal) -> dict[str, Any]:
         "id": proposal.id, "field": proposal.field_key, "label": FIELD_BY_KEY[proposal.field_key].label,
         "value": proposal.value, "evidence": proposal.evidence, "confidence": proposal.confidence,
         "status": proposal.status.value,
+        "validation": validate_onboarding_value(proposal.field_key, proposal.value),
     }
 
 

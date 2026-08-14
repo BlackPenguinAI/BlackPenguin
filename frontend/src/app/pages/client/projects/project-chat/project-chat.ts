@@ -25,6 +25,14 @@ import {
   ProjectPropertyType, PropertyTypeCatalog,
 } from './project-onboarding.models';
 import { ProjectOnboardingService } from './project-onboarding.service';
+import {
+  errorCount,
+  FormErrors,
+  validateMetaSetup,
+  validatePropertyType,
+  validateProposalDraft,
+  validateSalesInvite,
+} from './project-form-validation';
 
 @Component({
   selector: 'app-project-chat', standalone: true,
@@ -169,6 +177,28 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
       : 'Pending';
   }
 
+  propertyTypeErrors(item: Partial<ProjectPropertyType>): FormErrors { return validatePropertyType(item); }
+  propertyTypeError(item: Partial<ProjectPropertyType>, field: string): string { return this.propertyTypeErrors(item)[field] || ''; }
+  propertyTypeErrorCount(item: Partial<ProjectPropertyType>): number { return errorCount(this.propertyTypeErrors(item)); }
+  canSavePropertyType(item: Partial<ProjectPropertyType>): boolean {
+    return !this.propertyTypeBusy && this.propertyTypeErrorCount(item) === 0;
+  }
+  get catalogReady(): boolean {
+    return this.propertyCatalog.confirmed_count > 0
+      && this.propertyCatalog.candidate_count === 0
+      && this.propertyCatalog.items
+        .filter(item => item.review_status === 'confirmed')
+        .every(item => this.propertyTypeErrorCount(item) === 0);
+  }
+  get salesInviteErrors(): FormErrors { return validateSalesInvite(this.salesInvite); }
+  get salesInviteErrorCount(): number { return errorCount(this.salesInviteErrors); }
+  get canInviteSalesUser(): boolean { return !this.teamBusy && this.salesInviteErrorCount === 0; }
+  get metaSetupErrors(): FormErrors { return validateMetaSetup(this.metaSetup); }
+  get metaSetupErrorCount(): number { return errorCount(this.metaSetupErrors); }
+  get canTestMetaSetup(): boolean {
+    return !this.metaSetupBusy && this.metaSetupConfig.configured && this.metaSetupErrorCount === 0;
+  }
+
   loadProfile(): void {
     this.onboarding.getProfile(this.projectId).subscribe({
       next: (profile) => this.profile = profile,
@@ -212,7 +242,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   }
 
   saveNewPropertyType(): void {
-    if (!this.propertyTypeDraft.name?.trim() || this.propertyTypeBusy) return;
+    if (!this.canSavePropertyType(this.propertyTypeDraft)) return;
     this.propertyTypeBusy = true;
     const payload = { ...this.propertyTypeDraft, review_status: 'confirmed' as const, features: this.propertyTypeDraft.features || [],
       inventory_updated_at: this.propertyTypeDraft.inventory_updated_at ? new Date(this.propertyTypeDraft.inventory_updated_at).toISOString() : null };
@@ -223,7 +253,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   }
 
   confirmPropertyType(item: ProjectPropertyType): void {
-    if (this.propertyTypeBusy) return;
+    if (!this.canSavePropertyType(item)) return;
     this.propertyTypeBusy = true;
     this.onboarding.updatePropertyType(this.projectId, item.id, { ...item, review_status: 'confirmed',
       inventory_updated_at: item.inventory_updated_at ? new Date(item.inventory_updated_at).toISOString() : null }).subscribe({
@@ -309,7 +339,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     });
   }
   inviteSalesUser(message: ChatMessage): void {
-    if (!this.salesInvite.first_name.trim() || !this.salesInvite.last_name.trim() || !this.salesInvite.email.trim() || this.teamBusy) return;
+    if (!this.canInviteSalesUser) return;
     this.teamBusy = true; this.errorMessage = '';
     this.onboarding.inviteAndAssignSalesUser(this.projectId, this.salesInvite).subscribe({
       next: (assignment) => {
@@ -358,6 +388,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   }
   testMetaSetup(message: ChatMessage): void {
     if (!message.id || this.metaSetupBusy) return;
+    if (!this.canTestMetaSetup) return;
     this.metaSetupBusy = true; this.metaSetupMessage = ''; this.errorMessage = '';
     this.onboarding.applyOnboardingAction(this.projectId, {
       action: 'complete_meta_setup', question_message_id: message.id, client_action_id: this.createClientMessageId(),
@@ -532,25 +563,59 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   }
   decideProposal(source: ProjectSource, proposal: SourceProposal, action: 'confirm' | 'correct' | 'reject'): void {
     if (proposal.submitting || proposal.status !== 'pending') return;
+    if (action === 'confirm' && !this.proposalCanConfirm(proposal)) return;
+    if (action === 'correct' && !this.proposalCanSave(proposal)) return;
     const anchor = captureReviewScrollAnchor(this.chatScroll?.nativeElement, proposal.id);
+    const nextProposalId = source.proposals.find(item => item.status === 'pending' && item.id !== proposal.id)?.id || null;
     const value = action === 'correct' ? this.parseValue(proposal.draftValue || '') : undefined;
-    this.updateProposal(source.id, proposal.id, { submitting: true });
+    this.errorMessage = '';
+    this.updateProposal(source.id, proposal.id, { submitting: true, inlineError: undefined });
     this.onboarding.decideProposal(this.projectId, proposal.id, action, value).subscribe({
       next: (result) => {
-        this.updateProposal(source.id, proposal.id, { ...result.proposal, draftValue: this.formatValue(result.proposal.value), submitting: false });
-        this.profile = result.profile; this.syncState('preserve', anchor); this.cdr.detectChanges();
+        this.updateProposal(source.id, proposal.id, {
+          ...result.proposal,
+          draftValue: this.formatValue(result.proposal.value),
+          submitting: false,
+          inlineError: undefined,
+        });
+        this.profile = result.profile;
+        const pendingRemain = this.sources.some(item => this.hasPendingProposals(item));
+        if (pendingRemain) this.restoreProposalContext(anchor, nextProposalId);
+        else this.syncState('preserve', anchor);
+        this.cdr.detectChanges();
       },
       error: (error: HttpErrorResponse) => {
         if (error.status === 409) {
           this.errorMessage = 'This proposal changed in another request. The current state was reloaded.';
           this.syncState('preserve', anchor);
         } else {
-          this.updateProposal(source.id, proposal.id, { submitting: false });
-          this.errorMessage = error.status === 422 ? 'The proposed value is not valid. Review it and try again.' : 'That proposal could not be updated.';
-          this.restoreProposalAnchor(anchor);
+          const message = this.apiDetail(error, 'That proposal could not be updated.');
+          this.updateProposal(source.id, proposal.id, {
+            submitting: false,
+            inlineError: message,
+            validation: error.status === 422 && typeof error.error?.detail === 'object'
+              ? error.error.detail
+              : proposal.validation,
+          });
+          this.restoreProposalContext(anchor, proposal.id);
         }
       },
     });
+  }
+
+  onProposalDraftChange(source: ProjectSource, proposal: SourceProposal, value: string): void {
+    this.updateProposal(source.id, proposal.id, { draftValue: value, inlineError: undefined });
+  }
+  proposalDraftError(proposal: SourceProposal): string {
+    return proposal.inlineError || validateProposalDraft(proposal)['value'] || '';
+  }
+  proposalCanConfirm(proposal: SourceProposal): boolean {
+    return !proposal.submitting && !proposal.validation;
+  }
+  proposalCanSave(proposal: SourceProposal): boolean {
+    return !proposal.submitting
+      && (proposal.draftValue || '').trim() !== this.formatValue(proposal.value).trim()
+      && !this.proposalDraftError(proposal);
   }
 
   retrySource(source: ProjectSource): void {
@@ -616,7 +681,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   }
 
   confirmPropertyCatalog(): void {
-    if (this.propertyTypeBusy) return;
+    if (this.propertyTypeBusy || !this.catalogReady) return;
     this.propertyTypeBusy = true;
     this.onboarding.confirmPropertyTypeCatalog(this.projectId).subscribe({
       next: catalog => {
@@ -752,6 +817,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
         return {
           ...proposal,
           draftValue: preserveDraft ? previous.draftValue : this.formatValue(proposal.value),
+          inlineError: preserveDraft ? previous.inlineError : undefined,
         };
       }),
     }));
@@ -827,6 +893,18 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     if (!anchor) return;
     setTimeout(() => {
       restoreReviewScrollAnchor(this.chatScroll?.nativeElement, anchor);
+      this.cdr.detectChanges();
+    });
+  }
+  private restoreProposalContext(anchor: ReviewScrollAnchor | null, focusProposalId: string | null): void {
+    setTimeout(() => {
+      const container = this.chatScroll?.nativeElement;
+      restoreReviewScrollAnchor(container, anchor);
+      if (container && focusProposalId) {
+        const proposal = Array.from(container.querySelectorAll<HTMLElement>('[data-proposal-id]'))
+          .find(element => element.dataset['proposalId'] === focusProposalId);
+        proposal?.querySelector<HTMLElement>('input, textarea, button:not([disabled])')?.focus({ preventScroll: true });
+      }
       this.cdr.detectChanges();
     });
   }

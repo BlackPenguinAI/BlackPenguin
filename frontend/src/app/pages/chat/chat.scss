@@ -73,3 +73,9 @@
 }
 .processing-source { @apply flex items-center gap-3 rounded-xl border border-secondary/20 bg-secondary/5 px-4 py-3; }
 .processing-source__spinner { @apply h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-secondary/20 border-t-secondary; }
+.form-help { display: flex; align-items: center; gap: .4rem; border: 1px solid rgba(233,158,16,.22); border-radius: .6rem; background: rgba(233,158,16,.06); padding: .55rem .7rem; color: #e9a92a; font-size: .68rem; line-height: 1.35; }
+.field-label { display: flex; flex-direction: column; gap: .25rem; color: #6b7280; font-size: .625rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.form-input { width: 100%; border: 1px solid rgba(255,255,255,.1); border-radius: .5rem; background: rgba(0,0,0,.4); padding: .5rem .75rem; color: white; font-size: .75rem; font-weight: 400; letter-spacing: normal; text-transform: none; outline: none; }
+.form-input:focus { border-color: rgba(233,158,16,.5); }
+.field-error { margin-top: .25rem; color: #fca5a5; font-size: .62rem; font-weight: 500; letter-spacing: normal; line-height: 1.35; text-transform: none; }
+.form-input-invalid { border-color: rgba(248,113,113,.62) !important; }

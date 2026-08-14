@@ -111,6 +111,59 @@ describe('ProjectChatComponent', () => {
     expect(component.isSourceExpanded(component.sources[0])).toBe(true);
   });
 
+  it('updates one proposal in place without reloading the conversation while review remains', () => {
+    const first = {
+      id: 'proposal-1', field: 'exact_address', label: 'Address', value: 'Lima',
+      draftValue: 'Lima', evidence: null, confidence: 'high', status: 'pending' as const,
+    };
+    const second = {
+      id: 'proposal-2', field: 'city', label: 'City', value: 'Lima',
+      draftValue: 'Lima', evidence: null, confidence: 'high', status: 'pending' as const,
+    };
+    const source = {
+      id: 'source-1', kind: 'official_website', status: 'ready' as const, name: 'example.com',
+      url: 'https://example.com', mime_type: 'text/html', size_bytes: 100, error_message: null,
+      message_id: null, download_url: null, is_primary: false, proposals: [first, second],
+      created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    };
+    component.projectId = 'project-1';
+    component.sources = [source];
+
+    component.decideProposal(source, first, 'confirm');
+    http.expectOne('http://localhost:8000/api/v1/projects/project-1/proposals/proposal-1/decision').flush({
+      proposal: { ...first, status: 'confirmed' }, profile: EMPTY_PROJECT_PROFILE,
+    });
+
+    http.expectNone('http://localhost:8000/api/v1/projects/project-1/chat/state');
+    expect(component.sources[0].proposals.map(item => item.status)).toEqual(['confirmed', 'pending']);
+  });
+
+  it('shows proposal validation beside the proposal instead of in the global chat error', () => {
+    const proposal = {
+      id: 'proposal-short', field: 'target_audience', label: 'Target audience',
+      value: 'Families and individuals seeking new homes',
+      draftValue: 'Families and individuals seeking new homes with community amenities',
+      evidence: null, confidence: 'high', status: 'pending' as const,
+      validation: { code: 'minimum_words', field: 'target_audience', message: 'Enter at least 8 words.', minimum_words: 8 },
+    };
+    const source = {
+      id: 'source-short', kind: 'official_website', status: 'ready' as const, name: 'example.com',
+      url: 'https://example.com', mime_type: 'text/html', size_bytes: 100, error_message: null,
+      message_id: null, download_url: null, is_primary: false, proposals: [proposal],
+      created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    };
+    component.projectId = 'project-1';
+    component.sources = [source];
+
+    component.decideProposal(source, proposal, 'correct');
+    http.expectOne('http://localhost:8000/api/v1/projects/project-1/proposals/proposal-short/decision').flush({
+      detail: { code: 'minimum_words', field: 'target_audience', message: 'Enter at least 8 words.', minimum_words: 8 },
+    }, { status: 422, statusText: 'Unprocessable Entity' });
+
+    expect(component.sources[0].proposals[0].inlineError).toBe('Enter at least 8 words.');
+    expect(component.errorMessage).toBe('');
+  });
+
   it('uses an idempotency key and restores server state after a gateway timeout', () => {
     component.projectId = 'project-1';
     component.prompt = 'Modern homes with thoughtful layouts, exceptional services, and convenient access to the city.';

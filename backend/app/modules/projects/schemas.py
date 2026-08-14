@@ -170,6 +170,7 @@ class SourceProposalResponse(BaseModel):
     evidence: str | None = None
     confidence: str | None = None
     status: str
+    validation: dict[str, Any] | None = None
 
 
 class SourceResponse(BaseModel):
@@ -315,6 +316,8 @@ class PropertyTypeBase(BaseModel):
             raise ValueError("Area minimum cannot be greater than area maximum.")
         if self.total_units is not None and self.available_units is not None and self.available_units > self.total_units:
             raise ValueError("Available units cannot be greater than total units.")
+        if self.starting_price is not None and self.maximum_price is not None and self.starting_price > self.maximum_price:
+            raise ValueError("Starting price cannot be greater than maximum price.")
         if self.currency:
             self.currency = self.currency.upper()
         return self

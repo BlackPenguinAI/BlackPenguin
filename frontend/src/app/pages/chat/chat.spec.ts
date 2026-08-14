@@ -459,6 +459,16 @@ describe('ChatComponent', () => {
     expect(component.canSend).toBe(false);
   });
 
+  it('validates required Company user fields before enabling Add user', () => {
+    component.teamInvite = { first_name: '', last_name: '', email: 'invalid', role: 'sales' };
+    expect(component.teamInviteErrorCount).toBe(3);
+    expect(component.canInviteTeamMember).toBe(false);
+
+    component.teamInvite = { first_name: 'Ana', last_name: 'Torres', email: 'ana@example.com', role: 'sales' };
+    expect(component.teamInviteErrorCount).toBe(0);
+    expect(component.canInviteTeamMember).toBe(true);
+  });
+
   it('offers a failed official URL as user-confirmed website only until it is saved', () => {
     const source = {
       id: 'source-1', kind: 'official_website' as const, status: 'failed' as const,

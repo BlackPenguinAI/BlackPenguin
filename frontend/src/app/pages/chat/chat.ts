@@ -345,8 +345,52 @@ export class ChatComponent implements OnInit, OnDestroy {
     return this.currentStage === 'processing' || this.sources.some(source => source.status === 'processing');
   }
 
+  get teamInviteErrors(): Record<string, string> {
+    const errors: Record<string, string> = {};
+    if (!this.teamInvite.first_name.trim()) errors['first_name'] = 'Enter the first name.';
+    if (!this.teamInvite.last_name.trim()) errors['last_name'] = 'Enter the last name.';
+    if (!this.teamInvite.email.trim()) errors['email'] = 'Enter the business email.';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(this.teamInvite.email.trim())) errors['email'] = 'Enter a valid business email.';
+    return errors;
+  }
+
+  get teamInviteErrorCount(): number { return Object.keys(this.teamInviteErrors).length; }
+  get canInviteTeamMember(): boolean { return !this.teamSaving && this.teamInviteErrorCount === 0; }
+
+  publicPresenceFieldError(field: string): string {
+    if (!this.editablePublicPresenceFields.includes(field)) return '';
+    const values = field === 'public_contact_emails' ? this.splitList(this.publicEmails)
+      : field === 'public_contact_phones' ? this.splitList(this.publicPhones)
+      : this.splitList(this.socialProfiles);
+    if (!values.length) return '';
+    if (field === 'public_contact_emails' && values.some(value => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value))) {
+      return 'Enter complete public email addresses.';
+    }
+    if (field === 'public_contact_phones' && values.some(value => value.replace(/\D/g, '').length < 7)) {
+      return 'Enter public phone numbers with at least 7 digits.';
+    }
+    if (field === 'corporate_social_profiles' && values.some(value => !/^https?:\/\/[^\s.]+\.[^\s]+$/i.test(value))) {
+      return 'Enter complete HTTP or HTTPS social profile URLs.';
+    }
+    return '';
+  }
+
+  get publicPresenceErrorCount(): number {
+    const invalid = this.editablePublicPresenceFields.filter(field => !!this.publicPresenceFieldError(field)).length;
+    const hasValue = this.editablePublicPresenceFields.some(field => {
+      const value = field === 'public_contact_emails' ? this.publicEmails
+        : field === 'public_contact_phones' ? this.publicPhones : this.socialProfiles;
+      return this.splitList(value).length > 0;
+    });
+    return invalid + (hasValue ? 0 : 1);
+  }
+
+  get canSavePublicPresence(): boolean {
+    return !this.publicPresenceSaving && this.editablePublicPresenceFields.length > 0 && this.publicPresenceErrorCount === 0;
+  }
+
   inviteTeamMember(): void {
-    if (this.currentStage !== 'team' || this.teamSaving || this.hasPendingReview || this.isCompleted || !this.teamInvite.first_name.trim() || !this.teamInvite.last_name.trim() || !this.teamInvite.email.trim()) return;
+    if (this.currentStage !== 'team' || this.hasPendingReview || this.isCompleted || !this.canInviteTeamMember) return;
     this.teamSaving = true;
     this.teamSavingAction = 'add';
     this.teamError = '';
@@ -368,7 +412,7 @@ export class ChatComponent implements OnInit, OnDestroy {
   }
 
   savePublicPresence(): void {
-    if (this.currentStage !== 'enrichment' || this.publicPresenceSaving || this.hasPendingReview || this.isCompleted) return;
+    if (this.currentStage !== 'enrichment' || this.hasPendingReview || this.isCompleted || !this.canSavePublicPresence) return;
     const emails = this.splitList(this.publicEmails);
     const phones = this.splitList(this.publicPhones);
     const socialProfiles = this.splitList(this.socialProfiles);
@@ -563,6 +607,7 @@ export class ChatComponent implements OnInit, OnDestroy {
   ): void {
     if (proposal.submitting || proposal.status !== 'pending') return;
     const anchor = captureReviewScrollAnchor(this.chatScroll?.nativeElement, proposal.id);
+    const nextProposalId = source.proposals.find(item => item.status === 'pending' && item.id !== proposal.id)?.id || null;
     this.errorMessage = '';
     const value = action === 'correct'
       ? this.parseDraftValue(proposal.field, proposal.draftValue || '')
@@ -578,7 +623,9 @@ export class ChatComponent implements OnInit, OnDestroy {
         });
         this.profile = result.profile;
         this.isCompleted = result.profile.completion.can_complete;
-        this.syncState('preserve', anchor);
+        const pendingRemain = this.sources.some(item => this.hasPendingProposals(item));
+        if (pendingRemain) this.restoreProposalContext(anchor, nextProposalId);
+        else this.syncState('preserve', anchor);
         this.cdr.detectChanges();
       },
       error: (error: HttpErrorResponse) => {
@@ -976,6 +1023,18 @@ export class ChatComponent implements OnInit, OnDestroy {
     if (!anchor) return;
     setTimeout(() => {
       restoreReviewScrollAnchor(this.chatScroll?.nativeElement, anchor);
+      this.cdr.detectChanges();
+    });
+  }
+  private restoreProposalContext(anchor: ReviewScrollAnchor | null, focusProposalId: string | null): void {
+    setTimeout(() => {
+      const container = this.chatScroll?.nativeElement;
+      restoreReviewScrollAnchor(container, anchor);
+      if (container && focusProposalId) {
+        const proposal = Array.from(container.querySelectorAll<HTMLElement>('[data-proposal-id]'))
+          .find(element => element.dataset['proposalId'] === focusProposalId);
+        proposal?.querySelector<HTMLElement>('input, textarea, button:not([disabled])')?.focus({ preventScroll: true });
+      }
       this.cdr.detectChanges();
     });
   }

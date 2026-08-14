@@ -65,7 +65,11 @@ export interface ChatMessage {
 export interface SourceProposal {
   id: string; field: string; label: string; value: unknown; evidence: string | null;
   confidence: string | null; status: 'pending' | 'confirmed' | 'corrected' | 'rejected'; draftValue?: string;
-  submitting?: boolean;
+  submitting?: boolean; inlineError?: string;
+  validation?: {
+    code: string; field: string; message: string;
+    minimum_words?: number; minimum_characters?: number;
+  } | null;
 }
 export interface ProjectSource {
   id: string; kind: string; status: 'processing' | 'ready' | 'failed'; name: string;

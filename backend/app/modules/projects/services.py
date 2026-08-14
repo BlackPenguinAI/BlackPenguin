@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
 from app.modules.companies.models import Company
-from app.modules.onboarding_questions import is_too_short, validate_onboarding_value
+from app.modules.onboarding_questions import validate_onboarding_value
 from app.modules.project_team.models import ProjectUserAssignment
 from app.modules.users.models import User
 
@@ -452,8 +452,13 @@ def apply_field_updates(
             value = value.strip()
         if status not in {"missing", "not_applicable", "deferred"} and value in (None, "", []):
             rejected.append({"update": raw, "reason": "missing_value"}); continue
-        if is_too_short(key, value):
-            rejected.append({"update": raw, "reason": "answer_too_short"}); continue
+        validation_error = validate_onboarding_value(key, value)
+        if validation_error:
+            rejected.append({
+                "update": raw,
+                "reason": validation_error["code"],
+                "validation": validation_error,
+            }); continue
         if status not in {"not_applicable", "deferred"} and value is not None:
             data[key] = value
         states[key] = {"status": status, "applicable": False if status == "not_applicable" else update.get("applicable", True)}
