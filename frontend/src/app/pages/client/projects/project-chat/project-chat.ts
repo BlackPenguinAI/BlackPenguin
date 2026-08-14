@@ -58,6 +58,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   private speechBase = '';
   private pollingTimer?: ReturnType<typeof setTimeout>;
   private replyToMessageId: string | null = null;
+  private retryClientMessageId: string | null = null;
   private lastStateVersion = 0;
   private pollingStartedAt = 0;
   private readonly expandedSourceIds = new Set<string>();
@@ -183,7 +184,9 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     if (this.isRecording) this.speech.stop();
     const content = this.prompt.trim();
     const files = [...this.selectedFiles];
+    const clientMessageId = this.retryClientMessageId || this.createClientMessageId();
     const optimistic: ChatMessage = {
+      id: clientMessageId,
       sender: 'user',
       content: content || `Attached ${files.length} project file${files.length === 1 ? '' : 's'}.`,
       created_at: new Date(),
@@ -196,24 +199,21 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     this.prompt = ''; this.selectedFiles = []; this.errorMessage = '';
     this.messages = [...this.messages, optimistic]; this.isAnalyzing = true; this.isUploading = !!files.length; this.scrollToBottom();
     const request = files.length
-      ? this.onboarding.sendMessageWithFiles(this.projectId, content, files, this.replyToMessageId)
-      : this.onboarding.sendMessage(this.projectId, content, this.replyToMessageId);
+      ? this.onboarding.sendMessageWithFiles(this.projectId, content, files, this.replyToMessageId, clientMessageId)
+      : this.onboarding.sendMessage(this.projectId, content, this.replyToMessageId, clientMessageId);
     const replyTo = this.replyToMessageId;
     this.replyToMessageId = null;
     request.subscribe({
       next: (turn) => {
+        this.retryClientMessageId = null;
         this.messages = this.messages.filter((message) => message !== optimistic);
         this.markReply(replyTo, content);
         this.applyTurn(turn);
         this.isAnalyzing = false; this.isUploading = false; this.scrollToBottom();
       },
-      error: () => {
+      error: (error: HttpErrorResponse) => {
         this.messages = this.messages.filter((message) => message !== optimistic);
-        this.prompt = content; this.selectedFiles = files;
-        this.isAnalyzing = false; this.isUploading = false;
-        this.replyToMessageId = replyTo;
-        this.errorMessage = 'The message could not be processed. Your text and selected files were restored.';
-        this.cdr.detectChanges();
+        this.recoverFailedSend(error, content, files, replyTo, clientMessageId);
       },
     });
   }
@@ -343,7 +343,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   }
 
   renderMarkdown(content: string): string { const cached = this.markdownCache.get(content); if (cached) return cached; const rendered = marked.parse(content, { async: false, breaks: true }) as string; this.markdownCache.set(content, rendered); return rendered; }
-  statusIcon(status: ValidationStatus): string { return ({ confirmed: 'check_circle', corrected_by_user: 'check_circle', not_applicable: 'remove_circle', conflicting: 'error', stale: 'history', expired: 'event_busy', pending_confirmation: 'schedule', extracted: 'manage_search', missing: 'radio_button_unchecked' })[status]; }
+  statusIcon(status: ValidationStatus): string { return ({ confirmed: 'check_circle', corrected_by_user: 'check_circle', not_applicable: 'remove_circle', deferred: 'schedule', conflicting: 'error', stale: 'history', expired: 'event_busy', pending_confirmation: 'schedule', extracted: 'manage_search', missing: 'radio_button_unchecked' })[status]; }
   statusClass(status: ValidationStatus): string { if (status === 'confirmed' || status === 'corrected_by_user') return 'text-green-400'; if (status === 'conflicting' || status === 'expired') return 'text-red-400'; if (status === 'stale' || status === 'pending_confirmation' || status === 'extracted') return 'text-secondary'; return 'text-gray-600'; }
   statusLabel(status: ValidationStatus): string { return status.replaceAll('_', ' '); }
   formatValue(value: unknown): string { return typeof value === 'string' ? value : value == null ? '' : JSON.stringify(value); }
@@ -352,6 +352,55 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   trackField(_: number, item: ProjectFieldProgress): string { return item.key; }
 
   private parseValue(value: string): unknown { const trimmed = value.trim(); try { return /^[\[{]/.test(trimmed) ? JSON.parse(trimmed) : trimmed; } catch { return trimmed; } }
+  private createClientMessageId(): string {
+    if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (character) => {
+      const random = Math.floor(Math.random() * 16);
+      const value = character === 'x' ? random : (random & 0x3) | 0x8;
+      return value.toString(16);
+    });
+  }
+  private restoreFailedSend(
+    content: string, files: File[], replyTo: string | null, clientMessageId: string, message: string,
+  ): void {
+    this.prompt = content; this.selectedFiles = files; this.replyToMessageId = replyTo;
+    this.retryClientMessageId = clientMessageId;
+    this.isAnalyzing = false; this.isUploading = false; this.errorMessage = message;
+    this.cdr.detectChanges();
+  }
+  private recoverFailedSend(
+    error: HttpErrorResponse, content: string, files: File[], replyTo: string | null, clientMessageId: string,
+  ): void {
+    const uncertainDelivery = [0, 409, 502, 503, 504].includes(error.status);
+    if (!uncertainDelivery) {
+      const message = error.status === 422
+        ? 'That answer is not valid for the current question. Review it and try again.'
+        : 'The message could not be processed. Your text and selected files were restored.';
+      this.restoreFailedSend(content, files, replyTo, clientMessageId, message);
+      return;
+    }
+    this.onboarding.getState(this.projectId).subscribe({
+      next: (state) => {
+        const saved = state.messages.some((message) => message.id === clientMessageId);
+        if (!saved) {
+          this.restoreFailedSend(
+            content, files, replyTo, clientMessageId,
+            'The connection was interrupted. Your text and selected files were restored so you can retry safely.',
+          );
+          return;
+        }
+        this.retryClientMessageId = null;
+        this.applyState(state);
+        this.isAnalyzing = false; this.isUploading = false;
+        this.errorMessage = 'Your answer was saved. The current onboarding state has been restored.';
+        this.cdr.detectChanges();
+      },
+      error: () => this.restoreFailedSend(
+        content, files, replyTo, clientMessageId,
+        'The connection was interrupted. Your text and selected files were restored so you can retry safely.',
+      ),
+    });
+  }
   private joinSpeech(base: string, finalText: string, interimText: string): string {
     return [base, finalText, interimText].filter(Boolean).join(' ').replace(/\s+/g, ' ').trimStart();
   }
@@ -420,6 +469,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     this.messages = [...withIds.values(), ...this.messages.filter((message) => !message.id), ...additions.filter((message) => !message.id)];
     this.profile = turn.profile; this.nextQuestion = turn.next_question; this.mergeSources(turn.sources); this.cdr.detectChanges();
     if (turn.sources.some((source) => source.status === 'processing')) this.schedulePolling();
+    if (turn.redirect_url) this.router.navigateByUrl(turn.redirect_url);
   }
   private updateProposal(sourceId: string, proposalId: string, patch: Partial<SourceProposal>): void {
     this.sources = this.sources.map((source) => source.id !== sourceId ? source : ({

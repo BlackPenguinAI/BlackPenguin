@@ -331,7 +331,7 @@ def _mark_source_failed(db: Session, job: OnboardingSourceJob) -> None:
     if source:
         source.status = failed_status
         if not source.error_message:
-            source.error_message = "The website could not be processed after several attempts."
+            source.error_message = "The source could not be processed after several attempts."
         db.add(source)
 
 
@@ -401,6 +401,11 @@ async def _process_project(db: Session, job: OnboardingSourceJob) -> None:
     if source.status.value == "failed" and job.attempts < MAX_ATTEMPTS:
         source.status = source.status.__class__.PROCESSING; source.error_message = None
         db.add(source); db.commit(); db.refresh(source)
-    await source_service.process_url_source(db, source)
+    if source.url:
+        await source_service.process_url_source(db, source)
+    elif source.storage_path:
+        await source_service.process_stored_file_source(db, source)
+    else:
+        raise ValueError("source_location_missing")
     if source.status.value == "failed":
         raise ValueError(f"source_processing_failed: {_safe_error_detail(source.error_message)}")

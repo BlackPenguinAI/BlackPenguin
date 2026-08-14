@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+import uuid
 from typing import Any
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile, status
@@ -59,6 +60,82 @@ def _parse_agent_response(raw: str) -> tuple[str, list[dict[str, Any]], bool | N
 
 def _message(message: ProjectMessage) -> dict[str, Any]:
     return services.serialize_message(message)
+
+
+def _turn_payload(
+    *,
+    request_id: str,
+    ai_message: ProjectMessage,
+    user_message: ProjectMessage,
+    profile,
+    accepted: list[dict[str, Any]] | None = None,
+    rejected: list[dict[str, Any]] | None = None,
+    assistant_status: str = "deterministic",
+    sources: list[ProjectOnboardingSource] | None = None,
+) -> dict[str, Any]:
+    accepted = accepted or []
+    rejected = rejected or []
+    return {
+        "request_id": request_id,
+        "message_saved": True,
+        "profile_changed": bool(accepted),
+        "field_update_status": "accepted" if accepted else ("rejected" if rejected else "not_applicable"),
+        "assistant_status": assistant_status,
+        "message": _message(ai_message),
+        "user_message": _message(user_message),
+        "profile": services.serialize_profile(profile),
+        "accepted_fields": [item["field"] for item in accepted],
+        "rejected_updates": [
+            {"field": item.get("update", {}).get("field"), "reason": item["reason"]}
+            for item in rejected
+        ],
+        "sources": [source_service.serialize_source(source) for source in (sources or [])],
+        "next_question": _next_question(profile),
+    }
+
+
+def _existing_turn(
+    db: Session,
+    *,
+    project: Project,
+    client_message_id: str | None,
+    request_id: str,
+) -> dict[str, Any] | None:
+    if not client_message_id:
+        return None
+    user_message = db.query(ProjectMessage).filter(ProjectMessage.id == client_message_id).first()
+    if not user_message:
+        return None
+    if user_message.session_id != project.session.id or user_message.sender != SenderType.USER:
+        raise HTTPException(status_code=409, detail="That message identifier is already in use.")
+    ai_message = db.query(ProjectMessage).filter(
+        ProjectMessage.session_id == project.session.id,
+        ProjectMessage.sender == SenderType.AI,
+        ProjectMessage.in_reply_to_message_id == user_message.id,
+    ).order_by(ProjectMessage.created_at.desc()).first()
+    recovered_interrupted_turn = ai_message is None
+    if not ai_message:
+        profile = services.get_profile(project)
+        ai_message = services.save_message(
+            db,
+            project.session.id,
+            SenderType.AI,
+            "Your previous message was saved, but its assistant response was interrupted. "
+            + _next_prompt(profile),
+            ui_payload=_next_question(profile),
+            in_reply_to_message_id=user_message.id,
+        )
+    sources = db.query(ProjectOnboardingSource).filter(
+        ProjectOnboardingSource.message_id == user_message.id,
+    ).all()
+    return _turn_payload(
+        request_id=request_id,
+        ai_message=ai_message,
+        user_message=user_message,
+        profile=services.get_profile(project),
+        assistant_status="fallback" if recovered_interrupted_turn else "deterministic",
+        sources=sources,
+    )
 
 
 def _next_prompt(profile) -> str:
@@ -120,6 +197,11 @@ def _state_payload(db: Session, project: Project) -> dict[str, Any]:
     if not processing and not pending_review:
         latest_ai = next((item for item in reversed(messages) if item.sender == SenderType.AI), None)
         if latest_ai and not latest_ai.ui_payload and not latest_ai.response_payload:
+            services.supersede_unanswered_questions(
+                db,
+                project.session.id,
+                keep_message_id=latest_ai.id,
+            )
             latest_ai.ui_payload = _next_question(profile)
             db.add(latest_ai); db.commit(); db.refresh(latest_ai)
     if serialized_profile["completion"]["can_complete"]:
@@ -165,6 +247,7 @@ def _system_instruction(config: dict[str, Any]) -> str:
 async def _complete_chat_turn(
     *, db: Session, project: Project, current_user: User, user_message: ProjectMessage,
     sources: list[ProjectOnboardingSource], source_errors: list[dict[str, Any]],
+    request_id: str,
 ) -> dict[str, Any]:
     profile = services.get_profile(project)
     if any(source.status.value == "processing" for source in sources):
@@ -187,6 +270,11 @@ async def _complete_chat_turn(
             )
         db.refresh(user_message)
         return {
+            "request_id": request_id,
+            "message_saved": True,
+            "profile_changed": False,
+            "field_update_status": "not_applicable",
+            "assistant_status": "deterministic",
             "message": _message(ai_message),
             "user_message": _message(user_message),
             "profile": services.serialize_profile(profile),
@@ -196,8 +284,6 @@ async def _complete_chat_turn(
             "next_question": _next_question(profile),
         }
     ai_config = get_ai_config(db, current_user.company_id)
-    if not ai_config.openrouter_api_key:
-        raise HTTPException(status_code=500, detail="AI configuration is incomplete.")
     history = db.query(ProjectMessage).filter(
         ProjectMessage.session_id == project.session.id
     ).order_by(ProjectMessage.created_at.asc()).all()
@@ -221,28 +307,31 @@ async def _complete_chat_turn(
     for item in history[-12:]:
         messages.append({"role": "user" if item.sender == SenderType.USER else "assistant", "content": item.content})
     model = config.get("model", "openai/gpt-4o-mini")
+    assistant_status = "llm"
     try:
+        if not ai_config.openrouter_api_key:
+            raise ValueError("AI configuration is incomplete")
         raw = await generate_llm_response(
             ai_config.openrouter_api_key, model, messages,
             response_format={"type": "json_object"}, temperature=0.25, raise_on_error=True,
+            timeout_seconds=20.0,
         )
         parsed = _parse_agent_response(raw)
-        if parsed is None:
-            repaired = await generate_llm_response(
-                ai_config.openrouter_api_key, model,
-                messages + [{"role": "assistant", "content": raw}, {"role": "system", "content": "Repair the response and return only valid contract JSON."}],
-                response_format={"type": "json_object"}, temperature=0, raise_on_error=True,
-            )
-            parsed = _parse_agent_response(repaired)
     except (httpx.HTTPError, ValueError) as exc:
-        raise HTTPException(status_code=502, detail="The project assistant is temporarily unavailable.") from exc
+        parsed = None
+        assistant_status = "fallback"
 
     if parsed is None:
-        assistant_text, updates, approved = "I couldn't validate my response, so I left the Project Profile unchanged. " + _next_prompt(profile), [], None
+        assistant_text, updates, approved = (
+            "I saved your message, but the assistant is temporarily unavailable. " + _next_prompt(profile),
+            [],
+            None,
+        )
+        assistant_status = "fallback"
     else:
         assistant_text, updates, approved = parsed
     result = services.apply_field_updates(
-        db, profile, updates, allow_authoritative_statuses=current_user.role in TENANT_MANAGER_ROLES,
+        db, profile, updates, allow_authoritative_statuses=current_user.role in EDITOR_ROLES,
         final_approved=None,
     )
     if result.accepted:
@@ -250,13 +339,25 @@ async def _complete_chat_turn(
         assistant_text = "I validated and updated: " + ", ".join(f"**{label}**" for label in labels) + ".\n\n" + _next_prompt(profile)
     elif result.rejected:
         assistant_text = "I couldn't safely apply that information, so nothing was changed. " + _next_prompt(profile)
-    ai_message = services.save_message(
-        db, project.session.id, SenderType.AI, assistant_text,
-        ui_payload=_next_question(profile),
-        in_reply_to_message_id=user_message.id,
-    )
+    db.query(ProjectSession).filter(ProjectSession.id == project.session.id).with_for_update().one()
+    ai_message = db.query(ProjectMessage).filter(
+        ProjectMessage.session_id == project.session.id,
+        ProjectMessage.sender == SenderType.AI,
+        ProjectMessage.in_reply_to_message_id == user_message.id,
+    ).order_by(ProjectMessage.created_at.desc()).first()
+    if not ai_message:
+        ai_message = services.save_message(
+            db, project.session.id, SenderType.AI, assistant_text,
+            ui_payload=_next_question(profile),
+            in_reply_to_message_id=user_message.id,
+        )
     db.refresh(user_message)
     return {
+        "request_id": request_id,
+        "message_saved": True,
+        "profile_changed": bool(result.accepted),
+        "field_update_status": "accepted" if result.accepted else ("rejected" if result.rejected else "not_applicable"),
+        "assistant_status": assistant_status,
         "message": _message(ai_message),
         "user_message": _message(user_message),
         "profile": services.serialize_profile(profile),
@@ -537,13 +638,140 @@ def start_chat(project_id: str, db: Session = Depends(get_db), current_user: Use
 
 
 @router.post("/{project_id}/chat", response_model=ChatTurnResponse)
-async def send_chat(project_id: str, payload: ChatMessagePayload, db: Session = Depends(get_db), current_user: User = Depends(RoleChecker(EDITOR_ROLES))):
+async def send_chat(
+    project_id: str,
+    payload: ChatMessagePayload,
+    response: Response,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker(EDITOR_ROLES)),
+):
+    request_id = f"req_{uuid.uuid4().hex}"
+    response.headers["X-Request-ID"] = request_id
     project = services.get_project(db, project_id, current_user.company_id)
-    services.record_message_response(db, project.session.id, payload.in_reply_to_message_id, payload.message)
+    db.query(ProjectSession).filter(ProjectSession.id == project.session.id).with_for_update().one()
+    existing_turn = _existing_turn(
+        db,
+        project=project,
+        client_message_id=payload.client_message_id,
+        request_id=request_id,
+    )
+    if existing_turn:
+        return existing_turn
+
+    active_question = services.get_active_question(
+        db,
+        project.session.id,
+        payload.in_reply_to_message_id,
+    )
+    resolved_question_id = payload.in_reply_to_message_id or (active_question.id if active_question else None)
     user_message = services.save_message(
         db, project.session.id, SenderType.USER, payload.message,
-        in_reply_to_message_id=payload.in_reply_to_message_id,
+        in_reply_to_message_id=resolved_question_id,
+        message_id=payload.client_message_id,
+        commit=False,
     )
+
+    resolution = services.resolve_answer_to_question(
+        db,
+        session_id=project.session.id,
+        message_id=resolved_question_id,
+        answer=payload.message,
+        profile=services.get_profile(project),
+    )
+    if resolution.handled and not URL_PATTERN.search(payload.message):
+        profile = services.get_profile(project)
+        if resolution.action == "approve_profile":
+            services.record_message_response(
+                db,
+                project.session.id,
+                resolved_question_id,
+                payload.message,
+                status="accepted",
+                commit=False,
+            )
+            profile = services.complete_onboarding(db, project, current_user.id)
+            ai_message = services.save_message(
+                db,
+                project.session.id,
+                SenderType.AI,
+                "Your **Project Profile has been approved successfully**.",
+                ui_payload=None,
+                in_reply_to_message_id=user_message.id,
+            )
+            result = _turn_payload(
+                request_id=request_id,
+                ai_message=ai_message,
+                user_message=user_message,
+                profile=profile,
+                assistant_status="deterministic",
+            )
+            result["redirect_url"] = f"/app/projects/{project.id}"
+            return result
+
+        deterministic_result = services.apply_field_updates(
+            db,
+            profile,
+            resolution.updates,
+            allow_authoritative_statuses=current_user.role in EDITOR_ROLES,
+            commit=False,
+        ) if resolution.updates else services.ApplyUpdatesResult([], [])
+        accepted = deterministic_result.accepted
+        rejected = deterministic_result.rejected
+        accepted_resolution = resolution.status == "accepted" and (bool(accepted) or resolution.action == "request_changes")
+        services.record_message_response(
+            db,
+            project.session.id,
+            resolved_question_id,
+            payload.message,
+            status="accepted" if accepted_resolution else "rejected",
+            commit=False,
+        )
+        if accepted:
+            labels = [FIELD_BY_KEY[item["field"]].label for item in accepted]
+            assistant_text = (
+                "I validated and updated: "
+                + ", ".join(f"**{label}**" for label in labels)
+                + ".\n\n"
+                + _next_prompt(profile)
+            )
+        elif resolution.action == "request_changes":
+            assistant_text = "Tell me which Project Profile field you want to change."
+        else:
+            explanations = {
+                "invalid_question": "That question is no longer available.",
+                "stale_question": "That question is no longer the active step.",
+                "empty_answer": "Please enter a value before continuing.",
+                "minimum_words": "Please provide a more complete answer.",
+                "minimum_characters": "Please provide a more complete answer.",
+            }
+            assistant_text = explanations.get(
+                resolution.reason or "",
+                "I couldn't safely apply that answer.",
+            ) + " " + _next_prompt(profile)
+        ai_message = services.save_message(
+            db,
+            project.session.id,
+            SenderType.AI,
+            assistant_text,
+            ui_payload=_next_question(profile),
+            in_reply_to_message_id=user_message.id,
+            commit=False,
+        )
+        db.commit()
+        for item in (user_message, ai_message, profile):
+            db.refresh(item)
+        return _turn_payload(
+            request_id=request_id,
+            ai_message=ai_message,
+            user_message=user_message,
+            profile=profile,
+            accepted=accepted,
+            rejected=rejected or ([{"update": {"field": active_question.ui_payload.get("field") if active_question else None}, "reason": resolution.reason or "invalid_answer"}] if not accepted_resolution else []),
+            assistant_status="deterministic",
+        )
+
+    db.commit()
+    db.refresh(user_message)
     sources, source_errors = [], []
     for raw_url in URL_PATTERN.findall(payload.message)[:3]:
         url = raw_url.rstrip(".,;:!?)\"]}")
@@ -569,30 +797,43 @@ async def send_chat(project_id: str, payload: ChatMessagePayload, db: Session = 
             raise
     return await _complete_chat_turn(
         db=db, project=project, current_user=current_user, user_message=user_message,
-        sources=sources, source_errors=source_errors,
+        sources=sources, source_errors=source_errors, request_id=request_id,
     )
 
 
-@router.post("/{project_id}/chat/with-files", response_model=ChatTurnResponse)
+@router.post("/{project_id}/chat/with-files", response_model=ChatTurnResponse, status_code=202)
 async def send_chat_with_files(
     project_id: str,
+    response: Response,
     message: str = Form(""),
     in_reply_to_message_id: str | None = Form(None),
+    client_message_id: str | None = Form(None),
     files: list[UploadFile] = File(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker(EDITOR_ROLES)),
 ):
+    request_id = f"req_{uuid.uuid4().hex}"
+    response.headers["X-Request-ID"] = request_id
     project = services.get_project(db, project_id, current_user.company_id)
+    db.query(ProjectSession).filter(ProjectSession.id == project.session.id).with_for_update().one()
+    existing_turn = _existing_turn(
+        db,
+        project=project,
+        client_message_id=client_message_id,
+        request_id=request_id,
+    )
+    if existing_turn:
+        return existing_turn
     clean_message = message.strip()
     if not files or len(files) > source_service.MAX_FILES:
         raise HTTPException(status_code=422, detail=f"Upload between 1 and {source_service.MAX_FILES} files.")
     if len(clean_message) > 20000:
         raise HTTPException(status_code=422, detail="The message is too long.")
     visible_message = clean_message or f"Attached {len(files)} project file{'s' if len(files) != 1 else ''}."
-    services.record_message_response(db, project.session.id, in_reply_to_message_id, visible_message)
     user_message = services.save_message(
         db, project.session.id, SenderType.USER, visible_message,
         in_reply_to_message_id=in_reply_to_message_id,
+        message_id=client_message_id,
     )
     sources, source_errors = [], []
     for raw_url in URL_PATTERN.findall(clean_message)[:3]:
@@ -618,16 +859,27 @@ async def send_chat_with_files(
             db.rollback()
             raise
     for upload in files:
-        source = await source_service.ingest_file(
+        source = await source_service.create_file_source(
             db, project_id=project.id, company_id=current_user.company_id,
             user_id=current_user.id, upload=upload, message_id=user_message.id,
         )
         sources.append(source)
-        if source.status.value == "failed":
+        if source.status.value == "processing":
+            job_service.enqueue(
+                db,
+                scope="project",
+                company_id=current_user.company_id,
+                project_id=project.id,
+                source_id=source.id,
+                url=source_service.file_job_url(source),
+                session_id=project.session.id,
+                message_id=user_message.id,
+            )
+        else:
             source_errors.append({"file": source.name, "error": source.error_message})
     return await _complete_chat_turn(
         db=db, project=project, current_user=current_user, user_message=user_message,
-        sources=sources, source_errors=source_errors,
+        sources=sources, source_errors=source_errors, request_id=request_id,
     )
 
 
@@ -660,7 +912,7 @@ async def add_url(project_id: str, payload: UrlSourceRequest, db: Session = Depe
     return source_service.serialize_source(source)
 
 
-@router.post("/{project_id}/sources/files", response_model=list[SourceResponse])
+@router.post("/{project_id}/sources/files", response_model=list[SourceResponse], status_code=202)
 async def add_files(project_id: str, files: list[UploadFile] = File(...), db: Session = Depends(get_db), current_user: User = Depends(RoleChecker(TENANT_MANAGER_ROLES))):
     project = services.get_project(db, project_id, current_user.company_id)
     if not files or len(files) > source_service.MAX_FILES:
@@ -671,18 +923,33 @@ async def add_files(project_id: str, files: list[UploadFile] = File(...), db: Se
         SenderType.USER,
         f"Attached {len(files)} project file{'s' if len(files) != 1 else ''}.",
     )
-    sources = [await source_service.ingest_file(
-        db, project_id=project_id, company_id=current_user.company_id,
-        user_id=current_user.id, upload=file, message_id=user_message.id,
-    ) for file in files]
-    finalize_source_group(
-        db,
-        scope="project",
-        company_id=current_user.company_id,
-        project_id=project.id,
-        message_id=user_message.id,
-    )
-    db.commit()
+    sources = []
+    for upload in files:
+        source = await source_service.create_file_source(
+            db, project_id=project_id, company_id=current_user.company_id,
+            user_id=current_user.id, upload=upload, message_id=user_message.id,
+        )
+        sources.append(source)
+        if source.status.value == "processing":
+            job_service.enqueue(
+                db,
+                scope="project",
+                company_id=current_user.company_id,
+                project_id=project.id,
+                source_id=source.id,
+                url=source_service.file_job_url(source),
+                session_id=project.session.id,
+                message_id=user_message.id,
+            )
+    if not any(source.status.value == "processing" for source in sources):
+        finalize_source_group(
+            db,
+            scope="project",
+            company_id=current_user.company_id,
+            project_id=project.id,
+            message_id=user_message.id,
+        )
+        db.commit()
     return [source_service.serialize_source(source) for source in sources]
 
 
@@ -700,8 +967,8 @@ def retry_url_source(
     ).first()
     if not source:
         raise HTTPException(status_code=404, detail="Source not found.")
-    if not source.url:
-        raise HTTPException(status_code=409, detail="This source has no URL to retry.")
+    if not source.url and not source.storage_path:
+        raise HTTPException(status_code=409, detail="This source has no recoverable location.")
     if not job_service.retry_job(db, scope="project", source_id=source.id):
         raise HTTPException(status_code=409, detail="This source has no recoverable job.")
     source.status = source.status.__class__.PROCESSING

@@ -110,4 +110,40 @@ describe('ProjectChatComponent', () => {
     expect(component.sources[0].proposals[0].status).toBe('confirmed');
     expect(component.isSourceExpanded(component.sources[0])).toBe(true);
   });
+
+  it('uses an idempotency key and restores server state after a gateway timeout', () => {
+    component.projectId = 'project-1';
+    component.prompt = 'Modern homes with thoughtful layouts, exceptional services, and convenient access to the city.';
+
+    component.sendMessage();
+
+    const send = http.expectOne('http://localhost:8000/api/v1/projects/project-1/chat');
+    const clientMessageId = send.request.body.client_message_id as string;
+    expect(clientMessageId).toMatch(/^[0-9a-f-]{36}$/i);
+    send.flush('Gateway timeout', { status: 504, statusText: 'Gateway Timeout' });
+
+    http.expectOne('http://localhost:8000/api/v1/projects/project-1/chat/state').flush({
+      messages: [{
+        id: clientMessageId, sender: 'user', content: component.messages[0]?.content || 'Saved answer',
+        created_at: new Date().toISOString(), attachments: [],
+      }],
+      profile: EMPTY_PROJECT_PROFILE,
+      sources: [],
+      stage: 'conversation',
+      version: 1,
+      next_question: {
+        field: 'short_description', label: 'Approved short description', prompt: 'Description?',
+        input_type: 'long_text', options: [], examples: [], allow_custom: true, minimum_words: 8,
+      },
+    });
+
+    expect(component.prompt).toBe('');
+    expect(component.messages.some((message) => message.id === clientMessageId)).toBe(true);
+    expect(component.errorMessage).toContain('saved');
+  });
+
+  it('shows deferred project fields as a non-error pending choice', () => {
+    expect(component.statusIcon('deferred')).toBe('schedule');
+    expect(component.statusClass('deferred')).toBe('text-gray-600');
+  });
 });

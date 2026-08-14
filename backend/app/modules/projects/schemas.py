@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 
 ValidationStatus = Literal[
     "missing", "extracted", "pending_confirmation", "confirmed", "corrected_by_user",
-    "conflicting", "stale", "expired", "not_applicable",
+    "conflicting", "stale", "expired", "not_applicable", "deferred",
 ]
 
 
@@ -104,6 +104,7 @@ class ProjectProfilePatch(BaseModel):
 class ChatMessagePayload(BaseModel):
     message: str = Field(min_length=1, max_length=20000)
     in_reply_to_message_id: str | None = None
+    client_message_id: str | None = Field(default=None, min_length=36, max_length=36)
 
 
 class ChatAttachmentResponse(BaseModel):
@@ -137,6 +138,9 @@ class NextQuestionResponse(BaseModel):
     examples: list[str] = Field(default_factory=list)
     allow_custom: bool = True
     minimum_words: int | None = None
+    minimum_characters: int | None = None
+    help_text: str | None = None
+    answer_actions: dict[str, dict[str, Any]] = Field(default_factory=dict)
 
 
 class SourceProposalResponse(BaseModel):
@@ -167,6 +171,12 @@ class SourceResponse(BaseModel):
 
 
 class ChatTurnResponse(BaseModel):
+    request_id: str | None = None
+    message_saved: bool = True
+    profile_changed: bool = False
+    field_update_status: Literal["accepted", "rejected", "not_applicable"] = "not_applicable"
+    assistant_status: Literal["deterministic", "llm", "fallback"] = "deterministic"
+    redirect_url: str | None = None
     message: ChatMessageResponse
     user_message: ChatMessageResponse | None = None
     profile: ProjectProfileResponse

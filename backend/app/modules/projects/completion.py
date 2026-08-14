@@ -4,10 +4,11 @@ from dataclasses import dataclass
 from typing import Any
 
 
-RESOLVED_STATUSES = {"confirmed", "corrected_by_user", "not_applicable"}
+RESOLVED_STATUSES = {"confirmed", "corrected_by_user", "not_applicable", "deferred"}
 VALID_STATUSES = {
     "missing", "extracted", "pending_confirmation", "confirmed",
     "corrected_by_user", "conflicting", "stale", "expired", "not_applicable",
+    "deferred",
 }
 
 
@@ -84,21 +85,41 @@ def normalize_field_key(value: Any) -> str | None:
 
 def calculate_completion(states: dict[str, Any] | None, *, final_approved: bool = False) -> dict[str, Any]:
     states = states or {}
-    blocking = [f for f in FIELDS if f.requirement in {"required", "conditionally_required"}]
-    applicable = [
-        f for f in blocking
-        if f.requirement == "required" or states.get(f.key, {}).get("applicable") is not False
+    required = [f for f in FIELDS if f.requirement == "required"]
+    conditional = [f for f in FIELDS if f.requirement == "conditionally_required"]
+    applicable_conditional = [
+        f for f in conditional if states.get(f.key, {}).get("applicable") is True
     ]
+    unevaluated_conditional = [
+        f for f in conditional if states.get(f.key, {}).get("applicable") is None
+    ]
+    applicable = required + applicable_conditional
     completed = [f for f in applicable if states.get(f.key, {}).get("status", "missing") in RESOLVED_STATUSES]
     blockers = [
-        {"field": f.key, "label": f.label, "section": f.section,
-         "status": states.get(f.key, {}).get("status", "missing")}
+        {
+            "field": f.key,
+            "label": f.label,
+            "section": f.section,
+            "status": states.get(f.key, {}).get("status", "missing"),
+            "requirement": f.requirement,
+        }
         for f in applicable if f not in completed
     ]
-    percentage = round(100 * len(completed) / len(applicable)) if applicable else 100
+    blockers.extend({
+        "field": f.key,
+        "label": f.label,
+        "section": f.section,
+        "status": "applicability_pending",
+        "requirement": f.requirement,
+    } for f in unevaluated_conditional)
+    denominator = len(applicable) + len(unevaluated_conditional)
+    percentage = round(100 * len(completed) / denominator) if denominator else 100
     sections = []
     for key, label in SECTIONS:
-        section_fields = [f for f in FIELDS if f.section == key and f in applicable]
+        section_fields = [
+            f for f in FIELDS
+            if f.section == key and (f in applicable or f in unevaluated_conditional)
+        ]
         section_completed = [f for f in section_fields if f in completed]
         sections.append({
             "key": key, "label": label, "completed": len(section_completed),
@@ -112,7 +133,7 @@ def calculate_completion(states: dict[str, Any] | None, *, final_approved: bool 
         "ready_for_confirmation": not blockers and not final_approved,
         "can_complete": not blockers and final_approved,
         "final_approved": final_approved,
-        "completed": len(completed), "total": len(applicable), "remaining": len(blockers),
+        "completed": len(completed), "total": denominator, "remaining": len(blockers),
         "sections": sections, "blockers": blockers,
         "sales_activation_status": "ready" if not activation_blockers and final_approved else "not_ready",
         "sales_activation_blockers": activation_blockers,

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+import re
 from typing import Any
 
 from fastapi import HTTPException
@@ -9,7 +10,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
 from app.modules.companies.models import Company
-from app.modules.onboarding_questions import is_too_short
+from app.modules.onboarding_questions import is_too_short, validate_onboarding_value
 
 from .completion import FIELD_BY_KEY, VALID_STATUSES, calculate_completion, field_progress, normalize_field_key
 from . import storage_service
@@ -24,6 +25,16 @@ from .models import (
 class ApplyUpdatesResult:
     accepted: list[dict[str, Any]]
     rejected: list[dict[str, Any]]
+
+
+@dataclass
+class QuestionResolution:
+    handled: bool
+    status: str
+    updates: list[dict[str, Any]]
+    reason: str | None = None
+    question: ProjectMessage | None = None
+    action: str | None = None
 
 
 def check_project_limits(db: Session, company_id: str) -> None:
@@ -82,9 +93,13 @@ def save_message(
     db: Session, session_id: str, sender: SenderType, content: str, *,
     ui_payload: dict[str, Any] | None = None,
     in_reply_to_message_id: str | None = None,
+    message_id: str | None = None,
     commit: bool = True,
 ) -> ProjectMessage:
+    if sender == SenderType.AI and isinstance(ui_payload, dict):
+        supersede_unanswered_questions(db, session_id)
     message = ProjectMessage(
+        id=message_id,
         session_id=session_id, sender=sender, content=content,
         ui_payload=ui_payload, in_reply_to_message_id=in_reply_to_message_id,
     )
@@ -96,7 +111,62 @@ def save_message(
     return message
 
 
-def record_message_response(db: Session, session_id: str, message_id: str | None, answer: str) -> None:
+def supersede_unanswered_questions(
+    db: Session,
+    session_id: str,
+    *,
+    keep_message_id: str | None = None,
+) -> bool:
+    candidates = db.query(ProjectMessage).filter(
+        ProjectMessage.session_id == session_id,
+        ProjectMessage.sender == SenderType.AI,
+        ProjectMessage.response_payload.is_(None),
+    ).all()
+    changed = False
+    for message in candidates:
+        if message.id == keep_message_id or not isinstance(message.ui_payload, dict):
+            continue
+        message.response_payload = {
+            "status": "superseded",
+            "answer": "",
+            "selected_option": None,
+            "custom": False,
+        }
+        db.add(message)
+        changed = True
+    return changed
+
+
+def get_active_question(
+    db: Session,
+    session_id: str,
+    requested_message_id: str | None = None,
+) -> ProjectMessage | None:
+    candidates = [
+        message
+        for message in db.query(ProjectMessage).filter(
+            ProjectMessage.session_id == session_id,
+            ProjectMessage.sender == SenderType.AI,
+            ProjectMessage.response_payload.is_(None),
+        ).order_by(ProjectMessage.created_at.desc(), ProjectMessage.id.desc()).all()
+        if isinstance(message.ui_payload, dict)
+    ]
+    if not candidates:
+        return None
+    if requested_message_id == candidates[0].id:
+        return candidates[0]
+    return candidates[0]
+
+
+def record_message_response(
+    db: Session,
+    session_id: str,
+    message_id: str | None,
+    answer: str,
+    *,
+    status: str = "accepted",
+    commit: bool = True,
+) -> None:
     if not message_id:
         return
     message = db.query(ProjectMessage).filter(
@@ -109,10 +179,140 @@ def record_message_response(db: Session, session_id: str, message_id: str | None
     choices = ((message.ui_payload or {}).get("options") or (message.ui_payload or {}).get("examples") or [])
     selected = next((item for item in choices if str(item).casefold() == answer.strip().casefold()), None)
     message.response_payload = {
-        "status": "answered", "answer": answer.strip(),
+        "status": status, "answer": answer.strip(),
         "selected_option": selected, "custom": selected is None,
     }
-    db.add(message); db.commit()
+    db.add(message)
+    if commit:
+        db.commit()
+    else:
+        db.flush()
+
+
+def _user_update(
+    field: str,
+    value: Any,
+    *,
+    status: str = "confirmed",
+    applicable: bool = True,
+) -> dict[str, Any]:
+    return {
+        "field": field,
+        "value": value,
+        "status": status,
+        "applicable": applicable,
+        "source_type": "user",
+        "source_reference": "project_onboarding_chat",
+        "confidence": "high",
+    }
+
+
+def resolve_answer_to_question(
+    db: Session,
+    *,
+    session_id: str,
+    message_id: str | None,
+    answer: str,
+    profile: ProjectProfile,
+) -> QuestionResolution:
+    """Resolve a persisted structured question without depending on a model call."""
+    if not message_id:
+        return QuestionResolution(False, "not_applicable", [])
+    question = db.query(ProjectMessage).filter(
+        ProjectMessage.id == message_id,
+        ProjectMessage.session_id == session_id,
+        ProjectMessage.sender == SenderType.AI,
+    ).first()
+    if not question or not isinstance(question.ui_payload, dict):
+        return QuestionResolution(True, "rejected", [], "invalid_question", question)
+    if question.response_payload:
+        return QuestionResolution(True, "rejected", [], "stale_question", question)
+
+    active = get_active_question(db, session_id, message_id)
+    if active and active.id != question.id:
+        return QuestionResolution(True, "rejected", [], "stale_question", question)
+
+    text = re.sub(r"\s+", " ", answer).strip()
+    if not text:
+        return QuestionResolution(True, "rejected", [], "empty_answer", question)
+
+    answer_actions = question.ui_payload.get("answer_actions")
+    action = None
+    if isinstance(answer_actions, dict):
+        action = next(
+            (
+                value
+                for label, value in answer_actions.items()
+                if str(label).strip().casefold() == text.casefold() and isinstance(value, dict)
+            ),
+            None,
+        )
+        if action and action.get("kind") in {"approve_profile", "request_changes"}:
+            return QuestionResolution(
+                True,
+                "accepted",
+                [],
+                question=question,
+                action=str(action["kind"]),
+            )
+
+    field = normalize_field_key(question.ui_payload.get("field"))
+    if field is None:
+        return QuestionResolution(False, "not_applicable", [], question=question)
+
+    if action and action.get("kind") == "not_applicable":
+        return QuestionResolution(
+            True,
+            "accepted",
+            [_user_update(field, None, status="not_applicable", applicable=False)],
+            question=question,
+        )
+    if action and action.get("kind") == "defer":
+        return QuestionResolution(
+            True,
+            "accepted",
+            [_user_update(field, None, status="deferred", applicable=True)],
+            question=question,
+        )
+
+    definition = FIELD_BY_KEY[field]
+    lowered = text.casefold()
+    if definition.requirement == "conditionally_required" and lowered in {
+        "none", "no", "not applicable", "n/a", "no aplica", "does not apply",
+    }:
+        return QuestionResolution(
+            True,
+            "accepted",
+            [_user_update(field, None, status="not_applicable", applicable=False)],
+            question=question,
+        )
+
+    input_type = str(question.ui_payload.get("input_type") or "text")
+    value: Any
+    if input_type == "multi_select":
+        value = [item.strip() for item in re.split(r"[,;]", text) if item.strip()]
+        if not value:
+            return QuestionResolution(True, "rejected", [], "empty_answer", question)
+    else:
+        value = text
+
+    validation_error = validate_onboarding_value(field, value)
+    if validation_error:
+        return QuestionResolution(
+            True,
+            "rejected",
+            [],
+            validation_error["code"],
+            question,
+        )
+    existing = (profile.profile_data or {}).get(field)
+    update_status = "corrected_by_user" if existing not in (None, "", []) and existing != value else "confirmed"
+    return QuestionResolution(
+        True,
+        "accepted",
+        [_user_update(field, value, status=update_status)],
+        question=question,
+    )
 
 
 def seed_legacy_values(profile: ProjectProfile) -> None:
@@ -136,6 +336,7 @@ def seed_legacy_values(profile: ProjectProfile) -> None:
 def apply_field_updates(
     db: Session, profile: ProjectProfile, updates: list[dict[str, Any]], *,
     allow_authoritative_statuses: bool, final_approved: bool | None = None,
+    commit: bool = True,
 ) -> ApplyUpdatesResult:
     data, states, sources = dict(profile.profile_data or {}), dict(profile.field_states or {}), dict(profile.field_sources or {})
     accepted, rejected = [], []
@@ -150,11 +351,11 @@ def apply_field_updates(
         if status in {"confirmed", "corrected_by_user", "not_applicable"} and not allow_authoritative_statuses:
             status = "pending_confirmation"
         value = update.get("value")
-        if status not in {"missing", "not_applicable"} and value in (None, "", []):
+        if status not in {"missing", "not_applicable", "deferred"} and value in (None, "", []):
             rejected.append({"update": raw, "reason": "missing_value"}); continue
         if is_too_short(key, value):
             rejected.append({"update": raw, "reason": "answer_too_short"}); continue
-        if status != "not_applicable" and value is not None:
+        if status not in {"not_applicable", "deferred"} and value is not None:
             data[key] = value
         states[key] = {"status": status, "applicable": False if status == "not_applicable" else update.get("applicable", True)}
         source = {k: update.get(k) for k in ("source_type", "source_reference", "confidence") if update.get(k) is not None}
@@ -183,7 +384,11 @@ def apply_field_updates(
     for name in ("profile_data", "field_states", "field_sources"):
         flag_modified(profile, name)
     refresh_completion(profile)
-    db.add(profile); db.commit(); db.refresh(profile)
+    db.add(profile)
+    if commit:
+        db.commit(); db.refresh(profile)
+    else:
+        db.flush()
     return ApplyUpdatesResult(accepted=accepted, rejected=rejected)
 
 

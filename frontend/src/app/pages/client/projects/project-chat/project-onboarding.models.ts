@@ -1,6 +1,6 @@
 export type ValidationStatus =
   | 'missing' | 'extracted' | 'pending_confirmation' | 'confirmed'
-  | 'corrected_by_user' | 'conflicting' | 'stale' | 'expired' | 'not_applicable';
+  | 'corrected_by_user' | 'conflicting' | 'stale' | 'expired' | 'not_applicable' | 'deferred';
 
 export interface ProjectFieldProgress {
   key: string;
@@ -34,7 +34,7 @@ export interface ProjectProfile {
     total: number;
     remaining: number;
     sections: SectionProgress[];
-    blockers: Array<{ field: string; label: string; section: string; status: string }>;
+    blockers: Array<{ field: string; label: string; section: string; requirement: string; status: string }>;
     sales_activation_status: 'ready' | 'not_ready';
     sales_activation_blockers: Array<{ field: string; label: string; section: string; status: string }>;
   };
@@ -77,6 +77,9 @@ export interface ChatTurn {
   message: ChatMessage; user_message: ChatMessage | null; profile: ProjectProfile; accepted_fields: string[];
   rejected_updates: Array<{ field: string | null; reason: string }>; sources: ProjectSource[];
   next_question: NextQuestion;
+  request_id?: string | null; message_saved?: boolean; profile_changed?: boolean;
+  field_update_status?: 'accepted' | 'rejected' | 'not_applicable';
+  assistant_status?: 'deterministic' | 'llm' | 'fallback'; redirect_url?: string | null;
 }
 export interface OnboardingState {
   messages: ChatMessage[]; profile: ProjectProfile; sources: ProjectSource[];
@@ -86,6 +89,8 @@ export interface OnboardingState {
 export interface NextQuestion {
   field: string | null; label: string; prompt: string; input_type: string;
   options: string[]; examples: string[]; allow_custom: boolean; minimum_words: number | null;
+  minimum_characters?: number | null; help_text?: string | null;
+  answer_actions?: Record<string, { kind: string; [key: string]: unknown }>;
 }
 export interface Campaign {
   id: string; project_id: string; name: string; platform: string; objective: string | null;

@@ -14,6 +14,7 @@ from app.modules.company_onboarding import services as company_services
 from app.modules.company_onboarding.models import CompanyOnboardingSource, SourceStatus
 from app.modules.onboarding_jobs.models import OnboardingSourceJob
 from app.modules.onboarding_jobs.service import enqueue
+from app.modules.projects import source_service as project_source_service
 from app.modules.projects.models import ProjectOnboardingSource, ProjectSourceStatus
 
 
@@ -67,7 +68,7 @@ def reconcile(*, apply: bool) -> dict[str, Any]:
             if _has_job(db, scope="project", source_id=source.id):
                 continue
             project = source.project
-            if not source.url or not project or not project.session:
+            if (not source.url and not source.storage_path) or not project or not project.session:
                 report["marked_failed"].append({"scope": "project", "source_id": source.id})
                 if apply:
                     source.status = ProjectSourceStatus.FAILED
@@ -82,7 +83,7 @@ def reconcile(*, apply: bool) -> dict[str, Any]:
                     company_id=project.company_id,
                     project_id=project.id,
                     source_id=source.id,
-                    url=source.url,
+                    url=source.url or project_source_service.file_job_url(source),
                     session_id=project.session.id,
                     message_id=source.message_id,
                 )

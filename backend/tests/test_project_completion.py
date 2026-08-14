@@ -38,3 +38,26 @@ def test_aliases_are_normalized_but_unknown_fields_are_rejected():
     assert normalize_field_key("price from") == "starting_price"
     assert normalize_field_key("available_units") == "available_inventory"
     assert normalize_field_key("tenant_secret") is None
+
+
+def test_conditional_fields_must_be_explicitly_resolved_and_can_be_deferred():
+    states = {
+        field.key: {"status": "confirmed", "applicable": True}
+        for field in FIELDS if field.requirement == "required"
+    }
+
+    pending = calculate_completion(states)
+    assert any(
+        item["requirement"] == "conditionally_required"
+        and item["status"] == "applicability_pending"
+        for item in pending["blockers"]
+    )
+
+    for field in FIELDS:
+        if field.requirement == "conditionally_required":
+            states[field.key] = {"status": "deferred", "applicable": True}
+
+    resolved = calculate_completion(states, final_approved=True)
+    assert resolved["percentage"] == 100
+    assert resolved["can_complete"] is True
+    assert resolved["completed"] == resolved["total"]

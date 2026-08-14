@@ -22,13 +22,16 @@ export class ProjectOnboardingService {
   complete(id: string): Observable<{ completed: boolean; redirect_url: string; profile: ProjectProfile }> {
     return this.http.post<{ completed: boolean; redirect_url: string; profile: ProjectProfile }>(`${this.baseUrl}/${id}/onboarding/complete`, {});
   }
-  sendMessage(id: string, message: string, inReplyToMessageId?: string | null): Observable<ChatTurn> {
-    return this.http.post<ChatTurn>(`${this.baseUrl}/${id}/chat`, { message, in_reply_to_message_id: inReplyToMessageId || null });
+  sendMessage(id: string, message: string, inReplyToMessageId: string | null, clientMessageId: string): Observable<ChatTurn> {
+    return this.http.post<ChatTurn>(`${this.baseUrl}/${id}/chat`, {
+      message, in_reply_to_message_id: inReplyToMessageId || null, client_message_id: clientMessageId,
+    });
   }
-  sendMessageWithFiles(id: string, message: string, files: File[], inReplyToMessageId?: string | null): Observable<ChatTurn> {
+  sendMessageWithFiles(id: string, message: string, files: File[], inReplyToMessageId: string | null, clientMessageId: string): Observable<ChatTurn> {
     const body = new FormData();
     body.append('message', message);
     if (inReplyToMessageId) body.append('in_reply_to_message_id', inReplyToMessageId);
+    body.append('client_message_id', clientMessageId);
     files.forEach((file) => body.append('files', file, file.name));
     return this.http.post<ChatTurn>(`${this.baseUrl}/${id}/chat/with-files`, body);
   }

@@ -13,6 +13,7 @@ async def generate_llm_response(
     response_format: dict[str, Any] | None = None,
     temperature: float = 0.3,
     raise_on_error: bool = False,
+    timeout_seconds: float = 45.0,
 ) -> str:
     """Envía la solicitud asíncrona al LLM para generar texto."""
     url = "https://openrouter.ai/api/v1/chat/completions"
@@ -32,7 +33,7 @@ async def generate_llm_response(
     
     try:
         async with httpx.AsyncClient() as client:
-            response = await client.post(url, headers=headers, json=payload, timeout=45.0)
+            response = await client.post(url, headers=headers, json=payload, timeout=timeout_seconds)
             response.raise_for_status()
             try:
                 content = response.json()["choices"][0]["message"]["content"]

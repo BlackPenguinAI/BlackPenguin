@@ -13,6 +13,7 @@ from app.modules.onboarding_jobs.errors import AccessRestrictedError
 from app.modules.company_onboarding import router as company_router
 from app.modules.projects import router as project_router
 from app.modules.projects import services as project_services
+from app.modules.projects import source_service as project_source_service
 from app.modules.projects.models import ProjectMessage, SenderType
 
 
@@ -155,3 +156,53 @@ def test_company_chat_initializes_accepted_updates_before_processing_urls():
     assert source.index("accepted = deterministic_result.accepted") < source.index(
         "for url in services.extract_urls"
     )
+
+
+def test_project_structured_answers_are_resolved_without_an_llm_round_trip(monkeypatch):
+    question = ProjectMessage(
+        id="question-id",
+        session_id="session-id",
+        sender=SenderType.AI,
+        content="Choose a description",
+        ui_payload={
+            "field": "short_description",
+            "input_type": "long_text",
+            "options": [],
+            "examples": [],
+            "answer_actions": {},
+        },
+    )
+    db = Mock()
+    db.query.return_value.filter.return_value.first.return_value = question
+    monkeypatch.setattr(project_services, "get_active_question", lambda *_args, **_kwargs: question)
+    profile = Mock(profile_data={})
+
+    resolution = project_services.resolve_answer_to_question(
+        db,
+        session_id="session-id",
+        message_id="question-id",
+        answer="Modern homes with thoughtful layouts, exceptional services, and convenient access to the city.",
+        profile=profile,
+    )
+
+    assert resolution.handled is True
+    assert resolution.status == "accepted"
+    assert resolution.updates[0]["field"] == "short_description"
+    assert resolution.updates[0]["status"] == "confirmed"
+
+
+def test_project_chat_has_a_bounded_fallback_and_queues_file_extraction():
+    completion_source = inspect.getsource(project_router._complete_chat_turn)
+    file_chat_source = inspect.getsource(project_router.send_chat_with_files)
+    file_upload_source = inspect.getsource(project_router.add_files)
+    worker_source = inspect.getsource(job_service._process_project)
+
+    assert "timeout_seconds=20.0" in completion_source
+    assert "temporarily unavailable" in completion_source
+    assert "create_file_source(" in file_chat_source
+    assert "ingest_file(" not in file_chat_source
+    assert "job_service.enqueue(" in file_chat_source
+    assert "create_file_source(" in file_upload_source
+    assert "process_stored_file_source" in worker_source
+    assert project_source_service.file_job_url(Mock(project_id="project-id", id="source-id")) \
+        == "https://project-files.invalid/project-id/source-id"

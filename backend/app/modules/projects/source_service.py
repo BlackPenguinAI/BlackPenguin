@@ -131,6 +131,24 @@ async def ingest_file(
     db: Session, *, project_id: str, company_id: str, user_id: str, upload: UploadFile,
     message_id: str | None = None,
 ) -> ProjectOnboardingSource:
+    source = await create_file_source(
+        db,
+        project_id=project_id,
+        company_id=company_id,
+        user_id=user_id,
+        upload=upload,
+        message_id=message_id,
+    )
+    if source.status == ProjectSourceStatus.PROCESSING:
+        await process_stored_file_source(db, source)
+    return source
+
+
+async def create_file_source(
+    db: Session, *, project_id: str, company_id: str, user_id: str, upload: UploadFile,
+    message_id: str | None = None,
+) -> ProjectOnboardingSource:
+    """Validate and durably store an upload without waiting for AI extraction."""
     content = await upload.read(MAX_FILE_BYTES + 1)
     mime_type = (upload.content_type or "application/octet-stream").split(";", 1)[0].lower()
     filename = (Path(upload.filename or "project-document").name or "project-document")[:255]
@@ -157,10 +175,36 @@ async def ingest_file(
         source.stored_filename = stored.stored_filename
         _validate_signature(content, mime_type)
         db.add(source); db.commit(); db.refresh(source)
-        if mime_type.startswith("image/"):
+    except Exception as exc:
+        _fail_source(db, source, _safe_error(exc))
+    return source
+
+
+def file_job_url(source: ProjectOnboardingSource) -> str:
+    """Stable internal identifier used only to deduplicate a stored-file job."""
+    return f"https://project-files.invalid/{source.project_id}/{source.id}"
+
+
+async def process_stored_file_source(
+    db: Session,
+    source: ProjectOnboardingSource,
+) -> ProjectOnboardingSource:
+    if source.status != ProjectSourceStatus.PROCESSING or not source.storage_path:
+        return source
+    try:
+        path = storage_service.resolve_project_file(source.storage_path)
+        content = path.read_bytes()
+        if len(content) > MAX_FILE_BYTES:
+            raise ValueError("The file exceeds the 15 MB limit.")
+        _validate_signature(content, source.mime_type or "application/octet-stream")
+        if (source.mime_type or "").startswith("image/"):
             await _finish_source(db, source, image_content=content)
         else:
-            await _finish_source(db, source, text=_extract_bytes(content, mime_type, filename))
+            await _finish_source(
+                db,
+                source,
+                text=_extract_bytes(content, source.mime_type or "application/octet-stream", source.name),
+            )
     except Exception as exc:
         _fail_source(db, source, _safe_error(exc))
     return source

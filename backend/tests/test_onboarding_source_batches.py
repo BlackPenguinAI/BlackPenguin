@@ -58,13 +58,18 @@ def test_project_url_sent_with_files_uses_the_worker():
 
 
 def test_file_upload_endpoints_finalize_the_group():
-    for endpoint in (company_router.add_file_sources, project_router.add_files):
-        source = inspect.getsource(endpoint)
-        assert "message_id=user_message.id" in source
-        assert "finalize_source_group(" in source
+    company_source = inspect.getsource(company_router.add_file_sources)
+    project_source = inspect.getsource(project_router.add_files)
+
+    assert "message_id=user_message.id" in company_source
+    assert "finalize_source_group(" in company_source
+    assert "message_id=user_message.id" in project_source
+    assert "job_service.enqueue(" in project_source
+    assert 'if not any(source.status.value == "processing"' in project_source
+    assert "finalize_source_group(" in project_source
 
 
 def test_protected_files_are_stored_before_analysis():
-    for ingest_file in (company_sources.ingest_file, project_sources.ingest_file):
-        source = inspect.getsource(ingest_file)
+    for create_file_source in (company_sources.ingest_file, project_sources.create_file_source):
+        source = inspect.getsource(create_file_source)
         assert source.index("storage_service.store_") < source.index("_validate_signature(")

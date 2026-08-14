@@ -87,7 +87,7 @@
         </summary>
         <div *ngIf="source.status === 'failed'" class="mt-3 flex flex-wrap items-center justify-between gap-3">
           <p class="text-xs text-red-300">{{ source.error_message }}</p>
-          <button *ngIf="source.url" (click)="retrySource(source)" class="rounded-lg border border-red-300/30 px-3 py-1.5 text-[10px] font-semibold text-red-200 hover:bg-red-500/10">Retry processing</button>
+          <button *ngIf="source.url || source.download_url" (click)="retrySource(source)" class="rounded-lg border border-red-300/30 px-3 py-1.5 text-[10px] font-semibold text-red-200 hover:bg-red-500/10">Retry processing</button>
         </div>
         <p *ngIf="source.status === 'ready' && !source.proposals.length" class="mt-3 text-xs text-gray-400">No reliable project details were found.</p>
         <div *ngIf="source.kind === 'image' && source.status === 'ready'" class="mt-3 flex items-center justify-between rounded-lg border border-white/5 bg-black/20 px-3 py-2">
