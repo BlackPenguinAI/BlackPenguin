@@ -28,7 +28,7 @@ from . import asset_share_service, catalog_service, meta_service, services, sour
 from .completion import FIELD_BY_KEY
 from .models import (
     MetaConnection, Project, ProjectCampaign, ProjectMessage, ProjectOnboardingProposal,
-    ProjectOnboardingSource, ProjectPropertyType, ProjectSession, ProjectSourceKind, SenderType,
+    ProjectOnboardingSource, ProjectPropertyType, ProjectSession, ProjectSourceKind, ProjectSourceStatus, SenderType,
 )
 from .schemas import (
     CampaignCreate, CampaignResponse, ChatBootstrapRequest, ChatMessagePayload, ChatMessageResponse, ChatTurnResponse,
@@ -164,6 +164,17 @@ def _next_prompt(profile) -> str:
 
 def _next_question(profile) -> dict[str, Any]:
     blockers = services.serialize_profile(profile)["completion"]["blockers"]
+    catalog_managed_fields = {
+        "typologies", "available_inventory", "starting_price", "currency", "inventory_updated_at",
+    }
+    if blockers and blockers[0]["field"] in catalog_managed_fields:
+        blockers = [{
+            "field": "property_type_catalog",
+            "label": "Confirmed property type catalog",
+            "section": "product",
+            "status": "missing",
+            "requirement": "required",
+        }, *blockers[1:]]
     return build_next_question(
         blockers,
         final_prompt="Review the Project Profile and choose whether to approve it or make changes.",
@@ -217,13 +228,18 @@ def _state_payload(db: Session, project: Project) -> dict[str, Any]:
     )
     if not processing and not pending_review:
         latest_ai = next((item for item in reversed(messages) if item.sender == SenderType.AI), None)
-        if latest_ai and not latest_ai.ui_payload and not latest_ai.response_payload:
+        desired_question = _next_question(profile)
+        if latest_ai and not latest_ai.response_payload and (
+            not latest_ai.ui_payload
+            or (latest_ai.ui_payload or {}).get("field") != desired_question.get("field")
+        ):
             services.supersede_unanswered_questions(
                 db,
                 project.session.id,
                 keep_message_id=latest_ai.id,
             )
-            latest_ai.ui_payload = _next_question(profile)
+            latest_ai.ui_payload = desired_question
+            latest_ai.content = desired_question["prompt"]
             db.add(latest_ai); db.commit(); db.refresh(latest_ai)
     if serialized_profile["completion"]["can_complete"]:
         stage = "complete"
@@ -477,8 +493,42 @@ def set_project_cover(
     ).update({ProjectOnboardingSource.is_primary: False}, synchronize_session=False)
     source.is_primary = True
     profile = services.get_profile(source.project)
+    active_question = services.get_active_question(db, source.project.session.id)
     updates = [services.user_field_update("project_cover", source.id)]
-    services.apply_field_updates(db, profile, updates, allow_authoritative_statuses=True)
+    services.apply_field_updates(db, profile, updates, allow_authoritative_statuses=True, commit=False)
+    if active_question and (active_question.ui_payload or {}).get("input_type") == "project_cover":
+        services.record_message_response(
+            db, source.project.session.id, active_question.id,
+            f"Confirmed Project cover: {source.name}", commit=False,
+        )
+        services.save_message(
+            db, source.project.session.id, SenderType.AI, _next_prompt(profile),
+            ui_payload=_next_question(profile), in_reply_to_message_id=active_question.id,
+            commit=False,
+        )
+    db.add(source); db.commit(); db.refresh(source)
+    return source_service.serialize_source(source)
+
+
+@router.post("/{project_id}/sources/cover-upload", response_model=SourceResponse, status_code=201)
+async def upload_project_cover_candidate(
+    project_id: str, file: UploadFile = File(...), db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker(EDITOR_ROLES)),
+):
+    project = services.get_project(db, project_id, current_user.company_id)
+    source = await source_service.create_file_source(
+        db, project_id=project.id, company_id=current_user.company_id,
+        user_id=current_user.id, upload=file, message_id=None,
+    )
+    if source.kind != ProjectSourceKind.IMAGE or not source.storage_path:
+        if source.status != ProjectSourceStatus.FAILED:
+            source.status = ProjectSourceStatus.FAILED
+            source.error_message = "Use a valid JPG, PNG, or WEBP image."
+            db.add(source); db.commit()
+        raise HTTPException(status_code=422, detail=source.error_message or "Use a valid JPG, PNG, or WEBP image.")
+    source.status = ProjectSourceStatus.READY
+    source.extracted_text = "[User-uploaded Project cover candidate]"
+    source.error_message = None
     db.add(source); db.commit(); db.refresh(source)
     return source_service.serialize_source(source)
 
@@ -508,7 +558,21 @@ def confirm_property_type_catalog(
     current_user: User = Depends(RoleChecker(EDITOR_ROLES)),
 ):
     project = services.get_project(db, project_id, current_user.company_id)
-    return catalog_service.confirm_catalog(db, project)
+    active_question = services.get_active_question(db, project.session.id)
+    result = catalog_service.confirm_catalog(db, project)
+    profile = services.get_profile(project)
+    if active_question and (active_question.ui_payload or {}).get("input_type") == "property_type_catalog":
+        services.record_message_response(
+            db, project.session.id, active_question.id,
+            "Confirmed the current property type catalog", commit=False,
+        )
+        services.save_message(
+            db, project.session.id, SenderType.AI, _next_prompt(profile),
+            ui_payload=_next_question(profile), in_reply_to_message_id=active_question.id,
+            commit=False,
+        )
+        db.commit()
+    return result
 
 
 @router.post("/{project_id}/property-types", response_model=PropertyTypeResponse, status_code=201)

@@ -170,11 +170,14 @@
         </div>
         <section class="w-full rounded-2xl rounded-tl-sm border border-white/10 bg-white/5 p-4 md:p-5">
           <h2 class="text-sm font-semibold text-white">Public contact information and social media</h2>
-          <p class="mt-1 text-xs leading-relaxed text-gray-400">Review what was extracted from the website or enter the channels customers can use. Separate multiple values with commas or line breaks.</p>
+          <p class="mt-1 text-xs leading-relaxed text-gray-400">The information already confirmed from the website is preserved. Complete only the missing channels, or edit a confirmed value if needed.</p>
           <form (ngSubmit)="savePublicPresence()" class="mt-4 space-y-2">
-            <input name="public_emails" [(ngModel)]="publicEmails" type="text" placeholder="Public emails, e.g. info@example.com" class="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-xs outline-none focus:border-secondary/50">
-            <input name="public_phones" [(ngModel)]="publicPhones" type="text" placeholder="Public phone numbers" class="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-xs outline-none focus:border-secondary/50">
-            <textarea name="social_profiles" [(ngModel)]="socialProfiles" rows="2" placeholder="Official LinkedIn, Instagram, Facebook, X, YouTube, or TikTok URLs" class="w-full resize-y rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-xs outline-none focus:border-secondary/50"></textarea>
+            <div *ngIf="isPublicPresenceResolved('public_contact_emails') && !shouldEditPublicPresence('public_contact_emails')" class="flex items-start gap-3 rounded-lg border border-green-500/20 bg-green-500/[0.06] px-3 py-2"><span class="material-symbols-outlined text-base text-green-400">mail</span><div class="min-w-0 flex-1"><p class="text-[9px] font-bold uppercase tracking-wider text-green-400">Confirmed emails</p><p class="mt-1 break-words text-xs text-gray-200">{{ publicEmails }}</p></div><button type="button" (click)="editPublicPresence('public_contact_emails')" class="text-[10px] text-secondary">Edit</button></div>
+            <input *ngIf="shouldEditPublicPresence('public_contact_emails')" name="public_emails" [(ngModel)]="publicEmails" (ngModelChange)="markPublicPresenceDirty('public_contact_emails')" type="text" placeholder="Public emails, e.g. info@example.com" class="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-xs outline-none focus:border-secondary/50">
+            <div *ngIf="isPublicPresenceResolved('public_contact_phones') && !shouldEditPublicPresence('public_contact_phones')" class="flex items-start gap-3 rounded-lg border border-green-500/20 bg-green-500/[0.06] px-3 py-2"><span class="material-symbols-outlined text-base text-green-400">call</span><div class="min-w-0 flex-1"><p class="text-[9px] font-bold uppercase tracking-wider text-green-400">Confirmed phones</p><p class="mt-1 break-words text-xs text-gray-200">{{ publicPhones }}</p></div><button type="button" (click)="editPublicPresence('public_contact_phones')" class="text-[10px] text-secondary">Edit</button></div>
+            <input *ngIf="shouldEditPublicPresence('public_contact_phones')" name="public_phones" [(ngModel)]="publicPhones" (ngModelChange)="markPublicPresenceDirty('public_contact_phones')" type="text" placeholder="Public phone numbers" class="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-xs outline-none focus:border-secondary/50">
+            <div *ngIf="isPublicPresenceResolved('corporate_social_profiles') && !shouldEditPublicPresence('corporate_social_profiles')" class="flex items-start gap-3 rounded-lg border border-green-500/20 bg-green-500/[0.06] px-3 py-2"><span class="material-symbols-outlined text-base text-green-400">share</span><div class="min-w-0 flex-1"><p class="text-[9px] font-bold uppercase tracking-wider text-green-400">Confirmed social profiles</p><p class="mt-1 break-words text-xs text-gray-200">{{ socialProfiles }}</p></div><button type="button" (click)="editPublicPresence('corporate_social_profiles')" class="text-[10px] text-secondary">Edit</button></div>
+            <textarea *ngIf="shouldEditPublicPresence('corporate_social_profiles')" name="social_profiles" [(ngModel)]="socialProfiles" (ngModelChange)="markPublicPresenceDirty('corporate_social_profiles')" rows="2" placeholder="Official LinkedIn, Instagram, Facebook, X, YouTube, or TikTok URLs" class="w-full resize-y rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-xs outline-none focus:border-secondary/50"></textarea>
             <div class="flex items-center gap-3 pt-1">
               <button [disabled]="publicPresenceSaving" class="rounded-lg bg-secondary px-3 py-2 text-[10px] font-semibold text-black disabled:opacity-50">{{ publicPresenceSaving ? 'Saving...' : 'Save public information' }}</button>
               <span *ngIf="publicPresenceSaved" class="text-[10px] text-green-400">Saved</span>
@@ -342,7 +345,7 @@
       <div class="flex items-center justify-between gap-4">
         <h2 class="flex items-center gap-2 text-sm font-bold uppercase tracking-widest">
           <span class="material-symbols-outlined text-[20px] text-secondary">radar</span>
-          Company Profile
+          Core Company Profile
         </h2>
         <span class="text-2xl font-semibold text-secondary">{{ profile.completion.percentage }}%</span>
       </div>
@@ -353,7 +356,7 @@
         ></div>
       </div>
       <p class="mt-3 text-[11px] leading-relaxed text-gray-500">
-        Required fields: 90%. Applicable conditional fields: 10%. Enrichment does not block completion.
+        Required and applicable conditional profile: {{ profile.completion.percentage }}%. Public channels: {{ publicPresenceResolvedCount }} of 3 confirmed.
       </p>
     </header>
 

@@ -121,6 +121,8 @@ def _validate_confirmation(db: Session, project: Project, item: ProjectPropertyT
         raise HTTPException(status_code=422, detail=(
             "A confirmed property type requires price, currency, available units, and an inventory update date."
         ))
+    if item.total_units is not None and item.available_units is not None and item.available_units > item.total_units:
+        raise HTTPException(status_code=422, detail="Available units cannot exceed total units.")
 
 
 def _sync_profile(db: Session, project: Project) -> None:
@@ -192,6 +194,9 @@ def confirm_catalog(db: Session, project: Project) -> dict[str, Any]:
         raise HTTPException(status_code=409, detail="Review or remove every extracted candidate before completing the catalog.")
     if any(not is_complete(item) for item in confirmed):
         raise HTTPException(status_code=422, detail="Complete price, currency, availability, and inventory date for every property type.")
+    currencies = {str(item.currency).upper() for item in confirmed if item.currency}
+    if len(currencies) > 1:
+        raise HTTPException(status_code=422, detail="Use one commercial currency across the confirmed property catalog.")
 
     profile = services.get_profile(project)
     states = dict(profile.field_states or {})

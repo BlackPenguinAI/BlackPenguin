@@ -27,12 +27,16 @@ export class CompanyOnboardingService {
     return this.http.get<CompanyProfileResponse>(`${this.baseUrl}/profile`);
   }
 
-  savePublicPresence(emails: string[], phones: string[], socialProfiles: string[]): Observable<CompanyProfileResponse> {
+  savePublicPresence(
+    emails: string[], phones: string[], socialProfiles: string[],
+    fields: string[] = ['public_contact_emails', 'public_contact_phones', 'corporate_social_profiles'],
+  ): Observable<CompanyProfileResponse> {
+    const selectedFields = new Set(fields);
     const updates = [
       { field: 'public_contact_emails', value: emails },
       { field: 'public_contact_phones', value: phones },
       { field: 'corporate_social_profiles', value: socialProfiles },
-    ].map(item => ({
+    ].filter(item => selectedFields.has(item.field)).map(item => ({
       field: item.field,
       value: item.value.length ? item.value : null,
       status: item.value.length ? 'confirmed' : 'deferred',
@@ -44,8 +48,8 @@ export class CompanyOnboardingService {
     return this.http.patch<CompanyProfileResponse>(`${this.baseUrl}/profile`, { updates });
   }
 
-  deferPublicPresence(): Observable<CompanyProfileResponse> {
-    const updates = ['public_contact_emails', 'public_contact_phones', 'corporate_social_profiles'].map(field => ({
+  deferPublicPresence(fields: string[] = ['public_contact_emails', 'public_contact_phones', 'corporate_social_profiles']): Observable<CompanyProfileResponse> {
+    const updates = fields.map(field => ({
       field, value: null, status: 'deferred', applicable: true,
       source_type: 'user_input', source_reference: 'onboarding public presence deferred', confidence: 'high',
     }));

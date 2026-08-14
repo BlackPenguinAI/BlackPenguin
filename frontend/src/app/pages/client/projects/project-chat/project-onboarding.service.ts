@@ -53,6 +53,10 @@ export class ProjectOnboardingService {
   setCover(id: string, sourceId: string): Observable<ProjectSource> {
     return this.http.post<ProjectSource>(`${this.baseUrl}/${id}/sources/${sourceId}/cover`, {});
   }
+  uploadCover(id: string, file: File): Observable<ProjectSource> {
+    const body = new FormData(); body.append('file', file, file.name);
+    return this.http.post<ProjectSource>(`${this.baseUrl}/${id}/sources/cover-upload`, body);
+  }
   getPropertyTypes(id: string): Observable<PropertyTypeCatalog> {
     return this.http.get<PropertyTypeCatalog>(`${this.baseUrl}/${id}/property-types`);
   }

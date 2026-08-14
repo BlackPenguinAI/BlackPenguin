@@ -64,6 +64,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   propertyCatalog: PropertyTypeCatalog = { items: [], confirmed_count: 0, candidate_count: 0, limit: 0, remaining: 0, catalog_complete: false };
   propertyTypeBusy = false;
   coverBusy = false;
+  coverUploadBusy = false;
   selectedCoverSourceId: string | null = null;
   showPropertyTypeForm = false;
   propertyTypeDraft: Partial<ProjectPropertyType> = this.emptyPropertyType();
@@ -259,7 +260,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   }
 
   get readyProjectImages(): ProjectSource[] { return this.sources.filter(source => source.kind === 'image' && source.status === 'ready' && !!source.download_url); }
-  get showCoverPicker(): boolean { return this.nextQuestion?.input_type === 'project_cover' && this.readyProjectImages.length > 0; }
+  get showCoverPicker(): boolean { return this.nextQuestion?.input_type === 'project_cover'; }
   get showPropertyCatalog(): boolean { return this.nextQuestion?.input_type === 'property_type_catalog' || this.showPropertyTypeForm; }
 
   private emptyPropertyType(): Partial<ProjectPropertyType> {
@@ -287,6 +288,9 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   }
   isStructuredQuestion(message: ChatMessage, inputType: string): boolean {
     return this.isActiveQuestion(message) && message.ui_payload?.input_type === inputType;
+  }
+  isGlobalStructuredQuestion(message: ChatMessage): boolean {
+    return ['project_cover', 'property_type_catalog'].includes(message.ui_payload?.input_type || '');
   }
   assignSelectedSalesUser(message: ChatMessage): void {
     if (!this.selectedSalesUserId || this.teamBusy) return;
@@ -415,7 +419,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   }
 
   get hasPendingReview(): boolean {
-    return this.sources.some((source) => this.hasPendingProposals(source));
+    return this.sources.some((source) => this.isReviewableSource(source) && this.hasPendingProposals(source));
   }
   get visibleMessages(): ChatMessage[] {
     if (!this.hasPendingReview) return this.messages;
@@ -424,11 +428,14 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     ));
   }
   sourcesForMessage(messageId?: string): ProjectSource[] {
-    return messageId ? this.sources.filter((source) => source.message_id === messageId) : [];
+    return messageId ? this.sources.filter((source) => source.message_id === messageId && this.isReviewableSource(source)) : [];
   }
   get unlinkedSources(): ProjectSource[] {
     const messageIds = new Set(this.messages.flatMap((message) => message.id ? [message.id] : []));
-    return this.sources.filter((source) => !source.message_id || !messageIds.has(source.message_id));
+    return this.sources.filter((source) => this.isReviewableSource(source) && (!source.message_id || !messageIds.has(source.message_id)));
+  }
+  isReviewableSource(source: ProjectSource): boolean {
+    return !(source.kind === 'image' && !!source.url);
   }
   hasPendingProposals(source: ProjectSource): boolean {
     return source.proposals.some((proposal) => proposal.status === 'pending');
@@ -565,6 +572,32 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     this.selectedCoverSourceId = source.id;
     this.errorMessage = '';
     this.cdr.detectChanges();
+  }
+
+  uploadCoverCandidate(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file || this.coverUploadBusy || this.coverBusy) return;
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      this.errorMessage = 'Use a JPG, PNG, or WEBP image for the Project cover.';
+      return;
+    }
+    this.coverUploadBusy = true;
+    this.errorMessage = '';
+    this.onboarding.uploadCover(this.projectId, file).subscribe({
+      next: source => {
+        this.coverUploadBusy = false;
+        this.mergeSources([source]);
+        this.selectedCoverSourceId = source.id;
+        this.cdr.detectChanges();
+      },
+      error: (error: HttpErrorResponse) => {
+        this.coverUploadBusy = false;
+        this.errorMessage = this.apiDetail(error, 'The cover image could not be uploaded.');
+        this.cdr.detectChanges();
+      },
+    });
   }
 
   confirmProjectCover(): void {

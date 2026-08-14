@@ -83,6 +83,8 @@ export class ChatComponent implements OnInit, OnDestroy {
   publicPresenceSaving = false;
   publicPresenceSaved = false;
   publicPresenceError = '';
+  readonly publicPresenceDirty = new Set<string>();
+  readonly publicPresenceEditing = new Set<string>();
   companyMedia: CompanyMediaAsset[] = [];
   selectedLogoId: string | null = null;
   logoBusy = false;
@@ -98,7 +100,6 @@ export class ChatComponent implements OnInit, OnDestroy {
   private lastStateVersion = 0;
   private pollingStartedAt = 0;
   private readonly expandedSourceIds = new Set<string>();
-  private publicPresenceInitialized = false;
   readonly savingWebsiteSourceIds = new Set<string>();
   readonly confirmingSourceIds = new Set<string>();
 
@@ -371,19 +372,27 @@ export class ChatComponent implements OnInit, OnDestroy {
     const emails = this.splitList(this.publicEmails);
     const phones = this.splitList(this.publicPhones);
     const socialProfiles = this.splitList(this.socialProfiles);
-    if (!emails.length && !phones.length && !socialProfiles.length) {
+    const fields = this.editablePublicPresenceFields;
+    if (!fields.length) return;
+    const valuesByField: Record<string, string[]> = {
+      public_contact_emails: emails,
+      public_contact_phones: phones,
+      corporate_social_profiles: socialProfiles,
+    };
+    if (fields.every(field => !valuesByField[field].length)) {
       this.publicPresenceError = 'Enter at least one public email, phone number, or social profile.';
       return;
     }
     this.publicPresenceSaving = true;
     this.publicPresenceSaved = false;
     this.publicPresenceError = '';
-    this.onboarding.savePublicPresence(emails, phones, socialProfiles).pipe(finalize(() => {
+    this.onboarding.savePublicPresence(emails, phones, socialProfiles, fields).pipe(finalize(() => {
       this.publicPresenceSaving = false;
       this.cdr.detectChanges();
     })).subscribe({
       next: profile => {
         this.profile = profile;
+        fields.forEach(field => { this.publicPresenceDirty.delete(field); this.publicPresenceEditing.delete(field); });
         this.publicPresenceSaved = true;
         this.syncState('bottom');
       },
@@ -395,9 +404,11 @@ export class ChatComponent implements OnInit, OnDestroy {
 
   deferPublicPresence(): void {
     if (this.currentStage !== 'enrichment' || this.publicPresenceSaving || this.isCompleted) return;
+    const fields = this.editablePublicPresenceFields;
+    if (!fields.length) return;
     this.publicPresenceSaving = true;
     this.publicPresenceError = '';
-    this.onboarding.deferPublicPresence().pipe(finalize(() => {
+    this.onboarding.deferPublicPresence(fields).pipe(finalize(() => {
       this.publicPresenceSaving = false;
       this.cdr.detectChanges();
     })).subscribe({
@@ -862,14 +873,44 @@ export class ChatComponent implements OnInit, OnDestroy {
   }
 
   private initializePublicPresence(data: Record<string, unknown>): void {
-    if (this.publicPresenceInitialized) return;
     const values = (key: string): string => Array.isArray(data[key])
       ? (data[key] as unknown[]).map(String).join(', ')
       : (typeof data[key] === 'string' ? String(data[key]) : '');
-    this.publicEmails = values('public_contact_emails');
-    this.publicPhones = values('public_contact_phones');
-    this.socialProfiles = values('corporate_social_profiles');
-    this.publicPresenceInitialized = true;
+    if (!this.publicPresenceDirty.has('public_contact_emails')) this.publicEmails = values('public_contact_emails');
+    if (!this.publicPresenceDirty.has('public_contact_phones')) this.publicPhones = values('public_contact_phones');
+    if (!this.publicPresenceDirty.has('corporate_social_profiles')) this.socialProfiles = values('corporate_social_profiles');
+  }
+
+  publicPresenceStatus(field: string): ValidationStatus {
+    return this.profile.fields.find(item => item.key === field)?.status || 'missing';
+  }
+
+  isPublicPresenceResolved(field: string): boolean {
+    return ['confirmed', 'corrected_by_user'].includes(this.publicPresenceStatus(field));
+  }
+
+  shouldEditPublicPresence(field: string): boolean {
+    return !this.isPublicPresenceResolved(field) || this.publicPresenceEditing.has(field);
+  }
+
+  editPublicPresence(field: string): void {
+    this.publicPresenceEditing.add(field);
+    this.publicPresenceDirty.add(field);
+  }
+
+  markPublicPresenceDirty(field: string): void {
+    this.publicPresenceDirty.add(field);
+    this.publicPresenceSaved = false;
+  }
+
+  get editablePublicPresenceFields(): string[] {
+    return ['public_contact_emails', 'public_contact_phones', 'corporate_social_profiles']
+      .filter(field => this.shouldEditPublicPresence(field));
+  }
+
+  get publicPresenceResolvedCount(): number {
+    return ['public_contact_emails', 'public_contact_phones', 'corporate_social_profiles']
+      .filter(field => this.isPublicPresenceResolved(field)).length;
   }
 
   private splitList(value: string): string[] {

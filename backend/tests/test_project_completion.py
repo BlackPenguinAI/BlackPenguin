@@ -1,3 +1,4 @@
+from app.modules.onboarding_questions import build_next_question
 from app.modules.projects.completion import FIELDS, calculate_completion, normalize_field_key
 
 
@@ -83,3 +84,26 @@ def test_deferred_operational_fields_allow_profile_completion_but_not_sales_acti
     assert {item["field"] for item in result["sales_activation_blockers"]} >= {
         "sales_contacts", "appointment_routing", "campaigns_defined", "meta_connection_verified",
     }
+
+
+def test_property_catalog_precedes_catalog_derived_fields():
+    keys = [field.key for field in FIELDS]
+
+    assert keys.index("property_type_catalog") < keys.index("typologies")
+    assert keys.index("property_type_catalog") < keys.index("available_inventory")
+
+
+def test_structure_and_compliance_questions_explain_the_expected_information():
+    phases = build_next_question([{
+        "field": "phases_and_towers", "label": "Phases and towers",
+        "status": "applicability_pending", "requirement": "conditionally_required",
+    }], final_prompt="Approve")
+    compliance = build_next_question([{
+        "field": "compliance_notes", "label": "Project compliance notes",
+        "status": "applicability_pending", "requirement": "conditionally_required",
+    }], final_prompt="Approve")
+
+    assert "Single phase — no towers" in phases["options"]
+    assert "Multiple towers or buildings" in phases["options"]
+    assert compliance["input_type"] == "multi_select"
+    assert "Use standard Company compliance; no Project-specific notes" in compliance["options"]

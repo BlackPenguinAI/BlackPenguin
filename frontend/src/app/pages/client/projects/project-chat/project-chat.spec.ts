@@ -179,6 +179,29 @@ describe('ProjectChatComponent', () => {
     http.expectNone('http://localhost:8000/api/v1/projects/project-1/sources/cover-1/cover');
   });
 
+  it('keeps website images out of attachment source reviews', () => {
+    component.messages = [{ id: 'message-1', sender: 'user', content: 'https://example.com', created_at: new Date(), attachments: [] }];
+    component.sources = [{
+      id: 'website-image', kind: 'image', status: 'ready', name: 'hero.jpg',
+      url: 'https://example.com/hero.jpg', mime_type: 'image/jpeg', size_bytes: 100,
+      error_message: null, message_id: 'message-1', download_url: '/hero', is_primary: false,
+      proposals: [], created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    }];
+
+    expect(component.sourcesForMessage('message-1')).toEqual([]);
+    expect(component.unlinkedSources).toEqual([]);
+  });
+
+  it('shows the cover step even when no scraped image is available', () => {
+    component.nextQuestion = {
+      field: 'project_cover', label: 'Project cover', prompt: 'Choose cover',
+      input_type: 'project_cover', options: [], examples: [], allow_custom: false, minimum_words: null,
+    };
+    component.sources = [];
+
+    expect(component.showCoverPicker).toBe(true);
+  });
+
   it('keeps operational routing and Meta sections out of the Project Profile list', () => {
     component.profile = {
       ...EMPTY_PROJECT_PROFILE,

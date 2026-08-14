@@ -118,6 +118,21 @@ QUESTION_CATALOG: dict[str, dict[str, Any]] = {
         "help_text": "Select a website image or upload JPG, PNG, or WEBP. The selected image is used in Project Overview.",
         "allow_custom": False,
     },
+    "phases_and_towers": {
+        "input_type": "single_select",
+        "prompt": "How is this Project organized into **phases, towers, or buildings**?",
+        "options": [
+            "Single phase — no towers",
+            "Multiple phases",
+            "One tower or building",
+            "Multiple towers or buildings",
+            "Structure not defined yet",
+        ],
+        "help_text": (
+            "Record the commercial structure buyers use: phase, tower or building names, "
+            "status, delivery timing, unit count, and the property types assigned to each one."
+        ),
+    },
     "typologies": {
         "input_type": "multi_select",
         "options": ["Studio", "1 bedroom", "2 bedrooms", "3 bedrooms", "4+ bedrooms", "Penthouse", "Townhouse"],
@@ -209,6 +224,23 @@ QUESTION_CATALOG: dict[str, dict[str, Any]] = {
         "prompt": "Connect this project to **Meta Lead Ads** using the guided setup below.",
         "help_text": "You will need the Page ID, Ad Account ID, and Form ID. No access token is entered in the chat.",
         "options": ["Configure Meta later"],
+    },
+    "compliance_notes": {
+        "input_type": "multi_select",
+        "prompt": "Select the **Project-specific compliance notes** the Sales agent must follow.",
+        "options": [
+            "Use standard Company compliance; no Project-specific notes",
+            "Advertising or legal disclaimer",
+            "Licensing or registration requirements",
+            "Reservation, deposit or refund conditions",
+            "Financing disclaimer",
+            "Contact consent or privacy requirements",
+            "Human approval required for specific claims",
+        ],
+        "help_text": (
+            "Include only restrictions specific to this Project, such as mandatory disclaimers, "
+            "registration numbers, deposit rules, or claims that require human review."
+        ),
     },
 }
 

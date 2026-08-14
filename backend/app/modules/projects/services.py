@@ -683,6 +683,10 @@ def serialize_attachment(source: ProjectOnboardingSource) -> dict[str, Any]:
 
 
 def serialize_message(message: ProjectMessage) -> dict[str, Any]:
+    visible_attachments = [
+        source for source in message.attachments
+        if not (source.kind == ProjectSourceKind.IMAGE and bool(source.url))
+    ]
     return {
         "id": message.id,
         "sender": "user" if message.sender == SenderType.USER else "ai",
@@ -691,7 +695,7 @@ def serialize_message(message: ProjectMessage) -> dict[str, Any]:
         "response_payload": message.response_payload,
         "in_reply_to_message_id": message.in_reply_to_message_id,
         "created_at": message.created_at,
-        "attachments": [serialize_attachment(source) for source in message.attachments],
+        "attachments": [serialize_attachment(source) for source in visible_attachments],
     }
 
 

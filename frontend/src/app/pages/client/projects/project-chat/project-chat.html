@@ -40,6 +40,7 @@
         <div class="flex" [ngClass]="msg.sender === 'user' ? 'justify-end' : 'justify-start'">
           <div *ngIf="msg.sender === 'ai'" class="min-w-0 w-full">
             <app-onboarding-ai-message
+              *ngIf="!isGlobalStructuredQuestion(msg)"
               [message]="msg"
               [active]="isActiveQuestion(msg)"
               [disabled]="isAnalyzing || profile.completion.can_complete || hasPendingReview"
@@ -201,6 +202,10 @@
         <p class="text-[10px] font-bold uppercase tracking-[.18em] text-secondary">Project media</p>
         <h2 class="mt-1 text-lg font-medium">Choose the Project cover image</h2>
         <p class="mt-2 text-xs leading-5 text-gray-500">Select the image that will represent this Project in its Overview, then confirm to continue.</p>
+        <div *ngIf="!readyProjectImages.length" class="mt-4 rounded-xl border border-dashed border-white/15 bg-black/20 px-4 py-6 text-center">
+          <span class="material-symbols-outlined text-2xl text-gray-500">add_photo_alternate</span>
+          <p class="mt-2 text-xs text-gray-400">No suitable website image is available. Upload the image you want to use.</p>
+        </div>
         <div class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
           <button *ngFor="let image of readyProjectImages" type="button" (click)="selectCoverCandidate(image)" [disabled]="coverBusy" class="relative overflow-hidden rounded-xl border bg-black/30 p-1 transition" [class.border-secondary]="selectedCoverSourceId === image.id" [class.ring-2]="selectedCoverSourceId === image.id" [class.ring-secondary/30]="selectedCoverSourceId === image.id" [class.border-white/10]="selectedCoverSourceId !== image.id">
             <img *ngIf="sourceImageUrls.get(image.id) as preview" [src]="preview" [alt]="image.name" class="h-28 w-full rounded-lg object-cover" />
@@ -209,7 +214,8 @@
           </button>
         </div>
         <div class="mt-4 flex flex-wrap items-center gap-3">
-          <button (click)="confirmProjectCover()" [disabled]="coverBusy || !selectedCoverSourceId" class="rounded-xl bg-secondary px-5 py-2.5 text-xs font-semibold text-black disabled:opacity-40">{{ coverBusy ? 'Confirming...' : 'Confirm Project Cover' }}</button>
+          <label class="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-secondary/30 px-4 py-2.5 text-xs font-semibold text-secondary" [class.pointer-events-none]="coverUploadBusy || coverBusy" [class.opacity-50]="coverUploadBusy || coverBusy"><span class="material-symbols-outlined text-base">upload</span>{{ coverUploadBusy ? 'Uploading...' : 'Upload image' }}<input type="file" accept="image/jpeg,image/png,image/webp" class="hidden" [disabled]="coverUploadBusy || coverBusy" (change)="uploadCoverCandidate($event)" /></label>
+          <button (click)="confirmProjectCover()" [disabled]="coverBusy || coverUploadBusy || !selectedCoverSourceId" class="rounded-xl bg-secondary px-5 py-2.5 text-xs font-semibold text-black disabled:opacity-40">{{ coverBusy ? 'Confirming...' : 'Confirm Project Cover' }}</button>
           <span *ngIf="selectedCoverSourceId" class="text-[10px] text-green-400">Image selected. Confirm to continue.</span>
         </div>
       </section>

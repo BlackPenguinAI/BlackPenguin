@@ -113,6 +113,30 @@ describe('ChatComponent', () => {
     expect(component.teamStatusLabel('not_applicable')).toBe('Not needed now');
   });
 
+  it('refreshes extracted public presence values until the user edits that field', () => {
+    (component as any).initializePublicPresence({ public_contact_phones: ['+1 800 555 0100'] });
+    expect(component.publicPhones).toBe('+1 800 555 0100');
+
+    component.markPublicPresenceDirty('public_contact_phones');
+    component.publicPhones = '+1 305 555 0100';
+    (component as any).initializePublicPresence({ public_contact_phones: ['+1 999 555 0100'] });
+
+    expect(component.publicPhones).toBe('+1 305 555 0100');
+  });
+
+  it('asks only for unresolved public presence fields', () => {
+    component.profile = {
+      ...EMPTY_COMPANY_PROFILE,
+      fields: [
+        { key: 'public_contact_emails', label: 'Emails', requirement: 'recommended', status: 'missing', applicable: true },
+        { key: 'public_contact_phones', label: 'Phones', requirement: 'recommended', status: 'confirmed', applicable: true },
+        { key: 'corporate_social_profiles', label: 'Social', requirement: 'recommended', status: 'confirmed', applicable: true },
+      ],
+    };
+
+    expect(component.editablePublicPresenceFields).toEqual(['public_contact_emails']);
+  });
+
   it('should not keep a chat question active while Team owns the workflow', () => {
     component.currentStage = 'team';
     const staleQuestion = {
