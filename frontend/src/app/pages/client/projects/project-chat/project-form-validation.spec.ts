@@ -1,4 +1,5 @@
 import {
+  toPropertyTypePayload,
   validateMetaSetup,
   validatePropertyType,
   validateProposalDraft,
@@ -50,6 +51,26 @@ describe('project chat form validation', () => {
     expect(errors['area_max']).toContain('greater than or equal');
     expect(errors['currency']).toBeTruthy();
     expect(errors['inventory_updated_at']).toBeTruthy();
+  });
+
+  it('builds a normalized writable property type payload without response-only fields', () => {
+    const payload = toPropertyTypePayload({
+      id: 'type-2', project_id: 'project-1', name: '  Four bedrooms  ',
+      available_units: 1, total_units: 1, starting_price: 10, maximum_price: 20,
+      currency: 'usd', inventory_updated_at: '2026-08-01', features: [' Patio ', ''],
+      review_status: 'candidate', is_complete: false, media: [],
+      created_at: '2026-08-01T00:00:00Z', updated_at: '2026-08-01T00:00:00Z',
+    });
+
+    expect(payload.name).toBe('Four bedrooms');
+    expect(payload.currency).toBe('USD');
+    expect(payload.inventory_updated_at).toBe('2026-08-01T12:00:00.000Z');
+    expect(payload.features).toEqual(['Patio']);
+    expect(payload.review_status).toBe('confirmed');
+    expect(payload).not.toHaveProperty('id');
+    expect(payload).not.toHaveProperty('project_id');
+    expect(payload).not.toHaveProperty('is_complete');
+    expect(payload).not.toHaveProperty('media');
   });
 
   it('requires every Sales-user and Meta setup field before submission', () => {

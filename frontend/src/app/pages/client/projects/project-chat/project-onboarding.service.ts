@@ -7,7 +7,7 @@ import { API_V1_URL } from '../../../../core/config/api.config';
 import {
   Campaign, ChatMessage, ChatTurn, MetaConnection, MetaSetupConfiguration, MetaSetupResult,
   OnboardingState, ProjectAssignment, ProjectOnboardingActionPayload, ProjectProfile,
-  ProjectSalesCandidate, ProjectSource, SourceProposal, ProjectPropertyType, PropertyTypeCatalog,
+  ProjectSalesCandidate, ProjectSource, SourceProposal, ProjectPropertyType, ProjectPropertyTypePayload, PropertyTypeCatalog,
 } from './project-onboarding.models';
 
 @Injectable({ providedIn: 'root' })
@@ -63,10 +63,10 @@ export class ProjectOnboardingService {
   confirmPropertyTypeCatalog(id: string): Observable<PropertyTypeCatalog> {
     return this.http.post<PropertyTypeCatalog>(`${this.baseUrl}/${id}/property-types/confirm`, {});
   }
-  createPropertyType(id: string, payload: Partial<ProjectPropertyType>): Observable<ProjectPropertyType> {
+  createPropertyType(id: string, payload: ProjectPropertyTypePayload): Observable<ProjectPropertyType> {
     return this.http.post<ProjectPropertyType>(`${this.baseUrl}/${id}/property-types`, payload);
   }
-  updatePropertyType(id: string, propertyTypeId: string, payload: Partial<ProjectPropertyType>): Observable<ProjectPropertyType> {
+  updatePropertyType(id: string, propertyTypeId: string, payload: ProjectPropertyTypePayload): Observable<ProjectPropertyType> {
     return this.http.put<ProjectPropertyType>(`${this.baseUrl}/${id}/property-types/${propertyTypeId}`, payload);
   }
   deletePropertyType(id: string, propertyTypeId: string): Observable<void> {

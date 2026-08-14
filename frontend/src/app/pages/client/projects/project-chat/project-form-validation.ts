@@ -1,8 +1,54 @@
-import { ProjectPropertyType, SourceProposal } from './project-onboarding.models';
+import { ProjectPropertyType, ProjectPropertyTypePayload, SourceProposal } from './project-onboarding.models';
 
 export type FormErrors = Record<string, string>;
 
 const present = (value: unknown): boolean => value !== null && value !== undefined && String(value).trim() !== '';
+
+const nullableText = (value: unknown): string | null => {
+  const normalized = typeof value === 'string' ? value.trim() : '';
+  return normalized || null;
+};
+
+const nullableNumber = (value: unknown): number | null => {
+  if (!present(value)) return null;
+  const normalized = Number(value);
+  return Number.isFinite(normalized) ? normalized : null;
+};
+
+export function normalizeInventoryDate(value: string | null | undefined): string | null {
+  const normalized = value?.trim();
+  if (!normalized) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(normalized)) return `${normalized}T12:00:00.000Z`;
+  const parsed = new Date(normalized);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+}
+
+export function toPropertyTypePayload(
+  value: Partial<ProjectPropertyType>,
+  reviewStatus: ProjectPropertyTypePayload['review_status'] = 'confirmed',
+): ProjectPropertyTypePayload {
+  return {
+    name: value.name?.trim() || '',
+    code: nullableText(value.code),
+    description: nullableText(value.description),
+    bedrooms: nullableNumber(value.bedrooms),
+    bathrooms: nullableNumber(value.bathrooms),
+    area_min: nullableNumber(value.area_min),
+    area_max: nullableNumber(value.area_max),
+    area_unit: nullableText(value.area_unit),
+    total_units: nullableNumber(value.total_units),
+    available_units: nullableNumber(value.available_units),
+    starting_price: nullableNumber(value.starting_price),
+    maximum_price: nullableNumber(value.maximum_price),
+    currency: nullableText(value.currency)?.toUpperCase() || null,
+    features: Array.isArray(value.features) ? value.features.map(item => String(item).trim()).filter(Boolean) : [],
+    inventory_updated_at: normalizeInventoryDate(value.inventory_updated_at),
+    images_status: value.images_status || 'pending',
+    source_reference: nullableText(value.source_reference),
+    sort_order: Number.isFinite(Number(value.sort_order)) ? Number(value.sort_order) : 0,
+    review_status: reviewStatus,
+  };
+}
 
 export function validatePropertyType(value: Partial<ProjectPropertyType>): FormErrors {
   const errors: FormErrors = {};

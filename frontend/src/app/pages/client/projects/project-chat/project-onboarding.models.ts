@@ -117,6 +117,13 @@ export interface ProjectPropertyType {
   sort_order: number; is_complete: boolean; media: PropertyTypeMedia[]; created_at: string; updated_at: string;
 }
 
+export type ProjectPropertyTypePayload = Pick<ProjectPropertyType,
+  'name' | 'code' | 'description' | 'bedrooms' | 'bathrooms' | 'area_min' | 'area_max'
+  | 'area_unit' | 'total_units' | 'available_units' | 'starting_price' | 'maximum_price'
+  | 'currency' | 'features' | 'inventory_updated_at' | 'images_status' | 'source_reference'
+  | 'sort_order' | 'review_status'
+>;
+
 export interface PropertyTypeCatalog {
   items: ProjectPropertyType[]; confirmed_count: number; candidate_count: number;
   limit: number; remaining: number; catalog_complete: boolean;

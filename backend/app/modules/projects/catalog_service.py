@@ -25,16 +25,31 @@ def _number(value: Decimal | None) -> float | None:
     return float(value) if value is not None else None
 
 
+def confirmation_field_errors(item: ProjectPropertyType) -> dict[str, str]:
+    errors: dict[str, str] = {}
+    if item.available_units is None:
+        errors["available_units"] = "Enter the currently available units."
+    elif item.available_units < 0:
+        errors["available_units"] = "Available units cannot be negative."
+    if item.starting_price is None:
+        errors["starting_price"] = "Enter the starting price."
+    elif item.starting_price < 0:
+        errors["starting_price"] = "Starting price cannot be negative."
+    if not str(item.currency or "").strip():
+        errors["currency"] = "Select the commercial currency."
+    if item.inventory_updated_at is None:
+        errors["inventory_updated_at"] = "Select the inventory update date."
+    if item.total_units is not None and item.available_units is not None and item.available_units > item.total_units:
+        errors["available_units"] = "Available units cannot exceed total units."
+    if item.area_min is not None and item.area_max is not None and item.area_min > item.area_max:
+        errors["area_max"] = "Area maximum must be greater than or equal to area minimum."
+    if item.starting_price is not None and item.maximum_price is not None and item.starting_price > item.maximum_price:
+        errors["maximum_price"] = "Maximum price must be greater than or equal to starting price."
+    return errors
+
+
 def is_complete(item: ProjectPropertyType) -> bool:
-    return (
-        item.review_status == "confirmed"
-        and item.available_units is not None
-        and item.available_units >= 0
-        and item.starting_price is not None
-        and item.starting_price >= 0
-        and bool(item.currency)
-        and item.inventory_updated_at is not None
-    )
+    return item.review_status == "confirmed" and not confirmation_field_errors(item)
 
 
 def property_type_limit(db: Session, project: Project) -> int:
@@ -105,11 +120,14 @@ def catalog(db: Session, project: Project) -> dict[str, Any]:
 
 
 def _validate_confirmation(db: Session, project: Project, item: ProjectPropertyType) -> None:
-    confirmed_count = db.query(ProjectPropertyType).filter(
-        ProjectPropertyType.project_id == project.id,
-        ProjectPropertyType.review_status == "confirmed",
-        ProjectPropertyType.id != item.id,
-    ).count()
+    # Validation queries must not flush a partially edited ORM object before we
+    # can return a useful 422 response for that specific property type.
+    with db.no_autoflush:
+        confirmed_count = db.query(ProjectPropertyType).filter(
+            ProjectPropertyType.project_id == project.id,
+            ProjectPropertyType.review_status == "confirmed",
+            ProjectPropertyType.id != item.id,
+        ).count()
     limit = property_type_limit(db, project)
     if confirmed_count >= limit:
         raise HTTPException(status_code=409, detail={
@@ -117,12 +135,13 @@ def _validate_confirmation(db: Session, project: Project, item: ProjectPropertyT
             "limit": limit,
             "confirmed": confirmed_count,
         })
-    if not is_complete(item):
-        raise HTTPException(status_code=422, detail=(
-            "A confirmed property type requires price, currency, available units, and an inventory update date."
-        ))
-    if item.total_units is not None and item.available_units is not None and item.available_units > item.total_units:
-        raise HTTPException(status_code=422, detail="Available units cannot exceed total units.")
+    field_errors = confirmation_field_errors(item)
+    if field_errors:
+        raise HTTPException(status_code=422, detail={
+            "code": "incomplete_property_type",
+            "message": "Review the highlighted fields before confirming this property type.",
+            "field_errors": field_errors,
+        })
 
 
 def _sync_profile(db: Session, project: Project) -> None:
@@ -192,8 +211,16 @@ def confirm_catalog(db: Session, project: Project) -> dict[str, Any]:
         raise HTTPException(status_code=422, detail="Add and confirm at least one property type before completing the catalog.")
     if any(item.review_status == "candidate" for item in items):
         raise HTTPException(status_code=409, detail="Review or remove every extracted candidate before completing the catalog.")
-    if any(not is_complete(item) for item in confirmed):
-        raise HTTPException(status_code=422, detail="Complete price, currency, availability, and inventory date for every property type.")
+    incomplete = [
+        {"id": item.id, "name": item.name, "field_errors": confirmation_field_errors(item)}
+        for item in confirmed if confirmation_field_errors(item)
+    ]
+    if incomplete:
+        raise HTTPException(status_code=422, detail={
+            "code": "incomplete_property_catalog",
+            "message": "Review the highlighted fields before confirming the property catalog.",
+            "items": incomplete,
+        })
     currencies = {str(item.currency).upper() for item in confirmed if item.currency}
     if len(currencies) > 1:
         raise HTTPException(status_code=422, detail="Use one commercial currency across the confirmed property catalog.")

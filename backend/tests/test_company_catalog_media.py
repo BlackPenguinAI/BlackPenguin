@@ -51,6 +51,21 @@ def test_confirmed_property_type_requires_commercial_freshness():
     assert catalog_service.is_complete(item) is False
 
 
+def test_property_type_confirmation_reports_the_exact_invalid_fields():
+    item = ProjectPropertyType(
+        project_id="project-1", name="Four bedrooms", review_status="confirmed",
+        available_units=2, total_units=1, starting_price=Decimal("20"),
+        maximum_price=Decimal("10"), currency="", inventory_updated_at=None,
+    )
+
+    assert catalog_service.confirmation_field_errors(item) == {
+        "available_units": "Available units cannot exceed total units.",
+        "maximum_price": "Maximum price must be greater than or equal to starting price.",
+        "currency": "Select the commercial currency.",
+        "inventory_updated_at": "Select the inventory update date.",
+    }
+
+
 def test_plan_has_independent_property_type_and_unit_limits():
     plan = PlanCreate(name="Growth", max_property_types_per_project=12, max_properties_per_project=500)
     assert plan.max_property_types_per_project == 12

@@ -4,7 +4,7 @@ import { ActivatedRoute } from '@angular/router';
 import { RouterTestingModule } from '@angular/router/testing';
 
 import { ProjectChatComponent } from './project-chat';
-import { EMPTY_PROJECT_PROFILE } from './project-onboarding.models';
+import { EMPTY_PROJECT_PROFILE, ProjectPropertyType } from './project-onboarding.models';
 
 
 describe('ProjectChatComponent', () => {
@@ -253,6 +253,38 @@ describe('ProjectChatComponent', () => {
     component.sources = [];
 
     expect(component.showCoverPicker).toBe(true);
+  });
+
+  it('saves only the selected property type and maps server validation to its fields', () => {
+    const propertyType: ProjectPropertyType = {
+      id: 'type-2', project_id: 'project-1', name: 'Four bedrooms', code: null, description: null,
+      bedrooms: 4, bathrooms: 3.5, area_min: null, area_max: null, area_unit: 'ft²',
+      total_units: 1, available_units: 1, starting_price: 10, maximum_price: 20,
+      currency: 'USD', features: [], inventory_updated_at: '2026-08-01', images_status: 'pending',
+      review_status: 'candidate', source_reference: null, sort_order: 1, is_complete: false,
+      media: [], created_at: '2026-08-01T00:00:00Z', updated_at: '2026-08-01T00:00:00Z',
+    };
+    component.projectId = 'project-1';
+    component.propertyCatalog.items = [propertyType];
+
+    component.confirmPropertyType(propertyType);
+
+    expect(component.isPropertyTypeSaving(propertyType)).toBe(true);
+    const request = http.expectOne('http://localhost:8000/api/v1/projects/project-1/property-types/type-2');
+    expect(request.request.body).not.toHaveProperty('id');
+    expect(request.request.body).not.toHaveProperty('project_id');
+    expect(request.request.body).not.toHaveProperty('media');
+    expect(request.request.body.inventory_updated_at).toBe('2026-08-01T12:00:00.000Z');
+    request.flush({
+      detail: {
+        code: 'incomplete_property_type', message: 'Review the highlighted fields.',
+        field_errors: { inventory_updated_at: 'Select the inventory update date.' },
+      },
+    }, { status: 422, statusText: 'Unprocessable Entity' });
+
+    expect(component.isPropertyTypeSaving(propertyType)).toBe(false);
+    expect(component.propertyTypeError(propertyType, 'inventory_updated_at')).toContain('inventory update date');
+    expect(component.errorMessage).toBe('');
   });
 
   it('keeps operational routing and Meta sections out of the Project Profile list', () => {

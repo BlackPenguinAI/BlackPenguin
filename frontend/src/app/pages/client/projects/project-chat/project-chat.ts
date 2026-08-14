@@ -4,7 +4,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { marked } from 'marked';
-import { Subscription } from 'rxjs';
+import { finalize, Subscription, timeout } from 'rxjs';
 
 import { SpeechRecognitionService } from '../../../../core/services/speech-recognition.service';
 import { OnboardingQuestion } from '../../../../shared/ui/onboarding-response-options/onboarding-response-options';
@@ -32,6 +32,7 @@ import {
   validatePropertyType,
   validateProposalDraft,
   validateSalesInvite,
+  toPropertyTypePayload,
 } from './project-form-validation';
 
 @Component({
@@ -70,7 +71,11 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   metaSetupBusy = false;
   metaSetupMessage = '';
   propertyCatalog: PropertyTypeCatalog = { items: [], confirmed_count: 0, candidate_count: 0, limit: 0, remaining: 0, catalog_complete: false };
-  propertyTypeBusy = false;
+  readonly savingPropertyTypeIds = new Set<string>();
+  readonly propertyTypeServerErrors = new Map<string, FormErrors>();
+  readonly dirtyPropertyTypeIds = new Set<string>();
+  creatingPropertyType = false;
+  confirmingPropertyCatalog = false;
   coverBusy = false;
   coverUploadBusy = false;
   selectedCoverSourceId: string | null = null;
@@ -102,6 +107,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   private retryClientMessageId: string | null = null;
   private lastStateVersion = 0;
   private pollingStartedAt = 0;
+  private propertyCatalogRequestVersion = 0;
   private readonly expandedSourceIds = new Set<string>();
   private readonly activationFieldKeys = new Set([
     'sales_authorization', 'sales_contacts', 'appointment_routing', 'campaigns_defined', 'meta_connection_verified',
@@ -118,7 +124,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.projectId = this.route.snapshot.paramMap.get('id') || '';
     this.userName = localStorage.getItem('bp_name') || 'User';
-    this.syncState(); this.loadCampaigns(); this.loadMetaConnections(); this.loadSalesTeam(); this.loadMetaSetupConfiguration(); this.loadPropertyTypes();
+    this.syncState(); this.loadCampaigns(); this.loadMetaConnections(); this.loadSalesTeam(); this.loadMetaSetupConfiguration();
     this.speechSubscriptions.add(this.speech.state$.subscribe((state) => {
       this.isRecording = state === 'listening';
       this.cdr.detectChanges();
@@ -177,14 +183,29 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
       : 'Pending';
   }
 
-  propertyTypeErrors(item: Partial<ProjectPropertyType>): FormErrors { return validatePropertyType(item); }
+  propertyTypeErrors(item: Partial<ProjectPropertyType>): FormErrors {
+    return { ...validatePropertyType(item), ...(item.id ? this.propertyTypeServerErrors.get(item.id) : {}) };
+  }
   propertyTypeError(item: Partial<ProjectPropertyType>, field: string): string { return this.propertyTypeErrors(item)[field] || ''; }
-  propertyTypeErrorCount(item: Partial<ProjectPropertyType>): number { return errorCount(this.propertyTypeErrors(item)); }
+  propertyTypeFormError(item: Partial<ProjectPropertyType>): string { return this.propertyTypeErrors(item)['_form'] || ''; }
+  propertyTypeErrorCount(item: Partial<ProjectPropertyType>): number {
+    const errors = { ...this.propertyTypeErrors(item) };
+    delete errors['_form'];
+    return errorCount(errors);
+  }
   canSavePropertyType(item: Partial<ProjectPropertyType>): boolean {
-    return !this.propertyTypeBusy && this.propertyTypeErrorCount(item) === 0;
+    return !this.isPropertyTypeSaving(item)
+      && !this.propertyTypeFormError(item)
+      && this.propertyTypeErrorCount(item) === 0;
+  }
+  isPropertyTypeSaving(item: Partial<ProjectPropertyType>): boolean {
+    return item.id ? this.savingPropertyTypeIds.has(item.id) : this.creatingPropertyType;
   }
   get catalogReady(): boolean {
-    return this.propertyCatalog.confirmed_count > 0
+    return !this.creatingPropertyType
+      && this.savingPropertyTypeIds.size === 0
+      && !this.confirmingPropertyCatalog
+      && this.propertyCatalog.confirmed_count > 0
       && this.propertyCatalog.candidate_count === 0
       && this.propertyCatalog.items
         .filter(item => item.review_status === 'confirmed')
@@ -230,11 +251,19 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     });
   }
   loadPropertyTypes(): void {
+    const requestVersion = ++this.propertyCatalogRequestVersion;
     this.onboarding.getPropertyTypes(this.projectId).subscribe({
       next: catalog => {
-        this.propertyCatalog = { ...catalog, items: catalog.items.map(item => ({
-          ...item, inventory_updated_at: item.inventory_updated_at?.slice(0, 10) || null,
-        })) };
+        if (requestVersion !== this.propertyCatalogRequestVersion) return;
+        const localItems = new Map(this.propertyCatalog.items.map(item => [item.id, item]));
+        this.propertyCatalog = {
+          ...catalog,
+          items: catalog.items.map(item => {
+            const local = localItems.get(item.id);
+            if (local && (this.dirtyPropertyTypeIds.has(item.id) || this.savingPropertyTypeIds.has(item.id))) return local;
+            return this.normalizePropertyType(item);
+          }),
+        };
         this.cdr.detectChanges();
       },
       error: () => { this.errorMessage = 'The property type catalog could not be loaded.'; },
@@ -243,27 +272,62 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
 
   saveNewPropertyType(): void {
     if (!this.canSavePropertyType(this.propertyTypeDraft)) return;
-    this.propertyTypeBusy = true;
-    const payload = { ...this.propertyTypeDraft, review_status: 'confirmed' as const, features: this.propertyTypeDraft.features || [],
-      inventory_updated_at: this.propertyTypeDraft.inventory_updated_at ? new Date(this.propertyTypeDraft.inventory_updated_at).toISOString() : null };
-    this.onboarding.createPropertyType(this.projectId, payload).subscribe({
-      next: () => { this.propertyTypeBusy = false; this.showPropertyTypeForm = false; this.propertyTypeDraft = this.emptyPropertyType(); this.loadPropertyTypes(); this.syncState('none'); },
-      error: (error: HttpErrorResponse) => { this.propertyTypeBusy = false; this.errorMessage = this.apiDetail(error, 'The property type could not be saved.'); },
+    this.creatingPropertyType = true;
+    this.errorMessage = '';
+    this.onboarding.createPropertyType(this.projectId, toPropertyTypePayload(this.propertyTypeDraft)).pipe(
+      timeout(20_000),
+      finalize(() => { this.creatingPropertyType = false; this.cdr.detectChanges(); }),
+    ).subscribe({
+      next: updated => {
+        this.propertyCatalog = {
+          ...this.propertyCatalog,
+          items: [...this.propertyCatalog.items, this.normalizePropertyType(updated)],
+          confirmed_count: this.propertyCatalog.confirmed_count + 1,
+          remaining: Math.max(0, this.propertyCatalog.remaining - 1),
+        };
+        this.showPropertyTypeForm = false;
+        this.propertyTypeDraft = this.emptyPropertyType();
+        this.syncState('none');
+      },
+      error: (error: HttpErrorResponse) => this.handlePropertyTypeError(null, error, 'The property type could not be saved.'),
     });
   }
 
   confirmPropertyType(item: ProjectPropertyType): void {
     if (!this.canSavePropertyType(item)) return;
-    this.propertyTypeBusy = true;
-    this.onboarding.updatePropertyType(this.projectId, item.id, { ...item, review_status: 'confirmed',
-      inventory_updated_at: item.inventory_updated_at ? new Date(item.inventory_updated_at).toISOString() : null }).subscribe({
-      next: updated => { this.propertyTypeBusy = false; this.replacePropertyType(updated); this.syncState('none'); },
-      error: (error: HttpErrorResponse) => { this.propertyTypeBusy = false; this.errorMessage = this.apiDetail(error, 'Complete price, currency, availability, and inventory date before confirming.'); },
+    this.savingPropertyTypeIds.add(item.id);
+    this.propertyTypeServerErrors.delete(item.id);
+    this.errorMessage = '';
+    this.onboarding.updatePropertyType(this.projectId, item.id, toPropertyTypePayload(item)).pipe(
+      timeout(20_000),
+      finalize(() => { this.savingPropertyTypeIds.delete(item.id); this.cdr.detectChanges(); }),
+    ).subscribe({
+      next: updated => {
+        this.dirtyPropertyTypeIds.delete(item.id);
+        this.propertyTypeServerErrors.delete(item.id);
+        this.replacePropertyType(updated);
+        this.syncState('none');
+      },
+      error: (error: HttpErrorResponse) => this.handlePropertyTypeError(
+        item.id, error, 'This property type could not be saved. Review the highlighted fields and try again.',
+      ),
     });
   }
 
+  markPropertyTypeDirty(item: ProjectPropertyType): void {
+    this.dirtyPropertyTypeIds.add(item.id);
+    this.propertyTypeServerErrors.delete(item.id);
+    this.errorMessage = '';
+  }
+
   rejectPropertyType(item: ProjectPropertyType): void {
-    this.onboarding.deletePropertyType(this.projectId, item.id).subscribe({ next: () => this.loadPropertyTypes() });
+    this.onboarding.deletePropertyType(this.projectId, item.id).subscribe({
+      next: () => {
+        this.dirtyPropertyTypeIds.delete(item.id);
+        this.propertyTypeServerErrors.delete(item.id);
+        this.loadPropertyTypes();
+      },
+    });
   }
 
   togglePropertyTypeImage(item: ProjectPropertyType, sourceId: string): void {
@@ -300,8 +364,48 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   }
 
   private replacePropertyType(updated: ProjectPropertyType): void {
-    this.propertyCatalog = { ...this.propertyCatalog, items: this.propertyCatalog.items.map(item => item.id === updated.id ? updated : item) };
-    this.loadPropertyTypes(); this.cdr.detectChanges();
+    const normalized = this.normalizePropertyType(updated);
+    const items = this.propertyCatalog.items.map(item => item.id === updated.id ? normalized : item);
+    this.propertyCatalog = {
+      ...this.propertyCatalog,
+      items,
+      confirmed_count: items.filter(item => item.review_status === 'confirmed').length,
+      candidate_count: items.filter(item => item.review_status === 'candidate').length,
+    };
+    this.cdr.detectChanges();
+  }
+
+  private normalizePropertyType(item: ProjectPropertyType): ProjectPropertyType {
+    return { ...item, inventory_updated_at: item.inventory_updated_at?.slice(0, 10) || null };
+  }
+
+  private handlePropertyTypeError(itemId: string | null, error: Error | HttpErrorResponse, fallback: string): void {
+    const errors = this.propertyTypeApiErrors(error, fallback);
+    if (itemId) this.propertyTypeServerErrors.set(itemId, errors);
+    else this.errorMessage = errors['_form'] || Object.values(errors)[0] || fallback;
+    this.cdr.detectChanges();
+  }
+
+  private propertyTypeApiErrors(error: Error | HttpErrorResponse, fallback: string): FormErrors {
+    const httpError = error as HttpErrorResponse;
+    if (error.name === 'TimeoutError' || httpError.status === 0) {
+      return { _form: 'Saving took too long. Your changes remain in the form; check the connection and try again.' };
+    }
+    const detail = httpError.error?.detail;
+    if (detail?.field_errors && typeof detail.field_errors === 'object') return detail.field_errors as FormErrors;
+    if (Array.isArray(detail)) {
+      const errors: FormErrors = {};
+      for (const issue of detail) {
+        const location = Array.isArray(issue?.loc) ? issue.loc : [];
+        const candidate = String(location.at(-1) || '');
+        const field = !candidate || candidate === 'body' ? '_form' : candidate;
+        errors[field] = String(issue?.msg || fallback);
+      }
+      return Object.keys(errors).length ? errors : { _form: fallback };
+    }
+    if (typeof detail === 'string') return { _form: detail };
+    if (typeof detail?.message === 'string') return { _form: detail.message };
+    return { _form: fallback };
   }
 
   private apiDetail(error: HttpErrorResponse, fallback: string): string {
@@ -681,16 +785,17 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   }
 
   confirmPropertyCatalog(): void {
-    if (this.propertyTypeBusy || !this.catalogReady) return;
-    this.propertyTypeBusy = true;
-    this.onboarding.confirmPropertyTypeCatalog(this.projectId).subscribe({
+    if (this.confirmingPropertyCatalog || !this.catalogReady) return;
+    this.confirmingPropertyCatalog = true;
+    this.onboarding.confirmPropertyTypeCatalog(this.projectId).pipe(
+      timeout(20_000),
+      finalize(() => { this.confirmingPropertyCatalog = false; this.cdr.detectChanges(); }),
+    ).subscribe({
       next: catalog => {
-        this.propertyTypeBusy = false;
         this.propertyCatalog = catalog;
         this.syncState('bottom');
       },
       error: (error: HttpErrorResponse) => {
-        this.propertyTypeBusy = false;
         this.errorMessage = this.apiDetail(error, 'Review every property type before completing the catalog.');
       },
     });
