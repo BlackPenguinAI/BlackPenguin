@@ -56,6 +56,9 @@ export class ProjectOnboardingService {
   getPropertyTypes(id: string): Observable<PropertyTypeCatalog> {
     return this.http.get<PropertyTypeCatalog>(`${this.baseUrl}/${id}/property-types`);
   }
+  confirmPropertyTypeCatalog(id: string): Observable<PropertyTypeCatalog> {
+    return this.http.post<PropertyTypeCatalog>(`${this.baseUrl}/${id}/property-types/confirm`, {});
+  }
   createPropertyType(id: string, payload: Partial<ProjectPropertyType>): Observable<ProjectPropertyType> {
     return this.http.post<ProjectPropertyType>(`${this.baseUrl}/${id}/property-types`, payload);
   }

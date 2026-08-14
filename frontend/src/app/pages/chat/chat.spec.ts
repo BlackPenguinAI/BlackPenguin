@@ -37,7 +37,7 @@ describe('ChatComponent', () => {
     expect(component.showWelcome).toBe(false);
   });
 
-  it('should replace the composer with a Projects action after final approval', () => {
+  it('should keep the composer available for post-approval Company edits', () => {
     const completedProfile = {
       ...EMPTY_COMPANY_PROFILE,
       completion: {
@@ -64,8 +64,9 @@ describe('ChatComponent', () => {
 
     const element = fixture.nativeElement as HTMLElement;
     expect(element.querySelector('[data-testid="company-onboarding-complete"]')).not.toBeNull();
-    expect(element.textContent).toContain('Continue to Projects');
-    expect(element.querySelector('textarea')).toBeNull();
+    expect(element.textContent).toContain('Back to Company Overview');
+    expect(element.textContent).toContain('continue using the chat to update');
+    expect(element.querySelector('textarea')).not.toBeNull();
   });
 
   it('should expose required and conditional fields separately', () => {
@@ -130,6 +131,21 @@ describe('ChatComponent', () => {
 
     expect(component.isActiveQuestion(staleQuestion)).toBe(false);
     expect(component.hasExclusiveStep).toBe(true);
+  });
+
+  it('should keep logo selection provisional until the user confirms it', () => {
+    const asset = {
+      id: 'logo-1', role: 'candidate', name: 'logo.png', mime_type: 'image/png', size_bytes: 100,
+      source_url: 'https://example.com/logo.png', is_primary: false, review_status: 'candidate',
+      image_url: '/api/v1/company-onboarding/media/logo-1/file', created_at: new Date().toISOString(),
+    };
+    component.currentStage = 'logo_review';
+    component.companyMedia = [asset];
+
+    component.selectCompanyLogo(asset);
+
+    expect(component.selectedLogoId).toBe('logo-1');
+    http.expectNone('http://localhost:8000/api/v1/company-onboarding/media/logo-1/logo');
   });
 
   it('should save public contact information as structured lists', () => {

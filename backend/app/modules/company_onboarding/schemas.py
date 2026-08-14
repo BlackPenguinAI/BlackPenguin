@@ -244,7 +244,7 @@ class OnboardingStateResponse(BaseModel):
     sources: list[SourceResponse] = Field(default_factory=list)
     next_question: NextQuestionResponse | None = None
     stage: Literal[
-        "website", "processing", "website_review", "required", "team",
+        "website", "processing", "website_review", "logo_review", "required", "team",
         "conditional", "enrichment", "approval", "complete",
     ]
     version: int

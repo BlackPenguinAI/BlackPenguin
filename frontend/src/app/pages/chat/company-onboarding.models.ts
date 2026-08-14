@@ -149,6 +149,7 @@ export type OnboardingStage =
   | 'website'
   | 'processing'
   | 'website_review'
+  | 'logo_review'
   | 'required'
   | 'team'
   | 'conditional'

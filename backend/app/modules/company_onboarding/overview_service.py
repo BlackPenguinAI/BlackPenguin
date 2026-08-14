@@ -14,6 +14,20 @@ from . import services
 from .models import CompanyMediaAsset
 
 
+def _contact_list(value: Any) -> list[str]:
+    """Normalize legacy delimited values into stable contact rows."""
+    raw_values = value if isinstance(value, list) else [value]
+    result: list[str] = []
+    for raw in raw_values:
+        if not isinstance(raw, str):
+            continue
+        for item in raw.replace(";", "\n").replace(",", "\n").splitlines():
+            normalized = item.strip()
+            if normalized and normalized not in result:
+                result.append(normalized)
+    return result
+
+
 def serialize_asset(asset: CompanyMediaAsset) -> dict[str, Any]:
     return {
         "id": asset.id,
@@ -58,9 +72,9 @@ def overview(db: Session, company_id: str) -> dict[str, Any]:
         "asset_classes": data.get("core_asset_classes"),
         "operating_footprint": data.get("current_operating_footprint"),
         "public_contacts": {
-            "emails": data.get("public_contact_emails") or [],
-            "phones": data.get("public_contact_phones") or [],
-            "social_profiles": data.get("corporate_social_profiles") or [],
+            "emails": _contact_list(data.get("public_contact_emails")),
+            "phones": _contact_list(data.get("public_contact_phones")),
+            "social_profiles": _contact_list(data.get("corporate_social_profiles")),
         },
         "logo_url": serialize_asset(logo)["image_url"] if logo else None,
         "metrics": {

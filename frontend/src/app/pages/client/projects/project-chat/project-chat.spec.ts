@@ -165,6 +165,20 @@ describe('ProjectChatComponent', () => {
     expect(component.hasProcessingSources).toBe(true);
   });
 
+  it('keeps Project cover selection provisional until confirmation', () => {
+    const source = {
+      id: 'cover-1', kind: 'image' as const, status: 'ready' as const, name: 'cover.jpg',
+      url: null, mime_type: 'image/jpeg', size_bytes: 100, error_message: null,
+      message_id: null, download_url: '/cover', is_primary: false, proposals: [],
+      created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    };
+
+    component.selectCoverCandidate(source);
+
+    expect(component.selectedCoverSourceId).toBe('cover-1');
+    http.expectNone('http://localhost:8000/api/v1/projects/project-1/sources/cover-1/cover');
+  });
+
   it('keeps operational routing and Meta sections out of the Project Profile list', () => {
     component.profile = {
       ...EMPTY_PROJECT_PROFILE,

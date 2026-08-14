@@ -87,6 +87,7 @@ def catalog(db: Session, project: Project) -> dict[str, Any]:
         ProjectPropertyType.review_status != "rejected",
     ).order_by(ProjectPropertyType.sort_order, ProjectPropertyType.created_at).all()
     confirmed = [item for item in items if item.review_status == "confirmed"]
+    profile = services.get_profile(project)
     limit = property_type_limit(db, project)
     return {
         "items": [serialize(item) for item in items],
@@ -94,7 +95,12 @@ def catalog(db: Session, project: Project) -> dict[str, Any]:
         "candidate_count": sum(item.review_status == "candidate" for item in items),
         "limit": limit,
         "remaining": max(0, limit - len(confirmed)),
-        "catalog_complete": bool(confirmed) and all(is_complete(item) for item in confirmed),
+        "catalog_complete": (
+            bool(confirmed)
+            and all(is_complete(item) for item in confirmed)
+            and not any(item.review_status == "candidate" for item in items)
+            and (profile.field_states or {}).get("property_type_catalog", {}).get("status") in {"confirmed", "corrected_by_user"}
+        ),
     }
 
 
@@ -136,6 +142,10 @@ def _sync_profile(db: Session, project: Project) -> None:
         services.refresh_completion(profile)
         db.add(profile)
         return
+    has_candidates = db.query(ProjectPropertyType).filter(
+        ProjectPropertyType.project_id == project.id,
+        ProjectPropertyType.review_status == "candidate",
+    ).first() is not None
     data.update({
         "typologies": [item.name for item in confirmed],
         "available_inventory": sum(item.available_units or 0 for item in confirmed),
@@ -152,8 +162,11 @@ def _sync_profile(db: Session, project: Project) -> None:
         ],
     })
     data["property_type_catalog"] = [item.id for item in confirmed]
-    for key in ("typologies", "property_type_catalog", "available_inventory", "starting_price", "currency", "inventory_updated_at"):
+    for key in ("typologies", "available_inventory", "starting_price", "currency", "inventory_updated_at"):
         states[key] = {"status": "confirmed", "applicable": True}
+    current_catalog_status = states.get("property_type_catalog", {}).get("status")
+    if has_candidates or current_catalog_status not in {"confirmed", "corrected_by_user"}:
+        states["property_type_catalog"] = {"status": "pending_confirmation", "applicable": True}
     if data["areas"]:
         states["areas"] = {"status": "confirmed", "applicable": True}
     if data["bedrooms_and_bathrooms"]:
@@ -165,6 +178,30 @@ def _sync_profile(db: Session, project: Project) -> None:
     flag_modified(profile, "field_states")
     services.refresh_completion(profile)
     db.add(profile)
+
+
+def confirm_catalog(db: Session, project: Project) -> dict[str, Any]:
+    items = db.query(ProjectPropertyType).filter(
+        ProjectPropertyType.project_id == project.id,
+        ProjectPropertyType.review_status != "rejected",
+    ).all()
+    confirmed = [item for item in items if item.review_status == "confirmed"]
+    if not confirmed:
+        raise HTTPException(status_code=422, detail="Add and confirm at least one property type before completing the catalog.")
+    if any(item.review_status == "candidate" for item in items):
+        raise HTTPException(status_code=409, detail="Review or remove every extracted candidate before completing the catalog.")
+    if any(not is_complete(item) for item in confirmed):
+        raise HTTPException(status_code=422, detail="Complete price, currency, availability, and inventory date for every property type.")
+
+    profile = services.get_profile(project)
+    states = dict(profile.field_states or {})
+    states["property_type_catalog"] = {"status": "confirmed", "applicable": True}
+    profile.field_states = states
+    flag_modified(profile, "field_states")
+    services.refresh_completion(profile)
+    db.add(profile)
+    db.commit()
+    return catalog(db, project)
 
 
 def create(db: Session, project: Project, payload: dict[str, Any], *, user_id: str) -> ProjectPropertyType:

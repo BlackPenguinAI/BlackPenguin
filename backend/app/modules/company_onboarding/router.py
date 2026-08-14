@@ -67,6 +67,16 @@ def get_company_overview(
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker(ALLOWED_ROLES)),
 ):
+    profile = services.get_or_create_profile(db, current_user.company_id)
+    if not services.serialize_profile(profile)["completion"]["can_complete"]:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "company_onboarding_incomplete",
+                "message": "Complete and approve Company Onboarding before opening Company Overview.",
+                "redirect_url": "/app/company/onboarding",
+            },
+        )
     return overview_service.overview(db, current_user.company_id)
 
 
@@ -324,6 +334,12 @@ def _workflow_stage(
         return "website_review"
     if pristine:
         return "website"
+    logo = next(
+        (field for field in serialized_profile["fields"] if field["key"] == "company_logo"),
+        {"status": "missing"},
+    )
+    if logo["status"] not in {"confirmed", "corrected_by_user", "deferred"}:
+        return "logo_review"
     if completion["required"]["remaining"]:
         return "required"
     if any(role["status"] == "missing" for role in team["roles"]):
@@ -344,8 +360,26 @@ def _workflow_stage(
 CHAT_QUESTION_STAGES = {"required", "conditional", "approval"}
 
 
+def _logo_question() -> dict[str, Any]:
+    return {
+        "field": "company_logo",
+        "label": "Company logo",
+        "prompt": "Choose the official Company logo and confirm your selection.",
+        "input_type": "company_logo",
+        "options": [],
+        "examples": [],
+        "allow_custom": False,
+        "minimum_words": None,
+        "minimum_characters": None,
+        "help_text": "Select a website candidate, upload the official logo, or provide it later.",
+        "answer_actions": {},
+    }
+
+
 def _stage_next_question(stage: str, profile) -> dict[str, Any] | None:
     """Expose a chat question only while the chat is the active workflow control."""
+    if stage == "logo_review":
+        return _logo_question()
     return _next_question(profile) if stage in CHAT_QUESTION_STAGES else None
 
 
@@ -354,9 +388,11 @@ def _stage_continuation(stage: str, profile) -> str:
         return _next_prompt(profile)
     if stage == "team":
         return (
-            "Required Company Profile information is complete. Next, set up company users. "
-            "Conditional Company Profile questions will continue after this step."
+            "The required Company Profile is complete. Add Company users now, "
+            "or continue and invite them later."
         )
+    if stage == "logo_review":
+        return "Next, choose and confirm the official Company logo, or provide it later."
     if stage == "enrichment":
         return "Next, review the company's public contact information and social media."
     if stage == "complete":

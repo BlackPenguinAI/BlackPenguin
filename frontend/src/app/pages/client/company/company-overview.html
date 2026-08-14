@@ -5,7 +5,10 @@
   <main *ngIf="overview as company" class="mx-auto max-w-7xl p-4 sm:p-6 md:p-10">
     <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
       <div><p class="text-[10px] font-bold uppercase tracking-[.2em] text-secondary">Company Overview</p><p class="mt-1 text-sm text-gray-500">Updated {{ company.updated_at ? (company.updated_at | date:'medium') : 'pending' }}</p></div>
-      <a routerLink="/app/company/onboarding" class="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-gray-200 transition hover:border-secondary/50 hover:text-secondary"><span class="material-symbols-outlined text-lg">edit_note</span> Edit Company Data</a>
+      <div class="flex flex-wrap gap-2">
+        <a routerLink="/app/projects" class="inline-flex items-center gap-2 rounded-xl bg-secondary px-4 py-2.5 text-sm font-semibold text-black transition hover:brightness-110"><span class="material-symbols-outlined text-lg">apartment</span> View Projects</a>
+        <a routerLink="/app/company/onboarding" class="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-gray-200 transition hover:border-secondary/50 hover:text-secondary"><span class="material-symbols-outlined text-lg">edit_note</span> Edit Company Data</a>
+      </div>
     </div>
 
     <section class="company-hero relative overflow-hidden rounded-[2rem] border border-white/10 p-7 md:p-10">
@@ -19,15 +22,19 @@
     </section>
 
     <section class="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-      <article class="metric"><p>Active Projects</p><strong>{{ company.metrics.active_projects }}</strong><span>{{ company.metrics.demo_projects }} Demo</span></article>
-      <article class="metric"><p>Campaigns</p><strong>{{ company.metrics.campaigns_total }}</strong><span>{{ company.metrics.campaigns_active }} active</span></article>
-      <article class="metric"><p>Leads</p><strong>{{ company.metrics.leads_total }}</strong><span>{{ company.metrics.leads_current_month }} this month</span></article>
-      <article class="metric"><p>Team</p><strong>{{ company.metrics.team_active }}</strong><span>{{ company.metrics.team_total }} total users</span></article>
+      <a routerLink="/app/projects" class="metric"><p>Active Projects</p><strong>{{ company.metrics.active_projects }}</strong><span>{{ company.metrics.demo_projects }} Demo · View Projects</span></a>
+      <a routerLink="/app/marketing" class="metric"><p>Campaigns</p><strong>{{ company.metrics.campaigns_total }}</strong><span>{{ company.metrics.campaigns_active }} active · View Marketing</span></a>
+      <a routerLink="/app/sales" class="metric"><p>Leads</p><strong>{{ company.metrics.leads_total }}</strong><span>{{ company.metrics.leads_current_month }} this month · View Leads</span></a>
+      <a routerLink="/app/users" class="metric"><p>Team</p><strong>{{ company.metrics.team_active }}</strong><span>{{ company.metrics.team_total }} total users · Manage Team</span></a>
     </section>
 
     <section class="mt-6 grid gap-6 lg:grid-cols-2">
       <article class="panel"><p class="eyebrow">Company profile</p><h2>Business footprint</h2><dl><div><dt>Business model</dt><dd>{{ list(company.business_model) }}</dd></div><div><dt>Asset classes</dt><dd>{{ list(company.asset_classes) }}</dd></div><div><dt>Operating footprint</dt><dd>{{ list(company.operating_footprint) }}</dd></div></dl></article>
-      <article class="panel"><p class="eyebrow">Public presence</p><h2>Contact channels</h2><dl><div><dt>Emails</dt><dd>{{ company.public_contacts.emails.join(', ') || 'Pending' }}</dd></div><div><dt>Phones</dt><dd>{{ company.public_contacts.phones.join(', ') || 'Pending' }}</dd></div><div><dt>Social profiles</dt><dd>{{ company.public_contacts.social_profiles.length || 0 }} configured</dd></div></dl></article>
+      <article class="panel"><p class="eyebrow">Public presence</p><h2>Contact channels</h2><dl>
+        <div><dt>Emails</dt><dd class="contact-list"><a *ngFor="let email of company.public_contacts.emails" [href]="emailHref(email)"><span class="material-symbols-outlined">mail</span><span>{{ email }}</span></a><span *ngIf="!company.public_contacts.emails.length" class="text-gray-500">Pending</span></dd></div>
+        <div><dt>Phones</dt><dd class="contact-list"><a *ngFor="let phone of company.public_contacts.phones" [href]="phoneHref(phone)"><span class="material-symbols-outlined">call</span><span>{{ phone }}</span></a><span *ngIf="!company.public_contacts.phones.length" class="text-gray-500">Pending</span></dd></div>
+        <div><dt>Social profiles</dt><dd class="contact-list"><a *ngFor="let social of company.public_contacts.social_profiles" [href]="social" target="_blank" rel="noopener noreferrer"><span class="social-mark" aria-hidden="true">{{ socialMark(social) }}</span><span>{{ socialNetwork(social) }}</span><span class="material-symbols-outlined ml-auto text-sm">open_in_new</span></a><span *ngIf="!company.public_contacts.social_profiles.length" class="text-gray-500">Pending</span></dd></div>
+      </dl></article>
     </section>
 
     <section *ngIf="!company.completion.can_complete" class="mt-6 flex flex-col justify-between gap-4 rounded-2xl border border-secondary/20 bg-secondary/5 p-6 md:flex-row md:items-center"><div><h2 class="text-xl font-light">Company setup is still in progress</h2><p class="mt-2 text-sm text-gray-400">Continue the conversation to complete or update the remaining Company information.</p></div><a routerLink="/app/company/onboarding" class="rounded-xl bg-secondary px-5 py-3 text-center text-sm font-semibold text-black">Continue Onboarding</a></section>

@@ -29,6 +29,19 @@ QUESTION_CATALOG: dict[str, dict[str, Any]] = {
         "input_type": "multi_select",
         "options": ["English", "Spanish", "Portuguese", "French"],
     },
+    "corporate_compliance_information": {
+        "input_type": "multi_select",
+        "prompt": "Select the **Corporate compliance information** that applies, or write a different answer.",
+        "options": [
+            "Real-estate developer or broker licensing",
+            "Anti-money laundering and KYC",
+            "Data privacy and communications consent",
+            "Consumer protection or fair-housing obligations",
+            "Investor or securities compliance",
+            "Environmental, construction or building regulations",
+        ],
+        "help_text": "Choose the relevant areas, provide another requirement, defer this step, or mark it not applicable.",
+    },
     "public_contact_emails": {
         "input_type": "multi_select",
         "examples": ["info@example.com", "sales@example.com, support@example.com"],

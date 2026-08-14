@@ -9,6 +9,7 @@ from app.modules.company_onboarding.completion import FIELD_BY_KEY, calculate_co
 from app.modules.company_onboarding.router import (
     _accepted_response,
     _format_user_facing_value,
+    get_company_overview,
     _message_payload,
     _next_question,
     _normalize_user_facing_content,
@@ -78,7 +79,7 @@ def test_company_workflow_waits_for_required_fields_before_team():
             "required": {"remaining": 1},
             "blockers": [{"field": "official_company_name"}],
         },
-        "fields": [],
+        "fields": [{"key": "company_logo", "status": "confirmed"}],
     }
     team = {"roles": [{"role": "assistant", "status": "missing"}]}
 
@@ -147,8 +148,8 @@ def test_continuing_team_defers_every_missing_role_in_one_commit(monkeypatch):
 def test_team_stage_owns_the_interaction_before_conditional_questions():
     assert _stage_next_question("team", None) is None
     continuation = _stage_continuation("team", None)
-    assert "set up company users" in continuation
-    assert "Conditional Company Profile questions will continue after this step" in continuation
+    assert "Add Company users now" in continuation
+    assert "invite them later" in continuation
 
 
 def test_required_acknowledgement_transitions_to_team_without_legal_question():
@@ -167,7 +168,7 @@ def test_required_acknowledgement_transitions_to_team_without_legal_question():
     )
 
     assert "Integrated development capabilities" in response
-    assert "set up company users" in response
+    assert "Add Company users now" in response
     assert "Legal company name" not in response
 
 
@@ -198,6 +199,7 @@ def test_company_workflow_prioritizes_website_review_and_then_enrichment():
             "blockers": [],
         },
         "fields": [
+            {"key": "company_logo", "status": "deferred"},
             {"key": "public_contact_emails", "status": "missing"},
             {"key": "public_contact_phones", "status": "confirmed"},
             {"key": "corporate_social_profiles", "status": "deferred"},
@@ -212,10 +214,40 @@ def test_company_workflow_prioritizes_website_review_and_then_enrichment():
         profile, team, processing=False, pending_review=False, pristine=False,
     ) == "enrichment"
 
-    profile["fields"][0]["status"] = "deferred"
+    profile["fields"][1]["status"] = "deferred"
     assert _workflow_stage(
         profile, team, processing=False, pending_review=False, pristine=False,
     ) == "approval"
+
+
+def test_company_workflow_requires_a_logo_decision_before_profile_questions():
+    profile = {
+        "completion": {
+            "can_complete": False,
+            "required": {"remaining": 10},
+            "blockers": [{"field": "official_company_name"}],
+        },
+        "fields": [{"key": "company_logo", "status": "missing"}],
+    }
+
+    assert _workflow_stage(
+        profile, {"roles": []}, processing=False, pending_review=False, pristine=False,
+    ) == "logo_review"
+    assert _stage_next_question("logo_review", None)["input_type"] == "company_logo"
+
+
+def test_company_overview_is_blocked_until_final_approval(monkeypatch):
+    profile = SimpleNamespace()
+    monkeypatch.setattr(company_services, "get_or_create_profile", lambda *_args: profile)
+    monkeypatch.setattr(company_services, "serialize_profile", lambda _profile: {
+        "completion": {"can_complete": False, "final_approved": False},
+    })
+
+    with pytest.raises(HTTPException) as error:
+        get_company_overview(db=SimpleNamespace(), current_user=SimpleNamespace(company_id="company-1"))
+
+    assert error.value.status_code == 409
+    assert error.value.detail["redirect_url"] == "/app/company/onboarding"
 
 
 def test_deferred_conditional_field_does_not_block_completion():
@@ -244,6 +276,22 @@ def test_conditional_questions_offer_later_and_not_applicable_actions():
     )
     assert question["answer_actions"]["Provide later"] == {"kind": "defer"}
     assert question["answer_actions"]["Not applicable"] == {"kind": "not_applicable"}
+
+
+def test_compliance_question_offers_meaningful_choices():
+    question = build_next_question(
+        [{
+            "field": "corporate_compliance_information",
+            "label": "Corporate compliance information",
+            "status": "applicability_pending",
+            "requirement": "conditionally_required",
+        }],
+        final_prompt="Approve",
+    )
+
+    assert "Anti-money laundering and KYC" in question["options"]
+    assert "Data privacy and communications consent" in question["options"]
+    assert question["answer_actions"]["Provide later"] == {"kind": "defer"}
 
 
 def test_same_name_is_resolved_against_pending_display_name():

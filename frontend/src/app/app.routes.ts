@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/guards/auth.guard';
 import { roleGuard } from './core/guards/role.guard';
+import { companyCompletionGuard } from './core/guards/company-completion.guard';
 
 export const routes: Routes = [
   // ==========================================
@@ -162,7 +163,7 @@ export const routes: Routes = [
       },
       {
         path: 'company',
-        canActivate: [roleGuard],
+        canActivate: [roleGuard, companyCompletionGuard],
         data: { roles: ['admin', 'assistant'] },
         loadComponent: () =>
           import('./pages/client/company/company-overview').then((m) => m.CompanyOverviewComponent),

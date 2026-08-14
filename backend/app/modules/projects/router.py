@@ -502,6 +502,15 @@ def list_property_types(
     return catalog_service.catalog(db, project)
 
 
+@router.post("/{project_id}/property-types/confirm", response_model=PropertyTypeCatalogResponse)
+def confirm_property_type_catalog(
+    project_id: str, db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker(EDITOR_ROLES)),
+):
+    project = services.get_project(db, project_id, current_user.company_id)
+    return catalog_service.confirm_catalog(db, project)
+
+
 @router.post("/{project_id}/property-types", response_model=PropertyTypeResponse, status_code=201)
 def create_property_type(
     project_id: str, payload: PropertyTypeCreate, db: Session = Depends(get_db),

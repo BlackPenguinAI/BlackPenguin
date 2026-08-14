@@ -84,6 +84,7 @@ export class ChatComponent implements OnInit, OnDestroy {
   publicPresenceSaved = false;
   publicPresenceError = '';
   companyMedia: CompanyMediaAsset[] = [];
+  selectedLogoId: string | null = null;
   logoBusy = false;
   readonly companyMediaUrls = new Map<string, string>();
   teamInvite: TeamMemberInvite = {
@@ -185,6 +186,7 @@ export class ChatComponent implements OnInit, OnDestroy {
   loadCompanyMedia(): void {
     this.onboarding.getMedia().subscribe({ next: items => {
       this.companyMedia = items;
+      if (!this.selectedLogoId) this.selectedLogoId = items.find(item => item.is_primary)?.id || null;
       for (const item of items) {
         if (this.companyMediaUrls.has(item.id)) continue;
         this.onboarding.downloadAttachment(item.image_url).subscribe({ next: blob => {
@@ -200,19 +202,29 @@ export class ChatComponent implements OnInit, OnDestroy {
     const file = input.files?.[0]; if (!file || this.logoBusy) return;
     this.logoBusy = true;
     this.onboarding.uploadLogo(file).subscribe({
-      next: asset => this.onboarding.selectLogo(asset.id).subscribe({
-        next: () => { this.logoBusy = false; input.value = ''; this.loadCompanyMedia(); this.syncState('none'); },
-        error: () => { this.logoBusy = false; this.errorMessage = 'The uploaded logo could not be selected.'; },
-      }),
+      next: asset => {
+        this.logoBusy = false;
+        input.value = '';
+        this.selectedLogoId = asset.id;
+        this.loadCompanyMedia();
+        this.cdr.detectChanges();
+      },
       error: () => { this.logoBusy = false; this.errorMessage = 'Upload a valid JPG, PNG, or WEBP logo up to 5 MB.'; },
     });
   }
 
   selectCompanyLogo(asset: CompanyMediaAsset): void {
-    if (this.logoBusy || asset.is_primary) return;
+    if (this.logoBusy) return;
+    this.selectedLogoId = asset.id;
+    this.errorMessage = '';
+    this.cdr.detectChanges();
+  }
+
+  confirmCompanyLogo(): void {
+    if (this.logoBusy || !this.selectedLogoId) return;
     this.logoBusy = true;
-    this.onboarding.selectLogo(asset.id).subscribe({
-      next: () => { this.logoBusy = false; this.loadCompanyMedia(); this.syncState('none'); },
+    this.onboarding.selectLogo(this.selectedLogoId).subscribe({
+      next: () => { this.logoBusy = false; this.loadCompanyMedia(); this.syncState('bottom'); },
       error: () => { this.logoBusy = false; this.errorMessage = 'That image could not be selected as the Company logo.'; },
     });
   }
@@ -220,7 +232,7 @@ export class ChatComponent implements OnInit, OnDestroy {
   deferCompanyLogo(): void {
     this.logoBusy = true;
     this.onboarding.deferLogo().subscribe({
-      next: profile => { this.logoBusy = false; this.profile = profile; this.syncState('none'); },
+      next: profile => { this.logoBusy = false; this.profile = profile; this.selectedLogoId = null; this.syncState('bottom'); },
       error: () => { this.logoBusy = false; this.errorMessage = 'The logo step could not be deferred.'; },
     });
   }
@@ -320,12 +332,16 @@ export class ChatComponent implements OnInit, OnDestroy {
   }
 
   get canSend(): boolean {
-    return this.prompt.trim().length > 0 && !this.isAnalyzing && !this.isCompleted
+    return this.prompt.trim().length > 0 && !this.isAnalyzing
       && !this.hasPendingReview && !this.hasExclusiveStep;
   }
 
   get hasExclusiveStep(): boolean {
-    return this.currentStage === 'team' || this.currentStage === 'enrichment';
+    return this.currentStage === 'logo_review' || this.currentStage === 'team' || this.currentStage === 'enrichment';
+  }
+
+  get hasProcessingSources(): boolean {
+    return this.currentStage === 'processing' || this.sources.some(source => source.status === 'processing');
   }
 
   inviteTeamMember(): void {
@@ -706,7 +722,7 @@ export class ChatComponent implements OnInit, OnDestroy {
   }
 
   toggleRecording(): void {
-    if (!this.speechSupported || this.isAnalyzing || this.isCompleted) return;
+    if (!this.speechSupported || this.isAnalyzing) return;
     if (this.isRecording) {
       this.speech.stop();
       return;
@@ -798,6 +814,7 @@ export class ChatComponent implements OnInit, OnDestroy {
     for (const source of this.sources) {
       if (this.hasPendingProposals(source)) this.expandedSourceIds.add(source.id);
     }
+    const previousStage = this.currentStage;
     this.nextQuestion = state.next_question;
     this.currentStage = state.stage;
     this.team = state.team || EMPTY_TEAM_ONBOARDING;
@@ -808,6 +825,9 @@ export class ChatComponent implements OnInit, OnDestroy {
     if (state.stage === 'processing') this.schedulePolling();
     else this.pollingStartedAt = 0;
     this.cdr.detectChanges();
+    if (previousStage !== state.stage && ['logo_review', 'team', 'enrichment'].includes(state.stage)) {
+      this.scrollToBottom();
+    }
   }
 
   private applyTurn(turn: ChatTurnResponse): void {

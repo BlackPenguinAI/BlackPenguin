@@ -4,8 +4,10 @@ from pathlib import Path
 
 from app.db.base import Base
 from app.modules.company_onboarding.completion import FIELD_BY_KEY as COMPANY_FIELDS
+from app.modules.company_onboarding.overview_service import _contact_list
 from app.modules.projects import catalog_service
 from app.modules.projects.completion import FIELD_BY_KEY as PROJECT_FIELDS, calculate_completion
+from app.modules.projects.schemas import PropertyTypeCreate
 from app.modules.projects.models import ProjectPropertyType
 from app.modules.subscriptions.schemas import PlanCreate
 
@@ -29,6 +31,15 @@ def test_company_logo_is_recommended_and_can_be_deferred():
     assert COMPANY_FIELDS["company_logo"].requirement == "recommended"
 
 
+def test_company_overview_contacts_are_split_into_individual_rows():
+    assert _contact_list(["info@example.com, sales@example.com", "info@example.com"]) == [
+        "info@example.com", "sales@example.com",
+    ]
+    assert _contact_list("+1 305 555 0100; +51 999 555 010") == [
+        "+1 305 555 0100", "+51 999 555 010",
+    ]
+
+
 def test_confirmed_property_type_requires_commercial_freshness():
     item = ProjectPropertyType(
         project_id="project-1", name="Two bedrooms", review_status="confirmed",
@@ -44,6 +55,18 @@ def test_plan_has_independent_property_type_and_unit_limits():
     plan = PlanCreate(name="Growth", max_property_types_per_project=12, max_properties_per_project=500)
     assert plan.max_property_types_per_project == 12
     assert plan.max_properties_per_project == 500
+
+
+def test_property_type_rejects_inverted_area_range_and_normalizes_currency():
+    valid = PropertyTypeCreate(
+        name="Residence", area_min=90, area_max=110, available_units=2,
+        starting_price=100000, currency="usd", inventory_updated_at=datetime.utcnow(),
+    )
+    assert valid.currency == "USD"
+
+    import pytest
+    with pytest.raises(ValueError, match="Area minimum"):
+        PropertyTypeCreate(name="Residence", area_min=120, area_max=90)
 
 
 def test_catalog_migration_avoids_json_boolean_bind_tokens():

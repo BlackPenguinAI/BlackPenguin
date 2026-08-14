@@ -63,9 +63,19 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   metaSetupMessage = '';
   propertyCatalog: PropertyTypeCatalog = { items: [], confirmed_count: 0, candidate_count: 0, limit: 0, remaining: 0, catalog_complete: false };
   propertyTypeBusy = false;
+  coverBusy = false;
+  selectedCoverSourceId: string | null = null;
   showPropertyTypeForm = false;
   propertyTypeDraft: Partial<ProjectPropertyType> = this.emptyPropertyType();
   readonly propertyTypeImageSelection = new Map<string, Set<string>>();
+  readonly areaUnits = ['m²', 'ft²', 'ha', 'acres'];
+  readonly currencies = [
+    { code: 'USD', name: 'US Dollar' }, { code: 'PEN', name: 'Peruvian Sol' },
+    { code: 'EUR', name: 'Euro' }, { code: 'MXN', name: 'Mexican Peso' },
+    { code: 'COP', name: 'Colombian Peso' }, { code: 'BRL', name: 'Brazilian Real' },
+    { code: 'CLP', name: 'Chilean Peso' }, { code: 'ARS', name: 'Argentine Peso' },
+    { code: 'CAD', name: 'Canadian Dollar' }, { code: 'GBP', name: 'Pound Sterling' },
+  ];
   readonly sourceImageUrls = new Map<string, string>();
   profile: ProjectProfile = EMPTY_PROJECT_PROFILE;
   showWelcome = false;
@@ -249,6 +259,8 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   }
 
   get readyProjectImages(): ProjectSource[] { return this.sources.filter(source => source.kind === 'image' && source.status === 'ready' && !!source.download_url); }
+  get showCoverPicker(): boolean { return this.nextQuestion?.input_type === 'project_cover' && this.readyProjectImages.length > 0; }
+  get showPropertyCatalog(): boolean { return this.nextQuestion?.input_type === 'property_type_catalog' || this.showPropertyTypeForm; }
 
   private emptyPropertyType(): Partial<ProjectPropertyType> {
     return { name: '', code: null, description: null, bedrooms: null, bathrooms: null, area_min: null, area_max: null,
@@ -548,14 +560,41 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     });
   }
 
-  setCover(source: ProjectSource): void {
-    if (source.kind !== 'image' || source.is_primary) return;
-    this.onboarding.setCover(this.projectId, source.id).subscribe({
+  selectCoverCandidate(source: ProjectSource): void {
+    if (source.kind !== 'image' || this.coverBusy) return;
+    this.selectedCoverSourceId = source.id;
+    this.errorMessage = '';
+    this.cdr.detectChanges();
+  }
+
+  confirmProjectCover(): void {
+    if (!this.selectedCoverSourceId || this.coverBusy) return;
+    this.coverBusy = true;
+    this.onboarding.setCover(this.projectId, this.selectedCoverSourceId).subscribe({
       next: () => {
-        this.sources = this.sources.map((item) => ({ ...item, is_primary: item.id === source.id }));
+        const selectedId = this.selectedCoverSourceId;
+        this.coverBusy = false;
+        this.sources = this.sources.map((item) => ({ ...item, is_primary: item.id === selectedId }));
+        this.syncState('bottom');
         this.cdr.detectChanges();
       },
-      error: () => { this.errorMessage = 'That image could not be selected as the Project cover.'; },
+      error: () => { this.coverBusy = false; this.errorMessage = 'That image could not be selected as the Project cover.'; },
+    });
+  }
+
+  confirmPropertyCatalog(): void {
+    if (this.propertyTypeBusy) return;
+    this.propertyTypeBusy = true;
+    this.onboarding.confirmPropertyTypeCatalog(this.projectId).subscribe({
+      next: catalog => {
+        this.propertyTypeBusy = false;
+        this.propertyCatalog = catalog;
+        this.syncState('bottom');
+      },
+      error: (error: HttpErrorResponse) => {
+        this.propertyTypeBusy = false;
+        this.errorMessage = this.apiDetail(error, 'Review every property type before completing the catalog.');
+      },
     });
   }
 

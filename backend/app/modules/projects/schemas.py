@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
 
 
 ValidationStatus = Literal[
@@ -308,6 +308,16 @@ class PropertyTypeBase(BaseModel):
     images_status: Literal["pending", "provided", "deferred"] = "pending"
     source_reference: str | None = None
     sort_order: int = 0
+
+    @model_validator(mode="after")
+    def validate_ranges(self):
+        if self.area_min is not None and self.area_max is not None and self.area_min > self.area_max:
+            raise ValueError("Area minimum cannot be greater than area maximum.")
+        if self.total_units is not None and self.available_units is not None and self.available_units > self.total_units:
+            raise ValueError("Available units cannot be greater than total units.")
+        if self.currency:
+            self.currency = self.currency.upper()
+        return self
 
 
 class PropertyTypeCreate(PropertyTypeBase):
