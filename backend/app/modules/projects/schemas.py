@@ -1,7 +1,7 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator, model_validator
 
 
 ValidationStatus = Literal[
@@ -309,6 +309,13 @@ class PropertyTypeBase(BaseModel):
     images_status: Literal["pending", "provided", "deferred"] = "pending"
     source_reference: str | None = None
     sort_order: int = 0
+
+    @field_validator("inventory_updated_at", mode="after")
+    @classmethod
+    def normalize_inventory_updated_at(cls, value: datetime | None) -> datetime | None:
+        if value is None or value.tzinfo is None:
+            return value
+        return value.astimezone(timezone.utc).replace(tzinfo=None)
 
     @model_validator(mode="after")
     def validate_ranges(self):

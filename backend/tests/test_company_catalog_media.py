@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
 
@@ -64,6 +64,56 @@ def test_property_type_confirmation_reports_the_exact_invalid_fields():
         "currency": "Select the commercial currency.",
         "inventory_updated_at": "Select the inventory update date.",
     }
+
+
+def test_property_type_payload_normalizes_utc_datetime_for_naive_database_columns():
+    payload = PropertyTypeCreate(
+        name="Oxford F", available_units=1, total_units=7,
+        starting_price=1200, maximum_price=1300, currency="USD",
+        inventory_updated_at="2026-08-14T12:00:00.000Z",
+    )
+
+    assert payload.inventory_updated_at == datetime(2026, 8, 14, 12, 0)
+    assert payload.inventory_updated_at.tzinfo is None
+
+
+def test_latest_inventory_update_accepts_mixed_legacy_and_timezone_aware_values():
+    first = ProjectPropertyType(
+        project_id="project-1", name="First", review_status="confirmed",
+        inventory_updated_at=datetime(2026, 8, 13, 9, 0),
+    )
+    second = ProjectPropertyType(
+        project_id="project-1", name="Oxford F", review_status="confirmed",
+        inventory_updated_at=datetime(2026, 8, 14, 12, 0, tzinfo=timezone.utc),
+    )
+
+    latest = catalog_service._latest_inventory_update([first, second])
+
+    assert latest == datetime(2026, 8, 14, 12, 0)
+    assert latest.tzinfo is None
+
+
+def test_duplicate_property_type_name_returns_a_structured_conflict():
+    from contextlib import nullcontext
+    from types import SimpleNamespace
+    from unittest.mock import MagicMock
+
+    import pytest
+    from fastapi import HTTPException
+
+    db = MagicMock()
+    db.no_autoflush = nullcontext()
+    db.query.return_value.filter.return_value.first.return_value = object()
+    project = SimpleNamespace(id="project-1")
+    item = ProjectPropertyType(project_id="project-1", name=" Oxford F ", review_status="confirmed")
+
+    with pytest.raises(HTTPException) as error:
+        catalog_service._validate_unique_name(db, project, item)
+
+    assert item.name == "Oxford F"
+    assert error.value.status_code == 409
+    assert error.value.detail["code"] == "duplicate_property_type_name"
+    assert "name" in error.value.detail["field_errors"]
 
 
 def test_plan_has_independent_property_type_and_unit_limits():

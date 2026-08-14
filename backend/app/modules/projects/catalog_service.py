@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any
 
 from fastapi import HTTPException
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
@@ -23,6 +24,17 @@ from .models import (
 
 def _number(value: Decimal | None) -> float | None:
     return float(value) if value is not None else None
+
+
+def _utc_naive(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value
+    return value.astimezone(timezone.utc).replace(tzinfo=None)
+
+
+def _latest_inventory_update(items: list[ProjectPropertyType]) -> datetime | None:
+    values = [_utc_naive(item.inventory_updated_at) for item in items if item.inventory_updated_at is not None]
+    return max(values) if values else None
 
 
 def confirmation_field_errors(item: ProjectPropertyType) -> dict[str, str]:
@@ -144,6 +156,29 @@ def _validate_confirmation(db: Session, project: Project, item: ProjectPropertyT
         })
 
 
+def _validate_unique_name(db: Session, project: Project, item: ProjectPropertyType) -> None:
+    normalized_name = item.name.strip()
+    item.name = normalized_name
+    if not normalized_name:
+        raise HTTPException(status_code=422, detail={
+            "code": "invalid_property_type_name",
+            "message": "Enter a property type name.",
+            "field_errors": {"name": "Enter the property type name."},
+        })
+    with db.no_autoflush:
+        duplicate = db.query(ProjectPropertyType).filter(
+            ProjectPropertyType.project_id == project.id,
+            ProjectPropertyType.id != item.id,
+            func.lower(ProjectPropertyType.name) == normalized_name.casefold(),
+        ).first()
+    if duplicate:
+        raise HTTPException(status_code=409, detail={
+            "code": "duplicate_property_type_name",
+            "message": "A property type with this name already exists in the Project.",
+            "field_errors": {"name": "Use a different name or update the existing property type."},
+        })
+
+
 def _sync_profile(db: Session, project: Project) -> None:
     confirmed = db.query(ProjectPropertyType).filter(
         ProjectPropertyType.project_id == project.id,
@@ -167,12 +202,13 @@ def _sync_profile(db: Session, project: Project) -> None:
         ProjectPropertyType.project_id == project.id,
         ProjectPropertyType.review_status == "candidate",
     ).first() is not None
+    latest_inventory_update = _latest_inventory_update(confirmed)
     data.update({
         "typologies": [item.name for item in confirmed],
         "available_inventory": sum(item.available_units or 0 for item in confirmed),
         "starting_price": min(float(item.starting_price) for item in confirmed if item.starting_price is not None),
         "currency": next((item.currency for item in confirmed if item.currency), None),
-        "inventory_updated_at": max(item.inventory_updated_at for item in confirmed if item.inventory_updated_at).isoformat(),
+        "inventory_updated_at": latest_inventory_update.isoformat() if latest_inventory_update else None,
         "areas": [
             {"type": item.name, "min": _number(item.area_min), "max": _number(item.area_max), "unit": item.area_unit}
             for item in confirmed if item.area_min is not None or item.area_max is not None
@@ -194,7 +230,7 @@ def _sync_profile(db: Session, project: Project) -> None:
         states["bedrooms_and_bathrooms"] = {"status": "confirmed", "applicable": True}
     profile.profile_data = data
     profile.field_states = states
-    profile.inventory_last_updated_at = max(item.inventory_updated_at for item in confirmed if item.inventory_updated_at)
+    profile.inventory_last_updated_at = latest_inventory_update
     flag_modified(profile, "profile_data")
     flag_modified(profile, "field_states")
     services.refresh_completion(profile)
@@ -238,6 +274,7 @@ def confirm_catalog(db: Session, project: Project) -> dict[str, Any]:
 
 def create(db: Session, project: Project, payload: dict[str, Any], *, user_id: str) -> ProjectPropertyType:
     item = ProjectPropertyType(project_id=project.id, created_by_user_id=user_id, updated_by_user_id=user_id, **payload)
+    _validate_unique_name(db, project, item)
     if item.review_status == "confirmed":
         _validate_confirmation(db, project, item)
     db.add(item)
@@ -252,6 +289,7 @@ def update(db: Session, project: Project, item: ProjectPropertyType, payload: di
     for key, value in payload.items():
         setattr(item, key, value)
     item.updated_by_user_id = user_id
+    _validate_unique_name(db, project, item)
     if item.review_status == "confirmed":
         _validate_confirmation(db, project, item)
     db.add(item)
