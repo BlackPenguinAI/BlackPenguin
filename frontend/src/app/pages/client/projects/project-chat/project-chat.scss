@@ -35,3 +35,6 @@
 .processing-source__spinner { width: 1.1rem; height: 1.1rem; flex: 0 0 auto; border: 2px solid rgba(233,158,16,.25); border-top-color: #e99e10; border-radius: 9999px; animation: processing-spin .8s linear infinite; }
 @keyframes processing-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .processing-source__spinner { animation-duration: 1.8s; } }
+.field-label { display: flex; flex-direction: column; gap: .25rem; color: #6b7280; font-size: .625rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.catalog-input { margin-top: .25rem; width: 100%; border: 1px solid rgba(255,255,255,.1); border-radius: .55rem; background: rgba(0,0,0,.5); padding: .55rem .7rem; color: white; font-size: .75rem; font-weight: 400; letter-spacing: normal; text-transform: none; outline: none; }
+.catalog-input:focus { border-color: rgba(233,158,16,.55); }

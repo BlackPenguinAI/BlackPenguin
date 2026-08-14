@@ -12,12 +12,14 @@ PROFILE_DATA = {
     "project_type": "Residential development",
     "project_status": "Under construction",
     "short_description": "A synthetic residential Project created to demonstrate a completed Black Penguin workspace.",
+    "project_cover": "Demo placeholder artwork",
     "exact_address": "100 Demo Avenue (fictional)",
     "city": "Miami",
     "country": "United States",
     "location_references": ["Fictional waterfront district", "Demo transit station"],
     "phases_and_towers": "One residential tower used only for demonstration.",
     "typologies": ["1BR", "2BR", "3BR"],
+    "property_type_catalog": ["1BR", "2BR", "3BR"],
     "areas": {"1BR": "62-70 m2", "2BR": "88-105 m2", "3BR": "128-145 m2"},
     "bedrooms_and_bathrooms": ["1 bed / 1 bath", "2 bed / 2 bath", "3 bed / 3 bath"],
     "construction_details": "Synthetic contemporary concrete-and-glass tower.",
@@ -46,6 +48,7 @@ FIELD_STATES = {
     field.key: {"status": "confirmed", "applicable": True}
     for field in FIELDS
 }
+FIELD_STATES["project_cover"] = {"status": "not_applicable", "applicable": False}
 
 UNITS = (
     ("D-101", "1BR", 62, 1, 1, 420000, "available"),

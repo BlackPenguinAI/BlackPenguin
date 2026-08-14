@@ -10,6 +10,13 @@ QUESTION_CATALOG: dict[str, dict[str, Any]] = {
         "input_type": "url",
         "examples": ["https://example.com", "No website"],
     },
+    "company_logo": {
+        "input_type": "company_logo",
+        "prompt": "Choose or upload the official Company logo.",
+        "help_text": "Select a logo extracted from the website, upload JPG, PNG, or WEBP, or provide it later.",
+        "options": ["Provide logo later"],
+        "allow_custom": False,
+    },
     "primary_business_model": {
         "input_type": "single_select",
         "options": ["Real-estate development", "Investment and ownership", "Asset management", "Construction", "Brokerage", "Mixed model"],
@@ -92,9 +99,21 @@ QUESTION_CATALOG: dict[str, dict[str, Any]] = {
         ],
         "minimum_words": 8,
     },
+    "project_cover": {
+        "input_type": "project_cover",
+        "prompt": "Choose or upload the image that will represent this Project.",
+        "help_text": "Select a website image or upload JPG, PNG, or WEBP. The selected image is used in Project Overview.",
+        "allow_custom": False,
+    },
     "typologies": {
         "input_type": "multi_select",
         "options": ["Studio", "1 bedroom", "2 bedrooms", "3 bedrooms", "4+ bedrooms", "Penthouse", "Townhouse"],
+    },
+    "property_type_catalog": {
+        "input_type": "property_type_catalog",
+        "prompt": "Review the property types found in your sources and add any missing type.",
+        "help_text": "The extracted count is only a candidate list. You decide when the catalog is complete.",
+        "allow_custom": False,
     },
     "bedrooms_and_bathrooms": {
         "input_type": "multi_select",

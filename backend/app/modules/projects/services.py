@@ -18,7 +18,7 @@ from .completion import FIELD_BY_KEY, VALID_STATUSES, calculate_completion, fiel
 from . import storage_service
 from .models import (
     MetaConnection, Project, ProjectCampaign, ProjectMessage, ProjectOnboardingProposal, ProjectOnboardingSource, ProjectProfile,
-    ProjectProposalStatus, ProjectSourceKind, ProjectSourceStatus, ProjectUnit,
+    ProjectProposalStatus, ProjectPropertyType, ProjectSourceKind, ProjectSourceStatus, ProjectUnit,
     ProjectSession, SenderType,
 )
 
@@ -587,8 +587,31 @@ def serialize_overview(db: Session, project: Project) -> dict[str, Any]:
         ProjectOnboardingSource.status == ProjectSourceStatus.READY,
         ProjectOnboardingSource.storage_path.isnot(None),
     ).order_by(ProjectOnboardingSource.is_primary.desc(), ProjectOnboardingSource.created_at.asc()).first()
+    property_types = db.query(ProjectPropertyType).filter(
+        ProjectPropertyType.project_id == project.id,
+        ProjectPropertyType.review_status == "confirmed",
+    ).order_by(ProjectPropertyType.sort_order, ProjectPropertyType.created_at).all()
     inventory: list[dict[str, Any]] = []
-    if units:
+    if property_types:
+        for item in property_types:
+            inventory.append({
+                "id": item.id,
+                "typology": item.name,
+                "total": item.total_units,
+                "sold": max(0, item.total_units - item.available_units) if item.total_units is not None and item.available_units is not None else None,
+                "available": item.available_units,
+                "starting_price": float(item.starting_price) if item.starting_price is not None else None,
+                "currency": item.currency,
+                "description": item.description,
+                "bedrooms": item.bedrooms,
+                "bathrooms": item.bathrooms,
+                "area_min": float(item.area_min) if item.area_min is not None else None,
+                "area_max": float(item.area_max) if item.area_max is not None else None,
+                "area_unit": item.area_unit,
+                "images_status": item.images_status,
+                "images": [f"/api/v1/projects/{project.id}/sources/{media.source_id}/file" for media in sorted(item.media, key=lambda value: value.sort_order)],
+            })
+    elif units:
         typologies = sorted({unit.typology or "Unclassified" for unit in units})
         for typology in typologies:
             group = [unit for unit in units if (unit.typology or "Unclassified") == typology]
@@ -596,18 +619,23 @@ def serialize_overview(db: Session, project: Project) -> dict[str, Any]:
             sold = [unit for unit in group if unit.status == "sold"]
             prices = [float(unit.list_price) for unit in group if unit.list_price is not None]
             inventory.append({
+                "id": None,
                 "typology": typology, "total": len(group), "sold": len(sold), "available": len(available),
                 "starting_price": min(prices) if prices else None,
                 "currency": next((unit.currency for unit in group if unit.currency), data.get("currency")),
+                "description": None, "bedrooms": None, "bathrooms": None, "area_min": None, "area_max": None,
+                "area_unit": None, "images_status": "pending", "images": [],
             })
     else:
         raw_typologies = data.get("typologies") or []
         if isinstance(raw_typologies, str):
             raw_typologies = [item.strip() for item in raw_typologies.split(",") if item.strip()]
-        inventory = [{"typology": str(item), "total": None, "sold": None, "available": None,
-                      "starting_price": None, "currency": data.get("currency")} for item in raw_typologies]
+        inventory = [{"id": None, "typology": str(item), "total": None, "sold": None, "available": None,
+                      "starting_price": None, "currency": data.get("currency"), "description": None,
+                      "bedrooms": None, "bathrooms": None, "area_min": None, "area_max": None,
+                      "area_unit": None, "images_status": "pending", "images": []} for item in raw_typologies]
 
-    available_count = sum(1 for unit in units if unit.status == "available") if units else None
+    available_count = sum(item.available_units or 0 for item in property_types) if property_types else (sum(1 for unit in units if unit.status == "available") if units else None)
     revenue = sum(float(unit.list_price) for unit in units if unit.status == "sold" and unit.list_price is not None) if units else None
     currency = data.get("currency")
     starting_price = data.get("starting_price")

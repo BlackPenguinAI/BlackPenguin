@@ -2,7 +2,7 @@ from datetime import datetime
 import enum
 import uuid
 
-from sqlalchemy import Boolean, Column, DateTime, Enum as SqlaEnum, ForeignKey, Integer, JSON, String, Text
+from sqlalchemy import Boolean, Column, DateTime, Enum as SqlaEnum, ForeignKey, Integer, JSON, String, Text, UniqueConstraint
 from sqlalchemy.orm import relationship
 
 from app.db.postgres import Base
@@ -153,3 +153,28 @@ class CompanyOnboardingProposal(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     source = relationship("CompanyOnboardingSource", back_populates="proposals")
+
+
+class CompanyMediaAsset(Base):
+    __tablename__ = "company_media_assets"
+    __table_args__ = (
+        UniqueConstraint("company_id", "sha256", name="uq_company_media_company_sha256"),
+    )
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    company_id = Column(String(36), ForeignKey("companies.id", ondelete="CASCADE"), nullable=False, index=True)
+    source_id = Column(String(36), ForeignKey("company_onboarding_sources.id", ondelete="SET NULL"), nullable=True)
+    uploaded_by_user_id = Column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    role = Column(String(30), default="logo_candidate", nullable=False, index=True)
+    name = Column(String(255), nullable=False)
+    mime_type = Column(String(150), nullable=False)
+    size_bytes = Column(Integer, nullable=False)
+    sha256 = Column(String(64), nullable=False)
+    storage_path = Column(Text, nullable=False)
+    source_url = Column(Text, nullable=True)
+    is_primary = Column(Boolean, default=False, nullable=False)
+    review_status = Column(String(30), default="pending", nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    source = relationship("CompanyOnboardingSource")

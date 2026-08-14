@@ -44,6 +44,7 @@ export class PlansPageComponent implements OnInit {
     max_mkt_users: 0,
     max_sales_users: 0,
     max_projects: 1,
+    max_property_types_per_project: 20,
     max_properties_per_project: 50,
     is_active: true
   };
@@ -56,6 +57,7 @@ export class PlansPageComponent implements OnInit {
     max_mkt_users: 0,
     max_sales_users: 0,
     max_projects: 1,
+    max_property_types_per_project: 20,
     max_properties_per_project: 50,
     is_active: true
   };
@@ -88,7 +90,7 @@ export class PlansPageComponent implements OnInit {
   }
 
   openModal(): void {
-    this.form = { name: '', description: '', max_assistants: 0, max_mkt_users: 0, max_sales_users: 0, max_projects: 1, max_properties_per_project: 50, is_active: true };
+    this.form = { name: '', description: '', max_assistants: 0, max_mkt_users: 0, max_sales_users: 0, max_projects: 1, max_property_types_per_project: 20, max_properties_per_project: 50, is_active: true };
     this.showModal = true;
   }
 

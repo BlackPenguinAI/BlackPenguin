@@ -48,6 +48,12 @@ export interface CompanyProfileResponse {
   updated_at: string | null;
 }
 
+export interface CompanyMediaAsset {
+  id: string; role: string; name: string; mime_type: string; size_bytes: number;
+  source_url: string | null; is_primary: boolean; review_status: string;
+  image_url: string; created_at: string;
+}
+
 export interface ChatMessage {
   id?: string;
   sender: 'user' | 'ai';

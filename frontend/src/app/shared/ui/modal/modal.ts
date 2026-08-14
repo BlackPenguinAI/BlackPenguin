@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter } from '@angular/core';
+import { Component, Input, Output, EventEmitter, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 
 @Component({
@@ -16,4 +16,7 @@ export class ModalComponent {
   @Input() showCloseButton: boolean = true;
   
   @Output() close = new EventEmitter<void>();
+
+  @HostListener('document:keydown.escape')
+  closeOnEscape(): void { if (this.isOpen && this.showCloseButton) this.close.emit(); }
 }

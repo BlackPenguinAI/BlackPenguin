@@ -1,0 +1,12 @@
+.company-hero { background: radial-gradient(circle at 82% 10%, rgba(233,158,16,.2), transparent 28%), linear-gradient(135deg,#171717,#0a0a0a 65%); }
+.metric { @apply rounded-2xl border border-white/10 bg-[#111] p-5; }
+.metric p { @apply text-[10px] font-bold uppercase tracking-[.16em] text-gray-500; }
+.metric strong { @apply mt-3 block text-3xl font-medium; }
+.metric span { @apply mt-1 block text-xs text-gray-500; }
+.panel { @apply rounded-[1.75rem] border border-white/10 bg-[#101010] p-6; }
+.panel .eyebrow { @apply text-[10px] font-bold uppercase tracking-[.18em] text-secondary; }
+.panel h2 { @apply mt-2 text-2xl font-light; }
+.panel dl { @apply mt-6 divide-y divide-white/5; }
+.panel dl div { @apply grid gap-1 py-4 sm:grid-cols-[9rem_1fr]; }
+.panel dt { @apply text-xs uppercase tracking-wider text-gray-600; }
+.panel dd { @apply text-sm text-gray-300; }

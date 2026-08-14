@@ -1,0 +1,35 @@
+<div class="min-h-full bg-[#070707] text-white">
+  <div *ngIf="loading" class="mx-auto max-w-7xl p-10"><div class="h-72 animate-pulse rounded-[2rem] bg-white/5"></div></div>
+  <div *ngIf="errorMessage" class="p-10 text-center text-red-300">{{ errorMessage }}</div>
+
+  <main *ngIf="overview as company" class="mx-auto max-w-7xl p-4 sm:p-6 md:p-10">
+    <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
+      <div><p class="text-[10px] font-bold uppercase tracking-[.2em] text-secondary">Company Overview</p><p class="mt-1 text-sm text-gray-500">Updated {{ company.updated_at ? (company.updated_at | date:'medium') : 'pending' }}</p></div>
+      <a routerLink="/app/company/onboarding" class="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-gray-200 transition hover:border-secondary/50 hover:text-secondary"><span class="material-symbols-outlined text-lg">edit_note</span> Edit Company Data</a>
+    </div>
+
+    <section class="company-hero relative overflow-hidden rounded-[2rem] border border-white/10 p-7 md:p-10">
+      <div class="relative z-10 flex flex-col gap-7 md:flex-row md:items-center">
+        <div class="flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded-3xl border border-white/10 bg-black/50">
+          <img *ngIf="logoObjectUrl; else logoPlaceholder" [src]="logoObjectUrl" [alt]="company.name + ' logo'" class="h-full w-full object-contain p-3" />
+          <ng-template #logoPlaceholder><span class="material-symbols-outlined text-5xl text-secondary">corporate_fare</span></ng-template>
+        </div>
+        <div class="min-w-0 flex-1"><div class="flex flex-wrap items-center gap-3"><h1 class="text-4xl font-light tracking-tight md:text-6xl">{{ company.name }}</h1><span class="rounded-full border border-secondary/30 bg-secondary/10 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-secondary">{{ company.completion.percentage }}% profile</span></div><p class="mt-3 text-sm text-gray-400">{{ company.legal_name || 'Legal name pending' }} · {{ company.headquarters || 'Headquarters pending' }}</p><p class="mt-5 max-w-4xl text-sm leading-7 text-gray-300">{{ company.description || 'Company description pending.' }}</p></div>
+      </div>
+    </section>
+
+    <section class="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <article class="metric"><p>Active Projects</p><strong>{{ company.metrics.active_projects }}</strong><span>{{ company.metrics.demo_projects }} Demo</span></article>
+      <article class="metric"><p>Campaigns</p><strong>{{ company.metrics.campaigns_total }}</strong><span>{{ company.metrics.campaigns_active }} active</span></article>
+      <article class="metric"><p>Leads</p><strong>{{ company.metrics.leads_total }}</strong><span>{{ company.metrics.leads_current_month }} this month</span></article>
+      <article class="metric"><p>Team</p><strong>{{ company.metrics.team_active }}</strong><span>{{ company.metrics.team_total }} total users</span></article>
+    </section>
+
+    <section class="mt-6 grid gap-6 lg:grid-cols-2">
+      <article class="panel"><p class="eyebrow">Company profile</p><h2>Business footprint</h2><dl><div><dt>Business model</dt><dd>{{ list(company.business_model) }}</dd></div><div><dt>Asset classes</dt><dd>{{ list(company.asset_classes) }}</dd></div><div><dt>Operating footprint</dt><dd>{{ list(company.operating_footprint) }}</dd></div></dl></article>
+      <article class="panel"><p class="eyebrow">Public presence</p><h2>Contact channels</h2><dl><div><dt>Emails</dt><dd>{{ company.public_contacts.emails.join(', ') || 'Pending' }}</dd></div><div><dt>Phones</dt><dd>{{ company.public_contacts.phones.join(', ') || 'Pending' }}</dd></div><div><dt>Social profiles</dt><dd>{{ company.public_contacts.social_profiles.length || 0 }} configured</dd></div></dl></article>
+    </section>
+
+    <section *ngIf="!company.completion.can_complete" class="mt-6 flex flex-col justify-between gap-4 rounded-2xl border border-secondary/20 bg-secondary/5 p-6 md:flex-row md:items-center"><div><h2 class="text-xl font-light">Company setup is still in progress</h2><p class="mt-2 text-sm text-gray-400">Continue the conversation to complete or update the remaining Company information.</p></div><a routerLink="/app/company/onboarding" class="rounded-xl bg-secondary px-5 py-3 text-center text-sm font-semibold text-black">Continue Onboarding</a></section>
+  </main>
+</div>

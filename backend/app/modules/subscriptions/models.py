@@ -17,6 +17,7 @@ class SubscriptionPlan(Base):
     
     # Límites del Sistema
     max_projects = Column(Integer, default=1)
+    max_property_types_per_project = Column(Integer, default=20)
     max_properties_per_project = Column(Integer, default=50)
     
     is_active = Column(Boolean, default=True)

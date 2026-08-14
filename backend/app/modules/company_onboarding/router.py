@@ -23,11 +23,12 @@ from app.modules.onboarding_copy import conversational_acknowledgement
 from app.modules.users.models import TENANT_MANAGER_ROLES, User, UserRole
 from app.modules.users import services as user_services
 
-from . import services, source_service, storage_service
+from . import overview_service, services, source_service, storage_service
 from .completion import FIELD_BY_KEY
 from .models import (
     CompanyOnboardingProposal,
     CompanyOnboardingSource,
+    CompanyMediaAsset,
     OnboardingMessage,
     OnboardingSession,
     SenderType,
@@ -39,6 +40,8 @@ from .schemas import (
     ChatTurnResponse,
     CompanyProfilePatch,
     CompanyProfileResponse,
+    CompanyMediaAssetResponse,
+    CompanyOverviewResponse,
     OnboardingStateResponse,
     ProposalDecision,
     ProposalDecisionResponse,
@@ -57,6 +60,82 @@ ALLOWED_ROLES = [*TENANT_MANAGER_ROLES, UserRole.MKT]
 USER_FACING_JSON_VALUE = re.compile(
     r"(?P<prefix>\*\*[^*\n]+:\*\*\s*)(?P<value>\[[^\n]*\]|\{[^\n]*\})"
 )
+
+
+@router.get("/overview", response_model=CompanyOverviewResponse)
+def get_company_overview(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker(ALLOWED_ROLES)),
+):
+    return overview_service.overview(db, current_user.company_id)
+
+
+@router.get("/media", response_model=list[CompanyMediaAssetResponse])
+def list_company_media(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker(ALLOWED_ROLES)),
+):
+    assets = db.query(CompanyMediaAsset).filter(
+        CompanyMediaAsset.company_id == current_user.company_id,
+        CompanyMediaAsset.review_status != "rejected",
+    ).order_by(CompanyMediaAsset.is_primary.desc(), CompanyMediaAsset.created_at).all()
+    return [overview_service.serialize_asset(asset) for asset in assets]
+
+
+@router.post("/media/logo", response_model=CompanyMediaAssetResponse, status_code=201)
+async def upload_company_logo(
+    file: UploadFile = File(...), db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker(TENANT_MANAGER_ROLES)),
+):
+    asset = await source_service.ingest_logo_upload(
+        db, company_id=current_user.company_id, user_id=current_user.id, upload=file,
+    )
+    return overview_service.serialize_asset(asset)
+
+
+@router.post("/media/{asset_id}/logo", response_model=CompanyMediaAssetResponse)
+def select_company_logo(
+    asset_id: str, db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker(TENANT_MANAGER_ROLES)),
+):
+    asset = db.query(CompanyMediaAsset).filter(
+        CompanyMediaAsset.id == asset_id,
+        CompanyMediaAsset.company_id == current_user.company_id,
+    ).first()
+    if not asset:
+        raise HTTPException(status_code=404, detail="Company image not found.")
+    db.query(CompanyMediaAsset).filter(
+        CompanyMediaAsset.company_id == current_user.company_id,
+    ).update({CompanyMediaAsset.is_primary: False}, synchronize_session=False)
+    asset.is_primary = True; asset.role = "logo"; asset.review_status = "confirmed"
+    profile = services.get_or_create_profile(db, current_user.company_id)
+    services.apply_field_updates(db, profile, [{
+        "field": "company_logo", "value": asset.id, "status": "confirmed", "applicable": True,
+        "source_type": "media_selection", "source_reference": asset.source_url or asset.name, "confidence": "high",
+    }], allow_authoritative_statuses=True)
+    db.add(asset); db.commit(); db.refresh(asset)
+    return overview_service.serialize_asset(asset)
+
+
+@router.get("/media/{asset_id}/file")
+def get_company_media_file(
+    asset_id: str, db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker(ALLOWED_ROLES)),
+):
+    asset = db.query(CompanyMediaAsset).filter(
+        CompanyMediaAsset.id == asset_id,
+        CompanyMediaAsset.company_id == current_user.company_id,
+    ).first()
+    if not asset:
+        raise HTTPException(status_code=404, detail="Company image not found.")
+    try:
+        path = storage_service.resolve_company_file(asset.storage_path)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail="Company image not found.") from exc
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="Company image not found.")
+    return FileResponse(path, media_type=asset.mime_type, filename=asset.name,
+                        headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"})
 
 
 def _is_authorized_admin(user: User) -> bool:

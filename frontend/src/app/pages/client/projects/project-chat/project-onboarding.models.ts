@@ -98,6 +98,25 @@ export interface Campaign {
   status: string; external_campaign_id: string | null; lead_form_id: string | null;
   audience_notes: string | null; meta_connection_id: string | null; created_at: string; updated_at: string;
 }
+
+export interface PropertyTypeMedia {
+  id: string; source_id: string; caption: string | null; sort_order: number; image_url: string;
+}
+
+export interface ProjectPropertyType {
+  id: string; project_id: string; name: string; code: string | null; description: string | null;
+  bedrooms: number | null; bathrooms: number | null; area_min: number | null; area_max: number | null;
+  area_unit: string | null; total_units: number | null; available_units: number | null;
+  starting_price: number | null; maximum_price: number | null; currency: string | null;
+  features: string[]; inventory_updated_at: string | null; images_status: 'pending' | 'provided' | 'deferred';
+  review_status: 'candidate' | 'confirmed' | 'rejected'; source_reference: string | null;
+  sort_order: number; is_complete: boolean; media: PropertyTypeMedia[]; created_at: string; updated_at: string;
+}
+
+export interface PropertyTypeCatalog {
+  items: ProjectPropertyType[]; confirmed_count: number; candidate_count: number;
+  limit: number; remaining: number; catalog_complete: boolean;
+}
 export interface MetaConnection {
   id: string; label: string; business_account_id: string | null; ad_account_id: string | null;
   page_id: string | null; token_hint: string; scopes: string[]; expires_at: string | null;

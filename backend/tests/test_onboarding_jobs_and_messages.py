@@ -53,7 +53,7 @@ def test_repeating_a_failed_url_does_not_implicitly_retry_it():
 def test_create_all_metadata_registers_durable_jobs_and_schema_version():
     assert OnboardingSourceJob.__tablename__ in Base.metadata.tables
     assert "schema_versions" in Base.metadata.tables
-    assert CURRENT_SCHEMA_VERSION == "20260814_project_onboarding_ux"
+    assert CURRENT_SCHEMA_VERSION == "20260814_company_catalog_media"
 
 
 def test_project_onboarding_ux_migration_has_no_accidental_bind_parameters(monkeypatch):

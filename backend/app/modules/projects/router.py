@@ -24,11 +24,11 @@ from app.modules.onboarding_copy import conversational_acknowledgement
 from app.modules.project_team.models import ProjectUserAssignment
 from app.modules.users.models import TENANT_MANAGER_ROLES, User, UserRole
 
-from . import meta_service, services, source_service, storage_service
+from . import asset_share_service, catalog_service, meta_service, services, source_service, storage_service
 from .completion import FIELD_BY_KEY
 from .models import (
     MetaConnection, Project, ProjectCampaign, ProjectMessage, ProjectOnboardingProposal,
-    ProjectOnboardingSource, ProjectSession, ProjectSourceKind, SenderType,
+    ProjectOnboardingSource, ProjectPropertyType, ProjectSession, ProjectSourceKind, SenderType,
 )
 from .schemas import (
     CampaignCreate, CampaignResponse, ChatBootstrapRequest, ChatMessagePayload, ChatMessageResponse, ChatTurnResponse,
@@ -37,6 +37,8 @@ from .schemas import (
     ProjectOnboardingActionRequest,
     ProjectCompleteResponse, ProjectDeleteRequest, ProjectDeletionImpact, ProjectDraftResponse,
     ProjectOverviewResponse, ProjectProfileResponse, ProjectResponse,
+    PropertyTypeCatalogResponse, PropertyTypeCreate, PropertyTypeMediaAttach,
+    PropertyTypeResponse, PropertyTypeUpdate, ProjectMarketingSummary,
     OnboardingStateResponse, ProposalDecision, ProposalDecisionResponse,
     SourceResponse, UrlSourceRequest,
 )
@@ -47,6 +49,19 @@ router = APIRouter()
 EDITOR_ROLES = [*TENANT_MANAGER_ROLES, UserRole.MKT]
 VIEWER_ROLES = [*TENANT_MANAGER_ROLES, UserRole.MKT, UserRole.SALES]
 URL_PATTERN = re.compile(r"https?://[^\s<>]+", re.IGNORECASE)
+
+
+@router.get("/shared-assets/{token}", include_in_schema=False)
+def download_shared_sales_asset(token: str, db: Session = Depends(get_db)):
+    source = asset_share_service.resolve(db, token)
+    try:
+        path = storage_service.resolve_project_file(source.storage_path)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail="Shared image not found.") from exc
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="Shared image not found.")
+    return FileResponse(path, media_type=source.mime_type or "application/octet-stream", filename=source.original_filename or source.name,
+                        headers={"Cache-Control": "private, max-age=300", "X-Content-Type-Options": "nosniff"})
 
 
 def _parse_agent_response(raw: str) -> tuple[str, list[dict[str, Any]], bool | None] | None:
@@ -461,8 +476,89 @@ def set_project_cover(
         ProjectOnboardingSource.kind == ProjectSourceKind.IMAGE,
     ).update({ProjectOnboardingSource.is_primary: False}, synchronize_session=False)
     source.is_primary = True
+    profile = services.get_profile(source.project)
+    updates = [services.user_field_update("project_cover", source.id)]
+    services.apply_field_updates(db, profile, updates, allow_authoritative_statuses=True)
     db.add(source); db.commit(); db.refresh(source)
     return source_service.serialize_source(source)
+
+
+def _property_type(db: Session, project_id: str, property_type_id: str) -> ProjectPropertyType:
+    item = db.query(ProjectPropertyType).filter(
+        ProjectPropertyType.id == property_type_id,
+        ProjectPropertyType.project_id == project_id,
+    ).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Property type not found.")
+    return item
+
+
+@router.get("/{project_id}/property-types", response_model=PropertyTypeCatalogResponse)
+def list_property_types(
+    project_id: str, db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker(VIEWER_ROLES)),
+):
+    project = services.get_project(db, project_id, current_user.company_id)
+    return catalog_service.catalog(db, project)
+
+
+@router.post("/{project_id}/property-types", response_model=PropertyTypeResponse, status_code=201)
+def create_property_type(
+    project_id: str, payload: PropertyTypeCreate, db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker(EDITOR_ROLES)),
+):
+    project = services.get_project(db, project_id, current_user.company_id)
+    try:
+        return catalog_service.serialize(catalog_service.create(db, project, payload.model_dump(), user_id=current_user.id))
+    except Exception:
+        db.rollback()
+        raise
+
+
+@router.put("/{project_id}/property-types/{property_type_id}", response_model=PropertyTypeResponse)
+def update_property_type(
+    project_id: str, property_type_id: str, payload: PropertyTypeUpdate,
+    db: Session = Depends(get_db), current_user: User = Depends(RoleChecker(EDITOR_ROLES)),
+):
+    project = services.get_project(db, project_id, current_user.company_id)
+    item = _property_type(db, project.id, property_type_id)
+    try:
+        return catalog_service.serialize(catalog_service.update(db, project, item, payload.model_dump(), user_id=current_user.id))
+    except Exception:
+        db.rollback()
+        raise
+
+
+@router.delete("/{project_id}/property-types/{property_type_id}", status_code=204)
+def delete_property_type(
+    project_id: str, property_type_id: str, db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker(EDITOR_ROLES)),
+):
+    project = services.get_project(db, project_id, current_user.company_id)
+    item = _property_type(db, project.id, property_type_id)
+    db.delete(item); db.flush(); catalog_service._sync_profile(db, project); db.commit()
+    return Response(status_code=204)
+
+
+@router.post("/{project_id}/property-types/{property_type_id}/media", response_model=PropertyTypeResponse)
+def attach_property_type_media(
+    project_id: str, property_type_id: str, payload: PropertyTypeMediaAttach,
+    db: Session = Depends(get_db), current_user: User = Depends(RoleChecker(EDITOR_ROLES)),
+):
+    project = services.get_project(db, project_id, current_user.company_id)
+    item = _property_type(db, project.id, property_type_id)
+    return catalog_service.serialize(catalog_service.attach_media(db, project, item, payload.source_ids))
+
+
+@router.post("/{project_id}/property-types/{property_type_id}/defer-images", response_model=PropertyTypeResponse)
+def defer_property_type_images(
+    project_id: str, property_type_id: str, db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker(EDITOR_ROLES)),
+):
+    project = services.get_project(db, project_id, current_user.company_id)
+    item = _property_type(db, project.id, property_type_id)
+    item.images_status = "deferred"; db.add(item); db.commit(); db.refresh(item)
+    return catalog_service.serialize(item)
 
 
 @router.get("/{project_id}/deletion-impact", response_model=ProjectDeletionImpact)
@@ -1201,6 +1297,50 @@ def decide_proposal(project_id: str, proposal_id: str, payload: ProposalDecision
 def list_campaigns(project_id: str, db: Session = Depends(get_db), current_user: User = Depends(RoleChecker(VIEWER_ROLES))):
     services.get_project(db, project_id, current_user.company_id)
     return db.query(ProjectCampaign).filter(ProjectCampaign.project_id == project_id).all()
+
+
+@router.get("/{project_id}/marketing/summary", response_model=ProjectMarketingSummary)
+def project_marketing_summary(
+    project_id: str, db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker(VIEWER_ROLES)),
+):
+    from app.modules.sales_crm.models import FunnelStage, Lead, Meeting
+
+    project = services.get_project(db, project_id, current_user.company_id)
+    campaigns = db.query(ProjectCampaign).filter(ProjectCampaign.project_id == project.id).order_by(ProjectCampaign.created_at).all()
+    leads = db.query(Lead).filter(Lead.project_id == project.id, Lead.company_id == current_user.company_id).all()
+    meetings = db.query(Meeting).filter(Meeting.project_id == project.id).all()
+    lead_ids_with_meetings = {meeting.lead_id for meeting in meetings}
+    campaign_by_id = {campaign.id: campaign for campaign in campaigns}
+    campaign_metrics = []
+    for campaign in campaigns:
+        campaign_leads = [lead for lead in leads if lead.campaign_id == campaign.id]
+        qualified = sum(lead.funnel_stage in {FunnelStage.QUALIFIED, FunnelStage.APPOINTMENT_SET, FunnelStage.CLOSED} for lead in campaign_leads)
+        appointments = sum(lead.id in lead_ids_with_meetings for lead in campaign_leads)
+        campaign_metrics.append({
+            "id": campaign.id, "name": campaign.name, "platform": campaign.platform, "status": campaign.status,
+            "leads": len(campaign_leads), "qualified": qualified, "appointments": appointments,
+            "conversion_rate": round(100 * appointments / len(campaign_leads), 2) if campaign_leads else 0,
+        })
+    qualified_total = sum(lead.funnel_stage in {FunnelStage.QUALIFIED, FunnelStage.APPOINTMENT_SET, FunnelStage.CLOSED} for lead in leads)
+    appointments_total = sum(lead.id in lead_ids_with_meetings for lead in leads)
+    return {
+        "project_id": project.id,
+        "project_name": project.name,
+        "totals": {
+            "campaigns": len(campaigns), "active_campaigns": sum(item.status == "active" for item in campaigns),
+            "leads": len(leads), "qualified": qualified_total, "appointments": appointments_total,
+            "conversion_rate": round(100 * appointments_total / len(leads), 2) if leads else 0,
+        },
+        "campaigns": campaign_metrics,
+        "leads": [{
+            "id": lead.id, "full_name": lead.full_name, "email": lead.email, "phone": lead.phone,
+            "campaign_id": lead.campaign_id,
+            "campaign_name": campaign_by_id.get(lead.campaign_id).name if lead.campaign_id in campaign_by_id else "Unattributed",
+            "funnel_stage": lead.funnel_stage.value, "intent_score": float(lead.intent_score or 0),
+            "last_interaction_at": lead.last_interaction_at, "created_at": lead.created_at,
+        } for lead in leads],
+    }
 
 
 @router.post("/{project_id}/campaigns", response_model=CampaignResponse, status_code=201)

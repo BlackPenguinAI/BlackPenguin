@@ -7,7 +7,7 @@ import { API_V1_URL } from '../../../../core/config/api.config';
 import {
   Campaign, ChatMessage, ChatTurn, MetaConnection, MetaSetupConfiguration, MetaSetupResult,
   OnboardingState, ProjectAssignment, ProjectOnboardingActionPayload, ProjectProfile,
-  ProjectSalesCandidate, ProjectSource, SourceProposal,
+  ProjectSalesCandidate, ProjectSource, SourceProposal, ProjectPropertyType, PropertyTypeCatalog,
 } from './project-onboarding.models';
 
 @Injectable({ providedIn: 'root' })
@@ -52,6 +52,24 @@ export class ProjectOnboardingService {
   }
   setCover(id: string, sourceId: string): Observable<ProjectSource> {
     return this.http.post<ProjectSource>(`${this.baseUrl}/${id}/sources/${sourceId}/cover`, {});
+  }
+  getPropertyTypes(id: string): Observable<PropertyTypeCatalog> {
+    return this.http.get<PropertyTypeCatalog>(`${this.baseUrl}/${id}/property-types`);
+  }
+  createPropertyType(id: string, payload: Partial<ProjectPropertyType>): Observable<ProjectPropertyType> {
+    return this.http.post<ProjectPropertyType>(`${this.baseUrl}/${id}/property-types`, payload);
+  }
+  updatePropertyType(id: string, propertyTypeId: string, payload: Partial<ProjectPropertyType>): Observable<ProjectPropertyType> {
+    return this.http.put<ProjectPropertyType>(`${this.baseUrl}/${id}/property-types/${propertyTypeId}`, payload);
+  }
+  deletePropertyType(id: string, propertyTypeId: string): Observable<void> {
+    return this.http.delete<void>(`${this.baseUrl}/${id}/property-types/${propertyTypeId}`);
+  }
+  attachPropertyTypeMedia(id: string, propertyTypeId: string, sourceIds: string[]): Observable<ProjectPropertyType> {
+    return this.http.post<ProjectPropertyType>(`${this.baseUrl}/${id}/property-types/${propertyTypeId}/media`, { source_ids: sourceIds });
+  }
+  deferPropertyTypeImages(id: string, propertyTypeId: string): Observable<ProjectPropertyType> {
+    return this.http.post<ProjectPropertyType>(`${this.baseUrl}/${id}/property-types/${propertyTypeId}/defer-images`, {});
   }
   getCampaigns(id: string): Observable<Campaign[]> { return this.http.get<Campaign[]>(`${this.baseUrl}/${id}/campaigns`); }
   createCampaign(id: string, campaign: Partial<Campaign>): Observable<Campaign> { return this.http.post<Campaign>(`${this.baseUrl}/${id}/campaigns`, campaign); }

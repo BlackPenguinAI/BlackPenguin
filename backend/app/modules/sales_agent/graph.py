@@ -9,7 +9,8 @@ from sqlalchemy.orm import Session
 from app.integrations.openrouter_client import generate_llm_response
 from app.modules.ai_core.services import get_ai_config
 from app.modules.companies.models import Company
-from app.modules.projects.models import Project, ProjectUnit
+from app.modules.projects import asset_share_service
+from app.modules.projects.models import Project, ProjectPropertyType, ProjectUnit
 from app.modules.sales_crm.models import Lead
 
 from .state import SalesAgentState
@@ -64,10 +65,35 @@ def build_sales_graph(db: Session):
                 if (profile.field_states or {}).get(key, {}).get("status") in {"confirmed", "corrected_by_user", "not_applicable"}
             }
         units = db.query(ProjectUnit).filter(ProjectUnit.project_id == project.id).all()
+        property_types = db.query(ProjectPropertyType).filter(
+            ProjectPropertyType.project_id == project.id,
+            ProjectPropertyType.review_status == "confirmed",
+        ).all()
+        structured_inventory = []
+        for item in property_types:
+            links = [
+                asset_share_service.issue(
+                    db, company_id=company.id, project_id=project.id, lead_id=lead.id, source_id=media.source_id,
+                )
+                for media in sorted(item.media, key=lambda value: value.sort_order)[:6]
+            ]
+            structured_inventory.append({
+                "property_type": item.name, "description": item.description,
+                "bedrooms": item.bedrooms, "bathrooms": item.bathrooms,
+                "area_min": float(item.area_min) if item.area_min is not None else None,
+                "area_max": float(item.area_max) if item.area_max is not None else None,
+                "area_unit": item.area_unit, "available_units": item.available_units,
+                "starting_price": float(item.starting_price) if item.starting_price is not None else None,
+                "maximum_price": float(item.maximum_price) if item.maximum_price is not None else None,
+                "currency": item.currency, "features": item.features or [],
+                "inventory_updated_at": item.inventory_updated_at, "image_links": links,
+            })
+        if structured_inventory:
+            db.commit()
         return {
             "company_context": {"id": company.id, "name": company.name},
             "project_context": {"id": project.id, "name": project.name, "is_demo": project.is_demo, "profile": confirmed},
-            "inventory_context": [
+            "inventory_context": structured_inventory or [
                 {"unit_code": unit.unit_code, "typology": unit.typology, "bedrooms": unit.bedrooms,
                  "bathrooms": unit.bathrooms, "price": float(unit.list_price) if unit.list_price is not None else None,
                  "currency": unit.currency, "status": unit.status}

@@ -49,6 +49,7 @@ RECOMMENDED_FIELDS = tuple(
     FieldDefinition(key, label, "recommended")
     for key, label in (
         ("year_established", "Year established"),
+        ("company_logo", "Company logo"),
         ("public_contact_emails", "Public contact emails"),
         ("public_contact_phones", "Public contact phone numbers"),
         ("corporate_social_profiles", "Corporate social media profiles"),

@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     DEFAULT_AI_MODEL: str = "deepseek/deepseek-chat"
 
     PROJECT_UPLOAD_ROOT: str = "./var/uploads"
+    PUBLIC_APP_URL: str = "https://blackpenguin.ai"
 
     SMTP_SERVER: str = "smtp.gmail.com"
     SMTP_PORT: int = 587

@@ -12,6 +12,7 @@ import {
   TeamMember,
   TeamMemberInvite,
   TeamOnboarding,
+  CompanyMediaAsset,
 } from './company-onboarding.models';
 
 @Injectable({ providedIn: 'root' })
@@ -112,6 +113,26 @@ export class CompanyOnboardingService {
     const body = new FormData();
     files.forEach((file) => body.append('files', file, file.name));
     return this.http.post<OnboardingSource[]>(`${this.baseUrl}/sources/files`, body);
+  }
+
+  getMedia(): Observable<CompanyMediaAsset[]> {
+    return this.http.get<CompanyMediaAsset[]>(`${this.baseUrl}/media`);
+  }
+
+  uploadLogo(file: File): Observable<CompanyMediaAsset> {
+    const body = new FormData(); body.append('file', file, file.name);
+    return this.http.post<CompanyMediaAsset>(`${this.baseUrl}/media/logo`, body);
+  }
+
+  selectLogo(assetId: string): Observable<CompanyMediaAsset> {
+    return this.http.post<CompanyMediaAsset>(`${this.baseUrl}/media/${assetId}/logo`, {});
+  }
+
+  deferLogo(): Observable<CompanyProfileResponse> {
+    return this.http.patch<CompanyProfileResponse>(`${this.baseUrl}/profile`, { updates: [{
+      field: 'company_logo', value: null, status: 'deferred', applicable: true,
+      source_type: 'user_input', source_reference: 'company logo deferred', confidence: 'high',
+    }] });
   }
 
   decideProposal(

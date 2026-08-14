@@ -8,7 +8,8 @@ import json
 import re
 import socket
 from typing import Any
-from urllib.parse import unquote, urlparse
+from pathlib import Path
+from urllib.parse import unquote, urljoin, urlparse
 from zipfile import BadZipFile, ZipFile
 
 from bs4 import BeautifulSoup
@@ -34,6 +35,7 @@ from app.modules.onboarding_questions import validate_onboarding_value
 from . import services, storage_service
 from .completion import FIELD_BY_KEY
 from .models import (
+    CompanyMediaAsset,
     CompanyOnboardingProposal,
     CompanyOnboardingSource,
     ProposalStatus,
@@ -50,6 +52,7 @@ ALLOWED_FILE_TYPES = {
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
     "text/plain": ".txt",
 }
+ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
 
 
 def classify_url(url: str) -> SourceKind:
@@ -146,6 +149,8 @@ async def process_url_source(db: Session, source: CompanyOnboardingSource) -> Co
             if source.size_bytes > MAX_FILE_BYTES:
                 raise ValueError("The remote content exceeds the 15 MB limit.")
             text = _extract_bytes(response.content, content_type, final_url)
+            if content_type in {"text/html", "application/xhtml+xml"}:
+                await _capture_logo_candidates(db, client, source, response.content, final_url)
         await _finish_source(db, source, text)
     except AccessRestrictedError as exc:
         _fail_source(db, source, str(exc))
@@ -153,6 +158,95 @@ async def process_url_source(db: Session, source: CompanyOnboardingSource) -> Co
     except Exception as exc:
         _fail_source(db, source, _safe_error(exc))
     return source
+
+
+async def _capture_logo_candidates(
+    db: Session, client: httpx.AsyncClient, source: CompanyOnboardingSource, html: bytes, base_url: str,
+) -> None:
+    soup = BeautifulSoup(html, "html.parser")
+    candidates: list[tuple[int, str]] = []
+    for meta in soup.select('meta[property="og:image"], meta[name="twitter:image"]'):
+        if meta.get("content"):
+            candidates.append((1, urljoin(base_url, str(meta["content"]))))
+    for image in soup.find_all("img"):
+        raw = image.get("src") or image.get("data-src")
+        descriptor = " ".join(str(image.get(key) or "") for key in ("alt", "class", "id")).casefold()
+        if raw:
+            candidates.append((0 if "logo" in descriptor else 2, urljoin(base_url, str(raw))))
+    seen: set[str] = set()
+    for _, image_url in sorted(candidates, key=lambda value: value[0]):
+        if image_url in seen or len(seen) >= 10 or image_url.startswith("data:"):
+            continue
+        seen.add(image_url)
+        try:
+            response = await _get_public_url(client, image_url)
+            response.raise_for_status()
+            mime_type = response.headers.get("content-type", "").split(";", 1)[0].lower()
+            content = response.content
+            if mime_type not in ALLOWED_IMAGE_TYPES or not 2_048 <= len(content) <= 5 * 1024 * 1024:
+                continue
+            _validate_image(content, mime_type)
+            digest = hashlib.sha256(content).hexdigest()
+            if db.query(CompanyMediaAsset).filter(
+                CompanyMediaAsset.company_id == source.company_id,
+                CompanyMediaAsset.sha256 == digest,
+            ).first():
+                continue
+            filename = (Path(urlparse(str(response.url)).path).name or f"logo-candidate-{len(seen)}")[:255]
+            asset = CompanyMediaAsset(
+                company_id=source.company_id, source_id=source.id,
+                uploaded_by_user_id=source.uploaded_by_user_id, name=filename,
+                mime_type=mime_type, size_bytes=len(content), sha256=digest,
+                storage_path="pending", source_url=str(response.url), role="logo_candidate",
+            )
+            db.add(asset); db.flush()
+            stored = storage_service.store_company_file(
+                company_id=source.company_id, source_id=asset.id,
+                original_filename=filename, content=content,
+            )
+            asset.storage_path = stored.relative_path
+            db.add(asset)
+        except Exception:
+            continue
+
+
+async def ingest_logo_upload(
+    db: Session, *, company_id: str, user_id: str, upload: UploadFile,
+) -> CompanyMediaAsset:
+    content = await upload.read(5 * 1024 * 1024 + 1)
+    mime_type = (upload.content_type or "").split(";", 1)[0].lower()
+    filename = (Path(upload.filename or "company-logo").name or "company-logo")[:255]
+    if len(content) > 5 * 1024 * 1024 or mime_type not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(status_code=422, detail="Upload a JPG, PNG, or WEBP image up to 5 MB.")
+    _validate_image(content, mime_type)
+    digest = hashlib.sha256(content).hexdigest()
+    existing = db.query(CompanyMediaAsset).filter(
+        CompanyMediaAsset.company_id == company_id,
+        CompanyMediaAsset.sha256 == digest,
+    ).first()
+    if existing:
+        return existing
+    asset = CompanyMediaAsset(
+        company_id=company_id, uploaded_by_user_id=user_id, role="logo_candidate",
+        name=filename, mime_type=mime_type, size_bytes=len(content), sha256=digest,
+        storage_path="pending", review_status="pending",
+    )
+    db.add(asset); db.flush()
+    stored = storage_service.store_company_file(
+        company_id=company_id, source_id=asset.id, original_filename=filename, content=content,
+    )
+    asset.storage_path = stored.relative_path
+    db.add(asset); db.commit(); db.refresh(asset)
+    return asset
+
+
+def _validate_image(content: bytes, mime_type: str) -> None:
+    if mime_type == "image/jpeg" and not content.startswith(b"\xff\xd8\xff"):
+        raise ValueError("Invalid JPEG image.")
+    if mime_type == "image/png" and not content.startswith(b"\x89PNG\r\n\x1a\n"):
+        raise ValueError("Invalid PNG image.")
+    if mime_type == "image/webp" and not (content.startswith(b"RIFF") and content[8:12] == b"WEBP"):
+        raise ValueError("Invalid WEBP image.")
 
 
 async def _get_public_url(client: httpx.AsyncClient, url: str) -> httpx.Response:

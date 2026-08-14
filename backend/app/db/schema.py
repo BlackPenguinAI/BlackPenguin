@@ -5,7 +5,7 @@ from sqlalchemy import Column, DateTime, String
 from app.db.postgres import Base
 
 
-CURRENT_SCHEMA_VERSION = "20260814_project_onboarding_ux"
+CURRENT_SCHEMA_VERSION = "20260814_company_catalog_media"
 
 
 class SchemaVersion(Base):

@@ -165,6 +165,13 @@ export const routes: Routes = [
         canActivate: [roleGuard],
         data: { roles: ['admin', 'assistant'] },
         loadComponent: () =>
+          import('./pages/client/company/company-overview').then((m) => m.CompanyOverviewComponent),
+      },
+      {
+        path: 'company/onboarding',
+        canActivate: [roleGuard],
+        data: { roles: ['admin', 'assistant'] },
+        loadComponent: () =>
           import('./pages/chat/chat').then((m) => m.ChatComponent),
       },
       {
@@ -201,6 +208,13 @@ export const routes: Routes = [
           import('./pages/client/projects/project-chat/project-chat').then(
             (m) => m.ProjectChatComponent
           ),
+      },
+      {
+        path: 'projects/:id/marketing',
+        canActivate: [roleGuard],
+        data: { roles: ['admin', 'assistant', 'mkt'] },
+        loadComponent: () =>
+          import('./pages/client/marketing/marketing').then((m) => m.MarketingComponent),
       },
       {
         path: 'projects/:id/sales-report',

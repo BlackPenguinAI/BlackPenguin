@@ -14,6 +14,7 @@ from app.modules.company_onboarding.models import (
     CompanyOnboardingProposal,
     CompanyOnboardingSource,
     CompanyProfile,
+    CompanyMediaAsset,
     OnboardingMessage,
     OnboardingSession,
 )
@@ -27,6 +28,9 @@ from app.modules.projects.models import (
     ProjectProfile,
     ProjectSession,
     ProjectUnit,
+    ProjectPropertyType,
+    ProjectPropertyTypeMedia,
+    SalesAssetShare,
 )
 from app.modules.brokers.models import Broker
 from app.modules.sales_crm.models import Lead, LeadStageHistory, SmsChatMessage, Meeting

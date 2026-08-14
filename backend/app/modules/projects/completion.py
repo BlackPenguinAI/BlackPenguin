@@ -25,12 +25,14 @@ FIELDS = (
     FieldDefinition("project_type", "Project type", "identity"),
     FieldDefinition("project_status", "Development status", "identity"),
     FieldDefinition("short_description", "Approved short description", "identity"),
+    FieldDefinition("project_cover", "Project cover image", "media"),
     FieldDefinition("exact_address", "Exact address", "location"),
     FieldDefinition("city", "City / region", "location"),
     FieldDefinition("country", "Country", "location"),
     FieldDefinition("location_references", "Location references", "location", "recommended"),
     FieldDefinition("phases_and_towers", "Phases and towers", "structure", "conditionally_required"),
     FieldDefinition("typologies", "Unit typologies", "product"),
+    FieldDefinition("property_type_catalog", "Confirmed property type catalog", "product"),
     FieldDefinition("areas", "Area ranges", "product"),
     FieldDefinition("bedrooms_and_bathrooms", "Bedrooms and bathrooms", "product"),
     FieldDefinition("construction_details", "Construction details", "product", "recommended"),
@@ -58,6 +60,7 @@ FIELDS = (
 FIELD_BY_KEY = {field.key: field for field in FIELDS}
 SECTIONS = (
     ("identity", "Project Identity"), ("location", "Location"),
+    ("media", "Project Media"),
     ("structure", "Development Structure"), ("product", "Product Details"),
     ("amenities", "Amenities"), ("commercial", "Commercial Offer"),
     ("inventory", "Inventory"), ("sales_strategy", "Sales Strategy"),

@@ -18,9 +18,9 @@ export class ButtonComponent {
   @Output() onClick = new EventEmitter<Event>();
 
   getButtonClasses(): string {
-    let baseClass = 'font-semibold text-sm rounded-xl transition-all duration-300 flex items-center justify-center gap-2 focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.98] ';
+    let baseClass = 'min-w-0 whitespace-nowrap font-semibold text-sm rounded-xl transition-all duration-300 flex items-center justify-center gap-2 focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.98] ';
     
-    baseClass += this.fullWidth ? 'w-full py-3 ' : 'px-6 py-2.5 ';
+    baseClass += this.fullWidth ? 'w-full px-4 py-3 ' : 'px-6 py-2.5 ';
 
     switch (this.variant) {
       case 'primary':

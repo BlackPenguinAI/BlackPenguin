@@ -7,12 +7,16 @@ export interface ProjectOverviewMetric {
 }
 
 export interface ProjectInventorySummary {
+  id: string | null;
   typology: string;
   total: number | null;
   sold: number | null;
   available: number | null;
   starting_price: number | null;
   currency: string | null;
+  description: string | null; bedrooms: number | null; bathrooms: number | null;
+  area_min: number | null; area_max: number | null; area_unit: string | null;
+  images_status: string; images: string[];
 }
 
 export interface ProjectOverview {

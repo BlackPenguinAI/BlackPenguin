@@ -67,6 +67,7 @@ class Project(Base):
     sources = relationship("ProjectOnboardingSource", back_populates="project", cascade="all, delete-orphan")
     campaigns = relationship("ProjectCampaign", back_populates="project", cascade="all, delete-orphan")
     units = relationship("ProjectUnit", back_populates="project", cascade="all, delete-orphan")
+    property_types = relationship("ProjectPropertyType", back_populates="project", cascade="all, delete-orphan")
 
 
 class ProjectProfile(Base):
@@ -181,6 +182,71 @@ class ProjectUnit(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
     project = relationship("Project", back_populates="units")
+
+
+class ProjectPropertyType(Base):
+    __tablename__ = "project_property_types"
+    __table_args__ = (UniqueConstraint("project_id", "name", name="uq_project_property_types_project_name"),)
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    project_id = Column(String(36), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
+    name = Column(String(180), nullable=False)
+    code = Column(String(100), nullable=True)
+    description = Column(Text, nullable=True)
+    bedrooms = Column(Integer, nullable=True)
+    bathrooms = Column(Float, nullable=True)
+    area_min = Column(Numeric(12, 2), nullable=True)
+    area_max = Column(Numeric(12, 2), nullable=True)
+    area_unit = Column(String(20), nullable=True)
+    total_units = Column(Integer, nullable=True)
+    available_units = Column(Integer, nullable=True)
+    starting_price = Column(Numeric(16, 2), nullable=True)
+    maximum_price = Column(Numeric(16, 2), nullable=True)
+    currency = Column(String(10), nullable=True)
+    features = Column(JSON, default=list, nullable=False)
+    inventory_updated_at = Column(DateTime, nullable=True)
+    images_status = Column(String(30), default="pending", nullable=False)
+    review_status = Column(String(30), default="confirmed", nullable=False)
+    source_reference = Column(Text, nullable=True)
+    created_by_user_id = Column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    updated_by_user_id = Column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    sort_order = Column(Integer, default=0, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    project = relationship("Project", back_populates="property_types")
+    media = relationship("ProjectPropertyTypeMedia", back_populates="property_type", cascade="all, delete-orphan")
+
+
+class ProjectPropertyTypeMedia(Base):
+    __tablename__ = "project_property_type_media"
+    __table_args__ = (UniqueConstraint("property_type_id", "source_id", name="uq_property_type_media_source"),)
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    property_type_id = Column(String(36), ForeignKey("project_property_types.id", ondelete="CASCADE"), nullable=False, index=True)
+    source_id = Column(String(36), ForeignKey("project_onboarding_sources.id", ondelete="CASCADE"), nullable=False, index=True)
+    caption = Column(String(255), nullable=True)
+    sort_order = Column(Integer, default=0, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    property_type = relationship("ProjectPropertyType", back_populates="media")
+    source = relationship("ProjectOnboardingSource")
+
+
+class SalesAssetShare(Base):
+    __tablename__ = "sales_asset_shares"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    company_id = Column(String(36), ForeignKey("companies.id", ondelete="CASCADE"), nullable=False, index=True)
+    project_id = Column(String(36), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
+    lead_id = Column(String(36), ForeignKey("leads.id", ondelete="CASCADE"), nullable=False, index=True)
+    source_id = Column(String(36), ForeignKey("project_onboarding_sources.id", ondelete="CASCADE"), nullable=False, index=True)
+    token_hash = Column(String(64), unique=True, nullable=False, index=True)
+    expires_at = Column(DateTime, nullable=False, index=True)
+    revoked = Column(Boolean, default=False, nullable=False)
+    access_count = Column(Integer, default=0, nullable=False)
+    last_accessed_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
 
 class ProjectOnboardingProposal(Base):

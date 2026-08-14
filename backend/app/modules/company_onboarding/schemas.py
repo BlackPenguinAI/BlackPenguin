@@ -72,6 +72,35 @@ class CompanyProfileResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class CompanyMediaAssetResponse(BaseModel):
+    id: str
+    role: str
+    name: str
+    mime_type: str
+    size_bytes: int
+    source_url: str | None = None
+    is_primary: bool
+    review_status: str
+    image_url: str
+    created_at: datetime
+
+
+class CompanyOverviewResponse(BaseModel):
+    company_id: str
+    name: str
+    legal_name: str | None = None
+    description: str | None = None
+    headquarters: str | None = None
+    business_model: Any = None
+    asset_classes: Any = None
+    operating_footprint: Any = None
+    public_contacts: dict[str, Any] = Field(default_factory=dict)
+    logo_url: str | None = None
+    metrics: dict[str, Any] = Field(default_factory=dict)
+    completion: CompletionSummary
+    updated_at: datetime | None = None
+
+
 class FieldUpdate(BaseModel):
     field: str
     value: Any = None

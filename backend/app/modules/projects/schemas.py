@@ -254,12 +254,21 @@ class ProjectOverviewMetric(BaseModel):
 
 
 class ProjectInventorySummary(BaseModel):
+    id: str | None = None
     typology: str
     total: int | None = None
     sold: int | None = None
     available: int | None = None
     starting_price: float | None = None
     currency: str | None = None
+    description: str | None = None
+    bedrooms: int | None = None
+    bathrooms: float | None = None
+    area_min: float | None = None
+    area_max: float | None = None
+    area_unit: str | None = None
+    images_status: str = "pending"
+    images: list[str] = Field(default_factory=list)
 
 
 class ProjectOverviewResponse(BaseModel):
@@ -278,6 +287,85 @@ class ProjectOverviewResponse(BaseModel):
     location: dict[str, Any] = Field(default_factory=dict)
     market_intelligence: dict[str, Any] = Field(default_factory=dict)
     data_completeness: dict[str, Any] = Field(default_factory=dict)
+
+
+class PropertyTypeBase(BaseModel):
+    name: str = Field(min_length=1, max_length=180)
+    code: str | None = Field(default=None, max_length=100)
+    description: str | None = None
+    bedrooms: int | None = Field(default=None, ge=0, le=50)
+    bathrooms: float | None = Field(default=None, ge=0, le=50)
+    area_min: float | None = Field(default=None, ge=0)
+    area_max: float | None = Field(default=None, ge=0)
+    area_unit: str | None = Field(default=None, max_length=20)
+    total_units: int | None = Field(default=None, ge=0)
+    available_units: int | None = Field(default=None, ge=0)
+    starting_price: float | None = Field(default=None, ge=0)
+    maximum_price: float | None = Field(default=None, ge=0)
+    currency: str | None = Field(default=None, min_length=3, max_length=10)
+    features: list[str] = Field(default_factory=list)
+    inventory_updated_at: datetime | None = None
+    images_status: Literal["pending", "provided", "deferred"] = "pending"
+    source_reference: str | None = None
+    sort_order: int = 0
+
+
+class PropertyTypeCreate(PropertyTypeBase):
+    review_status: Literal["candidate", "confirmed"] = "confirmed"
+
+
+class PropertyTypeUpdate(PropertyTypeBase):
+    review_status: Literal["candidate", "confirmed", "rejected"] = "confirmed"
+
+
+class PropertyTypeMediaResponse(BaseModel):
+    id: str
+    source_id: str
+    caption: str | None = None
+    sort_order: int
+    image_url: str
+
+
+class PropertyTypeResponse(PropertyTypeBase):
+    id: str
+    project_id: str
+    review_status: Literal["candidate", "confirmed", "rejected"]
+    is_complete: bool
+    media: list[PropertyTypeMediaResponse] = Field(default_factory=list)
+    created_at: datetime
+    updated_at: datetime
+
+
+class PropertyTypeMediaAttach(BaseModel):
+    source_ids: list[str] = Field(min_length=1, max_length=20)
+
+
+class PropertyTypeCatalogResponse(BaseModel):
+    items: list[PropertyTypeResponse]
+    confirmed_count: int
+    candidate_count: int
+    limit: int
+    remaining: int
+    catalog_complete: bool
+
+
+class ProjectMarketingCampaignMetric(BaseModel):
+    id: str
+    name: str
+    platform: str
+    status: str
+    leads: int
+    qualified: int
+    appointments: int
+    conversion_rate: float
+
+
+class ProjectMarketingSummary(BaseModel):
+    project_id: str
+    project_name: str
+    totals: dict[str, int | float]
+    campaigns: list[ProjectMarketingCampaignMetric]
+    leads: list[dict[str, Any]]
 
 
 class CampaignCreate(BaseModel):

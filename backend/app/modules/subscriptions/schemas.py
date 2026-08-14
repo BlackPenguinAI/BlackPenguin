@@ -9,6 +9,7 @@ class SubscriptionPlanBase(BaseModel):
     max_mkt_users: int = 0
     max_sales_users: int = 0
     max_projects: int = 1
+    max_property_types_per_project: int = 20
     max_properties_per_project: int = 50
     is_active: bool = True
 

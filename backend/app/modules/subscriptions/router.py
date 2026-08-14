@@ -27,6 +27,7 @@ def create_plan(
         max_mkt_users=plan_in.max_mkt_users,
         max_sales_users=plan_in.max_sales_users,
         max_projects=plan_in.max_projects,
+        max_property_types_per_project=plan_in.max_property_types_per_project,
         max_properties_per_project=plan_in.max_properties_per_project,
         is_active=plan_in.is_active
     )
@@ -60,6 +61,7 @@ def update_plan(
     plan.max_mkt_users = plan_in.max_mkt_users
     plan.max_sales_users = plan_in.max_sales_users
     plan.max_projects = plan_in.max_projects
+    plan.max_property_types_per_project = plan_in.max_property_types_per_project
     plan.max_properties_per_project = plan_in.max_properties_per_project
     plan.is_active = plan_in.is_active
     

@@ -22,6 +22,7 @@ import {
   Campaign, ChatAttachment, ChatMessage, ChatTurn, EMPTY_PROJECT_PROFILE, MetaConnection,
   MetaSetupConfiguration, OnboardingState, ProjectAssignment, ProjectFieldProgress, ProjectProfile,
   ProjectSalesCandidate, ProjectSource, SectionProgress, SourceProposal, ValidationStatus,
+  ProjectPropertyType, PropertyTypeCatalog,
 } from './project-onboarding.models';
 import { ProjectOnboardingService } from './project-onboarding.service';
 
@@ -60,6 +61,12 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   };
   metaSetupBusy = false;
   metaSetupMessage = '';
+  propertyCatalog: PropertyTypeCatalog = { items: [], confirmed_count: 0, candidate_count: 0, limit: 0, remaining: 0, catalog_complete: false };
+  propertyTypeBusy = false;
+  showPropertyTypeForm = false;
+  propertyTypeDraft: Partial<ProjectPropertyType> = this.emptyPropertyType();
+  readonly propertyTypeImageSelection = new Map<string, Set<string>>();
+  readonly sourceImageUrls = new Map<string, string>();
   profile: ProjectProfile = EMPTY_PROJECT_PROFILE;
   showWelcome = false;
   initialState: 'loading' | 'ready' | 'error' = 'loading';
@@ -92,7 +99,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.projectId = this.route.snapshot.paramMap.get('id') || '';
     this.userName = localStorage.getItem('bp_name') || 'User';
-    this.syncState(); this.loadCampaigns(); this.loadMetaConnections(); this.loadSalesTeam(); this.loadMetaSetupConfiguration();
+    this.syncState(); this.loadCampaigns(); this.loadMetaConnections(); this.loadSalesTeam(); this.loadMetaSetupConfiguration(); this.loadPropertyTypes();
     this.speechSubscriptions.add(this.speech.state$.subscribe((state) => {
       this.isRecording = state === 'listening';
       this.cdr.detectChanges();
@@ -111,6 +118,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     this.speech.abort();
     this.speechSubscriptions.unsubscribe();
     if (this.pollingTimer) clearTimeout(this.pollingTimer);
+    for (const url of this.sourceImageUrls.values()) URL.revokeObjectURL(url);
   }
 
   get canSend(): boolean { return (!!this.prompt.trim() || !!this.selectedFiles.length) && !this.isAnalyzing && !this.hasPendingReview; }
@@ -165,7 +173,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
       error: (error: HttpErrorResponse) => { if (error.status !== 401) this.errorMessage = 'The project conversation could not be loaded.'; },
     });
   }
-  loadSources(): void { this.onboarding.getSources(this.projectId).subscribe({ next: (items) => this.sources = this.prepareSources(items) }); }
+  loadSources(): void { this.onboarding.getSources(this.projectId).subscribe({ next: (items) => { this.sources = this.prepareSources(items); this.loadSourceImagePreviews(); } }); }
   loadCampaigns(): void { this.onboarding.getCampaigns(this.projectId).subscribe({ next: (items) => this.campaigns = items }); }
   loadMetaConnections(): void { this.onboarding.getMetaConnections().subscribe({ next: (items) => this.metaConnections = items }); }
   loadSalesTeam(): void {
@@ -179,6 +187,83 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     this.onboarding.getMetaSetupConfiguration(this.projectId).subscribe({
       next: (configuration) => this.metaSetupConfig = configuration,
     });
+  }
+  loadPropertyTypes(): void {
+    this.onboarding.getPropertyTypes(this.projectId).subscribe({
+      next: catalog => {
+        this.propertyCatalog = { ...catalog, items: catalog.items.map(item => ({
+          ...item, inventory_updated_at: item.inventory_updated_at?.slice(0, 10) || null,
+        })) };
+        this.cdr.detectChanges();
+      },
+      error: () => { this.errorMessage = 'The property type catalog could not be loaded.'; },
+    });
+  }
+
+  saveNewPropertyType(): void {
+    if (!this.propertyTypeDraft.name?.trim() || this.propertyTypeBusy) return;
+    this.propertyTypeBusy = true;
+    const payload = { ...this.propertyTypeDraft, review_status: 'confirmed' as const, features: this.propertyTypeDraft.features || [],
+      inventory_updated_at: this.propertyTypeDraft.inventory_updated_at ? new Date(this.propertyTypeDraft.inventory_updated_at).toISOString() : null };
+    this.onboarding.createPropertyType(this.projectId, payload).subscribe({
+      next: () => { this.propertyTypeBusy = false; this.showPropertyTypeForm = false; this.propertyTypeDraft = this.emptyPropertyType(); this.loadPropertyTypes(); this.syncState('none'); },
+      error: (error: HttpErrorResponse) => { this.propertyTypeBusy = false; this.errorMessage = this.apiDetail(error, 'The property type could not be saved.'); },
+    });
+  }
+
+  confirmPropertyType(item: ProjectPropertyType): void {
+    if (this.propertyTypeBusy) return;
+    this.propertyTypeBusy = true;
+    this.onboarding.updatePropertyType(this.projectId, item.id, { ...item, review_status: 'confirmed',
+      inventory_updated_at: item.inventory_updated_at ? new Date(item.inventory_updated_at).toISOString() : null }).subscribe({
+      next: updated => { this.propertyTypeBusy = false; this.replacePropertyType(updated); this.syncState('none'); },
+      error: (error: HttpErrorResponse) => { this.propertyTypeBusy = false; this.errorMessage = this.apiDetail(error, 'Complete price, currency, availability, and inventory date before confirming.'); },
+    });
+  }
+
+  rejectPropertyType(item: ProjectPropertyType): void {
+    this.onboarding.deletePropertyType(this.projectId, item.id).subscribe({ next: () => this.loadPropertyTypes() });
+  }
+
+  togglePropertyTypeImage(item: ProjectPropertyType, sourceId: string): void {
+    const selected = this.propertyTypeImageSelection.get(item.id) || new Set<string>();
+    selected.has(sourceId) ? selected.delete(sourceId) : selected.add(sourceId);
+    this.propertyTypeImageSelection.set(item.id, selected);
+  }
+
+  attachSelectedImages(item: ProjectPropertyType): void {
+    const selected = [...(this.propertyTypeImageSelection.get(item.id) || [])];
+    if (!selected.length) return;
+    this.onboarding.attachPropertyTypeMedia(this.projectId, item.id, selected).subscribe({
+      next: updated => { this.propertyTypeImageSelection.delete(item.id); this.replacePropertyType(updated); },
+      error: () => this.errorMessage = 'The selected images could not be attached to this property type.',
+    });
+  }
+
+  deferPropertyTypeImages(item: ProjectPropertyType): void {
+    this.onboarding.deferPropertyTypeImages(this.projectId, item.id).subscribe({ next: updated => this.replacePropertyType(updated) });
+  }
+
+  isPropertyTypeImageSelected(item: ProjectPropertyType, sourceId: string): boolean {
+    return this.propertyTypeImageSelection.get(item.id)?.has(sourceId) || false;
+  }
+
+  get readyProjectImages(): ProjectSource[] { return this.sources.filter(source => source.kind === 'image' && source.status === 'ready' && !!source.download_url); }
+
+  private emptyPropertyType(): Partial<ProjectPropertyType> {
+    return { name: '', code: null, description: null, bedrooms: null, bathrooms: null, area_min: null, area_max: null,
+      area_unit: 'm²', total_units: null, available_units: null, starting_price: null, maximum_price: null,
+      currency: 'USD', features: [], inventory_updated_at: new Date().toISOString().slice(0, 10), images_status: 'pending', sort_order: 0 };
+  }
+
+  private replacePropertyType(updated: ProjectPropertyType): void {
+    this.propertyCatalog = { ...this.propertyCatalog, items: this.propertyCatalog.items.map(item => item.id === updated.id ? updated : item) };
+    this.loadPropertyTypes(); this.cdr.detectChanges();
+  }
+
+  private apiDetail(error: HttpErrorResponse, fallback: string): string {
+    const detail = error.error?.detail;
+    return typeof detail === 'string' ? detail : detail?.message || fallback;
   }
 
   get availableSalesUsers(): ProjectSalesCandidate[] {
@@ -604,6 +689,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     for (const source of this.prepareSources(items)) merged.set(source.id, source);
     this.sources = Array.from(merged.values());
     for (const source of this.sources) if (this.hasPendingProposals(source)) this.expandedSourceIds.add(source.id);
+    this.loadSourceImagePreviews();
   }
   private syncState(
     scrollMode: OnboardingScrollMode = 'none',
@@ -632,6 +718,8 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     this.lastStateVersion = state.version;
     this.messages = [...state.messages]; this.profile = state.profile;
     this.sources = this.prepareSources(state.sources); this.nextQuestion = state.next_question;
+    this.loadSourceImagePreviews();
+    this.loadPropertyTypes();
     for (const source of this.sources) if (this.hasPendingProposals(source)) this.expandedSourceIds.add(source.id);
     this.showWelcome = state.stage === 'website';
     if (this.pollingTimer) clearTimeout(this.pollingTimer);
@@ -654,6 +742,14 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
       proposals: source.proposals.map((item) => item.id === proposalId ? { ...item, ...patch } : item),
     }));
     this.cdr.detectChanges();
+  }
+  private loadSourceImagePreviews(): void {
+    for (const source of this.sources) {
+      if (source.kind !== 'image' || source.status !== 'ready' || !source.download_url || this.sourceImageUrls.has(source.id)) continue;
+      this.onboarding.downloadAttachment(source.download_url).subscribe({
+        next: blob => { this.sourceImageUrls.set(source.id, URL.createObjectURL(blob)); this.cdr.detectChanges(); },
+      });
+    }
   }
   private restoreProposalAnchor(anchor: ReviewScrollAnchor | null): void {
     if (!anchor) return;

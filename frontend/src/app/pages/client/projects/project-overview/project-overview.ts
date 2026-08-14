@@ -17,6 +17,7 @@ export class ProjectOverviewComponent implements OnInit, OnDestroy {
   projectId = '';
   overview: ProjectOverview | null = null;
   coverObjectUrl: string | null = null;
+  readonly inventoryImageUrls = new Map<string, string>();
   isLoading = true;
   errorMessage = '';
   mapSafeUrl: SafeResourceUrl | null = null;
@@ -35,6 +36,7 @@ export class ProjectOverviewComponent implements OnInit, OnDestroy {
         this.overview = overview; this.isLoading = false;
         this.mapSafeUrl = this.buildMapUrl(overview);
         if (overview.cover_image_url) this.loadCover(overview.cover_image_url);
+        for (const item of overview.inventory) for (const url of item.images) this.loadInventoryImage(url);
         this.cdr.detectChanges();
       },
       error: () => { this.isLoading = false; this.errorMessage = 'The Project Overview could not be loaded.'; this.cdr.detectChanges(); },
@@ -43,6 +45,7 @@ export class ProjectOverviewComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     if (this.coverObjectUrl) URL.revokeObjectURL(this.coverObjectUrl);
+    for (const url of this.inventoryImageUrls.values()) URL.revokeObjectURL(url);
   }
 
   get locationLabel(): string {
@@ -67,5 +70,11 @@ export class ProjectOverviewComponent implements OnInit, OnDestroy {
     this.overviewService.getCover(url).subscribe({
       next: (blob) => { this.coverObjectUrl = URL.createObjectURL(blob); this.cdr.detectChanges(); },
     });
+  }
+  private loadInventoryImage(url: string): void {
+    if (this.inventoryImageUrls.has(url)) return;
+    this.overviewService.getCover(url).subscribe({ next: blob => {
+      this.inventoryImageUrls.set(url, URL.createObjectURL(blob)); this.cdr.detectChanges();
+    }});
   }
 }

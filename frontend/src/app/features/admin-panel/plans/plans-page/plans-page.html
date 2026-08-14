@@ -47,8 +47,9 @@
                 </td>
 
                 <td class="py-4 px-6 text-center font-mono text-gray-400 text-xs">
-                  <span class="text-white">{{ plan.max_projects }}</span> Proj • 
-                  <span class="text-white">{{ plan.max_properties_per_project }}</span> Prop/Proj
+                  <span class="text-white">{{ plan.max_projects }}</span> Proj •
+                  <span class="text-white">{{ plan.max_property_types_per_project }}</span> Types/Proj •
+                  <span class="text-white">{{ plan.max_properties_per_project }}</span> Units/Proj
                 </td>
 
                 <td class="py-4 px-6 text-center">
@@ -106,9 +107,10 @@
 
     <div class="p-4 rounded-xl border border-white/10 bg-white/5">
       <h3 class="text-xs uppercase font-mono tracking-widest text-secondary mb-3">System Limits</h3>
-      <div class="grid grid-cols-2 gap-4">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
         <app-input label="Max Projects" type="number" [(ngModel)]="form.max_projects" name="proj"></app-input>
-        <app-input label="Max Properties / Project" type="number" [(ngModel)]="form.max_properties_per_project" name="prop"></app-input>
+        <app-input label="Max Property Types / Project" type="number" [(ngModel)]="form.max_property_types_per_project" name="types"></app-input>
+        <app-input label="Max Units / Project" type="number" [(ngModel)]="form.max_properties_per_project" name="prop"></app-input>
       </div>
     </div>
 
@@ -146,9 +148,10 @@
 
     <div class="p-4 rounded-xl border border-white/10 bg-white/5">
       <h3 class="text-xs uppercase font-mono tracking-widest text-secondary mb-3">System Limits</h3>
-      <div class="grid grid-cols-2 gap-4">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
         <app-input label="Max Projects" type="number" [(ngModel)]="editForm.max_projects" name="edit_proj"></app-input>
-        <app-input label="Max Properties / Project" type="number" [(ngModel)]="editForm.max_properties_per_project" name="edit_prop"></app-input>
+        <app-input label="Max Property Types / Project" type="number" [(ngModel)]="editForm.max_property_types_per_project" name="edit_types"></app-input>
+        <app-input label="Max Units / Project" type="number" [(ngModel)]="editForm.max_properties_per_project" name="edit_prop"></app-input>
       </div>
     </div>
 
@@ -172,6 +175,6 @@
   
   <div class="flex gap-3 w-full">
     <app-button variant="ghost" [fullWidth]="true" (onClick)="closeDeleteModal()">Cancel</app-button>
-    <app-button variant="danger" [fullWidth]="true" [isLoading]="isDeleting" (onClick)="confirmDelete()">Delete</app-button>
+    <app-button variant="danger" [fullWidth]="true" [isLoading]="isDeleting" (onClick)="confirmDelete()">Delete Plan</app-button>
   </div>
 </app-modal>
