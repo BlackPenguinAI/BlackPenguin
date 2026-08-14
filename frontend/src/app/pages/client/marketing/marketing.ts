@@ -8,11 +8,12 @@ import { API_V1_URL } from '../../../core/config/api.config';
 
 @Component({
   selector: 'app-marketing', standalone: true, imports: [CommonModule, FormsModule, RouterModule],
-  templateUrl: './marketing.html',
+  templateUrl: './marketing.html', styleUrls: ['./marketing.scss'],
 })
 export class MarketingComponent implements OnInit {
   projects: any[] = []; leads: any[] = []; projectId = ''; loading = true;
   summary: any = null; selectedCampaignId = ''; lockedProject = false;
+  leadView = 'high'; search = '';
   constructor(private http: HttpClient, private cdr: ChangeDetectorRef, private route: ActivatedRoute) {}
   ngOnInit(): void {
     const routeProjectId = this.route.snapshot.paramMap.get('id');
@@ -41,5 +42,11 @@ export class MarketingComponent implements OnInit {
     });
   }
   count(stage: string): number { return this.leads.filter(lead => lead.funnel_stage === stage).length; }
-  get visibleLeads(): any[] { return this.selectedCampaignId ? this.leads.filter(lead => lead.campaign_id === this.selectedCampaignId) : this.leads; }
+  get visibleLeads(): any[] {
+    const term = this.search.trim().toLowerCase();
+    return this.leads.filter(lead => (!this.selectedCampaignId || lead.campaign_id === this.selectedCampaignId)
+      && (this.leadView === 'all' || (this.leadView === 'high' ? lead.intent_score >= .75 : lead.funnel_stage === 'closed'))
+      && (!term || `${lead.full_name} ${lead.email || ''}`.toLowerCase().includes(term)));
+  }
+  initials(name: string): string { return name.split(/\s+/).slice(0,2).map(x => x[0]).join('').toUpperCase(); }
 }

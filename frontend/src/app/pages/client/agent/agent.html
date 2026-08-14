@@ -1,0 +1,24 @@
+<section class="agent-page">
+  <header class="agent-header">
+    <div><p>AI SALES ASSISTANT</p><h1>Lead conversations</h1><span>Review how the agent follows up, qualifies intent, and prepares the next sales action.</span></div>
+    <select [(ngModel)]="projectId" (change)="loadConversations()"><option *ngFor="let project of projects" [value]="project.id">{{ project.name }}{{ project.is_demo ? ' · Demo' : '' }}</option></select>
+  </header>
+  <div class="demo-banner"><span class="material-symbols-outlined">science</span><div><strong>Demo simulation</strong><small>No SMS is sent. Every reply stays inside this workspace.</small></div></div>
+  <div *ngIf="error" class="error">{{ error }} <button (click)="loadConversations(true)">Retry</button></div>
+  <div class="workspace">
+    <aside class="inbox">
+      <div class="inbox-top"><h2>Leads <b>{{ conversations.length }}</b></h2><input [(ngModel)]="search" placeholder="Search lead or phone" /></div>
+      <div class="filters"><button [class.active]="filter==='all'" (click)="filter='all'">All</button><button [class.active]="filter==='active'" (click)="filter='active'">Active</button><button [class.active]="filter==='paused'" (click)="filter='paused'">Paused</button></div>
+      <div class="loading" *ngIf="loading">Loading conversations…</div>
+      <button *ngFor="let row of visible" class="lead" [class.selected]="selected?.id===row.id" (click)="select(row)"><i>{{ initials(row.lead_name) }}</i><span><strong>{{ row.lead_name }}</strong><small>{{ row.last_message || 'No messages yet' }}</small></span><time>{{ row.last_message_at | date:'shortTime' }}</time></button>
+      <div class="empty" *ngIf="!loading && !visible.length">No conversations match this view.</div>
+    </aside>
+    <main class="chat" *ngIf="selected; else noSelection">
+      <div class="chat-head"><div><i>{{ initials(selected.lead_name) }}</i><span><strong>{{ selected.lead_name }}</strong><small>{{ selected.phone }} · {{ selected.funnel_stage }}</small></span></div><button class="pause" (click)="action(selected.is_paused ? 'resume' : 'pause')"><span class="material-symbols-outlined">{{ selected.is_paused ? 'play_arrow' : 'pause' }}</span>{{ selected.is_paused ? 'Resume' : 'Pause' }}</button></div>
+      <div class="thread" #thread><div *ngIf="loadingMessages" class="loading">Loading messages…</div><div *ngFor="let message of messages" class="bubble-row" [class.agent]="message.role==='assistant'"><div class="bubble"><small>{{ message.role==='assistant' ? 'AI agent' : selected.lead_name }}</small><p>{{ message.content }}</p><time>{{ message.created_at | date:'short' }} · {{ message.status }}</time></div></div></div>
+      <div class="composer"><textarea [(ngModel)]="draft" (keydown.control.enter)="send()" [disabled]="selected.is_paused || sending" rows="2" [placeholder]="selected.is_paused ? 'Resume the agent to continue' : 'Write the lead’s next simulated SMS…'"></textarea><button (click)="send()" [disabled]="!draft.trim() || selected.is_paused || sending"><span class="material-symbols-outlined">send</span></button><small>Ctrl + Enter to simulate the inbound SMS</small></div>
+    </main>
+    <aside class="context" *ngIf="selected"><p>LEAD CONTEXT</p><div class="score"><span>Intent score</span><strong>{{ selected.intent_score * 100 | number:'1.0-0' }}</strong><i><b [style.width.%]="selected.intent_score * 100"></b></i></div><dl><dt>Project</dt><dd>{{ selected.project_name }}</dd><dt>Stage</dt><dd>{{ selected.funnel_stage }}</dd><dt>Next action</dt><dd>{{ selected.next_action_at ? (selected.next_action_at | date:'medium') : 'Not scheduled' }}</dd><dt>Agent</dt><dd>{{ selected.is_paused ? 'Paused' : 'Following up' }}</dd></dl><button class="handoff" (click)="action('human_handoff')">Request human handoff</button></aside>
+  </div>
+  <ng-template #noSelection><main class="chat no-selection"><span class="material-symbols-outlined">forum</span><h2>Select a lead</h2><p>Choose a conversation to review the agent’s SMS-style follow-up.</p></main></ng-template>
+</section>

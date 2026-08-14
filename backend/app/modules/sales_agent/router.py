@@ -8,8 +8,11 @@ from app.modules.auth.deps import RoleChecker
 from app.modules.users.models import TENANT_MANAGER_ROLES, User, UserRole
 
 from .models import AgentRun, OutboundMessage, SalesConversation
-from .schemas import AgentRunResponse, ConversationSummary, DraftDecision, SimulationRequest
-from .service import simulate_turn
+from .schemas import (
+    AgentRunResponse, ConversationAction, ConversationSummary, DraftDecision,
+    SalesMessageResponse, SimulationRequest,
+)
+from .service import conversation_messages, conversation_summaries, set_conversation_action, simulate_turn
 
 
 router = APIRouter()
@@ -19,7 +22,7 @@ router = APIRouter()
 async def simulate(
     payload: SimulationRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.SALES])),
+    current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.MKT, UserRole.SALES])),
 ):
     return await simulate_turn(
         db,
@@ -32,14 +35,38 @@ async def simulate(
 
 @router.get("/conversations", response_model=list[ConversationSummary])
 def conversations(
+    project_id: str | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.MKT, UserRole.SALES])),
 ):
-    query = db.query(SalesConversation).filter(SalesConversation.company_id == current_user.company_id)
-    if current_user.role == UserRole.SALES:
-        from app.modules.sales_crm.models import Lead
-        query = query.join(Lead, Lead.id == SalesConversation.lead_id).filter(Lead.assigned_sales_user_id == current_user.id)
-    return query.order_by(SalesConversation.updated_at.desc()).all()
+    return conversation_summaries(
+        db, company_id=current_user.company_id, project_id=project_id,
+        sales_user_id=current_user.id if current_user.role == UserRole.SALES else None,
+    )
+
+
+@router.get("/conversations/{conversation_id}/messages", response_model=list[SalesMessageResponse])
+def messages(
+    conversation_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.MKT, UserRole.SALES])),
+):
+    return conversation_messages(db, company_id=current_user.company_id, conversation_id=conversation_id)
+
+
+@router.post("/conversations/{conversation_id}/action", response_model=ConversationSummary)
+def conversation_action(
+    conversation_id: str, payload: ConversationAction,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.MKT, UserRole.SALES])),
+):
+    conversation = set_conversation_action(
+        db, company_id=current_user.company_id, conversation_id=conversation_id, action=payload.action,
+    )
+    return next(item for item in conversation_summaries(
+        db, company_id=current_user.company_id,
+        sales_user_id=current_user.id if current_user.role == UserRole.SALES else None,
+    ) if item["id"] == conversation.id)
 
 
 @router.post("/drafts/{draft_id}/decision")

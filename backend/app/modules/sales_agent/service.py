@@ -7,10 +7,80 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.modules.projects.models import Project
-from app.modules.sales_crm.models import Lead
+from app.modules.sales_crm.models import FunnelStage, Lead
 
 from .graph import GRAPH_VERSION, TOOLSET_VERSION, build_sales_graph
 from .models import AgentRun, OutboundMessage, SalesConversation, SalesMessage
+
+
+def conversation_summaries(
+    db: Session,
+    *,
+    company_id: str,
+    project_id: str | None = None,
+    sales_user_id: str | None = None,
+) -> list[dict]:
+    query = db.query(SalesConversation, Lead, Project).join(
+        Lead, Lead.id == SalesConversation.lead_id,
+    ).join(Project, Project.id == SalesConversation.project_id).filter(
+        SalesConversation.company_id == company_id,
+    )
+    if project_id:
+        query = query.filter(SalesConversation.project_id == project_id)
+    if sales_user_id:
+        query = query.filter(Lead.assigned_sales_user_id == sales_user_id)
+    rows = query.order_by(SalesConversation.updated_at.desc()).all()
+    result = []
+    for conversation, lead, project in rows:
+        last = db.query(SalesMessage).filter(
+            SalesMessage.conversation_id == conversation.id,
+        ).order_by(SalesMessage.created_at.desc()).first()
+        result.append({
+            "id": conversation.id, "lead_id": lead.id, "project_id": project.id,
+            "campaign_id": conversation.campaign_id, "channel": conversation.channel,
+            "stage": conversation.stage, "automation_level": conversation.automation_level,
+            "is_paused": conversation.is_paused, "updated_at": conversation.updated_at,
+            "lead_name": lead.full_name, "phone": lead.phone,
+            "funnel_stage": lead.funnel_stage.value if hasattr(lead.funnel_stage, "value") else str(lead.funnel_stage),
+            "intent_score": float(lead.intent_score or 0),
+            "last_message": last.content if last else None,
+            "last_message_at": last.created_at if last else None,
+            "next_action_at": lead.next_action_at, "agent_status": lead.agent_status,
+            "project_name": project.name, "is_demo": bool(project.is_demo),
+        })
+    return result
+
+
+def conversation_messages(db: Session, *, company_id: str, conversation_id: str) -> list[SalesMessage]:
+    conversation = db.query(SalesConversation).filter(
+        SalesConversation.id == conversation_id,
+        SalesConversation.company_id == company_id,
+    ).first()
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found.")
+    return db.query(SalesMessage).filter(
+        SalesMessage.conversation_id == conversation.id,
+    ).order_by(SalesMessage.created_at.asc()).all()
+
+
+def set_conversation_action(
+    db: Session, *, company_id: str, conversation_id: str, action: str,
+) -> SalesConversation:
+    conversation = db.query(SalesConversation).filter(
+        SalesConversation.id == conversation_id,
+        SalesConversation.company_id == company_id,
+    ).first()
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found.")
+    if action == "resume":
+        conversation.is_paused = False
+        conversation.pause_reason = None
+    else:
+        conversation.is_paused = True
+        conversation.pause_reason = "Human handoff requested" if action == "human_handoff" else "Paused by user"
+    conversation.updated_at = datetime.utcnow()
+    db.add(conversation); db.commit(); db.refresh(conversation)
+    return conversation
 
 
 def get_or_create_conversation(db: Session, lead: Lead, *, channel: str) -> SalesConversation:
@@ -49,6 +119,8 @@ async def simulate_turn(
     project = db.query(Project).filter(Project.id == lead.project_id, Project.company_id == company_id).first()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found.")
+    if not lead.is_demo or not project.is_demo:
+        raise HTTPException(status_code=409, detail="Agent chat is currently available only for Demo leads.")
     event_id = event_id or f"simulation:{uuid.uuid4()}"
     existing = db.query(AgentRun).filter(AgentRun.event_id == event_id).first()
     if existing:
@@ -64,6 +136,13 @@ async def simulate_turn(
         content=inbound_text,
         status="received",
     )
+    conversation.is_paused = False
+    conversation.pause_reason = None
+    conversation.updated_at = datetime.utcnow()
+    lead.last_interaction_at = datetime.utcnow()
+    if lead.funnel_stage == FunnelStage.NEW:
+        lead.funnel_stage = FunnelStage.CONTACTED
+        lead.stage_changed_at = datetime.utcnow()
     db.add(inbound)
     run = AgentRun(
         conversation_id=conversation.id,
@@ -127,6 +206,9 @@ async def simulate_turn(
                 content=result["proposed_reply"],
                 status="draft",
             ))
+            conversation.updated_at = datetime.utcnow()
+            lead.agent_status = "simulation"
+            db.add_all([conversation, lead])
         db.commit()
         db.refresh(run)
         response = _response(run, run.output_snapshot)

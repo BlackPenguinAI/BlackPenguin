@@ -33,7 +33,32 @@ class ConversationSummary(BaseModel):
     automation_level: int
     is_paused: bool
     updated_at: datetime
+    lead_name: str
+    phone: str
+    funnel_stage: str
+    intent_score: float = 0
+    last_message: str | None = None
+    last_message_at: datetime | None = None
+    next_action_at: datetime | None = None
+    agent_status: str = "simulation"
+    project_name: str
+    is_demo: bool = False
     model_config = ConfigDict(from_attributes=True)
+
+
+class SalesMessageResponse(BaseModel):
+    id: str
+    conversation_id: str
+    direction: str
+    role: str
+    content: str
+    status: str
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ConversationAction(BaseModel):
+    action: str = Field(pattern="^(pause|resume|human_handoff)$")
 
 
 class DraftDecision(BaseModel):

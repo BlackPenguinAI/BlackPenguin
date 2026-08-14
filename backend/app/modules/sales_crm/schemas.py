@@ -47,6 +47,13 @@ class MeetingCreate(BaseModel):
     modality: str = "virtual"
     notes: Optional[str] = None
 
+class MeetingUpdate(BaseModel):
+    broker_id: Optional[str] = None
+    status: Optional[MeetingStatus] = None
+    confirmation_status: Optional[str] = None
+    modality: Optional[str] = None
+    notes: Optional[str] = None
+
 class MeetingResponse(BaseModel):
     id: str
     project_id: str

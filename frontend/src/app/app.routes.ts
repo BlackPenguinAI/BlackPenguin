@@ -204,6 +204,13 @@ export const routes: Routes = [
           import('./pages/client/sales/sales').then((m) => m.SalesComponent),
       },
       {
+        path: 'agent',
+        canActivate: [roleGuard],
+        data: { roles: ['admin', 'assistant', 'mkt', 'sales'] },
+        loadComponent: () =>
+          import('./pages/client/agent/agent').then((m) => m.AgentComponent),
+      },
+      {
         path: 'projects/:id/onboarding',
         loadComponent: () =>
           import('./pages/client/projects/project-chat/project-chat').then(

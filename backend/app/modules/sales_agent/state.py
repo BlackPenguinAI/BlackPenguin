@@ -15,6 +15,7 @@ class SalesAgentState(TypedDict, total=False):
     project_context: dict[str, Any]
     inventory_context: list[dict[str, Any]]
     lead_context: dict[str, Any]
+    conversation_history: list[dict[str, str]]
     prompt_snapshot: dict[str, Any]
     prompt_configuration_id: str | None
     model: str

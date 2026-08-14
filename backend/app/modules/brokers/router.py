@@ -14,6 +14,9 @@ router = APIRouter()
 
 @router.get("/{project_id}/brokers", response_model=List[BrokerResponse])
 def list_project_brokers(project_id: str, db: Session = Depends(get_db), current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.MKT, UserRole.SALES]))):
+    project = db.query(Project).filter(Project.id == project_id, Project.company_id == current_user.company_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found.")
     return db.query(Broker).filter(Broker.project_id == project_id).all()
 
 @router.post("/{project_id}/brokers", response_model=BrokerResponse)

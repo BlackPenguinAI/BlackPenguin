@@ -4,7 +4,7 @@ from typing import List, Optional
 from datetime import datetime
 
 from .models import Lead, LeadStageHistory, SmsChatMessage, Meeting, FunnelStage, MeetingStatus
-from .schemas import LeadUpdate, MeetingCreate
+from .schemas import LeadUpdate, MeetingCreate, MeetingUpdate
 from app.modules.brokers.models import Broker
 from app.modules.projects.models import Project
 from app.integrations.gcalendar_client import create_calendar_event
@@ -109,3 +109,19 @@ def get_project_meetings(db: Session, company_id: str, project_id: str, broker_i
     if sales_user_id:
         query = query.filter(Meeting.assigned_sales_user_id == sales_user_id)
     return query.order_by(Meeting.meeting_time.asc()).all()
+
+def update_meeting(db: Session, meeting_id: str, company_id: str, payload: MeetingUpdate) -> Meeting:
+    meeting = db.query(Meeting).join(Project, Project.id == Meeting.project_id).filter(
+        Meeting.id == meeting_id, Project.company_id == company_id,
+    ).first()
+    if not meeting:
+        raise HTTPException(status_code=404, detail="Meeting not found.")
+    updates = payload.model_dump(exclude_unset=True)
+    if updates.get("broker_id"):
+        broker = db.query(Broker).filter(Broker.id == updates["broker_id"], Broker.project_id == meeting.project_id).first()
+        if not broker:
+            raise HTTPException(status_code=400, detail="Broker is not assigned to this Project.")
+    for field, value in updates.items():
+        setattr(meeting, field, value)
+    db.add(meeting); db.commit(); db.refresh(meeting)
+    return meeting

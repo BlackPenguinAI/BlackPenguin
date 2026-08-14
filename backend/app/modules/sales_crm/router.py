@@ -10,7 +10,7 @@ from app.modules.ai_core.services import get_ai_config
 from app.integrations.openrouter_client import generate_llm_response
 
 from .models import Lead, SmsChatMessage, Meeting, FunnelStage
-from .schemas import LeadResponse, LeadUpdate, SmsChatMessageSchema, MeetingResponse, MeetingCreate, SalesReportResponse
+from .schemas import LeadResponse, LeadUpdate, SmsChatMessageSchema, MeetingResponse, MeetingCreate, MeetingUpdate, SalesReportResponse
 from . import services
 from app.modules.projects.models import Project, ProjectUnit
 
@@ -115,6 +115,19 @@ def schedule_meeting(
 ):
     assigned_sales_user_id = current_user.id if current_user.role == UserRole.SALES else None
     return services.create_meeting(db, payload, current_user.company_id, assigned_sales_user_id)
+
+@router.put("/meetings/{meeting_id}", response_model=MeetingResponse, summary="Actualizar cita y broker")
+def update_meeting(
+    meeting_id: str,
+    payload: MeetingUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.SALES])),
+):
+    meeting = services.update_meeting(db, meeting_id, current_user.company_id, payload)
+    item = MeetingResponse.model_validate(meeting)
+    if meeting.lead:
+        item.lead_name = meeting.lead.full_name
+    return item
 
 # =========================================================
 # 📲 TWILIO SMS WEBHOOK (Entrada de mensajes del prospecto)

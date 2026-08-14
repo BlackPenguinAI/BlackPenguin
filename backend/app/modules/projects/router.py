@@ -1404,6 +1404,9 @@ def project_marketing_summary(
             "campaigns": len(campaigns), "active_campaigns": sum(item.status == "active" for item in campaigns),
             "leads": len(leads), "qualified": qualified_total, "appointments": appointments_total,
             "conversion_rate": round(100 * appointments_total / len(leads), 2) if leads else 0,
+            "high_intent": sum(float(lead.intent_score or 0) >= 0.75 for lead in leads),
+            "pending_follow_up": sum(lead.next_action_at is not None for lead in leads),
+            "follow_up_rate": round(100 * sum(lead.last_interaction_at is not None for lead in leads) / len(leads), 1) if leads else 0,
         },
         "campaigns": campaign_metrics,
         "leads": [{
@@ -1411,7 +1414,9 @@ def project_marketing_summary(
             "campaign_id": lead.campaign_id,
             "campaign_name": campaign_by_id.get(lead.campaign_id).name if lead.campaign_id in campaign_by_id else "Unattributed",
             "funnel_stage": lead.funnel_stage.value, "intent_score": float(lead.intent_score or 0),
-            "last_interaction_at": lead.last_interaction_at, "created_at": lead.created_at,
+            "last_interaction_at": lead.last_interaction_at, "next_action_at": lead.next_action_at,
+            "agent_status": lead.agent_status, "qualification_summary": lead.qualification_summary,
+            "is_opt_out": lead.is_opt_out, "created_at": lead.created_at,
         } for lead in leads],
     }
 

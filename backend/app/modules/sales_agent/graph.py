@@ -13,6 +13,7 @@ from app.modules.projects import asset_share_service
 from app.modules.projects.models import Project, ProjectPropertyType, ProjectUnit
 from app.modules.sales_crm.models import Lead
 
+from .models import SalesMessage
 from .state import SalesAgentState
 
 
@@ -90,6 +91,9 @@ def build_sales_graph(db: Session):
             })
         if structured_inventory:
             db.commit()
+        history = db.query(SalesMessage).filter(
+            SalesMessage.conversation_id == state["conversation_id"],
+        ).order_by(SalesMessage.created_at.asc()).all()
         return {
             "company_context": {"id": company.id, "name": company.name},
             "project_context": {"id": project.id, "name": project.name, "is_demo": project.is_demo, "profile": confirmed},
@@ -104,6 +108,10 @@ def build_sales_graph(db: Session):
                 "intent_score": float(lead.intent_score or 0), "consent_status": lead.consent_status,
                 "qualification_summary": lead.qualification_summary,
             },
+            "conversation_history": [
+                {"role": message.role, "content": message.content}
+                for message in history[-20:]
+            ],
         }
 
     async def resolve_prompt(state: SalesAgentState) -> dict[str, Any]:
@@ -123,6 +131,17 @@ def build_sales_graph(db: Session):
     async def reason(state: SalesAgentState) -> dict[str, Any]:
         config = get_ai_config(db, state["company_id"])
         if not config.openrouter_api_key:
+            if state.get("project_context", {}).get("is_demo"):
+                return {
+                    "intent": "demo_follow_up",
+                    "proposed_actions": [{"type": "ask_qualification_question"}],
+                    "proposed_reply": (
+                        "Thanks for sharing that. What matters most for your next home: "
+                        "location, number of bedrooms, budget, or move-in timing?"
+                    ),
+                    "requires_human": False,
+                    "error_code": None,
+                }
             return {"requires_human": True, "error_code": "missing_openrouter_key", "proposed_reply": None}
         contract = {
             "reply": "string",
@@ -140,8 +159,12 @@ def build_sales_graph(db: Session):
                 "allowed_actions": ["answer_question", "ask_qualification_question", "search_inventory", "request_human_review"],
                 "contract": contract,
             }, ensure_ascii=False, default=str)},
-            {"role": "user", "content": state["inbound_text"]},
         ]
+        history = state.get("conversation_history", [])
+        for message in history[:-1]:
+            if message.get("role") in {"user", "assistant"} and message.get("content"):
+                messages.append({"role": message["role"], "content": message["content"]})
+        messages.append({"role": "user", "content": state["inbound_text"]})
         raw = await generate_llm_response(
             config.openrouter_api_key,
             state["model"],
