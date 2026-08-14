@@ -12,7 +12,8 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.db.postgres import get_db
-from app.modules.projects.models import Project, ProjectCampaign
+from app.modules.projects.models import MetaConnection, Project, ProjectCampaign
+from app.modules.project_team.service import select_next_sales_user
 from app.modules.sales_agent.models import ExternalWebhookEvent
 from app.modules.sales_crm.models import Lead
 
@@ -94,9 +95,15 @@ async def receive(
             )
             db.add(event)
             try:
-                campaign = db.query(ProjectCampaign).join(Project).filter(
+                event_page_id = str(value.get("page_id") or entry.get("id") or "")
+                campaign = db.query(ProjectCampaign).join(Project).join(
+                    MetaConnection, MetaConnection.id == ProjectCampaign.meta_connection_id,
+                ).filter(
                     ProjectCampaign.lead_form_id == str(form_id),
                     ProjectCampaign.platform == "meta",
+                    MetaConnection.page_id == event_page_id,
+                    MetaConnection.verification_mode == "real",
+                    MetaConnection.verification_status == "succeeded",
                     Project.is_demo.is_(False),
                     Project.is_active.is_(True),
                 ).first()
@@ -126,6 +133,7 @@ async def receive(
                     consent_status="captured_by_source",
                     consent_captured_at=datetime.utcnow(),
                     agent_status="draft",
+                    assigned_sales_user_id=select_next_sales_user(db, project.id),
                 )
                 db.add(lead)
                 event.status = "processed"

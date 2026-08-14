@@ -38,14 +38,78 @@
     <div #chatScroll class="flex flex-1 flex-col gap-6 overflow-y-auto p-4 md:p-8">
       <ng-container *ngFor="let msg of visibleMessages">
         <div class="flex" [ngClass]="msg.sender === 'user' ? 'justify-end' : 'justify-start'">
-          <app-onboarding-ai-message
-            *ngIf="msg.sender === 'ai'"
-            [message]="msg"
-            [active]="isActiveQuestion(msg)"
-            [disabled]="isAnalyzing || profile.completion.can_complete || hasPendingReview"
-            (selected)="chooseAnswer($event, msg)"
-            (custom)="writeCustomAnswer(msg)"
-          ></app-onboarding-ai-message>
+          <div *ngIf="msg.sender === 'ai'" class="min-w-0 w-full">
+            <app-onboarding-ai-message
+              [message]="msg"
+              [active]="isActiveQuestion(msg)"
+              [disabled]="isAnalyzing || profile.completion.can_complete || hasPendingReview"
+              (selected)="chooseAnswer($event, msg)"
+              (custom)="writeCustomAnswer(msg)"
+            ></app-onboarding-ai-message>
+
+            <section *ngIf="isStructuredQuestion(msg, 'project_sales_team')" class="structured-card ml-11 mt-4 max-w-3xl">
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <h2 class="text-sm font-semibold">Assign the project Sales team</h2>
+                  <p class="mt-1 text-xs leading-relaxed text-gray-400">Select an existing Sales user or create one here. Login emails are separate from public project contact information.</p>
+                </div>
+                <span class="material-symbols-outlined text-secondary">group_add</span>
+              </div>
+              <div *ngIf="assignedSalesUsers.length" class="mt-4 space-y-2">
+                <div *ngFor="let assignment of assignedSalesUsers" class="rounded-lg border border-green-500/20 bg-green-500/[0.07] px-3 py-2">
+                  <p class="text-xs font-medium text-green-300">{{ assignment.first_name }} {{ assignment.last_name }}</p>
+                  <p class="text-[10px] text-gray-400">{{ assignment.email }} · Receives new leads</p>
+                </div>
+              </div>
+              <div class="mt-4 grid gap-2 sm:grid-cols-[1fr_auto]">
+                <select [(ngModel)]="selectedSalesUserId" class="secure-input">
+                  <option value="">Select an existing Sales user</option>
+                  <option *ngFor="let user of availableSalesUsers" [value]="user.id">{{ user.first_name }} {{ user.last_name }} · {{ user.email }}</option>
+                </select>
+                <button (click)="assignSelectedSalesUser(msg)" [disabled]="!selectedSalesUserId || teamBusy" class="structured-primary">Assign</button>
+              </div>
+              <div class="my-4 flex items-center gap-3 text-[10px] uppercase tracking-wider text-gray-600"><span class="h-px flex-1 bg-white/10"></span>or create Sales user<span class="h-px flex-1 bg-white/10"></span></div>
+              <div class="grid gap-2 sm:grid-cols-2">
+                <input [(ngModel)]="salesInvite.first_name" placeholder="First name" class="secure-input" />
+                <input [(ngModel)]="salesInvite.last_name" placeholder="Last name" class="secure-input" />
+                <input [(ngModel)]="salesInvite.email" type="email" placeholder="Business email" class="secure-input sm:col-span-2" />
+              </div>
+              <div class="mt-3 flex flex-wrap gap-2">
+                <button (click)="inviteSalesUser(msg)" [disabled]="teamBusy" class="structured-primary">{{ teamBusy ? 'Saving...' : 'Create and assign Sales user' }}</button>
+                <button *ngIf="assignedSalesUsers.length" (click)="deferStructuredStep('Sales team configured', msg)" [disabled]="teamBusy" class="structured-primary">Continue with assigned team</button>
+                <button (click)="deferStructuredStep('Configure sales team later', msg)" [disabled]="teamBusy" class="structured-secondary">Configure later in Users</button>
+              </div>
+            </section>
+
+            <section *ngIf="isStructuredQuestion(msg, 'meta_lead_setup')" class="structured-card ml-11 mt-4 max-w-3xl">
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <h2 class="text-sm font-semibold">Connect Meta Lead Ads</h2>
+                  <p class="mt-1 text-xs leading-relaxed text-gray-400">Complete these steps to associate the project's lead form. This phase performs a clearly identified simulated connection test.</p>
+                </div>
+                <span class="material-symbols-outlined text-secondary">hub</span>
+              </div>
+              <div class="mt-4 rounded-lg border border-secondary/20 bg-secondary/[0.06] p-3">
+                <p class="text-[10px] font-bold uppercase tracking-wider text-secondary">Black Penguin partner</p>
+                <p *ngIf="metaSetupConfig.configured" class="mt-1 text-xs">Business Manager ID (Business Manager identifier): <strong>{{ metaSetupConfig.partner_business_manager_id }}</strong></p>
+                <p *ngIf="!metaSetupConfig.configured" class="mt-1 text-xs text-red-300">The platform administrator must configure META_BUSINESS_MANAGER_ID before this test can run.</p>
+              </div>
+              <ol class="mt-4 space-y-3 text-xs text-gray-300">
+                <li><strong>1. Enter asset identifiers</strong><div class="mt-2 grid gap-2"><input [(ngModel)]="metaSetup.page_id" inputmode="numeric" placeholder="Page ID (Page identifier)" class="secure-input" /><input [(ngModel)]="metaSetup.ad_account_id" placeholder="Ad Account ID (Advertising Account identifier)" class="secure-input" /><input [(ngModel)]="metaSetup.lead_form_id" inputmode="numeric" placeholder="Form ID (Lead Form identifier)" class="secure-input" /></div></li>
+                <li><strong>2. Grant partner access in Meta Business Suite</strong><p class="mt-1 text-[11px] text-gray-500">Grant Black Penguin access to the Page and Advertising Account, then include it under Integrations &gt; Leads Access.</p></li>
+              </ol>
+              <div class="mt-3 space-y-2 text-xs text-gray-300">
+                <label class="structured-check"><input [(ngModel)]="metaSetup.page_access_confirmed" type="checkbox" /> I granted access to the Page.</label>
+                <label class="structured-check"><input [(ngModel)]="metaSetup.ad_account_access_confirmed" type="checkbox" /> I granted access to the Advertising Account.</label>
+                <label class="structured-check"><input [(ngModel)]="metaSetup.leads_access_confirmed" type="checkbox" /> I granted access under Integrations &gt; Leads Access.</label>
+              </div>
+              <p *ngIf="metaSetupMessage" class="mt-3 rounded-lg border border-green-500/20 bg-green-500/10 p-3 text-xs text-green-300">{{ metaSetupMessage }}</p>
+              <div class="mt-4 flex flex-wrap gap-2">
+                <button (click)="testMetaSetup(msg)" [disabled]="metaSetupBusy || !metaSetupConfig.configured" class="structured-primary">{{ metaSetupBusy ? 'Testing...' : 'Run simulated connection test' }}</button>
+                <button (click)="deferStructuredStep('Configure Meta later', msg)" [disabled]="metaSetupBusy" class="structured-secondary">Configure Meta later</button>
+              </div>
+            </section>
+          </div>
           <div *ngIf="msg.sender === 'user'" class="max-w-[85%] text-right md:max-w-[80%]">
           <span class="mb-1 block text-[10px] text-gray-500">{{ userName }}</span>
           <div class="rounded-2xl rounded-tr-sm bg-white px-5 py-3 text-left text-sm text-black">{{ msg.content }}</div>
@@ -180,16 +244,11 @@
       </section>
 
       <section class="rounded-xl border border-white/10 bg-white/[0.025] p-4">
-        <div class="flex items-center justify-between"><h3 class="text-xs font-bold uppercase tracking-wider">Campaigns</h3><button (click)="showCampaignForm = !showCampaignForm" class="text-xs text-secondary">+ Add</button></div>
-        <p *ngIf="!campaigns.length" class="mt-3 text-[11px] text-gray-500">No associated campaigns yet.</p>
-        <div *ngFor="let campaign of campaigns" class="mt-3 rounded-lg border border-white/10 p-3"><div class="flex justify-between"><span class="text-xs">{{ campaign.name }}</span><span class="text-[9px] uppercase text-secondary">{{ campaign.status }}</span></div><p class="mt-1 text-[10px] text-gray-500">{{ campaign.platform }} · {{ campaign.objective || 'Objective pending' }}</p></div>
-        <div *ngIf="showCampaignForm" class="mt-3 space-y-2"><input [(ngModel)]="newCampaign.name" placeholder="Campaign name" class="secure-input" /><input [(ngModel)]="newCampaign.objective" placeholder="Objective" class="secure-input" /><select [(ngModel)]="newCampaign.meta_connection_id" class="secure-input"><option [ngValue]="null">No Meta connection</option><option *ngFor="let connection of metaConnections" [ngValue]="connection.id">{{ connection.label }}</option></select><button (click)="createCampaign()" class="w-full rounded-lg bg-secondary/20 py-2 text-xs text-secondary">Save campaign</button></div>
-      </section>
-
-      <section class="rounded-xl border border-white/10 bg-white/[0.025] p-4">
-        <div class="flex items-center justify-between"><h3 class="text-xs font-bold uppercase tracking-wider">Meta Connections</h3><button (click)="showMetaForm = !showMetaForm" class="text-xs text-secondary">+ Connect</button></div>
-        <div *ngFor="let connection of metaConnections" class="mt-3 rounded-lg border border-white/10 p-3"><div class="flex justify-between"><span class="text-xs">{{ connection.label }}</span><span class="text-[9px]" [ngClass]="connection.verified_at ? 'text-green-400' : 'text-yellow-400'">{{ connection.verified_at ? 'VERIFIED' : 'UNVERIFIED' }}</span></div><p class="mt-1 text-[10px] text-gray-500">Token {{ connection.token_hint }}</p><button *ngIf="!connection.verified_at" (click)="verifyMeta(connection)" class="mt-2 text-[10px] text-secondary">Verify with Meta</button></div>
-        <div *ngIf="showMetaForm" class="mt-3 space-y-2"><p class="text-[10px] text-yellow-200/80">Stored encrypted. Never sent to the assistant.</p><input [(ngModel)]="metaForm.label" placeholder="Connection label" class="secure-input" /><input [(ngModel)]="metaForm.access_token" type="password" autocomplete="off" placeholder="Meta access token" class="secure-input" /><input [(ngModel)]="metaForm.business_account_id" placeholder="Business account ID" class="secure-input" /><input [(ngModel)]="metaForm.ad_account_id" placeholder="Ad account ID" class="secure-input" /><input [(ngModel)]="metaForm.page_id" placeholder="Page ID" class="secure-input" /><button (click)="createMetaConnection()" class="w-full rounded-lg bg-secondary/20 py-2 text-xs text-secondary">Save encrypted connection</button></div>
+        <h3 class="text-xs font-bold uppercase tracking-wider">Sales activation</h3>
+        <div class="mt-3 flex items-center justify-between text-[11px]"><span class="text-gray-400">Assigned Sales users</span><span>{{ assignedSalesUsers.length }}</span></div>
+        <div class="mt-2 flex items-center justify-between text-[11px]"><span class="text-gray-400">Routing</span><span>Round robin</span></div>
+        <div class="mt-2 flex items-center justify-between text-[11px]"><span class="text-gray-400">Meta setup</span><span>{{ campaigns.length ? 'Configured' : 'Pending' }}</span></div>
+        <p class="mt-3 text-[10px] leading-relaxed text-gray-500">Operational configuration is completed through the guided cards in the conversation.</p>
       </section>
     </div>
 

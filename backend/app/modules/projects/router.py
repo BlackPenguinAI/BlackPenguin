@@ -10,6 +10,7 @@ from fastapi.responses import FileResponse
 import httpx
 from sqlalchemy.orm import Session, joinedload
 
+from app.core.config import settings
 from app.db.postgres import get_db
 from app.integrations.openrouter_client import generate_llm_response
 from app.modules.ai_core.services import get_ai_config
@@ -29,7 +30,8 @@ from .models import (
 )
 from .schemas import (
     CampaignCreate, CampaignResponse, ChatBootstrapRequest, ChatMessagePayload, ChatMessageResponse, ChatTurnResponse,
-    MetaConnectionCreate, MetaConnectionResponse, ProjectCreate, ProjectProfilePatch,
+    MetaConnectionCreate, MetaConnectionResponse, MetaProjectSetupRequest, MetaProjectSetupResponse,
+    MetaSetupConfigurationResponse, ProjectCreate, ProjectProfilePatch,
     ProjectCompleteResponse, ProjectDeleteRequest, ProjectDeletionImpact, ProjectDraftResponse,
     ProjectOverviewResponse, ProjectProfileResponse, ProjectResponse,
     OnboardingStateResponse, ProposalDecision, ProposalDecisionResponse,
@@ -147,6 +149,7 @@ def _next_question(profile) -> dict[str, Any]:
     return build_next_question(
         blockers,
         final_prompt="Review the Project Profile and choose whether to approve it or make changes.",
+        profile_data=profile.profile_data or {},
     )
 
 
@@ -743,6 +746,8 @@ async def send_chat(
                 "empty_answer": "Please enter a value before continuing.",
                 "minimum_words": "Please provide a more complete answer.",
                 "minimum_characters": "Please provide a more complete answer.",
+                "sales_team_required": "Assign at least one active Sales user, or choose to configure the team later.",
+                "meta_setup_required": "Complete the guided Meta setup test, or choose to configure Meta later.",
             }
             assistant_text = explanations.get(
                 resolution.reason or "",
@@ -1049,6 +1054,49 @@ def create_campaign(project_id: str, payload: CampaignCreate, db: Session = Depe
         allow_authoritative_statuses=current_user.role in TENANT_MANAGER_ROLES,
     )
     return campaign
+
+
+@router.get("/{project_id}/meta-setup/config", response_model=MetaSetupConfigurationResponse)
+def get_meta_setup_configuration(
+    project_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker(EDITOR_ROLES)),
+):
+    services.get_project(db, project_id, current_user.company_id)
+    partner_id = settings.META_BUSINESS_MANAGER_ID.strip() or None
+    return {"partner_business_manager_id": partner_id, "configured": partner_id is not None}
+
+
+@router.post("/{project_id}/meta-setup/simulate", response_model=MetaProjectSetupResponse)
+def simulate_meta_project_setup(
+    project_id: str,
+    payload: MetaProjectSetupRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker(EDITOR_ROLES)),
+):
+    project = services.get_project(db, project_id, current_user.company_id)
+    partner_id = settings.META_BUSINESS_MANAGER_ID.strip() or None
+    if not partner_id:
+        raise HTTPException(
+            status_code=503,
+            detail="Black Penguin's Meta Business Manager ID is not configured yet.",
+        )
+    try:
+        connection, campaign = meta_service.simulate_project_setup(
+            db,
+            project=project,
+            **payload.model_dump(),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {
+        "connection": connection,
+        "campaign": campaign,
+        "simulated": True,
+        "success": True,
+        "message": "Simulated connection successful. Live Meta access must still be verified before activation.",
+        "partner_business_manager_id": partner_id,
+    }
 
 
 @router.get("/integrations/meta/connections", response_model=list[MetaConnectionResponse])

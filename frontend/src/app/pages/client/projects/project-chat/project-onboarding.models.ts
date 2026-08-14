@@ -100,7 +100,30 @@ export interface Campaign {
 export interface MetaConnection {
   id: string; label: string; business_account_id: string | null; ad_account_id: string | null;
   page_id: string | null; token_hint: string; scopes: string[]; expires_at: string | null;
-  verified_at: string | null; created_at: string;
+  verified_at: string | null; simulated_verified_at?: string | null;
+  verification_mode?: 'simulated' | 'real'; verification_status?: 'pending' | 'running' | 'succeeded' | 'failed';
+  created_at: string;
+}
+
+export interface ProjectAssignment {
+  id: string; project_id: string; user_id: string; responsibility: 'marketing' | 'sales';
+  is_primary: boolean; routing_weight: number; accepts_new_leads: boolean; is_active: boolean;
+  email: string; first_name: string | null; last_name: string | null;
+}
+
+export interface ProjectSalesCandidate {
+  id: string; email: string; first_name?: string; last_name?: string;
+  role: 'sales'; is_active: boolean;
+}
+
+export interface MetaSetupConfiguration {
+  partner_business_manager_id: string | null;
+  configured: boolean;
+}
+
+export interface MetaSetupResult {
+  connection: MetaConnection; campaign: Campaign; simulated: true; success: boolean;
+  message: string; partner_business_manager_id: string | null;
 }
 
 export const EMPTY_PROJECT_PROFILE: ProjectProfile = {

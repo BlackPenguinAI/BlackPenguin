@@ -49,6 +49,8 @@ def invite_tenant_user(
     first_name: str,
     last_name: str,
     role: UserRole,
+    commit: bool = True,
+    send_activation_email: bool = True,
 ) -> User:
     """Create one non-administrator tenant account for every invitation surface."""
     if role not in INVITABLE_TENANT_ROLES:
@@ -76,13 +78,17 @@ def invite_tenant_user(
         is_active=True,
     )
     db.add(user)
-    db.commit()
-    db.refresh(user)
-    try:
-        send_user_activation(user)
-    except Exception:
-        # The account remains valid; activation can be resent independently.
-        pass
+    if commit:
+        db.commit()
+        db.refresh(user)
+        if send_activation_email:
+            try:
+                send_user_activation(user)
+            except Exception:
+                # The account remains valid; activation can be resent independently.
+                pass
+    else:
+        db.flush()
     return user
 
 def send_user_activation(user: User):

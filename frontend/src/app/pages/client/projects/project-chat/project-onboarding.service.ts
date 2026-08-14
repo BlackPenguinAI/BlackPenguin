@@ -5,8 +5,8 @@ import { Observable } from 'rxjs';
 import { API_V1_URL } from '../../../../core/config/api.config';
 
 import {
-  Campaign, ChatMessage, ChatTurn, MetaConnection, OnboardingState, ProjectProfile, ProjectSource,
-  SourceProposal,
+  Campaign, ChatMessage, ChatTurn, MetaConnection, MetaSetupConfiguration, MetaSetupResult,
+  OnboardingState, ProjectAssignment, ProjectProfile, ProjectSalesCandidate, ProjectSource, SourceProposal,
 } from './project-onboarding.models';
 
 @Injectable({ providedIn: 'root' })
@@ -57,4 +57,21 @@ export class ProjectOnboardingService {
   getMetaConnections(): Observable<MetaConnection[]> { return this.http.get<MetaConnection[]>(`${this.baseUrl}/integrations/meta/connections`); }
   createMetaConnection(payload: Record<string, unknown>): Observable<MetaConnection> { return this.http.post<MetaConnection>(`${this.baseUrl}/integrations/meta/connections`, payload); }
   verifyMetaConnection(id: string): Observable<MetaConnection> { return this.http.post<MetaConnection>(`${this.baseUrl}/integrations/meta/connections/${id}/verify`, {}); }
+  getProjectTeam(id: string): Observable<ProjectAssignment[]> { return this.http.get<ProjectAssignment[]>(`${this.baseUrl}/${id}/team`); }
+  getSalesCandidates(id: string): Observable<ProjectSalesCandidate[]> { return this.http.get<ProjectSalesCandidate[]>(`${this.baseUrl}/${id}/team/candidates`); }
+  assignSalesUser(id: string, userId: string): Observable<ProjectAssignment> {
+    return this.http.put<ProjectAssignment>(`${this.baseUrl}/${id}/team/${userId}`, {
+      user_id: userId, responsibility: 'sales', is_primary: false,
+      routing_weight: 100, accepts_new_leads: true, is_active: true,
+    });
+  }
+  inviteAndAssignSalesUser(id: string, payload: { first_name: string; last_name: string; email: string }): Observable<ProjectAssignment> {
+    return this.http.post<ProjectAssignment>(`${this.baseUrl}/${id}/team/invite-sales`, payload);
+  }
+  getMetaSetupConfiguration(id: string): Observable<MetaSetupConfiguration> {
+    return this.http.get<MetaSetupConfiguration>(`${this.baseUrl}/${id}/meta-setup/config`);
+  }
+  simulateMetaSetup(id: string, payload: Record<string, unknown>): Observable<MetaSetupResult> {
+    return this.http.post<MetaSetupResult>(`${this.baseUrl}/${id}/meta-setup/simulate`, payload);
+  }
 }

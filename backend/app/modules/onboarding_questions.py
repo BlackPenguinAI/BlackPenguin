@@ -112,13 +112,65 @@ QUESTION_CATALOG: dict[str, dict[str, Any]] = {
         "input_type": "single_select",
         "options": ["Authorized", "Not yet authorized", "Human approval required per lead"],
     },
+    "target_audience": {
+        "input_type": "long_text",
+        "examples": [
+            "Homebuyers seeking a primary residence with practical layouts and convenient access to everyday services.",
+            "Buyers looking for a second home with strong amenities, accessibility, and long-term value.",
+            "Real-estate investors prioritizing rental demand, market liquidity, and capital appreciation potential.",
+        ],
+        "minimum_words": 8,
+        "help_text": "Describe purchase intent, budget, timing, and housing needs. Do not use sensitive personal characteristics.",
+    },
+    "value_proposition": {
+        "input_type": "long_text",
+        "examples": [
+            "A well-located project that combines thoughtful design, useful amenities, and dependable long-term value.",
+            "Flexible residences designed for comfortable daily living with convenient access to the city.",
+            "A differentiated real-estate opportunity supported by quality execution, attractive spaces, and a practical location.",
+        ],
+        "minimum_words": 8,
+    },
+    "key_differentiators": {
+        "input_type": "long_text",
+        "examples": [
+            "Strategic location, efficient layouts, and amenities designed around residents' everyday needs.",
+            "Distinctive architecture, dependable construction quality, and an integrated customer experience.",
+            "Competitive value, flexible purchasing options, and convenient access to services and transportation.",
+        ],
+        "minimum_words": 6,
+    },
+    "qualification_rules": {
+        "input_type": "long_text",
+        "examples": [
+            "Confirm budget range, purchase timeline, financing status, preferred unit type, and readiness to schedule a visit.",
+            "Qualify the desired property type, available down payment, decision timeline, financing needs, and preferred contact channel.",
+            "Prioritize leads whose budget matches available inventory and who are ready to speak with Sales or arrange a viewing.",
+        ],
+        "minimum_words": 8,
+        "help_text": "These rules guide the artificial intelligence (AI) agent when deciding whether a lead is ready for Sales.",
+    },
+    "sales_contacts": {
+        "input_type": "project_sales_team",
+        "prompt": "Assign the **Sales users** who will receive this project's leads, or create a Sales user now.",
+        "help_text": "Only active Company users with the Sales role can be assigned. You can also configure the team later from Users.",
+        "options": ["Configure sales team later"],
+    },
     "appointment_routing": {
-        "input_type": "single_select",
-        "options": ["Round robin", "By availability", "By project specialist", "Manual assignment"],
+        "input_type": "system_managed",
+        "prompt": (
+            "Lead and appointment routing uses **round robin** automatically. "
+            "New opportunities are distributed in sequence among active Sales users assigned to the project. "
+            "You can always reassign a lead or appointment manually."
+        ),
+        "options": ["Continue with round robin"],
+        "help_text": "Round robin distributes each new opportunity to the next eligible Sales user in sequence.",
     },
     "campaigns_defined": {
-        "input_type": "single_select",
-        "options": ["Yes, configure now", "Yes, configure later", "No campaigns yet", "Not applicable"],
+        "input_type": "meta_lead_setup",
+        "prompt": "Connect this project to **Meta Lead Ads** using the guided setup below.",
+        "help_text": "You will need the Page ID, Ad Account ID, and Form ID. No access token is entered in the chat.",
+        "options": ["Configure Meta later"],
     },
 }
 
@@ -174,6 +226,8 @@ def build_next_question(
             options.append(not_applicable_label)
         answer_actions[later_label] = {"kind": "defer"}
         answer_actions.setdefault(not_applicable_label, {"kind": "not_applicable"})
+    if field in {"target_audience", "value_proposition", "key_differentiators"}:
+        examples = _project_specific_examples(field, profile_data or {}, examples)
     if config.get("prompt"):
         prompt = str(config["prompt"])
     elif options:
@@ -195,6 +249,32 @@ def build_next_question(
         "help_text": config.get("help_text"),
         "answer_actions": answer_actions,
     }
+
+
+def _project_specific_examples(field: str, data: dict[str, Any], fallbacks: list[str]) -> list[str]:
+    """Build safe, deterministic drafts from already confirmed project facts."""
+    project_type = str(data.get("project_type") or "residential project").strip().lower()
+    location = str(data.get("city") or data.get("country") or "its market").strip()
+    amenities = data.get("amenities") or []
+    if isinstance(amenities, str):
+        amenities = [item.strip() for item in amenities.split(",") if item.strip()]
+    amenity_text = ", ".join(str(item) for item in amenities[:2]) or "useful amenities"
+    if field == "target_audience":
+        contextual = (
+            f"Buyers seeking a {project_type} in {location}, with practical layouts, "
+            "a defined purchase timeline, and readiness to evaluate available inventory."
+        )
+    elif field == "value_proposition":
+        contextual = (
+            f"A {project_type} in {location} that combines thoughtful design, "
+            f"{amenity_text}, and dependable long-term value."
+        )
+    else:
+        contextual = (
+            f"Strategic positioning in {location}, {amenity_text}, efficient spaces, "
+            "and a customer-focused purchase experience."
+        )
+    return [contextual, *fallbacks[:2]]
 
 
 def is_too_short(field: str, value: Any) -> bool:

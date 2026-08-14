@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     META_VERIFY_TOKEN: str = "blackpenguin_meta_token_2026"
     META_APP_SECRET: str = "app_secret_de_meta_pendiente"
     META_API_VERSION: str = "v20.0"
+    META_BUSINESS_MANAGER_ID: str = ""
 
     OPENROUTER_API_KEY: str
     DEFAULT_AI_MODEL: str = "deepseek/deepseek-chat"
@@ -42,4 +43,3 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
-

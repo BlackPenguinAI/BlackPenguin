@@ -217,6 +217,7 @@ class ProjectCampaign(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
     project = relationship("Project", back_populates="campaigns")
+    meta_connection = relationship("MetaConnection")
 
 
 class MetaConnection(Base):
@@ -228,10 +229,17 @@ class MetaConnection(Base):
     business_account_id = Column(String(150), nullable=True)
     ad_account_id = Column(String(150), nullable=True)
     page_id = Column(String(150), nullable=True)
-    token_ciphertext = Column(Text, nullable=False)
-    token_hint = Column(String(12), nullable=False)
+    token_ciphertext = Column(Text, nullable=True)
+    token_hint = Column(String(12), nullable=True)
     scopes = Column(JSON, default=list, nullable=False)
     expires_at = Column(DateTime, nullable=True)
     verified_at = Column(DateTime, nullable=True)
+    verification_mode = Column(String(20), default="real", nullable=False)
+    verification_status = Column(String(30), default="pending", nullable=False)
+    verification_results = Column(JSON, default=dict, nullable=False)
+    page_access_confirmed = Column(Boolean, default=False, nullable=False)
+    ad_account_access_confirmed = Column(Boolean, default=False, nullable=False)
+    leads_access_confirmed = Column(Boolean, default=False, nullable=False)
+    simulated_verified_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)

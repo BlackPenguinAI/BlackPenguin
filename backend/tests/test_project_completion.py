@@ -61,3 +61,25 @@ def test_conditional_fields_must_be_explicitly_resolved_and_can_be_deferred():
     assert resolved["percentage"] == 100
     assert resolved["can_complete"] is True
     assert resolved["completed"] == resolved["total"]
+
+
+def test_deferred_operational_fields_allow_profile_completion_but_not_sales_activation():
+    states = {
+        field.key: {"status": "confirmed", "applicable": True}
+        for field in FIELDS if field.requirement == "required"
+    }
+    for field in FIELDS:
+        if field.requirement == "conditionally_required":
+            states[field.key] = {"status": "not_applicable", "applicable": False}
+    states["sales_contacts"] = {"status": "deferred", "applicable": True}
+    states["appointment_routing"] = {"status": "deferred", "applicable": True}
+    states["campaigns_defined"] = {"status": "deferred", "applicable": True}
+    states["meta_connection_verified"] = {"status": "deferred", "applicable": True}
+
+    result = calculate_completion(states, final_approved=True)
+
+    assert result["can_complete"] is True
+    assert result["sales_activation_status"] == "not_ready"
+    assert {item["field"] for item in result["sales_activation_blockers"]} >= {
+        "sales_contacts", "appointment_routing", "campaigns_defined", "meta_connection_verified",
+    }

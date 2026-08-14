@@ -24,3 +24,13 @@ class ProjectUserAssignment(Base):
 
     user = relationship("User")
     project = relationship("Project")
+
+
+class ProjectRoutingState(Base):
+    __tablename__ = "project_routing_states"
+
+    project_id = Column(String(36), ForeignKey("projects.id", ondelete="CASCADE"), primary_key=True)
+    policy = Column(String(30), default="round_robin", nullable=False)
+    last_assigned_user_id = Column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    assignment_sequence = Column(Integer, default=0, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)

@@ -36,4 +36,8 @@ export class OnboardingResponseOptionsComponent {
     const examples = Array.isArray(this.question?.examples) ? this.question.examples : [];
     return options.length ? options : examples;
   }
+
+  get isStructuredStep(): boolean {
+    return ['project_sales_team', 'meta_lead_setup'].includes(this.question?.input_type || '');
+  }
 }

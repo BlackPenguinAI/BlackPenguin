@@ -296,9 +296,35 @@ class MetaConnectionResponse(BaseModel):
     business_account_id: str | None = None
     ad_account_id: str | None = None
     page_id: str | None = None
-    token_hint: str
+    token_hint: str | None = None
     scopes: list[str] = Field(default_factory=list)
     expires_at: datetime | None = None
     verified_at: datetime | None = None
+    verification_mode: Literal["simulated", "real"] = "real"
+    verification_status: Literal["pending", "running", "succeeded", "failed"] = "pending"
+    simulated_verified_at: datetime | None = None
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
+
+
+class MetaProjectSetupRequest(BaseModel):
+    page_id: str = Field(min_length=5, max_length=32)
+    ad_account_id: str = Field(min_length=5, max_length=36)
+    lead_form_id: str = Field(min_length=5, max_length=32)
+    page_access_confirmed: bool
+    ad_account_access_confirmed: bool
+    leads_access_confirmed: bool
+
+
+class MetaProjectSetupResponse(BaseModel):
+    connection: MetaConnectionResponse
+    campaign: CampaignResponse
+    simulated: bool = True
+    success: bool = True
+    message: str
+    partner_business_manager_id: str | None = None
+
+
+class MetaSetupConfigurationResponse(BaseModel):
+    partner_business_manager_id: str | None = None
+    configured: bool

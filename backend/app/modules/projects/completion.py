@@ -126,7 +126,22 @@ def calculate_completion(states: dict[str, Any] | None, *, final_approved: bool 
             "total": len(section_fields),
             "percentage": round(100 * len(section_completed) / len(section_fields)) if section_fields else 100,
         })
-    activation_blockers = [b for b in blockers if b["section"] in {"inventory", "routing", "campaigns", "approval"}]
+    activation_fields = [
+        f for f in FIELDS
+        if f.section in {"inventory", "routing", "campaigns", "approval"}
+        and (f.requirement == "required" or states.get(f.key, {}).get("applicable") is True)
+    ]
+    activation_blockers = [
+        {
+            "field": f.key,
+            "label": f.label,
+            "section": f.section,
+            "status": states.get(f.key, {}).get("status", "missing"),
+            "requirement": f.requirement,
+        }
+        for f in activation_fields
+        if states.get(f.key, {}).get("status", "missing") not in {"confirmed", "corrected_by_user", "not_applicable"}
+    ]
     return {
         "percentage": percentage,
         "required_fields_complete": not blockers,

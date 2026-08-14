@@ -34,4 +34,15 @@ describe('OnboardingResponseOptionsComponent', () => {
     expect(component.question.help_text).toContain('Doing Business As');
     expect(component.question.answer_actions?.['No DBA — not applicable'].kind).toBe('not_applicable');
   });
+
+  it('delegates structured Project steps to their dedicated cards', () => {
+    const component = new OnboardingResponseOptionsComponent();
+    component.question = {
+      field: 'sales_contacts', label: 'Sales team', prompt: 'Assign Sales',
+      input_type: 'project_sales_team', options: ['Configure later'], examples: [],
+      allow_custom: true, minimum_words: null,
+    };
+
+    expect(component.isStructuredStep).toBe(true);
+  });
 });

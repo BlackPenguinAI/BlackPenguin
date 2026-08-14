@@ -26,6 +26,18 @@ REQUIRED_COLUMNS = {
         "idempotency_key",
         "available_at",
     },
+    "meta_connections": {
+        "verification_mode",
+        "verification_status",
+        "verification_results",
+        "simulated_verified_at",
+    },
+    "project_routing_states": {
+        "project_id",
+        "policy",
+        "last_assigned_user_id",
+        "assignment_sequence",
+    },
 }
 
 

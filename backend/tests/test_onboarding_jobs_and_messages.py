@@ -48,7 +48,7 @@ def test_repeating_a_failed_url_does_not_implicitly_retry_it():
 def test_create_all_metadata_registers_durable_jobs_and_schema_version():
     assert OnboardingSourceJob.__tablename__ in Base.metadata.tables
     assert "schema_versions" in Base.metadata.tables
-    assert CURRENT_SCHEMA_VERSION == "20260805_onboarding_jobs_v2"
+    assert CURRENT_SCHEMA_VERSION == "20260814_project_sales_meta"
 
 
 def test_jobs_include_retry_availability_timestamp():

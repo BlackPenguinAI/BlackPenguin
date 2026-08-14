@@ -1,4 +1,4 @@
-<section *ngIf="choices.length || question.allow_custom" class="question-options" aria-label="Suggested responses">
+<section *ngIf="!isStructuredStep && (choices.length || question.allow_custom)" class="question-options" aria-label="Suggested responses">
   <p *ngIf="showPrompt && !answered" class="question-prompt">{{ question.prompt }}</p>
   <p *ngIf="question.help_text && !answered" class="hint">{{ question.help_text }}</p>
   <div class="choice-list" [class.choice-list--examples]="!question.options.length">

@@ -87,3 +87,35 @@ def test_official_website_requires_the_structured_contract():
     assert validate_onboarding_value(
         "official_corporate_website", {"exists": True, "url": "cbhhomes.com"},
     )["code"] == "invalid_website"
+
+
+def test_project_sales_strategy_questions_offer_editable_examples():
+    for field in ("target_audience", "value_proposition", "key_differentiators", "qualification_rules"):
+        question = build_next_question(
+            [{"field": field, "label": field.replace("_", " ").title()}],
+            final_prompt="Approve",
+            profile_data={"project_type": "Single-family", "city": "Miami", "amenities": ["Pool"]},
+        )
+        assert question["examples"]
+        assert question["allow_custom"] is True
+        assert question["input_type"] == "long_text"
+
+
+def test_project_operational_steps_use_structured_contracts():
+    team = build_next_question(
+        [{"field": "sales_contacts", "label": "Sales contacts"}], final_prompt="Approve",
+    )
+    assert team["input_type"] == "project_sales_team"
+    assert team["options"] == ["Configure sales team later"]
+
+    routing = build_next_question(
+        [{"field": "appointment_routing", "label": "Appointment routing"}], final_prompt="Approve",
+    )
+    assert routing["input_type"] == "system_managed"
+    assert routing["options"] == ["Continue with round robin"]
+
+    meta = build_next_question(
+        [{"field": "campaigns_defined", "label": "Associated campaigns"}], final_prompt="Approve",
+    )
+    assert meta["input_type"] == "meta_lead_setup"
+    assert "Page ID" in (meta["help_text"] or "")

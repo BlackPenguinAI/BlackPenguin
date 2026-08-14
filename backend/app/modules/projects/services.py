@@ -11,11 +11,13 @@ from sqlalchemy.orm.attributes import flag_modified
 
 from app.modules.companies.models import Company
 from app.modules.onboarding_questions import is_too_short, validate_onboarding_value
+from app.modules.project_team.models import ProjectUserAssignment
+from app.modules.users.models import User
 
 from .completion import FIELD_BY_KEY, VALID_STATUSES, calculate_completion, field_progress, normalize_field_key
 from . import storage_service
 from .models import (
-    Project, ProjectCampaign, ProjectMessage, ProjectOnboardingProposal, ProjectOnboardingSource, ProjectProfile,
+    MetaConnection, Project, ProjectCampaign, ProjectMessage, ProjectOnboardingProposal, ProjectOnboardingSource, ProjectProfile,
     ProjectProposalStatus, ProjectSourceKind, ProjectSourceStatus, ProjectUnit,
     ProjectSession, SenderType,
 )
@@ -288,6 +290,93 @@ def resolve_answer_to_question(
         )
 
     input_type = str(question.ui_payload.get("input_type") or "text")
+    if input_type == "project_sales_team":
+        if text.casefold() == "configure sales team later":
+            return QuestionResolution(
+                True,
+                "accepted",
+                [
+                    _user_update("sales_contacts", None, status="deferred", applicable=True),
+                    _user_update("appointment_routing", "round_robin", status="deferred", applicable=True),
+                ],
+                question=question,
+                action="defer_sales_team",
+            )
+        assignments = (
+            db.query(ProjectUserAssignment)
+            .join(User, User.id == ProjectUserAssignment.user_id)
+            .filter(
+                ProjectUserAssignment.project_id == profile.project_id,
+                ProjectUserAssignment.responsibility == "sales",
+                ProjectUserAssignment.is_active.is_(True),
+                User.is_active.is_(True),
+            )
+            .all()
+        )
+        if not assignments:
+            return QuestionResolution(True, "rejected", [], "sales_team_required", question)
+        user_ids = [item.user_id for item in assignments]
+        return QuestionResolution(
+            True,
+            "accepted",
+            [
+                _user_update("sales_contacts", user_ids),
+                _user_update("appointment_routing", "round_robin"),
+            ],
+            question=question,
+            action="sales_team_configured",
+        )
+    if input_type == "system_managed" and field == "appointment_routing":
+        return QuestionResolution(
+            True,
+            "accepted",
+            [_user_update("appointment_routing", "round_robin")],
+            question=question,
+            action="round_robin_confirmed",
+        )
+    if input_type == "meta_lead_setup":
+        if text.casefold() == "configure meta later":
+            return QuestionResolution(
+                True,
+                "accepted",
+                [
+                    _user_update("campaigns_defined", None, status="deferred", applicable=True),
+                    _user_update("meta_connection_verified", None, status="deferred", applicable=True),
+                ],
+                question=question,
+                action="defer_meta_setup",
+            )
+        campaign = (
+            db.query(ProjectCampaign)
+            .join(MetaConnection, MetaConnection.id == ProjectCampaign.meta_connection_id)
+            .filter(
+                ProjectCampaign.project_id == profile.project_id,
+                ProjectCampaign.platform == "meta",
+                ProjectCampaign.lead_form_id.isnot(None),
+                MetaConnection.verification_status == "succeeded",
+            )
+            .first()
+        )
+        if not campaign:
+            return QuestionResolution(True, "rejected", [], "meta_setup_required", question)
+        verification_status = (
+            "confirmed" if campaign.meta_connection.verification_mode == "real" else "deferred"
+        )
+        return QuestionResolution(
+            True,
+            "accepted",
+            [
+                _user_update("campaigns_defined", True),
+                _user_update(
+                    "meta_connection_verified",
+                    campaign.meta_connection.verification_mode == "real",
+                    status=verification_status,
+                    applicable=True,
+                ),
+            ],
+            question=question,
+            action="meta_setup_completed",
+        )
     value: Any
     if input_type == "multi_select":
         value = [item.strip() for item in re.split(r"[,;]", text) if item.strip()]

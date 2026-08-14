@@ -19,8 +19,9 @@ import {
 } from '../../../../shared/utils/review-scroll-anchor';
 
 import {
-  Campaign, ChatAttachment, ChatMessage, ChatTurn, EMPTY_PROJECT_PROFILE, MetaConnection, OnboardingState,
-  ProjectFieldProgress, ProjectProfile, ProjectSource, SourceProposal, ValidationStatus,
+  Campaign, ChatAttachment, ChatMessage, ChatTurn, EMPTY_PROJECT_PROFILE, MetaConnection,
+  MetaSetupConfiguration, OnboardingState, ProjectAssignment, ProjectFieldProgress, ProjectProfile,
+  ProjectSalesCandidate, ProjectSource, SourceProposal, ValidationStatus,
 } from './project-onboarding.models';
 import { ProjectOnboardingService } from './project-onboarding.service';
 
@@ -45,6 +46,18 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   sources: ProjectSource[] = [];
   campaigns: Campaign[] = [];
   metaConnections: MetaConnection[] = [];
+  companyUsers: ProjectSalesCandidate[] = [];
+  projectTeam: ProjectAssignment[] = [];
+  selectedSalesUserId = '';
+  salesInvite = { first_name: '', last_name: '', email: '' };
+  teamBusy = false;
+  metaSetupConfig: MetaSetupConfiguration = { partner_business_manager_id: null, configured: false };
+  metaSetup = {
+    page_id: '', ad_account_id: '', lead_form_id: '',
+    page_access_confirmed: false, ad_account_access_confirmed: false, leads_access_confirmed: false,
+  };
+  metaSetupBusy = false;
+  metaSetupMessage = '';
   profile: ProjectProfile = EMPTY_PROJECT_PROFILE;
   showWelcome = false;
   initialState: 'loading' | 'ready' | 'error' = 'loading';
@@ -74,7 +87,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.projectId = this.route.snapshot.paramMap.get('id') || '';
     this.userName = localStorage.getItem('bp_name') || 'User';
-    this.syncState(); this.loadCampaigns(); this.loadMetaConnections();
+    this.syncState(); this.loadCampaigns(); this.loadMetaConnections(); this.loadSalesTeam(); this.loadMetaSetupConfiguration();
     this.speechSubscriptions.add(this.speech.state$.subscribe((state) => {
       this.isRecording = state === 'listening';
       this.cdr.detectChanges();
@@ -117,6 +130,80 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   loadSources(): void { this.onboarding.getSources(this.projectId).subscribe({ next: (items) => this.sources = this.prepareSources(items) }); }
   loadCampaigns(): void { this.onboarding.getCampaigns(this.projectId).subscribe({ next: (items) => this.campaigns = items }); }
   loadMetaConnections(): void { this.onboarding.getMetaConnections().subscribe({ next: (items) => this.metaConnections = items }); }
+  loadSalesTeam(): void {
+    this.onboarding.getProjectTeam(this.projectId).subscribe({ next: (items) => this.projectTeam = items });
+    this.onboarding.getSalesCandidates(this.projectId).subscribe({
+      next: (items) => this.companyUsers = items,
+      error: () => this.errorMessage = 'Company Sales users could not be loaded.',
+    });
+  }
+  loadMetaSetupConfiguration(): void {
+    this.onboarding.getMetaSetupConfiguration(this.projectId).subscribe({
+      next: (configuration) => this.metaSetupConfig = configuration,
+    });
+  }
+
+  get availableSalesUsers(): ProjectSalesCandidate[] {
+    const assigned = new Set(this.projectTeam.filter((item) => item.responsibility === 'sales').map((item) => item.user_id));
+    return this.companyUsers.filter((item) => item.role === 'sales' && item.is_active && !assigned.has(item.id));
+  }
+  get assignedSalesUsers(): ProjectAssignment[] {
+    return this.projectTeam.filter((item) => item.responsibility === 'sales' && item.is_active);
+  }
+  isStructuredQuestion(message: ChatMessage, inputType: string): boolean {
+    return this.isActiveQuestion(message) && message.ui_payload?.input_type === inputType;
+  }
+  assignSelectedSalesUser(message: ChatMessage): void {
+    if (!this.selectedSalesUserId || this.teamBusy) return;
+    this.teamBusy = true; this.errorMessage = '';
+    this.onboarding.assignSalesUser(this.projectId, this.selectedSalesUserId).subscribe({
+      next: (assignment) => {
+        this.projectTeam = [...this.projectTeam.filter((item) => item.user_id !== assignment.user_id), assignment];
+        this.selectedSalesUserId = ''; this.teamBusy = false;
+        this.submitStructuredAnswer('Sales team configured', message);
+      },
+      error: (error: HttpErrorResponse) => {
+        this.teamBusy = false;
+        this.errorMessage = error.error?.detail || 'The Sales user could not be assigned.';
+      },
+    });
+  }
+  inviteSalesUser(message: ChatMessage): void {
+    if (!this.salesInvite.first_name.trim() || !this.salesInvite.last_name.trim() || !this.salesInvite.email.trim() || this.teamBusy) return;
+    this.teamBusy = true; this.errorMessage = '';
+    this.onboarding.inviteAndAssignSalesUser(this.projectId, this.salesInvite).subscribe({
+      next: (assignment) => {
+        this.projectTeam = [...this.projectTeam, assignment];
+        this.companyUsers = [...this.companyUsers, {
+          id: assignment.user_id, email: assignment.email, first_name: assignment.first_name || undefined,
+          last_name: assignment.last_name || undefined, role: 'sales', is_active: true,
+        }];
+        this.salesInvite = { first_name: '', last_name: '', email: '' }; this.teamBusy = false;
+        this.submitStructuredAnswer('Sales team configured', message);
+      },
+      error: (error: HttpErrorResponse) => {
+        this.teamBusy = false;
+        this.errorMessage = error.error?.detail || 'The Sales user could not be created and assigned.';
+      },
+    });
+  }
+  deferStructuredStep(value: string, message: ChatMessage): void { this.submitStructuredAnswer(value, message); }
+  testMetaSetup(message: ChatMessage): void {
+    if (this.metaSetupBusy) return;
+    this.metaSetupBusy = true; this.metaSetupMessage = ''; this.errorMessage = '';
+    this.onboarding.simulateMetaSetup(this.projectId, this.metaSetup).subscribe({
+      next: (result) => {
+        this.metaSetupBusy = false; this.metaSetupMessage = result.message;
+        this.metaConnections = [...this.metaConnections.filter((item) => item.id !== result.connection.id), result.connection];
+        this.campaigns = [...this.campaigns.filter((item) => item.id !== result.campaign.id), result.campaign];
+        this.submitStructuredAnswer('Meta setup completed', message);
+      },
+      error: (error: HttpErrorResponse) => {
+        this.metaSetupBusy = false;
+        this.errorMessage = typeof error.error?.detail === 'string' ? error.error.detail : 'The simulated Meta connection test could not be completed.';
+      },
+    });
+  }
 
   startConversation(): void {
     this.showWelcome = false;
@@ -499,6 +586,11 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
       const selected = choices.find((item) => item.toLocaleLowerCase() === answer.toLocaleLowerCase()) || null;
       return { ...message, response_payload: { status: 'answered', answer, selected_option: selected, custom: !selected } };
     });
+  }
+  private submitStructuredAnswer(value: string, message: ChatMessage): void {
+    this.prompt = value;
+    this.replyToMessageId = message.id || null;
+    this.sendMessage();
   }
   private scrollToBottom(): void { setTimeout(() => { const element = this.chatScroll?.nativeElement; if (element) element.scrollTop = element.scrollHeight; this.cdr.detectChanges(); }, 100); }
 }
