@@ -289,9 +289,10 @@ jobs:
               -e DATABASE_URL=sqlite:////tmp/blackpenguin-preflight.db \
               -e PROJECT_UPLOAD_ROOT=/tmp/blackpenguin-test-uploads \
               -e SEED_MINTO_DEMO=false \
+              -e PYTHONPATH=/app \
               -v "$REPOSITORY_DIR/backend/tests:/app/tests:ro" \
               "$API_IMAGE" \
-              pytest -q /app/tests
+              python -m pytest -q /app/tests
 
             # Docker creates the bind-mount directory when it does not exist.
             # The write check runs as the same image user as API and worker and
