@@ -280,6 +280,19 @@ jobs:
               -t "$FRONTEND_IMAGE" \
               ./frontend
 
+            # Exercise the exact backend image before any production container
+            # is stopped or any database migration is applied. Tests are mounted
+            # read-only so the production image remains immutable.
+            docker run --rm \
+              --env-file backend/.env \
+              -e ENVIRONMENT=test \
+              -e DATABASE_URL=sqlite:////tmp/blackpenguin-preflight.db \
+              -e PROJECT_UPLOAD_ROOT=/tmp/blackpenguin-test-uploads \
+              -e SEED_MINTO_DEMO=false \
+              -v "$REPOSITORY_DIR/backend/tests:/app/tests:ro" \
+              "$API_IMAGE" \
+              pytest -q /app/tests
+
             # Docker creates the bind-mount directory when it does not exist.
             # The write check runs as the same image user as API and worker and
             # therefore needs neither sudo nor an interactive password.

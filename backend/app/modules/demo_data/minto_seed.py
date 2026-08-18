@@ -523,12 +523,8 @@ def _upsert_project_page_source(
     source.status = ProjectSourceStatus.READY
     source.error_message = None
     source.uploaded_by_user_id = admin.id
-    source.name = path.name
-    source.url = image["source_url"]
-    source.mime_type = image["mime_type"]
-    source.size_bytes = len(content)
-    source.original_filename = path.name
-    source.extracted_text = "[Official Minto project image retained for the demo]"
+    source.name = manifest["name"]
+    source.url = manifest["url"]
     source.mime_type = "text/html"
     source.extracted_text = manifest["source_summary"]
     return source
@@ -566,6 +562,14 @@ def _upsert_project_image(
         db.flush()
     source.status = ProjectSourceStatus.READY
     source.error_message = None
+    source.uploaded_by_user_id = admin.id
+    source.name = path.name
+    source.url = image["source_url"]
+    source.mime_type = image["mime_type"]
+    source.size_bytes = len(content)
+    source.sha256 = digest
+    source.original_filename = path.name
+    source.extracted_text = "[Official Minto project image retained for the demo]"
     source.is_primary = bool(image.get("primary"))
     if source.is_primary:
         db.query(ProjectOnboardingSource).filter(

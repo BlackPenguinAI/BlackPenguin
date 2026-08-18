@@ -60,13 +60,26 @@ def test_minto_seed_is_complete_idempotent_and_agent_ready(monkeypatch, tmp_path
         assert db.query(ProjectCampaign).count() == 2
         assert db.query(ProjectOnboardingSource).count() == 8
 
+        page_sources = db.query(ProjectOnboardingSource).filter(
+            ProjectOnboardingSource.kind == ProjectSourceKind.URL
+        ).all()
+        assert len(page_sources) == 2
+        assert all(source.mime_type == "text/html" for source in page_sources)
+        assert all(source.name and source.url and source.extracted_text for source in page_sources)
+
+        image_sources = db.query(ProjectOnboardingSource).filter(
+            ProjectOnboardingSource.kind == ProjectSourceKind.IMAGE
+        ).all()
+        assert len(image_sources) == 6
+        assert all(source.name == source.original_filename for source in image_sources)
+        assert all(source.mime_type.startswith("image/") for source in image_sources)
+        assert all(source.size_bytes and source.sha256 for source in image_sources)
+
         options = simulation_options(db, company_id=company.id)
         assert {item["name"] for item in options} == {"Wildflower", "East Hills Crossing"}
         assert all(item["campaigns"] and item["products"] for item in options)
         assert {product["currency"] for item in options for product in item["products"]} == {"CAD"}
-        assert all(source.storage_path for source in db.query(ProjectOnboardingSource).filter(
-            ProjectOnboardingSource.kind == ProjectSourceKind.IMAGE
-        ))
+        assert all(source.storage_path for source in image_sources)
     finally:
         db.close()
         engine.dispose()
