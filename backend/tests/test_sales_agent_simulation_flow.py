@@ -1,5 +1,7 @@
 import asyncio
+from datetime import datetime
 import importlib.util
+import json
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
@@ -61,6 +63,7 @@ def _fixture(db):
         project_id=project.id, name="Oxford F", code="OXF", bedrooms=4, bathrooms=3.5,
         area_min=2774, area_max=3000, area_unit="ft²", total_units=7, available_units=1,
         starting_price=589990, maximum_price=650000, currency="USD", review_status="confirmed",
+        inventory_updated_at=datetime(2026, 8, 14, 12, 0),
     )
     db.add_all([profile, campaign, product]); db.flush()
     for user in (sales_a, sales_b):
@@ -138,6 +141,8 @@ def test_lead_is_saved_before_the_first_llm_call_and_keeps_structured_product_co
     assert qualification["selected_product"]["id"] == f"property_type:{product.id}"
     assert qualification["budget"] == {"minimum": 600000.0, "maximum": 700000.0, "currency": "USD"}
     assert "purchase_timeline" not in qualification
+    assert simulation.form_snapshot["selected_product"]["inventory_updated_at"] == "2026-08-14T12:00:00"
+    json.dumps(simulation.form_snapshot)
 
 
 def test_initial_sms_is_idempotent_and_rejects_cross_tenant_access():

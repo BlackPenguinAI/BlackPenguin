@@ -5,6 +5,7 @@ import json
 import uuid
 
 from fastapi import HTTPException
+from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session
 
 from app.modules.project_team.service import eligible_sales_assignments
@@ -204,7 +205,7 @@ def create_simulation(
         conversation_id=conversation.id,
         created_by_user_id=created_by_user_id,
         status="initializing",
-        form_snapshot={
+        form_snapshot=jsonable_encoder({
             "first_name": lead_form["first_name"],
             "last_name": lead_form["last_name"],
             "full_name": full_name,
@@ -214,7 +215,7 @@ def create_simulation(
             "budget": budget,
             "consent": True,
             "custom_answers": lead_form.get("custom_answers") or {},
-        },
+        }),
         virtual_now=now,
     )
     db.add(simulation)
