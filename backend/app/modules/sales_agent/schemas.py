@@ -1,7 +1,8 @@
 from datetime import datetime
+from decimal import Decimal
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
 
 class SimulationRequest(BaseModel):
@@ -11,14 +12,23 @@ class SimulationRequest(BaseModel):
 
 
 class SimulationLeadForm(BaseModel):
-    full_name: str = Field(min_length=2, max_length=150)
+    first_name: str = Field(min_length=1, max_length=80)
+    last_name: str = Field(min_length=1, max_length=80)
     phone: str = Field(min_length=7, max_length=30)
-    email: EmailStr | None = None
-    product_interest: str | None = Field(default=None, max_length=255)
-    budget: str | None = Field(default=None, max_length=120)
-    purchase_timeline: str | None = Field(default=None, max_length=120)
+    email: EmailStr
+    product_id: str = Field(min_length=3, max_length=260)
+    budget_min: Decimal = Field(gt=0, max_digits=16, decimal_places=2)
+    budget_max: Decimal | None = Field(default=None, gt=0, max_digits=16, decimal_places=2)
     consent: bool
     custom_answers: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("first_name", "last_name")
+    @classmethod
+    def normalize_name(cls, value: str) -> str:
+        normalized = " ".join(value.split())
+        if not normalized:
+            raise ValueError("First and last name are required.")
+        return normalized
 
     @field_validator("phone")
     @classmethod
@@ -27,6 +37,12 @@ class SimulationLeadForm(BaseModel):
         if len([character for character in compact if character.isdigit()]) < 7:
             raise ValueError("Enter a valid phone number.")
         return compact
+
+    @model_validator(mode="after")
+    def validate_budget_range(self):
+        if self.budget_max is not None and self.budget_max < self.budget_min:
+            raise ValueError("Maximum budget must be greater than or equal to minimum budget.")
+        return self
 
 
 class SimulationCreate(BaseModel):
@@ -120,11 +136,31 @@ class SimulationOptionCampaign(BaseModel):
     objective: str | None = None
 
 
+class SimulationOptionProduct(BaseModel):
+    id: str
+    name: str
+    code: str | None = None
+    description: str | None = None
+    bedrooms: int | None = None
+    bathrooms: float | None = None
+    area_min: float | None = None
+    area_max: float | None = None
+    area_unit: str | None = None
+    available_units: int | None = None
+    total_units: int | None = None
+    starting_price: float | None = None
+    maximum_price: float | None = None
+    currency: str | None = None
+    inventory_updated_at: datetime | None = None
+
+
 class SimulationOptionProject(BaseModel):
     id: str
     name: str
     onboarding_status: str
     campaigns: list[SimulationOptionCampaign]
+    products: list[SimulationOptionProduct]
+    delivery_timeline: str | None = None
     eligible_sales_users: int
 
 
@@ -141,6 +177,7 @@ class SimulationCreateResponse(BaseModel):
     status: str
     initial_reply: str | None = None
     prompt_snapshot: dict[str, Any] = Field(default_factory=dict)
+    requires_initial_message: bool = True
 
 
 class AppointmentConfirmationResponse(BaseModel):

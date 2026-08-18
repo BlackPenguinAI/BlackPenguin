@@ -1,50 +1,355 @@
 <section class="agent-page">
   <header class="agent-header">
-    <div><p>AI SALES AGENT LAB</p><h1>Sales protocol simulation</h1><span>Test approved Project knowledge and Sales Agent prompts in an SMS-equivalent flow.</span></div>
-    <div class="header-actions"><select [(ngModel)]="projectId" (change)="projectChanged()"><option *ngFor="let project of options" [value]="project.id">{{project.name}}</option></select><button class="primary" (click)="setupOpen=true">New simulation</button></div>
+    <div>
+      <p>AI SALES AGENT LAB</p>
+      <h1>Sales protocol simulation</h1>
+      <span
+        >Test approved Project knowledge and Sales Agent prompts in an SMS-equivalent flow.</span
+      >
+    </div>
+    <div class="header-actions">
+      <select [(ngModel)]="projectId" (change)="projectChanged()">
+        <option *ngFor="let project of options" [value]="project.id">
+          {{ project.name }}
+        </option></select
+      ><button class="primary" (click)="setupOpen = true">New simulation</button>
+    </div>
   </header>
-  <div class="demo-banner"><span class="material-symbols-outlined">science</span><div><strong>Safe simulation</strong><small>No SMS or calendar event is sent. The same prompt, Project context, follow-up and routing contracts are exercised.</small></div></div>
-  <div *ngIf="error" class="notice error">{{error}}<button (click)="error=''">×</button></div>
-  <div *ngIf="success" class="notice success">{{success}}<button (click)="success=''">×</button></div>
+  <div class="demo-banner">
+    <span class="material-symbols-outlined">science</span>
+    <div>
+      <strong>Safe simulation</strong
+      ><small
+        >No SMS or calendar event is sent. The same prompt, Project context, follow-up and routing
+        contracts are exercised.</small
+      >
+    </div>
+  </div>
+  <div *ngIf="error" class="notice error">{{ error }}<button (click)="error = ''">×</button></div>
+  <div *ngIf="success" class="notice success">
+    {{ success }}<button (click)="success = ''">×</button>
+  </div>
 
   <section class="setup-card" *ngIf="setupOpen">
-    <div class="setup-head"><div><p>SIMULATED META LEAD FORM</p><h2>Create a test lead</h2><span>The form submission starts the agent's first SMS automatically.</span></div><button (click)="setupOpen=false" *ngIf="selected">×</button></div>
-    <div class="setup-grid">
-      <label>Project *<select [(ngModel)]="projectId" (change)="projectChanged()"><option *ngFor="let project of options" [value]="project.id">{{project.name}}</option></select><small>Only completed and approved Projects are available.</small></label>
-      <label>Campaign *<select [(ngModel)]="campaignId"><option value="" disabled>Select a campaign</option><option *ngFor="let campaign of campaigns" [value]="campaign.id">{{campaign.name}} · {{campaign.status}}</option></select><small *ngIf="!campaigns.length" class="field-error">This Project needs a campaign before it can be tested.</small></label>
-      <label>Full name *<input [(ngModel)]="form.full_name" placeholder="e.g. Taylor Morgan" [class.invalid]="!form.full_name.trim()" /></label>
-      <label>Mobile phone *<input [(ngModel)]="form.phone" placeholder="e.g. +1 305 555 0142" [class.invalid]="!form.phone.trim()" /></label>
-      <label>Email<input [(ngModel)]="form.email" type="email" placeholder="lead@example.com" /></label>
-      <label>Product interest<input [(ngModel)]="form.product_interest" placeholder="2-bedroom residence" /></label>
-      <label>Budget<input [(ngModel)]="form.budget" placeholder="$600,000–$750,000" /></label>
-      <label>Purchase timeline<input [(ngModel)]="form.purchase_timeline" placeholder="Within 6 months" /></label>
+    <div class="setup-head">
+      <div>
+        <p>SIMULATED META LEAD FORM</p>
+        <h2>Create a test lead</h2>
+        <span>The form submission starts the agent's first SMS automatically.</span>
+      </div>
+      <button (click)="setupOpen = false" *ngIf="selected">×</button>
     </div>
-    <label class="consent" [class.invalid-consent]="!form.consent"><input type="checkbox" [(ngModel)]="form.consent" /><span><b>SMS communication consent *</b><small>I agree to receive follow-up messages for this simulation.</small></span></label>
-    <div class="setup-footer"><span *ngIf="!formComplete">Complete Project, Campaign, name, phone and consent to start.</span><button class="primary" (click)="startSimulation()" [disabled]="!formComplete||creating">{{creating?'Starting agent…':'Submit form and start SMS'}}</button></div>
+    <div class="setup-grid">
+      <label
+        >Project *<select [(ngModel)]="projectId" (change)="projectChanged()">
+          <option *ngFor="let project of options" [value]="project.id">
+            {{ project.name }}
+          </option></select
+        ><small>Only completed and approved Projects are available.</small></label
+      >
+      <label
+        >Campaign *<select [(ngModel)]="campaignId">
+          <option value="" disabled>Select a campaign</option>
+          <option *ngFor="let campaign of campaigns" [value]="campaign.id">
+            {{ campaign.name }} · {{ campaign.status }}
+          </option></select
+        ><small *ngIf="!campaigns.length" class="field-error"
+          >This Project needs a campaign before it can be tested.</small
+        ></label
+      >
+      <label
+        >First name *<input
+          [(ngModel)]="form.first_name"
+          placeholder="e.g. Taylor"
+          [class.invalid]="!form.first_name.trim()"
+      /></label>
+      <label
+        >Last name *<input
+          [(ngModel)]="form.last_name"
+          placeholder="e.g. Morgan"
+          [class.invalid]="!form.last_name.trim()"
+      /></label>
+      <label
+        >Cellphone *<input
+          [(ngModel)]="form.phone"
+          type="tel"
+          placeholder="e.g. +1 305 555 0142"
+          [class.invalid]="!form.phone.trim()"
+      /></label>
+      <label
+        >Email *<input
+          [(ngModel)]="form.email"
+          type="email"
+          placeholder="lead@example.com"
+          [class.invalid]="form.email.length > 0 && !emailValid"
+      /></label>
+      <label
+        >Product interested *<select
+          [(ngModel)]="form.product_id"
+          [class.invalid]="!form.product_id"
+        >
+          <option value="" disabled>Select a property type</option>
+          <option *ngFor="let product of products" [value]="product.id">
+            {{ product.name }}{{ product.code ? ' · ' + product.code : '' }}
+          </option></select
+        ><small *ngIf="!products.length" class="field-error"
+          >This Project has no confirmed property types.</small
+        ></label
+      >
+      <label
+        >Budget minimum *
+        <div class="money-input">
+          <span>{{ currentProduct?.currency || '—' }}</span
+          ><input
+            [(ngModel)]="form.budget_min"
+            type="number"
+            min="1"
+            step="1000"
+            placeholder="600000"
+            [class.invalid]="form.budget_min !== null && !budgetValid"
+          /></div
+      ></label>
+      <label
+        >Budget maximum
+        <div class="money-input">
+          <span>{{ currentProduct?.currency || '—' }}</span
+          ><input
+            [(ngModel)]="form.budget_max"
+            type="number"
+            min="1"
+            step="1000"
+            placeholder="750000"
+            [class.invalid]="form.budget_max !== null && !budgetValid"
+          />
+        </div>
+        <small>Optional. Must be equal to or above the minimum.</small></label
+      >
+    </div>
+    <div class="product-card" *ngIf="currentProduct">
+      <div>
+        <small>SELECTED PRODUCT</small><strong>{{ currentProduct.name }}</strong
+        ><span>{{ currentProduct.description || 'Confirmed during Project onboarding.' }}</span>
+      </div>
+      <dl>
+        <div>
+          <dt>Reference price</dt>
+          <dd>
+            {{ formatMoney(currentProduct.starting_price, currentProduct.currency)
+            }}<ng-container *ngIf="currentProduct.maximum_price">
+              –
+              {{ formatMoney(currentProduct.maximum_price, currentProduct.currency) }}</ng-container
+            >
+          </dd>
+        </div>
+        <div>
+          <dt>Layout</dt>
+          <dd>
+            {{ currentProduct.bedrooms ?? '—' }} bd · {{ currentProduct.bathrooms ?? '—' }} ba
+          </dd>
+        </div>
+        <div>
+          <dt>Area</dt>
+          <dd>
+            {{ currentProduct.area_min ?? '—'
+            }}<ng-container *ngIf="currentProduct.area_max"
+              >–{{ currentProduct.area_max }}</ng-container
+            >
+            {{ currentProduct.area_unit || '' }}
+          </dd>
+        </div>
+        <div>
+          <dt>Availability</dt>
+          <dd>
+            {{ currentProduct.available_units ?? '—' }} / {{ currentProduct.total_units ?? '—' }}
+          </dd>
+        </div>
+      </dl>
+      <p *ngIf="currentProject?.delivery_timeline">
+        <b>Project delivery:</b> {{ currentProject.delivery_timeline }}
+      </p>
+    </div>
+    <label class="consent" [class.invalid-consent]="!form.consent"
+      ><input type="checkbox" [(ngModel)]="form.consent" /><span
+        ><b>SMS communication consent *</b
+        ><small>I agree to receive follow-up messages for this simulation.</small></span
+      ></label
+    >
+    <div class="setup-footer">
+      <span *ngIf="!formComplete"
+        >Complete all required contact, product, budget and consent fields to start.</span
+      ><button class="primary" (click)="startSimulation()" [disabled]="!formComplete || creating">
+        {{ creating ? 'Creating lead…' : 'Submit form and start SMS' }}
+      </button>
+    </div>
   </section>
 
   <div class="workspace" *ngIf="!setupOpen">
     <aside class="inbox">
-      <div class="inbox-top"><h2>Test leads <b>{{conversations.length}}</b></h2><input [(ngModel)]="search" placeholder="Search lead or phone" /></div>
-      <div class="filters"><button [class.active]="filter==='all'" (click)="filter='all'">All</button><button [class.active]="filter==='active'" (click)="filter='active'">Active</button><button [class.active]="filter==='paused'" (click)="filter='paused'">Paused</button></div>
+      <div class="inbox-top">
+        <h2>
+          Test leads <b>{{ conversations.length }}</b>
+        </h2>
+        <input [(ngModel)]="search" placeholder="Search lead or phone" />
+      </div>
+      <div class="filters">
+        <button [class.active]="filter === 'all'" (click)="filter = 'all'">All</button
+        ><button [class.active]="filter === 'active'" (click)="filter = 'active'">Active</button
+        ><button [class.active]="filter === 'paused'" (click)="filter = 'paused'">Paused</button>
+      </div>
       <div class="loading" *ngIf="loading">Loading conversations…</div>
-      <button *ngFor="let row of visible" class="lead" [class.selected]="selected?.id===row.id" (click)="select(row)"><i>{{initials(row.lead_name)}}</i><span><strong>{{row.lead_name}}</strong><small>{{row.last_message||'No messages yet'}}</small></span><time>{{row.last_message_at|date:'shortTime'}}</time></button>
-      <div class="empty" *ngIf="!loading&&!visible.length"><p>No simulations for this Project yet.</p><button class="primary" (click)="setupOpen=true">Create test lead</button></div>
+      <button
+        *ngFor="let row of visible"
+        class="lead"
+        [class.selected]="selected?.id === row.id"
+        (click)="select(row)"
+      >
+        <i>{{ initials(row.lead_name) }}</i
+        ><span
+          ><strong>{{ row.lead_name }}</strong
+          ><small>{{ row.last_message || 'No messages yet' }}</small></span
+        ><time>{{ row.last_message_at | date: 'shortTime' }}</time>
+      </button>
+      <div class="empty" *ngIf="!loading && !visible.length">
+        <p>No simulations for this Project yet.</p>
+        <button class="primary" (click)="setupOpen = true">Create test lead</button>
+      </div>
     </aside>
-    <main class="chat" *ngIf="selected;else noSelection">
-      <div class="chat-head"><div><i>{{initials(selected.lead_name)}}</i><span><strong>{{selected.lead_name}}</strong><small>{{selected.phone}} · {{selected.campaign_name||'Campaign'}}</small></span></div><button class="pause" (click)="action(selected.is_paused?'resume':'pause')"><span class="material-symbols-outlined">{{selected.is_paused?'play_arrow':'pause'}}</span>{{selected.is_paused?'Resume':'Pause'}}</button></div>
-      <div class="thread" #thread><div *ngIf="loadingMessages" class="loading">Loading messages…</div><div *ngFor="let message of messages" class="bubble-row" [class.agent]="message.role==='assistant'"><div class="bubble"><small>{{message.role==='assistant'?'AI sales agent':selected.lead_name}}</small><p>{{message.content}}</p><time>{{message.created_at|date:'short'}} · {{message.status}}</time></div></div></div>
-      <div class="composer"><textarea [(ngModel)]="draft" (keydown.control.enter)="send()" [disabled]="selected.is_paused||sending" rows="2" [placeholder]="selected.is_paused?'Resume the agent to continue':'Reply as the lead, exactly as an inbound SMS…'"></textarea><button (click)="send()" [disabled]="!draft.trim()||selected.is_paused||sending"><span class="material-symbols-outlined">send</span></button><small>Ctrl + Enter · Write as the lead. The agent responds using the active three-level prompt.</small></div>
+    <main class="chat" *ngIf="selected; else noSelection">
+      <div class="chat-head">
+        <div>
+          <i>{{ initials(selected.lead_name) }}</i
+          ><span
+            ><strong>{{ selected.lead_name }}</strong
+            ><small>{{ selected.phone }} · {{ selected.campaign_name || 'Campaign' }}</small></span
+          >
+        </div>
+        <button class="pause" (click)="action(selected.is_paused ? 'resume' : 'pause')">
+          <span class="material-symbols-outlined">{{
+            selected.is_paused ? 'play_arrow' : 'pause'
+          }}</span
+          >{{ selected.is_paused ? 'Resume' : 'Pause' }}
+        </button>
+      </div>
+      <div class="thread" #thread>
+        <div *ngIf="loadingMessages && !messages.length" class="loading">Loading messages…</div>
+        <div class="generation-state" *ngIf="generatingInitial">
+          <span class="material-symbols-outlined">hourglass_top</span>
+          <div>
+            <strong>Preparing the first SMS…</strong
+            ><small>The lead is already saved. You can remain on this conversation.</small>
+          </div>
+        </div>
+        <div class="generation-state failed" *ngIf="initialGenerationError && !generatingInitial">
+          <span class="material-symbols-outlined">error</span>
+          <div>
+            <strong>First SMS needs attention</strong><small>{{ initialGenerationError }}</small
+            ><button (click)="generateInitial()">Retry first SMS</button>
+          </div>
+        </div>
+        <div
+          *ngFor="let message of messages"
+          class="bubble-row"
+          [class.agent]="message.role === 'assistant'"
+        >
+          <div class="bubble">
+            <small>{{
+              message.role === 'assistant' ? 'AI sales agent' : selected.lead_name
+            }}</small>
+            <p>{{ message.content }}</p>
+            <time>{{ message.created_at | date: 'short' }} · {{ message.status }}</time>
+          </div>
+        </div>
+      </div>
+      <div class="composer">
+        <textarea
+          [(ngModel)]="draft"
+          (keydown.control.enter)="send()"
+          [disabled]="selected.is_paused || sending || generatingInitial"
+          rows="2"
+          [placeholder]="
+            selected.is_paused
+              ? 'Resume the agent to continue'
+              : sending
+                ? 'Waiting for the AI sales agent…'
+                : 'Reply as the lead, exactly as an inbound SMS…'
+          "
+        ></textarea
+        ><button
+          (click)="send()"
+          [disabled]="!draft.trim() || selected.is_paused || sending || generatingInitial"
+        >
+          <span class="material-symbols-outlined">{{
+            sending ? 'hourglass_top' : 'send'
+          }}</span></button
+        ><small
+          >Ctrl + Enter · Write as the lead. The agent responds using the active three-level
+          prompt.</small
+        >
+      </div>
     </main>
     <aside class="context" *ngIf="selected">
-      <p>SIMULATION CONTROL</p><div class="stage"><span>{{selected.simulation_status||'simulation'}}</span><b>{{selected.funnel_stage}}</b></div>
-      <dl><dt>Project</dt><dd>{{selected.project_name}}</dd><dt>Campaign</dt><dd>{{selected.campaign_name||'Not attributed'}}</dd><dt>Virtual time</dt><dd>{{selected.virtual_now|date:'medium'}}</dd><dt>Next follow-up</dt><dd>{{selected.next_action_at?(selected.next_action_at|date:'medium'):'Not scheduled'}}</dd><dt>Protocol review</dt><dd>{{selected.approval_status||'pending'}}</dd></dl>
-      <div class="clock" *ngIf="!selected.appointment_id"><strong>Test follow-up cadence</strong><div><button (click)="advance(24)" [disabled]="advancing">+24h</button><button (click)="advance(48)" [disabled]="advancing">+48h</button></div></div>
-      <div class="appointment" *ngIf="!selected.appointment_id"><strong>Appointment confirmation</strong><small *ngIf="!slots.length">No slots are available. A Sales user must configure availability and be assigned to this Project.</small><select [(ngModel)]="selectedSlot" *ngIf="slots.length"><option value="">Choose a verified slot</option><option *ngFor="let slot of slots" [value]="slot.start_at">{{slot.start_at|date:'medium'}} · {{slot.eligible_sales_users}} eligible</option></select><button class="primary" (click)="confirmSlot()" [disabled]="!selectedSlot||confirming">{{confirming?'Confirming…':'Confirm as lead'}}</button></div>
-      <div class="confirmed" *ngIf="selected.appointment_id"><span class="material-symbols-outlined">event_available</span><strong>Appointment confirmed</strong><small>It is now visible to the assigned Sales user.</small></div>
-      <div class="review"><strong>Client protocol approval</strong><div><button (click)="approve('approved')">Approve</button><button (click)="approve('changes_requested')">Request changes</button></div></div>
+      <p>SIMULATION CONTROL</p>
+      <div class="stage">
+        <span>{{ selected.simulation_status || 'simulation' }}</span
+        ><b>{{ selected.funnel_stage }}</b>
+      </div>
+      <dl>
+        <dt>Project</dt>
+        <dd>{{ selected.project_name }}</dd>
+        <dt>Campaign</dt>
+        <dd>{{ selected.campaign_name || 'Not attributed' }}</dd>
+        <dt>Virtual time</dt>
+        <dd>{{ selected.virtual_now | date: 'medium' }}</dd>
+        <dt>Next follow-up</dt>
+        <dd>
+          {{
+            selected.next_action_at ? (selected.next_action_at | date: 'medium') : 'Not scheduled'
+          }}
+        </dd>
+        <dt>Protocol review</dt>
+        <dd>{{ selected.approval_status || 'pending' }}</dd>
+      </dl>
+      <div class="clock" *ngIf="!selected.appointment_id">
+        <strong>Test follow-up cadence</strong>
+        <div>
+          <button (click)="advance(24)" [disabled]="advancing">+24h</button
+          ><button (click)="advance(48)" [disabled]="advancing">+48h</button>
+        </div>
+      </div>
+      <div class="appointment" *ngIf="!selected.appointment_id">
+        <strong>Appointment confirmation</strong
+        ><small *ngIf="!slots.length"
+          >No slots are available. A Sales user must configure availability and be assigned to this
+          Project.</small
+        ><select [(ngModel)]="selectedSlot" *ngIf="slots.length">
+          <option value="">Choose a verified slot</option>
+          <option *ngFor="let slot of slots" [value]="slot.start_at">
+            {{ slot.start_at | date: 'medium' }} · {{ slot.eligible_sales_users }} eligible
+          </option></select
+        ><button class="primary" (click)="confirmSlot()" [disabled]="!selectedSlot || confirming">
+          {{ confirming ? 'Confirming…' : 'Confirm as lead' }}
+        </button>
+      </div>
+      <div class="confirmed" *ngIf="selected.appointment_id">
+        <span class="material-symbols-outlined">event_available</span
+        ><strong>Appointment confirmed</strong
+        ><small>It is now visible to the assigned Sales user.</small>
+      </div>
+      <div class="review">
+        <strong>Client protocol approval</strong>
+        <div>
+          <button (click)="approve('approved')">Approve</button
+          ><button (click)="approve('changes_requested')">Request changes</button>
+        </div>
+      </div>
       <button class="handoff" (click)="action('human_handoff')">Request human handoff</button>
     </aside>
   </div>
-  <ng-template #noSelection><main class="chat no-selection"><span class="material-symbols-outlined">forum</span><h2>Select a test lead</h2><p>Choose a conversation or create a new Meta form simulation.</p></main></ng-template>
+  <ng-template #noSelection
+    ><main class="chat no-selection">
+      <span class="material-symbols-outlined">forum</span>
+      <h2>Select a test lead</h2>
+      <p>Choose a conversation or create a new Meta form simulation.</p>
+    </main></ng-template
+  >
 </section>

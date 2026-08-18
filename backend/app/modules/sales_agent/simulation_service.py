@@ -8,7 +8,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.modules.project_team.service import eligible_sales_assignments
-from app.modules.projects.models import Project, ProjectCampaign
+from app.modules.projects.models import Project, ProjectCampaign, ProjectPropertyType, ProjectUnit
 from app.modules.sales_crm.models import Lead, Meeting
 from app.modules.sales_crm.scheduling import available_slots, create_agent_appointment
 from app.modules.users.models import User
@@ -18,6 +18,88 @@ from .service import get_or_create_conversation, simulate_turn
 
 
 COMPLETED_PROJECT_STATUSES = {"complete", "completed"}
+INITIAL_EVENT_PREFIX = "simulation-start:"
+
+
+def _number(value) -> float | None:
+    return float(value) if value is not None else None
+
+
+def _delivery_timeline(project: Project) -> str | None:
+    profile = project.profile
+    if not profile:
+        return None
+    states = profile.field_states or {}
+    data = profile.profile_data or {}
+    for key in ("delivery_dates", "estimated_delivery", "availability_timeline"):
+        state = states.get(key, {})
+        value = data.get(key)
+        if value and state.get("status") in {"confirmed", "corrected_by_user"}:
+            return value if isinstance(value, str) else json.dumps(value, ensure_ascii=False)
+    return profile.delivery_dates or None
+
+
+def _property_type_product(item: ProjectPropertyType) -> dict:
+    return {
+        "id": f"property_type:{item.id}",
+        "name": item.name,
+        "code": item.code,
+        "description": item.description,
+        "bedrooms": item.bedrooms,
+        "bathrooms": item.bathrooms,
+        "area_min": _number(item.area_min),
+        "area_max": _number(item.area_max),
+        "area_unit": item.area_unit,
+        "available_units": item.available_units,
+        "total_units": item.total_units,
+        "starting_price": _number(item.starting_price),
+        "maximum_price": _number(item.maximum_price),
+        "currency": item.currency,
+        "inventory_updated_at": item.inventory_updated_at,
+    }
+
+
+def _unit_products(db: Session, project_id: str) -> list[dict]:
+    """Keep the existing Demo usable when it only has unit-level inventory."""
+    units = db.query(ProjectUnit).filter(ProjectUnit.project_id == project_id).order_by(ProjectUnit.typology).all()
+    grouped: dict[str, list[ProjectUnit]] = {}
+    for unit in units:
+        if unit.typology:
+            grouped.setdefault(unit.typology, []).append(unit)
+    result = []
+    for typology, items in grouped.items():
+        prices = [item.list_price for item in items if item.list_price is not None]
+        areas = [item.area for item in items if item.area is not None]
+        available = [item for item in items if item.status == "available"]
+        result.append({
+            "id": f"unit_typology:{typology}",
+            "name": typology,
+            "code": None,
+            "description": "Available unit typology",
+            "bedrooms": next((item.bedrooms for item in items if item.bedrooms is not None), None),
+            "bathrooms": next((item.bathrooms for item in items if item.bathrooms is not None), None),
+            "area_min": _number(min(areas)) if areas else None,
+            "area_max": _number(max(areas)) if areas else None,
+            "area_unit": None,
+            "available_units": len(available),
+            "total_units": len(items),
+            "starting_price": _number(min(prices)) if prices else None,
+            "maximum_price": _number(max(prices)) if prices else None,
+            "currency": next((item.currency for item in items if item.currency), None),
+            "inventory_updated_at": max(
+                (item.inventory_updated_at for item in items if item.inventory_updated_at),
+                default=None,
+            ),
+        })
+    return result
+
+
+def _products(db: Session, project: Project) -> list[dict]:
+    property_types = db.query(ProjectPropertyType).filter(
+        ProjectPropertyType.project_id == project.id,
+        ProjectPropertyType.review_status == "confirmed",
+    ).order_by(ProjectPropertyType.sort_order, ProjectPropertyType.name).all()
+    return [_property_type_product(item) for item in property_types] or _unit_products(db, project.id)
 
 
 def simulation_options(db: Session, *, company_id: str) -> list[dict]:
@@ -43,12 +125,14 @@ def simulation_options(db: Session, *, company_id: str) -> list[dict]:
                 "status": item.status,
                 "objective": item.objective,
             } for item in campaigns],
+            "products": _products(db, project),
+            "delivery_timeline": _delivery_timeline(project),
             "eligible_sales_users": len(eligible_sales_assignments(db, project.id)),
         })
     return result
 
 
-async def create_simulation(
+def create_simulation(
     db: Session,
     *,
     company_id: str,
@@ -74,21 +158,26 @@ async def create_simulation(
     if not lead_form.get("consent"):
         raise HTTPException(status_code=422, detail="Communication consent is required for the SMS simulation.")
 
+    product = _selected_product(db, project=project, product_id=lead_form["product_id"])
+
     now = datetime.utcnow()
     external_id = f"simulation:{uuid.uuid4()}"
+    full_name = f"{lead_form['first_name']} {lead_form['last_name']}".strip()
+    budget = {
+        "minimum": _number(lead_form["budget_min"]),
+        "maximum": _number(lead_form.get("budget_max")),
+        "currency": product.get("currency"),
+    }
     qualification = {
-        key: value for key, value in {
-            "product_interest": lead_form.get("product_interest"),
-            "budget": lead_form.get("budget"),
-            "purchase_timeline": lead_form.get("purchase_timeline"),
-            "custom_answers": lead_form.get("custom_answers") or {},
-        }.items() if value
+        "selected_product": product,
+        "budget": budget,
+        "custom_answers": lead_form.get("custom_answers") or {},
     }
     lead = Lead(
         company_id=company_id,
         project_id=project.id,
         campaign_id=campaign.id,
-        full_name=lead_form["full_name"],
+        full_name=full_name,
         phone=lead_form["phone"],
         email=str(lead_form.get("email")) if lead_form.get("email") else None,
         source="Meta Lead Form Simulation",
@@ -98,8 +187,8 @@ async def create_simulation(
         channel_address=lead_form["phone"],
         consent_status="granted_simulation",
         consent_captured_at=now,
-        qualification_summary=json.dumps(qualification, ensure_ascii=False) if qualification else None,
-        agent_status="simulation",
+        qualification_summary=json.dumps(qualification, ensure_ascii=False, default=str),
+        agent_status="initializing",
         is_demo=True,
     )
     db.add(lead)
@@ -114,40 +203,148 @@ async def create_simulation(
         lead_id=lead.id,
         conversation_id=conversation.id,
         created_by_user_id=created_by_user_id,
-        form_snapshot={**lead_form, "email": str(lead_form.get("email")) if lead_form.get("email") else None},
+        status="initializing",
+        form_snapshot={
+            "first_name": lead_form["first_name"],
+            "last_name": lead_form["last_name"],
+            "full_name": full_name,
+            "phone": lead_form["phone"],
+            "email": str(lead_form["email"]),
+            "selected_product": product,
+            "budget": budget,
+            "consent": True,
+            "custom_answers": lead_form.get("custom_answers") or {},
+        },
         virtual_now=now,
     )
     db.add(simulation)
     db.commit()
     db.refresh(simulation)
 
-    result = await simulate_turn(
-        db,
-        company_id=company_id,
-        lead_id=lead.id,
-        inbound_text=(
-            "A lead has just submitted the simulated Meta form for this campaign. "
-            "Send the approved opening SMS. Use the form facts already present in lead context, "
-            "identify the company, and ask at most one useful question."
-        ),
-        event_id=f"simulation-start:{simulation.id}",
-        record_inbound=False,
-        event_kind="lead_form_submitted",
-        virtual_now=simulation.virtual_now,
-    )
-    run = db.query(AgentRun).filter(AgentRun.id == result["run_id"]).first()
-    simulation.prompt_snapshot = run.prompt_snapshot if run else {}
-    simulation.updated_at = datetime.utcnow()
-    db.add(simulation)
-    db.commit()
     return {
         "simulation_id": simulation.id,
         "lead_id": lead.id,
         "conversation_id": conversation.id,
         "status": simulation.status,
-        "initial_reply": result.get("reply"),
-        "prompt_snapshot": simulation.prompt_snapshot or {},
+        "initial_reply": None,
+        "prompt_snapshot": {},
+        "requires_initial_message": True,
     }
+
+
+async def generate_initial_message(
+    db: Session,
+    *,
+    company_id: str,
+    simulation_id: str,
+) -> dict:
+    simulation = _simulation(db, company_id=company_id, simulation_id=simulation_id)
+    event_prefix = f"{INITIAL_EVENT_PREFIX}{simulation.id}"
+    completed = db.query(AgentRun).filter(
+        AgentRun.conversation_id == simulation.conversation_id,
+        AgentRun.event_id.like(f"{event_prefix}%"),
+        AgentRun.status.in_(("completed", "blocked")),
+    ).order_by(AgentRun.started_at.desc()).first()
+    if completed:
+        result = await simulate_turn(
+            db,
+            company_id=company_id,
+            lead_id=simulation.lead_id,
+            inbound_text=_initial_instruction(),
+            event_id=completed.event_id,
+            record_inbound=False,
+            event_kind="lead_form_submitted",
+            virtual_now=simulation.virtual_now,
+        )
+        lead = db.query(Lead).filter(Lead.id == simulation.lead_id).one()
+        simulation.prompt_snapshot = completed.prompt_snapshot or {}
+        simulation.status = "active" if result.get("reply") else "needs_retry"
+        simulation.updated_at = datetime.utcnow()
+        lead.agent_status = "simulation" if result.get("reply") else "needs_retry"
+        db.add_all([simulation, lead])
+        db.commit()
+        return result
+
+    if simulation.status == "generating" and simulation.updated_at:
+        if datetime.utcnow() - simulation.updated_at < timedelta(minutes=5):
+            raise HTTPException(status_code=409, detail="The first SMS is already being generated.")
+
+    failed_attempts = db.query(AgentRun).filter(
+        AgentRun.conversation_id == simulation.conversation_id,
+        AgentRun.event_id.like(f"{event_prefix}%"),
+        AgentRun.status == "failed",
+    ).count()
+    event_id = event_prefix if failed_attempts == 0 else f"{event_prefix}:retry:{failed_attempts}"
+    lead = db.query(Lead).filter(
+        Lead.id == simulation.lead_id,
+        Lead.company_id == company_id,
+    ).one()
+    simulation.status = "generating"
+    simulation.updated_at = datetime.utcnow()
+    lead.agent_status = "generating"
+    db.add_all([simulation, lead])
+    db.commit()
+    try:
+        result = await simulate_turn(
+            db,
+            company_id=company_id,
+            lead_id=lead.id,
+            inbound_text=_initial_instruction(),
+            event_id=event_id,
+            record_inbound=False,
+            event_kind="lead_form_submitted",
+            virtual_now=simulation.virtual_now,
+        )
+    except Exception:
+        db.rollback()
+        simulation = _simulation(db, company_id=company_id, simulation_id=simulation_id)
+        lead = db.query(Lead).filter(Lead.id == simulation.lead_id).one()
+        simulation.status = "needs_retry"
+        simulation.updated_at = datetime.utcnow()
+        lead.agent_status = "needs_retry"
+        db.add_all([simulation, lead])
+        db.commit()
+        raise
+
+    run = db.query(AgentRun).filter(AgentRun.id == result["run_id"]).first()
+    simulation = _simulation(db, company_id=company_id, simulation_id=simulation_id)
+    lead = db.query(Lead).filter(Lead.id == simulation.lead_id).one()
+    simulation.prompt_snapshot = run.prompt_snapshot if run else {}
+    simulation.status = "active" if result.get("reply") else "needs_retry"
+    simulation.updated_at = datetime.utcnow()
+    lead.agent_status = "simulation" if result.get("reply") else "needs_retry"
+    db.add_all([simulation, lead])
+    db.commit()
+    return result
+
+
+def _selected_product(db: Session, *, project: Project, product_id: str) -> dict:
+    if product_id.startswith("property_type:"):
+        item_id = product_id.removeprefix("property_type:")
+        item = db.query(ProjectPropertyType).filter(
+            ProjectPropertyType.id == item_id,
+            ProjectPropertyType.project_id == project.id,
+            ProjectPropertyType.review_status == "confirmed",
+        ).first()
+        if item:
+            return _property_type_product(item)
+    elif product_id.startswith("unit_typology:"):
+        typology = product_id.removeprefix("unit_typology:")
+        for product in _unit_products(db, project.id):
+            if product["id"] == product_id and product["name"] == typology:
+                return product
+    raise HTTPException(
+        status_code=422,
+        detail="Select a confirmed property type from the chosen Project.",
+    )
+
+
+def _initial_instruction() -> str:
+    return (
+        "A lead has just submitted the simulated Meta form for this campaign. "
+        "Send the approved opening SMS. Use the selected product and budget already present in lead context. "
+        "Do not claim the lead provided a purchase timeline. Identify the company and ask at most one useful question."
+    )
 
 
 def slots_for_simulation(

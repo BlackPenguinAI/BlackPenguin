@@ -17,7 +17,7 @@ from .schemas import (
 from .service import conversation_messages, conversation_summaries, set_conversation_action, simulate_turn
 from .simulation_service import (
     advance_simulation, approve_simulation, confirm_simulation_appointment,
-    create_simulation, simulation_options, slots_for_simulation,
+    create_simulation, generate_initial_message, simulation_options, slots_for_simulation,
 )
 
 
@@ -33,18 +33,31 @@ def get_simulation_options(
 
 
 @router.post("/simulations", response_model=SimulationCreateResponse, status_code=201)
-async def start_simulation(
+def start_simulation(
     payload: SimulationCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.MKT])),
 ):
-    return await create_simulation(
+    return create_simulation(
         db,
         company_id=current_user.company_id,
         created_by_user_id=current_user.id,
         project_id=payload.project_id,
         campaign_id=payload.campaign_id,
         lead_form=payload.lead.model_dump(),
+    )
+
+
+@router.post("/simulations/{simulation_id}/initial-message", response_model=AgentRunResponse)
+async def start_initial_message(
+    simulation_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.MKT])),
+):
+    return await generate_initial_message(
+        db,
+        company_id=current_user.company_id,
+        simulation_id=simulation_id,
     )
 
 
