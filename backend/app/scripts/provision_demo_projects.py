@@ -9,6 +9,9 @@ def main() -> None:
     try:
         created = 0
         for company in db.query(Company).all():
+            if company.name.strip().casefold() == "minto":
+                print(f"Skipped {company.id}: Minto uses the versioned demo-data seed")
+                continue
             admin = db.query(User).filter(
                 User.company_id == company.id,
                 User.role == UserRole.ADMIN,

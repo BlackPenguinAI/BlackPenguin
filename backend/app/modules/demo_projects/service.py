@@ -21,10 +21,11 @@ def provision_demo_project(
     approved_by_user_id: str,
     template_version: str = TEMPLATE_VERSION,
 ) -> Project:
-    """Create or reset the single Demo Project without committing the caller's transaction."""
+    """Create or reset the legacy synthetic Demo Project for tests and explicit tooling."""
     project = db.query(Project).filter(
         Project.company_id == company_id,
         Project.is_demo.is_(True),
+        Project.demo_template_version == template_version,
     ).first()
     now = datetime.utcnow()
     if not project:

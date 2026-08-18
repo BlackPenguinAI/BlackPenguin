@@ -266,6 +266,9 @@ jobs:
               echo "MAILCHIMP_LIST_ID=$MAILCHIMP_LIST"
               echo "MAILCHIMP_SERVER=$MAILCHIMP_SERVER"
               echo "PROJECT_UPLOAD_ROOT=$UPLOAD_DIR"
+              echo "SEED_MINTO_DEMO=true"
+              echo "MINTO_DEMO_EMAIL=test@minto.com"
+              echo "MINTO_DEMO_PASSWORD=1234"
             } > backend/.env
 
             docker build --pull \
@@ -325,6 +328,12 @@ jobs:
                 "$API_IMAGE" \
                 python -m app.scripts.reconcile_onboarding_jobs --apply
             fi
+
+            docker exec bp_api_prod sh -c '
+              if [ "${SEED_MINTO_DEMO:-false}" = "true" ]; then
+                python -m app.scripts.seed_minto_demo
+              fi
+            '
 
             start_worker "$API_IMAGE" healthcheck >/dev/null
             wait_for_readiness

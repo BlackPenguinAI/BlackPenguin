@@ -661,11 +661,17 @@ def reset_demo_project(
     project = services.get_project(db, project_id, current_user.company_id)
     if not project.is_demo:
         raise HTTPException(status_code=409, detail="Only the Demo Project can be reset.")
+    if project.demo_template_version != "v1":
+        raise HTTPException(
+            status_code=409,
+            detail="This versioned Demo Project is refreshed by its dedicated seed command.",
+        )
     try:
         project = provision_demo_project(
             db,
             company_id=current_user.company_id,
             approved_by_user_id=current_user.id,
+            template_version=project.demo_template_version,
         )
         db.commit()
         db.refresh(project)

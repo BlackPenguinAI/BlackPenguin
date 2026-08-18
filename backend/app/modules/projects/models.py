@@ -37,11 +37,12 @@ class Project(Base):
     __tablename__ = "projects"
     __table_args__ = (
         Index(
-            "uq_projects_one_demo_per_company",
+            "uq_projects_demo_template_per_company",
             "company_id",
+            "demo_template_version",
             unique=True,
-            postgresql_where=text("is_demo = true"),
-            sqlite_where=text("is_demo = 1"),
+            postgresql_where=text("is_demo = true AND demo_template_version IS NOT NULL"),
+            sqlite_where=text("is_demo = 1 AND demo_template_version IS NOT NULL"),
         ),
     )
 
