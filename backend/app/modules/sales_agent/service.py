@@ -1,16 +1,16 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 import uuid
 
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from app.modules.projects.models import Project
-from app.modules.sales_crm.models import FunnelStage, Lead
+from app.modules.projects.models import Project, ProjectCampaign
+from app.modules.sales_crm.models import FunnelStage, Lead, Meeting
 
 from .graph import GRAPH_VERSION, TOOLSET_VERSION, build_sales_graph
-from .models import AgentRun, OutboundMessage, SalesConversation, SalesMessage
+from .models import AgentRun, OutboundMessage, SalesAgentSimulation, SalesConversation, SalesFollowUpJob, SalesMessage
 
 
 def conversation_summaries(
@@ -35,6 +35,11 @@ def conversation_summaries(
         last = db.query(SalesMessage).filter(
             SalesMessage.conversation_id == conversation.id,
         ).order_by(SalesMessage.created_at.desc()).first()
+        simulation = db.query(SalesAgentSimulation).filter(
+            SalesAgentSimulation.conversation_id == conversation.id,
+        ).first()
+        campaign = db.query(ProjectCampaign).filter(ProjectCampaign.id == conversation.campaign_id).first() if conversation.campaign_id else None
+        meeting = db.query(Meeting).filter(Meeting.lead_id == lead.id).order_by(Meeting.created_at.desc()).first()
         result.append({
             "id": conversation.id, "lead_id": lead.id, "project_id": project.id,
             "campaign_id": conversation.campaign_id, "channel": conversation.channel,
@@ -47,6 +52,13 @@ def conversation_summaries(
             "last_message_at": last.created_at if last else None,
             "next_action_at": lead.next_action_at, "agent_status": lead.agent_status,
             "project_name": project.name, "is_demo": bool(project.is_demo),
+            "campaign_name": campaign.name if campaign else None,
+            "simulation_id": simulation.id if simulation else None,
+            "simulation_status": simulation.status if simulation else None,
+            "approval_status": simulation.approval_status if simulation else None,
+            "virtual_now": simulation.virtual_now if simulation else None,
+            "appointment_id": meeting.id if meeting else None,
+            "assigned_sales_user_id": lead.assigned_sales_user_id,
         })
     return result
 
@@ -112,6 +124,9 @@ async def simulate_turn(
     lead_id: str,
     inbound_text: str,
     event_id: str | None = None,
+    record_inbound: bool = True,
+    event_kind: str = "lead_message",
+    virtual_now: datetime | None = None,
 ) -> dict:
     lead = db.query(Lead).filter(Lead.id == lead_id, Lead.company_id == company_id).first()
     if not lead or not lead.project_id:
@@ -119,8 +134,8 @@ async def simulate_turn(
     project = db.query(Project).filter(Project.id == lead.project_id, Project.company_id == company_id).first()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found.")
-    if not lead.is_demo or not project.is_demo:
-        raise HTTPException(status_code=409, detail="Agent chat is currently available only for Demo leads.")
+    if not lead.is_demo:
+        raise HTTPException(status_code=409, detail="This endpoint accepts simulation leads only.")
     event_id = event_id or f"simulation:{uuid.uuid4()}"
     existing = db.query(AgentRun).filter(AgentRun.event_id == event_id).first()
     if existing:
@@ -128,22 +143,53 @@ async def simulate_turn(
         return _response(existing, output)
 
     conversation = get_or_create_conversation(db, lead, channel="simulation")
-    inbound = SalesMessage(
-        conversation_id=conversation.id,
-        channel="simulation",
-        direction="inbound",
-        role="user",
-        content=inbound_text,
-        status="received",
-    )
+    now = virtual_now or datetime.utcnow()
     conversation.is_paused = False
     conversation.pause_reason = None
-    conversation.updated_at = datetime.utcnow()
-    lead.last_interaction_at = datetime.utcnow()
+    conversation.updated_at = now
+    lead.last_interaction_at = now
     if lead.funnel_stage == FunnelStage.NEW:
         lead.funnel_stage = FunnelStage.CONTACTED
-        lead.stage_changed_at = datetime.utcnow()
-    db.add(inbound)
+        lead.stage_changed_at = now
+    if record_inbound:
+        db.add(SalesMessage(
+            conversation_id=conversation.id,
+            channel="simulation",
+            direction="inbound",
+            role="user",
+            content=inbound_text,
+            status="received",
+            created_at=now,
+        ))
+    normalized = inbound_text.strip().upper()
+    if record_inbound and normalized in {"STOP", "UNSUBSCRIBE", "CANCEL", "END", "QUIT"}:
+        lead.is_opt_out = True
+        lead.consent_status = "opted_out"
+        lead.agent_status = "paused"
+        lead.next_action_at = None
+        conversation.is_paused = True
+        conversation.pause_reason = "Lead opted out"
+        db.query(SalesFollowUpJob).filter(
+            SalesFollowUpJob.conversation_id == conversation.id,
+            SalesFollowUpJob.status == "pending",
+        ).update({SalesFollowUpJob.status: "cancelled"}, synchronize_session=False)
+        db.add(SalesMessage(
+            conversation_id=conversation.id,
+            channel="simulation",
+            direction="outbound",
+            role="assistant",
+            content="You have been unsubscribed and will not receive further messages.",
+            status="simulated",
+            created_at=now,
+        ))
+        db.commit()
+        return {
+            "run_id": f"optout:{conversation.id}", "conversation_id": conversation.id,
+            "status": "completed", "mode": "simulation",
+            "reply": "You have been unsubscribed and will not receive further messages.",
+            "intent": "opt_out", "proposed_actions": [], "requires_human": False,
+            "policy_violations": [], "draft_id": None,
+        }
     run = AgentRun(
         conversation_id=conversation.id,
         event_id=event_id,
@@ -153,7 +199,7 @@ async def simulate_turn(
         toolset_version=TOOLSET_VERSION,
         prompt_snapshot={},
         model="pending",
-        input_snapshot={"lead_id": lead.id, "message": inbound_text},
+        input_snapshot={"lead_id": lead.id, "message": inbound_text, "event_kind": event_kind},
     )
     db.add(run)
     db.commit()
@@ -169,6 +215,7 @@ async def simulate_turn(
             "lead_id": lead.id,
             "channel": "simulation",
             "inbound_text": inbound_text,
+            "event_kind": event_kind,
             "requires_human": False,
             "policy_violations": [],
         })
@@ -204,10 +251,30 @@ async def simulate_turn(
                 direction="outbound",
                 role="assistant",
                 content=result["proposed_reply"],
-                status="draft",
+                status="simulated",
+                created_at=now,
             ))
-            conversation.updated_at = datetime.utcnow()
+            conversation.updated_at = now
             lead.agent_status = "simulation"
+            pending_count = db.query(SalesFollowUpJob).filter(
+                SalesFollowUpJob.conversation_id == conversation.id,
+                SalesFollowUpJob.status == "pending",
+            ).count()
+            if pending_count == 0 and not lead.is_opt_out:
+                attempt = 1 if event_kind != "follow_up" else min(3, 1 + db.query(SalesFollowUpJob).filter(
+                    SalesFollowUpJob.conversation_id == conversation.id,
+                    SalesFollowUpJob.status == "processed",
+                ).count())
+                if attempt <= 3:
+                    scheduled_at = now + timedelta(hours=24 if attempt == 1 else 48)
+                    db.add(SalesFollowUpJob(
+                        conversation_id=conversation.id,
+                        idempotency_key=f"followup:{conversation.id}:{event_id}",
+                        scheduled_at=scheduled_at,
+                        reason="no_response",
+                        attempt_number=attempt,
+                    ))
+                    lead.next_action_at = scheduled_at
             db.add_all([conversation, lead])
         db.commit()
         db.refresh(run)

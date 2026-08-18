@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from typing import Optional, List
 from datetime import datetime
 from .models import FunnelStage, MeetingStatus
@@ -58,7 +58,7 @@ class MeetingResponse(BaseModel):
     id: str
     project_id: str
     lead_id: str
-    broker_id: str
+    broker_id: Optional[str] = None
     assigned_sales_user_id: Optional[str] = None
     meeting_time: datetime
     duration_minutes: int = 45
@@ -69,8 +69,48 @@ class MeetingResponse(BaseModel):
     notes: Optional[str] = None
     status: MeetingStatus
     gcal_event_id: Optional[str] = None
+    is_demo: bool = False
+    source: str = "manual"
     lead_name: Optional[str] = None
     created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AvailabilityWindowInput(BaseModel):
+    weekday: int = Field(ge=0, le=6)
+    start_time: str = Field(pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
+    end_time: str = Field(pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
+    is_active: bool = True
+
+    @model_validator(mode="after")
+    def validate_range(self):
+        if self.end_time <= self.start_time:
+            raise ValueError("End time must be after start time.")
+        return self
+
+
+class AvailabilityUpdate(BaseModel):
+    timezone: str = Field(min_length=1, max_length=80)
+    windows: List[AvailabilityWindowInput] = Field(default_factory=list, max_length=21)
+
+
+class AvailabilityWindowResponse(AvailabilityWindowInput):
+    id: str
+    timezone: str
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CalendarConnectionUpdate(BaseModel):
+    provider: str = Field(pattern="^(google|outlook|simulation)$")
+    calendar_id: str = Field(min_length=1, max_length=255)
+
+
+class CalendarConnectionResponse(BaseModel):
+    provider: str
+    calendar_id: Optional[str] = None
+    status: str
+    last_synced_at: Optional[datetime] = None
+    last_error: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)
 
 class SalesReportResponse(BaseModel):

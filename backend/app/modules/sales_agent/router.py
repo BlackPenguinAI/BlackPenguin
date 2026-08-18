@@ -9,13 +9,107 @@ from app.modules.users.models import TENANT_MANAGER_ROLES, User, UserRole
 
 from .models import AgentRun, OutboundMessage, SalesConversation
 from .schemas import (
-    AgentRunResponse, ConversationAction, ConversationSummary, DraftDecision,
-    SalesMessageResponse, SimulationRequest,
+    AgentRunResponse, AppointmentConfirmationResponse, AppointmentConfirm, AppointmentSlot,
+    ConversationAction, ConversationSummary, DraftDecision, SalesMessageResponse,
+    SimulationAdvance, SimulationApproval, SimulationCreate, SimulationCreateResponse,
+    SimulationOptionProject, SimulationRequest,
 )
 from .service import conversation_messages, conversation_summaries, set_conversation_action, simulate_turn
+from .simulation_service import (
+    advance_simulation, approve_simulation, confirm_simulation_appointment,
+    create_simulation, simulation_options, slots_for_simulation,
+)
 
 
 router = APIRouter()
+
+
+@router.get("/simulation-options", response_model=list[SimulationOptionProject])
+def get_simulation_options(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.MKT])),
+):
+    return simulation_options(db, company_id=current_user.company_id)
+
+
+@router.post("/simulations", response_model=SimulationCreateResponse, status_code=201)
+async def start_simulation(
+    payload: SimulationCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.MKT])),
+):
+    return await create_simulation(
+        db,
+        company_id=current_user.company_id,
+        created_by_user_id=current_user.id,
+        project_id=payload.project_id,
+        campaign_id=payload.campaign_id,
+        lead_form=payload.lead.model_dump(),
+    )
+
+
+@router.get("/simulations/{simulation_id}/slots", response_model=list[AppointmentSlot])
+def simulation_slots(
+    simulation_id: str,
+    duration_minutes: int = 45,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.MKT, UserRole.SALES])),
+):
+    return slots_for_simulation(
+        db,
+        company_id=current_user.company_id,
+        simulation_id=simulation_id,
+        duration_minutes=duration_minutes,
+    )
+
+
+@router.post("/simulations/{simulation_id}/appointments", response_model=AppointmentConfirmationResponse)
+def confirm_appointment(
+    simulation_id: str,
+    payload: AppointmentConfirm,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.MKT])),
+):
+    return confirm_simulation_appointment(
+        db,
+        company_id=current_user.company_id,
+        simulation_id=simulation_id,
+        starts_at=payload.start_at,
+        duration_minutes=payload.duration_minutes,
+        modality=payload.modality,
+    )
+
+
+@router.post("/simulations/{simulation_id}/advance")
+async def advance_clock(
+    simulation_id: str,
+    payload: SimulationAdvance,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.MKT])),
+):
+    return await advance_simulation(
+        db,
+        company_id=current_user.company_id,
+        simulation_id=simulation_id,
+        hours=payload.hours,
+    )
+
+
+@router.put("/simulations/{simulation_id}/approval")
+def set_simulation_approval(
+    simulation_id: str,
+    payload: SimulationApproval,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker(TENANT_MANAGER_ROLES)),
+):
+    item = approve_simulation(
+        db,
+        company_id=current_user.company_id,
+        simulation_id=simulation_id,
+        status=payload.status,
+        notes=payload.notes,
+    )
+    return {"simulation_id": item.id, "approval_status": item.approval_status, "notes": item.approval_notes}
 
 
 @router.post("/simulate", response_model=AgentRunResponse)

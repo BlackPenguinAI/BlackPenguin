@@ -29,7 +29,12 @@ def eligible_sales_assignments(db: Session, project_id: str) -> list[ProjectUser
     )
 
 
-def select_next_sales_user(db: Session, project_id: str) -> str | None:
+def select_next_sales_user(
+    db: Session,
+    project_id: str,
+    *,
+    eligible_user_ids: set[str] | None = None,
+) -> str | None:
     """Select the next eligible user while locking the project routing cursor."""
     state = (
         db.query(ProjectRoutingState)
@@ -42,6 +47,8 @@ def select_next_sales_user(db: Session, project_id: str) -> str | None:
         db.add(state)
         db.flush()
     assignments = eligible_sales_assignments(db, project_id)
+    if eligible_user_ids is not None:
+        assignments = [item for item in assignments if item.user_id in eligible_user_ids]
     if not assignments:
         return None
     ids = [item.user_id for item in assignments]

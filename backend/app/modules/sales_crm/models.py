@@ -96,7 +96,7 @@ class Meeting(Base):
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     project_id = Column(String(36), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
     lead_id = Column(String(36), ForeignKey("leads.id", ondelete="CASCADE"), nullable=False)
-    broker_id = Column(String(36), ForeignKey("brokers.id", ondelete="CASCADE"), nullable=False)
+    broker_id = Column(String(36), ForeignKey("brokers.id", ondelete="SET NULL"), nullable=True)
     assigned_sales_user_id = Column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     
     meeting_time = Column(DateTime, nullable=False)
@@ -108,7 +108,55 @@ class Meeting(Base):
     notes = Column(Text, nullable=True)
     status = Column(SqlaEnum(MeetingStatus), default=MeetingStatus.SCHEDULED, nullable=False)
     gcal_event_id = Column(String(255), nullable=True)  # ID del evento en Google Calendar
+    is_demo = Column(Boolean, default=False, nullable=False, index=True)
+    source = Column(String(40), default="manual", nullable=False)
     
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     
     lead = relationship("Lead", back_populates="meetings")
+
+
+class SalesAvailabilityWindow(Base):
+    __tablename__ = "sales_availability_windows"
+    __table_args__ = (
+        UniqueConstraint("user_id", "weekday", "start_time", "end_time", name="uq_sales_availability_window"),
+    )
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    weekday = Column(Integer, nullable=False)
+    start_time = Column(String(5), nullable=False)
+    end_time = Column(String(5), nullable=False)
+    timezone = Column(String(80), default="UTC", nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+
+class CalendarConnection(Base):
+    """Provider-neutral calendar connection metadata.
+
+    OAuth secrets remain server-side.  The simulation can exercise calendar-ready
+    scheduling without sending an external event.
+    """
+
+    __tablename__ = "calendar_connections"
+    __table_args__ = (UniqueConstraint("user_id", "provider", name="uq_calendar_connection_user_provider"),)
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    provider = Column(String(30), nullable=False)
+    calendar_id = Column(String(255), nullable=True)
+    access_token_ciphertext = Column(Text, nullable=True)
+    refresh_token_ciphertext = Column(Text, nullable=True)
+    token_expires_at = Column(DateTime, nullable=True)
+    scopes = Column(JSON, default=list, nullable=False)
+    sync_token = Column(Text, nullable=True)
+    watch_channel_id = Column(String(255), nullable=True)
+    watch_resource_id = Column(String(255), nullable=True)
+    watch_expires_at = Column(DateTime, nullable=True)
+    status = Column(String(30), default="simulation", nullable=False)
+    last_synced_at = Column(DateTime, nullable=True)
+    last_error = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)

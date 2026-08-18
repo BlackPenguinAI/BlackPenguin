@@ -98,3 +98,41 @@ class ExternalWebhookEvent(Base):
     error_message = Column(Text, nullable=True)
     received_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     processed_at = Column(DateTime, nullable=True)
+
+
+class SalesAgentSimulation(Base):
+    """Auditable demo run that uses the same conversation engine as a real lead."""
+
+    __tablename__ = "sales_agent_simulations"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    company_id = Column(String(36), ForeignKey("companies.id", ondelete="CASCADE"), nullable=False, index=True)
+    project_id = Column(String(36), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
+    campaign_id = Column(String(36), ForeignKey("project_campaigns.id", ondelete="CASCADE"), nullable=False, index=True)
+    lead_id = Column(String(36), ForeignKey("leads.id", ondelete="CASCADE"), nullable=False, unique=True)
+    conversation_id = Column(String(36), ForeignKey("sales_conversations.id", ondelete="CASCADE"), nullable=False, unique=True)
+    created_by_user_id = Column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    status = Column(String(40), default="active", nullable=False, index=True)
+    approval_status = Column(String(30), default="pending", nullable=False)
+    approval_notes = Column(Text, nullable=True)
+    form_snapshot = Column(JSON, default=dict, nullable=False)
+    prompt_snapshot = Column(JSON, default=dict, nullable=False)
+    virtual_now = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+
+class SalesFollowUpJob(Base):
+    """Durable follow-up schedule; the demo advances it with a virtual clock."""
+
+    __tablename__ = "sales_follow_up_jobs"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    conversation_id = Column(String(36), ForeignKey("sales_conversations.id", ondelete="CASCADE"), nullable=False, index=True)
+    idempotency_key = Column(String(220), nullable=False, unique=True)
+    scheduled_at = Column(DateTime, nullable=False, index=True)
+    status = Column(String(30), default="pending", nullable=False, index=True)
+    reason = Column(String(120), nullable=False)
+    attempt_number = Column(Integer, default=1, nullable=False)
+    processed_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

@@ -10,8 +10,13 @@ from app.modules.ai_core.services import get_ai_config
 from app.integrations.openrouter_client import generate_llm_response
 
 from .models import Lead, SmsChatMessage, Meeting, FunnelStage
-from .schemas import LeadResponse, LeadUpdate, SmsChatMessageSchema, MeetingResponse, MeetingCreate, MeetingUpdate, SalesReportResponse
+from .schemas import (
+    AvailabilityUpdate, AvailabilityWindowResponse, CalendarConnectionResponse,
+    CalendarConnectionUpdate, LeadResponse, LeadUpdate, MeetingCreate, MeetingResponse,
+    MeetingUpdate, SalesReportResponse, SmsChatMessageSchema,
+)
 from . import services
+from . import scheduling
 from app.modules.projects.models import Project, ProjectUnit
 
 router = APIRouter()
@@ -128,6 +133,50 @@ def update_meeting(
     if meeting.lead:
         item.lead_name = meeting.lead.full_name
     return item
+
+
+@router.get("/availability/me", response_model=List[AvailabilityWindowResponse])
+def get_my_availability(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([UserRole.SALES])),
+):
+    return scheduling.availability_for_user(db, current_user.id)
+
+
+@router.put("/availability/me", response_model=List[AvailabilityWindowResponse])
+def set_my_availability(
+    payload: AvailabilityUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([UserRole.SALES])),
+):
+    return scheduling.replace_availability(
+        db,
+        user=current_user,
+        timezone_name=payload.timezone,
+        windows=[item.model_dump() for item in payload.windows],
+    )
+
+
+@router.get("/calendar-connections/me", response_model=List[CalendarConnectionResponse])
+def get_my_calendar_connections(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([UserRole.SALES])),
+):
+    return scheduling.calendar_connections_for_user(db, current_user.id)
+
+
+@router.put("/calendar-connections/me", response_model=CalendarConnectionResponse)
+def set_my_calendar_connection(
+    payload: CalendarConnectionUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([UserRole.SALES])),
+):
+    return scheduling.upsert_calendar_connection(
+        db,
+        user_id=current_user.id,
+        provider=payload.provider,
+        calendar_id=payload.calendar_id,
+    )
 
 # =========================================================
 # 📲 TWILIO SMS WEBHOOK (Entrada de mensajes del prospecto)

@@ -1,13 +1,53 @@
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 
 class SimulationRequest(BaseModel):
     lead_id: str
     message: str = Field(min_length=1, max_length=5000)
     event_id: str | None = None
+
+
+class SimulationLeadForm(BaseModel):
+    full_name: str = Field(min_length=2, max_length=150)
+    phone: str = Field(min_length=7, max_length=30)
+    email: EmailStr | None = None
+    product_interest: str | None = Field(default=None, max_length=255)
+    budget: str | None = Field(default=None, max_length=120)
+    purchase_timeline: str | None = Field(default=None, max_length=120)
+    consent: bool
+    custom_answers: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, value: str) -> str:
+        compact = "".join(character for character in value if character.isdigit() or character == "+")
+        if len([character for character in compact if character.isdigit()]) < 7:
+            raise ValueError("Enter a valid phone number.")
+        return compact
+
+
+class SimulationCreate(BaseModel):
+    project_id: str
+    campaign_id: str
+    lead: SimulationLeadForm
+
+
+class SimulationApproval(BaseModel):
+    status: str = Field(pattern="^(approved|changes_requested|rejected)$")
+    notes: str | None = Field(default=None, max_length=4000)
+
+
+class SimulationAdvance(BaseModel):
+    hours: int = Field(ge=1, le=720)
+
+
+class AppointmentConfirm(BaseModel):
+    start_at: datetime
+    duration_minutes: int = Field(default=45, ge=15, le=240)
+    modality: str = Field(default="virtual", pattern="^(virtual|phone|showroom|in_person)$")
 
 
 class AgentRunResponse(BaseModel):
@@ -43,6 +83,13 @@ class ConversationSummary(BaseModel):
     agent_status: str = "simulation"
     project_name: str
     is_demo: bool = False
+    campaign_name: str | None = None
+    simulation_id: str | None = None
+    simulation_status: str | None = None
+    approval_status: str | None = None
+    virtual_now: datetime | None = None
+    appointment_id: str | None = None
+    assigned_sales_user_id: str | None = None
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -64,3 +111,41 @@ class ConversationAction(BaseModel):
 class DraftDecision(BaseModel):
     action: str = Field(pattern="^(approve|reject)$")
     reason: str | None = None
+
+
+class SimulationOptionCampaign(BaseModel):
+    id: str
+    name: str
+    status: str
+    objective: str | None = None
+
+
+class SimulationOptionProject(BaseModel):
+    id: str
+    name: str
+    onboarding_status: str
+    campaigns: list[SimulationOptionCampaign]
+    eligible_sales_users: int
+
+
+class AppointmentSlot(BaseModel):
+    start_at: datetime
+    end_at: datetime
+    eligible_sales_users: int
+
+
+class SimulationCreateResponse(BaseModel):
+    simulation_id: str
+    lead_id: str
+    conversation_id: str
+    status: str
+    initial_reply: str | None = None
+    prompt_snapshot: dict[str, Any] = Field(default_factory=dict)
+
+
+class AppointmentConfirmationResponse(BaseModel):
+    meeting_id: str
+    assigned_sales_user_id: str
+    assigned_sales_name: str
+    meeting_time: datetime
+    calendar_sync_status: str

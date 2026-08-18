@@ -131,7 +131,7 @@ def build_sales_graph(db: Session):
     async def reason(state: SalesAgentState) -> dict[str, Any]:
         config = get_ai_config(db, state["company_id"])
         if not config.openrouter_api_key:
-            if state.get("project_context", {}).get("is_demo"):
+            if state.get("mode") == "simulation":
                 return {
                     "intent": "demo_follow_up",
                     "proposed_actions": [{"type": "ask_qualification_question"}],
@@ -156,7 +156,8 @@ def build_sales_graph(db: Session):
             {"role": "system", "content": "RUNTIME CONTEXT:\n" + json.dumps({
                 "company": state["company_context"], "project": state["project_context"],
                 "inventory": state["inventory_context"], "lead": state["lead_context"],
-                "allowed_actions": ["answer_question", "ask_qualification_question", "search_inventory", "request_human_review"],
+                "event_kind": state.get("event_kind", "lead_message"),
+                "allowed_actions": ["answer_question", "ask_qualification_question", "search_inventory", "request_available_slots", "offer_appointment", "schedule_follow_up", "request_human_review"],
                 "contract": contract,
             }, ensure_ascii=False, default=str)},
         ]
@@ -185,7 +186,7 @@ def build_sales_graph(db: Session):
 
     async def validate_output(state: SalesAgentState) -> dict[str, Any]:
         violations = list(state.get("policy_violations", []))
-        allowed = {"answer_question", "ask_qualification_question", "search_inventory", "request_human_review"}
+        allowed = {"answer_question", "ask_qualification_question", "search_inventory", "request_available_slots", "offer_appointment", "schedule_follow_up", "request_human_review"}
         for action in state.get("proposed_actions", []):
             if not isinstance(action, dict) or action.get("type") not in allowed:
                 violations.append("unsupported_action")

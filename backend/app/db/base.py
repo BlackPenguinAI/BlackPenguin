@@ -33,8 +33,8 @@ from app.modules.projects.models import (
     SalesAssetShare,
 )
 from app.modules.brokers.models import Broker
-from app.modules.sales_crm.models import Lead, LeadStageHistory, SmsChatMessage, Meeting
+from app.modules.sales_crm.models import CalendarConnection, Lead, LeadStageHistory, Meeting, SalesAvailabilityWindow, SmsChatMessage
 from app.modules.project_team.models import ProjectRoutingState, ProjectUserAssignment
-from app.modules.sales_agent.models import AgentRun, ExternalWebhookEvent, OutboundMessage, SalesConversation, SalesMessage
+from app.modules.sales_agent.models import AgentRun, ExternalWebhookEvent, OutboundMessage, SalesAgentSimulation, SalesConversation, SalesFollowUpJob, SalesMessage
 from app.modules.onboarding_jobs.models import OnboardingSourceJob
 from app.db.schema import SchemaVersion
