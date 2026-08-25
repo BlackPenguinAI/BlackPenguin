@@ -11,4 +11,20 @@ describe('SalesComponent scheduling view', () => {
     expect(component.meetingsFor(now)).toHaveLength(1);
     expect(component.count('confirmed')).toBe(1);
   });
+
+  it('offers an IANA timezone list instead of accepting an arbitrary timezone', () => {
+    vi.stubGlobal('localStorage', { getItem: () => 'sales' });
+    const component = new SalesComponent({} as any, { markForCheck: () => undefined } as any);
+    expect(component.timezones).toContain('UTC');
+    expect(component.timezones).toContain('America/Lima');
+    expect(component.timezones.length).toBeGreaterThan(10);
+  });
+
+  it('exposes only valid next steps for an active visit', () => {
+    vi.stubGlobal('localStorage', { getItem: () => 'sales' });
+    const component = new SalesComponent({} as any, { markForCheck: () => undefined } as any);
+    expect(component.statusOptions('in_progress').map(item => item.value)).toEqual([
+      'in_progress', 'completed_sale_pending', 'sale_closed',
+    ]);
+  });
 });

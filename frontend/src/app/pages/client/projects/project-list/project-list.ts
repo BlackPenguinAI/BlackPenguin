@@ -36,7 +36,8 @@ export class ProjectListComponent implements OnInit, OnDestroy {
   projectToDelete: any | null = null;
   deletionImpact: ProjectDeletionImpact | null = null;
   confirmProjectName = '';
-  readonly canManageProjects = localStorage.getItem('bp_role') === 'admin';
+  readonly canManageProjects = ['admin', 'assistant'].includes(localStorage.getItem('bp_role') || '');
+  readonly isSales = localStorage.getItem('bp_role') === 'sales';
   private destroyed = false;
 
   // FastAPI declares the collection route as "/". Keep the trailing slash so

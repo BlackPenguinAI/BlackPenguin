@@ -3,7 +3,7 @@ from fastapi import HTTPException
 from typing import List, Optional
 from datetime import datetime
 
-from .models import Lead, LeadStageHistory, SmsChatMessage, Meeting, FunnelStage, MeetingStatus
+from .models import Lead, LeadStageHistory, SmsChatMessage, Meeting, MeetingAttachment, FunnelStage, MeetingStatus
 from .schemas import LeadUpdate, MeetingCreate, MeetingUpdate
 from app.modules.brokers.models import Broker
 from app.modules.projects.models import Project
@@ -49,7 +49,7 @@ def get_lead_detail(db: Session, lead_id: str, company_id: str, sales_user_id: s
     if conversation:
         messages = db.query(SalesMessage).filter(
             SalesMessage.conversation_id == conversation.id,
-        ).order_by(SalesMessage.created_at.desc()).limit(6).all()
+        ).order_by(SalesMessage.created_at.asc()).limit(100).all()
     chat_summary = lead.qualification_summary
     if not chat_summary and messages:
         chat_summary = "Recent conversation: " + " | ".join(
@@ -67,6 +67,13 @@ def get_lead_detail(db: Session, lead_id: str, company_id: str, sales_user_id: s
         "meta_form_data": meta_form_data,
         "chat_summary": chat_summary,
         "visit_recommendations": recommendations,
+        "chat_messages": [
+            {"id": message.id, "role": message.role, "content": message.content, "created_at": message.created_at}
+            for message in messages
+        ] or [
+            {"id": message.id, "role": message.role, "content": message.content, "created_at": message.created_at}
+            for message in get_lead_sms_chat(db, lead.id, company_id, sales_user_id)
+        ],
     }
 
 def update_lead(db: Session, lead_id: str, company_id: str, payload: LeadUpdate, actor_id: str | None = None, sales_user_id: str | None = None) -> Lead:
@@ -158,19 +165,61 @@ def get_project_meetings(db: Session, company_id: str, project_id: str, broker_i
         query = query.filter(Meeting.assigned_sales_user_id == sales_user_id)
     return query.order_by(Meeting.meeting_time.asc()).all()
 
-def update_meeting(db: Session, meeting_id: str, company_id: str, payload: MeetingUpdate, sales_user_id: str | None = None) -> Meeting:
-    meeting = db.query(Meeting).join(Project, Project.id == Meeting.project_id).filter(
+
+def get_tenant_meeting(db: Session, meeting_id: str, company_id: str, sales_user_id: str | None = None) -> Meeting:
+    query = db.query(Meeting).join(Project, Project.id == Meeting.project_id).filter(
         Meeting.id == meeting_id, Project.company_id == company_id,
-    ).first()
-    if meeting and sales_user_id and meeting.assigned_sales_user_id != sales_user_id:
-        meeting = None
+    )
+    if sales_user_id:
+        query = query.filter(Meeting.assigned_sales_user_id == sales_user_id)
+    meeting = query.first()
     if not meeting:
         raise HTTPException(status_code=404, detail="Meeting not found.")
+    return meeting
+
+def update_meeting(db: Session, meeting_id: str, company_id: str, payload: MeetingUpdate, sales_user_id: str | None = None) -> Meeting:
+    meeting = get_tenant_meeting(db, meeting_id, company_id, sales_user_id)
     updates = payload.model_dump(exclude_unset=True)
     if updates.get("broker_id"):
         broker = db.query(Broker).filter(Broker.id == updates["broker_id"], Broker.project_id == meeting.project_id).first()
         if not broker:
             raise HTTPException(status_code=400, detail="Broker is not assigned to this Project.")
+    requested_status = updates.get("status")
+    effective_status = requested_status or meeting.status
+    if any(updates.get(field) for field in ("visit_notes", "visit_details", "sale_closed_at")) and effective_status not in {
+        MeetingStatus.IN_PROGRESS, MeetingStatus.COMPLETED, MeetingStatus.COMPLETED_SALE_PENDING, MeetingStatus.SALE_CLOSED,
+    }:
+        raise HTTPException(status_code=409, detail="Start the visit before saving its report.")
+    if requested_status and requested_status != meeting.status:
+        allowed = {
+            MeetingStatus.SCHEDULED: {MeetingStatus.CONFIRMED, MeetingStatus.IN_PROGRESS, MeetingStatus.CANCELLED, MeetingStatus.NO_SHOW},
+            MeetingStatus.CONFIRMED: {MeetingStatus.IN_PROGRESS, MeetingStatus.CANCELLED, MeetingStatus.NO_SHOW},
+            MeetingStatus.IN_PROGRESS: {MeetingStatus.COMPLETED, MeetingStatus.COMPLETED_SALE_PENDING, MeetingStatus.SALE_CLOSED},
+            MeetingStatus.COMPLETED_SALE_PENDING: {MeetingStatus.SALE_CLOSED},
+        }
+        if requested_status not in allowed.get(meeting.status, set()):
+            raise HTTPException(status_code=409, detail=f"Meeting cannot move from {meeting.status.value} to {requested_status.value}.")
+        now = datetime.utcnow()
+        if requested_status == MeetingStatus.SALE_CLOSED:
+            closing_date = updates.get("sale_closed_at")
+            evidence = db.query(MeetingAttachment).filter(
+                MeetingAttachment.meeting_id == meeting.id,
+                MeetingAttachment.kind == "sale_evidence",
+            ).first()
+            if not closing_date or not evidence:
+                raise HTTPException(status_code=422, detail="Sale evidence and closing date are required to close a sale.")
+        if requested_status == MeetingStatus.IN_PROGRESS:
+            meeting.started_at = meeting.started_at or now
+        if requested_status in {MeetingStatus.COMPLETED, MeetingStatus.COMPLETED_SALE_PENDING, MeetingStatus.SALE_CLOSED}:
+            meeting.completed_at = meeting.completed_at or now
+        if requested_status == MeetingStatus.SALE_CLOSED:
+            previous_stage = meeting.lead.funnel_stage.value
+            meeting.lead.funnel_stage = FunnelStage.CLOSED
+            meeting.lead.stage_changed_at = now
+            db.add(LeadStageHistory(
+                lead_id=meeting.lead.id, from_stage=previous_stage, to_stage=FunnelStage.CLOSED.value,
+                actor_type="user", actor_id=sales_user_id, reason="Sale closed from property visit",
+            ))
     for field, value in updates.items():
         setattr(meeting, field, value)
     db.add(meeting); db.commit(); db.refresh(meeting)

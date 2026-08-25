@@ -9,7 +9,7 @@
   <main *ngIf="overview as project" class="mx-auto max-w-7xl p-4 sm:p-6 md:p-10">
     <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
       <a routerLink="/app/projects" class="inline-flex items-center gap-2 text-sm text-gray-400 transition hover:text-white"><span class="material-symbols-outlined text-lg">arrow_back</span> All projects</a>
-      <a [routerLink]="['/app/projects', project.id, 'onboarding']" class="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-gray-200 transition hover:border-secondary/50 hover:text-secondary"><span class="material-symbols-outlined text-lg">edit_note</span> Edit Project Data</a>
+      <a *ngIf="canEditProject" [routerLink]="['/app/projects', project.id, 'onboarding']" class="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-gray-200 transition hover:border-secondary/50 hover:text-secondary"><span class="material-symbols-outlined text-lg">edit_note</span> Edit Project Data</a>
     </div>
 
     <section class="hero relative min-h-[430px] overflow-hidden rounded-[2rem] border border-white/10 bg-[#121212]" [style.--cover-position]="(project.cover_focal_point.x * 100) + '% ' + (project.cover_focal_point.y * 100) + '%'">
@@ -58,7 +58,7 @@
       </article>
     </section>
 
-    <section class="intelligence-card mt-6 flex flex-col justify-between gap-6 overflow-hidden rounded-[1.75rem] border border-secondary/20 p-6 md:flex-row md:items-center md:p-8">
+    <section *ngIf="canViewMarketing" class="intelligence-card mt-6 flex flex-col justify-between gap-6 overflow-hidden rounded-[1.75rem] border border-secondary/20 p-6 md:flex-row md:items-center md:p-8">
       <div><p class="eyebrow text-secondary">Marketing performance</p><h2 class="mt-2 text-2xl font-light md:text-3xl">Review lead acquisition by campaign</h2><p class="mt-3 max-w-2xl text-sm leading-6 text-gray-400">Compare campaigns, captured leads, qualification and appointment conversion for this Project.</p></div>
       <a [routerLink]="['/app/projects', project.id, 'marketing']" class="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-secondary px-5 py-3 text-sm font-semibold text-black transition hover:brightness-110">View Project Marketing <span class="material-symbols-outlined text-lg">arrow_forward</span></a>
     </section>

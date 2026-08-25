@@ -207,12 +207,14 @@ export const routes: Routes = [
       {
         path: 'agent',
         canActivate: [roleGuard],
-        data: { roles: ['admin', 'assistant', 'mkt', 'sales'] },
+        data: { roles: ['admin', 'assistant', 'mkt'] },
         loadComponent: () =>
           import('./pages/client/agent/agent').then((m) => m.AgentComponent),
       },
       {
         path: 'projects/:id/onboarding',
+        canActivate: [roleGuard],
+        data: { roles: ['admin', 'assistant'] },
         loadComponent: () =>
           import('./pages/client/projects/project-chat/project-chat').then(
             (m) => m.ProjectChatComponent

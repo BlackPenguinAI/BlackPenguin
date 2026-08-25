@@ -14,6 +14,8 @@ import { ProjectOverviewService } from './project-overview.service';
   styleUrls: ['./project-overview.scss'],
 })
 export class ProjectOverviewComponent implements OnInit, OnDestroy {
+  readonly canEditProject = ['admin', 'assistant'].includes(localStorage.getItem('bp_role') || '');
+  readonly canViewMarketing = ['admin', 'assistant', 'mkt'].includes(localStorage.getItem('bp_role') || '');
   projectId = '';
   overview: ProjectOverview | null = null;
   coverObjectUrl: string | null = null;

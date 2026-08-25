@@ -43,6 +43,7 @@ class SalesLeadDetailResponse(LeadResponse):
     meta_form_data: dict = Field(default_factory=dict)
     chat_summary: Optional[str] = None
     visit_recommendations: Optional[str] = None
+    chat_messages: List[SmsChatMessageSchema] = Field(default_factory=list)
 
 class LeadUpdate(BaseModel):
     funnel_stage: FunnelStage
@@ -62,6 +63,20 @@ class MeetingUpdate(BaseModel):
     confirmation_status: Optional[str] = None
     modality: Optional[str] = None
     notes: Optional[str] = None
+    visit_notes: Optional[str] = Field(default=None, max_length=10000)
+    visit_details: Optional[str] = Field(default=None, max_length=10000)
+    sale_closed_at: Optional[datetime] = None
+
+
+class MeetingAttachmentResponse(BaseModel):
+    id: str
+    kind: str
+    original_filename: str
+    mime_type: str
+    size_bytes: int
+    created_at: datetime
+    download_url: Optional[str] = None
+    model_config = ConfigDict(from_attributes=True)
 
 class MeetingResponse(BaseModel):
     id: str
@@ -76,11 +91,18 @@ class MeetingResponse(BaseModel):
     calendar_sync_status: str = "not_connected"
     meeting_url: Optional[str] = None
     notes: Optional[str] = None
+    visit_notes: Optional[str] = None
+    visit_details: Optional[str] = None
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    sale_closed_at: Optional[datetime] = None
     status: MeetingStatus
     gcal_event_id: Optional[str] = None
     is_demo: bool = False
     source: str = "manual"
     lead_name: Optional[str] = None
+    sales_user_name: Optional[str] = None
+    attachments: List[MeetingAttachmentResponse] = Field(default_factory=list)
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
 
@@ -125,12 +147,25 @@ class AvailabilityBlockCreate(BaseModel):
 
 class AvailabilityBlockResponse(AvailabilityBlockCreate):
     id: str
+    user_id: Optional[str] = None
+    sales_user_name: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)
 
 
 class SalesScheduleResponse(BaseModel):
     availability: List[AvailabilityBlockResponse]
     meetings: List[MeetingResponse]
+
+
+class SalesUserOption(BaseModel):
+    id: str
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    email: str
+
+
+class ManagerSalesScheduleResponse(SalesScheduleResponse):
+    sales_users: List[SalesUserOption]
 
 
 class CalendarConnectionUpdate(BaseModel):

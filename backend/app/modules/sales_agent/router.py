@@ -66,7 +66,7 @@ def simulation_slots(
     simulation_id: str,
     duration_minutes: int = 45,
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.MKT, UserRole.SALES])),
+    current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.MKT])),
 ):
     return slots_for_simulation(
         db,
@@ -129,7 +129,7 @@ def set_simulation_approval(
 async def simulate(
     payload: SimulationRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.MKT, UserRole.SALES])),
+    current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.MKT])),
 ):
     return await simulate_turn(
         db,
@@ -137,7 +137,7 @@ async def simulate(
         lead_id=payload.lead_id,
         inbound_text=payload.message,
         event_id=payload.event_id,
-        sales_user_id=current_user.id if current_user.role == UserRole.SALES else None,
+        sales_user_id=None,
     )
 
 
@@ -145,11 +145,11 @@ async def simulate(
 def conversations(
     project_id: str | None = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.MKT, UserRole.SALES])),
+    current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.MKT])),
 ):
     return conversation_summaries(
         db, company_id=current_user.company_id, project_id=project_id,
-        sales_user_id=current_user.id if current_user.role == UserRole.SALES else None,
+        sales_user_id=None,
     )
 
 
@@ -157,11 +157,11 @@ def conversations(
 def messages(
     conversation_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.MKT, UserRole.SALES])),
+    current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.MKT])),
 ):
     return conversation_messages(
         db, company_id=current_user.company_id, conversation_id=conversation_id,
-        sales_user_id=current_user.id if current_user.role == UserRole.SALES else None,
+        sales_user_id=None,
     )
 
 
@@ -169,15 +169,15 @@ def messages(
 def conversation_action(
     conversation_id: str, payload: ConversationAction,
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.MKT, UserRole.SALES])),
+    current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.MKT])),
 ):
     conversation = set_conversation_action(
         db, company_id=current_user.company_id, conversation_id=conversation_id, action=payload.action,
-        sales_user_id=current_user.id if current_user.role == UserRole.SALES else None,
+        sales_user_id=None,
     )
     return next(item for item in conversation_summaries(
         db, company_id=current_user.company_id,
-        sales_user_id=current_user.id if current_user.role == UserRole.SALES else None,
+        sales_user_id=None,
     ) if item["id"] == conversation.id)
 
 
@@ -186,7 +186,7 @@ def decide_draft(
     draft_id: str,
     payload: DraftDecision,
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.SALES])),
+    current_user: User = Depends(RoleChecker(TENANT_MANAGER_ROLES)),
 ):
     draft = db.query(OutboundMessage).join(SalesConversation).filter(
         OutboundMessage.id == draft_id,

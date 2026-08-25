@@ -1,7 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Form
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime, timezone
+from pathlib import Path
+import uuid
 
 from app.db.postgres import get_db
 from app.modules.auth.deps import RoleChecker
@@ -9,18 +12,40 @@ from app.modules.users.models import TENANT_MANAGER_ROLES, User, UserRole
 from app.modules.ai_core.services import get_ai_config
 from app.integrations.openrouter_client import generate_llm_response
 
-from .models import Lead, SmsChatMessage, Meeting, FunnelStage
+from .models import Lead, SmsChatMessage, Meeting, MeetingAttachment, MeetingStatus, SalesAvailabilityBlock, FunnelStage
 from .schemas import (
     AvailabilityBlockCreate, AvailabilityBlockResponse, AvailabilityUpdate, AvailabilityWindowResponse,
     CalendarConnectionResponse, CalendarConnectionUpdate, LeadResponse, LeadUpdate,
-    MeetingCreate, MeetingResponse, MeetingUpdate, SalesLeadDetailResponse, SalesReportResponse,
-    SalesScheduleResponse, SmsChatMessageSchema,
+    ManagerSalesScheduleResponse, MeetingAttachmentResponse, MeetingCreate, MeetingResponse, MeetingUpdate,
+    SalesLeadDetailResponse, SalesReportResponse, SalesScheduleResponse, SmsChatMessageSchema,
 )
 from . import services
 from . import scheduling
+from . import storage_service
 from app.modules.projects.models import Project, ProjectUnit
 
 router = APIRouter()
+
+ATTACHMENT_RULES = {
+    "visit_photo": ({"image/jpeg", "image/png", "image/webp"}, 10 * 1024 * 1024),
+    "sale_evidence": ({"image/jpeg", "image/png", "image/webp", "application/pdf"}, 15 * 1024 * 1024),
+}
+
+
+def _meeting_response(meeting: Meeting, db: Session) -> MeetingResponse:
+    item = MeetingResponse.model_validate(meeting)
+    if meeting.lead:
+        item.lead_name = meeting.lead.full_name
+    if meeting.assigned_sales_user_id:
+        user = db.query(User).filter(User.id == meeting.assigned_sales_user_id).first()
+        if user:
+            item.sales_user_name = " ".join(filter(None, [user.first_name, user.last_name])) or user.email
+    item.attachments = [
+        MeetingAttachmentResponse.model_validate(attachment).model_copy(update={
+            "download_url": f"/api/v1/sales/meetings/{meeting.id}/attachments/{attachment.id}",
+        }) for attachment in meeting.attachments
+    ]
+    return item
 
 # =========================================================
 # 📊 LEADS & HISTORIAL DE CHAT SMS
@@ -125,10 +150,7 @@ def get_meetings(
     meetings = services.get_project_meetings(db, current_user.company_id, project_id, broker_id, sales_user_id)
     response = []
     for m in meetings:
-        item = MeetingResponse.model_validate(m)
-        if m.lead:
-            item.lead_name = m.lead.full_name
-        response.append(item)
+        response.append(_meeting_response(m, db))
     return response
 
 @router.post("/meetings", response_model=MeetingResponse, summary="Crear o Agendar Cita")
@@ -151,10 +173,7 @@ def update_meeting(
         db, meeting_id, current_user.company_id, payload,
         current_user.id if current_user.role == UserRole.SALES else None,
     )
-    item = MeetingResponse.model_validate(meeting)
-    if meeting.lead:
-        item.lead_name = meeting.lead.full_name
-    return item
+    return _meeting_response(meeting, db)
 
 
 @router.get("/availability/me", response_model=List[AvailabilityWindowResponse])
@@ -228,16 +247,124 @@ def get_my_schedule(
     ).order_by(Meeting.meeting_time).all()
     meeting_rows = []
     for meeting in meetings:
-        item = MeetingResponse.model_validate(meeting)
-        if meeting.lead:
-            item.lead_name = meeting.lead.full_name
-        meeting_rows.append(item)
+        meeting_rows.append(_meeting_response(meeting, db))
     return {
         "availability": scheduling.availability_blocks_for_user(
             db, user_id=current_user.id, starts_at=start, ends_at=end,
         ),
         "meetings": meeting_rows,
     }
+
+
+@router.get("/schedule", response_model=ManagerSalesScheduleResponse)
+def get_company_sales_schedule(
+    start: datetime,
+    end: datetime,
+    sales_user_id: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker(TENANT_MANAGER_ROLES)),
+):
+    sales_query = db.query(User).filter(
+        User.company_id == current_user.company_id, User.role == UserRole.SALES, User.is_active.is_(True),
+    ).order_by(User.first_name, User.last_name, User.email)
+    sales_users = sales_query.all()
+    allowed_ids = {user.id for user in sales_users}
+    if sales_user_id and sales_user_id not in allowed_ids:
+        raise HTTPException(status_code=404, detail="Sales user not found.")
+    selected_ids = {sales_user_id} if sales_user_id else allowed_ids
+    start_value = start.astimezone(timezone.utc).replace(tzinfo=None) if start.tzinfo else start
+    end_value = end.astimezone(timezone.utc).replace(tzinfo=None) if end.tzinfo else end
+    meetings = [] if not selected_ids else db.query(Meeting).join(Project, Project.id == Meeting.project_id).filter(
+        Project.company_id == current_user.company_id,
+        Meeting.assigned_sales_user_id.in_(selected_ids),
+        Meeting.meeting_time >= start_value,
+        Meeting.meeting_time < end_value,
+    ).order_by(Meeting.meeting_time).all()
+    blocks = [] if not selected_ids else db.query(SalesAvailabilityBlock).filter(
+        SalesAvailabilityBlock.user_id.in_(selected_ids),
+        SalesAvailabilityBlock.ends_at > start_value,
+        SalesAvailabilityBlock.starts_at < end_value,
+    ).order_by(SalesAvailabilityBlock.starts_at).all()
+    names = {user.id: " ".join(filter(None, [user.first_name, user.last_name])) or user.email for user in sales_users}
+    availability = []
+    for block in blocks:
+        item = AvailabilityBlockResponse.model_validate(block)
+        item.sales_user_name = names.get(block.user_id)
+        availability.append(item)
+    return {
+        "sales_users": sales_users,
+        "availability": availability,
+        "meetings": [_meeting_response(meeting, db) for meeting in meetings],
+    }
+
+
+@router.post("/meetings/{meeting_id}/attachments", response_model=MeetingAttachmentResponse, status_code=status.HTTP_201_CREATED)
+async def upload_meeting_attachment(
+    meeting_id: str,
+    kind: str = Form(...),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.SALES])),
+):
+    meeting = services.get_tenant_meeting(
+        db, meeting_id, current_user.company_id,
+        current_user.id if current_user.role == UserRole.SALES else None,
+    )
+    reportable_statuses = {
+        MeetingStatus.IN_PROGRESS, MeetingStatus.COMPLETED, MeetingStatus.COMPLETED_SALE_PENDING, MeetingStatus.SALE_CLOSED,
+    }
+    if meeting.status not in reportable_statuses:
+        raise HTTPException(status_code=409, detail="Start the visit before uploading report attachments.")
+    rule = ATTACHMENT_RULES.get(kind)
+    content_type = (file.content_type or "").lower()
+    if not rule or content_type not in rule[0]:
+        raise HTTPException(status_code=422, detail="Unsupported attachment type.")
+    content = await file.read(rule[1] + 1)
+    if not content or len(content) > rule[1]:
+        raise HTTPException(status_code=413, detail="Attachment is empty or exceeds the size limit.")
+    attachment_id = str(uuid.uuid4())
+    extension = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp", "application/pdf": ".pdf"}[content_type]
+    stored = storage_service.store_meeting_attachment(
+        company_id=current_user.company_id, meeting_id=meeting.id, attachment_id=attachment_id,
+        extension=extension, content=content,
+    )
+    attachment = MeetingAttachment(
+        id=attachment_id, meeting_id=meeting.id, uploaded_by_user_id=current_user.id, kind=kind,
+        storage_path=stored.relative_path, original_filename=Path(file.filename or f"attachment{extension}").name[:255],
+        mime_type=content_type, size_bytes=len(content),
+    )
+    db.add(attachment); db.commit(); db.refresh(attachment)
+    return MeetingAttachmentResponse.model_validate(attachment).model_copy(update={
+        "download_url": f"/api/v1/sales/meetings/{meeting.id}/attachments/{attachment.id}",
+    })
+
+
+@router.get("/meetings/{meeting_id}/attachments/{attachment_id}")
+def download_meeting_attachment(
+    meeting_id: str,
+    attachment_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.SALES])),
+):
+    services.get_tenant_meeting(
+        db, meeting_id, current_user.company_id,
+        current_user.id if current_user.role == UserRole.SALES else None,
+    )
+    attachment = db.query(MeetingAttachment).filter(
+        MeetingAttachment.id == attachment_id, MeetingAttachment.meeting_id == meeting_id,
+    ).first()
+    if not attachment:
+        raise HTTPException(status_code=404, detail="Attachment not found.")
+    try:
+        path = storage_service.resolve_meeting_attachment(attachment.storage_path)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail="Attachment not found.") from exc
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="Attachment not found.")
+    return FileResponse(
+        path, media_type=attachment.mime_type, filename=attachment.original_filename,
+        headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"},
+    )
 
 
 @router.get("/calendar-connections/me", response_model=List[CalendarConnectionResponse])

@@ -16,7 +16,10 @@ class FunnelStage(str, enum.Enum):
 class MeetingStatus(str, enum.Enum):
     SCHEDULED = "scheduled"
     CONFIRMED = "confirmed"
+    IN_PROGRESS = "in_progress"
     COMPLETED = "completed"
+    COMPLETED_SALE_PENDING = "completed_sale_pending"
+    SALE_CLOSED = "sale_closed"
     CANCELLED = "cancelled"
     NO_SHOW = "no_show"
 
@@ -108,6 +111,11 @@ class Meeting(Base):
     calendar_sync_status = Column(String(30), default="not_connected", nullable=False)
     meeting_url = Column(Text, nullable=True)
     notes = Column(Text, nullable=True)
+    visit_notes = Column(Text, nullable=True)
+    visit_details = Column(Text, nullable=True)
+    started_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+    sale_closed_at = Column(DateTime, nullable=True)
     status = Column(SqlaEnum(MeetingStatus), default=MeetingStatus.SCHEDULED, nullable=False)
     gcal_event_id = Column(String(255), nullable=True)  # ID del evento en Google Calendar
     is_demo = Column(Boolean, default=False, nullable=False, index=True)
@@ -116,6 +124,23 @@ class Meeting(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     
     lead = relationship("Lead", back_populates="meetings")
+    attachments = relationship("MeetingAttachment", back_populates="meeting", cascade="all, delete-orphan")
+
+
+class MeetingAttachment(Base):
+    __tablename__ = "meeting_attachments"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    meeting_id = Column(String(36), ForeignKey("meetings.id", ondelete="CASCADE"), nullable=False, index=True)
+    uploaded_by_user_id = Column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    kind = Column(String(30), nullable=False)
+    storage_path = Column(Text, nullable=False)
+    original_filename = Column(String(255), nullable=False)
+    mime_type = Column(String(100), nullable=False)
+    size_bytes = Column(Integer, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    meeting = relationship("Meeting", back_populates="attachments")
 
 
 class SalesAvailabilityWindow(Base):
