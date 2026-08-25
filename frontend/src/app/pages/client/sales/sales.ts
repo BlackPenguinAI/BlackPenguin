@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 
 import { API_V1_URL } from '../../../core/config/api.config';
-import { supportedTimezones, timezoneLabel } from '../../../core/timezones';
+import { canonicalTimezone, supportedTimezones, timezoneLabel } from '../../../core/timezones';
 
 type ScheduleSection = 'availability' | 'appointments';
 type CalendarView = 'month' | 'week' | 'day';
@@ -72,7 +72,7 @@ export class SalesComponent implements OnInit {
   }
 
   filtersChanged(): void {
-    this.timezone = this.selectedProject?.timezone || this.userTimezone; this.selected = null; this.selectedDay = null; this.editingBlock = null;
+    this.timezone = canonicalTimezone(this.selectedProject?.timezone || this.userTimezone); this.selected = null; this.selectedDay = null; this.editingBlock = null;
     if (this.isManager && this.projectId) this.loadLeads(); else this.leads = [];
     this.reload();
   }
@@ -96,7 +96,7 @@ export class SalesComponent implements OnInit {
     });
   }
 
-  editAvailability(block: any): void { if (!this.canManageBlock(block)) return; this.editingBlock = block; this.timezone = block.timezone || this.timezone; this.blockStart = this.timeValue(block.starts_at, this.timezone); this.blockEnd = this.timeValue(block.ends_at, this.timezone); }
+  editAvailability(block: any): void { if (!this.canManageBlock(block)) return; this.editingBlock = block; this.timezone = canonicalTimezone(block.timezone || this.timezone); this.blockStart = this.timeValue(block.starts_at, block.timezone || this.timezone); this.blockEnd = this.timeValue(block.ends_at, block.timezone || this.timezone); }
   cancelBlockEdit(): void { this.editingBlock = null; this.blockStart = '09:00'; this.blockEnd = '17:00'; }
   removeAvailability(block: any): void {
     if (!this.canManageBlock(block)) return; const target = this.role === 'sales' ? 'me' : block.user_id;
@@ -180,7 +180,7 @@ export class SalesComponent implements OnInit {
   hasEvidence(): boolean { return (this.selected?.attachments || []).some((item: any) => item.kind === 'sale_evidence'); }
 
   private acceptSchedule(data: any): void { this.meetings = data.meetings || []; this.availability = data.availability || []; this.loading = false; this.cdr.markForCheck(); }
-  private loadProfile(): void { this.http.get<any>(`${API_V1_URL}/users/me`).subscribe({ next: profile => { this.userTimezone = profile.timezone || 'UTC'; if (!this.projectId) this.timezone = this.userTimezone; this.cdr.markForCheck(); } }); }
+  private loadProfile(): void { this.http.get<any>(`${API_V1_URL}/users/me`).subscribe({ next: profile => { this.userTimezone = canonicalTimezone(profile.timezone || 'UTC'); if (!this.projectId) this.timezone = this.userTimezone; this.cdr.markForCheck(); } }); }
   private loadProjects(): void { this.http.get<any[]>(`${API_V1_URL}/projects/`).subscribe({ next: rows => { this.projects = rows || []; this.cdr.markForCheck(); } }); }
   private loadLeads(): void { this.http.get<any[]>(`${API_V1_URL}/sales/projects/${this.projectId}/leads-report`).subscribe({ next: rows => { this.leads = rows || []; this.cdr.markForCheck(); }, error: () => { this.leads = []; this.cdr.markForCheck(); } }); }
   private loadCalendarConnection(): void { this.http.get<any[]>(`${API_V1_URL}/sales/calendar-connections/me`).subscribe({ next: rows => { this.calendarStatus = rows[0]?.status || 'not_connected'; this.cdr.markForCheck(); } }); }

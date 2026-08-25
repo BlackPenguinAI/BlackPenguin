@@ -40,6 +40,13 @@ LLM_REPLY = (
     '"requires_human":false,"reason":"Need one preference"}'
 )
 
+SLOTS_REPLY = (
+    '{"reply":"I will check the available appointment slots. Please hold on.",'
+    '"intent":"appointment_request","extracted_facts":[],'
+    '"proposed_actions":[{"type":"request_available_slots"}],'
+    '"requires_human":false,"reason":"Check verified availability"}'
+)
+
 
 def _db():
     engine = create_engine("sqlite://")
@@ -247,6 +254,45 @@ def test_virtual_clock_runs_due_follow_up_and_stop_cancels_future_work():
     stop = asyncio.run(simulate_turn(db, company_id=company.id, lead_id=lead_id, inbound_text="STOP"))
     assert stop["intent"] == "opt_out"
     assert db.query(SalesFollowUpJob).filter_by(status="pending").count() == 0
+
+
+def test_live_reply_after_follow_up_uses_the_monotonic_simulation_clock():
+    db = _db(); company, _, admin, _, _, project, campaign, product = _fixture(db)
+    result = _start(db, company, admin, project, campaign, product)
+    with patch("app.modules.sales_agent.graph.generate_llm_response", new=AsyncMock(return_value=LLM_REPLY)):
+        asyncio.run(advance_simulation(
+            db, company_id=company.id, simulation_id=result["simulation_id"], hours=25,
+        ))
+        asyncio.run(simulate_turn(
+            db, company_id=company.id, lead_id=result["lead_id"], inbound_text="Yes, tell me more",
+        ))
+    messages = db.query(SalesMessage).filter_by(
+        conversation_id=result["conversation_id"],
+    ).order_by(SalesMessage.created_at).all()
+    reminder = next(message for message in messages if message.status == "simulated_follow_up_24h")
+    later_inbound = next(message for message in messages if message.content == "Yes, tell me more")
+    assert later_inbound.created_at > reminder.created_at
+    assert messages[-1].role == "assistant"
+
+
+def test_slot_request_is_executed_and_returns_verified_times_in_the_same_turn():
+    db = _db(); company, _, admin, _, _, project, campaign, product = _fixture(db)
+    project.timezone = "UTC"
+    db.add(project); db.commit()
+    result = _start(db, company, admin, project, campaign, product)
+    simulation = db.query(SalesAgentSimulation).filter_by(id=result["simulation_id"]).one()
+    simulation.virtual_now = datetime(2026, 8, 25, 18, 0)
+    db.add(simulation); db.commit()
+    with patch("app.modules.sales_agent.graph.generate_llm_response", new=AsyncMock(return_value=SLOTS_REPLY)):
+        response = asyncio.run(simulate_turn(
+            db,
+            company_id=company.id,
+            lead_id=result["lead_id"],
+            inbound_text="Monday, the 31st, works for me",
+        ))
+    assert "verified appointment times" in response["reply"]
+    assert "Monday, August 31" in response["reply"]
+    assert "hold on" not in response["reply"].lower()
 
 
 def test_simulation_migration_adopts_existing_schema_and_is_repeatable(monkeypatch):

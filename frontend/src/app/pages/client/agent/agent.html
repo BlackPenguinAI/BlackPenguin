@@ -9,6 +9,7 @@
     </div>
     <div class="header-actions" *ngIf="role !== 'sales'">
       <select [(ngModel)]="projectId" (change)="projectChanged()">
+        <option value="">All leads</option>
         <option *ngFor="let project of options" [value]="project.id">
           {{ project.name }}
         </option></select
@@ -42,6 +43,7 @@
     <div class="setup-grid">
       <label
         >Project *<select [(ngModel)]="projectId" (change)="projectChanged()">
+          <option value="" disabled>Select a Project</option>
           <option *ngFor="let project of options" [value]="project.id">
             {{ project.name }}
           </option></select
@@ -246,20 +248,22 @@
             ><button (click)="generateInitial()">Retry first SMS</button>
           </div>
         </div>
-        <div
-          *ngFor="let message of messages"
-          class="bubble-row"
-          [class.agent]="message.role === 'assistant'"
-        >
-          <div class="bubble">
-            <small>{{
-              message.role === 'assistant' ? 'AI sales agent' : selected.lead_name
-            }}</small>
-            <span *ngIf="isReminder(message)" class="mt-1 inline-flex items-center gap-1 rounded-full bg-secondary/10 px-2 py-1 text-[10px] font-bold text-secondary"><span class="material-symbols-outlined text-[13px]">schedule</span>{{ reminderLabel(message) }}</span>
-            <p>{{ message.content }}</p>
-            <time>{{ message.created_at | date: 'short' }} · {{ message.status }}</time>
+        <ng-container *ngFor="let message of messages">
+          <div *ngIf="isReminder(message); else smsBubble" class="my-2 ml-auto flex max-w-[72%] items-start gap-2 rounded-lg border border-dashed border-[#6b5206] bg-[#151104] px-3 py-2 text-[#a98b31]">
+            <span class="material-symbols-outlined text-base">schedule</span>
+            <div class="min-w-0 flex-1"><strong class="block text-[9px]">{{ reminderLabel(message) }}</strong><p class="my-1 overflow-hidden text-ellipsis whitespace-nowrap text-[11px] text-[#9a9589]">{{ message.content }}</p></div>
+            <time class="whitespace-nowrap text-[9px]">{{ message.created_at | date: 'short' }}</time>
           </div>
-        </div>
+          <ng-template #smsBubble>
+            <div class="bubble-row" [class.agent]="message.role === 'assistant'">
+              <div class="bubble">
+                <small>{{ message.role === 'assistant' ? 'AI sales agent' : selected.lead_name }}</small>
+                <p>{{ message.content }}</p>
+                <time>{{ message.created_at | date: 'short' }} · {{ message.status }}</time>
+              </div>
+            </div>
+          </ng-template>
+        </ng-container>
       </div>
       <div class="composer" *ngIf="role !== 'sales'; else salesReadOnly">
         <textarea

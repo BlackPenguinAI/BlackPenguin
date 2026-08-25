@@ -1,7 +1,10 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import date, datetime, time, timedelta, timezone
+import calendar
+import re
 import uuid
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import HTTPException
 from sqlalchemy import case
@@ -9,9 +12,113 @@ from sqlalchemy.orm import Session
 
 from app.modules.projects.models import Project, ProjectCampaign
 from app.modules.sales_crm.models import FunnelStage, Lead, Meeting
+from app.modules.sales_crm.scheduling import available_slots
 
 from .graph import GRAPH_VERSION, TOOLSET_VERSION, build_sales_graph
 from .models import AgentRun, OutboundMessage, SalesAgentSimulation, SalesConversation, SalesFollowUpJob, SalesMessage
+
+
+MONTHS = {
+    name.lower(): index
+    for index in range(1, 13)
+    for name in (calendar.month_name[index], calendar.month_abbr[index])
+}
+
+
+def _project_zone(project: Project) -> ZoneInfo:
+    try:
+        return ZoneInfo(project.timezone or "UTC")
+    except ZoneInfoNotFoundError:
+        return ZoneInfo("UTC")
+
+
+def _requested_date(text: str, *, now: datetime, zone: ZoneInfo) -> date | None:
+    """Resolve an explicit date without inventing one when the lead did not provide it."""
+    iso = re.search(r"\b(20\d{2})-(\d{1,2})-(\d{1,2})\b", text)
+    if iso:
+        try:
+            return date(int(iso.group(1)), int(iso.group(2)), int(iso.group(3)))
+        except ValueError:
+            return None
+    lowered = text.lower()
+    month_match = re.search(
+        r"\b(" + "|".join(sorted(MONTHS, key=len, reverse=True)) + r")\s+(\d{1,2})(?:st|nd|rd|th)?\b",
+        lowered,
+    )
+    local_now = now.replace(tzinfo=timezone.utc).astimezone(zone)
+    if month_match:
+        month = MONTHS[month_match.group(1)]
+        year = local_now.year + (1 if month < local_now.month else 0)
+        try:
+            return date(year, month, int(month_match.group(2)))
+        except ValueError:
+            return None
+    ordinal = re.search(r"\b(?:the\s+)?(\d{1,2})(?:st|nd|rd|th)\b", lowered)
+    if not ordinal:
+        return None
+    day = int(ordinal.group(1))
+    year, month = local_now.year, local_now.month
+    for _ in range(2):
+        try:
+            candidate = date(year, month, day)
+        except ValueError:
+            candidate = None
+        if candidate and candidate >= local_now.date():
+            return candidate
+        month += 1
+        if month == 13:
+            month, year = 1, year + 1
+    return None
+
+
+def _action_types(actions: list[dict] | None) -> set[str]:
+    return {
+        str(action.get("type"))
+        for action in (actions or [])
+        if isinstance(action, dict) and action.get("type")
+    }
+
+
+def _availability_reply(
+    db: Session, *, project: Project, inbound_text: str, now: datetime,
+) -> str:
+    """Execute the model's slot request and return a complete, grounded SMS."""
+    zone = _project_zone(project)
+    requested = _requested_date(inbound_text, now=now, zone=zone)
+    search_after = now
+    days = 14
+    if requested:
+        local_midnight = datetime.combine(requested, time.min, tzinfo=zone)
+        search_after = local_midnight.astimezone(timezone.utc).replace(tzinfo=None) - timedelta(microseconds=1)
+        days = 2
+    slots = available_slots(
+        db,
+        project_id=project.id,
+        after=search_after,
+        duration_minutes=45,
+        days=days,
+        limit=48 if requested else 3,
+    )
+    if requested:
+        slots = [
+            slot for slot in slots
+            if slot["start_at"].replace(tzinfo=timezone.utc).astimezone(zone).date() == requested
+        ]
+    slots = slots[:3]
+    if not slots:
+        when = requested.strftime("%A, %B %-d") if requested else "the next 14 days"
+        return (
+            f"I couldn't find a verified appointment time for {when}. "
+            "Would you like another day, or should I ask the sales team to contact you?"
+        )
+    local_starts = [slot["start_at"].replace(tzinfo=timezone.utc).astimezone(zone) for slot in slots]
+    day_label = local_starts[0].strftime("%A, %B %-d")
+    times = [value.strftime("%-I:%M %p") for value in local_starts]
+    time_list = times[0] if len(times) == 1 else f"{', '.join(times[:-1])} or {times[-1]}"
+    return (
+        f"I found these verified appointment times for {day_label}: {time_list} "
+        f"({project.timezone or 'UTC'}). Which one works best for you?"
+    )
 
 
 def conversation_summaries(
@@ -164,7 +271,20 @@ async def simulate_turn(
         return _response(existing, output)
 
     conversation = get_or_create_conversation(db, lead, channel="simulation")
-    now = virtual_now or datetime.utcnow()
+    simulation = db.query(SalesAgentSimulation).filter(
+        SalesAgentSimulation.lead_id == lead.id,
+        SalesAgentSimulation.conversation_id == conversation.id,
+    ).first()
+    if virtual_now is not None:
+        now = virtual_now
+    elif simulation:
+        # Once +24h/+48h advances the simulation, wall-clock timestamps would
+        # place later replies before the reminder. Keep one monotonic clock.
+        now = max(datetime.utcnow(), simulation.virtual_now) + timedelta(seconds=1)
+        simulation.virtual_now = now
+        db.add(simulation)
+    else:
+        now = datetime.utcnow()
     conversation.is_paused = False
     conversation.pause_reason = None
     conversation.updated_at = now
@@ -240,13 +360,22 @@ async def simulate_turn(
             "requires_human": False,
             "policy_violations": [],
         })
+        proposed_actions = result.get("proposed_actions", [])
+        proposed_reply = result.get("proposed_reply")
+        if (
+            "request_available_slots" in _action_types(proposed_actions)
+            and not result.get("policy_violations")
+        ):
+            proposed_reply = _availability_reply(
+                db, project=project, inbound_text=inbound_text, now=now,
+            )
         run.prompt_configuration_id = result.get("prompt_configuration_id")
         run.prompt_snapshot = result.get("prompt_snapshot", {})
         run.model = result.get("model", "unknown")
         run.output_snapshot = {
-            "reply": result.get("proposed_reply"),
+            "reply": proposed_reply,
             "intent": result.get("intent"),
-            "proposed_actions": result.get("proposed_actions", []),
+            "proposed_actions": proposed_actions,
             "requires_human": result.get("requires_human", False),
             "policy_violations": result.get("policy_violations", []),
             "error_code": result.get("error_code"),
@@ -255,14 +384,14 @@ async def simulate_turn(
         run.error_code = result.get("error_code")
         run.completed_at = datetime.utcnow()
         draft = None
-        if result.get("proposed_reply") and not result.get("policy_violations"):
+        if proposed_reply and not result.get("policy_violations"):
             draft = OutboundMessage(
                 conversation_id=conversation.id,
                 agent_run_id=run.id,
                 idempotency_key=f"outbound:{conversation.id}:{event_id}",
                 channel="simulation",
                 recipient=lead.channel_address or lead.phone,
-                content=result["proposed_reply"],
+                content=proposed_reply,
                 status="draft",
             )
             db.add(draft)
@@ -271,7 +400,7 @@ async def simulate_turn(
                 channel="simulation",
                 direction="outbound",
                 role="assistant",
-                content=result["proposed_reply"],
+                content=proposed_reply,
                 status=f"simulated_follow_up_{follow_up_hours or 24}h" if event_kind == "follow_up" else "simulated",
                 metadata_json={"event_kind": event_kind, "follow_up_hours": follow_up_hours},
                 created_at=now + timedelta(microseconds=1) if record_inbound else now,

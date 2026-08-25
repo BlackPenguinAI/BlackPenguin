@@ -62,6 +62,16 @@ describe('AgentComponent simulation form', () => {
     expect(value.reminderLabel({ status: 'simulated_follow_up_48h' })).toContain('+48h');
   });
 
+  it('loads every lead when the All leads filter is selected', () => {
+    const urls: string[] = [];
+    const value = component({ get: (url: string) => { urls.push(url); return of([]); } });
+    value.projectId = '';
+    value.loadConversations();
+    value.refreshConversationSummaries();
+    expect(urls).toHaveLength(2);
+    expect(urls.every(url => url.endsWith('/sales-agent/conversations'))).toBe(true);
+  });
+
   it('saves the lead before requesting the initial SMS and always clears loading state', () => {
     const calls: string[] = [];
     const conversation = {

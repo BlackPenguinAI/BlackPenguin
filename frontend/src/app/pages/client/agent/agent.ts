@@ -71,7 +71,7 @@ export class AgentComponent implements OnInit {
       next: (rows) => {
         this.options = rows;
         const requested = this.route.snapshot.queryParamMap.get('project');
-        this.projectId = rows.find((row) => row.id === requested)?.id || rows[0]?.id || '';
+        this.projectId = rows.find((row) => row.id === requested)?.id || '';
         this.campaignId = this.campaigns[0]?.id || '';
         this.loadConversations();
       },
@@ -134,11 +134,6 @@ export class AgentComponent implements OnInit {
   }
 
   loadConversations(keep = false, preferredConversationId = '', preserveSetup = false): void {
-    if (!this.projectId && this.role !== 'sales') {
-      this.loading = false;
-      this.conversations = [];
-      return;
-    }
     this.loading = true;
     this.error = '';
     const url = this.projectId
@@ -328,11 +323,11 @@ export class AgentComponent implements OnInit {
   }
 
   refreshConversationSummaries(): void {
-    if (!this.projectId) return;
+    const url = this.projectId
+      ? `${API_V1_URL}/sales-agent/conversations?project_id=${encodeURIComponent(this.projectId)}`
+      : `${API_V1_URL}/sales-agent/conversations`;
     this.http
-      .get<any[]>(
-        `${API_V1_URL}/sales-agent/conversations?project_id=${encodeURIComponent(this.projectId)}`,
-      )
+      .get<any[]>(url)
       .subscribe({
         next: (rows) => {
           this.conversations = rows;

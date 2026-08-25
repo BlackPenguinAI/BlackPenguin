@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../../core/services/auth';
 import { ToastService } from '../../../core/services/toast';
-import { supportedTimezones, timezoneLabel } from '../../../core/timezones';
+import { canonicalTimezone, supportedTimezones, timezoneLabel } from '../../../core/timezones';
 
 @Component({
   selector: 'app-profile',
@@ -54,7 +54,11 @@ export class ProfileComponent implements OnInit {
     this.isLoading = true;
     this.authService.getMyProfile().subscribe({
       next: (data) => {
-        this.profileData = { ...this.profileData, ...data };
+        this.profileData = {
+          ...this.profileData,
+          ...data,
+          timezone: canonicalTimezone(data.timezone || 'UTC'),
+        };
         this.isLoading = false;
         this.cdr.detectChanges(); // 🚀 Obligamos a Angular a ocultar el spinner de inmediato
       },
