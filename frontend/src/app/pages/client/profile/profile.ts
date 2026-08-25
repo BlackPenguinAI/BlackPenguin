@@ -12,6 +12,7 @@ import { ToastService } from '../../../core/services/toast';
   styleUrls: ['./profile.scss']
 })
 export class ProfileComponent implements OnInit {
+  role = typeof localStorage === 'undefined' ? '' : localStorage.getItem('bp_role') || '';
   isLoading: boolean = true;
   isSaving: boolean = false;
   isChangingPass: boolean = false;
@@ -19,9 +20,10 @@ export class ProfileComponent implements OnInit {
   // Modelo de datos del perfil
   profileData = {
     email: '',
-    full_name: '',
-    last_name_paternal: '',
-    last_name_maternal: '',
+    first_name: '',
+    last_name: '',
+    phone: '',
+    country: '',
     company_name: '',
     plan_name: 'No active plan',
     license_start: null,
@@ -63,10 +65,11 @@ export class ProfileComponent implements OnInit {
   saveProfile() {
     this.isSaving = true;
     const payload = {
-      full_name: this.profileData.full_name,
-      last_name_paternal: this.profileData.last_name_paternal,
-      last_name_maternal: this.profileData.last_name_maternal,
-      company_name: this.profileData.company_name
+      first_name: this.profileData.first_name,
+      last_name: this.profileData.last_name,
+      phone: this.profileData.phone,
+      country: this.profileData.country,
+      company_name: this.role === 'sales' ? null : this.profileData.company_name,
     };
 
     this.authService.updateMyProfile(payload).subscribe({

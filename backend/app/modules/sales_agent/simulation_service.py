@@ -189,6 +189,19 @@ def create_simulation(
         consent_status="granted_simulation",
         consent_captured_at=now,
         qualification_summary=json.dumps(qualification, ensure_ascii=False, default=str),
+        meta_form_data=jsonable_encoder({
+            "first_name": lead_form["first_name"],
+            "last_name": lead_form["last_name"],
+            "phone": lead_form["phone"],
+            "email": str(lead_form["email"]),
+            "selected_product": product,
+            "budget": budget,
+            "custom_answers": lead_form.get("custom_answers") or {},
+        }),
+        visit_recommendations=(
+            f"Review the lead's interest in {product.get('name') or 'the selected property'} and "
+            "confirm priorities, budget fit and any unresolved questions before the visit."
+        ),
         agent_status="initializing",
         is_demo=True,
     )

@@ -21,6 +21,8 @@ export interface CompanyUserInvite {
   last_name: string;
   email: string;
   role: InvitableCompanyUserRole;
+  password: string;
+  is_active: boolean;
 }
 
 export type CompanyUserLimits = Record<InvitableCompanyUserRole, {

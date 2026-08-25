@@ -9,6 +9,7 @@ export interface DashboardStats {
   leads: { current_month: number };
   ai_interactions: { current_month: number };
   generated_at: string;
+  sales?: { assigned_leads: number; appointments_today: number; upcoming_appointments: number };
 }
 
 @Injectable({ providedIn: 'root' })

@@ -20,6 +20,7 @@ router = APIRouter()
 def get_my_profile(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     profile_data = {
         "email": current_user.email,
+        "role": current_user.role,
         "first_name": current_user.first_name, # 🚀 CORREGIDO (antes decía "first name")
         "last_name": current_user.last_name,
         "phone": current_user.phone,           # 🚀 AÑADIDO
@@ -45,7 +46,7 @@ def update_my_profile(payload: MyProfileUpdate, current_user: User = Depends(get
     current_user.phone = payload.phone
     current_user.country = payload.country
     
-    if current_user.company_id and payload.company_name:
+    if current_user.company_id and payload.company_name and current_user.role in TENANT_MANAGER_ROLES:
         company = db.query(Company).filter(Company.id == current_user.company_id).first()
         if company: 
             company.name = payload.company_name
@@ -125,13 +126,15 @@ def invite_company_user(
         role = UserRole(payload.role)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail="Role must be assistant, mkt or sales.") from exc
-    return services.invite_tenant_user(
+    return services.create_tenant_user(
         db,
         company_id=current_user.company_id,
         email=str(payload.email),
         first_name=payload.first_name,
         last_name=payload.last_name,
         role=role,
+        password=payload.password,
+        is_active=payload.is_active,
     )
 
 

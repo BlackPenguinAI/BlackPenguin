@@ -14,6 +14,7 @@ import { API_V1_URL } from '../../../core/config/api.config';
   styleUrls: ['./agent.scss'],
 })
 export class AgentComponent implements OnInit {
+  role = typeof localStorage === 'undefined' ? '' : localStorage.getItem('bp_role') || '';
   @ViewChild('thread') thread?: ElementRef<HTMLElement>;
   options: any[] = [];
   conversations: any[] = [];
@@ -55,7 +56,12 @@ export class AgentComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    this.loadOptions();
+    if (this.role === 'sales') {
+      this.setupOpen = false;
+      this.loadConversations();
+    } else {
+      this.loadOptions();
+    }
   }
 
   loadOptions(): void {
@@ -128,17 +134,18 @@ export class AgentComponent implements OnInit {
   }
 
   loadConversations(keep = false, preferredConversationId = '', preserveSetup = false): void {
-    if (!this.projectId) {
+    if (!this.projectId && this.role !== 'sales') {
       this.loading = false;
       this.conversations = [];
       return;
     }
     this.loading = true;
     this.error = '';
+    const url = this.projectId
+      ? `${API_V1_URL}/sales-agent/conversations?project_id=${encodeURIComponent(this.projectId)}`
+      : `${API_V1_URL}/sales-agent/conversations`;
     this.http
-      .get<any[]>(
-        `${API_V1_URL}/sales-agent/conversations?project_id=${encodeURIComponent(this.projectId)}`,
-      )
+      .get<any[]>(url)
       .subscribe({
         next: (rows) => {
           this.conversations = rows;

@@ -197,12 +197,13 @@ export const routes: Routes = [
           import('./pages/client/marketing/marketing').then((m) => m.MarketingComponent),
       },
       {
-        path: 'sales',
+        path: 'schedule',
         canActivate: [roleGuard],
         data: { roles: ['admin', 'assistant', 'sales'] },
         loadComponent: () =>
           import('./pages/client/sales/sales').then((m) => m.SalesComponent),
       },
+      { path: 'sales', redirectTo: 'schedule', pathMatch: 'full' },
       {
         path: 'agent',
         canActivate: [roleGuard],

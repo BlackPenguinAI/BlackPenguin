@@ -7,7 +7,7 @@
     <div class="flex flex-col md:flex-row md:items-center justify-between mb-10 border-b border-white/10 pb-6 gap-4">
       <div>
         <h1 class="text-3xl font-light tracking-tight">Welcome to <span class="text-secondary font-medium">Black Penguin</span></h1>
-        <p class="text-sm text-gray-400 mt-1">Your AI-powered real estate workspace.</p>
+        <p class="text-sm text-gray-400 mt-1">{{ role === 'sales' ? 'Your assigned leads, conversations and upcoming appointments.' : 'Your AI-powered real estate workspace.' }}</p>
       </div>
       
       <div class="flex flex-col md:items-end">
@@ -36,28 +36,28 @@
           <div class="bg-white/5 border border-white/10 rounded-2xl p-6 shadow-lg hover:bg-white/10 transition-all">
             <div class="flex items-center gap-3 text-gray-400 mb-3">
               <span class="material-symbols-outlined text-[20px]">apartment</span>
-              <span class="text-xs uppercase tracking-widest font-bold">Projects</span>
+              <span class="text-xs uppercase tracking-widest font-bold">{{ role === 'sales' ? 'Assigned leads' : 'Projects' }}</span>
             </div>
-            <div class="text-4xl font-light text-white">{{ stats.projects_count }}</div>
-            <div class="text-[11px] text-gray-500 mt-2">Active real estate projects</div>
+            <div class="text-4xl font-light text-white">{{ role === 'sales' ? (stats.sales?.assigned_leads || 0) : stats.projects_count }}</div>
+            <div class="text-[11px] text-gray-500 mt-2">{{ role === 'sales' ? 'Leads assigned to you' : 'Active real estate projects' }}</div>
           </div>
 
           <div class="bg-white/5 border border-white/10 rounded-2xl p-6 shadow-lg hover:bg-white/10 transition-all">
             <div class="flex items-center gap-3 text-gray-400 mb-3">
               <span class="material-symbols-outlined text-[20px]">groups</span>
-              <span class="text-xs uppercase tracking-widest font-bold">Leads</span>
+              <span class="text-xs uppercase tracking-widest font-bold">{{ role === 'sales' ? 'Today' : 'Leads' }}</span>
             </div>
-            <div class="text-4xl font-light text-white">{{ stats.leads_count }}</div>
-            <div class="text-[11px] text-gray-500 mt-2">Captured this month</div>
+            <div class="text-4xl font-light text-white">{{ role === 'sales' ? (stats.sales?.appointments_today || 0) : stats.leads_count }}</div>
+            <div class="text-[11px] text-gray-500 mt-2">{{ role === 'sales' ? 'Appointments today' : 'Captured this month' }}</div>
           </div>
 
           <div class="bg-white/5 border border-white/10 rounded-2xl p-6 shadow-lg hover:bg-white/10 transition-all relative overflow-hidden group">
             <div class="flex items-center gap-3 text-secondary mb-3">
               <span class="material-symbols-outlined text-[20px]">forum</span>
-              <span class="text-xs uppercase tracking-widest font-bold">AI Interactions</span>
+              <span class="text-xs uppercase tracking-widest font-bold">{{ role === 'sales' ? 'Upcoming' : 'AI Interactions' }}</span>
             </div>
-            <div class="text-4xl font-light text-white">{{ stats.ai_interactions_count }}</div>
-            <div class="text-[11px] text-gray-500 mt-2">Conversations handled by AI</div>
+            <div class="text-4xl font-light text-white">{{ role === 'sales' ? (stats.sales?.upcoming_appointments || 0) : stats.ai_interactions_count }}</div>
+            <div class="text-[11px] text-gray-500 mt-2">{{ role === 'sales' ? 'Scheduled appointments' : 'Conversations handled by AI' }}</div>
           </div>
         </div>
 
@@ -65,7 +65,7 @@
           <h2 class="text-sm font-bold uppercase tracking-widest text-gray-400 mb-4 px-1">Quick Actions</h2>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             
-            <a routerLink="/app/company" class="bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/20 rounded-xl p-5 flex items-center justify-between transition-all group cursor-pointer">
+            <a *ngIf="role !== 'sales'" routerLink="/app/company" class="bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/20 rounded-xl p-5 flex items-center justify-between transition-all group cursor-pointer">
               <div class="flex items-center gap-4">
                 <div class="p-2.5 bg-secondary/10 rounded-lg text-secondary group-hover:scale-110 transition-transform">
                   <span class="material-symbols-outlined block">support_agent</span>
@@ -76,6 +76,10 @@
                 </div>
               </div>
               <span class="material-symbols-outlined text-gray-500 group-hover:text-white transition-colors">arrow_forward</span>
+            </a>
+
+            <a *ngIf="role === 'sales'" routerLink="/app/schedule" class="bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/20 rounded-xl p-5 flex items-center justify-between transition-all group cursor-pointer">
+              <div class="flex items-center gap-4"><div class="p-2.5 bg-secondary/10 rounded-lg text-secondary"><span class="material-symbols-outlined block">calendar_month</span></div><div class="flex flex-col"><span class="text-sm font-medium text-white">Open Schedule</span><span class="text-[10px] text-gray-500 mt-0.5">Availability and assigned visits</span></div></div><span class="material-symbols-outlined text-gray-500">arrow_forward</span>
             </a>
 
             <a routerLink="/app/profile" class="bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/20 rounded-xl p-5 flex items-center justify-between transition-all group cursor-pointer">
@@ -95,7 +99,7 @@
         </div>
       </div>
 
-      <div>
+      <div *ngIf="role !== 'sales'">
         <div class="liquid-glass border border-white/5 rounded-2xl p-6 relative overflow-hidden">
           <div class="absolute top-0 right-0 w-32 h-32 bg-secondary/10 rounded-full blur-[50px]"></div>
           

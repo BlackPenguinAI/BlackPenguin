@@ -1,10 +1,11 @@
-from pydantic import BaseModel, EmailStr, ConfigDict
+from pydantic import BaseModel, EmailStr, ConfigDict, Field
 from typing import Optional, List
 from datetime import datetime
 from .models import UserRole
 
 class MyProfileResponse(BaseModel):
     email: str
+    role: UserRole
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     phone: Optional[str] = None      # 🚀 AÑADIDO
@@ -53,9 +54,11 @@ class UserAdminListResponse(BaseModel):
 
 class TenantUserCreate(BaseModel):
     email: EmailStr
-    first_name: str
-    last_name: str
+    first_name: str = Field(min_length=1, max_length=150)
+    last_name: str = Field(min_length=1, max_length=100)
     role: str
+    password: str = Field(min_length=4, max_length=128)
+    is_active: bool = True
 
 
 class TenantUserUpdate(BaseModel):

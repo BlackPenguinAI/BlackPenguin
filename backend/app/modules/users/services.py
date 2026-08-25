@@ -53,6 +53,34 @@ def invite_tenant_user(
     send_activation_email: bool = True,
 ) -> User:
     """Create one non-administrator tenant account for every invitation surface."""
+    return create_tenant_user(
+        db,
+        company_id=company_id,
+        email=email,
+        first_name=first_name,
+        last_name=last_name,
+        role=role,
+        password=secrets.token_urlsafe(32),
+        is_active=True,
+        commit=commit,
+        send_activation_email=send_activation_email,
+    )
+
+
+def create_tenant_user(
+    db: Session,
+    *,
+    company_id: str,
+    email: str,
+    first_name: str,
+    last_name: str,
+    role: UserRole,
+    password: str,
+    is_active: bool,
+    commit: bool = True,
+    send_activation_email: bool = False,
+) -> User:
+    """Create a tenant user with either a temporary or administrator-set password."""
     if role not in INVITABLE_TENANT_ROLES:
         raise HTTPException(
             status_code=403,
@@ -67,15 +95,16 @@ def invite_tenant_user(
     ).first()
     if not company:
         raise HTTPException(status_code=404, detail="Active Company not found.")
-    enforce_role_limit(db, company, role)
+    if is_active:
+        enforce_role_limit(db, company, role)
     user = User(
         company_id=company_id,
         email=normalized_email,
         first_name=first_name.strip(),
         last_name=last_name.strip(),
         role=role,
-        hashed_password=get_password_hash(secrets.token_urlsafe(32)),
-        is_active=True,
+        hashed_password=get_password_hash(password),
+        is_active=is_active,
     )
     db.add(user)
     if commit:

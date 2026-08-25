@@ -132,6 +132,7 @@ async def receive(
                     channel_address=phone or fields.get("email"),
                     consent_status="captured_by_source",
                     consent_captured_at=datetime.utcnow(),
+                    meta_form_data=fields,
                     agent_status="draft",
                     assigned_sales_user_id=select_next_sales_user(db, project.id),
                 )

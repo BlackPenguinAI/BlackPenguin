@@ -1,8 +1,9 @@
 <section class="p-8 max-w-7xl mx-auto space-y-8">
-  <header>
-    <p class="text-xs uppercase tracking-[0.25em] text-secondary">Company access</p>
+  <header class="flex items-end justify-between gap-4">
+    <div><p class="text-xs uppercase tracking-[0.25em] text-secondary">Company access</p>
     <h1 class="text-3xl font-semibold mt-2">Users</h1>
-    <p class="text-gray-400 mt-2">Invite Assistants, Marketing and Sales users. Active seats follow the Company plan.</p>
+    <p class="text-gray-400 mt-2">Manage Assistant, Marketing and Sales accounts. Active seats follow the Company plan.</p></div>
+    <button type="button" (click)="openAddModal()" class="rounded-xl bg-secondary px-5 py-3 font-bold text-black hover:bg-yellow-400 flex items-center gap-2"><span class="material-symbols-outlined">person_add</span>Add User</button>
   </header>
 
   <section *ngIf="administrator" class="rounded-2xl border border-secondary/20 bg-secondary/5 p-5">
@@ -23,16 +24,6 @@
     <div class="rounded-xl border border-white/10 bg-white/[0.03] p-4"><p class="text-xs text-gray-400">Sales</p><p class="mt-1 text-xl">{{ limits.sales.used }} / {{ limits.sales.limit }}</p></div>
   </section>
 
-  <form (ngSubmit)="sendInvite()" class="grid md:grid-cols-5 gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-    <input name="first_name" [(ngModel)]="invite.first_name" required placeholder="First name" class="bg-black border border-white/10 rounded-lg px-3 py-2">
-    <input name="last_name" [(ngModel)]="invite.last_name" required placeholder="Last name" class="bg-black border border-white/10 rounded-lg px-3 py-2">
-    <input name="email" [(ngModel)]="invite.email" required type="email" placeholder="Email" class="bg-black border border-white/10 rounded-lg px-3 py-2">
-    <select name="role" [(ngModel)]="invite.role" class="bg-black border border-white/10 rounded-lg px-3 py-2">
-      <option value="assistant">Assistant</option><option value="mkt">Marketing</option><option value="sales">Sales</option>
-    </select>
-    <button [disabled]="saving" class="rounded-lg bg-secondary text-black font-semibold px-4 py-2 disabled:opacity-50">{{ saving ? 'Creating…' : 'Invite user' }}</button>
-  </form>
-
   <div class="rounded-2xl border border-white/10 overflow-hidden">
     <div *ngIf="loading" class="p-8 text-gray-400">Loading users…</div>
     <table *ngIf="!loading" class="w-full text-left">
@@ -47,3 +38,26 @@
     <div *ngIf="!loading && teamUsers.length === 0" class="border-t border-white/10 p-8 text-center text-sm text-gray-500">No team members yet.</div>
   </div>
 </section>
+
+<app-modal [isOpen]="showAddModal" title="Add Company User" maxWidthClass="max-w-2xl" (close)="closeAddModal()">
+  <form (ngSubmit)="sendInvite()" class="flex flex-col gap-4">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <app-input label="First Name" placeholder="John" [(ngModel)]="invite.first_name" name="first_name"></app-input>
+      <app-input label="Last Name" placeholder="Doe" [(ngModel)]="invite.last_name" name="last_name"></app-input>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <app-input label="Email" type="email" placeholder="user@company.com" [(ngModel)]="invite.email" name="email"></app-input>
+      <div class="flex items-center justify-between self-end h-[46px] rounded-xl border border-white/10 bg-white/5 p-2.5">
+        <div><span class="block text-xs font-mono uppercase tracking-widest text-gray-300">User Status</span><small class="text-[10px] text-gray-500">Can log in immediately</small></div>
+        <label class="relative inline-flex cursor-pointer items-center"><input type="checkbox" [(ngModel)]="invite.is_active" name="is_active" class="sr-only peer"><div class="w-9 h-5 rounded-full bg-white/10 peer peer-checked:bg-secondary after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all peer-checked:after:translate-x-full"></div></label>
+      </div>
+    </div>
+    <div class="flex flex-col gap-1.5"><label class="ml-1 text-[10px] font-bold uppercase tracking-widest text-gray-500">Role</label><select [(ngModel)]="invite.role" name="role" class="w-full rounded-xl border border-white/10 bg-black/50 px-4 py-3 text-sm text-white outline-none focus:border-secondary"><option value="assistant">Assistant</option><option value="mkt">Marketing</option><option value="sales">Sales</option></select><small class="text-xs text-gray-500">Sales users belong only to this Company and see only leads assigned to them.</small></div>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <app-input label="Password" type="password" placeholder="••••••••" [(ngModel)]="invite.password" name="password"></app-input>
+      <app-input label="Repeat Password" type="password" placeholder="••••••••" [(ngModel)]="repeatPassword" name="repeat_password"></app-input>
+    </div>
+    <p *ngIf="repeatPassword && invite.password !== repeatPassword" class="text-xs text-red-300">Passwords do not match.</p>
+    <div class="mt-3 flex justify-end gap-3 border-t border-white/10 pt-4"><app-button variant="ghost" (onClick)="closeAddModal()">Cancel</app-button><app-button type="submit" variant="secondary" [isLoading]="saving" [disabled]="!formValid">Add User</app-button></div>
+  </form>
+</app-modal>

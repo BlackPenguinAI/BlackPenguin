@@ -9,7 +9,10 @@ from sqlalchemy.orm import Session
 from app.modules.project_team.service import eligible_sales_assignments, select_next_sales_user
 from app.modules.users.models import User
 
-from .models import CalendarConnection, FunnelStage, Lead, Meeting, MeetingStatus, SalesAvailabilityWindow
+from .models import (
+    CalendarConnection, FunnelStage, Lead, Meeting, MeetingStatus,
+    SalesAvailabilityBlock, SalesAvailabilityWindow,
+)
 
 
 ACTIVE_MEETING_STATUSES = {MeetingStatus.SCHEDULED, MeetingStatus.CONFIRMED}
@@ -55,6 +58,55 @@ def availability_for_user(db: Session, user_id: str) -> list[SalesAvailabilityWi
     return db.query(SalesAvailabilityWindow).filter(
         SalesAvailabilityWindow.user_id == user_id,
     ).order_by(SalesAvailabilityWindow.weekday, SalesAvailabilityWindow.start_time).all()
+
+
+def _utc_naive(value: datetime, timezone_name: str) -> datetime:
+    zone = _zone(timezone_name)
+    localized = value.replace(tzinfo=zone) if value.tzinfo is None else value
+    return localized.astimezone(timezone.utc).replace(tzinfo=None)
+
+
+def create_availability_block(
+    db: Session, *, user: User, starts_at: datetime, ends_at: datetime, timezone_name: str,
+) -> SalesAvailabilityBlock:
+    start_utc = _utc_naive(starts_at, timezone_name)
+    end_utc = _utc_naive(ends_at, timezone_name)
+    if end_utc <= start_utc:
+        raise HTTPException(status_code=422, detail="End time must be after start time.")
+    overlap = db.query(SalesAvailabilityBlock).filter(
+        SalesAvailabilityBlock.user_id == user.id,
+        SalesAvailabilityBlock.starts_at < end_utc,
+        SalesAvailabilityBlock.ends_at > start_utc,
+    ).first()
+    if overlap:
+        raise HTTPException(status_code=409, detail="This availability overlaps an existing block.")
+    item = SalesAvailabilityBlock(
+        user_id=user.id, starts_at=start_utc, ends_at=end_utc, timezone=timezone_name,
+    )
+    db.add(item); db.commit(); db.refresh(item)
+    return item
+
+
+def availability_blocks_for_user(
+    db: Session, *, user_id: str, starts_at: datetime, ends_at: datetime,
+) -> list[SalesAvailabilityBlock]:
+    start_utc = starts_at.astimezone(timezone.utc).replace(tzinfo=None) if starts_at.tzinfo else starts_at
+    end_utc = ends_at.astimezone(timezone.utc).replace(tzinfo=None) if ends_at.tzinfo else ends_at
+    return db.query(SalesAvailabilityBlock).filter(
+        SalesAvailabilityBlock.user_id == user_id,
+        SalesAvailabilityBlock.starts_at < end_utc,
+        SalesAvailabilityBlock.ends_at > start_utc,
+    ).order_by(SalesAvailabilityBlock.starts_at).all()
+
+
+def delete_availability_block(db: Session, *, user_id: str, block_id: str) -> None:
+    item = db.query(SalesAvailabilityBlock).filter(
+        SalesAvailabilityBlock.id == block_id,
+        SalesAvailabilityBlock.user_id == user_id,
+    ).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Availability block not found.")
+    db.delete(item); db.commit()
 
 
 def upsert_calendar_connection(
@@ -118,6 +170,13 @@ def eligible_users_for_slot(
     ends_at = starts_at + timedelta(minutes=duration_minutes)
     eligible = []
     for assignment in eligible_sales_assignments(db, project_id):
+        date_blocks = availability_blocks_for_user(
+            db, user_id=assignment.user_id, starts_at=starts_at, ends_at=ends_at,
+        )
+        if any(block.starts_at <= starts_at and block.ends_at >= ends_at for block in date_blocks):
+            if _is_free(db, user_id=assignment.user_id, starts_at=starts_at, ends_at=ends_at):
+                eligible.append(assignment.user_id)
+            continue
         windows = availability_for_user(db, assignment.user_id)
         for window in windows:
             zone = _zone(window.timezone)

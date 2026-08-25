@@ -11,11 +11,14 @@ import {
   CompanyUsersService,
 } from '../../../core/services/company-users.service';
 import { ToastService } from '../../../core/services/toast';
+import { ButtonComponent } from '../../../shared/ui/button/button';
+import { InputComponent } from '../../../shared/ui/input/input';
+import { ModalComponent } from '../../../shared/ui/modal/modal';
 
 @Component({
   selector: 'app-company-users',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, ButtonComponent, InputComponent, ModalComponent],
   templateUrl: './company-users.html',
 })
 export class CompanyUsersComponent implements OnInit {
@@ -23,7 +26,9 @@ export class CompanyUsersComponent implements OnInit {
   limits: CompanyUserLimits | null = null;
   loading = true;
   saving = false;
-  invite: CompanyUserInvite = { first_name: '', last_name: '', email: '', role: 'assistant' };
+  showAddModal = false;
+  repeatPassword = '';
+  invite: CompanyUserInvite = this.emptyForm();
 
   constructor(
     private companyUsers: CompanyUsersService,
@@ -50,15 +55,27 @@ export class CompanyUsersComponent implements OnInit {
     });
   }
 
+  openAddModal(): void {
+    this.invite = this.emptyForm();
+    this.repeatPassword = '';
+    this.showAddModal = true;
+  }
+
+  closeAddModal(): void {
+    if (!this.saving) this.showAddModal = false;
+  }
+
   sendInvite(): void {
-    if (!this.invite.email || !this.invite.first_name || !this.invite.last_name) return;
+    if (!this.formValid) return;
     this.saving = true;
     this.companyUsers.invite(this.invite).subscribe({
       next: user => {
         this.users = [...this.users, user].sort((a, b) => a.email.localeCompare(b.email));
-        this.invite = { first_name: '', last_name: '', email: '', role: 'assistant' };
+        this.invite = this.emptyForm();
+        this.repeatPassword = '';
+        this.showAddModal = false;
         this.saving = false;
-        this.toast.showSuccess('Invitation created');
+        this.toast.showSuccess('User created');
         this.reloadLimits();
         this.cdr.markForCheck();
       },
@@ -98,6 +115,18 @@ export class CompanyUsersComponent implements OnInit {
 
   roleLabel(role: CompanyUserRole): string {
     return ({ admin: 'Administrator', assistant: 'Assistant', mkt: 'Marketing', sales: 'Sales' })[role];
+  }
+
+  get formValid(): boolean {
+    return !!(
+      this.invite.first_name.trim() && this.invite.last_name.trim() &&
+      /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(this.invite.email.trim()) &&
+      this.invite.password.length >= 4 && this.invite.password === this.repeatPassword
+    );
+  }
+
+  private emptyForm(): CompanyUserInvite {
+    return { first_name: '', last_name: '', email: '', role: 'assistant', password: '', is_active: true };
   }
 
   private reloadLimits(): void {

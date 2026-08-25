@@ -46,6 +46,8 @@ class Lead(Base):
     intent_score = Column(Numeric(3, 2), default=0.0)
     is_opt_out = Column(Boolean, default=False)
     qualification_summary = Column(Text, nullable=True)
+    meta_form_data = Column(JSON, default=dict, nullable=False)
+    visit_recommendations = Column(Text, nullable=True)
     agent_status = Column(String(30), default="paused", nullable=False)
     is_demo = Column(Boolean, default=False, nullable=False)
     funnel_stage = Column(SqlaEnum(FunnelStage), default=FunnelStage.NEW, nullable=False)
@@ -131,6 +133,22 @@ class SalesAvailabilityWindow(Base):
     is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+
+class SalesAvailabilityBlock(Base):
+    """Date-specific availability entered by a Sales user in the monthly calendar."""
+
+    __tablename__ = "sales_availability_blocks"
+    __table_args__ = (
+        UniqueConstraint("user_id", "starts_at", "ends_at", name="uq_sales_availability_block"),
+    )
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    starts_at = Column(DateTime, nullable=False, index=True)
+    ends_at = Column(DateTime, nullable=False, index=True)
+    timezone = Column(String(80), default="UTC", nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
 
 class CalendarConnection(Base):

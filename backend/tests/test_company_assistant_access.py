@@ -12,7 +12,8 @@ from app.modules.auth.deps import RoleChecker
 from app.modules.companies.models import Company
 from app.modules.subscriptions.models import SubscriptionPlan
 from app.modules.users.models import TENANT_MANAGER_ROLES, User, UserRole
-from app.modules.users.services import enforce_role_limit, invite_tenant_user
+from app.core.security import verify_password
+from app.modules.users.services import create_tenant_user, enforce_role_limit, invite_tenant_user
 
 
 @pytest.fixture()
@@ -67,6 +68,24 @@ def test_shared_invitation_service_creates_assistant_and_normalizes_email(db):
     assert user.email == "assistant@example.com"
     assert user.first_name == "Ada"
     assert user.role == UserRole.ASSISTANT
+
+
+def test_company_manager_can_create_sales_user_with_password_and_status(db):
+    company = _company(db)
+    user = create_tenant_user(
+        db,
+        company_id=company.id,
+        email=" Sales@Example.com ",
+        first_name=" Sam ",
+        last_name=" Seller ",
+        role=UserRole.SALES,
+        password="1234",
+        is_active=True,
+    )
+    assert user.company_id == company.id
+    assert user.email == "sales@example.com"
+    assert verify_password("1234", user.hashed_password)
+    assert user.hashed_password != "1234"
 
 
 def test_administrator_cannot_be_created_by_tenant_invitation(db):

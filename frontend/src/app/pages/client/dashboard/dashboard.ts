@@ -1,7 +1,7 @@
 import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router'; // 🚀 Requerido para que funcionen los routerLink
-import { DashboardService } from './dashboard.service';
+import { DashboardService, DashboardStats } from './dashboard.service';
 
 @Component({
   selector: 'app-dashboard',
@@ -11,13 +11,15 @@ import { DashboardService } from './dashboard.service';
   styleUrls: ['./dashboard.scss']
 })
 export class Dashboard implements OnInit {
+  role = typeof localStorage === 'undefined' ? '' : localStorage.getItem('bp_role') || '';
   isLoading: boolean = true;
   loadError = false;
   
   stats = {
     projects_count: 0,
     leads_count: 0,
-    ai_interactions_count: 0
+    ai_interactions_count: 0,
+    sales: null as DashboardStats['sales'] | null,
   };
 
   constructor(
@@ -38,6 +40,7 @@ export class Dashboard implements OnInit {
           projects_count: data.projects.active,
           leads_count: data.leads.current_month,
           ai_interactions_count: data.ai_interactions.current_month,
+          sales: data.sales || null,
         };
         this.isLoading = false;
         this.cdr.detectChanges(); // 🚀 Obligamos a pintar la pantalla

@@ -1,13 +1,13 @@
 <section class="agent-page">
   <header class="agent-header">
     <div>
-      <p>AI SALES AGENT LAB</p>
-      <h1>Sales protocol simulation</h1>
+      <p>{{ role === 'sales' ? 'ASSIGNED LEAD CONVERSATIONS' : 'AI SALES AGENT LAB' }}</p>
+      <h1>{{ role === 'sales' ? 'Lead chats' : 'Sales protocol simulation' }}</h1>
       <span
-        >Test approved Project knowledge and Sales Agent prompts in an SMS-equivalent flow.</span
+        >{{ role === 'sales' ? 'Review the SMS history and context for leads assigned to you.' : 'Test approved Project knowledge and Sales Agent prompts in an SMS-equivalent flow.' }}</span
       >
     </div>
-    <div class="header-actions">
+    <div class="header-actions" *ngIf="role !== 'sales'">
       <select [(ngModel)]="projectId" (change)="projectChanged()">
         <option *ngFor="let project of options" [value]="project.id">
           {{ project.name }}
@@ -15,7 +15,7 @@
       ><button class="primary" (click)="setupOpen = true">New simulation</button>
     </div>
   </header>
-  <div class="demo-banner">
+  <div class="demo-banner" *ngIf="role !== 'sales'">
     <span class="material-symbols-outlined">science</span>
     <div>
       <strong>Safe simulation</strong
@@ -30,7 +30,7 @@
     {{ success }}<button (click)="success = ''">×</button>
   </div>
 
-  <section class="setup-card" *ngIf="setupOpen">
+  <section class="setup-card" *ngIf="setupOpen && role !== 'sales'">
     <div class="setup-head">
       <div>
         <p>SIMULATED META LEAD FORM</p>
@@ -187,7 +187,7 @@
     <aside class="inbox">
       <div class="inbox-top">
         <h2>
-          Test leads <b>{{ conversations.length }}</b>
+          {{ role === 'sales' ? 'Assigned leads' : 'Test leads' }} <b>{{ conversations.length }}</b>
         </h2>
         <input [(ngModel)]="search" placeholder="Search lead or phone" />
       </div>
@@ -260,7 +260,7 @@
           </div>
         </div>
       </div>
-      <div class="composer">
+      <div class="composer" *ngIf="role !== 'sales'; else salesReadOnly">
         <textarea
           [(ngModel)]="draft"
           (keydown.control.enter)="send()"
@@ -286,6 +286,7 @@
           prompt.</small
         >
       </div>
+      <ng-template #salesReadOnly><div class="composer"><small>Read-only Sales view. The AI Agent manages the SMS conversation; use this history to prepare for the appointment.</small></div></ng-template>
     </main>
     <aside class="context" *ngIf="selected">
       <p>SIMULATION CONTROL</p>

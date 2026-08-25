@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Form
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.db.postgres import get_db
 from app.modules.auth.deps import RoleChecker
@@ -11,9 +11,10 @@ from app.integrations.openrouter_client import generate_llm_response
 
 from .models import Lead, SmsChatMessage, Meeting, FunnelStage
 from .schemas import (
-    AvailabilityUpdate, AvailabilityWindowResponse, CalendarConnectionResponse,
-    CalendarConnectionUpdate, LeadResponse, LeadUpdate, MeetingCreate, MeetingResponse,
-    MeetingUpdate, SalesReportResponse, SmsChatMessageSchema,
+    AvailabilityBlockCreate, AvailabilityBlockResponse, AvailabilityUpdate, AvailabilityWindowResponse,
+    CalendarConnectionResponse, CalendarConnectionUpdate, LeadResponse, LeadUpdate,
+    MeetingCreate, MeetingResponse, MeetingUpdate, SalesLeadDetailResponse, SalesReportResponse,
+    SalesScheduleResponse, SmsChatMessageSchema,
 )
 from . import services
 from . import scheduling
@@ -39,7 +40,22 @@ def get_lead_chat(
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.MKT, UserRole.SALES]))
 ):
-    return services.get_lead_sms_chat(db, lead_id, current_user.company_id)
+    return services.get_lead_sms_chat(
+        db, lead_id, current_user.company_id,
+        current_user.id if current_user.role == UserRole.SALES else None,
+    )
+
+
+@router.get("/leads/{lead_id}", response_model=SalesLeadDetailResponse, summary="Lead detail for Marketing and assigned Sales")
+def get_lead_detail(
+    lead_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.MKT, UserRole.SALES])),
+):
+    return services.get_lead_detail(
+        db, lead_id, current_user.company_id,
+        current_user.id if current_user.role == UserRole.SALES else None,
+    )
 
 @router.put("/leads/{lead_id}", response_model=LeadResponse, summary="Actualizar Etapa del Embudo del Prospecto")
 def update_lead_status(
@@ -48,7 +64,10 @@ def update_lead_status(
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.SALES]))
 ):
-    return services.update_lead(db, lead_id, current_user.company_id, payload, current_user.id)
+    return services.update_lead(
+        db, lead_id, current_user.company_id, payload, current_user.id,
+        current_user.id if current_user.role == UserRole.SALES else None,
+    )
 
 # =========================================================
 # 📈 SALES REPORT (Inventario, Revenue, ROI y Coordenadas Mapa)
@@ -128,7 +147,10 @@ def update_meeting(
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.SALES])),
 ):
-    meeting = services.update_meeting(db, meeting_id, current_user.company_id, payload)
+    meeting = services.update_meeting(
+        db, meeting_id, current_user.company_id, payload,
+        current_user.id if current_user.role == UserRole.SALES else None,
+    )
     item = MeetingResponse.model_validate(meeting)
     if meeting.lead:
         item.lead_name = meeting.lead.full_name
@@ -155,6 +177,67 @@ def set_my_availability(
         timezone_name=payload.timezone,
         windows=[item.model_dump() for item in payload.windows],
     )
+
+
+@router.get("/availability-blocks/me", response_model=List[AvailabilityBlockResponse])
+def get_my_availability_blocks(
+    start: datetime,
+    end: datetime,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([UserRole.SALES])),
+):
+    return scheduling.availability_blocks_for_user(
+        db, user_id=current_user.id, starts_at=start, ends_at=end,
+    )
+
+
+@router.post("/availability-blocks/me", response_model=AvailabilityBlockResponse, status_code=status.HTTP_201_CREATED)
+def add_my_availability_block(
+    payload: AvailabilityBlockCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([UserRole.SALES])),
+):
+    return scheduling.create_availability_block(
+        db, user=current_user, starts_at=payload.starts_at, ends_at=payload.ends_at,
+        timezone_name=payload.timezone,
+    )
+
+
+@router.delete("/availability-blocks/me/{block_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_my_availability_block(
+    block_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([UserRole.SALES])),
+):
+    scheduling.delete_availability_block(db, user_id=current_user.id, block_id=block_id)
+
+
+@router.get("/schedule/me", response_model=SalesScheduleResponse)
+def get_my_schedule(
+    start: datetime,
+    end: datetime,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([UserRole.SALES])),
+):
+    start_value = start.astimezone(timezone.utc).replace(tzinfo=None) if start.tzinfo else start
+    end_value = end.astimezone(timezone.utc).replace(tzinfo=None) if end.tzinfo else end
+    meetings = db.query(Meeting).filter(
+        Meeting.assigned_sales_user_id == current_user.id,
+        Meeting.meeting_time >= start_value,
+        Meeting.meeting_time < end_value,
+    ).order_by(Meeting.meeting_time).all()
+    meeting_rows = []
+    for meeting in meetings:
+        item = MeetingResponse.model_validate(meeting)
+        if meeting.lead:
+            item.lead_name = meeting.lead.full_name
+        meeting_rows.append(item)
+    return {
+        "availability": scheduling.availability_blocks_for_user(
+            db, user_id=current_user.id, starts_at=start, ends_at=end,
+        ),
+        "meetings": meeting_rows,
+    }
 
 
 @router.get("/calendar-connections/me", response_model=List[CalendarConnectionResponse])

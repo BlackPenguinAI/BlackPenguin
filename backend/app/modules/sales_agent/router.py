@@ -137,6 +137,7 @@ async def simulate(
         lead_id=payload.lead_id,
         inbound_text=payload.message,
         event_id=payload.event_id,
+        sales_user_id=current_user.id if current_user.role == UserRole.SALES else None,
     )
 
 
@@ -158,7 +159,10 @@ def messages(
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.MKT, UserRole.SALES])),
 ):
-    return conversation_messages(db, company_id=current_user.company_id, conversation_id=conversation_id)
+    return conversation_messages(
+        db, company_id=current_user.company_id, conversation_id=conversation_id,
+        sales_user_id=current_user.id if current_user.role == UserRole.SALES else None,
+    )
 
 
 @router.post("/conversations/{conversation_id}/action", response_model=ConversationSummary)
@@ -169,6 +173,7 @@ def conversation_action(
 ):
     conversation = set_conversation_action(
         db, company_id=current_user.company_id, conversation_id=conversation_id, action=payload.action,
+        sales_user_id=current_user.id if current_user.role == UserRole.SALES else None,
     )
     return next(item for item in conversation_summaries(
         db, company_id=current_user.company_id,

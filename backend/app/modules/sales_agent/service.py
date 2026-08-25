@@ -63,11 +63,16 @@ def conversation_summaries(
     return result
 
 
-def conversation_messages(db: Session, *, company_id: str, conversation_id: str) -> list[SalesMessage]:
-    conversation = db.query(SalesConversation).filter(
+def conversation_messages(
+    db: Session, *, company_id: str, conversation_id: str, sales_user_id: str | None = None,
+) -> list[SalesMessage]:
+    query = db.query(SalesConversation).join(Lead, Lead.id == SalesConversation.lead_id).filter(
         SalesConversation.id == conversation_id,
         SalesConversation.company_id == company_id,
-    ).first()
+    )
+    if sales_user_id:
+        query = query.filter(Lead.assigned_sales_user_id == sales_user_id)
+    conversation = query.first()
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found.")
     return db.query(SalesMessage).filter(
@@ -77,11 +82,15 @@ def conversation_messages(db: Session, *, company_id: str, conversation_id: str)
 
 def set_conversation_action(
     db: Session, *, company_id: str, conversation_id: str, action: str,
+    sales_user_id: str | None = None,
 ) -> SalesConversation:
-    conversation = db.query(SalesConversation).filter(
+    query = db.query(SalesConversation).join(Lead, Lead.id == SalesConversation.lead_id).filter(
         SalesConversation.id == conversation_id,
         SalesConversation.company_id == company_id,
-    ).first()
+    )
+    if sales_user_id:
+        query = query.filter(Lead.assigned_sales_user_id == sales_user_id)
+    conversation = query.first()
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found.")
     if action == "resume":
@@ -127,8 +136,12 @@ async def simulate_turn(
     record_inbound: bool = True,
     event_kind: str = "lead_message",
     virtual_now: datetime | None = None,
+    sales_user_id: str | None = None,
 ) -> dict:
-    lead = db.query(Lead).filter(Lead.id == lead_id, Lead.company_id == company_id).first()
+    lead_query = db.query(Lead).filter(Lead.id == lead_id, Lead.company_id == company_id)
+    if sales_user_id:
+        lead_query = lead_query.filter(Lead.assigned_sales_user_id == sales_user_id)
+    lead = lead_query.first()
     if not lead or not lead.project_id:
         raise HTTPException(status_code=404, detail="Lead not found or not associated with a Project.")
     project = db.query(Project).filter(Project.id == lead.project_id, Project.company_id == company_id).first()

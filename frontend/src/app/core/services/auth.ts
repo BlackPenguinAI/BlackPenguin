@@ -68,7 +68,7 @@ export class AuthService {
   defaultRouteForRole(role: string | null = this.getRole()): string {
     if (role === 'superadmin') return '/admin/dashboard';
     if (role === 'mkt') return '/app/marketing';
-    if (role === 'sales') return '/app/sales';
+    if (role === 'sales') return '/app/dashboard';
     return '/app/dashboard';
   }
 

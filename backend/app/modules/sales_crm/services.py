@@ -18,14 +18,62 @@ def get_project_leads(db: Session, company_id: str, project_id: str, sales_user_
         query = query.filter(Lead.assigned_sales_user_id == sales_user_id)
     return query.order_by(Lead.created_at.desc()).all()
 
-def get_lead_sms_chat(db: Session, lead_id: str, company_id: str) -> List[SmsChatMessage]:
-    return db.query(SmsChatMessage).join(Lead).filter(
+def get_lead_sms_chat(
+    db: Session, lead_id: str, company_id: str, sales_user_id: str | None = None,
+) -> List[SmsChatMessage]:
+    query = db.query(SmsChatMessage).join(Lead).filter(
         SmsChatMessage.lead_id == lead_id,
         Lead.company_id == company_id,
-    ).order_by(SmsChatMessage.created_at.asc()).all()
+    )
+    if sales_user_id:
+        query = query.filter(Lead.assigned_sales_user_id == sales_user_id)
+    return query.order_by(SmsChatMessage.created_at.asc()).all()
 
-def update_lead(db: Session, lead_id: str, company_id: str, payload: LeadUpdate, actor_id: str | None = None) -> Lead:
-    lead = db.query(Lead).filter(Lead.id == lead_id, Lead.company_id == company_id).first()
+
+def get_lead_detail(db: Session, lead_id: str, company_id: str, sales_user_id: str | None = None) -> dict:
+    from app.modules.projects.models import Project, ProjectCampaign
+    from app.modules.sales_agent.models import SalesAgentSimulation, SalesConversation, SalesMessage
+
+    query = db.query(Lead).filter(Lead.id == lead_id, Lead.company_id == company_id)
+    if sales_user_id:
+        query = query.filter(Lead.assigned_sales_user_id == sales_user_id)
+    lead = query.first()
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found.")
+    project = db.query(Project).filter(Project.id == lead.project_id).first()
+    campaign = db.query(ProjectCampaign).filter(ProjectCampaign.id == lead.campaign_id).first() if lead.campaign_id else None
+    conversation = db.query(SalesConversation).filter(SalesConversation.lead_id == lead.id).first()
+    simulation = db.query(SalesAgentSimulation).filter(SalesAgentSimulation.lead_id == lead.id).first()
+    meta_form_data = lead.meta_form_data or (simulation.form_snapshot if simulation else {}) or {}
+    messages = []
+    if conversation:
+        messages = db.query(SalesMessage).filter(
+            SalesMessage.conversation_id == conversation.id,
+        ).order_by(SalesMessage.created_at.desc()).limit(6).all()
+    chat_summary = lead.qualification_summary
+    if not chat_summary and messages:
+        chat_summary = "Recent conversation: " + " | ".join(
+            f"{message.role}: {message.content}" for message in reversed(messages)
+        )
+    recommendations = lead.visit_recommendations or (
+        "Review the captured preferences, confirm any unresolved requirements and use the chat history "
+        "to prepare a relevant property visit."
+    )
+    return {
+        **{column.name: getattr(lead, column.name) for column in Lead.__table__.columns},
+        "project_name": project.name if project else None,
+        "campaign_name": campaign.name if campaign else None,
+        "conversation_id": conversation.id if conversation else None,
+        "meta_form_data": meta_form_data,
+        "chat_summary": chat_summary,
+        "visit_recommendations": recommendations,
+    }
+
+def update_lead(db: Session, lead_id: str, company_id: str, payload: LeadUpdate, actor_id: str | None = None, sales_user_id: str | None = None) -> Lead:
+    query = db.query(Lead).filter(Lead.id == lead_id, Lead.company_id == company_id)
+    if sales_user_id:
+        query = query.filter(Lead.assigned_sales_user_id == sales_user_id)
+    lead = query.first()
     if not lead:
         raise HTTPException(status_code=404, detail="Prospecto no encontrado.")
     
@@ -110,10 +158,12 @@ def get_project_meetings(db: Session, company_id: str, project_id: str, broker_i
         query = query.filter(Meeting.assigned_sales_user_id == sales_user_id)
     return query.order_by(Meeting.meeting_time.asc()).all()
 
-def update_meeting(db: Session, meeting_id: str, company_id: str, payload: MeetingUpdate) -> Meeting:
+def update_meeting(db: Session, meeting_id: str, company_id: str, payload: MeetingUpdate, sales_user_id: str | None = None) -> Meeting:
     meeting = db.query(Meeting).join(Project, Project.id == Meeting.project_id).filter(
         Meeting.id == meeting_id, Project.company_id == company_id,
     ).first()
+    if meeting and sales_user_id and meeting.assigned_sales_user_id != sales_user_id:
+        meeting = None
     if not meeting:
         raise HTTPException(status_code=404, detail="Meeting not found.")
     updates = payload.model_dump(exclude_unset=True)

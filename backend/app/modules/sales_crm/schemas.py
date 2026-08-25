@@ -35,6 +35,15 @@ class LeadResponse(BaseModel):
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
 
+
+class SalesLeadDetailResponse(LeadResponse):
+    project_name: Optional[str] = None
+    campaign_name: Optional[str] = None
+    conversation_id: Optional[str] = None
+    meta_form_data: dict = Field(default_factory=dict)
+    chat_summary: Optional[str] = None
+    visit_recommendations: Optional[str] = None
+
 class LeadUpdate(BaseModel):
     funnel_stage: FunnelStage
 
@@ -98,6 +107,30 @@ class AvailabilityWindowResponse(AvailabilityWindowInput):
     id: str
     timezone: str
     model_config = ConfigDict(from_attributes=True)
+
+
+class AvailabilityBlockCreate(BaseModel):
+    starts_at: datetime
+    ends_at: datetime
+    timezone: str = Field(min_length=1, max_length=80)
+
+    @model_validator(mode="after")
+    def validate_range(self):
+        if self.ends_at <= self.starts_at:
+            raise ValueError("End time must be after start time.")
+        if (self.ends_at - self.starts_at).total_seconds() > 24 * 60 * 60:
+            raise ValueError("An availability block cannot exceed 24 hours.")
+        return self
+
+
+class AvailabilityBlockResponse(AvailabilityBlockCreate):
+    id: str
+    model_config = ConfigDict(from_attributes=True)
+
+
+class SalesScheduleResponse(BaseModel):
+    availability: List[AvailabilityBlockResponse]
+    meetings: List[MeetingResponse]
 
 
 class CalendarConnectionUpdate(BaseModel):

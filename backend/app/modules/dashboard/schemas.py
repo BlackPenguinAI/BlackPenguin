@@ -15,3 +15,4 @@ class DashboardStats(BaseModel):
     projects_count: int
     leads_count: int
     ai_interactions_count: int
+    sales: dict | None = None
