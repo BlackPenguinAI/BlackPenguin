@@ -34,6 +34,11 @@ ATTACHMENT_RULES = {
 
 def _meeting_response(meeting: Meeting, db: Session) -> MeetingResponse:
     item = MeetingResponse.model_validate(meeting)
+    project = db.query(Project).filter(Project.id == meeting.project_id).first()
+    if project:
+        item.project_name = project.name
+        item.project_address = project.address
+        item.project_timezone = project.timezone or "UTC"
     if meeting.lead:
         item.lead_name = meeting.lead.full_name
     if meeting.assigned_sales_user_id:
@@ -160,7 +165,8 @@ def schedule_meeting(
     current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.SALES]))
 ):
     assigned_sales_user_id = current_user.id if current_user.role == UserRole.SALES else None
-    return services.create_meeting(db, payload, current_user.company_id, assigned_sales_user_id)
+    meeting = services.create_meeting(db, payload, current_user.company_id, assigned_sales_user_id)
+    return _meeting_response(meeting, db)
 
 @router.put("/meetings/{meeting_id}", response_model=MeetingResponse, summary="Actualizar cita y broker")
 def update_meeting(
@@ -174,6 +180,15 @@ def update_meeting(
         current_user.id if current_user.role == UserRole.SALES else None,
     )
     return _meeting_response(meeting, db)
+
+
+@router.delete("/meetings/{meeting_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_meeting(
+    meeting_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker(TENANT_MANAGER_ROLES)),
+):
+    services.delete_meeting(db, meeting_id, current_user.company_id)
 
 
 @router.get("/availability/me", response_model=List[AvailabilityWindowResponse])
@@ -222,6 +237,19 @@ def add_my_availability_block(
     )
 
 
+@router.put("/availability-blocks/me/{block_id}", response_model=AvailabilityBlockResponse)
+def edit_my_availability_block(
+    block_id: str,
+    payload: AvailabilityBlockCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([UserRole.SALES])),
+):
+    return scheduling.update_availability_block(
+        db, user=current_user, block_id=block_id, starts_at=payload.starts_at,
+        ends_at=payload.ends_at, timezone_name=payload.timezone,
+    )
+
+
 @router.delete("/availability-blocks/me/{block_id}", status_code=status.HTTP_204_NO_CONTENT)
 def remove_my_availability_block(
     block_id: str,
@@ -231,20 +259,75 @@ def remove_my_availability_block(
     scheduling.delete_availability_block(db, user_id=current_user.id, block_id=block_id)
 
 
+def _company_sales_user(db: Session, company_id: str, user_id: str) -> User:
+    user = db.query(User).filter(
+        User.id == user_id, User.company_id == company_id, User.role == UserRole.SALES,
+    ).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Sales user not found.")
+    return user
+
+
+@router.post("/availability-blocks/{sales_user_id}", response_model=AvailabilityBlockResponse, status_code=status.HTTP_201_CREATED)
+def add_sales_user_availability_block(
+    sales_user_id: str,
+    payload: AvailabilityBlockCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker(TENANT_MANAGER_ROLES)),
+):
+    """Administrator/Assistant master control. Overlap checks remain per Sales user."""
+    sales_user = _company_sales_user(db, current_user.company_id, sales_user_id)
+    return scheduling.create_availability_block(
+        db, user=sales_user, starts_at=payload.starts_at, ends_at=payload.ends_at,
+        timezone_name=payload.timezone,
+    )
+
+
+@router.put("/availability-blocks/{sales_user_id}/{block_id}", response_model=AvailabilityBlockResponse)
+def edit_sales_user_availability_block(
+    sales_user_id: str,
+    block_id: str,
+    payload: AvailabilityBlockCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker(TENANT_MANAGER_ROLES)),
+):
+    sales_user = _company_sales_user(db, current_user.company_id, sales_user_id)
+    return scheduling.update_availability_block(
+        db, user=sales_user, block_id=block_id, starts_at=payload.starts_at,
+        ends_at=payload.ends_at, timezone_name=payload.timezone,
+    )
+
+
+@router.delete("/availability-blocks/{sales_user_id}/{block_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_sales_user_availability_block(
+    sales_user_id: str,
+    block_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker(TENANT_MANAGER_ROLES)),
+):
+    _company_sales_user(db, current_user.company_id, sales_user_id)
+    scheduling.delete_availability_block(db, user_id=sales_user_id, block_id=block_id)
+
+
 @router.get("/schedule/me", response_model=SalesScheduleResponse)
 def get_my_schedule(
     start: datetime,
     end: datetime,
+    project_id: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker([UserRole.SALES])),
 ):
     start_value = start.astimezone(timezone.utc).replace(tzinfo=None) if start.tzinfo else start
     end_value = end.astimezone(timezone.utc).replace(tzinfo=None) if end.tzinfo else end
-    meetings = db.query(Meeting).filter(
+    meetings_query = db.query(Meeting).join(Project, Project.id == Meeting.project_id).filter(
         Meeting.assigned_sales_user_id == current_user.id,
+        Project.company_id == current_user.company_id,
         Meeting.meeting_time >= start_value,
         Meeting.meeting_time < end_value,
-    ).order_by(Meeting.meeting_time).all()
+    )
+    if project_id:
+        meetings_query = meetings_query.filter(Meeting.project_id == project_id)
+    meetings = meetings_query.order_by(Meeting.meeting_time).all()
     meeting_rows = []
     for meeting in meetings:
         meeting_rows.append(_meeting_response(meeting, db))
@@ -263,6 +346,7 @@ def get_company_sales_schedule(
     sales_user_id: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker(TENANT_MANAGER_ROLES)),
+    project_id: Optional[str] = None,
 ):
     sales_query = db.query(User).filter(
         User.company_id == current_user.company_id, User.role == UserRole.SALES, User.is_active.is_(True),
@@ -274,12 +358,17 @@ def get_company_sales_schedule(
     selected_ids = {sales_user_id} if sales_user_id else allowed_ids
     start_value = start.astimezone(timezone.utc).replace(tzinfo=None) if start.tzinfo else start
     end_value = end.astimezone(timezone.utc).replace(tzinfo=None) if end.tzinfo else end
-    meetings = [] if not selected_ids else db.query(Meeting).join(Project, Project.id == Meeting.project_id).filter(
+    meetings_query = db.query(Meeting).join(Project, Project.id == Meeting.project_id).filter(
         Project.company_id == current_user.company_id,
         Meeting.assigned_sales_user_id.in_(selected_ids),
         Meeting.meeting_time >= start_value,
         Meeting.meeting_time < end_value,
-    ).order_by(Meeting.meeting_time).all()
+    )
+    if project_id:
+        if not db.query(Project.id).filter(Project.id == project_id, Project.company_id == current_user.company_id).first():
+            raise HTTPException(status_code=404, detail="Project not found.")
+        meetings_query = meetings_query.filter(Meeting.project_id == project_id)
+    meetings = [] if not selected_ids else meetings_query.order_by(Meeting.meeting_time).all()
     blocks = [] if not selected_ids else db.query(SalesAvailabilityBlock).filter(
         SalesAvailabilityBlock.user_id.in_(selected_ids),
         SalesAvailabilityBlock.ends_at > start_value,

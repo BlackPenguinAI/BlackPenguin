@@ -535,7 +535,7 @@ def serialize_project(project: Project) -> dict[str, Any]:
     return {
         "id": project.id, "company_id": project.company_id, "name": resolved_name,
         "description": project.description, "address": project.address, "city": project.city,
-        "country": project.country, "is_active": project.is_active,
+        "country": project.country, "timezone": project.timezone or "UTC", "is_active": project.is_active,
         "is_demo": project.is_demo,
         "demo_template_version": project.demo_template_version,
         "onboarding_status": project.onboarding_status,

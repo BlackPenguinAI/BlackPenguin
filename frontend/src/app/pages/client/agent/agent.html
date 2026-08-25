@@ -255,6 +255,7 @@
             <small>{{
               message.role === 'assistant' ? 'AI sales agent' : selected.lead_name
             }}</small>
+            <span *ngIf="isReminder(message)" class="mt-1 inline-flex items-center gap-1 rounded-full bg-secondary/10 px-2 py-1 text-[10px] font-bold text-secondary"><span class="material-symbols-outlined text-[13px]">schedule</span>{{ reminderLabel(message) }}</span>
             <p>{{ message.content }}</p>
             <time>{{ message.created_at | date: 'short' }} · {{ message.status }}</time>
           </div>

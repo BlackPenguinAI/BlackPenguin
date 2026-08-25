@@ -518,13 +518,18 @@ def create_onboarding_team_member(
         role = UserRole(payload.role)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail="Role must be assistant, mkt or sales.") from exc
-    user = user_services.invite_tenant_user(
+    # Onboarding uses the same manual-password contract as /app/users. Email
+    # invitations remain deliberately disabled until that integration is enabled.
+    user = user_services.create_tenant_user(
         db,
         company_id=current_user.company_id,
         email=payload.email,
         first_name=payload.first_name,
         last_name=payload.last_name,
         role=role,
+        password=payload.password,
+        is_active=payload.is_active,
+        send_activation_email=False,
     )
     profile = services.get_or_create_profile(db, current_user.company_id)
     services.clear_team_role_decision(db, profile, role)

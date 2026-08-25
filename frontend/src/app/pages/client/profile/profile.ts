@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../../core/services/auth';
 import { ToastService } from '../../../core/services/toast';
+import { supportedTimezones, timezoneLabel } from '../../../core/timezones';
 
 @Component({
   selector: 'app-profile',
@@ -12,6 +13,8 @@ import { ToastService } from '../../../core/services/toast';
   styleUrls: ['./profile.scss']
 })
 export class ProfileComponent implements OnInit {
+  readonly timezones = supportedTimezones();
+  readonly timezoneLabel = timezoneLabel;
   role = typeof localStorage === 'undefined' ? '' : localStorage.getItem('bp_role') || '';
   isLoading: boolean = true;
   isSaving: boolean = false;
@@ -24,6 +27,7 @@ export class ProfileComponent implements OnInit {
     last_name: '',
     phone: '',
     country: '',
+    timezone: 'UTC',
     company_name: '',
     plan_name: 'No active plan',
     license_start: null,
@@ -69,6 +73,7 @@ export class ProfileComponent implements OnInit {
       last_name: this.profileData.last_name,
       phone: this.profileData.phone,
       country: this.profileData.country,
+      timezone: this.profileData.timezone,
       company_name: this.role === 'sales' ? null : this.profileData.company_name,
     };
 

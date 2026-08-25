@@ -33,7 +33,7 @@ from .models import (
 from .schemas import (
     CampaignCreate, CampaignResponse, ChatBootstrapRequest, ChatMessagePayload, ChatMessageResponse, ChatTurnResponse,
     MetaConnectionCreate, MetaConnectionResponse, MetaProjectSetupRequest, MetaProjectSetupResponse,
-    MetaSetupConfigurationResponse, ProjectCreate, ProjectProfilePatch,
+    MetaSetupConfigurationResponse, ProjectCreate, ProjectProfilePatch, ProjectTimezoneUpdate,
     ProjectOnboardingActionRequest,
     ProjectCompleteResponse, ProjectDeleteRequest, ProjectDeletionImpact, ProjectDraftResponse,
     ProjectOverviewResponse, ProjectProfileResponse, ProjectResponse,
@@ -452,6 +452,25 @@ def list_projects(db: Session = Depends(get_db), current_user: User = Depends(Ro
 @router.get("/{project_id}", response_model=ProjectResponse)
 def get_project(project_id: str, db: Session = Depends(get_db), current_user: User = Depends(RoleChecker(VIEWER_ROLES))):
     return services.serialize_project(services.get_project(db, project_id, current_user.company_id))
+
+
+@router.patch("/{project_id}/timezone", response_model=ProjectResponse)
+def update_project_timezone(
+    project_id: str,
+    payload: ProjectTimezoneUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker(EDITOR_ROLES)),
+):
+    from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+    try:
+        ZoneInfo(payload.timezone)
+    except ZoneInfoNotFoundError as exc:
+        raise HTTPException(status_code=422, detail="Unknown timezone.") from exc
+    project = services.get_project(db, project_id, current_user.company_id)
+    project.timezone = payload.timezone
+    db.add(project); db.commit(); db.refresh(project)
+    return services.serialize_project(project)
 
 
 @router.get("/{project_id}/overview", response_model=ProjectOverviewResponse)

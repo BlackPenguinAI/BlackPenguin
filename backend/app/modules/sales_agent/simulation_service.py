@@ -486,6 +486,7 @@ async def advance_simulation(
             event_id=f"followup:{job.id}",
             record_inbound=False,
             event_kind="follow_up",
+            follow_up_hours=24 if job.attempt_number == 1 else 48,
             virtual_now=simulation.virtual_now,
         )
         processed += 1

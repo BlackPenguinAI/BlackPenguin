@@ -250,7 +250,13 @@ export class AgentComponent implements OnInit {
       .subscribe({
         next: (rows) => {
           if (this.selected?.id !== conversationId) return;
-          this.messages = rows;
+          // API order is chronological. Keep an explicit stable client order as
+          // a safeguard against cached/proxy responses with equal timestamps.
+          this.messages = [...rows].sort((a, b) => {
+            const byTime = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+            const byDirection = (a.direction === 'inbound' ? 0 : 1) - (b.direction === 'inbound' ? 0 : 1);
+            return byTime || byDirection || String(a.id).localeCompare(String(b.id));
+          });
           this.loadingMessages = false;
           this.cdr.markForCheck();
           if (stayAtBottom) setTimeout(() => this.scrollEnd());
@@ -404,6 +410,13 @@ export class AgentComponent implements OnInit {
           this.cdr.markForCheck();
         },
       });
+  }
+
+  isReminder(message: any): boolean { return String(message.status || '').startsWith('simulated_follow_up_'); }
+
+  reminderLabel(message: any): string {
+    const hours = String(message.status || '').match(/_(24|48)h$/)?.[1];
+    return hours ? `Reminder scheduled to arrive after +${hours}h` : 'Scheduled reminder';
   }
 
   approve(status: 'approved' | 'changes_requested'): void {

@@ -51,9 +51,10 @@ class LeadUpdate(BaseModel):
 class MeetingCreate(BaseModel):
     project_id: str
     lead_id: str
-    broker_id: str
+    broker_id: Optional[str] = None
+    assigned_sales_user_id: Optional[str] = None
     meeting_time: datetime
-    duration_minutes: int = 45
+    duration_minutes: int = Field(default=45, ge=15, le=480)
     modality: str = "virtual"
     notes: Optional[str] = None
 
@@ -66,6 +67,9 @@ class MeetingUpdate(BaseModel):
     visit_notes: Optional[str] = Field(default=None, max_length=10000)
     visit_details: Optional[str] = Field(default=None, max_length=10000)
     sale_closed_at: Optional[datetime] = None
+    assigned_sales_user_id: Optional[str] = None
+    meeting_time: Optional[datetime] = None
+    duration_minutes: Optional[int] = Field(default=None, ge=15, le=480)
 
 
 class MeetingAttachmentResponse(BaseModel):
@@ -102,6 +106,9 @@ class MeetingResponse(BaseModel):
     source: str = "manual"
     lead_name: Optional[str] = None
     sales_user_name: Optional[str] = None
+    project_name: Optional[str] = None
+    project_address: Optional[str] = None
+    project_timezone: str = "UTC"
     attachments: List[MeetingAttachmentResponse] = Field(default_factory=list)
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)

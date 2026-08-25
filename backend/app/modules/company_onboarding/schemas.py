@@ -260,6 +260,8 @@ class TeamMemberCreate(BaseModel):
     last_name: str = Field(min_length=1, max_length=100)
     email: EmailStr
     role: TeamRole
+    password: str = Field(min_length=4, max_length=128)
+    is_active: bool = True
 
     @field_validator("first_name", "last_name")
     @classmethod

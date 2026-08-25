@@ -55,6 +55,13 @@ describe('AgentComponent simulation form', () => {
     expect(value.budgetValid).toBe(true);
   });
 
+  it('labels +24h and +48h follow-ups as scheduled reminders', () => {
+    const value = component();
+    expect(value.isReminder({ status: 'simulated_follow_up_24h' })).toBe(true);
+    expect(value.reminderLabel({ status: 'simulated_follow_up_24h' })).toContain('+24h');
+    expect(value.reminderLabel({ status: 'simulated_follow_up_48h' })).toContain('+48h');
+  });
+
   it('saves the lead before requesting the initial SMS and always clears loading state', () => {
     const calls: string[] = [];
     const conversation = {

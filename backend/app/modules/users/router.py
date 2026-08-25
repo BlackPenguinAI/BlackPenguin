@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from app.db.postgres import get_db
 from app.modules.auth.deps import get_current_user, RoleChecker
@@ -25,6 +26,7 @@ def get_my_profile(current_user: User = Depends(get_current_user), db: Session =
         "last_name": current_user.last_name,
         "phone": current_user.phone,           # 🚀 AÑADIDO
         "country": current_user.country,       # 🚀 AÑADIDO
+        "timezone": current_user.timezone or "UTC",
     }
     
     if current_user.company_id:
@@ -40,11 +42,18 @@ def get_my_profile(current_user: User = Depends(get_current_user), db: Session =
 
 @router.put("/me")
 def update_my_profile(payload: MyProfileUpdate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if payload.timezone is not None:
+        try:
+            ZoneInfo(payload.timezone)
+        except ZoneInfoNotFoundError as exc:
+            raise HTTPException(status_code=422, detail="Unknown timezone.") from exc
     # 🚀 ACTUALIZAMOS TODOS LOS CAMPOS
     current_user.first_name = payload.first_name
     current_user.last_name = payload.last_name
     current_user.phone = payload.phone
     current_user.country = payload.country
+    if payload.timezone is not None:
+        current_user.timezone = payload.timezone
     
     if current_user.company_id and payload.company_name and current_user.role in TENANT_MANAGER_ROLES:
         company = db.query(Company).filter(Company.id == current_user.company_id).first()

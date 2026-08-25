@@ -174,6 +174,8 @@ export interface TeamMemberInvite {
   last_name: string;
   email: string;
   role: TeamRole;
+  password: string;
+  is_active: boolean;
 }
 
 export interface TeamRoleProgress {

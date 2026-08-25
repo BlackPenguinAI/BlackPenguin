@@ -10,6 +10,7 @@ class MyProfileResponse(BaseModel):
     last_name: Optional[str] = None
     phone: Optional[str] = None      # 🚀 AÑADIDO
     country: Optional[str] = None    # 🚀 AÑADIDO
+    timezone: str = "UTC"
     company_name: Optional[str] = None
     plan_name: Optional[str] = None
     license_start: Optional[datetime] = None
@@ -20,6 +21,7 @@ class MyProfileUpdate(BaseModel):
     last_name: Optional[str] = None
     phone: Optional[str] = None      # 🚀 AÑADIDO
     country: Optional[str] = None    # 🚀 AÑADIDO
+    timezone: Optional[str] = Field(default=None, min_length=1, max_length=80)
     company_name: Optional[str] = None
 
 class PasswordUpdatePayload(BaseModel):
@@ -76,6 +78,7 @@ class TenantUserResponse(BaseModel):
     last_name: Optional[str] = None
     phone: Optional[str] = None
     country: Optional[str] = None
+    timezone: str = "UTC"
     role: UserRole
     is_active: bool
     model_config = ConfigDict(from_attributes=True)

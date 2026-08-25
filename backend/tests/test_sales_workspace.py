@@ -24,10 +24,12 @@ from app.modules.sales_crm.models import Lead, Meeting, MeetingAttachment, Meeti
 from app.modules.sales_crm.schemas import MeetingUpdate
 from app.modules.sales_crm.scheduling import (
     availability_blocks_for_user, create_availability_block, delete_availability_block,
+    update_availability_block,
 )
 from app.modules.sales_crm.router import get_company_sales_schedule, upload_meeting_attachment
 from app.modules.sales_crm import storage_service
-from app.modules.sales_crm.services import get_lead_detail, update_meeting
+from app.modules.sales_crm.services import create_meeting, delete_meeting, get_lead_detail, update_meeting
+from app.modules.sales_crm.schemas import MeetingCreate
 from app.modules.users.models import User, UserRole
 
 
@@ -90,6 +92,31 @@ def test_sales_user_manages_date_specific_availability_blocks(db):
     assert availability_blocks_for_user(
         db, user_id=sales_a.id, starts_at=starts_at, ends_at=starts_at + timedelta(days=1),
     ) == []
+
+
+def test_availability_update_excludes_current_block_but_rejects_other_overlap(db):
+    _, sales_a, _, _, _, _ = _fixture(db)
+    starts_at = datetime(2026, 8, 28, 14, 0)
+    block = create_availability_block(
+        db, user=sales_a, starts_at=starts_at, ends_at=starts_at + timedelta(hours=2),
+        timezone_name="America/Lima",
+    )
+    updated = update_availability_block(
+        db, user=sales_a, block_id=block.id, starts_at=starts_at + timedelta(hours=1),
+        ends_at=starts_at + timedelta(hours=3), timezone_name="America/Lima",
+    )
+    # Naive wall time in America/Lima is persisted as naive UTC (+05:00).
+    assert updated.starts_at == starts_at + timedelta(hours=6)
+    create_availability_block(
+        db, user=sales_a, starts_at=starts_at + timedelta(hours=4),
+        ends_at=starts_at + timedelta(hours=6), timezone_name="America/Lima",
+    )
+    with pytest.raises(HTTPException) as overlap:
+        update_availability_block(
+            db, user=sales_a, block_id=block.id, starts_at=starts_at + timedelta(hours=5),
+            ends_at=starts_at + timedelta(hours=7), timezone_name="America/Lima",
+        )
+    assert overlap.value.status_code == 409
 
 
 def test_sales_lead_detail_and_chat_are_limited_to_assignee(db):
@@ -176,6 +203,30 @@ def test_manager_schedule_lists_and_filters_company_sales_users(db):
     assert {item.assigned_sales_user_id for item in filtered["meetings"]} == {sales_b.id}
 
 
+def test_manager_creates_updates_and_deletes_assigned_appointment(db):
+    company, sales_a, sales_b, project, lead, _ = _fixture(db)
+    meeting = create_meeting(
+        db,
+        MeetingCreate(
+            project_id=project.id, lead_id=lead.id, assigned_sales_user_id=sales_a.id,
+            meeting_time=datetime(2026, 9, 2, 15, 0), duration_minutes=45, modality="in_person",
+        ),
+        company.id,
+    )
+    assert meeting.assigned_sales_user_id == sales_a.id
+    moved = update_meeting(
+        db, meeting.id, company.id,
+        MeetingUpdate(
+            assigned_sales_user_id=sales_b.id, meeting_time=datetime(2026, 9, 2, 16, 0),
+            duration_minutes=60,
+        ),
+    )
+    assert moved.assigned_sales_user_id == sales_b.id
+    assert moved.duration_minutes == 60
+    delete_meeting(db, meeting.id, company.id)
+    assert db.query(Meeting).filter(Meeting.id == meeting.id).first() is None
+
+
 def test_sales_uploads_visit_photo_only_to_assigned_meeting(db, monkeypatch, tmp_path):
     company, sales_a, sales_b, project, lead, _ = _fixture(db)
     meeting = Meeting(
@@ -232,4 +283,19 @@ def test_sales_workspace_migration_creates_availability_table_and_is_repeatable(
         migration.upgrade()
         migration.upgrade()
         assert "sales_availability_blocks" in connection.dialect.get_table_names(connection)
+    engine.dispose()
+
+
+def test_schedule_timezone_migration_is_repeatable(monkeypatch):
+    path = Path(__file__).parents[1] / "alembic" / "versions" / "20260825_schedule_timezones.py"
+    spec = importlib.util.spec_from_file_location("schedule_timezone_migration", path)
+    assert spec and spec.loader
+    migration = importlib.util.module_from_spec(spec); spec.loader.exec_module(migration)
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with engine.begin() as connection:
+        monkeypatch.setattr(migration, "op", Operations(MigrationContext.configure(connection)))
+        migration.upgrade(); migration.upgrade()
+        assert "timezone" in {column["name"] for column in inspect(connection).get_columns("users")}
+        assert "timezone" in {column["name"] for column in inspect(connection).get_columns("projects")}
     engine.dispose()

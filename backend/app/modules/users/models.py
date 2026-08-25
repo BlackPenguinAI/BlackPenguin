@@ -27,6 +27,7 @@ class User(Base):
     last_name = Column(String(100), nullable=True)
     phone = Column(String(50), nullable=True)
     country = Column(String(100), nullable=True)
+    timezone = Column(String(80), default="UTC", nullable=False)
     
     email = Column(String(150), unique=True, index=True, nullable=False)
     hashed_password = Column(String(255), nullable=False)

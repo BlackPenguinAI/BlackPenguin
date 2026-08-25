@@ -109,6 +109,35 @@ def delete_availability_block(db: Session, *, user_id: str, block_id: str) -> No
     db.delete(item); db.commit()
 
 
+def update_availability_block(
+    db: Session, *, user: User, block_id: str, starts_at: datetime, ends_at: datetime,
+    timezone_name: str,
+) -> SalesAvailabilityBlock:
+    _zone(timezone_name)
+    start_utc = _utc_naive(starts_at, timezone_name)
+    end_utc = _utc_naive(ends_at, timezone_name)
+    if end_utc <= start_utc:
+        raise HTTPException(status_code=422, detail="End time must be after start time.")
+    item = db.query(SalesAvailabilityBlock).filter(
+        SalesAvailabilityBlock.id == block_id, SalesAvailabilityBlock.user_id == user.id,
+    ).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Availability block not found.")
+    overlap = db.query(SalesAvailabilityBlock).filter(
+        SalesAvailabilityBlock.user_id == user.id,
+        SalesAvailabilityBlock.id != item.id,
+        SalesAvailabilityBlock.starts_at < end_utc,
+        SalesAvailabilityBlock.ends_at > start_utc,
+    ).first()
+    if overlap:
+        raise HTTPException(status_code=409, detail="This availability overlaps an existing block.")
+    item.starts_at = start_utc
+    item.ends_at = end_utc
+    item.timezone = timezone_name
+    db.add(item); db.commit(); db.refresh(item)
+    return item
+
+
 def upsert_calendar_connection(
     db: Session,
     *,

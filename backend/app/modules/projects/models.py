@@ -53,6 +53,7 @@ class Project(Base):
     address = Column(String(255), nullable=True)
     city = Column(String(100), nullable=True)
     country = Column(String(100), nullable=True)
+    timezone = Column(String(80), default="UTC", nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
     is_demo = Column(Boolean, default=False, nullable=False, index=True)
     demo_template_version = Column(String(30), nullable=True)

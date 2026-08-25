@@ -24,7 +24,23 @@ describe('SalesComponent scheduling view', () => {
     vi.stubGlobal('localStorage', { getItem: () => 'sales' });
     const component = new SalesComponent({} as any, { markForCheck: () => undefined } as any);
     expect(component.statusOptions('in_progress').map(item => item.value)).toEqual([
-      'in_progress', 'completed_sale_pending', 'sale_closed',
+      'in_progress', 'completed', 'completed_sale_pending', 'sale_closed',
     ]);
+  });
+
+  it('supports month, week and day calendar ranges', () => {
+    vi.stubGlobal('localStorage', { getItem: () => 'sales' });
+    const http = { get: () => ({ subscribe: () => undefined }) };
+    const component = new SalesComponent(http as any, { markForCheck: () => undefined } as any);
+    component.view = 'month'; expect(component.days).toHaveLength(42);
+    component.view = 'week'; expect(component.days).toHaveLength(7);
+    component.view = 'day'; expect(component.days).toHaveLength(1);
+  });
+
+  it('renders timezone choices with a UTC offset and city label', () => {
+    vi.stubGlobal('localStorage', { getItem: () => 'sales' });
+    const component = new SalesComponent({} as any, { markForCheck: () => undefined } as any);
+    expect(component.timezoneLabel('America/Lima')).toContain('UTC-05:00');
+    expect(component.timezoneLabel('America/Lima')).toContain('Lima');
   });
 });

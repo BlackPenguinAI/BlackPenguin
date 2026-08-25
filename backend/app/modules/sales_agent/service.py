@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 import uuid
 
 from fastapi import HTTPException
+from sqlalchemy import case
 from sqlalchemy.orm import Session
 
 from app.modules.projects.models import Project, ProjectCampaign
@@ -75,9 +76,15 @@ def conversation_messages(
     conversation = query.first()
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found.")
+    # A lead message and its generated answer can share virtual time. Direction
+    # preserves the causal order before the stable id tie-breaker.
     return db.query(SalesMessage).filter(
         SalesMessage.conversation_id == conversation.id,
-    ).order_by(SalesMessage.created_at.asc()).all()
+    ).order_by(
+        SalesMessage.created_at.asc(),
+        case((SalesMessage.direction == "inbound", 0), else_=1),
+        SalesMessage.id.asc(),
+    ).all()
 
 
 def set_conversation_action(
@@ -135,6 +142,7 @@ async def simulate_turn(
     event_id: str | None = None,
     record_inbound: bool = True,
     event_kind: str = "lead_message",
+    follow_up_hours: int | None = None,
     virtual_now: datetime | None = None,
     sales_user_id: str | None = None,
 ) -> dict:
@@ -264,8 +272,9 @@ async def simulate_turn(
                 direction="outbound",
                 role="assistant",
                 content=result["proposed_reply"],
-                status="simulated",
-                created_at=now,
+                status=f"simulated_follow_up_{follow_up_hours or 24}h" if event_kind == "follow_up" else "simulated",
+                metadata_json={"event_kind": event_kind, "follow_up_hours": follow_up_hours},
+                created_at=now + timedelta(microseconds=1) if record_inbound else now,
             ))
             conversation.updated_at = now
             lead.agent_status = "simulation"

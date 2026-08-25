@@ -16,6 +16,11 @@ class ProjectCreate(BaseModel):
     address: str | None = None
     city: str | None = None
     country: str | None = None
+    timezone: str = Field(default="UTC", min_length=1, max_length=80)
+
+
+class ProjectTimezoneUpdate(BaseModel):
+    timezone: str = Field(min_length=1, max_length=80)
 
 
 class ProjectFieldProgress(BaseModel):

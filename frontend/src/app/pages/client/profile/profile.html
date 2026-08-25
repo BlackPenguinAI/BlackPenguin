@@ -73,6 +73,13 @@
             <label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold ml-1">Country</label>
             <input type="text" [(ngModel)]="profileData.country" class="w-full bg-surface-level-1/40 border border-white/10 focus:border-secondary rounded-xl px-4 py-3 text-sm text-white outline-none transition-colors">
           </div>
+          <div class="flex flex-col gap-1.5">
+            <label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold ml-1">Timezone <span class="text-secondary">*</span></label>
+            <select [(ngModel)]="profileData.timezone" class="w-full bg-surface-level-1/40 border border-white/10 focus:border-secondary rounded-xl px-4 py-3 text-sm text-white outline-none transition-colors">
+              <option *ngFor="let zone of timezones" [value]="zone">{{ timezoneLabel(zone) }}</option>
+            </select>
+            <small class="text-[10px] text-gray-500">Used as your default when no Project timezone is selected.</small>
+          </div>
         </div>
 
         <div class="flex justify-end pt-4 border-t border-white/10">

@@ -1,23 +1,89 @@
 <section class="sales-page">
   <header>
-    <div><p>{{role==='sales'?'MY SALES WORKSPACE':'TEAM SCHEDULE'}}</p><h1>Schedule</h1><span>{{role==='sales'?'Set availability, prepare visits and report outcomes.':'Review availability and AI-assigned appointments for every Sales user.'}}</span></div>
-    <div class="header-actions">
-      <select *ngIf="role!=='sales'" [(ngModel)]="salesUserId" (change)="loadManagerSchedule()" aria-label="Filter by Sales user"><option value="">All Sales users</option><option *ngFor="let user of salesUsers" [value]="user.id">{{user.first_name}} {{user.last_name}} · {{user.email}}</option></select>
-      <button *ngIf="role==='sales'" (click)="settingsOpen=!settingsOpen"><span class="material-symbols-outlined">event_available</span>Calendar connection</button>
+    <div><p>{{role==='sales'?'MY SALES WORKSPACE':'TEAM SCHEDULE'}}</p><h1>Schedule</h1><span>{{role==='sales'?'Manage availability and prepare assigned property visits.':'Master control for Sales availability and appointments.'}}</span></div>
+    <div class="header-actions filters">
+      <select *ngIf="isManager" [(ngModel)]="salesUserId" (change)="filtersChanged()" aria-label="Filter by Sales user"><option value="">All Sales users</option><option *ngFor="let user of salesUsers" [value]="user.id">{{user.first_name}} {{user.last_name}} · {{user.email}}</option></select>
+      <select [(ngModel)]="projectId" (change)="filtersChanged()" aria-label="Filter by project"><option value="">All projects</option><option *ngFor="let project of projects" [value]="project.id">{{project.name}}</option></select>
     </div>
   </header>
-  <div *ngIf="error" class="notice error">{{error}}<button (click)="error=''">×</button></div><div *ngIf="success" class="notice success">{{success}}<button (click)="success=''">×</button></div>
-  <section class="settings" *ngIf="role==='sales'&&settingsOpen"><article><p>CALENDAR CONNECTION</p><div class="setting-grid calendar-fields"><label>Provider<select [(ngModel)]="calendarProvider"><option value="google">Google Calendar</option><option value="outlook">Outlook Calendar</option></select></label><label>Calendar ID<input [(ngModel)]="calendarId" placeholder="your-email@example.com"></label></div><span class="status">{{calendarStatus}}</span><small>Connection metadata is ready for production OAuth; no external event is sent in simulation.</small><button class="primary" (click)="saveCalendarConnection()" [disabled]="calendarSaving||!calendarId.trim()">{{calendarSaving?'Saving…':'Save connection'}}</button></article></section>
+
+  <div *ngIf="error" class="notice error">{{error}}<button (click)="error=''">×</button></div>
+  <div *ngIf="success" class="notice success">{{success}}<button (click)="success=''">×</button></div>
+
+  <nav class="schedule-tabs" aria-label="Schedule sections">
+    <button [class.active]="section==='availability'" (click)="setSection('availability')"><span class="material-symbols-outlined">event_available</span><span><b>Available time slots</b><small>Create and maintain working blocks</small></span></button>
+    <button [class.active]="section==='appointments'" (click)="setSection('appointments')"><span class="material-symbols-outlined">calendar_month</span><span><b>Appointments assigned</b><small>Review, confirm and report visits</small></span></button>
+  </nav>
+
+  <section class="timezone-bar">
+    <div><span class="material-symbols-outlined">public</span><span><b>{{projectId?'Project timezone':'My default timezone'}}</b><small>{{projectId?'All appointment times for '+selectedProject?.name:'Select a Project to work in its physical-location timezone.'}}</small></span></div>
+    <select [(ngModel)]="timezone" [disabled]="isManager&&!projectId"><option *ngFor="let zone of timezones" [value]="zone">{{timezoneLabel(zone)}}</option></select>
+    <button *ngIf="isManager&&projectId" class="primary compact" (click)="saveProjectTimezone()" [disabled]="projectTimezoneSaving">{{projectTimezoneSaving?'Saving…':'Save Project timezone'}}</button>
+  </section>
+
   <div class="metrics"><article><small>APPOINTMENTS</small><strong>{{meetings.length}}</strong></article><article><small>AVAILABILITY BLOCKS</small><strong>{{availability.length}}</strong></article><article><small>PENDING</small><strong>{{count('scheduled')}}</strong></article><article><small>IN PROGRESS</small><strong>{{count('in_progress')}}</strong></article></div>
   <div *ngIf="loading" class="loading">Loading calendar…</div>
+
   <div class="layout" *ngIf="!loading">
-    <aside class="project"><p>{{role==='sales'?'AVAILABILITY':'VISIBILITY'}}</p><h2>{{role==='sales'?'Choose a day':'Sales team'}}</h2><small>{{role==='sales'?'Click a day, define a time range and save it. The AI Agent will offer only verified free slots.':'Showing availability and assignments for '+(salesUserId?'the selected Sales user.':'all active Sales users.')}}</small><div class="legend"><span><i class="available-dot"></i>Available</span><span><i class="meeting-dot"></i>Appointment</span></div></aside>
-    <main class="calendar"><div class="calendar-head"><button (click)="move(-1)">‹</button><h2>{{month|date:'MMMM y'}}</h2><button (click)="move(1)">›</button></div><div class="week"><b *ngFor="let label of ['SUN','MON','TUE','WED','THU','FRI','SAT']">{{label}}</b></div><div class="calendar-days"><button *ngFor="let day of days" [class.outside]="day.getMonth()!==month.getMonth()" [class.chosen]="selectedDay?.toDateString()===day.toDateString()" (click)="selectDay(day)"><span>{{day.getDate()}}</span><i class="available-block" *ngFor="let block of availabilityFor(day);trackBy:trackById">{{block.sales_user_name?block.sales_user_name+' · ':''}}{{formatBlockTime(block.starts_at,block.timezone)}}–{{formatBlockTime(block.ends_at,block.timezone)}}</i><i class="meeting-block" *ngFor="let meeting of meetingsFor(day);trackBy:trackById" [class.demo]="meeting.is_demo" (click)="$event.stopPropagation();selectMeeting(meeting)">{{meeting.meeting_time|date:'shortTime'}} · {{meeting.lead_name}}{{meeting.sales_user_name?' · '+meeting.sales_user_name:''}}</i></button></div></main>
-    <aside class="detail" *ngIf="selectedDay&&role==='sales'"><p>NEW AVAILABILITY</p><h2>{{selectedDay|date:'fullDate'}}</h2><label>From<input type="time" [(ngModel)]="blockStart"></label><label>To<input type="time" [(ngModel)]="blockEnd"></label><label>Timezone<select [(ngModel)]="timezone"><option *ngFor="let zone of timezones" [value]="zone">{{zone}}</option></select></label><small *ngIf="blockEnd<=blockStart" class="validation">End time must be after start time.</small><button (click)="addAvailability()" [disabled]="availabilitySaving||blockEnd<=blockStart">{{availabilitySaving?'Saving…':'ADD BLOCK'}}</button><div class="day-blocks" *ngIf="availabilityFor(selectedDay).length"><h3>Saved blocks</h3><div *ngFor="let block of availabilityFor(selectedDay)"><span>{{formatBlockTime(block.starts_at,block.timezone)}}–{{formatBlockTime(block.ends_at,block.timezone)}} · {{block.timezone}}</span><button (click)="removeAvailability(block)" aria-label="Remove availability">×</button></div></div></aside>
-    <aside class="detail appointment" *ngIf="selected"><p>APPOINTMENT</p><div class="avatar"><span class="material-symbols-outlined">person</span></div><h2>{{selected.lead_name}}</h2><strong>{{statusLabel(selected.status)}}</strong><em *ngIf="selected.is_demo">SIMULATION</em><dl><dt>SCHEDULED TIME</dt><dd>{{selected.meeting_time|date:'medium'}}</dd><ng-container *ngIf="selected.sales_user_name"><dt>ASSIGNED SALES</dt><dd>{{selected.sales_user_name}}</dd></ng-container><dt>MODALITY</dt><dd>{{selected.modality}}</dd><dt>CONFIRMATION</dt><dd>{{selected.confirmation_status}}</dd></dl>
-      <div *ngIf="leadLoading" class="lead-loading">Loading lead context…</div><section class="lead-context" *ngIf="selectedLead"><h3>Lead information</h3><div *ngFor="let field of objectEntries(selectedLead.meta_form_data)"><small>{{field.key}}</small><span>{{field.value}}</span></div><h3>Chat summary</h3><p>{{selectedLead.chat_summary||'No summary available yet.'}}</p><h3>Visit recommendations</h3><p>{{selectedLead.visit_recommendations}}</p><button class="secondary" *ngIf="selectedLead.chat_messages?.length" (click)="chatOpen=!chatOpen">{{chatOpen?'HIDE CHAT':'VIEW CHAT'}}</button><div class="chat" *ngIf="chatOpen"><article *ngFor="let message of selectedLead.chat_messages" [class.inbound]="message.role==='user'"><small>{{message.role==='user'?'Lead':'AI Agent'}}</small><p>{{message.content}}</p></article></div></section>
+    <aside class="project">
+      <p>{{section==='availability'?'AVAILABILITY':'APPOINTMENTS'}}</p>
+      <h2>{{section==='availability'?'Working hours':'Property visits'}}</h2>
+      <small *ngIf="section==='availability'">Blocks cannot overlap for the same Sales user. Different Sales users may be available at the same time.</small>
+      <small *ngIf="section==='appointments'">Open a visit to see the property, lead profile, AI chat summary and recommended in-person approach.</small>
+      <div class="legend"><span *ngIf="section==='availability'"><i class="available-dot"></i>Available</span><span *ngIf="section==='appointments'"><i class="meeting-dot"></i>Appointment</span></div>
+      <div class="calendar-connect" *ngIf="section==='appointments'"><span class="material-symbols-outlined">calendar_add_on</span><b>Google Calendar</b><small>{{calendarStatus==='not_connected'?'Connection will be available soon.':'Calendar configuration: '+calendarStatus}}</small><button disabled>CONNECT GOOGLE CALENDAR · COMING SOON</button></div>
+    </aside>
+
+    <main class="calendar" [class.week-view]="view==='week'" [class.day-view]="view==='day'">
+      <div class="calendar-toolbar">
+        <button class="today" (click)="goToday()">Today</button>
+        <div class="calendar-head"><button (click)="move(-1)">‹</button><h2>{{calendarTitle}}</h2><button (click)="move(1)">›</button></div>
+        <div class="view-switch"><button [class.active]="view==='month'" (click)="setView('month')">Month</button><button [class.active]="view==='week'" (click)="setView('week')">Week</button><button [class.active]="view==='day'" (click)="setView('day')">Day</button></div>
+      </div>
+      <div class="week" [style.grid-template-columns]="view==='day'?'1fr':'repeat(7,1fr)'"><b *ngFor="let day of days | slice:0:(view==='month'?7:days.length)">{{day|date:'EEE'|uppercase}}</b></div>
+      <div class="calendar-days" [class.single-day]="view==='day'" [style.grid-template-columns]="view==='day'?'1fr':'repeat(7,1fr)'">
+        <button *ngFor="let day of days" [class.outside]="view==='month'&&day.getMonth()!==cursor.getMonth()" [class.chosen]="selectedDay?.toDateString()===day.toDateString()" (click)="selectDay(day)">
+          <span>{{view==='day'?(day|date:'fullDate'):day.getDate()}}</span>
+          <ng-container *ngIf="section==='availability'"><i class="available-block" *ngFor="let block of availabilityFor(day);trackBy:trackById" (click)="$event.stopPropagation();selectDay(day);editAvailability(block)">{{block.sales_user_name?block.sales_user_name+' · ':''}}{{formatBlockTime(block.starts_at,block.timezone)}}–{{formatBlockTime(block.ends_at,block.timezone)}}</i></ng-container>
+          <ng-container *ngIf="section==='appointments'"><i class="meeting-block" *ngFor="let meeting of meetingsFor(day);trackBy:trackById" [class.demo]="meeting.is_demo" (click)="$event.stopPropagation();selectMeeting(meeting)">{{formatBlockTime(meeting.meeting_time,meeting.project_timezone)}} · {{meeting.lead_name}}{{meeting.sales_user_name?' · '+meeting.sales_user_name:''}}</i></ng-container>
+        </button>
+      </div>
+    </main>
+
+    <aside class="detail" *ngIf="selectedDay&&!selected&&section==='availability'">
+      <p>{{editingBlock?'EDIT':'NEW'}} AVAILABILITY</p><h2>{{selectedDay|date:'fullDate'}}</h2>
+      <small *ngIf="isManager&&!salesUserId" class="validation">Choose a Sales user to create or edit their blocks.</small>
+      <label>From<input type="time" [(ngModel)]="blockStart"></label><label>To<input type="time" [(ngModel)]="blockEnd"></label>
+      <label>Timezone<select [(ngModel)]="timezone"><option *ngFor="let zone of timezones" [value]="zone">{{timezoneLabel(zone)}}</option></select></label>
+      <small *ngIf="blockEnd<=blockStart" class="validation">End time must be after start time.</small>
+      <button (click)="saveAvailability()" [disabled]="availabilitySaving||blockEnd<=blockStart||(isManager&&!salesUserId)">{{availabilitySaving?'Saving…':(editingBlock?'UPDATE BLOCK':'ADD BLOCK')}}</button>
+      <button *ngIf="editingBlock" class="secondary" (click)="cancelBlockEdit()">CANCEL EDIT</button>
+      <div class="day-blocks" *ngIf="availabilityFor(selectedDay).length"><h3>Saved blocks</h3><div *ngFor="let block of availabilityFor(selectedDay)"><span>{{block.sales_user_name?block.sales_user_name+' · ':''}}{{formatBlockTime(block.starts_at,block.timezone)}}–{{formatBlockTime(block.ends_at,block.timezone)}}</span><span class="row-actions" *ngIf="canManageBlock(block)"><button (click)="editAvailability(block)" aria-label="Edit availability"><span class="material-symbols-outlined">edit</span></button><button (click)="removeAvailability(block)" aria-label="Delete availability"><span class="material-symbols-outlined">delete</span></button></span></div></div>
+    </aside>
+
+    <aside class="detail" *ngIf="selectedDay&&!selected&&section==='appointments'&&isManager">
+      <p>NEW APPOINTMENT</p><h2>{{selectedDay|date:'fullDate'}}</h2>
+      <small *ngIf="!projectId||!salesUserId" class="validation">Choose a Project and a Sales user before creating an appointment.</small>
+      <label>Lead<select [(ngModel)]="newAppointment.lead_id" [disabled]="!projectId"><option value="">Choose a Project lead</option><option *ngFor="let lead of leads" [value]="lead.id">{{lead.full_name}} · {{lead.phone}}</option></select></label>
+      <label>Start<input type="time" [(ngModel)]="newAppointment.time"></label><label>Duration (minutes)<input type="number" min="15" max="480" step="15" [(ngModel)]="newAppointment.duration_minutes"></label>
+      <label>Modality<select [(ngModel)]="newAppointment.modality"><option value="in_person">In person</option><option value="showroom">Showroom</option><option value="virtual">Virtual</option><option value="phone">Phone</option></select></label>
+      <label>Notes<textarea rows="3" [(ngModel)]="newAppointment.notes" placeholder="Internal scheduling notes"></textarea></label>
+      <button (click)="createAppointment()" [disabled]="saving||!projectId||!salesUserId||!newAppointment.lead_id">{{saving?'Saving…':'CREATE APPOINTMENT'}}</button>
+    </aside>
+
+    <aside class="detail empty" *ngIf="selectedDay&&!selected&&section==='appointments'&&role==='sales'">Assigned appointments appear automatically. Select an appointment to review and confirm it.</aside>
+
+    <aside class="detail appointment" *ngIf="selected">
+      <p>APPOINTMENT</p><div class="avatar"><span class="material-symbols-outlined">person</span></div><h2>{{selected.lead_name}}</h2><strong>{{statusLabel(selected.status)}}</strong><em *ngIf="selected.is_demo">SIMULATION</em>
+      <dl><dt>PROJECT</dt><dd>{{selected.project_name}}</dd><dt>PROPERTY</dt><dd>{{selected.project_address||'Address pending'}}</dd><dt>SCHEDULED TIME</dt><dd>{{formatMeetingTime(selected)}}</dd><dt>TIMEZONE</dt><dd>{{timezoneLabel(selected.project_timezone||timezone)}}</dd><ng-container *ngIf="selected.sales_user_name"><dt>ASSIGNED SALES</dt><dd>{{selected.sales_user_name}}</dd></ng-container><dt>MODALITY</dt><dd>{{selected.modality}}</dd><dt>CONFIRMATION</dt><dd>{{selected.confirmation_status}}</dd></dl>
+      <div *ngIf="leadLoading" class="lead-loading">Loading lead context…</div>
+      <section class="lead-context" *ngIf="selectedLead"><h3>Lead information</h3><div *ngFor="let field of objectEntries(selectedLead.meta_form_data)"><small>{{field.key}}</small><span>{{field.value}}</span></div><h3>AI chat summary</h3><p>{{selectedLead.chat_summary||'No summary available yet.'}}</p><h3>In-person approach</h3><p>{{selectedLead.visit_recommendations}}</p><button class="secondary" *ngIf="selectedLead.chat_messages?.length" (click)="chatOpen=!chatOpen">{{chatOpen?'HIDE CHAT':'VIEW FULL CHAT'}}</button><div class="chat" *ngIf="chatOpen"><article *ngFor="let message of selectedLead.chat_messages" [class.inbound]="message.role==='user'"><small>{{message.role==='user'?'Lead':'AI Agent'}}</small><p>{{message.content}}</p></article></div></section>
+
+      <section class="visit-form" *ngIf="isManager"><h3>Master appointment control</h3><label>Assigned Sales<select [(ngModel)]="selected.assigned_sales_user_id"><option *ngFor="let user of salesUsers" [value]="user.id">{{user.first_name}} {{user.last_name}}</option></select></label><label>Date and time<input type="datetime-local" [(ngModel)]="managerMeetingTime"></label><label>Duration (minutes)<input type="number" min="15" max="480" step="15" [(ngModel)]="selected.duration_minutes"></label><label>Modality<select [(ngModel)]="selected.modality"><option value="in_person">In person</option><option value="showroom">Showroom</option><option value="virtual">Virtual</option><option value="phone">Phone</option></select></label><label>Status<select [(ngModel)]="selected.status"><option *ngFor="let item of statusOptions(selected.status)" [value]="item.value">{{item.label}}</option></select></label><label>Notes<textarea rows="3" [(ngModel)]="selected.notes"></textarea></label><button (click)="saveManagerMeeting()" [disabled]="saving">{{saving?'Saving…':'SAVE APPOINTMENT'}}</button><button class="danger-action" (click)="deleteAppointment()" [disabled]="saving||selected.status==='in_progress'||selected.status==='sale_closed'">DELETE APPOINTMENT</button></section>
+
       <section class="visit-form" *ngIf="role==='sales'"><h3>Visit report</h3><label>Status<select [(ngModel)]="selected.status"><option *ngFor="let item of statusOptions(selected.status)" [value]="item.value">{{item.label}}</option></select></label><label>Notes<textarea [(ngModel)]="selected.visit_notes" rows="3" placeholder="Observations and follow-up notes"></textarea></label><label>Visit details<textarea [(ngModel)]="selected.visit_details" rows="3" placeholder="Property, preferences and relevant details"></textarea></label><label>Visit photo<input type="file" accept="image/jpeg,image/png,image/webp" (change)="selectFile($event,'visit_photo')"></label><button class="secondary" (click)="uploadAttachment('visit_photo')" [disabled]="!visitPhoto||attachmentSaving">UPLOAD PHOTO</button><ng-container *ngIf="selected.status==='sale_closed'"><label>Closing date<input type="date" [(ngModel)]="closingDate"></label><label>Sale evidence<input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" (change)="selectFile($event,'sale_evidence')"></label><button class="secondary" (click)="uploadAttachment('sale_evidence')" [disabled]="!saleEvidence||attachmentSaving">UPLOAD EVIDENCE</button><small class="validation" *ngIf="!hasEvidence()">Evidence is required before completing the sale.</small></ng-container><div class="attachments" *ngIf="selected.attachments?.length"><h3>Attachments</h3><button *ngFor="let attachment of selected.attachments" (click)="downloadAttachment(attachment)"><span class="material-symbols-outlined">attachment</span>{{attachment.original_filename}}</button></div><button (click)="saveMeeting()" [disabled]="saving||(selected.status==='sale_closed'&&(!closingDate||!hasEvidence()))">{{saving?'Saving…':'SAVE REPORT'}}</button></section>
     </aside>
-    <aside class="detail empty" *ngIf="!selected&&!selectedDay">{{role==='sales'?'Select a day to add availability or an appointment to prepare and report the visit.':'Select an appointment to review the assigned Sales user and lead context.'}}</aside>
+
+    <aside class="detail empty" *ngIf="!selected&&!selectedDay">Select a day or {{section==='availability'?'an availability block':'an appointment'}}.</aside>
   </div>
 </section>
