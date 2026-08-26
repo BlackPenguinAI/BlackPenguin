@@ -10,8 +10,10 @@ from sqlalchemy.pool import StaticPool
 from app.db.postgres import Base
 from app.modules.auth.deps import RoleChecker
 from app.modules.companies.models import Company
+from app.modules.project_team.models import ProjectUserAssignment
+from app.modules.projects.models import Project
 from app.modules.subscriptions.models import SubscriptionPlan
-from app.modules.users.models import TENANT_MANAGER_ROLES, User, UserRole
+from app.modules.users.models import TENANT_MANAGER_ROLES, User, UserProjectAccess, UserRole
 from app.core.security import verify_password
 from app.modules.users.services import create_tenant_user, enforce_role_limit, invite_tenant_user
 
@@ -25,7 +27,14 @@ def db():
     )
     Base.metadata.create_all(
         engine,
-        tables=[SubscriptionPlan.__table__, Company.__table__, User.__table__],
+        tables=[
+            SubscriptionPlan.__table__,
+            Company.__table__,
+            User.__table__,
+            Project.__table__,
+            UserProjectAccess.__table__,
+            ProjectUserAssignment.__table__,
+        ],
     )
     session = sessionmaker(bind=engine)()
     try:
