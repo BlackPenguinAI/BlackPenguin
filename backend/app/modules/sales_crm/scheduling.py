@@ -264,6 +264,14 @@ def create_agent_appointment(
     modality: str,
 ) -> tuple[Meeting, User]:
     starts_at = starts_at.replace(tzinfo=None) if starts_at.tzinfo else starts_at
+    # Lock every candidate Sales user in a stable order before rechecking
+    # availability. This serializes overlapping bookings even when the same
+    # person is assigned to multiple Projects.
+    candidate_ids = sorted({
+        assignment.user_id for assignment in eligible_sales_assignments(db, lead.project_id)
+    })
+    if candidate_ids:
+        db.query(User).filter(User.id.in_(candidate_ids)).order_by(User.id).with_for_update().all()
     eligible_user_ids = eligible_users_for_slot(
         db,
         project_id=lead.project_id,

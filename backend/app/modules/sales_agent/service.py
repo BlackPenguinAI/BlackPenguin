@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.modules.projects.models import Project, ProjectCampaign
 from app.modules.sales_crm.models import FunnelStage, Lead, Meeting
-from app.modules.sales_crm.scheduling import available_slots
+from app.modules.sales_crm.scheduling import available_slots, create_agent_appointment
 
 from .graph import GRAPH_VERSION, TOOLSET_VERSION, build_sales_graph
 from .models import AgentRun, OutboundMessage, SalesAgentSimulation, SalesConversation, SalesFollowUpJob, SalesMessage
@@ -91,7 +91,7 @@ def _is_availability_request(text: str, *, now: datetime, zone: ZoneInfo) -> boo
 
 def _availability_reply(
     db: Session, *, project: Project, inbound_text: str, now: datetime,
-) -> tuple[str, bool]:
+) -> tuple[str, list[datetime]]:
     """Execute the model's slot request and return a complete, grounded SMS."""
     zone = _project_zone(project)
     requested = _requested_date(inbound_text, now=now, zone=zone)
@@ -120,16 +120,120 @@ def _availability_reply(
         return (
             f"I couldn't find a verified appointment time for {when}. "
             "Would you like another day, or should I ask the sales team to contact you?",
-            False,
+            [],
         )
     local_starts = [slot["start_at"].replace(tzinfo=timezone.utc).astimezone(zone) for slot in slots]
     day_label = local_starts[0].strftime("%A, %B %-d")
     times = [value.strftime("%-I:%M %p") for value in local_starts]
     time_list = times[0] if len(times) == 1 else f"{', '.join(times[:-1])} or {times[-1]}"
+    zone_label = _timezone_label(slots[0]["start_at"], zone, project.timezone or "UTC")
     return (
         f"I found these verified appointment times for {day_label}: {time_list} "
-        f"({project.timezone or 'UTC'}). Which one works best for you?",
-        True,
+        f"({zone_label}, Project local time). Which one works best for you?",
+        [slot["start_at"] for slot in slots],
+    )
+
+
+def _selected_time(text: str) -> time | None:
+    match = re.search(
+        r"\b(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)\b",
+        text,
+        flags=re.IGNORECASE,
+    )
+    if not match:
+        match = re.search(r"\b([01]?\d|2[0-3]):([0-5]\d)\b", text)
+        if not match:
+            return None
+        return time(int(match.group(1)), int(match.group(2)))
+    hour = int(match.group(1)) % 12
+    if match.group(3).lower().startswith("p"):
+        hour += 12
+    minute = int(match.group(2) or 0)
+    if minute > 59:
+        return None
+    return time(hour, minute)
+
+
+def _offered_slot_selection(
+    db: Session,
+    *,
+    conversation_id: str,
+    inbound_text: str,
+    project: Project,
+    now: datetime,
+) -> datetime | None:
+    """Resolve a choice only against a recent verified offer from this chat."""
+    selected = _selected_time(inbound_text)
+    if selected is None:
+        return None
+    zone = _project_zone(project)
+    messages = db.query(SalesMessage).filter(
+        SalesMessage.conversation_id == conversation_id,
+        SalesMessage.direction == "outbound",
+    ).order_by(SalesMessage.created_at.desc()).limit(20).all()
+    for message in messages:
+        offer = (message.metadata_json or {}).get("appointment_offer")
+        if not isinstance(offer, dict):
+            continue
+        for raw_slot in offer.get("slots", []):
+            try:
+                start_utc = datetime.fromisoformat(raw_slot)
+            except (TypeError, ValueError):
+                continue
+            local_start = start_utc.replace(tzinfo=timezone.utc).astimezone(zone)
+            if local_start.time().replace(second=0, microsecond=0) == selected:
+                return start_utc.replace(tzinfo=None)
+        # Only the latest structured offer is actionable. Older offers may have
+        # been superseded by a different date or refreshed availability.
+        return None
+
+    # Backward-compatible fallback for offers created before slot metadata was
+    # introduced. It is deliberately limited to a verified-offer SMS.
+    legacy_offer = next(
+        (message for message in messages if "verified appointment times" in message.content.casefold()),
+        None,
+    )
+    if not legacy_offer:
+        return None
+    requested = _requested_date(legacy_offer.content, now=now, zone=zone)
+    if requested is None:
+        return None
+    advertised_times = {_selected_time(value) for value in re.findall(
+        r"\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?)",
+        legacy_offer.content,
+        flags=re.IGNORECASE,
+    )}
+    if selected not in advertised_times:
+        return None
+    local_start = datetime.combine(requested, selected, tzinfo=zone)
+    return local_start.astimezone(timezone.utc).replace(tzinfo=None)
+
+
+def _timezone_label(value: datetime, zone: ZoneInfo, timezone_name: str) -> str:
+    local = value.replace(tzinfo=timezone.utc).astimezone(zone)
+    offset = local.strftime("%z")
+    formatted_offset = f"UTC{offset[:3]}:{offset[3:]}" if offset else "UTC+00:00"
+    return f"{formatted_offset}, {timezone_name}"
+
+
+def _appointment_confirmation(
+    *, project: Project, lead: Lead, user, starts_at: datetime,
+) -> str:
+    zone = _project_zone(project)
+    local_start = starts_at.replace(tzinfo=timezone.utc).astimezone(zone)
+    sales_name = " ".join(
+        value for value in (user.first_name, user.last_name) if value
+    ) or user.email
+    location_parts = [project.address, project.city, project.country]
+    location = ", ".join(dict.fromkeys(value.strip() for value in location_parts if value and value.strip()))
+    location = f"{project.name}, {location}" if location else project.name
+    email = lead.email or "the email address provided in your lead form"
+    return (
+        f"Your appointment is confirmed for {local_start.strftime('%A, %B %-d, %Y at %-I:%M %p')} "
+        f"({_timezone_label(starts_at, zone, project.timezone or 'UTC')}). "
+        f"Your Sales representative is {sales_name}. Location: {location}. "
+        f"A confirmation with these appointment details will also be sent to {email}. "
+        "We look forward to welcoming you!"
     )
 
 
@@ -378,11 +482,73 @@ async def simulate_turn(
         proposed_actions = result.get("proposed_actions", [])
         proposed_reply = result.get("proposed_reply")
         availability_handled = False
-        if not result.get("policy_violations") and (
+        appointment_confirmed = False
+        offered_slots: list[datetime] = []
+        selected_slot = _offered_slot_selection(
+            db,
+            conversation_id=conversation.id,
+            inbound_text=inbound_text,
+            project=project,
+            now=now,
+        ) if record_inbound and event_kind == "lead_message" else None
+        if not result.get("policy_violations") and selected_slot is not None:
+            try:
+                meeting, assigned_user = create_agent_appointment(
+                    db,
+                    lead=lead,
+                    starts_at=selected_slot,
+                    duration_minutes=45,
+                    modality="showroom",
+                )
+            except HTTPException as exc:
+                if exc.status_code != 409:
+                    raise
+                selected_local = selected_slot.replace(tzinfo=timezone.utc).astimezone(_project_zone(project))
+                proposed_reply, offered_slots = _availability_reply(
+                    db,
+                    project=project,
+                    inbound_text=selected_local.strftime("%B %-d, %Y"),
+                    now=now,
+                )
+                proposed_reply = (
+                    "That appointment time was just booked by another lead. "
+                    + proposed_reply
+                )
+                proposed_actions = [{"type": "request_available_slots"}]
+                if offered_slots:
+                    proposed_actions.append({"type": "offer_appointment"})
+            else:
+                proposed_reply = _appointment_confirmation(
+                    project=project,
+                    lead=lead,
+                    user=assigned_user,
+                    starts_at=meeting.meeting_time,
+                )
+                proposed_actions = [{
+                    "type": "appointment_confirmed",
+                    "meeting_id": meeting.id,
+                    "assigned_sales_user_id": assigned_user.id,
+                }]
+                appointment_confirmed = True
+                conversation.stage = "appointment_confirmed"
+                conversation.is_paused = True
+                conversation.pause_reason = "Appointment confirmed"
+                lead.agent_status = "appointment_confirmed"
+                lead.next_action_at = None
+                if simulation:
+                    simulation.status = "appointment_confirmed"
+                    simulation.updated_at = datetime.utcnow()
+                    db.add(simulation)
+                db.query(SalesFollowUpJob).filter(
+                    SalesFollowUpJob.conversation_id == conversation.id,
+                    SalesFollowUpJob.status == "pending",
+                ).update({SalesFollowUpJob.status: "cancelled"}, synchronize_session=False)
+            availability_handled = True
+        elif not result.get("policy_violations") and (
             "request_available_slots" in _action_types(proposed_actions)
             or _is_availability_request(inbound_text, now=now, zone=_project_zone(project))
         ):
-            proposed_reply, has_slots = _availability_reply(
+            proposed_reply, offered_slots = _availability_reply(
                 db, project=project, inbound_text=inbound_text, now=now,
             )
             availability_handled = True
@@ -392,14 +558,14 @@ async def simulate_turn(
             ]
             if "request_available_slots" not in _action_types(proposed_actions):
                 proposed_actions.append({"type": "request_available_slots"})
-            if has_slots and "offer_appointment" not in _action_types(proposed_actions):
+            if offered_slots and "offer_appointment" not in _action_types(proposed_actions):
                 proposed_actions.append({"type": "offer_appointment"})
         run.prompt_configuration_id = result.get("prompt_configuration_id")
         run.prompt_snapshot = result.get("prompt_snapshot", {})
         run.model = result.get("model", "unknown")
         run.output_snapshot = {
             "reply": proposed_reply,
-            "intent": result.get("intent"),
+            "intent": "appointment_confirmed" if appointment_confirmed else result.get("intent"),
             "proposed_actions": proposed_actions,
             "requires_human": False if availability_handled else result.get("requires_human", False),
             "policy_violations": result.get("policy_violations", []),
@@ -427,16 +593,27 @@ async def simulate_turn(
                 role="assistant",
                 content=proposed_reply,
                 status=f"simulated_follow_up_{follow_up_hours or 24}h" if event_kind == "follow_up" else "simulated",
-                metadata_json={"event_kind": event_kind, "follow_up_hours": follow_up_hours},
+                metadata_json={
+                    "event_kind": event_kind,
+                    "follow_up_hours": follow_up_hours,
+                    **({
+                        "appointment_offer": {
+                            "duration_minutes": 45,
+                            "project_timezone": project.timezone or "UTC",
+                            "slots": [slot.isoformat() for slot in offered_slots],
+                        },
+                    } if offered_slots else {}),
+                    **({"appointment_confirmed": True} if appointment_confirmed else {}),
+                },
                 created_at=now + timedelta(microseconds=1) if record_inbound else now,
             ))
             conversation.updated_at = now
-            lead.agent_status = "simulation"
+            lead.agent_status = "appointment_confirmed" if appointment_confirmed else "simulation"
             pending_count = db.query(SalesFollowUpJob).filter(
                 SalesFollowUpJob.conversation_id == conversation.id,
                 SalesFollowUpJob.status == "pending",
             ).count()
-            if pending_count == 0 and not lead.is_opt_out:
+            if pending_count == 0 and not lead.is_opt_out and not appointment_confirmed:
                 attempt = 1 if event_kind != "follow_up" else min(3, 1 + db.query(SalesFollowUpJob).filter(
                     SalesFollowUpJob.conversation_id == conversation.id,
                     SalesFollowUpJob.status == "processed",

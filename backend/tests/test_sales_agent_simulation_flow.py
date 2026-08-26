@@ -18,7 +18,7 @@ from app.modules.ai_core.models import AIConfiguration
 from app.modules.companies.models import Company
 from app.modules.project_team.models import ProjectUserAssignment
 from app.modules.projects.models import Project, ProjectCampaign, ProjectProfile, ProjectPropertyType, ProjectUnit
-from app.modules.sales_agent.models import SalesAgentSimulation, SalesFollowUpJob, SalesMessage
+from app.modules.sales_agent.models import SalesAgentSimulation, SalesConversation, SalesFollowUpJob, SalesMessage
 from app.modules.sales_agent.schemas import SimulationLeadForm
 from app.modules.sales_agent.service import simulate_turn
 from app.modules.sales_agent.simulation_service import (
@@ -29,7 +29,7 @@ from app.modules.sales_agent.simulation_service import (
     simulation_options,
     slots_for_simulation,
 )
-from app.modules.sales_crm.models import Lead, Meeting, SalesAvailabilityWindow
+from app.modules.sales_crm.models import Lead, Meeting, SalesAvailabilityBlock, SalesAvailabilityWindow
 from app.modules.users.models import User, UserRole
 
 
@@ -315,6 +315,85 @@ def test_explicit_date_forces_verified_availability_even_if_model_requests_human
     assert "verified appointment times" in response["reply"]
     assert response["requires_human"] is False
     assert "request_human_review" not in {action["type"] for action in response["proposed_actions"]}
+
+
+def test_sms_selection_books_once_and_closes_with_timezone_sales_location_and_email():
+    db = _db(); company, _, admin, sales_a, sales_b, project, campaign, product = _fixture(db)
+    project.timezone = "America/Lima"
+    project.address = "123 Wildflower Way"
+    project.city = "Lima"
+    project.country = "Peru"
+    sales_a.last_name = "Stone"
+    sales_b.is_active = False
+    db.query(SalesAvailabilityWindow).delete(synchronize_session=False)
+    db.add(SalesAvailabilityBlock(
+        user_id=sales_a.id,
+        starts_at=datetime(2026, 8, 31, 13, 0),
+        ends_at=datetime(2026, 8, 31, 15, 0),
+        timezone="America/Lima",
+    ))
+    db.add_all([project, sales_a, sales_b]); db.commit()
+
+    first = _start(db, company, admin, project, campaign, product, "1")
+    second = _start(db, company, admin, project, campaign, product, "2")
+    for result in (first, second):
+        simulation = db.query(SalesAgentSimulation).filter_by(id=result["simulation_id"]).one()
+        simulation.virtual_now = datetime(2026, 8, 25, 18, 0)
+        db.add(simulation)
+    db.commit()
+
+    with patch("app.modules.sales_agent.graph.generate_llm_response", new=AsyncMock(return_value=SLOTS_REPLY)):
+        for result in (first, second):
+            offer = asyncio.run(simulate_turn(
+                db,
+                company_id=company.id,
+                lead_id=result["lead_id"],
+                inbound_text="What about August 31st?",
+            ))
+            assert "8:00 AM" in offer["reply"]
+            assert "UTC-05:00, America/Lima, Project local time" in offer["reply"]
+
+        confirmed = asyncio.run(simulate_turn(
+            db,
+            company_id=company.id,
+            lead_id=first["lead_id"],
+            inbound_text="8:00 AM works for me",
+        ))
+        stale = asyncio.run(simulate_turn(
+            db,
+            company_id=company.id,
+            lead_id=second["lead_id"],
+            inbound_text="8am is ok",
+        ))
+
+    assert confirmed["intent"] == "appointment_confirmed"
+    assert "Ava Stone" in confirmed["reply"]
+    assert "Approved Project, 123 Wildflower Way, Lima, Peru" in confirmed["reply"]
+    assert "UTC-05:00, America/Lima" in confirmed["reply"]
+    assert "lead1@example.test" in confirmed["reply"]
+    assert "will also be sent" in confirmed["reply"]
+    assert "just booked by another lead" in stale["reply"]
+    assert "9:00 AM" in stale["reply"]
+    assert db.query(Meeting).count() == 1
+    meeting = db.query(Meeting).one()
+    assert meeting.assigned_sales_user_id == sales_a.id
+    assert meeting.meeting_time == datetime(2026, 8, 31, 13, 0)
+    first_simulation = db.query(SalesAgentSimulation).filter_by(id=first["simulation_id"]).one()
+    assert first_simulation.status == "appointment_confirmed"
+    assert first_simulation.conversation_id
+    conversation = db.query(SalesConversation).filter_by(id=first_simulation.conversation_id).one()
+    assert conversation.is_paused is True
+    assert conversation.pause_reason == "Appointment confirmed"
+    assert db.query(SalesFollowUpJob).filter_by(
+        conversation_id=first_simulation.conversation_id,
+        status="pending",
+    ).count() == 0
+
+    confirmation_message = db.query(SalesMessage).filter_by(
+        conversation_id=first_simulation.conversation_id,
+        direction="outbound",
+    ).order_by(SalesMessage.created_at.desc()).first()
+    assert confirmation_message.metadata_json["appointment_confirmed"] is True
 
 
 def test_simulation_migration_adopts_existing_schema_and_is_repeatable(monkeypatch):
