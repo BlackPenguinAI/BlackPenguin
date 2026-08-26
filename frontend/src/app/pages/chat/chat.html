@@ -224,6 +224,19 @@
               <option value="mkt">Marketing</option>
               <option value="sales">Sales</option>
             </select>
+            <div class="rounded-lg border border-white/10 bg-black/20 p-3 space-y-2">
+              <label class="field-label">Timezone</label>
+              <input name="team_timezone_search" [(ngModel)]="teamTimezoneSearch" placeholder="Search Bogotá, Quito or UTC-05:00" class="form-input">
+              <select name="team_timezone" [(ngModel)]="teamInvite.timezone" class="w-full rounded-lg border border-white/10 bg-black/60 px-3 py-2 text-xs outline-none focus:border-secondary/50"><option *ngFor="let option of teamTimezoneOptions" [value]="option.value">{{ option.label }}</option></select>
+              <p class="text-[10px] text-gray-500">Preselected from this device.</p>
+            </div>
+            <div class="rounded-lg border border-white/10 bg-black/20 p-3 space-y-2">
+              <p class="field-label">Project access</p>
+              <label class="flex gap-2 text-xs"><input type="radio" name="team_project_scope" [(ngModel)]="teamInvite.project_access_scope" value="all" class="accent-secondary"> All current and future Projects</label>
+              <label class="flex gap-2 text-xs"><input type="radio" name="team_project_scope" [(ngModel)]="teamInvite.project_access_scope" value="selected" class="accent-secondary"> Selected Projects</label>
+              <div *ngIf="teamInvite.project_access_scope === 'selected'" class="grid gap-2 sm:grid-cols-2"><label *ngFor="let project of teamProjects" class="flex items-center gap-2 rounded border border-white/10 p-2 text-[10px]"><input type="checkbox" [checked]="teamProjectSelected(project.id)" (change)="toggleTeamProject(project.id, $any($event.target).checked)" class="accent-secondary">{{ project.name }}</label></div>
+              <span *ngIf="teamInviteErrors['project_ids']" class="field-error">{{ teamInviteErrors['project_ids'] }}</span>
+            </div>
             <label class="flex items-center gap-2 text-[10px] text-gray-400"><input name="team_active" type="checkbox" [(ngModel)]="teamInvite.is_active" class="accent-secondary"> Active user</label>
             <div class="flex flex-wrap gap-2 pt-1">
               <button [disabled]="!canInviteTeamMember" [title]="canInviteTeamMember ? '' : 'Complete all required user fields.'" class="rounded-lg bg-secondary px-3 py-2 text-[10px] font-semibold text-black disabled:cursor-not-allowed disabled:opacity-40">{{ teamSavingAction === 'add' ? 'Adding...' : (teamInviteErrorCount ? 'Complete required fields' : 'Add user') }}</button>

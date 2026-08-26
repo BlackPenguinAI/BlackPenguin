@@ -9,6 +9,8 @@ import uuid
 from app.db.postgres import get_db
 from app.modules.auth.deps import RoleChecker
 from app.modules.users.models import TENANT_MANAGER_ROLES, User, UserRole
+from app.modules.users.project_access import require_project_access
+from app.modules.project_team.service import eligible_sales_assignments
 from app.modules.ai_core.services import get_ai_config
 from app.integrations.openrouter_client import generate_llm_response
 
@@ -326,6 +328,7 @@ def get_my_schedule(
         Meeting.meeting_time < end_value,
     )
     if project_id:
+        require_project_access(db, current_user, project_id)
         meetings_query = meetings_query.filter(Meeting.project_id == project_id)
     meetings = meetings_query.order_by(Meeting.meeting_time).all()
     meeting_rows = []
@@ -365,8 +368,10 @@ def get_company_sales_schedule(
         Meeting.meeting_time < end_value,
     )
     if project_id:
-        if not db.query(Project.id).filter(Project.id == project_id, Project.company_id == current_user.company_id).first():
-            raise HTTPException(status_code=404, detail="Project not found.")
+        require_project_access(db, current_user, project_id)
+        project_sales_ids = {assignment.user_id for assignment in eligible_sales_assignments(db, project_id)}
+        selected_ids &= project_sales_ids
+        sales_users = [user for user in sales_users if user.id in project_sales_ids]
         meetings_query = meetings_query.filter(Meeting.project_id == project_id)
     meetings = [] if not selected_ids else meetings_query.order_by(Meeting.meeting_time).all()
     blocks = [] if not selected_ids else db.query(SalesAvailabilityBlock).filter(

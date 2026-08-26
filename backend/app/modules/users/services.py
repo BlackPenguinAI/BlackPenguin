@@ -1,4 +1,5 @@
 import secrets
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import HTTPException
 from sqlalchemy.orm import Session, joinedload
@@ -6,6 +7,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.core.security import create_email_token, get_password_hash
 from app.modules.companies.models import Company
 from app.modules.users.models import User, UserRole
+from app.modules.users.project_access import sync_user_project_access
 
 
 INVITABLE_TENANT_ROLES = {
@@ -49,6 +51,8 @@ def invite_tenant_user(
     first_name: str,
     last_name: str,
     role: UserRole,
+    project_access_scope: str = "all",
+    project_ids: list[str] | None = None,
     commit: bool = True,
     send_activation_email: bool = True,
 ) -> User:
@@ -62,6 +66,8 @@ def invite_tenant_user(
         role=role,
         password=secrets.token_urlsafe(32),
         is_active=True,
+        project_access_scope=project_access_scope,
+        project_ids=project_ids,
         commit=commit,
         send_activation_email=send_activation_email,
     )
@@ -77,6 +83,9 @@ def create_tenant_user(
     role: UserRole,
     password: str,
     is_active: bool,
+    timezone: str = "UTC",
+    project_access_scope: str = "all",
+    project_ids: list[str] | None = None,
     commit: bool = True,
     send_activation_email: bool = False,
 ) -> User:
@@ -86,6 +95,10 @@ def create_tenant_user(
             status_code=403,
             detail="Only Assistant, Marketing and Sales users can be invited.",
         )
+    try:
+        ZoneInfo(timezone)
+    except ZoneInfoNotFoundError as exc:
+        raise HTTPException(status_code=422, detail="Unknown timezone.") from exc
     normalized_email = email.strip().casefold()
     if db.query(User).filter(User.email == normalized_email).first():
         raise HTTPException(status_code=409, detail="The email is already registered.")
@@ -105,8 +118,17 @@ def create_tenant_user(
         role=role,
         hashed_password=get_password_hash(password),
         is_active=is_active,
+        timezone=timezone,
+        project_access_scope=project_access_scope,
     )
     db.add(user)
+    db.flush()
+    sync_user_project_access(
+        db,
+        user=user,
+        scope=project_access_scope,
+        project_ids=project_ids or [],
+    )
     if commit:
         db.commit()
         db.refresh(user)

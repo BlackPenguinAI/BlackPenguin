@@ -13,6 +13,7 @@ from app.modules.companies.models import Company
 from app.modules.onboarding_questions import validate_onboarding_value
 from app.modules.project_team.models import ProjectUserAssignment
 from app.modules.users.models import User
+from app.modules.users.project_access import sync_all_scope_users_for_project
 
 from .completion import FIELD_BY_KEY, VALID_STATUSES, calculate_completion, field_progress, normalize_field_key
 from . import storage_service
@@ -66,6 +67,7 @@ def create_project_with_onboarding(db: Session, *, company_id: str, payload: dic
     profile = ProjectProfile(project_id=project.id)
     session = ProjectSession(project_id=project.id)
     db.add_all([profile, session])
+    sync_all_scope_users_for_project(db, project)
     seed = {
         "project_name": project.name, "short_description": project.description,
         "exact_address": project.address, "city": project.city, "country": project.country,

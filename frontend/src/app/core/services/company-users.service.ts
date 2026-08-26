@@ -14,6 +14,12 @@ export interface CompanyUser {
   last_name?: string;
   role: CompanyUserRole;
   is_active: boolean;
+  phone?: string;
+  country?: string;
+  timezone?: string;
+  project_access_scope?: 'all' | 'selected';
+  project_ids?: string[];
+  project_assignment_required: boolean;
 }
 
 export interface CompanyUserInvite {
@@ -23,7 +29,16 @@ export interface CompanyUserInvite {
   role: InvitableCompanyUserRole;
   password: string;
   is_active: boolean;
+  timezone?: string;
+  project_access_scope?: 'all' | 'selected';
+  project_ids?: string[];
 }
+
+export interface CompanyUserUpdate extends Omit<CompanyUserInvite, 'email' | 'password'> {
+  password?: string;
+}
+
+export interface CompanyProjectOption { id: string; name: string; }
 
 export type CompanyUserLimits = Record<InvitableCompanyUserRole, {
   used: number;
@@ -44,6 +59,14 @@ export class CompanyUsersService {
 
   invite(payload: CompanyUserInvite): Observable<CompanyUser> {
     return this.http.post<CompanyUser>(`${API_V1_URL}/users/company`, payload);
+  }
+
+  projects(): Observable<CompanyProjectOption[]> {
+    return this.http.get<CompanyProjectOption[]>(`${API_V1_URL}/users/company/projects`);
+  }
+
+  update(userId: string, payload: CompanyUserUpdate): Observable<CompanyUser> {
+    return this.http.patch<CompanyUser>(`${API_V1_URL}/users/company/${userId}`, payload);
   }
 
   setActive(userId: string, isActive: boolean): Observable<CompanyUser> {

@@ -7,14 +7,31 @@ from app.db.postgres import get_db
 from app.modules.auth.deps import get_current_user, RoleChecker
 from app.core.security import verify_password, get_password_hash, verify_email_token
 from .models import TENANT_MANAGER_ROLES, User, UserRole
+from .project_access import project_ids_for_user, sync_user_project_access
 from . import services
 from .schemas import (
-    MyProfileUpdate, MyProfileResponse, PasswordUpdatePayload, SetPasswordPayload,
+    CompanyProjectOption, MyProfileUpdate, MyProfileResponse, PasswordUpdatePayload, SetPasswordPayload,
     TenantUserCreate, TenantUserResponse, TenantUserUpdate, UserAdminListResponse,
 )
 from app.modules.companies.models import Company
+from app.modules.projects.models import Project
 
 router = APIRouter()
+
+
+def _tenant_user_response(db: Session, user: User) -> dict:
+    project_ids = project_ids_for_user(db, user)
+    return {
+        "id": user.id, "email": user.email, "first_name": user.first_name,
+        "last_name": user.last_name, "phone": user.phone, "country": user.country,
+        "timezone": user.timezone or "UTC", "role": user.role, "is_active": user.is_active,
+        "project_access_scope": "all" if user.role == UserRole.ADMIN else (user.project_access_scope or "all"),
+        "project_ids": project_ids,
+        "project_assignment_required": bool(
+            user.role in (UserRole.MKT, UserRole.SALES)
+            and (user.project_access_scope or "all") == "selected" and not project_ids
+        ),
+    }
 
 
 @router.get("/me", response_model=MyProfileResponse)
@@ -122,7 +139,8 @@ def list_company_users(
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker(TENANT_MANAGER_ROLES)),
 ):
-    return db.query(User).filter(User.company_id == current_user.company_id).order_by(User.email.asc()).all()
+    users = db.query(User).filter(User.company_id == current_user.company_id).order_by(User.email.asc()).all()
+    return [_tenant_user_response(db, user) for user in users]
 
 
 @router.post("/company", response_model=TenantUserResponse, status_code=status.HTTP_201_CREATED)
@@ -135,7 +153,7 @@ def invite_company_user(
         role = UserRole(payload.role)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail="Role must be assistant, mkt or sales.") from exc
-    return services.create_tenant_user(
+    user = services.create_tenant_user(
         db,
         company_id=current_user.company_id,
         email=str(payload.email),
@@ -144,7 +162,11 @@ def invite_company_user(
         role=role,
         password=payload.password,
         is_active=payload.is_active,
+        timezone=payload.timezone,
+        project_access_scope=payload.project_access_scope,
+        project_ids=payload.project_ids,
     )
+    return _tenant_user_response(db, user)
 
 
 @router.get("/company/limits")
@@ -174,6 +196,21 @@ def get_company_user_limits(
     return result
 
 
+@router.get("/company/projects", response_model=List[CompanyProjectOption])
+def list_company_project_options(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker(TENANT_MANAGER_ROLES)),
+):
+    query = db.query(Project).filter(
+        Project.company_id == current_user.company_id,
+        Project.is_active.is_(True),
+    )
+    if current_user.role == UserRole.ASSISTANT and (current_user.project_access_scope or "all") == "selected":
+        allowed = project_ids_for_user(db, current_user)
+        query = query.filter(Project.id.in_(allowed)) if allowed else query.filter(Project.id == "")
+    return query.order_by(Project.name).all()
+
+
 @router.patch("/company/{user_id}", response_model=TenantUserResponse)
 def update_company_user(
     user_id: str,
@@ -189,16 +226,38 @@ def update_company_user(
             status_code=403,
             detail="The Company administrator can only be managed from the superadmin Company panel.",
         )
-    if payload.is_active is True and not user.is_active:
+    try:
+        next_role = UserRole(payload.role) if payload.role is not None else user.role
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail="Role must be assistant, mkt or sales.") from exc
+    if next_role not in services.INVITABLE_TENANT_ROLES:
+        raise HTTPException(status_code=422, detail="Role must be assistant, mkt or sales.")
+    next_active = payload.is_active if payload.is_active is not None else user.is_active
+    if next_active and (not user.is_active or next_role != user.role):
         company = db.query(Company).options(joinedload(Company.plan)).filter(
             Company.id == current_user.company_id,
         ).first()
-        services.enforce_role_limit(db, company, user.role)
-    for key, value in payload.model_dump(exclude_unset=True).items():
+        services.enforce_role_limit(db, company, next_role)
+    if payload.timezone is not None:
+        try:
+            ZoneInfo(payload.timezone)
+        except ZoneInfoNotFoundError as exc:
+            raise HTTPException(status_code=422, detail="Unknown timezone.") from exc
+    values = payload.model_dump(
+        exclude_unset=True,
+        exclude={"password", "project_access_scope", "project_ids", "role"},
+    )
+    for key, value in values.items():
         setattr(user, key, value)
+    user.role = next_role
+    if payload.password:
+        user.hashed_password = get_password_hash(payload.password)
+    scope = payload.project_access_scope or user.project_access_scope or "all"
+    selected_ids = payload.project_ids if payload.project_ids is not None else project_ids_for_user(db, user)
+    sync_user_project_access(db, user=user, scope=scope, project_ids=selected_ids)
     db.commit()
     db.refresh(user)
-    return user
+    return _tenant_user_response(db, user)
 
 
 @router.post("/company/{user_id}/resend-activation")

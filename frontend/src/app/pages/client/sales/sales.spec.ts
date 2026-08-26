@@ -37,10 +37,10 @@ describe('SalesComponent scheduling view', () => {
     component.view = 'day'; expect(component.days).toHaveLength(1);
   });
 
-  it('renders timezone choices with a UTC offset and standard name', () => {
+  it('renders timezone choices with a UTC offset and representative cities', () => {
     vi.stubGlobal('localStorage', { getItem: () => 'sales' });
     const component = new SalesComponent({} as any, { markForCheck: () => undefined } as any);
     expect(component.timezoneLabel('America/Lima')).toContain('UTC-05:00');
-    expect(component.timezoneLabel('America/Lima')).toContain('Peru Standard Time');
+    expect(component.timezoneLabel('America/Lima')).toContain('Bogotá, Lima, Quito');
   });
 });

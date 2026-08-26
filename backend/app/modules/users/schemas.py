@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr, ConfigDict, Field
-from typing import Optional, List
+from typing import Literal, Optional, List
 from datetime import datetime
 from .models import UserRole
 
@@ -61,6 +61,9 @@ class TenantUserCreate(BaseModel):
     role: str
     password: str = Field(min_length=4, max_length=128)
     is_active: bool = True
+    timezone: str = Field(default="UTC", min_length=1, max_length=80)
+    project_access_scope: Literal["all", "selected"] = "all"
+    project_ids: List[str] = Field(default_factory=list)
 
 
 class TenantUserUpdate(BaseModel):
@@ -69,6 +72,11 @@ class TenantUserUpdate(BaseModel):
     phone: Optional[str] = None
     country: Optional[str] = None
     is_active: Optional[bool] = None
+    role: Optional[Literal["assistant", "mkt", "sales"]] = None
+    timezone: Optional[str] = Field(default=None, min_length=1, max_length=80)
+    project_access_scope: Optional[Literal["all", "selected"]] = None
+    project_ids: Optional[List[str]] = None
+    password: Optional[str] = Field(default=None, min_length=4, max_length=128)
 
 
 class TenantUserResponse(BaseModel):
@@ -81,4 +89,12 @@ class TenantUserResponse(BaseModel):
     timezone: str = "UTC"
     role: UserRole
     is_active: bool
+    project_access_scope: Literal["all", "selected"] = "all"
+    project_ids: List[str] = Field(default_factory=list)
+    project_assignment_required: bool = False
     model_config = ConfigDict(from_attributes=True)
+
+
+class CompanyProjectOption(BaseModel):
+    id: str
+    name: str

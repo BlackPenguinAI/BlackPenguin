@@ -15,6 +15,7 @@ import { marked } from 'marked';
 import { catchError, concatMap, finalize, from, of, Subscription, tap, toArray } from 'rxjs';
 
 import { SpeechRecognitionService } from '../../core/services/speech-recognition.service';
+import { deviceTimezone, filterTimezoneOptions } from '../../core/timezones';
 import { OnboardingQuestion } from '../../shared/ui/onboarding-response-options/onboarding-response-options';
 import { OnboardingAiMessageComponent } from '../../shared/ui/onboarding-ai-message/onboarding-ai-message';
 import { OnboardingWelcomeComponent } from '../../shared/ui/onboarding-welcome/onboarding-welcome';
@@ -43,6 +44,7 @@ import {
   TeamOnboarding,
   CompanyMediaAsset,
   TeamRoleStatus,
+  TeamProjectOption,
 } from './company-onboarding.models';
 import { CompanyOnboardingService } from './company-onboarding.service';
 
@@ -91,8 +93,11 @@ export class ChatComponent implements OnInit, OnDestroy {
   readonly companyMediaUrls = new Map<string, string>();
   teamInvite: TeamMemberInvite = {
     first_name: '', last_name: '', email: '', role: 'assistant', password: '', is_active: true,
+    timezone: deviceTimezone(), project_access_scope: 'all', project_ids: [],
   };
   teamRepeatPassword = '';
+  teamProjects: TeamProjectOption[] = [];
+  teamTimezoneSearch = '';
   private readonly markdownCache = new Map<string, string>();
   private readonly speechSubscriptions = new Subscription();
   private speechBase = '';
@@ -355,6 +360,7 @@ export class ChatComponent implements OnInit, OnDestroy {
     if (this.teamInvite.password.length < 4) errors['password'] = 'Use at least 4 characters for the temporary password.';
     if (!this.teamRepeatPassword) errors['repeat_password'] = 'Repeat the temporary password.';
     else if (this.teamInvite.password !== this.teamRepeatPassword) errors['repeat_password'] = 'Passwords do not match.';
+    if (this.teamInvite.project_access_scope === 'selected' && !(this.teamInvite.project_ids || []).length) errors['project_ids'] = 'Select at least one Project.';
     return errors;
   }
 
@@ -404,7 +410,8 @@ export class ChatComponent implements OnInit, OnDestroy {
       this.cdr.detectChanges();
     })).subscribe({
       next: () => {
-        this.teamInvite = { first_name: '', last_name: '', email: '', role: 'assistant', password: '', is_active: true };
+        this.teamInvite = { first_name: '', last_name: '', email: '', role: 'assistant', password: '', is_active: true,
+          timezone: deviceTimezone(), project_access_scope: 'all', project_ids: [] };
         this.teamRepeatPassword = '';
         this.refreshTeam(true);
       },
@@ -414,6 +421,14 @@ export class ChatComponent implements OnInit, OnDestroy {
           : 'The team member could not be invited.';
       },
     });
+  }
+
+  get teamTimezoneOptions() { return filterTimezoneOptions(this.teamTimezoneSearch); }
+  teamProjectSelected(projectId: string): boolean { return (this.teamInvite.project_ids || []).includes(projectId); }
+  toggleTeamProject(projectId: string, selected: boolean): void {
+    this.teamInvite.project_ids = selected
+      ? [...new Set([...(this.teamInvite.project_ids || []), projectId])]
+      : (this.teamInvite.project_ids || []).filter(id => id !== projectId);
   }
 
   savePublicPresence(): void {
@@ -881,6 +896,7 @@ export class ChatComponent implements OnInit, OnDestroy {
     this.nextQuestion = state.next_question;
     this.currentStage = state.stage;
     this.team = state.team || EMPTY_TEAM_ONBOARDING;
+    this.teamProjects = this.team.projects || [];
     this.initializePublicPresence(state.profile.data);
     this.isCompleted = state.profile.completion.can_complete;
     this.showWelcome = state.stage === 'website';
@@ -917,6 +933,7 @@ export class ChatComponent implements OnInit, OnDestroy {
     this.onboarding.getTeam().subscribe({
       next: team => {
         this.team = team;
+        this.teamProjects = team.projects || [];
         if (syncStage) this.syncState('bottom');
         this.cdr.detectChanges();
       },

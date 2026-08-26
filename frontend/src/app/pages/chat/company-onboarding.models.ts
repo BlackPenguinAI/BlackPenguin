@@ -176,7 +176,12 @@ export interface TeamMemberInvite {
   role: TeamRole;
   password: string;
   is_active: boolean;
+  timezone?: string;
+  project_access_scope?: 'all' | 'selected';
+  project_ids?: string[];
 }
+
+export interface TeamProjectOption { id: string; name: string; }
 
 export interface TeamRoleProgress {
   role: TeamRole;
@@ -189,6 +194,7 @@ export interface TeamOnboarding {
   administrator: TeamMember | null;
   members: TeamMember[];
   roles: TeamRoleProgress[];
+  projects?: TeamProjectOption[];
 }
 
 export const EMPTY_TEAM_ONBOARDING: TeamOnboarding = {

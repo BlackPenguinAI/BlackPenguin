@@ -529,6 +529,9 @@ def create_onboarding_team_member(
         role=role,
         password=payload.password,
         is_active=payload.is_active,
+        timezone=payload.timezone,
+        project_access_scope=payload.project_access_scope,
+        project_ids=payload.project_ids,
         send_activation_email=False,
     )
     profile = services.get_or_create_profile(db, current_user.company_id)

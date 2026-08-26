@@ -7,6 +7,7 @@ from app.modules.projects.models import Project
 from app.modules.users.models import TENANT_MANAGER_ROLES, User, UserRole
 from app.modules.users import services as user_services
 from app.modules.users.schemas import TenantUserResponse
+from app.modules.users.project_access import require_project_access
 
 from .models import ProjectUserAssignment
 from .schemas import AssignmentResponse, AssignmentUpsert, RoutingPolicyResponse, SalesUserInviteAndAssign
@@ -16,8 +17,9 @@ from .service import ROUND_ROBIN_DESCRIPTION, eligible_sales_assignments
 router = APIRouter()
 
 
-def _project(db: Session, project_id: str, company_id: str) -> Project:
-    project = db.query(Project).filter(Project.id == project_id, Project.company_id == company_id).first()
+def _project(db: Session, project_id: str, current_user: User) -> Project:
+    require_project_access(db, current_user, project_id)
+    project = db.query(Project).filter(Project.id == project_id, Project.company_id == current_user.company_id).first()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found.")
     return project
@@ -45,7 +47,7 @@ def list_team(
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.MKT, UserRole.SALES])),
 ):
-    _project(db, project_id, current_user.company_id)
+    _project(db, project_id, current_user)
     items = db.query(ProjectUserAssignment).options(joinedload(ProjectUserAssignment.user)).filter(
         ProjectUserAssignment.project_id == project_id,
     ).order_by(ProjectUserAssignment.responsibility, ProjectUserAssignment.is_primary.desc()).all()
@@ -58,7 +60,7 @@ def list_sales_candidates(
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.MKT])),
 ):
-    _project(db, project_id, current_user.company_id)
+    _project(db, project_id, current_user)
     return db.query(User).filter(
         User.company_id == current_user.company_id,
         User.role == UserRole.SALES,
@@ -74,7 +76,7 @@ def upsert_assignment(
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker(TENANT_MANAGER_ROLES)),
 ):
-    _project(db, project_id, current_user.company_id)
+    _project(db, project_id, current_user)
     if payload.user_id != user_id:
         raise HTTPException(status_code=422, detail="Path and payload user IDs differ.")
     user = db.query(User).filter(User.id == user_id, User.company_id == current_user.company_id).first()
@@ -106,7 +108,7 @@ def invite_and_assign_sales_user(
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker(TENANT_MANAGER_ROLES)),
 ):
-    _project(db, project_id, current_user.company_id)
+    _project(db, project_id, current_user)
     try:
         user = user_services.invite_tenant_user(
             db,
@@ -115,6 +117,8 @@ def invite_and_assign_sales_user(
             first_name=payload.first_name,
             last_name=payload.last_name,
             role=UserRole.SALES,
+            project_access_scope="selected",
+            project_ids=[project_id],
             commit=False,
             send_activation_email=False,
         )
@@ -123,15 +127,11 @@ def invite_and_assign_sales_user(
                 ProjectUserAssignment.project_id == project_id,
                 ProjectUserAssignment.responsibility == "sales",
             ).update({ProjectUserAssignment.is_primary: False}, synchronize_session=False)
-        assignment = ProjectUserAssignment(
-            project_id=project_id,
-            user_id=user.id,
-            responsibility="sales",
-            is_primary=payload.is_primary,
-            accepts_new_leads=True,
-            is_active=True,
-        )
-        db.add(assignment)
+        assignment = db.query(ProjectUserAssignment).filter(
+            ProjectUserAssignment.project_id == project_id,
+            ProjectUserAssignment.user_id == user.id,
+        ).one()
+        assignment.is_primary = payload.is_primary
         db.commit()
         assignment = db.query(ProjectUserAssignment).options(joinedload(ProjectUserAssignment.user)).filter(
             ProjectUserAssignment.id == assignment.id,
@@ -152,7 +152,7 @@ def get_routing_policy(
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.MKT, UserRole.SALES])),
 ):
-    _project(db, project_id, current_user.company_id)
+    _project(db, project_id, current_user)
     return {
         "policy": "round_robin",
         "description": ROUND_ROBIN_DESCRIPTION,
@@ -168,7 +168,7 @@ def remove_assignment(
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker(TENANT_MANAGER_ROLES)),
 ):
-    _project(db, project_id, current_user.company_id)
+    _project(db, project_id, current_user)
     db.query(ProjectUserAssignment).filter(
         ProjectUserAssignment.project_id == project_id,
         ProjectUserAssignment.user_id == user_id,

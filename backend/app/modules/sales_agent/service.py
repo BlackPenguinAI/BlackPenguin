@@ -79,9 +79,19 @@ def _action_types(actions: list[dict] | None) -> set[str]:
     }
 
 
+def _is_availability_request(text: str, *, now: datetime, zone: ZoneInfo) -> bool:
+    """Detect scheduling turns independently from the model's optional tool action."""
+    lowered = text.casefold()
+    scheduling_words = (
+        "appointment", "schedule", "availability", "available", "slot", "visit",
+        "cita", "agendar", "horario", "disponible", "visita",
+    )
+    return any(word in lowered for word in scheduling_words) or _requested_date(text, now=now, zone=zone) is not None
+
+
 def _availability_reply(
     db: Session, *, project: Project, inbound_text: str, now: datetime,
-) -> str:
+) -> tuple[str, bool]:
     """Execute the model's slot request and return a complete, grounded SMS."""
     zone = _project_zone(project)
     requested = _requested_date(inbound_text, now=now, zone=zone)
@@ -109,7 +119,8 @@ def _availability_reply(
         when = requested.strftime("%A, %B %-d") if requested else "the next 14 days"
         return (
             f"I couldn't find a verified appointment time for {when}. "
-            "Would you like another day, or should I ask the sales team to contact you?"
+            "Would you like another day, or should I ask the sales team to contact you?",
+            False,
         )
     local_starts = [slot["start_at"].replace(tzinfo=timezone.utc).astimezone(zone) for slot in slots]
     day_label = local_starts[0].strftime("%A, %B %-d")
@@ -117,7 +128,8 @@ def _availability_reply(
     time_list = times[0] if len(times) == 1 else f"{', '.join(times[:-1])} or {times[-1]}"
     return (
         f"I found these verified appointment times for {day_label}: {time_list} "
-        f"({project.timezone or 'UTC'}). Which one works best for you?"
+        f"({project.timezone or 'UTC'}). Which one works best for you?",
+        True,
     )
 
 
@@ -127,6 +139,7 @@ def conversation_summaries(
     company_id: str,
     project_id: str | None = None,
     sales_user_id: str | None = None,
+    allowed_project_ids: list[str] | None = None,
 ) -> list[dict]:
     query = db.query(SalesConversation, Lead, Project).join(
         Lead, Lead.id == SalesConversation.lead_id,
@@ -135,6 +148,8 @@ def conversation_summaries(
     )
     if project_id:
         query = query.filter(SalesConversation.project_id == project_id)
+    if allowed_project_ids is not None:
+        query = query.filter(SalesConversation.project_id.in_(allowed_project_ids)) if allowed_project_ids else query.filter(SalesConversation.project_id == "")
     if sales_user_id:
         query = query.filter(Lead.assigned_sales_user_id == sales_user_id)
     rows = query.order_by(SalesConversation.updated_at.desc()).all()
@@ -362,13 +377,23 @@ async def simulate_turn(
         })
         proposed_actions = result.get("proposed_actions", [])
         proposed_reply = result.get("proposed_reply")
-        if (
+        availability_handled = False
+        if not result.get("policy_violations") and (
             "request_available_slots" in _action_types(proposed_actions)
-            and not result.get("policy_violations")
+            or _is_availability_request(inbound_text, now=now, zone=_project_zone(project))
         ):
-            proposed_reply = _availability_reply(
+            proposed_reply, has_slots = _availability_reply(
                 db, project=project, inbound_text=inbound_text, now=now,
             )
+            availability_handled = True
+            proposed_actions = [
+                action for action in proposed_actions
+                if isinstance(action, dict) and action.get("type") != "request_human_review"
+            ]
+            if "request_available_slots" not in _action_types(proposed_actions):
+                proposed_actions.append({"type": "request_available_slots"})
+            if has_slots and "offer_appointment" not in _action_types(proposed_actions):
+                proposed_actions.append({"type": "offer_appointment"})
         run.prompt_configuration_id = result.get("prompt_configuration_id")
         run.prompt_snapshot = result.get("prompt_snapshot", {})
         run.model = result.get("model", "unknown")
@@ -376,7 +401,7 @@ async def simulate_turn(
             "reply": proposed_reply,
             "intent": result.get("intent"),
             "proposed_actions": proposed_actions,
-            "requires_human": result.get("requires_human", False),
+            "requires_human": False if availability_handled else result.get("requires_human", False),
             "policy_violations": result.get("policy_violations", []),
             "error_code": result.get("error_code"),
         }

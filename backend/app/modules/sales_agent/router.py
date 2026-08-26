@@ -6,8 +6,10 @@ from sqlalchemy.orm import Session
 from app.db.postgres import get_db
 from app.modules.auth.deps import RoleChecker
 from app.modules.users.models import TENANT_MANAGER_ROLES, User, UserRole
+from app.modules.users.project_access import project_ids_for_user, require_project_access
 
-from .models import AgentRun, OutboundMessage, SalesConversation
+from .models import AgentRun, OutboundMessage, SalesAgentSimulation, SalesConversation
+from app.modules.sales_crm.models import Lead
 from .schemas import (
     AgentRunResponse, AppointmentConfirmationResponse, AppointmentConfirm, AppointmentSlot,
     ConversationAction, ConversationSummary, DraftDecision, SalesMessageResponse,
@@ -24,12 +26,23 @@ from .simulation_service import (
 router = APIRouter()
 
 
+def _require_simulation_access(db: Session, current_user: User, simulation_id: str) -> None:
+    simulation = db.query(SalesAgentSimulation).filter(
+        SalesAgentSimulation.id == simulation_id,
+        SalesAgentSimulation.company_id == current_user.company_id,
+    ).first()
+    if not simulation:
+        raise HTTPException(status_code=404, detail="Simulation not found.")
+    require_project_access(db, current_user, simulation.project_id)
+
+
 @router.get("/simulation-options", response_model=list[SimulationOptionProject])
 def get_simulation_options(
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.MKT])),
 ):
-    return simulation_options(db, company_id=current_user.company_id)
+    allowed = set(project_ids_for_user(db, current_user))
+    return [item for item in simulation_options(db, company_id=current_user.company_id) if item["id"] in allowed]
 
 
 @router.post("/simulations", response_model=SimulationCreateResponse, status_code=201)
@@ -38,6 +51,7 @@ def start_simulation(
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.MKT])),
 ):
+    require_project_access(db, current_user, payload.project_id)
     return create_simulation(
         db,
         company_id=current_user.company_id,
@@ -54,6 +68,7 @@ async def start_initial_message(
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.MKT])),
 ):
+    _require_simulation_access(db, current_user, simulation_id)
     return await generate_initial_message(
         db,
         company_id=current_user.company_id,
@@ -68,6 +83,7 @@ def simulation_slots(
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.MKT])),
 ):
+    _require_simulation_access(db, current_user, simulation_id)
     return slots_for_simulation(
         db,
         company_id=current_user.company_id,
@@ -83,6 +99,7 @@ def confirm_appointment(
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.MKT])),
 ):
+    _require_simulation_access(db, current_user, simulation_id)
     return confirm_simulation_appointment(
         db,
         company_id=current_user.company_id,
@@ -100,6 +117,7 @@ async def advance_clock(
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.MKT])),
 ):
+    _require_simulation_access(db, current_user, simulation_id)
     return await advance_simulation(
         db,
         company_id=current_user.company_id,
@@ -115,6 +133,7 @@ def set_simulation_approval(
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker(TENANT_MANAGER_ROLES)),
 ):
+    _require_simulation_access(db, current_user, simulation_id)
     item = approve_simulation(
         db,
         company_id=current_user.company_id,
@@ -131,6 +150,10 @@ async def simulate(
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.MKT])),
 ):
+    lead = db.query(Lead).filter(Lead.id == payload.lead_id, Lead.company_id == current_user.company_id).first()
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found.")
+    require_project_access(db, current_user, lead.project_id)
     return await simulate_turn(
         db,
         company_id=current_user.company_id,
@@ -147,9 +170,11 @@ def conversations(
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.MKT])),
 ):
+    if project_id:
+        require_project_access(db, current_user, project_id)
     return conversation_summaries(
         db, company_id=current_user.company_id, project_id=project_id,
-        sales_user_id=None,
+        sales_user_id=None, allowed_project_ids=project_ids_for_user(db, current_user),
     )
 
 
@@ -159,6 +184,13 @@ def messages(
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.MKT])),
 ):
+    conversation = db.query(SalesConversation).filter(
+        SalesConversation.id == conversation_id,
+        SalesConversation.company_id == current_user.company_id,
+    ).first()
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found.")
+    require_project_access(db, current_user, conversation.project_id)
     return conversation_messages(
         db, company_id=current_user.company_id, conversation_id=conversation_id,
         sales_user_id=None,
@@ -171,13 +203,20 @@ def conversation_action(
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.MKT])),
 ):
+    existing = db.query(SalesConversation).filter(
+        SalesConversation.id == conversation_id,
+        SalesConversation.company_id == current_user.company_id,
+    ).first()
+    if not existing:
+        raise HTTPException(status_code=404, detail="Conversation not found.")
+    require_project_access(db, current_user, existing.project_id)
     conversation = set_conversation_action(
         db, company_id=current_user.company_id, conversation_id=conversation_id, action=payload.action,
         sales_user_id=None,
     )
     return next(item for item in conversation_summaries(
         db, company_id=current_user.company_id,
-        sales_user_id=None,
+        sales_user_id=None, allowed_project_ids=project_ids_for_user(db, current_user),
     ) if item["id"] == conversation.id)
 
 

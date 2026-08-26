@@ -11,6 +11,7 @@ from sqlalchemy.orm.attributes import flag_modified
 
 from app.modules.onboarding_questions import validate_onboarding_value
 from app.modules.users.models import User, UserRole
+from app.modules.projects.models import Project
 
 from .completion import FIELD_BY_KEY, VALID_STATUSES, calculate_completion, field_progress
 from .models import CompanyProfile, OnboardingMessage, OnboardingSession, SenderType
@@ -649,6 +650,12 @@ def serialize_team(db: Session, company_id: str, profile: CompanyProfile | None 
         "administrator": member_payload(administrator),
         "members": [member_payload(user) for user in users if user.role != UserRole.ADMIN],
         "roles": roles,
+        "projects": [
+            {"id": project.id, "name": project.name}
+            for project in db.query(Project).filter(
+                Project.company_id == company_id, Project.is_active.is_(True),
+            ).order_by(Project.name).all()
+        ],
     }
 
 

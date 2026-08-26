@@ -23,6 +23,7 @@ from app.modules.onboarding_jobs.models import OnboardingSourceJob
 from app.modules.onboarding_copy import conversational_acknowledgement
 from app.modules.project_team.models import ProjectUserAssignment
 from app.modules.users.models import TENANT_MANAGER_ROLES, User, UserRole
+from app.modules.users.project_access import project_ids_for_user, require_project_access
 
 from . import asset_share_service, catalog_service, meta_service, services, source_service, storage_service
 from .completion import FIELD_BY_KEY
@@ -445,12 +446,15 @@ def list_projects(db: Session = Depends(get_db), current_user: User = Depends(Ro
     projects = db.query(Project).options(joinedload(Project.profile)).filter(
         Project.company_id == current_user.company_id,
         Project.is_active.is_(True),
-    ).order_by(Project.created_at.desc()).all()
+    )
+    allowed = project_ids_for_user(db, current_user)
+    projects = (projects.filter(Project.id.in_(allowed)) if allowed else projects.filter(Project.id == "")).order_by(Project.created_at.desc()).all()
     return [services.serialize_project(project) for project in projects]
 
 
 @router.get("/{project_id}", response_model=ProjectResponse)
 def get_project(project_id: str, db: Session = Depends(get_db), current_user: User = Depends(RoleChecker(VIEWER_ROLES))):
+    require_project_access(db, current_user, project_id)
     return services.serialize_project(services.get_project(db, project_id, current_user.company_id))
 
 
@@ -478,6 +482,7 @@ def get_project_overview(
     project_id: str, db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker(VIEWER_ROLES)),
 ):
+    require_project_access(db, current_user, project_id)
     project = services.get_project(db, project_id, current_user.company_id)
     return services.serialize_overview(db, project)
 

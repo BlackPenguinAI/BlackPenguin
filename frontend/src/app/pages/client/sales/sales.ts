@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 
 import { API_V1_URL } from '../../../core/config/api.config';
-import { canonicalTimezone, supportedTimezones, timezoneLabel } from '../../../core/timezones';
+import { canonicalTimezone, filterTimezoneOptions, supportedTimezones, timezoneLabel } from '../../../core/timezones';
 
 type ScheduleSection = 'availability' | 'appointments';
 type CalendarView = 'month' | 'week' | 'day';
@@ -18,7 +18,8 @@ export class SalesComponent implements OnInit {
   role = typeof localStorage === 'undefined' ? '' : localStorage.getItem('bp_role') || '';
   section: ScheduleSection = 'availability'; view: CalendarView = 'month'; cursor = new Date();
   salesUserId = ''; projectId = ''; userTimezone = 'UTC'; timezone = 'UTC';
-  readonly timezones = supportedTimezones(); readonly timezoneLabel = timezoneLabel;
+  readonly timezones = supportedTimezones(); timezoneSearch = ''; readonly timezoneLabel = timezoneLabel;
+  get filteredTimezoneOptions() { return filterTimezoneOptions(this.timezoneSearch); }
   loading = true; saving = false; availabilitySaving = false; attachmentSaving = false; projectTimezoneSaving = false;
   error = ''; success = ''; selected: any = null; selectedLead: any = null; selectedDay: Date | null = null; editingBlock: any = null;
   leadLoading = false; chatOpen = false; persistedStatus = ''; blockStart = '09:00'; blockEnd = '17:00'; closingDate = '';

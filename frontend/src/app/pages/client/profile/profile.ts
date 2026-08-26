@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../../core/services/auth';
 import { ToastService } from '../../../core/services/toast';
-import { canonicalTimezone, supportedTimezones, timezoneLabel } from '../../../core/timezones';
+import { canonicalTimezone, filterTimezoneOptions, supportedTimezones, timezoneLabel } from '../../../core/timezones';
 
 @Component({
   selector: 'app-profile',
@@ -13,8 +13,10 @@ import { canonicalTimezone, supportedTimezones, timezoneLabel } from '../../../c
   styleUrls: ['./profile.scss']
 })
 export class ProfileComponent implements OnInit {
-  readonly timezones = supportedTimezones();
   readonly timezoneLabel = timezoneLabel;
+  readonly timezones = supportedTimezones();
+  timezoneSearch = '';
+  get filteredTimezoneOptions() { return filterTimezoneOptions(this.timezoneSearch); }
   role = typeof localStorage === 'undefined' ? '' : localStorage.getItem('bp_role') || '';
   isLoading: boolean = true;
   isSaving: boolean = false;

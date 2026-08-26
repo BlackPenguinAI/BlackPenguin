@@ -262,6 +262,9 @@ class TeamMemberCreate(BaseModel):
     role: TeamRole
     password: str = Field(min_length=4, max_length=128)
     is_active: bool = True
+    timezone: str = Field(default="UTC", min_length=1, max_length=80)
+    project_access_scope: Literal["all", "selected"] = "all"
+    project_ids: list[str] = Field(default_factory=list)
 
     @field_validator("first_name", "last_name")
     @classmethod
@@ -292,6 +295,7 @@ class TeamOnboardingResponse(BaseModel):
     administrator: TeamMemberResponse | None = None
     members: list[TeamMemberResponse] = Field(default_factory=list)
     roles: list[TeamRoleProgress] = Field(default_factory=list)
+    projects: list[dict[str, str]] = Field(default_factory=list)
 
 
 class TeamRoleDecision(BaseModel):
