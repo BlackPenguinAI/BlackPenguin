@@ -9,7 +9,7 @@ from sqlalchemy import func
 from app.modules.companies.models import Company
 
 from .schemas import (
-    FirebaseConfigSchema, FirebaseConfigUpdate,
+    FirebaseConfigSchema, FirebaseConfigUpdate, GoogleCalendarConfigSchema, GoogleCalendarConfigUpdate,
     TwilioConfigSchema, TwilioConfigUpdate,
     LegalDocumentResponse, LegalDocumentPayload
 )
@@ -60,6 +60,23 @@ def verify_messaging_settings(
     current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN])),
 ):
     return services.twilio_config_response(services.verify_twilio_config(db))
+
+
+@router.get("/integrations/google-calendar", response_model=GoogleCalendarConfigSchema)
+def get_google_calendar_settings(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN])),
+):
+    return services.google_calendar_config_response(services.get_google_calendar_config(db))
+
+
+@router.put("/integrations/google-calendar", response_model=GoogleCalendarConfigSchema)
+def update_google_calendar_settings(
+    payload: GoogleCalendarConfigUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN])),
+):
+    return services.google_calendar_config_response(services.update_google_calendar_config(db, payload))
 
 # =========================================================
 # 📄 DOCUMENTOS LEGALES (PRIVACY & TERMS)

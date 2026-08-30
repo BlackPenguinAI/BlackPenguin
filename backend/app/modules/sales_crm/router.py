@@ -1,9 +1,12 @@
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse, RedirectResponse, Response
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.exc import NoResultFound
 from typing import List, Optional
 from datetime import datetime, timezone
 from pathlib import Path
+import hashlib
+import secrets
 import uuid
 from datetime import timedelta
 import httpx
@@ -17,6 +20,8 @@ from app.modules.auth.deps import RoleChecker
 from app.modules.users.models import TENANT_MANAGER_ROLES, User, UserRole
 from app.modules.users.project_access import project_ids_for_user, require_project_access
 from app.modules.project_team.service import eligible_sales_assignments
+from app.modules.system_settings.models import CalendarOAuthAttempt
+from app.modules.system_settings.services import get_google_calendar_config, google_calendar_credentials
 
 from .models import CalendarConnection, Lead, SmsChatMessage, Meeting, MeetingAttachment, MeetingStatus, SalesAvailabilityBlock, FunnelStage
 from .schemas import (
@@ -531,28 +536,61 @@ def set_my_calendar_connection(
 
 @router.get("/calendar/google/connect")
 def connect_google_calendar(
+    db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker([UserRole.SALES])),
 ):
-    if not settings.GOOGLE_CALENDAR_CLIENT_ID or not settings.GOOGLE_CALENDAR_CLIENT_SECRET:
-        raise HTTPException(status_code=409, detail="Google Calendar OAuth is not configured by Black Penguin.")
+    google_calendar_credentials(db)
+    nonce = secrets.token_urlsafe(32)
+    db.query(CalendarOAuthAttempt).filter(CalendarOAuthAttempt.expires_at <= datetime.utcnow()).delete(synchronize_session=False)
+    db.add(CalendarOAuthAttempt(
+        user_id=current_user.id,
+        nonce_hash=hashlib.sha256(nonce.encode()).hexdigest(),
+        expires_at=datetime.utcnow() + timedelta(minutes=10),
+    ))
+    db.commit()
     state = jwt.encode({
         "sub": current_user.id,
         "purpose": "google_calendar",
+        "jti": nonce,
         "exp": datetime.utcnow() + timedelta(minutes=10),
     }, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
-    return {"authorization_url": authorization_url(state, current_user.email)}
+    return {"authorization_url": authorization_url(db, state, current_user.email)}
+
+
+@router.get("/calendar/google/platform-status")
+def google_calendar_platform_status(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([UserRole.SALES])),
+):
+    config = get_google_calendar_config(db)
+    return {
+        "available": bool(config.is_enabled and config.client_id and config.client_secret_ciphertext),
+        "status": config.verification_status,
+    }
 
 
 @router.get("/calendar/google/callback")
 def google_calendar_callback(
-    code: str, state: str, db: Session = Depends(get_db),
+    state: str, code: str | None = None, error: str | None = None, db: Session = Depends(get_db),
 ):
+    if error or not code:
+        return RedirectResponse(f"{settings.PUBLIC_APP_URL}/app/schedule?calendar=cancelled")
     try:
         payload = jwt.decode(state, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         if payload.get("purpose") != "google_calendar": raise JWTError("invalid purpose")
+        nonce_hash = hashlib.sha256(str(payload.get("jti", "")).encode()).hexdigest()
+        attempt = db.query(CalendarOAuthAttempt).filter(
+            CalendarOAuthAttempt.nonce_hash == nonce_hash,
+            CalendarOAuthAttempt.user_id == payload.get("sub"),
+            CalendarOAuthAttempt.consumed_at.is_(None),
+            CalendarOAuthAttempt.expires_at > datetime.utcnow(),
+        ).with_for_update().one()
+        attempt.consumed_at = datetime.utcnow()
+        db.commit()
         user = db.query(User).filter(User.id == payload.get("sub"), User.role == UserRole.SALES, User.is_active.is_(True)).one()
-        tokens = exchange_code(code)
-    except (JWTError, httpx.HTTPError, ValueError):
+        tokens = exchange_code(db, code)
+    except (JWTError, httpx.HTTPError, ValueError, NoResultFound, HTTPException):
+        db.rollback()
         return RedirectResponse(f"{settings.PUBLIC_APP_URL}/app/schedule?calendar=failed")
     item = db.query(CalendarConnection).filter(CalendarConnection.user_id == user.id, CalendarConnection.provider == "google").first()
     if not item:

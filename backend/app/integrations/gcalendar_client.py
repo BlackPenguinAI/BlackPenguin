@@ -5,25 +5,28 @@ from urllib.parse import urlencode
 import uuid
 
 import httpx
+from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from app.core.config import settings
 from app.core.secret_store import decrypt_secret, encrypt_secret
+from app.modules.system_settings.services import google_calendar_credentials
 
 AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 TOKEN_URL = "https://oauth2.googleapis.com/token"
 CALENDAR_API = "https://www.googleapis.com/calendar/v3"
-SCOPES = ["https://www.googleapis.com/auth/calendar.events", "https://www.googleapis.com/auth/calendar.readonly"]
+SCOPES = ["https://www.googleapis.com/auth/calendar.events", "https://www.googleapis.com/auth/calendar.freebusy"]
 
 
-def authorization_url(state: str, login_hint: str | None = None) -> str:
-    params = {"client_id": settings.GOOGLE_CALENDAR_CLIENT_ID, "redirect_uri": settings.GOOGLE_CALENDAR_REDIRECT_URI, "response_type": "code", "scope": " ".join(SCOPES), "access_type": "offline", "include_granted_scopes": "true", "prompt": "consent", "state": state}
+def authorization_url(db: Session, state: str, login_hint: str | None = None) -> str:
+    config, _ = google_calendar_credentials(db)
+    params = {"client_id": config.client_id, "redirect_uri": config.redirect_uri, "response_type": "code", "scope": " ".join(SCOPES), "access_type": "offline", "include_granted_scopes": "true", "prompt": "consent", "state": state}
     if login_hint: params["login_hint"] = login_hint
     return f"{AUTH_URL}?{urlencode(params)}"
 
 
-def exchange_code(code: str) -> dict:
-    response = httpx.post(TOKEN_URL, data={"code": code, "client_id": settings.GOOGLE_CALENDAR_CLIENT_ID, "client_secret": settings.GOOGLE_CALENDAR_CLIENT_SECRET, "redirect_uri": settings.GOOGLE_CALENDAR_REDIRECT_URI, "grant_type": "authorization_code"}, timeout=20.0)
+def exchange_code(db: Session, code: str) -> dict:
+    config, secret = google_calendar_credentials(db)
+    response = httpx.post(TOKEN_URL, data={"code": code, "client_id": config.client_id, "client_secret": secret, "redirect_uri": config.redirect_uri, "grant_type": "authorization_code"}, timeout=20.0)
     response.raise_for_status(); return response.json()
 
 
@@ -32,7 +35,8 @@ def _access_token(db: Session, connection) -> str:
     if token and connection.token_expires_at and connection.token_expires_at > datetime.utcnow() + timedelta(minutes=2): return token
     refresh = decrypt_secret(connection.refresh_token_ciphertext)
     if not refresh: raise RuntimeError("Google Calendar refresh token is unavailable.")
-    response = httpx.post(TOKEN_URL, data={"client_id": settings.GOOGLE_CALENDAR_CLIENT_ID, "client_secret": settings.GOOGLE_CALENDAR_CLIENT_SECRET, "refresh_token": refresh, "grant_type": "refresh_token"}, timeout=20.0)
+    config, secret = google_calendar_credentials(db)
+    response = httpx.post(TOKEN_URL, data={"client_id": config.client_id, "client_secret": secret, "refresh_token": refresh, "grant_type": "refresh_token"}, timeout=20.0)
     response.raise_for_status(); data = response.json()
     connection.access_token_ciphertext = encrypt_secret(data["access_token"])
     connection.token_expires_at = datetime.utcnow() + timedelta(seconds=int(data.get("expires_in", 3600)))
@@ -54,7 +58,7 @@ def calendar_busy_ranges(db: Session, connection, *, starts_at: datetime, ends_a
             )
             for item in busy
         ]
-    except (httpx.HTTPError, RuntimeError) as exc:
+    except (httpx.HTTPError, RuntimeError, HTTPException) as exc:
         connection.last_error = type(exc).__name__; db.flush()
         # Fail closed: a disconnected external calendar must never cause a
         # double booking just because FreeBusy is temporarily unavailable.

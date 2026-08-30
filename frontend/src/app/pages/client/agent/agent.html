@@ -268,7 +268,7 @@
       <div class="composer" *ngIf="role !== 'sales' && (!isLive || canManualControl); else salesReadOnly">
         <textarea
           [(ngModel)]="draft"
-          (keydown.control.enter)="send()"
+          (keydown)="onComposerKeydown($event)"
           [disabled]="sending || generatingInitial || (!isLive && selected.is_paused) || (isLive && !selected.is_paused)"
           rows="2"
           [placeholder]="
@@ -284,14 +284,15 @@
           "
         ></textarea
         ><button
+          class="grid place-items-center transition-transform enabled:hover:-translate-y-px"
           (click)="send()"
           [disabled]="!draft.trim() || sending || generatingInitial || (!isLive && selected.is_paused) || (isLive && !selected.is_paused)"
         >
           <span class="material-symbols-outlined">{{
-            sending ? 'hourglass_top' : 'send'
+            sending ? 'hourglass_top' : 'arrow_upward'
           }}</span></button
         ><small
-          >{{ isLive ? 'Manual SMS is stored in the same trace and delivered through Twilio.' : 'Ctrl + Enter · Write as the lead. The agent responds using the active three-level prompt.' }}</small
+          >{{ isLive ? 'Enter to send · Shift + Enter for a new line. Manual SMS is stored in the same trace and delivered through Twilio.' : 'Enter to send · Shift + Enter for a new line. Write as the lead; the agent uses the published prompt pack.' }}</small
         >
       </div>
       <ng-template #salesReadOnly><div class="composer"><small>Read-only Sales view. The AI Agent manages the SMS conversation; use this history to prepare for the appointment.</small></div></ng-template>

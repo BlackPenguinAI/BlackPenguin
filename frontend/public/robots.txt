@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /app/
+Disallow: /admin/
+Disallow: /login
+Disallow: /register
+Disallow: /set-password
+
+Sitemap: https://blackpenguin.ai/sitemap.xml

@@ -8,7 +8,7 @@ from app.modules.waitlist.models import WaitlistEntry
 from app.modules.subscriptions.models import SubscriptionPlan
 from app.modules.companies.models import Company
 from app.modules.users.models import User
-from app.modules.system_settings.models import FirebaseConfig, TwilioConfig, LegalDocument
+from app.modules.system_settings.models import CalendarOAuthAttempt, FirebaseConfig, GoogleCalendarConfig, TwilioConfig, LegalDocument
 from app.modules.ai_core.models import AIConfiguration, PromptVersion
 from app.modules.company_onboarding.models import (
     CompanyOnboardingProposal,
@@ -42,4 +42,5 @@ from app.modules.sales_crm.models import (
 from app.modules.project_team.models import ProjectRoutingState, ProjectUserAssignment
 from app.modules.sales_agent.models import AgentRun, ExternalWebhookEvent, OutboundMessage, SalesAgentSimulation, SalesConversation, SalesFollowUpJob, SalesMessage
 from app.modules.onboarding_jobs.models import OnboardingSourceJob
+from app.modules.seo.models import SeoAuditRun
 from app.db.schema import SchemaVersion

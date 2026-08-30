@@ -23,7 +23,7 @@ export class SalesComponent implements OnInit {
   loading = true; saving = false; availabilitySaving = false; attachmentSaving = false; projectTimezoneSaving = false;
   error = ''; success = ''; selected: any = null; selectedLead: any = null; selectedDay: Date | null = null; editingBlock: any = null;
   leadLoading = false; chatOpen = false; persistedStatus = ''; blockStart = '09:00'; blockEnd = '17:00'; closingDate = '';
-  visitPhoto: File | null = null; saleEvidence: File | null = null; managerMeetingTime = ''; calendarStatus = 'not_connected';
+  visitPhoto: File | null = null; saleEvidence: File | null = null; managerMeetingTime = ''; calendarStatus = 'not_connected'; calendarPlatformAvailable = true;
   newAppointment = { lead_id: '', time: '10:00', duration_minutes: 45, modality: 'in_person', notes: '' };
 
   constructor(private http: HttpClient, private cdr: ChangeDetectorRef) {}
@@ -184,7 +184,10 @@ export class SalesComponent implements OnInit {
   private loadProfile(): void { this.http.get<any>(`${API_V1_URL}/users/me`).subscribe({ next: profile => { this.userTimezone = canonicalTimezone(profile.timezone || 'UTC'); if (!this.projectId) this.timezone = this.userTimezone; this.cdr.markForCheck(); } }); }
   private loadProjects(): void { this.http.get<any[]>(`${API_V1_URL}/projects/`).subscribe({ next: rows => { this.projects = rows || []; this.cdr.markForCheck(); } }); }
   private loadLeads(): void { this.http.get<any[]>(`${API_V1_URL}/sales/projects/${this.projectId}/leads-report`).subscribe({ next: rows => { this.leads = rows || []; this.cdr.markForCheck(); }, error: () => { this.leads = []; this.cdr.markForCheck(); } }); }
-  private loadCalendarConnection(): void { this.http.get<any[]>(`${API_V1_URL}/sales/calendar-connections/me`).subscribe({ next: rows => { this.calendarStatus = rows[0]?.status || 'not_connected'; this.cdr.markForCheck(); } }); }
+  private loadCalendarConnection(): void {
+    this.http.get<any>(`${API_V1_URL}/sales/calendar/google/platform-status`).subscribe({ next: value => { this.calendarPlatformAvailable = !!value.available; this.cdr.markForCheck(); } });
+    this.http.get<any[]>(`${API_V1_URL}/sales/calendar-connections/me`).subscribe({ next: rows => { this.calendarStatus = rows[0]?.status || 'not_connected'; this.cdr.markForCheck(); } });
+  }
   connectGoogleCalendar(): void { this.http.get<any>(`${API_V1_URL}/sales/calendar/google/connect`).subscribe({ next: value => window.location.assign(value.authorization_url), error: err => { this.error = err.error?.detail || 'Google Calendar connection could not start.'; this.cdr.markForCheck(); } }); }
   disconnectGoogleCalendar(): void { this.http.delete(`${API_V1_URL}/sales/calendar/google`).subscribe({ next: () => { this.calendarStatus = 'not_connected'; this.success = 'Google Calendar disconnected.'; this.cdr.markForCheck(); }, error: err => { this.error = err.error?.detail || 'Google Calendar could not be disconnected.'; } }); }
   private refreshMeeting(row: any): void { const index = this.meetings.findIndex(item => item.id === row.id); if (index >= 0) this.meetings[index] = row; }

@@ -21,7 +21,8 @@ export class PrivacyPolicyComponent implements OnInit {
     private http: HttpClient,
     private cdr: ChangeDetectorRef // 🚀 Inyectamos la herramienta
   ) {
-    this.currentLang = this.translate.currentLang || localStorage.getItem('bp_lang') || 'en';
+    this.currentLang = 'en'; this.translate.use('en');
+    if (typeof localStorage !== 'undefined') localStorage.setItem('bp_lang', 'en');
   }
 
   ngOnInit() {
@@ -62,6 +63,7 @@ export class PrivacyPolicyComponent implements OnInit {
   }
 
   switchLanguage(lang: string) {
+    if (lang !== 'en') return;
     this.translate.use(lang);
     this.currentLang = lang;
     localStorage.setItem('bp_lang', lang);

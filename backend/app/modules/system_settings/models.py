@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, String, DateTime, Text
+from sqlalchemy import Boolean, Column, String, DateTime, ForeignKey, Text
 import uuid
 from datetime import datetime
 from app.db.postgres import Base
@@ -34,6 +34,31 @@ class TwilioConfig(Base):
     last_error = Column(Text, nullable=True)
     
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class GoogleCalendarConfig(Base):
+    __tablename__ = "google_calendar_configurations"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    client_id = Column(String(255), nullable=True)
+    client_secret_ciphertext = Column(Text, nullable=True)
+    client_secret_hint = Column(String(12), nullable=True)
+    redirect_uri = Column(String(500), nullable=False)
+    is_enabled = Column(Boolean, default=False, nullable=False)
+    verification_status = Column(String(30), default="not_configured", nullable=False)
+    last_error = Column(Text, nullable=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class CalendarOAuthAttempt(Base):
+    __tablename__ = "calendar_oauth_attempts"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    nonce_hash = Column(String(64), nullable=False, unique=True, index=True)
+    expires_at = Column(DateTime, nullable=False)
+    consumed_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
 class LegalDocument(Base):
     __tablename__ = "legal_documents"

@@ -1,0 +1,17 @@
+<section class="bp-page">
+  <div class="bp-page__container bp-page__container--form">
+    <header class="bp-page-header">
+      <div><p>PLATFORM CONNECTIONS</p><h1>Integrations</h1><span>Configure provider credentials once for every authorized Black Penguin tenant.</span></div>
+    </header>
+    <div *ngIf="loading" class="bp-loading">Loading integrations…</div>
+    <form *ngIf="!loading" class="integration-card" (ngSubmit)="save()">
+      <div class="integration-title"><span class="material-symbols-outlined">calendar_month</span><div><h2>Google Calendar</h2><small>Sales users connect their own accounts from Schedule.</small></div><b [class.ready]="config.verification_status === 'ready'">{{ config.verification_status }}</b></div>
+      <label>OAuth Client ID<input name="client_id" [(ngModel)]="config.client_id" (ngModelChange)="markDirty()" placeholder="000000000000-xxxxxxxx.apps.googleusercontent.com"></label>
+      <label>Replace Client Secret<input name="client_secret" type="password" [(ngModel)]="config.client_secret" (ngModelChange)="markDirty()" placeholder="Leave blank to keep the configured secret"><small *ngIf="config.client_secret_configured">Secret configured{{ config.client_secret_hint ? ' · ending in '+config.client_secret_hint : '' }}. It cannot be displayed again.</small></label>
+      <label>Authorized Redirect URI<input name="redirect_uri" [(ngModel)]="config.redirect_uri" (ngModelChange)="markDirty()"></label>
+      <div class="setup-note"><b>Google Cloud checklist</b><span>Enable Google Calendar API, create a Web application OAuth client, configure the consent screen, and register the redirect URI above exactly.</span></div>
+      <label class="switch"><input name="is_enabled" type="checkbox" [(ngModel)]="config.is_enabled" (ngModelChange)="markDirty()"><span>Allow Sales users to connect Google Calendar</span></label>
+      <footer><span *ngIf="dirty">Unsaved changes</span><button type="submit" [disabled]="saving || !dirty">{{ saving ? 'Saving…' : 'Save Integration' }}</button></footer>
+    </form>
+  </div>
+</section>

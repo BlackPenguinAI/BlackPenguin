@@ -15,6 +15,7 @@ import { filter } from 'rxjs/operators';
 export class LayoutComponent implements OnInit {
   userRole: string = '';
   currentLang: string = 'en';
+  profile: any = null;
 
   constructor(
     private router: Router, 
@@ -22,26 +23,49 @@ export class LayoutComponent implements OnInit {
     private translate: TranslateService,
     private cdr: ChangeDetectorRef
   ) {
-    this.currentLang = localStorage.getItem('bp_lang') || 'en';
+    this.currentLang = 'en';
     this.translate.use(this.currentLang);
+    if (typeof localStorage !== 'undefined') localStorage.setItem('bp_lang', 'en');
 
     // Escuchamos los cambios de ruta para refrescar el rol del usuario dinámicamente
     this.router.events.pipe(
       filter(event => event instanceof NavigationEnd)
     ).subscribe(() => {
-      this.userRole = localStorage.getItem('bp_role') || '';
+      this.userRole = typeof localStorage === 'undefined' ? '' : localStorage.getItem('bp_role') || '';
       this.cdr.detectChanges();
     });
   }
 
   ngOnInit() {
-    this.userRole = localStorage.getItem('bp_role') || '';
+    this.userRole = typeof localStorage === 'undefined' ? '' : localStorage.getItem('bp_role') || '';
+    this.authService.getMyProfile().subscribe({
+      next: profile => { this.profile = profile; this.userRole = profile.role || this.userRole; this.cdr.detectChanges(); },
+      error: () => { this.profile = null; this.cdr.detectChanges(); },
+    });
   }
 
   switchLanguage(lang: string) {
+    if (lang !== 'en') return;
     this.translate.use(lang);
     this.currentLang = lang;
-    localStorage.setItem('bp_lang', lang);
+    if (typeof localStorage !== 'undefined') localStorage.setItem('bp_lang', lang);
+  }
+
+  get displayName(): string {
+    return [this.profile?.first_name, this.profile?.last_name].filter(Boolean).join(' ') || this.profile?.email || 'Black Penguin user';
+  }
+
+  get roleLabel(): string {
+    return ({ superadmin: 'Black Penguin Administrator', admin: 'Company Administrator', assistant: 'Assistant', mkt: 'Marketing', sales: 'Sales' } as Record<string, string>)[this.userRole] || this.userRole;
+  }
+
+  get identityScope(): string {
+    return this.userRole === 'superadmin' ? 'Black Penguin Platform' : (this.profile?.company_name || 'Company workspace');
+  }
+
+  get initials(): string {
+    const source = this.displayName.split(/\s+/).filter(Boolean);
+    return source.slice(0, 2).map(value => value[0]?.toUpperCase()).join('') || 'BP';
   }
 
   logout() {

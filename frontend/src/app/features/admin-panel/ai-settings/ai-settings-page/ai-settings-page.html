@@ -1,10 +1,10 @@
-<div class="min-h-screen bg-black text-white font-sans p-6 md:p-12 relative overflow-hidden">
+<div class="bp-page">
   <div class="absolute bottom-0 left-0 w-96 h-96 bg-secondary/5 rounded-full blur-[120px] pointer-events-none"></div>
 
-  <div class="max-w-5xl mx-auto relative z-10">
+  <div class="bp-page__container bp-page__container--form">
     <div class="mb-8 border-b border-white/10 pb-6">
       <h1 class="text-3xl font-light tracking-tight">Specialized <span class="text-secondary font-medium">Agents</span></h1>
-      <p class="text-sm text-gray-400 mt-1">Sintoniza los protocolos, comportamientos y restricciones de los agentes de Inteligencia Artificial.</p>
+      <p class="text-sm text-gray-400 mt-1">Govern identity, protocols, playbooks and published behavior without changing deterministic platform safety.</p>
     </div>
 
     <div *ngIf="isLoading" class="flex justify-center py-24">
@@ -18,31 +18,31 @@
           <button type="button" (click)="setTab('empresa')" 
                   [class]="activeTab === 'empresa' ? 'bg-secondary text-black hover:bg-yellow-500' : 'bg-white/5 text-gray-400 border hover:border-secondary'" 
                   class="px-5 py-2.5 rounded-xl text-sm font-bold transition-all border-white/5">
-            Onboarding Empresa
+            Company Onboarding
           </button>
           <button type="button" (click)="setTab('proyectos')" 
                   [class]="activeTab === 'proyectos' ? 'bg-secondary text-black hover:bg-yellow-500' : 'bg-white/5 text-gray-400 border hover:border-secondary'" 
                   class="px-5 py-2.5 rounded-xl text-sm font-bold transition-all border-white/5">
-            Onboarding Proyectos
+            Project Onboarding
           </button>
           <button type="button" (click)="setTab('ventas')" 
                   [class]="activeTab === 'ventas' ? 'bg-secondary text-black hover:bg-yellow-500' : 'bg-white/5 text-gray-400 border hover:border-secondary'" 
                   class="px-5 py-2.5 rounded-xl text-sm font-bold transition-all border-white/5">
-            Agente de Ventas
+            Sales Agent
           </button>
           <button type="button" (click)="setTab('reporteria')" 
                   [class]="activeTab === 'reporteria' ? 'bg-secondary text-black hover:bg-yellow-500' : 'bg-white/5 text-gray-400 border hover:border-secondary'" 
                   class="px-5 py-2.5 rounded-xl text-sm font-bold transition-all border-white/5">
-            Reportería
+            Reporting
           </button>
         </div>
 
         <div class="flex flex-col gap-6 animate-fade-in">
           
           <div class="flex flex-col gap-2 w-full md:w-1/2">
-            <label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold ml-1">Modelo de Lenguaje</label>
+            <label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold ml-1">Language model</label>
             <select name="modelSelect" [(ngModel)]="activeAgent.model" class="w-full bg-black/50 border border-white/10 focus:border-secondary rounded-xl py-3 px-4 text-sm text-white outline-none transition-colors">
-              <option value="" disabled>Selecciona un modelo base...</option>
+              <option value="" disabled>Select a base model...</option>
               <option *ngFor="let m of config.available_models" [value]="m" class="bg-[#111]">{{ m }}</option>
             </select>
           </div>
@@ -52,16 +52,38 @@
             <textarea rows="4" name="sysPrompt" [(ngModel)]="activeAgent.system_prompt" placeholder="Ej: Eres un especialista corporativo..." class="bg-black/50 border border-white/10 focus:border-secondary rounded-xl p-4 text-sm text-white focus:outline-none font-mono resize-y leading-relaxed"></textarea>
           </div>
 
+          <ng-container *ngIf="activeTab === 'ventas'">
+            <section class="rounded-xl border border-white/10 bg-black/20 p-4">
+              <h3 class="text-sm font-medium uppercase tracking-wider text-secondary">10-stage workflow playbook</h3>
+              <p class="mt-1 text-xs text-gray-500">These instructions guide conversation behavior. Tenant isolation, consent, verified slots and transactional bookings remain protected in code.</p>
+              <div class="mt-4 grid gap-3">
+                <label *ngFor="let item of promptEntries(activeAgent.stage_prompts)" class="grid gap-1 text-[10px] uppercase tracking-wider text-gray-500">{{ item.key }}<textarea rows="2" [(ngModel)]="activeAgent.stage_prompts[item.key]" [name]="'stage_'+item.key" class="rounded-lg border border-white/10 bg-black/50 p-3 text-xs normal-case tracking-normal text-white"></textarea></label>
+              </div>
+            </section>
+
+            <section class="rounded-xl border border-white/10 bg-black/20 p-4">
+              <h3 class="text-sm font-medium uppercase tracking-wider text-secondary">Segment strategies</h3>
+              <div class="mt-4 grid gap-3">
+                <label *ngFor="let item of promptEntries(activeAgent.segment_prompts)" class="grid gap-1 text-[10px] uppercase tracking-wider text-gray-500">{{ item.key }}<textarea rows="2" [(ngModel)]="activeAgent.segment_prompts[item.key]" [name]="'segment_'+item.key" class="rounded-lg border border-white/10 bg-black/50 p-3 text-xs normal-case tracking-normal text-white"></textarea></label>
+              </div>
+            </section>
+
+            <section class="grid gap-4 rounded-xl border border-white/10 bg-black/20 p-4 md:grid-cols-2">
+              <div><h3 class="text-sm font-medium uppercase tracking-wider text-secondary">Intent scoring</h3><label class="mt-3 grid gap-1 text-xs text-gray-400">Hot threshold<input type="number" name="hot_threshold" [(ngModel)]="activeAgent.scoring_config.hot_threshold" class="rounded-lg border border-white/10 bg-black/50 p-2 text-white"></label><label class="mt-3 grid gap-1 text-xs text-gray-400">Warm threshold<input type="number" name="warm_threshold" [(ngModel)]="activeAgent.scoring_config.warm_threshold" class="rounded-lg border border-white/10 bg-black/50 p-2 text-white"></label></div>
+              <div><h3 class="text-sm font-medium uppercase tracking-wider text-secondary">Cadence hours</h3><label class="mt-3 grid gap-1 text-xs text-gray-400">Hot<input type="number" name="hot_hours" [(ngModel)]="activeAgent.cadence_config.hot_hours" class="rounded-lg border border-white/10 bg-black/50 p-2 text-white"></label><label class="mt-3 grid gap-1 text-xs text-gray-400">Warm<input type="number" name="warm_hours" [(ngModel)]="activeAgent.cadence_config.warm_hours" class="rounded-lg border border-white/10 bg-black/50 p-2 text-white"></label><label class="mt-3 grid gap-1 text-xs text-gray-400">Cold<input type="number" name="cold_hours" [(ngModel)]="activeAgent.cadence_config.cold_hours" class="rounded-lg border border-white/10 bg-black/50 p-2 text-white"></label></div>
+            </section>
+
+            <label class="grid gap-2 text-xs text-gray-400">Change note<input name="change_note" [(ngModel)]="changeNote" placeholder="Why is this behavior changing?" class="rounded-xl border border-white/10 bg-black/50 p-3 text-white"></label>
+          </ng-container>
+
           <section *ngIf="activeTab === 'ventas'" class="border border-white/10 rounded-xl p-4">
             <div class="flex items-center justify-between mb-3">
-              <div><h3 class="text-sm font-medium text-secondary uppercase tracking-wider">Historial de prompts</h3><p class="text-xs text-gray-500 mt-1">Cada guardado publica una versión auditable. Restaurar nunca borra el historial.</p></div>
+              <div><h3 class="text-sm font-medium text-secondary uppercase tracking-wider">Prompt history</h3><p class="text-xs text-gray-500 mt-1">Drafts are auditable; publishing is explicit and rollback never removes history.</p></div>
             </div>
-            <div *ngIf="!promptVersions.length" class="text-xs text-gray-500">Aún no hay versiones publicadas.</div>
-            <div *ngFor="let version of promptVersions" class="flex items-center justify-between py-2 border-t border-white/5 text-sm">
-              <span>Versión {{ version.version }} <small class="text-gray-500">· {{ version.created_at | date:'medium' }}</small></span>
-              <button type="button" [disabled]="version.is_published || restoringVersionId === version.id" (click)="restorePromptVersion(version)" class="px-3 py-1.5 rounded-lg border border-white/10 disabled:opacity-40 hover:border-secondary">
-                {{ version.is_published ? 'Publicada' : (restoringVersionId === version.id ? 'Restaurando…' : 'Restaurar') }}
-              </button>
+            <div *ngIf="!promptVersions.length" class="text-xs text-gray-500">No prompt versions yet.</div>
+            <div *ngFor="let version of promptVersions" class="flex items-center justify-between gap-3 py-2 border-t border-white/5 text-sm">
+              <span>Version {{ version.version }} <small class="text-gray-500">· {{ version.created_at | date:'medium' }} · {{ version.is_published ? 'Published' : 'Draft' }}</small><small *ngIf="version.change_note" class="mt-1 block text-gray-400">{{ version.change_note }}</small></span>
+              <span class="flex gap-2"><button type="button" (click)="loadVersion(version)" class="px-3 py-1.5 rounded-lg border border-white/10 hover:border-secondary">Load</button><button *ngIf="!version.is_published" type="button" [disabled]="restoringVersionId === version.id" (click)="publishVersion(version)" class="px-3 py-1.5 rounded-lg bg-secondary text-black disabled:opacity-40">Publish</button><button type="button" [disabled]="version.is_published || restoringVersionId === version.id" (click)="restorePromptVersion(version)" class="px-3 py-1.5 rounded-lg border border-white/10 disabled:opacity-40 hover:border-secondary">Restore as published</button></span>
             </div>
           </section>
 
@@ -76,10 +98,10 @@
           </div>
         </div>
 
-        <div class="flex justify-end border-t border-white/10 pt-6 mt-6">
-          <app-button type="submit" variant="primary" [isLoading]="isSaving">
-            Guardar Configuración
-          </app-button>
+        <div class="flex justify-end gap-3 border-t border-white/10 pt-6 mt-6">
+          <button *ngIf="activeTab === 'ventas'" type="button" (click)="saveSalesDraft(false)" [disabled]="isSaving" class="rounded-xl border border-white/15 px-5 py-2.5 text-sm text-white disabled:opacity-40">Save draft</button>
+          <button *ngIf="activeTab === 'ventas'" type="button" (click)="saveSalesDraft(true)" [disabled]="isSaving || !changeNote.trim()" class="rounded-xl bg-secondary px-5 py-2.5 text-sm font-bold text-black disabled:opacity-40">{{ isSaving ? 'Publishing…' : 'Publish changes' }}</button>
+          <app-button *ngIf="activeTab !== 'ventas'" type="submit" variant="primary" [isLoading]="isSaving">Save Configuration</app-button>
         </div>
       </app-glass-card>
     </form>

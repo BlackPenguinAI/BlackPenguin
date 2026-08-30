@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 from fastapi import HTTPException
@@ -6,13 +8,15 @@ from .schemas import AIConfigUpdatePayload
 from app.integrations.openrouter_client import check_openrouter_consumption
 from app.modules.sales_agent.default_prompt import (
     SALES_AGENT_DEFAULT_CONFIG,
+    merge_sales_agent_defaults,
     needs_sales_agent_default,
 )
 
 
 def _apply_safe_defaults(db: Session, config: AIConfiguration) -> AIConfiguration:
-    if needs_sales_agent_default(config.agent_ventas):
-        config.agent_ventas = dict(SALES_AGENT_DEFAULT_CONFIG)
+    merged = merge_sales_agent_defaults(config.agent_ventas)
+    if merged != config.agent_ventas:
+        config.agent_ventas = merged
         flag_modified(config, "agent_ventas")
         db.commit()
         db.refresh(config)
@@ -67,6 +71,7 @@ def update_ai_config(db: Session, payload: AIConfigUpdatePayload, company_id: st
         flag_modified(config, "agent_onboarding_proyectos")
 
     if payload.agent_ventas is not None:
+        validate_sales_configuration(payload.agent_ventas.model_dump())
         config.agent_ventas = payload.agent_ventas.model_dump()
         flag_modified(config, "agent_ventas")
         latest = db.query(PromptVersion).filter(PromptVersion.company_id == company_id, PromptVersion.agent_key == "sales").order_by(PromptVersion.version_number.desc()).first()
@@ -84,6 +89,42 @@ def update_ai_config(db: Session, payload: AIConfigUpdatePayload, company_id: st
 
 def prompt_versions(db: Session, *, company_id: str | None, agent_key: str) -> list[PromptVersion]:
     return db.query(PromptVersion).filter(PromptVersion.company_id == company_id, PromptVersion.agent_key == agent_key).order_by(PromptVersion.version_number.desc()).all()
+
+
+def create_prompt_draft(db: Session, *, company_id: str | None, agent_key: str, configuration: dict, change_note: str, actor_id: str) -> PromptVersion:
+    validate_sales_configuration(configuration)
+    config = get_ai_config(db, company_id)
+    db.query(AIConfiguration).filter(AIConfiguration.id == config.id).with_for_update().one()
+    latest = db.query(PromptVersion).filter(PromptVersion.company_id == company_id, PromptVersion.agent_key == agent_key).order_by(PromptVersion.version_number.desc()).first()
+    item = PromptVersion(company_id=company_id, agent_key=agent_key, version_number=(latest.version_number + 1 if latest else 1), configuration=configuration, is_published=False, published_at=None, change_note=change_note[:500], created_by_user_id=actor_id)
+    db.add(item); db.commit(); db.refresh(item); return item
+
+
+def validate_sales_configuration(configuration: dict) -> None:
+    scoring = configuration.get("scoring_config") or {}
+    hot = int(scoring.get("hot_threshold", 70)); warm = int(scoring.get("warm_threshold", 40))
+    if not 0 <= warm < hot <= 100:
+        raise HTTPException(status_code=422, detail="Scoring thresholds must satisfy 0 ≤ warm < hot ≤ 100.")
+    for key in ("timeline", "financial_readiness", "budget_fit", "engagement", "decision_authority", "specificity"):
+        value = int(scoring.get(key, SALES_AGENT_DEFAULT_CONFIG["scoring_config"][key]))
+        if value < 0 or value > 100:
+            raise HTTPException(status_code=422, detail=f"Scoring weight {key} must be between 0 and 100.")
+    cadence = configuration.get("cadence_config") or {}
+    for key in ("hot_hours", "warm_hours", "cold_hours"):
+        value = int(cadence.get(key, SALES_AGENT_DEFAULT_CONFIG["cadence_config"][key]))
+        if value < 1 or value > 2160:
+            raise HTTPException(status_code=422, detail=f"Cadence {key} must be between 1 and 2160 hours.")
+
+
+def publish_prompt_version(db: Session, *, company_id: str | None, agent_key: str, version_id: str, actor_id: str) -> AIConfiguration:
+    version = db.query(PromptVersion).filter(PromptVersion.id == version_id, PromptVersion.company_id == company_id, PromptVersion.agent_key == agent_key).first()
+    if not version: raise HTTPException(status_code=404, detail="Prompt version not found.")
+    config = get_ai_config(db, company_id)
+    config = db.query(AIConfiguration).filter(AIConfiguration.id == config.id).with_for_update().one()
+    db.query(PromptVersion).filter(PromptVersion.company_id == company_id, PromptVersion.agent_key == agent_key, PromptVersion.is_published.is_(True)).update({PromptVersion.is_published: False}, synchronize_session=False)
+    config.agent_ventas = merge_sales_agent_defaults(version.configuration); flag_modified(config, "agent_ventas")
+    version.is_published = True; version.published_at = datetime.utcnow(); version.created_by_user_id = actor_id
+    db.commit(); db.refresh(config); return config
 
 
 def restore_prompt_version(db: Session, *, company_id: str | None, agent_key: str, version_id: str, actor_id: str) -> AIConfiguration:

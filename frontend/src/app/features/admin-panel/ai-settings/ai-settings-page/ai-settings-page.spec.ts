@@ -1,22 +1,12 @@
-import { ComponentFixture, TestBed } from '@angular/core/testing';
+import '@angular/compiler';
+import { describe, expect, it } from 'vitest';
+import { AiSettingsPageComponent } from './ai-settings-page';
 
-import { AiSettingsPage } from './ai-settings-page';
-
-describe('AiSettingsPage', () => {
-  let component: AiSettingsPage;
-  let fixture: ComponentFixture<AiSettingsPage>;
-
-  beforeEach(async () => {
-    await TestBed.configureTestingModule({
-      imports: [AiSettingsPage],
-    }).compileComponents();
-
-    fixture = TestBed.createComponent(AiSettingsPage);
-    component = fixture.componentInstance;
-    await fixture.whenStable();
-  });
-
-  it('should create', () => {
-    expect(component).toBeTruthy();
+describe('AiSettingsPageComponent', () => {
+  it('exposes a structured sales prompt pack', () => {
+    const component = new AiSettingsPageComponent({} as any, {} as any, {} as any);
+    component.activeTab = 'ventas';
+    expect(component.activeAgent.stage_prompts).toEqual({});
+    expect(component.activeAgent.scoring_config).toEqual({});
   });
 });

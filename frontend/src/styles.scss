@@ -16,6 +16,27 @@ html, body {
   overflow-x: hidden;
 }
 
+// Shared Black Penguin page rhythm. Workspaces may use the data width while
+// forms keep a shorter reading line; both share gutters and title hierarchy.
+.bp-page {
+  min-height: 100%;
+  position: relative;
+  overflow: hidden;
+  background: #050505;
+  color: #f5f5f5;
+  padding: clamp(1rem, 3vw, 3rem);
+}
+
+.bp-page__container { width: 100%; margin-inline: auto; position: relative; z-index: 1; }
+.bp-page__container--form { max-width: 70rem; }
+.bp-page__container--data { max-width: 94rem; }
+.bp-page-header { display: flex; align-items: end; justify-content: space-between; gap: 1.25rem; padding-bottom: 1.5rem; margin-bottom: 2rem; border-bottom: 1px solid rgba(255,255,255,.1); }
+.bp-page-header > div > p:first-child { margin: 0; color: #e9ad00; font-size: .625rem; font-weight: 800; letter-spacing: .18em; }
+.bp-page-header > div > h1 { margin: .3rem 0; color: white; font-size: clamp(1.8rem, 3vw, 2.2rem); font-weight: 400; letter-spacing: -.025em; }
+.bp-page-header > div > span { color: #7f8491; font-size: .82rem; }
+.bp-loading { padding: 5rem 1rem; text-align: center; color: #777; }
+@media (max-width: 720px) { .bp-page-header { align-items: stretch; flex-direction: column; } }
+
 // Clases utilitarias personalizadas exigidas por la UI
 .px-margin-mobile {
   padding-left: 1.5rem;

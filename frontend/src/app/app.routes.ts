@@ -121,6 +121,18 @@ export const routes: Routes = [
           ).then((m) => m.MessagingSettingsPageComponent),
       },
       {
+        path: 'integrations',
+        loadComponent: () =>
+          import('./features/admin-panel/integrations/integrations-page/integrations-page').then(
+            (m) => m.IntegrationsPageComponent
+          ),
+      },
+      {
+        path: 'seo',
+        loadComponent: () =>
+          import('./features/admin-panel/seo/seo-page/seo-page').then((m) => m.SeoPageComponent),
+      },
+      {
         path: 'legal-compliance',
         loadComponent: () =>
           import(

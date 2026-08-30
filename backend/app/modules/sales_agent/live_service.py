@@ -24,6 +24,7 @@ from .service import (
     _is_availability_request, _offered_slot_selection, _project_zone,
 )
 from app.modules.sales_crm.scheduling import create_agent_appointment, next_cadence_time
+from app.modules.ai_core.services import get_ai_config
 
 
 def normalize_phone(value: str) -> str:
@@ -150,7 +151,8 @@ async def _dispatch(
 def _schedule_next_action(db: Session, conversation: SalesConversation, lead: Lead, event_id: str) -> None:
     if lead.is_opt_out or conversation.is_paused:
         return
-    delays = {"hot": 24, "warm": 72, "cold": 24 * 14}
+    cadence = (get_ai_config(db, None).agent_ventas or {}).get("cadence_config", {})
+    delays = {"hot": int(cadence.get("hot_hours", 24)), "warm": int(cadence.get("warm_hours", 72)), "cold": int(cadence.get("cold_hours", 24 * 14))}
     hours = delays.get(lead.intent_tier, 72)
     project = db.query(Project).filter(Project.id == conversation.project_id).first()
     scheduled_at = next_cadence_time(

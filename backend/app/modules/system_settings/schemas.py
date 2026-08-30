@@ -43,6 +43,25 @@ class TwilioConfigSchema(BaseModel):
     
     model_config = ConfigDict(from_attributes=True)
 
+
+class GoogleCalendarConfigUpdate(BaseModel):
+    client_id: Optional[str] = None
+    client_secret: Optional[str] = None
+    redirect_uri: Optional[str] = None
+    is_enabled: Optional[bool] = None
+
+
+class GoogleCalendarConfigSchema(BaseModel):
+    id: Optional[str] = None
+    client_id: Optional[str] = None
+    client_secret_configured: bool = False
+    client_secret_hint: Optional[str] = None
+    redirect_uri: str
+    is_enabled: bool = False
+    verification_status: str = "not_configured"
+    last_error: Optional[str] = None
+    updated_at: Optional[datetime] = None
+
 # =========================================================================
 # SCHEMAS DE DOCUMENTOS LEGALES
 # =========================================================================

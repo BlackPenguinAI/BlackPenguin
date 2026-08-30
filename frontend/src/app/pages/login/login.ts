@@ -32,8 +32,7 @@ export class LoginComponent implements AfterViewInit {
     this.translate.setDefaultLang('en');
     
     // 2. Buscamos si el usuario ya había elegido un idioma antes, si no, forzamos Inglés
-    const storedLang = localStorage.getItem('bp_lang');
-    this.currentLang = storedLang === 'es' ? 'es' : 'en';
+    this.currentLang = 'en';
     
     // 3. Aplicamos el idioma y lo guardamos
     this.translate.use(this.currentLang);
@@ -41,6 +40,7 @@ export class LoginComponent implements AfterViewInit {
   }
 
   switchLanguage(lang: string) {
+    if (lang !== 'en') return;
     this.translate.use(lang);
     this.currentLang = lang;
     localStorage.setItem('bp_lang', lang);

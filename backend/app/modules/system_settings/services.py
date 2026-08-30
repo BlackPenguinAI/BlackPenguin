@@ -4,8 +4,8 @@ import re
 import httpx
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
-from .models import FirebaseConfig, TwilioConfig, LegalDocument
-from .schemas import FirebaseConfigUpdate, TwilioConfigUpdate, LegalDocumentPayload
+from .models import FirebaseConfig, GoogleCalendarConfig, TwilioConfig, LegalDocument
+from .schemas import FirebaseConfigUpdate, GoogleCalendarConfigUpdate, TwilioConfigUpdate, LegalDocumentPayload
 from app.core.config import settings
 from app.core.secret_store import decrypt_secret, encrypt_secret
 
@@ -77,7 +77,12 @@ def twilio_config_response(config: TwilioConfig) -> dict:
 
 def twilio_credentials(db: Session) -> tuple[TwilioConfig, str]:
     config = get_twilio_config(db)
-    token = decrypt_secret(config.auth_token_ciphertext)
+    try:
+        token = decrypt_secret(config.auth_token_ciphertext)
+    except ValueError as exc:
+        config.verification_status = "failed"; config.last_error = "credential_decryption_failed"
+        db.commit()
+        raise HTTPException(status_code=409, detail="The stored Twilio token cannot be decrypted. Replace and save the Auth Token.") from exc
     if not config.account_sid or not token or not config.from_phone_number:
         raise HTTPException(status_code=409, detail="Twilio is not fully configured.")
     return config, token
@@ -142,6 +147,8 @@ def verify_twilio_config(db: Session) -> TwilioConfig:
         config.last_error = "from_number_not_found"
         db.commit()
         raise
+
+
     except httpx.HTTPError as exc:
         config.verification_status = "failed"
         config.last_error = type(exc).__name__
@@ -152,6 +159,80 @@ def verify_twilio_config(db: Session) -> TwilioConfig:
     config.last_error = None
     db.commit(); db.refresh(config)
     return config
+
+
+# --- GOOGLE CALENDAR PLATFORM OAUTH ---
+def get_google_calendar_config(db: Session) -> GoogleCalendarConfig:
+    config = db.query(GoogleCalendarConfig).first()
+    if not config:
+        config = GoogleCalendarConfig(
+            client_id=settings.GOOGLE_CALENDAR_CLIENT_ID or None,
+            client_secret_ciphertext=encrypt_secret(settings.GOOGLE_CALENDAR_CLIENT_SECRET),
+            client_secret_hint=settings.GOOGLE_CALENDAR_CLIENT_SECRET[-4:] if settings.GOOGLE_CALENDAR_CLIENT_SECRET else None,
+            redirect_uri=settings.GOOGLE_CALENDAR_REDIRECT_URI,
+            is_enabled=bool(settings.GOOGLE_CALENDAR_CLIENT_ID and settings.GOOGLE_CALENDAR_CLIENT_SECRET),
+            verification_status="ready" if settings.GOOGLE_CALENDAR_CLIENT_ID and settings.GOOGLE_CALENDAR_CLIENT_SECRET else "not_configured",
+        )
+        db.add(config); db.commit(); db.refresh(config)
+    bootstrapped = False
+    if not config.client_id and settings.GOOGLE_CALENDAR_CLIENT_ID:
+        config.client_id = settings.GOOGLE_CALENDAR_CLIENT_ID; bootstrapped = True
+    if not config.client_secret_ciphertext and settings.GOOGLE_CALENDAR_CLIENT_SECRET:
+        config.client_secret_ciphertext = encrypt_secret(settings.GOOGLE_CALENDAR_CLIENT_SECRET)
+        config.client_secret_hint = settings.GOOGLE_CALENDAR_CLIENT_SECRET[-4:]; bootstrapped = True
+    if bootstrapped and config.client_id and config.client_secret_ciphertext:
+        config.is_enabled = True; config.verification_status = "ready"
+        db.commit(); db.refresh(config)
+    return config
+
+
+def google_calendar_config_response(config: GoogleCalendarConfig) -> dict:
+    return {
+        "id": config.id,
+        "client_id": config.client_id,
+        "client_secret_configured": bool(config.client_secret_ciphertext),
+        "client_secret_hint": config.client_secret_hint,
+        "redirect_uri": config.redirect_uri,
+        "is_enabled": bool(config.is_enabled),
+        "verification_status": config.verification_status,
+        "last_error": config.last_error,
+        "updated_at": config.updated_at,
+    }
+
+
+def update_google_calendar_config(db: Session, payload: GoogleCalendarConfigUpdate) -> GoogleCalendarConfig:
+    config = get_google_calendar_config(db)
+    values = payload.model_dump(exclude_unset=True)
+    secret = values.pop("client_secret", None)
+    if secret:
+        config.client_secret_ciphertext = encrypt_secret(secret)
+        config.client_secret_hint = secret[-4:]
+    for key, value in values.items():
+        setattr(config, key, value)
+    if not config.redirect_uri.startswith("https://"):
+        raise HTTPException(status_code=422, detail="Google Calendar redirect URI must use HTTPS.")
+    ready = bool(config.client_id and config.client_secret_ciphertext and config.redirect_uri)
+    if config.is_enabled and not ready:
+        raise HTTPException(status_code=422, detail="Complete Google Calendar OAuth credentials before enabling the integration.")
+    config.verification_status = "ready" if ready else "not_configured"
+    config.last_error = None
+    db.commit(); db.refresh(config)
+    return config
+
+
+def google_calendar_credentials(db: Session) -> tuple[GoogleCalendarConfig, str]:
+    config = get_google_calendar_config(db)
+    if not config.is_enabled or config.verification_status != "ready":
+        raise HTTPException(status_code=409, detail="Google Calendar OAuth is not configured by Black Penguin.")
+    try:
+        secret = decrypt_secret(config.client_secret_ciphertext)
+    except ValueError as exc:
+        config.verification_status = "failed"; config.last_error = "credential_decryption_failed"
+        db.commit()
+        raise HTTPException(status_code=409, detail="The stored Google Client Secret cannot be decrypted. Replace and save it from Integrations.") from exc
+    if not config.client_id or not secret:
+        raise HTTPException(status_code=409, detail="Google Calendar OAuth is not configured by Black Penguin.")
+    return config, secret
 
 # --- LEGAL ---
 def get_legal_document(db: Session, doc_type: str, lang: str = "en") -> LegalDocument:

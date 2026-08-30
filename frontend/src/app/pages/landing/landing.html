@@ -23,14 +23,12 @@
       <div class="flex items-center gap-2 border-l border-white/20 pl-6">
         <button (click)="switchLanguage('en')" [class.text-secondary]="currentLang === 'en'" class="text-xs font-bold text-gray-custom hover:text-white transition-colors">EN</button>
         <span class="text-gray-custom text-xs">/</span>
-        <button (click)="switchLanguage('es')" [class.text-secondary]="currentLang === 'es'" class="text-xs font-bold text-gray-custom hover:text-white transition-colors">ES</button>
+        <button type="button" disabled title="Spanish — Coming soon" class="cursor-not-allowed text-xs font-bold text-gray-600">ES</button>
       </div>
 
-      <!--
-      <button routerLink="/register" class="bg-white text-black px-6 py-2.5 rounded-full font-medium text-sm transition-transform active:scale-95 hover:bg-secondary hover:text-white">
-        {{ 'NAV.REQUEST_ACCESS' | translate }}
+      <button routerLink="/login" class="bg-white text-black px-6 py-2.5 rounded-full font-medium text-sm transition-transform active:scale-95 hover:bg-secondary">
+        Login
       </button>
-      -->
     </div>
 
     <button class="md:hidden text-white p-1 focus:outline-none transition-transform active:scale-95" (click)="toggleMobileMenu()">
@@ -52,14 +50,12 @@
     <div class="flex items-center justify-center gap-4 py-2">
       <button (click)="switchLanguage('en'); toggleMobileMenu()" [class.text-secondary]="currentLang === 'en'" class="text-sm font-bold text-gray-custom hover:text-white transition-colors">ENGLISH</button>
       <span class="text-gray-custom text-sm">/</span>
-      <button (click)="switchLanguage('es'); toggleMobileMenu()" [class.text-secondary]="currentLang === 'es'" class="text-sm font-bold text-gray-custom hover:text-white transition-colors">ESPAÑOL</button>
+      <button type="button" disabled title="Spanish — Coming soon" class="cursor-not-allowed text-sm font-bold text-gray-600">ESPAÑOL</button>
     </div>
 
-    <!--
-    <button routerLink="/register" (click)="toggleMobileMenu()" class="w-full bg-secondary text-black px-6 py-4 rounded-xl font-bold text-base transition-transform active:scale-95 shadow-lg mt-2">
-      {{ 'NAV.REQUEST_ACCESS' | translate }}
+    <button routerLink="/login" (click)="toggleMobileMenu()" class="w-full bg-secondary text-black px-6 py-4 rounded-xl font-bold text-base transition-transform active:scale-95 shadow-lg mt-2">
+      Login
     </button>
-    -->
   </div>
 
 </nav>

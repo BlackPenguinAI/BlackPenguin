@@ -4,7 +4,7 @@
   <div class="fixed top-6 right-6 z-50 bg-white/5 backdrop-blur-md border border-white/10 px-4 py-2 rounded-full flex items-center gap-2">
     <button (click)="switchLanguage('en')" [class.text-secondary]="currentLang === 'en'" class="text-xs font-bold text-gray-400 hover:text-white transition-colors">EN</button>
     <span class="text-gray-600 text-xs">/</span>
-    <button (click)="switchLanguage('es')" [class.text-secondary]="currentLang === 'es'" class="text-xs font-bold text-gray-400 hover:text-white transition-colors">ES</button>
+    <button type="button" disabled title="Spanish — Coming soon" class="cursor-not-allowed text-xs font-bold text-gray-600">ES</button>
   </div>
 
   <div class="max-w-3xl mx-auto px-6 py-20 relative z-10">

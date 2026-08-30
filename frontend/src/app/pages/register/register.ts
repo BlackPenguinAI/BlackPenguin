@@ -26,10 +26,12 @@ export class RegisterComponent implements AfterViewInit {
     private authService: AuthService,
     private toastService: ToastService
   ) {
-    this.currentLang = this.translate.currentLang || localStorage.getItem('bp_lang') || 'en';
+    this.currentLang = 'en'; this.translate.use('en');
+    if (typeof localStorage !== 'undefined') localStorage.setItem('bp_lang', 'en');
   }
 
   switchLanguage(lang: string) {
+    if (lang !== 'en') return;
     this.translate.use(lang);
     this.currentLang = lang;
     localStorage.setItem('bp_lang', lang);

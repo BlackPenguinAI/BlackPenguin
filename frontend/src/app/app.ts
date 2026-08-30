@@ -3,6 +3,7 @@ import { RouterOutlet } from '@angular/router';
 import { CommonModule } from '@angular/common'; // 🚀 Importante para *ngIf y [ngClass]
 import { TranslateService } from '@ngx-translate/core';
 import { ToastService } from './core/services/toast'; // 🚀 Importamos el servicio
+import { SeoMetaService } from './core/services/seo-meta';
 
 @Component({
   selector: 'app-root',
@@ -21,9 +22,11 @@ import { ToastService } from './core/services/toast'; // 🚀 Importamos el serv
 })
 export class App {
   // 🚀 Inyectamos el ToastService para usarlo en el HTML
-  constructor(private translate: TranslateService, public toastService: ToastService) {
+  constructor(private translate: TranslateService, public toastService: ToastService, seo: SeoMetaService) {
     this.translate.setDefaultLang('en');
-    const savedLang = localStorage.getItem('bp_lang') || 'en';
-    this.translate.use(savedLang);
+    localStorage.setItem('bp_lang', 'en');
+    this.translate.use('en');
+    document.documentElement.lang = 'en';
+    seo.start();
   }
 }

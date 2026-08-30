@@ -135,7 +135,8 @@ def test_completed_project_meta_form_starts_an_isolated_sms_simulation():
     assert result["initial_reply"].startswith("Hi")
     assert len(messages) == 1
     assert messages[0].role == "assistant"
-    assert simulation.prompt_snapshot["guardrails_prompt"] == "Never cross tenants."
+    assert "Company, Project, campaign, and lead isolation" in simulation.prompt_snapshot["guardrails_prompt"]
+    assert simulation.prompt_snapshot["guardrails_prompt"] != "Never cross tenants."
 
     with pytest.raises(HTTPException) as captured:
         slots_for_simulation(db, company_id=other.id, simulation_id=simulation.id)

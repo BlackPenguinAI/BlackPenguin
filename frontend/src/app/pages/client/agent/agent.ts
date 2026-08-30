@@ -327,6 +327,12 @@ export class AgentComponent implements OnInit {
       });
   }
 
+  onComposerKeydown(event: KeyboardEvent): void {
+    if (event.key !== 'Enter' || event.shiftKey || event.isComposing) return;
+    event.preventDefault();
+    this.send();
+  }
+
   private sendManual(message: string): void {
     if (!this.selected?.is_paused) {
       this.error = 'Pause the AI before sending a manual SMS.';

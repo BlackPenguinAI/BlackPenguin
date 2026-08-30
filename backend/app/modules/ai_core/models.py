@@ -37,3 +37,4 @@ class PromptVersion(Base):
     created_by_user_id = Column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     published_at = Column(DateTime, default=datetime.utcnow, nullable=True)
+    change_note = Column(String(500), nullable=True)

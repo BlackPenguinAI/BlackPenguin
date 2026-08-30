@@ -32,10 +32,12 @@ export class LandingComponent implements AfterViewInit {
     private http: HttpClient,
     private cdr: ChangeDetectorRef // 🚀 NUEVO: Inyectamos el actualizador de vista
   ) {
-    this.currentLang = this.translate.currentLang || localStorage.getItem('bp_lang') || 'en';
+    this.currentLang = 'en'; this.translate.use('en');
+    if (typeof localStorage !== 'undefined') localStorage.setItem('bp_lang', 'en');
   }
 
   switchLanguage(lang: string) {
+    if (lang !== 'en') return;
     this.translate.use(lang);
     this.currentLang = lang;
     localStorage.setItem('bp_lang', lang);

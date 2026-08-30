@@ -1,7 +1,7 @@
-<div class="min-h-screen bg-black text-white font-sans p-6 md:p-12 relative overflow-hidden">
+<div class="bp-page">
   <div class="absolute top-0 right-1/4 w-96 h-96 bg-secondary/5 rounded-full blur-[120px] pointer-events-none"></div>
 
-  <div class="max-w-4xl mx-auto relative z-10">
+  <div class="bp-page__container bp-page__container--form">
     
     <div class="mb-8 border-b border-white/10 pb-6">
       <h1 class="text-3xl font-light tracking-tight">Messaging <span class="text-secondary font-medium">Settings</span></h1>
@@ -23,33 +23,34 @@
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <app-input 
               label="Account SID" 
-              [(ngModel)]="twilioConfig.account_sid" 
+              [(ngModel)]="twilioConfig.account_sid" (ngModelChange)="markDirty()"
               name="account_sid" 
               placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
             </app-input>
 
             <div class="flex flex-col gap-1">
               <app-input 
-                label="Auth Token" 
+                label="Replace Auth Token"
                 type="password"
-                [(ngModel)]="twilioConfig.auth_token" 
+                [(ngModel)]="twilioConfig.auth_token" (ngModelChange)="markDirty()"
                 name="auth_token" 
                 placeholder="Enter a new or rotated token">
               </app-input>
-              <span class="text-[10px] text-gray-500 ml-1" *ngIf="twilioConfig.auth_token_configured">A token is configured{{twilioConfig.auth_token_hint ? ' · ending in '+twilioConfig.auth_token_hint : ''}}. Leave blank to keep it.</span>
+              <span class="text-[10px] text-green-300 ml-1" *ngIf="twilioConfig.auth_token_configured">Auth Token configured{{twilioConfig.auth_token_hint ? ' · ending in ••••'+twilioConfig.auth_token_hint : ''}}. It is encrypted and cannot be displayed again. Leave blank to keep it.</span>
             </div>
           </div>
 
           <div class="mt-6 rounded-xl border border-white/10 bg-black/30 p-4 text-xs text-gray-400">
-            <div class="flex items-center justify-between gap-4"><span><b class="text-white">Connection status:</b> {{twilioConfig.verification_status}}</span><button type="button" class="rounded-lg border border-secondary px-3 py-2 text-secondary" (click)="verifyConfig()" [disabled]="isVerifying">{{isVerifying?'Verifying…':'Test connection'}}</button></div>
-            <label class="mt-4 flex items-center gap-3"><input type="checkbox" [(ngModel)]="twilioConfig.live_sms_enabled" name="live_sms_enabled" [disabled]="twilioConfig.verification_status!=='verified'"><span>Enable live SMS after successful verification</span></label>
+            <div class="flex items-center justify-between gap-4"><span><b class="text-white">Connection status:</b> {{twilioConfig.verification_status}}</span><button type="button" class="rounded-lg border border-secondary px-3 py-2 text-secondary disabled:opacity-40" (click)="verifyConfig()" [disabled]="isVerifying || isDirty" [title]="isDirty ? 'Save changes before testing' : 'Test the stored credentials'">{{isVerifying?'Verifying…':'Test stored connection'}}</button></div>
+            <p *ngIf="isDirty" class="mt-2 text-secondary">Unsaved changes · save before testing the connection.</p>
+            <label class="mt-4 flex items-center gap-3"><input type="checkbox" [(ngModel)]="twilioConfig.live_sms_enabled" (ngModelChange)="markDirty()" name="live_sms_enabled" [disabled]="twilioConfig.verification_status!=='verified'"><span>Enable live SMS after successful verification</span></label>
             <p class="mt-3">Inbound webhook: <code>https://blackpenguin.ai/api/v1/webhooks/twilio/sms</code><br>Status callback: <code>https://blackpenguin.ai/api/v1/webhooks/twilio/status</code></p>
           </div>
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <app-input 
               label="From Phone Number (SMS)"
-              [(ngModel)]="twilioConfig.from_phone_number" 
+              [(ngModel)]="twilioConfig.from_phone_number" (ngModelChange)="markDirty()"
               name="from_phone_number" 
               placeholder="+1234567890">
             </app-input>

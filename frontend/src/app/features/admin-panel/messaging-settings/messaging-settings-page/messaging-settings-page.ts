@@ -31,6 +31,7 @@ export class MessagingSettingsPageComponent implements OnInit {
   isLoading: boolean = true;
   isSaving: boolean = false;
   isVerifying: boolean = false;
+  isDirty: boolean = false;
 
   constructor(
     private http: HttpClient,
@@ -69,6 +70,7 @@ export class MessagingSettingsPageComponent implements OnInit {
           };
         }
         this.isLoading = false;
+        this.isDirty = false;
         this.cdr.detectChanges();
       },
       error: () => {
@@ -96,6 +98,9 @@ export class MessagingSettingsPageComponent implements OnInit {
         this.twilioConfig.auth_token_configured = !!data.auth_token_configured;
         this.twilioConfig.auth_token_hint = data.auth_token_hint || '';
         this.twilioConfig.verification_status = data.verification_status;
+        this.twilioConfig.verified_at = data.verified_at || null;
+        this.twilioConfig.last_error = data.last_error || '';
+        this.isDirty = false;
         this.toast.showSuccess('Messaging settings saved successfully.');
         this.isSaving = false;
         this.cdr.detectChanges();
@@ -109,10 +114,16 @@ export class MessagingSettingsPageComponent implements OnInit {
   }
 
   verifyConfig() {
+    if (this.isDirty) {
+      this.toast.showError('Save your changes before testing the stored credentials.');
+      return;
+    }
     this.isVerifying = true;
     this.http.post<any>(`${this.baseUrl}/api/v1/system/messaging-settings/verify`, {}, { headers: this.headers }).subscribe({
-      next: data => { this.isVerifying = false; this.twilioConfig.verification_status = data.verification_status; this.twilioConfig.verified_at = data.verified_at; this.toast.showSuccess('Twilio credentials verified.'); this.cdr.detectChanges(); },
+      next: data => { this.isVerifying = false; this.twilioConfig.auth_token_configured = !!data.auth_token_configured; this.twilioConfig.auth_token_hint = data.auth_token_hint || ''; this.twilioConfig.verification_status = data.verification_status; this.twilioConfig.verified_at = data.verified_at; this.twilioConfig.last_error = data.last_error || ''; this.toast.showSuccess('Twilio credentials verified.'); this.cdr.detectChanges(); },
       error: err => { this.isVerifying = false; this.twilioConfig.verification_status = 'failed'; this.toast.showError(err.error?.detail || 'Twilio verification failed.'); this.cdr.detectChanges(); }
     });
   }
+
+  markDirty(): void { this.isDirty = true; }
 }

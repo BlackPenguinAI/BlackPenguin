@@ -72,6 +72,17 @@ describe('AgentComponent simulation form', () => {
     expect(urls.every(url => url.endsWith('/sales-agent/conversations'))).toBe(true);
   });
 
+  it('sends with Enter, preserves Shift+Enter and ignores IME composition', () => {
+    const value = component();
+    let sends = 0;
+    value.send = () => { sends += 1; };
+    const enter = { key: 'Enter', shiftKey: false, isComposing: false, preventDefault: () => undefined } as any;
+    value.onComposerKeydown(enter);
+    value.onComposerKeydown({ ...enter, shiftKey: true });
+    value.onComposerKeydown({ ...enter, isComposing: true });
+    expect(sends).toBe(1);
+  });
+
   it('saves the lead before requesting the initial SMS and always clears loading state', () => {
     const calls: string[] = [];
     const conversation = {

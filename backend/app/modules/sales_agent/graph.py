@@ -12,7 +12,6 @@ from app.modules.companies.models import Company
 from app.modules.projects import asset_share_service
 from app.modules.projects.models import Project, ProjectPropertyType, ProjectUnit
 from app.modules.sales_crm.models import Lead, LeadContact
-from app.modules.sales_crm.intelligence import strategy_context
 from .segment_strategies import BASE_SEGMENT_GUARDRAIL, STRATEGY_VERSION
 
 from .models import SalesMessage
@@ -114,7 +113,7 @@ def build_sales_graph(db: Session):
                 "intent_score": float(lead.intent_score or 0), "consent_status": lead.consent_status,
                 "intent_tier": lead.intent_tier, "pipeline_stage": lead.pipeline_stage,
                 "assigned_segment": lead.assigned_segment,
-                "segment_strategy": strategy_context(lead),
+                "segment_strategy": None,
                 "segment_strategy_version": STRATEGY_VERSION,
                 "segment_guardrail": BASE_SEGMENT_GUARDRAIL,
                 "qualification_summary": lead.qualification_summary,
@@ -128,8 +127,15 @@ def build_sales_graph(db: Session):
         }
 
     async def resolve_prompt(state: SalesAgentState) -> dict[str, Any]:
-        config = get_ai_config(db, state["company_id"])
+        config = get_ai_config(db, None)
         agent = config.agent_ventas or {}
+        segment = (state.get("lead_context") or {}).get("assigned_segment") or ""
+        playbook = {
+            "stage_prompts": agent.get("stage_prompts", {}),
+            "segment_prompt": (agent.get("segment_prompts", {}) or {}).get(segment, ""),
+            "objection_prompts": agent.get("objection_prompts", {}),
+            "sms_templates": agent.get("sms_templates", {}),
+        }
         return {
             "prompt_configuration_id": config.id,
             "prompt_snapshot": {
@@ -137,11 +143,14 @@ def build_sales_graph(db: Session):
                 "system_prompt": agent.get("system_prompt", ""),
                 "protocol_prompt": agent.get("protocol_prompt", ""),
                 "guardrails_prompt": agent.get("guardrails_prompt", ""),
+                "published_playbook": "PUBLISHED PLAYBOOK:\n" + json.dumps(playbook, ensure_ascii=False),
             },
             "model": agent.get("model") or "openai/gpt-4o-mini",
         }
 
     async def reason(state: SalesAgentState) -> dict[str, Any]:
+        # Provider keys may remain Company-scoped, while the published Sales
+        # prompt pack above is governed globally by Black Penguin.
         config = get_ai_config(db, state["company_id"])
         if not config.openrouter_api_key:
             if state.get("mode") == "simulation":

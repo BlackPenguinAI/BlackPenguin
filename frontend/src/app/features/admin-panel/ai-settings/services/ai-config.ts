@@ -37,6 +37,14 @@ export class AiConfigService {
     return this.http.post<any>(`${this.apiUrl}/prompts/sales/versions/${versionId}/restore`, {}, { headers: this.headers });
   }
 
+  createSalesPromptDraft(configuration: any, changeNote: string): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/prompts/sales/drafts`, { configuration, change_note: changeNote }, { headers: this.headers });
+  }
+
+  publishSalesPromptVersion(versionId: string): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/prompts/sales/versions/${versionId}/publish`, {}, { headers: this.headers });
+  }
+
   getConsumption(): Observable<any> {
     return this.http.get<any>(`${this.apiUrl}/config/consumption`, { headers: this.headers });
   }
