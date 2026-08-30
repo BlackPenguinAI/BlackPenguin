@@ -12,7 +12,8 @@ from sqlalchemy.orm import Session
 
 from app.modules.projects.models import Project, ProjectCampaign
 from app.modules.sales_crm.models import FunnelStage, Lead, Meeting
-from app.modules.sales_crm.scheduling import available_slots, create_agent_appointment
+from app.modules.sales_crm.scheduling import available_slots, create_agent_appointment, next_cadence_time
+from app.modules.sales_crm.calendar_links import calendar_invite_url, google_calendar_add_url
 
 from .graph import GRAPH_VERSION, TOOLSET_VERSION, build_sales_graph
 from .models import AgentRun, OutboundMessage, SalesAgentSimulation, SalesConversation, SalesFollowUpJob, SalesMessage
@@ -275,6 +276,8 @@ def conversation_summaries(
             "lead_name": lead.full_name, "phone": lead.phone,
             "funnel_stage": lead.funnel_stage.value if hasattr(lead.funnel_stage, "value") else str(lead.funnel_stage),
             "intent_score": float(lead.intent_score or 0),
+            "intent_tier": lead.intent_tier, "assigned_segment": lead.assigned_segment,
+            "pipeline_stage": lead.pipeline_stage, "pause_reason": conversation.pause_reason,
             "last_message": last.content if last else None,
             "last_message_at": last.created_at if last else None,
             "next_action_at": lead.next_action_at, "agent_status": lead.agent_status,
@@ -327,11 +330,41 @@ def set_conversation_action(
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found.")
     if action == "resume":
+        lead = db.query(Lead).filter(Lead.id == conversation.lead_id).first()
+        if lead and lead.is_opt_out:
+            raise HTTPException(status_code=409, detail="An opted-out lead cannot be resumed.")
+        if conversation.pause_reason == "Appointment confirmed":
+            raise HTTPException(status_code=409, detail="This conversation is closed because the appointment is confirmed.")
         conversation.is_paused = False
         conversation.pause_reason = None
+        if lead:
+            lead.agent_status = "active" if conversation.channel == "sms" else "simulation"
+            if conversation.channel == "sms" and not db.query(SalesFollowUpJob).filter(
+                SalesFollowUpJob.conversation_id == conversation.id,
+                SalesFollowUpJob.status == "pending",
+            ).first():
+                hours = {"hot": 24, "warm": 72, "cold": 24 * 14}.get(lead.intent_tier, 72)
+                project = db.query(Project).filter(Project.id == conversation.project_id).first()
+                scheduled_at = next_cadence_time(
+                    now=datetime.utcnow(), timezone_name=project.timezone if project else "UTC", delay_hours=hours,
+                )
+                db.add(SalesFollowUpJob(
+                    conversation_id=conversation.id,
+                    idempotency_key=f"resume:{conversation.id}:{uuid.uuid4()}",
+                    scheduled_at=scheduled_at, reason=f"{lead.intent_tier}_cadence", attempt_number=1,
+                ))
+                lead.next_action_at = scheduled_at
     else:
         conversation.is_paused = True
         conversation.pause_reason = "Human handoff requested" if action == "human_handoff" else "Paused by user"
+        db.query(SalesFollowUpJob).filter(
+            SalesFollowUpJob.conversation_id == conversation.id,
+            SalesFollowUpJob.status == "pending",
+        ).update({SalesFollowUpJob.status: "cancelled"}, synchronize_session=False)
+        lead = db.query(Lead).filter(Lead.id == conversation.lead_id).first()
+        if lead:
+            lead.agent_status = "human_control" if action in {"pause", "human_handoff"} else lead.agent_status
+            lead.next_action_at = None
     conversation.updated_at = datetime.utcnow()
     db.add(conversation); db.commit(); db.refresh(conversation)
     return conversation
@@ -524,6 +557,10 @@ async def simulate_turn(
                     user=assigned_user,
                     starts_at=meeting.meeting_time,
                 )
+                proposed_reply += (
+                    f" Add to Google Calendar: {google_calendar_add_url(project=project, lead=lead, starts_at=meeting.meeting_time)}. "
+                    f"Other calendar apps: {calendar_invite_url(meeting.id)}"
+                )
                 proposed_actions = [{
                     "type": "appointment_confirmed",
                     "meeting_id": meeting.id,
@@ -534,6 +571,7 @@ async def simulate_turn(
                 conversation.is_paused = True
                 conversation.pause_reason = "Appointment confirmed"
                 lead.agent_status = "appointment_confirmed"
+                lead.pipeline_stage = "S09_HANDOFF"
                 lead.next_action_at = None
                 if simulation:
                     simulation.status = "appointment_confirmed"

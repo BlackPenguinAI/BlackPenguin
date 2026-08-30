@@ -93,6 +93,10 @@ class ConversationSummary(BaseModel):
     phone: str
     funnel_stage: str
     intent_score: float = 0
+    intent_tier: str = "cold"
+    assigned_segment: str | None = None
+    pipeline_stage: str = "S00_CAPTURE"
+    pause_reason: str | None = None
     last_message: str | None = None
     last_message_at: datetime | None = None
     next_action_at: datetime | None = None
@@ -114,14 +118,21 @@ class SalesMessageResponse(BaseModel):
     conversation_id: str
     direction: str
     role: str
+    author_user_id: str | None = None
     content: str
     status: str
+    provider_message_id: str | None = None
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
 
 
 class ConversationAction(BaseModel):
     action: str = Field(pattern="^(pause|resume|human_handoff)$")
+
+
+class ManualMessageCreate(BaseModel):
+    content: str = Field(min_length=1, max_length=1600)
 
 
 class DraftDecision(BaseModel):

@@ -29,6 +29,14 @@ export class AiConfigService {
     return this.http.put<any>(`${this.apiUrl}/config`, payload, { headers: this.headers });
   }
 
+  getSalesPromptVersions(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiUrl}/prompts/sales/versions`, { headers: this.headers });
+  }
+
+  restoreSalesPromptVersion(versionId: string): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/prompts/sales/versions/${versionId}/restore`, {}, { headers: this.headers });
+  }
+
   getConsumption(): Observable<any> {
     return this.http.get<any>(`${this.apiUrl}/config/consumption`, { headers: this.headers });
   }

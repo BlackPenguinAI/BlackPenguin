@@ -23,16 +23,22 @@ class FirebaseConfigSchema(FirebaseConfigBase):
 # =========================================================================
 # SCHEMAS DE MESSAGING SETTINGS (TWILIO)
 # =========================================================================
-class TwilioConfigBase(BaseModel):
+class TwilioConfigUpdate(BaseModel):
     account_sid: Optional[str] = None
     auth_token: Optional[str] = None
     from_phone_number: Optional[str] = None
+    live_sms_enabled: Optional[bool] = None
 
-class TwilioConfigUpdate(TwilioConfigBase):
-    pass
-
-class TwilioConfigSchema(TwilioConfigBase):
+class TwilioConfigSchema(BaseModel):
     id: Optional[str] = None
+    account_sid: Optional[str] = None
+    auth_token_configured: bool = False
+    auth_token_hint: Optional[str] = None
+    from_phone_number: Optional[str] = None
+    live_sms_enabled: bool = False
+    verification_status: str = "not_configured"
+    verified_at: Optional[datetime] = None
+    last_error: Optional[str] = None
     updated_at: Optional[datetime] = None
     
     model_config = ConfigDict(from_attributes=True)

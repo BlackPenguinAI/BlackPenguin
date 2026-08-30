@@ -1439,6 +1439,14 @@ def project_marketing_summary(
             "follow_up_rate": round(100 * sum(lead.last_interaction_at is not None for lead in leads) / len(leads), 1) if leads else 0,
         },
         "campaigns": campaign_metrics,
+        "intent_distribution": {
+            tier: sum(lead.intent_tier == tier for lead in leads)
+            for tier in ("hot", "warm", "cold", "unscored")
+        },
+        "segment_distribution": {
+            segment: sum(lead.assigned_segment == segment for lead in leads)
+            for segment in sorted({lead.assigned_segment for lead in leads if lead.assigned_segment})
+        },
         "leads": [{
             "id": lead.id, "full_name": lead.full_name, "email": lead.email, "phone": lead.phone,
             "campaign_id": lead.campaign_id,
@@ -1446,6 +1454,8 @@ def project_marketing_summary(
             "funnel_stage": lead.funnel_stage.value, "intent_score": float(lead.intent_score or 0),
             "last_interaction_at": lead.last_interaction_at, "next_action_at": lead.next_action_at,
             "agent_status": lead.agent_status, "qualification_summary": lead.qualification_summary,
+            "intent_tier": lead.intent_tier, "assigned_segment": lead.assigned_segment,
+            "pipeline_stage": lead.pipeline_stage,
             "is_opt_out": lead.is_opt_out, "created_at": lead.created_at,
         } for lead in leads],
     }

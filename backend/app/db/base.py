@@ -9,7 +9,7 @@ from app.modules.subscriptions.models import SubscriptionPlan
 from app.modules.companies.models import Company
 from app.modules.users.models import User
 from app.modules.system_settings.models import FirebaseConfig, TwilioConfig, LegalDocument
-from app.modules.ai_core.models import AIConfiguration
+from app.modules.ai_core.models import AIConfiguration, PromptVersion
 from app.modules.company_onboarding.models import (
     CompanyOnboardingProposal,
     CompanyOnboardingSource,
@@ -33,7 +33,12 @@ from app.modules.projects.models import (
     SalesAssetShare,
 )
 from app.modules.brokers.models import Broker
-from app.modules.sales_crm.models import CalendarConnection, Lead, LeadStageHistory, Meeting, MeetingAttachment, SalesAvailabilityBlock, SalesAvailabilityWindow, SmsChatMessage
+from app.modules.sales_crm.models import (
+    CalendarConnection, Lead, LeadConsentEvent, LeadContact, LeadObjection,
+    LeadScoreSnapshot, LeadSegmentAssignment, LeadStageHistory, Meeting,
+    MeetingAttachment, SalesAvailabilityBlock, SalesAvailabilityWindow,
+    SmsChatMessage,
+)
 from app.modules.project_team.models import ProjectRoutingState, ProjectUserAssignment
 from app.modules.sales_agent.models import AgentRun, ExternalWebhookEvent, OutboundMessage, SalesAgentSimulation, SalesConversation, SalesFollowUpJob, SalesMessage
 from app.modules.onboarding_jobs.models import OnboardingSourceJob

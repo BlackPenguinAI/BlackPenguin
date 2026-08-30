@@ -16,7 +16,7 @@
       ><button class="primary" (click)="setupOpen = true">New simulation</button>
     </div>
   </header>
-  <div class="demo-banner" *ngIf="role !== 'sales'">
+  <div class="demo-banner" *ngIf="role !== 'sales' && (!selected || !isLive)">
     <span class="material-symbols-outlined">science</span>
     <div>
       <strong>Safe simulation</strong
@@ -255,9 +255,9 @@
             <time class="whitespace-nowrap text-[9px]">{{ message.created_at | date: 'short' }}</time>
           </div>
           <ng-template #smsBubble>
-            <div class="bubble-row" [class.agent]="message.role === 'assistant'">
+            <div class="bubble-row" [class.agent]="message.role === 'assistant' || message.role === 'human'" [class.human]="message.role === 'human'">
               <div class="bubble">
-                <small>{{ message.role === 'assistant' ? 'AI sales agent' : selected.lead_name }}</small>
+                <small>{{ message.role === 'assistant' ? 'AI sales agent' : (message.role === 'human' ? 'Company team · manual SMS' : selected.lead_name) }}</small>
                 <p>{{ message.content }}</p>
                 <time>{{ message.created_at | date: 'short' }} · {{ message.status }}</time>
               </div>
@@ -265,15 +265,19 @@
           </ng-template>
         </ng-container>
       </div>
-      <div class="composer" *ngIf="role !== 'sales'; else salesReadOnly">
+      <div class="composer" *ngIf="role !== 'sales' && (!isLive || canManualControl); else salesReadOnly">
         <textarea
           [(ngModel)]="draft"
           (keydown.control.enter)="send()"
-          [disabled]="selected.is_paused || sending || generatingInitial"
+          [disabled]="sending || generatingInitial || (!isLive && selected.is_paused) || (isLive && !selected.is_paused)"
           rows="2"
           [placeholder]="
-            selected.is_paused
-              ? 'Resume the agent to continue'
+            isLive && selected.is_paused
+              ? 'Send a manual SMS while AI is paused…'
+              : isLive
+                ? 'Pause the AI to take manual control'
+            : selected.is_paused
+              ? 'Resume the simulation to continue'
               : sending
                 ? 'Waiting for the AI sales agent…'
                 : 'Reply as the lead, exactly as an inbound SMS…'
@@ -281,31 +285,31 @@
         ></textarea
         ><button
           (click)="send()"
-          [disabled]="!draft.trim() || selected.is_paused || sending || generatingInitial"
+          [disabled]="!draft.trim() || sending || generatingInitial || (!isLive && selected.is_paused) || (isLive && !selected.is_paused)"
         >
           <span class="material-symbols-outlined">{{
             sending ? 'hourglass_top' : 'send'
           }}</span></button
         ><small
-          >Ctrl + Enter · Write as the lead. The agent responds using the active three-level
-          prompt.</small
+          >{{ isLive ? 'Manual SMS is stored in the same trace and delivered through Twilio.' : 'Ctrl + Enter · Write as the lead. The agent responds using the active three-level prompt.' }}</small
         >
       </div>
       <ng-template #salesReadOnly><div class="composer"><small>Read-only Sales view. The AI Agent manages the SMS conversation; use this history to prepare for the appointment.</small></div></ng-template>
     </main>
     <aside class="context" *ngIf="selected">
-      <p>SIMULATION CONTROL</p>
+      <p>{{ isLive ? 'LIVE SMS CONTROL' : 'SIMULATION CONTROL' }}</p>
       <div class="stage">
-        <span>{{ selected.simulation_status || 'simulation' }}</span
-        ><b>{{ selected.funnel_stage }}</b>
+        <span>{{ selected.simulation_status || selected.agent_status || selected.stage }}</span
+        ><b>{{ selected.pipeline_stage || selected.funnel_stage }}</b>
       </div>
       <dl>
+        <dt>Intent</dt><dd>{{ selected.intent_tier || 'unscored' }} · {{ (selected.intent_score || 0) * 100 | number:'1.0-0' }}/100</dd>
+        <dt>Segment</dt><dd>{{ selected.assigned_segment || 'Unsegmented' }}</dd>
         <dt>Project</dt>
         <dd>{{ selected.project_name }}</dd>
         <dt>Campaign</dt>
         <dd>{{ selected.campaign_name || 'Not attributed' }}</dd>
-        <dt>Virtual time</dt>
-        <dd>{{ selected.virtual_now | date: 'medium' }}</dd>
+        <ng-container *ngIf="!isLive"><dt>Virtual time</dt><dd>{{ selected.virtual_now | date: 'medium' }}</dd></ng-container>
         <dt>Next follow-up</dt>
         <dd>
           {{
@@ -314,15 +318,16 @@
         </dd>
         <dt>Protocol review</dt>
         <dd>{{ selected.approval_status || 'pending' }}</dd>
+        <ng-container *ngIf="selected.pause_reason"><dt>Pause reason</dt><dd>{{ selected.pause_reason }}</dd></ng-container>
       </dl>
-      <div class="clock" *ngIf="!selected.appointment_id">
+      <div class="clock" *ngIf="!isLive && !selected.appointment_id">
         <strong>Test follow-up cadence</strong>
         <div>
           <button (click)="advance(24)" [disabled]="advancing">+24h</button
           ><button (click)="advance(48)" [disabled]="advancing">+48h</button>
         </div>
       </div>
-      <div class="appointment" *ngIf="!selected.appointment_id">
+      <div class="appointment" *ngIf="!isLive && !selected.appointment_id">
         <strong>Appointment confirmation</strong
         ><small *ngIf="!slots.length"
           >No slots are available. A Sales user must configure availability and be assigned to this
@@ -341,7 +346,7 @@
         ><strong>Appointment confirmed</strong
         ><small>It is now visible to the assigned Sales user.</small>
       </div>
-      <div class="review">
+      <div class="review" *ngIf="!isLive">
         <strong>Client protocol approval</strong>
         <div>
           <button (click)="approve('approved')">Approve</button

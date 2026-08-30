@@ -52,6 +52,19 @@
             <textarea rows="4" name="sysPrompt" [(ngModel)]="activeAgent.system_prompt" placeholder="Ej: Eres un especialista corporativo..." class="bg-black/50 border border-white/10 focus:border-secondary rounded-xl p-4 text-sm text-white focus:outline-none font-mono resize-y leading-relaxed"></textarea>
           </div>
 
+          <section *ngIf="activeTab === 'ventas'" class="border border-white/10 rounded-xl p-4">
+            <div class="flex items-center justify-between mb-3">
+              <div><h3 class="text-sm font-medium text-secondary uppercase tracking-wider">Historial de prompts</h3><p class="text-xs text-gray-500 mt-1">Cada guardado publica una versión auditable. Restaurar nunca borra el historial.</p></div>
+            </div>
+            <div *ngIf="!promptVersions.length" class="text-xs text-gray-500">Aún no hay versiones publicadas.</div>
+            <div *ngFor="let version of promptVersions" class="flex items-center justify-between py-2 border-t border-white/5 text-sm">
+              <span>Versión {{ version.version }} <small class="text-gray-500">· {{ version.created_at | date:'medium' }}</small></span>
+              <button type="button" [disabled]="version.is_published || restoringVersionId === version.id" (click)="restorePromptVersion(version)" class="px-3 py-1.5 rounded-lg border border-white/10 disabled:opacity-40 hover:border-secondary">
+                {{ version.is_published ? 'Publicada' : (restoringVersionId === version.id ? 'Restaurando…' : 'Restaurar') }}
+              </button>
+            </div>
+          </section>
+
           <div class="flex flex-col gap-2">
             <label class="text-sm font-medium text-secondary uppercase tracking-wider flex items-center gap-2"><span>●</span> Flow & Protocol (Pasos)</label>
             <textarea rows="6" name="protPrompt" [(ngModel)]="activeAgent.protocol_prompt" placeholder="1. Pide el nombre... 2. Evalúa..." class="bg-black/50 border border-white/10 focus:border-secondary rounded-xl p-4 text-sm text-white focus:outline-none font-mono resize-y leading-relaxed"></textarea>

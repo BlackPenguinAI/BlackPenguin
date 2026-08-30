@@ -372,6 +372,8 @@ def test_sms_selection_books_once_and_closes_with_timezone_sales_location_and_em
     assert "UTC-05:00, America/Lima" in confirmed["reply"]
     assert "lead1@example.test" in confirmed["reply"]
     assert "will also be sent" in confirmed["reply"]
+    assert "calendar.google.com/calendar/render" in confirmed["reply"]
+    assert "/api/v1/sales/public/meetings/" in confirmed["reply"]
     assert "just booked by another lead" in stale["reply"]
     assert "9:00 AM" in stale["reply"]
     assert db.query(Meeting).count() == 1

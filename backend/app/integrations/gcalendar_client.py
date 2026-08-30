@@ -1,17 +1,78 @@
-from datetime import datetime
+"""Google Calendar OAuth, FreeBusy and event transport."""
+
+from datetime import datetime, timedelta, timezone
+from urllib.parse import urlencode
 import uuid
 
+import httpx
+from sqlalchemy.orm import Session
+
+from app.core.config import settings
+from app.core.secret_store import decrypt_secret, encrypt_secret
+
+AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
+TOKEN_URL = "https://oauth2.googleapis.com/token"
+CALENDAR_API = "https://www.googleapis.com/calendar/v3"
+SCOPES = ["https://www.googleapis.com/auth/calendar.events", "https://www.googleapis.com/auth/calendar.readonly"]
+
+
+def authorization_url(state: str, login_hint: str | None = None) -> str:
+    params = {"client_id": settings.GOOGLE_CALENDAR_CLIENT_ID, "redirect_uri": settings.GOOGLE_CALENDAR_REDIRECT_URI, "response_type": "code", "scope": " ".join(SCOPES), "access_type": "offline", "include_granted_scopes": "true", "prompt": "consent", "state": state}
+    if login_hint: params["login_hint"] = login_hint
+    return f"{AUTH_URL}?{urlencode(params)}"
+
+
+def exchange_code(code: str) -> dict:
+    response = httpx.post(TOKEN_URL, data={"code": code, "client_id": settings.GOOGLE_CALENDAR_CLIENT_ID, "client_secret": settings.GOOGLE_CALENDAR_CLIENT_SECRET, "redirect_uri": settings.GOOGLE_CALENDAR_REDIRECT_URI, "grant_type": "authorization_code"}, timeout=20.0)
+    response.raise_for_status(); return response.json()
+
+
+def _access_token(db: Session, connection) -> str:
+    token = decrypt_secret(connection.access_token_ciphertext)
+    if token and connection.token_expires_at and connection.token_expires_at > datetime.utcnow() + timedelta(minutes=2): return token
+    refresh = decrypt_secret(connection.refresh_token_ciphertext)
+    if not refresh: raise RuntimeError("Google Calendar refresh token is unavailable.")
+    response = httpx.post(TOKEN_URL, data={"client_id": settings.GOOGLE_CALENDAR_CLIENT_ID, "client_secret": settings.GOOGLE_CALENDAR_CLIENT_SECRET, "refresh_token": refresh, "grant_type": "refresh_token"}, timeout=20.0)
+    response.raise_for_status(); data = response.json()
+    connection.access_token_ciphertext = encrypt_secret(data["access_token"])
+    connection.token_expires_at = datetime.utcnow() + timedelta(seconds=int(data.get("expires_in", 3600)))
+    connection.status = "connected"; connection.last_error = None; db.flush()
+    return data["access_token"]
+
+
+def calendar_busy_ranges(db: Session, connection, *, starts_at: datetime, ends_at: datetime) -> list[tuple[datetime, datetime]]:
+    if connection.status != "connected": return []
+    try:
+        token = _access_token(db, connection)
+        response = httpx.post(f"{CALENDAR_API}/freeBusy", headers={"Authorization": f"Bearer {token}"}, json={"timeMin": starts_at.replace(tzinfo=timezone.utc).isoformat(), "timeMax": ends_at.replace(tzinfo=timezone.utc).isoformat(), "items": [{"id": connection.calendar_id or "primary"}]}, timeout=15.0)
+        response.raise_for_status(); busy = response.json().get("calendars", {}).get(connection.calendar_id or "primary", {}).get("busy", [])
+        connection.last_synced_at = datetime.utcnow(); connection.last_error = None; db.flush()
+        return [
+            (
+                datetime.fromisoformat(item["start"].replace("Z", "+00:00")).astimezone(timezone.utc).replace(tzinfo=None),
+                datetime.fromisoformat(item["end"].replace("Z", "+00:00")).astimezone(timezone.utc).replace(tzinfo=None),
+            )
+            for item in busy
+        ]
+    except (httpx.HTTPError, RuntimeError) as exc:
+        connection.last_error = type(exc).__name__; db.flush()
+        # Fail closed: a disconnected external calendar must never cause a
+        # double booking just because FreeBusy is temporarily unavailable.
+        return [(starts_at, ends_at)]
+
+
+def is_calendar_free(db: Session, connection, *, starts_at: datetime, ends_at: datetime) -> bool:
+    return not calendar_busy_ranges(db, connection, starts_at=starts_at, ends_at=ends_at)
+
+
+def create_calendar_event_for_connection(db: Session, connection, *, title: str, description: str, location: str, start_time: datetime, end_time: datetime, timezone_name: str, attendee_email: str | None) -> dict:
+    token = _access_token(db, connection)
+    body = {"summary": title, "description": description, "location": location, "start": {"dateTime": start_time.replace(tzinfo=timezone.utc).isoformat(), "timeZone": timezone_name}, "end": {"dateTime": end_time.replace(tzinfo=timezone.utc).isoformat(), "timeZone": timezone_name}, "reminders": {"useDefault": False, "overrides": [{"method": "email", "minutes": 1440}, {"method": "popup", "minutes": 60}]}}
+    if attendee_email: body["attendees"] = [{"email": attendee_email}]
+    response = httpx.post(f"{CALENDAR_API}/calendars/{connection.calendar_id or 'primary'}/events", params={"sendUpdates": "all"}, headers={"Authorization": f"Bearer {token}"}, json=body, timeout=20.0)
+    response.raise_for_status(); return response.json()
+
+
 def create_calendar_event(calendar_id: str, title: str, start_time: datetime, attendee_email: str) -> str:
-    """
-    Simula la creación de un evento en Google Calendar.
-    En producción, aquí se integrará la SDK oficial de Google (google-api-python-client).
-    """
-    print(f"\n--- 📅 GOOGLE CALENDAR SIMULATION ---")
-    print(f"Calendar ID: {calendar_id}")
-    print(f"Event: {title}")
-    print(f"Time: {start_time}")
-    print(f"Attendee: {attendee_email}")
-    print("--------------------------------------\n")
-    
-    # Retornamos un ID de evento falso para simular la respuesta de Google
-    return f"gcal_evt_{uuid.uuid4().hex[:12]}"
+    """Compatibility adapter for legacy Broker records."""
+    return f"legacy_calendar_pending_{uuid.uuid4().hex[:12]}"

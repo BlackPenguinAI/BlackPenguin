@@ -11,7 +11,9 @@ from app.modules.ai_core.services import get_ai_config
 from app.modules.companies.models import Company
 from app.modules.projects import asset_share_service
 from app.modules.projects.models import Project, ProjectPropertyType, ProjectUnit
-from app.modules.sales_crm.models import Lead
+from app.modules.sales_crm.models import Lead, LeadContact
+from app.modules.sales_crm.intelligence import strategy_context
+from .segment_strategies import BASE_SEGMENT_GUARDRAIL, STRATEGY_VERSION
 
 from .models import SalesMessage
 from .state import SalesAgentState
@@ -58,6 +60,10 @@ def build_sales_graph(db: Session):
         company = db.query(Company).filter(Company.id == state["company_id"]).one()
         project = db.query(Project).filter(Project.id == state["project_id"], Project.company_id == state["company_id"]).one()
         lead = db.query(Lead).filter(Lead.id == state["lead_id"], Lead.company_id == state["company_id"]).one()
+        contact = db.query(LeadContact).filter(
+            LeadContact.id == lead.contact_id,
+            LeadContact.company_id == state["company_id"],
+        ).first() if lead.contact_id else None
         profile = project.profile
         confirmed = {}
         if profile:
@@ -106,7 +112,14 @@ def build_sales_graph(db: Session):
             "lead_context": {
                 "id": lead.id, "name": lead.full_name, "stage": lead.funnel_stage.value,
                 "intent_score": float(lead.intent_score or 0), "consent_status": lead.consent_status,
+                "intent_tier": lead.intent_tier, "pipeline_stage": lead.pipeline_stage,
+                "assigned_segment": lead.assigned_segment,
+                "segment_strategy": strategy_context(lead),
+                "segment_strategy_version": STRATEGY_VERSION,
+                "segment_guardrail": BASE_SEGMENT_GUARDRAIL,
                 "qualification_summary": lead.qualification_summary,
+                "meta_form_data": lead.meta_form_data or {},
+                "prior_history_for_phone": contact.previous_projects if contact else [],
             },
             "conversation_history": [
                 {"role": message.role, "content": message.content}

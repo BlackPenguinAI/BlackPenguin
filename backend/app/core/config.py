@@ -29,6 +29,19 @@ class Settings(BaseSettings):
     PROJECT_UPLOAD_ROOT: str = "./var/uploads"
     PUBLIC_APP_URL: str = "https://blackpenguin.ai"
 
+    # Provider credentials are bootstrapped only when the database record is
+    # empty. The Twilio Auth Token must be supplied through the environment and
+    # is never returned by an API response.
+    SETTINGS_ENCRYPTION_KEY: str = ""
+    TWILIO_ACCOUNT_SID: str = ""
+    TWILIO_AUTH_TOKEN: str = ""
+    TWILIO_FROM_PHONE_NUMBER: str = "+18573824206"
+    TWILIO_LIVE_SMS_ENABLED: bool = False
+
+    GOOGLE_CALENDAR_CLIENT_ID: str = ""
+    GOOGLE_CALENDAR_CLIENT_SECRET: str = ""
+    GOOGLE_CALENDAR_REDIRECT_URI: str = "https://blackpenguin.ai/api/v1/sales/calendar/google/callback"
+
     SMTP_SERVER: str = "smtp.gmail.com"
     SMTP_PORT: int = 587
     SMTP_USER: str = ""

@@ -12,11 +12,12 @@ from .models import AgentRun, OutboundMessage, SalesAgentSimulation, SalesConver
 from app.modules.sales_crm.models import Lead
 from .schemas import (
     AgentRunResponse, AppointmentConfirmationResponse, AppointmentConfirm, AppointmentSlot,
-    ConversationAction, ConversationSummary, DraftDecision, SalesMessageResponse,
+    ConversationAction, ConversationSummary, DraftDecision, ManualMessageCreate, SalesMessageResponse,
     SimulationAdvance, SimulationApproval, SimulationCreate, SimulationCreateResponse,
     SimulationOptionProject, SimulationRequest,
 )
 from .service import conversation_messages, conversation_summaries, set_conversation_action, simulate_turn
+from .live_service import send_manual_message
 from .simulation_service import (
     advance_simulation, approve_simulation, confirm_simulation_appointment,
     create_simulation, generate_initial_message, simulation_options, slots_for_simulation,
@@ -218,6 +219,25 @@ def conversation_action(
         db, company_id=current_user.company_id,
         sales_user_id=None, allowed_project_ids=project_ids_for_user(db, current_user),
     ) if item["id"] == conversation.id)
+
+
+@router.post("/conversations/{conversation_id}/manual-message", response_model=SalesMessageResponse)
+async def manual_message(
+    conversation_id: str, payload: ManualMessageCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker(TENANT_MANAGER_ROLES)),
+):
+    existing = db.query(SalesConversation).filter(
+        SalesConversation.id == conversation_id,
+        SalesConversation.company_id == current_user.company_id,
+    ).first()
+    if not existing:
+        raise HTTPException(status_code=404, detail="Conversation not found.")
+    require_project_access(db, current_user, existing.project_id)
+    return await send_manual_message(
+        db, conversation_id=conversation_id, company_id=current_user.company_id,
+        user_id=current_user.id, content=payload.content.strip(),
+    )
 
 
 @router.post("/drafts/{draft_id}/decision")

@@ -7,6 +7,7 @@ import httpx
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.secret_store import decrypt_secret, encrypt_secret
 
 from .models import MetaConnection, Project, ProjectCampaign
 
@@ -17,12 +18,23 @@ def _fernet() -> Fernet:
     return Fernet(key)
 
 
+def decrypt_connection_token(connection: MetaConnection) -> str:
+    if not connection.token_ciphertext:
+        raise ValueError("A real access token is required for live Meta operations.")
+    try:
+        return decrypt_secret(connection.token_ciphertext) or ""
+    except ValueError:
+        # Compatibility with tokens encrypted before SETTINGS_ENCRYPTION_KEY
+        # became available. A later save migrates them to the shared vault.
+        return _fernet().decrypt(connection.token_ciphertext.encode("ascii")).decode("utf-8")
+
+
 def create_connection(db: Session, *, company_id: str, payload: dict) -> MetaConnection:
     payload = dict(payload)
     token = payload.pop("access_token")
     connection = MetaConnection(
         company_id=company_id,
-        token_ciphertext=_fernet().encrypt(token.encode("utf-8")).decode("ascii"),
+        token_ciphertext=encrypt_secret(token),
         token_hint=f"••••{token[-4:]}",
         verification_mode="real",
         verification_status="pending",
@@ -35,7 +47,7 @@ def create_connection(db: Session, *, company_id: str, payload: dict) -> MetaCon
 async def verify_connection(db: Session, connection: MetaConnection) -> MetaConnection:
     if not connection.token_ciphertext:
         raise ValueError("A real access token is required for live verification.")
-    token = _fernet().decrypt(connection.token_ciphertext.encode("ascii")).decode("utf-8")
+    token = decrypt_connection_token(connection)
     async with httpx.AsyncClient() as client:
         response = await client.get(
             f"https://graph.facebook.com/{settings.META_API_VERSION}/me",

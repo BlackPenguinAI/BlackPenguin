@@ -298,7 +298,12 @@ export class AgentComponent implements OnInit {
 
   send(): void {
     const message = this.draft.trim();
-    if (!message || !this.selected || this.sending || this.selected.is_paused) return;
+    if (!message || !this.selected || this.sending) return;
+    if (this.selected.channel === 'sms') {
+      this.sendManual(message);
+      return;
+    }
+    if (this.selected.is_paused) return;
     this.sending = true;
     this.error = '';
     this.http
@@ -321,6 +326,23 @@ export class AgentComponent implements OnInit {
         },
       });
   }
+
+  private sendManual(message: string): void {
+    if (!this.selected?.is_paused) {
+      this.error = 'Pause the AI before sending a manual SMS.';
+      return;
+    }
+    this.sending = true; this.error = '';
+    this.http.post(`${API_V1_URL}/sales-agent/conversations/${this.selected.id}/manual-message`, { content: message })
+      .pipe(finalize(() => { this.sending = false; this.cdr.markForCheck(); }))
+      .subscribe({
+        next: () => { this.draft = ''; this.refreshMessages(true); this.refreshConversationSummaries(); },
+        error: err => { this.error = err.error?.detail || 'The manual SMS could not be sent.'; },
+      });
+  }
+
+  get isLive(): boolean { return this.selected?.channel === 'sms'; }
+  get canManualControl(): boolean { return this.role === 'admin' || this.role === 'assistant'; }
 
   refreshConversationSummaries(): void {
     const url = this.projectId

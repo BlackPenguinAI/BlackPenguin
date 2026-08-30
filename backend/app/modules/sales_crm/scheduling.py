@@ -8,6 +8,12 @@ from sqlalchemy.orm import Session
 
 from app.modules.project_team.service import eligible_sales_assignments, select_next_sales_user
 from app.modules.users.models import User
+from app.integrations.gcalendar_client import (
+    calendar_busy_ranges,
+    create_calendar_event_for_connection,
+    is_calendar_free,
+)
+from app.modules.projects.models import Project
 
 from .models import (
     CalendarConnection, FunnelStage, Lead, Meeting, MeetingStatus,
@@ -16,6 +22,18 @@ from .models import (
 
 
 ACTIVE_MEETING_STATUSES = {MeetingStatus.SCHEDULED, MeetingStatus.CONFIRMED}
+
+
+def next_cadence_time(*, now: datetime, timezone_name: str, delay_hours: int) -> datetime:
+    """Schedule follow-ups inside 09:00–18:00 Project-local time."""
+    candidate = now + timedelta(hours=delay_hours)
+    candidate = candidate.replace(tzinfo=timezone.utc) if candidate.tzinfo is None else candidate.astimezone(timezone.utc)
+    local = candidate.astimezone(_zone(timezone_name))
+    if local.hour >= 18:
+        local = (local + timedelta(days=1)).replace(hour=9, minute=0, second=0, microsecond=0)
+    elif local.hour < 9:
+        local = local.replace(hour=9, minute=0, second=0, microsecond=0)
+    return local.astimezone(timezone.utc).replace(tzinfo=None)
 
 
 def _zone(name: str) -> ZoneInfo:
@@ -176,16 +194,27 @@ def _is_free(
     user_id: str,
     starts_at: datetime,
     ends_at: datetime,
+    external_busy: list[tuple[datetime, datetime]] | None = None,
 ) -> bool:
     meetings = db.query(Meeting).filter(
         Meeting.assigned_sales_user_id == user_id,
         Meeting.status.in_(ACTIVE_MEETING_STATUSES),
         Meeting.meeting_time < ends_at,
     ).all()
-    return not any(
+    database_free = not any(
         meeting.meeting_time + timedelta(minutes=meeting.duration_minutes) > starts_at
         for meeting in meetings
     )
+    if not database_free:
+        return False
+    if external_busy is not None:
+        return not any(busy_start < ends_at and busy_end > starts_at for busy_start, busy_end in external_busy)
+    connection = db.query(CalendarConnection).filter(
+        CalendarConnection.user_id == user_id,
+        CalendarConnection.provider == "google",
+        CalendarConnection.status == "connected",
+    ).first()
+    return not connection or is_calendar_free(db, connection, starts_at=starts_at, ends_at=ends_at)
 
 
 def eligible_users_for_slot(
@@ -194,6 +223,7 @@ def eligible_users_for_slot(
     project_id: str,
     starts_at: datetime,
     duration_minutes: int,
+    external_busy_by_user: dict[str, list[tuple[datetime, datetime]]] | None = None,
 ) -> list[str]:
     starts_at = starts_at.replace(tzinfo=None) if starts_at.tzinfo else starts_at
     ends_at = starts_at + timedelta(minutes=duration_minutes)
@@ -203,7 +233,10 @@ def eligible_users_for_slot(
             db, user_id=assignment.user_id, starts_at=starts_at, ends_at=ends_at,
         )
         if any(block.starts_at <= starts_at and block.ends_at >= ends_at for block in date_blocks):
-            if _is_free(db, user_id=assignment.user_id, starts_at=starts_at, ends_at=ends_at):
+            if _is_free(
+                db, user_id=assignment.user_id, starts_at=starts_at, ends_at=ends_at,
+                external_busy=(external_busy_by_user or {}).get(assignment.user_id) if external_busy_by_user is not None else None,
+            ):
                 eligible.append(assignment.user_id)
             continue
         windows = availability_for_user(db, assignment.user_id)
@@ -216,7 +249,10 @@ def eligible_users_for_slot(
             window_start = time.fromisoformat(window.start_time)
             window_end = time.fromisoformat(window.end_time)
             if window.is_active and local_start.time() >= window_start and local_end.time() <= window_end:
-                if _is_free(db, user_id=assignment.user_id, starts_at=starts_at, ends_at=ends_at):
+                if _is_free(
+                    db, user_id=assignment.user_id, starts_at=starts_at, ends_at=ends_at,
+                    external_busy=(external_busy_by_user or {}).get(assignment.user_id) if external_busy_by_user is not None else None,
+                ):
                     eligible.append(assignment.user_id)
                 break
     return eligible
@@ -237,6 +273,17 @@ def available_slots(
     if cursor <= after:
         cursor += timedelta(minutes=30)
     end = after + timedelta(days=days)
+    external_busy_by_user: dict[str, list[tuple[datetime, datetime]]] = {}
+    for assignment in eligible_sales_assignments(db, project_id):
+        connection = db.query(CalendarConnection).filter(
+            CalendarConnection.user_id == assignment.user_id,
+            CalendarConnection.provider == "google",
+            CalendarConnection.status == "connected",
+        ).first()
+        external_busy_by_user[assignment.user_id] = (
+            calendar_busy_ranges(db, connection, starts_at=after, ends_at=end)
+            if connection else []
+        )
     result = []
     while cursor < end and len(result) < limit:
         user_ids = eligible_users_for_slot(
@@ -244,6 +291,7 @@ def available_slots(
             project_id=project_id,
             starts_at=cursor,
             duration_minutes=duration_minutes,
+            external_busy_by_user=external_busy_by_user,
         )
         if user_ids:
             result.append({
@@ -289,6 +337,7 @@ def create_agent_appointment(
         raise HTTPException(status_code=409, detail="No eligible Sales user is available for this time.")
     user = db.query(User).filter(User.id == assigned_user_id, User.company_id == lead.company_id).one()
     connections = calendar_connections_for_user(db, user.id)
+    google_connection = next((item for item in connections if item.provider == "google" and item.status == "connected"), None)
     meeting = Meeting(
         project_id=lead.project_id,
         lead_id=lead.id,
@@ -298,15 +347,31 @@ def create_agent_appointment(
         duration_minutes=duration_minutes,
         modality=modality,
         confirmation_status="confirmed",
-        calendar_sync_status="simulation_ready" if connections else "not_connected",
+        calendar_sync_status="simulation_ready" if lead.is_demo and connections else ("pending" if google_connection else "not_connected"),
         status=MeetingStatus.CONFIRMED,
-        is_demo=True,
-        source="agent_simulation",
-        notes="Appointment confirmed in the AI Sales Agent simulation.",
+        is_demo=bool(lead.is_demo),
+        source="agent_simulation" if lead.is_demo else "agent_sms",
+        notes="Appointment confirmed by the AI Sales Agent.",
     )
     lead.assigned_sales_user_id = user.id
     lead.funnel_stage = FunnelStage.APPOINTMENT_SET
     lead.stage_changed_at = datetime.utcnow()
     db.add_all([meeting, lead])
     db.flush()
+    if google_connection and not lead.is_demo:
+        project = db.query(Project).filter(Project.id == lead.project_id).one()
+        location = ", ".join(value for value in (project.name, project.address, project.city, project.country) if value)
+        try:
+            event = create_calendar_event_for_connection(
+                db, google_connection, title=f"{project.name} visit with {lead.full_name}",
+                description="Appointment coordinated by Black Penguin AI Sales Agent.", location=location,
+                start_time=starts_at, end_time=starts_at + timedelta(minutes=duration_minutes),
+                timezone_name=project.timezone or "UTC", attendee_email=lead.email,
+            )
+            meeting.gcal_event_id = event.get("id")
+            meeting.meeting_url = event.get("htmlLink")
+            meeting.calendar_sync_status = "synced"
+        except Exception as exc:
+            meeting.calendar_sync_status = "failed"
+            meeting.notes = f"{meeting.notes} Calendar sync pending: {type(exc).__name__}."
     return meeting, user

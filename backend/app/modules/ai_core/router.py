@@ -24,8 +24,25 @@ def update_config(
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN, *TENANT_MANAGER_ROLES]))
 ):
-    services.update_ai_config(db, payload, company_id=current_user.company_id)
+    services.update_ai_config(db, payload, company_id=current_user.company_id, actor_id=current_user.id)
     return {"message": "Configuración Multi-Agente actualizada con éxito."}
+
+
+@router.get("/prompts/sales/versions")
+def list_sales_prompt_versions(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN, *TENANT_MANAGER_ROLES])),
+):
+    return [{"id": item.id, "version": item.version_number, "is_published": item.is_published, "created_at": item.created_at, "created_by_user_id": item.created_by_user_id} for item in services.prompt_versions(db, company_id=current_user.company_id, agent_key="sales")]
+
+
+@router.post("/prompts/sales/versions/{version_id}/restore")
+def restore_sales_prompt_version(
+    version_id: str, db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN, *TENANT_MANAGER_ROLES])),
+):
+    services.restore_prompt_version(db, company_id=current_user.company_id, agent_key="sales", version_id=version_id, actor_id=current_user.id)
+    return {"message": "Sales Agent prompt version restored as a new published version."}
 
 @router.get("/config/consumption", summary="Consultar saldo de OpenRouter")
 def get_api_consumption(

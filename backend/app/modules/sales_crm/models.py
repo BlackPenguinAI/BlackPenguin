@@ -34,6 +34,7 @@ class Lead(Base):
     project_id = Column(String(36), ForeignKey("projects.id", ondelete="SET NULL"), nullable=True)
     campaign_id = Column(String(36), ForeignKey("project_campaigns.id", ondelete="SET NULL"), nullable=True, index=True)
     assigned_sales_user_id = Column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    contact_id = Column(String(36), ForeignKey("lead_contacts.id", ondelete="SET NULL"), nullable=True, index=True)
     
     full_name = Column(String(150), nullable=False)
     phone = Column(String(50), nullable=False)
@@ -47,6 +48,10 @@ class Lead(Base):
     consent_captured_at = Column(DateTime, nullable=True)
     
     intent_score = Column(Numeric(3, 2), default=0.0)
+    intent_tier = Column(String(20), default="cold", nullable=False, index=True)
+    assigned_segment = Column(String(60), nullable=True, index=True)
+    buyer_type = Column(String(30), nullable=True)
+    pipeline_stage = Column(String(40), default="S00_CAPTURE", nullable=False, index=True)
     is_opt_out = Column(Boolean, default=False)
     qualification_summary = Column(Text, nullable=True)
     meta_form_data = Column(JSON, default=dict, nullable=False)
@@ -68,6 +73,81 @@ class Lead(Base):
     messages = relationship("SmsChatMessage", back_populates="lead", cascade="all, delete-orphan")
     meetings = relationship("Meeting", back_populates="lead", cascade="all, delete-orphan")
     stage_history = relationship("LeadStageHistory", back_populates="lead", cascade="all, delete-orphan")
+    score_history = relationship("LeadScoreSnapshot", back_populates="lead", cascade="all, delete-orphan")
+    segment_history = relationship("LeadSegmentAssignment", back_populates="lead", cascade="all, delete-orphan")
+    objections = relationship("LeadObjection", back_populates="lead", cascade="all, delete-orphan")
+
+
+class LeadContact(Base):
+    __tablename__ = "lead_contacts"
+    __table_args__ = (UniqueConstraint("company_id", "canonical_phone", name="uq_lead_contact_company_phone"),)
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    company_id = Column(String(36), ForeignKey("companies.id", ondelete="CASCADE"), nullable=False, index=True)
+    canonical_phone = Column(String(50), nullable=False)
+    full_name = Column(String(150), nullable=True)
+    email = Column(String(150), nullable=True)
+    preferred_language = Column(String(10), nullable=True)
+    preferred_channel = Column(String(30), nullable=True)
+    previous_projects = Column(JSON, default=list, nullable=False)
+    lifetime_value = Column(Numeric(16, 2), nullable=True)
+    vip_flag = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+
+class LeadScoreSnapshot(Base):
+    __tablename__ = "lead_score_snapshots"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    lead_id = Column(String(36), ForeignKey("leads.id", ondelete="CASCADE"), nullable=False, index=True)
+    total_score = Column(Integer, nullable=False)
+    assigned_tier = Column(String(20), nullable=False, index=True)
+    factor_breakdown = Column(JSON, default=dict, nullable=False)
+    scoring_version = Column(String(40), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    lead = relationship("Lead", back_populates="score_history")
+
+
+class LeadSegmentAssignment(Base):
+    __tablename__ = "lead_segment_assignments"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    lead_id = Column(String(36), ForeignKey("leads.id", ondelete="CASCADE"), nullable=False, index=True)
+    segment = Column(String(60), nullable=False, index=True)
+    confidence = Column(Numeric(3, 2), nullable=False, default=0.0)
+    reasons = Column(JSON, default=list, nullable=False)
+    strategy_version = Column(String(40), nullable=False)
+    is_current = Column(Boolean, default=True, nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    lead = relationship("Lead", back_populates="segment_history")
+
+
+class LeadObjection(Base):
+    __tablename__ = "lead_objections"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    lead_id = Column(String(36), ForeignKey("leads.id", ondelete="CASCADE"), nullable=False, index=True)
+    objection_type = Column(String(30), nullable=False, index=True)
+    evidence = Column(Text, nullable=False)
+    status = Column(String(20), default="open", nullable=False)
+    occurrence_count = Column(Integer, default=1, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    lead = relationship("Lead", back_populates="objections")
+
+
+class LeadConsentEvent(Base):
+    __tablename__ = "lead_consent_events"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    lead_id = Column(String(36), ForeignKey("leads.id", ondelete="CASCADE"), nullable=False, index=True)
+    channel = Column(String(30), nullable=False)
+    action = Column(String(30), nullable=False)
+    source = Column(String(60), nullable=False)
+    policy_version = Column(String(40), nullable=True)
+    evidence = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
 
 class LeadStageHistory(Base):

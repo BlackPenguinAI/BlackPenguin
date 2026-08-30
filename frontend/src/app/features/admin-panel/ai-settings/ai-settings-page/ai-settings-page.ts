@@ -28,6 +28,8 @@ export class AiSettingsPageComponent implements OnInit {
   activeTab: string = 'empresa';
   isLoading: boolean = true;
   isSaving: boolean = false;
+  promptVersions: any[] = [];
+  restoringVersionId = '';
 
   constructor(
     private aiService: AiConfigService, 
@@ -43,6 +45,7 @@ export class AiSettingsPageComponent implements OnInit {
     this.aiService.getConfig().subscribe({
       next: (data) => {
         this.config = data;
+        this.loadPromptVersions();
         this.isLoading = false;
         this.cdr.detectChanges();
       },
@@ -50,6 +53,25 @@ export class AiSettingsPageComponent implements OnInit {
         this.toast.showError('Error al cargar la configuración de los agentes.');
         this.isLoading = false;
         this.cdr.detectChanges();
+      }
+    });
+  }
+
+  loadPromptVersions() {
+    this.aiService.getSalesPromptVersions().subscribe({ next: versions => this.promptVersions = versions });
+  }
+
+  restorePromptVersion(version: any) {
+    this.restoringVersionId = version.id;
+    this.aiService.restoreSalesPromptVersion(version.id).subscribe({
+      next: () => {
+        this.restoringVersionId = '';
+        this.toast.showSuccess(`Versión ${version.version} restaurada como una nueva versión publicada.`);
+        this.loadConfig();
+      },
+      error: (err) => {
+        this.restoringVersionId = '';
+        this.toast.showError(err.error?.detail || 'No se pudo restaurar la versión.');
       }
     });
   }
@@ -77,6 +99,7 @@ export class AiSettingsPageComponent implements OnInit {
       next: () => {
         this.isSaving = false;
         this.toast.showSuccess('Configuración de Agentes actualizada en el ecosistema.');
+        this.loadPromptVersions();
         this.cdr.detectChanges(); 
       },
       error: (err) => {

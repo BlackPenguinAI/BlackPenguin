@@ -5,7 +5,7 @@
     
     <div class="mb-8 border-b border-white/10 pb-6">
       <h1 class="text-3xl font-light tracking-tight">Messaging <span class="text-secondary font-medium">Settings</span></h1>
-      <p class="text-sm text-gray-400 mt-1">Configure Twilio integration for automated SMS and WhatsApp communications.</p>
+      <p class="text-sm text-gray-400 mt-1">Configure Twilio Programmable Messaging for automated and manual SMS.</p>
     </div>
 
     <div *ngIf="isLoading" class="flex justify-center py-24">
@@ -17,7 +17,7 @@
         
         <app-glass-card title="Twilio API Credentials" icon="sms" class="mb-6 block">
           <p class="text-xs text-gray-400 mb-6 leading-relaxed">
-            Enter your Twilio API credentials to enable the platform to send real-time notifications, 2FA codes, and marketing messages to users and administrators.
+            Credentials are encrypted at rest. The Auth Token is write-only and is never returned to the browser. Rotate the previously exposed token before enabling live SMS.
           </p>
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
@@ -31,21 +31,24 @@
             <div class="flex flex-col gap-1">
               <app-input 
                 label="Auth Token" 
-                [type]="showToken ? 'text' : 'password'" 
+                type="password"
                 [(ngModel)]="twilioConfig.auth_token" 
                 name="auth_token" 
-                placeholder="your_auth_token_here">
+                placeholder="Enter a new or rotated token">
               </app-input>
-              <label class="flex items-center gap-2 mt-1 ml-1 cursor-pointer w-max">
-                <input type="checkbox" (change)="toggleTokenVisibility()" class="rounded bg-black border-white/20 text-secondary focus:ring-0 w-3.5 h-3.5">
-                <span class="text-[10px] text-gray-500 font-bold uppercase tracking-widest hover:text-white transition-colors">Show Auth Token</span>
-              </label>
+              <span class="text-[10px] text-gray-500 ml-1" *ngIf="twilioConfig.auth_token_configured">A token is configured{{twilioConfig.auth_token_hint ? ' · ending in '+twilioConfig.auth_token_hint : ''}}. Leave blank to keep it.</span>
             </div>
+          </div>
+
+          <div class="mt-6 rounded-xl border border-white/10 bg-black/30 p-4 text-xs text-gray-400">
+            <div class="flex items-center justify-between gap-4"><span><b class="text-white">Connection status:</b> {{twilioConfig.verification_status}}</span><button type="button" class="rounded-lg border border-secondary px-3 py-2 text-secondary" (click)="verifyConfig()" [disabled]="isVerifying">{{isVerifying?'Verifying…':'Test connection'}}</button></div>
+            <label class="mt-4 flex items-center gap-3"><input type="checkbox" [(ngModel)]="twilioConfig.live_sms_enabled" name="live_sms_enabled" [disabled]="twilioConfig.verification_status!=='verified'"><span>Enable live SMS after successful verification</span></label>
+            <p class="mt-3">Inbound webhook: <code>https://blackpenguin.ai/api/v1/webhooks/twilio/sms</code><br>Status callback: <code>https://blackpenguin.ai/api/v1/webhooks/twilio/status</code></p>
           </div>
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <app-input 
-              label="From Phone Number (WhatsApp / SMS)" 
+              label="From Phone Number (SMS)"
               [(ngModel)]="twilioConfig.from_phone_number" 
               name="from_phone_number" 
               placeholder="+1234567890">

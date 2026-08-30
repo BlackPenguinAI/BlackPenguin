@@ -390,6 +390,8 @@ class ProjectMarketingSummary(BaseModel):
     project_name: str
     totals: dict[str, int | float]
     campaigns: list[ProjectMarketingCampaignMetric]
+    intent_distribution: dict[str, int] = Field(default_factory=dict)
+    segment_distribution: dict[str, int] = Field(default_factory=dict)
     leads: list[dict[str, Any]]
 
 

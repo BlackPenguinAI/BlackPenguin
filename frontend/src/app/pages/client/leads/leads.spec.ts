@@ -1,0 +1,2 @@
+import { LeadsComponent } from './leads';
+describe('LeadsComponent', () => { it('keeps the compatibility score and protected-trait-safe segments', () => { const component = Object.create(LeadsComponent.prototype) as LeadsComponent; expect(component.score({ intent_score: .73 })).toBe(73); expect(component.segments).toContain('downsizing'); expect(component.segments).not.toContain('retirement_age'); }); });

@@ -6,16 +6,17 @@ import hmac
 import json
 
 import httpx
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Query, Request
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.db.postgres import get_db
 from app.modules.projects.models import MetaConnection, Project, ProjectCampaign
-from app.modules.project_team.service import select_next_sales_user
+from app.modules.projects.meta_service import decrypt_connection_token
 from app.modules.sales_agent.models import ExternalWebhookEvent
-from app.modules.sales_crm.models import Lead
+from app.modules.sales_agent.live_service import start_live_lead
+from app.modules.sales_crm.models import Lead, LeadConsentEvent
 
 
 router = APIRouter()
@@ -28,12 +29,12 @@ def _valid_signature(body: bytes, signature: str | None) -> bool:
     return hmac.compare_digest(signature.removeprefix("sha256="), expected)
 
 
-async def _fetch_lead(leadgen_id: str) -> dict:
+async def _fetch_lead(leadgen_id: str, access_token: str) -> dict:
     url = f"https://graph.facebook.com/{settings.META_API_VERSION}/{leadgen_id}"
     async with httpx.AsyncClient(timeout=20.0) as client:
         response = await client.get(url, params={
-            "access_token": settings.META_ACCESS_TOKEN,
-            "fields": "id,created_time,field_data",
+            "access_token": access_token,
+            "fields": "id,created_time,ad_id,form_id,field_data",
         })
         response.raise_for_status()
         return response.json()
@@ -62,6 +63,7 @@ def verify(
 @router.post("/meta")
 async def receive(
     request: Request,
+    background_tasks: BackgroundTasks,
     x_hub_signature_256: str | None = Header(None),
     db: Session = Depends(get_db),
 ):
@@ -113,7 +115,9 @@ async def receive(
                     event.processed_at = datetime.utcnow()
                     db.commit()
                     continue
-                details = await _fetch_lead(str(leadgen_id))
+                details = await _fetch_lead(
+                    str(leadgen_id), decrypt_connection_token(campaign.meta_connection)
+                )
                 fields = _fields(details)
                 project = campaign.project
                 phone = fields.get("phone_number") or fields.get("phone") or ""
@@ -128,20 +132,34 @@ async def receive(
                     source="Meta Lead Ads",
                     platform="meta",
                     external_lead_id=str(leadgen_id),
-                    preferred_channel="whatsapp" if phone else "email",
+                    preferred_channel="sms" if phone else "email",
                     channel_address=phone or fields.get("email"),
                     consent_status="captured_by_source",
                     consent_captured_at=datetime.utcnow(),
-                    meta_form_data=fields,
-                    agent_status="draft",
-                    assigned_sales_user_id=select_next_sales_user(db, project.id),
+                    meta_form_data={
+                        **fields,
+                        "leadgen_id": str(leadgen_id),
+                        "form_id": str(form_id),
+                        "ad_id": str(details.get("ad_id") or value.get("ad_id") or "") or None,
+                        "campaign_id": campaign.external_campaign_id,
+                        "campaign_name": campaign.name,
+                        "campaign_objective": campaign.objective,
+                    },
+                    agent_status="queued",
+                    pipeline_stage="S00_CAPTURE",
+                    assigned_sales_user_id=None,
                 )
-                db.add(lead)
+                db.add(lead); db.flush()
+                db.add(LeadConsentEvent(
+                    lead_id=lead.id, channel="sms", action="consent_captured",
+                    source="meta_lead_form", evidence="Captured by configured Meta lead form.",
+                ))
                 event.status = "processed"
                 event.processed_at = datetime.utcnow()
                 db.commit()
+                background_tasks.add_task(start_live_lead, lead.id)
                 accepted += 1
-            except (httpx.HTTPError, IntegrityError) as exc:
+            except (httpx.HTTPError, IntegrityError, ValueError) as exc:
                 db.rollback()
                 failed = ExternalWebhookEvent(
                     platform="meta",

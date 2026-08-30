@@ -197,6 +197,13 @@ export const routes: Routes = [
           import('./pages/client/marketing/marketing').then((m) => m.MarketingComponent),
       },
       {
+        path: 'leads',
+        canActivate: [roleGuard],
+        data: { roles: ['admin', 'assistant'] },
+        loadComponent: () =>
+          import('./pages/client/leads/leads').then((m) => m.LeadsComponent),
+      },
+      {
         path: 'schedule',
         canActivate: [roleGuard],
         data: { roles: ['admin', 'assistant', 'sales'] },

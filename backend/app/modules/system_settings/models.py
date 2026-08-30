@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, DateTime, Text
+from sqlalchemy import Boolean, Column, String, DateTime, Text
 import uuid
 from datetime import datetime
 from app.db.postgres import Base
@@ -23,8 +23,15 @@ class TwilioConfig(Base):
     
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     account_sid = Column(String(255), nullable=True)
+    # Kept temporarily for a non-destructive migration from the legacy schema.
     auth_token = Column(String(255), nullable=True)
+    auth_token_ciphertext = Column(Text, nullable=True)
+    auth_token_hint = Column(String(12), nullable=True)
     from_phone_number = Column(String(50), nullable=True)
+    live_sms_enabled = Column(Boolean, default=False, nullable=False)
+    verification_status = Column(String(30), default="not_configured", nullable=False)
+    verified_at = Column(DateTime, nullable=True)
+    last_error = Column(Text, nullable=True)
     
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

@@ -1,3 +1,5 @@
+import asyncio
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware 
 from app.core.config import settings
@@ -23,6 +25,8 @@ from app.modules.health.router import router as health_router
 from app.modules.project_team.router import router as project_team_router
 from app.modules.sales_agent.router import router as sales_agent_router
 from app.modules.meta_leads.router import router as meta_leads_router
+from app.modules.sales_agent.provider_router import router as sales_provider_router
+from app.modules.sales_agent.live_worker import run_live_followup_worker
 
 from sqlalchemy import text
 from app.db.postgres import engine
@@ -79,6 +83,7 @@ app.include_router(health_router, prefix=f"{settings.API_V1_STR}/health", tags=[
 app.include_router(project_team_router, prefix=f"{settings.API_V1_STR}/projects", tags=["Project Team & Routing"])
 app.include_router(sales_agent_router, prefix=f"{settings.API_V1_STR}/sales-agent", tags=["Sales Agent"])
 app.include_router(meta_leads_router, prefix=f"{settings.API_V1_STR}/webhooks", tags=["Meta Lead Ads"])
+app.include_router(sales_provider_router, prefix=f"{settings.API_V1_STR}/webhooks/twilio", tags=["Twilio Messaging"])
 
 @app.get("/", tags=["Health"])
 def health_check():
@@ -93,3 +98,17 @@ def fix_database_schema():
             print("✅ EXCELENTE: Columna 'created_at' inyectada forzosamente en PostgreSQL")
         except Exception as e:
             pass
+
+
+@app.on_event("startup")
+async def start_live_followup_worker():
+    app.state.live_followup_stop = asyncio.Event()
+    app.state.live_followup_task = asyncio.create_task(
+        run_live_followup_worker(app.state.live_followup_stop)
+    )
+
+
+@app.on_event("shutdown")
+async def stop_live_followup_worker():
+    app.state.live_followup_stop.set()
+    await app.state.live_followup_task

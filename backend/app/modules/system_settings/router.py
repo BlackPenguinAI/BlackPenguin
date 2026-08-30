@@ -43,7 +43,7 @@ def get_messaging_settings(
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN]))
 ):
-    return services.get_twilio_config(db)
+    return services.twilio_config_response(services.get_twilio_config(db))
 
 @router.put("/messaging-settings", response_model=TwilioConfigSchema, summary="Actualizar configuración de Twilio SMS")
 def update_messaging_settings(
@@ -51,7 +51,15 @@ def update_messaging_settings(
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN]))
 ):
-    return services.update_twilio_config(db, payload)
+    return services.twilio_config_response(services.update_twilio_config(db, payload))
+
+
+@router.post("/messaging-settings/verify", response_model=TwilioConfigSchema, summary="Verificar configuración de Twilio")
+def verify_messaging_settings(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN])),
+):
+    return services.twilio_config_response(services.verify_twilio_config(db))
 
 # =========================================================
 # 📄 DOCUMENTOS LEGALES (PRIVACY & TERMS)

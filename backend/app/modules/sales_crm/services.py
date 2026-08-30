@@ -3,7 +3,10 @@ from fastapi import HTTPException
 from typing import List, Optional
 from datetime import datetime, timedelta
 
-from .models import Lead, LeadStageHistory, SmsChatMessage, Meeting, MeetingAttachment, FunnelStage, MeetingStatus
+from .models import (
+    Lead, LeadObjection, LeadScoreSnapshot, LeadSegmentAssignment, LeadStageHistory,
+    SmsChatMessage, Meeting, MeetingAttachment, FunnelStage, MeetingStatus,
+)
 from .schemas import LeadUpdate, MeetingCreate, MeetingUpdate
 from app.modules.brokers.models import Broker
 from app.modules.projects.models import Project
@@ -18,6 +21,19 @@ def get_project_leads(db: Session, company_id: str, project_id: str, sales_user_
     if sales_user_id:
         query = query.filter(Lead.assigned_sales_user_id == sales_user_id)
     return query.order_by(Lead.created_at.desc()).all()
+
+
+def get_company_leads(
+    db: Session, company_id: str, *, project_ids: list[str], project_id: str | None = None,
+    tier: str | None = None, segment: str | None = None, stage: str | None = None,
+) -> List[Lead]:
+    query = db.query(Lead).filter(Lead.company_id == company_id)
+    query = query.filter(Lead.project_id.in_(project_ids)) if project_ids else query.filter(Lead.project_id == "")
+    if project_id: query = query.filter(Lead.project_id == project_id)
+    if tier: query = query.filter(Lead.intent_tier == tier)
+    if segment: query = query.filter(Lead.assigned_segment == segment)
+    if stage: query = query.filter(Lead.pipeline_stage == stage)
+    return query.order_by(Lead.last_interaction_at.desc().nullslast(), Lead.created_at.desc()).all()
 
 def get_lead_sms_chat(
     db: Session, lead_id: str, company_id: str, sales_user_id: str | None = None,
@@ -75,6 +91,22 @@ def get_lead_detail(db: Session, lead_id: str, company_id: str, sales_user_id: s
             {"id": message.id, "role": message.role, "content": message.content, "created_at": message.created_at}
             for message in get_lead_sms_chat(db, lead.id, company_id, sales_user_id)
         ],
+        "score_history": [
+            {"total_score": item.total_score, "tier": item.assigned_tier, "factors": item.factor_breakdown, "version": item.scoring_version, "created_at": item.created_at}
+            for item in db.query(LeadScoreSnapshot).filter(LeadScoreSnapshot.lead_id == lead.id).order_by(LeadScoreSnapshot.created_at.desc()).limit(20)
+        ],
+        "segment_history": [
+            {"segment": item.segment, "confidence": float(item.confidence or 0), "reasons": item.reasons, "version": item.strategy_version, "is_current": item.is_current, "created_at": item.created_at}
+            for item in db.query(LeadSegmentAssignment).filter(LeadSegmentAssignment.lead_id == lead.id).order_by(LeadSegmentAssignment.created_at.desc()).limit(20)
+        ],
+        "objections": [
+            {"type": item.objection_type, "evidence": item.evidence, "status": item.status, "count": item.occurrence_count, "updated_at": item.updated_at}
+            for item in db.query(LeadObjection).filter(LeadObjection.lead_id == lead.id).order_by(LeadObjection.updated_at.desc())
+        ],
+        "conversation": ({
+            "id": conversation.id, "channel": conversation.channel, "stage": conversation.stage,
+            "is_paused": conversation.is_paused, "pause_reason": conversation.pause_reason,
+        } if conversation else None),
     }
 
 def update_lead(db: Session, lead_id: str, company_id: str, payload: LeadUpdate, actor_id: str | None = None, sales_user_id: str | None = None) -> Lead:
@@ -269,6 +301,27 @@ def update_meeting(db: Session, meeting_id: str, company_id: str, payload: Meeti
                 lead_id=meeting.lead.id, from_stage=previous_stage, to_stage=FunnelStage.CLOSED.value,
                 actor_type="user", actor_id=sales_user_id, reason="Sale closed from property visit",
             ))
+        if requested_status in {MeetingStatus.COMPLETED, MeetingStatus.COMPLETED_SALE_PENDING, MeetingStatus.SALE_CLOSED}:
+            meeting.lead.pipeline_stage = "S09_HANDOFF"
+            meeting.lead.next_action_at = None
+        elif requested_status in {MeetingStatus.NO_SHOW, MeetingStatus.CANCELLED}:
+            from app.modules.sales_agent.models import SalesConversation, SalesFollowUpJob
+            conversation = db.query(SalesConversation).filter(
+                SalesConversation.lead_id == meeting.lead.id,
+                SalesConversation.channel == "sms",
+            ).first()
+            meeting.lead.pipeline_stage = "S06_NURTURE"
+            meeting.lead.agent_status = "active"
+            if conversation and not meeting.lead.is_opt_out:
+                conversation.is_paused = False
+                conversation.pause_reason = None
+                scheduled_at = now + timedelta(days=14 if meeting.lead.intent_tier == "cold" else 3)
+                db.add(SalesFollowUpJob(
+                    conversation_id=conversation.id,
+                    idempotency_key=f"meeting-outcome:{meeting.id}:{requested_status.value}",
+                    scheduled_at=scheduled_at, reason="appointment_outcome_nurture", attempt_number=1,
+                ))
+                meeting.lead.next_action_at = scheduled_at
     for field, value in updates.items():
         setattr(meeting, field, value)
     db.add(meeting); db.commit(); db.refresh(meeting)

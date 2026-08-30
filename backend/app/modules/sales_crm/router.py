@@ -1,20 +1,24 @@
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse, Response
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime, timezone
 from pathlib import Path
 import uuid
+from datetime import timedelta
+import httpx
+from jose import JWTError, jwt
 
 from app.db.postgres import get_db
+from app.core.config import settings
+from app.core.secret_store import encrypt_secret
+from app.integrations.gcalendar_client import authorization_url, exchange_code, SCOPES
 from app.modules.auth.deps import RoleChecker
 from app.modules.users.models import TENANT_MANAGER_ROLES, User, UserRole
-from app.modules.users.project_access import require_project_access
+from app.modules.users.project_access import project_ids_for_user, require_project_access
 from app.modules.project_team.service import eligible_sales_assignments
-from app.modules.ai_core.services import get_ai_config
-from app.integrations.openrouter_client import generate_llm_response
 
-from .models import Lead, SmsChatMessage, Meeting, MeetingAttachment, MeetingStatus, SalesAvailabilityBlock, FunnelStage
+from .models import CalendarConnection, Lead, SmsChatMessage, Meeting, MeetingAttachment, MeetingStatus, SalesAvailabilityBlock, FunnelStage
 from .schemas import (
     AvailabilityBlockCreate, AvailabilityBlockResponse, AvailabilityUpdate, AvailabilityWindowResponse,
     CalendarConnectionResponse, CalendarConnectionUpdate, LeadResponse, LeadUpdate,
@@ -32,6 +36,32 @@ ATTACHMENT_RULES = {
     "visit_photo": ({"image/jpeg", "image/png", "image/webp"}, 10 * 1024 * 1024),
     "sale_evidence": ({"image/jpeg", "image/png", "image/webp", "application/pdf"}, 15 * 1024 * 1024),
 }
+
+
+@router.get("/public/meetings/{meeting_id}.ics")
+def public_calendar_invite(meeting_id: str, token: str, db: Session = Depends(get_db)):
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        if payload.get("purpose") != "calendar_invite" or payload.get("meeting_id") != meeting_id:
+            raise JWTError("invalid calendar token")
+    except JWTError as exc:
+        raise HTTPException(status_code=403, detail="Invalid or expired calendar invitation.") from exc
+    meeting = db.query(Meeting).filter(Meeting.id == meeting_id).first()
+    if not meeting:
+        raise HTTPException(status_code=404, detail="Meeting not found.")
+    project = db.query(Project).filter(Project.id == meeting.project_id).one()
+    end = meeting.meeting_time + timedelta(minutes=meeting.duration_minutes)
+    stamp = lambda value: value.strftime("%Y%m%dT%H%M%SZ")
+    location = ", ".join(value for value in (project.name, project.address, project.city, project.country) if value).replace(",", "\\,")
+    content = "\r\n".join([
+        "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Black Penguin//AI Sales Agent//EN",
+        "BEGIN:VEVENT", f"UID:{meeting.id}@blackpenguin.ai", f"DTSTAMP:{stamp(datetime.utcnow())}",
+        f"DTSTART:{stamp(meeting.meeting_time)}", f"DTEND:{stamp(end)}",
+        f"SUMMARY:{project.name} property visit", f"LOCATION:{location}",
+        "DESCRIPTION:Appointment coordinated by Black Penguin AI Sales Agent.",
+        "END:VEVENT", "END:VCALENDAR", "",
+    ])
+    return Response(content=content, media_type="text/calendar", headers={"Content-Disposition": f'attachment; filename="blackpenguin-{meeting.id}.ics"'})
 
 
 def _meeting_response(meeting: Meeting, db: Session) -> MeetingResponse:
@@ -65,6 +95,22 @@ def get_leads_report(
 ):
     sales_user_id = current_user.id if current_user.role == UserRole.SALES else None
     return services.get_project_leads(db, current_user.company_id, project_id, sales_user_id)
+
+
+@router.get("/leads", response_model=List[LeadResponse], summary="Company Lead Record index")
+def get_company_leads(
+    project_id: Optional[str] = None,
+    tier: Optional[str] = None,
+    segment: Optional[str] = None,
+    stage: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker(TENANT_MANAGER_ROLES)),
+):
+    if project_id: require_project_access(db, current_user, project_id)
+    return services.get_company_leads(
+        db, current_user.company_id, project_ids=project_ids_for_user(db, current_user),
+        project_id=project_id, tier=tier, segment=segment, stage=stage,
+    )
 
 @router.get("/leads/{lead_id}/chat", response_model=List[SmsChatMessageSchema], summary="Historial de Chat SMS con el Lead")
 def get_lead_chat(
@@ -482,43 +528,60 @@ def set_my_calendar_connection(
         calendar_id=payload.calendar_id,
     )
 
+
+@router.get("/calendar/google/connect")
+def connect_google_calendar(
+    current_user: User = Depends(RoleChecker([UserRole.SALES])),
+):
+    if not settings.GOOGLE_CALENDAR_CLIENT_ID or not settings.GOOGLE_CALENDAR_CLIENT_SECRET:
+        raise HTTPException(status_code=409, detail="Google Calendar OAuth is not configured by Black Penguin.")
+    state = jwt.encode({
+        "sub": current_user.id,
+        "purpose": "google_calendar",
+        "exp": datetime.utcnow() + timedelta(minutes=10),
+    }, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+    return {"authorization_url": authorization_url(state, current_user.email)}
+
+
+@router.get("/calendar/google/callback")
+def google_calendar_callback(
+    code: str, state: str, db: Session = Depends(get_db),
+):
+    try:
+        payload = jwt.decode(state, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        if payload.get("purpose") != "google_calendar": raise JWTError("invalid purpose")
+        user = db.query(User).filter(User.id == payload.get("sub"), User.role == UserRole.SALES, User.is_active.is_(True)).one()
+        tokens = exchange_code(code)
+    except (JWTError, httpx.HTTPError, ValueError):
+        return RedirectResponse(f"{settings.PUBLIC_APP_URL}/app/schedule?calendar=failed")
+    item = db.query(CalendarConnection).filter(CalendarConnection.user_id == user.id, CalendarConnection.provider == "google").first()
+    if not item:
+        item = CalendarConnection(user_id=user.id, provider="google", calendar_id="primary")
+    item.access_token_ciphertext = encrypt_secret(tokens.get("access_token"))
+    if tokens.get("refresh_token"): item.refresh_token_ciphertext = encrypt_secret(tokens["refresh_token"])
+    item.token_expires_at = datetime.utcnow() + timedelta(seconds=int(tokens.get("expires_in", 3600)))
+    item.scopes = tokens.get("scope", " ".join(SCOPES)).split()
+    item.status = "connected"; item.last_error = None; item.last_synced_at = datetime.utcnow()
+    db.add(item); db.commit()
+    return RedirectResponse(f"{settings.PUBLIC_APP_URL}/app/schedule?calendar=connected")
+
+
+@router.delete("/calendar/google", status_code=status.HTTP_204_NO_CONTENT)
+def disconnect_google_calendar(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([UserRole.SALES])),
+):
+    item = db.query(CalendarConnection).filter(CalendarConnection.user_id == current_user.id, CalendarConnection.provider == "google").first()
+    if item: db.delete(item); db.commit()
+
 # =========================================================
 # 📲 TWILIO SMS WEBHOOK (Entrada de mensajes del prospecto)
 # =========================================================
 @router.post("/webhook/twilio", summary="Webhook entrante de Twilio SMS")
 async def twilio_sms_webhook(
-    From: str = Form(...),
-    Body: str = Form(...),
     db: Session = Depends(get_db)
 ):
-    # 1. Buscar prospecto por teléfono
-    lead = db.query(Lead).filter(Lead.phone == From).first()
-    if not lead:
-        return {"status": "ignored", "reason": "Número no registrado"}
-
-    # 2. Guardar mensaje del prospecto
-    user_msg = SmsChatMessage(lead_id=lead.id, role="user", content=Body)
-    db.add(user_msg)
-    db.commit()
-
-    # 3. Consultar configuración del Agente de Ventas
-    ai_config = get_ai_config(db, company_id=lead.company_id)
-    agent_config = ai_config.agent_ventas
-    
-    system_instruction = f"{agent_config.get('system_prompt', '')}\n\nProtocolo:\n{agent_config.get('protocol_prompt', '')}\n\nGuardrails:\n{agent_config.get('guardrails_prompt', '')}"
-    
-    chat_history = db.query(SmsChatMessage).filter(SmsChatMessage.lead_id == lead.id).order_by(SmsChatMessage.created_at.asc()).all()
-    messages_payload = [{"role": "system", "content": system_instruction}]
-    for msg in chat_history[-10:]:
-        messages_payload.append({"role": "user" if msg.role == "user" else "assistant", "content": msg.content})
-
-    # 4. Generar respuesta con la IA de Ventas
-    model = agent_config.get("model", "openai/gpt-4o-mini")
-    ai_reply = await generate_llm_response(ai_config.openrouter_api_key, model, messages_payload)
-
-    # 5. Guardar respuesta del Agente
-    ai_msg = SmsChatMessage(lead_id=lead.id, role="assistant", content=ai_reply)
-    db.add(ai_msg)
-    db.commit()
-
-    return {"status": "success", "reply": ai_reply}
+    raise HTTPException(
+        status_code=410,
+        detail="Legacy unsigned webhook disabled. Configure Twilio to use /api/v1/webhooks/twilio/sms.",
+    )

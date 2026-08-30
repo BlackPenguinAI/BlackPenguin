@@ -23,6 +23,10 @@ class LeadResponse(BaseModel):
     preferred_channel: Optional[str] = None
     consent_status: str = "unknown"
     intent_score: float
+    intent_tier: str = "cold"
+    assigned_segment: Optional[str] = None
+    buyer_type: Optional[str] = None
+    pipeline_stage: str = "S00_CAPTURE"
     is_opt_out: bool
     funnel_stage: FunnelStage
     qualification_summary: Optional[str] = None
@@ -44,6 +48,10 @@ class SalesLeadDetailResponse(LeadResponse):
     chat_summary: Optional[str] = None
     visit_recommendations: Optional[str] = None
     chat_messages: List[SmsChatMessageSchema] = Field(default_factory=list)
+    score_history: List[dict] = Field(default_factory=list)
+    segment_history: List[dict] = Field(default_factory=list)
+    objections: List[dict] = Field(default_factory=list)
+    conversation: Optional[dict] = None
 
 class LeadUpdate(BaseModel):
     funnel_stage: FunnelStage

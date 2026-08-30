@@ -185,6 +185,8 @@ export class SalesComponent implements OnInit {
   private loadProjects(): void { this.http.get<any[]>(`${API_V1_URL}/projects/`).subscribe({ next: rows => { this.projects = rows || []; this.cdr.markForCheck(); } }); }
   private loadLeads(): void { this.http.get<any[]>(`${API_V1_URL}/sales/projects/${this.projectId}/leads-report`).subscribe({ next: rows => { this.leads = rows || []; this.cdr.markForCheck(); }, error: () => { this.leads = []; this.cdr.markForCheck(); } }); }
   private loadCalendarConnection(): void { this.http.get<any[]>(`${API_V1_URL}/sales/calendar-connections/me`).subscribe({ next: rows => { this.calendarStatus = rows[0]?.status || 'not_connected'; this.cdr.markForCheck(); } }); }
+  connectGoogleCalendar(): void { this.http.get<any>(`${API_V1_URL}/sales/calendar/google/connect`).subscribe({ next: value => window.location.assign(value.authorization_url), error: err => { this.error = err.error?.detail || 'Google Calendar connection could not start.'; this.cdr.markForCheck(); } }); }
+  disconnectGoogleCalendar(): void { this.http.delete(`${API_V1_URL}/sales/calendar/google`).subscribe({ next: () => { this.calendarStatus = 'not_connected'; this.success = 'Google Calendar disconnected.'; this.cdr.markForCheck(); }, error: err => { this.error = err.error?.detail || 'Google Calendar could not be disconnected.'; } }); }
   private refreshMeeting(row: any): void { const index = this.meetings.findIndex(item => item.id === row.id); if (index >= 0) this.meetings[index] = row; }
   private startOfDay(value: Date): Date { return new Date(value.getFullYear(), value.getMonth(), value.getDate()); }
   private localDateKey(date: Date): string { return `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`; }
