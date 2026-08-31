@@ -7,7 +7,7 @@ from dateutil.relativedelta import relativedelta
 from app.db.postgres import get_db
 from app.modules.auth.deps import RoleChecker
 from app.modules.users.models import User, UserRole
-from app.core.security import get_password_hash
+from app.modules.users import services as user_services
 
 from .models import Company
 from .schemas import CompanyResponse
@@ -27,7 +27,6 @@ def create_company_workspace(
     admin_first_name: str = Form(...),
     admin_last_name: str = Form(...),
     admin_email: str = Form(...),
-    admin_password: str = Form(...),
     is_active: str = Form('true'),       # 🚀 Company Status (default 'true')
     admin_is_active: str = Form('true'), # 🚀 User Status (default 'true')
     start_date: Optional[str] = Form(None),
@@ -66,20 +65,16 @@ def create_company_workspace(
     db.add(new_company)
     db.flush()
 
-    # Crear Admin con su estado seleccionado
-    new_admin = User(
-        email=admin_email, 
-        hashed_password=get_password_hash(admin_password),
-        first_name=admin_first_name, 
-        last_name=admin_last_name,
-        role=UserRole.ADMIN, 
-        company_id=new_company.id, 
-        is_active=admin_is_active_bool
-    )
     try:
-        db.add(new_admin)
-        db.flush()
-        db.commit()
+        new_admin = user_services.invite_company_administrator(
+            db,
+            company_id=new_company.id,
+            email=admin_email,
+            first_name=admin_first_name,
+            last_name=admin_last_name,
+            is_active=admin_is_active_bool,
+            invited_by_user_id=current_user.id,
+        )
         db.refresh(new_company)
     except Exception:
         db.rollback()
@@ -115,7 +110,6 @@ def update_company(
     is_active: str = Form('true'),       
     admin_is_active: str = Form('true'), 
     start_date: Optional[str] = Form(None),
-    admin_password: Optional[str] = Form(None),
     receipt_file: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN]))
@@ -148,17 +142,16 @@ def update_company(
 
     admin_user = db.query(User).filter(User.company_id == company_id, User.role == UserRole.ADMIN).first()
     if admin_user:
-        if admin_user.email != admin_email:
-            if db.query(User).filter(User.email == admin_email).first():
-                raise HTTPException(status_code=400, detail="The email is already registered.")
+        if admin_user.email != admin_email.strip().casefold():
+            raise HTTPException(
+                status_code=422,
+                detail="Administrator email cannot be changed here. Invite a replacement through a verified identity workflow.",
+            )
         
         admin_user.first_name = admin_first_name
         admin_user.last_name = admin_last_name
-        admin_user.email = admin_email
-        admin_user.is_active = admin_is_active_bool
-
-        if admin_password and admin_password.strip():
-            admin_user.hashed_password = get_password_hash(admin_password)
+        if admin_user.is_active != admin_is_active_bool:
+            user_services.set_user_enabled(db, user=admin_user, enabled=admin_is_active_bool)
 
     db.commit()
     db.refresh(company)
@@ -194,4 +187,10 @@ def resend_activation(
     if not company:
         raise HTTPException(status_code=404, detail="Company not found.")
     
+    admin_user = db.query(User).filter(
+        User.company_id == company_id, User.role == UserRole.ADMIN,
+    ).first()
+    if not admin_user:
+        raise HTTPException(status_code=404, detail="Company administrator not found.")
+    user_services.resend_user_activation(db, user=admin_user, invited_by_user_id=current_user.id)
     return {"detail": "Activation link sent"}

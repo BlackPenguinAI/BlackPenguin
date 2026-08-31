@@ -4,7 +4,7 @@
   <div class="bp-page__container bp-page__container--form">
     <div class="mb-8 border-b border-white/10 pb-6">
       <h1 class="text-3xl font-light tracking-tight">Email <span class="text-secondary font-medium">Settings</span></h1>
-      <p class="text-sm text-gray-400 mt-1">Configure Firebase Admin SDK to handle system emails and notifications.</p>
+      <p class="text-sm text-gray-400 mt-1">Configure Firebase Authentication for invitations, activation and password recovery.</p>
     </div>
 
     <div *ngIf="isLoading" class="flex justify-center py-24">
@@ -18,9 +18,20 @@
         <app-glass-card title="Firebase Project Details" icon="cloud" class="mb-6 block">
           <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
             <app-input label="Project ID" [(ngModel)]="firebaseConfig.project_id" name="project_id" placeholder="my-firebase-project-123"></app-input>
-            <app-input label="Web API Key (Optional)" [(ngModel)]="firebaseConfig.api_key" name="api_key" placeholder="AIzaSyA..."></app-input>
+            <app-input label="Web API Key" [(ngModel)]="firebaseConfig.api_key" name="api_key" placeholder="AIzaSyA..."></app-input>
             <app-input label="Auth Domain (Optional)" [(ngModel)]="firebaseConfig.auth_domain" name="auth_domain" placeholder="project.firebaseapp.com"></app-input>
           </div>
+          <div class="mt-4 grid gap-4 md:grid-cols-2">
+            <app-input label="Action Handler URL" [(ngModel)]="firebaseConfig.action_handler_url" name="action_handler_url"></app-input>
+            <div class="rounded-xl border border-white/10 bg-white/[0.03] p-3 text-xs">
+              <span class="text-gray-500">Status</span>
+              <strong class="ml-2 uppercase" [class.text-green-400]="firebaseConfig.verification_status === 'verified'" [class.text-red-300]="firebaseConfig.verification_status === 'failed'">{{ firebaseConfig.verification_status }}</strong>
+              <p *ngIf="firebaseConfig.credentials_hint" class="mt-2 text-gray-400">{{ firebaseConfig.credentials_hint }}</p>
+            </div>
+          </div>
+          <p class="mt-4 rounded-xl border border-blue-500/20 bg-blue-500/5 p-3 text-xs leading-relaxed text-blue-200">
+            In Firebase Console, enable Email/Password, authorize <strong>blackpenguin.ai</strong>, and set this URL as the custom password-action handler. Firebase uses it for both first-time activation and secure password recovery.
+          </p>
         </app-glass-card>
 
         <app-glass-card title="Service Account Credentials" icon="key">
@@ -42,7 +53,7 @@
           <div class="relative w-full rounded-xl overflow-hidden border border-white/10 focus-within:border-secondary/50 bg-black/50 transition-colors">
             <div class="bg-white/5 border-b border-white/10 px-4 py-2 flex items-center justify-between">
               <span class="text-[10px] font-mono uppercase tracking-widest text-gray-400">credentials.json</span>
-              <span class="material-symbols-outlined text-[16px] text-green-400" *ngIf="firebaseConfig.credentials_json && firebaseConfig.credentials_json.includes('private_key')">check_circle</span>
+              <span class="material-symbols-outlined text-[16px] text-green-400" *ngIf="firebaseConfig.credentials_configured || (firebaseConfig.credentials_json && firebaseConfig.credentials_json.includes('private_key'))">check_circle</span>
             </div>
             <textarea 
               [(ngModel)]="firebaseConfig.credentials_json" 
@@ -50,15 +61,19 @@
               rows="14" 
               spellcheck="false"
               class="w-full bg-transparent p-4 text-xs font-mono text-gray-300 outline-none resize-y"
-              placeholder="&#123;
-  &quot;type&quot;: &quot;service_account&quot;,
-  &quot;project_id&quot;: &quot;...&quot;,
-  &quot;private_key&quot;: &quot;...&quot;
-&#125;">
+              [placeholder]="firebaseConfig.credentials_configured ? 'A service account is already encrypted. Upload only to rotate it.' : 'Paste the Service Account JSON here.'">
             </textarea>
           </div>
 
-          <div class="flex justify-end border-t border-white/10 pt-6 mt-6">
+          <div class="mt-5 flex items-center justify-between rounded-xl border border-white/10 p-4">
+            <div><p class="text-sm font-medium">Enable Firebase Authentication</p><p class="text-xs text-gray-500">Enable only after Test Connection succeeds.</p></div>
+            <input type="checkbox" [(ngModel)]="firebaseConfig.is_enabled" name="is_enabled" [disabled]="firebaseConfig.verification_status !== 'verified'" class="h-5 w-5 accent-yellow-400">
+          </div>
+
+          <div class="flex justify-end gap-3 border-t border-white/10 pt-6 mt-6">
+            <app-button type="button" variant="ghost" icon="verified" [isLoading]="isTesting" (onClick)="testConnection()">
+              Test Connection
+            </app-button>
             <app-button type="submit" variant="primary" icon="save" [isLoading]="isSaving">
               Save Firebase Config
             </app-button>

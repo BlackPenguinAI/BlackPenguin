@@ -18,7 +18,11 @@ export const authInterceptor: HttpInterceptorFn = (request, next) => {
   const isPublicAuthRequest =
     request.url.includes('/auth/login') ||
     request.url.includes('/auth/register') ||
-    request.url.includes('/auth/set-password');
+    request.url.includes('/auth/set-password') ||
+    request.url.includes('/auth/firebase/action-code') ||
+    request.url.includes('/auth/firebase/complete-invitation') ||
+    request.url.includes('/auth/firebase/exchange') ||
+    request.url.includes('/auth/forgot-password');
 
   const outgoingRequest = token && isApiRequest && !isPublicAuthRequest
     ? request.clone({

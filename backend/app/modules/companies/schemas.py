@@ -18,6 +18,8 @@ class UserBasicResponse(BaseModel):
     last_name: Optional[str] = None
     role: str
     is_active: bool
+    auth_status: str = "active"
+    invitation_sent_at: Optional[datetime] = None
     
     model_config = ConfigDict(from_attributes=True)
 

@@ -20,6 +20,9 @@ export interface CompanyUser {
   project_access_scope?: 'all' | 'selected';
   project_ids?: string[];
   project_assignment_required: boolean;
+  auth_status: 'invited' | 'active' | 'suspended' | 'provisioning_failed' | 'migration_required';
+  invitation_sent_at?: string;
+  activated_at?: string;
 }
 
 export interface CompanyUserInvite {
@@ -27,16 +30,13 @@ export interface CompanyUserInvite {
   last_name: string;
   email: string;
   role: InvitableCompanyUserRole;
-  password: string;
   is_active: boolean;
   timezone?: string;
   project_access_scope?: 'all' | 'selected';
   project_ids?: string[];
 }
 
-export interface CompanyUserUpdate extends Omit<CompanyUserInvite, 'email' | 'password'> {
-  password?: string;
-}
+export interface CompanyUserUpdate extends Omit<CompanyUserInvite, 'email'> {}
 
 export interface CompanyProjectOption { id: string; name: string; }
 
@@ -79,6 +79,12 @@ export class CompanyUsersService {
     return this.http.post<{ detail: string }>(
       `${API_V1_URL}/users/company/${userId}/resend-activation`,
       {},
+    );
+  }
+
+  revokeInvitation(userId: string): Observable<{ detail: string }> {
+    return this.http.delete<{ detail: string }>(
+      API_V1_URL + '/users/company/' + userId + '/invitation',
     );
   }
 }

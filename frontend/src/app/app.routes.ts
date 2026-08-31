@@ -23,6 +23,13 @@ export const routes: Routes = [
       import('./pages/register/register').then((m) => m.RegisterComponent),
   },
   {
+    path: 'activate-account',
+    loadComponent: () =>
+      import('./pages/activate-account/activate-account').then(
+        (m) => m.ActivateAccountComponent
+      ),
+  },
+  {
     path: 'set-password',
     loadComponent: () =>
       import('./pages/set-password/set-password').then(

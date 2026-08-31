@@ -140,7 +140,9 @@ def invite_and_assign_sales_user(
         db.rollback()
         raise
     try:
-        user_services.send_user_activation(user)
+        user_services.provision_invitation(
+            db, user=user, invited_by_user_id=current_user.id,
+        )
     except Exception:
         pass
     return _serialize(assignment)

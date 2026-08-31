@@ -174,8 +174,6 @@ export interface TeamMemberInvite {
   last_name: string;
   email: string;
   role: TeamRole;
-  password: string;
-  is_active: boolean;
   timezone?: string;
   project_access_scope?: 'all' | 'selected';
   project_ids?: string[];

@@ -26,6 +26,22 @@ class MultiTenantMiddleware(BaseHTTPMiddleware):
             f"{settings.API_V1_STR}/health/ready",
         }
 
+        is_google_calendar_callback = (
+            request.method == "GET"
+            and path == f"{settings.API_V1_STR}/sales/calendar/google/callback"
+        )
+        is_public_calendar_invite = (
+            request.method == "GET"
+            and path.startswith(f"{settings.API_V1_STR}/sales/public/meetings/")
+            and path.endswith(".ics")
+        )
+        is_public_firebase_action = request.method == "POST" and path in {
+            f"{settings.API_V1_STR}/auth/firebase/action-code",
+            f"{settings.API_V1_STR}/auth/firebase/complete-invitation",
+            f"{settings.API_V1_STR}/auth/firebase/exchange",
+            f"{settings.API_V1_STR}/auth/forgot-password",
+        }
+
         if (
             path
             in [
@@ -38,6 +54,9 @@ class MultiTenantMiddleware(BaseHTTPMiddleware):
             or is_public_legal_route
             or is_waitlist_post
             or is_health_route
+            or is_google_calendar_callback
+            or is_public_calendar_invite
+            or is_public_firebase_action
         ):
             return await call_next(request)
 

@@ -35,20 +35,25 @@ export class AuthService {
     return this.http.post(`${this.apiUrl}/auth/login`, formData.toString(), {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
     }).pipe(
-      tap((response: any) => {
-        if (response && response.access_token) {
-          localStorage.setItem('bp_token', response.access_token);
-          
-          const role = response.role || 'admin';
-          localStorage.setItem('bp_role', role);
-          
-          if (response.name) {
-            localStorage.setItem('bp_name', response.name); 
-          }
-        }
-      }),
+      tap((response: any) => this.saveSession(response)),
       catchError(this.handleError)
     );
+  }
+
+  inspectActivation(oobCode: string): Observable<any> {
+    return this.http.post(this.apiUrl + '/auth/firebase/action-code', { oob_code: oobCode })
+      .pipe(catchError(this.handleError));
+  }
+
+  completeActivation(oobCode: string, newPassword: string): Observable<any> {
+    return this.http.post(this.apiUrl + '/auth/firebase/complete-invitation', {
+      oob_code: oobCode, new_password: newPassword,
+    }).pipe(tap((response: any) => this.saveSession(response)), catchError(this.handleError));
+  }
+
+  forgotPassword(email: string): Observable<any> {
+    return this.http.post(this.apiUrl + '/auth/forgot-password', { email })
+      .pipe(catchError(this.handleError));
   }
 
   logout() {
@@ -63,6 +68,13 @@ export class AuthService {
 
   getRole(): string | null {
     return localStorage.getItem('bp_role');
+  }
+
+  private saveSession(response: any): void {
+    if (!response?.access_token) return;
+    localStorage.setItem('bp_token', response.access_token);
+    localStorage.setItem('bp_role', response.role || 'admin');
+    if (response.name) localStorage.setItem('bp_name', response.name);
   }
 
   defaultRouteForRole(role: string | null = this.getRole()): string {

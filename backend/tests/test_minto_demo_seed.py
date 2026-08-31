@@ -1,4 +1,5 @@
 from pathlib import Path
+from unittest.mock import patch
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -98,21 +99,21 @@ def test_creating_a_regular_company_no_longer_creates_a_demo_project(monkeypatch
         db.add_all([plan, superadmin])
         db.commit()
 
-        company = create_company_workspace(
-            name="Regular Company",
-            plan_id=plan.id,
-            duration_months=12,
-            admin_first_name="Regular",
-            admin_last_name="Admin",
-            admin_email="regular@example.com",
-            admin_password="safe-test-password",
-            is_active="true",
-            admin_is_active="true",
-            start_date=None,
-            receipt_file=None,
-            db=db,
-            current_user=superadmin,
-        )
+        with patch("app.modules.users.services.provision_invitation"):
+            company = create_company_workspace(
+                name="Regular Company",
+                plan_id=plan.id,
+                duration_months=12,
+                admin_first_name="Regular",
+                admin_last_name="Admin",
+                admin_email="regular@example.com",
+                is_active="true",
+                admin_is_active="true",
+                start_date=None,
+                receipt_file=None,
+                db=db,
+                current_user=superadmin,
+            )
 
         assert db.query(Project).filter(Project.company_id == company.id).count() == 0
     finally:

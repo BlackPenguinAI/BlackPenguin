@@ -42,6 +42,12 @@ class Settings(BaseSettings):
     GOOGLE_CALENDAR_CLIENT_SECRET: str = ""
     GOOGLE_CALENDAR_REDIRECT_URI: str = "https://blackpenguin.ai/api/v1/sales/calendar/google/callback"
 
+    FIREBASE_PROJECT_ID: str = ""
+    FIREBASE_API_KEY: str = ""
+    FIREBASE_AUTH_DOMAIN: str = ""
+    FIREBASE_SERVICE_ACCOUNT_JSON: str = ""
+    FIREBASE_AUTH_MODE: str = "hybrid"
+
     SMTP_SERVER: str = "smtp.gmail.com"
     SMTP_PORT: int = 587
     SMTP_USER: str = ""

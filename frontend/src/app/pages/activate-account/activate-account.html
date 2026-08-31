@@ -1,0 +1,56 @@
+<main class="activation-shell">
+  <section class="activation-card">
+    <a routerLink="/" class="brand"><span>Black</span><strong>Penguin</strong></a>
+
+    <div *ngIf="loading" class="state">
+      <span class="material-symbols-outlined animate-spin">sync</span>
+      <p>Validating your invitation…</p>
+    </div>
+
+    <div *ngIf="!loading && error && !invitation" class="state">
+      <span class="material-symbols-outlined text-red-300">link_off</span>
+      <h1>Invitation unavailable</h1>
+      <p>{{ error }}</p>
+      <a routerLink="/login" class="primary-link">Return to sign in</a>
+    </div>
+
+    <form *ngIf="!loading && invitation" (ngSubmit)="activate()" class="content">
+      <p class="eyebrow">{{ invitation.flow === 'password_reset' ? 'PASSWORD RESET' : 'ACCOUNT ACTIVATION' }}</p>
+      <h1>{{ invitation.flow === 'password_reset' ? 'Choose a new password' : ('Welcome, ' + (invitation.first_name || 'there')) }}</h1>
+      <p class="subtitle" *ngIf="invitation.flow !== 'password_reset'">Create your password to join {{ invitation.company_name || 'Black Penguin' }}.</p>
+      <p class="subtitle" *ngIf="invitation.flow === 'password_reset'">Secure your {{ invitation.company_name || 'Black Penguin' }} account with a new password.</p>
+
+      <div class="context">
+        <div><small>Email</small><span>{{ invitation.email }}</span></div>
+        <div><small>Role</small><span>{{ invitation.role }}</span></div>
+      </div>
+
+      <label>New password
+        <div class="password-field">
+          <input [(ngModel)]="password" name="password" [type]="showPassword ? 'text' : 'password'"
+            autocomplete="new-password" required>
+          <button type="button" (click)="showPassword = !showPassword">
+            <span class="material-symbols-outlined">{{ showPassword ? 'visibility_off' : 'visibility' }}</span>
+          </button>
+        </div>
+      </label>
+      <label>Confirm password
+        <input [(ngModel)]="confirmPassword" name="confirm_password"
+          [type]="showPassword ? 'text' : 'password'" autocomplete="new-password" required>
+      </label>
+
+      <ul class="checks">
+        <li [class.ok]="passwordChecks.length">At least 10 characters</li>
+        <li [class.ok]="passwordChecks.uppercase && passwordChecks.lowercase">Uppercase and lowercase letters</li>
+        <li [class.ok]="passwordChecks.number">At least one number</li>
+        <li [class.ok]="passwordChecks.symbol">At least one symbol</li>
+        <li [class.ok]="confirmPassword && password === confirmPassword">Passwords match</li>
+      </ul>
+
+      <p *ngIf="error" class="error">{{ error }}</p>
+      <button class="activate" type="submit" [disabled]="!valid">
+        {{ saving ? (invitation.flow === 'password_reset' ? 'Updating…' : 'Activating…') : (invitation.flow === 'password_reset' ? 'Update password' : 'Activate account') }}
+      </button>
+    </form>
+  </section>
+</main>

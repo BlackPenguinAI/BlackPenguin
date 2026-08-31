@@ -92,10 +92,9 @@ export class ChatComponent implements OnInit, OnDestroy {
   logoBusy = false;
   readonly companyMediaUrls = new Map<string, string>();
   teamInvite: TeamMemberInvite = {
-    first_name: '', last_name: '', email: '', role: 'assistant', password: '', is_active: true,
+    first_name: '', last_name: '', email: '', role: 'assistant',
     timezone: deviceTimezone(), project_access_scope: 'all', project_ids: [],
   };
-  teamRepeatPassword = '';
   teamProjects: TeamProjectOption[] = [];
   teamTimezoneSearch = '';
   private readonly markdownCache = new Map<string, string>();
@@ -357,9 +356,6 @@ export class ChatComponent implements OnInit, OnDestroy {
     if (!this.teamInvite.last_name.trim()) errors['last_name'] = 'Enter the last name.';
     if (!this.teamInvite.email.trim()) errors['email'] = 'Enter the business email.';
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(this.teamInvite.email.trim())) errors['email'] = 'Enter a valid business email.';
-    if (this.teamInvite.password.length < 4) errors['password'] = 'Use at least 4 characters for the temporary password.';
-    if (!this.teamRepeatPassword) errors['repeat_password'] = 'Repeat the temporary password.';
-    else if (this.teamInvite.password !== this.teamRepeatPassword) errors['repeat_password'] = 'Passwords do not match.';
     if (this.teamInvite.project_access_scope === 'selected' && !(this.teamInvite.project_ids || []).length) errors['project_ids'] = 'Select at least one Project.';
     return errors;
   }
@@ -410,9 +406,8 @@ export class ChatComponent implements OnInit, OnDestroy {
       this.cdr.detectChanges();
     })).subscribe({
       next: () => {
-        this.teamInvite = { first_name: '', last_name: '', email: '', role: 'assistant', password: '', is_active: true,
+        this.teamInvite = { first_name: '', last_name: '', email: '', role: 'assistant',
           timezone: deviceTimezone(), project_access_scope: 'all', project_ids: [] };
-        this.teamRepeatPassword = '';
         this.refreshTeam(true);
       },
       error: (error: HttpErrorResponse) => {

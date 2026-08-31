@@ -3,15 +3,14 @@ import { describe, expect, it } from 'vitest';
 import { CompanyUsersComponent } from './company-users';
 
 describe('CompanyUsersComponent', () => {
-  it('requires matching passwords before adding a user', () => {
+  it('validates identity fields without asking for an initial password', () => {
     const component = new CompanyUsersComponent({} as any, {} as any, {} as any);
     component.invite = {
       first_name: 'Ana', last_name: 'Sales', email: 'ana@example.com', role: 'sales',
-      password: '1234', is_active: true,
+      is_active: true, timezone: 'America/Lima', project_access_scope: 'all', project_ids: [],
     };
-    component.repeatPassword = 'wrong';
-    expect(component.formValid).toBe(false);
-    component.repeatPassword = '1234';
     expect(component.formValid).toBe(true);
+    component.invite.email = 'invalid';
+    expect(component.formValid).toBe(false);
   });
 });

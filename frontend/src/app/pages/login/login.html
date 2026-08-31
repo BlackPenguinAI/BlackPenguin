@@ -46,7 +46,10 @@
           <input type="checkbox" class="rounded bg-surface-level-1 border-white/10 text-secondary focus:ring-0">
           {{ 'AUTH.REMEMBER_ME' | translate }}
         </label>
-        <a class="text-secondary hover:underline cursor-pointer">{{ 'AUTH.FORGOT_PASSWORD' | translate }}</a>
+        <button type="button" (click)="requestPasswordReset()" [disabled]="isResetting"
+          class="text-secondary hover:underline disabled:opacity-50">
+          {{ isResetting ? 'Sending…' : ('AUTH.FORGOT_PASSWORD' | translate) }}
+        </button>
       </div>
 
       <button 

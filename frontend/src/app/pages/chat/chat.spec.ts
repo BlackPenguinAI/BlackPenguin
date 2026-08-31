@@ -198,9 +198,8 @@ describe('ChatComponent', () => {
   it('should create onboarding users through the shared company user store', () => {
     component.currentStage = 'team';
     component.teamInvite = {
-      first_name: 'Ana', last_name: 'Sales', email: 'ana@example.com', role: 'sales', password: '1234', is_active: true,
+      first_name: 'Ana', last_name: 'Sales', email: 'ana@example.com', role: 'sales',
     };
-    component.teamRepeatPassword = '1234';
 
     component.inviteTeamMember();
 
@@ -461,13 +460,11 @@ describe('ChatComponent', () => {
   });
 
   it('validates required Company user fields before enabling Add user', () => {
-    component.teamInvite = { first_name: '', last_name: '', email: 'invalid', role: 'sales', password: '', is_active: true };
-    component.teamRepeatPassword = '';
-    expect(component.teamInviteErrorCount).toBe(5);
+    component.teamInvite = { first_name: '', last_name: '', email: 'invalid', role: 'sales' };
+    expect(component.teamInviteErrorCount).toBe(3);
     expect(component.canInviteTeamMember).toBe(false);
 
-    component.teamInvite = { first_name: 'Ana', last_name: 'Torres', email: 'ana@example.com', role: 'sales', password: '1234', is_active: true };
-    component.teamRepeatPassword = '1234';
+    component.teamInvite = { first_name: 'Ana', last_name: 'Torres', email: 'ana@example.com', role: 'sales' };
     expect(component.teamInviteErrorCount).toBe(0);
     expect(component.canInviteTeamMember).toBe(true);
   });

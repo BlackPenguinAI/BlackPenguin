@@ -18,6 +18,7 @@ export class LoginComponent implements AfterViewInit {
   
   credentials = { email: '', password: '' };
   isSubmitting = false;
+  isResetting = false;
   currentLang: string = 'en';
 
   constructor(
@@ -71,6 +72,24 @@ export class LoginComponent implements AfterViewInit {
         this.isSubmitting = false;
         this.toastService.showError(err.message); 
       }
+    });
+  }
+
+  requestPasswordReset(): void {
+    if (!this.credentials.email || this.isResetting) {
+      this.toastService.showError('Enter your email first.');
+      return;
+    }
+    this.isResetting = true;
+    this.authService.forgotPassword(this.credentials.email).subscribe({
+      next: () => {
+        this.isResetting = false;
+        this.toastService.showSuccess('If the account is eligible, password instructions have been sent.');
+      },
+      error: () => {
+        this.isResetting = false;
+        this.toastService.showSuccess('If the account is eligible, password instructions have been sent.');
+      },
     });
   }
 

@@ -1,0 +1,12 @@
+.activation-shell { min-height: 100vh; display: grid; place-items: center; padding: 24px; background: radial-gradient(circle at top, #24200a, #080808 42%); color: #fff; }
+.activation-card { width: min(100%, 520px); padding: 34px; border: 1px solid rgba(255,255,255,.12); border-radius: 24px; background: rgba(16,16,16,.92); box-shadow: 0 28px 80px rgba(0,0,0,.45); }
+.brand { display: inline-flex; gap: 2px; color: #fff; font-size: 21px; text-decoration: none; }.brand strong,.eyebrow { color: #f5c400; }
+.content,.state { display: flex; flex-direction: column; gap: 18px; margin-top: 30px; }.state { align-items: center; text-align: center; color: #aaa; }
+h1 { margin: 0; font-size: 30px; }.subtitle { margin: -10px 0 0; color: #999; line-height: 1.55; }.eyebrow { margin: 0; font-size: 11px; font-weight: 700; letter-spacing: .2em; }
+.context { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 14px; border: 1px solid rgba(255,255,255,.08); border-radius: 14px; background: rgba(255,255,255,.03); }
+.context div { min-width: 0; }.context small { display: block; color: #777; text-transform: uppercase; font-size: 9px; letter-spacing: .12em; }.context span { display: block; overflow: hidden; text-overflow: ellipsis; margin-top: 4px; text-transform: capitalize; }
+label { display: flex; flex-direction: column; gap: 7px; color: #aaa; font-size: 12px; } input { width: 100%; box-sizing: border-box; border: 1px solid rgba(255,255,255,.12); border-radius: 12px; padding: 13px 14px; background: #090909; color: #fff; outline: none; } input:focus { border-color: #f5c400; }
+.password-field { position: relative; }.password-field button { position: absolute; top: 8px; right: 8px; border: 0; background: transparent; color: #888; cursor: pointer; }
+.checks { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; color: #777; font-size: 12px; }.checks li::before { content: '○'; margin-right: 8px; }.checks li.ok { color: #7ed99b; }.checks li.ok::before { content: '✓'; }
+.activate,.primary-link { border: 0; border-radius: 999px; padding: 13px 18px; background: #f5c400; color: #070707; font-weight: 700; text-align: center; text-decoration: none; cursor: pointer; }.activate:disabled { cursor: not-allowed; opacity: .35; }.error { color: #fca5a5; font-size: 12px; }
+@media (max-width: 520px) { .activation-card { padding: 24px; }.context { grid-template-columns: 1fr; } }

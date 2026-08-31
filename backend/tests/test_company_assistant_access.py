@@ -65,7 +65,7 @@ def test_assistant_is_a_tenant_manager():
 
 def test_shared_invitation_service_creates_assistant_and_normalizes_email(db):
     company = _company(db)
-    with patch("app.modules.users.services.send_user_activation"):
+    with patch("app.modules.users.services.provision_invitation"):
         user = invite_tenant_user(
             db,
             company_id=company.id,
@@ -77,6 +77,7 @@ def test_shared_invitation_service_creates_assistant_and_normalizes_email(db):
     assert user.email == "assistant@example.com"
     assert user.first_name == "Ada"
     assert user.role == UserRole.ASSISTANT
+    assert user.auth_status.value == "invited"
 
 
 def test_company_manager_can_create_sales_user_with_password_and_status(db):

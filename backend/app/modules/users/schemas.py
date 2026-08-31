@@ -59,8 +59,6 @@ class TenantUserCreate(BaseModel):
     first_name: str = Field(min_length=1, max_length=150)
     last_name: str = Field(min_length=1, max_length=100)
     role: str
-    password: str = Field(min_length=4, max_length=128)
-    is_active: bool = True
     timezone: str = Field(default="UTC", min_length=1, max_length=80)
     project_access_scope: Literal["all", "selected"] = "all"
     project_ids: List[str] = Field(default_factory=list)
@@ -76,7 +74,6 @@ class TenantUserUpdate(BaseModel):
     timezone: Optional[str] = Field(default=None, min_length=1, max_length=80)
     project_access_scope: Optional[Literal["all", "selected"]] = None
     project_ids: Optional[List[str]] = None
-    password: Optional[str] = Field(default=None, min_length=4, max_length=128)
 
 
 class TenantUserResponse(BaseModel):
@@ -92,6 +89,9 @@ class TenantUserResponse(BaseModel):
     project_access_scope: Literal["all", "selected"] = "all"
     project_ids: List[str] = Field(default_factory=list)
     project_assignment_required: bool = False
+    auth_status: str = "active"
+    invitation_sent_at: Optional[datetime] = None
+    activated_at: Optional[datetime] = None
     model_config = ConfigDict(from_attributes=True)
 
 

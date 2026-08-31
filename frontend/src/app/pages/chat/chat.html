@@ -218,7 +218,7 @@
               <label class="field-label">Last name *<input name="team_last_name" [(ngModel)]="teamInvite.last_name" required placeholder="Last name" class="form-input" [class.form-input-invalid]="!!teamInviteErrors['last_name']"><span *ngIf="teamInviteErrors['last_name']" class="field-error">{{ teamInviteErrors['last_name'] }}</span></label>
             </div>
             <label class="field-label">Business email *<input name="team_email" [(ngModel)]="teamInvite.email" required type="email" placeholder="name@company.com" class="form-input" [class.form-input-invalid]="!!teamInviteErrors['email']"><span *ngIf="teamInviteErrors['email']" class="field-error">{{ teamInviteErrors['email'] }}</span></label>
-            <div class="grid grid-cols-1 gap-2 sm:grid-cols-2"><label class="field-label">Password *<input name="team_password" [(ngModel)]="teamInvite.password" required type="password" minlength="4" autocomplete="new-password" placeholder="At least 4 characters" class="form-input" [class.form-input-invalid]="!!teamInviteErrors['password']"><span *ngIf="teamInviteErrors['password']" class="field-error">{{ teamInviteErrors['password'] }}</span></label><label class="field-label">Repeat password *<input name="team_repeat_password" [(ngModel)]="teamRepeatPassword" required type="password" autocomplete="new-password" placeholder="Repeat password" class="form-input" [class.form-input-invalid]="!!teamInviteErrors['repeat_password']"><span *ngIf="teamInviteErrors['repeat_password']" class="field-error">{{ teamInviteErrors['repeat_password'] }}</span></label></div>
+            <p class="rounded-lg border border-secondary/15 bg-secondary/5 p-3 text-[10px] text-gray-300">A secure Firebase activation email will be sent. The user creates their own password.</p>
             <select name="team_role" [(ngModel)]="teamInvite.role" class="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-xs outline-none focus:border-secondary/50">
               <option value="assistant">Assistant</option>
               <option value="mkt">Marketing</option>
@@ -237,9 +237,8 @@
               <div *ngIf="teamInvite.project_access_scope === 'selected'" class="grid gap-2 sm:grid-cols-2"><label *ngFor="let project of teamProjects" class="flex items-center gap-2 rounded border border-white/10 p-2 text-[10px]"><input type="checkbox" [checked]="teamProjectSelected(project.id)" (change)="toggleTeamProject(project.id, $any($event.target).checked)" class="accent-secondary">{{ project.name }}</label></div>
               <span *ngIf="teamInviteErrors['project_ids']" class="field-error">{{ teamInviteErrors['project_ids'] }}</span>
             </div>
-            <label class="flex items-center gap-2 text-[10px] text-gray-400"><input name="team_active" type="checkbox" [(ngModel)]="teamInvite.is_active" class="accent-secondary"> Active user</label>
             <div class="flex flex-wrap gap-2 pt-1">
-              <button [disabled]="!canInviteTeamMember" [title]="canInviteTeamMember ? '' : 'Complete all required user fields.'" class="rounded-lg bg-secondary px-3 py-2 text-[10px] font-semibold text-black disabled:cursor-not-allowed disabled:opacity-40">{{ teamSavingAction === 'add' ? 'Adding...' : (teamInviteErrorCount ? 'Complete required fields' : 'Add user') }}</button>
+              <button [disabled]="!canInviteTeamMember" [title]="canInviteTeamMember ? '' : 'Complete all required user fields.'" class="rounded-lg bg-secondary px-3 py-2 text-[10px] font-semibold text-black disabled:cursor-not-allowed disabled:opacity-40">{{ teamSavingAction === 'add' ? 'Sending...' : (teamInviteErrorCount ? 'Complete required fields' : 'Send invitation') }}</button>
             </div>
           </form>
           <button type="button" (click)="continueTeamSetup()" [disabled]="teamSaving" class="mt-3 rounded-lg border border-secondary/30 px-3 py-2 text-[10px] font-semibold text-secondary disabled:opacity-50">

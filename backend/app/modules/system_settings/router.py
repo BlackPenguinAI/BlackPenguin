@@ -25,7 +25,7 @@ def get_email_settings(
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN]))
 ):
-    return services.get_firebase_config(db)
+    return services.firebase_config_response(services.get_firebase_config(db))
 
 @router.put("/email-settings", response_model=FirebaseConfigSchema, summary="Actualizar configuración de Firebase Email")
 def update_email_settings(
@@ -33,7 +33,15 @@ def update_email_settings(
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN]))
 ):
-    return services.update_firebase_config(db, payload)
+    return services.firebase_config_response(services.update_firebase_config(db, payload))
+
+
+@router.post("/email-settings/verify", response_model=FirebaseConfigSchema, summary="Verify Firebase Authentication")
+def verify_email_settings(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN])),
+):
+    return services.firebase_config_response(services.verify_firebase_config(db))
 
 # =========================================================
 # ⚙️ MESSAGING SETTINGS (TWILIO)

@@ -260,8 +260,6 @@ class TeamMemberCreate(BaseModel):
     last_name: str = Field(min_length=1, max_length=100)
     email: EmailStr
     role: TeamRole
-    password: str = Field(min_length=4, max_length=128)
-    is_active: bool = True
     timezone: str = Field(default="UTC", min_length=1, max_length=80)
     project_access_scope: Literal["all", "selected"] = "all"
     project_ids: list[str] = Field(default_factory=list)
@@ -282,6 +280,8 @@ class TeamMemberResponse(BaseModel):
     email: str
     role: str
     is_active: bool
+    auth_status: str = "active"
+    invitation_sent_at: datetime | None = None
 
 
 class TeamRoleProgress(BaseModel):

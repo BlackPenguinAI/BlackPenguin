@@ -24,7 +24,7 @@ export class CompanyUsersComponent implements OnInit {
   limits: CompanyUserLimits | null = null;
   loading = true; saving = false; showAddModal = false;
   editingUserId: string | null = null;
-  repeatPassword = ''; timezoneSearch = '';
+  timezoneSearch = '';
   invite: CompanyUserInvite = this.emptyForm();
   readonly timezoneLabel = timezoneLabel;
 
@@ -42,7 +42,7 @@ export class CompanyUsersComponent implements OnInit {
   }
 
   openAddModal(): void {
-    this.editingUserId = null; this.invite = this.emptyForm(); this.repeatPassword = '';
+    this.editingUserId = null; this.invite = this.emptyForm();
     this.timezoneSearch = ''; this.showAddModal = true;
   }
 
@@ -50,11 +50,11 @@ export class CompanyUsersComponent implements OnInit {
     this.editingUserId = user.id;
     this.invite = {
       first_name: user.first_name || '', last_name: user.last_name || '', email: user.email,
-      role: user.role === 'admin' ? 'assistant' : user.role, password: '', is_active: user.is_active,
+      role: user.role === 'admin' ? 'assistant' : user.role, is_active: user.is_active,
       timezone: user.timezone || deviceTimezone(), project_access_scope: user.project_access_scope || 'all',
       project_ids: [...(user.project_ids || [])],
     };
-    this.repeatPassword = ''; this.timezoneSearch = ''; this.showAddModal = true;
+    this.timezoneSearch = ''; this.showAddModal = true;
   }
 
   closeAddModal(): void { if (!this.saving) this.showAddModal = false; }
@@ -67,7 +67,6 @@ export class CompanyUsersComponent implements OnInit {
           first_name: this.invite.first_name, last_name: this.invite.last_name, role: this.invite.role,
           is_active: this.invite.is_active, timezone: this.invite.timezone || deviceTimezone(),
           project_access_scope: this.invite.project_access_scope || 'all', project_ids: this.invite.project_ids || [],
-          ...(this.invite.password ? { password: this.invite.password } : {}),
         })
       : this.companyUsers.invite(this.invite);
     request.subscribe({
@@ -76,7 +75,8 @@ export class CompanyUsersComponent implements OnInit {
         this.users = index < 0 ? [...this.users, user] : this.users.map(item => item.id === user.id ? user : item);
         this.users.sort((a, b) => a.email.localeCompare(b.email));
         this.showAddModal = false; this.saving = false;
-        this.toast.showSuccess(this.editingUserId ? 'User updated' : 'User created');
+        this.toast.showSuccess(this.editingUserId ? 'User updated' :
+          (user.auth_status === 'provisioning_failed' ? 'User saved, but Firebase delivery must be retried.' : 'Invitation sent'));
         this.reloadLimits(); this.cdr.markForCheck();
       },
       error: err => { this.saving = false; this.toast.showError(err.error?.detail || 'Could not save user'); this.cdr.markForCheck(); },
@@ -92,9 +92,16 @@ export class CompanyUsersComponent implements OnInit {
 
   resendActivation(user: CompanyUser): void {
     this.companyUsers.resendActivation(user.id).subscribe({
-      next: () => this.toast.showSuccess('Activation link sent'),
+      next: () => { user.auth_status = 'invited'; user.invitation_sent_at = new Date().toISOString(); this.toast.showSuccess('Activation link sent'); this.cdr.markForCheck(); },
       error: err => this.toast.showError(err.error?.detail || 'Could not resend activation'),
     });
+  }
+
+  authStatusLabel(user: CompanyUser): string {
+    return ({
+      invited: 'Invitation sent', active: 'Active', suspended: 'Suspended',
+      provisioning_failed: 'Delivery failed', migration_required: 'Migration required',
+    } as Record<string, string>)[user.auth_status] || 'Pending';
   }
 
   get filteredTimezones() { return filterTimezoneOptions(this.timezoneSearch); }
@@ -110,16 +117,13 @@ export class CompanyUsersComponent implements OnInit {
   }
 
   get formValid(): boolean {
-    const passwordValid = this.editingUserId
-      ? (!this.invite.password || (this.invite.password.length >= 4 && this.invite.password === this.repeatPassword))
-      : this.invite.password.length >= 4 && this.invite.password === this.repeatPassword;
     return !!(this.invite.first_name.trim() && this.invite.last_name.trim() &&
-      /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(this.invite.email.trim()) && passwordValid &&
+      /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(this.invite.email.trim()) &&
       ((this.invite.project_access_scope || 'all') === 'all' || (this.invite.project_ids || []).length > 0));
   }
 
   private emptyForm(): CompanyUserInvite {
-    return { first_name: '', last_name: '', email: '', role: 'assistant', password: '', is_active: true,
+    return { first_name: '', last_name: '', email: '', role: 'assistant', is_active: true,
       timezone: deviceTimezone(), project_access_scope: 'all', project_ids: [] };
   }
   private reloadLimits(): void { this.companyUsers.limits().subscribe({ next: limits => { this.limits = limits; this.cdr.markForCheck(); } }); }

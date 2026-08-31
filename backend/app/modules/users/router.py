@@ -6,7 +6,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from app.db.postgres import get_db
 from app.modules.auth.deps import get_current_user, RoleChecker
 from app.core.security import verify_password, get_password_hash, verify_email_token
-from .models import TENANT_MANAGER_ROLES, User, UserRole
+from .models import TENANT_MANAGER_ROLES, User, UserAuthStatus, UserInvitation, UserRole
 from .project_access import project_ids_for_user, sync_user_project_access
 from . import services
 from .schemas import (
@@ -27,6 +27,9 @@ def _tenant_user_response(db: Session, user: User) -> dict:
         "timezone": user.timezone or "UTC", "role": user.role, "is_active": user.is_active,
         "project_access_scope": "all" if user.role == UserRole.ADMIN else (user.project_access_scope or "all"),
         "project_ids": project_ids,
+        "auth_status": user.auth_status.value if hasattr(user.auth_status, "value") else str(user.auth_status or "active").lower(),
+        "invitation_sent_at": user.invitation_sent_at,
+        "activated_at": user.activated_at,
         "project_assignment_required": bool(
             user.role in (UserRole.MKT, UserRole.SALES)
             and (user.project_access_scope or "all") == "selected" and not project_ids
@@ -153,18 +156,17 @@ def invite_company_user(
         role = UserRole(payload.role)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail="Role must be assistant, mkt or sales.") from exc
-    user = services.create_tenant_user(
+    user = services.invite_tenant_user(
         db,
         company_id=current_user.company_id,
         email=str(payload.email),
         first_name=payload.first_name,
         last_name=payload.last_name,
         role=role,
-        password=payload.password,
-        is_active=payload.is_active,
         timezone=payload.timezone,
         project_access_scope=payload.project_access_scope,
         project_ids=payload.project_ids,
+        invited_by_user_id=current_user.id,
     )
     return _tenant_user_response(db, user)
 
@@ -189,7 +191,7 @@ def get_company_user_limits(
             "used": db.query(User).filter(
                 User.company_id == current_user.company_id,
                 User.role == role,
-                User.is_active.is_(True),
+                User.auth_status.in_(services.SEAT_HOLDING_AUTH_STATUSES),
             ).count(),
             "limit": limit,
         }
@@ -245,16 +247,22 @@ def update_company_user(
             raise HTTPException(status_code=422, detail="Unknown timezone.") from exc
     values = payload.model_dump(
         exclude_unset=True,
-        exclude={"password", "project_access_scope", "project_ids", "role"},
+        exclude={"is_active", "project_access_scope", "project_ids", "role"},
     )
     for key, value in values.items():
         setattr(user, key, value)
     user.role = next_role
-    if payload.password:
-        user.hashed_password = get_password_hash(payload.password)
+    if payload.is_active is not None and payload.is_active != user.is_active:
+        services.set_user_enabled(db, user=user, enabled=payload.is_active)
     scope = payload.project_access_scope or user.project_access_scope or "all"
     selected_ids = payload.project_ids if payload.project_ids is not None else project_ids_for_user(db, user)
     sync_user_project_access(db, user=user, scope=scope, project_ids=selected_ids)
+    if user.firebase_uid and any(value is not None for value in (payload.first_name, payload.last_name)):
+        from app.integrations.firebase_client import update_identity
+        update_identity(
+            db, uid=user.firebase_uid,
+            display_name=f"{user.first_name or ''} {user.last_name or ''}".strip(),
+        )
     db.commit()
     db.refresh(user)
     return _tenant_user_response(db, user)
@@ -274,5 +282,27 @@ def resend_company_user_activation(
             status_code=403,
             detail="The Company administrator can only be managed from the superadmin Company panel.",
         )
-    services.send_user_activation(user)
+    services.resend_user_activation(db, user=user, invited_by_user_id=current_user.id)
     return {"detail": "Activation link sent."}
+
+
+@router.delete("/company/{user_id}/invitation")
+def revoke_company_user_invitation(
+    user_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker(TENANT_MANAGER_ROLES)),
+):
+    user = db.query(User).filter(User.id == user_id, User.company_id == current_user.company_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+    if user.role == UserRole.ADMIN or user.auth_status == UserAuthStatus.ACTIVE:
+        raise HTTPException(status_code=409, detail="Only pending team invitations can be revoked.")
+    invitation = db.query(UserInvitation).filter(
+        UserInvitation.user_id == user.id, UserInvitation.status == "pending",
+    ).order_by(UserInvitation.created_at.desc()).first()
+    if invitation:
+        from datetime import datetime
+        invitation.status = "revoked"; invitation.revoked_at = datetime.utcnow()
+    services.set_user_enabled(db, user=user, enabled=False)
+    db.commit()
+    return {"detail": "Invitation revoked."}

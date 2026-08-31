@@ -3,7 +3,6 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { ToastService } from '../../../../core/services/toast';
-
 import { GlassCardComponent } from '../../../../shared/ui/glass-card/glass-card';
 import { InputComponent } from '../../../../shared/ui/input/input';
 import { ButtonComponent } from '../../../../shared/ui/button/button';
@@ -15,122 +14,105 @@ import { ButtonComponent } from '../../../../shared/ui/button/button';
   templateUrl: './email-settings-page.html'
 })
 export class EmailSettingsPageComponent implements OnInit {
-  
   firebaseConfig = {
-    api_key: '',
-    auth_domain: '',
-    project_id: '',
-    credentials_json: ''
+    api_key: '', auth_domain: '', project_id: '', credentials_json: '',
+    credentials_configured: false, credentials_hint: '', is_enabled: false,
+    auth_mode: 'hybrid', action_handler_url: 'https://blackpenguin.ai/activate-account',
+    verification_status: 'not_configured', last_error: '',
   };
+  isLoading = true;
+  isSaving = false;
+  isTesting = false;
 
-  isLoading: boolean = true;
-  isSaving: boolean = false;
+  constructor(private http: HttpClient, private toast: ToastService, private cdr: ChangeDetectorRef) {}
+  ngOnInit() { this.loadConfig(); }
 
-  constructor(
-    private http: HttpClient,
-    private toast: ToastService,
-    private cdr: ChangeDetectorRef
-  ) {}
-
-  ngOnInit() {
-    this.loadConfig();
-  }
-
-  private get baseUrl() {
-    return isDevMode() ? 'http://localhost:8000' : 'https://blackpenguin.ai';
-  }
-
+  private get baseUrl() { return isDevMode() ? 'http://localhost:8000' : 'https://blackpenguin.ai'; }
   private get headers() {
-    const token = localStorage.getItem('bp_token');
-    return new HttpHeaders().set('Authorization', `Bearer ${token}`);
+    return new HttpHeaders().set('Authorization', 'Bearer ' + localStorage.getItem('bp_token'));
   }
 
   loadConfig() {
     this.isLoading = true;
-    this.http.get<any>(`${this.baseUrl}/api/v1/system/email-settings`, { headers: this.headers }).subscribe({
-      next: (data) => {
-        if (data) {
-          this.firebaseConfig = {
-            api_key: data.api_key || '',
-            auth_domain: data.auth_domain || '',
-            project_id: data.project_id || '',
-            credentials_json: data.credentials_json || ''
-          };
-          this.formatJson(); // Intenta embellecer el JSON si ya existe
-        }
-        this.isLoading = false;
-        this.cdr.detectChanges();
+    this.http.get<any>(this.baseUrl + '/api/v1/system/email-settings', { headers: this.headers }).subscribe({
+      next: data => {
+        this.firebaseConfig = {
+          api_key: data.api_key || '', auth_domain: data.auth_domain || '',
+          project_id: data.project_id || '', credentials_json: '',
+          credentials_configured: !!data.credentials_configured,
+          credentials_hint: data.credentials_hint || '', is_enabled: !!data.is_enabled,
+          auth_mode: data.auth_mode || 'hybrid',
+          action_handler_url: data.action_handler_url || 'https://blackpenguin.ai/activate-account',
+          verification_status: data.verification_status || 'not_configured',
+          last_error: data.last_error || '',
+        };
+        this.isLoading = false; this.cdr.detectChanges();
       },
-      error: () => {
-        this.toast.showError('Failed to load Firebase configuration.');
-        this.isLoading = false;
-        this.cdr.detectChanges();
-      }
+      error: () => { this.toast.showError('Failed to load Firebase configuration.'); this.isLoading = false; this.cdr.detectChanges(); }
     });
   }
 
   saveConfig() {
     this.isSaving = true;
-    this.cdr.detectChanges();
-
-    this.http.put<any>(`${this.baseUrl}/api/v1/system/email-settings`, this.firebaseConfig, { headers: this.headers }).subscribe({
-      next: () => {
+    const payload: any = {
+      api_key: this.firebaseConfig.api_key, auth_domain: this.firebaseConfig.auth_domain,
+      project_id: this.firebaseConfig.project_id, is_enabled: this.firebaseConfig.is_enabled,
+      auth_mode: this.firebaseConfig.auth_mode, action_handler_url: this.firebaseConfig.action_handler_url,
+    };
+    if (this.firebaseConfig.credentials_json) payload.credentials_json = this.firebaseConfig.credentials_json;
+    this.http.put<any>(this.baseUrl + '/api/v1/system/email-settings', payload, { headers: this.headers }).subscribe({
+      next: data => {
+        this.firebaseConfig.credentials_json = '';
+        this.firebaseConfig.credentials_configured = !!data.credentials_configured;
+        this.firebaseConfig.credentials_hint = data.credentials_hint || '';
+        this.firebaseConfig.verification_status = data.verification_status;
         this.toast.showSuccess('Firebase settings saved successfully.');
-        this.isSaving = false;
-        this.cdr.detectChanges();
+        this.isSaving = false; this.cdr.detectChanges();
       },
-      error: (err) => {
-        this.toast.showError(err.error?.detail || 'Failed to save Firebase settings.');
-        this.isSaving = false;
-        this.cdr.detectChanges();
+      error: err => { this.toast.showError(err.error?.detail || 'Failed to save Firebase settings.'); this.isSaving = false; this.cdr.detectChanges(); }
+    });
+  }
+
+  testConnection() {
+    this.isTesting = true;
+    this.http.post<any>(this.baseUrl + '/api/v1/system/email-settings/verify', {}, { headers: this.headers }).subscribe({
+      next: data => {
+        this.isTesting = false; this.firebaseConfig.verification_status = data.verification_status;
+        this.firebaseConfig.credentials_configured = !!data.credentials_configured;
+        this.firebaseConfig.credentials_hint = data.credentials_hint || '';
+        this.toast.showSuccess('Firebase Authentication verified.'); this.cdr.detectChanges();
+      },
+      error: err => {
+        this.isTesting = false; this.firebaseConfig.verification_status = 'failed';
+        this.toast.showError(err.error?.detail || 'Firebase verification failed.'); this.cdr.detectChanges();
       }
     });
   }
 
-  // 🚀 LECTURA DEL ARCHIVO JSON
   onFileSelected(event: any) {
     const file = event.target.files[0];
     if (!file) return;
-
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = e => {
       try {
-        const result = e.target?.result as string;
-        const parsedJson = JSON.parse(result); // Validamos que sea un JSON real
-        
-        // Lo asignamos al text area formateado
-        this.firebaseConfig.credentials_json = JSON.stringify(parsedJson, null, 2);
-        
-        // Autocompletar el Project ID si viene en el JSON
-        if (parsedJson.project_id) {
-          this.firebaseConfig.project_id = parsedJson.project_id;
-        }
-
+        const parsed = JSON.parse(e.target?.result as string);
+        this.firebaseConfig.credentials_json = JSON.stringify(parsed, null, 2);
+        if (parsed.project_id) this.firebaseConfig.project_id = parsed.project_id;
         this.toast.showSuccess('Service Account JSON loaded successfully.');
-        this.cdr.detectChanges();
-
-      } catch (err) {
+      } catch {
         this.toast.showError('Invalid JSON file. Please check the file structure.');
       }
-      
-      // Limpiar el input para permitir cargar el mismo archivo si es necesario
-      event.target.value = '';
+      event.target.value = ''; this.cdr.detectChanges();
     };
     reader.readAsText(file);
   }
 
-  // 🚀 FORMATEAR JSON MANUAL
   formatJson() {
     if (!this.firebaseConfig.credentials_json) return;
     try {
       const parsed = JSON.parse(this.firebaseConfig.credentials_json);
       this.firebaseConfig.credentials_json = JSON.stringify(parsed, null, 2);
-      
-      if (parsed.project_id && !this.firebaseConfig.project_id) {
-        this.firebaseConfig.project_id = parsed.project_id;
-      }
-    } catch (err) {
-      // Si el usuario está tipeando y se equivoca, no formateamos para no borrarle nada
-    }
+      if (parsed.project_id && !this.firebaseConfig.project_id) this.firebaseConfig.project_id = parsed.project_id;
+    } catch {}
   }
 }

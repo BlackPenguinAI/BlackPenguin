@@ -49,8 +49,6 @@ export class CompaniesPageComponent implements OnInit {
     admin_first_name: '',
     admin_last_name: '',
     admin_email: '',
-    admin_password: '',
-    admin_confirm_password: '',
     is_active: true,      // Company Status
     admin_is_active: true // User Status
   };
@@ -64,8 +62,6 @@ export class CompaniesPageComponent implements OnInit {
     admin_first_name: '',
     admin_last_name: '',
     admin_email: '',
-    admin_password: '',
-    admin_confirm_password: '',
     is_active: true,      
     admin_is_active: true 
   };
@@ -132,8 +128,6 @@ export class CompaniesPageComponent implements OnInit {
       admin_first_name: '',
       admin_last_name: '',
       admin_email: '',
-      admin_password: '',
-      admin_confirm_password: '',
       is_active: true,
       admin_is_active: true
     };
@@ -161,8 +155,6 @@ export class CompaniesPageComponent implements OnInit {
       admin_first_name: admin ? admin.first_name : '',
       admin_last_name: admin ? admin.last_name : '',
       admin_email: admin ? admin.email : '',
-      admin_password: '',
-      admin_confirm_password: '',
       is_active: item.is_active !== undefined ? item.is_active : true,
       admin_is_active: admin ? (admin.is_active !== undefined ? admin.is_active : true) : true
     };
@@ -184,13 +176,8 @@ export class CompaniesPageComponent implements OnInit {
   }
 
   saveCompany(): void {
-    if (!this.form.name || !this.form.admin_email || !this.form.admin_password || !this.form.plan_id) {
+    if (!this.form.name || !this.form.admin_email || !this.form.plan_id) {
       this.toast.showError('Please complete all required fields.');
-      return;
-    }
-
-    if (this.form.admin_password !== this.form.admin_confirm_password) {
-      this.toast.showError('Passwords do not match.');
       return;
     }
 
@@ -204,7 +191,6 @@ export class CompaniesPageComponent implements OnInit {
     formData.append('admin_first_name', this.form.admin_first_name);
     formData.append('admin_last_name', this.form.admin_last_name);
     formData.append('admin_email', this.form.admin_email);
-    formData.append('admin_password', this.form.admin_password);
     formData.append('is_active', this.form.is_active.toString());
     formData.append('admin_is_active', this.form.admin_is_active.toString());
     
@@ -217,11 +203,18 @@ export class CompaniesPageComponent implements OnInit {
     }
 
     this.companyService.createCompany(formData).subscribe({
-      next: () => {
+      next: (company: any) => {
         this.isSaving = false;
         this.closeModal();
         this.loadData();
-        this.toast.showSuccess('Company registered successfully.');
+        const administrator = company.users?.find((user: any) => user.role === 'admin');
+        if (administrator?.auth_status === 'provisioning_failed') {
+          this.toast.showError('Company registered, but Firebase could not deliver the activation link. Verify Firebase and use Resend activation.');
+        } else if (administrator?.auth_status === 'suspended') {
+          this.toast.showSuccess('Company registered. The Administrator is suspended, so no activation was sent.');
+        } else {
+          this.toast.showSuccess('Company registered. Firebase invitation sent to the Administrator.');
+        }
       },
       error: (err) => {
         this.isSaving = false;
@@ -237,10 +230,6 @@ export class CompaniesPageComponent implements OnInit {
       return;
     }
 
-    if (this.editForm.admin_password && this.editForm.admin_password !== this.editForm.admin_confirm_password) {
-      this.toast.showError('Passwords do not match.');
-      return;
-    }
 
     this.isSaving = true;
     this.cdr.detectChanges();
@@ -255,9 +244,6 @@ export class CompaniesPageComponent implements OnInit {
     formData.append('is_active', this.editForm.is_active.toString());
     formData.append('admin_is_active', this.editForm.admin_is_active.toString());
     
-    if (this.editForm.admin_password) {
-      formData.append('admin_password', this.editForm.admin_password);
-    }
 
     if (this.editForm.start_date) {
       formData.append('start_date', this.editForm.start_date);

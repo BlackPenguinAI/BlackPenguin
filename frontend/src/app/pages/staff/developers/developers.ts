@@ -34,7 +34,6 @@ export class StaffDevelopersComponent implements OnInit {
     plan_id: '',
     duration_months: 12,
     admin_email: '',
-    admin_password: '', // 🚀 NUEVO CAMPO EN EL FORMULARIO
     admin_first_name: '',        
     admin_paternal_last_name: '',  
     admin_maternal_last_name: '',  
@@ -104,7 +103,6 @@ export class StaffDevelopersComponent implements OnInit {
     if (dev) {
       this.isEditing = true;
       this.currentDevId = dev.id;
-      this.form.admin_password = '';  // para que no se quede pegada la contraseña del cliente anterior
 
       this.form = {
         company_name: dev.name,
