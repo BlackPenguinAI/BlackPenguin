@@ -91,7 +91,7 @@ def test_invitation_provisions_firebase_without_an_administrator_password():
         db.close(); engine.dispose()
 
 
-def test_activation_is_one_time_and_returns_a_tenant_session():
+def test_activation_is_one_time_and_returns_a_tenant_session(caplog):
     engine, db = _db()
     try:
         company = _company(db)
@@ -109,7 +109,7 @@ def test_activation_is_one_time_and_returns_a_tenant_session():
         db.add(invitation)
         db.commit()
         state = create_invitation_state(invitation.id, user.id)
-        with patch(
+        with caplog.at_level(logging.INFO), patch(
             "app.integrations.firebase_client.sign_in_with_email_link",
             return_value={"localId": "firebase-sales", "idToken": "email-link-id-token"},
         ) as sign_in, patch("app.integrations.firebase_client.update_password") as update_password:
@@ -132,6 +132,13 @@ def test_activation_is_one_time_and_returns_a_tenant_session():
         update_password.assert_called_once_with(
             db, id_token="email-link-id-token", password="Secure#Pass1",
         )
+        combined = "\n".join(record.message for record in caplog.records)
+        assert f"Firebase email-link activation started company_id={company.id}" in combined
+        assert f"user_id={user.id}" in combined
+        assert f"invitation_id={invitation.id}" in combined
+        assert "Firebase email-link activation completed" in combined
+        assert "valid-action-code" not in combined
+        assert "Secure#Pass1" not in combined
     finally:
         db.close(); engine.dispose()
 

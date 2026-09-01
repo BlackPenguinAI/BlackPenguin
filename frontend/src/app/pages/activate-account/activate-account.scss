@@ -9,4 +9,5 @@ label { display: flex; flex-direction: column; gap: 7px; color: #aaa; font-size:
 .password-field { position: relative; }.password-field button { position: absolute; top: 8px; right: 8px; border: 0; background: transparent; color: #888; cursor: pointer; }
 .checks { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; color: #777; font-size: 12px; }.checks li::before { content: '○'; margin-right: 8px; }.checks li.ok { color: #7ed99b; }.checks li.ok::before { content: '✓'; }
 .activate,.primary-link { border: 0; border-radius: 999px; padding: 13px 18px; background: #f5c400; color: #070707; font-weight: 700; text-align: center; text-decoration: none; cursor: pointer; }.activate:disabled { cursor: not-allowed; opacity: .35; }.error { color: #fca5a5; font-size: 12px; }
+.state-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }.secondary-link { border: 1px solid rgba(255,255,255,.15); border-radius: 999px; padding: 12px 18px; color: #ddd; font-weight: 600; text-decoration: none; }
 @media (max-width: 520px) { .activation-card { padding: 24px; }.context { grid-template-columns: 1fr; } }

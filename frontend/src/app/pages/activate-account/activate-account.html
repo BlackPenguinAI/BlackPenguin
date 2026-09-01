@@ -11,7 +11,10 @@
       <span class="material-symbols-outlined text-red-300">link_off</span>
       <h1>Invitation unavailable</h1>
       <p>{{ error }}</p>
-      <a routerLink="/login" class="primary-link">Return to sign in</a>
+      <div class="state-actions">
+        <button type="button" class="primary-link" (click)="retryValidation()">Try again</button>
+        <a routerLink="/login" class="secondary-link">Return to sign in</a>
+      </div>
     </div>
 
     <form *ngIf="!loading && invitation" (ngSubmit)="activate()" class="content">

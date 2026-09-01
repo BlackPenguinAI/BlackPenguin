@@ -102,6 +102,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
 def _pending_invitation_from_state(state_token: str, db: Session) -> tuple[User, UserInvitation]:
     state = verify_invitation_state(state_token)
     if not state:
+        logger.warning("Firebase invitation state rejected reason=invalid_or_expired")
         raise HTTPException(status_code=410, detail="This invitation is invalid or expired.")
     invitation = db.query(UserInvitation).filter(
         UserInvitation.id == state["invitation_id"],
@@ -110,6 +111,10 @@ def _pending_invitation_from_state(state_token: str, db: Session) -> tuple[User,
         UserInvitation.expires_at > datetime.utcnow(),
     ).first()
     if not invitation:
+        logger.warning(
+            "Firebase invitation state rejected user_id=%s invitation_id=%s reason=not_pending_or_expired",
+            state["sub"], state["invitation_id"],
+        )
         raise HTTPException(status_code=410, detail="This invitation is expired or no longer active.")
     user = db.query(User).filter(User.id == invitation.user_id).first()
     if not user:
@@ -123,7 +128,11 @@ def _pending_invitation_from_state(state_token: str, db: Session) -> tuple[User,
 
 @router.post("/firebase/action-code")
 def inspect_firebase_action(payload: FirebaseActionCodePayload, db: Session = Depends(get_db)):
-    user, _ = _pending_invitation_from_state(payload.state, db)
+    user, invitation = _pending_invitation_from_state(payload.state, db)
+    logger.info(
+        "Firebase invitation validated company_id=%s user_id=%s invitation_id=%s status=%s",
+        user.company_id, user.id, invitation.id, invitation.status,
+    )
     return {
         "email": user.email, "first_name": user.first_name, "role": user.role,
         "company_name": user.company.name if user.company else None, "flow": "invitation",
@@ -132,7 +141,11 @@ def inspect_firebase_action(payload: FirebaseActionCodePayload, db: Session = De
 
 @router.post("/firebase/complete-invitation", response_model=TokenResponse)
 def complete_firebase_invitation(payload: CompleteInvitationPayload, db: Session = Depends(get_db)):
-    user, _ = _pending_invitation_from_state(payload.state, db)
+    user, invitation = _pending_invitation_from_state(payload.state, db)
+    logger.info(
+        "Firebase email-link activation started company_id=%s user_id=%s invitation_id=%s",
+        user.company_id, user.id, invitation.id,
+    )
     firebase_session = firebase_client.sign_in_with_email_link(
         db, email=user.email, oob_code=payload.oob_code,
     )
@@ -157,6 +170,10 @@ def complete_firebase_invitation(payload: CompleteInvitationPayload, db: Session
     user_services.mark_invitation_accepted(db, user)
     response = _session_response(user)
     db.commit()
+    logger.info(
+        "Firebase email-link activation completed company_id=%s user_id=%s invitation_id=%s firebase_uid=%s",
+        user.company_id, user.id, invitation.id, user.firebase_uid,
+    )
     return response
 
 
