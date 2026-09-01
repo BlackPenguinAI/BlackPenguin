@@ -8,6 +8,7 @@ and suspension, so a Firebase identity never grants application access alone.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import logging
 from typing import Any
 
 import httpx
@@ -18,6 +19,7 @@ from app.modules.system_settings.models import FirebaseConfig
 
 
 IDENTITY_TOOLKIT = "https://identitytoolkit.googleapis.com/v1"
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -28,8 +30,16 @@ class FirebaseIdentity:
 def _configuration(db: Session, *, require_enabled: bool = True) -> FirebaseConfig:
     config = db.query(FirebaseConfig).first()
     if not config or not config.project_id or not config.api_key:
+        logger.error(
+            "Firebase configuration unavailable configured=%s project_id_present=%s api_key_present=%s",
+            bool(config), bool(config and config.project_id), bool(config and config.api_key),
+        )
         raise HTTPException(status_code=409, detail="Firebase Authentication is not configured by Black Penguin.")
     if require_enabled and not config.is_enabled:
+        logger.error(
+            "Firebase configuration disabled project_id=%s verification_status=%s",
+            config.project_id, config.verification_status,
+        )
         raise HTTPException(status_code=409, detail="Firebase Authentication is not enabled by Black Penguin.")
     return config
 
@@ -37,6 +47,10 @@ def _configuration(db: Session, *, require_enabled: bool = True) -> FirebaseConf
 def ensure_firebase_ready(db: Session) -> FirebaseConfig:
     config = _configuration(db)
     if config.verification_status != "verified":
+        logger.error(
+            "Firebase configuration not verified project_id=%s verification_status=%s",
+            config.project_id, config.verification_status,
+        )
         raise HTTPException(status_code=409, detail="Verify Firebase Authentication before inviting users.")
     return config
 
@@ -57,10 +71,27 @@ def _request(config: FirebaseConfig, endpoint: str, payload: dict[str, Any]) -> 
             json=payload, timeout=15.0,
         )
         data = response.json()
-    except (httpx.HTTPError, ValueError) as exc:
+    except httpx.HTTPError as exc:
+        # Do not log the exception string: httpx may include the request URL,
+        # whose query string contains the Firebase Web API key.
+        logger.error(
+            "Firebase REST transport failure endpoint=%s project_id=%s exception_type=%s",
+            endpoint, config.project_id, type(exc).__name__,
+        )
+        raise HTTPException(status_code=502, detail="Firebase Authentication is temporarily unavailable.") from exc
+    except ValueError as exc:
+        logger.error(
+            "Firebase REST invalid JSON response endpoint=%s project_id=%s http_status=%s",
+            endpoint, config.project_id, response.status_code,
+        )
         raise HTTPException(status_code=502, detail="Firebase Authentication is temporarily unavailable.") from exc
     if response.is_error:
-        raise _firebase_error(str(data.get("error", {}).get("message", "FIREBASE_REQUEST_FAILED")))
+        error_code = str(data.get("error", {}).get("message", "FIREBASE_REQUEST_FAILED")).split(" : ", 1)[0]
+        logger.error(
+            "Firebase REST request rejected endpoint=%s project_id=%s http_status=%s error_code=%s",
+            endpoint, config.project_id, response.status_code, error_code,
+        )
+        raise _firebase_error(error_code)
     return data
 
 

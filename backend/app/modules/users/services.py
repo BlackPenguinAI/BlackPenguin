@@ -1,3 +1,4 @@
+import logging
 import secrets
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -12,6 +13,7 @@ from app.modules.users.models import User, UserAuthStatus, UserInvitation, UserR
 from app.modules.users.project_access import sync_user_project_access
 
 
+logger = logging.getLogger(__name__)
 INVITABLE_TENANT_ROLES = {UserRole.ASSISTANT, UserRole.MKT, UserRole.SALES}
 SEAT_HOLDING_AUTH_STATUSES = {
     UserAuthStatus.INVITED, UserAuthStatus.ACTIVE,
@@ -193,6 +195,11 @@ def provision_invitation(db: Session, *, user: User, invited_by_user_id: str | N
     invitation.send_attempts = (invitation.send_attempts or 0) + 1
     invitation.expires_at = now + timedelta(days=7)
     db.commit(); db.refresh(user); db.refresh(invitation)
+    logger.info(
+        "Firebase invitation attempt started company_id=%s user_id=%s invitation_id=%s attempt=%s has_firebase_uid=%s",
+        user.company_id, user.id, invitation.id, invitation.send_attempts, bool(user.firebase_uid),
+    )
+    phase = "create_identity"
     try:
         if not user.firebase_uid:
             try:
@@ -204,9 +211,19 @@ def provision_invitation(db: Session, *, user: User, invited_by_user_id: str | N
             except HTTPException as exc:
                 if exc.detail != "EMAIL_EXISTS":
                     raise
+                phase = "recover_identity"
+                logger.warning(
+                    "Firebase identity already exists; attempting recovery company_id=%s user_id=%s invitation_id=%s",
+                    user.company_id, user.id, invitation.id,
+                )
                 identity = recover_identity(db, email=user.email, password=temporary_password)
             user.firebase_uid = identity.uid
             db.commit()
+            logger.info(
+                "Firebase identity linked company_id=%s user_id=%s invitation_id=%s firebase_uid=%s",
+                user.company_id, user.id, invitation.id, user.firebase_uid,
+            )
+        phase = "send_action_email"
         send_password_action_email(db, user.email)
         now = datetime.utcnow()
         user.auth_status = UserAuthStatus.INVITED
@@ -215,10 +232,19 @@ def provision_invitation(db: Session, *, user: User, invited_by_user_id: str | N
         invitation.sent_at = now
         invitation.last_error = None
         invitation.provisioning_secret_ciphertext = None
+        logger.info(
+            "Firebase activation request accepted company_id=%s user_id=%s invitation_id=%s attempt=%s",
+            user.company_id, user.id, invitation.id, invitation.send_attempts,
+        )
     except HTTPException as exc:
         user.auth_status = UserAuthStatus.PROVISIONING_FAILED
         invitation.status = "delivery_failed"
         invitation.last_error = str(exc.detail)[:500]
+        logger.error(
+            "Firebase invitation failed company_id=%s user_id=%s invitation_id=%s attempt=%s phase=%s http_status=%s error_code=%s",
+            user.company_id, user.id, invitation.id, invitation.send_attempts,
+            phase, exc.status_code, invitation.last_error,
+        )
     db.commit(); db.refresh(user); db.refresh(invitation)
     return invitation
 
@@ -228,11 +254,15 @@ def resend_user_activation(db: Session, *, user: User, invited_by_user_id: str |
         raise HTTPException(status_code=409, detail="This user has already activated the account.")
     latest = db.query(UserInvitation).filter(UserInvitation.user_id == user.id).order_by(UserInvitation.created_at.desc()).first()
     if latest and latest.last_attempt_at and latest.last_attempt_at > datetime.utcnow() - timedelta(seconds=60):
+        logger.warning(
+            "Firebase invitation resend rate limited company_id=%s user_id=%s invitation_id=%s",
+            user.company_id, user.id, latest.id,
+        )
         raise HTTPException(status_code=429, detail="Wait one minute before resending the invitation.")
     invitation = provision_invitation(db, user=user, invited_by_user_id=invited_by_user_id)
     if invitation.status == "delivery_failed":
         raise HTTPException(
-            status_code=502,
+            status_code=424,
             detail=f"Firebase did not accept the activation request: {invitation.last_error or 'unknown error'}",
         )
     return invitation

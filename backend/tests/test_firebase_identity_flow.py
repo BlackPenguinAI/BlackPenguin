@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+import logging
 from unittest.mock import patch
 
 import pytest
@@ -142,6 +143,45 @@ def test_firebase_rest_configuration_does_not_require_a_service_account():
         db.close(); engine.dispose()
 
 
+def test_firebase_invitation_failure_is_logged_with_trace_context_and_resend_uses_424(caplog):
+    engine, db = _db()
+    try:
+        company = _company(db)
+        _verified_firebase(db)
+        with caplog.at_level(logging.INFO), patch(
+            "app.integrations.firebase_client.create_identity",
+            side_effect=HTTPException(status_code=422, detail="OPERATION_NOT_ALLOWED"),
+        ):
+            user = invite_tenant_user(
+                db, company_id=company.id, email="sales@northstar.example",
+                first_name="Alex", last_name="Rivera", role=UserRole.SALES,
+            )
+        invitation = db.query(UserInvitation).filter_by(user_id=user.id).one()
+        assert user.auth_status == UserAuthStatus.PROVISIONING_FAILED
+        assert invitation.last_error == "OPERATION_NOT_ALLOWED"
+        assert any(
+            "Firebase invitation failed" in record.message
+            and f"company_id={company.id}" in record.message
+            and f"user_id={user.id}" in record.message
+            and f"invitation_id={invitation.id}" in record.message
+            and "phase=create_identity" in record.message
+            and "error_code=OPERATION_NOT_ALLOWED" in record.message
+            for record in caplog.records
+        )
+
+        invitation.last_attempt_at = datetime.utcnow() - timedelta(minutes=2)
+        db.commit()
+        with patch(
+            "app.integrations.firebase_client.create_identity",
+            side_effect=HTTPException(status_code=422, detail="OPERATION_NOT_ALLOWED"),
+        ), pytest.raises(HTTPException) as exc_info:
+            resend_user_activation(db, user=user)
+        assert exc_info.value.status_code == 424
+        assert exc_info.value.detail.endswith("OPERATION_NOT_ALLOWED")
+    finally:
+        db.close(); engine.dispose()
+
+
 def test_only_signed_public_flows_bypass_global_bearer_requirement():
     app = FastAPI()
     app.add_middleware(MultiTenantMiddleware)
@@ -251,6 +291,34 @@ def test_firebase_rest_creates_and_looks_up_an_identity_without_admin_sdk():
         db.close(); engine.dispose()
 
 
+def test_firebase_rest_rejection_logs_safe_provider_details(caplog):
+    engine, db = _db()
+    try:
+        _verified_firebase(db)
+
+        class Response:
+            is_error = True
+            status_code = 400
+            def json(self):
+                return {"error": {"message": "OPERATION_NOT_ALLOWED"}}
+
+        with caplog.at_level(logging.ERROR), patch(
+            "app.integrations.firebase_client.httpx.post", return_value=Response(),
+        ), pytest.raises(HTTPException):
+            from app.integrations.firebase_client import create_identity
+            create_identity(db, email="sales@example.com", password="DoNotLog#123")
+
+        combined = "\n".join(record.message for record in caplog.records)
+        assert "endpoint=accounts:signUp" in combined
+        assert "project_id=bp-test" in combined
+        assert "http_status=400" in combined
+        assert "error_code=OPERATION_NOT_ALLOWED" in combined
+        assert "public-api-key" not in combined
+        assert "DoNotLog#123" not in combined
+    finally:
+        db.close(); engine.dispose()
+
+
 def test_resend_reports_provider_failure_instead_of_false_success():
     engine, db = _db()
     try:
@@ -275,7 +343,7 @@ def test_resend_reports_provider_failure_instead_of_false_success():
             with pytest.raises(HTTPException) as error:
                 resend_user_activation(db, user=user)
         invitation = db.query(UserInvitation).filter_by(user_id=user.id).one()
-        assert error.value.status_code == 502
+        assert error.value.status_code == 424
         assert "OPERATION_NOT_ALLOWED" in error.value.detail
         assert invitation.status == "delivery_failed"
         assert invitation.send_attempts == 2
