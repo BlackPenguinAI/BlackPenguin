@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from typing import Dict, Any
 
@@ -30,10 +30,42 @@ def update_config(
 
 @router.get("/prompts/sales/versions")
 def list_sales_prompt_versions(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=50),
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN])),
 ):
-    return [{"id": item.id, "version": item.version_number, "is_published": item.is_published, "created_at": item.created_at, "published_at": item.published_at, "created_by_user_id": item.created_by_user_id, "change_note": item.change_note, "configuration": item.configuration} for item in services.prompt_versions(db, company_id=current_user.company_id, agent_key="sales")]
+    items, total = services.prompt_versions(
+        db, company_id=current_user.company_id, agent_key="sales",
+        offset=(page - 1) * page_size, limit=page_size,
+    )
+    return {
+        "items": [{
+            "id": item.id, "version": item.version_number,
+            "is_published": item.is_published, "created_at": item.created_at,
+            "published_at": item.published_at,
+            "created_by_user_id": item.created_by_user_id,
+            "change_note": item.change_note,
+        } for item in items],
+        "total": total, "page": page, "page_size": page_size,
+    }
+
+
+@router.get("/prompts/sales/versions/{version_id}")
+def get_sales_prompt_version(
+    version_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN])),
+):
+    item = services.prompt_version(
+        db, company_id=current_user.company_id, agent_key="sales", version_id=version_id,
+    )
+    return {
+        "id": item.id, "version": item.version_number,
+        "is_published": item.is_published, "created_at": item.created_at,
+        "published_at": item.published_at, "change_note": item.change_note,
+        "configuration": item.configuration,
+    }
 
 
 @router.post("/prompts/sales/drafts")

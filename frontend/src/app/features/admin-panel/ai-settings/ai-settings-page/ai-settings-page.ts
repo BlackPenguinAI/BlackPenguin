@@ -29,6 +29,14 @@ export class AiSettingsPageComponent implements OnInit {
   isLoading: boolean = true;
   isSaving: boolean = false;
   promptVersions: any[] = [];
+  promptVersionsLoaded = false;
+  promptVersionsLoading = false;
+  promptVersionsError = '';
+  promptVersionsPage = 1;
+  promptVersionsTotal = 0;
+  readonly promptVersionsPageSize = 20;
+  stagePromptKeys: string[] = [];
+  segmentPromptKeys: string[] = [];
   restoringVersionId = '';
   changeNote = '';
 
@@ -46,7 +54,10 @@ export class AiSettingsPageComponent implements OnInit {
     this.aiService.getConfig().subscribe({
       next: (data) => {
         this.config = data;
-        this.loadPromptVersions();
+        this.refreshPromptKeys();
+        if (this.activeTab === 'ventas' && this.promptVersionsLoaded) {
+          this.loadPromptVersions(this.promptVersionsPage);
+        }
         this.isLoading = false;
         this.cdr.detectChanges();
       },
@@ -58,8 +69,25 @@ export class AiSettingsPageComponent implements OnInit {
     });
   }
 
-  loadPromptVersions() {
-    this.aiService.getSalesPromptVersions().subscribe({ next: versions => this.promptVersions = versions });
+  loadPromptVersions(page = 1) {
+    this.promptVersionsLoading = true;
+    this.promptVersionsError = '';
+    this.aiService.getSalesPromptVersions(page, this.promptVersionsPageSize).subscribe({
+      next: response => {
+        this.promptVersions = response.items || [];
+        this.promptVersionsPage = response.page || page;
+        this.promptVersionsTotal = response.total || 0;
+        this.promptVersionsLoaded = true;
+        this.promptVersionsLoading = false;
+        this.cdr.detectChanges();
+      },
+      error: err => {
+        this.promptVersionsLoading = false;
+        this.promptVersionsLoaded = true;
+        this.promptVersionsError = err.error?.detail || 'Prompt history could not be loaded.';
+        this.cdr.detectChanges();
+      },
+    });
   }
 
   restorePromptVersion(version: any) {
@@ -86,15 +114,29 @@ export class AiSettingsPageComponent implements OnInit {
   }
 
   loadVersion(version: any): void {
-    this.config.agent_ventas = JSON.parse(JSON.stringify(version.configuration));
-    this.changeNote = `Based on version ${version.version}`;
-    this.toast.showSuccess(`Version ${version.version} loaded into the editor. Publishing will create an auditable change.`);
-    this.cdr.detectChanges();
+    this.restoringVersionId = version.id;
+    this.aiService.getSalesPromptVersion(version.id).subscribe({
+      next: detail => {
+        this.config.agent_ventas = JSON.parse(JSON.stringify(detail.configuration));
+        this.refreshPromptKeys();
+        this.restoringVersionId = '';
+        this.changeNote = `Based on version ${version.version}`;
+        this.toast.showSuccess(`Version ${version.version} loaded into the editor. Publishing will create an auditable change.`);
+        this.cdr.detectChanges();
+      },
+      error: err => {
+        this.restoringVersionId = '';
+        this.toast.showError(err.error?.detail || 'The prompt version could not be loaded.');
+        this.cdr.detectChanges();
+      },
+    });
   }
 
-  setTab(tab: string) { 
-    this.activeTab = tab; 
-    this.cdr.detectChanges(); 
+  setTab(tab: string) {
+    this.activeTab = tab;
+    if (tab === 'ventas' && !this.promptVersionsLoaded && !this.promptVersionsLoading) {
+      this.loadPromptVersions();
+    }
   }
 
   get activeAgent() {
@@ -121,7 +163,7 @@ export class AiSettingsPageComponent implements OnInit {
       next: () => {
         this.isSaving = false;
         this.toast.showSuccess('Configuración de Agentes actualizada en el ecosistema.');
-        this.loadPromptVersions();
+        if (this.promptVersionsLoaded) this.loadPromptVersions(this.promptVersionsPage);
         this.cdr.detectChanges(); 
       },
       error: (err) => {
@@ -149,7 +191,15 @@ export class AiSettingsPageComponent implements OnInit {
     });
   }
 
-  promptEntries(value: Record<string, string> | undefined): { key: string; value: string }[] {
-    return Object.entries(value || {}).map(([key, item]) => ({ key, value: item }));
+  trackByKey(_index: number, key: string): string { return key; }
+
+  get hasPreviousPromptPage(): boolean { return this.promptVersionsPage > 1; }
+  get hasNextPromptPage(): boolean {
+    return this.promptVersionsPage * this.promptVersionsPageSize < this.promptVersionsTotal;
+  }
+
+  private refreshPromptKeys(): void {
+    this.stagePromptKeys = Object.keys(this.config.agent_ventas?.stage_prompts || {});
+    this.segmentPromptKeys = Object.keys(this.config.agent_ventas?.segment_prompts || {});
   }
 }

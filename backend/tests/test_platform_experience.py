@@ -6,7 +6,9 @@ from sqlalchemy.orm import sessionmaker
 import app.db.base  # noqa: F401
 from app.db.postgres import Base
 from app.integrations.gcalendar_client import authorization_url
-from app.modules.ai_core.services import create_prompt_draft, publish_prompt_version
+from app.modules.ai_core.services import (
+    create_prompt_draft, prompt_version, prompt_versions, publish_prompt_version,
+)
 from app.modules.sales_agent.default_prompt import SALES_AGENT_DEFAULT_CONFIG
 from app.modules.seo.service import run_audit
 from app.modules.system_settings.schemas import GoogleCalendarConfigUpdate
@@ -42,6 +44,30 @@ def test_sales_prompt_draft_does_not_change_runtime_until_published():
     active = publish_prompt_version(db, company_id=None, agent_key="sales", version_id=draft.id, actor_id="actor")
     assert active.agent_ventas["system_prompt"] == "Published only after explicit approval."
     assert draft.is_published is True
+
+
+def test_sales_prompt_history_is_paginated_and_details_are_loaded_separately():
+    db = _db()
+    for number in range(25):
+        configuration = dict(SALES_AGENT_DEFAULT_CONFIG)
+        configuration["system_prompt"] = f"Version {number + 1}"
+        create_prompt_draft(
+            db, company_id=None, agent_key="sales", configuration=configuration,
+            change_note=f"Change {number + 1}", actor_id="actor",
+        )
+    first_page, total = prompt_versions(
+        db, company_id=None, agent_key="sales", offset=0, limit=20,
+    )
+    second_page, _ = prompt_versions(
+        db, company_id=None, agent_key="sales", offset=20, limit=20,
+    )
+    detail = prompt_version(
+        db, company_id=None, agent_key="sales", version_id=first_page[0].id,
+    )
+    assert total == 25
+    assert len(first_page) == 20
+    assert len(second_page) == 5
+    assert detail.configuration["system_prompt"] == "Version 25"
 
 
 class _Response:

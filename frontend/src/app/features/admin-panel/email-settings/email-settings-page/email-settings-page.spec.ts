@@ -1,22 +1,25 @@
-import { ComponentFixture, TestBed } from '@angular/core/testing';
+import '@angular/compiler';
+import { of } from 'rxjs';
+import { describe, expect, it, vi } from 'vitest';
 
-import { EmailSettingsPage } from './email-settings-page';
+import { EmailSettingsPageComponent } from './email-settings-page';
 
-describe('EmailSettingsPage', () => {
-  let component: EmailSettingsPage;
-  let fixture: ComponentFixture<EmailSettingsPage>;
-
-  beforeEach(async () => {
-    await TestBed.configureTestingModule({
-      imports: [EmailSettingsPage],
-    }).compileComponents();
-
-    fixture = TestBed.createComponent(EmailSettingsPage);
-    component = fixture.componentInstance;
-    await fixture.whenStable();
-  });
-
-  it('should create', () => {
-    expect(component).toBeTruthy();
+describe('EmailSettingsPageComponent', () => {
+  it('saves Firebase REST fields without requesting a service-account JSON', () => {
+    vi.stubGlobal('localStorage', { getItem: vi.fn().mockReturnValue('test-token') });
+    const http = {
+      put: vi.fn().mockReturnValue(of({ is_enabled: false, verification_status: 'pending' })),
+    };
+    const component = new EmailSettingsPageComponent(
+      http as any, { showSuccess: vi.fn(), showError: vi.fn() } as any,
+      { detectChanges: vi.fn() } as any,
+    );
+    component.firebaseConfig.project_id = 'blackpenguinai';
+    component.firebaseConfig.api_key = 'public-web-api-key';
+    component.saveConfig();
+    const payload = http.put.mock.calls[0][1];
+    expect(payload.auth_mode).toBe('rest');
+    expect(payload.project_id).toBe('blackpenguinai');
+    expect(payload.credentials_json).toBeUndefined();
   });
 });

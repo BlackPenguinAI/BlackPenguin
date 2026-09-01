@@ -76,7 +76,7 @@ export class CompanyUsersComponent implements OnInit {
         this.users.sort((a, b) => a.email.localeCompare(b.email));
         this.showAddModal = false; this.saving = false;
         this.toast.showSuccess(this.editingUserId ? 'User updated' :
-          (user.auth_status === 'provisioning_failed' ? 'User saved, but Firebase delivery must be retried.' : 'Invitation sent'));
+          (user.auth_status === 'provisioning_failed' ? 'User saved, but Firebase rejected the activation request.' : 'Activation request accepted by Firebase'));
         this.reloadLimits(); this.cdr.markForCheck();
       },
       error: err => { this.saving = false; this.toast.showError(err.error?.detail || 'Could not save user'); this.cdr.markForCheck(); },
@@ -92,14 +92,19 @@ export class CompanyUsersComponent implements OnInit {
 
   resendActivation(user: CompanyUser): void {
     this.companyUsers.resendActivation(user.id).subscribe({
-      next: () => { user.auth_status = 'invited'; user.invitation_sent_at = new Date().toISOString(); this.toast.showSuccess('Activation link sent'); this.cdr.markForCheck(); },
+      next: result => {
+        user.auth_status = 'invited';
+        user.invitation_sent_at = result.sent_at;
+        this.toast.showSuccess('Activation request accepted by Firebase');
+        this.cdr.markForCheck();
+      },
       error: err => this.toast.showError(err.error?.detail || 'Could not resend activation'),
     });
   }
 
   authStatusLabel(user: CompanyUser): string {
     return ({
-      invited: 'Invitation sent', active: 'Active', suspended: 'Suspended',
+      invited: 'Activation requested', active: 'Active', suspended: 'Suspended',
       provisioning_failed: 'Delivery failed', migration_required: 'Migration required',
     } as Record<string, string>)[user.auth_status] || 'Pending';
   }

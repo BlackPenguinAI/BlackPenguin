@@ -6,6 +6,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.security import get_password_hash
+from app.core.secret_store import decrypt_secret, encrypt_secret
 from app.modules.companies.models import Company
 from app.modules.users.models import User, UserAuthStatus, UserInvitation, UserRole
 from app.modules.users.project_access import sync_user_project_access
@@ -94,6 +95,9 @@ def invite_tenant_user(
 ) -> User:
     if role not in INVITABLE_TENANT_ROLES:
         raise HTTPException(status_code=403, detail="Only Assistant, Marketing and Sales users can be invited.")
+    if send_activation_email:
+        from app.integrations.firebase_client import ensure_firebase_ready
+        ensure_firebase_ready(db)
     user = _create_pending_user(
         db, company_id=company_id, email=email, first_name=first_name, last_name=last_name,
         role=role, timezone=timezone, project_access_scope=project_access_scope,
@@ -110,6 +114,9 @@ def invite_company_administrator(
     db: Session, *, company_id: str, email: str, first_name: str, last_name: str,
     is_active: bool = True, invited_by_user_id: str | None = None,
 ) -> User:
+    from app.integrations.firebase_client import ensure_firebase_ready
+    if is_active:
+        ensure_firebase_ready(db)
     user = _create_pending_user(
         db, company_id=company_id, email=email, first_name=first_name, last_name=last_name,
         role=UserRole.ADMIN, timezone="UTC", project_access_scope="all", project_ids=[],
@@ -154,26 +161,60 @@ def _create_pending_user(
 
 
 def provision_invitation(db: Session, *, user: User, invited_by_user_id: str | None = None) -> UserInvitation:
-    from app.integrations.firebase_client import create_identity, send_password_action_email
-
-    invitation = UserInvitation(
-        user_id=user.id, invited_by_user_id=invited_by_user_id, status="pending",
-        expires_at=datetime.utcnow() + timedelta(days=7), send_attempts=1,
+    from app.integrations.firebase_client import (
+        create_identity, ensure_firebase_ready, recover_identity, send_password_action_email,
     )
-    db.add(invitation); db.commit(); db.refresh(user); db.refresh(invitation)
-    try:
-        identity = create_identity(
-            db, uid=user.id, email=user.email,
-            display_name=f"{user.first_name or ''} {user.last_name or ''}".strip(),
-            password=secrets.token_urlsafe(48),
+    ensure_firebase_ready(db)
+
+    invitation = db.query(UserInvitation).filter(
+        UserInvitation.user_id == user.id,
+        UserInvitation.status.in_(["pending", "delivery_failed"]),
+    ).order_by(UserInvitation.created_at.desc()).first()
+    temporary_password = None
+    if not invitation:
+        temporary_password = secrets.token_urlsafe(48)
+        invitation = UserInvitation(
+            user_id=user.id, invited_by_user_id=invited_by_user_id, status="pending",
+            expires_at=datetime.utcnow() + timedelta(days=7), send_attempts=0,
+            provisioning_secret_ciphertext=encrypt_secret(temporary_password),
         )
-        user.firebase_uid = identity.uid
+        db.add(invitation)
+    elif invitation.provisioning_secret_ciphertext:
+        try:
+            temporary_password = decrypt_secret(invitation.provisioning_secret_ciphertext)
+        except ValueError:
+            invitation.provisioning_secret_ciphertext = None
+    if not temporary_password and not user.firebase_uid:
+        temporary_password = secrets.token_urlsafe(48)
+        invitation.provisioning_secret_ciphertext = encrypt_secret(temporary_password)
+    now = datetime.utcnow()
+    invitation.status = "pending"
+    invitation.last_attempt_at = now
+    invitation.send_attempts = (invitation.send_attempts or 0) + 1
+    invitation.expires_at = now + timedelta(days=7)
+    db.commit(); db.refresh(user); db.refresh(invitation)
+    try:
+        if not user.firebase_uid:
+            try:
+                identity = create_identity(
+                    db, email=user.email,
+                    display_name=f"{user.first_name or ''} {user.last_name or ''}".strip(),
+                    password=temporary_password,
+                )
+            except HTTPException as exc:
+                if exc.detail != "EMAIL_EXISTS":
+                    raise
+                identity = recover_identity(db, email=user.email, password=temporary_password)
+            user.firebase_uid = identity.uid
+            db.commit()
         send_password_action_email(db, user.email)
         now = datetime.utcnow()
         user.auth_status = UserAuthStatus.INVITED
         user.invitation_sent_at = now
+        invitation.status = "accepted_by_provider"
         invitation.sent_at = now
         invitation.last_error = None
+        invitation.provisioning_secret_ciphertext = None
     except HTTPException as exc:
         user.auth_status = UserAuthStatus.PROVISIONING_FAILED
         invitation.status = "delivery_failed"
@@ -186,24 +227,28 @@ def resend_user_activation(db: Session, *, user: User, invited_by_user_id: str |
     if user.auth_status == UserAuthStatus.ACTIVE:
         raise HTTPException(status_code=409, detail="This user has already activated the account.")
     latest = db.query(UserInvitation).filter(UserInvitation.user_id == user.id).order_by(UserInvitation.created_at.desc()).first()
-    if latest and latest.sent_at and latest.sent_at > datetime.utcnow() - timedelta(seconds=60):
+    if latest and latest.last_attempt_at and latest.last_attempt_at > datetime.utcnow() - timedelta(seconds=60):
         raise HTTPException(status_code=429, detail="Wait one minute before resending the invitation.")
-    return provision_invitation(db, user=user, invited_by_user_id=invited_by_user_id)
+    invitation = provision_invitation(db, user=user, invited_by_user_id=invited_by_user_id)
+    if invitation.status == "delivery_failed":
+        raise HTTPException(
+            status_code=502,
+            detail=f"Firebase did not accept the activation request: {invitation.last_error or 'unknown error'}",
+        )
+    return invitation
 
 
 def set_user_enabled(db: Session, *, user: User, enabled: bool) -> None:
-    from app.integrations.firebase_client import update_identity
     user.is_active = enabled
     if enabled:
         user.auth_status = UserAuthStatus.ACTIVE if user.activated_at else UserAuthStatus.INVITED
     else:
         user.auth_status = UserAuthStatus.SUSPENDED
-    if user.firebase_uid:
-        update_identity(db, uid=user.firebase_uid, disabled=not enabled)
+    # Black Penguin authorization is resolved from PostgreSQL on every request.
+    # Firebase REST has no service-account operation for disabling identities.
 
 
 def mark_invitation_accepted(db: Session, user: User) -> None:
-    from app.integrations.firebase_client import update_identity
     now = datetime.utcnow()
     user.auth_status = UserAuthStatus.ACTIVE
     user.is_active = True
@@ -211,11 +256,10 @@ def mark_invitation_accepted(db: Session, user: User) -> None:
     user.last_login_at = now
     invitation = db.query(UserInvitation).filter(
         UserInvitation.user_id == user.id,
-        UserInvitation.status.in_(["pending", "delivery_failed"]),
+        UserInvitation.status.in_(["pending", "accepted_by_provider", "delivery_failed"]),
     ).order_by(UserInvitation.created_at.desc()).first()
     if invitation:
         invitation.status = "accepted"
         invitation.accepted_at = now
-    if user.firebase_uid:
-        update_identity(db, uid=user.firebase_uid, email_verified=True, disabled=False)
+        invitation.provisioning_secret_ciphertext = None
     db.commit()

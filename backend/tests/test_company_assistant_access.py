@@ -65,7 +65,9 @@ def test_assistant_is_a_tenant_manager():
 
 def test_shared_invitation_service_creates_assistant_and_normalizes_email(db):
     company = _company(db)
-    with patch("app.modules.users.services.provision_invitation"):
+    with patch("app.integrations.firebase_client.ensure_firebase_ready"), patch(
+        "app.modules.users.services.provision_invitation"
+    ):
         user = invite_tenant_user(
             db,
             company_id=company.id,

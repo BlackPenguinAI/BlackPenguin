@@ -257,12 +257,6 @@ def update_company_user(
     scope = payload.project_access_scope or user.project_access_scope or "all"
     selected_ids = payload.project_ids if payload.project_ids is not None else project_ids_for_user(db, user)
     sync_user_project_access(db, user=user, scope=scope, project_ids=selected_ids)
-    if user.firebase_uid and any(value is not None for value in (payload.first_name, payload.last_name)):
-        from app.integrations.firebase_client import update_identity
-        update_identity(
-            db, uid=user.firebase_uid,
-            display_name=f"{user.first_name or ''} {user.last_name or ''}".strip(),
-        )
     db.commit()
     db.refresh(user)
     return _tenant_user_response(db, user)
@@ -282,8 +276,8 @@ def resend_company_user_activation(
             status_code=403,
             detail="The Company administrator can only be managed from the superadmin Company panel.",
         )
-    services.resend_user_activation(db, user=user, invited_by_user_id=current_user.id)
-    return {"detail": "Activation link sent."}
+    invitation = services.resend_user_activation(db, user=user, invited_by_user_id=current_user.id)
+    return {"detail": "Activation request accepted by Firebase.", "status": invitation.status, "sent_at": invitation.sent_at}
 
 
 @router.delete("/company/{user_id}/invitation")
@@ -298,7 +292,8 @@ def revoke_company_user_invitation(
     if user.role == UserRole.ADMIN or user.auth_status == UserAuthStatus.ACTIVE:
         raise HTTPException(status_code=409, detail="Only pending team invitations can be revoked.")
     invitation = db.query(UserInvitation).filter(
-        UserInvitation.user_id == user.id, UserInvitation.status == "pending",
+        UserInvitation.user_id == user.id,
+        UserInvitation.status.in_(["pending", "accepted_by_provider", "delivery_failed"]),
     ).order_by(UserInvitation.created_at.desc()).first()
     if invitation:
         from datetime import datetime

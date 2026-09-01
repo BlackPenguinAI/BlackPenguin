@@ -29,8 +29,12 @@ export class AiConfigService {
     return this.http.put<any>(`${this.apiUrl}/config`, payload, { headers: this.headers });
   }
 
-  getSalesPromptVersions(): Observable<any[]> {
-    return this.http.get<any[]>(`${this.apiUrl}/prompts/sales/versions`, { headers: this.headers });
+  getSalesPromptVersions(page = 1, pageSize = 20): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/prompts/sales/versions?page=${page}&page_size=${pageSize}`, { headers: this.headers });
+  }
+
+  getSalesPromptVersion(versionId: string): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/prompts/sales/versions/${versionId}`, { headers: this.headers });
   }
 
   restoreSalesPromptVersion(versionId: string): Observable<any> {

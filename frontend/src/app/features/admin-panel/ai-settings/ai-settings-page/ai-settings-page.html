@@ -57,14 +57,14 @@
               <h3 class="text-sm font-medium uppercase tracking-wider text-secondary">10-stage workflow playbook</h3>
               <p class="mt-1 text-xs text-gray-500">These instructions guide conversation behavior. Tenant isolation, consent, verified slots and transactional bookings remain protected in code.</p>
               <div class="mt-4 grid gap-3">
-                <label *ngFor="let item of promptEntries(activeAgent.stage_prompts)" class="grid gap-1 text-[10px] uppercase tracking-wider text-gray-500">{{ item.key }}<textarea rows="2" [(ngModel)]="activeAgent.stage_prompts[item.key]" [name]="'stage_'+item.key" class="rounded-lg border border-white/10 bg-black/50 p-3 text-xs normal-case tracking-normal text-white"></textarea></label>
+                <label *ngFor="let key of stagePromptKeys; trackBy: trackByKey" class="grid gap-1 text-[10px] uppercase tracking-wider text-gray-500">{{ key }}<textarea rows="2" [(ngModel)]="activeAgent.stage_prompts[key]" [name]="'stage_'+key" class="rounded-lg border border-white/10 bg-black/50 p-3 text-xs normal-case tracking-normal text-white"></textarea></label>
               </div>
             </section>
 
             <section class="rounded-xl border border-white/10 bg-black/20 p-4">
               <h3 class="text-sm font-medium uppercase tracking-wider text-secondary">Segment strategies</h3>
               <div class="mt-4 grid gap-3">
-                <label *ngFor="let item of promptEntries(activeAgent.segment_prompts)" class="grid gap-1 text-[10px] uppercase tracking-wider text-gray-500">{{ item.key }}<textarea rows="2" [(ngModel)]="activeAgent.segment_prompts[item.key]" [name]="'segment_'+item.key" class="rounded-lg border border-white/10 bg-black/50 p-3 text-xs normal-case tracking-normal text-white"></textarea></label>
+                <label *ngFor="let key of segmentPromptKeys; trackBy: trackByKey" class="grid gap-1 text-[10px] uppercase tracking-wider text-gray-500">{{ key }}<textarea rows="2" [(ngModel)]="activeAgent.segment_prompts[key]" [name]="'segment_'+key" class="rounded-lg border border-white/10 bg-black/50 p-3 text-xs normal-case tracking-normal text-white"></textarea></label>
               </div>
             </section>
 
@@ -80,10 +80,17 @@
             <div class="flex items-center justify-between mb-3">
               <div><h3 class="text-sm font-medium text-secondary uppercase tracking-wider">Prompt history</h3><p class="text-xs text-gray-500 mt-1">Drafts are auditable; publishing is explicit and rollback never removes history.</p></div>
             </div>
-            <div *ngIf="!promptVersions.length" class="text-xs text-gray-500">No prompt versions yet.</div>
+            <div *ngIf="promptVersionsLoading" class="text-xs text-gray-500">Loading prompt history…</div>
+            <div *ngIf="promptVersionsError" class="rounded-lg border border-red-500/20 bg-red-500/5 p-3 text-xs text-red-300">{{ promptVersionsError }} <button type="button" class="ml-2 underline" (click)="loadPromptVersions(promptVersionsPage)">Retry</button></div>
+            <div *ngIf="promptVersionsLoaded && !promptVersionsLoading && !promptVersionsError && !promptVersions.length" class="text-xs text-gray-500">No prompt versions yet.</div>
             <div *ngFor="let version of promptVersions" class="flex items-center justify-between gap-3 py-2 border-t border-white/5 text-sm">
               <span>Version {{ version.version }} <small class="text-gray-500">· {{ version.created_at | date:'medium' }} · {{ version.is_published ? 'Published' : 'Draft' }}</small><small *ngIf="version.change_note" class="mt-1 block text-gray-400">{{ version.change_note }}</small></span>
               <span class="flex gap-2"><button type="button" (click)="loadVersion(version)" class="px-3 py-1.5 rounded-lg border border-white/10 hover:border-secondary">Load</button><button *ngIf="!version.is_published" type="button" [disabled]="restoringVersionId === version.id" (click)="publishVersion(version)" class="px-3 py-1.5 rounded-lg bg-secondary text-black disabled:opacity-40">Publish</button><button type="button" [disabled]="version.is_published || restoringVersionId === version.id" (click)="restorePromptVersion(version)" class="px-3 py-1.5 rounded-lg border border-white/10 disabled:opacity-40 hover:border-secondary">Restore as published</button></span>
+            </div>
+            <div *ngIf="promptVersionsTotal > promptVersionsPageSize" class="mt-3 flex items-center justify-end gap-3 text-xs text-gray-400">
+              <button type="button" [disabled]="!hasPreviousPromptPage || promptVersionsLoading" (click)="loadPromptVersions(promptVersionsPage - 1)" class="rounded-lg border border-white/10 px-3 py-1.5 disabled:opacity-40">Previous</button>
+              <span>Page {{ promptVersionsPage }} · {{ promptVersionsTotal }} versions</span>
+              <button type="button" [disabled]="!hasNextPromptPage || promptVersionsLoading" (click)="loadPromptVersions(promptVersionsPage + 1)" class="rounded-lg border border-white/10 px-3 py-1.5 disabled:opacity-40">Next</button>
             </div>
           </section>
 

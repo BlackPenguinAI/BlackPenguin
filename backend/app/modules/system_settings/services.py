@@ -1,5 +1,4 @@
 from datetime import datetime
-import json
 import re
 
 import httpx
@@ -14,38 +13,20 @@ from app.core.secret_store import decrypt_secret, encrypt_secret
 def get_firebase_config(db: Session) -> FirebaseConfig:
     config = db.query(FirebaseConfig).first()
     if not config:
-        service_account = settings.FIREBASE_SERVICE_ACCOUNT_JSON or None
-        service_hint = None
-        if service_account:
-            try:
-                service_hint = json.loads(service_account).get("client_email")
-            except json.JSONDecodeError:
-                service_account = None
         config = FirebaseConfig(
             api_key=settings.FIREBASE_API_KEY or None,
             auth_domain=settings.FIREBASE_AUTH_DOMAIN or None,
             project_id=settings.FIREBASE_PROJECT_ID or None,
-            service_account_ciphertext=encrypt_secret(service_account),
-            service_account_hint=service_hint,
             is_enabled=False,
-            auth_mode=settings.FIREBASE_AUTH_MODE or "hybrid",
+            auth_mode="rest",
             action_handler_url=f"{settings.PUBLIC_APP_URL.rstrip('/')}/activate-account",
         )
         db.add(config)
         db.commit()
         db.refresh(config)
-    if config.credentials_json and not config.service_account_ciphertext:
-        try:
-            parsed = json.loads(config.credentials_json)
-            config.service_account_ciphertext = encrypt_secret(config.credentials_json)
-            config.service_account_hint = parsed.get("client_email")
-            config.credentials_json = None
-            config.verification_status = "pending"
-            db.commit(); db.refresh(config)
-        except (ValueError, json.JSONDecodeError):
-            config.verification_status = "failed"
-            config.last_error = "legacy_credentials_invalid"
-            db.commit(); db.refresh(config)
+    if config.auth_mode != "rest":
+        config.auth_mode = "rest"
+        db.commit(); db.refresh(config)
     return config
 
 
@@ -53,9 +34,7 @@ def firebase_config_response(config: FirebaseConfig) -> dict:
     return {
         "id": config.id, "api_key": config.api_key, "auth_domain": config.auth_domain,
         "project_id": config.project_id,
-        "credentials_configured": bool(config.service_account_ciphertext),
-        "credentials_hint": config.service_account_hint,
-        "is_enabled": bool(config.is_enabled), "auth_mode": config.auth_mode or "hybrid",
+        "is_enabled": bool(config.is_enabled), "auth_mode": "rest",
         "action_handler_url": config.action_handler_url,
         "verification_status": config.verification_status or "not_configured",
         "verified_at": config.verified_at, "last_error": config.last_error,
@@ -65,27 +44,24 @@ def firebase_config_response(config: FirebaseConfig) -> dict:
 def update_firebase_config(db: Session, payload: FirebaseConfigUpdate) -> FirebaseConfig:
     config = get_firebase_config(db)
     update_data = payload.model_dump(exclude_unset=True)
-    credentials = update_data.pop("credentials_json", None)
-    if credentials:
-        try:
-            parsed = json.loads(credentials)
-        except json.JSONDecodeError as exc:
-            raise HTTPException(status_code=422, detail="Service Account JSON is not valid JSON.") from exc
-        if not parsed.get("project_id") or not parsed.get("private_key") or not parsed.get("client_email"):
-            raise HTTPException(status_code=422, detail="Service Account JSON is incomplete.")
-        if update_data.get("project_id", config.project_id) != parsed["project_id"]:
-            raise HTTPException(status_code=422, detail="Service Account Project ID must match Firebase Project ID.")
-        config.service_account_ciphertext = encrypt_secret(credentials)
-        config.service_account_hint = parsed["client_email"]
+    update_data["auth_mode"] = "rest"
+    connection_changed = any(
+        key in update_data and update_data[key] != getattr(config, key)
+        for key in ("api_key", "auth_domain", "project_id", "action_handler_url")
+    )
+    for key, value in update_data.items():
+        setattr(config, key, value)
+    if config.action_handler_url and not config.action_handler_url.startswith("https://"):
+        raise HTTPException(status_code=422, detail="Firebase Action Handler URL must use HTTPS.")
+    if config.is_enabled and not (config.api_key and config.project_id and config.action_handler_url):
+        raise HTTPException(status_code=422, detail="Complete Firebase Project ID, Web API Key and Action Handler URL before enabling Authentication.")
+    if config.is_enabled and config.verification_status != "verified":
+        raise HTTPException(status_code=422, detail="Test Firebase successfully before enabling Authentication.")
+    if connection_changed:
+        config.is_enabled = False
         config.verification_status = "pending"
         config.verified_at = None
         config.last_error = None
-    for key, value in update_data.items():
-        setattr(config, key, value)
-    if config.is_enabled and not (config.api_key and config.project_id and config.service_account_ciphertext):
-        raise HTTPException(status_code=422, detail="Complete Firebase credentials before enabling Authentication.")
-    if config.is_enabled and config.verification_status != "verified":
-        raise HTTPException(status_code=422, detail="Test Firebase successfully before enabling Authentication.")
     db.commit()
     db.refresh(config)
     return config
@@ -95,13 +71,13 @@ def verify_firebase_config(db: Session) -> FirebaseConfig:
     config = get_firebase_config(db)
     try:
         from app.integrations.firebase_client import verify_configuration
-        service_account = verify_configuration(db)
+        verify_configuration(db)
     except HTTPException as exc:
+        config.is_enabled = False
         config.verification_status = "failed"
         config.last_error = str(exc.detail)
         db.commit()
         raise
-    config.service_account_hint = service_account.get("client_email")
     config.verification_status = "verified"
     config.verified_at = datetime.utcnow()
     config.last_error = None

@@ -1,8 +1,8 @@
 from datetime import datetime, timedelta
-from types import SimpleNamespace
 from unittest.mock import patch
 
-from fastapi import FastAPI
+import pytest
+from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -27,6 +27,7 @@ from app.modules.system_settings.schemas import FirebaseConfigUpdate
 from app.modules.system_settings.services import firebase_config_response, update_firebase_config
 from app.modules.users.models import User, UserAuthStatus, UserInvitation, UserRole
 from app.modules.users.services import invite_tenant_user
+from app.modules.users.services import resend_user_activation
 
 
 def _db():
@@ -48,23 +49,39 @@ def _company(db):
     return company
 
 
+def _verified_firebase(db):
+    config = FirebaseConfig(
+        project_id="bp-test", api_key="public-api-key",
+        auth_domain="bp-test.firebaseapp.com", is_enabled=True,
+        auth_mode="rest", verification_status="verified",
+        action_handler_url="https://blackpenguin.ai/activate-account",
+    )
+    db.add(config); db.commit()
+    return config
+
+
 def test_invitation_provisions_firebase_without_an_administrator_password():
     engine, db = _db()
     try:
         company = _company(db)
+        _verified_firebase(db)
         with patch("app.integrations.firebase_client.create_identity") as create_identity, patch(
             "app.integrations.firebase_client.send_password_action_email"
         ) as send_email:
-            create_identity.side_effect = lambda _db, **kwargs: SimpleNamespace(uid=kwargs["uid"])
+            create_identity.return_value.uid = "firebase-sales"
             user = invite_tenant_user(
                 db, company_id=company.id, email="Sales@Northstar.example",
                 first_name="Alex", last_name="Rivera", role=UserRole.SALES,
                 timezone="America/New_York", invited_by_user_id=None,
             )
         assert user.auth_status == UserAuthStatus.INVITED
-        assert user.firebase_uid == user.id
+        assert user.firebase_uid == "firebase-sales"
         assert user.invitation_sent_at is not None
-        assert db.query(UserInvitation).filter_by(user_id=user.id, status="pending").count() == 1
+        invitation = db.query(UserInvitation).filter_by(user_id=user.id).one()
+        assert invitation.status == "accepted_by_provider"
+        assert invitation.send_attempts == 1
+        assert invitation.last_attempt_at is not None
+        assert invitation.provisioning_secret_ciphertext is None
         create_identity.assert_called_once()
         send_email.assert_called_once_with(db, "sales@northstar.example")
     finally:
@@ -92,7 +109,7 @@ def test_activation_is_one_time_and_returns_a_tenant_session():
         ), patch(
             "app.integrations.firebase_client.sign_in_with_password",
             return_value={"localId": user.firebase_uid},
-        ), patch("app.integrations.firebase_client.update_identity"):
+        ):
             response = complete_firebase_invitation(
                 CompleteInvitationPayload(oob_code="valid-action-code", new_password="Secure#Pass1"),
                 db,
@@ -108,22 +125,19 @@ def test_activation_is_one_time_and_returns_a_tenant_session():
         db.close(); engine.dispose()
 
 
-def test_firebase_service_account_is_write_only_and_encrypted():
+def test_firebase_rest_configuration_does_not_require_a_service_account():
     engine, db = _db()
     try:
-        raw = '{"project_id":"bp-test","client_email":"firebase@bp-test.iam.gserviceaccount.com","private_key":"secret"}'
         config = update_firebase_config(db, FirebaseConfigUpdate(
             project_id="bp-test", api_key="public-api-key",
-            auth_domain="bp-test.firebaseapp.com", credentials_json=raw,
+            auth_domain="bp-test.firebaseapp.com",
             action_handler_url="https://blackpenguin.ai/activate-account",
         ))
         response = firebase_config_response(config)
-        assert config.credentials_json is None
-        assert config.service_account_ciphertext
-        assert raw not in config.service_account_ciphertext
-        assert response["credentials_configured"] is True
-        assert "credentials_json" not in response
-        assert response["credentials_hint"] == "firebase@bp-test.iam.gserviceaccount.com"
+        assert config.service_account_ciphertext is None
+        assert response["auth_mode"] == "rest"
+        assert "credentials_configured" not in response
+        assert "credentials_hint" not in response
     finally:
         db.close(); engine.dispose()
 
@@ -158,7 +172,7 @@ def test_authenticated_firebase_user_changes_password_in_identity_provider():
         company = _company(db)
         db.add(FirebaseConfig(
             project_id="bp-test", api_key="public-key", is_enabled=True,
-            auth_mode="firebase", action_handler_url="https://blackpenguin.ai/activate-account",
+            auth_mode="rest", action_handler_url="https://blackpenguin.ai/activate-account",
         ))
         user = User(
             company_id=company.id, email="sales@example.com", first_name="Sam",
@@ -169,8 +183,8 @@ def test_authenticated_firebase_user_changes_password_in_identity_provider():
         db.add(user); db.commit()
         with patch(
             "app.integrations.firebase_client.sign_in_with_password",
-            return_value={"localId": user.firebase_uid},
-        ) as sign_in, patch("app.integrations.firebase_client.update_identity") as update_identity:
+            return_value={"localId": user.firebase_uid, "idToken": "firebase-id-token"},
+        ) as sign_in, patch("app.integrations.firebase_client.update_password") as update_password:
             response = change_password(
                 ChangePasswordPayload(current_password="OldSecure#1", new_password="NewSecure#2"),
                 db,
@@ -178,7 +192,7 @@ def test_authenticated_firebase_user_changes_password_in_identity_provider():
             )
         assert response["detail"] == "Password updated successfully."
         sign_in.assert_called_once_with(db, user.email, "OldSecure#1")
-        update_identity.assert_called_once_with(db, uid=user.firebase_uid, password="NewSecure#2")
+        update_password.assert_called_once_with(db, id_token="firebase-id-token", password="NewSecure#2")
         assert verify_password("NewSecure#2", user.hashed_password)
     finally:
         db.close(); engine.dispose()
@@ -208,5 +222,63 @@ def test_active_user_can_use_the_same_firebase_handler_for_password_recovery():
         assert response["access_token"]
         assert db.query(UserInvitation).filter_by(user_id=user.id).count() == 0
         assert user.auth_status == UserAuthStatus.ACTIVE
+    finally:
+        db.close(); engine.dispose()
+
+
+def test_firebase_rest_creates_and_looks_up_an_identity_without_admin_sdk():
+    engine, db = _db()
+    try:
+        _verified_firebase(db)
+
+        class Response:
+            is_error = False
+            def __init__(self, payload): self.payload = payload
+            def json(self): return self.payload
+
+        with patch("app.integrations.firebase_client.httpx.post", side_effect=[
+            Response({"localId": "firebase-uid", "idToken": "token"}),
+            Response({"users": [{"localId": "firebase-uid", "email": "sales@example.com"}]}),
+        ]) as post:
+            from app.integrations.firebase_client import create_identity, verify_id_token
+            identity = create_identity(db, email="sales@example.com", password="Temporary#123")
+            verified = verify_id_token(db, "firebase-token")
+        assert identity.uid == "firebase-uid"
+        assert verified["uid"] == "firebase-uid"
+        assert post.call_args_list[0].args[0].endswith("accounts:signUp")
+        assert post.call_args_list[1].args[0].endswith("accounts:lookup")
+    finally:
+        db.close(); engine.dispose()
+
+
+def test_resend_reports_provider_failure_instead_of_false_success():
+    engine, db = _db()
+    try:
+        company = _company(db)
+        _verified_firebase(db)
+        user = User(
+            company_id=company.id, email="retry@example.com", first_name="Riley",
+            role=UserRole.SALES, hashed_password="not-used", firebase_uid="firebase-retry",
+            auth_status=UserAuthStatus.PROVISIONING_FAILED, is_active=True,
+        )
+        db.add(user); db.flush()
+        db.add(UserInvitation(
+            user_id=user.id, status="delivery_failed", send_attempts=1,
+            last_attempt_at=datetime.utcnow() - timedelta(minutes=2),
+            expires_at=datetime.utcnow() + timedelta(days=1),
+        ))
+        db.commit()
+        with patch(
+            "app.integrations.firebase_client.send_password_action_email",
+            side_effect=HTTPException(status_code=422, detail="OPERATION_NOT_ALLOWED"),
+        ):
+            with pytest.raises(HTTPException) as error:
+                resend_user_activation(db, user=user)
+        invitation = db.query(UserInvitation).filter_by(user_id=user.id).one()
+        assert error.value.status_code == 502
+        assert "OPERATION_NOT_ALLOWED" in error.value.detail
+        assert invitation.status == "delivery_failed"
+        assert invitation.send_attempts == 2
+        assert user.auth_status == UserAuthStatus.PROVISIONING_FAILED
     finally:
         db.close(); engine.dispose()

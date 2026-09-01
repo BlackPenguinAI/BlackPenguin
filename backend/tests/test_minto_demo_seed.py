@@ -99,7 +99,9 @@ def test_creating_a_regular_company_no_longer_creates_a_demo_project(monkeypatch
         db.add_all([plan, superadmin])
         db.commit()
 
-        with patch("app.modules.users.services.provision_invitation"):
+        with patch("app.integrations.firebase_client.ensure_firebase_ready"), patch(
+            "app.modules.users.services.provision_invitation"
+        ):
             company = create_company_workspace(
                 name="Regular Company",
                 plan_id=plan.id,

@@ -20,7 +20,7 @@ class FirebaseConfig(Base):
     verification_status = Column(String(30), default="not_configured", nullable=False)
     verified_at = Column(DateTime, nullable=True)
     last_error = Column(Text, nullable=True)
-    auth_mode = Column(String(20), default="hybrid", nullable=False)
+    auth_mode = Column(String(20), default="rest", nullable=False)
     action_handler_url = Column(String(500), default="https://blackpenguin.ai/activate-account", nullable=False)
     # Legacy plaintext column retained only so the migration can encrypt it.
     credentials_json = Column(Text, nullable=True)

@@ -71,7 +71,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
         if verify_password(form_data.password, user.hashed_password):
             try:
                 identity = firebase_client.create_identity(
-                    db, uid=user.id, email=user.email,
+                    db, email=user.email,
                     display_name=f"{user.first_name or ''} {user.last_name or ''}".strip(),
                     password=form_data.password,
                 )
@@ -104,7 +104,7 @@ def inspect_firebase_action(payload: FirebaseActionCodePayload, db: Session = De
     if user.auth_status in {UserAuthStatus.INVITED, UserAuthStatus.PROVISIONING_FAILED}:
         invitation = db.query(UserInvitation).filter(
             UserInvitation.user_id == user.id,
-            UserInvitation.status.in_(["pending", "delivery_failed"]),
+            UserInvitation.status.in_(["pending", "accepted_by_provider", "delivery_failed"]),
             UserInvitation.expires_at > datetime.utcnow(),
         ).order_by(UserInvitation.created_at.desc()).first()
         if not invitation:
@@ -170,8 +170,8 @@ def change_password(
         session = firebase_client.sign_in_with_password(db, current_user.email, payload.current_password)
         if session.get("localId") != current_user.firebase_uid:
             raise HTTPException(status_code=401, detail="Firebase identity does not match this Black Penguin account.")
-        firebase_client.update_identity(
-            db, uid=current_user.firebase_uid, password=payload.new_password,
+        firebase_client.update_password(
+            db, id_token=session["idToken"], password=payload.new_password,
         )
     elif not verify_password(payload.current_password, current_user.hashed_password):
         raise HTTPException(status_code=400, detail="Current password is incorrect.")

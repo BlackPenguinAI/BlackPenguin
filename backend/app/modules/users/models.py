@@ -77,6 +77,8 @@ class UserInvitation(Base):
     accepted_at = Column(DateTime, nullable=True)
     revoked_at = Column(DateTime, nullable=True)
     send_attempts = Column(Integer, default=0, nullable=False)
+    last_attempt_at = Column(DateTime, nullable=True)
+    provisioning_secret_ciphertext = Column(String(500), nullable=True)
     last_error = Column(String(500), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 

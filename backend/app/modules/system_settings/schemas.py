@@ -9,9 +9,8 @@ class FirebaseConfigBase(BaseModel):
     api_key: Optional[str] = None
     auth_domain: Optional[str] = None
     project_id: Optional[str] = None
-    credentials_json: Optional[str] = None
     is_enabled: bool = False
-    auth_mode: str = "hybrid"
+    auth_mode: str = "rest"
     action_handler_url: str = "https://blackpenguin.ai/activate-account"
 
 class FirebaseConfigUpdate(FirebaseConfigBase):
@@ -22,10 +21,8 @@ class FirebaseConfigSchema(BaseModel):
     api_key: Optional[str] = None
     auth_domain: Optional[str] = None
     project_id: Optional[str] = None
-    credentials_configured: bool = False
-    credentials_hint: Optional[str] = None
     is_enabled: bool = False
-    auth_mode: str = "hybrid"
+    auth_mode: str = "rest"
     action_handler_url: str
     verification_status: str = "not_configured"
     verified_at: Optional[datetime] = None

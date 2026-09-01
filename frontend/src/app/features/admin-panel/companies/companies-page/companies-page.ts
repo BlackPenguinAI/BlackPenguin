@@ -209,11 +209,11 @@ export class CompaniesPageComponent implements OnInit {
         this.loadData();
         const administrator = company.users?.find((user: any) => user.role === 'admin');
         if (administrator?.auth_status === 'provisioning_failed') {
-          this.toast.showError('Company registered, but Firebase could not deliver the activation link. Verify Firebase and use Resend activation.');
+          this.toast.showError('Company registered, but Firebase rejected the activation request. Verify Firebase and use Resend activation.');
         } else if (administrator?.auth_status === 'suspended') {
           this.toast.showSuccess('Company registered. The Administrator is suspended, so no activation was sent.');
         } else {
-          this.toast.showSuccess('Company registered. Firebase invitation sent to the Administrator.');
+          this.toast.showSuccess('Company registered. Activation request accepted by Firebase.');
         }
       },
       error: (err) => {
@@ -276,7 +276,7 @@ export class CompaniesPageComponent implements OnInit {
       next: () => {
         this.resendingId = null;
         this.cdr.detectChanges();
-        this.toast.showSuccess('Activation link sent successfully.');
+        this.toast.showSuccess('Activation request accepted by Firebase.');
       },
       error: (err) => {
         this.resendingId = null;

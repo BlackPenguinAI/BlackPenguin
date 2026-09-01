@@ -192,5 +192,5 @@ def resend_activation(
     ).first()
     if not admin_user:
         raise HTTPException(status_code=404, detail="Company administrator not found.")
-    user_services.resend_user_activation(db, user=admin_user, invited_by_user_id=current_user.id)
-    return {"detail": "Activation link sent"}
+    invitation = user_services.resend_user_activation(db, user=admin_user, invited_by_user_id=current_user.id)
+    return {"detail": "Activation request accepted by Firebase.", "status": invitation.status, "sent_at": invitation.sent_at}

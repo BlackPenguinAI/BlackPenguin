@@ -26,56 +26,37 @@
             <div class="rounded-xl border border-white/10 bg-white/[0.03] p-3 text-xs">
               <span class="text-gray-500">Status</span>
               <strong class="ml-2 uppercase" [class.text-green-400]="firebaseConfig.verification_status === 'verified'" [class.text-red-300]="firebaseConfig.verification_status === 'failed'">{{ firebaseConfig.verification_status }}</strong>
-              <p *ngIf="firebaseConfig.credentials_hint" class="mt-2 text-gray-400">{{ firebaseConfig.credentials_hint }}</p>
+              <p class="mt-2 text-gray-400">Mode: Firebase Authentication REST API</p>
             </div>
           </div>
           <p class="mt-4 rounded-xl border border-blue-500/20 bg-blue-500/5 p-3 text-xs leading-relaxed text-blue-200">
-            In Firebase Console, enable Email/Password, authorize <strong>blackpenguin.ai</strong>, and set this URL as the custom password-action handler. Firebase uses it for both first-time activation and secure password recovery.
+            In Firebase Console, enable Email/Password and add <strong>blackpenguin.ai</strong> under Authentication → Settings → Authorized domains. The Action Handler URL is the Black Penguin route that receives Firebase password actions; keep <strong>https://blackpenguin.ai/activate-account</strong> in production.
           </p>
         </app-glass-card>
 
-        <app-glass-card title="Service Account Credentials" icon="key">
-          <p class="text-xs text-gray-400 mb-4 leading-relaxed">
-            Upload your Firebase Service Account JSON file or paste its contents directly below. This allows Black Penguin to securely authenticate with Firebase on the server side.
-          </p>
-
-          <div class="mb-4">
-            <label class="relative inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-white/5 hover:bg-secondary/10 border border-white/10 hover:border-secondary/30 rounded-lg text-sm text-gray-200 transition-colors cursor-pointer group">
-              <span class="material-symbols-outlined text-secondary group-hover:scale-110 transition-transform">upload_file</span>
-              Upload JSON File
-              <input type="file" accept=".json" (change)="onFileSelected($event)" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
-            </label>
-            <button type="button" (click)="formatJson()" class="ml-3 text-xs text-gray-500 hover:text-white underline">
-              Format JSON Code
-            </button>
+        <app-glass-card title="Passwordless Administration" icon="key">
+          <div class="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4 text-sm text-emerald-100">
+            <p class="font-medium">Firebase REST mode — no Service Account JSON required</p>
+            <p class="mt-2 text-xs leading-relaxed text-gray-300">Black Penguin uses the Firebase Web API Key for end-user identity creation, activation links, password recovery and login. Company roles, Projects and suspended status remain enforced by Black Penguin.</p>
           </div>
 
-          <div class="relative w-full rounded-xl overflow-hidden border border-white/10 focus-within:border-secondary/50 bg-black/50 transition-colors">
-            <div class="bg-white/5 border-b border-white/10 px-4 py-2 flex items-center justify-between">
-              <span class="text-[10px] font-mono uppercase tracking-widest text-gray-400">credentials.json</span>
-              <span class="material-symbols-outlined text-[16px] text-green-400" *ngIf="firebaseConfig.credentials_configured || (firebaseConfig.credentials_json && firebaseConfig.credentials_json.includes('private_key'))">check_circle</span>
-            </div>
-            <textarea 
-              [(ngModel)]="firebaseConfig.credentials_json" 
-              name="credentials_json" 
-              rows="14" 
-              spellcheck="false"
-              class="w-full bg-transparent p-4 text-xs font-mono text-gray-300 outline-none resize-y"
-              [placeholder]="firebaseConfig.credentials_configured ? 'A service account is already encrypted. Upload only to rotate it.' : 'Paste the Service Account JSON here.'">
-            </textarea>
-          </div>
+          <ol class="mt-5 grid gap-3 text-xs text-gray-400 md:grid-cols-3">
+            <li class="rounded-xl border border-white/10 p-3"><strong class="block text-white">1. Save</strong>Enter Project ID, Web API Key and the production handler URL.</li>
+            <li class="rounded-xl border border-white/10 p-3"><strong class="block text-white">2. Test</strong>Verify the API configuration without creating a user.</li>
+            <li class="rounded-xl border border-white/10 p-3"><strong class="block text-white">3. Enable</strong>Only verified settings can send invitations.</li>
+          </ol>
 
           <div class="mt-5 flex items-center justify-between rounded-xl border border-white/10 p-4">
-            <div><p class="text-sm font-medium">Enable Firebase Authentication</p><p class="text-xs text-gray-500">Enable only after Test Connection succeeds.</p></div>
+            <div><p class="text-sm font-medium">Enable Firebase Authentication</p><p class="text-xs text-gray-500">Changing connection fields disables Firebase until it is tested again.</p></div>
             <input type="checkbox" [(ngModel)]="firebaseConfig.is_enabled" name="is_enabled" [disabled]="firebaseConfig.verification_status !== 'verified'" class="h-5 w-5 accent-yellow-400">
           </div>
 
           <div class="flex justify-end gap-3 border-t border-white/10 pt-6 mt-6">
             <app-button type="button" variant="ghost" icon="verified" [isLoading]="isTesting" (onClick)="testConnection()">
-              Test Connection
+              Test REST Connection
             </app-button>
             <app-button type="submit" variant="primary" icon="save" [isLoading]="isSaving">
-              Save Firebase Config
+              Save Firebase REST Config
             </app-button>
           </div>
         </app-glass-card>

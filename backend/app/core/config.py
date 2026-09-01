@@ -45,8 +45,6 @@ class Settings(BaseSettings):
     FIREBASE_PROJECT_ID: str = ""
     FIREBASE_API_KEY: str = ""
     FIREBASE_AUTH_DOMAIN: str = ""
-    FIREBASE_SERVICE_ACCOUNT_JSON: str = ""
-    FIREBASE_AUTH_MODE: str = "hybrid"
 
     SMTP_SERVER: str = "smtp.gmail.com"
     SMTP_PORT: int = 587

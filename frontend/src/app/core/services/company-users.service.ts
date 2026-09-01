@@ -75,8 +75,8 @@ export class CompanyUsersService {
     });
   }
 
-  resendActivation(userId: string): Observable<{ detail: string }> {
-    return this.http.post<{ detail: string }>(
+  resendActivation(userId: string): Observable<{ detail: string; status: string; sent_at: string }> {
+    return this.http.post<{ detail: string; status: string; sent_at: string }>(
       `${API_V1_URL}/users/company/${userId}/resend-activation`,
       {},
     );

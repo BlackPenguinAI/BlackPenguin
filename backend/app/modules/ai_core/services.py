@@ -87,8 +87,30 @@ def update_ai_config(db: Session, payload: AIConfigUpdatePayload, company_id: st
     return config
 
 
-def prompt_versions(db: Session, *, company_id: str | None, agent_key: str) -> list[PromptVersion]:
-    return db.query(PromptVersion).filter(PromptVersion.company_id == company_id, PromptVersion.agent_key == agent_key).order_by(PromptVersion.version_number.desc()).all()
+def prompt_versions(
+    db: Session, *, company_id: str | None, agent_key: str,
+    offset: int = 0, limit: int = 20,
+) -> tuple[list[PromptVersion], int]:
+    query = db.query(PromptVersion).filter(
+        PromptVersion.company_id == company_id,
+        PromptVersion.agent_key == agent_key,
+    )
+    total = query.count()
+    items = query.order_by(PromptVersion.version_number.desc()).offset(offset).limit(limit).all()
+    return items, total
+
+
+def prompt_version(
+    db: Session, *, company_id: str | None, agent_key: str, version_id: str,
+) -> PromptVersion:
+    item = db.query(PromptVersion).filter(
+        PromptVersion.id == version_id,
+        PromptVersion.company_id == company_id,
+        PromptVersion.agent_key == agent_key,
+    ).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Prompt version not found.")
+    return item
 
 
 def create_prompt_draft(db: Session, *, company_id: str | None, agent_key: str, configuration: dict, change_note: str, actor_id: str) -> PromptVersion:
