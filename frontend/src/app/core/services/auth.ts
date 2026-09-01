@@ -40,14 +40,14 @@ export class AuthService {
     );
   }
 
-  inspectActivation(oobCode: string): Observable<any> {
-    return this.http.post(this.apiUrl + '/auth/firebase/action-code', { oob_code: oobCode })
+  inspectActivation(state: string): Observable<any> {
+    return this.http.post(this.apiUrl + '/auth/firebase/action-code', { state })
       .pipe(catchError(this.handleError));
   }
 
-  completeActivation(oobCode: string, newPassword: string): Observable<any> {
+  completeActivation(state: string, oobCode: string, newPassword: string): Observable<any> {
     return this.http.post(this.apiUrl + '/auth/firebase/complete-invitation', {
-      oob_code: oobCode, new_password: newPassword,
+      state, oob_code: oobCode, new_password: newPassword,
     }).pipe(tap((response: any) => this.saveSession(response)), catchError(this.handleError));
   }
 

@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import logging
 from typing import Any
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import httpx
 from fastapi import HTTPException
@@ -115,11 +116,38 @@ def update_password(db: Session, *, id_token: str, password: str) -> None:
     })
 
 
-def send_password_action_email(db: Session, email: str) -> None:
+def _continue_url(config: FirebaseConfig, **parameters: str) -> str:
+    parts = urlsplit(config.action_handler_url)
+    query = dict(parse_qsl(parts.query, keep_blank_values=True))
+    query.update(parameters)
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))
+
+
+def send_email_sign_in_link(db: Session, email: str, *, invitation_state: str) -> None:
+    """Send an invitation that must be completed inside Black Penguin."""
+    config = _configuration(db)
+    _request(config, "accounts:sendOobCode", {
+        "requestType": "EMAIL_SIGNIN",
+        "email": email,
+        "continueUrl": _continue_url(config, state=invitation_state),
+        "canHandleCodeInApp": True,
+    })
+
+
+def sign_in_with_email_link(db: Session, *, email: str, oob_code: str) -> dict[str, Any]:
+    config = _configuration(db)
+    return _request(config, "accounts:signInWithEmailLink", {
+        "email": email,
+        "oobCode": oob_code,
+    })
+
+
+def send_password_reset_email(db: Session, email: str) -> None:
+    """Send recovery for an active account; never use this as an invitation."""
     config = _configuration(db)
     _request(config, "accounts:sendOobCode", {
         "requestType": "PASSWORD_RESET", "email": email,
-        "continueUrl": config.action_handler_url,
+        "continueUrl": _continue_url(config, passwordReset="complete"),
     })
 
 

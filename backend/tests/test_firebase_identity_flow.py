@@ -11,14 +11,16 @@ from sqlalchemy.pool import StaticPool
 
 import app.db.base  # noqa: F401
 from app.core.middleware import MultiTenantMiddleware
-from app.core.security import verify_password
+from app.core.security import create_invitation_state, verify_password
 from app.db.postgres import Base
 from app.modules.auth.router import (
     ChangePasswordPayload,
     CompleteInvitationPayload,
     FirebaseActionCodePayload,
+    ForgotPasswordPayload,
     change_password,
     complete_firebase_invitation,
+    forgot_password,
     inspect_firebase_action,
 )
 from app.modules.companies.models import Company
@@ -66,25 +68,25 @@ def test_invitation_provisions_firebase_without_an_administrator_password():
     try:
         company = _company(db)
         _verified_firebase(db)
-        with patch("app.integrations.firebase_client.create_identity") as create_identity, patch(
-            "app.integrations.firebase_client.send_password_action_email"
+        with patch(
+            "app.integrations.firebase_client.send_email_sign_in_link"
         ) as send_email:
-            create_identity.return_value.uid = "firebase-sales"
             user = invite_tenant_user(
                 db, company_id=company.id, email="Sales@Northstar.example",
                 first_name="Alex", last_name="Rivera", role=UserRole.SALES,
                 timezone="America/New_York", invited_by_user_id=None,
             )
         assert user.auth_status == UserAuthStatus.INVITED
-        assert user.firebase_uid == "firebase-sales"
+        assert user.firebase_uid is None
         assert user.invitation_sent_at is not None
         invitation = db.query(UserInvitation).filter_by(user_id=user.id).one()
         assert invitation.status == "accepted_by_provider"
         assert invitation.send_attempts == 1
         assert invitation.last_attempt_at is not None
         assert invitation.provisioning_secret_ciphertext is None
-        create_identity.assert_called_once()
-        send_email.assert_called_once_with(db, "sales@northstar.example")
+        send_email.assert_called_once()
+        assert send_email.call_args.args == (db, "sales@northstar.example")
+        assert send_email.call_args.kwargs["invitation_state"]
     finally:
         db.close(); engine.dispose()
 
@@ -96,23 +98,25 @@ def test_activation_is_one_time_and_returns_a_tenant_session():
         user = User(
             company_id=company.id, email="sales@example.com", first_name="Sam",
             last_name="Seller", role=UserRole.SALES, hashed_password="not-used",
-            firebase_uid="firebase-sales", auth_status=UserAuthStatus.INVITED,
+            firebase_uid="stale-firebase-sales", auth_status=UserAuthStatus.INVITED,
             is_active=True,
         )
         db.add(user); db.flush()
-        db.add(UserInvitation(
+        invitation = UserInvitation(
             user_id=user.id, status="pending",
             expires_at=datetime.utcnow() + timedelta(hours=1),
-        ))
+        )
+        db.add(invitation)
         db.commit()
-        with patch("app.integrations.firebase_client.verify_password_action_code", return_value=user.email), patch(
-            "app.integrations.firebase_client.confirm_password_action", return_value=user.email
-        ), patch(
-            "app.integrations.firebase_client.sign_in_with_password",
-            return_value={"localId": user.firebase_uid},
-        ):
+        state = create_invitation_state(invitation.id, user.id)
+        with patch(
+            "app.integrations.firebase_client.sign_in_with_email_link",
+            return_value={"localId": "firebase-sales", "idToken": "email-link-id-token"},
+        ) as sign_in, patch("app.integrations.firebase_client.update_password") as update_password:
             response = complete_firebase_invitation(
-                CompleteInvitationPayload(oob_code="valid-action-code", new_password="Secure#Pass1"),
+                CompleteInvitationPayload(
+                    state=state, oob_code="valid-action-code", new_password="Secure#Pass1",
+                ),
                 db,
             )
         db.refresh(user)
@@ -120,8 +124,75 @@ def test_activation_is_one_time_and_returns_a_tenant_session():
         assert response["role"] == UserRole.SALES
         assert response["access_token"]
         assert user.auth_status == UserAuthStatus.ACTIVE
+        assert user.firebase_uid == "firebase-sales"
+        assert verify_password("Secure#Pass1", user.hashed_password)
         assert invitation.status == "accepted"
         assert invitation.accepted_at is not None
+        sign_in.assert_called_once_with(db, email=user.email, oob_code="valid-action-code")
+        update_password.assert_called_once_with(
+            db, id_token="email-link-id-token", password="Secure#Pass1",
+        )
+    finally:
+        db.close(); engine.dispose()
+
+
+def test_invitation_state_cannot_be_tampered_with_or_reused():
+    engine, db = _db()
+    try:
+        company = _company(db)
+        user = User(
+            company_id=company.id, email="secure@example.com", first_name="Casey",
+            role=UserRole.SALES, hashed_password="not-used",
+            auth_status=UserAuthStatus.INVITED, is_active=True,
+        )
+        db.add(user); db.flush()
+        invitation = UserInvitation(
+            user_id=user.id, status="accepted_by_provider",
+            expires_at=datetime.utcnow() + timedelta(hours=1),
+        )
+        db.add(invitation); db.commit()
+        state = create_invitation_state(invitation.id, user.id)
+
+        preview = inspect_firebase_action(FirebaseActionCodePayload(state=state), db)
+        assert preview["flow"] == "invitation"
+        assert preview["email"] == user.email
+
+        with pytest.raises(HTTPException) as tampered:
+            inspect_firebase_action(FirebaseActionCodePayload(state=state + "x"), db)
+        assert tampered.value.status_code == 410
+
+        invitation.status = "accepted"
+        db.commit()
+        with pytest.raises(HTTPException) as reused:
+            inspect_firebase_action(FirebaseActionCodePayload(state=state), db)
+        assert reused.value.status_code == 410
+    finally:
+        db.close(); engine.dispose()
+
+
+def test_firebase_email_link_and_password_reset_use_distinct_request_types():
+    engine, db = _db()
+    try:
+        _verified_firebase(db)
+
+        class Response:
+            is_error = False
+            status_code = 200
+            def json(self): return {"email": "sales@example.com"}
+
+        with patch("app.integrations.firebase_client.httpx.post", return_value=Response()) as post:
+            from app.integrations.firebase_client import send_email_sign_in_link, send_password_reset_email
+            send_email_sign_in_link(db, "sales@example.com", invitation_state="signed-state")
+            send_password_reset_email(db, "sales@example.com")
+
+        invitation_payload = post.call_args_list[0].kwargs["json"]
+        reset_payload = post.call_args_list[1].kwargs["json"]
+        assert invitation_payload["requestType"] == "EMAIL_SIGNIN"
+        assert invitation_payload["canHandleCodeInApp"] is True
+        assert "state=signed-state" in invitation_payload["continueUrl"]
+        assert reset_payload["requestType"] == "PASSWORD_RESET"
+        assert "passwordReset=complete" in reset_payload["continueUrl"]
+        assert "canHandleCodeInApp" not in reset_payload
     finally:
         db.close(); engine.dispose()
 
@@ -149,7 +220,7 @@ def test_firebase_invitation_failure_is_logged_with_trace_context_and_resend_use
         company = _company(db)
         _verified_firebase(db)
         with caplog.at_level(logging.INFO), patch(
-            "app.integrations.firebase_client.create_identity",
+            "app.integrations.firebase_client.send_email_sign_in_link",
             side_effect=HTTPException(status_code=422, detail="OPERATION_NOT_ALLOWED"),
         ):
             user = invite_tenant_user(
@@ -164,7 +235,7 @@ def test_firebase_invitation_failure_is_logged_with_trace_context_and_resend_use
             and f"company_id={company.id}" in record.message
             and f"user_id={user.id}" in record.message
             and f"invitation_id={invitation.id}" in record.message
-            and "phase=create_identity" in record.message
+            and "phase=send_email_sign_in_link" in record.message
             and "error_code=OPERATION_NOT_ALLOWED" in record.message
             for record in caplog.records
         )
@@ -172,7 +243,7 @@ def test_firebase_invitation_failure_is_logged_with_trace_context_and_resend_use
         invitation.last_attempt_at = datetime.utcnow() - timedelta(minutes=2)
         db.commit()
         with patch(
-            "app.integrations.firebase_client.create_identity",
+            "app.integrations.firebase_client.send_email_sign_in_link",
             side_effect=HTTPException(status_code=422, detail="OPERATION_NOT_ALLOWED"),
         ), pytest.raises(HTTPException) as exc_info:
             resend_user_activation(db, user=user)
@@ -238,7 +309,7 @@ def test_authenticated_firebase_user_changes_password_in_identity_provider():
         db.close(); engine.dispose()
 
 
-def test_active_user_can_use_the_same_firebase_handler_for_password_recovery():
+def test_password_recovery_is_separate_from_invitation_activation():
     engine, db = _db()
     try:
         company = _company(db)
@@ -248,18 +319,10 @@ def test_active_user_can_use_the_same_firebase_handler_for_password_recovery():
             auth_status=UserAuthStatus.ACTIVE, is_active=True,
         )
         db.add(user); db.commit()
-        with patch("app.integrations.firebase_client.verify_password_action_code", return_value=user.email):
-            preview = inspect_firebase_action(FirebaseActionCodePayload(oob_code="reset-action-code"), db)
-        assert preview["flow"] == "password_reset"
-        with patch("app.integrations.firebase_client.verify_password_action_code", return_value=user.email), patch(
-            "app.integrations.firebase_client.confirm_password_action", return_value=user.email,
-        ), patch(
-            "app.integrations.firebase_client.sign_in_with_password", return_value={"localId": user.firebase_uid},
-        ):
-            response = complete_firebase_invitation(
-                CompleteInvitationPayload(oob_code="reset-action-code", new_password="ResetSecure#3"), db,
-            )
-        assert response["access_token"]
+        with patch("app.integrations.firebase_client.send_password_reset_email") as send_reset:
+            response = forgot_password(ForgotPasswordPayload(email=user.email), db)
+        assert response["detail"].startswith("If the account is eligible")
+        send_reset.assert_called_once_with(db, user.email)
         assert db.query(UserInvitation).filter_by(user_id=user.id).count() == 0
         assert user.auth_status == UserAuthStatus.ACTIVE
     finally:
@@ -337,7 +400,7 @@ def test_resend_reports_provider_failure_instead_of_false_success():
         ))
         db.commit()
         with patch(
-            "app.integrations.firebase_client.send_password_action_email",
+            "app.integrations.firebase_client.send_email_sign_in_link",
             side_effect=HTTPException(status_code=422, detail="OPERATION_NOT_ALLOWED"),
         ):
             with pytest.raises(HTTPException) as error:

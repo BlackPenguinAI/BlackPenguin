@@ -6,8 +6,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from fastapi import HTTPException
 from sqlalchemy.orm import Session, joinedload
 
-from app.core.security import get_password_hash
-from app.core.secret_store import decrypt_secret, encrypt_secret
+from app.core.security import create_invitation_state, get_password_hash
 from app.modules.companies.models import Company
 from app.modules.users.models import User, UserAuthStatus, UserInvitation, UserRole
 from app.modules.users.project_access import sync_user_project_access
@@ -163,32 +162,19 @@ def _create_pending_user(
 
 
 def provision_invitation(db: Session, *, user: User, invited_by_user_id: str | None = None) -> UserInvitation:
-    from app.integrations.firebase_client import (
-        create_identity, ensure_firebase_ready, recover_identity, send_password_action_email,
-    )
+    from app.integrations.firebase_client import ensure_firebase_ready, send_email_sign_in_link
     ensure_firebase_ready(db)
 
     invitation = db.query(UserInvitation).filter(
         UserInvitation.user_id == user.id,
         UserInvitation.status.in_(["pending", "delivery_failed"]),
     ).order_by(UserInvitation.created_at.desc()).first()
-    temporary_password = None
     if not invitation:
-        temporary_password = secrets.token_urlsafe(48)
         invitation = UserInvitation(
             user_id=user.id, invited_by_user_id=invited_by_user_id, status="pending",
             expires_at=datetime.utcnow() + timedelta(days=7), send_attempts=0,
-            provisioning_secret_ciphertext=encrypt_secret(temporary_password),
         )
         db.add(invitation)
-    elif invitation.provisioning_secret_ciphertext:
-        try:
-            temporary_password = decrypt_secret(invitation.provisioning_secret_ciphertext)
-        except ValueError:
-            invitation.provisioning_secret_ciphertext = None
-    if not temporary_password and not user.firebase_uid:
-        temporary_password = secrets.token_urlsafe(48)
-        invitation.provisioning_secret_ciphertext = encrypt_secret(temporary_password)
     now = datetime.utcnow()
     invitation.status = "pending"
     invitation.last_attempt_at = now
@@ -196,35 +182,13 @@ def provision_invitation(db: Session, *, user: User, invited_by_user_id: str | N
     invitation.expires_at = now + timedelta(days=7)
     db.commit(); db.refresh(user); db.refresh(invitation)
     logger.info(
-        "Firebase invitation attempt started company_id=%s user_id=%s invitation_id=%s attempt=%s has_firebase_uid=%s",
+        "Firebase email-link invitation attempt started company_id=%s user_id=%s invitation_id=%s attempt=%s has_firebase_uid=%s",
         user.company_id, user.id, invitation.id, invitation.send_attempts, bool(user.firebase_uid),
     )
-    phase = "create_identity"
+    phase = "send_email_sign_in_link"
     try:
-        if not user.firebase_uid:
-            try:
-                identity = create_identity(
-                    db, email=user.email,
-                    display_name=f"{user.first_name or ''} {user.last_name or ''}".strip(),
-                    password=temporary_password,
-                )
-            except HTTPException as exc:
-                if exc.detail != "EMAIL_EXISTS":
-                    raise
-                phase = "recover_identity"
-                logger.warning(
-                    "Firebase identity already exists; attempting recovery company_id=%s user_id=%s invitation_id=%s",
-                    user.company_id, user.id, invitation.id,
-                )
-                identity = recover_identity(db, email=user.email, password=temporary_password)
-            user.firebase_uid = identity.uid
-            db.commit()
-            logger.info(
-                "Firebase identity linked company_id=%s user_id=%s invitation_id=%s firebase_uid=%s",
-                user.company_id, user.id, invitation.id, user.firebase_uid,
-            )
-        phase = "send_action_email"
-        send_password_action_email(db, user.email)
+        state = create_invitation_state(invitation.id, user.id, timedelta(days=7))
+        send_email_sign_in_link(db, user.email, invitation_state=state)
         now = datetime.utcnow()
         user.auth_status = UserAuthStatus.INVITED
         user.invitation_sent_at = now

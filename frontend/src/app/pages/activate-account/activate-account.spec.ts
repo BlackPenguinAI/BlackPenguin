@@ -5,8 +5,15 @@ import { describe, expect, it, vi } from 'vitest';
 import { ActivateAccountComponent } from './activate-account';
 
 describe('ActivateAccountComponent', () => {
-  function component(code = 'valid-code') {
-    const route = { snapshot: { queryParamMap: { get: () => code } } } as any;
+  function component(code = 'valid-code', state = 'signed-invitation-state') {
+    const params: Record<string, string | null> = { oobCode: code, state, continueUrl: null };
+    const route = {
+      snapshot: {
+        queryParamMap: {
+          get: (key: string) => params[key] ?? null,
+        },
+      },
+    } as any;
     const router = { navigateByUrl: vi.fn() } as any;
     const auth = {
       inspectActivation: vi.fn().mockReturnValue(of({
@@ -21,7 +28,7 @@ describe('ActivateAccountComponent', () => {
   it('validates the Firebase action code before showing the password form', () => {
     const { value, auth } = component();
     value.ngOnInit();
-    expect(auth.inspectActivation).toHaveBeenCalledWith('valid-code');
+    expect(auth.inspectActivation).toHaveBeenCalledWith('signed-invitation-state');
     expect(value.invitation.email).toBe('sales@example.com');
   });
 
@@ -32,7 +39,9 @@ describe('ActivateAccountComponent', () => {
     value.confirmPassword = 'Secure#Pass1';
     expect(value.valid).toBe(true);
     value.activate();
-    expect(auth.completeActivation).toHaveBeenCalledWith('valid-code', 'Secure#Pass1');
+    expect(auth.completeActivation).toHaveBeenCalledWith(
+      'signed-invitation-state', 'valid-code', 'Secure#Pass1',
+    );
     expect(router.navigateByUrl).toHaveBeenCalledWith('/app/dashboard', { replaceUrl: true });
   });
 
@@ -42,5 +51,12 @@ describe('ActivateAccountComponent', () => {
     value.ngOnInit();
     expect(value.invitation).toBeNull();
     expect(value.error).toBe('Expired');
+  });
+
+  it('rejects links that do not carry both Firebase code and signed state', () => {
+    const { value, auth } = component('', 'signed-invitation-state');
+    value.ngOnInit();
+    expect(auth.inspectActivation).not.toHaveBeenCalled();
+    expect(value.error).toBe('This activation link is incomplete.');
   });
 });

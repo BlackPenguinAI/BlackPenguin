@@ -1,11 +1,17 @@
 from datetime import datetime
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.orm import Session
 
-from app.core.security import create_access_token, get_password_hash, verify_password
+from app.core.security import (
+    create_access_token,
+    get_password_hash,
+    verify_invitation_state,
+    verify_password,
+)
 from app.db.postgres import get_db
 from app.integrations import firebase_client
 from app.modules.auth.deps import get_current_user
@@ -16,13 +22,15 @@ from app.modules.users.models import User, UserAuthStatus, UserInvitation
 from .schemas import TokenResponse
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 class FirebaseActionCodePayload(BaseModel):
-    oob_code: str = Field(min_length=8, max_length=2048)
+    state: str = Field(min_length=20, max_length=4096)
 
 
 class CompleteInvitationPayload(FirebaseActionCodePayload):
+    oob_code: str = Field(min_length=8, max_length=2048)
     new_password: str = Field(min_length=10, max_length=128)
 
 
@@ -91,46 +99,62 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     return response
 
 
-@router.post("/firebase/action-code")
-def inspect_firebase_action(payload: FirebaseActionCodePayload, db: Session = Depends(get_db)):
-    email = firebase_client.verify_password_action_code(db, payload.oob_code)
-    user = db.query(User).filter(User.email == email).first()
+def _pending_invitation_from_state(state_token: str, db: Session) -> tuple[User, UserInvitation]:
+    state = verify_invitation_state(state_token)
+    if not state:
+        raise HTTPException(status_code=410, detail="This invitation is invalid or expired.")
+    invitation = db.query(UserInvitation).filter(
+        UserInvitation.id == state["invitation_id"],
+        UserInvitation.user_id == state["sub"],
+        UserInvitation.status.in_(["pending", "accepted_by_provider", "delivery_failed"]),
+        UserInvitation.expires_at > datetime.utcnow(),
+    ).first()
+    if not invitation:
+        raise HTTPException(status_code=410, detail="This invitation is expired or no longer active.")
+    user = db.query(User).filter(User.id == invitation.user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="Invitation account was not found.")
     if user.auth_status == UserAuthStatus.SUSPENDED or not user.is_active:
         raise HTTPException(status_code=410, detail="This invitation is expired or no longer active.")
-    invitation = None
-    flow = "password_reset"
-    if user.auth_status in {UserAuthStatus.INVITED, UserAuthStatus.PROVISIONING_FAILED}:
-        invitation = db.query(UserInvitation).filter(
-            UserInvitation.user_id == user.id,
-            UserInvitation.status.in_(["pending", "accepted_by_provider", "delivery_failed"]),
-            UserInvitation.expires_at > datetime.utcnow(),
-        ).order_by(UserInvitation.created_at.desc()).first()
-        if not invitation:
-            raise HTTPException(status_code=410, detail="This invitation is expired or no longer active.")
-        flow = "invitation"
+    if user.auth_status not in {UserAuthStatus.INVITED, UserAuthStatus.PROVISIONING_FAILED}:
+        raise HTTPException(status_code=409, detail="This account has already been activated.")
+    return user, invitation
+
+
+@router.post("/firebase/action-code")
+def inspect_firebase_action(payload: FirebaseActionCodePayload, db: Session = Depends(get_db)):
+    user, _ = _pending_invitation_from_state(payload.state, db)
     return {
         "email": user.email, "first_name": user.first_name, "role": user.role,
-        "company_name": user.company.name if user.company else None, "flow": flow,
+        "company_name": user.company.name if user.company else None, "flow": "invitation",
     }
 
 
 @router.post("/firebase/complete-invitation", response_model=TokenResponse)
 def complete_firebase_invitation(payload: CompleteInvitationPayload, db: Session = Depends(get_db)):
-    preview = inspect_firebase_action(FirebaseActionCodePayload(oob_code=payload.oob_code), db)
-    email = firebase_client.confirm_password_action(db, payload.oob_code, payload.new_password)
-    if email != preview["email"]:
-        raise HTTPException(status_code=409, detail="Invitation identity mismatch.")
-    user = db.query(User).filter(User.email == email).first()
-    firebase_session = firebase_client.sign_in_with_password(db, email, payload.new_password)
-    if not user.firebase_uid or firebase_session.get("localId") != user.firebase_uid:
-        raise HTTPException(status_code=409, detail="Firebase identity mismatch.")
-    if preview["flow"] == "invitation":
-        user_services.mark_invitation_accepted(db, user)
-    else:
-        user.auth_status = UserAuthStatus.ACTIVE
-        user.is_active = True
+    user, _ = _pending_invitation_from_state(payload.state, db)
+    firebase_session = firebase_client.sign_in_with_email_link(
+        db, email=user.email, oob_code=payload.oob_code,
+    )
+    firebase_uid = firebase_session.get("localId")
+    id_token = firebase_session.get("idToken")
+    if not firebase_uid or not id_token:
+        raise HTTPException(status_code=502, detail="Firebase returned an incomplete activation response.")
+    linked_user = db.query(User).filter(
+        User.firebase_uid == firebase_uid,
+        User.id != user.id,
+    ).first()
+    if linked_user:
+        raise HTTPException(status_code=409, detail="Firebase identity is already linked to another account.")
+    if user.firebase_uid and user.firebase_uid != firebase_uid:
+        logger.warning(
+            "Rebinding pending invitation to verified Firebase identity company_id=%s user_id=%s old_uid=%s new_uid=%s",
+            user.company_id, user.id, user.firebase_uid, firebase_uid,
+        )
+    firebase_client.update_password(db, id_token=id_token, password=payload.new_password)
+    user.firebase_uid = firebase_uid
+    user.hashed_password = get_password_hash(payload.new_password)
+    user_services.mark_invitation_accepted(db, user)
     response = _session_response(user)
     db.commit()
     return response
@@ -152,7 +176,7 @@ def forgot_password(payload: ForgotPasswordPayload, db: Session = Depends(get_db
     user = db.query(User).filter(User.email == str(payload.email).casefold()).first()
     if user and user.firebase_uid and user.is_active:
         try:
-            firebase_client.send_password_action_email(db, user.email)
+            firebase_client.send_password_reset_email(db, user.email)
         except HTTPException:
             pass
     return {"detail": "If the account is eligible, password instructions have been sent."}

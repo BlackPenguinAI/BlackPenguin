@@ -22,7 +22,7 @@
             <app-input label="Auth Domain (Optional)" [(ngModel)]="firebaseConfig.auth_domain" name="auth_domain" placeholder="project.firebaseapp.com"></app-input>
           </div>
           <div class="mt-4 grid gap-4 md:grid-cols-2">
-            <app-input label="Action Handler URL" [(ngModel)]="firebaseConfig.action_handler_url" name="action_handler_url"></app-input>
+            <app-input label="Application Continue URL" [(ngModel)]="firebaseConfig.action_handler_url" name="action_handler_url"></app-input>
             <div class="rounded-xl border border-white/10 bg-white/[0.03] p-3 text-xs">
               <span class="text-gray-500">Status</span>
               <strong class="ml-2 uppercase" [class.text-green-400]="firebaseConfig.verification_status === 'verified'" [class.text-red-300]="firebaseConfig.verification_status === 'failed'">{{ firebaseConfig.verification_status }}</strong>
@@ -30,14 +30,14 @@
             </div>
           </div>
           <p class="mt-4 rounded-xl border border-blue-500/20 bg-blue-500/5 p-3 text-xs leading-relaxed text-blue-200">
-            In Firebase Console, enable Email/Password and add <strong>blackpenguin.ai</strong> under Authentication → Settings → Authorized domains. The Action Handler URL is the Black Penguin route that receives Firebase password actions; keep <strong>https://blackpenguin.ai/activate-account</strong> in production.
+            In Firebase Console, enable both <strong>Email/Password</strong> and <strong>Email link (passwordless sign-in)</strong>, then add <strong>blackpenguin.ai</strong> under Authentication → Settings → Authorized domains. This Continue URL is embedded by the API in invitation links; keep <strong>https://blackpenguin.ai/activate-account</strong> in production. It does not require editing Firebase's locked template Action URL.
           </p>
         </app-glass-card>
 
         <app-glass-card title="Passwordless Administration" icon="key">
           <div class="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4 text-sm text-emerald-100">
             <p class="font-medium">Firebase REST mode — no Service Account JSON required</p>
-            <p class="mt-2 text-xs leading-relaxed text-gray-300">Black Penguin uses the Firebase Web API Key for end-user identity creation, activation links, password recovery and login. Company roles, Projects and suspended status remain enforced by Black Penguin.</p>
+            <p class="mt-2 text-xs leading-relaxed text-gray-300">Black Penguin uses Email Link for invitations and Password Reset only for existing users. No Service Account JSON is required. Company roles, Projects and suspended status remain enforced by Black Penguin.</p>
           </div>
 
           <ol class="mt-5 grid gap-3 text-xs text-gray-400 md:grid-cols-3">

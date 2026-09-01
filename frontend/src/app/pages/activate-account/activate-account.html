@@ -15,10 +15,9 @@
     </div>
 
     <form *ngIf="!loading && invitation" (ngSubmit)="activate()" class="content">
-      <p class="eyebrow">{{ invitation.flow === 'password_reset' ? 'PASSWORD RESET' : 'ACCOUNT ACTIVATION' }}</p>
-      <h1>{{ invitation.flow === 'password_reset' ? 'Choose a new password' : ('Welcome, ' + (invitation.first_name || 'there')) }}</h1>
-      <p class="subtitle" *ngIf="invitation.flow !== 'password_reset'">Create your password to join {{ invitation.company_name || 'Black Penguin' }}.</p>
-      <p class="subtitle" *ngIf="invitation.flow === 'password_reset'">Secure your {{ invitation.company_name || 'Black Penguin' }} account with a new password.</p>
+      <p class="eyebrow">ACCOUNT ACTIVATION</p>
+      <h1>Welcome, {{ invitation.first_name || 'there' }}</h1>
+      <p class="subtitle">Your email has been verified. Create your password to join {{ invitation.company_name || 'Black Penguin' }}.</p>
 
       <div class="context">
         <div><small>Email</small><span>{{ invitation.email }}</span></div>
@@ -49,7 +48,7 @@
 
       <p *ngIf="error" class="error">{{ error }}</p>
       <button class="activate" type="submit" [disabled]="!valid">
-        {{ saving ? (invitation.flow === 'password_reset' ? 'Updating…' : 'Activating…') : (invitation.flow === 'password_reset' ? 'Update password' : 'Activate account') }}
+        {{ saving ? 'Activating…' : 'Activate account' }}
       </button>
     </form>
   </section>

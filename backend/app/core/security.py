@@ -40,3 +40,32 @@ def verify_email_token(token: str) -> dict | None:
         return decoded_token
     except jwt.JWTError:
         return None
+
+
+def create_invitation_state(
+    invitation_id: str,
+    user_id: str,
+    expires_delta: timedelta = timedelta(days=7),
+) -> str:
+    """Create opaque, signed state for a Firebase email-link invitation."""
+    expire = datetime.now(timezone.utc) + expires_delta
+    payload = {
+        "exp": expire,
+        "sub": user_id,
+        "invitation_id": invitation_id,
+        "type": "firebase_invitation",
+    }
+    return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+
+
+def verify_invitation_state(token: str) -> dict | None:
+    """Validate invitation state without exposing the invitee email in the URL."""
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        if payload.get("type") != "firebase_invitation":
+            return None
+        if not payload.get("sub") or not payload.get("invitation_id"):
+            return None
+        return payload
+    except jwt.JWTError:
+        return None

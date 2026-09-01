@@ -21,6 +21,7 @@ export class ActivateAccountComponent implements OnInit {
   confirmPassword = '';
   showPassword = false;
   private code = '';
+  private state = '';
 
   constructor(
     private readonly route: ActivatedRoute,
@@ -30,12 +31,23 @@ export class ActivateAccountComponent implements OnInit {
 
   ngOnInit(): void {
     this.code = this.route.snapshot.queryParamMap.get('oobCode') || '';
-    if (!this.code) {
+    this.state = this.route.snapshot.queryParamMap.get('state') || '';
+    const continueUrl = this.route.snapshot.queryParamMap.get('continueUrl');
+    if (continueUrl) {
+      try {
+        const nested = new URL(continueUrl);
+        this.state ||= nested.searchParams.get('state') || '';
+        this.code ||= nested.searchParams.get('oobCode') || '';
+      } catch {
+        // Firebase may omit continueUrl after redirecting; direct parameters remain authoritative.
+      }
+    }
+    if (!this.code || !this.state) {
       this.loading = false;
       this.error = 'This activation link is incomplete.';
       return;
     }
-    this.auth.inspectActivation(this.code).subscribe({
+    this.auth.inspectActivation(this.state).subscribe({
       next: value => { this.invitation = value; this.loading = false; },
       error: err => { this.error = err.message || 'This activation link is invalid or expired.'; this.loading = false; },
     });
@@ -59,7 +71,7 @@ export class ActivateAccountComponent implements OnInit {
   activate(): void {
     if (!this.valid) return;
     this.saving = true; this.error = '';
-    this.auth.completeActivation(this.code, this.password).subscribe({
+    this.auth.completeActivation(this.state, this.code, this.password).subscribe({
       next: response => {
         void this.router.navigateByUrl(this.auth.defaultRouteForRole(response.role), { replaceUrl: true });
       },
