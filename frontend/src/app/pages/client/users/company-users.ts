@@ -7,15 +7,16 @@ import {
   CompanyProjectOption, CompanyUser, CompanyUserInvite, CompanyUserLimits,
   CompanyUserRole, CompanyUsersService,
 } from '../../../core/services/company-users.service';
-import { deviceTimezone, filterTimezoneOptions, timezoneLabel } from '../../../core/timezones';
+import { deviceTimezone, timezoneLabel } from '../../../core/timezones';
 import { ToastService } from '../../../core/services/toast';
 import { ButtonComponent } from '../../../shared/ui/button/button';
 import { InputComponent } from '../../../shared/ui/input/input';
 import { ModalComponent } from '../../../shared/ui/modal/modal';
+import { TimezoneSelectComponent } from '../../../shared/ui/timezone-select/timezone-select';
 
 @Component({
   selector: 'app-company-users', standalone: true,
-  imports: [CommonModule, FormsModule, ButtonComponent, InputComponent, ModalComponent],
+  imports: [CommonModule, FormsModule, ButtonComponent, InputComponent, ModalComponent, TimezoneSelectComponent],
   templateUrl: './company-users.html',
 })
 export class CompanyUsersComponent implements OnInit {
@@ -24,7 +25,6 @@ export class CompanyUsersComponent implements OnInit {
   limits: CompanyUserLimits | null = null;
   loading = true; saving = false; showAddModal = false;
   editingUserId: string | null = null;
-  timezoneSearch = '';
   invite: CompanyUserInvite = this.emptyForm();
   readonly timezoneLabel = timezoneLabel;
 
@@ -43,7 +43,7 @@ export class CompanyUsersComponent implements OnInit {
 
   openAddModal(): void {
     this.editingUserId = null; this.invite = this.emptyForm();
-    this.timezoneSearch = ''; this.showAddModal = true;
+    this.showAddModal = true;
   }
 
   openEditModal(user: CompanyUser): void {
@@ -54,7 +54,7 @@ export class CompanyUsersComponent implements OnInit {
       timezone: user.timezone || deviceTimezone(), project_access_scope: user.project_access_scope || 'all',
       project_ids: [...(user.project_ids || [])],
     };
-    this.timezoneSearch = ''; this.showAddModal = true;
+    this.showAddModal = true;
   }
 
   closeAddModal(): void { if (!this.saving) this.showAddModal = false; }
@@ -109,7 +109,6 @@ export class CompanyUsersComponent implements OnInit {
     } as Record<string, string>)[user.auth_status] || 'Pending';
   }
 
-  get filteredTimezones() { return filterTimezoneOptions(this.timezoneSearch); }
   get administrator(): CompanyUser | undefined { return this.users.find(user => user.role === 'admin'); }
   get teamUsers(): CompanyUser[] { return this.users.filter(user => user.role !== 'admin'); }
   roleLabel(role: CompanyUserRole): string { return ({ admin: 'Administrator', assistant: 'Assistant', mkt: 'Marketing', sales: 'Sales' })[role]; }

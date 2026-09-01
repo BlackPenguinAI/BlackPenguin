@@ -78,8 +78,8 @@ export function validateSalesInvite(value: { first_name: string; last_name: stri
   const errors: FormErrors = {};
   if (!value.first_name.trim()) errors['first_name'] = 'Enter the first name.';
   if (!value.last_name.trim()) errors['last_name'] = 'Enter the last name.';
-  if (!value.email.trim()) errors['email'] = 'Enter the business email.';
-  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.email.trim())) errors['email'] = 'Enter a valid business email.';
+  if (!value.email.trim()) errors['email'] = 'Enter an email address.';
+  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.email.trim())) errors['email'] = 'Enter a valid email address.';
   return errors;
 }
 

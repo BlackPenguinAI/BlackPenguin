@@ -1,6 +1,7 @@
 import '@angular/compiler';
 import { describe, expect, it, vi } from 'vitest';
 import { SalesComponent } from './sales';
+import { supportedTimezones } from '../../../core/timezones';
 
 describe('SalesComponent scheduling view', () => {
   it('keeps simulated appointments in the same calendar collection', () => {
@@ -14,10 +15,11 @@ describe('SalesComponent scheduling view', () => {
 
   it('offers an IANA timezone list instead of accepting an arbitrary timezone', () => {
     vi.stubGlobal('localStorage', { getItem: () => 'sales' });
-    const component = new SalesComponent({} as any, { markForCheck: () => undefined } as any);
-    expect(component.timezones).toContain('UTC');
-    expect(component.timezones).toContain('America/Lima');
-    expect(component.timezones.length).toBeGreaterThan(10);
+    const timezones = supportedTimezones();
+    expect(timezones).toContain('UTC');
+    expect(timezones).toContain('America/Lima');
+    expect(timezones).toContain('America/Bogota');
+    expect(timezones.length).toBeGreaterThan(10);
   });
 
   it('exposes only valid next steps for an active visit', () => {
@@ -37,10 +39,11 @@ describe('SalesComponent scheduling view', () => {
     component.view = 'day'; expect(component.days).toHaveLength(1);
   });
 
-  it('renders timezone choices with a UTC offset and representative cities', () => {
+  it('renders timezone choices with a UTC offset and the exact IANA city', () => {
     vi.stubGlobal('localStorage', { getItem: () => 'sales' });
     const component = new SalesComponent({} as any, { markForCheck: () => undefined } as any);
     expect(component.timezoneLabel('America/Lima')).toContain('UTC-05:00');
-    expect(component.timezoneLabel('America/Lima')).toContain('Bogotá, Lima, Quito');
+    expect(component.timezoneLabel('America/Lima')).toContain('Lima — America/Lima');
+    expect(component.timezoneLabel('America/Bogota')).toContain('Bogotá — America/Bogota');
   });
 });

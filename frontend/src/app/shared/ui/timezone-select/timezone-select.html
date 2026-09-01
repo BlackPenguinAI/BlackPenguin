@@ -1,0 +1,17 @@
+<ng-select
+  class="timezone-select"
+  [class.timezone-select--compact]="compact"
+  [items]="options"
+  bindLabel="label"
+  bindValue="value"
+  [searchFn]="searchTimezone"
+  [virtualScroll]="true"
+  [clearable]="false"
+  [disabled]="disabled"
+  [searchable]="true"
+  [ngModel]="value"
+  [ngModelOptions]="{ standalone: true }"
+  (ngModelChange)="update($event)"
+  placeholder="Search Lima, Bogotá, America/Lima or UTC-5"
+  [attr.aria-label]="ariaLabel"
+></ng-select>

@@ -1,29 +1,34 @@
 import { describe, expect, it } from 'vitest';
-import { canonicalTimezone, filterTimezoneOptions, supportedTimezones, timezoneLabel, timezoneOptions } from './timezones';
+import { canonicalTimezone, deviceTimezone, filterTimezoneOptions, supportedTimezones, timezoneLabel, timezoneOptions } from './timezones';
 
 describe('timezone catalog', () => {
   const reference = new Date('2026-08-25T12:00:00Z');
 
-  it('contains one entry per UTC offset in numeric order', () => {
-    const labels = supportedTimezones(reference).map(zone => timezoneLabel(zone, reference));
-    const offsets = labels.map(label => {
-      const [, sign, hours, minutes] = label.match(/^\(UTC([+-])(\d{2}):(\d{2})\)/) || [];
-      const value = Number(hours) * 60 + Number(minutes);
-      return sign === '-' ? -value : value;
-    });
-    expect(new Set(offsets).size).toBe(offsets.length);
+  it('keeps distinct IANA zones even when their current offsets match', () => {
+    const zones = supportedTimezones(reference);
+    expect(zones).toContain('America/Lima');
+    expect(zones).toContain('America/Bogota');
+    expect(canonicalTimezone('America/Bogota')).toBe('America/Bogota');
+  });
+
+  it('uses the requested offset, city and exact IANA identifier', () => {
+    expect(timezoneLabel('America/Lima', reference)).toBe('(UTC-05:00) Lima — America/Lima');
+    expect(timezoneLabel('America/Bogota', reference)).toBe('(UTC-05:00) Bogotá — America/Bogota');
+  });
+
+  it('searches by city, normalized accents, IANA identifier and compact UTC offset', () => {
+    expect(filterTimezoneOptions('bogota', reference).some(option => option.value === 'America/Bogota')).toBe(true);
+    expect(filterTimezoneOptions('America/Lima', reference).some(option => option.value === 'America/Lima')).toBe(true);
+    expect(filterTimezoneOptions('UTC-5', reference).some(option => option.value === 'America/Lima')).toBe(true);
+  });
+
+  it('sorts by current offset without collapsing options', () => {
+    const offsets = timezoneOptions(reference).map(option => option.offsetMinutes);
     expect(offsets).toEqual([...offsets].sort((left, right) => left - right));
+    expect(new Set(offsets).size).toBeLessThan(offsets.length);
   });
 
-  it('uses the requested offset and city format', () => {
-    expect(timezoneLabel('America/Lima', reference)).toBe('(UTC-05:00) Bogotá, Lima, Quito');
-    expect(supportedTimezones(reference)).toContain('America/Lima');
-  });
-
-  it('keeps one option per offset and searches city names without accents', () => {
-    const options = timezoneOptions(reference);
-    expect(new Set(options.map(option => option.offsetMinutes)).size).toBe(options.length);
-    expect(filterTimezoneOptions('bogota', reference)[0]?.value).toBe('America/Lima');
-    expect(canonicalTimezone('America/Bogota', reference)).toBe('America/Lima');
+  it('returns a valid exact device timezone', () => {
+    expect(() => new Intl.DateTimeFormat('en-US', { timeZone: deviceTimezone() })).not.toThrow();
   });
 });

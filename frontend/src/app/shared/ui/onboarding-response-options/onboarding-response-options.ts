@@ -13,6 +13,8 @@ export interface OnboardingQuestion {
   minimum_characters?: number | null;
   help_text?: string | null;
   answer_actions?: Record<string, { kind: string; source_field?: string }>;
+  suggestion_origin?: 'website' | 'confirmed_context' | 'generic_fallback' | null;
+  suggestion_sources?: string[];
 }
 
 @Component({
@@ -39,5 +41,12 @@ export class OnboardingResponseOptionsComponent {
 
   get isStructuredStep(): boolean {
     return ['ai_sales_authorization', 'project_sales_team', 'meta_lead_setup'].includes(this.question?.input_type || '');
+  }
+
+  get suggestionLabel(): string {
+    if (this.question.suggestion_origin === 'website') return 'Based on your website and confirmed information';
+    if (this.question.suggestion_origin === 'confirmed_context') return 'Based on your confirmed answers';
+    if (this.question.suggestion_origin === 'generic_fallback') return 'Starter suggestions';
+    return '';
   }
 }

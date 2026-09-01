@@ -1,6 +1,11 @@
 <section *ngIf="!isStructuredStep && (choices.length || question.allow_custom)" class="question-options" aria-label="Suggested responses">
   <p *ngIf="showPrompt && !answered" class="question-prompt">{{ question.prompt }}</p>
   <p *ngIf="question.help_text && !answered" class="hint">{{ question.help_text }}</p>
+  <div *ngIf="suggestionLabel && !answered" class="suggestion-origin" [class.suggestion-origin--fallback]="question.suggestion_origin === 'generic_fallback'">
+    <span class="material-symbols-outlined">{{ question.suggestion_origin === 'generic_fallback' ? 'lightbulb' : 'travel_explore' }}</span>
+    <span>{{ suggestionLabel }}</span>
+    <small *ngIf="question.suggestion_sources?.length">{{ question.suggestion_sources?.join(' · ') }}</small>
+  </div>
   <div class="choice-list" [class.choice-list--examples]="!question.options.length">
     <button
       *ngFor="let choice of choices"

@@ -17,8 +17,7 @@
 
   <section class="timezone-bar">
     <div><span class="material-symbols-outlined">public</span><span><b>{{projectId?'Project timezone':'My default timezone'}}</b><small>{{projectId?'All appointment times for '+selectedProject?.name:'Select a Project to work in its physical-location timezone.'}}</small></span></div>
-    <input [(ngModel)]="timezoneSearch" placeholder="Search city or UTC offset" aria-label="Search timezone">
-    <select [(ngModel)]="timezone" [disabled]="isManager&&!projectId"><option *ngFor="let option of filteredTimezoneOptions" [value]="option.value">{{option.label}}</option></select>
+    <app-timezone-select [(value)]="timezone" [disabled]="isManager&&!projectId" [compact]="true" ariaLabel="Schedule timezone"></app-timezone-select>
     <button *ngIf="isManager&&projectId" class="primary compact" (click)="saveProjectTimezone()" [disabled]="projectTimezoneSaving">{{projectTimezoneSaving?'Saving…':'Save Project timezone'}}</button>
   </section>
 
@@ -55,7 +54,7 @@
       <p>{{editingBlock?'EDIT':'NEW'}} AVAILABILITY</p><h2>{{selectedDay|date:'fullDate'}}</h2>
       <small *ngIf="isManager&&!salesUserId" class="validation">Choose a Sales user to create or edit their blocks.</small>
       <label>From<input type="time" [(ngModel)]="blockStart"></label><label>To<input type="time" [(ngModel)]="blockEnd"></label>
-      <label>Timezone<select [(ngModel)]="timezone"><option *ngFor="let option of filteredTimezoneOptions" [value]="option.value">{{option.label}}</option></select></label>
+      <label>Timezone<app-timezone-select [(value)]="timezone" [compact]="true" ariaLabel="Availability timezone"></app-timezone-select></label>
       <small *ngIf="blockEnd<=blockStart" class="validation">End time must be after start time.</small>
       <button (click)="saveAvailability()" [disabled]="availabilitySaving||blockEnd<=blockStart||(isManager&&!salesUserId)">{{availabilitySaving?'Saving…':(editingBlock?'UPDATE BLOCK':'ADD BLOCK')}}</button>
       <button *ngIf="editingBlock" class="secondary" (click)="cancelBlockEdit()">CANCEL EDIT</button>

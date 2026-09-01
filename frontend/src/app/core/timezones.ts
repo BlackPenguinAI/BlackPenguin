@@ -1,32 +1,58 @@
 export interface TimezoneOption {
   value: string;
   label: string;
-  cities: string;
+  city: string;
   offsetMinutes: number;
+  searchText: string;
 }
 
-// Preference order inside an offset. Only the first zone for each current UTC
-// offset is exposed, avoiding repeated UTC+10 (and similar) entries.
-const TIMEZONE_CANDIDATES: ReadonlyArray<readonly [string, string]> = [
-  ['Etc/GMT+12', 'International Date Line West'], ['Pacific/Pago_Pago', 'Pago Pago'],
-  ['Pacific/Honolulu', 'Honolulu'], ['Pacific/Marquesas', 'Marquesas'],
-  ['America/Anchorage', 'Anchorage'], ['America/Los_Angeles', 'Los Angeles, Vancouver'],
-  ['America/Denver', 'Denver, Edmonton'], ['America/Lima', 'Bogotá, Lima, Quito'],
-  ['America/Chicago', 'Chicago, Mexico City'], ['America/Halifax', 'Halifax'],
-  ['America/St_Johns', "St. John's"], ['America/Sao_Paulo', 'Brasília, São Paulo'],
-  ['Atlantic/South_Georgia', 'South Georgia'], ['UTC', 'Coordinated Universal Time'],
-  ['Atlantic/Azores', 'Azores'], ['Europe/London', 'London, Dublin'],
-  ['Europe/Paris', 'Paris, Madrid, Berlin'], ['Europe/Athens', 'Athens, Bucharest'],
-  ['Europe/Moscow', 'Moscow'], ['Asia/Tehran', 'Tehran'], ['Asia/Dubai', 'Dubai, Abu Dhabi'],
-  ['Asia/Kabul', 'Kabul'], ['Asia/Karachi', 'Karachi'], ['Asia/Kolkata', 'Delhi, Kolkata, Mumbai'],
-  ['Asia/Kathmandu', 'Kathmandu'], ['Asia/Dhaka', 'Dhaka'], ['Asia/Yangon', 'Yangon'],
-  ['Asia/Bangkok', 'Bangkok, Jakarta'], ['Asia/Shanghai', 'Beijing, Shanghai'],
-  ['Australia/Eucla', 'Eucla'], ['Asia/Tokyo', 'Tokyo, Seoul'],
-  ['Australia/Adelaide', 'Adelaide'], ['Australia/Brisbane', 'Brisbane'],
-  ['Australia/Lord_Howe', 'Lord Howe'], ['Pacific/Noumea', 'Nouméa'],
-  ['Pacific/Auckland', 'Auckland'], ['Pacific/Chatham', 'Chatham Islands'],
-  ['Pacific/Tongatapu', "Nuku'alofa"], ['Pacific/Kiritimati', 'Kiritimati'],
+type IntlWithSupportedValues = typeof Intl & {
+  supportedValuesOf?: (key: 'timeZone') => string[];
+};
+
+// Kept only for runtimes that predate Intl.supportedValuesOf. Distinct IANA
+// zones are never collapsed merely because they share an offset today.
+const FALLBACK_TIMEZONES = [
+  'UTC', 'Pacific/Honolulu', 'America/Anchorage', 'America/Los_Angeles',
+  'America/Denver', 'America/Chicago', 'America/Bogota', 'America/Lima',
+  'America/Guayaquil', 'America/New_York', 'America/Halifax',
+  'America/Sao_Paulo', 'Europe/London', 'Europe/Paris', 'Europe/Athens',
+  'Asia/Dubai', 'Asia/Kolkata', 'Asia/Bangkok', 'Asia/Shanghai', 'Asia/Tokyo',
+  'Australia/Adelaide', 'Australia/Sydney', 'Pacific/Auckland',
 ];
+
+const CITY_ALIASES: Record<string, string> = {
+  'America/Bogota': 'Bogotá',
+  'America/Guayaquil': 'Quito / Guayaquil',
+  'America/Lima': 'Lima',
+  'America/Mexico_City': 'Mexico City',
+  'America/New_York': 'New York',
+  'America/Los_Angeles': 'Los Angeles',
+  UTC: 'Coordinated Universal Time',
+};
+
+function normalized(value: string): string {
+  return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+}
+
+function validTimezone(zone: string): boolean {
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: zone }).format();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function availableTimezones(): string[] {
+  const supported = (Intl as IntlWithSupportedValues).supportedValuesOf?.('timeZone') || FALLBACK_TIMEZONES;
+  return [...new Set(['UTC', ...supported])].filter(validTimezone);
+}
+
+function cityLabel(zone: string): string {
+  if (CITY_ALIASES[zone]) return CITY_ALIASES[zone];
+  return zone.split('/').pop()?.replaceAll('_', ' ') || zone;
+}
 
 function zoneOffsetMinutes(zone: string, at: Date): number {
   try {
@@ -39,24 +65,30 @@ function zoneOffsetMinutes(zone: string, at: Date): number {
     if (!match) return 0;
     const total = Number(match[2]) * 60 + Number(match[3] || 0);
     return match[1] === '-' ? -total : total;
-  } catch { return 0; }
+  } catch {
+    return 0;
+  }
 }
 
-function offsetLabel(minutes: number): string {
+function offsetLabel(minutes: number, padded = true): string {
   const sign = minutes < 0 ? '-' : '+';
   const absolute = Math.abs(minutes);
-  return `UTC${sign}${String(Math.floor(absolute / 60)).padStart(2, '0')}:${String(absolute % 60).padStart(2, '0')}`;
+  const hours = String(Math.floor(absolute / 60));
+  const hourText = padded ? hours.padStart(2, '0') : hours;
+  return `UTC${sign}${hourText}:${String(absolute % 60).padStart(2, '0')}`;
 }
 
 export function timezoneOptions(at = new Date()): TimezoneOption[] {
-  const byOffset = new Map<number, TimezoneOption>();
-  for (const [value, cities] of TIMEZONE_CANDIDATES) {
-    const offsetMinutes = zoneOffsetMinutes(value, at);
-    if (!byOffset.has(offsetMinutes)) {
-      byOffset.set(offsetMinutes, { value, cities, offsetMinutes, label: `(${offsetLabel(offsetMinutes)}) ${cities}` });
-    }
-  }
-  return [...byOffset.values()].sort((left, right) => left.offsetMinutes - right.offsetMinutes);
+  return availableTimezones()
+    .map(value => {
+      const offsetMinutes = zoneOffsetMinutes(value, at);
+      const city = cityLabel(value);
+      const label = `(${offsetLabel(offsetMinutes)}) ${city} — ${value}`;
+      const shortOffset = offsetLabel(offsetMinutes, false).replace(':00', '');
+      const searchText = normalized(`${label} ${shortOffset} ${shortOffset.replace('UTC', 'GMT')}`);
+      return { value, label, city, offsetMinutes, searchText };
+    })
+    .sort((left, right) => left.offsetMinutes - right.offsetMinutes || left.city.localeCompare(right.city));
 }
 
 export function supportedTimezones(at = new Date()): string[] {
@@ -64,25 +96,33 @@ export function supportedTimezones(at = new Date()): string[] {
 }
 
 export function timezoneLabel(zone: string, at = new Date()): string {
-  const exact = TIMEZONE_CANDIDATES.find(([value]) => value === zone);
-  const offset = zoneOffsetMinutes(zone || 'UTC', at);
-  const representative = timezoneOptions(at).find(option => option.offsetMinutes === offset);
-  return `(${offsetLabel(offset)}) ${exact?.[1] || representative?.cities || zone.replaceAll('_', ' ')}`;
+  const canonical = canonicalTimezone(zone);
+  const offset = zoneOffsetMinutes(canonical, at);
+  return `(${offsetLabel(offset)}) ${cityLabel(canonical)} — ${canonical}`;
 }
 
-export function canonicalTimezone(zone: string, at = new Date()): string {
-  const targetOffset = zoneOffsetMinutes(zone || 'UTC', at);
-  return timezoneOptions(at).find(option => option.offsetMinutes === targetOffset)?.value || 'UTC';
+export function canonicalTimezone(zone: string): string {
+  try {
+    return new Intl.DateTimeFormat('en-US', { timeZone: zone || 'UTC' }).resolvedOptions().timeZone || 'UTC';
+  } catch {
+    return 'UTC';
+  }
 }
 
-export function deviceTimezone(at = new Date()): string {
-  try { return canonicalTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC', at); }
-  catch { return 'UTC'; }
+export function deviceTimezone(): string {
+  try {
+    return canonicalTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC');
+  } catch {
+    return 'UTC';
+  }
 }
 
 export function filterTimezoneOptions(search: string, at = new Date()): TimezoneOption[] {
-  const normalize = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-  const needle = normalize(search.trim());
+  const needle = normalized(search.trim());
   if (!needle) return timezoneOptions(at);
-  return timezoneOptions(at).filter(option => normalize(`${option.label} ${option.value}`).includes(needle));
+  return timezoneOptions(at).filter(option => option.searchText.includes(needle));
+}
+
+export function searchTimezone(term: string, option: TimezoneOption): boolean {
+  return option.searchText.includes(normalized(term.trim()));
 }

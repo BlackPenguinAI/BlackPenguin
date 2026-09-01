@@ -77,6 +77,66 @@ def test_company_short_description_rejects_an_incomplete_fragment():
     }
 
 
+def test_company_writing_suggestions_use_confirmed_website_context_before_fallbacks():
+    question = build_next_question(
+        [{"field": "approved_short_company_description", "label": "Approved short company description"}],
+        final_prompt="Approve",
+        profile_data={
+            "preferred_display_name": "Realty Miami Group",
+            "primary_business_model": "Real-estate development",
+            "core_asset_classes": ["Multifamily"],
+            "current_operating_footprint": ["Miami"],
+        },
+        profile_sources={
+            "preferred_display_name": {
+                "source_type": "official_website",
+                "source_reference": "https://realtymiamigroup.com",
+            },
+            "core_asset_classes": {
+                "source_type": "official_website",
+                "source_reference": "https://realtymiamigroup.com/projects",
+            },
+        },
+    )
+
+    assert question["suggestion_origin"] == "website"
+    assert question["suggestion_sources"] == [
+        "https://realtymiamigroup.com", "https://realtymiamigroup.com/projects",
+    ]
+    assert all("Multifamily" in example and "Miami" in example for example in question["examples"])
+    assert not any("high-growth urban markets" in example for example in question["examples"])
+
+
+def test_company_writing_suggestions_are_honest_generic_fallbacks_without_context():
+    question = build_next_question(
+        [{"field": "corporate_value_proposition", "label": "Corporate value proposition"}],
+        final_prompt="Approve",
+    )
+
+    assert question["suggestion_origin"] == "generic_fallback"
+    assert question["suggestion_sources"] == []
+    assert question["examples"]
+
+
+def test_operating_markets_explains_scope_and_only_offers_headquarters_as_candidate():
+    question = build_next_question(
+        [{"field": "current_operating_footprint", "label": "Current operating markets"}],
+        final_prompt="Approve",
+        profile_data={"headquarters": "Miami"},
+        profile_sources={
+            "headquarters": {
+                "source_type": "official_website",
+                "source_reference": "https://example.com/contact",
+            },
+        },
+    )
+
+    assert question["examples"] == ["Miami"]
+    assert question["suggestion_origin"] == "website"
+    assert "currently develops" in question["help_text"]
+    assert "future target markets" in question["help_text"]
+
+
 def test_official_website_requires_the_structured_contract():
     assert validate_onboarding_value(
         "official_corporate_website", {"exists": True, "url": "https://cbhhomes.com/"},

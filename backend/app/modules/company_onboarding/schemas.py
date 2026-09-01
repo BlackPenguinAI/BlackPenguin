@@ -155,6 +155,8 @@ class NextQuestionResponse(BaseModel):
     minimum_characters: int | None = None
     help_text: str | None = None
     answer_actions: dict[str, dict[str, Any]] = Field(default_factory=dict)
+    suggestion_origin: Literal["website", "confirmed_context", "generic_fallback"] | None = None
+    suggestion_sources: list[str] = Field(default_factory=list)
 
 
 class RejectedUpdate(BaseModel):
@@ -218,6 +220,10 @@ class SourceResponse(BaseModel):
     message_id: str | None = None
     download_url: str | None = None
     error_message: str | None = None
+    processing_stage: Literal[
+        "queued", "connecting", "reading", "extracting", "identifying", "preparing", "complete", "failed"
+    ] = "queued"
+    processing_detail: str | None = None
     proposals: list[SourceProposalResponse] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime

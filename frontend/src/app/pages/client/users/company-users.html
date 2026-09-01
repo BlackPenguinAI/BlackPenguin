@@ -47,7 +47,7 @@
       <app-input label="Last Name" placeholder="Doe" [(ngModel)]="invite.last_name" name="last_name"></app-input>
     </div>
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <app-input label="Email" type="email" placeholder="user@company.com" [(ngModel)]="invite.email" name="email" [disabled]="!!editingUserId"></app-input>
+      <app-input label="Email address" type="email" placeholder="name@example.com" [(ngModel)]="invite.email" name="email" [disabled]="!!editingUserId"></app-input>
       <div *ngIf="editingUserId" class="flex items-center justify-between self-end h-[46px] rounded-xl border border-white/10 bg-white/5 p-2.5">
         <div><span class="block text-xs font-mono uppercase tracking-widest text-gray-300">User Status</span><small class="text-[10px] text-gray-500">Access starts after email activation</small></div>
         <label class="relative inline-flex cursor-pointer items-center"><input type="checkbox" [(ngModel)]="invite.is_active" name="is_active" class="sr-only peer"><div class="w-9 h-5 rounded-full bg-white/10 peer peer-checked:bg-secondary after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all peer-checked:after:translate-x-full"></div></label>
@@ -58,9 +58,8 @@
     </div>
     <div class="flex flex-col gap-1.5"><label class="ml-1 text-[10px] font-bold uppercase tracking-widest text-gray-500">Role</label><select [(ngModel)]="invite.role" name="role" class="w-full rounded-xl border border-white/10 bg-black/50 px-4 py-3 text-sm text-white outline-none focus:border-secondary"><option value="assistant">Assistant</option><option value="mkt">Marketing</option><option value="sales">Sales</option></select><small class="text-xs text-gray-500">Sales users belong only to this Company and see only leads assigned to them.</small></div>
     <div class="rounded-xl border border-white/10 bg-white/[0.02] p-4 space-y-3">
-      <div><label class="ml-1 text-[10px] font-bold uppercase tracking-widest text-gray-500">Timezone</label><p class="mt-1 text-xs text-gray-500">Preselected from this device. Search by city or UTC offset.</p></div>
-      <input [(ngModel)]="timezoneSearch" name="timezone_search" placeholder="Search Bogotá, Quito or UTC-05:00" class="w-full rounded-xl border border-white/10 bg-black/50 px-4 py-2.5 text-sm text-white outline-none focus:border-secondary">
-      <select [(ngModel)]="invite.timezone" name="timezone" class="w-full rounded-xl border border-white/10 bg-black px-4 py-3 text-sm text-white outline-none focus:border-secondary"><option *ngFor="let option of filteredTimezones" [value]="option.value">{{ option.label }}</option></select>
+      <div><label class="ml-1 text-[10px] font-bold uppercase tracking-widest text-gray-500">Timezone</label><p class="mt-1 text-xs text-gray-500">Preselected from this device. Search by city, IANA zone or UTC offset.</p></div>
+      <app-timezone-select [value]="invite.timezone || 'UTC'" (valueChange)="invite.timezone = $event" ariaLabel="Company user timezone"></app-timezone-select>
     </div>
     <div class="rounded-xl border border-white/10 bg-white/[0.02] p-4 space-y-3">
       <label class="text-[10px] font-bold uppercase tracking-widest text-gray-500">Project access</label>
@@ -72,7 +71,7 @@
       </div>
     </div>
     <p *ngIf="!editingUserId" class="rounded-xl border border-secondary/15 bg-secondary/5 p-3 text-xs text-gray-300">
-      Black Penguin will email a secure Firebase activation link. The user creates their own password.
+      Black Penguin will email a secure Firebase activation link. Work and personal email addresses are accepted, and the user creates their own password.
     </p>
     <p *ngIf="invite.project_access_scope === 'selected' && !(invite.project_ids || []).length" class="text-xs text-amber-300">Select at least one Project.</p>
     <div class="mt-3 flex justify-end gap-3 border-t border-white/10 pt-4"><app-button variant="ghost" (onClick)="closeAddModal()">Cancel</app-button><app-button type="submit" variant="secondary" [isLoading]="saving" [disabled]="!formValid">{{ editingUserId ? 'Save Changes' : 'Send Invitation' }}</app-button></div>

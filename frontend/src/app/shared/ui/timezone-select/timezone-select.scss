@@ -1,0 +1,26 @@
+:host { display: block; min-width: 0; }
+
+:host ::ng-deep .timezone-select .ng-select-container {
+  min-height: 2.75rem;
+  border: 1px solid rgba(255, 255, 255, .1);
+  border-radius: .75rem;
+  background: rgba(0, 0, 0, .5);
+  color: #fff;
+  box-shadow: none;
+}
+:host ::ng-deep .timezone-select.ng-select-focused .ng-select-container { border-color: #e99e10; }
+:host ::ng-deep .timezone-select .ng-value-container { padding-left: .9rem; }
+:host ::ng-deep .timezone-select .ng-input > input { color: #fff; }
+:host ::ng-deep .timezone-select .ng-placeholder { color: #6b7280; }
+:host ::ng-deep .timezone-select .ng-arrow { border-color: #9ca3af transparent transparent; }
+:host ::ng-deep .timezone-select .ng-dropdown-panel {
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, .12);
+  border-radius: .75rem;
+  background: #111;
+  box-shadow: 0 18px 45px rgba(0, 0, 0, .5);
+}
+:host ::ng-deep .timezone-select .ng-option { padding: .65rem .9rem; background: #111; color: #d1d5db; }
+:host ::ng-deep .timezone-select .ng-option.ng-option-marked { background: rgba(233, 158, 16, .12); color: #f5c96e; }
+:host ::ng-deep .timezone-select .ng-option.ng-option-selected { background: rgba(233, 158, 16, .2); color: #f3b43b; }
+:host ::ng-deep .timezone-select--compact .ng-select-container { min-height: 2.25rem; border-radius: .5rem; }

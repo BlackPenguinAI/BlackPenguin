@@ -19,4 +19,8 @@
 .choice-list--examples .choice { border-radius: .75rem; line-height: 1.35; }
 .choice--custom { border-color: rgba(255,255,255,.15); background: rgba(255,255,255,.04); color: #d1d5db; }
 .hint { margin-top: .45rem; color: #6b7280; font-size: .64rem; }
+.suggestion-origin { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem; margin: .55rem 0; color: #86efac; font-size: .64rem; }
+.suggestion-origin .material-symbols-outlined { font-size: 14px; }
+.suggestion-origin small { width: 100%; overflow: hidden; color: #6b7280; text-overflow: ellipsis; white-space: nowrap; }
+.suggestion-origin--fallback { color: #d1d5db; }
 @media (max-width: 640px) { .question-options { margin-left: 0; } .choice { width: 100%; border-radius: .7rem; } }

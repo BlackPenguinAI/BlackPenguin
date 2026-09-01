@@ -239,6 +239,7 @@ def _next_question(profile) -> dict[str, Any]:
         completion["blockers"],
         final_prompt="Review the Company Profile and choose whether to approve it or make changes.",
         profile_data=profile.profile_data or {},
+        profile_sources=profile.field_sources or {},
     )
 
 

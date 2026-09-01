@@ -76,6 +76,8 @@ export interface NextQuestion {
   minimum_words: number | null; minimum_characters?: number | null;
   help_text?: string | null;
   answer_actions?: Record<string, { kind: string; source_field?: string }>;
+  suggestion_origin?: 'website' | 'confirmed_context' | 'generic_fallback' | null;
+  suggestion_sources?: string[];
 }
 
 export type SourceKind =
@@ -112,6 +114,8 @@ export interface OnboardingSource {
   message_id: string | null;
   download_url: string | null;
   error_message: string | null;
+  processing_stage?: 'queued' | 'connecting' | 'reading' | 'extracting' | 'identifying' | 'preparing' | 'complete' | 'failed';
+  processing_detail?: string | null;
   proposals: SourceProposal[];
   created_at: string;
   updated_at: string;

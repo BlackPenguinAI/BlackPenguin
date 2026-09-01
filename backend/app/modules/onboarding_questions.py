@@ -25,6 +25,14 @@ QUESTION_CATALOG: dict[str, dict[str, Any]] = {
         "input_type": "multi_select",
         "options": ["Condominiums", "Multifamily", "Single-family", "Mixed-use", "Hospitality", "Office", "Retail", "Industrial"],
     },
+    "current_operating_footprint": {
+        "input_type": "long_text",
+        "help_text": (
+            "List the cities, metropolitan areas, states, regions, or countries where the company "
+            "currently develops, owns, manages, or operates real-estate projects. Do not include "
+            "headquarters-only locations or future target markets unless they are active today."
+        ),
+    },
     "additional_corporate_languages": {
         "input_type": "multi_select",
         "options": ["English", "Spanish", "Portuguese", "French"],
@@ -250,6 +258,7 @@ def build_next_question(
     *,
     final_prompt: str,
     profile_data: dict[str, Any] | None = None,
+    profile_sources: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     if not blockers:
         return {
@@ -267,6 +276,8 @@ def build_next_question(
                 "Approve profile": {"kind": "approve_profile"},
                 "I need to make changes": {"kind": "request_changes"},
             },
+            "suggestion_origin": None,
+            "suggestion_sources": [],
         }
     blocker = blockers[0]
     field = blocker["field"]
@@ -274,6 +285,8 @@ def build_next_question(
     options = list(config.get("options", []))
     examples = list(config.get("examples", []))
     answer_actions: dict[str, dict[str, Any]] = {}
+    suggestion_origin: str | None = None
+    suggestion_sources: list[str] = []
     if field == "dba":
         preferred_name = str((profile_data or {}).get("preferred_display_name") or "").strip()
         if preferred_name:
@@ -298,6 +311,32 @@ def build_next_question(
         answer_actions.setdefault(not_applicable_label, {"kind": "not_applicable"})
     if field in {"target_audience", "value_proposition", "key_differentiators"}:
         examples = _project_specific_examples(field, profile_data or {}, examples)
+    if field in {
+        "current_operating_footprint",
+        "approved_short_company_description",
+        "corporate_value_proposition",
+        "corporate_differentiators",
+    }:
+        grounded, used_fields = _company_specific_examples(field, profile_data or {})
+        if grounded:
+            examples = grounded
+            ordered_used_fields = [key for key in (profile_data or {}) if key in used_fields]
+            referenced_sources = [
+                (profile_sources or {}).get(key, {}) for key in ordered_used_fields
+                if isinstance((profile_sources or {}).get(key), dict)
+            ]
+            suggestion_sources = list(dict.fromkeys(
+                str(source.get("source_reference")) for source in referenced_sources
+                if source.get("source_reference")
+            ))
+            suggestion_origin = "website" if any(
+                source.get("source_type") in {
+                    "official_website", "social_profile", "online_document", "third_party", "uploaded_file",
+                }
+                for source in referenced_sources
+            ) else "confirmed_context"
+        elif examples:
+            suggestion_origin = "generic_fallback"
     if config.get("prompt"):
         prompt = str(config["prompt"])
     elif options:
@@ -318,7 +357,91 @@ def build_next_question(
         "minimum_characters": config.get("minimum_characters"),
         "help_text": config.get("help_text"),
         "answer_actions": answer_actions,
+        "suggestion_origin": suggestion_origin,
+        "suggestion_sources": suggestion_sources[:3],
     }
+
+
+def _as_values(value: Any) -> list[str]:
+    if isinstance(value, str):
+        return [item.strip() for item in re.split(r"[,;\n]", value) if item.strip()]
+    if isinstance(value, list):
+        return [str(item).strip() for item in value if str(item).strip()]
+    if isinstance(value, dict):
+        return [str(item).strip() for item in value.values() if isinstance(item, str) and item.strip()]
+    return []
+
+
+def _join_words(values: list[str]) -> str:
+    unique = list(dict.fromkeys(values))
+    if len(unique) < 2:
+        return unique[0] if unique else ""
+    if len(unique) == 2:
+        return f"{unique[0]} and {unique[1]}"
+    return ", ".join(unique[:-1]) + f", and {unique[-1]}"
+
+
+def _company_specific_examples(field: str, data: dict[str, Any]) -> tuple[list[str], set[str]]:
+    """Draft only from already-confirmed profile facts; never from unreviewed suggestions."""
+    name = str(data.get("preferred_display_name") or data.get("official_company_name") or "").strip()
+    business_model = str(data.get("primary_business_model") or "").strip()
+    assets = _as_values(data.get("core_asset_classes"))
+    markets = _as_values(data.get("current_operating_footprint"))
+    headquarters = _as_values(data.get("headquarters"))
+    used: set[str] = set()
+
+    if field == "current_operating_footprint":
+        # Headquarters is a useful candidate, never an inferred operating fact.
+        if headquarters:
+            return headquarters[:3], {"headquarters"}
+        return [], used
+
+    if name:
+        used.add("preferred_display_name" if data.get("preferred_display_name") else "official_company_name")
+    if business_model:
+        used.add("primary_business_model")
+    if assets:
+        used.add("core_asset_classes")
+    if markets:
+        used.add("current_operating_footprint")
+
+    asset_text = _join_words(assets[:3])
+    market_text = _join_words(markets[:3])
+    model_text = business_model.casefold()
+
+    if field == "approved_short_company_description" and name and asset_text and market_text:
+        model_clause = f" specializing in {model_text}" if model_text else ""
+        return [
+            f"{name} is a real-estate company{model_clause}, focused on {asset_text} across {market_text}.",
+            f"A {market_text}-focused real-estate company working in {asset_text} through {model_text or 'its core business model'}.",
+        ], used
+
+    if field == "corporate_value_proposition" and asset_text and market_text:
+        return [
+            f"We focus our {model_text or 'real-estate'} capabilities on {asset_text} in {market_text}.",
+            f"Our proposition combines a dedicated focus on {asset_text} with active market knowledge in {market_text}.",
+        ], used
+
+    if field == "corporate_differentiators":
+        candidates: list[str] = []
+        if asset_text:
+            candidates.append(f"Specialized focus on {asset_text}")
+        if market_text:
+            candidates.append(f"Active operating presence in {market_text}")
+        if business_model:
+            candidates.append(f"{business_model} capabilities")
+        explicit_fields = (
+            "technology_capabilities", "sustainability_principles", "community_impact_principles",
+            "awards", "certifications", "completed_projects_count",
+        )
+        for key in explicit_fields:
+            values = _as_values(data.get(key))
+            if values:
+                used.add(key)
+                candidates.extend(values[:2])
+        return list(dict.fromkeys(candidates))[:4], used
+
+    return [], set()
 
 
 def _project_specific_examples(field: str, data: dict[str, Any], fallbacks: list[str]) -> list[str]:

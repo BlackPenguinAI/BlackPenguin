@@ -4,13 +4,14 @@ import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 
 import { API_V1_URL } from '../../../core/config/api.config';
-import { canonicalTimezone, filterTimezoneOptions, supportedTimezones, timezoneLabel } from '../../../core/timezones';
+import { canonicalTimezone, timezoneLabel } from '../../../core/timezones';
+import { TimezoneSelectComponent } from '../../../shared/ui/timezone-select/timezone-select';
 
 type ScheduleSection = 'availability' | 'appointments';
 type CalendarView = 'month' | 'week' | 'day';
 
 @Component({
-  selector: 'app-sales', standalone: true, imports: [CommonModule, FormsModule],
+  selector: 'app-sales', standalone: true, imports: [CommonModule, FormsModule, TimezoneSelectComponent],
   templateUrl: './sales.html', styleUrls: ['./sales.scss', './sales-visit.scss'],
 })
 export class SalesComponent implements OnInit {
@@ -18,8 +19,7 @@ export class SalesComponent implements OnInit {
   role = typeof localStorage === 'undefined' ? '' : localStorage.getItem('bp_role') || '';
   section: ScheduleSection = 'availability'; view: CalendarView = 'month'; cursor = new Date();
   salesUserId = ''; projectId = ''; userTimezone = 'UTC'; timezone = 'UTC';
-  readonly timezones = supportedTimezones(); timezoneSearch = ''; readonly timezoneLabel = timezoneLabel;
-  get filteredTimezoneOptions() { return filterTimezoneOptions(this.timezoneSearch); }
+  readonly timezoneLabel = timezoneLabel;
   loading = true; saving = false; availabilitySaving = false; attachmentSaving = false; projectTimezoneSaving = false;
   error = ''; success = ''; selected: any = null; selectedLead: any = null; selectedDay: Date | null = null; editingBlock: any = null;
   leadLoading = false; chatOpen = false; persistedStatus = ''; blockStart = '09:00'; blockEnd = '17:00'; closingDate = '';

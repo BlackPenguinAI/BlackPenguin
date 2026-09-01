@@ -84,8 +84,8 @@
       <section *ngIf="source.status === 'processing'" class="processing-source ml-11 max-w-3xl" role="status" aria-live="polite">
         <span class="processing-source__spinner" aria-hidden="true"></span>
         <div class="min-w-0">
-          <p class="text-xs font-semibold text-gray-200">Analyzing {{ source.name }}…</p>
-          <p class="mt-1 text-[10px] text-gray-500">Extracting Company details, logo candidates and public contact information. Results will appear automatically.</p>
+          <p class="text-xs font-semibold text-gray-200">{{ source.processing_detail || ('Analyzing ' + source.name + '…') }}</p>
+          <p class="mt-1 text-[10px] text-gray-500">Agent step: {{ (source.processing_stage || 'queued').replaceAll('_', ' ') }}. Results will appear automatically.</p>
         </div>
       </section>
       <details
@@ -217,8 +217,8 @@
               <label class="field-label">First name *<input name="team_first_name" [(ngModel)]="teamInvite.first_name" required placeholder="First name" class="form-input" [class.form-input-invalid]="!!teamInviteErrors['first_name']"><span *ngIf="teamInviteErrors['first_name']" class="field-error">{{ teamInviteErrors['first_name'] }}</span></label>
               <label class="field-label">Last name *<input name="team_last_name" [(ngModel)]="teamInvite.last_name" required placeholder="Last name" class="form-input" [class.form-input-invalid]="!!teamInviteErrors['last_name']"><span *ngIf="teamInviteErrors['last_name']" class="field-error">{{ teamInviteErrors['last_name'] }}</span></label>
             </div>
-            <label class="field-label">Business email *<input name="team_email" [(ngModel)]="teamInvite.email" required type="email" placeholder="name@company.com" class="form-input" [class.form-input-invalid]="!!teamInviteErrors['email']"><span *ngIf="teamInviteErrors['email']" class="field-error">{{ teamInviteErrors['email'] }}</span></label>
-            <p class="rounded-lg border border-secondary/15 bg-secondary/5 p-3 text-[10px] text-gray-300">A secure Firebase activation email will be sent. The user creates their own password.</p>
+            <label class="field-label">Email address *<input name="team_email" [(ngModel)]="teamInvite.email" required type="email" placeholder="name@example.com" class="form-input" [class.form-input-invalid]="!!teamInviteErrors['email']"><span *ngIf="teamInviteErrors['email']" class="field-error">{{ teamInviteErrors['email'] }}</span></label>
+            <p class="rounded-lg border border-secondary/15 bg-secondary/5 p-3 text-[10px] text-gray-300">A secure Firebase activation link will be sent. Work and personal email addresses are accepted, and the user creates their own password.</p>
             <select name="team_role" [(ngModel)]="teamInvite.role" class="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-xs outline-none focus:border-secondary/50">
               <option value="assistant">Assistant</option>
               <option value="mkt">Marketing</option>
@@ -226,9 +226,8 @@
             </select>
             <div class="rounded-lg border border-white/10 bg-black/20 p-3 space-y-2">
               <label class="field-label">Timezone</label>
-              <input name="team_timezone_search" [(ngModel)]="teamTimezoneSearch" placeholder="Search Bogotá, Quito or UTC-05:00" class="form-input">
-              <select name="team_timezone" [(ngModel)]="teamInvite.timezone" class="w-full rounded-lg border border-white/10 bg-black/60 px-3 py-2 text-xs outline-none focus:border-secondary/50"><option *ngFor="let option of teamTimezoneOptions" [value]="option.value">{{ option.label }}</option></select>
-              <p class="text-[10px] text-gray-500">Preselected from this device.</p>
+              <app-timezone-select [value]="teamInvite.timezone || 'UTC'" (valueChange)="teamInvite.timezone = $event" ariaLabel="Team member timezone"></app-timezone-select>
+              <p class="text-[10px] text-gray-500">Preselected from this device. The exact IANA timezone is saved.</p>
             </div>
             <div class="rounded-lg border border-white/10 bg-black/20 p-3 space-y-2">
               <p class="field-label">Project access</p>

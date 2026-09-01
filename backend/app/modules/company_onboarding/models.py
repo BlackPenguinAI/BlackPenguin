@@ -122,6 +122,8 @@ class CompanyOnboardingSource(Base):
     storage_path = Column(Text, nullable=True)
     extracted_text = Column(Text, nullable=True)
     error_message = Column(Text, nullable=True)
+    processing_stage = Column(String(40), default="queued", nullable=False)
+    processing_detail = Column(String(255), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 

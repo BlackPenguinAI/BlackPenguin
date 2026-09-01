@@ -15,10 +15,11 @@ import { marked } from 'marked';
 import { catchError, concatMap, finalize, from, of, Subscription, tap, toArray } from 'rxjs';
 
 import { SpeechRecognitionService } from '../../core/services/speech-recognition.service';
-import { deviceTimezone, filterTimezoneOptions } from '../../core/timezones';
+import { deviceTimezone } from '../../core/timezones';
 import { OnboardingQuestion } from '../../shared/ui/onboarding-response-options/onboarding-response-options';
 import { OnboardingAiMessageComponent } from '../../shared/ui/onboarding-ai-message/onboarding-ai-message';
 import { OnboardingWelcomeComponent } from '../../shared/ui/onboarding-welcome/onboarding-welcome';
+import { TimezoneSelectComponent } from '../../shared/ui/timezone-select/timezone-select';
 import {
   captureReviewScrollAnchor,
   isNearScrollBottom,
@@ -52,7 +53,7 @@ import { CompanyOnboardingService } from './company-onboarding.service';
 @Component({
   selector: 'app-chat',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, TranslateModule, OnboardingAiMessageComponent, OnboardingWelcomeComponent],
+  imports: [CommonModule, FormsModule, RouterModule, TranslateModule, OnboardingAiMessageComponent, OnboardingWelcomeComponent, TimezoneSelectComponent],
   templateUrl: './chat.html',
   styleUrl: './chat.scss',
 })
@@ -96,7 +97,6 @@ export class ChatComponent implements OnInit, OnDestroy {
     timezone: deviceTimezone(), project_access_scope: 'all', project_ids: [],
   };
   teamProjects: TeamProjectOption[] = [];
-  teamTimezoneSearch = '';
   private readonly markdownCache = new Map<string, string>();
   private readonly speechSubscriptions = new Subscription();
   private speechBase = '';
@@ -354,8 +354,8 @@ export class ChatComponent implements OnInit, OnDestroy {
     const errors: Record<string, string> = {};
     if (!this.teamInvite.first_name.trim()) errors['first_name'] = 'Enter the first name.';
     if (!this.teamInvite.last_name.trim()) errors['last_name'] = 'Enter the last name.';
-    if (!this.teamInvite.email.trim()) errors['email'] = 'Enter the business email.';
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(this.teamInvite.email.trim())) errors['email'] = 'Enter a valid business email.';
+    if (!this.teamInvite.email.trim()) errors['email'] = 'Enter an email address.';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(this.teamInvite.email.trim())) errors['email'] = 'Enter a valid email address.';
     if (this.teamInvite.project_access_scope === 'selected' && !(this.teamInvite.project_ids || []).length) errors['project_ids'] = 'Select at least one Project.';
     return errors;
   }
@@ -418,7 +418,6 @@ export class ChatComponent implements OnInit, OnDestroy {
     });
   }
 
-  get teamTimezoneOptions() { return filterTimezoneOptions(this.teamTimezoneSearch); }
   teamProjectSelected(projectId: string): boolean { return (this.teamInvite.project_ids || []).includes(projectId); }
   toggleTeamProject(projectId: string, selected: boolean): void {
     this.teamInvite.project_ids = selected

@@ -1,3 +1,5 @@
+import '@angular/compiler';
+import { describe, expect, it } from 'vitest';
 import { OnboardingResponseOptionsComponent } from './onboarding-response-options';
 
 
@@ -55,5 +57,19 @@ describe('OnboardingResponseOptionsComponent', () => {
     };
 
     expect(component.isStructuredStep).toBe(true);
+  });
+
+  it('labels grounded and fallback suggestions without presenting them as confirmed facts', () => {
+    const component = new OnboardingResponseOptionsComponent();
+    component.question = {
+      field: 'corporate_differentiators', label: 'Differentiators', prompt: 'Choose',
+      input_type: 'long_text', options: [], examples: ['Multifamily focus'],
+      allow_custom: true, minimum_words: null, suggestion_origin: 'website',
+      suggestion_sources: ['https://example.com'],
+    };
+    expect(component.suggestionLabel).toBe('Based on your website and confirmed information');
+
+    component.question = { ...component.question, suggestion_origin: 'generic_fallback' };
+    expect(component.suggestionLabel).toBe('Starter suggestions');
   });
 });
