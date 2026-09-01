@@ -7,7 +7,7 @@ import uuid
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import HTTPException
-from sqlalchemy import case
+from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 
 from app.modules.projects.models import Project, ProjectCampaign
@@ -431,16 +431,25 @@ async def simulate_turn(
         now = virtual_now
     elif simulation:
         # Once +24h/+48h advances the simulation, wall-clock timestamps would
-        # place later replies before the reminder. Keep one monotonic clock.
-        now = max(datetime.utcnow(), simulation.virtual_now) + timedelta(seconds=1)
+        # place later replies before the reminder. The simulation clock is the
+        # sole authority here: mixing in wall time also changes relative dates
+        # such as "Monday, the 31st" when replaying a past/future scenario.
+        now = simulation.virtual_now + timedelta(seconds=1)
         simulation.virtual_now = now
         db.add(simulation)
     else:
         now = datetime.utcnow()
+    latest_message_at = db.query(func.max(SalesMessage.created_at)).filter(
+        SalesMessage.conversation_id == conversation.id,
+    ).scalar()
+    message_now = (
+        max(now, latest_message_at + timedelta(seconds=1))
+        if latest_message_at else now
+    )
     conversation.is_paused = False
     conversation.pause_reason = None
-    conversation.updated_at = now
-    lead.last_interaction_at = now
+    conversation.updated_at = message_now
+    lead.last_interaction_at = message_now
     if lead.funnel_stage == FunnelStage.NEW:
         lead.funnel_stage = FunnelStage.CONTACTED
         lead.stage_changed_at = now
@@ -452,7 +461,7 @@ async def simulate_turn(
             role="user",
             content=inbound_text,
             status="received",
-            created_at=now,
+            created_at=message_now,
         ))
     normalized = inbound_text.strip().upper()
     if record_inbound and normalized in {"STOP", "UNSUBSCRIBE", "CANCEL", "END", "QUIT"}:
@@ -473,7 +482,7 @@ async def simulate_turn(
             role="assistant",
             content="You have been unsubscribed and will not receive further messages.",
             status="simulated",
-            created_at=now,
+            created_at=message_now + timedelta(microseconds=1),
         ))
         db.commit()
         return {
@@ -643,9 +652,9 @@ async def simulate_turn(
                     } if offered_slots else {}),
                     **({"appointment_confirmed": True} if appointment_confirmed else {}),
                 },
-                created_at=now + timedelta(microseconds=1) if record_inbound else now,
+                created_at=message_now + timedelta(microseconds=1) if record_inbound else message_now,
             ))
-            conversation.updated_at = now
+            conversation.updated_at = message_now
             lead.agent_status = "appointment_confirmed" if appointment_confirmed else "simulation"
             pending_count = db.query(SalesFollowUpJob).filter(
                 SalesFollowUpJob.conversation_id == conversation.id,
