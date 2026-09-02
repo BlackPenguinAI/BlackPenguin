@@ -1,4 +1,4 @@
-:host { display: block; min-width: 0; }
+:host { display: block; min-width: 0; width: 100%; }
 
 :host ::ng-deep .timezone-select .ng-select-container {
   min-height: 2.75rem;
@@ -7,20 +7,31 @@
   background: rgba(0, 0, 0, .5);
   color: #fff;
   box-shadow: none;
+  font-size: .75rem;
 }
 :host ::ng-deep .timezone-select.ng-select-focused .ng-select-container { border-color: #e99e10; }
-:host ::ng-deep .timezone-select .ng-value-container { padding-left: .9rem; }
-:host ::ng-deep .timezone-select .ng-input > input { color: #fff; }
+:host ::ng-deep .timezone-select .ng-value-container { min-width: 0; padding-left: .9rem; padding-right: .25rem; }
+:host ::ng-deep .timezone-select .ng-value { min-width: 0; max-width: 100%; }
+:host ::ng-deep .timezone-select .ng-input { top: auto; padding-left: .9rem; padding-right: 2.75rem; }
+:host ::ng-deep .timezone-select .ng-input > input { color: #fff; line-height: 1.4; }
 :host ::ng-deep .timezone-select .ng-placeholder { color: #6b7280; }
 :host ::ng-deep .timezone-select .ng-arrow { border-color: #9ca3af transparent transparent; }
+:host ::ng-deep .timezone-select .ng-arrow-wrapper { flex: 0 0 2rem; width: 2rem; padding-right: .65rem; }
+:host ::ng-deep .timezone-select .ng-clear-wrapper { display: none; }
 :host ::ng-deep .timezone-select .ng-dropdown-panel {
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, .12);
   border-radius: .75rem;
   background: #111;
   box-shadow: 0 18px 45px rgba(0, 0, 0, .5);
+  z-index: 1100;
 }
-:host ::ng-deep .timezone-select .ng-option { padding: .65rem .9rem; background: #111; color: #d1d5db; }
+:host ::ng-deep .timezone-select .ng-dropdown-panel-items { max-height: 16rem; }
+:host ::ng-deep .timezone-select .ng-option { display: flex; min-width: 0; flex-direction: column; gap: .15rem; padding: .65rem .9rem; background: #111; color: #d1d5db; }
 :host ::ng-deep .timezone-select .ng-option.ng-option-marked { background: rgba(233, 158, 16, .12); color: #f5c96e; }
 :host ::ng-deep .timezone-select .ng-option.ng-option-selected { background: rgba(233, 158, 16, .2); color: #f3b43b; }
 :host ::ng-deep .timezone-select--compact .ng-select-container { min-height: 2.25rem; border-radius: .5rem; }
+
+.timezone-value { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.timezone-option__summary { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .75rem; font-weight: 600; }
+.timezone-option__iana { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #6b7280; font-family: monospace; font-size: .65rem; }

@@ -1,6 +1,7 @@
 export interface TimezoneOption {
   value: string;
   label: string;
+  summary: string;
   city: string;
   offsetMinutes: number;
   searchText: string;
@@ -83,10 +84,11 @@ export function timezoneOptions(at = new Date()): TimezoneOption[] {
     .map(value => {
       const offsetMinutes = zoneOffsetMinutes(value, at);
       const city = cityLabel(value);
-      const label = `(${offsetLabel(offsetMinutes)}) ${city} — ${value}`;
+      const summary = `(${offsetLabel(offsetMinutes)}) ${city}`;
+      const label = `${summary} — ${value}`;
       const shortOffset = offsetLabel(offsetMinutes, false).replace(':00', '');
       const searchText = normalized(`${label} ${shortOffset} ${shortOffset.replace('UTC', 'GMT')}`);
-      return { value, label, city, offsetMinutes, searchText };
+      return { value, label, summary, city, offsetMinutes, searchText };
     })
     .sort((left, right) => left.offsetMinutes - right.offsetMinutes || left.city.localeCompare(right.city));
 }

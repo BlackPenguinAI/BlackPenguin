@@ -80,6 +80,7 @@ class UserInvitation(Base):
     last_attempt_at = Column(DateTime, nullable=True)
     provisioning_secret_ciphertext = Column(String(500), nullable=True)
     last_error = Column(String(500), nullable=True)
+    idempotency_key = Column(String(100), nullable=True, unique=True, index=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     user = relationship("User", foreign_keys=[user_id], back_populates="invitations")

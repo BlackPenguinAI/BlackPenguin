@@ -207,17 +207,22 @@
               <div class="min-w-0">
                 <span class="block truncate text-gray-200">{{ member.first_name }} {{ member.last_name }}</span>
                 <span class="block truncate text-[10px] text-gray-500">{{ member.email }}</span>
+                <span class="mt-1 block text-[9px] font-semibold uppercase tracking-wider"
+                  [ngClass]="member.auth_status === 'active' ? 'text-green-400' : (member.auth_status === 'provisioning_failed' ? 'text-red-300' : 'text-amber-300')">
+                  {{ member.auth_status === 'active' ? 'Active' : (member.auth_status === 'provisioning_failed' ? 'Delivery failed' : 'Pending activation') }}
+                </span>
               </div>
               <span class="rounded-full bg-secondary/10 px-2 py-1 text-[9px] font-semibold uppercase text-secondary">{{ member.role === 'mkt' ? 'Marketing' : member.role }}</span>
             </div>
           </div>
           <form (ngSubmit)="inviteTeamMember()" class="mt-4 space-y-2">
-            <p *ngIf="teamInviteErrorCount" class="form-help" role="status"><span class="material-symbols-outlined text-sm">info</span>Complete {{ teamInviteErrorCount }} required field{{ teamInviteErrorCount === 1 ? '' : 's' }} to add the user.</p>
+            <p *ngIf="teamInviteAttempted && teamInviteErrorCount" class="form-help" role="status"><span class="material-symbols-outlined text-sm">info</span>Complete {{ teamInviteErrorCount }} required field{{ teamInviteErrorCount === 1 ? '' : 's' }} to add the user.</p>
+            <p *ngIf="teamSuccess" class="rounded-lg border border-green-500/25 bg-green-500/10 px-3 py-2 text-[10px] text-green-300" role="status">{{ teamSuccess }}</p>
             <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              <label class="field-label">First name *<input name="team_first_name" [(ngModel)]="teamInvite.first_name" required placeholder="First name" class="form-input" [class.form-input-invalid]="!!teamInviteErrors['first_name']"><span *ngIf="teamInviteErrors['first_name']" class="field-error">{{ teamInviteErrors['first_name'] }}</span></label>
-              <label class="field-label">Last name *<input name="team_last_name" [(ngModel)]="teamInvite.last_name" required placeholder="Last name" class="form-input" [class.form-input-invalid]="!!teamInviteErrors['last_name']"><span *ngIf="teamInviteErrors['last_name']" class="field-error">{{ teamInviteErrors['last_name'] }}</span></label>
+              <label class="field-label">First name *<input name="team_first_name" [(ngModel)]="teamInvite.first_name" required placeholder="First name" class="form-input" [class.form-input-invalid]="teamInviteAttempted && !!teamInviteErrors['first_name']"><span *ngIf="teamInviteAttempted && teamInviteErrors['first_name']" class="field-error">{{ teamInviteErrors['first_name'] }}</span></label>
+              <label class="field-label">Last name *<input name="team_last_name" [(ngModel)]="teamInvite.last_name" required placeholder="Last name" class="form-input" [class.form-input-invalid]="teamInviteAttempted && !!teamInviteErrors['last_name']"><span *ngIf="teamInviteAttempted && teamInviteErrors['last_name']" class="field-error">{{ teamInviteErrors['last_name'] }}</span></label>
             </div>
-            <label class="field-label">Email address *<input name="team_email" [(ngModel)]="teamInvite.email" required type="email" placeholder="name@example.com" class="form-input" [class.form-input-invalid]="!!teamInviteErrors['email']"><span *ngIf="teamInviteErrors['email']" class="field-error">{{ teamInviteErrors['email'] }}</span></label>
+            <label class="field-label">Email address *<input name="team_email" [(ngModel)]="teamInvite.email" required type="email" placeholder="name@example.com" class="form-input" [class.form-input-invalid]="teamInviteAttempted && !!teamInviteErrors['email']"><span *ngIf="teamInviteAttempted && teamInviteErrors['email']" class="field-error">{{ teamInviteErrors['email'] }}</span></label>
             <p class="rounded-lg border border-secondary/15 bg-secondary/5 p-3 text-[10px] text-gray-300">A secure Firebase activation link will be sent. Work and personal email addresses are accepted, and the user creates their own password.</p>
             <select name="team_role" [(ngModel)]="teamInvite.role" class="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-xs outline-none focus:border-secondary/50">
               <option value="assistant">Assistant</option>
@@ -234,10 +239,10 @@
               <label class="flex gap-2 text-xs"><input type="radio" name="team_project_scope" [(ngModel)]="teamInvite.project_access_scope" value="all" class="accent-secondary"> All current and future Projects</label>
               <label class="flex gap-2 text-xs"><input type="radio" name="team_project_scope" [(ngModel)]="teamInvite.project_access_scope" value="selected" class="accent-secondary"> Selected Projects</label>
               <div *ngIf="teamInvite.project_access_scope === 'selected'" class="grid gap-2 sm:grid-cols-2"><label *ngFor="let project of teamProjects" class="flex items-center gap-2 rounded border border-white/10 p-2 text-[10px]"><input type="checkbox" [checked]="teamProjectSelected(project.id)" (change)="toggleTeamProject(project.id, $any($event.target).checked)" class="accent-secondary">{{ project.name }}</label></div>
-              <span *ngIf="teamInviteErrors['project_ids']" class="field-error">{{ teamInviteErrors['project_ids'] }}</span>
+              <span *ngIf="teamInviteAttempted && teamInviteErrors['project_ids']" class="field-error">{{ teamInviteErrors['project_ids'] }}</span>
             </div>
             <div class="flex flex-wrap gap-2 pt-1">
-              <button [disabled]="!canInviteTeamMember" [title]="canInviteTeamMember ? '' : 'Complete all required user fields.'" class="rounded-lg bg-secondary px-3 py-2 text-[10px] font-semibold text-black disabled:cursor-not-allowed disabled:opacity-40">{{ teamSavingAction === 'add' ? 'Sending...' : (teamInviteErrorCount ? 'Complete required fields' : 'Send invitation') }}</button>
+              <button [disabled]="teamSaving" class="rounded-lg bg-secondary px-3 py-2 text-[10px] font-semibold text-black disabled:cursor-not-allowed disabled:opacity-40">{{ teamSavingAction === 'add' ? 'Sending...' : 'Send invitation' }}</button>
             </div>
           </form>
           <button type="button" (click)="continueTeamSetup()" [disabled]="teamSaving" class="mt-3 rounded-lg border border-secondary/30 px-3 py-2 text-[10px] font-semibold text-secondary disabled:opacity-50">

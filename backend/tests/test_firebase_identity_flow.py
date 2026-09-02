@@ -30,6 +30,7 @@ from app.modules.system_settings.schemas import FirebaseConfigUpdate
 from app.modules.system_settings.services import firebase_config_response, update_firebase_config
 from app.modules.users.models import User, UserAuthStatus, UserInvitation, UserRole
 from app.modules.users.services import invite_tenant_user
+from app.modules.users.services import invitation_for_idempotency_key
 from app.modules.users.services import resend_user_activation
 
 
@@ -87,6 +88,57 @@ def test_invitation_provisions_firebase_without_an_administrator_password():
         send_email.assert_called_once()
         assert send_email.call_args.args == (db, "sales@northstar.example")
         assert send_email.call_args.kwargs["invitation_state"]
+    finally:
+        db.close(); engine.dispose()
+
+
+def test_company_user_invitation_can_be_replayed_with_the_same_idempotency_key():
+    engine, db = _db()
+    try:
+        company = _company(db)
+        _verified_firebase(db)
+        with patch("app.integrations.firebase_client.send_email_sign_in_link") as send_email:
+            user = invite_tenant_user(
+                db, company_id=company.id, email="replay@example.com",
+                first_name="Alex", last_name="Rivera", role=UserRole.SALES,
+                idempotency_key="company-user-request-123",
+            )
+        replay = invitation_for_idempotency_key(
+            db, idempotency_key="company-user-request-123",
+            company_id=company.id, email="replay@example.com",
+        )
+        assert replay is not None
+        assert replay.user_id == user.id
+        assert db.query(User).filter(User.email == "replay@example.com").count() == 1
+        assert db.query(UserInvitation).filter_by(user_id=user.id).count() == 1
+        send_email.assert_called_once()
+    finally:
+        db.close(); engine.dispose()
+
+
+def test_duplicate_pending_user_returns_an_actionable_conflict():
+    engine, db = _db()
+    try:
+        company = _company(db)
+        _verified_firebase(db)
+        with patch("app.integrations.firebase_client.send_email_sign_in_link"):
+            user = invite_tenant_user(
+                db, company_id=company.id, email="pending@example.com",
+                first_name="Alex", last_name="Rivera", role=UserRole.SALES,
+            )
+            with pytest.raises(HTTPException) as error:
+                invite_tenant_user(
+                    db, company_id=company.id, email="pending@example.com",
+                    first_name="Alex", last_name="Rivera", role=UserRole.SALES,
+                )
+        assert error.value.status_code == 409
+        assert error.value.detail == {
+            "code": "USER_ALREADY_INVITED",
+            "message": "This user is already pending activation.",
+            "user_id": user.id,
+            "auth_status": "invited",
+            "next_action": "resend_activation",
+        }
     finally:
         db.close(); engine.dispose()
 
@@ -173,6 +225,61 @@ def test_invitation_state_cannot_be_tampered_with_or_reused():
         with pytest.raises(HTTPException) as reused:
             inspect_firebase_action(FirebaseActionCodePayload(state=state), db)
         assert reused.value.status_code == 410
+    finally:
+        db.close(); engine.dispose()
+
+
+def test_expired_invitation_returns_a_specific_safe_reason(caplog):
+    engine, db = _db()
+    try:
+        company = _company(db)
+        user = User(
+            company_id=company.id, email="expired@example.com", first_name="Casey",
+            role=UserRole.SALES, hashed_password="not-used",
+            auth_status=UserAuthStatus.INVITED, is_active=True,
+        )
+        db.add(user); db.flush()
+        invitation = UserInvitation(
+            user_id=user.id, status="accepted_by_provider",
+            expires_at=datetime.utcnow() - timedelta(seconds=1),
+        )
+        db.add(invitation); db.commit()
+        state = create_invitation_state(invitation.id, user.id)
+        with caplog.at_level(logging.WARNING), pytest.raises(HTTPException) as error:
+            inspect_firebase_action(FirebaseActionCodePayload(state=state), db)
+        assert error.value.status_code == 410
+        assert error.value.detail["code"] == "INVITATION_EXPIRED"
+        assert any("reason=invitation_expired" in record.message for record in caplog.records)
+        assert state not in "\n".join(record.message for record in caplog.records)
+    finally:
+        db.close(); engine.dispose()
+
+
+def test_successful_resend_revokes_the_previous_email_link():
+    engine, db = _db()
+    try:
+        company = _company(db)
+        _verified_firebase(db)
+        user = User(
+            company_id=company.id, email="renew@example.com", first_name="Riley",
+            role=UserRole.SALES, hashed_password="not-used",
+            auth_status=UserAuthStatus.INVITED, is_active=True,
+        )
+        db.add(user); db.flush()
+        previous = UserInvitation(
+            user_id=user.id, status="accepted_by_provider", send_attempts=1,
+            last_attempt_at=datetime.utcnow() - timedelta(minutes=2),
+            expires_at=datetime.utcnow() + timedelta(days=1),
+        )
+        db.add(previous); db.commit()
+        previous_id = previous.id
+        with patch("app.integrations.firebase_client.send_email_sign_in_link"):
+            current = resend_user_activation(db, user=user)
+        db.refresh(previous)
+        assert current.id != previous_id
+        assert current.status == "accepted_by_provider"
+        assert previous.status == "revoked"
+        assert previous.revoked_at is not None
     finally:
         db.close(); engine.dispose()
 

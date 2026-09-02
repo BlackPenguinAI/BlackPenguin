@@ -288,6 +288,9 @@ class TeamMemberResponse(BaseModel):
     is_active: bool
     auth_status: str = "active"
     invitation_sent_at: datetime | None = None
+    invitation_status: str | None = None
+    invitation_delivery: Literal["sent", "failed", "pending", "not_applicable"] = "not_applicable"
+    request_replayed: bool = False
 
 
 class TeamRoleProgress(BaseModel):

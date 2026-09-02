@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
 from app.modules.onboarding_questions import validate_onboarding_value
+from app.modules.users import services as user_services
 from app.modules.users.models import User, UserRole
 from app.modules.projects.models import Project
 
@@ -614,6 +615,25 @@ def serialize_profile(profile: CompanyProfile) -> dict[str, Any]:
     }
 
 
+def team_member_payload(db: Session, user: User | None, *, request_replayed: bool = False) -> dict[str, Any] | None:
+    if user is None:
+        return None
+    invitation = user_services.latest_user_invitation(db, user.id)
+    return {
+        "id": user.id,
+        "first_name": user.first_name,
+        "last_name": user.last_name,
+        "email": user.email,
+        "role": user.role.value,
+        "is_active": user.is_active,
+        "auth_status": user.auth_status.value,
+        "invitation_sent_at": user.invitation_sent_at,
+        "invitation_status": invitation.status if invitation else None,
+        "invitation_delivery": user_services.invitation_delivery_status(invitation),
+        "request_replayed": request_replayed,
+    }
+
+
 def serialize_team(db: Session, company_id: str, profile: CompanyProfile | None = None) -> dict[str, Any]:
     """Return onboarding team progress derived from the canonical users table."""
     profile = profile or get_or_create_profile(db, company_id)
@@ -634,21 +654,9 @@ def serialize_team(db: Session, company_id: str, profile: CompanyProfile | None 
             "active_users": active_users,
         })
 
-    def member_payload(user: User | None) -> dict[str, Any] | None:
-        if user is None:
-            return None
-        return {
-            "id": user.id,
-            "first_name": user.first_name,
-            "last_name": user.last_name,
-            "email": user.email,
-            "role": user.role.value,
-            "is_active": user.is_active,
-        }
-
     return {
-        "administrator": member_payload(administrator),
-        "members": [member_payload(user) for user in users if user.role != UserRole.ADMIN],
+        "administrator": team_member_payload(db, administrator),
+        "members": [team_member_payload(db, user) for user in users if user.role != UserRole.ADMIN],
         "roles": roles,
         "projects": [
             {"id": project.id, "name": project.name}

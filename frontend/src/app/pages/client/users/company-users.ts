@@ -27,6 +27,8 @@ export class CompanyUsersComponent implements OnInit {
   editingUserId: string | null = null;
   invite: CompanyUserInvite = this.emptyForm();
   readonly timezoneLabel = timezoneLabel;
+  private inviteRequestKey = '';
+  private inviteRequestFingerprint = '';
 
   constructor(private companyUsers: CompanyUsersService, private toast: ToastService, private cdr: ChangeDetectorRef) {}
   ngOnInit(): void { this.load(); }
@@ -43,6 +45,7 @@ export class CompanyUsersComponent implements OnInit {
 
   openAddModal(): void {
     this.editingUserId = null; this.invite = this.emptyForm();
+    this.inviteRequestKey = ''; this.inviteRequestFingerprint = '';
     this.showAddModal = true;
   }
 
@@ -68,18 +71,29 @@ export class CompanyUsersComponent implements OnInit {
           is_active: this.invite.is_active, timezone: this.invite.timezone || deviceTimezone(),
           project_access_scope: this.invite.project_access_scope || 'all', project_ids: this.invite.project_ids || [],
         })
-      : this.companyUsers.invite(this.invite);
+      : this.companyUsers.invite(this.invite, this.invitationRequestKey());
     request.subscribe({
       next: user => {
         const index = this.users.findIndex(item => item.id === user.id);
         this.users = index < 0 ? [...this.users, user] : this.users.map(item => item.id === user.id ? user : item);
         this.users.sort((a, b) => a.email.localeCompare(b.email));
         this.showAddModal = false; this.saving = false;
-        this.toast.showSuccess(this.editingUserId ? 'User updated' :
-          (user.auth_status === 'provisioning_failed' ? 'User saved, but Firebase rejected the activation request.' : 'Activation request accepted by Firebase'));
+        this.inviteRequestKey = ''; this.inviteRequestFingerprint = '';
+        const message = this.invitationResultMessage(user);
+        if (!this.editingUserId && (user.invitation_delivery === 'failed' || user.auth_status === 'provisioning_failed')) {
+          this.toast.showError(message);
+        } else {
+          this.toast.showSuccess(this.editingUserId ? 'User updated' : message);
+        }
         this.reloadLimits(); this.cdr.markForCheck();
       },
-      error: err => { this.saving = false; this.toast.showError(err.error?.detail || 'Could not save user'); this.cdr.markForCheck(); },
+      error: err => {
+        this.saving = false;
+        const detail = err.error?.detail;
+        this.toast.showError(typeof detail === 'string' ? detail : detail?.message || 'Could not save user');
+        if (detail?.code === 'USER_ALREADY_INVITED') this.load();
+        this.cdr.markForCheck();
+      },
     });
   }
 
@@ -129,6 +143,27 @@ export class CompanyUsersComponent implements OnInit {
   private emptyForm(): CompanyUserInvite {
     return { first_name: '', last_name: '', email: '', role: 'assistant', is_active: true,
       timezone: deviceTimezone(), project_access_scope: 'all', project_ids: [] };
+  }
+  private invitationRequestKey(): string {
+    const fingerprint = JSON.stringify({
+      ...this.invite,
+      first_name: this.invite.first_name.trim(), last_name: this.invite.last_name.trim(),
+      email: this.invite.email.trim().toLowerCase(),
+      project_ids: [...(this.invite.project_ids || [])].sort(),
+    });
+    if (!this.inviteRequestKey || fingerprint !== this.inviteRequestFingerprint) {
+      const random = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
+      this.inviteRequestKey = `company-user-${random}`;
+      this.inviteRequestFingerprint = fingerprint;
+    }
+    return this.inviteRequestKey;
+  }
+  private invitationResultMessage(user: CompanyUser): string {
+    if (user.request_replayed) return `The invitation for ${user.email} was already processed.`;
+    if (user.invitation_delivery === 'failed' || user.auth_status === 'provisioning_failed') {
+      return `User saved, but Firebase did not accept the invitation for ${user.email}.`;
+    }
+    return `Invitation sent to ${user.email}. The user is pending activation.`;
   }
   private reloadLimits(): void { this.companyUsers.limits().subscribe({ next: limits => { this.limits = limits; this.cdr.markForCheck(); } }); }
 }

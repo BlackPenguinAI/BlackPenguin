@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.core.security import create_invitation_state, get_password_hash
 from app.modules.companies.models import Company
 from app.modules.users.models import User, UserAuthStatus, UserInvitation, UserRole
-from app.modules.users.project_access import sync_user_project_access
+from app.modules.users.project_access import project_ids_for_user, sync_user_project_access
 
 
 logger = logging.getLogger(__name__)
@@ -18,6 +18,37 @@ SEAT_HOLDING_AUTH_STATUSES = {
     UserAuthStatus.INVITED, UserAuthStatus.ACTIVE,
     UserAuthStatus.PROVISIONING_FAILED, UserAuthStatus.MIGRATION_REQUIRED,
 }
+
+
+def normalize_idempotency_key(value: str | None) -> str | None:
+    if value is None:
+        return None
+    normalized = value.strip()
+    if not 8 <= len(normalized) <= 100:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "INVALID_IDEMPOTENCY_KEY",
+                "message": "Idempotency-Key must contain between 8 and 100 characters.",
+            },
+        )
+    return normalized
+
+
+def latest_user_invitation(db: Session, user_id: str) -> UserInvitation | None:
+    return db.query(UserInvitation).filter(
+        UserInvitation.user_id == user_id,
+    ).order_by(UserInvitation.created_at.desc()).first()
+
+
+def invitation_delivery_status(invitation: UserInvitation | None) -> str:
+    if invitation is None:
+        return "not_applicable"
+    if invitation.status == "accepted_by_provider":
+        return "sent"
+    if invitation.status == "delivery_failed":
+        return "failed"
+    return "pending"
 
 
 def enforce_role_limit(db: Session, company: Company, role: UserRole, *, exclude_user_id: str | None = None) -> None:
@@ -93,6 +124,7 @@ def invite_tenant_user(
     role: UserRole, timezone: str = "UTC", project_access_scope: str = "all",
     project_ids: list[str] | None = None, invited_by_user_id: str | None = None,
     commit: bool = True, send_activation_email: bool = True,
+    idempotency_key: str | None = None,
 ) -> User:
     if role not in INVITABLE_TENANT_ROLES:
         raise HTTPException(status_code=403, detail="Only Assistant, Marketing and Sales users can be invited.")
@@ -107,7 +139,10 @@ def invite_tenant_user(
     if commit:
         db.commit(); db.refresh(user)
     if send_activation_email:
-        provision_invitation(db, user=user, invited_by_user_id=invited_by_user_id)
+        provision_invitation(
+            db, user=user, invited_by_user_id=invited_by_user_id,
+            idempotency_key=idempotency_key,
+        )
     return user
 
 
@@ -144,8 +179,26 @@ def _create_pending_user(
     except ZoneInfoNotFoundError as exc:
         raise HTTPException(status_code=422, detail="Unknown timezone.") from exc
     normalized_email = email.strip().casefold()
-    if db.query(User).filter(User.email == normalized_email).first():
-        raise HTTPException(status_code=409, detail="The email is already registered.")
+    existing = db.query(User).filter(User.email == normalized_email).first()
+    if existing:
+        if role == UserRole.ADMIN or existing.company_id != company_id:
+            raise HTTPException(status_code=409, detail="The email is already registered.")
+        pending = existing.auth_status in {
+            UserAuthStatus.INVITED, UserAuthStatus.PROVISIONING_FAILED,
+        }
+        detail = {
+            "code": "USER_ALREADY_INVITED" if pending else "EMAIL_ALREADY_REGISTERED",
+            "message": (
+                "This user is already pending activation."
+                if pending else "The email is already registered."
+            ),
+        }
+        detail.update({
+            "user_id": existing.id,
+            "auth_status": existing.auth_status.value,
+            "next_action": "resend_activation" if pending else "view_user",
+        })
+        raise HTTPException(status_code=409, detail=detail)
     company = _validated_company(db, company_id, require_active=require_active_company)
     if enforce_limit:
         enforce_role_limit(db, company, role)
@@ -161,7 +214,46 @@ def _create_pending_user(
     return user
 
 
-def provision_invitation(db: Session, *, user: User, invited_by_user_id: str | None = None) -> UserInvitation:
+def invitation_for_idempotency_key(
+    db: Session, *, idempotency_key: str, company_id: str, email: str,
+    first_name: str | None = None, last_name: str | None = None,
+    role: UserRole | None = None, timezone: str | None = None,
+    project_access_scope: str | None = None, project_ids: list[str] | None = None,
+) -> UserInvitation | None:
+    invitation = db.query(UserInvitation).join(User, User.id == UserInvitation.user_id).filter(
+        UserInvitation.idempotency_key == idempotency_key,
+    ).first()
+    different_request = bool(invitation) and (
+        invitation.user.company_id != company_id
+        or invitation.user.email != email.strip().casefold()
+        or (first_name is not None and invitation.user.first_name != first_name.strip())
+        or (last_name is not None and invitation.user.last_name != last_name.strip())
+        or (role is not None and invitation.user.role != role)
+        or (timezone is not None and (invitation.user.timezone or "UTC") != timezone)
+        or (
+            project_access_scope is not None
+            and (invitation.user.project_access_scope or "all") != project_access_scope
+        )
+        or (
+            project_ids is not None
+            and set(project_ids_for_user(db, invitation.user)) != set(project_ids)
+        )
+    )
+    if invitation and different_request:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "IDEMPOTENCY_KEY_REUSED",
+                "message": "This invitation request key was already used for different data.",
+            },
+        )
+    return invitation
+
+
+def provision_invitation(
+    db: Session, *, user: User, invited_by_user_id: str | None = None,
+    idempotency_key: str | None = None,
+) -> UserInvitation:
     from app.integrations.firebase_client import ensure_firebase_ready, send_email_sign_in_link
     ensure_firebase_ready(db)
 
@@ -173,8 +265,11 @@ def provision_invitation(db: Session, *, user: User, invited_by_user_id: str | N
         invitation = UserInvitation(
             user_id=user.id, invited_by_user_id=invited_by_user_id, status="pending",
             expires_at=datetime.utcnow() + timedelta(days=7), send_attempts=0,
+            idempotency_key=idempotency_key,
         )
         db.add(invitation)
+    elif idempotency_key and not invitation.idempotency_key:
+        invitation.idempotency_key = idempotency_key
     now = datetime.utcnow()
     invitation.status = "pending"
     invitation.last_attempt_at = now
@@ -228,6 +323,14 @@ def resend_user_activation(db: Session, *, user: User, invited_by_user_id: str |
         raise HTTPException(
             status_code=424,
             detail=f"Firebase did not accept the activation request: {invitation.last_error or 'unknown error'}",
+        )
+    if latest and latest.id != invitation.id and latest.status == "accepted_by_provider":
+        latest.status = "revoked"
+        latest.revoked_at = datetime.utcnow()
+        db.commit()
+        logger.info(
+            "Previous Firebase invitation revoked after successful resend company_id=%s user_id=%s old_invitation_id=%s new_invitation_id=%s",
+            user.company_id, user.id, latest.id, invitation.id,
         )
     return invitation
 

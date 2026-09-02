@@ -6,7 +6,7 @@ from typing import Any
 import uuid
 
 import httpx
-from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
+from fastapi import APIRouter, Depends, File, Header, HTTPException, Response, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session, joinedload
 
@@ -514,11 +514,23 @@ def create_onboarding_team_member(
     payload: TeamMemberCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker([UserRole.ADMIN])),
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
 ):
     try:
         role = UserRole(payload.role)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail="Role must be assistant, mkt or sales.") from exc
+    key = user_services.normalize_idempotency_key(idempotency_key)
+    if key:
+        replay = user_services.invitation_for_idempotency_key(
+            db, idempotency_key=key, company_id=current_user.company_id,
+            email=str(payload.email), first_name=payload.first_name,
+            last_name=payload.last_name, role=role, timezone=payload.timezone,
+            project_access_scope=payload.project_access_scope,
+            project_ids=payload.project_ids,
+        )
+        if replay:
+            return services.team_member_payload(db, replay.user, request_replayed=True)
     user = user_services.invite_tenant_user(
         db,
         company_id=current_user.company_id,
@@ -530,10 +542,11 @@ def create_onboarding_team_member(
         project_access_scope=payload.project_access_scope,
         project_ids=payload.project_ids,
         invited_by_user_id=current_user.id,
+        idempotency_key=key,
     )
     profile = services.get_or_create_profile(db, current_user.company_id)
     services.clear_team_role_decision(db, profile, role)
-    return user
+    return services.team_member_payload(db, user)
 
 
 @router.patch("/team/roles/{role_name}", response_model=TeamOnboardingResponse)

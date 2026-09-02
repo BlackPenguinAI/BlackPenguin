@@ -80,6 +80,8 @@ export class ChatComponent implements OnInit, OnDestroy {
   teamSaving = false;
   teamSavingAction: 'add' | 'continue' | null = null;
   teamError = '';
+  teamSuccess = '';
+  teamInviteAttempted = false;
   publicEmails = '';
   publicPhones = '';
   socialProfiles = '';
@@ -103,6 +105,8 @@ export class ChatComponent implements OnInit, OnDestroy {
   private pollingTimer?: ReturnType<typeof setTimeout>;
   private replyToMessageId: string | null = null;
   private lastStateVersion = 0;
+  private teamInviteRequestKey = '';
+  private teamInviteRequestFingerprint = '';
   private pollingStartedAt = 0;
   private readonly expandedSourceIds = new Set<string>();
   readonly savingWebsiteSourceIds = new Set<string>();
@@ -396,26 +400,59 @@ export class ChatComponent implements OnInit, OnDestroy {
   }
 
   inviteTeamMember(): void {
+    this.teamInviteAttempted = true;
+    this.teamSuccess = '';
     if (this.currentStage !== 'team' || this.hasPendingReview || this.isCompleted || !this.canInviteTeamMember) return;
     this.teamSaving = true;
     this.teamSavingAction = 'add';
     this.teamError = '';
-    this.onboarding.createTeamMember(this.teamInvite).pipe(finalize(() => {
+    const submittedEmail = this.teamInvite.email.trim();
+    const requestKey = this.teamInvitationRequestKey();
+    this.onboarding.createTeamMember(this.teamInvite, requestKey).pipe(finalize(() => {
       this.teamSaving = false;
       this.teamSavingAction = null;
       this.cdr.detectChanges();
     })).subscribe({
-      next: () => {
+      next: member => {
+        if (member.invitation_delivery === 'failed' || member.auth_status === 'provisioning_failed') {
+          this.teamError = `The user ${submittedEmail} was saved, but Firebase did not accept the invitation. Use Resend invitation from Users.`;
+          this.teamSuccess = '';
+        } else {
+          this.teamSuccess = member.request_replayed
+            ? `The invitation for ${submittedEmail} was already processed.`
+            : `Invitation sent to ${submittedEmail}. The user is pending activation.`;
+        }
         this.teamInvite = { first_name: '', last_name: '', email: '', role: 'assistant',
           timezone: deviceTimezone(), project_access_scope: 'all', project_ids: [] };
+        this.teamInviteAttempted = false;
+        this.teamInviteRequestKey = '';
+        this.teamInviteRequestFingerprint = '';
         this.refreshTeam(true);
       },
       error: (error: HttpErrorResponse) => {
-        this.teamError = typeof error.error?.detail === 'string'
-          ? error.error.detail
-          : 'The team member could not be invited.';
+        const detail = error.error?.detail;
+        this.teamError = typeof detail === 'string'
+          ? detail
+          : detail?.message || 'The team member could not be invited.';
+        if (detail?.code === 'USER_ALREADY_INVITED') this.refreshTeam(true);
       },
     });
+  }
+
+  private teamInvitationRequestKey(): string {
+    const fingerprint = JSON.stringify({
+      ...this.teamInvite,
+      first_name: this.teamInvite.first_name.trim(),
+      last_name: this.teamInvite.last_name.trim(),
+      email: this.teamInvite.email.trim().toLowerCase(),
+      project_ids: [...(this.teamInvite.project_ids || [])].sort(),
+    });
+    if (!this.teamInviteRequestKey || fingerprint !== this.teamInviteRequestFingerprint) {
+      const random = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
+      this.teamInviteRequestKey = `company-onboarding-user-${random}`;
+      this.teamInviteRequestFingerprint = fingerprint;
+    }
+    return this.teamInviteRequestKey;
   }
 
   teamProjectSelected(projectId: string): boolean { return (this.teamInvite.project_ids || []).includes(projectId); }

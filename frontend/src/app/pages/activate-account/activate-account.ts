@@ -5,6 +5,7 @@ import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { timeout } from 'rxjs';
 
 import { AuthService } from '../../core/services/auth';
+import { activationLinkParameters } from './activation-link';
 
 @Component({
   selector: 'app-activate-account',
@@ -17,6 +18,7 @@ export class ActivateAccountComponent implements OnInit {
   loading = true;
   saving = false;
   error = '';
+  errorCode = '';
   invitation: any = null;
   password = '';
   confirmPassword = '';
@@ -34,20 +36,15 @@ export class ActivateAccountComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    this.code = this.route.snapshot.queryParamMap.get('oobCode') || '';
-    this.state = this.route.snapshot.queryParamMap.get('state') || '';
-    const continueUrl = this.route.snapshot.queryParamMap.get('continueUrl');
-    if (continueUrl) {
-      try {
-        const nested = new URL(continueUrl);
-        this.state ||= nested.searchParams.get('state') || '';
-        this.code ||= nested.searchParams.get('oobCode') || '';
-      } catch {
-        // Firebase may omit continueUrl after redirecting; direct parameters remain authoritative.
-      }
-    }
+    const parameters = activationLinkParameters(
+      key => this.route.snapshot.queryParamMap.get(key),
+      this.route.snapshot.fragment || '',
+    );
+    this.code = parameters.oobCode;
+    this.state = parameters.state;
     if (!this.code || !this.state) {
       this.loading = false;
+      this.errorCode = 'INCOMPLETE_ACTIVATION_LINK';
       this.error = 'This activation link is incomplete.';
       return;
     }
@@ -58,6 +55,7 @@ export class ActivateAccountComponent implements OnInit {
     if (!this.code || !this.state) return;
     this.loading = true;
     this.error = '';
+    this.errorCode = '';
     this.invitation = null;
     this.cdr.detectChanges();
     this.validateInvitation();
@@ -73,6 +71,7 @@ export class ActivateAccountComponent implements OnInit {
         this.cdr.detectChanges();
       },
       error: err => {
+        this.errorCode = err?.code || '';
         this.error = err?.name === 'TimeoutError'
           ? 'Black Penguin could not validate the invitation in time. Please try again.'
           : (err.message || 'This activation link is invalid or expired.');
@@ -99,7 +98,7 @@ export class ActivateAccountComponent implements OnInit {
 
   activate(): void {
     if (!this.valid) return;
-    this.saving = true; this.error = '';
+    this.saving = true; this.error = ''; this.errorCode = '';
     this.auth.completeActivation(this.state, this.code, this.password).pipe(
       timeout({ first: this.activationTimeoutMs }),
     ).subscribe({
@@ -107,6 +106,7 @@ export class ActivateAccountComponent implements OnInit {
         void this.router.navigateByUrl(this.auth.defaultRouteForRole(response.role), { replaceUrl: true });
       },
       error: err => {
+        this.errorCode = err?.code || '';
         this.error = err?.name === 'TimeoutError'
           ? 'Firebase did not complete the activation in time. Your link is still safe; please try again.'
           : (err.message || 'Account activation failed.');

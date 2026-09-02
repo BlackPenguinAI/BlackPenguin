@@ -14,4 +14,12 @@
   (ngModelChange)="update($event)"
   placeholder="Search Lima, Bogotá, America/Lima or UTC-5"
   [attr.aria-label]="ariaLabel"
-></ng-select>
+>
+  <ng-template ng-label-tmp let-item="item">
+    <span class="timezone-value" [title]="item.label">{{ item.summary }}</span>
+  </ng-template>
+  <ng-template ng-option-tmp let-item="item">
+    <span class="timezone-option__summary">{{ item.summary }}</span>
+    <span class="timezone-option__iana">{{ item.value }}</span>
+  </ng-template>
+</ng-select>

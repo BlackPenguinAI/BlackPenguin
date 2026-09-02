@@ -1,4 +1,4 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Injectable, isDevMode } from '@angular/core';
 import { Observable } from 'rxjs';
 
@@ -93,8 +93,9 @@ export class CompanyOnboardingService {
     return this.http.get<TeamOnboarding>(`${this.baseUrl}/team`);
   }
 
-  createTeamMember(payload: TeamMemberInvite): Observable<TeamMember> {
-    return this.http.post<TeamMember>(`${this.baseUrl}/team/members`, payload);
+  createTeamMember(payload: TeamMemberInvite, idempotencyKey: string): Observable<TeamMember> {
+    const headers = new HttpHeaders({ 'Idempotency-Key': idempotencyKey });
+    return this.http.post<TeamMember>(`${this.baseUrl}/team/members`, payload, { headers });
   }
 
   continueTeamSetup(): Observable<OnboardingState> {

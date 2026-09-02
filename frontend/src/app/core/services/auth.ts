@@ -104,7 +104,13 @@ export class AuthService {
 
   private handleError(error: any) {
     console.error('Error en AuthService:', error);
-    return throwError(() => new Error(error.error?.detail || 'Error en la autenticación.'));
+    const detail = error.error?.detail;
+    const wrapped = new Error(
+      typeof detail === 'string' ? detail : detail?.message || 'Error en la autenticación.'
+    ) as Error & { code?: string; status?: number };
+    wrapped.code = typeof detail === 'object' ? detail?.code : undefined;
+    wrapped.status = error.status;
+    return throwError(() => wrapped);
   }
 
   // Helper para inyectar el token en las peticiones seguras

@@ -2,6 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
 import { TranslateModule } from '@ngx-translate/core';
 import { provideRouter } from '@angular/router';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ChatComponent } from './chat';
 import { EMPTY_COMPANY_PROFILE } from './company-onboarding.models';
@@ -205,9 +206,10 @@ describe('ChatComponent', () => {
 
     const create = http.expectOne('http://localhost:8000/api/v1/company-onboarding/team/members');
     expect(create.request.body).toEqual(component.teamInvite);
+    expect(create.request.headers.get('Idempotency-Key')).toMatch(/^company-onboarding-user-/);
     create.flush({
       id: 'user-1', first_name: 'Ana', last_name: 'Sales', email: 'ana@example.com',
-      role: 'sales', is_active: true,
+      role: 'sales', is_active: true, auth_status: 'invited', invitation_delivery: 'sent',
     });
     http.expectOne('http://localhost:8000/api/v1/company-onboarding/team').flush({
       administrator: null,
@@ -220,6 +222,39 @@ describe('ChatComponent', () => {
       next_question: null,
     });
     expect(component.team.members[0].email).toBe('ana@example.com');
+    expect(component.teamInviteAttempted).toBe(false);
+    expect(component.teamSuccess).toContain('Invitation sent to ana@example.com');
+    expect(component.teamInviteErrorCount).toBe(3);
+  });
+
+  it('should reuse its idempotency key when an invitation request is retried', () => {
+    component.currentStage = 'team';
+    component.teamInvite = {
+      first_name: 'Ana', last_name: 'Sales', email: 'ana@example.com', role: 'sales',
+      timezone: 'America/Lima', project_access_scope: 'all', project_ids: [],
+    };
+
+    component.inviteTeamMember();
+    const first = http.expectOne('http://localhost:8000/api/v1/company-onboarding/team/members');
+    const firstKey = first.request.headers.get('Idempotency-Key');
+    first.flush({ detail: 'Gateway timeout' }, { status: 504, statusText: 'Gateway Timeout' });
+
+    component.inviteTeamMember();
+    const retry = http.expectOne('http://localhost:8000/api/v1/company-onboarding/team/members');
+    expect(retry.request.headers.get('Idempotency-Key')).toBe(firstKey);
+    retry.flush({
+      id: 'user-1', first_name: 'Ana', last_name: 'Sales', email: 'ana@example.com',
+      role: 'sales', is_active: true, auth_status: 'invited', invitation_delivery: 'sent',
+      request_replayed: true,
+    });
+    http.expectOne('http://localhost:8000/api/v1/company-onboarding/team').flush({
+      administrator: null, members: [], roles: [], projects: [],
+    });
+    http.expectOne('http://localhost:8000/api/v1/company-onboarding/chat/state').flush({
+      messages: [], profile: EMPTY_COMPANY_PROFILE, sources: [], stage: 'team', version: 1,
+      team: { administrator: null, members: [], roles: [] }, next_question: null,
+    });
+    expect(component.teamSuccess).toContain('already processed');
   });
 
   it('should render extracted list proposals without JSON syntax', () => {

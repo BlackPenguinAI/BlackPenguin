@@ -102,27 +102,77 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
 def _pending_invitation_from_state(state_token: str, db: Session) -> tuple[User, UserInvitation]:
     state = verify_invitation_state(state_token)
     if not state:
-        logger.warning("Firebase invitation state rejected reason=invalid_or_expired")
-        raise HTTPException(status_code=410, detail="This invitation is invalid or expired.")
+        logger.warning("Firebase invitation state rejected reason=invalid_state_signature")
+        raise HTTPException(status_code=410, detail={
+            "code": "INVALID_INVITATION_STATE",
+            "message": "This invitation link is invalid or expired.",
+        })
     invitation = db.query(UserInvitation).filter(
         UserInvitation.id == state["invitation_id"],
         UserInvitation.user_id == state["sub"],
-        UserInvitation.status.in_(["pending", "accepted_by_provider", "delivery_failed"]),
-        UserInvitation.expires_at > datetime.utcnow(),
     ).first()
     if not invitation:
         logger.warning(
-            "Firebase invitation state rejected user_id=%s invitation_id=%s reason=not_pending_or_expired",
+            "Firebase invitation state rejected user_id=%s invitation_id=%s reason=invitation_not_found",
             state["sub"], state["invitation_id"],
         )
-        raise HTTPException(status_code=410, detail="This invitation is expired or no longer active.")
+        raise HTTPException(status_code=410, detail={
+            "code": "INVITATION_NOT_FOUND",
+            "message": "This invitation is no longer available.",
+        })
+    if invitation.expires_at <= datetime.utcnow():
+        logger.warning(
+            "Firebase invitation state rejected user_id=%s invitation_id=%s reason=invitation_expired status=%s",
+            state["sub"], invitation.id, invitation.status,
+        )
+        raise HTTPException(status_code=410, detail={
+            "code": "INVITATION_EXPIRED",
+            "message": "This invitation has expired. Ask your Company administrator to resend it.",
+        })
+    if invitation.status in {"accepted", "revoked", "expired"}:
+        reason = {
+            "accepted": "invitation_already_accepted",
+            "revoked": "invitation_revoked",
+            "expired": "invitation_expired",
+        }[invitation.status]
+        logger.warning(
+            "Firebase invitation state rejected user_id=%s invitation_id=%s reason=%s status=%s",
+            state["sub"], invitation.id, reason, invitation.status,
+        )
+        if invitation.status == "accepted":
+            raise HTTPException(status_code=410, detail={
+                "code": "ACCOUNT_ALREADY_ACTIVATED",
+                "message": "This account has already been activated. Sign in with your password.",
+            })
+        raise HTTPException(status_code=410, detail={
+            "code": "INVITATION_REVOKED" if invitation.status == "revoked" else "INVITATION_EXPIRED",
+            "message": "This invitation is no longer active. Ask your Company administrator to resend it.",
+        })
     user = db.query(User).filter(User.id == invitation.user_id).first()
     if not user:
+        logger.warning(
+            "Firebase invitation state rejected user_id=%s invitation_id=%s reason=user_not_found",
+            state["sub"], invitation.id,
+        )
         raise HTTPException(status_code=404, detail="Invitation account was not found.")
     if user.auth_status == UserAuthStatus.SUSPENDED or not user.is_active:
-        raise HTTPException(status_code=410, detail="This invitation is expired or no longer active.")
+        logger.warning(
+            "Firebase invitation state rejected user_id=%s invitation_id=%s reason=user_suspended auth_status=%s is_active=%s",
+            user.id, invitation.id, user.auth_status.value, user.is_active,
+        )
+        raise HTTPException(status_code=410, detail={
+            "code": "USER_SUSPENDED",
+            "message": "This invitation belongs to a suspended account.",
+        })
     if user.auth_status not in {UserAuthStatus.INVITED, UserAuthStatus.PROVISIONING_FAILED}:
-        raise HTTPException(status_code=409, detail="This account has already been activated.")
+        logger.warning(
+            "Firebase invitation state rejected user_id=%s invitation_id=%s reason=user_not_invitable auth_status=%s",
+            user.id, invitation.id, user.auth_status.value,
+        )
+        raise HTTPException(status_code=409, detail={
+            "code": "ACCOUNT_ALREADY_ACTIVATED",
+            "message": "This account has already been activated. Sign in with your password.",
+        })
     return user, invitation
 
 

@@ -171,6 +171,11 @@ export interface TeamMember {
   email: string;
   role: 'admin' | TeamRole;
   is_active: boolean;
+  auth_status?: 'invited' | 'active' | 'suspended' | 'provisioning_failed' | 'migration_required';
+  invitation_sent_at?: string | null;
+  invitation_status?: string | null;
+  invitation_delivery?: 'sent' | 'failed' | 'pending' | 'not_applicable';
+  request_replayed?: boolean;
 }
 
 export interface TeamMemberInvite {

@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
 import { API_V1_URL } from '../config/api.config';
@@ -22,6 +22,9 @@ export interface CompanyUser {
   project_assignment_required: boolean;
   auth_status: 'invited' | 'active' | 'suspended' | 'provisioning_failed' | 'migration_required';
   invitation_sent_at?: string;
+  invitation_status?: string;
+  invitation_delivery?: 'sent' | 'failed' | 'pending' | 'not_applicable';
+  request_replayed?: boolean;
   activated_at?: string;
 }
 
@@ -57,8 +60,9 @@ export class CompanyUsersService {
     return this.http.get<CompanyUserLimits>(`${API_V1_URL}/users/company/limits`);
   }
 
-  invite(payload: CompanyUserInvite): Observable<CompanyUser> {
-    return this.http.post<CompanyUser>(`${API_V1_URL}/users/company`, payload);
+  invite(payload: CompanyUserInvite, idempotencyKey: string): Observable<CompanyUser> {
+    const headers = new HttpHeaders({ 'Idempotency-Key': idempotencyKey });
+    return this.http.post<CompanyUser>(`${API_V1_URL}/users/company`, payload, { headers });
   }
 
   projects(): Observable<CompanyProjectOption[]> {

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, status, Query
 from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -19,8 +19,9 @@ from app.modules.projects.models import Project
 router = APIRouter()
 
 
-def _tenant_user_response(db: Session, user: User) -> dict:
+def _tenant_user_response(db: Session, user: User, *, request_replayed: bool = False) -> dict:
     project_ids = project_ids_for_user(db, user)
+    invitation = services.latest_user_invitation(db, user.id)
     return {
         "id": user.id, "email": user.email, "first_name": user.first_name,
         "last_name": user.last_name, "phone": user.phone, "country": user.country,
@@ -29,6 +30,9 @@ def _tenant_user_response(db: Session, user: User) -> dict:
         "project_ids": project_ids,
         "auth_status": user.auth_status.value if hasattr(user.auth_status, "value") else str(user.auth_status or "active").lower(),
         "invitation_sent_at": user.invitation_sent_at,
+        "invitation_status": invitation.status if invitation else None,
+        "invitation_delivery": services.invitation_delivery_status(invitation),
+        "request_replayed": request_replayed,
         "activated_at": user.activated_at,
         "project_assignment_required": bool(
             user.role in (UserRole.MKT, UserRole.SALES)
@@ -151,11 +155,23 @@ def invite_company_user(
     payload: TenantUserCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker(TENANT_MANAGER_ROLES)),
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
 ):
     try:
         role = UserRole(payload.role)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail="Role must be assistant, mkt or sales.") from exc
+    key = services.normalize_idempotency_key(idempotency_key)
+    if key:
+        replay = services.invitation_for_idempotency_key(
+            db, idempotency_key=key, company_id=current_user.company_id,
+            email=str(payload.email), first_name=payload.first_name,
+            last_name=payload.last_name, role=role, timezone=payload.timezone,
+            project_access_scope=payload.project_access_scope,
+            project_ids=payload.project_ids,
+        )
+        if replay:
+            return _tenant_user_response(db, replay.user, request_replayed=True)
     user = services.invite_tenant_user(
         db,
         company_id=current_user.company_id,
@@ -167,6 +183,7 @@ def invite_company_user(
         project_access_scope=payload.project_access_scope,
         project_ids=payload.project_ids,
         invited_by_user_id=current_user.id,
+        idempotency_key=key,
     )
     return _tenant_user_response(db, user)
 

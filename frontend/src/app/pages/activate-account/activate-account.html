@@ -12,7 +12,7 @@
       <h1>Invitation unavailable</h1>
       <p>{{ error }}</p>
       <div class="state-actions">
-        <button type="button" class="primary-link" (click)="retryValidation()">Try again</button>
+        <button *ngIf="errorCode !== 'ACCOUNT_ALREADY_ACTIVATED'" type="button" class="primary-link" (click)="retryValidation()">Try again</button>
         <a routerLink="/login" class="secondary-link">Return to sign in</a>
       </div>
     </div>
