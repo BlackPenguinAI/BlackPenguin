@@ -630,6 +630,7 @@ def team_member_payload(db: Session, user: User | None, *, request_replayed: boo
         "invitation_sent_at": user.invitation_sent_at,
         "invitation_status": invitation.status if invitation else None,
         "invitation_delivery": user_services.invitation_delivery_status(invitation),
+        "invitation_error_code": user_services.invitation_error_code(invitation),
         "request_replayed": request_replayed,
     }
 
@@ -642,7 +643,10 @@ def serialize_team(db: Session, company_id: str, profile: CompanyProfile | None 
     states = profile.field_states or {}
     roles = []
     for role, state_key in TEAM_ROLE_STATE_KEYS.items():
-        active_users = sum(user.role == role and user.is_active for user in users)
+        active_users = sum(
+            user.role == role and user.is_active and user.auth_status == UserAuthStatus.ACTIVE
+            for user in users
+        )
         pending_users = sum(
             user.role == role and user.auth_status == UserAuthStatus.INVITED
             for user in users

@@ -213,6 +213,10 @@
                 </span>
               </div>
               <span class="rounded-full bg-secondary/10 px-2 py-1 text-[9px] font-semibold uppercase text-secondary">{{ member.role === 'mkt' ? 'Marketing' : member.role }}</span>
+              <div *ngIf="member.auth_status === 'provisioning_failed'" class="flex shrink-0 gap-2">
+                <button type="button" (click)="resendTeamMember(member.id)" [disabled]="teamMemberBusyIds.has(member.id)" class="rounded-lg border border-secondary/30 px-2 py-1 text-[9px] font-semibold text-secondary disabled:opacity-40">Resend</button>
+                <button type="button" (click)="revokeTeamMember(member.id)" [disabled]="teamMemberBusyIds.has(member.id)" class="rounded-lg border border-red-500/30 px-2 py-1 text-[9px] font-semibold text-red-300 disabled:opacity-40">Remove</button>
+              </div>
             </div>
           </div>
           <form (ngSubmit)="inviteTeamMember()" class="mt-4 space-y-2">

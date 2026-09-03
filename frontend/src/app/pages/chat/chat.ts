@@ -81,6 +81,7 @@ export class ChatComponent implements OnInit, OnDestroy {
   teamSavingAction: 'add' | 'continue' | null = null;
   teamError = '';
   teamSuccess = '';
+  readonly teamMemberBusyIds = new Set<string>();
   teamInviteAttempted = false;
   publicEmails = '';
   publicPhones = '';
@@ -415,7 +416,8 @@ export class ChatComponent implements OnInit, OnDestroy {
     })).subscribe({
       next: member => {
         if (member.invitation_delivery === 'failed' || member.auth_status === 'provisioning_failed') {
-          this.teamError = `The user ${submittedEmail} was saved, but Firebase did not accept the invitation. Use Resend invitation from Users.`;
+          const code = member.invitation_error_code ? ` (${member.invitation_error_code})` : '';
+          this.teamError = `The user ${submittedEmail} was saved, but Firebase did not accept the invitation${code}. Use Resend invitation or revoke the failed user below.`;
           this.teamSuccess = '';
         } else {
           this.teamSuccess = member.request_replayed
@@ -527,6 +529,46 @@ export class ChatComponent implements OnInit, OnDestroy {
         this.teamError = typeof error.error?.detail === 'string'
           ? error.error.detail
           : 'The onboarding could not continue. Please try again.';
+      },
+    });
+  }
+
+  resendTeamMember(memberId: string): void {
+    if (this.teamMemberBusyIds.has(memberId)) return;
+    this.teamMemberBusyIds.add(memberId);
+    this.teamError = '';
+    this.onboarding.resendTeamMember(memberId).pipe(finalize(() => {
+      this.teamMemberBusyIds.delete(memberId);
+      this.cdr.detectChanges();
+    })).subscribe({
+      next: () => {
+        this.teamSuccess = 'Firebase accepted the new activation request.';
+        this.refreshTeam(true);
+      },
+      error: (error: HttpErrorResponse) => {
+        this.teamError = typeof error.error?.detail === 'string'
+          ? error.error.detail
+          : 'The activation request could not be resent.';
+      },
+    });
+  }
+
+  revokeTeamMember(memberId: string): void {
+    if (this.teamMemberBusyIds.has(memberId)) return;
+    this.teamMemberBusyIds.add(memberId);
+    this.teamError = '';
+    this.onboarding.revokeTeamMember(memberId).pipe(finalize(() => {
+      this.teamMemberBusyIds.delete(memberId);
+      this.cdr.detectChanges();
+    })).subscribe({
+      next: () => {
+        this.teamSuccess = 'The failed invitation was removed. The email can be invited again.';
+        this.refreshTeam(true);
+      },
+      error: (error: HttpErrorResponse) => {
+        this.teamError = typeof error.error?.detail === 'string'
+          ? error.error.detail
+          : 'The failed invitation could not be removed.';
       },
     });
   }

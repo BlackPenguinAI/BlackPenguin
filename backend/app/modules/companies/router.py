@@ -170,9 +170,11 @@ def delete_company(
     if not company:
         raise HTTPException(status_code=404, detail="Company not found.")
     
-    db.delete(company)
-    db.commit()
-    return {"detail": "Company deleted successfully"}
+    deleted_users = services.delete_company_workspace(db, company)
+    return {
+        "detail": "Company and associated Firebase users deleted successfully.",
+        "deleted_users": deleted_users,
+    }
 
 # ==========================================
 # 5. REENVIAR ACTIVACIÓN

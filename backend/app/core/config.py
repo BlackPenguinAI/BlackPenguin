@@ -45,6 +45,11 @@ class Settings(BaseSettings):
     FIREBASE_PROJECT_ID: str = ""
     FIREBASE_API_KEY: str = ""
     FIREBASE_AUTH_DOMAIN: str = ""
+    # Privileged deletion is delegated to a Cloud Run bridge with an attached
+    # IAM service account. No service-account private key is stored here.
+    FIREBASE_ADMIN_BRIDGE_URL: str = ""
+    FIREBASE_ADMIN_BRIDGE_SECRET: str = ""
+    FIREBASE_ADMIN_BRIDGE_TIMEOUT_SECONDS: float = 15.0
 
     SMTP_SERVER: str = "smtp.gmail.com"
     SMTP_PORT: int = 587

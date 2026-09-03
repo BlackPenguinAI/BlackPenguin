@@ -51,6 +51,14 @@ def invitation_delivery_status(invitation: UserInvitation | None) -> str:
     return "pending"
 
 
+def invitation_error_code(invitation: UserInvitation | None) -> str | None:
+    """Return only a stable provider code, never a raw provider response."""
+    if not invitation or not invitation.last_error:
+        return None
+    candidate = invitation.last_error.strip().split(" : ", 1)[0]
+    return candidate if candidate.replace("_", "").isalnum() else "FIREBASE_REQUEST_FAILED"
+
+
 def enforce_role_limit(db: Session, company: Company, role: UserRole, *, exclude_user_id: str | None = None) -> None:
     if not company.plan:
         raise HTTPException(status_code=409, detail="The Company does not have an assigned plan.")

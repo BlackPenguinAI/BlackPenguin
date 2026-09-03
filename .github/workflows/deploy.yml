@@ -33,11 +33,13 @@ jobs:
           MAILCHIMP_KEY: ${{ secrets.MAILCHIMP_API_KEY }}
           MAILCHIMP_LIST: ${{ secrets.MAILCHIMP_LIST_ID }}
           MAILCHIMP_SERVER: ${{ secrets.MAILCHIMP_SERVER }}
+          FIREBASE_ADMIN_BRIDGE_URL: ${{ secrets.FIREBASE_ADMIN_BRIDGE_URL }}
+          FIREBASE_ADMIN_BRIDGE_SECRET: ${{ secrets.FIREBASE_ADMIN_BRIDGE_SECRET }}
         with:
           host: ${{ secrets.DO_HOST }}
           username: ${{ secrets.DO_USER }}
           key: ${{ secrets.DO_SSH_KEY }}
-          envs: DEPLOY_SHA,DB_URL,META_TOKEN,META_BUSINESS_MANAGER_ID,OPENROUTER_KEY,JWT_SECRET,SA_EMAIL,SA_PASS,MAILCHIMP_KEY,MAILCHIMP_LIST,MAILCHIMP_SERVER
+          envs: DEPLOY_SHA,DB_URL,META_TOKEN,META_BUSINESS_MANAGER_ID,OPENROUTER_KEY,JWT_SECRET,SA_EMAIL,SA_PASS,MAILCHIMP_KEY,MAILCHIMP_LIST,MAILCHIMP_SERVER,FIREBASE_ADMIN_BRIDGE_URL,FIREBASE_ADMIN_BRIDGE_SECRET
           command_timeout: 30m
           script: |
             set -Eeuo pipefail
@@ -265,6 +267,8 @@ jobs:
               echo "MAILCHIMP_API_KEY=$MAILCHIMP_KEY"
               echo "MAILCHIMP_LIST_ID=$MAILCHIMP_LIST"
               echo "MAILCHIMP_SERVER=$MAILCHIMP_SERVER"
+              echo "FIREBASE_ADMIN_BRIDGE_URL=${FIREBASE_ADMIN_BRIDGE_URL:-}"
+              echo "FIREBASE_ADMIN_BRIDGE_SECRET=${FIREBASE_ADMIN_BRIDGE_SECRET:-}"
               echo "PROJECT_UPLOAD_ROOT=$UPLOAD_DIR"
               echo "SEED_MINTO_DEMO=true"
               echo "MINTO_DEMO_EMAIL=test@minto.com"

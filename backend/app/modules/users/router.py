@@ -6,7 +6,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from app.db.postgres import get_db
 from app.modules.auth.deps import get_current_user, RoleChecker
 from app.core.security import verify_password, get_password_hash, verify_email_token
-from .models import TENANT_MANAGER_ROLES, User, UserAuthStatus, UserInvitation, UserRole
+from .models import TENANT_MANAGER_ROLES, User, UserAuthStatus, UserRole
 from .project_access import project_ids_for_user, sync_user_project_access
 from . import services
 from .schemas import (
@@ -32,6 +32,7 @@ def _tenant_user_response(db: Session, user: User, *, request_replayed: bool = F
         "invitation_sent_at": user.invitation_sent_at,
         "invitation_status": invitation.status if invitation else None,
         "invitation_delivery": services.invitation_delivery_status(invitation),
+        "invitation_error_code": services.invitation_error_code(invitation),
         "request_replayed": request_replayed,
         "activated_at": user.activated_at,
         "project_assignment_required": bool(
@@ -308,13 +309,9 @@ def revoke_company_user_invitation(
         raise HTTPException(status_code=404, detail="User not found.")
     if user.role == UserRole.ADMIN or user.auth_status == UserAuthStatus.ACTIVE:
         raise HTTPException(status_code=409, detail="Only pending team invitations can be revoked.")
-    invitation = db.query(UserInvitation).filter(
-        UserInvitation.user_id == user.id,
-        UserInvitation.status.in_(["pending", "accepted_by_provider", "delivery_failed"]),
-    ).order_by(UserInvitation.created_at.desc()).first()
-    if invitation:
-        from datetime import datetime
-        invitation.status = "revoked"; invitation.revoked_at = datetime.utcnow()
-    services.set_user_enabled(db, user=user, enabled=False)
+    # Pending Firebase email links are bound to the invitation/user identifiers
+    # in their signed state. Removing both records makes every old link invalid
+    # and releases the email for a clean invitation.
+    db.delete(user)
     db.commit()
-    return {"detail": "Invitation revoked."}
+    return {"detail": "Invitation revoked and pending user removed."}

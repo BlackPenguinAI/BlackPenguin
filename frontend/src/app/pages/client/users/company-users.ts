@@ -161,7 +161,8 @@ export class CompanyUsersComponent implements OnInit {
   private invitationResultMessage(user: CompanyUser): string {
     if (user.request_replayed) return `The invitation for ${user.email} was already processed.`;
     if (user.invitation_delivery === 'failed' || user.auth_status === 'provisioning_failed') {
-      return `User saved, but Firebase did not accept the invitation for ${user.email}.`;
+      const code = user.invitation_error_code ? ` (${user.invitation_error_code})` : '';
+      return `User saved, but Firebase did not accept the invitation for ${user.email}${code}.`;
     }
     return `Invitation sent to ${user.email}. The user is pending activation.`;
   }

@@ -465,26 +465,21 @@ def _state_payload(db: Session, company_id: str) -> dict[str, Any]:
     next_question = _stage_next_question(stage, profile)
     if next_question:
         active_question = services.get_active_question(db, session.id)
-        latest_ai = next((item for item in reversed(messages) if item.sender == SenderType.AI), None)
-        if active_question:
-            changed = services.supersede_unanswered_questions(
+        if active_question and active_question.ui_payload == next_question:
+            if services.supersede_unanswered_questions(
                 db, session.id, keep_message_id=active_question.id,
-            )
-            if active_question.ui_payload != next_question:
-                active_question.ui_payload = next_question
-                db.add(active_question)
-                changed = True
-            if changed:
+            ):
                 db.commit(); db.refresh(active_question)
-        elif latest_ai and not latest_ai.ui_payload and not latest_ai.response_payload:
+        else:
+            # Never attach a new question's controls to an older transition
+            # message. Content and ui_payload form one immutable prompt.
             services.supersede_unanswered_questions(db, session.id)
-            latest_ai.ui_payload = next_question
-            db.add(latest_ai); db.commit(); db.refresh(latest_ai)
-        elif not active_question:
-            latest_ai = services.save_message(
+            question_message = services.save_message(
                 db, session.id, SenderType.AI, next_question["prompt"], ui_payload=next_question,
+                commit=False,
             )
-            messages.append(latest_ai)
+            db.commit(); db.refresh(question_message)
+            messages.append(question_message)
     else:
         if services.supersede_unanswered_questions(db, session.id):
             db.commit()

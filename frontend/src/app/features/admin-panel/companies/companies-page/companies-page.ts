@@ -313,6 +313,7 @@ export class CompaniesPageComponent implements OnInit {
       error: (err) => {
         this.isDeleting = false;
         this.closeDeleteModal();
+        this.loadData();
         this.toast.showError(err.error?.detail || 'Error deleting company.');
       }
     });

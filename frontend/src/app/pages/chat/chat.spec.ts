@@ -25,6 +25,9 @@ describe('ChatComponent', () => {
   });
 
   afterEach(() => {
+    for (const request of http.match((candidate) => candidate.url.endsWith('/company-onboarding/media'))) {
+      request.flush([]);
+    }
     http.verify();
     localStorage.clear();
   });
@@ -255,6 +258,39 @@ describe('ChatComponent', () => {
       team: { administrator: null, members: [], roles: [] }, next_question: null,
     });
     expect(component.teamSuccess).toContain('already processed');
+  });
+
+  it('shows the safe Firebase code and supports removing a failed invitation', () => {
+    component.currentStage = 'team';
+    component.teamInvite = {
+      first_name: 'Ana', last_name: 'Sales', email: 'ana@example.com', role: 'sales',
+    };
+
+    component.inviteTeamMember();
+    http.expectOne('http://localhost:8000/api/v1/company-onboarding/team/members').flush({
+      id: 'user-1', first_name: 'Ana', last_name: 'Sales', email: 'ana@example.com',
+      role: 'sales', is_active: true, auth_status: 'provisioning_failed',
+      invitation_delivery: 'failed', invitation_error_code: 'TOO_MANY_ATTEMPTS_TRY_LATER',
+    });
+    http.expectOne('http://localhost:8000/api/v1/company-onboarding/team').flush({
+      administrator: null, members: [], roles: [], projects: [],
+    });
+    http.expectOne('http://localhost:8000/api/v1/company-onboarding/chat/state').flush({
+      messages: [], profile: EMPTY_COMPANY_PROFILE, sources: [], stage: 'team', version: 1,
+      team: { administrator: null, members: [], roles: [] }, next_question: null,
+    });
+    expect(component.teamError).toContain('TOO_MANY_ATTEMPTS_TRY_LATER');
+
+    component.revokeTeamMember('user-1');
+    http.expectOne('http://localhost:8000/api/v1/users/company/user-1/invitation').flush({ detail: 'removed' });
+    http.expectOne('http://localhost:8000/api/v1/company-onboarding/team').flush({
+      administrator: null, members: [], roles: [], projects: [],
+    });
+    http.expectOne('http://localhost:8000/api/v1/company-onboarding/chat/state').flush({
+      messages: [], profile: EMPTY_COMPANY_PROFILE, sources: [], stage: 'team', version: 2,
+      team: { administrator: null, members: [], roles: [] }, next_question: null,
+    });
+    expect(component.teamSuccess).toContain('email can be invited again');
   });
 
   it('should render extracted list proposals without JSON syntax', () => {

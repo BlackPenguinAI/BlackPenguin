@@ -2,6 +2,8 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Injectable, isDevMode } from '@angular/core';
 import { Observable } from 'rxjs';
 
+import { API_V1_URL } from '../../core/config/api.config';
+
 import {
   ChatMessage,
   ChatTurnResponse,
@@ -100,6 +102,14 @@ export class CompanyOnboardingService {
 
   continueTeamSetup(): Observable<OnboardingState> {
     return this.http.post<OnboardingState>(`${this.baseUrl}/team/continue`, {});
+  }
+
+  resendTeamMember(userId: string): Observable<{ detail: string }> {
+    return this.http.post<{ detail: string }>(`${API_V1_URL}/users/company/${userId}/resend-activation`, {});
+  }
+
+  revokeTeamMember(userId: string): Observable<{ detail: string }> {
+    return this.http.delete<{ detail: string }>(`${API_V1_URL}/users/company/${userId}/invitation`);
   }
 
   sendMessage(message: string, inReplyToMessageId?: string | null): Observable<ChatTurnResponse> {

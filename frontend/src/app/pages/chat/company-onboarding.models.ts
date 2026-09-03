@@ -175,6 +175,7 @@ export interface TeamMember {
   invitation_sent_at?: string | null;
   invitation_status?: string | null;
   invitation_delivery?: 'sent' | 'failed' | 'pending' | 'not_applicable';
+  invitation_error_code?: string | null;
   request_replayed?: boolean;
 }
 
