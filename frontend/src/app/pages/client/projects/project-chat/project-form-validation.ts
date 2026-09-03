@@ -85,12 +85,14 @@ export function validateSalesInvite(value: { first_name: string; last_name: stri
 
 export function validateMetaSetup(value: {
   page_id: string; ad_account_id: string; lead_form_id: string;
+  campaign_name?: string;
   page_access_confirmed: boolean; ad_account_access_confirmed: boolean; leads_access_confirmed: boolean;
 }): FormErrors {
   const errors: FormErrors = {};
   if (value.page_id.trim().length < 5) errors['page_id'] = 'Enter the Page ID.';
   if (value.ad_account_id.trim().length < 5) errors['ad_account_id'] = 'Enter the Ad Account ID.';
   if (value.lead_form_id.trim().length < 5) errors['lead_form_id'] = 'Enter the Lead Form ID.';
+  if (value.campaign_name !== undefined && !value.campaign_name.trim()) errors['campaign_name'] = 'Enter a campaign label.';
   if (!value.page_access_confirmed) errors['page_access_confirmed'] = 'Confirm access to the Page.';
   if (!value.ad_account_access_confirmed) errors['ad_account_access_confirmed'] = 'Confirm access to the Advertising Account.';
   if (!value.leads_access_confirmed) errors['leads_access_confirmed'] = 'Confirm Leads Access.';

@@ -288,6 +288,23 @@ describe('ChatComponent', () => {
     expect(component.team.roles.every(role => role.status === 'deferred')).toBe(true);
   });
 
+  it('keeps invited Team members visible after onboarding advances', () => {
+    fixture.detectChanges();
+    http.expectOne('http://localhost:8000/api/v1/company-onboarding/chat/state').flush({
+      messages: [], profile: EMPTY_COMPANY_PROFILE, sources: [], stage: 'conditional', version: 1,
+      team: {
+        administrator: null,
+        members: [{ id: 'user-1', first_name: 'Ana', last_name: 'Sales', email: 'ana@example.com', role: 'sales', is_active: false, auth_status: 'invited' }],
+        roles: [{ role: 'sales', label: 'Sales users', status: 'confirmed', active_users: 0, pending_users: 1, failed_users: 0 }],
+      },
+      next_question: { field: 'dba', label: 'DBA', prompt: 'DBA?', input_type: 'text', options: [], examples: [], allow_custom: true, minimum_words: null },
+    });
+    fixture.detectChanges();
+    const summary = (fixture.nativeElement as HTMLElement).querySelector('[data-testid="saved-team-summary"]');
+    expect(summary?.textContent).toContain('Ana Sales');
+    expect(summary?.textContent).toContain('Pending activation');
+  });
+
   it('should not expose the removed session initializer', () => {
     expect((component as unknown as { initSession?: unknown }).initSession).toBeUndefined();
   });

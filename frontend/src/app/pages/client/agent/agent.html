@@ -13,16 +13,16 @@
         <option *ngFor="let project of options" [value]="project.id">
           {{ project.name }}
         </option></select
-      ><button class="primary" (click)="setupOpen = true">New simulation</button>
+      ><button (click)="openSetup('simulation')">New simulation</button
+      ><button class="primary" (click)="openSetup('live_meta')">Test real SMS</button>
     </div>
   </header>
-  <div class="demo-banner" *ngIf="role !== 'sales' && (!selected || !isLive)">
+  <div class="demo-banner" [class.live-warning]="setupOpen && setupMode === 'live_meta'" *ngIf="role !== 'sales' && (setupOpen || !selected || !isLive)">
     <span class="material-symbols-outlined">science</span>
     <div>
-      <strong>Safe simulation</strong
+      <strong>{{ setupOpen && setupMode === 'live_meta' ? 'Live delivery test' : 'Safe simulation' }}</strong
       ><small
-        >No SMS or calendar event is sent. The same prompt, Project context, follow-up and routing
-        contracts are exercised.</small
+        >{{ setupOpen && setupMode === 'live_meta' ? 'One submission creates a test-marked lead and sends a real SMS through Twilio. Carrier charges apply.' : 'No SMS or calendar event is sent. The same prompt, Project context, follow-up and routing contracts are exercised.' }}</small
       >
     </div>
   </div>
@@ -34,9 +34,9 @@
   <section class="setup-card" *ngIf="setupOpen && role !== 'sales'">
     <div class="setup-head">
       <div>
-        <p>SIMULATED META LEAD FORM</p>
-        <h2>Create a test lead</h2>
-        <span>The form submission starts the agent's first SMS automatically.</span>
+        <p>{{ setupMode === 'live_meta' ? 'MANUAL META LEAD ADS CONTROL' : 'SIMULATED META LEAD FORM' }}</p>
+        <h2>{{ setupMode === 'live_meta' ? 'Submit a lead and start a real SMS' : 'Create a test lead' }}</h2>
+        <span>{{ setupMode === 'live_meta' ? 'This reproduces one Meta form submission from the control panel; creating the lead and starting SMS remain one action.' : "The form submission starts the agent's first simulated SMS automatically." }}</span>
       </div>
       <button (click)="setupOpen = false" *ngIf="selected">×</button>
     </div>
@@ -52,11 +52,11 @@
       <label
         >Campaign *<select [(ngModel)]="campaignId">
           <option value="" disabled>Select a campaign</option>
-          <option *ngFor="let campaign of campaigns" [value]="campaign.id">
+          <option *ngFor="let campaign of availableCampaigns" [value]="campaign.id">
             {{ campaign.name }} · {{ campaign.status }}
           </option></select
-        ><small *ngIf="!campaigns.length" class="field-error"
-          >This Project needs a campaign before it can be tested.</small
+        ><small *ngIf="!availableCampaigns.length" class="field-error"
+          >{{ setupMode === 'live_meta' ? 'Map at least one campaign to a Meta Lead Form in Project onboarding.' : 'This Project needs a campaign before it can be tested.' }}</small
         ></label
       >
       <label
@@ -173,14 +173,15 @@
     <label class="consent" [class.invalid-consent]="!form.consent"
       ><input type="checkbox" [(ngModel)]="form.consent" /><span
         ><b>SMS communication consent *</b
-        ><small>I agree to receive follow-up messages for this simulation.</small></span
+        ><small>{{ setupMode === 'live_meta' ? 'I confirm that this phone owner consented to receive real test and follow-up SMS messages.' : 'I agree to receive follow-up messages for this simulation.' }}</small></span
       ></label
     >
     <div class="setup-footer">
       <span *ngIf="!formComplete"
         >Complete all required contact, product, budget and consent fields to start.</span
-      ><button class="primary" (click)="startSimulation()" [disabled]="!formComplete || creating">
-        {{ creating ? 'Creating lead…' : 'Submit form and start SMS' }}
+      ><span class="agent-progress" *ngIf="creating && liveProgress">{{ liveProgress }}</span
+      ><button class="primary" (click)="submitLead()" [disabled]="!formComplete || creating">
+        {{ creating ? (setupMode === 'live_meta' ? 'Starting live test…' : 'Creating lead…') : (setupMode === 'live_meta' ? 'Submit once and send real SMS' : 'Submit form and start simulation') }}
       </button>
     </div>
   </section>
@@ -207,7 +208,7 @@
       >
         <i>{{ initials(row.lead_name) }}</i
         ><span
-          ><strong>{{ row.lead_name }}</strong
+          ><strong>{{ row.lead_name }} <em *ngIf="row.is_test" class="test-badge">LIVE TEST</em></strong
           ><small>{{ row.last_message || 'No messages yet' }}</small></span
         ><time>{{ row.last_message_at | date: 'shortTime' }}</time>
       </button>
@@ -221,7 +222,7 @@
         <div>
           <i>{{ initials(selected.lead_name) }}</i
           ><span
-            ><strong>{{ selected.lead_name }}</strong
+            ><strong>{{ selected.lead_name }} <em *ngIf="selected.is_test" class="test-badge">LIVE TEST</em></strong
             ><small>{{ selected.phone }} · {{ selected.campaign_name || 'Campaign' }}</small></span
           >
         </div>

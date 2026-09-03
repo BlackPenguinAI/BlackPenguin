@@ -39,6 +39,41 @@ describe('AgentComponent simulation form', () => {
     expect(value.campaigns.map((item) => item.id)).toEqual(['c2']);
   });
 
+  it('offers only Meta-mapped campaigns for a real SMS test', () => {
+    const value = component();
+    value.options = [{ id: 'p1', campaigns: [
+      { id: 'draft', live_test_ready: false },
+      { id: 'mapped', live_test_ready: true, lead_form_id: '12345' },
+    ], products: [] }];
+    value.projectId = 'p1';
+    value.openSetup('live_meta');
+    expect(value.availableCampaigns.map((item) => item.id)).toEqual(['mapped']);
+    expect(value.campaignId).toBe('mapped');
+  });
+
+  it('submits one idempotent request that creates the lead and starts real SMS', () => {
+    const calls: Array<{ url: string; options: any }> = [];
+    const http = {
+      post: (url: string, _body: any, options: any) => {
+        calls.push({ url, options });
+        return of({ conversation_id: 'live-conversation', replayed: false });
+      },
+      get: () => of([]),
+    };
+    const value = component(http);
+    value.options = [{ id: 'project', campaigns: [{ id: 'campaign', live_test_ready: true }], products: [{ id: 'property_type:home' }] }];
+    value.projectId = 'project'; value.openSetup('live_meta');
+    value.form = {
+      first_name: 'Taylor', last_name: 'Morgan', phone: '+13055550142', email: 'taylor@example.com',
+      product_id: 'property_type:home', budget_min: 600000, budget_max: 750000, consent: true,
+    };
+    value.startLiveMetaTest();
+    expect(calls).toHaveLength(1);
+    expect(calls[0].url.endsWith('/sales-agent/meta-test-leads')).toBe(true);
+    expect(calls[0].options.headers['Idempotency-Key'].length).toBeGreaterThanOrEqual(16);
+    expect(value.creating).toBe(false);
+  });
+
   it('shows only products from the selected Project and validates the budget range', () => {
     const value = component();
     value.options = [

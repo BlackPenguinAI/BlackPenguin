@@ -126,6 +126,12 @@ class ProjectOnboardingActionRequest(BaseModel):
     page_id: str | None = Field(default=None, min_length=5, max_length=32)
     ad_account_id: str | None = Field(default=None, min_length=5, max_length=36)
     lead_form_id: str | None = Field(default=None, min_length=5, max_length=32)
+    meta_connection_id: str | None = None
+    campaign_name: str | None = Field(default=None, min_length=1, max_length=180)
+    external_campaign_id: str | None = Field(default=None, min_length=5, max_length=32)
+    external_adset_id: str | None = Field(default=None, min_length=5, max_length=32)
+    external_ad_id: str | None = Field(default=None, min_length=5, max_length=32)
+    instagram_account_id: str | None = Field(default=None, min_length=5, max_length=32)
     page_access_confirmed: bool = False
     ad_account_access_confirmed: bool = False
     leads_access_confirmed: bool = False
@@ -401,6 +407,8 @@ class CampaignCreate(BaseModel):
     objective: str | None = None
     status: Literal["draft", "active", "paused", "archived"] = "draft"
     external_campaign_id: str | None = None
+    external_adset_id: str | None = None
+    external_ad_id: str | None = None
     lead_form_id: str | None = None
     audience_notes: str | None = None
     meta_connection_id: str | None = None
@@ -420,6 +428,7 @@ class MetaConnectionCreate(BaseModel):
     business_account_id: str | None = None
     ad_account_id: str | None = None
     page_id: str | None = None
+    instagram_account_id: str | None = None
     scopes: list[str] = Field(default_factory=list)
     expires_at: datetime | None = None
 
@@ -430,6 +439,7 @@ class MetaConnectionResponse(BaseModel):
     business_account_id: str | None = None
     ad_account_id: str | None = None
     page_id: str | None = None
+    instagram_account_id: str | None = None
     token_hint: str | None = None
     scopes: list[str] = Field(default_factory=list)
     expires_at: datetime | None = None
@@ -442,9 +452,15 @@ class MetaConnectionResponse(BaseModel):
 
 
 class MetaProjectSetupRequest(BaseModel):
+    meta_connection_id: str | None = None
     page_id: str = Field(min_length=5, max_length=32)
     ad_account_id: str = Field(min_length=5, max_length=36)
     lead_form_id: str = Field(min_length=5, max_length=32)
+    campaign_name: str = Field(default="Meta Lead Ads", min_length=1, max_length=180)
+    external_campaign_id: str | None = Field(default=None, min_length=5, max_length=32)
+    external_adset_id: str | None = Field(default=None, min_length=5, max_length=32)
+    external_ad_id: str | None = Field(default=None, min_length=5, max_length=32)
+    instagram_account_id: str | None = Field(default=None, min_length=5, max_length=32)
     page_access_confirmed: bool
     ad_account_access_confirmed: bool
     leads_access_confirmed: bool

@@ -18,7 +18,10 @@ from app.modules.sales_crm.calendar_links import calendar_invite_url, google_cal
 from app.modules.system_settings.services import get_twilio_config
 
 from .graph import GRAPH_VERSION, TOOLSET_VERSION, build_sales_graph
-from .models import AgentRun, OutboundMessage, SalesConversation, SalesFollowUpJob, SalesMessage
+from .models import (
+    AgentRun, OutboundMessage, SalesConversation, SalesConversationLeadContext,
+    SalesFollowUpJob, SalesMessage,
+)
 from .service import (
     _action_types, _appointment_confirmation, _availability_reply,
     _is_availability_request, _offered_slot_selection, _project_zone,
@@ -77,9 +80,37 @@ def get_or_create_live_conversation(db: Session, lead: Lead) -> tuple[SalesConve
         SalesConversation.provider_thread_key == thread_key,
     ).first()
     if existing:
-        if existing.lead_id != lead.id and not existing.is_paused:
-            raise HTTPException(status_code=409, detail="This phone already has an active SMS conversation on the shared sender.")
+        if existing.company_id != lead.company_id:
+            raise HTTPException(
+                status_code=409,
+                detail="This phone is already assigned to another Company on the shared SMS sender. The conversation was not reassigned.",
+            )
+        current_context = db.query(SalesConversationLeadContext).filter(
+            SalesConversationLeadContext.conversation_id == existing.id,
+            SalesConversationLeadContext.lead_id == existing.lead_id,
+        ).first()
+        if not current_context:
+            db.add(SalesConversationLeadContext(
+                conversation_id=existing.id, lead_id=existing.lead_id, is_active=True,
+            ))
         if existing.lead_id != lead.id:
+            db.query(SalesFollowUpJob).filter(
+                SalesFollowUpJob.conversation_id == existing.id,
+                SalesFollowUpJob.status == "pending",
+            ).update({SalesFollowUpJob.status: "cancelled"}, synchronize_session=False)
+            db.query(SalesConversationLeadContext).filter(
+                SalesConversationLeadContext.conversation_id == existing.id,
+                SalesConversationLeadContext.is_active.is_(True),
+            ).update({SalesConversationLeadContext.is_active: False}, synchronize_session=False)
+            context = db.query(SalesConversationLeadContext).filter(
+                SalesConversationLeadContext.conversation_id == existing.id,
+                SalesConversationLeadContext.lead_id == lead.id,
+            ).first()
+            if not context:
+                context = SalesConversationLeadContext(conversation_id=existing.id, lead_id=lead.id)
+            context.is_active = True
+            context.activated_at = datetime.utcnow()
+            db.add(context)
             existing.lead_id = lead.id
             existing.project_id = lead.project_id
             existing.campaign_id = lead.campaign_id
@@ -96,6 +127,8 @@ def get_or_create_live_conversation(db: Session, lead: Lead) -> tuple[SalesConve
         automation_level=2, is_paused=False,
     )
     db.add(conversation); db.flush()
+    db.add(SalesConversationLeadContext(conversation_id=conversation.id, lead_id=lead.id, is_active=True))
+    db.flush()
     return conversation, True
 
 
@@ -120,14 +153,39 @@ async def _dispatch(
     metadata: dict | None = None,
     idempotency_key: str | None = None,
 ) -> SalesMessage:
-    outbound = OutboundMessage(
+    if idempotency_key:
+        existing_outbound = db.query(OutboundMessage).filter(
+            OutboundMessage.idempotency_key == idempotency_key,
+        ).first()
+        if existing_outbound:
+            existing_message = db.query(SalesMessage).filter(
+                SalesMessage.conversation_id == conversation.id,
+                SalesMessage.direction == "outbound",
+                SalesMessage.content == existing_outbound.content,
+            ).order_by(SalesMessage.created_at.desc()).first()
+            if existing_outbound.status != "failed" and existing_message:
+                return existing_message
+            if existing_outbound.status == "failed" and existing_message:
+                outbound = existing_outbound
+                message = existing_message
+                outbound.status = "queued"; outbound.last_error = None
+                message.status = "queued"
+            else:
+                raise HTTPException(status_code=409, detail="The initial SMS request is already being processed.")
+        else:
+            outbound = None
+            message = None
+    else:
+        outbound = None
+        message = None
+    outbound = outbound or OutboundMessage(
         conversation_id=conversation.id, agent_run_id=agent_run_id,
         idempotency_key=idempotency_key or f"twilio:{conversation.id}:{uuid.uuid4()}", channel="sms",
         recipient=lead.phone, content=content, status="queued",
         approved_by_user_id=author_user_id,
         approved_at=datetime.utcnow() if author_user_id else None,
     )
-    message = SalesMessage(
+    message = message or SalesMessage(
         conversation_id=conversation.id, channel="sms", direction="outbound", role=role,
         author_user_id=author_user_id, content=content, status="queued",
         metadata_json=metadata or {}, created_at=datetime.utcnow(),
@@ -176,31 +234,54 @@ async def start_live_lead(lead_id: str) -> None:
         lead = db.query(Lead).filter(Lead.id == lead_id, Lead.is_demo.is_(False)).first()
         if not lead or not lead.project_id or lead.is_opt_out:
             return
-        config = get_twilio_config(db)
-        if not config.live_sms_enabled or config.verification_status != "verified":
-            lead.agent_status = "waiting_for_twilio"
-            db.commit(); return
-        project = db.query(Project).filter(Project.id == lead.project_id, Project.company_id == lead.company_id).one()
-        campaign = db.query(ProjectCampaign).filter(ProjectCampaign.id == lead.campaign_id).first() if lead.campaign_id else None
-        ensure_contact(db, lead)
         try:
-            conversation, is_new_lead_thread = get_or_create_live_conversation(db, lead)
+            await launch_live_lead(db, lead)
         except HTTPException as exc:
-            if exc.status_code != 409:
-                raise
-            lead.agent_status = "duplicate_active_contact"
-            db.commit()
-            return
-        if not is_new_lead_thread and db.query(SalesMessage).filter(SalesMessage.conversation_id == conversation.id).count():
-            return
-        content = _initial_message(lead, project, campaign)
-        await _dispatch(db, conversation=conversation, lead=lead, content=content, role="assistant", agent_run_id=None, metadata={"event_kind": "meta_lead_first_contact"})
-        lead.agent_status = "active"; lead.funnel_stage = FunnelStage.CONTACTED
-        lead.pipeline_stage = "S01_RESEARCH"; lead.last_interaction_at = datetime.utcnow()
-        _schedule_next_action(db, conversation, lead, f"initial:{lead.id}")
-        db.commit()
+            if exc.status_code == 409:
+                lead.agent_status = "routing_blocked"
+                db.commit()
+                return
+            raise
     finally:
         db.close()
+
+
+async def launch_live_lead(db: Session, lead: Lead) -> tuple[SalesConversation | None, SalesMessage | None]:
+    """Start or safely re-contextualize the one physical SMS thread for this sender/recipient."""
+    config = get_twilio_config(db)
+    if not config.live_sms_enabled or config.verification_status != "verified":
+        lead.agent_status = "waiting_for_twilio"
+        db.commit()
+        return None, None
+    project = db.query(Project).filter(Project.id == lead.project_id, Project.company_id == lead.company_id).one()
+    campaign = db.query(ProjectCampaign).filter(ProjectCampaign.id == lead.campaign_id).first() if lead.campaign_id else None
+    ensure_contact(db, lead)
+    conversation, should_send = get_or_create_live_conversation(db, lead)
+    prior_message_count = db.query(SalesMessage).filter(
+        SalesMessage.conversation_id == conversation.id,
+        SalesMessage.status != "failed",
+    ).count()
+    if not should_send and prior_message_count:
+        return conversation, None
+    content = _initial_message(lead, project, campaign)
+    event_kind = "meta_lead_first_contact"
+    if prior_message_count:
+        first_name = (lead.full_name or "there").split()[0]
+        content = (
+            f"Hi {first_name}, I also received your interest in {campaign.name if campaign else project.name}. "
+            f"I'll continue here so your conversation stays in one place. What would you like to know about {project.name}?"
+        )
+        event_kind = "meta_lead_project_context_changed"
+    message = await _dispatch(
+        db, conversation=conversation, lead=lead, content=content, role="assistant", agent_run_id=None,
+        metadata={"event_kind": event_kind, "lead_id": lead.id, "project_id": project.id},
+        idempotency_key=f"live-initial:{lead.id}",
+    )
+    lead.agent_status = "active"; lead.funnel_stage = FunnelStage.CONTACTED
+    lead.pipeline_stage = "S01_RESEARCH"; lead.last_interaction_at = datetime.utcnow()
+    _schedule_next_action(db, conversation, lead, f"initial:{lead.id}")
+    db.commit()
+    return conversation, message
 
 
 async def process_live_inbound(conversation_id: str, inbound_message_id: str) -> None:

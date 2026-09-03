@@ -58,6 +58,7 @@ class Lead(Base):
     visit_recommendations = Column(Text, nullable=True)
     agent_status = Column(String(30), default="paused", nullable=False)
     is_demo = Column(Boolean, default=False, nullable=False)
+    is_test = Column(Boolean, default=False, nullable=False, index=True)
     funnel_stage = Column(SqlaEnum(FunnelStage), default=FunnelStage.NEW, nullable=False)
     last_interaction_at = Column(DateTime, nullable=True)
     stage_changed_at = Column(DateTime, default=datetime.utcnow, nullable=False)

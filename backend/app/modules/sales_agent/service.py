@@ -281,7 +281,7 @@ def conversation_summaries(
             "last_message": last.content if last else None,
             "last_message_at": last.created_at if last else None,
             "next_action_at": lead.next_action_at, "agent_status": lead.agent_status,
-            "project_name": project.name, "is_demo": bool(project.is_demo),
+            "project_name": project.name, "is_demo": bool(project.is_demo), "is_test": bool(lead.is_test),
             "campaign_name": campaign.name if campaign else None,
             "simulation_id": simulation.id if simulation else None,
             "simulation_status": simulation.status if simulation else None,

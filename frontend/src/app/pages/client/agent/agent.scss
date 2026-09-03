@@ -80,6 +80,27 @@ textarea {
 .demo-banner small {
   color: #a88b44;
 }
+.demo-banner.live-warning {
+  border-color: #8a5a12;
+  background: #201304;
+}
+.agent-progress {
+  color: #efb600 !important;
+  animation: agentPulse 1.2s ease-in-out infinite;
+}
+.test-badge {
+  margin-left: 5px;
+  border: 1px solid #8a5a12;
+  border-radius: 999px;
+  padding: 2px 5px;
+  color: #efb600;
+  font-size: 8px;
+  font-style: normal;
+  letter-spacing: 0.08em;
+}
+@keyframes agentPulse {
+  50% { opacity: 0.55; }
+}
 .notice {
   margin: 0 0 12px;
   padding: 10px 14px;

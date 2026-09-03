@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy.orm import Session
 
 from app.db.postgres import get_db
@@ -12,12 +12,14 @@ from .models import AgentRun, OutboundMessage, SalesAgentSimulation, SalesConver
 from app.modules.sales_crm.models import Lead
 from .schemas import (
     AgentRunResponse, AppointmentConfirmationResponse, AppointmentConfirm, AppointmentSlot,
-    ConversationAction, ConversationSummary, DraftDecision, ManualMessageCreate, SalesMessageResponse,
+    ConversationAction, ConversationSummary, DraftDecision, LiveMetaTestCreate, LiveMetaTestResponse,
+    ManualMessageCreate, SalesMessageResponse,
     SimulationAdvance, SimulationApproval, SimulationCreate, SimulationCreateResponse,
     SimulationOptionProject, SimulationRequest,
 )
 from .service import conversation_messages, conversation_summaries, set_conversation_action, simulate_turn
 from .live_service import send_manual_message
+from .live_test_service import create_live_meta_test
 from .simulation_service import (
     advance_simulation, approve_simulation, confirm_simulation_appointment,
     create_simulation, generate_initial_message, simulation_options, slots_for_simulation,
@@ -60,6 +62,24 @@ def start_simulation(
         project_id=payload.project_id,
         campaign_id=payload.campaign_id,
         lead_form=payload.lead.model_dump(),
+    )
+
+
+@router.post("/meta-test-leads", response_model=LiveMetaTestResponse, status_code=201)
+async def start_live_meta_test(
+    payload: LiveMetaTestCreate,
+    idempotency_key: str = Header(..., alias="Idempotency-Key", min_length=16, max_length=120),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.MKT])),
+):
+    require_project_access(db, current_user, payload.project_id)
+    return await create_live_meta_test(
+        db,
+        company_id=current_user.company_id,
+        project_id=payload.project_id,
+        campaign_id=payload.campaign_id,
+        lead_form=payload.lead.model_dump(),
+        idempotency_key=idempotency_key,
     )
 
 

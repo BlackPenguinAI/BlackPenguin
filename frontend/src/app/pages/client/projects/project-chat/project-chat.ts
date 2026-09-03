@@ -65,7 +65,9 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   authorizationBusy = false;
   metaSetupConfig: MetaSetupConfiguration = { partner_business_manager_id: null, configured: false };
   metaSetup = {
-    page_id: '', ad_account_id: '', lead_form_id: '',
+    meta_connection_id: '', page_id: '', ad_account_id: '', lead_form_id: '',
+    campaign_name: 'Meta Lead Ads', external_campaign_id: '', external_adset_id: '',
+    external_ad_id: '', instagram_account_id: '',
     page_access_confirmed: false, ad_account_access_confirmed: false, leads_access_confirmed: false,
   };
   metaSetupBusy = false;
@@ -238,6 +240,13 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   loadSources(): void { this.onboarding.getSources(this.projectId).subscribe({ next: (items) => { this.sources = this.prepareSources(items); this.loadSourceImagePreviews(); } }); }
   loadCampaigns(): void { this.onboarding.getCampaigns(this.projectId).subscribe({ next: (items) => this.campaigns = items }); }
   loadMetaConnections(): void { this.onboarding.getMetaConnections().subscribe({ next: (items) => this.metaConnections = items }); }
+  selectMetaConnection(): void {
+    const connection = this.metaConnections.find(item => item.id === this.metaSetup.meta_connection_id);
+    if (!connection) return;
+    this.metaSetup.page_id = connection.page_id || '';
+    this.metaSetup.ad_account_id = connection.ad_account_id || '';
+    this.metaSetup.instagram_account_id = connection.instagram_account_id || '';
+  }
   loadSalesTeam(): void {
     this.onboarding.getProjectTeam(this.projectId).subscribe({ next: (items) => this.projectTeam = items });
     this.onboarding.getSalesCandidates(this.projectId).subscribe({
@@ -494,9 +503,15 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     if (!message.id || this.metaSetupBusy) return;
     if (!this.canTestMetaSetup) return;
     this.metaSetupBusy = true; this.metaSetupMessage = ''; this.errorMessage = '';
+    const optional = (value: string) => value.trim() || undefined;
     this.onboarding.applyOnboardingAction(this.projectId, {
       action: 'complete_meta_setup', question_message_id: message.id, client_action_id: this.createClientMessageId(),
       ...this.metaSetup,
+      meta_connection_id: optional(this.metaSetup.meta_connection_id),
+      external_campaign_id: optional(this.metaSetup.external_campaign_id),
+      external_adset_id: optional(this.metaSetup.external_adset_id),
+      external_ad_id: optional(this.metaSetup.external_ad_id),
+      instagram_account_id: optional(this.metaSetup.instagram_account_id),
     }).subscribe({
       next: (turn) => {
         this.metaSetupBusy = false;

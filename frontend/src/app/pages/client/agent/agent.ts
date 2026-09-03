@@ -32,6 +32,10 @@ export class AgentComponent implements OnInit {
   confirming = false;
   generatingInitial = false;
   setupOpen = true;
+  setupMode: 'simulation' | 'live_meta' = 'simulation';
+  liveProgress = '';
+  private liveProgressTimer?: ReturnType<typeof setInterval>;
+  private liveSubmissionKey = '';
   search = '';
   filter = 'all';
   draft = '';
@@ -85,7 +89,7 @@ export class AgentComponent implements OnInit {
 
   projectChanged(): void {
     const preserveSetup = this.setupOpen;
-    this.campaignId = this.campaigns[0]?.id || '';
+    this.campaignId = this.availableCampaigns[0]?.id || '';
     this.form.product_id = '';
     this.form.budget_min = null;
     this.form.budget_max = null;
@@ -97,6 +101,11 @@ export class AgentComponent implements OnInit {
 
   get campaigns(): any[] {
     return this.options.find((row) => row.id === this.projectId)?.campaigns || [];
+  }
+  get availableCampaigns(): any[] {
+    return this.setupMode === 'live_meta'
+      ? this.campaigns.filter((campaign) => campaign.live_test_ready)
+      : this.campaigns;
   }
   get currentProject(): any {
     return this.options.find((row) => row.id === this.projectId);
@@ -123,6 +132,7 @@ export class AgentComponent implements OnInit {
     return !!(
       this.projectId &&
       this.campaignId &&
+      (this.setupMode === 'simulation' || this.availableCampaigns.some((row) => row.id === this.campaignId)) &&
       this.form.first_name.trim() &&
       this.form.last_name.trim() &&
       this.form.phone.trim() &&
@@ -208,6 +218,75 @@ export class AgentComponent implements OnInit {
             err.error?.detail ||
             this.validationMessage(err.error) ||
             'The simulation could not be created.';
+          this.cdr.markForCheck();
+        },
+      });
+  }
+
+  openSetup(mode: 'simulation' | 'live_meta'): void {
+    this.setupMode = mode;
+    this.setupOpen = true;
+    this.campaignId = this.availableCampaigns.some((row) => row.id === this.campaignId)
+      ? this.campaignId
+      : this.availableCampaigns[0]?.id || '';
+    this.error = '';
+    this.success = '';
+  }
+
+  submitLead(): void {
+    if (this.setupMode === 'live_meta') this.startLiveMetaTest();
+    else this.startSimulation();
+  }
+
+  startLiveMetaTest(): void {
+    if (!this.formComplete || this.creating) return;
+    this.creating = true;
+    this.error = '';
+    this.success = '';
+    this.liveSubmissionKey ||= this.newRequestId();
+    const stages = [
+      'Validating Project and Meta attribution…',
+      'Creating the lead and consent trace…',
+      'Opening the protected SMS conversation…',
+      'Asking Twilio to deliver the first message…',
+    ];
+    let stage = 0;
+    this.liveProgress = stages[stage];
+    this.liveProgressTimer = setInterval(() => {
+      stage = Math.min(stage + 1, stages.length - 1);
+      this.liveProgress = stages[stage];
+      this.cdr.markForCheck();
+    }, 1200);
+    this.http.post<any>(`${API_V1_URL}/sales-agent/meta-test-leads`, {
+      project_id: this.projectId,
+      campaign_id: this.campaignId,
+      lead: {
+        first_name: this.form.first_name.trim(), last_name: this.form.last_name.trim(),
+        phone: this.form.phone.trim(), email: this.form.email.trim(), product_id: this.form.product_id,
+        budget_min: Number(this.form.budget_min),
+        budget_max: this.form.budget_max === null || this.form.budget_max === undefined ? null : Number(this.form.budget_max),
+        consent: this.form.consent, custom_answers: {},
+      },
+    }, { headers: { 'Idempotency-Key': this.liveSubmissionKey } })
+      .pipe(finalize(() => {
+        this.creating = false;
+        if (this.liveProgressTimer) clearInterval(this.liveProgressTimer);
+        this.liveProgressTimer = undefined;
+        this.liveProgress = '';
+        this.cdr.markForCheck();
+      }))
+      .subscribe({
+        next: (result) => {
+          this.liveSubmissionKey = '';
+          this.setupOpen = false;
+          this.success = result.replayed
+            ? 'This submission was already received; the existing SMS conversation was reopened.'
+            : 'The Meta test lead was created and the first real SMS was handed to Twilio.';
+          this.resetForm();
+          this.loadConversations(false, result.conversation_id);
+        },
+        error: (err) => {
+          this.error = err.error?.detail || this.validationMessage(err.error) || 'The live Meta test could not be started.';
           this.cdr.markForCheck();
         },
       });
@@ -522,6 +601,9 @@ export class AgentComponent implements OnInit {
   }
   private resetForm(): void {
     this.form = this.emptyForm();
+  }
+  private newRequestId(): string {
+    return globalThis.crypto?.randomUUID?.() || `meta-test-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   }
   private validationMessage(error: any): string {
     return Array.isArray(error?.detail) ? error.detail.map((item: any) => item.msg).join(' ') : '';

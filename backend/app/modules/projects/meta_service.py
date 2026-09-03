@@ -69,6 +69,12 @@ def simulate_project_setup(
     page_id: str,
     ad_account_id: str,
     lead_form_id: str,
+    meta_connection_id: str | None = None,
+    campaign_name: str = "Meta Lead Ads",
+    external_campaign_id: str | None = None,
+    external_adset_id: str | None = None,
+    external_ad_id: str | None = None,
+    instagram_account_id: str | None = None,
     page_access_confirmed: bool,
     ad_account_access_confirmed: bool,
     leads_access_confirmed: bool,
@@ -88,12 +94,27 @@ def simulate_project_setup(
     page_id = page_id.strip()
     ad_account_id = ad_account_id.removeprefix("act_").strip()
     lead_form_id = lead_form_id.strip()
-    connection = db.query(MetaConnection).filter(
-        MetaConnection.company_id == project.company_id,
-        MetaConnection.page_id == page_id,
-        MetaConnection.ad_account_id == ad_account_id,
-        MetaConnection.verification_mode == "simulated",
-    ).first()
+    connection = None
+    if meta_connection_id:
+        connection = db.query(MetaConnection).filter(
+            MetaConnection.id == meta_connection_id,
+            MetaConnection.company_id == project.company_id,
+        ).first()
+        if not connection:
+            raise ValueError("The selected Meta connection does not belong to this Company.")
+        if connection.verification_status != "succeeded":
+            raise ValueError("Verify the selected Meta connection before assigning it to a Project.")
+        if connection.page_id and connection.page_id != page_id:
+            raise ValueError("The Page ID does not match the selected Company Meta connection.")
+        if connection.ad_account_id and connection.ad_account_id != ad_account_id:
+            raise ValueError("The Ad Account ID does not match the selected Company Meta connection.")
+    else:
+        connection = db.query(MetaConnection).filter(
+            MetaConnection.company_id == project.company_id,
+            MetaConnection.page_id == page_id,
+            MetaConnection.ad_account_id == ad_account_id,
+            MetaConnection.verification_mode == "simulated",
+        ).first()
     now = datetime.utcnow()
     if not connection:
         connection = MetaConnection(
@@ -105,31 +126,38 @@ def simulate_project_setup(
             token_hint=None,
             verification_mode="simulated",
         )
-    connection.verification_status = "succeeded"
-    connection.verification_results = {
-        "simulated": True,
-        "checks": ["page_id", "ad_account_id", "lead_form_id", "asset_access_confirmations"],
-    }
+    connection.instagram_account_id = instagram_account_id or connection.instagram_account_id
+    if connection.verification_mode == "simulated":
+        connection.verification_status = "succeeded"
+        connection.verification_results = {
+            "simulated": True,
+            "checks": ["page_id", "ad_account_id", "lead_form_id", "asset_access_confirmations"],
+        }
     connection.page_access_confirmed = page_access_confirmed
     connection.ad_account_access_confirmed = ad_account_access_confirmed
     connection.leads_access_confirmed = leads_access_confirmed
-    connection.simulated_verified_at = now
+    if connection.verification_mode == "simulated":
+        connection.simulated_verified_at = now
     db.add(connection)
     db.flush()
     campaign = db.query(ProjectCampaign).filter(
         ProjectCampaign.project_id == project.id,
         ProjectCampaign.platform == "meta",
         ProjectCampaign.lead_form_id == lead_form_id,
+        ProjectCampaign.external_ad_id == external_ad_id,
     ).first()
     if not campaign:
         campaign = ProjectCampaign(
             project_id=project.id,
-            name=f"Meta Lead Ads · {project.name}"[:180],
+            name=campaign_name.strip()[:180],
             platform="meta",
             status="draft",
             lead_form_id=lead_form_id,
         )
     campaign.meta_connection_id = connection.id
+    campaign.external_campaign_id = external_campaign_id
+    campaign.external_adset_id = external_adset_id
+    campaign.external_ad_id = external_ad_id
     db.add(campaign)
     if commit:
         db.commit()

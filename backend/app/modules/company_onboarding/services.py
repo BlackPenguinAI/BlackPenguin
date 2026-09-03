@@ -11,7 +11,7 @@ from sqlalchemy.orm.attributes import flag_modified
 
 from app.modules.onboarding_questions import validate_onboarding_value
 from app.modules.users import services as user_services
-from app.modules.users.models import User, UserRole
+from app.modules.users.models import User, UserAuthStatus, UserRole
 from app.modules.projects.models import Project
 
 from .completion import FIELD_BY_KEY, VALID_STATUSES, calculate_completion, field_progress
@@ -643,8 +643,19 @@ def serialize_team(db: Session, company_id: str, profile: CompanyProfile | None 
     roles = []
     for role, state_key in TEAM_ROLE_STATE_KEYS.items():
         active_users = sum(user.role == role and user.is_active for user in users)
+        pending_users = sum(
+            user.role == role and user.auth_status == UserAuthStatus.INVITED
+            for user in users
+        )
+        failed_users = sum(
+            user.role == role and user.auth_status == UserAuthStatus.PROVISIONING_FAILED
+            for user in users
+        )
         saved_status = states.get(state_key, {}).get("status")
-        status = "confirmed" if active_users else (
+        # A successfully delivered invitation is a configured Team role even
+        # while the recipient has not activated the account yet. Treating it
+        # as missing caused Continue to overwrite it with a deferred decision.
+        status = "confirmed" if active_users or pending_users else (
             saved_status if saved_status in {"deferred", "not_applicable"} else "missing"
         )
         roles.append({
@@ -652,6 +663,8 @@ def serialize_team(db: Session, company_id: str, profile: CompanyProfile | None 
             "label": TEAM_ROLE_LABELS[role],
             "status": status,
             "active_users": active_users,
+            "pending_users": pending_users,
+            "failed_users": failed_users,
         })
 
     return {

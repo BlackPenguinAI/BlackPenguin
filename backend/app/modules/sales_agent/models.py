@@ -26,6 +26,23 @@ class SalesConversation(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
     messages = relationship("SalesMessage", back_populates="conversation", cascade="all, delete-orphan")
+    lead_contexts = relationship("SalesConversationLeadContext", back_populates="conversation", cascade="all, delete-orphan")
+
+
+class SalesConversationLeadContext(Base):
+    """Opportunity history for one physical sender/recipient SMS thread."""
+
+    __tablename__ = "sales_conversation_lead_contexts"
+    __table_args__ = (UniqueConstraint("conversation_id", "lead_id", name="uq_sales_conversation_lead_context"),)
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    conversation_id = Column(String(36), ForeignKey("sales_conversations.id", ondelete="CASCADE"), nullable=False, index=True)
+    lead_id = Column(String(36), ForeignKey("leads.id", ondelete="CASCADE"), nullable=False, index=True)
+    is_active = Column(Boolean, default=True, nullable=False, index=True)
+    activated_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    conversation = relationship("SalesConversation", back_populates="lead_contexts")
 
 
 class SalesMessage(Base):

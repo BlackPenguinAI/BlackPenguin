@@ -841,12 +841,18 @@ def apply_onboarding_action(
             required_ids = (payload.page_id, payload.ad_account_id, payload.lead_form_id)
             if any(value is None for value in required_ids):
                 raise HTTPException(status_code=422, detail="Page ID, Ad Account ID, and Form ID are required.")
-            meta_service.simulate_project_setup(
+            connection, _ = meta_service.simulate_project_setup(
                 db,
                 project=project,
                 page_id=payload.page_id or "",
                 ad_account_id=payload.ad_account_id or "",
                 lead_form_id=payload.lead_form_id or "",
+                meta_connection_id=payload.meta_connection_id,
+                campaign_name=payload.campaign_name or f"Meta Lead Ads · {project.name}",
+                external_campaign_id=payload.external_campaign_id,
+                external_adset_id=payload.external_adset_id,
+                external_ad_id=payload.external_ad_id,
+                instagram_account_id=payload.instagram_account_id,
                 page_access_confirmed=payload.page_access_confirmed,
                 ad_account_access_confirmed=payload.ad_account_access_confirmed,
                 leads_access_confirmed=payload.leads_access_confirmed,
@@ -854,7 +860,11 @@ def apply_onboarding_action(
             )
             updates = [
                 services.user_field_update("campaigns_defined", True),
-                services.user_field_update("meta_connection_verified", False, status="deferred"),
+                services.user_field_update(
+                    "meta_connection_verified",
+                    connection.verification_mode == "real" and connection.verification_status == "succeeded",
+                    status="confirmed" if connection.verification_mode == "real" else "deferred",
+                ),
             ]
         else:
             updates = [
@@ -1524,9 +1534,13 @@ def simulate_meta_project_setup(
     return {
         "connection": connection,
         "campaign": campaign,
-        "simulated": True,
+        "simulated": connection.verification_mode == "simulated",
         "success": True,
-        "message": "Simulated connection successful. Live Meta access must still be verified before activation.",
+        "message": (
+            "Verified Company Meta connection assigned to the Project."
+            if connection.verification_mode == "real"
+            else "Simulated connection successful. Live Meta access must still be verified before activation."
+        ),
         "partner_business_manager_id": partner_id,
     }
 

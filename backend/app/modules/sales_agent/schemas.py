@@ -51,6 +51,20 @@ class SimulationCreate(BaseModel):
     lead: SimulationLeadForm
 
 
+class LiveMetaTestCreate(BaseModel):
+    project_id: str
+    campaign_id: str
+    lead: SimulationLeadForm
+
+
+class LiveMetaTestResponse(BaseModel):
+    lead_id: str
+    conversation_id: str
+    message_id: str | None = None
+    status: str
+    replayed: bool = False
+
+
 class SimulationApproval(BaseModel):
     status: str = Field(pattern="^(approved|changes_requested|rejected)$")
     notes: str | None = Field(default=None, max_length=4000)
@@ -103,6 +117,7 @@ class ConversationSummary(BaseModel):
     agent_status: str = "simulation"
     project_name: str
     is_demo: bool = False
+    is_test: bool = False
     campaign_name: str | None = None
     simulation_id: str | None = None
     simulation_status: str | None = None
@@ -145,6 +160,11 @@ class SimulationOptionCampaign(BaseModel):
     name: str
     status: str
     objective: str | None = None
+    external_campaign_id: str | None = None
+    external_adset_id: str | None = None
+    external_ad_id: str | None = None
+    lead_form_id: str | None = None
+    live_test_ready: bool = False
 
 
 class SimulationOptionProduct(BaseModel):

@@ -49,6 +49,39 @@ def _fields(payload: dict) -> dict[str, str]:
     return result
 
 
+def _resolve_campaign(
+    db: Session, *, page_id: str, form_id: str, ad_id: str | None,
+) -> tuple[ProjectCampaign | None, str | None]:
+    """Resolve a Meta route deterministically; never pick an arbitrary tenant Project."""
+    candidates = db.query(ProjectCampaign).join(Project).join(
+        MetaConnection, MetaConnection.id == ProjectCampaign.meta_connection_id,
+    ).filter(
+        ProjectCampaign.lead_form_id == form_id,
+        ProjectCampaign.platform == "meta",
+        MetaConnection.page_id == page_id,
+        MetaConnection.verification_mode == "real",
+        MetaConnection.verification_status == "succeeded",
+        Project.is_demo.is_(False),
+        Project.is_active.is_(True),
+    ).all()
+    if ad_id:
+        exact = [item for item in candidates if item.external_ad_id == ad_id]
+        if len(exact) == 1:
+            return exact[0], None
+        if len(exact) > 1:
+            return None, "Ambiguous Meta route: Page, Form, and Ad are assigned more than once."
+    generic = [item for item in candidates if not item.external_ad_id]
+    if len(generic) == 1:
+        return generic[0], None
+    if not ad_id and len(candidates) == 1:
+        return candidates[0], None
+    if ad_id and candidates:
+        return None, "No Project mapping matches the incoming Ad ID."
+    if candidates:
+        return None, "Ambiguous Meta route: add the Ad ID to every Project mapping that shares this Page and Form."
+    return None, "No active non-Demo campaign matches this Page and Form."
+
+
 @router.get("/meta")
 def verify(
     mode: str = Query(..., alias="hub.mode"),
@@ -98,20 +131,13 @@ async def receive(
             db.add(event)
             try:
                 event_page_id = str(value.get("page_id") or entry.get("id") or "")
-                campaign = db.query(ProjectCampaign).join(Project).join(
-                    MetaConnection, MetaConnection.id == ProjectCampaign.meta_connection_id,
-                ).filter(
-                    ProjectCampaign.lead_form_id == str(form_id),
-                    ProjectCampaign.platform == "meta",
-                    MetaConnection.page_id == event_page_id,
-                    MetaConnection.verification_mode == "real",
-                    MetaConnection.verification_status == "succeeded",
-                    Project.is_demo.is_(False),
-                    Project.is_active.is_(True),
-                ).first()
+                webhook_ad_id = str(value.get("ad_id") or "") or None
+                campaign, route_error = _resolve_campaign(
+                    db, page_id=event_page_id, form_id=str(form_id), ad_id=webhook_ad_id,
+                )
                 if not campaign:
                     event.status = "ignored"
-                    event.error_message = "No active non-Demo campaign matches this form."
+                    event.error_message = route_error
                     event.processed_at = datetime.utcnow()
                     db.commit()
                     continue

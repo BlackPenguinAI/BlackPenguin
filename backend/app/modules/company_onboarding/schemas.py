@@ -298,6 +298,8 @@ class TeamRoleProgress(BaseModel):
     label: str
     status: TeamRoleStatus
     active_users: int
+    pending_users: int = 0
+    failed_users: int = 0
 
 
 class TeamOnboardingResponse(BaseModel):

@@ -165,7 +165,7 @@ def test_cadence_is_shifted_into_project_local_contact_hours():
     assert scheduled == datetime(2026, 8, 31, 14, 0)
 
 
-def test_same_company_phone_history_is_reused_without_merging_active_threads():
+def test_same_company_phone_history_is_reused_as_one_physical_thread():
     db = _db()
     company = Company(name="Tenant")
     db.add(company); db.flush()
@@ -179,15 +179,32 @@ def test_same_company_phone_history_is_reused_without_merging_active_threads():
     conversation, created = get_or_create_live_conversation(db, first)
     db.commit()
     assert created is True
-    with pytest.raises(HTTPException) as active:
-        get_or_create_live_conversation(db, second)
-    assert active.value.status_code == 409
-    conversation.is_paused = True; db.commit()
     contact = ensure_contact(db, second)
     reused, fresh_lead = get_or_create_live_conversation(db, second)
     db.commit()
     assert fresh_lead is True and reused.id == conversation.id and reused.lead_id == second.id
     assert contact.previous_projects[0]["lead_id"] == first.id
+
+
+def test_shared_sender_never_reassigns_a_phone_thread_between_companies():
+    db = _db()
+    first_company = Company(name="Tenant A")
+    second_company = Company(name="Tenant B")
+    db.add_all([first_company, second_company]); db.flush()
+    first_project = Project(company_id=first_company.id, name="A")
+    second_project = Project(company_id=second_company.id, name="B")
+    db.add_all([first_project, second_project]); db.flush()
+    db.add(TwilioConfig(account_sid=TEST_ACCOUNT_SID, from_phone_number="+18573824206"))
+    first = Lead(company_id=first_company.id, project_id=first_project.id, full_name="First", phone="+15550000000", source="meta", platform="meta")
+    second = Lead(company_id=second_company.id, project_id=second_project.id, full_name="Second", phone="+15550000000", source="meta", platform="meta")
+    db.add_all([first, second]); db.flush()
+    conversation, _ = get_or_create_live_conversation(db, first)
+    db.commit()
+    with pytest.raises(HTTPException, match="another Company") as collision:
+        get_or_create_live_conversation(db, second)
+    assert collision.value.status_code == 409
+    assert conversation.company_id == first_company.id
+    assert conversation.lead_id == first.id
 
 
 def test_closed_or_opted_out_live_conversation_cannot_be_resumed():

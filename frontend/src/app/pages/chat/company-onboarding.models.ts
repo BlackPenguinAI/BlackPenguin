@@ -195,6 +195,8 @@ export interface TeamRoleProgress {
   label: string;
   status: TeamRoleStatus;
   active_users: number;
+  pending_users?: number;
+  failed_users?: number;
 }
 
 export interface TeamOnboarding {
@@ -208,9 +210,9 @@ export const EMPTY_TEAM_ONBOARDING: TeamOnboarding = {
   administrator: null,
   members: [],
   roles: [
-    { role: 'assistant', label: 'Assistant users', status: 'missing', active_users: 0 },
-    { role: 'mkt', label: 'Marketing users', status: 'missing', active_users: 0 },
-    { role: 'sales', label: 'Sales users', status: 'missing', active_users: 0 },
+    { role: 'assistant', label: 'Assistant users', status: 'missing', active_users: 0, pending_users: 0, failed_users: 0 },
+    { role: 'mkt', label: 'Marketing users', status: 'missing', active_users: 0, pending_users: 0, failed_users: 0 },
+    { role: 'sales', label: 'Sales users', status: 'missing', active_users: 0, pending_users: 0, failed_users: 0 },
   ],
 };
 

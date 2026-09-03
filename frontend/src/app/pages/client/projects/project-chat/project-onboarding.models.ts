@@ -99,7 +99,8 @@ export interface NextQuestion {
 }
 export interface Campaign {
   id: string; project_id: string; name: string; platform: string; objective: string | null;
-  status: string; external_campaign_id: string | null; lead_form_id: string | null;
+  status: string; external_campaign_id: string | null; external_adset_id: string | null;
+  external_ad_id: string | null; lead_form_id: string | null;
   audience_notes: string | null; meta_connection_id: string | null; created_at: string; updated_at: string;
 }
 
@@ -130,7 +131,7 @@ export interface PropertyTypeCatalog {
 }
 export interface MetaConnection {
   id: string; label: string; business_account_id: string | null; ad_account_id: string | null;
-  page_id: string | null; token_hint: string; scopes: string[]; expires_at: string | null;
+  page_id: string | null; instagram_account_id?: string | null; token_hint: string; scopes: string[]; expires_at: string | null;
   verified_at: string | null; simulated_verified_at?: string | null;
   verification_mode?: 'simulated' | 'real'; verification_status?: 'pending' | 'running' | 'succeeded' | 'failed';
   created_at: string;
@@ -171,6 +172,12 @@ export interface ProjectOnboardingActionPayload {
   page_id?: string;
   ad_account_id?: string;
   lead_form_id?: string;
+  meta_connection_id?: string;
+  campaign_name?: string;
+  external_campaign_id?: string;
+  external_adset_id?: string;
+  external_ad_id?: string;
+  instagram_account_id?: string;
   page_access_confirmed?: boolean;
   ad_account_access_confirmed?: boolean;
   leads_access_confirmed?: boolean;
