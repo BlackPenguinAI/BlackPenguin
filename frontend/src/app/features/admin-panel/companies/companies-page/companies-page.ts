@@ -39,6 +39,8 @@ export class CompaniesPageComponent implements OnInit {
   showEditModal: boolean = false;
   showDeleteModal: boolean = false;
   companyToDeleteId: string | null = null;
+  manualFirebaseCleanupRequired: boolean = false;
+  deleteWarningMessage: string = '';
   selectedFile: File | null = null;
 
   form: any = {
@@ -288,6 +290,8 @@ export class CompaniesPageComponent implements OnInit {
 
   openDeleteModal(id: string): void {
     this.companyToDeleteId = id;
+    this.manualFirebaseCleanupRequired = false;
+    this.deleteWarningMessage = '';
     this.showDeleteModal = true;
     this.cdr.detectChanges();
   }
@@ -295,6 +299,8 @@ export class CompaniesPageComponent implements OnInit {
   closeDeleteModal(): void {
     this.showDeleteModal = false;
     this.companyToDeleteId = null;
+    this.manualFirebaseCleanupRequired = false;
+    this.deleteWarningMessage = '';
     this.cdr.detectChanges();
   }
 
@@ -303,7 +309,10 @@ export class CompaniesPageComponent implements OnInit {
     this.isDeleting = true;
     this.cdr.detectChanges();
 
-    this.companyService.deleteCompany(this.companyToDeleteId).subscribe({
+    this.companyService.deleteCompany(
+      this.companyToDeleteId,
+      this.manualFirebaseCleanupRequired
+    ).subscribe({
       next: () => {
         this.isDeleting = false;
         this.closeDeleteModal();
@@ -312,9 +321,23 @@ export class CompaniesPageComponent implements OnInit {
       },
       error: (err) => {
         this.isDeleting = false;
-        this.closeDeleteModal();
-        this.loadData();
-        this.toast.showError(err.error?.detail || 'Error deleting company.');
+        const detail = err.error?.detail;
+        if (
+          err.status === 409 &&
+          detail?.code === 'FIREBASE_ADMIN_DELETE_UNAVAILABLE' &&
+          detail?.can_confirm_manual_cleanup === true
+        ) {
+          this.manualFirebaseCleanupRequired = true;
+          this.deleteWarningMessage = detail.message;
+          this.cdr.detectChanges();
+          return;
+        }
+
+        const message = typeof detail === 'string'
+          ? detail
+          : detail?.message || 'Error deleting company.';
+        this.cdr.detectChanges();
+        this.toast.showError(message);
       }
     });
   }

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Query
 from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
 from datetime import datetime
@@ -163,6 +163,7 @@ def update_company(
 @router.delete("/{company_id}/", status_code=status.HTTP_200_OK)
 def delete_company(
     company_id: str,
+    firebase_cleanup_confirmed: bool = Query(False),
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN]))
 ):
@@ -170,10 +171,20 @@ def delete_company(
     if not company:
         raise HTTPException(status_code=404, detail="Company not found.")
     
-    deleted_users = services.delete_company_workspace(db, company)
+    deleted_users = services.delete_company_workspace(
+        db,
+        company,
+        confirm_manual_firebase_cleanup=firebase_cleanup_confirmed,
+        deleted_by_user_id=current_user.id,
+    )
     return {
-        "detail": "Company and associated Firebase users deleted successfully.",
+        "detail": (
+            "Company data deleted after confirmed manual Firebase cleanup."
+            if firebase_cleanup_confirmed
+            else "Company and associated Firebase users deleted successfully."
+        ),
         "deleted_users": deleted_users,
+        "firebase_cleanup": "confirmed_manual" if firebase_cleanup_confirmed else "automatic",
     }
 
 # ==========================================

@@ -45,7 +45,8 @@ export class CompanyService {
   }
 
   // 🚀 CORREGIDO: AÑADIDA BARRA FINAL (/)
-  deleteCompany(companyId: string): Observable<any> {
-    return this.http.delete<any>(`${this.apiUrl}${companyId}/`, { headers: this.headers });
+  deleteCompany(companyId: string, firebaseCleanupConfirmed = false): Observable<any> {
+    const suffix = firebaseCleanupConfirmed ? '?firebase_cleanup_confirmed=true' : '';
+    return this.http.delete<any>(`${this.apiUrl}${companyId}/${suffix}`, { headers: this.headers });
   }
 }

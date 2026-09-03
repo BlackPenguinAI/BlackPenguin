@@ -85,6 +85,81 @@ def test_company_deletion_removes_remote_identities_before_local_users():
         db.close(); engine.dispose()
 
 
+def test_company_deletion_without_bridge_requires_explicit_manual_confirmation(monkeypatch):
+    engine, db = _db()
+    try:
+        company = _company(db)
+        user = _user(db, company, "admin@example.com", UserRole.ADMIN, "already-removed-uid")
+        db.add(FirebaseConfig(project_id="bp-test", auth_mode="rest")); db.commit()
+        monkeypatch.setattr(settings, "FIREBASE_ADMIN_BRIDGE_URL", "")
+        monkeypatch.setattr(settings, "FIREBASE_ADMIN_BRIDGE_SECRET", "")
+
+        with pytest.raises(HTTPException) as error:
+            delete_company_workspace(db, company)
+
+        assert error.value.status_code == 409
+        assert error.value.detail == {
+            "code": "FIREBASE_ADMIN_DELETE_UNAVAILABLE",
+            "message": (
+                "Firebase administrative deletion is not configured. "
+                "Configure the keyless Firebase Admin bridge, or confirm that the "
+                "Company identities were already removed manually from Firebase."
+            ),
+            "can_confirm_manual_cleanup": True,
+        }
+        db.expire_all()
+        assert db.query(Company).filter_by(id=company.id).one().is_active is True
+        assert db.query(User).filter_by(id=user.id).one().is_active is True
+    finally:
+        db.close(); engine.dispose()
+
+
+def test_confirmed_manual_firebase_cleanup_completes_local_cascade():
+    engine, db = _db()
+    try:
+        company = _company(db)
+        user = _user(db, company, "admin@example.com", UserRole.ADMIN, "already-removed-uid")
+        db.add(UserInvitation(
+            user_id=user.id,
+            status="accepted_by_provider",
+            expires_at=onboarding_services.datetime.utcnow(),
+        )); db.commit()
+
+        with patch("app.integrations.firebase_admin_client.delete_identity") as delete_identity:
+            deleted = delete_company_workspace(
+                db,
+                company,
+                confirm_manual_firebase_cleanup=True,
+                deleted_by_user_id="superadmin-1",
+            )
+
+        assert deleted == 1
+        delete_identity.assert_not_called()
+        assert db.query(Company).filter_by(id=company.id).first() is None
+        assert db.query(User).filter_by(id=user.id).first() is None
+        assert db.query(UserInvitation).filter_by(user_id=user.id).first() is None
+    finally:
+        db.close(); engine.dispose()
+
+
+def test_company_deletion_accepts_remote_identity_already_missing():
+    engine, db = _db()
+    try:
+        company = _company(db)
+        _user(db, company, "admin@example.com", UserRole.ADMIN, "missing-uid")
+        db.add(FirebaseConfig(project_id="bp-test", auth_mode="rest")); db.commit()
+
+        with patch("app.integrations.firebase_admin_client.ensure_admin_deletion_ready"), patch(
+            "app.integrations.firebase_admin_client.delete_identity", return_value="not_found",
+        ):
+            deleted = delete_company_workspace(db, company)
+
+        assert deleted == 1
+        assert db.query(Company).filter_by(id=company.id).first() is None
+    finally:
+        db.close(); engine.dispose()
+
+
 def test_firebase_admin_bridge_request_is_signed_and_contains_no_private_key(monkeypatch):
     monkeypatch.setattr(settings, "FIREBASE_ADMIN_BRIDGE_URL", "https://firebase-admin.example")
     monkeypatch.setattr(settings, "FIREBASE_ADMIN_BRIDGE_SECRET", "bridge-secret")

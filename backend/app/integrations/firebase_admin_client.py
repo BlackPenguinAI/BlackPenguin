@@ -17,14 +17,27 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 
+def admin_deletion_is_configured() -> bool:
+    """Return whether privileged deletion can be attempted from this API."""
+    return bool(
+        settings.FIREBASE_ADMIN_BRIDGE_URL
+        and settings.FIREBASE_ADMIN_BRIDGE_SECRET
+    )
+
+
 def ensure_admin_deletion_ready() -> None:
-    if not settings.FIREBASE_ADMIN_BRIDGE_URL or not settings.FIREBASE_ADMIN_BRIDGE_SECRET:
+    if not admin_deletion_is_configured():
         raise HTTPException(
             status_code=409,
-            detail=(
-                "Firebase administrative deletion is not configured. "
-                "Configure the keyless Firebase Admin bridge before deleting a Company."
-            ),
+            detail={
+                "code": "FIREBASE_ADMIN_DELETE_UNAVAILABLE",
+                "message": (
+                    "Firebase administrative deletion is not configured. "
+                    "Configure the keyless Firebase Admin bridge, or confirm that the "
+                    "Company identities were already removed manually from Firebase."
+                ),
+                "can_confirm_manual_cleanup": True,
+            },
         )
 
 
