@@ -176,13 +176,7 @@ describe('ChatComponent', () => {
     http.expectNone('http://localhost:8000/api/v1/company-onboarding/media/logo-1/logo');
   });
 
-  it('exposes the confirmed logo and hides empty superseded assistant messages', () => {
-    const asset = {
-      id: 'logo-1', role: 'logo', name: 'official-logo.png', mime_type: 'image/png', size_bytes: 100,
-      source_url: null, is_primary: true, review_status: 'confirmed',
-      image_url: '/api/v1/company-onboarding/media/logo-1/file', created_at: new Date().toISOString(),
-    };
-    component.companyMedia = [asset];
+  it('keeps the next question as the final visible chat item after logo confirmation', () => {
     component.messages = [
       {
         id: 'legacy-empty', sender: 'ai', content: '', created_at: new Date(), attachments: [],
@@ -192,7 +186,6 @@ describe('ChatComponent', () => {
       { id: 'next-question', sender: 'ai', content: 'What is the headquarters?', created_at: new Date(), attachments: [] },
     ];
 
-    expect(component.selectedCompanyLogo?.id).toBe('logo-1');
     expect(component.visibleMessages.map(message => message.id)).toEqual(['next-question']);
   });
 

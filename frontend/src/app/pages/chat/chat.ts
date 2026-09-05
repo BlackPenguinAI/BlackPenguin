@@ -359,10 +359,6 @@ export class ChatComponent implements OnInit, OnDestroy {
     return this.currentStage === 'processing' || this.sources.some(source => source.status === 'processing');
   }
 
-  get selectedCompanyLogo(): CompanyMediaAsset | null {
-    return this.companyMedia.find(asset => asset.is_primary && asset.role === 'logo') || null;
-  }
-
   get teamInviteErrors(): Record<string, string> {
     const errors: Record<string, string> = {};
     if (!this.teamInvite.first_name.trim()) errors['first_name'] = 'Enter the first name.';
