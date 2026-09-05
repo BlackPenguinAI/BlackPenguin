@@ -114,15 +114,30 @@ def select_company_logo(
     ).first()
     if not asset:
         raise HTTPException(status_code=404, detail="Company image not found.")
+    session = services.get_or_create_session(db, current_user.company_id)
+    profile = services.get_or_create_profile(db, current_user.company_id)
+    logo_state = (profile.field_states or {}).get("company_logo", {})
+    already_selected = bool(
+        asset.is_primary
+        and (profile.profile_data or {}).get("company_logo") == asset.id
+        and logo_state.get("status") in {"confirmed", "corrected_by_user"}
+    )
     db.query(CompanyMediaAsset).filter(
         CompanyMediaAsset.company_id == current_user.company_id,
     ).update({CompanyMediaAsset.is_primary: False}, synchronize_session=False)
     asset.is_primary = True; asset.role = "logo"; asset.review_status = "confirmed"
-    profile = services.get_or_create_profile(db, current_user.company_id)
     services.apply_field_updates(db, profile, [{
         "field": "company_logo", "value": asset.id, "status": "confirmed", "applicable": True,
         "source_type": "media_selection", "source_reference": asset.source_url or asset.name, "confidence": "high",
-    }], allow_authoritative_statuses=True)
+    }], allow_authoritative_statuses=True, commit=False)
+    if not already_selected:
+        services.save_message(
+            db,
+            session.id,
+            SenderType.AI,
+            "I saved the selected image as the official Company logo.",
+            commit=False,
+        )
     db.add(asset); db.commit(); db.refresh(asset)
     return overview_service.serialize_asset(asset)
 
@@ -195,6 +210,9 @@ def _message_payload(message: OnboardingMessage) -> dict[str, Any]:
         prompt = message.ui_payload["prompt"].strip()
         if prompt and content.rstrip().endswith(prompt):
             content = content.rstrip()[:-len(prompt)].rstrip()
+        # Older source-continuation messages included this connector directly
+        # before the now-superseded prompt. Do not expose the orphaned label.
+        content = re.sub(r"(?:\n\s*)*(?:Let's continue:|Next:)\s*$", "", content).rstrip()
     return {
         "id": message.id,
         "sender": "user" if message.sender == SenderType.USER else "ai",
@@ -213,6 +231,20 @@ def _message_payload(message: OnboardingMessage) -> dict[str, Any]:
             for source in message.attachments
         ],
     }
+
+
+def _message_payloads(messages: list[OnboardingMessage]) -> list[dict[str, Any]]:
+    """Serialize history without legacy empty superseded assistant bubbles."""
+    payloads = [_message_payload(message) for message in messages]
+    return [
+        payload for payload in payloads
+        if payload["sender"] != "ai"
+        or bool(payload["content"].strip())
+        or not (
+            payload.get("response_payload")
+            and payload["response_payload"].get("status") == "superseded"
+        )
+    ]
 
 
 def _next_prompt(profile) -> str:
@@ -379,8 +411,6 @@ def _logo_question() -> dict[str, Any]:
 
 def _stage_next_question(stage: str, profile) -> dict[str, Any] | None:
     """Expose a chat question only while the chat is the active workflow control."""
-    if stage == "logo_review":
-        return _logo_question()
     return _next_question(profile) if stage in CHAT_QUESTION_STAGES else None
 
 
@@ -486,7 +516,7 @@ def _state_payload(db: Session, company_id: str) -> dict[str, Any]:
     timestamps = [profile.updated_at, *[item.created_at for item in messages], *[item.updated_at for item in sources]]
     version = int(max((item.timestamp() for item in timestamps if item), default=0) * 1000)
     return {
-        "messages": [_message_payload(message) for message in messages],
+        "messages": _message_payloads(messages),
         "profile": serialized_profile,
         "sources": [source_service.serialize_source(source) for source in sources],
         "next_question": next_question,
@@ -634,7 +664,7 @@ def get_chat_history(
         .order_by(OnboardingMessage.created_at.asc())
         .all()
     )
-    return [_message_payload(message) for message in messages]
+    return _message_payloads(messages)
 
 
 @router.get("/chat/state", response_model=OnboardingStateResponse)

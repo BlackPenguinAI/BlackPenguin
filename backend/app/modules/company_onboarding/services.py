@@ -631,6 +631,7 @@ def team_member_payload(db: Session, user: User | None, *, request_replayed: boo
         "invitation_status": invitation.status if invitation else None,
         "invitation_delivery": user_services.invitation_delivery_status(invitation),
         "invitation_error_code": user_services.invitation_error_code(invitation),
+        "invitation_error_message": user_services.invitation_error_message(invitation),
         "request_replayed": request_replayed,
     }
 

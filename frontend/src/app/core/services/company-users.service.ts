@@ -25,6 +25,7 @@ export interface CompanyUser {
   invitation_status?: string;
   invitation_delivery?: 'sent' | 'failed' | 'pending' | 'not_applicable';
   invitation_error_code?: string | null;
+  invitation_error_message?: string | null;
   request_replayed?: boolean;
   activated_at?: string;
 }

@@ -291,6 +291,7 @@ class TeamMemberResponse(BaseModel):
     invitation_status: str | None = None
     invitation_delivery: Literal["sent", "failed", "pending", "not_applicable"] = "not_applicable"
     invitation_error_code: str | None = None
+    invitation_error_message: str | None = None
     request_replayed: bool = False
 
 

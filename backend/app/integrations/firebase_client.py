@@ -62,6 +62,8 @@ def _firebase_error(code: str) -> HTTPException:
         return HTTPException(status_code=401, detail=normalized)
     if normalized == "EMAIL_EXISTS":
         return HTTPException(status_code=409, detail=normalized)
+    if normalized == "QUOTA_EXCEEDED":
+        return HTTPException(status_code=429, detail=normalized)
     return HTTPException(status_code=422, detail=normalized)
 
 

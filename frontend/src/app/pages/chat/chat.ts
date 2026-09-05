@@ -298,10 +298,14 @@ export class ChatComponent implements OnInit, OnDestroy {
   }
 
   get visibleMessages(): ChatMessage[] {
-    if (!this.hasPendingReview) return this.messages;
-    return this.messages.filter((message) => !(
+    const stageMessages = !this.hasPendingReview ? this.messages : this.messages.filter((message) => !(
       message.sender === 'ai' && !!message.ui_payload && !message.response_payload
     ));
+    return stageMessages.filter(message =>
+      message.sender !== 'ai'
+      || !!message.content.trim()
+      || (!!message.ui_payload && !message.response_payload)
+    );
   }
 
   sourcesForMessage(messageId?: string): OnboardingSource[] {
@@ -353,6 +357,10 @@ export class ChatComponent implements OnInit, OnDestroy {
 
   get hasProcessingSources(): boolean {
     return this.currentStage === 'processing' || this.sources.some(source => source.status === 'processing');
+  }
+
+  get selectedCompanyLogo(): CompanyMediaAsset | null {
+    return this.companyMedia.find(asset => asset.is_primary && asset.role === 'logo') || null;
   }
 
   get teamInviteErrors(): Record<string, string> {
@@ -417,7 +425,9 @@ export class ChatComponent implements OnInit, OnDestroy {
       next: member => {
         if (member.invitation_delivery === 'failed' || member.auth_status === 'provisioning_failed') {
           const code = member.invitation_error_code ? ` (${member.invitation_error_code})` : '';
-          this.teamError = `The user ${submittedEmail} was saved, but Firebase did not accept the invitation${code}. Use Resend invitation or revoke the failed user below.`;
+          this.teamError = member.invitation_error_message
+            ? `The user ${submittedEmail} was saved. ${member.invitation_error_message}`
+            : `The user ${submittedEmail} was saved, but Firebase did not accept the invitation${code}. Use Resend invitation or revoke the failed user below.`;
           this.teamSuccess = '';
         } else {
           this.teamSuccess = member.request_replayed
@@ -546,11 +556,19 @@ export class ChatComponent implements OnInit, OnDestroy {
         this.refreshTeam(true);
       },
       error: (error: HttpErrorResponse) => {
-        this.teamError = typeof error.error?.detail === 'string'
-          ? error.error.detail
-          : 'The activation request could not be resent.';
+        const detail = error.error?.detail;
+        this.teamError = typeof detail === 'string'
+          ? detail
+          : detail?.message || 'The activation request could not be resent.';
       },
     });
+  }
+
+  teamMemberStatusLabel(member: { auth_status?: string; invitation_error_code?: string | null }): string {
+    if (member.auth_status === 'active') return 'Active';
+    if (member.invitation_error_code === 'QUOTA_EXCEEDED') return 'Email quota exceeded';
+    if (member.auth_status === 'provisioning_failed') return 'Delivery failed';
+    return 'Pending activation';
   }
 
   revokeTeamMember(memberId: string): void {

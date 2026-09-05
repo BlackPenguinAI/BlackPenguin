@@ -94,6 +94,7 @@ class TenantUserResponse(BaseModel):
     invitation_status: Optional[str] = None
     invitation_delivery: Literal["sent", "failed", "pending", "not_applicable"] = "not_applicable"
     invitation_error_code: Optional[str] = None
+    invitation_error_message: Optional[str] = None
     request_replayed: bool = False
     activated_at: Optional[datetime] = None
     model_config = ConfigDict(from_attributes=True)

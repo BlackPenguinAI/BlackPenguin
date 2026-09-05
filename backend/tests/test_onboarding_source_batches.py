@@ -48,6 +48,17 @@ def test_mixed_group_reports_failures_and_waits_for_review():
     assert "What is the project type?" not in content
 
 
+def test_exclusive_media_step_can_finish_source_processing_without_empty_connector():
+    content = _result_content(
+        [_source("example.com", "ready")],
+        pending_count=0,
+        question_prompt="",
+    )
+
+    assert content == "I finished processing 1 accessible source."
+    assert "Let's continue:" not in content
+
+
 def test_project_url_sent_with_files_uses_the_worker():
     source = inspect.getsource(project_router.send_chat_with_files)
 

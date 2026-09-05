@@ -26,4 +26,18 @@ describe('CompanyUsersComponent', () => {
     component.invite.email = 'other@example.com';
     expect(requestKey()).not.toBe(first);
   });
+
+  it('presents Firebase quota exhaustion as a recoverable saved-user state', () => {
+    const component = new CompanyUsersComponent({} as any, {} as any, {} as any);
+    const user = {
+      id: 'user-1', email: 'quota@example.com', role: 'sales', is_active: true,
+      project_assignment_required: false, auth_status: 'provisioning_failed',
+      invitation_delivery: 'failed', invitation_error_code: 'QUOTA_EXCEEDED',
+      invitation_error_message: 'Firebase has exhausted the daily email-link quota. Use Resend invitation after it resets.',
+    } as const;
+
+    expect(component.authStatusLabel(user)).toBe('Email quota exceeded');
+    expect((component as any).invitationResultMessage(user)).toContain('User quota@example.com was saved.');
+    expect((component as any).invitationResultMessage(user)).toContain('Use Resend invitation');
+  });
 });

@@ -176,6 +176,26 @@ describe('ChatComponent', () => {
     http.expectNone('http://localhost:8000/api/v1/company-onboarding/media/logo-1/logo');
   });
 
+  it('exposes the confirmed logo and hides empty superseded assistant messages', () => {
+    const asset = {
+      id: 'logo-1', role: 'logo', name: 'official-logo.png', mime_type: 'image/png', size_bytes: 100,
+      source_url: null, is_primary: true, review_status: 'confirmed',
+      image_url: '/api/v1/company-onboarding/media/logo-1/file', created_at: new Date().toISOString(),
+    };
+    component.companyMedia = [asset];
+    component.messages = [
+      {
+        id: 'legacy-empty', sender: 'ai', content: '', created_at: new Date(), attachments: [],
+        ui_payload: { field: 'company_logo', label: 'Logo', prompt: 'Choose logo', input_type: 'company_logo', options: [], examples: [], allow_custom: false, minimum_words: null },
+        response_payload: { status: 'superseded', answer: '' },
+      },
+      { id: 'next-question', sender: 'ai', content: 'What is the headquarters?', created_at: new Date(), attachments: [] },
+    ];
+
+    expect(component.selectedCompanyLogo?.id).toBe('logo-1');
+    expect(component.visibleMessages.map(message => message.id)).toEqual(['next-question']);
+  });
+
   it('should save public contact information as structured lists', () => {
     component.currentStage = 'enrichment';
     component.publicEmails = 'info@example.com, sales@example.com';
@@ -291,6 +311,45 @@ describe('ChatComponent', () => {
       team: { administrator: null, members: [], roles: [] }, next_question: null,
     });
     expect(component.teamSuccess).toContain('email can be invited again');
+  });
+
+  it('explains Firebase email quota exhaustion without asking for a duplicate user', () => {
+    component.currentStage = 'team';
+    component.teamInvite = {
+      first_name: 'Ana', last_name: 'Sales', email: 'quota@example.com', role: 'sales',
+    };
+    const quotaMessage = 'Firebase has exhausted the daily email-link quota. The user was saved, but no invitation was sent.';
+
+    component.inviteTeamMember();
+    http.expectOne('http://localhost:8000/api/v1/company-onboarding/team/members').flush({
+      id: 'user-quota', first_name: 'Ana', last_name: 'Sales', email: 'quota@example.com',
+      role: 'sales', is_active: true, auth_status: 'provisioning_failed',
+      invitation_delivery: 'failed', invitation_error_code: 'QUOTA_EXCEEDED',
+      invitation_error_message: quotaMessage,
+    });
+    http.expectOne('http://localhost:8000/api/v1/company-onboarding/team').flush({
+      administrator: null, members: [], roles: [], projects: [],
+    });
+    http.expectOne('http://localhost:8000/api/v1/company-onboarding/chat/state').flush({
+      messages: [], profile: EMPTY_COMPANY_PROFILE, sources: [], stage: 'team', version: 1,
+      team: { administrator: null, members: [], roles: [] }, next_question: null,
+    });
+
+    expect(component.teamError).toContain('The user quota@example.com was saved.');
+    expect(component.teamError).toContain('daily email-link quota');
+    expect(component.teamMemberStatusLabel({ auth_status: 'provisioning_failed', invitation_error_code: 'QUOTA_EXCEEDED' })).toBe('Email quota exceeded');
+  });
+
+  it('shows the structured Firebase quota message returned by Resend', () => {
+    component.resendTeamMember('user-quota');
+    http.expectOne('http://localhost:8000/api/v1/users/company/user-quota/resend-activation').flush({
+      detail: {
+        code: 'FIREBASE_EMAIL_QUOTA_EXCEEDED',
+        message: 'Firebase daily email-link quota is exhausted.',
+      },
+    }, { status: 429, statusText: 'Too Many Requests' });
+
+    expect(component.teamError).toBe('Firebase daily email-link quota is exhausted.');
   });
 
   it('should render extracted list proposals without JSON syntax', () => {

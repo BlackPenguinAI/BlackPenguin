@@ -112,11 +112,15 @@ export class CompanyUsersComponent implements OnInit {
         this.toast.showSuccess('Activation request accepted by Firebase');
         this.cdr.markForCheck();
       },
-      error: err => this.toast.showError(err.error?.detail || 'Could not resend activation'),
+      error: err => {
+        const detail = err.error?.detail;
+        this.toast.showError(typeof detail === 'string' ? detail : detail?.message || 'Could not resend activation');
+      },
     });
   }
 
   authStatusLabel(user: CompanyUser): string {
+    if (user.invitation_error_code === 'QUOTA_EXCEEDED') return 'Email quota exceeded';
     return ({
       invited: 'Activation requested', active: 'Active', suspended: 'Suspended',
       provisioning_failed: 'Delivery failed', migration_required: 'Migration required',
@@ -161,6 +165,7 @@ export class CompanyUsersComponent implements OnInit {
   private invitationResultMessage(user: CompanyUser): string {
     if (user.request_replayed) return `The invitation for ${user.email} was already processed.`;
     if (user.invitation_delivery === 'failed' || user.auth_status === 'provisioning_failed') {
+      if (user.invitation_error_message) return `User ${user.email} was saved. ${user.invitation_error_message}`;
       const code = user.invitation_error_code ? ` (${user.invitation_error_code})` : '';
       return `User saved, but Firebase did not accept the invitation for ${user.email}${code}.`;
     }

@@ -31,6 +31,7 @@ from app.modules.system_settings.services import firebase_config_response, updat
 from app.modules.users.models import User, UserAuthStatus, UserInvitation, UserRole
 from app.modules.users.services import invite_tenant_user
 from app.modules.users.services import invitation_for_idempotency_key
+from app.modules.users.services import invitation_error_message
 from app.modules.users.services import resend_user_activation
 
 
@@ -363,6 +364,44 @@ def test_firebase_invitation_failure_is_logged_with_trace_context_and_resend_use
             resend_user_activation(db, user=user)
         assert exc_info.value.status_code == 424
         assert exc_info.value.detail.endswith("OPERATION_NOT_ALLOWED")
+    finally:
+        db.close(); engine.dispose()
+
+
+def test_email_link_quota_failure_is_actionable_and_reuses_the_saved_user():
+    engine, db = _db()
+    try:
+        company = _company(db)
+        _verified_firebase(db)
+        quota_error = HTTPException(status_code=429, detail="QUOTA_EXCEEDED")
+        with patch(
+            "app.integrations.firebase_client.send_email_sign_in_link",
+            side_effect=quota_error,
+        ):
+            user = invite_tenant_user(
+                db, company_id=company.id, email="quota@example.com",
+                first_name="Quota", last_name="Test", role=UserRole.SALES,
+                idempotency_key="quota-invitation-request",
+            )
+
+        invitation = db.query(UserInvitation).filter_by(user_id=user.id).one()
+        assert user.auth_status == UserAuthStatus.PROVISIONING_FAILED
+        assert invitation.last_error == "QUOTA_EXCEEDED"
+        assert "daily email-link quota" in invitation_error_message(invitation)
+
+        invitation.last_attempt_at = datetime.utcnow() - timedelta(minutes=2)
+        db.commit()
+        with patch(
+            "app.integrations.firebase_client.send_email_sign_in_link",
+            side_effect=quota_error,
+        ), pytest.raises(HTTPException) as error:
+            resend_user_activation(db, user=user)
+
+        assert error.value.status_code == 429
+        assert error.value.detail["code"] == "FIREBASE_EMAIL_QUOTA_EXCEEDED"
+        assert "daily email-link quota" in error.value.detail["message"]
+        assert db.query(User).filter_by(email="quota@example.com").count() == 1
+        assert db.query(UserInvitation).filter_by(user_id=user.id).count() == 1
     finally:
         db.close(); engine.dispose()
 

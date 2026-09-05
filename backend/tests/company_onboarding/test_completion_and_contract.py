@@ -11,6 +11,7 @@ from app.modules.company_onboarding.router import (
     _format_user_facing_value,
     get_company_overview,
     _message_payload,
+    _message_payloads,
     _next_question,
     _normalize_user_facing_content,
     _parse_agent_response,
@@ -191,6 +192,26 @@ def test_superseded_prompt_is_removed_from_existing_conversation_payloads():
     assert payload["response_payload"]["status"] == "superseded"
 
 
+def test_legacy_superseded_logo_prompts_do_not_leave_empty_bubbles_or_connectors():
+    prompt = "Choose or upload the official Company logo."
+    transition = SimpleNamespace(
+        id="message-1", sender=SenderType.AI,
+        content=f"I finished processing 1 accessible source.\n\nLet's continue: {prompt}",
+        ui_payload={"prompt": prompt}, response_payload={"status": "superseded"},
+        in_reply_to_message_id=None, created_at=None, attachments=[],
+    )
+    prompt_only = SimpleNamespace(
+        id="message-2", sender=SenderType.AI, content=prompt,
+        ui_payload={"prompt": prompt}, response_payload={"status": "superseded"},
+        in_reply_to_message_id=None, created_at=None, attachments=[],
+    )
+
+    payloads = _message_payloads([transition, prompt_only])
+
+    assert [payload["id"] for payload in payloads] == ["message-1"]
+    assert payloads[0]["content"] == "I finished processing 1 accessible source."
+
+
 def test_company_workflow_prioritizes_website_review_and_then_enrichment():
     profile = {
         "completion": {
@@ -233,7 +254,7 @@ def test_company_workflow_requires_a_logo_decision_before_profile_questions():
     assert _workflow_stage(
         profile, {"roles": []}, processing=False, pending_review=False, pristine=False,
     ) == "logo_review"
-    assert _stage_next_question("logo_review", None)["input_type"] == "company_logo"
+    assert _stage_next_question("logo_review", None) is None
 
 
 def test_company_overview_is_blocked_until_final_approval(monkeypatch):

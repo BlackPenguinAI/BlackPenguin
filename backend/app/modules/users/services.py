@@ -18,6 +18,10 @@ SEAT_HOLDING_AUTH_STATUSES = {
     UserAuthStatus.INVITED, UserAuthStatus.ACTIVE,
     UserAuthStatus.PROVISIONING_FAILED, UserAuthStatus.MIGRATION_REQUIRED,
 }
+FIREBASE_EMAIL_QUOTA_MESSAGE = (
+    "Firebase has exhausted the daily email-link quota. The user was saved, but no invitation "
+    "was sent. Add a billing instrument or wait for the Firebase quota to reset, then use Resend invitation."
+)
 
 
 def normalize_idempotency_key(value: str | None) -> str | None:
@@ -57,6 +61,15 @@ def invitation_error_code(invitation: UserInvitation | None) -> str | None:
         return None
     candidate = invitation.last_error.strip().split(" : ", 1)[0]
     return candidate if candidate.replace("_", "").isalnum() else "FIREBASE_REQUEST_FAILED"
+
+
+def invitation_error_message(invitation: UserInvitation | None) -> str | None:
+    code = invitation_error_code(invitation)
+    if code == "QUOTA_EXCEEDED":
+        return FIREBASE_EMAIL_QUOTA_MESSAGE
+    if code:
+        return f"Firebase did not accept the invitation ({code}). Use Resend invitation or remove the failed user."
+    return None
 
 
 def enforce_role_limit(db: Session, company: Company, role: UserRole, *, exclude_user_id: str | None = None) -> None:
@@ -328,6 +341,16 @@ def resend_user_activation(db: Session, *, user: User, invited_by_user_id: str |
         raise HTTPException(status_code=429, detail="Wait one minute before resending the invitation.")
     invitation = provision_invitation(db, user=user, invited_by_user_id=invited_by_user_id)
     if invitation.status == "delivery_failed":
+        error_code = invitation_error_code(invitation)
+        if error_code == "QUOTA_EXCEEDED":
+            raise HTTPException(
+                status_code=429,
+                detail={
+                    "code": "FIREBASE_EMAIL_QUOTA_EXCEEDED",
+                    "provider_code": error_code,
+                    "message": FIREBASE_EMAIL_QUOTA_MESSAGE,
+                },
+            )
         raise HTTPException(
             status_code=424,
             detail=f"Firebase did not accept the activation request: {invitation.last_error or 'unknown error'}",

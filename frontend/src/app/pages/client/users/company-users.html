@@ -32,7 +32,7 @@
         <td class="p-4"><div>{{ user.first_name }} {{ user.last_name }}</div><div class="text-sm text-gray-500">{{ user.email }}</div></td>
         <td class="p-4 text-sm">{{ roleLabel(user.role) }}</td>
         <td class="p-4 text-sm"><span *ngIf="(user.project_access_scope || 'all') === 'all'">All current and future Projects</span><span *ngIf="user.project_access_scope === 'selected'">{{ (user.project_ids || []).length }} selected</span><div *ngIf="user.project_assignment_required" class="mt-1 text-xs text-amber-300">Project assignment required</div></td>
-        <td class="p-4"><span [class.text-emerald-400]="user.auth_status === 'active'" [class.text-amber-300]="user.auth_status === 'invited'" [class.text-red-300]="user.auth_status === 'provisioning_failed'">{{ authStatusLabel(user) }}</span></td>
+        <td class="p-4"><span [class.text-emerald-400]="user.auth_status === 'active'" [class.text-amber-300]="user.auth_status === 'invited'" [class.text-red-300]="user.auth_status === 'provisioning_failed'">{{ authStatusLabel(user) }}</span><p *ngIf="user.invitation_error_message" class="mt-1 max-w-sm text-xs leading-relaxed text-red-200">{{ user.invitation_error_message }}</p></td>
         <td class="p-4 text-right"><div class="flex justify-end gap-3"><button (click)="openEditModal(user)" class="text-sm text-white hover:text-secondary">Edit</button><button *ngIf="user.auth_status !== 'active'" (click)="resendActivation(user)" class="text-sm text-gray-400 hover:text-white">Resend invitation</button><button (click)="setActive(user, !user.is_active)" class="text-sm text-secondary hover:text-secondary/80">{{ user.is_active ? 'Suspend' : 'Reactivate' }}</button></div></td>
       </tr></tbody>
     </table>

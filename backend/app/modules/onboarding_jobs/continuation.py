@@ -45,7 +45,8 @@ def _result_content(
             parts.append(
                 "You can upload accessible copies later or provide the information manually."
             )
-        parts.append(f"Let's continue: {question_prompt}")
+        if question_prompt.strip():
+            parts.append(f"Let's continue: {question_prompt}")
 
     return "\n\n".join(parts)
 
@@ -138,12 +139,18 @@ def finalize_source_group(
         if proposal.status == pending_value
     )
     question = build_next_question(blockers, final_prompt=final_prompt)
+    # Company logo review is controlled by a dedicated, server-owned stage in
+    # the UI. Persisting another structured question for the same action left
+    # a superseded empty bubble after the logo was selected.
+    exclusive_company_logo = (
+        scope == "company" and question.get("input_type") == "company_logo"
+    )
     content = _result_content(
         sources,
         pending_count=pending_count,
-        question_prompt=question["prompt"],
+        question_prompt="" if exclusive_company_logo else question["prompt"],
     )
-    ui_payload = None if pending_count else question
+    ui_payload = None if pending_count or exclusive_company_logo else question
 
     existing = db.query(message_model).filter(
         message_model.session_id == origin.session_id,

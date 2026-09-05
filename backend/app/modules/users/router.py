@@ -33,6 +33,7 @@ def _tenant_user_response(db: Session, user: User, *, request_replayed: bool = F
         "invitation_status": invitation.status if invitation else None,
         "invitation_delivery": services.invitation_delivery_status(invitation),
         "invitation_error_code": services.invitation_error_code(invitation),
+        "invitation_error_message": services.invitation_error_message(invitation),
         "request_replayed": request_replayed,
         "activated_at": user.activated_at,
         "project_assignment_required": bool(

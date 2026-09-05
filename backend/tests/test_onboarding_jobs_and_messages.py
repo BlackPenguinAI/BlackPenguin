@@ -141,7 +141,8 @@ def test_worker_defers_next_question_when_extracted_proposals_need_review():
     assert 'OnboardingSourceJob.status.in_(["queued", "processing"])' in continuation_source
     assert 'any(_source_value(source, "status") == "processing"' in continuation_source
     assert "pending_count" in continuation_source
-    assert "ui_payload = None if pending_count else question" in continuation_source
+    assert "exclusive_company_logo" in continuation_source
+    assert "ui_payload = None if pending_count or exclusive_company_logo else question" in continuation_source
 
 
 def test_state_does_not_attach_a_question_while_review_is_pending():

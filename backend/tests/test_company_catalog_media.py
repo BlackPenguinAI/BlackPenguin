@@ -1,15 +1,23 @@
 from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
 from app.db.base import Base
+from app.modules.companies.models import Company
 from app.modules.company_onboarding.completion import FIELD_BY_KEY as COMPANY_FIELDS
+from app.modules.company_onboarding.models import CompanyMediaAsset, CompanyProfile, OnboardingMessage
 from app.modules.company_onboarding.overview_service import _contact_list
+from app.modules.company_onboarding.router import select_company_logo
 from app.modules.projects import catalog_service
 from app.modules.projects.completion import FIELD_BY_KEY as PROJECT_FIELDS, calculate_completion
 from app.modules.projects.schemas import PropertyTypeCreate
 from app.modules.projects.models import ProjectPropertyType
 from app.modules.subscriptions.schemas import PlanCreate
+from app.modules.subscriptions.models import SubscriptionPlan
+from app.modules.users.models import User, UserAuthStatus, UserRole
 
 
 def test_catalog_and_media_tables_are_registered():
@@ -29,6 +37,42 @@ def test_project_cover_and_structured_catalog_block_completion_until_resolved():
 
 def test_company_logo_is_recommended_and_can_be_deferred():
     assert COMPANY_FIELDS["company_logo"].requirement == "recommended"
+
+
+def test_selecting_company_logo_records_one_idempotent_confirmation():
+    engine = create_engine(
+        "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool,
+    )
+    Base.metadata.create_all(engine)
+    db = sessionmaker(bind=engine)()
+    try:
+        plan = SubscriptionPlan(name="Logo Test", is_active=True)
+        company = Company(name="Logo Company", plan=plan, is_active=True)
+        db.add_all([plan, company]); db.flush()
+        administrator = User(
+            company_id=company.id, email="admin@logo.example", first_name="Admin",
+            last_name="User", role=UserRole.ADMIN, hashed_password="unused",
+            auth_status=UserAuthStatus.ACTIVE, is_active=True,
+        )
+        asset = CompanyMediaAsset(
+            company_id=company.id, uploaded_by_user_id=None, role="logo_candidate",
+            name="logo.png", mime_type="image/png", size_bytes=2048,
+            sha256="a" * 64, storage_path="companies/logo.png",
+        )
+        db.add_all([administrator, asset]); db.commit(); db.refresh(administrator); db.refresh(asset)
+
+        selected = select_company_logo(asset.id, db, administrator)
+        select_company_logo(asset.id, db, administrator)
+
+        profile = db.query(CompanyProfile).filter_by(company_id=company.id).one()
+        confirmations = db.query(OnboardingMessage).filter(
+            OnboardingMessage.content == "I saved the selected image as the official Company logo.",
+        ).all()
+        assert selected["is_primary"] is True
+        assert profile.profile_data["company_logo"] == asset.id
+        assert len(confirmations) == 1
+    finally:
+        db.close(); engine.dispose()
 
 
 def test_company_overview_contacts_are_split_into_individual_rows():
