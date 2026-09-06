@@ -23,8 +23,8 @@
       <p class="subtitle">Your email has been verified. Create your password to join {{ invitation.company_name || 'Black Penguin' }}.</p>
 
       <div class="context">
-        <div><small>Email</small><span>{{ invitation.email }}</span></div>
-        <div><small>Role</small><span>{{ invitation.role }}</span></div>
+        <div><small>Email</small><span class="email-value">{{ invitation.email }}</span></div>
+        <div><small>Role</small><span class="role-value">{{ invitation.role }}</span></div>
       </div>
 
       <label>New password

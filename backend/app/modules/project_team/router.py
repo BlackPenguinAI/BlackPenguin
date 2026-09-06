@@ -122,6 +122,9 @@ def invite_and_assign_sales_user(
             commit=False,
             send_activation_email=False,
         )
+        # SessionLocal disables autoflush. Persist the access and operational
+        # assignment created by sync_user_project_access before reading it back.
+        db.flush()
         if payload.is_primary:
             db.query(ProjectUserAssignment).filter(
                 ProjectUserAssignment.project_id == project_id,
@@ -130,7 +133,17 @@ def invite_and_assign_sales_user(
         assignment = db.query(ProjectUserAssignment).filter(
             ProjectUserAssignment.project_id == project_id,
             ProjectUserAssignment.user_id == user.id,
-        ).one()
+        ).one_or_none()
+        if assignment is None:
+            assignment = ProjectUserAssignment(
+                project_id=project_id,
+                user_id=user.id,
+                responsibility="sales",
+                is_active=True,
+                accepts_new_leads=True,
+            )
+            db.add(assignment)
+            db.flush()
         assignment.is_primary = payload.is_primary
         db.commit()
         assignment = db.query(ProjectUserAssignment).options(joinedload(ProjectUserAssignment.user)).filter(

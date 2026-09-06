@@ -174,6 +174,11 @@ def _catalog_confirmation_message(result: dict[str, Any], next_prompt: str) -> s
     return f"{summary}.\n\nLet's continue: {next_prompt}"
 
 
+def _cover_confirmation_message(source_name: str, next_prompt: str) -> str:
+    name = source_name.strip() or "the selected image"
+    return f"I saved {name} as the Project cover image.\n\nLet's continue: {next_prompt}"
+
+
 def _next_question(profile) -> dict[str, Any]:
     blockers = services.serialize_profile(profile)["completion"]["blockers"]
     catalog_managed_fields = {
@@ -537,7 +542,8 @@ def set_project_cover(
             f"Confirmed Project cover: {source.name}", commit=False,
         )
         services.save_message(
-            db, source.project.session.id, SenderType.AI, _next_prompt(profile),
+            db, source.project.session.id, SenderType.AI,
+            _cover_confirmation_message(source.name, _next_prompt(profile)),
             ui_payload=_next_question(profile), in_reply_to_message_id=active_question.id,
             commit=False,
         )

@@ -40,7 +40,7 @@
         <div class="flex" [ngClass]="msg.sender === 'user' ? 'justify-end' : 'justify-start'">
           <div *ngIf="msg.sender === 'ai'" class="min-w-0 w-full">
             <app-onboarding-ai-message
-              *ngIf="!isGlobalStructuredQuestion(msg)"
+              *ngIf="!isGlobalStructuredQuestion(msg) || hasPersistedStructuredTransition(msg)"
               [message]="msg"
               [active]="isActiveQuestion(msg)"
               [disabled]="isAnalyzing || profile.completion.can_complete || hasPendingReview"

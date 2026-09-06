@@ -470,6 +470,9 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   isGlobalStructuredQuestion(message: ChatMessage): boolean {
     return ['project_cover', 'property_type_catalog'].includes(message.ui_payload?.input_type || '');
   }
+  hasPersistedStructuredTransition(message: ChatMessage): boolean {
+    return message.sender === 'ai' && /^I saved\b/i.test(message.content.trim());
+  }
   assignSelectedSalesUser(message: ChatMessage): void {
     if (!this.selectedSalesUserId || this.teamBusy) return;
     this.teamBusy = true; this.errorMessage = '';

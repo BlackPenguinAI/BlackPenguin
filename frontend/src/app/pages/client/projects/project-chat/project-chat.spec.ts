@@ -263,6 +263,22 @@ describe('ProjectChatComponent', () => {
     expect(component.showCoverPicker).toBe(true);
   });
 
+  it('keeps a saved cover transition visible while the catalog form becomes active', () => {
+    const message = {
+      id: 'cover-confirmation', sender: 'ai' as const,
+      content: 'I saved harbor-hero.jpg as the Project cover image.\n\nLet\'s continue: Review the catalog.',
+      created_at: new Date(), attachments: [], response_payload: null,
+      ui_payload: {
+        field: 'property_type_catalog', label: 'Property catalog', prompt: 'Review the catalog',
+        input_type: 'property_type_catalog', options: [], examples: [], allow_custom: false,
+        minimum_words: null,
+      },
+    };
+
+    expect(component.isGlobalStructuredQuestion(message)).toBe(true);
+    expect(component.hasPersistedStructuredTransition(message)).toBe(true);
+  });
+
   it('saves only the selected property type and maps server validation to its fields', () => {
     const propertyType: ProjectPropertyType = {
       id: 'type-2', project_id: 'project-1', name: 'Four bedrooms', code: null, description: null,

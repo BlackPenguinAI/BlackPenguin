@@ -15,9 +15,10 @@ from app.modules.projects import catalog_service
 from app.modules.projects.completion import FIELD_BY_KEY as PROJECT_FIELDS, calculate_completion
 from app.modules.projects.schemas import PropertyTypeCreate
 from app.modules.projects.models import (
-    Project, ProjectMessage, ProjectProfile, ProjectPropertyType, ProjectSession, SenderType,
+    Project, ProjectMessage, ProjectOnboardingSource, ProjectProfile, ProjectPropertyType,
+    ProjectSession, ProjectSourceKind, ProjectSourceStatus, SenderType,
 )
-from app.modules.projects.router import confirm_property_type_catalog
+from app.modules.projects.router import confirm_property_type_catalog, set_project_cover
 from app.modules.subscriptions.schemas import PlanCreate
 from app.modules.subscriptions.models import SubscriptionPlan
 from app.modules.users.models import User, UserAuthStatus, UserRole
@@ -262,6 +263,52 @@ def test_confirming_property_catalog_persists_summary_and_next_question_in_chat(
         assert "I saved the Property catalog with 1 confirmed property type: Typology 1." in messages[-1].content
         assert "Let's continue:" in messages[-1].content
         assert messages[-1].ui_payload["input_type"] != "property_type_catalog"
+    finally:
+        db.close(); engine.dispose()
+
+
+def test_confirming_project_cover_persists_visible_transition_to_catalog():
+    engine = create_engine(
+        "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool,
+    )
+    Base.metadata.create_all(engine)
+    db = sessionmaker(bind=engine)()
+    try:
+        plan = SubscriptionPlan(name="Cover Trace Test", is_active=True)
+        company = Company(name="Cover Company", plan=plan, is_active=True)
+        db.add_all([plan, company]); db.flush()
+        administrator = User(
+            company_id=company.id, email="admin@cover.example", first_name="Admin",
+            last_name="User", role=UserRole.ADMIN, hashed_password="unused",
+            auth_status=UserAuthStatus.ACTIVE, is_active=True,
+        )
+        project = Project(company_id=company.id, name="Cover Project")
+        profile = ProjectProfile(project=project, profile_data={}, field_states={}, field_sources={})
+        session = ProjectSession(project=project)
+        source = ProjectOnboardingSource(
+            project=project, kind=ProjectSourceKind.IMAGE, status=ProjectSourceStatus.READY,
+            name="harbor-hero.jpg", mime_type="image/jpeg", storage_path="projects/harbor-hero.jpg",
+        )
+        question = ProjectMessage(
+            session=session, sender=SenderType.AI, content="Choose the Project cover image.",
+            ui_payload={
+                "field": "project_cover", "label": "Project cover",
+                "prompt": "Choose the Project cover image.", "input_type": "project_cover",
+                "options": [], "examples": [], "allow_custom": False,
+            },
+        )
+        db.add_all([administrator, project, profile, session, source, question]); db.commit()
+        db.refresh(administrator); db.refresh(project); db.refresh(source)
+
+        selected = set_project_cover(project.id, source.id, db, administrator)
+
+        messages = db.query(ProjectMessage).filter_by(session_id=session.id).order_by(ProjectMessage.created_at).all()
+        assert selected["is_primary"] is True
+        assert question.response_payload["answer"] == "Confirmed Project cover: harbor-hero.jpg"
+        assert len(messages) == 2
+        assert messages[-1].content.startswith("I saved harbor-hero.jpg as the Project cover image.")
+        assert "Let's continue:" in messages[-1].content
+        assert messages[-1].ui_payload["input_type"] != "project_cover"
     finally:
         db.close(); engine.dispose()
 
