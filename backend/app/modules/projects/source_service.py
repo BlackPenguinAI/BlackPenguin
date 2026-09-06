@@ -321,7 +321,6 @@ async def _extract_proposals(
     existing_names = {
         item.name.casefold() for item in db.query(ProjectPropertyType).filter(
             ProjectPropertyType.project_id == project.id,
-            ProjectPropertyType.review_status != "rejected",
         ).all()
     }
     for index, item in enumerate(payload.get("property_types", []) if isinstance(payload, dict) else []):

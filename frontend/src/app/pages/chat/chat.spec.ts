@@ -376,10 +376,15 @@ describe('ChatComponent', () => {
     expect(component.team.roles.every(role => role.status === 'deferred')).toBe(true);
   });
 
-  it('keeps invited Team members visible after onboarding advances', () => {
+  it('keeps the active Company question last after Team setup advances', () => {
     fixture.detectChanges();
     http.expectOne('http://localhost:8000/api/v1/company-onboarding/chat/state').flush({
-      messages: [], profile: EMPTY_COMPANY_PROFILE, sources: [], stage: 'conditional', version: 1,
+      messages: [{
+        id: 'legal-name-question', sender: 'ai',
+        content: 'Choose the best option for Legal company name, or suggest a different answer.',
+        created_at: new Date().toISOString(), attachments: [],
+        ui_payload: { field: 'legal_company_name', label: 'Legal company name', prompt: 'Choose the best option for Legal company name, or suggest a different answer.', input_type: 'text', options: ['Example LLC'], examples: [], allow_custom: true, minimum_words: null },
+      }], profile: EMPTY_COMPANY_PROFILE, sources: [], stage: 'conditional', version: 1,
       team: {
         administrator: null,
         members: [{ id: 'user-1', first_name: 'Ana', last_name: 'Sales', email: 'ana@example.com', role: 'sales', is_active: false, auth_status: 'invited' }],
@@ -388,9 +393,9 @@ describe('ChatComponent', () => {
       next_question: { field: 'dba', label: 'DBA', prompt: 'DBA?', input_type: 'text', options: [], examples: [], allow_custom: true, minimum_words: null },
     });
     fixture.detectChanges();
-    const summary = (fixture.nativeElement as HTMLElement).querySelector('[data-testid="saved-team-summary"]');
-    expect(summary?.textContent).toContain('Ana Sales');
-    expect(summary?.textContent).toContain('Pending activation');
+    const element = fixture.nativeElement as HTMLElement;
+    expect(element.querySelector('[data-testid="saved-team-summary"]')).toBeNull();
+    expect(element.textContent).toContain('Choose the best option for Legal company name');
   });
 
   it('should not expose the removed session initializer', () => {

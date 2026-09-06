@@ -273,7 +273,18 @@ def confirm_catalog(db: Session, project: Project) -> dict[str, Any]:
 
 
 def create(db: Session, project: Project, payload: dict[str, Any], *, user_id: str) -> ProjectPropertyType:
-    item = ProjectPropertyType(project_id=project.id, created_by_user_id=user_id, updated_by_user_id=user_id, **payload)
+    normalized_name = str(payload.get("name") or "").strip()
+    item = db.query(ProjectPropertyType).filter(
+        ProjectPropertyType.project_id == project.id,
+        ProjectPropertyType.review_status == "rejected",
+        func.lower(ProjectPropertyType.name) == normalized_name.casefold(),
+    ).first()
+    if item:
+        for key, value in payload.items():
+            setattr(item, key, value)
+        item.updated_by_user_id = user_id
+    else:
+        item = ProjectPropertyType(project_id=project.id, created_by_user_id=user_id, updated_by_user_id=user_id, **payload)
     _validate_unique_name(db, project, item)
     if item.review_status == "confirmed":
         _validate_confirmation(db, project, item)
@@ -283,6 +294,17 @@ def create(db: Session, project: Project, payload: dict[str, Any], *, user_id: s
     db.commit()
     db.refresh(item)
     return item
+
+
+def remove(db: Session, project: Project, item: ProjectPropertyType) -> None:
+    if item.review_status == "candidate":
+        item.review_status = "rejected"
+        db.add(item)
+    else:
+        db.delete(item)
+    db.flush()
+    _sync_profile(db, project)
+    db.commit()
 
 
 def update(db: Session, project: Project, item: ProjectPropertyType, payload: dict[str, Any], *, user_id: str) -> ProjectPropertyType:

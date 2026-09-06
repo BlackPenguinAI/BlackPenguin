@@ -258,24 +258,6 @@
         </section>
       </div>
 
-      <div *ngIf="currentStage !== 'team' && team.members.length" class="flex max-w-3xl gap-4" data-testid="saved-team-summary">
-        <div class="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-green-500/40 bg-green-500/10">
-          <span class="material-symbols-outlined text-[18px] text-green-400">group</span>
-        </div>
-        <section class="w-full rounded-2xl rounded-tl-sm border border-green-500/20 bg-green-500/[0.05] p-4">
-          <div class="flex items-start justify-between gap-3">
-            <div><h2 class="text-sm font-semibold text-green-300">Team setup saved</h2><p class="mt-1 text-[11px] text-gray-400">Invited users remain available while you continue the Company Profile.</p></div>
-            <a routerLink="/app/users" class="shrink-0 text-[10px] font-semibold text-secondary hover:underline">Manage users</a>
-          </div>
-          <div class="mt-3 flex flex-wrap gap-2">
-            <span *ngFor="let member of team.members" class="rounded-full border border-white/10 bg-black/20 px-3 py-1.5 text-[10px] text-gray-300">
-              {{ member.first_name }} {{ member.last_name }} · {{ member.role === 'mkt' ? 'Marketing' : member.role }} ·
-              <strong [ngClass]="member.auth_status === 'active' ? 'text-green-400' : (member.auth_status === 'provisioning_failed' ? 'text-red-300' : 'text-amber-300')">{{ teamMemberStatusLabel(member) }}</strong>
-            </span>
-          </div>
-        </section>
-      </div>
-
       <div *ngIf="currentStage === 'logo_review'" class="flex max-w-3xl gap-4" data-testid="company-logo-step">
         <div class="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-secondary/50 bg-secondary/20"><span class="material-symbols-outlined text-[18px] text-secondary">image</span></div>
         <section class="w-full rounded-2xl rounded-tl-sm border border-white/10 bg-white/5 p-4 md:p-5">

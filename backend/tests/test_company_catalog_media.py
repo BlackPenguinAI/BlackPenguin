@@ -14,7 +14,7 @@ from app.modules.company_onboarding.router import select_company_logo
 from app.modules.projects import catalog_service
 from app.modules.projects.completion import FIELD_BY_KEY as PROJECT_FIELDS, calculate_completion
 from app.modules.projects.schemas import PropertyTypeCreate
-from app.modules.projects.models import ProjectPropertyType
+from app.modules.projects.models import Project, ProjectProfile, ProjectPropertyType
 from app.modules.subscriptions.schemas import PlanCreate
 from app.modules.subscriptions.models import SubscriptionPlan
 from app.modules.users.models import User, UserAuthStatus, UserRole
@@ -158,6 +158,63 @@ def test_duplicate_property_type_name_returns_a_structured_conflict():
     assert error.value.status_code == 409
     assert error.value.detail["code"] == "duplicate_property_type_name"
     assert "name" in error.value.detail["field_errors"]
+
+
+def test_removing_an_extracted_property_candidate_hides_it_without_deleting_audit_history():
+    engine = create_engine(
+        "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool,
+    )
+    Base.metadata.create_all(engine)
+    db = sessionmaker(bind=engine)()
+    try:
+        plan = SubscriptionPlan(name="Catalog Test", is_active=True)
+        company = Company(name="Catalog Company", plan=plan, is_active=True)
+        db.add_all([plan, company]); db.flush()
+        project = Project(company_id=company.id, name="Catalog Project")
+        profile = ProjectProfile(project=project, profile_data={}, field_states={}, field_sources={})
+        candidate = ProjectPropertyType(
+            project=project, name="Bayside Collection", review_status="candidate",
+            source_reference="https://example.com/property",
+        )
+        db.add_all([project, profile, candidate]); db.commit(); db.refresh(candidate)
+
+        catalog_service.remove(db, project, candidate)
+
+        hidden = catalog_service.catalog(db, project)
+        persisted = db.query(ProjectPropertyType).filter_by(id=candidate.id).one()
+        assert hidden["items"] == []
+        assert hidden["candidate_count"] == 0
+        assert persisted.review_status == "rejected"
+    finally:
+        db.close(); engine.dispose()
+
+
+def test_manual_property_can_restore_a_previously_rejected_candidate():
+    engine = create_engine(
+        "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool,
+    )
+    Base.metadata.create_all(engine)
+    db = sessionmaker(bind=engine)()
+    try:
+        plan = SubscriptionPlan(name="Restore Test", is_active=True)
+        company = Company(name="Restore Company", plan=plan, is_active=True)
+        db.add_all([plan, company]); db.flush()
+        project = Project(company_id=company.id, name="Restore Project")
+        profile = ProjectProfile(project=project, profile_data={}, field_states={}, field_sources={})
+        rejected = ProjectPropertyType(project=project, name="Bayside Collection", review_status="rejected")
+        db.add_all([project, profile, rejected]); db.commit(); db.refresh(rejected)
+
+        restored = catalog_service.create(db, project, {
+            "name": "Bayside Collection", "review_status": "confirmed",
+            "available_units": 3, "starting_price": Decimal("450000"),
+            "currency": "USD", "inventory_updated_at": datetime.utcnow(),
+        }, user_id="user-1")
+
+        assert restored.id == rejected.id
+        assert restored.review_status == "confirmed"
+        assert catalog_service.catalog(db, project)["confirmed_count"] == 1
+    finally:
+        db.close(); engine.dispose()
 
 
 def test_plan_has_independent_property_type_and_unit_limits():

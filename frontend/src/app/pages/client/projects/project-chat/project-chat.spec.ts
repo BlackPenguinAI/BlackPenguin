@@ -28,7 +28,15 @@ describe('ProjectChatComponent', () => {
     http = TestBed.inject(HttpTestingController);
   });
 
-  afterEach(() => http.verify());
+  afterEach(() => {
+    for (const request of http.match((candidate) => candidate.url.endsWith('/property-types'))) {
+      request.flush({
+        items: [], confirmed_count: 0, candidate_count: 0,
+        limit: 20, remaining: 20, catalog_complete: false,
+      });
+    }
+    http.verify();
+  });
 
   it('should create', () => {
     expect(component).toBeTruthy();
@@ -285,6 +293,56 @@ describe('ProjectChatComponent', () => {
     expect(component.isPropertyTypeSaving(propertyType)).toBe(false);
     expect(component.propertyTypeError(propertyType, 'inventory_updated_at')).toContain('inventory update date');
     expect(component.errorMessage).toBe('');
+  });
+
+  it('removes an extracted property suggestion and refreshes the active catalog step', () => {
+    const propertyType: ProjectPropertyType = {
+      id: 'type-candidate', project_id: 'project-1', name: 'Bayside Collection', code: null, description: null,
+      bedrooms: null, bathrooms: null, area_min: null, area_max: null, area_unit: null,
+      total_units: null, available_units: null, starting_price: null, maximum_price: null,
+      currency: null, features: [], inventory_updated_at: null, images_status: 'pending',
+      review_status: 'candidate', source_reference: 'https://example.com', sort_order: 0, is_complete: false,
+      media: [], created_at: '2026-09-01T00:00:00Z', updated_at: '2026-09-01T00:00:00Z',
+    };
+    component.projectId = 'project-1';
+    component.propertyCatalog = {
+      items: [propertyType], confirmed_count: 0, candidate_count: 1,
+      limit: 20, remaining: 20, catalog_complete: false,
+    };
+
+    component.rejectPropertyType(propertyType);
+
+    expect(component.removingPropertyTypeIds.has(propertyType.id)).toBe(true);
+    http.expectOne('http://localhost:8000/api/v1/projects/project-1/property-types/type-candidate')
+      .flush(null, { status: 204, statusText: 'No Content' });
+    expect(component.propertyCatalog.items).toEqual([]);
+    expect(component.propertyCatalog.candidate_count).toBe(0);
+
+    http.expectOne('http://localhost:8000/api/v1/projects/project-1/chat/state').flush({
+      messages: [], profile: EMPTY_PROJECT_PROFILE, sources: [], stage: 'conversation', version: 1,
+      next_question: {
+        field: 'property_type_catalog', label: 'Property catalog', prompt: 'Review catalog',
+        input_type: 'property_type_catalog', options: [], examples: [], allow_custom: false, minimum_words: null,
+      },
+    });
+    http.expectOne('http://localhost:8000/api/v1/projects/project-1/property-types').flush({
+      items: [], confirmed_count: 0, candidate_count: 0,
+      limit: 20, remaining: 20, catalog_complete: false,
+    });
+    expect(component.removingPropertyTypeIds.has(propertyType.id)).toBe(false);
+  });
+
+  it('shows a useful error when a property suggestion cannot be removed', () => {
+    const propertyType = { id: 'type-candidate', review_status: 'candidate' } as ProjectPropertyType;
+    component.projectId = 'project-1';
+
+    component.rejectPropertyType(propertyType);
+    http.expectOne('http://localhost:8000/api/v1/projects/project-1/property-types/type-candidate').flush({
+      detail: { message: 'The catalog changed. Refresh and try again.' },
+    }, { status: 409, statusText: 'Conflict' });
+
+    expect(component.errorMessage).toBe('The catalog changed. Refresh and try again.');
+    expect(component.removingPropertyTypeIds.has(propertyType.id)).toBe(false);
   });
 
   it('keeps operational routing and Meta sections out of the Project Profile list', () => {

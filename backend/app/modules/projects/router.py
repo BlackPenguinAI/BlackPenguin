@@ -633,7 +633,11 @@ def delete_property_type(
 ):
     project = services.get_project(db, project_id, current_user.company_id)
     item = _property_type(db, project.id, property_type_id)
-    db.delete(item); db.flush(); catalog_service._sync_profile(db, project); db.commit()
+    try:
+        catalog_service.remove(db, project, item)
+    except Exception:
+        db.rollback()
+        raise
     return Response(status_code=204)
 
 

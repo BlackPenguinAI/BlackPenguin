@@ -74,6 +74,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   metaSetupMessage = '';
   propertyCatalog: PropertyTypeCatalog = { items: [], confirmed_count: 0, candidate_count: 0, limit: 0, remaining: 0, catalog_complete: false };
   readonly savingPropertyTypeIds = new Set<string>();
+  readonly removingPropertyTypeIds = new Set<string>();
   readonly propertyTypeServerErrors = new Map<string, FormErrors>();
   readonly dirtyPropertyTypeIds = new Set<string>();
   creatingPropertyType = false;
@@ -330,11 +331,26 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   }
 
   rejectPropertyType(item: ProjectPropertyType): void {
-    this.onboarding.deletePropertyType(this.projectId, item.id).subscribe({
+    if (this.removingPropertyTypeIds.has(item.id)) return;
+    this.removingPropertyTypeIds.add(item.id);
+    this.errorMessage = '';
+    this.onboarding.deletePropertyType(this.projectId, item.id).pipe(
+      timeout(20_000),
+      finalize(() => { this.removingPropertyTypeIds.delete(item.id); this.cdr.detectChanges(); }),
+    ).subscribe({
       next: () => {
         this.dirtyPropertyTypeIds.delete(item.id);
         this.propertyTypeServerErrors.delete(item.id);
-        this.loadPropertyTypes();
+        this.propertyCatalog = {
+          ...this.propertyCatalog,
+          items: this.propertyCatalog.items.filter(candidate => candidate.id !== item.id),
+          candidate_count: Math.max(0, this.propertyCatalog.candidate_count - (item.review_status === 'candidate' ? 1 : 0)),
+          confirmed_count: Math.max(0, this.propertyCatalog.confirmed_count - (item.review_status === 'confirmed' ? 1 : 0)),
+        };
+        this.syncState('none');
+      },
+      error: (error: HttpErrorResponse) => {
+        this.errorMessage = this.apiDetail(error, 'This property type could not be removed. Refresh the catalog and try again.');
       },
     });
   }
