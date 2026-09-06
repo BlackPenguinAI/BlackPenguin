@@ -4,7 +4,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { marked } from 'marked';
-import { finalize, Subscription, timeout } from 'rxjs';
+import { catchError, finalize, of, Subscription, switchMap, timeout } from 'rxjs';
 
 import { SpeechRecognitionService } from '../../../../core/services/speech-recognition.service';
 import { OnboardingQuestion } from '../../../../shared/ui/onboarding-response-options/onboarding-response-options';
@@ -84,6 +84,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   selectedCoverSourceId: string | null = null;
   showPropertyTypeForm = false;
   propertyTypeDraft: Partial<ProjectPropertyType> = this.emptyPropertyType();
+  readonly propertyTypeDraftImageSelection = new Set<string>();
   readonly propertyTypeImageSelection = new Map<string, Set<string>>();
   readonly areaUnits = ['m²', 'ft²', 'ha', 'acres'];
   readonly currencies = [
@@ -284,8 +285,19 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     if (!this.canSavePropertyType(this.propertyTypeDraft)) return;
     this.creatingPropertyType = true;
     this.errorMessage = '';
+    const selectedImageIds = [...this.propertyTypeDraftImageSelection];
     this.onboarding.createPropertyType(this.projectId, toPropertyTypePayload(this.propertyTypeDraft)).pipe(
       timeout(20_000),
+      switchMap(updated => {
+        if (!selectedImageIds.length) return of(updated);
+        return this.onboarding.attachPropertyTypeMedia(this.projectId, updated.id, selectedImageIds).pipe(
+          catchError(() => {
+            this.propertyTypeImageSelection.set(updated.id, new Set(selectedImageIds));
+            this.errorMessage = 'The property type was saved, but its images could not be attached. The selection is ready to retry.';
+            return of(updated);
+          }),
+        );
+      }),
       finalize(() => { this.creatingPropertyType = false; this.cdr.detectChanges(); }),
     ).subscribe({
       next: updated => {
@@ -297,6 +309,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
         };
         this.showPropertyTypeForm = false;
         this.propertyTypeDraft = this.emptyPropertyType();
+        this.propertyTypeDraftImageSelection.clear();
         this.syncState('none');
       },
       error: (error: HttpErrorResponse) => this.handlePropertyTypeError(null, error, 'The property type could not be saved.'),
@@ -359,6 +372,12 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     const selected = this.propertyTypeImageSelection.get(item.id) || new Set<string>();
     selected.has(sourceId) ? selected.delete(sourceId) : selected.add(sourceId);
     this.propertyTypeImageSelection.set(item.id, selected);
+  }
+
+  toggleDraftPropertyTypeImage(sourceId: string): void {
+    this.propertyTypeDraftImageSelection.has(sourceId)
+      ? this.propertyTypeDraftImageSelection.delete(sourceId)
+      : this.propertyTypeDraftImageSelection.add(sourceId);
   }
 
   attachSelectedImages(item: ProjectPropertyType): void {

@@ -163,6 +163,17 @@ def _next_prompt(profile) -> str:
     return _next_question(profile)["prompt"]
 
 
+def _catalog_confirmation_message(result: dict[str, Any], next_prompt: str) -> str:
+    items = [item for item in result.get("items", []) if item.get("review_status") == "confirmed"]
+    names = [str(item.get("name") or "").strip() for item in items if str(item.get("name") or "").strip()]
+    count = len(names)
+    noun = "property type" if count == 1 else "property types"
+    summary = f"I saved the Property catalog with {count} confirmed {noun}"
+    if names:
+        summary += ": " + ", ".join(names)
+    return f"{summary}.\n\nLet's continue: {next_prompt}"
+
+
 def _next_question(profile) -> dict[str, Any]:
     blockers = services.serialize_profile(profile)["completion"]["blockers"]
     catalog_managed_fields = {
@@ -590,9 +601,11 @@ def confirm_property_type_catalog(
             db, project.session.id, active_question.id,
             "Confirmed the current property type catalog", commit=False,
         )
+        next_question = _next_question(profile)
         services.save_message(
-            db, project.session.id, SenderType.AI, _next_prompt(profile),
-            ui_payload=_next_question(profile), in_reply_to_message_id=active_question.id,
+            db, project.session.id, SenderType.AI,
+            _catalog_confirmation_message(result, next_question["prompt"]),
+            ui_payload=next_question, in_reply_to_message_id=active_question.id,
             commit=False,
         )
         db.commit()

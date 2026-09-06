@@ -345,6 +345,62 @@ describe('ProjectChatComponent', () => {
     expect(component.removingPropertyTypeIds.has(propertyType.id)).toBe(false);
   });
 
+  it('keeps an empty Property catalog explicit until the user chooses to add a type', () => {
+    component.propertyCatalog = {
+      items: [], confirmed_count: 0, candidate_count: 0,
+      limit: 30, remaining: 30, catalog_complete: false,
+    };
+
+    expect(component.showPropertyTypeForm).toBe(false);
+    expect(component.propertyCatalog.items).toEqual([]);
+  });
+
+  it('attaches images selected before saving the first property type', () => {
+    const created: ProjectPropertyType = {
+      id: 'type-new', project_id: 'project-1', name: 'Typology 1', code: null, description: null,
+      bedrooms: null, bathrooms: null, area_min: null, area_max: null, area_unit: 'm²',
+      total_units: 10, available_units: 10, starting_price: 50000, maximum_price: 60000,
+      currency: 'USD', features: [], inventory_updated_at: '2026-09-06', images_status: 'pending',
+      review_status: 'confirmed', source_reference: null, sort_order: 0, is_complete: true,
+      media: [], created_at: '2026-09-06T00:00:00Z', updated_at: '2026-09-06T00:00:00Z',
+    };
+    component.projectId = 'project-1';
+    component.showPropertyTypeForm = true;
+    component.propertyTypeDraft = {
+      name: 'Typology 1', total_units: 10, available_units: 10,
+      starting_price: 50000, maximum_price: 60000, currency: 'USD',
+      area_unit: 'm²', inventory_updated_at: '2026-09-06',
+    };
+    component.toggleDraftPropertyTypeImage('image-1');
+    component.toggleDraftPropertyTypeImage('image-2');
+
+    component.saveNewPropertyType();
+
+    const create = http.expectOne('http://localhost:8000/api/v1/projects/project-1/property-types');
+    expect(create.request.method).toBe('POST');
+    create.flush(created);
+    const attach = http.expectOne('http://localhost:8000/api/v1/projects/project-1/property-types/type-new/media');
+    expect(attach.request.body).toEqual({ source_ids: ['image-1', 'image-2'] });
+    attach.flush({
+      ...created, images_status: 'provided',
+      media: [
+        { id: 'media-1', source_id: 'image-1', caption: null, sort_order: 0, image_url: '/image-1' },
+        { id: 'media-2', source_id: 'image-2', caption: null, sort_order: 1, image_url: '/image-2' },
+      ],
+    });
+
+    expect(component.showPropertyTypeForm).toBe(false);
+    expect(component.propertyTypeDraftImageSelection.size).toBe(0);
+    expect(component.propertyCatalog.items[0].media).toHaveLength(2);
+    http.expectOne('http://localhost:8000/api/v1/projects/project-1/chat/state').flush({
+      messages: [], profile: EMPTY_PROJECT_PROFILE, sources: [], stage: 'conversation', version: 1,
+      next_question: {
+        field: 'property_type_catalog', label: 'Property catalog', prompt: 'Review catalog',
+        input_type: 'property_type_catalog', options: [], examples: [], allow_custom: false, minimum_words: null,
+      },
+    });
+  });
+
   it('keeps operational routing and Meta sections out of the Project Profile list', () => {
     component.profile = {
       ...EMPTY_PROJECT_PROFILE,

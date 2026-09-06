@@ -14,7 +14,10 @@ from app.modules.company_onboarding.router import select_company_logo
 from app.modules.projects import catalog_service
 from app.modules.projects.completion import FIELD_BY_KEY as PROJECT_FIELDS, calculate_completion
 from app.modules.projects.schemas import PropertyTypeCreate
-from app.modules.projects.models import Project, ProjectProfile, ProjectPropertyType
+from app.modules.projects.models import (
+    Project, ProjectMessage, ProjectProfile, ProjectPropertyType, ProjectSession, SenderType,
+)
+from app.modules.projects.router import confirm_property_type_catalog
 from app.modules.subscriptions.schemas import PlanCreate
 from app.modules.subscriptions.models import SubscriptionPlan
 from app.modules.users.models import User, UserAuthStatus, UserRole
@@ -213,6 +216,52 @@ def test_manual_property_can_restore_a_previously_rejected_candidate():
         assert restored.id == rejected.id
         assert restored.review_status == "confirmed"
         assert catalog_service.catalog(db, project)["confirmed_count"] == 1
+    finally:
+        db.close(); engine.dispose()
+
+
+def test_confirming_property_catalog_persists_summary_and_next_question_in_chat():
+    engine = create_engine(
+        "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool,
+    )
+    Base.metadata.create_all(engine)
+    db = sessionmaker(bind=engine)()
+    try:
+        plan = SubscriptionPlan(name="Catalog Trace Test", is_active=True)
+        company = Company(name="Trace Company", plan=plan, is_active=True)
+        db.add_all([plan, company]); db.flush()
+        administrator = User(
+            company_id=company.id, email="admin@trace.example", first_name="Admin",
+            last_name="User", role=UserRole.ADMIN, hashed_password="unused",
+            auth_status=UserAuthStatus.ACTIVE, is_active=True,
+        )
+        project = Project(company_id=company.id, name="Trace Project")
+        profile = ProjectProfile(project=project, profile_data={}, field_states={}, field_sources={})
+        session = ProjectSession(project=project)
+        property_type = ProjectPropertyType(
+            project=project, name="Typology 1", review_status="confirmed",
+            available_units=10, starting_price=Decimal("50000"), currency="USD",
+            inventory_updated_at=datetime.utcnow(),
+        )
+        question = ProjectMessage(
+            session=session, sender=SenderType.AI, content="Review the Property catalog.",
+            ui_payload={
+                "field": "property_type_catalog", "label": "Property catalog",
+                "prompt": "Review the Property catalog.", "input_type": "property_type_catalog",
+                "options": [], "examples": [], "allow_custom": False,
+            },
+        )
+        db.add_all([administrator, project, profile, session, property_type, question]); db.commit()
+        db.refresh(administrator); db.refresh(project)
+
+        confirm_property_type_catalog(project.id, db, administrator)
+
+        messages = db.query(ProjectMessage).filter_by(session_id=session.id).order_by(ProjectMessage.created_at).all()
+        assert question.response_payload["answer"] == "Confirmed the current property type catalog"
+        assert len(messages) == 2
+        assert "I saved the Property catalog with 1 confirmed property type: Typology 1." in messages[-1].content
+        assert "Let's continue:" in messages[-1].content
+        assert messages[-1].ui_payload["input_type"] != "property_type_catalog"
     finally:
         db.close(); engine.dispose()
 
