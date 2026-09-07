@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectorRef, Component, ElementRef, OnInit, ViewChild } from '@angular/core';
+import { ChangeDetectorRef, Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { ActivatedRoute } from '@angular/router';
@@ -13,7 +13,7 @@ import { API_V1_URL } from '../../../core/config/api.config';
   templateUrl: './agent.html',
   styleUrls: ['./agent.scss'],
 })
-export class AgentComponent implements OnInit {
+export class AgentComponent implements OnInit, OnDestroy {
   role = typeof localStorage === 'undefined' ? '' : localStorage.getItem('bp_role') || '';
   @ViewChild('thread') thread?: ElementRef<HTMLElement>;
   options: any[] = [];
@@ -36,6 +36,11 @@ export class AgentComponent implements OnInit {
   liveProgress = '';
   private liveProgressTimer?: ReturnType<typeof setInterval>;
   private liveSubmissionKey = '';
+  private conversationPollTimer?: ReturnType<typeof setTimeout>;
+  private conversationPolling = false;
+  private conversationPollingEnabled = false;
+  private knownConversationIds = new Set<string>();
+  private conversationSnapshotReady = false;
   search = '';
   filter = 'all';
   draft = '';
@@ -60,12 +65,19 @@ export class AgentComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
+    this.conversationPollingEnabled = true;
     if (this.role === 'sales') {
       this.setupOpen = false;
       this.loadConversations();
     } else {
       this.loadOptions();
     }
+  }
+
+  ngOnDestroy(): void {
+    this.conversationPollingEnabled = false;
+    if (this.liveProgressTimer) clearInterval(this.liveProgressTimer);
+    if (this.conversationPollTimer) clearTimeout(this.conversationPollTimer);
   }
 
   loadOptions(): void {
@@ -154,6 +166,7 @@ export class AgentComponent implements OnInit {
       .subscribe({
         next: (rows) => {
           this.conversations = rows;
+          this.rememberConversations(rows);
           const requestedLead = this.route.snapshot.queryParamMap.get('lead');
           const next =
             rows.find((row) => row.id === preferredConversationId) ||
@@ -167,13 +180,61 @@ export class AgentComponent implements OnInit {
             this.setupOpen = preserveSetup || !next;
           }
           this.cdr.markForCheck();
+          this.scheduleConversationPoll();
         },
         error: (err) => {
           this.loading = false;
           this.error = err.error?.detail || 'Conversations could not be loaded.';
           this.cdr.markForCheck();
+          this.scheduleConversationPoll();
         },
       });
+  }
+
+  private scheduleConversationPoll(): void {
+    if (!this.conversationPollingEnabled) return;
+    if (this.conversationPollTimer) clearTimeout(this.conversationPollTimer);
+    this.conversationPollTimer = setTimeout(() => this.pollConversations(), 2000);
+  }
+
+  private pollConversations(): void {
+    if (this.conversationPolling) {
+      this.scheduleConversationPoll();
+      return;
+    }
+    if (typeof document !== 'undefined' && document.hidden) {
+      this.scheduleConversationPoll();
+      return;
+    }
+    this.conversationPolling = true;
+    const url = this.projectId
+      ? `${API_V1_URL}/sales-agent/conversations?project_id=${encodeURIComponent(this.projectId)}`
+      : `${API_V1_URL}/sales-agent/conversations`;
+    this.http.get<any[]>(url).pipe(finalize(() => {
+      this.conversationPolling = false;
+      this.scheduleConversationPoll();
+    })).subscribe({
+      next: (rows) => {
+        const incoming = this.conversationSnapshotReady
+          ? rows.find((row) => row.platform === 'meta' && !this.knownConversationIds.has(row.id))
+          : null;
+        this.conversations = rows;
+        this.rememberConversations(rows);
+        if (incoming) {
+          this.success = `New Meta lead received: ${incoming.lead_name}.`;
+          this.select(incoming);
+        } else {
+          const current = rows.find((row) => row.id === this.selected?.id);
+          if (current) this.selected = current;
+        }
+        this.cdr.markForCheck();
+      },
+    });
+  }
+
+  private rememberConversations(rows: any[]): void {
+    rows.forEach((row) => this.knownConversationIds.add(row.id));
+    this.conversationSnapshotReady = true;
   }
 
   startSimulation(): void {
@@ -427,6 +488,7 @@ export class AgentComponent implements OnInit {
   }
 
   get isLive(): boolean { return this.selected?.channel === 'sms'; }
+  get isMetaSimulation(): boolean { return this.selected?.platform === 'meta' && !this.isLive; }
   get canManualControl(): boolean { return this.role === 'admin' || this.role === 'assistant'; }
 
   refreshConversationSummaries(): void {

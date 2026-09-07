@@ -99,6 +99,8 @@ class ConversationSummary(BaseModel):
     project_id: str
     campaign_id: str | None = None
     channel: str
+    platform: str = "manual"
+    source: str = "Unknown"
     stage: str
     automation_level: int
     is_paused: bool

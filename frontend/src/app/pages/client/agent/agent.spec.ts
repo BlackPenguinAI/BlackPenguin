@@ -107,6 +107,24 @@ describe('AgentComponent simulation form', () => {
     expect(urls.every(url => url.endsWith('/sales-agent/conversations'))).toBe(true);
   });
 
+  it('detects and opens a newly arrived Meta conversation without a page reload', () => {
+    const incoming = {
+      id: 'meta-conversation', lead_id: 'meta-lead', lead_name: 'Meta Lead',
+      platform: 'meta', channel: 'simulation', is_paused: false,
+    };
+    const http = {
+      get: (url: string) => url.includes('/messages') ? of([]) : of([incoming]),
+    };
+    const value = component(http);
+    (value as any).conversationSnapshotReady = true;
+    (value as any).knownConversationIds = new Set(['existing']);
+
+    (value as any).pollConversations();
+
+    expect(value.selected?.id).toBe('meta-conversation');
+    expect(value.success).toContain('New Meta lead received');
+  });
+
   it('sends with Enter, preserves Shift+Enter and ignores IME composition', () => {
     const value = component();
     let sends = 0;

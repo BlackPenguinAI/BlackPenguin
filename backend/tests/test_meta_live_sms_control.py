@@ -17,6 +17,8 @@ from app.modules.companies.models import Company
 from app.modules.meta_leads.router import _resolve_campaign, router as meta_leads_router
 from app.modules.projects.models import MetaConnection, Project, ProjectCampaign, ProjectProfile, ProjectPropertyType
 from app.modules.sales_agent.live_test_service import create_live_meta_test
+from app.modules.sales_agent.live_service import launch_live_lead
+from app.modules.sales_agent.service import simulate_turn
 from app.modules.sales_agent.models import SalesConversation, SalesConversationLeadContext, SalesMessage
 from app.modules.sales_crm.models import Lead, LeadContact
 from app.modules.system_settings.models import TwilioConfig
@@ -98,6 +100,49 @@ def test_manual_meta_control_is_one_idempotent_real_sms_action():
     assert db.query(Lead).filter_by(platform="meta_test").count() == 1
     assert db.query(SalesMessage).count() == 1
     assert sms.await_count == 1
+
+
+def test_real_meta_lead_opens_an_idempotent_simulation_when_twilio_is_disabled():
+    db = _db(); company = Company(name="Tenant A"); db.add(company); db.flush()
+    project, campaign, _ = _project(db, company)
+    lead = Lead(
+        company_id=company.id, project_id=project.id, campaign_id=campaign.id,
+        full_name="Meta Demo Lead", phone="+13055550142", email="meta@example.com",
+        source="Meta Lead Ads", platform="meta", external_lead_id="meta-lead-1",
+        preferred_channel="sms", channel_address="+13055550142",
+        consent_status="captured_by_source", agent_status="queued", is_demo=False,
+    )
+    db.add_all([lead, TwilioConfig(
+        live_sms_enabled=False, verification_status="not_configured",
+    )]); db.commit()
+
+    first_conversation, first_message = asyncio.run(launch_live_lead(db, lead))
+    second_conversation, second_message = asyncio.run(launch_live_lead(db, lead))
+
+    assert first_conversation.id == second_conversation.id
+    assert first_conversation.channel == "simulation"
+    assert first_conversation.is_paused is False
+    assert first_message.id == second_message.id
+    assert first_message.status == "simulated"
+    assert first_message.metadata_json["delivery"] == "not_sent"
+    assert db.query(SalesConversation).count() == 1
+    assert db.query(SalesMessage).count() == 1
+    db.refresh(lead)
+    assert lead.agent_status == "simulation"
+    assert lead.is_demo is False
+
+    reply = (
+        '{"reply":"Thanks. Which property type interests you?","intent":"qualification",'
+        '"extracted_facts":[],"proposed_actions":[{"type":"ask_qualification_question"}],'
+        '"requires_human":false,"reason":"Continue qualification"}'
+    )
+    with patch("app.modules.sales_agent.graph.generate_llm_response", new=AsyncMock(return_value=reply)):
+        turn = asyncio.run(simulate_turn(
+            db, company_id=company.id, lead_id=lead.id,
+            inbound_text="I want more information about the project.",
+        ))
+    assert turn["reply"].startswith("Thanks")
+    assert db.query(SalesMessage).count() == 3
 
 
 def test_same_company_phone_keeps_one_thread_and_changes_project_context():

@@ -271,6 +271,7 @@ def conversation_summaries(
         result.append({
             "id": conversation.id, "lead_id": lead.id, "project_id": project.id,
             "campaign_id": conversation.campaign_id, "channel": conversation.channel,
+            "platform": lead.platform, "source": lead.source,
             "stage": conversation.stage, "automation_level": conversation.automation_level,
             "is_paused": conversation.is_paused, "updated_at": conversation.updated_at,
             "lead_name": lead.full_name, "phone": lead.phone,
@@ -414,7 +415,14 @@ async def simulate_turn(
     project = db.query(Project).filter(Project.id == lead.project_id, Project.company_id == company_id).first()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found.")
-    if not lead.is_demo:
+    meta_simulation = db.query(SalesConversation).filter(
+        SalesConversation.lead_id == lead.id,
+        SalesConversation.company_id == company_id,
+        SalesConversation.channel == "simulation",
+    ).first()
+    if not lead.is_demo and not (
+        lead.platform == "meta" and lead.agent_status == "simulation" and meta_simulation
+    ):
         raise HTTPException(status_code=409, detail="This endpoint accepts simulation leads only.")
     event_id = event_id or f"simulation:{uuid.uuid4()}"
     existing = db.query(AgentRun).filter(AgentRun.event_id == event_id).first()
@@ -422,7 +430,7 @@ async def simulate_turn(
         output = existing.output_snapshot or {}
         return _response(existing, output)
 
-    conversation = get_or_create_conversation(db, lead, channel="simulation")
+    conversation = meta_simulation or get_or_create_conversation(db, lead, channel="simulation")
     simulation = db.query(SalesAgentSimulation).filter(
         SalesAgentSimulation.lead_id == lead.id,
         SalesAgentSimulation.conversation_id == conversation.id,

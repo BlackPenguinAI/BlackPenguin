@@ -20,9 +20,9 @@
   <div class="demo-banner" [class.live-warning]="setupOpen && setupMode === 'live_meta'" *ngIf="role !== 'sales' && (setupOpen || !selected || !isLive)">
     <span class="material-symbols-outlined">science</span>
     <div>
-      <strong>{{ setupOpen && setupMode === 'live_meta' ? 'Live delivery test' : 'Safe simulation' }}</strong
+      <strong>{{ setupOpen && setupMode === 'live_meta' ? 'Live delivery test' : (isMetaSimulation ? 'Real Meta lead · simulated delivery' : 'Safe simulation') }}</strong
       ><small
-        >{{ setupOpen && setupMode === 'live_meta' ? 'One submission creates a test-marked lead and sends a real SMS through Twilio. Carrier charges apply.' : 'No SMS or calendar event is sent. The same prompt, Project context, follow-up and routing contracts are exercised.' }}</small
+        >{{ setupOpen && setupMode === 'live_meta' ? 'One submission creates a test-marked lead and sends a real SMS through Twilio. Carrier charges apply.' : (isMetaSimulation ? 'This lead came from the configured Meta form. Twilio is disabled, so replies stay inside Black Penguin and no SMS is sent.' : 'No SMS or calendar event is sent. The same prompt, Project context, follow-up and routing contracts are exercised.') }}</small
       >
     </div>
   </div>
@@ -190,7 +190,7 @@
     <aside class="inbox">
       <div class="inbox-top">
         <h2>
-          {{ role === 'sales' ? 'Assigned leads' : 'Test leads' }} <b>{{ conversations.length }}</b>
+          {{ role === 'sales' ? 'Assigned leads' : 'Conversations' }} <b>{{ conversations.length }}</b>
         </h2>
         <input [(ngModel)]="search" placeholder="Search lead or phone" />
       </div>
@@ -322,14 +322,14 @@
         <dd>{{ selected.approval_status || 'pending' }}</dd>
         <ng-container *ngIf="selected.pause_reason"><dt>Pause reason</dt><dd>{{ selected.pause_reason }}</dd></ng-container>
       </dl>
-      <div class="clock" *ngIf="!isLive && !selected.appointment_id">
+      <div class="clock" *ngIf="selected.simulation_id && !selected.appointment_id">
         <strong>Test follow-up cadence</strong>
         <div>
           <button (click)="advance(24)" [disabled]="advancing">+24h</button
           ><button (click)="advance(48)" [disabled]="advancing">+48h</button>
         </div>
       </div>
-      <div class="appointment" *ngIf="!isLive && !selected.appointment_id">
+      <div class="appointment" *ngIf="selected.simulation_id && !selected.appointment_id">
         <strong>Appointment confirmation</strong
         ><small *ngIf="!slots.length"
           >No slots are available. A Sales user must configure availability and be assigned to this
@@ -348,7 +348,7 @@
         ><strong>Appointment confirmed</strong
         ><small>It is now visible to the assigned Sales user.</small>
       </div>
-      <div class="review" *ngIf="!isLive">
+      <div class="review" *ngIf="selected.simulation_id">
         <strong>Client protocol approval</strong>
         <div>
           <button (click)="approve('approved')">Approve</button

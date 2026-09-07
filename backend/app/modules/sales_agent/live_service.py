@@ -25,6 +25,7 @@ from .models import (
 from .service import (
     _action_types, _appointment_confirmation, _availability_reply,
     _is_availability_request, _offered_slot_selection, _project_zone,
+    get_or_create_conversation,
 )
 from app.modules.sales_crm.scheduling import create_agent_appointment, next_cadence_time
 from app.modules.ai_core.services import get_ai_config
@@ -246,13 +247,64 @@ async def start_live_lead(lead_id: str) -> None:
         db.close()
 
 
+def prepare_meta_simulation(db: Session, lead: Lead) -> tuple[SalesConversation, SalesMessage]:
+    """Open an interactive in-app conversation when live SMS is unavailable.
+
+    The lead remains a real, auditable Meta lead. Only message delivery is
+    simulated, so the existing simulation endpoint can exercise the same AI
+    protocol without pretending that an SMS was sent.
+    """
+    project = db.query(Project).filter(
+        Project.id == lead.project_id,
+        Project.company_id == lead.company_id,
+    ).one()
+    campaign = (
+        db.query(ProjectCampaign).filter(ProjectCampaign.id == lead.campaign_id).first()
+        if lead.campaign_id else None
+    )
+    conversation = get_or_create_conversation(db, lead, channel="simulation")
+    conversation.is_paused = False
+    conversation.pause_reason = None
+    conversation.automation_level = 0
+    existing = db.query(SalesMessage).filter(
+        SalesMessage.conversation_id == conversation.id,
+        SalesMessage.metadata_json["event_kind"].as_string() == "meta_lead_simulation_started",
+    ).first()
+    if existing:
+        return conversation, existing
+    message = SalesMessage(
+        conversation_id=conversation.id,
+        channel="simulation",
+        direction="outbound",
+        role="assistant",
+        content=_initial_message(lead, project, campaign),
+        status="simulated",
+        metadata_json={
+            "event_kind": "meta_lead_simulation_started",
+            "delivery": "not_sent",
+            "reason": "twilio_disabled",
+            "lead_id": lead.id,
+            "project_id": project.id,
+        },
+        created_at=datetime.utcnow(),
+    )
+    lead.agent_status = "simulation"
+    lead.funnel_stage = FunnelStage.CONTACTED
+    lead.pipeline_stage = "S01_RESEARCH"
+    lead.last_interaction_at = datetime.utcnow()
+    conversation.stage = "contacted"
+    conversation.updated_at = datetime.utcnow()
+    db.add_all([lead, conversation, message])
+    db.commit()
+    db.refresh(message)
+    return conversation, message
+
+
 async def launch_live_lead(db: Session, lead: Lead) -> tuple[SalesConversation | None, SalesMessage | None]:
     """Start or safely re-contextualize the one physical SMS thread for this sender/recipient."""
     config = get_twilio_config(db)
     if not config.live_sms_enabled or config.verification_status != "verified":
-        lead.agent_status = "waiting_for_twilio"
-        db.commit()
-        return None, None
+        return prepare_meta_simulation(db, lead)
     project = db.query(Project).filter(Project.id == lead.project_id, Project.company_id == lead.company_id).one()
     campaign = db.query(ProjectCampaign).filter(ProjectCampaign.id == lead.campaign_id).first() if lead.campaign_id else None
     ensure_contact(db, lead)
