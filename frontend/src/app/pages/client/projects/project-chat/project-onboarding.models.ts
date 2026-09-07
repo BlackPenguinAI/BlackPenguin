@@ -60,7 +60,11 @@ export interface ChatMessage {
   attachments: ChatAttachment[];
   ui_payload?: NextQuestion | null;
   response_payload?: { status: string; answer: string; selected_option?: string | null; custom?: boolean } | null;
+  media_evidence?: MediaEvidence | null;
   in_reply_to_message_id?: string | null;
+}
+export interface MediaEvidence {
+  kind: 'company_logo' | 'project_cover'; asset_id: string; name: string; image_url: string;
 }
 export interface SourceProposal {
   id: string; field: string; label: string; value: unknown; evidence: string | null;
@@ -151,6 +155,23 @@ export interface ProjectSalesCandidate {
 export interface MetaSetupConfiguration {
   partner_business_manager_id: string | null;
   configured: boolean;
+  oauth_enabled: boolean;
+  manual_fallback_enabled: boolean;
+}
+
+export interface MetaAuthorization {
+  id: string; meta_user_id: string; meta_user_name: string | null; scopes: string[];
+  expires_at: string | null; status: string; created_at: string;
+}
+
+export interface MetaAssetOption {
+  id: string; name: string; status: string | null;
+  instagram_account_id?: string | null; instagram_username?: string | null;
+}
+
+export interface MetaAssetDiscovery {
+  authorizations: MetaAuthorization[]; pages: MetaAssetOption[]; ad_accounts: MetaAssetOption[];
+  lead_forms: MetaAssetOption[]; campaigns: MetaAssetOption[]; adsets: MetaAssetOption[]; ads: MetaAssetOption[];
 }
 
 export interface MetaSetupResult {
@@ -163,6 +184,7 @@ export type ProjectOnboardingAction =
   | 'complete_sales_team'
   | 'defer_sales_team'
   | 'complete_meta_setup'
+  | 'complete_meta_oauth_setup'
   | 'defer_meta_setup';
 
 export interface ProjectOnboardingActionPayload {
@@ -181,6 +203,8 @@ export interface ProjectOnboardingActionPayload {
   page_access_confirmed?: boolean;
   ad_account_access_confirmed?: boolean;
   leads_access_confirmed?: boolean;
+  meta_authorization_id?: string;
+  business_account_id?: string;
 }
 
 export const EMPTY_PROJECT_PROFILE: ProjectProfile = {

@@ -62,7 +62,12 @@ export interface ChatMessage {
   attachments: ChatAttachment[];
   ui_payload?: NextQuestion | null;
   response_payload?: { status: string; answer: string; selected_option?: string | null; custom?: boolean } | null;
+  media_evidence?: MediaEvidence | null;
   in_reply_to_message_id?: string | null;
+}
+
+export interface MediaEvidence {
+  kind: 'company_logo' | 'project_cover'; asset_id: string; name: string; image_url: string;
 }
 
 export interface ChatAttachment {

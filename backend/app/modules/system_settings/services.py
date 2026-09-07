@@ -1,13 +1,23 @@
 from datetime import datetime
 import re
+import secrets
 
 import httpx
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
-from .models import FirebaseConfig, GoogleCalendarConfig, TwilioConfig, LegalDocument
-from .schemas import FirebaseConfigUpdate, GoogleCalendarConfigUpdate, TwilioConfigUpdate, LegalDocumentPayload
+from .models import FirebaseConfig, GoogleCalendarConfig, MetaPlatformConfig, TwilioConfig, LegalDocument
+from .schemas import (
+    FirebaseConfigUpdate, GoogleCalendarConfigUpdate, LegalDocumentPayload,
+    MetaPlatformConfigUpdate, TwilioConfigUpdate,
+)
 from app.core.config import settings
 from app.core.secret_store import decrypt_secret, encrypt_secret
+
+
+META_OAUTH_SCOPES = [
+    "business_management", "pages_show_list", "pages_read_engagement",
+    "pages_manage_metadata", "leads_retrieval", "ads_read",
+]
 
 # --- FIREBASE ---
 def get_firebase_config(db: Session) -> FirebaseConfig:
@@ -289,6 +299,136 @@ def google_calendar_credentials(db: Session) -> tuple[GoogleCalendarConfig, str]
     if not config.client_id or not secret:
         raise HTTPException(status_code=409, detail="Google Calendar OAuth is not configured by Black Penguin.")
     return config, secret
+
+
+# --- META LEAD ADS PLATFORM OAUTH ---
+def get_meta_platform_config(db: Session) -> MetaPlatformConfig:
+    config = db.query(MetaPlatformConfig).first()
+    if not config:
+        verify_token = settings.META_VERIFY_TOKEN or secrets.token_urlsafe(32)
+        config = MetaPlatformConfig(
+            app_id=settings.META_APP_ID or None,
+            app_secret_ciphertext=encrypt_secret(settings.META_APP_SECRET) if settings.META_APP_SECRET and settings.META_APP_SECRET != "app_secret_de_meta_pendiente" else None,
+            app_secret_hint=settings.META_APP_SECRET[-4:] if settings.META_APP_SECRET and settings.META_APP_SECRET != "app_secret_de_meta_pendiente" else None,
+            login_config_id=settings.META_LOGIN_CONFIG_ID or None,
+            graph_api_version=settings.META_API_VERSION,
+            redirect_uri=settings.META_OAUTH_REDIRECT_URI,
+            webhook_callback_url=f"{settings.PUBLIC_APP_URL.rstrip('/')}/api/v1/webhooks/meta",
+            webhook_verify_token_ciphertext=encrypt_secret(verify_token),
+            webhook_verify_token_hint=verify_token[-4:],
+            requested_scopes=META_OAUTH_SCOPES,
+            verification_status="pending" if settings.META_APP_ID else "not_configured",
+        )
+        db.add(config); db.commit(); db.refresh(config)
+    return config
+
+
+def meta_platform_config_response(config: MetaPlatformConfig) -> dict:
+    return {
+        "id": config.id, "app_id": config.app_id,
+        "app_secret_configured": bool(config.app_secret_ciphertext),
+        "app_secret_hint": config.app_secret_hint,
+        "login_config_id": config.login_config_id,
+        "graph_api_version": config.graph_api_version,
+        "redirect_uri": config.redirect_uri,
+        "webhook_callback_url": config.webhook_callback_url,
+        "webhook_verify_token_configured": bool(config.webhook_verify_token_ciphertext),
+        "webhook_verify_token_hint": config.webhook_verify_token_hint,
+        "requested_scopes": list(config.requested_scopes or META_OAUTH_SCOPES),
+        "is_enabled": bool(config.is_enabled),
+        "verification_status": config.verification_status,
+        "app_review_status": config.app_review_status,
+        "business_verification_status": config.business_verification_status,
+        "verified_at": config.verified_at, "last_error": config.last_error,
+        "updated_at": config.updated_at,
+    }
+
+
+def update_meta_platform_config(db: Session, payload: MetaPlatformConfigUpdate) -> MetaPlatformConfig:
+    config = get_meta_platform_config(db)
+    values = payload.model_dump(exclude_unset=True)
+    secret = (values.pop("app_secret", None) or "").strip()
+    if secret:
+        config.app_secret_ciphertext = encrypt_secret(secret)
+        config.app_secret_hint = secret[-4:]
+    changed = bool(secret)
+    for key, value in values.items():
+        if isinstance(value, str):
+            value = value.strip()
+        if key in {"app_id", "login_config_id", "graph_api_version", "redirect_uri", "webhook_callback_url"} and value != getattr(config, key):
+            changed = True
+        setattr(config, key, value)
+    if not re.fullmatch(r"v\d+\.\d+", config.graph_api_version or ""):
+        raise HTTPException(status_code=422, detail="Meta Graph API Version must use the vNN.N format.")
+    if not (config.redirect_uri or "").startswith("https://") or not (config.webhook_callback_url or "").startswith("https://"):
+        raise HTTPException(status_code=422, detail="Meta OAuth and Webhook URLs must use HTTPS.")
+    ready = bool(config.app_id and config.app_secret_ciphertext and config.login_config_id and config.redirect_uri)
+    if config.is_enabled and (not ready or config.verification_status != "verified"):
+        raise HTTPException(status_code=422, detail="Save and verify the complete Meta OAuth configuration before enabling it.")
+    if changed:
+        config.is_enabled = False
+        config.verification_status = "pending" if ready else "not_configured"
+        config.verified_at = None
+        config.last_error = None
+    config.requested_scopes = META_OAUTH_SCOPES
+    db.commit(); db.refresh(config)
+    return config
+
+
+def meta_platform_credentials(db: Session, *, require_enabled: bool = True) -> tuple[MetaPlatformConfig, str]:
+    config = get_meta_platform_config(db)
+    if require_enabled and (not config.is_enabled or config.verification_status != "verified"):
+        raise HTTPException(status_code=409, detail="Meta OAuth is not enabled by Black Penguin.")
+    try:
+        secret = decrypt_secret(config.app_secret_ciphertext)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail="The stored Meta App Secret cannot be decrypted. Replace it from Integrations.") from exc
+    if not config.app_id or not secret or not config.login_config_id:
+        raise HTTPException(status_code=409, detail="Meta OAuth is not fully configured.")
+    return config, secret
+
+
+def verify_meta_platform_config(db: Session) -> MetaPlatformConfig:
+    config, secret = meta_platform_credentials(db, require_enabled=False)
+    try:
+        response = httpx.get(
+            f"https://graph.facebook.com/{config.graph_api_version}/{config.app_id}",
+            params={"fields": "id,name", "access_token": f"{config.app_id}|{secret}"},
+            timeout=20.0,
+        )
+        response.raise_for_status()
+        if str(response.json().get("id") or "") != config.app_id:
+            raise HTTPException(status_code=422, detail="Meta returned a different App ID.")
+    except HTTPException:
+        config.verification_status = "failed"; config.last_error = "app_identity_mismatch"; db.commit()
+        raise
+    except (httpx.HTTPError, ValueError) as exc:
+        config.verification_status = "failed"
+        config.last_error = type(exc).__name__
+        db.commit()
+        raise HTTPException(status_code=422, detail="Meta App credentials could not be verified.") from exc
+    config.verification_status = "verified"
+    config.verified_at = datetime.utcnow()
+    config.last_error = None
+    db.commit(); db.refresh(config)
+    return config
+
+
+def rotate_meta_webhook_verify_token(db: Session) -> tuple[MetaPlatformConfig, str]:
+    config = get_meta_platform_config(db)
+    token = secrets.token_urlsafe(32)
+    config.webhook_verify_token_ciphertext = encrypt_secret(token)
+    config.webhook_verify_token_hint = token[-4:]
+    db.commit(); db.refresh(config)
+    return config, token
+
+
+def meta_webhook_verify_token(db: Session) -> str:
+    config = get_meta_platform_config(db)
+    try:
+        return decrypt_secret(config.webhook_verify_token_ciphertext) or ""
+    except ValueError:
+        return settings.META_VERIFY_TOKEN
 
 # --- LEGAL ---
 def get_legal_document(db: Session, doc_type: str, lang: str = "en") -> LegalDocument:

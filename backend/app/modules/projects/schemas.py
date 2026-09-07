@@ -119,6 +119,7 @@ class ProjectOnboardingActionRequest(BaseModel):
         "complete_sales_team",
         "defer_sales_team",
         "complete_meta_setup",
+        "complete_meta_oauth_setup",
         "defer_meta_setup",
     ]
     question_message_id: str
@@ -127,6 +128,8 @@ class ProjectOnboardingActionRequest(BaseModel):
     ad_account_id: str | None = Field(default=None, min_length=5, max_length=36)
     lead_form_id: str | None = Field(default=None, min_length=5, max_length=32)
     meta_connection_id: str | None = None
+    meta_authorization_id: str | None = None
+    business_account_id: str | None = None
     campaign_name: str | None = Field(default=None, min_length=1, max_length=180)
     external_campaign_id: str | None = Field(default=None, min_length=5, max_length=32)
     external_adset_id: str | None = Field(default=None, min_length=5, max_length=32)
@@ -156,6 +159,7 @@ class ChatMessageResponse(BaseModel):
     attachments: list[ChatAttachmentResponse] = Field(default_factory=list)
     ui_payload: dict[str, Any] | None = None
     response_payload: dict[str, Any] | None = None
+    media_evidence: dict[str, Any] | None = None
     in_reply_to_message_id: str | None = None
 
 
@@ -478,3 +482,40 @@ class MetaProjectSetupResponse(BaseModel):
 class MetaSetupConfigurationResponse(BaseModel):
     partner_business_manager_id: str | None = None
     configured: bool
+    oauth_enabled: bool = False
+    manual_fallback_enabled: bool = True
+
+
+class MetaOAuthStartResponse(BaseModel):
+    authorization_url: str
+    expires_at: datetime
+
+
+class MetaAuthorizationResponse(BaseModel):
+    id: str
+    meta_user_id: str
+    meta_user_name: str | None = None
+    scopes: list[str] = Field(default_factory=list)
+    expires_at: datetime | None = None
+    status: str
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+
+class MetaAssetOption(BaseModel):
+    id: str
+    name: str
+    status: str | None = None
+    parent_id: str | None = None
+    instagram_account_id: str | None = None
+    instagram_username: str | None = None
+
+
+class MetaAssetDiscoveryResponse(BaseModel):
+    authorizations: list[MetaAuthorizationResponse] = Field(default_factory=list)
+    pages: list[MetaAssetOption] = Field(default_factory=list)
+    ad_accounts: list[MetaAssetOption] = Field(default_factory=list)
+    lead_forms: list[MetaAssetOption] = Field(default_factory=list)
+    campaigns: list[MetaAssetOption] = Field(default_factory=list)
+    adsets: list[MetaAssetOption] = Field(default_factory=list)
+    ads: list[MetaAssetOption] = Field(default_factory=list)

@@ -10,6 +10,7 @@ from app.modules.companies.models import Company
 
 from .schemas import (
     FirebaseConfigSchema, FirebaseConfigUpdate, GoogleCalendarConfigSchema, GoogleCalendarConfigUpdate,
+    MetaPlatformConfigSchema, MetaPlatformConfigUpdate,
     TwilioConfigSchema, TwilioConfigUpdate,
     LegalDocumentResponse, LegalDocumentPayload
 )
@@ -85,6 +86,40 @@ def update_google_calendar_settings(
     current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN])),
 ):
     return services.google_calendar_config_response(services.update_google_calendar_config(db, payload))
+
+
+@router.get("/integrations/meta", response_model=MetaPlatformConfigSchema)
+def get_meta_platform_settings(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN])),
+):
+    return services.meta_platform_config_response(services.get_meta_platform_config(db))
+
+
+@router.put("/integrations/meta", response_model=MetaPlatformConfigSchema)
+def update_meta_platform_settings(
+    payload: MetaPlatformConfigUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN])),
+):
+    return services.meta_platform_config_response(services.update_meta_platform_config(db, payload))
+
+
+@router.post("/integrations/meta/verify", response_model=MetaPlatformConfigSchema)
+def verify_meta_platform_settings(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN])),
+):
+    return services.meta_platform_config_response(services.verify_meta_platform_config(db))
+
+
+@router.post("/integrations/meta/rotate-webhook-token")
+def rotate_meta_webhook_token(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN])),
+):
+    config, token = services.rotate_meta_webhook_verify_token(db)
+    return {"config": services.meta_platform_config_response(config), "verify_token": token}
 
 # =========================================================
 # 📄 DOCUMENTOS LEGALES (PRIVACY & TERMS)

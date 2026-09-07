@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, String, DateTime, ForeignKey, Text
+from sqlalchemy import Boolean, Column, String, DateTime, ForeignKey, JSON, Text
 import uuid
 from datetime import datetime
 from app.db.postgres import Base
@@ -64,6 +64,42 @@ class CalendarOAuthAttempt(Base):
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    nonce_hash = Column(String(64), nullable=False, unique=True, index=True)
+    expires_at = Column(DateTime, nullable=False)
+    consumed_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class MetaPlatformConfig(Base):
+    __tablename__ = "meta_platform_configurations"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    app_id = Column(String(100), nullable=True)
+    app_secret_ciphertext = Column(Text, nullable=True)
+    app_secret_hint = Column(String(12), nullable=True)
+    login_config_id = Column(String(150), nullable=True)
+    graph_api_version = Column(String(20), default="v20.0", nullable=False)
+    redirect_uri = Column(String(500), nullable=False)
+    webhook_callback_url = Column(String(500), nullable=False)
+    webhook_verify_token_ciphertext = Column(Text, nullable=True)
+    webhook_verify_token_hint = Column(String(12), nullable=True)
+    requested_scopes = Column(JSON, default=list, nullable=False)
+    is_enabled = Column(Boolean, default=False, nullable=False)
+    verification_status = Column(String(30), default="not_configured", nullable=False)
+    app_review_status = Column(String(30), default="pending", nullable=False)
+    business_verification_status = Column(String(30), default="pending", nullable=False)
+    verified_at = Column(DateTime, nullable=True)
+    last_error = Column(Text, nullable=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class MetaOAuthAttempt(Base):
+    __tablename__ = "meta_oauth_attempts"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    company_id = Column(String(36), ForeignKey("companies.id", ondelete="CASCADE"), nullable=False, index=True)
+    project_id = Column(String(36), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
     nonce_hash = Column(String(64), nullable=False, unique=True, index=True)
     expires_at = Column(DateTime, nullable=False)
     consumed_at = Column(DateTime, nullable=True)

@@ -126,6 +126,7 @@ class ProjectMessage(Base):
     content = Column(Text, nullable=False)
     ui_payload = Column(JSON, nullable=True)
     response_payload = Column(JSON, nullable=True)
+    media_evidence = Column(JSON, nullable=True)
     in_reply_to_message_id = Column(String(36), ForeignKey("project_messages.id", ondelete="SET NULL"), nullable=True, index=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
@@ -295,6 +296,7 @@ class MetaConnection(Base):
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     company_id = Column(String(36), ForeignKey("companies.id", ondelete="CASCADE"), nullable=False, index=True)
+    authorization_id = Column(String(36), ForeignKey("meta_authorizations.id", ondelete="SET NULL"), nullable=True, index=True)
     label = Column(String(120), nullable=False)
     business_account_id = Column(String(150), nullable=True)
     ad_account_id = Column(String(150), nullable=True)
@@ -312,5 +314,26 @@ class MetaConnection(Base):
     ad_account_access_confirmed = Column(Boolean, default=False, nullable=False)
     leads_access_confirmed = Column(Boolean, default=False, nullable=False)
     simulated_verified_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+
+class MetaAuthorization(Base):
+    __tablename__ = "meta_authorizations"
+    __table_args__ = (
+        UniqueConstraint("company_id", "meta_user_id", name="uq_meta_authorization_company_user"),
+    )
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    company_id = Column(String(36), ForeignKey("companies.id", ondelete="CASCADE"), nullable=False, index=True)
+    connected_by_user_id = Column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    meta_user_id = Column(String(150), nullable=False)
+    meta_user_name = Column(String(255), nullable=True)
+    token_ciphertext = Column(Text, nullable=False)
+    token_hint = Column(String(12), nullable=True)
+    scopes = Column(JSON, default=list, nullable=False)
+    expires_at = Column(DateTime, nullable=True)
+    status = Column(String(30), default="active", nullable=False)
+    verification_results = Column(JSON, default=dict, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)

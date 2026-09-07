@@ -47,6 +47,12 @@
               (selected)="chooseAnswer($event, msg)"
               (custom)="writeCustomAnswer(msg)"
             ></app-onboarding-ai-message>
+            <div *ngIf="msg.media_evidence as media" class="ml-11 mt-2 max-w-sm rounded-xl border border-green-500/20 bg-green-500/[0.06] p-3">
+              <div class="flex items-center gap-3">
+                <img *ngIf="sourceImageUrls.get(media.asset_id) as preview" [src]="preview" [alt]="media.name" class="h-20 w-28 rounded-lg border border-white/10 bg-black/30 object-cover" />
+                <div class="min-w-0"><p class="text-xs font-semibold text-green-300">Project cover</p><p class="mt-1 truncate text-[10px] text-gray-500">{{ media.name }}</p></div>
+              </div>
+            </div>
 
             <section *ngIf="isStructuredQuestion(msg, 'ai_sales_authorization')" class="structured-card ml-11 mt-4 max-w-3xl">
               <div class="flex items-start gap-3">
@@ -102,15 +108,27 @@
               <div class="flex items-start justify-between gap-3">
                 <div>
                   <h2 class="text-sm font-semibold">Connect Meta Lead Ads</h2>
-                  <p class="mt-1 text-xs leading-relaxed text-gray-400">Complete these steps to associate the project's lead form. This phase performs a clearly identified simulated connection test.</p>
+                  <p class="mt-1 text-xs leading-relaxed text-gray-400">Connect once, then choose the Page, Ad Account and Lead Form that belong to this Project. Credentials never appear in this form.</p>
                 </div>
                 <span class="material-symbols-outlined text-secondary">hub</span>
               </div>
-              <div class="mt-4 rounded-lg border border-secondary/20 bg-secondary/[0.06] p-3">
-                <p class="text-[10px] font-bold uppercase tracking-wider text-secondary">Black Penguin partner</p>
-                <p *ngIf="metaSetupConfig.configured" class="mt-1 text-xs">Business Manager ID (Business Manager identifier): <strong>{{ metaSetupConfig.partner_business_manager_id }}</strong></p>
-                <p *ngIf="!metaSetupConfig.configured" class="mt-1 text-xs text-red-300">The platform administrator must configure META_BUSINESS_MANAGER_ID before this test can run.</p>
+              <div *ngIf="metaSetupConfig.oauth_enabled" class="mt-4 rounded-lg border border-secondary/20 bg-secondary/[0.06] p-3">
+                <div class="flex flex-wrap items-center justify-between gap-3"><div><p class="text-[10px] font-bold uppercase tracking-wider text-secondary">Secure Meta login</p><p class="mt-1 text-xs text-gray-300">The authorization is stored at Company level and can be reused for its Projects.</p></div><button type="button" (click)="connectMeta()" [disabled]="metaOAuthBusy" class="structured-primary">{{ metaAuthorizations.length ? 'Connect another Meta account' : 'Continue with Meta' }}</button></div>
               </div>
+              <div *ngIf="metaSetupConfig.oauth_enabled && metaAuthorizations.length" class="mt-4 grid gap-3 sm:grid-cols-2">
+                <label class="field-label sm:col-span-2">Company Meta authorization<select [(ngModel)]="metaOAuth.authorization_id" (change)="loadMetaAssets()" class="secure-input"><option *ngFor="let authorization of metaAuthorizations" [value]="authorization.id">{{ authorization.meta_user_name || authorization.meta_user_id }}</option></select></label>
+                <label class="field-label">Facebook Page *<select [(ngModel)]="metaOAuth.page_id" (change)="metaPageChanged()" class="secure-input"><option value="">Select a Page</option><option *ngFor="let item of metaAssets.pages" [value]="item.id">{{ item.name }}</option></select></label>
+                <label class="field-label">Ad Account *<select [(ngModel)]="metaOAuth.ad_account_id" (change)="metaAdAccountChanged()" class="secure-input"><option value="">Select an Ad Account</option><option *ngFor="let item of metaAssets.ad_accounts" [value]="item.id">{{ item.name }} · {{ item.id }}</option></select></label>
+                <label class="field-label">Lead Form *<select [(ngModel)]="metaOAuth.lead_form_id" class="secure-input"><option value="">Select a Lead Form</option><option *ngFor="let item of metaAssets.lead_forms" [value]="item.id">{{ item.name }}</option></select></label>
+                <label class="field-label">Campaign label *<input [(ngModel)]="metaOAuth.campaign_name" class="secure-input" placeholder="Project launch campaign" /></label>
+                <label class="field-label">Meta campaign<select [(ngModel)]="metaOAuth.external_campaign_id" class="secure-input"><option value="">Optional</option><option *ngFor="let item of metaAssets.campaigns" [value]="item.id">{{ item.name }}</option></select></label>
+                <label class="field-label">Ad set<select [(ngModel)]="metaOAuth.external_adset_id" class="secure-input"><option value="">Optional</option><option *ngFor="let item of metaAssets.adsets" [value]="item.id">{{ item.name }}</option></select></label>
+                <label class="field-label sm:col-span-2">Ad (recommended for exact routing)<select [(ngModel)]="metaOAuth.external_ad_id" class="secure-input"><option value="">Route using Page + Form</option><option *ngFor="let item of metaAssets.ads" [value]="item.id">{{ item.name }}</option></select></label>
+                <button type="button" (click)="completeMetaOAuth(msg)" [disabled]="metaOAuthBusy || !metaOAuth.page_id || !metaOAuth.ad_account_id || !metaOAuth.lead_form_id || !metaOAuth.campaign_name.trim()" class="structured-primary sm:col-span-2">{{ metaOAuthBusy ? 'Loading Meta assets…' : 'Connect selected assets and continue' }}</button>
+              </div>
+              <button *ngIf="metaSetupConfig.manual_fallback_enabled" type="button" (click)="showManualMetaSetup = !showManualMetaSetup" class="structured-secondary mt-4">{{ showManualMetaSetup ? 'Hide manual setup' : 'Use asset IDs manually' }}</button>
+              <div *ngIf="showManualMetaSetup || !metaSetupConfig.oauth_enabled">
+              <div class="mt-4 rounded-lg border border-secondary/20 bg-secondary/[0.06] p-3"><p class="text-[10px] font-bold uppercase tracking-wider text-secondary">Manual fallback</p><p class="mt-1 text-xs text-gray-400">Use this only when Meta OAuth is unavailable. It runs the existing simulated verification.</p></div>
               <ol class="mt-4 space-y-3 text-xs text-gray-300">
                 <li><strong>1. Reuse a Company connection when possible</strong><div class="mt-2 grid gap-2"><label class="field-label">Verified Company connection<select [(ngModel)]="metaSetup.meta_connection_id" (change)="selectMetaConnection()" class="secure-input"><option value="">Create/reuse by asset IDs</option><option *ngFor="let connection of metaConnections" [value]="connection.id" [disabled]="connection.verification_status !== 'succeeded'">{{ connection.label }} · {{ connection.verification_mode }} · {{ connection.verification_status }}</option></select><small class="mt-1 text-[10px] font-normal normal-case tracking-normal text-gray-500">A single Company connection can be reused by several Projects. Project-specific Pages remain separate connections.</small></label><label class="field-label">Campaign label *<input [(ngModel)]="metaSetup.campaign_name" placeholder="Project launch campaign" class="secure-input" [class.form-input-invalid]="!!metaSetupErrors['campaign_name']" /><span *ngIf="metaSetupErrors['campaign_name']" class="field-error">{{ metaSetupErrors['campaign_name'] }}</span></label></div></li>
                 <li><strong>2. Identify the exact Meta route</strong><div class="mt-2 grid gap-2 sm:grid-cols-2"><label class="field-label">Page ID *<input [(ngModel)]="metaSetup.page_id" inputmode="numeric" placeholder="Page ID" class="secure-input" [class.form-input-invalid]="!!metaSetupErrors['page_id']" /><span *ngIf="metaSetupErrors['page_id']" class="field-error">{{ metaSetupErrors['page_id'] }}</span></label><label class="field-label">Ad Account ID *<input [(ngModel)]="metaSetup.ad_account_id" placeholder="Ad Account ID" class="secure-input" [class.form-input-invalid]="!!metaSetupErrors['ad_account_id']" /><span *ngIf="metaSetupErrors['ad_account_id']" class="field-error">{{ metaSetupErrors['ad_account_id'] }}</span></label><label class="field-label">Lead Form ID *<input [(ngModel)]="metaSetup.lead_form_id" inputmode="numeric" placeholder="Lead Form ID" class="secure-input" [class.form-input-invalid]="!!metaSetupErrors['lead_form_id']" /><span *ngIf="metaSetupErrors['lead_form_id']" class="field-error">{{ metaSetupErrors['lead_form_id'] }}</span></label><label class="field-label">Campaign ID<input [(ngModel)]="metaSetup.external_campaign_id" inputmode="numeric" placeholder="Optional campaign ID" class="secure-input" /></label><label class="field-label">Ad set ID<input [(ngModel)]="metaSetup.external_adset_id" inputmode="numeric" placeholder="Optional ad set ID" class="secure-input" /></label><label class="field-label">Ad ID<input [(ngModel)]="metaSetup.external_ad_id" inputmode="numeric" placeholder="Recommended for exact routing" class="secure-input" /></label><label class="field-label">Instagram account ID<input [(ngModel)]="metaSetup.instagram_account_id" inputmode="numeric" placeholder="Optional Instagram account ID" class="secure-input" /></label></div><p class="mt-2 text-[11px] text-gray-500">Page + Form route the lead. Ad ID disambiguates the route when the same form is used by more than one Project.</p></li>
@@ -122,11 +140,12 @@
                 <label class="structured-check" [class.form-input-invalid]="!!metaSetupErrors['leads_access_confirmed']"><input [(ngModel)]="metaSetup.leads_access_confirmed" type="checkbox" /> I granted access under Integrations &gt; Leads Access. *</label>
               </div>
               <p *ngIf="metaSetupErrorCount" class="form-help mt-3" role="status"><span class="material-symbols-outlined text-sm">info</span>Complete {{ metaSetupErrorCount }} required item{{ metaSetupErrorCount === 1 ? '' : 's' }} before running the test.</p>
-              <p *ngIf="metaSetupMessage" class="mt-3 rounded-lg border border-green-500/20 bg-green-500/10 p-3 text-xs text-green-300">{{ metaSetupMessage }}</p>
               <div class="mt-4 flex flex-wrap gap-2">
                 <button (click)="testMetaSetup(msg)" [disabled]="!canTestMetaSetup" [title]="canTestMetaSetup ? '' : 'Complete all required Meta fields and confirmations.'" class="structured-primary">{{ metaSetupBusy ? 'Testing...' : (metaSetupErrorCount ? 'Complete required items' : 'Run simulated connection test') }}</button>
-                <button (click)="deferMetaSetup(msg)" [disabled]="metaSetupBusy" class="structured-secondary">Configure Meta later</button>
               </div>
+              </div>
+              <p *ngIf="metaSetupMessage" class="mt-3 rounded-lg border border-green-500/20 bg-green-500/10 p-3 text-xs text-green-300">{{ metaSetupMessage }}</p>
+              <button (click)="deferMetaSetup(msg)" [disabled]="metaSetupBusy || metaOAuthBusy" class="structured-secondary mt-3">Configure Meta later</button>
             </section>
           </div>
           <div *ngIf="msg.sender === 'user'" class="max-w-[85%] text-right md:max-w-[80%]">

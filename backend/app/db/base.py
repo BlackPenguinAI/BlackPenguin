@@ -8,7 +8,10 @@ from app.modules.waitlist.models import WaitlistEntry
 from app.modules.subscriptions.models import SubscriptionPlan
 from app.modules.companies.models import Company
 from app.modules.users.models import User
-from app.modules.system_settings.models import CalendarOAuthAttempt, FirebaseConfig, GoogleCalendarConfig, TwilioConfig, LegalDocument
+from app.modules.system_settings.models import (
+    CalendarOAuthAttempt, FirebaseConfig, GoogleCalendarConfig, LegalDocument,
+    MetaOAuthAttempt, MetaPlatformConfig, TwilioConfig,
+)
 from app.modules.ai_core.models import AIConfiguration, PromptVersion
 from app.modules.company_onboarding.models import (
     CompanyOnboardingProposal,
@@ -20,6 +23,7 @@ from app.modules.company_onboarding.models import (
 )
 from app.modules.projects.models import (
     MetaConnection,
+    MetaAuthorization,
     Project,
     ProjectCampaign,
     ProjectMessage,

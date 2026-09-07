@@ -17,20 +17,21 @@ from app.modules.projects.meta_service import decrypt_connection_token
 from app.modules.sales_agent.models import ExternalWebhookEvent
 from app.modules.sales_agent.live_service import start_live_lead
 from app.modules.sales_crm.models import Lead, LeadConsentEvent
+from app.modules.system_settings import services as system_settings
 
 
 router = APIRouter()
 
 
-def _valid_signature(body: bytes, signature: str | None) -> bool:
+def _valid_signature(body: bytes, signature: str | None, app_secret: str) -> bool:
     if not signature or not signature.startswith("sha256="):
         return False
-    expected = hmac.new(settings.META_APP_SECRET.encode(), body, hashlib.sha256).hexdigest()
+    expected = hmac.new(app_secret.encode(), body, hashlib.sha256).hexdigest()
     return hmac.compare_digest(signature.removeprefix("sha256="), expected)
 
 
-async def _fetch_lead(leadgen_id: str, access_token: str) -> dict:
-    url = f"https://graph.facebook.com/{settings.META_API_VERSION}/{leadgen_id}"
+async def _fetch_lead(leadgen_id: str, access_token: str, graph_api_version: str) -> dict:
+    url = f"https://graph.facebook.com/{graph_api_version}/{leadgen_id}"
     async with httpx.AsyncClient(timeout=20.0) as client:
         response = await client.get(url, params={
             "access_token": access_token,
@@ -87,8 +88,10 @@ def verify(
     mode: str = Query(..., alias="hub.mode"),
     token: str = Query(..., alias="hub.verify_token"),
     challenge: str = Query(..., alias="hub.challenge"),
+    db: Session = Depends(get_db),
 ):
-    if mode == "subscribe" and hmac.compare_digest(token, settings.META_VERIFY_TOKEN):
+    expected = system_settings.meta_webhook_verify_token(db) or settings.META_VERIFY_TOKEN
+    if mode == "subscribe" and hmac.compare_digest(token, expected):
         return int(challenge)
     raise HTTPException(status_code=403, detail="Invalid verification token.")
 
@@ -101,7 +104,13 @@ async def receive(
     db: Session = Depends(get_db),
 ):
     body = await request.body()
-    if not _valid_signature(body, x_hub_signature_256):
+    try:
+        meta_config, app_secret = system_settings.meta_platform_credentials(db, require_enabled=False)
+        graph_api_version = meta_config.graph_api_version
+    except HTTPException:
+        app_secret = settings.META_APP_SECRET
+        graph_api_version = settings.META_API_VERSION
+    if not app_secret or not _valid_signature(body, x_hub_signature_256, app_secret):
         raise HTTPException(status_code=401, detail="Invalid Meta signature.")
     payload = json.loads(body)
     accepted = 0
@@ -142,7 +151,7 @@ async def receive(
                     db.commit()
                     continue
                 details = await _fetch_lead(
-                    str(leadgen_id), decrypt_connection_token(campaign.meta_connection)
+                    str(leadgen_id), decrypt_connection_token(campaign.meta_connection), graph_api_version,
                 )
                 fields = _fields(details)
                 project = campaign.project

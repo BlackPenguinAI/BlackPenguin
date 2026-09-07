@@ -140,6 +140,7 @@ class ChatMessageResponse(BaseModel):
     attachments: list[ChatAttachmentResponse] = Field(default_factory=list)
     ui_payload: dict[str, Any] | None = None
     response_payload: dict[str, Any] | None = None
+    media_evidence: dict[str, Any] | None = None
     in_reply_to_message_id: str | None = None
 
 

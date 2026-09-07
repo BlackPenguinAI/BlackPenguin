@@ -5,7 +5,7 @@ import { Observable } from 'rxjs';
 import { API_V1_URL } from '../../../../core/config/api.config';
 
 import {
-  Campaign, ChatMessage, ChatTurn, MetaConnection, MetaSetupConfiguration, MetaSetupResult,
+  Campaign, ChatMessage, ChatTurn, MetaAssetDiscovery, MetaAuthorization, MetaConnection, MetaSetupConfiguration, MetaSetupResult,
   OnboardingState, ProjectAssignment, ProjectOnboardingActionPayload, ProjectProfile,
   ProjectSalesCandidate, ProjectSource, SourceProposal, ProjectPropertyType, ProjectPropertyTypePayload, PropertyTypeCatalog,
 } from './project-onboarding.models';
@@ -96,6 +96,18 @@ export class ProjectOnboardingService {
   }
   getMetaSetupConfiguration(id: string): Observable<MetaSetupConfiguration> {
     return this.http.get<MetaSetupConfiguration>(`${this.baseUrl}/${id}/meta-setup/config`);
+  }
+  startMetaOAuth(id: string): Observable<{ authorization_url: string; expires_at: string }> {
+    return this.http.get<{ authorization_url: string; expires_at: string }>(`${this.baseUrl}/${id}/meta/oauth/start`);
+  }
+  getMetaAuthorizations(id: string): Observable<MetaAuthorization[]> {
+    return this.http.get<MetaAuthorization[]>(`${this.baseUrl}/${id}/meta/oauth/authorizations`);
+  }
+  discoverMetaAssets(id: string, authorizationId: string, pageId = '', adAccountId = ''): Observable<MetaAssetDiscovery> {
+    const params: Record<string, string> = { authorization_id: authorizationId };
+    if (pageId) params['page_id'] = pageId;
+    if (adAccountId) params['ad_account_id'] = adAccountId;
+    return this.http.get<MetaAssetDiscovery>(`${this.baseUrl}/${id}/meta/oauth/assets`, { params });
   }
   simulateMetaSetup(id: string, payload: Record<string, unknown>): Observable<MetaSetupResult> {
     return this.http.post<MetaSetupResult>(`${this.baseUrl}/${id}/meta-setup/simulate`, payload);

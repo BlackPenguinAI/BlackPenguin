@@ -1,4 +1,6 @@
 from unittest.mock import patch
+from urllib.parse import parse_qs, urlparse
+import hashlib
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -11,8 +13,12 @@ from app.modules.ai_core.services import (
 )
 from app.modules.sales_agent.default_prompt import SALES_AGENT_DEFAULT_CONFIG
 from app.modules.seo.service import run_audit
-from app.modules.system_settings.schemas import GoogleCalendarConfigUpdate
-from app.modules.system_settings.services import google_calendar_config_response, google_calendar_credentials, update_google_calendar_config
+from app.modules.system_settings.schemas import GoogleCalendarConfigUpdate, MetaPlatformConfigUpdate
+from app.modules.system_settings.services import (
+    google_calendar_config_response, google_calendar_credentials, meta_platform_config_response,
+    meta_platform_credentials, update_google_calendar_config, update_meta_platform_config,
+    verify_meta_platform_config,
+)
 
 
 def _db():
@@ -33,6 +39,70 @@ def test_google_calendar_secret_is_write_only_and_runtime_uses_database_configur
     url = authorization_url(db, "signed-state", "sales@example.com")
     assert "calendar.events" in url and "calendar.freebusy" in url
     assert "calendar.readonly" not in url
+
+
+def test_meta_platform_secret_is_write_only_and_must_be_verified_before_enabling():
+    db = _db()
+    config = update_meta_platform_config(db, MetaPlatformConfigUpdate(
+        app_id="123456789", app_secret="meta-secret-value", login_config_id="987654321",
+        graph_api_version="v23.0",
+        redirect_uri="https://blackpenguin.ai/api/v1/projects/integrations/meta/oauth/callback",
+        webhook_callback_url="https://blackpenguin.ai/api/v1/webhooks/meta",
+    ))
+    response = meta_platform_config_response(config)
+    assert response["app_secret_configured"] is True
+    assert response["app_secret_hint"] == "alue"
+    assert "app_secret" not in response
+
+    class MetaResponse:
+        def raise_for_status(self): return None
+        def json(self): return {"id": "123456789", "name": "Black Penguin"}
+
+    with patch("app.modules.system_settings.services.httpx.get", return_value=MetaResponse()):
+        verify_meta_platform_config(db)
+    enabled = update_meta_platform_config(db, MetaPlatformConfigUpdate(is_enabled=True))
+    assert enabled.is_enabled is True
+    _, secret = meta_platform_credentials(db)
+    assert secret == "meta-secret-value"
+
+
+def test_project_chat_message_serializes_persistent_media_evidence():
+    from app.modules.projects.models import SenderType
+    from app.modules.projects.services import save_message, serialize_message
+
+    db = _db()
+    evidence = {"kind": "project_cover", "asset_id": "asset-1", "name": "cover.jpg", "image_url": "/media/asset-1"}
+    message = save_message(db, "session-1", SenderType.AI, "Project cover saved.", media_evidence=evidence)
+    assert serialize_message(message)["media_evidence"] == evidence
+
+
+def test_meta_oauth_state_is_short_lived_hashed_and_bound_to_the_company_project():
+    from app.modules.companies.models import Company
+    from app.modules.projects.meta_oauth_service import start_oauth
+    from app.modules.projects.models import Project
+    from app.modules.system_settings.models import MetaOAuthAttempt, MetaPlatformConfig
+    from app.modules.users.models import User, UserRole
+
+    db = _db()
+    company = Company(name="OAuth Company")
+    db.add(company); db.flush()
+    user = User(company_id=company.id, first_name="Ana", email="ana-oauth@example.com", hashed_password="x", role=UserRole.ADMIN)
+    project = Project(company_id=company.id, name="OAuth Project")
+    db.add_all([user, project]); db.commit()
+    update_meta_platform_config(db, MetaPlatformConfigUpdate(
+        app_id="123456789", app_secret="meta-secret-value", login_config_id="987654321",
+        graph_api_version="v23.0", redirect_uri="https://blackpenguin.ai/api/v1/projects/integrations/meta/oauth/callback",
+        webhook_callback_url="https://blackpenguin.ai/api/v1/webhooks/meta",
+    ))
+    config = db.query(MetaPlatformConfig).one()
+    config.verification_status = "verified"; config.is_enabled = True; db.commit()
+
+    result = start_oauth(db, project=project, user=user)
+    state = parse_qs(urlparse(result["authorization_url"]).query)["state"][0]
+    attempt = db.query(MetaOAuthAttempt).one()
+    assert attempt.nonce_hash == hashlib.sha256(state.encode()).hexdigest()
+    assert state not in attempt.nonce_hash
+    assert attempt.company_id == company.id and attempt.project_id == project.id and attempt.user_id == user.id
 
 
 def test_sales_prompt_draft_does_not_change_runtime_until_published():

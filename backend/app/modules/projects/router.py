@@ -5,8 +5,8 @@ import re
 import uuid
 from typing import Any
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile, status
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Response, UploadFile, status
+from fastapi.responses import FileResponse, RedirectResponse
 import httpx
 from sqlalchemy.orm import Session, joinedload
 
@@ -21,11 +21,12 @@ from app.modules.onboarding_jobs import service as job_service
 from app.modules.onboarding_jobs.continuation import finalize_source_group
 from app.modules.onboarding_jobs.models import OnboardingSourceJob
 from app.modules.onboarding_copy import conversational_acknowledgement
+from app.modules.system_settings import services as system_settings_service
 from app.modules.project_team.models import ProjectUserAssignment
 from app.modules.users.models import TENANT_MANAGER_ROLES, User, UserRole
 from app.modules.users.project_access import project_ids_for_user, require_project_access
 
-from . import asset_share_service, catalog_service, meta_service, services, source_service, storage_service
+from . import asset_share_service, catalog_service, meta_oauth_service, meta_service, services, source_service, storage_service
 from .completion import FIELD_BY_KEY
 from .models import (
     MetaConnection, Project, ProjectCampaign, ProjectMessage, ProjectOnboardingProposal,
@@ -34,6 +35,7 @@ from .models import (
 from .schemas import (
     CampaignCreate, CampaignResponse, ChatBootstrapRequest, ChatMessagePayload, ChatMessageResponse, ChatTurnResponse,
     MetaConnectionCreate, MetaConnectionResponse, MetaProjectSetupRequest, MetaProjectSetupResponse,
+    MetaAssetDiscoveryResponse, MetaAuthorizationResponse, MetaOAuthStartResponse,
     MetaSetupConfigurationResponse, ProjectCreate, ProjectProfilePatch, ProjectTimezoneUpdate,
     ProjectOnboardingActionRequest,
     ProjectCompleteResponse, ProjectDeleteRequest, ProjectDeletionImpact, ProjectDraftResponse,
@@ -544,6 +546,10 @@ def set_project_cover(
         services.save_message(
             db, source.project.session.id, SenderType.AI,
             _cover_confirmation_message(source.name, _next_prompt(profile)),
+            media_evidence={
+                "kind": "project_cover", "asset_id": source.id, "name": source.name,
+                "image_url": f"/api/v1/projects/{project_id}/sources/{source.id}/file",
+            },
             ui_payload=_next_question(profile), in_reply_to_message_id=active_question.id,
             commit=False,
         )
@@ -804,6 +810,7 @@ def apply_onboarding_action(
         "complete_sales_team": "project_sales_team",
         "defer_sales_team": "project_sales_team",
         "complete_meta_setup": "meta_lead_setup",
+        "complete_meta_oauth_setup": "meta_lead_setup",
         "defer_meta_setup": "meta_lead_setup",
     }[payload.action]
     if input_type != expected_input:
@@ -816,6 +823,7 @@ def apply_onboarding_action(
         "complete_sales_team": "Continue with the assigned Sales team",
         "defer_sales_team": "Configure the Sales team later",
         "complete_meta_setup": "Run the simulated Meta connection test",
+        "complete_meta_oauth_setup": "Connect the selected Meta assets",
         "defer_meta_setup": "Configure Meta Lead Ads later",
     }
     user_message = services.save_message(
@@ -856,6 +864,32 @@ def apply_onboarding_action(
             updates = [
                 services.user_field_update("sales_contacts", None, status="deferred"),
                 services.user_field_update("appointment_routing", "round_robin", status="deferred"),
+            ]
+        elif payload.action == "complete_meta_oauth_setup":
+            required = (
+                payload.meta_authorization_id, payload.page_id,
+                payload.ad_account_id, payload.lead_form_id,
+            )
+            if any(value is None for value in required):
+                raise HTTPException(status_code=422, detail="Meta authorization, Page, Ad Account, and Lead Form are required.")
+            connection, _ = meta_oauth_service.configure_project_setup(
+                db,
+                project=project,
+                authorization_id=payload.meta_authorization_id or "",
+                business_account_id=payload.business_account_id,
+                page_id=payload.page_id or "",
+                ad_account_id=payload.ad_account_id or "",
+                lead_form_id=payload.lead_form_id or "",
+                campaign_name=payload.campaign_name or f"Meta Lead Ads · {project.name}",
+                external_campaign_id=payload.external_campaign_id,
+                external_adset_id=payload.external_adset_id,
+                external_ad_id=payload.external_ad_id,
+                instagram_account_id=payload.instagram_account_id,
+                commit=False,
+            )
+            updates = [
+                services.user_field_update("campaigns_defined", True),
+                services.user_field_update("meta_connection_verified", True),
             ]
         elif payload.action == "complete_meta_setup":
             partner_id = settings.META_BUSINESS_MANAGER_ID.strip() or None
@@ -1529,7 +1563,78 @@ def get_meta_setup_configuration(
 ):
     services.get_project(db, project_id, current_user.company_id)
     partner_id = settings.META_BUSINESS_MANAGER_ID.strip() or None
-    return {"partner_business_manager_id": partner_id, "configured": partner_id is not None}
+    try:
+        oauth_config, _ = system_settings_service.meta_platform_credentials(db)
+        oauth_enabled = bool(oauth_config.is_enabled)
+    except HTTPException:
+        oauth_enabled = False
+    return {
+        "partner_business_manager_id": partner_id,
+        "configured": oauth_enabled or partner_id is not None,
+        "oauth_enabled": oauth_enabled,
+        "manual_fallback_enabled": True,
+    }
+
+
+@router.get("/{project_id}/meta/oauth/start", response_model=MetaOAuthStartResponse)
+def start_meta_oauth(
+    project_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker(EDITOR_ROLES)),
+):
+    project = services.get_project(db, project_id, current_user.company_id)
+    return meta_oauth_service.start_oauth(db, project=project, user=current_user)
+
+
+@router.get("/integrations/meta/oauth/callback", include_in_schema=False)
+async def meta_oauth_callback(
+    state: str = Query(default=""), code: str = Query(default=""), error: str = Query(default=""),
+    db: Session = Depends(get_db),
+):
+    from urllib.parse import urlencode
+
+    if error or not state or not code:
+        query = urlencode({"meta_oauth": "error", "reason": error or "authorization_cancelled"})
+        return RedirectResponse(f"{settings.PUBLIC_APP_URL.rstrip('/')}/app/projects?{query}", status_code=303)
+    try:
+        _, project_id = await meta_oauth_service.complete_oauth(db, state=state, code=code)
+    except (HTTPException, httpx.HTTPError) as exc:
+        reason = exc.detail if isinstance(exc, HTTPException) else "meta_exchange_failed"
+        query = urlencode({"meta_oauth": "error", "reason": str(reason)[:180]})
+        return RedirectResponse(f"{settings.PUBLIC_APP_URL.rstrip('/')}/app/projects?{query}", status_code=303)
+    query = urlencode({"meta_oauth": "connected"})
+    return RedirectResponse(
+        f"{settings.PUBLIC_APP_URL.rstrip('/')}/app/projects/{project_id}/onboarding?{query}", status_code=303,
+    )
+
+
+@router.get("/{project_id}/meta/oauth/authorizations", response_model=list[MetaAuthorizationResponse])
+def list_meta_authorizations(
+    project_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker(EDITOR_ROLES)),
+):
+    services.get_project(db, project_id, current_user.company_id)
+    return [meta_oauth_service.serialize_authorization(item) for item in meta_oauth_service.authorizations(db, current_user.company_id)]
+
+
+@router.get("/{project_id}/meta/oauth/assets", response_model=MetaAssetDiscoveryResponse)
+async def discover_meta_assets(
+    project_id: str,
+    authorization_id: str,
+    page_id: str | None = None,
+    ad_account_id: str | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker(EDITOR_ROLES)),
+):
+    services.get_project(db, project_id, current_user.company_id)
+    try:
+        return await meta_oauth_service.discover_assets(
+            db, company_id=current_user.company_id, authorization_id=authorization_id,
+            page_id=page_id, ad_account_id=ad_account_id,
+        )
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=422, detail="Meta could not load the assets available to this authorization.") from exc
 
 
 @router.post("/{project_id}/meta-setup/simulate", response_model=MetaProjectSetupResponse)

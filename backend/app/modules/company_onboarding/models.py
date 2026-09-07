@@ -96,6 +96,7 @@ class OnboardingMessage(Base):
     content = Column(Text, nullable=False)
     ui_payload = Column(JSON, nullable=True)
     response_payload = Column(JSON, nullable=True)
+    media_evidence = Column(JSON, nullable=True)
     in_reply_to_message_id = Column(String(36), ForeignKey("onboarding_messages.id", ondelete="SET NULL"), nullable=True, index=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 

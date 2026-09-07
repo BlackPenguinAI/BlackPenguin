@@ -19,7 +19,7 @@ import {
 } from '../../../../shared/utils/review-scroll-anchor';
 
 import {
-  Campaign, ChatAttachment, ChatMessage, ChatTurn, EMPTY_PROJECT_PROFILE, MetaConnection,
+  Campaign, ChatAttachment, ChatMessage, ChatTurn, EMPTY_PROJECT_PROFILE, MetaAssetDiscovery, MetaAuthorization, MetaConnection,
   MetaSetupConfiguration, OnboardingState, ProjectAssignment, ProjectFieldProgress, ProjectProfile,
   ProjectSalesCandidate, ProjectSource, SectionProgress, SourceProposal, ValidationStatus,
   ProjectPropertyType, PropertyTypeCatalog,
@@ -63,7 +63,12 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   teamBusy = false;
   teamSetupMessage = '';
   authorizationBusy = false;
-  metaSetupConfig: MetaSetupConfiguration = { partner_business_manager_id: null, configured: false };
+  metaSetupConfig: MetaSetupConfiguration = { partner_business_manager_id: null, configured: false, oauth_enabled: false, manual_fallback_enabled: true };
+  metaAuthorizations: MetaAuthorization[] = [];
+  metaAssets: MetaAssetDiscovery = { authorizations: [], pages: [], ad_accounts: [], lead_forms: [], campaigns: [], adsets: [], ads: [] };
+  metaOAuth = { authorization_id: '', page_id: '', ad_account_id: '', lead_form_id: '', campaign_name: 'Meta Lead Ads', external_campaign_id: '', external_adset_id: '', external_ad_id: '', instagram_account_id: '' };
+  metaOAuthBusy = false;
+  showManualMetaSetup = false;
   metaSetup = {
     meta_connection_id: '', page_id: '', ad_account_id: '', lead_form_id: '',
     campaign_name: 'Meta Lead Ads', external_campaign_id: '', external_adset_id: '',
@@ -129,6 +134,9 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     this.projectId = this.route.snapshot.paramMap.get('id') || '';
     this.userName = localStorage.getItem('bp_name') || 'User';
     this.syncState(); this.loadCampaigns(); this.loadMetaConnections(); this.loadSalesTeam(); this.loadMetaSetupConfiguration();
+    const oauthStatus = this.route.snapshot.queryParamMap?.get('meta_oauth');
+    if (oauthStatus === 'connected') this.metaSetupMessage = 'Meta connected. Select the assets that belong to this Project.';
+    if (oauthStatus === 'error') this.errorMessage = this.route.snapshot.queryParamMap?.get('reason') || 'Meta connection could not be completed.';
     this.speechSubscriptions.add(this.speech.state$.subscribe((state) => {
       this.isRecording = state === 'listening';
       this.cdr.detectChanges();
@@ -258,7 +266,66 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   }
   loadMetaSetupConfiguration(): void {
     this.onboarding.getMetaSetupConfiguration(this.projectId).subscribe({
-      next: (configuration) => this.metaSetupConfig = configuration,
+      next: (configuration) => {
+        this.metaSetupConfig = configuration;
+        if (configuration.oauth_enabled) this.loadMetaAuthorizations();
+        else this.showManualMetaSetup = true;
+      },
+    });
+  }
+  connectMeta(): void {
+    if (this.metaOAuthBusy) return;
+    this.metaOAuthBusy = true; this.errorMessage = '';
+    this.onboarding.startMetaOAuth(this.projectId).subscribe({
+      next: value => window.location.assign(value.authorization_url),
+      error: (error: HttpErrorResponse) => { this.metaOAuthBusy = false; this.errorMessage = error.error?.detail || 'Meta connection could not be started.'; this.cdr.detectChanges(); },
+    });
+  }
+  loadMetaAuthorizations(): void {
+    this.onboarding.getMetaAuthorizations(this.projectId).subscribe({
+      next: items => {
+        this.metaAuthorizations = items;
+        if (!this.metaOAuth.authorization_id && items.length) this.metaOAuth.authorization_id = items[0].id;
+        if (this.metaOAuth.authorization_id) this.loadMetaAssets();
+        this.cdr.detectChanges();
+      },
+      error: () => { this.errorMessage = 'Existing Meta authorizations could not be loaded.'; },
+    });
+  }
+  loadMetaAssets(): void {
+    if (!this.metaOAuth.authorization_id) return;
+    this.metaOAuthBusy = true;
+    this.onboarding.discoverMetaAssets(this.projectId, this.metaOAuth.authorization_id, this.metaOAuth.page_id, this.metaOAuth.ad_account_id).subscribe({
+      next: assets => {
+        this.metaAssets = assets; this.metaOAuthBusy = false;
+        if (assets.pages.length === 1 && !this.metaOAuth.page_id) this.metaOAuth.page_id = assets.pages[0].id;
+        if (assets.ad_accounts.length === 1 && !this.metaOAuth.ad_account_id) this.metaOAuth.ad_account_id = assets.ad_accounts[0].id;
+        const page = assets.pages.find(item => item.id === this.metaOAuth.page_id);
+        if (page?.instagram_account_id) this.metaOAuth.instagram_account_id = page.instagram_account_id;
+        this.cdr.detectChanges();
+      },
+      error: (error: HttpErrorResponse) => { this.metaOAuthBusy = false; this.errorMessage = error.error?.detail || 'Meta assets could not be loaded.'; this.cdr.detectChanges(); },
+    });
+  }
+  metaPageChanged(): void { this.metaOAuth.lead_form_id = ''; this.loadMetaAssets(); }
+  metaAdAccountChanged(): void {
+    this.metaOAuth.external_campaign_id = ''; this.metaOAuth.external_adset_id = ''; this.metaOAuth.external_ad_id = '';
+    this.loadMetaAssets();
+  }
+  completeMetaOAuth(message: ChatMessage): void {
+    if (!message.id || this.metaOAuthBusy || !this.metaOAuth.authorization_id || !this.metaOAuth.page_id || !this.metaOAuth.ad_account_id || !this.metaOAuth.lead_form_id || !this.metaOAuth.campaign_name.trim()) return;
+    this.metaOAuthBusy = true; this.errorMessage = '';
+    const optional = (value: string) => value.trim() || undefined;
+    this.onboarding.applyOnboardingAction(this.projectId, {
+      action: 'complete_meta_oauth_setup', question_message_id: message.id, client_action_id: this.createClientMessageId(),
+      meta_authorization_id: this.metaOAuth.authorization_id, page_id: this.metaOAuth.page_id,
+      ad_account_id: this.metaOAuth.ad_account_id, lead_form_id: this.metaOAuth.lead_form_id,
+      campaign_name: this.metaOAuth.campaign_name.trim(), external_campaign_id: optional(this.metaOAuth.external_campaign_id),
+      external_adset_id: optional(this.metaOAuth.external_adset_id), external_ad_id: optional(this.metaOAuth.external_ad_id),
+      instagram_account_id: optional(this.metaOAuth.instagram_account_id),
+    }).subscribe({
+      next: turn => { this.metaOAuthBusy = false; this.metaSetupMessage = 'Meta assets connected and lead delivery activated for this Project.'; this.applyTurn(turn); this.loadCampaigns(); this.loadMetaConnections(); this.scrollToBottom(); },
+      error: (error: HttpErrorResponse) => { this.metaOAuthBusy = false; this.handleStructuredActionError(error, 'The selected Meta assets could not be connected.'); },
     });
   }
   loadPropertyTypes(): void {

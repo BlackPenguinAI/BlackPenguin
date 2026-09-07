@@ -42,14 +42,21 @@
           class="flex w-full"
           [ngClass]="msg.sender === 'user' ? 'justify-end' : 'justify-start'"
         >
-          <app-onboarding-ai-message
-            *ngIf="msg.sender === 'ai'"
-            [message]="msg"
-            [active]="isActiveQuestion(msg)"
-            [disabled]="isAnalyzing || isCompleted || hasPendingReview"
-            (selected)="chooseAnswer($event, msg)"
-            (custom)="writeCustomAnswer(msg)"
-          ></app-onboarding-ai-message>
+          <div *ngIf="msg.sender === 'ai'" class="min-w-0 w-full">
+            <app-onboarding-ai-message
+              [message]="msg"
+              [active]="isActiveQuestion(msg)"
+              [disabled]="isAnalyzing || isCompleted || hasPendingReview"
+              (selected)="chooseAnswer($event, msg)"
+              (custom)="writeCustomAnswer(msg)"
+            ></app-onboarding-ai-message>
+            <div *ngIf="msg.media_evidence as media" class="ml-11 mt-2 max-w-sm rounded-xl border border-green-500/20 bg-green-500/[0.06] p-3">
+              <div class="flex items-center gap-3">
+                <img *ngIf="companyMediaUrls.get(media.asset_id) as preview" [src]="preview" [alt]="media.name" class="h-16 w-20 rounded-lg border border-white/10 bg-black/30 object-contain p-1" />
+                <div class="min-w-0"><p class="text-xs font-semibold text-green-300">Official Company logo</p><p class="mt-1 truncate text-[10px] text-gray-500">{{ media.name }}</p></div>
+              </div>
+            </div>
+          </div>
 
           <div *ngIf="msg.sender === 'user'" class="flex max-w-[85%] flex-col items-end md:max-w-[80%]">
           <span class="mb-1 mr-2 text-[10px] text-gray-500">{{ userName }}</span>

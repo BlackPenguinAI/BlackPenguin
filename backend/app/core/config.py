@@ -18,10 +18,13 @@ class Settings(BaseSettings):
     FIRST_SUPERADMIN_PASSWORD: str
 
     META_ACCESS_TOKEN: str
+    META_APP_ID: str = ""
+    META_LOGIN_CONFIG_ID: str = ""
     META_VERIFY_TOKEN: str = "blackpenguin_meta_token_2026"
     META_APP_SECRET: str = "app_secret_de_meta_pendiente"
     META_API_VERSION: str = "v20.0"
     META_BUSINESS_MANAGER_ID: str = ""
+    META_OAUTH_REDIRECT_URI: str = "https://blackpenguin.ai/api/v1/projects/integrations/meta/oauth/callback"
 
     OPENROUTER_API_KEY: str
     DEFAULT_AI_MODEL: str = "deepseek/deepseek-chat"

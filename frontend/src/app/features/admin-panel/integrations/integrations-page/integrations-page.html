@@ -13,5 +13,25 @@
       <label class="switch"><input name="is_enabled" type="checkbox" [(ngModel)]="config.is_enabled" (ngModelChange)="markDirty()"><span>Allow Sales users to connect Google Calendar</span></label>
       <footer><span *ngIf="dirty">Unsaved changes</span><button type="submit" [disabled]="saving || !dirty">{{ saving ? 'Saving…' : 'Save Integration' }}</button></footer>
     </form>
+    <div *ngIf="metaLoading" class="bp-loading">Loading Meta integration…</div>
+    <form *ngIf="!metaLoading" class="integration-card" (ngSubmit)="saveMeta()">
+      <div class="integration-title"><span class="material-symbols-outlined">hub</span><div><h2>Meta Lead Ads</h2><small>One platform App; each Company authorizes its own reusable Meta assets.</small></div><b [class.ready]="metaConfig.verification_status === 'verified'">{{ metaConfig.verification_status }}</b></div>
+      <div class="field-grid">
+        <label>Meta App ID<input name="meta_app_id" [(ngModel)]="metaConfig.app_id" (ngModelChange)="markMetaDirty()" placeholder="Meta App ID"></label>
+        <label>Facebook Login configuration ID<input name="meta_login_config_id" [(ngModel)]="metaConfig.login_config_id" (ngModelChange)="markMetaDirty()" placeholder="Optional config ID"></label>
+        <label>Replace App Secret<input name="meta_app_secret" type="password" [(ngModel)]="metaConfig.app_secret" (ngModelChange)="markMetaDirty()" placeholder="Leave blank to keep the configured secret"><small *ngIf="metaConfig.app_secret_configured">Secret configured{{ metaConfig.app_secret_hint ? ' · ending in '+metaConfig.app_secret_hint : '' }}.</small></label>
+        <label>Graph API version<input name="meta_graph_version" [(ngModel)]="metaConfig.graph_api_version" (ngModelChange)="markMetaDirty()" placeholder="v23.0"></label>
+      </div>
+      <label>Valid OAuth Redirect URI<input name="meta_redirect_uri" [(ngModel)]="metaConfig.redirect_uri" (ngModelChange)="markMetaDirty()"></label>
+      <label>Webhook Callback URL<input name="meta_webhook_url" [(ngModel)]="metaConfig.webhook_callback_url" (ngModelChange)="markMetaDirty()"></label>
+      <div class="field-grid">
+        <label>Business verification<select name="meta_business_status" [(ngModel)]="metaConfig.business_verification_status" (ngModelChange)="markMetaDirty()"><option value="pending">Pending</option><option value="verified">Verified</option></select></label>
+        <label>App Review<select name="meta_review_status" [(ngModel)]="metaConfig.app_review_status" (ngModelChange)="markMetaDirty()"><option value="pending">Pending</option><option value="in_review">In review</option><option value="approved">Approved</option></select></label>
+      </div>
+      <div class="setup-note"><b>Meta App checklist</b><span>Add Facebook Login for Business and Webhooks, register the exact redirect URI, subscribe Page/leadgen, add the callback and verify token, complete Business Verification, and request Advanced Access for: {{ metaConfig.requested_scopes.join(', ') }}.</span></div>
+      <div class="token-row"><div><b>Webhook verify token</b><small>{{ metaConfig.webhook_verify_token_configured ? 'Configured · ending in '+metaConfig.webhook_verify_token_hint : 'Not configured' }}</small><code *ngIf="newWebhookVerifyToken">{{ newWebhookVerifyToken }}</code></div><button type="button" class="secondary" (click)="rotateWebhookToken()">Rotate token</button></div>
+      <label class="switch"><input name="meta_enabled" type="checkbox" [(ngModel)]="metaConfig.is_enabled" (ngModelChange)="markMetaDirty()"><span>Allow Companies to connect Meta during Project onboarding</span></label>
+      <footer><button type="button" class="secondary" (click)="verifyMeta()" [disabled]="metaVerifying || metaDirty">{{ metaVerifying ? 'Verifying…' : 'Verify credentials' }}</button><span *ngIf="metaDirty">Unsaved changes</span><button type="submit" [disabled]="metaSaving || !metaDirty">{{ metaSaving ? 'Saving…' : 'Save Meta Integration' }}</button></footer>
+    </form>
   </div>
 </section>

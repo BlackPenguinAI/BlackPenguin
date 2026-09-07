@@ -136,6 +136,10 @@ def select_company_logo(
             session.id,
             SenderType.AI,
             "I saved the selected image as the official Company logo.",
+            media_evidence={
+                "kind": "company_logo", "asset_id": asset.id, "name": asset.name,
+                "image_url": f"/api/v1/company-onboarding/media/{asset.id}/file",
+            },
             commit=False,
         )
     db.add(asset); db.commit(); db.refresh(asset)
@@ -219,6 +223,7 @@ def _message_payload(message: OnboardingMessage) -> dict[str, Any]:
         "content": content,
         "ui_payload": message.ui_payload,
         "response_payload": message.response_payload,
+        "media_evidence": getattr(message, "media_evidence", None),
         "in_reply_to_message_id": message.in_reply_to_message_id,
         "created_at": message.created_at,
         "attachments": [

@@ -144,6 +144,7 @@ def get_or_create_session(db: Session, company_id: str) -> OnboardingSession:
 def save_message(
     db: Session, session_id: str, sender: SenderType, content: str, *,
     ui_payload: dict[str, Any] | None = None,
+    media_evidence: dict[str, Any] | None = None,
     in_reply_to_message_id: str | None = None,
     commit: bool = True,
 ) -> OnboardingMessage:
@@ -151,7 +152,8 @@ def save_message(
         supersede_unanswered_questions(db, session_id)
     message = OnboardingMessage(
         session_id=session_id, sender=sender, content=content,
-        ui_payload=ui_payload, in_reply_to_message_id=in_reply_to_message_id,
+        ui_payload=ui_payload, media_evidence=media_evidence,
+        in_reply_to_message_id=in_reply_to_message_id,
     )
     db.add(message)
     if commit:
