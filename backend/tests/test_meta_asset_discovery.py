@@ -128,3 +128,33 @@ def test_stale_authorization_without_pages_manage_ads_preserves_base_and_ad_asse
     assert result["lead_forms"] == []
     assert result["campaigns"][0]["id"] == "campaign-1"
     assert "pages_manage_ads" in result["warnings"][0]
+
+
+def test_advertising_hierarchy_and_ad_lead_form_are_serialized(monkeypatch):
+    responses = {
+        "/me/accounts": (200, {"data": [{"id": "page-1", "name": "Page", "access_token": "page-token"}]}),
+        "/me/adaccounts": (200, {"data": [{"id": "act_123", "account_id": "123", "name": "Ads"}]}),
+        "/page-1/leadgen_forms": (200, {"data": [{"id": "form-1", "name": "Project form", "status": "ACTIVE"}]}),
+        "/act_123/campaigns": (200, {"data": [{
+            "id": "campaign-1", "name": "Lead campaign", "status": "ACTIVE", "objective": "OUTCOME_LEADS",
+        }]}),
+        "/act_123/adsets": (200, {"data": [{
+            "id": "adset-1", "name": "Qualified buyers", "status": "ACTIVE", "campaign_id": "campaign-1",
+        }]}),
+        "/act_123/ads": (200, {"data": [{
+            "id": "ad-1", "name": "Project creative", "status": "ACTIVE",
+            "campaign_id": "campaign-1", "adset_id": "adset-1",
+            "creative": {"id": "creative-1", "object_story_spec": {
+                "link_data": {"call_to_action": {"value": {"lead_gen_form_id": "form-1"}}},
+            }},
+        }]}),
+    }
+
+    result = _run_discovery(monkeypatch, responses, page_id="page-1", ad_account_id="123")
+
+    assert result["campaigns"][0]["objective"] == "OUTCOME_LEADS"
+    assert result["adsets"][0]["parent_id"] == "campaign-1"
+    assert result["ads"][0]["parent_id"] == "adset-1"
+    assert result["ads"][0]["campaign_id"] == "campaign-1"
+    assert result["ads"][0]["lead_form_id"] == "form-1"
+    assert result["lead_forms"][0]["parent_id"] == "page-1"

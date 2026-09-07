@@ -512,6 +512,9 @@ class MetaAssetOption(BaseModel):
     name: str
     status: str | None = None
     parent_id: str | None = None
+    campaign_id: str | None = None
+    lead_form_id: str | None = None
+    objective: str | None = None
     instagram_account_id: str | None = None
     instagram_username: str | None = None
 

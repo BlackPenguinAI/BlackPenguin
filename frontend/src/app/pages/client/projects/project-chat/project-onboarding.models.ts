@@ -184,6 +184,7 @@ export interface MetaAuthorization {
 
 export interface MetaAssetOption {
   id: string; name: string; status: string | null;
+  parent_id?: string | null; campaign_id?: string | null; lead_form_id?: string | null; objective?: string | null;
   instagram_account_id?: string | null; instagram_username?: string | null;
 }
 

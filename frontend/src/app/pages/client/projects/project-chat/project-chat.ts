@@ -19,7 +19,7 @@ import {
 } from '../../../../shared/utils/review-scroll-anchor';
 
 import {
-  Campaign, ChatAttachment, ChatMessage, ChatTurn, EMPTY_PROJECT_PROFILE, MetaAssetDiscovery, MetaAuthorization, MetaConnection,
+  Campaign, ChatAttachment, ChatMessage, ChatTurn, EMPTY_PROJECT_PROFILE, MetaAssetDiscovery, MetaAssetOption, MetaAuthorization, MetaConnection,
   MetaSetupConfiguration, OnboardingState, ProjectAssignment, ProjectFieldProgress, ProjectProfile,
   ProjectSalesCandidate, ProjectSource, SectionProgress, SourceProposal, ValidationStatus,
   ProjectPropertyType, PropertyTypeCatalog,
@@ -267,6 +267,24 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   get canTestMetaSetup(): boolean {
     return !this.metaSetupBusy && this.metaSetupConfig.configured && this.metaSetupErrorCount === 0;
   }
+  get metaCampaignOptions(): MetaAssetOption[] { return this.metaAssets.campaigns; }
+  get metaAdSetOptions(): MetaAssetOption[] {
+    if (!this.metaOAuth.external_campaign_id) return [];
+    return this.metaAssets.adsets.filter(item => item.parent_id === this.metaOAuth.external_campaign_id);
+  }
+  get metaAdOptions(): MetaAssetOption[] {
+    if (!this.metaOAuth.external_adset_id) return [];
+    return this.metaAssets.ads.filter(item => item.parent_id === this.metaOAuth.external_adset_id);
+  }
+  get selectedMetaAd(): MetaAssetOption | undefined {
+    return this.metaAssets.ads.find(item => item.id === this.metaOAuth.external_ad_id);
+  }
+  get metaLeadFormOptions(): MetaAssetOption[] {
+    const linkedFormId = this.selectedMetaAd?.lead_form_id;
+    return linkedFormId
+      ? this.metaAssets.lead_forms.filter(item => item.id === linkedFormId)
+      : this.metaAssets.lead_forms;
+  }
 
   loadProfile(): void {
     this.onboarding.getProfile(this.projectId).subscribe({
@@ -335,19 +353,53 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     this.onboarding.discoverMetaAssets(this.projectId, this.metaOAuth.authorization_id, this.metaOAuth.page_id, this.metaOAuth.ad_account_id).subscribe({
       next: assets => {
         this.metaAssets = assets; this.metaOAuthBusy = false;
-        if (assets.pages.length === 1 && !this.metaOAuth.page_id) this.metaOAuth.page_id = assets.pages[0].id;
-        if (assets.ad_accounts.length === 1 && !this.metaOAuth.ad_account_id) this.metaOAuth.ad_account_id = assets.ad_accounts[0].id;
+        let selectionWasInferred = false;
+        if (assets.pages.length === 1 && !this.metaOAuth.page_id) { this.metaOAuth.page_id = assets.pages[0].id; selectionWasInferred = true; }
+        if (assets.ad_accounts.length === 1 && !this.metaOAuth.ad_account_id) { this.metaOAuth.ad_account_id = assets.ad_accounts[0].id; selectionWasInferred = true; }
         const page = assets.pages.find(item => item.id === this.metaOAuth.page_id);
         if (page?.instagram_account_id) this.metaOAuth.instagram_account_id = page.instagram_account_id;
+        this.reconcileMetaHierarchy();
         this.cdr.detectChanges();
+        if (selectionWasInferred) this.loadMetaAssets();
       },
       error: (error: HttpErrorResponse) => { this.metaOAuthBusy = false; this.errorMessage = this.apiDetail(error, 'Meta assets could not be loaded.'); this.cdr.detectChanges(); },
     });
   }
-  metaPageChanged(): void { this.metaOAuth.lead_form_id = ''; this.loadMetaAssets(); }
+  metaAuthorizationChanged(): void {
+    this.metaOAuth.page_id = ''; this.metaOAuth.ad_account_id = ''; this.metaOAuth.instagram_account_id = '';
+    this.resetMetaHierarchy(); this.loadMetaAssets();
+  }
+  metaPageChanged(): void { this.resetMetaHierarchy(); this.loadMetaAssets(); }
   metaAdAccountChanged(): void {
-    this.metaOAuth.external_campaign_id = ''; this.metaOAuth.external_adset_id = ''; this.metaOAuth.external_ad_id = '';
-    this.loadMetaAssets();
+    this.resetMetaHierarchy(); this.loadMetaAssets();
+  }
+  metaCampaignChanged(): void {
+    this.metaOAuth.external_adset_id = ''; this.metaOAuth.external_ad_id = ''; this.metaOAuth.lead_form_id = '';
+  }
+  metaAdSetChanged(): void { this.metaOAuth.external_ad_id = ''; this.metaOAuth.lead_form_id = ''; }
+  metaAdChanged(): void {
+    this.metaOAuth.lead_form_id = '';
+    const linkedFormId = this.selectedMetaAd?.lead_form_id;
+    if (linkedFormId && this.metaAssets.lead_forms.some(item => item.id === linkedFormId)) {
+      this.metaOAuth.lead_form_id = linkedFormId;
+    }
+  }
+  private resetMetaHierarchy(): void {
+    this.metaOAuth.external_campaign_id = ''; this.metaOAuth.external_adset_id = '';
+    this.metaOAuth.external_ad_id = ''; this.metaOAuth.lead_form_id = '';
+  }
+  private reconcileMetaHierarchy(): void {
+    if (this.metaOAuth.external_campaign_id && !this.metaCampaignOptions.some(item => item.id === this.metaOAuth.external_campaign_id)) {
+      this.resetMetaHierarchy(); return;
+    }
+    if (this.metaOAuth.external_adset_id && !this.metaAdSetOptions.some(item => item.id === this.metaOAuth.external_adset_id)) {
+      this.metaOAuth.external_adset_id = ''; this.metaOAuth.external_ad_id = ''; this.metaOAuth.lead_form_id = ''; return;
+    }
+    if (this.metaOAuth.external_ad_id && !this.metaAdOptions.some(item => item.id === this.metaOAuth.external_ad_id)) {
+      this.metaOAuth.external_ad_id = ''; this.metaOAuth.lead_form_id = ''; return;
+    }
+    const linkedFormId = this.selectedMetaAd?.lead_form_id;
+    if (linkedFormId && this.metaAssets.lead_forms.some(item => item.id === linkedFormId)) this.metaOAuth.lead_form_id = linkedFormId;
   }
   completeMetaOAuth(message: ChatMessage): void {
     if (!message.id || this.metaOAuthBusy || !this.metaOAuth.authorization_id || !this.metaOAuth.page_id || !this.metaOAuth.ad_account_id || !this.metaOAuth.lead_form_id || !this.metaOAuth.campaign_name.trim()) return;

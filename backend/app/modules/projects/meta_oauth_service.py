@@ -22,6 +22,23 @@ from .models import MetaAuthorization, MetaConnection, Project, ProjectCampaign
 logger = logging.getLogger(__name__)
 
 
+def _nested_lead_form_id(value: object) -> str | None:
+    if isinstance(value, dict):
+        candidate = value.get("lead_gen_form_id")
+        if candidate not in (None, ""):
+            return str(candidate)
+        for nested in value.values():
+            found = _nested_lead_form_id(nested)
+            if found:
+                return found
+    elif isinstance(value, list):
+        for nested in value:
+            found = _nested_lead_form_id(nested)
+            if found:
+                return found
+    return None
+
+
 def _log_graph_error(stage: str, exc: httpx.HTTPError) -> None:
     response = getattr(exc, "response", None)
     status_code = getattr(response, "status_code", None)
@@ -240,10 +257,15 @@ async def discover_assets(
             if not account:
                 raise HTTPException(status_code=422, detail="The selected Ad Account is not available to this Meta authorization.")
             account_path = str(account.get("id") or f"act_{normalized}")
+            asset_fields = {
+                "campaigns": "id,name,status,effective_status,objective",
+                "adsets": "id,name,status,effective_status,campaign_id",
+                "ads": "id,name,status,effective_status,campaign_id,adset_id,creative{id,object_story_spec}",
+            }
             for edge, target in (("campaigns", campaigns_raw), ("adsets", adsets_raw), ("ads", ads_raw)):
                 try:
                     edge_response = await client.get(f"{base}/{account_path}/{edge}", params={
-                        "access_token": token, "fields": "id,name,status", "limit": 200,
+                        "access_token": token, "fields": asset_fields[edge], "limit": 200,
                     })
                     edge_response.raise_for_status()
                 except httpx.HTTPError as exc:
@@ -266,12 +288,19 @@ async def discover_assets(
             **option(item), "instagram_account_id": str(instagram.get("id") or "") or None,
             "instagram_username": instagram.get("username"),
         })
+    campaigns = [{**option(item), "objective": item.get("objective")} for item in campaigns_raw]
+    adsets = [{**option(item), "parent_id": str(item.get("campaign_id") or "") or None} for item in adsets_raw]
+    ads = [{
+        **option(item),
+        "parent_id": str(item.get("adset_id") or "") or None,
+        "campaign_id": str(item.get("campaign_id") or "") or None,
+        "lead_form_id": _nested_lead_form_id(item.get("creative")),
+    } for item in ads_raw]
     return {
         "authorizations": [serialize_authorization(item) for item in authorizations(db, company_id)],
         "pages": pages, "ad_accounts": [option(item) for item in ad_accounts_raw],
-        "lead_forms": [option(item) for item in forms_raw],
-        "campaigns": [option(item) for item in campaigns_raw],
-        "adsets": [option(item) for item in adsets_raw], "ads": [option(item) for item in ads_raw],
+        "lead_forms": [{**option(item), "parent_id": str(page_id or "") or None} for item in forms_raw],
+        "campaigns": campaigns, "adsets": adsets, "ads": ads,
         "warnings": warnings,
     }
 

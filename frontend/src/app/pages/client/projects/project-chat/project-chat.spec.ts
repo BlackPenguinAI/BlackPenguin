@@ -502,6 +502,52 @@ describe('ProjectChatComponent', () => {
     expect(navigate).toHaveBeenCalledWith([], expect.objectContaining({ replaceUrl: true }));
   });
 
+  it('cascades Meta Campaign, Ad Set and Ad options and selects the Ad Lead Form', () => {
+    component.metaAssets = {
+      authorizations: [], pages: [], ad_accounts: [], warnings: [],
+      campaigns: [
+        { id: 'campaign-1', name: 'Lead campaign', status: 'ACTIVE', objective: 'OUTCOME_LEADS' },
+        { id: 'campaign-2', name: 'Other campaign', status: 'ACTIVE' },
+      ],
+      adsets: [
+        { id: 'adset-1', name: 'First Ad Set', status: 'ACTIVE', parent_id: 'campaign-1' },
+        { id: 'adset-2', name: 'Other Ad Set', status: 'ACTIVE', parent_id: 'campaign-2' },
+      ],
+      ads: [
+        { id: 'ad-1', name: 'Lead Ad', status: 'ACTIVE', parent_id: 'adset-1', lead_form_id: 'form-1' },
+        { id: 'ad-2', name: 'Other Ad', status: 'ACTIVE', parent_id: 'adset-2', lead_form_id: 'form-2' },
+      ],
+      lead_forms: [
+        { id: 'form-1', name: 'Project form', status: 'ACTIVE' },
+        { id: 'form-2', name: 'Other form', status: 'ACTIVE' },
+      ],
+    };
+    component.metaOAuth.external_campaign_id = 'campaign-1';
+
+    expect(component.metaAdSetOptions.map(item => item.id)).toEqual(['adset-1']);
+    component.metaOAuth.external_adset_id = 'adset-1';
+    expect(component.metaAdOptions.map(item => item.id)).toEqual(['ad-1']);
+    component.metaOAuth.external_ad_id = 'ad-1';
+    component.metaAdChanged();
+
+    expect(component.metaOAuth.lead_form_id).toBe('form-1');
+    expect(component.metaLeadFormOptions.map(item => item.id)).toEqual(['form-1']);
+  });
+
+  it('clears dependent Meta selections when a parent selection changes', () => {
+    component.metaOAuth.external_campaign_id = 'campaign-1';
+    component.metaOAuth.external_adset_id = 'adset-1';
+    component.metaOAuth.external_ad_id = 'ad-1';
+    component.metaOAuth.lead_form_id = 'form-1';
+
+    component.metaCampaignChanged();
+
+    expect(component.metaOAuth.external_campaign_id).toBe('campaign-1');
+    expect(component.metaOAuth.external_adset_id).toBe('');
+    expect(component.metaOAuth.external_ad_id).toBe('');
+    expect(component.metaOAuth.lead_form_id).toBe('');
+  });
+
   it('keeps Meta manual setup collapsed and exposes the OAuth blocker', () => {
     component.metaSetupConfig = {
       partner_business_manager_id: null, configured: false, oauth_enabled: false,
