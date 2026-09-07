@@ -4,16 +4,17 @@ from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from fastapi import HTTPException
+from fastapi import FastAPI, HTTPException
+from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from alembic.migration import MigrationContext
 from alembic.operations import Operations
 
 import app.db.base  # noqa: F401
-from app.db.postgres import Base
+from app.db.postgres import Base, get_db
 from app.modules.companies.models import Company
-from app.modules.meta_leads.router import _resolve_campaign, verify as verify_meta_webhook
+from app.modules.meta_leads.router import _resolve_campaign, router as meta_leads_router
 from app.modules.projects.models import MetaConnection, Project, ProjectCampaign, ProjectProfile, ProjectPropertyType
 from app.modules.sales_agent.live_test_service import create_live_meta_test
 from app.modules.sales_agent.models import SalesConversation, SalesConversationLeadContext, SalesMessage
@@ -53,17 +54,27 @@ def _lead_form(product, phone="+13055550142"):
     }
 
 
-def test_meta_webhook_verification_echoes_an_opaque_challenge():
+def test_meta_webhook_verification_echoes_an_opaque_challenge_as_plain_text():
+    app = FastAPI()
+    app.include_router(meta_leads_router, prefix="/webhooks")
+    app.dependency_overrides[get_db] = lambda: object()
+
     with patch(
         "app.modules.meta_leads.router.system_settings.meta_webhook_verify_token",
         return_value="demo-verify-token",
     ):
-        result = verify_meta_webhook(
-            mode="subscribe", token="demo-verify-token",
-            challenge="opaque-challenge-value", db=object(),
+        response = TestClient(app).get(
+            "/webhooks/meta",
+            params={
+                "hub.mode": "subscribe",
+                "hub.verify_token": "demo-verify-token",
+                "hub.challenge": "opaque-challenge-value",
+            },
         )
 
-    assert result == "opaque-challenge-value"
+    assert response.status_code == 200
+    assert response.text == "opaque-challenge-value"
+    assert response.headers["content-type"].startswith("text/plain")
 
 
 def test_manual_meta_control_is_one_idempotent_real_sms_action():

@@ -7,6 +7,7 @@ import json
 
 import httpx
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Query, Request
+from fastapi.responses import PlainTextResponse
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -83,7 +84,7 @@ def _resolve_campaign(
     return None, "No active non-Demo campaign matches this Page and Form."
 
 
-@router.get("/meta")
+@router.get("/meta", response_class=PlainTextResponse)
 def verify(
     mode: str = Query(..., alias="hub.mode"),
     token: str = Query(..., alias="hub.verify_token"),
@@ -93,8 +94,9 @@ def verify(
     expected = system_settings.meta_webhook_verify_token(db) or settings.META_VERIFY_TOKEN
     if mode == "subscribe" and hmac.compare_digest(token, expected):
         # Meta owns this opaque challenge. Echo it without assuming it is
-        # numeric so webhook verification cannot fail on a valid string value.
-        return challenge
+        # numeric or serializing it as a quoted JSON string. Meta requires the
+        # response body to match hub.challenge exactly.
+        return PlainTextResponse(content=challenge, status_code=200)
     raise HTTPException(status_code=403, detail="Invalid verification token.")
 
 
