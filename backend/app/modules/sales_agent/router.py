@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
 from app.db.postgres import get_db
@@ -22,7 +22,8 @@ from .live_service import send_manual_message
 from .live_test_service import create_live_meta_test
 from .simulation_service import (
     advance_simulation, approve_simulation, confirm_simulation_appointment,
-    create_simulation, generate_initial_message, simulation_options, slots_for_simulation,
+    create_simulation, delete_simulation, generate_initial_message, simulation_options,
+    slots_for_simulation,
 )
 
 
@@ -63,6 +64,23 @@ def start_simulation(
         campaign_id=payload.campaign_id,
         lead_form=payload.lead.model_dump(),
     )
+
+
+@router.delete("/simulations/{simulation_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_simulation(
+    simulation_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.MKT])),
+):
+    simulation = db.query(SalesAgentSimulation).filter(
+        SalesAgentSimulation.id == simulation_id,
+        SalesAgentSimulation.company_id == current_user.company_id,
+    ).first()
+    if not simulation:
+        raise HTTPException(status_code=404, detail="Simulation not found.")
+    require_project_access(db, current_user, simulation.project_id)
+    delete_simulation(db, company_id=current_user.company_id, simulation_id=simulation_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post("/meta-test-leads", response_model=LiveMetaTestResponse, status_code=201)

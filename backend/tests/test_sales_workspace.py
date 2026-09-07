@@ -1,7 +1,9 @@
 from datetime import datetime, timedelta
 import asyncio
+import csv
 import importlib.util
-from io import BytesIO
+import json
+from io import BytesIO, StringIO
 from pathlib import Path
 
 import pytest
@@ -26,9 +28,11 @@ from app.modules.sales_crm.scheduling import (
     availability_blocks_for_user, create_availability_block, delete_availability_block,
     update_availability_block,
 )
-from app.modules.sales_crm.router import get_company_sales_schedule, upload_meeting_attachment
+from app.modules.sales_crm.router import export_lead_record, get_company_sales_schedule, upload_meeting_attachment
 from app.modules.sales_crm import storage_service
-from app.modules.sales_crm.services import create_meeting, delete_meeting, get_lead_detail, update_meeting
+from app.modules.sales_crm.services import (
+    create_meeting, delete_meeting, get_lead_detail, leads_csv_report, update_meeting,
+)
 from app.modules.sales_crm.schemas import MeetingCreate
 from app.modules.users.models import User, UserRole
 
@@ -69,6 +73,45 @@ def _fixture(db):
     ))
     db.commit()
     return company, sales_a, sales_b, project, lead, conversation
+
+
+def test_filtered_lead_csv_is_excel_safe_and_keeps_structured_meta_data(db):
+    company, _, _, project, lead, _ = _fixture(db)
+    lead.full_name = "=IMPORTXML(\"https://invalid.example\")"
+    lead.meta_form_data = {
+        "selected_product": {"name": "Shoreline Collection", "code": "S-01", "currency": "USD"},
+        "budget": {"minimum": 500000, "maximum": 800000, "currency": "USD"},
+        "custom_answers": {"bedrooms": "3"},
+    }
+    db.commit()
+
+    content = leads_csv_report(
+        db, company.id, project_ids=[project.id], project_id=project.id, search="IMPORTXML",
+    )
+    rows = list(csv.DictReader(StringIO(content.lstrip("\ufeff"))))
+
+    assert len(rows) == 1
+    assert rows[0]["Full name"].startswith("'=")
+    assert rows[0]["Phone"].startswith("'+")
+    assert rows[0]["Selected product"] == "Shoreline Collection"
+    assert rows[0]["Budget minimum"] == "500000"
+    assert rows[0]["Custom answers"] == '{"bedrooms": "3"}'
+
+    empty = leads_csv_report(db, company.id, project_ids=[project.id], search="no match")
+    assert list(csv.DictReader(StringIO(empty.lstrip("\ufeff")))) == []
+
+
+def test_individual_lead_record_is_a_private_download_for_the_assigned_sales_user(db):
+    _, sales_a, _, _, lead, _ = _fixture(db)
+
+    response = export_lead_record(lead.id, db=db, current_user=sales_a)
+    payload = json.loads(response.body)
+
+    assert response.media_type == "application/json"
+    assert response.headers["content-disposition"].endswith(f'lead-{lead.id}.json"')
+    assert response.headers["cache-control"] == "private, no-store"
+    assert payload["lead"]["id"] == lead.id
+    assert payload["lead"]["meta_form_data"] == {"budget": "600000", "bedrooms": "3"}
 
 
 def test_sales_user_manages_date_specific_availability_blocks(db):

@@ -31,6 +31,8 @@ class LeadResponse(BaseModel):
     funnel_stage: FunnelStage
     qualification_summary: Optional[str] = None
     agent_status: str = "paused"
+    is_demo: bool = False
+    is_test: bool = False
     last_interaction_at: Optional[datetime] = None
     stage_changed_at: Optional[datetime] = None
     next_action_at: Optional[datetime] = None

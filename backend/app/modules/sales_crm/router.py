@@ -1,11 +1,14 @@
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
-from fastapi.responses import FileResponse, RedirectResponse, Response
+from fastapi.encoders import jsonable_encoder
+from fastapi.responses import FileResponse, RedirectResponse, Response, StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.exc import NoResultFound
 from typing import List, Optional
 from datetime import datetime, timezone
 from pathlib import Path
 import hashlib
+import io
+import json
 import secrets
 import uuid
 from datetime import timedelta
@@ -117,6 +120,34 @@ def get_company_leads(
         project_id=project_id, tier=tier, segment=segment, stage=stage,
     )
 
+
+@router.get("/leads/export.csv", summary="Download the filtered Company Lead report")
+def export_company_leads(
+    project_id: Optional[str] = None,
+    tier: Optional[str] = None,
+    segment: Optional[str] = None,
+    stage: Optional[str] = None,
+    search: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker(TENANT_MANAGER_ROLES)),
+):
+    if project_id:
+        require_project_access(db, current_user, project_id)
+    content = services.leads_csv_report(
+        db, current_user.company_id, project_ids=project_ids_for_user(db, current_user),
+        project_id=project_id, tier=tier, segment=segment, stage=stage, search=search,
+    )
+    filename = f"black-penguin-leads-{datetime.now(timezone.utc).date().isoformat()}.csv"
+    return StreamingResponse(
+        io.BytesIO(content.encode("utf-8")),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Cache-Control": "private, no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
 @router.get("/leads/{lead_id}/chat", response_model=List[SmsChatMessageSchema], summary="Historial de Chat SMS con el Lead")
 def get_lead_chat(
     lead_id: str,
@@ -138,6 +169,32 @@ def get_lead_detail(
     return services.get_lead_detail(
         db, lead_id, current_user.company_id,
         current_user.id if current_user.role == UserRole.SALES else None,
+    )
+
+
+@router.get("/leads/{lead_id}/export.json", summary="Download the complete Lead Record")
+def export_lead_record(
+    lead_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.MKT, UserRole.SALES])),
+):
+    detail = services.get_lead_detail(
+        db, lead_id, current_user.company_id,
+        current_user.id if current_user.role == UserRole.SALES else None,
+    )
+    payload = {
+        "exported_at": datetime.now(timezone.utc),
+        "lead": detail,
+    }
+    content = json.dumps(jsonable_encoder(payload), ensure_ascii=False, indent=2)
+    return Response(
+        content=content,
+        media_type="application/json",
+        headers={
+            "Content-Disposition": f'attachment; filename="black-penguin-lead-{lead_id}.json"',
+            "Cache-Control": "private, no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
     )
 
 @router.put("/leads/{lead_id}", response_model=LeadResponse, summary="Actualizar Etapa del Embudo del Prospecto")

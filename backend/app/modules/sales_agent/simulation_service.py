@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 import json
+import logging
 import uuid
 
 from fastapi import HTTPException
@@ -9,17 +10,25 @@ from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session
 
 from app.modules.project_team.service import eligible_sales_assignments
-from app.modules.projects.models import Project, ProjectCampaign, ProjectPropertyType, ProjectUnit
-from app.modules.sales_crm.models import Lead, Meeting
+from app.modules.projects.models import Project, ProjectCampaign, ProjectPropertyType, ProjectUnit, SalesAssetShare
+from app.modules.sales_crm import storage_service
+from app.modules.sales_crm.models import (
+    Lead, LeadConsentEvent, LeadObjection, LeadScoreSnapshot, LeadSegmentAssignment,
+    LeadStageHistory, Meeting, MeetingAttachment, SmsChatMessage,
+)
 from app.modules.sales_crm.scheduling import available_slots, create_agent_appointment
 from app.modules.users.models import User
 
-from .models import AgentRun, SalesAgentSimulation, SalesConversation, SalesFollowUpJob, SalesMessage
+from .models import (
+    AgentRun, OutboundMessage, SalesAgentSimulation, SalesConversation,
+    SalesConversationLeadContext, SalesFollowUpJob, SalesMessage,
+)
 from .service import get_or_create_conversation, simulate_turn
 
 
 COMPLETED_PROJECT_STATUSES = {"complete", "completed"}
 INITIAL_EVENT_PREFIX = "simulation-start:"
+logger = logging.getLogger(__name__)
 
 
 def _number(value) -> float | None:
@@ -249,6 +258,85 @@ def create_simulation(
         "prompt_snapshot": {},
         "requires_initial_message": True,
     }
+
+
+def delete_simulation(db: Session, *, company_id: str, simulation_id: str) -> None:
+    """Delete one synthetic Agent run without exposing a generic Lead delete path."""
+    simulation = db.query(SalesAgentSimulation).filter(
+        SalesAgentSimulation.id == simulation_id,
+        SalesAgentSimulation.company_id == company_id,
+    ).first()
+    if not simulation:
+        raise HTTPException(status_code=404, detail="Simulation not found.")
+
+    lead = db.query(Lead).filter(
+        Lead.id == simulation.lead_id,
+        Lead.company_id == company_id,
+    ).first()
+    if not lead:
+        raise HTTPException(status_code=404, detail="Simulation lead not found.")
+    if not lead.is_demo or lead.platform != "demo_meta_form":
+        raise HTTPException(status_code=409, detail="Only synthetic leads created from Agent can be deleted.")
+    if db.query(Meeting).filter(Meeting.lead_id == lead.id, Meeting.is_demo.is_(False)).first():
+        raise HTTPException(status_code=409, detail="This synthetic lead has a non-simulation appointment and cannot be deleted.")
+
+    conversation_ids = [row[0] for row in db.query(SalesConversation.id).filter(
+        SalesConversation.lead_id == lead.id,
+        SalesConversation.company_id == company_id,
+    ).all()]
+    meeting_ids = [row[0] for row in db.query(Meeting.id).filter(
+        Meeting.lead_id == lead.id,
+        Meeting.is_demo.is_(True),
+    ).all()]
+    attachment_paths = [row[0] for row in db.query(MeetingAttachment.storage_path).filter(
+        MeetingAttachment.meeting_id.in_(meeting_ids),
+    ).all()] if meeting_ids else []
+
+    try:
+        if meeting_ids:
+            db.query(MeetingAttachment).filter(MeetingAttachment.meeting_id.in_(meeting_ids)).delete(
+                synchronize_session=False,
+            )
+            db.query(Meeting).filter(Meeting.id.in_(meeting_ids)).delete(synchronize_session=False)
+        db.query(SalesAgentSimulation).filter(SalesAgentSimulation.id == simulation.id).delete(
+            synchronize_session=False,
+        )
+        if conversation_ids:
+            for model in (SalesFollowUpJob, OutboundMessage, AgentRun, SalesMessage):
+                db.query(model).filter(model.conversation_id.in_(conversation_ids)).delete(
+                    synchronize_session=False,
+                )
+            db.query(SalesConversationLeadContext).filter(
+                SalesConversationLeadContext.conversation_id.in_(conversation_ids),
+            ).delete(synchronize_session=False)
+            db.query(SalesConversation).filter(SalesConversation.id.in_(conversation_ids)).delete(
+                synchronize_session=False,
+            )
+        db.query(SalesConversationLeadContext).filter(
+            SalesConversationLeadContext.lead_id == lead.id,
+        ).delete(synchronize_session=False)
+        for model in (
+            LeadConsentEvent, LeadObjection, LeadScoreSnapshot, LeadSegmentAssignment,
+            LeadStageHistory, SmsChatMessage, SalesAssetShare,
+        ):
+            db.query(model).filter(model.lead_id == lead.id).delete(synchronize_session=False)
+        db.query(Lead).filter(Lead.id == lead.id, Lead.company_id == company_id).delete(
+            synchronize_session=False,
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+    for relative_path in attachment_paths:
+        try:
+            storage_service.resolve_meeting_attachment(relative_path).unlink(missing_ok=True)
+        except (OSError, ValueError):
+            logger.warning(
+                "simulation_attachment_cleanup_failed simulation_id=%s path=%s",
+                simulation_id,
+                relative_path,
+            )
 
 
 async def generate_initial_message(

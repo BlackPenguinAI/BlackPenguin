@@ -208,7 +208,7 @@
       >
         <i>{{ initials(row.lead_name) }}</i
         ><span
-          ><strong>{{ row.lead_name }} <em *ngIf="row.is_test" class="test-badge">LIVE TEST</em></strong
+          ><strong>{{ row.lead_name }} <em *ngIf="row.is_test" class="test-badge">LIVE TEST</em><em *ngIf="row.simulation_id" class="test-badge">SIMULATION</em></strong
           ><small>{{ row.last_message || 'No messages yet' }}</small></span
         ><time>{{ row.last_message_at | date: 'shortTime' }}</time>
       </button>
@@ -356,6 +356,10 @@
         </div>
       </div>
       <button class="handoff" (click)="action('human_handoff')">Request human handoff</button>
+      <button class="handoff error" *ngIf="canDeleteSimulation" (click)="deleteSelectedSimulation()" [disabled]="deletingSimulation">
+        <span class="material-symbols-outlined">delete</span>
+        {{ deletingSimulation ? 'Deleting simulation…' : 'Delete synthetic lead' }}
+      </button>
     </aside>
   </div>
   <ng-template #noSelection

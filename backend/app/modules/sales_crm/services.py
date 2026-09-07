@@ -1,4 +1,8 @@
+import csv
+import io
+import json
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 from fastapi import HTTPException
 from typing import List, Optional
 from datetime import datetime, timedelta
@@ -26,6 +30,7 @@ def get_project_leads(db: Session, company_id: str, project_id: str, sales_user_
 def get_company_leads(
     db: Session, company_id: str, *, project_ids: list[str], project_id: str | None = None,
     tier: str | None = None, segment: str | None = None, stage: str | None = None,
+    search: str | None = None,
 ) -> List[Lead]:
     query = db.query(Lead).filter(Lead.company_id == company_id)
     query = query.filter(Lead.project_id.in_(project_ids)) if project_ids else query.filter(Lead.project_id == "")
@@ -33,7 +38,99 @@ def get_company_leads(
     if tier: query = query.filter(Lead.intent_tier == tier)
     if segment: query = query.filter(Lead.assigned_segment == segment)
     if stage: query = query.filter(Lead.pipeline_stage == stage)
+    if search and search.strip():
+        escaped = search.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        term = f"%{escaped}%"
+        query = query.filter(or_(
+            Lead.full_name.ilike(term, escape="\\"),
+            Lead.email.ilike(term, escape="\\"),
+            Lead.phone.ilike(term, escape="\\"),
+        ))
     return query.order_by(Lead.last_interaction_at.desc().nullslast(), Lead.created_at.desc()).all()
+
+
+LEAD_EXPORT_COLUMNS = [
+    "Lead ID", "Full name", "Phone", "Email", "Platform", "Source", "Project", "Campaign",
+    "Intent score", "Interest level", "Segment", "Pipeline stage", "Agent status",
+    "Selected product", "Product code", "Budget minimum", "Budget maximum", "Currency",
+    "Consent status", "Synthetic lead", "Meta test lead", "Created at", "Last interaction",
+    "Next action", "Custom answers",
+]
+
+
+def _csv_safe(value) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, (dict, list)):
+        text = json.dumps(value, ensure_ascii=False, default=str, sort_keys=True)
+    elif isinstance(value, datetime):
+        text = value.isoformat()
+    elif hasattr(value, "value"):
+        text = str(value.value)
+    else:
+        text = str(value)
+    return f"'{text}" if text.lstrip().startswith(("=", "+", "-", "@", "\t", "\r")) else text
+
+
+def leads_csv_report(
+    db: Session, company_id: str, *, project_ids: list[str], project_id: str | None = None,
+    tier: str | None = None, segment: str | None = None, stage: str | None = None,
+    search: str | None = None,
+) -> str:
+    from app.modules.projects.models import Project, ProjectCampaign
+
+    leads = get_company_leads(
+        db, company_id, project_ids=project_ids, project_id=project_id,
+        tier=tier, segment=segment, stage=stage, search=search,
+    )
+    project_names = {
+        item.id: item.name for item in db.query(Project).filter(
+            Project.company_id == company_id,
+            Project.id.in_({lead.project_id for lead in leads if lead.project_id}),
+        ).all()
+    } if leads else {}
+    campaign_names = {
+        item.id: item.name for item in db.query(ProjectCampaign).filter(
+            ProjectCampaign.id.in_({lead.campaign_id for lead in leads if lead.campaign_id}),
+        ).all()
+    } if leads else {}
+
+    output = io.StringIO(newline="")
+    output.write("\ufeff")
+    writer = csv.DictWriter(output, fieldnames=LEAD_EXPORT_COLUMNS, lineterminator="\r\n")
+    writer.writeheader()
+    for lead in leads:
+        form = lead.meta_form_data if isinstance(lead.meta_form_data, dict) else {}
+        product = form.get("selected_product") if isinstance(form.get("selected_product"), dict) else {}
+        budget = form.get("budget") if isinstance(form.get("budget"), dict) else {}
+        writer.writerow({key: _csv_safe(value) for key, value in {
+            "Lead ID": lead.id,
+            "Full name": lead.full_name,
+            "Phone": lead.phone,
+            "Email": lead.email,
+            "Platform": lead.platform,
+            "Source": lead.source,
+            "Project": project_names.get(lead.project_id, ""),
+            "Campaign": campaign_names.get(lead.campaign_id, ""),
+            "Intent score": float(lead.intent_score or 0),
+            "Interest level": lead.intent_tier,
+            "Segment": lead.assigned_segment,
+            "Pipeline stage": lead.pipeline_stage,
+            "Agent status": lead.agent_status,
+            "Selected product": product.get("name") or form.get("product_name"),
+            "Product code": product.get("code") or form.get("product_code"),
+            "Budget minimum": budget.get("minimum") or form.get("budget_min"),
+            "Budget maximum": budget.get("maximum") or form.get("budget_max"),
+            "Currency": budget.get("currency") or product.get("currency") or form.get("currency"),
+            "Consent status": lead.consent_status,
+            "Synthetic lead": lead.is_demo,
+            "Meta test lead": lead.is_test,
+            "Created at": lead.created_at,
+            "Last interaction": lead.last_interaction_at,
+            "Next action": lead.next_action_at,
+            "Custom answers": form.get("custom_answers") or {},
+        }.items()})
+    return output.getvalue()
 
 def get_lead_sms_chat(
     db: Session, lead_id: str, company_id: str, sales_user_id: str | None = None,

@@ -40,4 +40,44 @@ describe('LeadsComponent', () => {
     expect(navigations[0][0]).toEqual(['/app/agent']);
     expect(navigations[0][1].queryParams).toEqual({ project: 'project-1', lead: 'lead-1' });
   });
+
+  it('renders nested source data as structured rows instead of JSON text', () => {
+    const value = component();
+    const rows = value.dataRows({
+      selected_product: { name: 'Shoreline Collection', available_units: 3 },
+      budget: { minimum: 500000, currency: 'USD' },
+    });
+
+    expect(rows.some(row => row.group && row.label === 'Selected product')).toBe(true);
+    expect(rows.some(row => row.label === 'Name' && row.value === 'Shoreline Collection')).toBe(true);
+    expect(rows.some(row => row.label === 'Minimum' && row.value === '500,000')).toBe(true);
+    expect(rows.every(row => !row.value.includes('{'))).toBe(true);
+    expect(value.structuredSummary('{"budget":{"minimum":500000}}')).toEqual({ budget: { minimum: 500000 } });
+    expect(value.structuredSummary('Human-readable summary')).toBeNull();
+  });
+
+  it('exports the active filters and downloads an individual Lead Record', () => {
+    const calls: Array<{ url: string; options: any }> = [];
+    const http = { get: (url: string, options: any) => { calls.push({ url, options }); return of(new Blob(['ok'])); } };
+    const value = new LeadsComponent(
+      http as any,
+      { markForCheck: () => undefined } as any,
+      { navigate: () => Promise.resolve(true) } as any,
+    );
+    const files: string[] = [];
+    (value as any).saveBlob = (_blob: Blob, filename: string) => files.push(filename);
+    value.projectId = 'project-1'; value.tier = 'hot'; value.search = 'George';
+    value.selected = { id: 'lead-1' };
+
+    value.exportCurrentView();
+    value.downloadSourceData();
+
+    expect(calls[0].url).toContain('/sales/leads/export.csv?');
+    expect(calls[0].url).toContain('project_id=project-1');
+    expect(calls[0].url).toContain('tier=hot');
+    expect(calls[0].url).toContain('search=George');
+    expect(calls[0].options.responseType).toBe('blob');
+    expect(calls[1].url).toContain('/sales/leads/lead-1/export.json');
+    expect(files[1]).toBe('black-penguin-lead-lead-1.json');
+  });
 });

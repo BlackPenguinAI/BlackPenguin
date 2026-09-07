@@ -30,6 +30,7 @@ export class AgentComponent implements OnInit, OnDestroy {
   creating = false;
   advancing = false;
   confirming = false;
+  deletingSimulation = false;
   generatingInitial = false;
   setupOpen = true;
   setupMode: 'simulation' | 'live_meta' = 'simulation';
@@ -127,6 +128,9 @@ export class AgentComponent implements OnInit, OnDestroy {
   }
   get currentProduct(): any {
     return this.products.find((row) => row.id === this.form.product_id);
+  }
+  get canDeleteSimulation(): boolean {
+    return !!this.selected?.simulation_id && this.selected?.platform === 'demo_meta_form';
   }
   get emailValid(): boolean {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(this.form.email.trim());
@@ -373,6 +377,35 @@ export class AgentComponent implements OnInit, OnDestroy {
     ) {
       this.generateInitial(conversation.simulation_id, conversation.id);
     }
+  }
+
+  deleteSelectedSimulation(): void {
+    if (!this.canDeleteSimulation || this.deletingSimulation) return;
+    if (typeof window !== 'undefined' && !window.confirm(
+      `Delete the synthetic lead “${this.selected.lead_name}” and all of its simulated conversation data?`,
+    )) return;
+    const simulationId = this.selected.simulation_id;
+    const conversationId = this.selected.id;
+    this.deletingSimulation = true;
+    this.error = '';
+    this.http.delete(`${API_V1_URL}/sales-agent/simulations/${simulationId}`)
+      .pipe(finalize(() => { this.deletingSimulation = false; this.cdr.markForCheck(); }))
+      .subscribe({
+        next: () => {
+          this.knownConversationIds.delete(conversationId);
+          this.conversations = this.conversations.filter(row => row.id !== conversationId);
+          this.selected = null;
+          this.messages = [];
+          this.slots = [];
+          this.selectedSlot = '';
+          this.setupOpen = !this.conversations.length;
+          this.success = 'The synthetic lead and its simulation data were deleted.';
+          if (this.conversations.length) this.select(this.conversations[0]);
+        },
+        error: err => {
+          this.error = err.error?.detail || 'The simulation could not be deleted.';
+        },
+      });
   }
 
   refreshMessages(forceBottom = false): void {

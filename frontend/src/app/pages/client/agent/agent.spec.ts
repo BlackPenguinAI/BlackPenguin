@@ -125,6 +125,29 @@ describe('AgentComponent simulation form', () => {
     expect(value.success).toContain('New Meta lead received');
   });
 
+  it('deletes only the selected synthetic Agent lead and clears its conversation', () => {
+    const calls: string[] = [];
+    const value = component({ delete: (url: string) => { calls.push(url); return of(null); } });
+    value.selected = {
+      id: 'conversation-1', simulation_id: 'simulation-1', platform: 'demo_meta_form',
+      lead_name: 'Synthetic Lead',
+    };
+    value.conversations = [value.selected];
+
+    value.deleteSelectedSimulation();
+
+    expect(calls[0]).toContain('/sales-agent/simulations/simulation-1');
+    expect(value.conversations).toEqual([]);
+    expect(value.selected).toBeNull();
+    expect(value.success).toContain('synthetic lead');
+  });
+
+  it('never exposes synthetic deletion for a real Meta lead', () => {
+    const value = component();
+    value.selected = { id: 'real', platform: 'meta', simulation_id: null };
+    expect(value.canDeleteSimulation).toBe(false);
+  });
+
   it('sends with Enter, preserves Shift+Enter and ignores IME composition', () => {
     const value = component();
     let sends = 0;

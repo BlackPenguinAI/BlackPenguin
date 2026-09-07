@@ -25,6 +25,7 @@ from app.modules.sales_agent.simulation_service import (
     advance_simulation,
     confirm_simulation_appointment,
     create_simulation,
+    delete_simulation,
     generate_initial_message,
     simulation_options,
     slots_for_simulation,
@@ -172,6 +173,64 @@ def test_initial_sms_is_idempotent_and_rejects_cross_tenant_access():
     with pytest.raises(HTTPException) as captured:
         asyncio.run(generate_initial_message(db, company_id=other.id, simulation_id=result["simulation_id"]))
     assert captured.value.status_code == 404
+
+
+def test_synthetic_lead_deletion_is_tenant_safe_and_removes_its_complete_simulation():
+    db = _db(); company, other, admin, _, _, project, campaign, product = _fixture(db)
+    result = _create(db, company, admin, project, campaign, product)
+    db.add(SalesMessage(
+        conversation_id=result["conversation_id"], channel="simulation", direction="outbound",
+        role="assistant", content="Synthetic message", status="simulated",
+    ))
+    db.add(SalesFollowUpJob(
+        conversation_id=result["conversation_id"], idempotency_key=f"delete:{result['conversation_id']}",
+        scheduled_at=datetime.utcnow(), reason="test",
+    ))
+    db.commit()
+
+    with pytest.raises(HTTPException) as cross_tenant:
+        delete_simulation(db, company_id=other.id, simulation_id=result["simulation_id"])
+    assert cross_tenant.value.status_code == 404
+
+    delete_simulation(db, company_id=company.id, simulation_id=result["simulation_id"])
+
+    assert db.query(Lead).filter_by(id=result["lead_id"]).count() == 0
+    assert db.query(SalesAgentSimulation).filter_by(id=result["simulation_id"]).count() == 0
+    assert db.query(SalesConversation).filter_by(id=result["conversation_id"]).count() == 0
+    assert db.query(SalesMessage).filter_by(conversation_id=result["conversation_id"]).count() == 0
+    assert db.query(SalesFollowUpJob).filter_by(conversation_id=result["conversation_id"]).count() == 0
+
+
+def test_simulation_delete_guard_refuses_a_real_lead_even_with_a_simulation_record():
+    db = _db(); company, _, admin, _, _, project, campaign, product = _fixture(db)
+    result = _create(db, company, admin, project, campaign, product)
+    lead = db.query(Lead).filter_by(id=result["lead_id"]).one()
+    lead.is_demo = False
+    lead.platform = "meta"
+    db.commit()
+
+    with pytest.raises(HTTPException) as protected:
+        delete_simulation(db, company_id=company.id, simulation_id=result["simulation_id"])
+
+    assert protected.value.status_code == 409
+    assert db.query(Lead).filter_by(id=result["lead_id"]).count() == 1
+    assert db.query(SalesAgentSimulation).filter_by(id=result["simulation_id"]).count() == 1
+
+
+def test_simulation_delete_guard_refuses_a_non_demo_appointment():
+    db = _db(); company, _, admin, _, _, project, campaign, product = _fixture(db)
+    result = _create(db, company, admin, project, campaign, product)
+    db.add(Meeting(
+        project_id=project.id, lead_id=result["lead_id"], meeting_time=datetime.utcnow(),
+        is_demo=False, source="manual",
+    ))
+    db.commit()
+
+    with pytest.raises(HTTPException) as protected:
+        delete_simulation(db, company_id=company.id, simulation_id=result["simulation_id"])
+
+    assert protected.value.status_code == 409
+    assert db.query(Lead).filter_by(id=result["lead_id"]).count() == 1
 
 
 def test_simulation_rejects_a_property_type_from_another_project():
