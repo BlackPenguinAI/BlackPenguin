@@ -39,7 +39,10 @@ def _authorization(db) -> MetaAuthorization:
     authorization = MetaAuthorization(
         company_id=company.id, meta_user_id="meta-user", meta_user_name="Meta User",
         token_ciphertext="encrypted", status="active",
-        scopes=["pages_show_list", "pages_manage_metadata", "leads_retrieval", "ads_read"],
+        scopes=[
+            "pages_show_list", "pages_manage_metadata", "pages_manage_ads",
+            "leads_retrieval", "ads_read",
+        ],
     )
     db.add(authorization); db.commit(); db.refresh(authorization)
     return authorization

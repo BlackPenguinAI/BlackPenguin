@@ -53,7 +53,10 @@ def _token(authorization: MetaAuthorization) -> str:
 
 
 def _ensure_required_scopes(authorization: MetaAuthorization) -> None:
-    required = {"pages_show_list", "pages_manage_metadata", "leads_retrieval", "ads_read"}
+    required = {
+        "pages_show_list", "pages_manage_metadata", "pages_manage_ads",
+        "leads_retrieval", "ads_read",
+    }
     missing = sorted(required.difference(authorization.scopes or []))
     if missing:
         raise HTTPException(status_code=422, detail=f"Reconnect Meta and grant the required permissions: {', '.join(missing)}.")
@@ -73,7 +76,7 @@ def start_oauth(db: Session, *, project: Project, user: User) -> dict:
         "redirect_uri": config.redirect_uri,
         "state": state,
         "response_type": "code",
-        "scope": ",".join(config.requested_scopes or system_settings.META_OAUTH_SCOPES),
+        "scope": ",".join(system_settings.meta_oauth_scopes(config)),
         "config_id": config.login_config_id,
     }
     return {

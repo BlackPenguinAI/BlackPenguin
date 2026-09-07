@@ -54,6 +54,7 @@ def test_meta_platform_secret_is_write_only_and_must_be_verified_before_enabling
     assert response["app_secret_configured"] is True
     assert response["app_secret_hint"] == "alue"
     assert "app_secret" not in response
+    assert "pages_manage_ads" in response["requested_scopes"]
 
     class MetaResponse:
         def raise_for_status(self): return None
@@ -120,7 +121,9 @@ def test_meta_oauth_state_is_short_lived_hashed_and_bound_to_the_company_project
     config.verification_status = "verified"; config.is_enabled = True; db.commit()
 
     result = start_oauth(db, project=project, user=user)
-    state = parse_qs(urlparse(result["authorization_url"]).query)["state"][0]
+    oauth_query = parse_qs(urlparse(result["authorization_url"]).query)
+    state = oauth_query["state"][0]
+    assert "pages_manage_ads" in oauth_query["scope"][0].split(",")
     attempt = db.query(MetaOAuthAttempt).one()
     assert attempt.nonce_hash == hashlib.sha256(state.encode()).hexdigest()
     assert state not in attempt.nonce_hash

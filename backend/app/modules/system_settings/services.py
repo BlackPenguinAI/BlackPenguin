@@ -16,8 +16,13 @@ from app.core.secret_store import decrypt_secret, encrypt_secret
 
 META_OAUTH_SCOPES = [
     "business_management", "pages_show_list", "pages_read_engagement",
-    "pages_manage_metadata", "leads_retrieval", "ads_read",
+    "pages_manage_metadata", "pages_manage_ads", "leads_retrieval", "ads_read",
 ]
+
+
+def meta_oauth_scopes(config: MetaPlatformConfig) -> list[str]:
+    """Return configured scopes plus permissions required by this release."""
+    return list(dict.fromkeys([*(config.requested_scopes or []), *META_OAUTH_SCOPES]))
 
 # --- FIREBASE ---
 def get_firebase_config(db: Session) -> FirebaseConfig:
@@ -334,7 +339,7 @@ def meta_platform_config_response(config: MetaPlatformConfig) -> dict:
         "webhook_callback_url": config.webhook_callback_url,
         "webhook_verify_token_configured": bool(config.webhook_verify_token_ciphertext),
         "webhook_verify_token_hint": config.webhook_verify_token_hint,
-        "requested_scopes": list(config.requested_scopes or META_OAUTH_SCOPES),
+        "requested_scopes": meta_oauth_scopes(config),
         "is_enabled": bool(config.is_enabled),
         "verification_status": config.verification_status,
         "app_review_status": config.app_review_status,
