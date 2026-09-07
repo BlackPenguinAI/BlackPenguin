@@ -30,6 +30,17 @@ class MultiTenantMiddleware(BaseHTTPMiddleware):
             request.method == "GET"
             and path == f"{settings.API_V1_STR}/sales/calendar/google/callback"
         )
+        # Meta calls both endpoints without a Black Penguin user session. Keep
+        # these exceptions exact: OAuth is protected by its one-time state and
+        # webhook delivery by the verify token / X-Hub-Signature-256.
+        is_meta_oauth_callback = (
+            request.method == "GET"
+            and path == f"{settings.API_V1_STR}/projects/integrations/meta/oauth/callback"
+        )
+        is_meta_webhook = (
+            request.method in {"GET", "POST"}
+            and path == f"{settings.API_V1_STR}/webhooks/meta"
+        )
         is_public_calendar_invite = (
             request.method == "GET"
             and path.startswith(f"{settings.API_V1_STR}/sales/public/meetings/")
@@ -55,6 +66,8 @@ class MultiTenantMiddleware(BaseHTTPMiddleware):
             or is_waitlist_post
             or is_health_route
             or is_google_calendar_callback
+            or is_meta_oauth_callback
+            or is_meta_webhook
             or is_public_calendar_invite
             or is_public_firebase_action
         ):

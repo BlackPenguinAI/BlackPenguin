@@ -6,7 +6,7 @@
     <div class="mb-8 border-b border-white/10 pb-6 flex flex-col md:flex-row md:items-end justify-between gap-4">
       <div>
         <h1 class="text-3xl font-light tracking-tight">Legal & <span class="text-secondary font-medium">Compliance</span></h1>
-        <p class="text-sm text-gray-400 mt-1">Manage Privacy Policy and Terms & Conditions content in Markdown.</p>
+        <p class="text-sm text-gray-400 mt-1">Manage the public legal documents required by the platform and Meta App review.</p>
       </div>
 
       
@@ -25,6 +25,12 @@
         <span class="material-symbols-outlined text-3xl">gavel</span>
         <span class="text-sm font-medium tracking-wide">Terms & Conditions</span>
       </button>
+      <button (click)="setDocType('data_deletion')"
+              [ngClass]="currentDocType === 'data_deletion' ? 'border-secondary text-secondary bg-secondary/10' : 'border-white/10 text-gray-400 hover:border-white/30 bg-white/5'"
+              class="flex-1 py-5 rounded-xl border flex flex-col items-center justify-center gap-2 transition-all">
+        <span class="material-symbols-outlined text-3xl">person_remove</span>
+        <span class="text-sm font-medium tracking-wide">Data Deletion</span>
+      </button>
     </div>
 
     <div *ngIf="isLoading" class="flex justify-center py-24">
@@ -36,7 +42,7 @@
         <div class="flex items-center justify-between mb-6">
           <h2 class="text-lg font-medium text-white flex items-center gap-3">
             <span class="material-symbols-outlined text-secondary">edit_document</span>
-            Editing: {{ currentDocType === 'privacy' ? 'Privacy Policy' : 'Terms & Conditions' }} ({{ currentLang | uppercase }})
+            Editing: {{ currentDocumentLabel }} ({{ currentLang | uppercase }})
           </h2>
         </div>
 
@@ -60,7 +66,7 @@
 
         <div class="flex justify-end pt-8 mt-6 border-t border-white/10">
           <app-button type="submit" variant="primary" icon="save" [isLoading]="isSaving">
-            Save {{ currentDocType === 'privacy' ? 'Privacy Policy' : 'Terms & Conditions' }}
+            Save {{ currentDocumentLabel }}
           </app-button>
         </div>
       </app-glass-card>

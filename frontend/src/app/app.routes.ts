@@ -51,6 +51,13 @@ export const routes: Routes = [
         (m) => m.TermsConditionsComponent
       ),
   },
+  {
+    path: 'legal/data-deletion',
+    loadComponent: () =>
+      import('./pages/legal/data-deletion/data-deletion').then(
+        (m) => m.DataDeletionComponent
+      ),
+  },
 
   // ==========================================
   // 2. ZONA SUPERADMIN / PANEL ADMIN (10 RUTAS)

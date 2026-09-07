@@ -431,7 +431,53 @@ def meta_webhook_verify_token(db: Session) -> str:
         return settings.META_VERIFY_TOKEN
 
 # --- LEGAL ---
+LEGAL_DOCUMENT_TYPES = {"privacy", "terms", "data_deletion"}
+
+DATA_DELETION_DEFAULTS = {
+    "en": """# User Data Deletion Instructions
+
+Black Penguin users and people whose information was received through a connected Meta Lead Ads form may request deletion of their personal data.
+
+## How to request deletion
+
+Email **info@blackpenguin.ai** with the subject **Data Deletion Request** and include:
+
+- The email address or telephone number associated with the data.
+- The Company or real-estate Project involved, when known.
+- Your Meta/Facebook user identifier, when available.
+- A short description of the information you want deleted.
+
+We may request reasonable information to verify your identity and prevent unauthorized deletion. After verification, we will delete or anonymize the applicable personal data and confirm completion, except where retention is required for security, fraud prevention, legal compliance, or the establishment or defense of legal claims.
+
+You may also remove Black Penguin from **Facebook Settings → Business Integrations**. Removing the integration stops future access but does not replace a deletion request for data previously provided to Black Penguin.
+
+For questions about this process, contact **info@blackpenguin.ai**.
+""",
+    "es": """# Instrucciones para eliminar datos de usuario
+
+Los usuarios de Black Penguin y las personas cuyos datos fueron recibidos mediante un formulario conectado de Meta Lead Ads pueden solicitar la eliminación de sus datos personales.
+
+## Cómo solicitar la eliminación
+
+Envía un correo a **info@blackpenguin.ai** con el asunto **Solicitud de eliminación de datos** e incluye:
+
+- El correo electrónico o teléfono asociado con los datos.
+- La compañía o proyecto inmobiliario involucrado, si lo conoces.
+- Tu identificador de usuario de Meta/Facebook, si está disponible.
+- Una descripción breve de la información que deseas eliminar.
+
+Podemos solicitar información razonable para verificar tu identidad y prevenir eliminaciones no autorizadas. Después de la verificación, eliminaremos o anonimizaremos los datos personales aplicables y confirmaremos la atención, excepto cuando deban conservarse por seguridad, prevención de fraude, cumplimiento legal o defensa de reclamaciones.
+
+También puedes retirar Black Penguin desde **Configuración de Facebook → Integraciones comerciales**. Retirar la integración detiene el acceso futuro, pero no sustituye una solicitud de eliminación de información entregada previamente a Black Penguin.
+
+Para consultas sobre este proceso, escribe a **info@blackpenguin.ai**.
+""",
+}
+
+
 def get_legal_document(db: Session, doc_type: str, lang: str = "en") -> LegalDocument:
+    if doc_type not in LEGAL_DOCUMENT_TYPES:
+        raise HTTPException(status_code=404, detail="Legal document not found.")
     document = db.query(LegalDocument).filter(
         LegalDocument.doc_type == doc_type,
         LegalDocument.language == lang
@@ -441,8 +487,12 @@ def get_legal_document(db: Session, doc_type: str, lang: str = "en") -> LegalDoc
         document = LegalDocument(
             doc_type=doc_type,
             language=lang,
-            last_updated_label="July 2026" if lang == "en" else "Julio 2026",
-            content_markdown=f"# {doc_type.capitalize()} Policy\n\n*Content under construction.*"
+            last_updated_label="September 2026" if lang == "en" else "Septiembre 2026",
+            content_markdown=(
+                DATA_DELETION_DEFAULTS.get(lang, DATA_DELETION_DEFAULTS["en"])
+                if doc_type == "data_deletion"
+                else f"# {doc_type.capitalize()} Policy\n\n*Content under construction.*"
+            ),
         )
         db.add(document)
         db.commit()
@@ -450,7 +500,7 @@ def get_legal_document(db: Session, doc_type: str, lang: str = "en") -> LegalDoc
     return document
 
 def update_legal_document(db: Session, doc_type: str, payload: LegalDocumentPayload, lang: str = "en") -> LegalDocument:
-    if doc_type not in ["privacy", "terms"]:
+    if doc_type not in LEGAL_DOCUMENT_TYPES:
         raise HTTPException(status_code=400, detail="Documento legal inválido.")
         
     document = db.query(LegalDocument).filter(

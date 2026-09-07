@@ -78,7 +78,7 @@ class MetaPlatformConfig(Base):
     app_secret_ciphertext = Column(Text, nullable=True)
     app_secret_hint = Column(String(12), nullable=True)
     login_config_id = Column(String(150), nullable=True)
-    graph_api_version = Column(String(20), default="v20.0", nullable=False)
+    graph_api_version = Column(String(20), default="v26.0", nullable=False)
     redirect_uri = Column(String(500), nullable=False)
     webhook_callback_url = Column(String(500), nullable=False)
     webhook_verify_token_ciphertext = Column(Text, nullable=True)
@@ -109,7 +109,7 @@ class LegalDocument(Base):
     __tablename__ = "legal_documents"
     
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    doc_type = Column(String(50), nullable=False)  # 'privacy' o 'terms'
+    doc_type = Column(String(50), nullable=False)  # privacy, terms, or data_deletion
     language = Column(String(10), nullable=False, default="en")  # 'en' o 'es'
     last_updated_label = Column(String(100), nullable=True, default="July 2026")
     content_markdown = Column(Text, nullable=False)

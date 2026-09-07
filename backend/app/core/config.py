@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     META_LOGIN_CONFIG_ID: str = ""
     META_VERIFY_TOKEN: str = "blackpenguin_meta_token_2026"
     META_APP_SECRET: str = "app_secret_de_meta_pendiente"
-    META_API_VERSION: str = "v20.0"
+    META_API_VERSION: str = "v26.0"
     META_BUSINESS_MANAGER_ID: str = ""
     META_OAUTH_REDIRECT_URI: str = "https://blackpenguin.ai/api/v1/projects/integrations/meta/oauth/callback"
 

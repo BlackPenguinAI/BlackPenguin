@@ -16,7 +16,7 @@ import { ButtonComponent } from '../../../../shared/ui/button/button';
 })
 export class LegalCompliancePageComponent implements OnInit {
   
-  currentDocType: 'privacy' | 'terms' = 'privacy';
+  currentDocType: 'privacy' | 'terms' | 'data_deletion' = 'privacy';
   currentLang: 'en' | 'es' = 'en';
 
   legalDoc = {
@@ -46,7 +46,13 @@ export class LegalCompliancePageComponent implements OnInit {
     return new HttpHeaders().set('Authorization', `Bearer ${token}`);
   }
 
-  setDocType(type: 'privacy' | 'terms') {
+  get currentDocumentLabel(): string {
+    if (this.currentDocType === 'privacy') return 'Privacy Policy';
+    if (this.currentDocType === 'terms') return 'Terms & Conditions';
+    return 'User Data Deletion';
+  }
+
+  setDocType(type: 'privacy' | 'terms' | 'data_deletion') {
     if (this.currentDocType === type) return;
     this.currentDocType = type;
     this.loadDocument();

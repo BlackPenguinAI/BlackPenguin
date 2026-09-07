@@ -15,8 +15,9 @@ from app.modules.sales_agent.default_prompt import SALES_AGENT_DEFAULT_CONFIG
 from app.modules.seo.service import run_audit
 from app.modules.system_settings.schemas import GoogleCalendarConfigUpdate, MetaPlatformConfigUpdate
 from app.modules.system_settings.services import (
+    DATA_DELETION_DEFAULTS,
     google_calendar_config_response, google_calendar_credentials, meta_platform_config_response,
-    meta_platform_credentials, update_google_calendar_config, update_meta_platform_config,
+    get_legal_document, meta_platform_credentials, update_google_calendar_config, update_meta_platform_config,
     verify_meta_platform_config,
 )
 
@@ -64,6 +65,17 @@ def test_meta_platform_secret_is_write_only_and_must_be_verified_before_enabling
     assert enabled.is_enabled is True
     _, secret = meta_platform_credentials(db)
     assert secret == "meta-secret-value"
+
+
+def test_public_data_deletion_document_has_actionable_default_in_both_languages():
+    db = _db()
+    english = get_legal_document(db, "data_deletion", "en")
+    spanish = get_legal_document(db, "data_deletion", "es")
+
+    assert english.content_markdown == DATA_DELETION_DEFAULTS["en"]
+    assert spanish.content_markdown == DATA_DELETION_DEFAULTS["es"]
+    assert "info@blackpenguin.ai" in english.content_markdown
+    assert "Facebook" in english.content_markdown
 
 
 def test_project_chat_message_serializes_persistent_media_evidence():

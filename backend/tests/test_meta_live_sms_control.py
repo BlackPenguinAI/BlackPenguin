@@ -13,7 +13,7 @@ from alembic.operations import Operations
 import app.db.base  # noqa: F401
 from app.db.postgres import Base
 from app.modules.companies.models import Company
-from app.modules.meta_leads.router import _resolve_campaign
+from app.modules.meta_leads.router import _resolve_campaign, verify as verify_meta_webhook
 from app.modules.projects.models import MetaConnection, Project, ProjectCampaign, ProjectProfile, ProjectPropertyType
 from app.modules.sales_agent.live_test_service import create_live_meta_test
 from app.modules.sales_agent.models import SalesConversation, SalesConversationLeadContext, SalesMessage
@@ -51,6 +51,19 @@ def _lead_form(product, phone="+13055550142"):
         "budget_min": 550000, "budget_max": 650000, "consent": True,
         "custom_answers": {"timeline": "this year"},
     }
+
+
+def test_meta_webhook_verification_echoes_an_opaque_challenge():
+    with patch(
+        "app.modules.meta_leads.router.system_settings.meta_webhook_verify_token",
+        return_value="demo-verify-token",
+    ):
+        result = verify_meta_webhook(
+            mode="subscribe", token="demo-verify-token",
+            challenge="opaque-challenge-value", db=object(),
+        )
+
+    assert result == "opaque-challenge-value"
 
 
 def test_manual_meta_control_is_one_idempotent_real_sms_action():

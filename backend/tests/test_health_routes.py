@@ -17,6 +17,18 @@ def build_test_app() -> FastAPI:
     def protected_route() -> dict[str, bool]:
         return {"ok": True}
 
+    @app.get(f"{settings.API_V1_STR}/projects/integrations/meta/oauth/callback")
+    def meta_oauth_callback() -> dict[str, bool]:
+        return {"ok": True}
+
+    @app.get(f"{settings.API_V1_STR}/webhooks/meta")
+    def meta_webhook_verify() -> dict[str, bool]:
+        return {"ok": True}
+
+    @app.post(f"{settings.API_V1_STR}/webhooks/meta")
+    def meta_webhook_delivery() -> dict[str, bool]:
+        return {"ok": True}
+
     return app
 
 
@@ -72,3 +84,16 @@ def test_application_route_remains_protected_without_jwt():
         response = client.get(f"{settings.API_V1_STR}/protected")
 
     assert response.status_code == 401
+
+
+def test_meta_provider_callbacks_are_public_without_exposing_other_project_routes():
+    with TestClient(build_test_app()) as client:
+        oauth = client.get(f"{settings.API_V1_STR}/projects/integrations/meta/oauth/callback")
+        webhook_verify = client.get(f"{settings.API_V1_STR}/webhooks/meta")
+        webhook_delivery = client.post(f"{settings.API_V1_STR}/webhooks/meta")
+        protected = client.get(f"{settings.API_V1_STR}/projects/project-1/meta/oauth/start")
+
+    assert oauth.status_code == 200
+    assert webhook_verify.status_code == 200
+    assert webhook_delivery.status_code == 200
+    assert protected.status_code == 401

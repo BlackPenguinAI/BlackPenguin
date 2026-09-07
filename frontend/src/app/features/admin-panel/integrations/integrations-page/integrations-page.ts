@@ -16,7 +16,7 @@ export class IntegrationsPageComponent implements OnInit {
   config = { client_id: '', client_secret: '', client_secret_configured: false, client_secret_hint: '', redirect_uri: 'https://blackpenguin.ai/api/v1/sales/calendar/google/callback', is_enabled: false, verification_status: 'not_configured', updated_at: null as string | null };
   metaConfig = {
     app_id: '', app_secret: '', app_secret_configured: false, app_secret_hint: '', login_config_id: '',
-    graph_api_version: 'v23.0', redirect_uri: 'https://blackpenguin.ai/api/v1/projects/integrations/meta/oauth/callback',
+    graph_api_version: 'v26.0', redirect_uri: 'https://blackpenguin.ai/api/v1/projects/integrations/meta/oauth/callback',
     webhook_callback_url: 'https://blackpenguin.ai/api/v1/webhooks/meta', webhook_verify_token_configured: false,
     webhook_verify_token_hint: '', requested_scopes: [] as string[], is_enabled: false,
     verification_status: 'not_configured', app_review_status: 'pending', business_verification_status: 'pending',
@@ -29,6 +29,20 @@ export class IntegrationsPageComponent implements OnInit {
   dirty = false;
   metaDirty = false;
   newWebhookVerifyToken = '';
+  readonly metaPublicUrls = {
+    privacy: 'https://blackpenguin.ai/legal/privacy',
+    terms: 'https://blackpenguin.ai/legal/terms',
+    dataDeletion: 'https://blackpenguin.ai/legal/data-deletion',
+  };
+
+  get metaDemoReady(): boolean {
+    return Boolean(
+      this.metaConfig.app_id && this.metaConfig.app_secret_configured &&
+      this.metaConfig.login_config_id && this.metaConfig.redirect_uri &&
+      this.metaConfig.webhook_callback_url && this.metaConfig.webhook_verify_token_configured &&
+      this.metaConfig.verification_status === 'verified' && this.metaConfig.is_enabled
+    );
+  }
 
   constructor(private http: HttpClient, private toast: ToastService, private cdr: ChangeDetectorRef) {}
 

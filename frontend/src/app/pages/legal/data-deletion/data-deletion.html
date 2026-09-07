@@ -1,0 +1,19 @@
+<main class="relative min-h-screen overflow-hidden bg-black font-sans text-white">
+  <div class="pointer-events-none absolute right-0 top-0 h-[500px] w-[500px] rounded-full bg-secondary/5 blur-[150px]"></div>
+  <div class="fixed right-6 top-6 z-50 flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 backdrop-blur-md">
+    <button type="button" (click)="switchLanguage('en')" [class.text-secondary]="currentLang === 'en'" class="text-xs font-bold text-gray-400">EN</button>
+    <span class="text-xs text-gray-600">/</span>
+    <button type="button" (click)="switchLanguage('es')" [class.text-secondary]="currentLang === 'es'" class="text-xs font-bold text-gray-400">ES</button>
+  </div>
+  <div class="relative z-10 mx-auto max-w-3xl px-6 py-20">
+    <button routerLink="/" class="mb-8 flex items-center gap-1 text-xs text-gray-400 transition-colors hover:text-white">
+      <span class="material-symbols-outlined text-sm">arrow_back</span> Back to Home
+    </button>
+    <header class="mb-10">
+      <p class="mb-3 text-[10px] font-bold uppercase tracking-[0.2em] text-secondary">Privacy control</p>
+      <h1 class="text-4xl font-light tracking-tight">User Data <span class="font-medium text-secondary">Deletion</span></h1>
+      <p class="mt-2 font-mono text-xs uppercase tracking-wider text-gray-500">Last updated: {{ lastUpdated }}</p>
+    </header>
+    <article class="liquid-glass rounded-2xl border border-white/5 p-8 text-sm font-light leading-relaxed text-gray-300 shadow-2xl md:p-12" [innerHTML]="legalHTMLContent"></article>
+  </div>
+</main>

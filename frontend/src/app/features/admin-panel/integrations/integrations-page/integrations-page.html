@@ -16,6 +16,14 @@
     <div *ngIf="metaLoading" class="bp-loading">Loading Meta integration…</div>
     <form *ngIf="!metaLoading" class="integration-card" (ngSubmit)="saveMeta()">
       <div class="integration-title"><span class="material-symbols-outlined">hub</span><div><h2>Meta Lead Ads</h2><small>One platform App; each Company authorizes its own reusable Meta assets.</small></div><b [class.ready]="metaConfig.verification_status === 'verified'">{{ metaConfig.verification_status }}</b></div>
+      <div class="demo-readiness" [class.ready]="metaDemoReady">
+        <div><b>{{ metaDemoReady ? 'DEMO PREFLIGHT READY' : 'DEMO PREFLIGHT INCOMPLETE' }}</b><span>Development Mode is sufficient only for Facebook accounts assigned as App Admin, Developer, or Tester and authorized for the test assets.</span></div>
+        <ul>
+          <li>Keep App Review and Business Verification at their truthful status; neither is required for an app-role demo.</li>
+          <li>Save credentials, verify them, then enable the integration and save again.</li>
+          <li>Meta webhook setup must use the token below and subscribe the Page object to <code>leadgen</code>.</li>
+        </ul>
+      </div>
       <div class="field-grid">
         <label>Meta App ID<input name="meta_app_id" [(ngModel)]="metaConfig.app_id" (ngModelChange)="markMetaDirty()" placeholder="Meta App ID"></label>
         <label>Facebook Login configuration ID<input name="meta_login_config_id" [(ngModel)]="metaConfig.login_config_id" (ngModelChange)="markMetaDirty()" placeholder="Optional config ID"></label>
@@ -24,6 +32,12 @@
       </div>
       <label>Valid OAuth Redirect URI<input name="meta_redirect_uri" [(ngModel)]="metaConfig.redirect_uri" (ngModelChange)="markMetaDirty()"></label>
       <label>Webhook Callback URL<input name="meta_webhook_url" [(ngModel)]="metaConfig.webhook_callback_url" (ngModelChange)="markMetaDirty()"></label>
+      <div class="legal-links">
+        <div><b>Public URLs required by Meta</b><small>Publish final company-approved content before production review. These routes remain publicly accessible without a Black Penguin login.</small></div>
+        <a [href]="metaPublicUrls.privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>
+        <a [href]="metaPublicUrls.terms" target="_blank" rel="noopener noreferrer">Terms</a>
+        <a [href]="metaPublicUrls.dataDeletion" target="_blank" rel="noopener noreferrer">Data Deletion</a>
+      </div>
       <div class="field-grid">
         <label>Business verification<select name="meta_business_status" [(ngModel)]="metaConfig.business_verification_status" (ngModelChange)="markMetaDirty()"><option value="pending">Pending</option><option value="verified">Verified</option></select></label>
         <label>App Review<select name="meta_review_status" [(ngModel)]="metaConfig.app_review_status" (ngModelChange)="markMetaDirty()"><option value="pending">Pending</option><option value="in_review">In review</option><option value="approved">Approved</option></select></label>
@@ -31,7 +45,8 @@
       <div class="setup-note"><b>Meta App checklist</b><span>Add Facebook Login for Business and Webhooks, register the exact redirect URI, subscribe Page/leadgen, add the callback and verify token, complete Business Verification, and request Advanced Access for: {{ metaConfig.requested_scopes.join(', ') }}.</span></div>
       <div class="token-row"><div><b>Webhook verify token</b><small>{{ metaConfig.webhook_verify_token_configured ? 'Configured · ending in '+metaConfig.webhook_verify_token_hint : 'Not configured' }}</small><code *ngIf="newWebhookVerifyToken">{{ newWebhookVerifyToken }}</code></div><button type="button" class="secondary" (click)="rotateWebhookToken()">Rotate token</button></div>
       <label class="switch"><input name="meta_enabled" type="checkbox" [(ngModel)]="metaConfig.is_enabled" (ngModelChange)="markMetaDirty()"><span>Allow Companies to connect Meta during Project onboarding</span></label>
-      <footer><button type="button" class="secondary" (click)="verifyMeta()" [disabled]="metaVerifying || metaDirty">{{ metaVerifying ? 'Verifying…' : 'Verify credentials' }}</button><span *ngIf="metaDirty">Unsaved changes</span><button type="submit" [disabled]="metaSaving || !metaDirty">{{ metaSaving ? 'Saving…' : 'Save Meta Integration' }}</button></footer>
+      <p class="verification-scope">Credential verification checks the App ID and App Secret. Complete the OAuth login and send a test lead to validate the Login Configuration, permissions, Page subscription, webhook, and lead routing end to end.</p>
+      <footer><button type="button" class="secondary" (click)="verifyMeta()" [disabled]="metaVerifying || metaDirty">{{ metaVerifying ? 'Verifying…' : 'Verify App credentials' }}</button><span *ngIf="metaDirty">Unsaved changes</span><button type="submit" [disabled]="metaSaving || !metaDirty">{{ metaSaving ? 'Saving…' : 'Save Meta Integration' }}</button></footer>
     </form>
   </div>
 </section>

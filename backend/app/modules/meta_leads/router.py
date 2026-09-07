@@ -92,7 +92,9 @@ def verify(
 ):
     expected = system_settings.meta_webhook_verify_token(db) or settings.META_VERIFY_TOKEN
     if mode == "subscribe" and hmac.compare_digest(token, expected):
-        return int(challenge)
+        # Meta owns this opaque challenge. Echo it without assuming it is
+        # numeric so webhook verification cannot fail on a valid string value.
+        return challenge
     raise HTTPException(status_code=403, detail="Invalid verification token.")
 
 

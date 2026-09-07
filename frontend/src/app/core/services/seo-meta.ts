@@ -10,6 +10,7 @@ export class SeoMetaService {
     '/': { title: 'Black Penguin AI | Autonomous Real Estate Lead Conversion', description: 'Black Penguin helps real estate developers qualify Meta leads, continue conversations by SMS, route appointments and prepare Sales teams with traceable AI intelligence.' },
     '/legal/privacy': { title: 'Privacy Policy | Black Penguin AI', description: 'Learn how Black Penguin AI handles personal information, lead data and platform usage.' },
     '/legal/terms': { title: 'Terms and Conditions | Black Penguin AI', description: 'Review the terms governing use of the Black Penguin AI platform.' },
+    '/legal/data-deletion': { title: 'User Data Deletion | Black Penguin AI', description: 'Request deletion of personal information handled by Black Penguin AI, including data received from connected Meta services.' },
   };
   constructor(private router: Router, private title: Title, private meta: Meta, @Inject(DOCUMENT) private document: Document) {}
   start(): void {
