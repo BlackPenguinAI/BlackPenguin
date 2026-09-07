@@ -53,10 +53,7 @@ def _token(authorization: MetaAuthorization) -> str:
 
 
 def _ensure_required_scopes(authorization: MetaAuthorization) -> None:
-    required = {
-        "pages_show_list", "pages_manage_metadata", "pages_manage_ads",
-        "leads_retrieval", "ads_read",
-    }
+    required = {"pages_show_list", "pages_manage_metadata", "leads_retrieval", "ads_read"}
     missing = sorted(required.difference(authorization.scopes or []))
     if missing:
         raise HTTPException(status_code=422, detail=f"Reconnect Meta and grant the required permissions: {', '.join(missing)}.")
@@ -217,17 +214,23 @@ async def discover_assets(
         if page_id:
             if not page:
                 raise HTTPException(status_code=422, detail="The selected Page is not available to this Meta authorization.")
-            try:
-                forms_response = await client.get(f"{base}/{page_id}/leadgen_forms", params={
-                    "access_token": page.get("access_token") or token, "fields": "id,name,status", "limit": 200,
-                })
-                forms_response.raise_for_status()
-            except httpx.HTTPError as exc:
-                raise _meta_asset_failure(
-                    "lead_forms", exc,
-                    "Meta could not load Lead Forms for this Page. Grant the connected user and Black Penguin Leads Access in Meta Business Suite, then reconnect Meta.",
-                ) from exc
-            forms_raw = forms_response.json().get("data", [])
+            if "pages_manage_ads" not in (authorization.scopes or []):
+                warnings.append(
+                    "Reconnect Meta and grant pages_manage_ads to load Lead Forms. "
+                    "Pages, Ad Accounts, and advertising assets remain available."
+                )
+            else:
+                try:
+                    forms_response = await client.get(f"{base}/{page_id}/leadgen_forms", params={
+                        "access_token": page.get("access_token") or token, "fields": "id,name,status", "limit": 200,
+                    })
+                    forms_response.raise_for_status()
+                except httpx.HTTPError as exc:
+                    raise _meta_asset_failure(
+                        "lead_forms", exc,
+                        "Meta could not load Lead Forms for this Page. Grant the connected user and Black Penguin Leads Access in Meta Business Suite, then reconnect Meta.",
+                    ) from exc
+                forms_raw = forms_response.json().get("data", [])
         campaigns_raw: list[dict] = []
         adsets_raw: list[dict] = []
         ads_raw: list[dict] = []

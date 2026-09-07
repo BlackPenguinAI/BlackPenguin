@@ -32,14 +32,14 @@ class FakeMetaClient:
         return httpx.Response(status_code, json=payload, request=httpx.Request("GET", url))
 
 
-def _authorization(db) -> MetaAuthorization:
+def _authorization(db, scopes: list[str] | None = None) -> MetaAuthorization:
     plan = SubscriptionPlan(name="Meta Asset Test", is_active=True)
     company = Company(name="Meta Asset Company", plan=plan, is_active=True)
     db.add_all([plan, company]); db.flush()
     authorization = MetaAuthorization(
         company_id=company.id, meta_user_id="meta-user", meta_user_name="Meta User",
         token_ciphertext="encrypted", status="active",
-        scopes=[
+        scopes=scopes or [
             "pages_show_list", "pages_manage_metadata", "pages_manage_ads",
             "leads_retrieval", "ads_read",
         ],
@@ -48,13 +48,13 @@ def _authorization(db) -> MetaAuthorization:
     return authorization
 
 
-def _run_discovery(monkeypatch, responses, *, page_id=None, ad_account_id=None):
+def _run_discovery(monkeypatch, responses, *, page_id=None, ad_account_id=None, scopes=None):
     engine = create_engine(
         "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool,
     )
     Base.metadata.create_all(engine)
     db = sessionmaker(bind=engine)()
-    authorization = _authorization(db)
+    authorization = _authorization(db, scopes)
     fake_client = FakeMetaClient(responses)
     monkeypatch.setattr(meta_oauth_service, "_token", lambda _authorization: "user-token")
     monkeypatch.setattr(
@@ -107,3 +107,24 @@ def test_optional_campaign_failure_preserves_page_and_form_assets(monkeypatch):
     assert result["lead_forms"][0]["id"] == "form-1"
     assert result["campaigns"] == []
     assert "still connect using the Page and Lead Form" in result["warnings"][0]
+
+
+def test_stale_authorization_without_pages_manage_ads_preserves_base_and_ad_assets(monkeypatch):
+    responses = {
+        "/me/accounts": (200, {"data": [{"id": "page-1", "name": "Page", "access_token": "page-token"}]}),
+        "/me/adaccounts": (200, {"data": [{"id": "act_123", "account_id": "123", "name": "Ads"}]}),
+        "/act_123/campaigns": (200, {"data": [{"id": "campaign-1", "name": "Lead campaign", "status": "ACTIVE"}]}),
+        "/act_123/adsets": (200, {"data": []}),
+        "/act_123/ads": (200, {"data": []}),
+    }
+
+    result = _run_discovery(
+        monkeypatch, responses, page_id="page-1", ad_account_id="123",
+        scopes=["pages_show_list", "pages_manage_metadata", "leads_retrieval", "ads_read"],
+    )
+
+    assert result["pages"][0]["id"] == "page-1"
+    assert result["ad_accounts"][0]["id"] == "123"
+    assert result["lead_forms"] == []
+    assert result["campaigns"][0]["id"] == "campaign-1"
+    assert "pages_manage_ads" in result["warnings"][0]
