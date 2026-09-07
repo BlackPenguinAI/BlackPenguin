@@ -76,6 +76,16 @@ def test_project_chat_message_serializes_persistent_media_evidence():
     assert serialize_message(message)["media_evidence"] == evidence
 
 
+def test_project_chat_message_serializes_structured_artifact_receipt():
+    from app.modules.projects.models import SenderType
+    from app.modules.projects.services import save_message, serialize_message
+
+    db = _db()
+    artifact = {"kind": "property_catalog_snapshot", "confirmed_at": "2026-09-07T00:00:00", "items": [{"name": "Harbor"}]}
+    message = save_message(db, "session-1", SenderType.AI, "Catalog saved.", artifact_payload=artifact)
+    assert serialize_message(message)["artifact_payload"] == artifact
+
+
 def test_meta_oauth_state_is_short_lived_hashed_and_bound_to_the_company_project():
     from app.modules.companies.models import Company
     from app.modules.projects.meta_oauth_service import start_oauth
@@ -103,6 +113,40 @@ def test_meta_oauth_state_is_short_lived_hashed_and_bound_to_the_company_project
     assert attempt.nonce_hash == hashlib.sha256(state.encode()).hexdigest()
     assert state not in attempt.nonce_hash
     assert attempt.company_id == company.id and attempt.project_id == project.id and attempt.user_id == user.id
+
+
+def test_project_meta_setup_explains_why_oauth_is_unavailable_and_when_it_is_ready():
+    from app.modules.companies.models import Company
+    from app.modules.projects.models import Project
+    from app.modules.projects.router import get_meta_setup_configuration
+    from app.modules.system_settings.models import MetaPlatformConfig
+    from app.modules.users.models import User, UserRole
+
+    db = _db()
+    company = Company(name="Meta Status Company")
+    db.add(company); db.flush()
+    user = User(company_id=company.id, email="meta-status@example.com", hashed_password="x", role=UserRole.ADMIN)
+    project = Project(company_id=company.id, name="Meta Status Project")
+    db.add_all([user, project]); db.commit()
+
+    unavailable = get_meta_setup_configuration(project.id, db, user)
+    assert unavailable["oauth_enabled"] is False
+    assert unavailable["oauth_blocker_code"] == "META_OAUTH_INCOMPLETE"
+
+    update_meta_platform_config(db, MetaPlatformConfigUpdate(
+        app_id="123456789", app_secret="meta-secret-value", login_config_id="987654321",
+        graph_api_version="v23.0", redirect_uri="https://blackpenguin.ai/api/v1/projects/integrations/meta/oauth/callback",
+        webhook_callback_url="https://blackpenguin.ai/api/v1/webhooks/meta",
+    ))
+    pending = get_meta_setup_configuration(project.id, db, user)
+    assert pending["oauth_status"] == "pending_verification"
+
+    config = db.query(MetaPlatformConfig).one()
+    config.verification_status = "verified"; config.is_enabled = True; db.commit()
+    ready = get_meta_setup_configuration(project.id, db, user)
+    assert ready["oauth_enabled"] is True
+    assert ready["can_connect"] is True
+    assert ready["oauth_blocker_message"] is None
 
 
 def test_sales_prompt_draft_does_not_change_runtime_until_published():

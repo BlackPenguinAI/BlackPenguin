@@ -160,6 +160,7 @@ class ChatMessageResponse(BaseModel):
     ui_payload: dict[str, Any] | None = None
     response_payload: dict[str, Any] | None = None
     media_evidence: dict[str, Any] | None = None
+    artifact_payload: dict[str, Any] | None = None
     in_reply_to_message_id: str | None = None
 
 
@@ -483,6 +484,10 @@ class MetaSetupConfigurationResponse(BaseModel):
     partner_business_manager_id: str | None = None
     configured: bool
     oauth_enabled: bool = False
+    oauth_status: Literal["ready", "not_configured", "pending_verification", "verification_failed", "disabled", "credential_error"] = "not_configured"
+    oauth_blocker_code: str | None = None
+    oauth_blocker_message: str | None = None
+    can_connect: bool = False
     manual_fallback_enabled: bool = True
 
 

@@ -241,7 +241,9 @@ def test_confirming_property_catalog_persists_summary_and_next_question_in_chat(
         session = ProjectSession(project=project)
         property_type = ProjectPropertyType(
             project=project, name="Typology 1", review_status="confirmed",
-            available_units=10, starting_price=Decimal("50000"), currency="USD",
+            bedrooms=2, bathrooms=2, area_min=Decimal("80"), area_max=Decimal("95"), area_unit="m²",
+            total_units=12, available_units=10, starting_price=Decimal("50000"), maximum_price=Decimal("65000"),
+            currency="USD", features=["Balcony", "Parking"], description="Two-bedroom residence.",
             inventory_updated_at=datetime.utcnow(),
         )
         question = ProjectMessage(
@@ -263,6 +265,13 @@ def test_confirming_property_catalog_persists_summary_and_next_question_in_chat(
         assert "I saved the Property catalog with 1 confirmed property type: Typology 1." in messages[-1].content
         assert "Let's continue:" in messages[-1].content
         assert messages[-1].ui_payload["input_type"] != "property_type_catalog"
+        assert messages[-1].artifact_payload["kind"] == "property_catalog_snapshot"
+        receipt = messages[-1].artifact_payload["items"][0]
+        assert receipt["name"] == "Typology 1"
+        assert receipt["bedrooms"] == 2
+        assert receipt["available_units"] == 10
+        assert receipt["starting_price"] == 50000.0
+        assert receipt["features"] == ["Balcony", "Parking"]
     finally:
         db.close(); engine.dispose()
 

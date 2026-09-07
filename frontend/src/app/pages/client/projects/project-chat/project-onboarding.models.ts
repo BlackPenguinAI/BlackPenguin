@@ -61,10 +61,22 @@ export interface ChatMessage {
   ui_payload?: NextQuestion | null;
   response_payload?: { status: string; answer: string; selected_option?: string | null; custom?: boolean } | null;
   media_evidence?: MediaEvidence | null;
+  artifact_payload?: ProjectChatArtifact | null;
   in_reply_to_message_id?: string | null;
 }
 export interface MediaEvidence {
   kind: 'company_logo' | 'project_cover'; asset_id: string; name: string; image_url: string;
+}
+export interface PropertyCatalogSnapshotItem {
+  id: string; name: string; code: string | null; description: string | null;
+  bedrooms: number | null; bathrooms: number | null; area_min: number | null; area_max: number | null;
+  area_unit: string | null; total_units: number | null; available_units: number | null;
+  starting_price: number | null; maximum_price: number | null; currency: string | null;
+  features: string[]; inventory_updated_at: string | null; images_status: string;
+  media: Array<{ source_id: string; caption: string | null; image_url: string }>;
+}
+export interface ProjectChatArtifact {
+  kind: 'property_catalog_snapshot'; confirmed_at: string; items: PropertyCatalogSnapshotItem[];
 }
 export interface SourceProposal {
   id: string; field: string; label: string; value: unknown; evidence: string | null;
@@ -145,6 +157,8 @@ export interface ProjectAssignment {
   id: string; project_id: string; user_id: string; responsibility: 'marketing' | 'sales';
   is_primary: boolean; routing_weight: number; accepts_new_leads: boolean; is_active: boolean;
   email: string; first_name: string | null; last_name: string | null;
+  invitation_id?: string | null; invitation_status?: string | null;
+  delivery_status?: 'accepted' | 'failed' | 'not_requested' | null; invitation_message?: string | null;
 }
 
 export interface ProjectSalesCandidate {
@@ -156,6 +170,10 @@ export interface MetaSetupConfiguration {
   partner_business_manager_id: string | null;
   configured: boolean;
   oauth_enabled: boolean;
+  oauth_status: 'ready' | 'not_configured' | 'pending_verification' | 'verification_failed' | 'disabled' | 'credential_error';
+  oauth_blocker_code: string | null;
+  oauth_blocker_message: string | null;
+  can_connect: boolean;
   manual_fallback_enabled: boolean;
 }
 

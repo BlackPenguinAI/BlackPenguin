@@ -1,6 +1,7 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
+from types import SimpleNamespace
 
 from app.db.base import Base
 from app.modules.companies.models import Company
@@ -32,7 +33,7 @@ def test_sales_invitation_flushes_assignment_when_autoflush_is_disabled(monkeypa
         db.refresh(administrator); db.refresh(project)
         monkeypatch.setattr(
             "app.modules.project_team.router.user_services.provision_invitation",
-            lambda *args, **kwargs: None,
+            lambda *args, **kwargs: SimpleNamespace(id="invitation-1", status="accepted_by_provider"),
         )
 
         result = invite_and_assign_sales_user(
@@ -52,5 +53,7 @@ def test_sales_invitation_flushes_assignment_when_autoflush_is_disabled(monkeypa
         assert result["responsibility"] == "sales"
         assert assignment.is_active is True
         assert assignment.accepts_new_leads is True
+        assert result["invitation_id"] == "invitation-1"
+        assert result["delivery_status"] == "accepted"
     finally:
         db.close(); engine.dispose()

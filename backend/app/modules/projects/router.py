@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 import uuid
+from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Response, UploadFile, status
@@ -174,6 +175,35 @@ def _catalog_confirmation_message(result: dict[str, Any], next_prompt: str) -> s
     if names:
         summary += ": " + ", ".join(names)
     return f"{summary}.\n\nLet's continue: {next_prompt}"
+
+
+def _catalog_artifact(result: dict[str, Any]) -> dict[str, Any]:
+    """Keep an immutable, user-visible receipt of the catalog confirmed in this turn."""
+    fields = (
+        "id", "name", "code", "description", "bedrooms", "bathrooms", "area_min", "area_max",
+        "area_unit", "total_units", "available_units", "starting_price", "maximum_price", "currency",
+        "features", "inventory_updated_at", "images_status",
+    )
+    items = []
+    for source in result.get("items", []):
+        if source.get("review_status") != "confirmed":
+            continue
+        item = {field: source.get(field) for field in fields}
+        item["inventory_updated_at"] = (
+            source["inventory_updated_at"].isoformat()
+            if hasattr(source.get("inventory_updated_at"), "isoformat")
+            else source.get("inventory_updated_at")
+        )
+        item["media"] = [
+            {key: media.get(key) for key in ("source_id", "caption", "image_url")}
+            for media in source.get("media", [])
+        ]
+        items.append(item)
+    return {
+        "kind": "property_catalog_snapshot",
+        "confirmed_at": datetime.utcnow().isoformat(),
+        "items": items,
+    }
 
 
 def _cover_confirmation_message(source_name: str, next_prompt: str) -> str:
@@ -617,7 +647,8 @@ def confirm_property_type_catalog(
         services.save_message(
             db, project.session.id, SenderType.AI,
             _catalog_confirmation_message(result, next_question["prompt"]),
-            ui_payload=next_question, in_reply_to_message_id=active_question.id,
+            ui_payload=next_question, artifact_payload=_catalog_artifact(result),
+            in_reply_to_message_id=active_question.id,
             commit=False,
         )
         db.commit()
@@ -1563,15 +1594,42 @@ def get_meta_setup_configuration(
 ):
     services.get_project(db, project_id, current_user.company_id)
     partner_id = settings.META_BUSINESS_MANAGER_ID.strip() or None
-    try:
-        oauth_config, _ = system_settings_service.meta_platform_credentials(db)
-        oauth_enabled = bool(oauth_config.is_enabled)
-    except HTTPException:
-        oauth_enabled = False
+    oauth_config = system_settings_service.get_meta_platform_config(db)
+    oauth_status = "ready"
+    blocker_code = None
+    blocker_message = None
+    if not oauth_config.app_id or not oauth_config.app_secret_ciphertext or not oauth_config.login_config_id:
+        oauth_status = "not_configured"
+        blocker_code = "META_OAUTH_INCOMPLETE"
+        blocker_message = "Black Penguin must complete the Meta App ID, App Secret, and Login configuration ID."
+    elif oauth_config.verification_status == "failed":
+        oauth_status = "verification_failed"
+        blocker_code = "META_OAUTH_VERIFICATION_FAILED"
+        blocker_message = "The configured Meta App credentials failed verification."
+    elif oauth_config.verification_status != "verified":
+        oauth_status = "pending_verification"
+        blocker_code = "META_OAUTH_NOT_VERIFIED"
+        blocker_message = "The Meta App credentials must be verified by the Black Penguin platform administrator."
+    elif not oauth_config.is_enabled:
+        oauth_status = "disabled"
+        blocker_code = "META_OAUTH_DISABLED"
+        blocker_message = "Meta OAuth is configured but has not been enabled by the Black Penguin platform administrator."
+    else:
+        try:
+            system_settings_service.meta_platform_credentials(db)
+        except HTTPException:
+            oauth_status = "credential_error"
+            blocker_code = "META_OAUTH_CREDENTIAL_ERROR"
+            blocker_message = "The stored Meta credential cannot be used. The platform administrator must replace and verify it."
+    oauth_enabled = oauth_status == "ready"
     return {
         "partner_business_manager_id": partner_id,
         "configured": oauth_enabled or partner_id is not None,
         "oauth_enabled": oauth_enabled,
+        "oauth_status": oauth_status,
+        "oauth_blocker_code": blocker_code,
+        "oauth_blocker_message": blocker_message,
+        "can_connect": oauth_enabled,
         "manual_fallback_enabled": True,
     }
 

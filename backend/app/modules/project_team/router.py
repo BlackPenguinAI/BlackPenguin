@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session, joinedload
 
@@ -15,6 +17,7 @@ from .service import ROUND_ROBIN_DESCRIPTION, eligible_sales_assignments
 
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 def _project(db: Session, project_id: str, current_user: User) -> Project:
@@ -152,13 +155,39 @@ def invite_and_assign_sales_user(
     except Exception:
         db.rollback()
         raise
+    invitation = None
+    invitation_message = None
     try:
-        user_services.provision_invitation(
+        invitation = user_services.provision_invitation(
             db, user=user, invited_by_user_id=current_user.id,
         )
+    except HTTPException as exc:
+        logger.warning(
+            "project_sales_invitation_delivery_failed project_id=%s user_id=%s status=%s detail=%s",
+            project_id, user.id, exc.status_code, exc.detail,
+        )
+        invitation_message = (
+            exc.detail.get("message") if isinstance(exc.detail, dict)
+            else str(exc.detail)
+        )
     except Exception:
-        pass
-    return _serialize(assignment)
+        logger.exception(
+            "project_sales_invitation_delivery_error project_id=%s user_id=%s",
+            project_id, user.id,
+        )
+        invitation_message = "The Sales user was assigned, but the activation email could not be sent. Retry it from Users."
+    result = _serialize(assignment)
+    result.update({
+        "invitation_id": invitation.id if invitation else None,
+        "invitation_status": invitation.status if invitation else "delivery_failed",
+        "delivery_status": "accepted" if invitation and invitation.status == "accepted_by_provider" else "failed",
+        "invitation_message": (
+            "The activation email was accepted by the provider."
+            if invitation and invitation.status == "accepted_by_provider"
+            else invitation_message or "The Sales user was assigned, but activation delivery failed. Retry it from Users."
+        ),
+    })
+    return result
 
 
 @router.get("/{project_id}/routing-policy", response_model=RoutingPolicyResponse)

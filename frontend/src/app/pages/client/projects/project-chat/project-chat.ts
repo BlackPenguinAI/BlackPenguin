@@ -62,8 +62,15 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   salesInvite = { first_name: '', last_name: '', email: '' };
   teamBusy = false;
   teamSetupMessage = '';
+  teamSetupWarning = '';
+  showSalesInviteForm = true;
+  salesInviteTouched = false;
   authorizationBusy = false;
-  metaSetupConfig: MetaSetupConfiguration = { partner_business_manager_id: null, configured: false, oauth_enabled: false, manual_fallback_enabled: true };
+  metaSetupConfig: MetaSetupConfiguration = {
+    partner_business_manager_id: null, configured: false, oauth_enabled: false,
+    oauth_status: 'not_configured', oauth_blocker_code: null, oauth_blocker_message: null,
+    can_connect: false, manual_fallback_enabled: true,
+  };
   metaAuthorizations: MetaAuthorization[] = [];
   metaAssets: MetaAssetDiscovery = { authorizations: [], pages: [], ad_accounts: [], lead_forms: [], campaigns: [], adsets: [], ads: [] };
   metaOAuth = { authorization_id: '', page_id: '', ad_account_id: '', lead_form_id: '', campaign_name: 'Meta Lead Ads', external_campaign_id: '', external_adset_id: '', external_ad_id: '', instagram_account_id: '' };
@@ -194,6 +201,22 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
       ? 'Configure later'
       : 'Pending';
   }
+  get isPlatformAdmin(): boolean { return localStorage.getItem('bp_role') === 'superadmin'; }
+  formatCatalogMoney(value: number | null, currency: string | null): string {
+    if (value === null || value === undefined) return 'Not specified';
+    try {
+      return new Intl.NumberFormat('en-US', { style: 'currency', currency: currency || 'USD', maximumFractionDigits: 0 }).format(value);
+    } catch {
+      return `${currency || ''} ${value.toLocaleString('en-US')}`.trim();
+    }
+  }
+  formatCatalogArea(minimum: number | null, maximum: number | null, unit: string | null): string {
+    if (minimum === null && maximum === null) return 'Not specified';
+    const range = minimum !== null && maximum !== null && minimum !== maximum
+      ? `${minimum.toLocaleString()}–${maximum.toLocaleString()}`
+      : `${(minimum ?? maximum)?.toLocaleString()}`;
+    return `${range} ${unit || ''}`.trim();
+  }
 
   propertyTypeErrors(item: Partial<ProjectPropertyType>): FormErrors {
     return { ...validatePropertyType(item), ...(item.id ? this.propertyTypeServerErrors.get(item.id) : {}) };
@@ -226,6 +249,12 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   get salesInviteErrors(): FormErrors { return validateSalesInvite(this.salesInvite); }
   get salesInviteErrorCount(): number { return errorCount(this.salesInviteErrors); }
   get canInviteSalesUser(): boolean { return !this.teamBusy && this.salesInviteErrorCount === 0; }
+  markSalesInviteTouched(): void { this.salesInviteTouched = true; }
+  addAnotherSalesUser(): void {
+    this.salesInvite = { first_name: '', last_name: '', email: '' };
+    this.salesInviteTouched = false; this.teamSetupMessage = ''; this.teamSetupWarning = '';
+    this.showSalesInviteForm = true; this.cdr.detectChanges();
+  }
   get metaSetupErrors(): FormErrors { return validateMetaSetup(this.metaSetup); }
   get metaSetupErrorCount(): number { return errorCount(this.metaSetupErrors); }
   get canTestMetaSetup(): boolean {
@@ -258,9 +287,9 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     this.metaSetup.instagram_account_id = connection.instagram_account_id || '';
   }
   loadSalesTeam(): void {
-    this.onboarding.getProjectTeam(this.projectId).subscribe({ next: (items) => this.projectTeam = items });
+    this.onboarding.getProjectTeam(this.projectId).subscribe({ next: (items) => { this.projectTeam = items; this.cdr.detectChanges(); } });
     this.onboarding.getSalesCandidates(this.projectId).subscribe({
-      next: (items) => this.companyUsers = items,
+      next: (items) => { this.companyUsers = items; this.cdr.detectChanges(); },
       error: () => this.errorMessage = 'Company Sales users could not be loaded.',
     });
   }
@@ -269,7 +298,8 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
       next: (configuration) => {
         this.metaSetupConfig = configuration;
         if (configuration.oauth_enabled) this.loadMetaAuthorizations();
-        else this.showManualMetaSetup = true;
+        else this.showManualMetaSetup = false;
+        this.cdr.detectChanges();
       },
     });
   }
@@ -543,36 +573,47 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   assignSelectedSalesUser(message: ChatMessage): void {
     if (!this.selectedSalesUserId || this.teamBusy) return;
     this.teamBusy = true; this.errorMessage = '';
-    this.onboarding.assignSalesUser(this.projectId, this.selectedSalesUserId).subscribe({
+    this.onboarding.assignSalesUser(this.projectId, this.selectedSalesUserId).pipe(
+      finalize(() => { this.teamBusy = false; this.cdr.detectChanges(); }),
+    ).subscribe({
       next: (assignment) => {
         this.projectTeam = [...this.projectTeam.filter((item) => item.user_id !== assignment.user_id), assignment];
-        this.selectedSalesUserId = ''; this.teamBusy = false;
+        this.selectedSalesUserId = ''; this.showSalesInviteForm = false;
         this.teamSetupMessage = `${assignment.first_name || ''} ${assignment.last_name || ''}`.trim()
           + ' was assigned. Add another Sales user or continue with this team.';
+        this.cdr.detectChanges(); this.scrollToBottom();
       },
       error: (error: HttpErrorResponse) => {
-        this.teamBusy = false;
         this.errorMessage = error.error?.detail || 'The Sales user could not be assigned.';
+        this.cdr.detectChanges();
       },
     });
   }
   inviteSalesUser(message: ChatMessage): void {
     if (!this.canInviteSalesUser) return;
-    this.teamBusy = true; this.errorMessage = '';
-    this.onboarding.inviteAndAssignSalesUser(this.projectId, this.salesInvite).subscribe({
+    this.teamBusy = true; this.errorMessage = ''; this.teamSetupMessage = ''; this.teamSetupWarning = '';
+    this.onboarding.inviteAndAssignSalesUser(this.projectId, this.salesInvite).pipe(
+      finalize(() => { this.teamBusy = false; this.cdr.detectChanges(); }),
+    ).subscribe({
       next: (assignment) => {
-        this.projectTeam = [...this.projectTeam, assignment];
-        this.companyUsers = [...this.companyUsers, {
+        this.projectTeam = [...this.projectTeam.filter(item => item.user_id !== assignment.user_id), assignment];
+        this.companyUsers = [...this.companyUsers.filter(item => item.id !== assignment.user_id), {
           id: assignment.user_id, email: assignment.email, first_name: assignment.first_name || undefined,
           last_name: assignment.last_name || undefined, role: 'sales', is_active: true,
         }];
-        this.salesInvite = { first_name: '', last_name: '', email: '' }; this.teamBusy = false;
-        this.teamSetupMessage = `${assignment.first_name || ''} ${assignment.last_name || ''}`.trim()
-          + ' was created and assigned. Add another Sales user or continue with this team.';
+        this.salesInvite = { first_name: '', last_name: '', email: '' };
+        this.salesInviteTouched = false; this.showSalesInviteForm = false;
+        const name = `${assignment.first_name || ''} ${assignment.last_name || ''}`.trim();
+        if (assignment.delivery_status === 'failed') {
+          this.teamSetupWarning = `${name} was assigned, but the activation email was not delivered. ${assignment.invitation_message || 'Retry it from Users.'}`;
+        } else {
+          this.teamSetupMessage = `${name} was created and assigned. ${assignment.invitation_message || 'The activation invitation was sent.'}`;
+        }
+        this.cdr.detectChanges(); this.scrollToBottom();
       },
       error: (error: HttpErrorResponse) => {
-        this.teamBusy = false;
         this.errorMessage = error.error?.detail || 'The Sales user could not be created and assigned.';
+        this.cdr.detectChanges();
       },
     });
   }

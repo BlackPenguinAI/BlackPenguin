@@ -18,6 +18,10 @@ class AssignmentResponse(AssignmentUpsert):
     email: str
     first_name: str | None = None
     last_name: str | None = None
+    invitation_id: str | None = None
+    invitation_status: str | None = None
+    delivery_status: Literal["accepted", "failed", "not_requested"] | None = None
+    invitation_message: str | None = None
     model_config = ConfigDict(from_attributes=True)
 
 

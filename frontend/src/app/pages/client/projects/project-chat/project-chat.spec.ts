@@ -437,4 +437,41 @@ describe('ProjectChatComponent', () => {
 
     expect(component.profileSections.map((section) => section.key)).toEqual(['identity']);
   });
+
+  it('finishes a Sales invitation immediately and keeps a fresh form pristine', () => {
+    component.projectId = 'project-1';
+    component.salesInvite = { first_name: 'Jorge', last_name: 'Jorgei', email: 'jorge@example.com' };
+    component.salesInviteTouched = true;
+
+    component.inviteSalesUser({ id: 'team-question', sender: 'ai', content: 'Assign team', created_at: new Date(), attachments: [] });
+    expect(component.teamBusy).toBe(true);
+    http.expectOne('http://localhost:8000/api/v1/projects/project-1/team/invite-sales').flush({
+      id: 'assignment-1', project_id: 'project-1', user_id: 'user-1', responsibility: 'sales',
+      is_primary: false, routing_weight: 100, accepts_new_leads: true, is_active: true,
+      email: 'jorge@example.com', first_name: 'Jorge', last_name: 'Jorgei',
+      invitation_id: 'invitation-1', invitation_status: 'accepted_by_provider', delivery_status: 'accepted',
+      invitation_message: 'The activation email was accepted by the provider.',
+    });
+
+    expect(component.teamBusy).toBe(false);
+    expect(component.showSalesInviteForm).toBe(false);
+    expect(component.salesInviteTouched).toBe(false);
+    expect(component.salesInviteErrorCount).toBe(3);
+    expect(component.teamSetupMessage).toContain('activation email was accepted');
+    expect(component.projectTeam.map(item => item.user_id)).toEqual(['user-1']);
+  });
+
+  it('keeps Meta manual setup collapsed and exposes the OAuth blocker', () => {
+    component.metaSetupConfig = {
+      partner_business_manager_id: null, configured: false, oauth_enabled: false,
+      oauth_status: 'pending_verification', oauth_blocker_code: 'META_OAUTH_NOT_VERIFIED',
+      oauth_blocker_message: 'The Meta App credentials must be verified.', can_connect: false,
+      manual_fallback_enabled: true,
+    };
+    component.showManualMetaSetup = false;
+
+    expect(component.metaSetupConfig.oauth_enabled).toBe(false);
+    expect(component.metaSetupConfig.oauth_blocker_code).toBe('META_OAUTH_NOT_VERIFIED');
+    expect(component.showManualMetaSetup).toBe(false);
+  });
 });

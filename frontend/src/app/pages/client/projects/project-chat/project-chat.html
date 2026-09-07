@@ -53,6 +53,20 @@
                 <div class="min-w-0"><p class="text-xs font-semibold text-green-300">Project cover</p><p class="mt-1 truncate text-[10px] text-gray-500">{{ media.name }}</p></div>
               </div>
             </div>
+            <section *ngIf="msg.artifact_payload as artifact" class="ml-11 mt-3 max-w-3xl">
+              <div *ngIf="artifact.kind === 'property_catalog_snapshot'" class="rounded-2xl border border-green-500/20 bg-green-500/[0.05] p-4" data-testid="property-catalog-receipt">
+                <div class="flex flex-wrap items-start justify-between gap-2"><div><p class="text-[10px] font-bold uppercase tracking-[.16em] text-green-300">Property catalog saved</p><h3 class="mt-1 text-sm font-semibold">{{ artifact.items.length }} confirmed property type{{ artifact.items.length === 1 ? '' : 's' }}</h3></div><span class="material-symbols-outlined text-green-300">inventory_2</span></div>
+                <div class="mt-3 grid gap-3 md:grid-cols-2">
+                  <article *ngFor="let item of artifact.items" class="overflow-hidden rounded-xl border border-white/10 bg-black/25">
+                    <img *ngIf="item.media.length && sourceImageUrls.get(item.media[0].source_id) as preview" [src]="preview" [alt]="item.name" class="h-28 w-full object-cover" />
+                    <div class="p-3"><div class="flex items-start justify-between gap-2"><div><p class="text-sm font-semibold text-white">{{ item.name }}</p><p *ngIf="item.code" class="text-[10px] text-gray-500">{{ item.code }}</p></div><span class="rounded-full border border-green-500/20 px-2 py-1 text-[9px] text-green-300">Confirmed</span></div>
+                      <div class="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-[10px]"><p><span class="block text-gray-500">Beds / baths</span>{{ item.bedrooms ?? '—' }} / {{ item.bathrooms ?? '—' }}</p><p><span class="block text-gray-500">Area</span>{{ formatCatalogArea(item.area_min, item.area_max, item.area_unit) }}</p><p><span class="block text-gray-500">Available</span>{{ item.available_units ?? '—' }}<span *ngIf="item.total_units !== null"> / {{ item.total_units }}</span></p><p><span class="block text-gray-500">Starting price</span>{{ formatCatalogMoney(item.starting_price, item.currency) }}</p><p class="col-span-2"><span class="block text-gray-500">Inventory updated</span>{{ item.inventory_updated_at ? (item.inventory_updated_at | date:'mediumDate':'UTC') : 'Not specified' }}</p></div>
+                      <p *ngIf="item.description" class="mt-3 text-[10px] leading-4 text-gray-400">{{ item.description }}</p><div *ngIf="item.features.length" class="mt-2 flex flex-wrap gap-1"><span *ngFor="let feature of item.features" class="rounded-full bg-white/[0.06] px-2 py-1 text-[9px] text-gray-300">{{ feature }}</span></div>
+                    </div>
+                  </article>
+                </div>
+              </div>
+            </section>
 
             <section *ngIf="isStructuredQuestion(msg, 'ai_sales_authorization')" class="structured-card ml-11 mt-4 max-w-3xl">
               <div class="flex items-start gap-3">
@@ -83,6 +97,7 @@
                 </div>
               </div>
               <p *ngIf="teamSetupMessage" class="mt-3 rounded-lg border border-green-500/20 bg-green-500/10 p-3 text-xs text-green-300">{{ teamSetupMessage }}</p>
+              <p *ngIf="teamSetupWarning" class="mt-3 rounded-lg border border-amber-500/25 bg-amber-500/[0.08] p-3 text-xs text-amber-200">{{ teamSetupWarning }}</p>
               <div class="mt-4 grid gap-2 sm:grid-cols-[1fr_auto]">
                 <select [(ngModel)]="selectedSalesUserId" class="secure-input">
                   <option value="">Select an existing Sales user</option>
@@ -90,15 +105,18 @@
                 </select>
                 <button (click)="assignSelectedSalesUser(msg)" [disabled]="!selectedSalesUserId || teamBusy" class="structured-primary">Assign</button>
               </div>
-              <div class="my-4 flex items-center gap-3 text-[10px] uppercase tracking-wider text-gray-600"><span class="h-px flex-1 bg-white/10"></span>or create Sales user<span class="h-px flex-1 bg-white/10"></span></div>
-              <p *ngIf="salesInviteErrorCount" class="form-help" role="status"><span class="material-symbols-outlined text-sm">info</span>Complete {{ salesInviteErrorCount }} required field{{ salesInviteErrorCount === 1 ? '' : 's' }} to create the user.</p>
-              <div class="grid gap-2 sm:grid-cols-2">
-                <label class="field-label">First name *<input [(ngModel)]="salesInvite.first_name" placeholder="First name" class="secure-input" [class.form-input-invalid]="!!salesInviteErrors['first_name']" /><span *ngIf="salesInviteErrors['first_name']" class="field-error">{{ salesInviteErrors['first_name'] }}</span></label>
-                <label class="field-label">Last name *<input [(ngModel)]="salesInvite.last_name" placeholder="Last name" class="secure-input" [class.form-input-invalid]="!!salesInviteErrors['last_name']" /><span *ngIf="salesInviteErrors['last_name']" class="field-error">{{ salesInviteErrors['last_name'] }}</span></label>
-                <label class="field-label sm:col-span-2">Email address *<input [(ngModel)]="salesInvite.email" type="email" placeholder="name@example.com" class="secure-input" [class.form-input-invalid]="!!salesInviteErrors['email']" /><span *ngIf="salesInviteErrors['email']" class="field-error">{{ salesInviteErrors['email'] }}</span><small class="mt-1 block text-[10px] font-normal normal-case tracking-normal text-gray-500">Work and personal email addresses are accepted.</small></label>
+              <button *ngIf="!showSalesInviteForm" type="button" (click)="addAnotherSalesUser()" [disabled]="teamBusy" class="structured-secondary mt-4">Add another Sales user</button>
+              <div *ngIf="showSalesInviteForm">
+                <div class="my-4 flex items-center gap-3 text-[10px] uppercase tracking-wider text-gray-600"><span class="h-px flex-1 bg-white/10"></span>or create Sales user<span class="h-px flex-1 bg-white/10"></span></div>
+                <p *ngIf="salesInviteTouched && salesInviteErrorCount" class="form-help" role="status"><span class="material-symbols-outlined text-sm">info</span>Complete {{ salesInviteErrorCount }} required field{{ salesInviteErrorCount === 1 ? '' : 's' }} to create the user.</p>
+                <div class="grid gap-2 sm:grid-cols-2">
+                  <label class="field-label">First name *<input [(ngModel)]="salesInvite.first_name" (ngModelChange)="markSalesInviteTouched()" placeholder="First name" class="secure-input" [class.form-input-invalid]="salesInviteTouched && !!salesInviteErrors['first_name']" /><span *ngIf="salesInviteTouched && salesInviteErrors['first_name']" class="field-error">{{ salesInviteErrors['first_name'] }}</span></label>
+                  <label class="field-label">Last name *<input [(ngModel)]="salesInvite.last_name" (ngModelChange)="markSalesInviteTouched()" placeholder="Last name" class="secure-input" [class.form-input-invalid]="salesInviteTouched && !!salesInviteErrors['last_name']" /><span *ngIf="salesInviteTouched && salesInviteErrors['last_name']" class="field-error">{{ salesInviteErrors['last_name'] }}</span></label>
+                  <label class="field-label sm:col-span-2">Email address *<input [(ngModel)]="salesInvite.email" (ngModelChange)="markSalesInviteTouched()" type="email" placeholder="name@example.com" class="secure-input" [class.form-input-invalid]="salesInviteTouched && !!salesInviteErrors['email']" /><span *ngIf="salesInviteTouched && salesInviteErrors['email']" class="field-error">{{ salesInviteErrors['email'] }}</span><small class="mt-1 block text-[10px] font-normal normal-case tracking-normal text-gray-500">Work and personal email addresses are accepted.</small></label>
+                </div>
+                <button (click)="inviteSalesUser(msg)" [disabled]="!canInviteSalesUser" [title]="canInviteSalesUser ? '' : 'Complete all required user fields.'" class="structured-primary mt-3">{{ teamBusy ? 'Sending invitation…' : 'Create and assign Sales user' }}</button>
               </div>
               <div class="mt-3 flex flex-wrap gap-2">
-                <button (click)="inviteSalesUser(msg)" [disabled]="!canInviteSalesUser" [title]="canInviteSalesUser ? '' : 'Complete all required user fields.'" class="structured-primary">{{ teamBusy ? 'Saving...' : (salesInviteErrorCount ? 'Complete required fields' : 'Create and assign Sales user') }}</button>
                 <button *ngIf="assignedSalesUsers.length" (click)="completeSalesTeam(msg)" [disabled]="teamBusy" class="structured-primary">Continue with assigned team</button>
                 <button (click)="deferSalesTeam(msg)" [disabled]="teamBusy" class="structured-secondary">Configure later in Users</button>
               </div>
@@ -115,6 +133,11 @@
               <div *ngIf="metaSetupConfig.oauth_enabled" class="mt-4 rounded-lg border border-secondary/20 bg-secondary/[0.06] p-3">
                 <div class="flex flex-wrap items-center justify-between gap-3"><div><p class="text-[10px] font-bold uppercase tracking-wider text-secondary">Secure Meta login</p><p class="mt-1 text-xs text-gray-300">The authorization is stored at Company level and can be reused for its Projects.</p></div><button type="button" (click)="connectMeta()" [disabled]="metaOAuthBusy" class="structured-primary">{{ metaAuthorizations.length ? 'Connect another Meta account' : 'Continue with Meta' }}</button></div>
               </div>
+              <div *ngIf="!metaSetupConfig.oauth_enabled" class="mt-4 rounded-lg border border-amber-500/25 bg-amber-500/[0.08] p-3" data-testid="meta-oauth-blocker">
+                <p class="text-[10px] font-bold uppercase tracking-wider text-amber-300">Meta OAuth unavailable</p>
+                <p class="mt-1 text-xs leading-5 text-amber-100">{{ metaSetupConfig.oauth_blocker_message || 'The Black Penguin platform administrator must finish the Meta integration.' }}</p>
+                <a *ngIf="isPlatformAdmin" routerLink="/admin/integrations" class="mt-3 inline-flex rounded-lg border border-amber-400/30 px-3 py-2 text-[10px] font-semibold text-amber-200">Open platform integrations</a>
+              </div>
               <div *ngIf="metaSetupConfig.oauth_enabled && metaAuthorizations.length" class="mt-4 grid gap-3 sm:grid-cols-2">
                 <label class="field-label sm:col-span-2">Company Meta authorization<select [(ngModel)]="metaOAuth.authorization_id" (change)="loadMetaAssets()" class="secure-input"><option *ngFor="let authorization of metaAuthorizations" [value]="authorization.id">{{ authorization.meta_user_name || authorization.meta_user_id }}</option></select></label>
                 <label class="field-label">Facebook Page *<select [(ngModel)]="metaOAuth.page_id" (change)="metaPageChanged()" class="secure-input"><option value="">Select a Page</option><option *ngFor="let item of metaAssets.pages" [value]="item.id">{{ item.name }}</option></select></label>
@@ -127,7 +150,7 @@
                 <button type="button" (click)="completeMetaOAuth(msg)" [disabled]="metaOAuthBusy || !metaOAuth.page_id || !metaOAuth.ad_account_id || !metaOAuth.lead_form_id || !metaOAuth.campaign_name.trim()" class="structured-primary sm:col-span-2">{{ metaOAuthBusy ? 'Loading Meta assets…' : 'Connect selected assets and continue' }}</button>
               </div>
               <button *ngIf="metaSetupConfig.manual_fallback_enabled" type="button" (click)="showManualMetaSetup = !showManualMetaSetup" class="structured-secondary mt-4">{{ showManualMetaSetup ? 'Hide manual setup' : 'Use asset IDs manually' }}</button>
-              <div *ngIf="showManualMetaSetup || !metaSetupConfig.oauth_enabled">
+              <div *ngIf="showManualMetaSetup">
               <div class="mt-4 rounded-lg border border-secondary/20 bg-secondary/[0.06] p-3"><p class="text-[10px] font-bold uppercase tracking-wider text-secondary">Manual fallback</p><p class="mt-1 text-xs text-gray-400">Use this only when Meta OAuth is unavailable. It runs the existing simulated verification.</p></div>
               <ol class="mt-4 space-y-3 text-xs text-gray-300">
                 <li><strong>1. Reuse a Company connection when possible</strong><div class="mt-2 grid gap-2"><label class="field-label">Verified Company connection<select [(ngModel)]="metaSetup.meta_connection_id" (change)="selectMetaConnection()" class="secure-input"><option value="">Create/reuse by asset IDs</option><option *ngFor="let connection of metaConnections" [value]="connection.id" [disabled]="connection.verification_status !== 'succeeded'">{{ connection.label }} · {{ connection.verification_mode }} · {{ connection.verification_status }}</option></select><small class="mt-1 text-[10px] font-normal normal-case tracking-normal text-gray-500">A single Company connection can be reused by several Projects. Project-specific Pages remain separate connections.</small></label><label class="field-label">Campaign label *<input [(ngModel)]="metaSetup.campaign_name" placeholder="Project launch campaign" class="secure-input" [class.form-input-invalid]="!!metaSetupErrors['campaign_name']" /><span *ngIf="metaSetupErrors['campaign_name']" class="field-error">{{ metaSetupErrors['campaign_name'] }}</span></label></div></li>
