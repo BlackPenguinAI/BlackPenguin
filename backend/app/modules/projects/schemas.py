@@ -524,3 +524,4 @@ class MetaAssetDiscoveryResponse(BaseModel):
     campaigns: list[MetaAssetOption] = Field(default_factory=list)
     adsets: list[MetaAssetOption] = Field(default_factory=list)
     ads: list[MetaAssetOption] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)

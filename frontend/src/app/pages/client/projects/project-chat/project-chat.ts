@@ -72,7 +72,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     can_connect: false, manual_fallback_enabled: true,
   };
   metaAuthorizations: MetaAuthorization[] = [];
-  metaAssets: MetaAssetDiscovery = { authorizations: [], pages: [], ad_accounts: [], lead_forms: [], campaigns: [], adsets: [], ads: [] };
+  metaAssets: MetaAssetDiscovery = { authorizations: [], pages: [], ad_accounts: [], lead_forms: [], campaigns: [], adsets: [], ads: [], warnings: [] };
   metaOAuth = { authorization_id: '', page_id: '', ad_account_id: '', lead_form_id: '', campaign_name: 'Meta Lead Ads', external_campaign_id: '', external_adset_id: '', external_ad_id: '', instagram_account_id: '' };
   metaOAuthBusy = false;
   showManualMetaSetup = false;
@@ -140,10 +140,17 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.projectId = this.route.snapshot.paramMap.get('id') || '';
     this.userName = localStorage.getItem('bp_name') || 'User';
-    this.syncState(); this.loadCampaigns(); this.loadMetaConnections(); this.loadSalesTeam(); this.loadMetaSetupConfiguration();
     const oauthStatus = this.route.snapshot.queryParamMap?.get('meta_oauth');
     if (oauthStatus === 'connected') this.metaSetupMessage = 'Meta connected. Select the assets that belong to this Project.';
     if (oauthStatus === 'error') this.errorMessage = this.route.snapshot.queryParamMap?.get('reason') || 'Meta connection could not be completed.';
+    this.syncState(oauthStatus ? 'bottom' : 'none');
+    this.loadCampaigns(); this.loadMetaConnections(); this.loadSalesTeam(); this.loadMetaSetupConfiguration();
+    if (oauthStatus) {
+      void this.router.navigate([], {
+        relativeTo: this.route, queryParams: { meta_oauth: null, reason: null },
+        queryParamsHandling: 'merge', replaceUrl: true,
+      });
+    }
     this.speechSubscriptions.add(this.speech.state$.subscribe((state) => {
       this.isRecording = state === 'listening';
       this.cdr.detectChanges();
@@ -308,7 +315,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     this.metaOAuthBusy = true; this.errorMessage = '';
     this.onboarding.startMetaOAuth(this.projectId).subscribe({
       next: value => window.location.assign(value.authorization_url),
-      error: (error: HttpErrorResponse) => { this.metaOAuthBusy = false; this.errorMessage = error.error?.detail || 'Meta connection could not be started.'; this.cdr.detectChanges(); },
+      error: (error: HttpErrorResponse) => { this.metaOAuthBusy = false; this.errorMessage = this.apiDetail(error, 'Meta connection could not be started.'); this.cdr.detectChanges(); },
     });
   }
   loadMetaAuthorizations(): void {
@@ -324,7 +331,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   }
   loadMetaAssets(): void {
     if (!this.metaOAuth.authorization_id) return;
-    this.metaOAuthBusy = true;
+    this.metaOAuthBusy = true; this.errorMessage = '';
     this.onboarding.discoverMetaAssets(this.projectId, this.metaOAuth.authorization_id, this.metaOAuth.page_id, this.metaOAuth.ad_account_id).subscribe({
       next: assets => {
         this.metaAssets = assets; this.metaOAuthBusy = false;
@@ -334,7 +341,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
         if (page?.instagram_account_id) this.metaOAuth.instagram_account_id = page.instagram_account_id;
         this.cdr.detectChanges();
       },
-      error: (error: HttpErrorResponse) => { this.metaOAuthBusy = false; this.errorMessage = error.error?.detail || 'Meta assets could not be loaded.'; this.cdr.detectChanges(); },
+      error: (error: HttpErrorResponse) => { this.metaOAuthBusy = false; this.errorMessage = this.apiDetail(error, 'Meta assets could not be loaded.'); this.cdr.detectChanges(); },
     });
   }
   metaPageChanged(): void { this.metaOAuth.lead_form_id = ''; this.loadMetaAssets(); }
@@ -551,7 +558,19 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
 
   private apiDetail(error: HttpErrorResponse, fallback: string): string {
     const detail = error.error?.detail;
-    return typeof detail === 'string' ? detail : detail?.message || fallback;
+    if (typeof detail === 'string') return detail;
+    if (typeof detail?.message === 'string') {
+      return detail.next_action === 'resend_activation'
+        ? `${detail.message} Resend the activation invitation from Users.`
+        : detail.message;
+    }
+    if (Array.isArray(detail)) {
+      const messages = detail
+        .map((issue) => typeof issue?.msg === 'string' ? issue.msg : '')
+        .filter((message): message is string => !!message);
+      if (messages.length) return messages.join(' ');
+    }
+    return fallback;
   }
 
   get availableSalesUsers(): ProjectSalesCandidate[] {
@@ -584,7 +603,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
         this.cdr.detectChanges(); this.scrollToBottom();
       },
       error: (error: HttpErrorResponse) => {
-        this.errorMessage = error.error?.detail || 'The Sales user could not be assigned.';
+        this.errorMessage = this.apiDetail(error, 'The Sales user could not be assigned.');
         this.cdr.detectChanges();
       },
     });
@@ -612,7 +631,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
         this.cdr.detectChanges(); this.scrollToBottom();
       },
       error: (error: HttpErrorResponse) => {
-        this.errorMessage = error.error?.detail || 'The Sales user could not be created and assigned.';
+        this.errorMessage = this.apiDetail(error, 'The Sales user could not be created and assigned.');
         this.cdr.detectChanges();
       },
     });

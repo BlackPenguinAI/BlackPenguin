@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 import hashlib
+import logging
 import secrets
 from urllib.parse import urlencode
 
@@ -16,6 +17,32 @@ from app.modules.system_settings.models import MetaOAuthAttempt
 from app.modules.users.models import User
 
 from .models import MetaAuthorization, MetaConnection, Project, ProjectCampaign
+
+
+logger = logging.getLogger(__name__)
+
+
+def _log_graph_error(stage: str, exc: httpx.HTTPError) -> None:
+    response = getattr(exc, "response", None)
+    status_code = getattr(response, "status_code", None)
+    error: dict = {}
+    if response is not None:
+        try:
+            payload = response.json()
+            if isinstance(payload, dict) and isinstance(payload.get("error"), dict):
+                error = payload["error"]
+        except ValueError:
+            pass
+    logger.warning(
+        "meta_asset_discovery_failed stage=%s http_status=%s graph_code=%s graph_subcode=%s graph_type=%s graph_message=%s",
+        stage, status_code, error.get("code"), error.get("error_subcode"), error.get("type"),
+        str(error.get("message") or "")[:500],
+    )
+
+
+def _meta_asset_failure(stage: str, exc: httpx.HTTPError, message: str) -> HTTPException:
+    _log_graph_error(stage, exc)
+    return HTTPException(status_code=422, detail=message)
 
 
 def _token(authorization: MetaAuthorization) -> str:
@@ -157,27 +184,46 @@ async def discover_assets(
     config, _ = system_settings.meta_platform_credentials(db)
     token = _token(authorization)
     base = f"https://graph.facebook.com/{config.graph_api_version}"
+    warnings: list[str] = []
     async with httpx.AsyncClient(timeout=25.0) as client:
-        pages_response = await client.get(f"{base}/me/accounts", params={
-            "access_token": token,
-            "fields": "id,name,access_token,instagram_business_account{id,username}", "limit": 200,
-        })
-        pages_response.raise_for_status()
+        try:
+            pages_response = await client.get(f"{base}/me/accounts", params={
+                "access_token": token,
+                "fields": "id,name,access_token,instagram_business_account{id,username}", "limit": 200,
+            })
+            pages_response.raise_for_status()
+        except httpx.HTTPError as exc:
+            raise _meta_asset_failure(
+                "pages", exc,
+                "Meta could not load Pages for this authorization. Reconnect Meta and grant Page access.",
+            ) from exc
         pages_raw = pages_response.json().get("data", [])
-        ad_accounts_response = await client.get(f"{base}/me/adaccounts", params={
-            "access_token": token, "fields": "id,account_id,name,account_status", "limit": 200,
-        })
-        ad_accounts_response.raise_for_status()
+        try:
+            ad_accounts_response = await client.get(f"{base}/me/adaccounts", params={
+                "access_token": token, "fields": "id,account_id,name,account_status", "limit": 200,
+            })
+            ad_accounts_response.raise_for_status()
+        except httpx.HTTPError as exc:
+            raise _meta_asset_failure(
+                "ad_accounts", exc,
+                "Meta could not load Ad Accounts for this authorization. Reconnect Meta and grant Advertising Account access.",
+            ) from exc
         ad_accounts_raw = ad_accounts_response.json().get("data", [])
         forms_raw: list[dict] = []
         page = next((item for item in pages_raw if str(item.get("id")) == str(page_id)), None)
         if page_id:
             if not page:
                 raise HTTPException(status_code=422, detail="The selected Page is not available to this Meta authorization.")
-            forms_response = await client.get(f"{base}/{page_id}/leadgen_forms", params={
-                "access_token": page.get("access_token") or token, "fields": "id,name,status", "limit": 200,
-            })
-            forms_response.raise_for_status()
+            try:
+                forms_response = await client.get(f"{base}/{page_id}/leadgen_forms", params={
+                    "access_token": page.get("access_token") or token, "fields": "id,name,status", "limit": 200,
+                })
+                forms_response.raise_for_status()
+            except httpx.HTTPError as exc:
+                raise _meta_asset_failure(
+                    "lead_forms", exc,
+                    "Meta could not load Lead Forms for this Page. Grant the connected user and Black Penguin Leads Access in Meta Business Suite, then reconnect Meta.",
+                ) from exc
             forms_raw = forms_response.json().get("data", [])
         campaigns_raw: list[dict] = []
         adsets_raw: list[dict] = []
@@ -189,10 +235,18 @@ async def discover_assets(
                 raise HTTPException(status_code=422, detail="The selected Ad Account is not available to this Meta authorization.")
             account_path = str(account.get("id") or f"act_{normalized}")
             for edge, target in (("campaigns", campaigns_raw), ("adsets", adsets_raw), ("ads", ads_raw)):
-                edge_response = await client.get(f"{base}/{account_path}/{edge}", params={
-                    "access_token": token, "fields": "id,name,status", "limit": 200,
-                })
-                edge_response.raise_for_status()
+                try:
+                    edge_response = await client.get(f"{base}/{account_path}/{edge}", params={
+                        "access_token": token, "fields": "id,name,status", "limit": 200,
+                    })
+                    edge_response.raise_for_status()
+                except httpx.HTTPError as exc:
+                    _log_graph_error(edge, exc)
+                    warnings.append(
+                        f"Meta could not load {edge} for the selected Ad Account. "
+                        "You can still connect using the Page and Lead Form."
+                    )
+                    continue
                 target.extend(edge_response.json().get("data", []))
     option = lambda item: {
         "id": str(item.get("account_id") or item.get("id") or ""),
@@ -212,6 +266,7 @@ async def discover_assets(
         "lead_forms": [option(item) for item in forms_raw],
         "campaigns": [option(item) for item in campaigns_raw],
         "adsets": [option(item) for item in adsets_raw], "ads": [option(item) for item in ads_raw],
+        "warnings": warnings,
     }
 
 

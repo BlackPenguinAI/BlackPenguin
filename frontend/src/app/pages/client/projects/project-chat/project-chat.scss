@@ -1,4 +1,4 @@
-:host { display: block; height: 100%; }
+:host { display: block; height: 100%; color-scheme: dark; }
 .assistant-markdown {
   overflow-wrap: anywhere;
   :where(p, ul, ol, blockquote) + :where(p, ul, ol, blockquote) { margin-top: .75rem; }
@@ -16,6 +16,8 @@
 }
 .secure-input { width: 100%; border: 1px solid rgba(255,255,255,.1); border-radius: .6rem; background: rgba(255,255,255,.04); padding: .55rem .7rem; color: #fff; font-size: .7rem; outline: none;
   &:focus { border-color: rgba(233,158,16,.6); }
+  &[type='date'], &[type='time'], &:is(select) { color-scheme: dark; }
+  option { background: #111; color: #fff; }
 }
 .attachment-chip { display: flex; align-items: center; gap: .45rem; border: 1px solid rgba(255,255,255,.13); border-radius: .65rem; background: rgba(17,24,39,.92); padding: .45rem .65rem; color: #e5e7eb; font-size: .68rem; text-align: left;
   &:hover:not(:disabled) { border-color: rgba(233,158,16,.55); color: #e99e10; }

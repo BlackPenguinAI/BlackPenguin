@@ -259,14 +259,19 @@ def test_confirming_property_catalog_persists_summary_and_next_question_in_chat(
 
         confirm_property_type_catalog(project.id, db, administrator)
 
-        messages = db.query(ProjectMessage).filter_by(session_id=session.id).order_by(ProjectMessage.created_at).all()
+        messages = db.query(ProjectMessage).filter_by(session_id=session.id).order_by(
+            ProjectMessage.created_at, ProjectMessage.id,
+        ).all()
         assert question.response_payload["answer"] == "Confirmed the current property type catalog"
-        assert len(messages) == 2
-        assert "I saved the Property catalog with 1 confirmed property type: Typology 1." in messages[-1].content
-        assert "Let's continue:" in messages[-1].content
-        assert messages[-1].ui_payload["input_type"] != "property_type_catalog"
-        assert messages[-1].artifact_payload["kind"] == "property_catalog_snapshot"
-        receipt = messages[-1].artifact_payload["items"][0]
+        assert len(messages) == 3
+        receipt_message, next_message = messages[-2:]
+        assert receipt_message.content == "I saved the Property catalog with 1 confirmed property type: Typology 1."
+        assert receipt_message.ui_payload is None
+        assert receipt_message.artifact_payload["kind"] == "property_catalog_snapshot"
+        assert next_message.content == next_message.ui_payload["prompt"]
+        assert next_message.ui_payload["input_type"] != "property_type_catalog"
+        assert next_message.artifact_payload is None
+        receipt = receipt_message.artifact_payload["items"][0]
         assert receipt["name"] == "Typology 1"
         assert receipt["bedrooms"] == 2
         assert receipt["available_units"] == 10

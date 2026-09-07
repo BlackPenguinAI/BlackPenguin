@@ -166,7 +166,7 @@ def _next_prompt(profile) -> str:
     return _next_question(profile)["prompt"]
 
 
-def _catalog_confirmation_message(result: dict[str, Any], next_prompt: str) -> str:
+def _catalog_confirmation_message(result: dict[str, Any]) -> str:
     items = [item for item in result.get("items", []) if item.get("review_status") == "confirmed"]
     names = [str(item.get("name") or "").strip() for item in items if str(item.get("name") or "").strip()]
     count = len(names)
@@ -174,7 +174,7 @@ def _catalog_confirmation_message(result: dict[str, Any], next_prompt: str) -> s
     summary = f"I saved the Property catalog with {count} confirmed {noun}"
     if names:
         summary += ": " + ", ".join(names)
-    return f"{summary}.\n\nLet's continue: {next_prompt}"
+    return f"{summary}."
 
 
 def _catalog_artifact(result: dict[str, Any]) -> dict[str, Any]:
@@ -646,8 +646,15 @@ def confirm_property_type_catalog(
         next_question = _next_question(profile)
         services.save_message(
             db, project.session.id, SenderType.AI,
-            _catalog_confirmation_message(result, next_question["prompt"]),
-            ui_payload=next_question, artifact_payload=_catalog_artifact(result),
+            _catalog_confirmation_message(result),
+            artifact_payload=_catalog_artifact(result),
+            in_reply_to_message_id=active_question.id,
+            commit=False,
+        )
+        services.save_message(
+            db, project.session.id, SenderType.AI,
+            next_question["prompt"],
+            ui_payload=next_question,
             in_reply_to_message_id=active_question.id,
             commit=False,
         )

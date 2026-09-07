@@ -190,6 +190,7 @@ export interface MetaAssetOption {
 export interface MetaAssetDiscovery {
   authorizations: MetaAuthorization[]; pages: MetaAssetOption[]; ad_accounts: MetaAssetOption[];
   lead_forms: MetaAssetOption[]; campaigns: MetaAssetOption[]; adsets: MetaAssetOption[]; ads: MetaAssetOption[];
+  warnings: string[];
 }
 
 export interface MetaSetupResult {

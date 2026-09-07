@@ -37,7 +37,7 @@
 
     <div #chatScroll class="flex flex-1 flex-col gap-6 overflow-y-auto p-4 md:p-8">
       <ng-container *ngFor="let msg of visibleMessages">
-        <div class="flex" [ngClass]="msg.sender === 'user' ? 'justify-end' : 'justify-start'">
+        <div class="flex" [attr.data-message-id]="msg.id" [attr.data-active-question]="isActiveQuestion(msg) ? 'true' : null" [ngClass]="msg.sender === 'user' ? 'justify-end' : 'justify-start'">
           <div *ngIf="msg.sender === 'ai'" class="min-w-0 w-full">
             <app-onboarding-ai-message
               *ngIf="!isGlobalStructuredQuestion(msg) || hasPersistedStructuredTransition(msg)"
@@ -147,6 +147,9 @@
                 <label class="field-label">Meta campaign<select [(ngModel)]="metaOAuth.external_campaign_id" class="secure-input"><option value="">Optional</option><option *ngFor="let item of metaAssets.campaigns" [value]="item.id">{{ item.name }}</option></select></label>
                 <label class="field-label">Ad set<select [(ngModel)]="metaOAuth.external_adset_id" class="secure-input"><option value="">Optional</option><option *ngFor="let item of metaAssets.adsets" [value]="item.id">{{ item.name }}</option></select></label>
                 <label class="field-label sm:col-span-2">Ad (recommended for exact routing)<select [(ngModel)]="metaOAuth.external_ad_id" class="secure-input"><option value="">Route using Page + Form</option><option *ngFor="let item of metaAssets.ads" [value]="item.id">{{ item.name }}</option></select></label>
+                <div *ngIf="metaAssets.warnings.length" class="space-y-1 rounded-lg border border-amber-500/25 bg-amber-500/[0.07] p-3 text-[11px] font-normal normal-case leading-relaxed tracking-normal text-amber-200 sm:col-span-2" role="status">
+                  <p *ngFor="let warning of metaAssets.warnings">{{ warning }}</p>
+                </div>
                 <button type="button" (click)="completeMetaOAuth(msg)" [disabled]="metaOAuthBusy || !metaOAuth.page_id || !metaOAuth.ad_account_id || !metaOAuth.lead_form_id || !metaOAuth.campaign_name.trim()" class="structured-primary sm:col-span-2">{{ metaOAuthBusy ? 'Loading Meta assets…' : 'Connect selected assets and continue' }}</button>
               </div>
               <button *ngIf="metaSetupConfig.manual_fallback_enabled" type="button" (click)="showManualMetaSetup = !showManualMetaSetup" class="structured-secondary mt-4">{{ showManualMetaSetup ? 'Hide manual setup' : 'Use asset IDs manually' }}</button>

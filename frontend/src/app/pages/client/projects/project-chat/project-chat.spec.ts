@@ -1,6 +1,6 @@
 import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { RouterTestingModule } from '@angular/router/testing';
 
 import { ProjectChatComponent } from './project-chat';
@@ -18,7 +18,12 @@ describe('ProjectChatComponent', () => {
       providers: [
         {
           provide: ActivatedRoute,
-          useValue: { snapshot: { paramMap: { get: () => 'project-1' } } },
+          useValue: {
+            snapshot: {
+              paramMap: { get: () => 'project-1' },
+              queryParamMap: { get: () => null },
+            },
+          },
         },
       ],
     }).compileComponents();
@@ -459,6 +464,42 @@ describe('ProjectChatComponent', () => {
     expect(component.salesInviteErrorCount).toBe(3);
     expect(component.teamSetupMessage).toContain('activation email was accepted');
     expect(component.projectTeam.map(item => item.user_id)).toEqual(['user-1']);
+  });
+
+  it('renders the structured duplicate-email conflict instead of object Object', () => {
+    component.projectId = 'project-1';
+    component.salesInvite = { first_name: 'Jorge', last_name: 'Jesus', email: 'jorge@example.com' };
+
+    component.inviteSalesUser({ id: 'team-question', sender: 'ai', content: 'Assign team', created_at: new Date(), attachments: [] });
+    http.expectOne('http://localhost:8000/api/v1/projects/project-1/team/invite-sales').flush({
+      detail: {
+        code: 'USER_ALREADY_INVITED', message: 'This user is already pending activation.',
+        user_id: 'user-1', auth_status: 'invited', next_action: 'resend_activation',
+      },
+    }, { status: 409, statusText: 'Conflict' });
+
+    expect(component.errorMessage).toBe('This user is already pending activation. Resend the activation invitation from Users.');
+    expect(component.errorMessage).not.toContain('[object Object]');
+    expect(component.salesInvite.email).toBe('jorge@example.com');
+  });
+
+  it('restores the conversation bottom after returning from Meta OAuth', () => {
+    const route = TestBed.inject(ActivatedRoute) as unknown as {
+      snapshot: { queryParamMap: { get(key: string): string | null } };
+    };
+    route.snapshot.queryParamMap.get = (key: string) => key === 'meta_oauth' ? 'connected' : null;
+    const syncState = vi.spyOn(component as unknown as { syncState(mode?: string): void }, 'syncState').mockImplementation(() => undefined);
+    vi.spyOn(component, 'loadCampaigns').mockImplementation(() => undefined);
+    vi.spyOn(component, 'loadMetaConnections').mockImplementation(() => undefined);
+    vi.spyOn(component, 'loadSalesTeam').mockImplementation(() => undefined);
+    vi.spyOn(component, 'loadMetaSetupConfiguration').mockImplementation(() => undefined);
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+
+    component.ngOnInit();
+
+    expect(syncState).toHaveBeenCalledWith('bottom');
+    expect(component.metaSetupMessage).toContain('Meta connected');
+    expect(navigate).toHaveBeenCalledWith([], expect.objectContaining({ replaceUrl: true }));
   });
 
   it('keeps Meta manual setup collapsed and exposes the OAuth blocker', () => {
