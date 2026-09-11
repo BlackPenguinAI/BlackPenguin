@@ -240,7 +240,7 @@
               [disabled]="proposal.status !== 'pending' || proposal.submitting === true"
               [attr.aria-invalid]="!!proposalDraftError(proposal)"
               [attr.aria-describedby]="proposalDraftError(proposal) ? 'proposal-error-' + proposal.id : null"
-              rows="2"
+              [rows]="isStructuredProposal(proposal) ? 4 : 2"
               class="mt-2 w-full resize-y rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs outline-none focus:border-secondary/60 disabled:opacity-60"
               [class.border-red-400/60]="!!proposalDraftError(proposal)"
             ></textarea>

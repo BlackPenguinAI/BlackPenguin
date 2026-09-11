@@ -349,7 +349,7 @@ describe('ChatComponent', () => {
     expect(component.formatProposalValue({
       field: 'corporate_social_profiles',
       value: ['https://instagram.com/example', 'https://linkedin.com/company/example'],
-    })).toBe('https://instagram.com/example, https://linkedin.com/company/example');
+    })).toBe('https://instagram.com/example\nhttps://linkedin.com/company/example');
   });
 
   it('should continue from Team with one state-changing request', () => {
@@ -408,8 +408,8 @@ describe('ChatComponent', () => {
     expect(html).not.toContain('**Official');
   });
 
-  it('should keep generic structured source values available for editing', () => {
-    expect(component.formatValue({ exists: false, url: null })).toBe('{"exists":false,"url":null}');
+  it('should keep generic structured source values available for friendly editing', () => {
+    expect(component.formatValue({ exists: false, url: null })).toBe('Exists: No\nUrl: Not provided');
   });
 
   it('should present official website proposals as user-friendly values', () => {

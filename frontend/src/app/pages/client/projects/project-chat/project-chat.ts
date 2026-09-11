@@ -17,6 +17,11 @@ import {
   restoreReviewScrollAnchor,
   ReviewScrollAnchor,
 } from '../../../../shared/utils/review-scroll-anchor';
+import {
+  formatProposalValue as friendlyProposalValue,
+  isStructuredProposalValue,
+  parseProposalValue,
+} from '../../../../shared/utils/proposal-value';
 
 import {
   Campaign, ChatAttachment, ChatMessage, ChatTurn, EMPTY_PROJECT_PROFILE, MetaAssetDiscovery, MetaAssetOption, MetaAuthorization, MetaConnection,
@@ -802,7 +807,10 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     return this.sources.filter((source) => this.isReviewableSource(source) && (!source.message_id || !messageIds.has(source.message_id)));
   }
   isReviewableSource(source: ProjectSource): boolean {
-    return !(source.kind === 'image' && !!source.url);
+    return source.kind !== 'image'
+      || source.status === 'processing'
+      || source.status === 'failed'
+      || source.proposals.length > 0;
   }
   hasPendingProposals(source: ProjectSource): boolean {
     return source.proposals.some((proposal) => proposal.status === 'pending');
@@ -903,14 +911,14 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     if (action === 'correct' && !this.proposalCanSave(proposal)) return;
     const anchor = captureReviewScrollAnchor(this.chatScroll?.nativeElement, proposal.id);
     const nextProposalId = source.proposals.find(item => item.status === 'pending' && item.id !== proposal.id)?.id || null;
-    const value = action === 'correct' ? this.parseValue(proposal.draftValue || '') : undefined;
+    const value = action === 'correct' ? parseProposalValue(proposal.field, proposal.draftValue || '', proposal.value) : undefined;
     this.errorMessage = '';
     this.updateProposal(source.id, proposal.id, { submitting: true, inlineError: undefined });
     this.onboarding.decideProposal(this.projectId, proposal.id, action, value).subscribe({
       next: (result) => {
         this.updateProposal(source.id, proposal.id, {
           ...result.proposal,
-          draftValue: this.formatValue(result.proposal.value),
+          draftValue: this.formatProposalValue(result.proposal),
           submitting: false,
           inlineError: undefined,
         });
@@ -950,7 +958,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   }
   proposalCanSave(proposal: SourceProposal): boolean {
     return !proposal.submitting
-      && (proposal.draftValue || '').trim() !== this.formatValue(proposal.value).trim()
+      && (proposal.draftValue || '').trim() !== this.formatProposalValue(proposal).trim()
       && !this.proposalDraftError(proposal);
   }
 
@@ -1009,7 +1017,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
         const selectedId = this.selectedCoverSourceId;
         this.coverBusy = false;
         this.sources = this.sources.map((item) => ({ ...item, is_primary: item.id === selectedId }));
-        this.syncState('bottom');
+        this.syncState('none');
         this.cdr.detectChanges();
       },
       error: () => { this.coverBusy = false; this.errorMessage = 'That image could not be selected as the Project cover.'; },
@@ -1074,12 +1082,13 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   statusIcon(status: ValidationStatus): string { return ({ confirmed: 'check_circle', corrected_by_user: 'check_circle', not_applicable: 'remove_circle', deferred: 'schedule', conflicting: 'error', stale: 'history', expired: 'event_busy', pending_confirmation: 'schedule', extracted: 'manage_search', missing: 'radio_button_unchecked' })[status]; }
   statusClass(status: ValidationStatus): string { if (status === 'confirmed' || status === 'corrected_by_user') return 'text-green-400'; if (status === 'conflicting' || status === 'expired') return 'text-red-400'; if (status === 'stale' || status === 'pending_confirmation' || status === 'extracted') return 'text-secondary'; return 'text-gray-600'; }
   statusLabel(status: ValidationStatus): string { return status.replaceAll('_', ' '); }
-  formatValue(value: unknown): string { return typeof value === 'string' ? value : value == null ? '' : JSON.stringify(value); }
+  formatValue(value: unknown, field = ''): string { return friendlyProposalValue(field, value); }
+  formatProposalValue(proposal: Pick<SourceProposal, 'field' | 'value'>): string { return friendlyProposalValue(proposal.field, proposal.value); }
+  isStructuredProposal(proposal: Pick<SourceProposal, 'value'>): boolean { return isStructuredProposalValue(proposal.value); }
   trackSource(_: number, item: ProjectSource): string { return item.id; }
   trackProposal(_: number, item: SourceProposal): string { return item.id; }
   trackField(_: number, item: ProjectFieldProgress): string { return item.key; }
 
-  private parseValue(value: string): unknown { const trimmed = value.trim(); try { return /^[\[{]/.test(trimmed) ? JSON.parse(trimmed) : trimmed; } catch { return trimmed; } }
   private createClientMessageId(): string {
     if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (character) => {
@@ -1153,7 +1162,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
           && previous.draftValue !== undefined;
         return {
           ...proposal,
-          draftValue: preserveDraft ? previous.draftValue : this.formatValue(proposal.value),
+          draftValue: preserveDraft ? previous.draftValue : this.formatProposalValue(proposal),
           inlineError: preserveDraft ? previous.inlineError : undefined,
         };
       }),

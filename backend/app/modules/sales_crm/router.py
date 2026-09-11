@@ -28,7 +28,7 @@ from app.modules.system_settings.services import get_google_calendar_config, goo
 
 from .models import CalendarConnection, Lead, SmsChatMessage, Meeting, MeetingAttachment, MeetingStatus, SalesAvailabilityBlock, FunnelStage
 from .schemas import (
-    AvailabilityBlockCreate, AvailabilityBlockResponse, AvailabilityUpdate, AvailabilityWindowResponse,
+    AvailabilityBlockCreate, AvailabilityBlockRangeCreate, AvailabilityBlockResponse, AvailabilityUpdate, AvailabilityWindowResponse,
     CalendarConnectionResponse, CalendarConnectionUpdate, LeadResponse, LeadUpdate,
     ManagerSalesScheduleResponse, MeetingAttachmentResponse, MeetingCreate, MeetingResponse, MeetingUpdate,
     SalesLeadDetailResponse, SalesReportResponse, SalesScheduleResponse, SmsChatMessageSchema,
@@ -347,6 +347,20 @@ def add_my_availability_block(
     )
 
 
+@router.post("/availability-blocks/me/range", response_model=List[AvailabilityBlockResponse], status_code=status.HTTP_201_CREATED)
+def add_my_availability_range(
+    payload: AvailabilityBlockRangeCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([UserRole.SALES])),
+):
+    return scheduling.create_availability_range(
+        db, user=current_user, timezone_name=payload.timezone,
+        start_date=payload.start_date, end_date=payload.end_date,
+        start_time=payload.start_time, end_time=payload.end_time,
+        weekdays=payload.weekdays,
+    )
+
+
 @router.put("/availability-blocks/me/{block_id}", response_model=AvailabilityBlockResponse)
 def edit_my_availability_block(
     block_id: str,
@@ -390,6 +404,22 @@ def add_sales_user_availability_block(
     return scheduling.create_availability_block(
         db, user=sales_user, starts_at=payload.starts_at, ends_at=payload.ends_at,
         timezone_name=payload.timezone,
+    )
+
+
+@router.post("/availability-blocks/{sales_user_id}/range", response_model=List[AvailabilityBlockResponse], status_code=status.HTTP_201_CREATED)
+def add_sales_user_availability_range(
+    sales_user_id: str,
+    payload: AvailabilityBlockRangeCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker(TENANT_MANAGER_ROLES)),
+):
+    sales_user = _company_sales_user(db, current_user.company_id, sales_user_id)
+    return scheduling.create_availability_range(
+        db, user=sales_user, timezone_name=payload.timezone,
+        start_date=payload.start_date, end_date=payload.end_date,
+        start_time=payload.start_time, end_time=payload.end_time,
+        weekdays=payload.weekdays,
     )
 
 

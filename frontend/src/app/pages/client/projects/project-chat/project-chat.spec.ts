@@ -258,6 +258,26 @@ describe('ProjectChatComponent', () => {
     expect(component.unlinkedSources).toEqual([]);
   });
 
+  it('keeps ready uploaded images in their chat attachment instead of duplicating them below the chat', () => {
+    component.messages = [{ id: 'message-1', sender: 'user', content: 'Attached image', created_at: new Date(), attachments: [] }];
+    component.sources = [{
+      id: 'uploaded-image', kind: 'image', status: 'ready', name: 'floorplan.png',
+      url: null, mime_type: 'image/png', size_bytes: 100, error_message: null,
+      message_id: 'message-1', download_url: '/floorplan', is_primary: false,
+      proposals: [], created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    }];
+
+    expect(component.sourcesForMessage('message-1')).toEqual([]);
+    expect(component.unlinkedSources).toEqual([]);
+    expect(component.readyProjectImages).toHaveLength(1);
+  });
+
+  it('formats structured extraction values without raw JSON', () => {
+    expect(component.formatProposalValue({
+      field: 'location', value: { city: 'Lima', coordinates: { latitude: -12.04, longitude: -77.03 } },
+    })).toBe('City: Lima\nCoordinates › Latitude: -12.04\nCoordinates › Longitude: -77.03');
+  });
+
   it('shows the cover step even when no scraped image is available', () => {
     component.nextQuestion = {
       field: 'project_cover', label: 'Project cover', prompt: 'Choose cover',

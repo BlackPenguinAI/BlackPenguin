@@ -27,6 +27,11 @@ import {
   restoreReviewScrollAnchor,
   ReviewScrollAnchor,
 } from '../../shared/utils/review-scroll-anchor';
+import {
+  formatProposalValue as friendlyProposalValue,
+  isStructuredProposalValue,
+  parseProposalValue,
+} from '../../shared/utils/proposal-value';
 
 import {
   ChatMessage,
@@ -235,7 +240,7 @@ export class ChatComponent implements OnInit, OnDestroy {
     if (this.logoBusy || !this.selectedLogoId) return;
     this.logoBusy = true;
     this.onboarding.selectLogo(this.selectedLogoId).subscribe({
-      next: () => { this.logoBusy = false; this.loadCompanyMedia(); this.syncState('bottom'); },
+      next: () => { this.logoBusy = false; this.loadCompanyMedia(); this.syncState('none'); },
       error: () => { this.logoBusy = false; this.errorMessage = 'That image could not be selected as the Company logo.'; },
     });
   }
@@ -717,7 +722,7 @@ export class ChatComponent implements OnInit, OnDestroy {
     const nextProposalId = source.proposals.find(item => item.status === 'pending' && item.id !== proposal.id)?.id || null;
     this.errorMessage = '';
     const value = action === 'correct'
-      ? this.parseDraftValue(proposal.field, proposal.draftValue || '')
+      ? this.parseDraftValue(proposal, proposal.draftValue || '')
       : undefined;
     this.updateProposal(source.id, proposal.id, { submitting: true, errorMessage: undefined });
     this.onboarding.decideProposal(proposal.id, action, value).subscribe({
@@ -831,21 +836,13 @@ export class ChatComponent implements OnInit, OnDestroy {
   }
 
   formatValue(value: unknown): string {
-    if (typeof value === 'string') return value;
-    if (value === null || value === undefined) return '';
-    return JSON.stringify(value);
+    return friendlyProposalValue('', value);
   }
 
   formatProposalValue(proposal: Pick<SourceProposal, 'field' | 'value'>): string {
-    if (proposal.field === 'official_corporate_website'
-      && proposal.value && typeof proposal.value === 'object') {
-      const website = proposal.value as { exists?: boolean; url?: unknown };
-      if (website.exists === false) return 'No official website';
-      if (typeof website.url === 'string') return website.url;
-    }
-    if (Array.isArray(proposal.value)) return proposal.value.map(String).join(', ');
-    return this.formatValue(proposal.value);
+    return friendlyProposalValue(proposal.field, proposal.value);
   }
+  isStructuredProposal(proposal: Pick<SourceProposal, 'value'>): boolean { return isStructuredProposalValue(proposal.value); }
 
   formatBytes(bytes: number | null): string {
     if (bytes == null) return '';
@@ -865,25 +862,8 @@ export class ChatComponent implements OnInit, OnDestroy {
     });
   }
 
-  private parseDraftValue(field: string, value: string): unknown {
-    const trimmed = value.trim();
-    if (field === 'official_corporate_website') {
-      if (/^(no official website|no website|none|no)$/i.test(trimmed)) {
-        return { exists: false, url: null };
-      }
-      return { exists: true, url: trimmed };
-    }
-    if (['public_contact_emails', 'public_contact_phones', 'corporate_social_profiles'].includes(field)) {
-      return this.splitList(trimmed);
-    }
-    if (/^[\[{]/.test(trimmed)) {
-      try {
-        return JSON.parse(trimmed);
-      } catch {
-        return trimmed;
-      }
-    }
-    return trimmed;
+  private parseDraftValue(proposal: Pick<SourceProposal, 'field' | 'value'>, value: string): unknown {
+    return parseProposalValue(proposal.field, value, proposal.value);
   }
 
   toggleRecording(): void {

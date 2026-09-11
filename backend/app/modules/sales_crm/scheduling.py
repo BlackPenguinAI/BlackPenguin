@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, time, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import HTTPException
@@ -103,6 +103,81 @@ def create_availability_block(
     )
     db.add(item); db.commit(); db.refresh(item)
     return item
+
+
+def create_availability_range(
+    db: Session,
+    *,
+    user: User,
+    start_date: date,
+    end_date: date,
+    start_time: time,
+    end_time: time,
+    timezone_name: str,
+    weekdays: list[int],
+) -> list[SalesAvailabilityBlock]:
+    """Create inclusive, date-specific daily blocks as one atomic operation."""
+    _zone(timezone_name)
+    if end_date < start_date:
+        raise HTTPException(status_code=422, detail="End date must be on or after start date.")
+    if (end_date - start_date).days >= 90:
+        raise HTTPException(status_code=422, detail="An availability range cannot exceed 90 calendar days.")
+    if end_time <= start_time:
+        raise HTTPException(status_code=422, detail="End time must be after start time.")
+
+    selected_weekdays = set(weekdays)
+    candidates: list[tuple[date, datetime, datetime]] = []
+    current = start_date
+    while current <= end_date:
+        if current.weekday() in selected_weekdays:
+            local_start = datetime.combine(current, start_time)
+            local_end = datetime.combine(current, end_time)
+            candidates.append((current, _utc_naive(local_start, timezone_name), _utc_naive(local_end, timezone_name)))
+        current += timedelta(days=1)
+    if not candidates:
+        raise HTTPException(status_code=422, detail="The selected weekdays do not occur in this date range.")
+
+    existing = db.query(SalesAvailabilityBlock).filter(
+        SalesAvailabilityBlock.user_id == user.id,
+        SalesAvailabilityBlock.starts_at < max(item[2] for item in candidates),
+        SalesAvailabilityBlock.ends_at > min(item[1] for item in candidates),
+    ).order_by(SalesAvailabilityBlock.starts_at).all()
+    conflicts = [
+        {
+            "date": local_date.isoformat(),
+            "existing_block_id": block.id,
+            "existing_starts_at": block.starts_at.isoformat(),
+            "existing_ends_at": block.ends_at.isoformat(),
+        }
+        for local_date, starts_at, ends_at in candidates
+        for block in existing
+        if block.starts_at < ends_at and block.ends_at > starts_at
+    ]
+    if conflicts:
+        raise HTTPException(status_code=409, detail={
+            "code": "availability_range_conflict",
+            "message": "The range overlaps existing availability on one or more dates.",
+            "conflicts": conflicts,
+        })
+
+    items = [
+        SalesAvailabilityBlock(
+            user_id=user.id,
+            starts_at=starts_at,
+            ends_at=ends_at,
+            timezone=timezone_name,
+        )
+        for _, starts_at, ends_at in candidates
+    ]
+    try:
+        db.add_all(items)
+        db.commit()
+        for item in items:
+            db.refresh(item)
+    except Exception:
+        db.rollback()
+        raise
+    return items
 
 
 def availability_blocks_for_user(

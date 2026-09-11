@@ -23,6 +23,12 @@ export class SalesComponent implements OnInit {
   loading = true; saving = false; availabilitySaving = false; attachmentSaving = false; projectTimezoneSaving = false;
   error = ''; success = ''; selected: any = null; selectedLead: any = null; selectedDay: Date | null = null; editingBlock: any = null;
   leadLoading = false; chatOpen = false; persistedStatus = ''; blockStart = '09:00'; blockEnd = '17:00'; closingDate = '';
+  rangeStartDate = ''; rangeEndDate = ''; selectedWeekdays = [0, 1, 2, 3, 4, 5, 6];
+  readonly weekdayOptions = [
+    { value: 0, label: 'Mon' }, { value: 1, label: 'Tue' }, { value: 2, label: 'Wed' },
+    { value: 3, label: 'Thu' }, { value: 4, label: 'Fri' }, { value: 5, label: 'Sat' },
+    { value: 6, label: 'Sun' },
+  ];
   visitPhoto: File | null = null; saleEvidence: File | null = null; managerMeetingTime = ''; calendarStatus = 'not_connected'; calendarPlatformAvailable = true;
   newAppointment = { lead_id: '', time: '10:00', duration_minutes: 45, modality: 'in_person', notes: '' };
 
@@ -81,29 +87,68 @@ export class SalesComponent implements OnInit {
   selectDay(day: Date): void {
     if (this.view === 'month' && day.getMonth() !== this.cursor.getMonth()) return;
     this.selectedDay = day; this.selected = null; this.selectedLead = null; this.editingBlock = null; this.blockStart = '09:00'; this.blockEnd = '17:00';
+    this.rangeStartDate = this.dateInputValue(day); this.rangeEndDate = this.rangeStartDate;
   }
 
   saveAvailability(): void {
-    if (!this.selectedDay || this.availabilitySaving || this.blockEnd <= this.blockStart) return;
+    if (!this.selectedDay || this.availabilitySaving || this.blockEnd <= this.blockStart || this.rangeDateError) return;
     const target = this.role === 'sales' ? 'me' : this.salesUserId;
     if (!target) { this.error = 'Select a Sales user before managing availability.'; return; }
     const body = { starts_at: this.wallTimeToUtc(this.selectedDay, this.blockStart, this.timezone).toISOString(), ends_at: this.wallTimeToUtc(this.selectedDay, this.blockEnd, this.timezone).toISOString(), timezone: this.timezone };
     const base = `${API_V1_URL}/sales/availability-blocks/${target}`;
-    const request = this.editingBlock ? this.http.put(`${base}/${this.editingBlock.id}`, body) : this.http.post(base, body);
+    const rangeBody = {
+      start_date: this.rangeStartDate, end_date: this.rangeEndDate,
+      start_time: this.blockStart, end_time: this.blockEnd,
+      timezone: this.timezone, weekdays: this.selectedWeekdays,
+    };
+    const request = this.editingBlock
+      ? this.http.put(`${base}/${this.editingBlock.id}`, body)
+      : this.http.post<any[]>(`${base}/range`, rangeBody);
     this.availabilitySaving = true;
     request.subscribe({
-      next: () => { this.availabilitySaving = false; this.success = this.editingBlock ? 'Availability block updated.' : 'Availability block added.'; this.editingBlock = null; this.reload(); },
-      error: err => { this.availabilitySaving = false; this.error = err.error?.detail || 'Availability could not be saved.'; this.cdr.markForCheck(); },
+      next: result => {
+        this.availabilitySaving = false;
+        const created = Array.isArray(result) ? result.length : 1;
+        this.success = this.editingBlock ? 'Availability block updated.' : `${created} availability block${created === 1 ? '' : 's'} added.`;
+        this.editingBlock = null; this.reload();
+      },
+      error: err => { this.availabilitySaving = false; this.error = this.availabilityError(err); this.cdr.markForCheck(); },
     });
   }
 
-  editAvailability(block: any): void { if (!this.canManageBlock(block)) return; this.editingBlock = block; this.timezone = canonicalTimezone(block.timezone || this.timezone); this.blockStart = this.timeValue(block.starts_at, block.timezone || this.timezone); this.blockEnd = this.timeValue(block.ends_at, block.timezone || this.timezone); }
+  editAvailability(block: any): void { if (!this.canManageBlock(block)) return; this.editingBlock = block; this.timezone = canonicalTimezone(block.timezone || this.timezone); this.blockStart = this.timeValue(block.starts_at, block.timezone || this.timezone); this.blockEnd = this.timeValue(block.ends_at, block.timezone || this.timezone); const date = this.dateInputValue(this.utcDate(block.starts_at), block.timezone || this.timezone); this.rangeStartDate = date; this.rangeEndDate = date; }
   cancelBlockEdit(): void { this.editingBlock = null; this.blockStart = '09:00'; this.blockEnd = '17:00'; }
   removeAvailability(block: any): void {
     if (!this.canManageBlock(block)) return; const target = this.role === 'sales' ? 'me' : block.user_id;
     this.http.delete(`${API_V1_URL}/sales/availability-blocks/${target}/${block.id}`).subscribe({ next: () => { this.success = 'Availability block removed.'; this.reload(); }, error: err => { this.error = err.error?.detail || 'Availability could not be removed.'; this.cdr.markForCheck(); } });
   }
   canManageBlock(block: any): boolean { return this.role === 'sales' || (!!this.salesUserId && this.salesUserId === block.user_id); }
+  toggleWeekday(value: number): void {
+    this.selectedWeekdays = this.selectedWeekdays.includes(value)
+      ? this.selectedWeekdays.filter(day => day !== value)
+      : [...this.selectedWeekdays, value].sort();
+  }
+  get rangeDateError(): string {
+    if (this.editingBlock) return '';
+    if (!this.rangeStartDate || !this.rangeEndDate) return 'Choose the start and end dates.';
+    const start = this.inputDate(this.rangeStartDate); const end = this.inputDate(this.rangeEndDate);
+    if (end < start) return 'End date must be on or after start date.';
+    if (Math.round((end.getTime() - start.getTime()) / 86400000) >= 90) return 'The range cannot exceed 90 calendar days.';
+    if (!this.selectedWeekdays.length) return 'Choose at least one weekday.';
+    if (!this.rangeBlockCount) return 'The selected weekdays do not occur in this range.';
+    return '';
+  }
+  get rangeBlockCount(): number {
+    if (!this.rangeStartDate || !this.rangeEndDate || !this.selectedWeekdays.length) return 0;
+    const start = this.inputDate(this.rangeStartDate); const end = this.inputDate(this.rangeEndDate);
+    if (end < start) return 0;
+    let count = 0; let visited = 0;
+    for (const day = new Date(start); day <= end && visited < 90; day.setDate(day.getDate() + 1), visited++) {
+      const pythonWeekday = (day.getDay() + 6) % 7;
+      if (this.selectedWeekdays.includes(pythonWeekday)) count++;
+    }
+    return count;
+  }
 
   createAppointment(): void {
     if (!this.isManager || !this.selectedDay || !this.projectId || !this.salesUserId || !this.newAppointment.lead_id || this.saving) return;
@@ -193,9 +238,26 @@ export class SalesComponent implements OnInit {
   private refreshMeeting(row: any): void { const index = this.meetings.findIndex(item => item.id === row.id); if (index >= 0) this.meetings[index] = row; }
   private startOfDay(value: Date): Date { return new Date(value.getFullYear(), value.getMonth(), value.getDate()); }
   private localDateKey(date: Date): string { return `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`; }
+  private inputDate(value: string): Date { const [year, month, day] = value.split('-').map(Number); return new Date(year, month - 1, day, 12); }
+  private dateInputValue(value: Date, timezone?: string): string {
+    if (timezone) {
+      const parts = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(value);
+      const read = (type: string) => parts.find(item => item.type === type)?.value || '';
+      return `${read('year')}-${read('month')}-${read('day')}`;
+    }
+    return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
+  }
   private dateKey(value: string, timezone: string): string { const parts = new Intl.DateTimeFormat('en-US', { timeZone: timezone || 'UTC', year: 'numeric', month: 'numeric', day: 'numeric' }).formatToParts(this.utcDate(value)); const read = (type: string) => Number(parts.find(item => item.type === type)?.value || 0); return `${read('year')}-${read('month')}-${read('day')}`; }
   private timeValue(value: string, timezone: string): string { const parts = new Intl.DateTimeFormat('en-US', { timeZone: timezone || 'UTC', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(this.utcDate(value)); const read = (type: string) => parts.find(item => item.type === type)?.value || '00'; return `${read('hour')}:${read('minute')}`; }
   private datetimeLocalValue(value: string, timezone: string): string { const parts = new Intl.DateTimeFormat('en-US', { timeZone: timezone || 'UTC', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(this.utcDate(value)); const read = (type: string) => parts.find(item => item.type === type)?.value || '00'; return `${read('year')}-${read('month')}-${read('day')}T${read('hour')}:${read('minute')}`; }
   private wallTimeToUtc(day: Date, time: string, timezone: string): Date { const [hour, minute] = time.split(':').map(Number); const wanted = Date.UTC(day.getFullYear(), day.getMonth(), day.getDate(), hour, minute); let guess = wanted; for (let index = 0; index < 3; index++) { const parts = new Intl.DateTimeFormat('en-US', { timeZone: timezone, year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(guess)); const read = (type: string) => Number(parts.find(item => item.type === type)?.value || 0); const represented = Date.UTC(read('year'), read('month') - 1, read('day'), read('hour'), read('minute')); guess += wanted - represented; } return new Date(guess); }
+  private availabilityError(error: any): string {
+    const detail = error?.error?.detail;
+    if (detail?.code === 'availability_range_conflict') {
+      const dates = [...new Set((detail.conflicts || []).map((item: any) => item.date))];
+      return `${detail.message} Conflicting date${dates.length === 1 ? '' : 's'}: ${dates.join(', ')}.`;
+    }
+    return typeof detail === 'string' ? detail : 'Availability could not be saved.';
+  }
   private fail(message: string): void { this.loading = false; this.error = message; this.cdr.markForCheck(); }
 }

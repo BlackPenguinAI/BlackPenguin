@@ -53,10 +53,22 @@
     <aside class="detail" *ngIf="selectedDay&&!selected&&section==='availability'">
       <p>{{editingBlock?'EDIT':'NEW'}} AVAILABILITY</p><h2>{{selectedDay|date:'fullDate'}}</h2>
       <small *ngIf="isManager&&!salesUserId" class="validation">Choose a Sales user to create or edit their blocks.</small>
+      <ng-container *ngIf="!editingBlock">
+        <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <label class="!mb-0">Start date<input type="date" [(ngModel)]="rangeStartDate"></label>
+          <label class="!mb-0">End date<input type="date" [(ngModel)]="rangeEndDate" [min]="rangeStartDate"></label>
+        </div>
+        <label>Apply on</label>
+        <div class="grid grid-cols-7 gap-1" role="group" aria-label="Weekdays included in availability range">
+          <button *ngFor="let day of weekdayOptions" type="button" class="min-w-0 rounded-md border px-0.5 py-2 text-[9px]" [ngClass]="selectedWeekdays.includes(day.value)?'border-green-500 bg-green-950 text-green-300':'border-neutral-700 bg-neutral-900 text-neutral-500'" [attr.aria-pressed]="selectedWeekdays.includes(day.value)" (click)="toggleWeekday(day.value)">{{day.label}}</button>
+        </div>
+        <small *ngIf="!rangeDateError" class="mt-2 block text-left text-green-300">{{rangeBlockCount}} daily block{{rangeBlockCount===1?'':'s'}} will be created.</small>
+        <small *ngIf="rangeDateError" class="validation">{{rangeDateError}}</small>
+      </ng-container>
       <label>From<input type="time" [(ngModel)]="blockStart"></label><label>To<input type="time" [(ngModel)]="blockEnd"></label>
       <label>Timezone<app-timezone-select [(value)]="timezone" [compact]="true" ariaLabel="Availability timezone"></app-timezone-select></label>
       <small *ngIf="blockEnd<=blockStart" class="validation">End time must be after start time.</small>
-      <button (click)="saveAvailability()" [disabled]="availabilitySaving||blockEnd<=blockStart||(isManager&&!salesUserId)">{{availabilitySaving?'Saving…':(editingBlock?'UPDATE BLOCK':'ADD BLOCK')}}</button>
+      <button (click)="saveAvailability()" [disabled]="availabilitySaving||blockEnd<=blockStart||!!rangeDateError||(isManager&&!salesUserId)">{{availabilitySaving?'Saving…':(editingBlock?'UPDATE BLOCK':(rangeBlockCount===1?'ADD BLOCK':'ADD '+rangeBlockCount+' BLOCKS'))}}</button>
       <button *ngIf="editingBlock" class="secondary" (click)="cancelBlockEdit()">CANCEL EDIT</button>
       <div class="day-blocks" *ngIf="availabilityFor(selectedDay).length"><h3>Saved blocks</h3><div *ngFor="let block of availabilityFor(selectedDay)"><span>{{block.sales_user_name?block.sales_user_name+' · ':''}}{{formatBlockTime(block.starts_at,block.timezone)}}–{{formatBlockTime(block.ends_at,block.timezone)}}</span><span class="row-actions" *ngIf="canManageBlock(block)"><button (click)="editAvailability(block)" aria-label="Edit availability"><span class="material-symbols-outlined">edit</span></button><button (click)="removeAvailability(block)" aria-label="Delete availability"><span class="material-symbols-outlined">delete</span></button></span></div></div>
     </aside>

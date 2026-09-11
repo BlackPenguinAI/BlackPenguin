@@ -1,4 +1,5 @@
 import { ProjectPropertyType, ProjectPropertyTypePayload, SourceProposal } from './project-onboarding.models';
+import { formatProposalValue } from '../../../../shared/utils/proposal-value';
 
 export type FormErrors = Record<string, string>;
 
@@ -117,7 +118,7 @@ export function validateProposalDraft(proposal: SourceProposal): FormErrors {
     }
     return {};
   }
-  return proposal.draftValue === undefined || proposal.draftValue === String(proposal.value ?? '')
+  return proposal.draftValue === undefined || proposal.draftValue === formatProposalValue(proposal.field, proposal.value)
     ? { value: validation.message }
     : {};
 }

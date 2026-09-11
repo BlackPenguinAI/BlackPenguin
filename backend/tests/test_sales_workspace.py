@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import date, datetime, time, timedelta
 import asyncio
 import csv
 import importlib.util
@@ -22,10 +22,10 @@ from app.modules.companies.models import Company
 from app.modules.projects.models import Project
 from app.modules.sales_agent.models import SalesConversation, SalesMessage
 from app.modules.sales_agent.service import conversation_messages
-from app.modules.sales_crm.models import Lead, Meeting, MeetingAttachment, MeetingStatus
+from app.modules.sales_crm.models import Lead, Meeting, MeetingAttachment, MeetingStatus, SalesAvailabilityBlock
 from app.modules.sales_crm.schemas import MeetingUpdate
 from app.modules.sales_crm.scheduling import (
-    availability_blocks_for_user, create_availability_block, delete_availability_block,
+    availability_blocks_for_user, create_availability_block, create_availability_range, delete_availability_block,
     update_availability_block,
 )
 from app.modules.sales_crm.router import export_lead_record, get_company_sales_schedule, upload_meeting_attachment
@@ -135,6 +135,45 @@ def test_sales_user_manages_date_specific_availability_blocks(db):
     assert availability_blocks_for_user(
         db, user_id=sales_a.id, starts_at=starts_at, ends_at=starts_at + timedelta(days=1),
     ) == []
+
+
+def test_availability_range_creates_inclusive_daily_blocks_in_utc(db):
+    _, sales_a, _, _, _, _ = _fixture(db)
+    rows = create_availability_range(
+        db, user=sales_a, start_date=date(2026, 9, 14), end_date=date(2026, 9, 20),
+        start_time=time(9), end_time=time(17), timezone_name="America/Lima",
+        weekdays=[0, 1, 2, 3, 4],
+    )
+    assert len(rows) == 5
+    assert rows[0].starts_at == datetime(2026, 9, 14, 14)
+    assert rows[-1].ends_at == datetime(2026, 9, 18, 22)
+
+
+def test_availability_range_is_atomic_when_any_day_overlaps(db):
+    _, sales_a, _, _, _, _ = _fixture(db)
+    create_availability_block(
+        db, user=sales_a, starts_at=datetime(2026, 9, 16, 10),
+        ends_at=datetime(2026, 9, 16, 12), timezone_name="America/Lima",
+    )
+    with pytest.raises(HTTPException) as error:
+        create_availability_range(
+            db, user=sales_a, start_date=date(2026, 9, 15), end_date=date(2026, 9, 17),
+            start_time=time(9), end_time=time(17), timezone_name="America/Lima",
+            weekdays=list(range(7)),
+        )
+    assert error.value.status_code == 409
+    assert error.value.detail["code"] == "availability_range_conflict"
+    assert [item[0] for item in db.query(SalesAvailabilityBlock.starts_at).all()] == [datetime(2026, 9, 16, 15)]
+
+
+def test_availability_range_respects_dst_for_each_local_date(db):
+    _, sales_a, _, _, _, _ = _fixture(db)
+    rows = create_availability_range(
+        db, user=sales_a, start_date=date(2026, 10, 30), end_date=date(2026, 11, 2),
+        start_time=time(9), end_time=time(10), timezone_name="America/New_York",
+        weekdays=list(range(7)),
+    )
+    assert [item.starts_at.hour for item in rows] == [13, 13, 14, 14]
 
 
 def test_availability_update_excludes_current_block_but_rejects_other_overlap(db):

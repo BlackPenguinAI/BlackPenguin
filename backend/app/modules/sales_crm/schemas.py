@@ -1,6 +1,6 @@
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from typing import Optional, List
-from datetime import datetime
+from datetime import date, datetime, time
 from .models import FunnelStage, MeetingStatus
 
 class SmsChatMessageSchema(BaseModel):
@@ -167,6 +167,34 @@ class AvailabilityBlockResponse(AvailabilityBlockCreate):
     user_id: Optional[str] = None
     sales_user_name: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)
+
+
+class AvailabilityBlockRangeCreate(BaseModel):
+    start_date: date
+    end_date: date
+    start_time: time
+    end_time: time
+    timezone: str = Field(min_length=1, max_length=80)
+    weekdays: List[int] = Field(default_factory=lambda: list(range(7)), min_length=1, max_length=7)
+
+    @field_validator("weekdays")
+    @classmethod
+    def validate_weekdays(cls, value: List[int]) -> List[int]:
+        if any(day < 0 or day > 6 for day in value):
+            raise ValueError("Weekdays must use values from 0 (Monday) to 6 (Sunday).")
+        if len(set(value)) != len(value):
+            raise ValueError("Weekdays cannot contain duplicates.")
+        return value
+
+    @model_validator(mode="after")
+    def validate_range(self):
+        if self.end_date < self.start_date:
+            raise ValueError("End date must be on or after start date.")
+        if (self.end_date - self.start_date).days >= 90:
+            raise ValueError("An availability range cannot exceed 90 calendar days.")
+        if self.end_time <= self.start_time:
+            raise ValueError("End time must be after start time.")
+        return self
 
 
 class SalesScheduleResponse(BaseModel):
