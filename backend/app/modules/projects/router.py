@@ -5,8 +5,9 @@ import re
 import uuid
 from datetime import datetime
 from typing import Any
+from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Response, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, Response, UploadFile, status
 from fastapi.responses import FileResponse, RedirectResponse
 import httpx
 from sqlalchemy.orm import Session, joinedload
@@ -26,6 +27,7 @@ from app.modules.system_settings import services as system_settings_service
 from app.modules.project_team.models import ProjectUserAssignment
 from app.modules.users.models import TENANT_MANAGER_ROLES, User, UserRole
 from app.modules.users.project_access import project_ids_for_user, require_project_access
+from app.modules.governance.services import request_fingerprint
 
 from . import asset_share_service, catalog_service, meta_oauth_service, meta_service, services, source_service, storage_service
 from .completion import FIELD_BY_KEY
@@ -56,16 +58,28 @@ URL_PATTERN = re.compile(r"https?://[^\s<>]+", re.IGNORECASE)
 
 
 @router.get("/shared-assets/{token}", include_in_schema=False)
-def download_shared_sales_asset(token: str, db: Session = Depends(get_db)):
-    source = asset_share_service.resolve(db, token)
+def download_shared_sales_asset(token: str, request: Request, download: bool = False, db: Session = Depends(get_db)):
+    source, share = asset_share_service.resolve(db, token)
     try:
         path = storage_service.resolve_project_file(source.storage_path)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail="Shared image not found.") from exc
     if not path.is_file():
         raise HTTPException(status_code=404, detail="Shared image not found.")
-    return FileResponse(path, media_type=source.mime_type or "application/octet-stream", filename=source.original_filename or source.name,
-                        headers={"Cache-Control": "private, max-age=300", "X-Content-Type-Options": "nosniff"})
+    try:
+        content = storage_service.read_project_file(source.storage_path, encrypted=bool(source.is_encrypted))
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail="Shared image not found.") from exc
+    ip_hash, user_agent_hash, _ = request_fingerprint(request)
+    asset_share_service.record_access(
+        db, share=share, event_type="download" if download else "view",
+        ip_hash=ip_hash, user_agent_hash=user_agent_hash,
+        user_agent=request.headers.get("user-agent"),
+    )
+    return Response(content=content, media_type=source.mime_type or "application/octet-stream", headers={
+        "Content-Disposition": f"{'attachment' if download else 'inline'}; filename*=UTF-8''{quote(source.original_filename or source.name)}",
+        "Cache-Control": "private, max-age=300", "X-Content-Type-Options": "nosniff",
+    })
 
 
 def _parse_agent_response(raw: str) -> tuple[str, list[dict[str, Any]], bool | None] | None:
@@ -1481,11 +1495,14 @@ def download_source_file(
         raise HTTPException(status_code=404, detail="File not found.") from exc
     if not path.is_file():
         raise HTTPException(status_code=404, detail="File not found.")
-    return FileResponse(
-        path, media_type=source.mime_type or "application/octet-stream",
-        filename=source.original_filename or source.name,
-        headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"},
-    )
+    try:
+        content = storage_service.read_project_file(source.storage_path, encrypted=bool(source.is_encrypted))
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail="The stored file failed integrity verification.") from exc
+    return Response(content=content, media_type=source.mime_type or "application/octet-stream", headers={
+        "Content-Disposition": f"attachment; filename*=UTF-8''{quote(source.original_filename or source.name)}",
+        "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff",
+    })
 
 
 @router.post("/{project_id}/proposals/{proposal_id}/decision", response_model=ProposalDecisionResponse)

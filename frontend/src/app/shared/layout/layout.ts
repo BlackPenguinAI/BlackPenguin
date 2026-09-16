@@ -1,9 +1,11 @@
-import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
+import { Component, OnDestroy, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, Router, NavigationEnd } from '@angular/router';
 import { AuthService } from '../../core/services/auth';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { filter } from 'rxjs/operators';
+import { HttpClient } from '@angular/common/http';
+import { API_V1_URL } from '../../core/config/api.config';
 
 @Component({
   selector: 'app-layout',
@@ -12,16 +14,19 @@ import { filter } from 'rxjs/operators';
   templateUrl: './layout.html',
   styleUrl: './layout.scss'
 })
-export class LayoutComponent implements OnInit {
+export class LayoutComponent implements OnInit, OnDestroy {
   userRole: string = '';
   currentLang: string = 'en';
   profile: any = null;
+  notificationCount = 0;
+  private notificationTimer?: ReturnType<typeof setInterval>;
 
   constructor(
     private router: Router, 
     private authService: AuthService,
     private translate: TranslateService,
-    private cdr: ChangeDetectorRef
+    private cdr: ChangeDetectorRef,
+    private http: HttpClient,
   ) {
     this.currentLang = 'en';
     this.translate.use(this.currentLang);
@@ -42,6 +47,16 @@ export class LayoutComponent implements OnInit {
       next: profile => { this.profile = profile; this.userRole = profile.role || this.userRole; this.cdr.detectChanges(); },
       error: () => { this.profile = null; this.cdr.detectChanges(); },
     });
+    if (this.userRole !== 'superadmin') {
+      this.loadNotificationCount();
+      this.notificationTimer = setInterval(() => this.loadNotificationCount(), 15000);
+    }
+  }
+
+  ngOnDestroy(): void { if (this.notificationTimer) clearInterval(this.notificationTimer); }
+
+  private loadNotificationCount(): void {
+    this.http.get<{count:number}>(`${API_V1_URL}/governance/notifications/unread-count`).subscribe({ next: value => { this.notificationCount = value.count || 0; this.cdr.detectChanges(); } });
   }
 
   switchLanguage(lang: string) {

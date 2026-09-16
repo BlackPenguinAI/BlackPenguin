@@ -20,7 +20,8 @@ from app.integrations.gcalendar_client import create_calendar_event
 def get_project_leads(db: Session, company_id: str, project_id: str, sales_user_id: str | None = None) -> List[Lead]:
     query = db.query(Lead).filter(
         Lead.company_id == company_id,
-        Lead.project_id == project_id
+        Lead.project_id == project_id,
+        Lead.deleted_at.is_(None),
     )
     if sales_user_id:
         query = query.filter(Lead.assigned_sales_user_id == sales_user_id)
@@ -32,7 +33,7 @@ def get_company_leads(
     tier: str | None = None, segment: str | None = None, stage: str | None = None,
     search: str | None = None,
 ) -> List[Lead]:
-    query = db.query(Lead).filter(Lead.company_id == company_id)
+    query = db.query(Lead).filter(Lead.company_id == company_id, Lead.deleted_at.is_(None))
     query = query.filter(Lead.project_id.in_(project_ids)) if project_ids else query.filter(Lead.project_id == "")
     if project_id: query = query.filter(Lead.project_id == project_id)
     if tier: query = query.filter(Lead.intent_tier == tier)
@@ -148,7 +149,7 @@ def get_lead_detail(db: Session, lead_id: str, company_id: str, sales_user_id: s
     from app.modules.projects.models import Project, ProjectCampaign
     from app.modules.sales_agent.models import SalesAgentSimulation, SalesConversation, SalesMessage
 
-    query = db.query(Lead).filter(Lead.id == lead_id, Lead.company_id == company_id)
+    query = db.query(Lead).filter(Lead.id == lead_id, Lead.company_id == company_id, Lead.deleted_at.is_(None))
     if sales_user_id:
         query = query.filter(Lead.assigned_sales_user_id == sales_user_id)
     lead = query.first()

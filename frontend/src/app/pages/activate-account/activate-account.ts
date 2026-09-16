@@ -23,6 +23,7 @@ export class ActivateAccountComponent implements OnInit {
   password = '';
   confirmPassword = '';
   showPassword = false;
+  legalAccepted = false;
   private code = '';
   private state = '';
   private readonly validationTimeoutMs = 15_000;
@@ -93,13 +94,18 @@ export class ActivateAccountComponent implements OnInit {
 
   get valid(): boolean {
     return Object.values(this.passwordChecks).every(Boolean) &&
-      this.password === this.confirmPassword && !this.saving;
+      this.password === this.confirmPassword && this.legalAccepted &&
+      Array.isArray(this.invitation?.legal_documents) && this.invitation.legal_documents.length === 3 && !this.saving;
+  }
+
+  get acceptedLegalVersions(): Record<string, string> {
+    return Object.fromEntries((this.invitation?.legal_documents || []).map((item: any) => [item.doc_type, item.version_id]));
   }
 
   activate(): void {
     if (!this.valid) return;
     this.saving = true; this.error = ''; this.errorCode = '';
-    this.auth.completeActivation(this.state, this.code, this.password).pipe(
+    this.auth.completeActivation(this.state, this.code, this.password, this.acceptedLegalVersions).pipe(
       timeout({ first: this.activationTimeoutMs }),
     ).subscribe({
       next: response => {

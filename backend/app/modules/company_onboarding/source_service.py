@@ -209,6 +209,9 @@ async def _capture_logo_candidates(
                 original_filename=filename, content=content,
             )
             asset.storage_path = stored.relative_path
+            asset.is_encrypted = True
+            asset.content_hash = stored.content_hash
+            asset.encryption_key_id = stored.encryption_key_id
             db.add(asset)
         except Exception:
             continue
@@ -240,6 +243,9 @@ async def ingest_logo_upload(
         company_id=company_id, source_id=asset.id, original_filename=filename, content=content,
     )
     asset.storage_path = stored.relative_path
+    asset.is_encrypted = True
+    asset.content_hash = stored.content_hash
+    asset.encryption_key_id = stored.encryption_key_id
     db.add(asset); db.commit(); db.refresh(asset)
     return asset
 
@@ -317,6 +323,9 @@ async def ingest_file(
         )
         source.storage_path = stored.relative_path
         source.stored_filename = stored.stored_filename
+        source.is_encrypted = True
+        source.content_hash = stored.content_hash
+        source.encryption_key_id = stored.encryption_key_id
         _validate_signature(content, mime_type)
         text = _extract_bytes(content, mime_type, filename)
         await _finish_source(db, source, text)

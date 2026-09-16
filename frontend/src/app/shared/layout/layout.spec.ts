@@ -10,6 +10,7 @@ describe('LayoutComponent identity', () => {
       { getMyProfile: () => of({ first_name: 'Taylor', last_name: 'Morgan', role: 'sales', company_name: 'Acme Homes' }) } as any,
       { use: () => undefined } as any,
       { detectChanges: () => undefined } as any,
+      { get: () => of({ count: 0 }) } as any,
     );
     component.ngOnInit();
     expect(component.displayName).toBe('Taylor Morgan');

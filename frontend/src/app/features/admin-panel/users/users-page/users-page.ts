@@ -25,6 +25,12 @@ export class UsersPageComponent implements OnInit {
   companies: any[] = [];
   
   isLoading: boolean = true;
+  actionUser: any = null;
+  action: 'suspend' | 'reactivate' | 'delete' | '' = '';
+  actionReason = '';
+  actionConfirmation = '';
+  firebaseCleanupConfirmed = false;
+  actionSaving = false;
 
   // Filtros reactivos
   filters = {
@@ -114,5 +120,35 @@ export class UsersPageComponent implements OnInit {
       email: ''
     };
     this.loadUsers();
+  }
+
+  openAction(user: any, action: 'suspend' | 'reactivate' | 'delete'): void {
+    this.actionUser = user; this.action = action; this.actionReason = '';
+    this.actionConfirmation = ''; this.firebaseCleanupConfirmed = false;
+  }
+
+  closeAction(): void { if (!this.actionSaving) { this.actionUser = null; this.action = ''; } }
+
+  get actionValid(): boolean {
+    return this.actionReason.trim().length >= 5 &&
+      (this.action !== 'delete' || this.actionConfirmation.trim().toLowerCase() === String(this.actionUser?.email || '').toLowerCase());
+  }
+
+  submitAction(): void {
+    if (!this.actionUser || !this.action || !this.actionValid || this.actionSaving) return;
+    this.actionSaving = true;
+    const body = this.action === 'delete'
+      ? { reason: this.actionReason.trim(), confirmation: this.actionConfirmation.trim() }
+      : { reason: this.actionReason.trim(), action: this.action };
+    const url = this.action === 'delete'
+      ? `${this.baseUrl}/api/v1/users/admin/${this.actionUser.id}?firebase_cleanup_confirmed=${this.firebaseCleanupConfirmed}`
+      : `${this.baseUrl}/api/v1/users/admin/${this.actionUser.id}/status`;
+    const request = this.action === 'delete'
+      ? this.http.delete(url, { headers: this.headers, body })
+      : this.http.patch(url, body, { headers: this.headers });
+    request.subscribe({
+      next: () => { this.actionSaving = false; this.toast.showSuccess('User access updated.'); this.closeAction(); this.loadUsers(); },
+      error: err => { this.actionSaving = false; this.toast.showError(err.error?.detail?.message || err.error?.detail || 'The user could not be updated.'); this.cdr.detectChanges(); },
+    });
   }
 }

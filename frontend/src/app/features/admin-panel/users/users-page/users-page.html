@@ -59,6 +59,7 @@
               <th class="py-4 px-6 text-center">Role</th>
               <th class="py-4 px-6 text-center">OpenRouter Usage</th>
               <th class="py-4 px-6 text-center">Status</th>
+              <th class="py-4 px-6 text-right">Actions</th>
             </tr>
           </thead>
 
@@ -93,18 +94,23 @@
                   <span class="text-[10px] text-gray-500">{{ (u.ai_tokens_used || 0) | number }} tokens</span>
                 </div>
               </td>
-
               <td class="py-4 px-6 text-center">
                 <span [ngClass]="u.is_active ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-red-500/10 text-red-400 border-red-500/20'"
                       class="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border shadow-sm">
-                  {{ u.is_active ? 'ACTIVE' : 'INACTIVE' }}
+                  {{ u.deleted_at ? 'DELETED' : (u.is_active ? 'ACTIVE' : 'SUSPENDED') }}
                 </span>
+              </td>
+
+              <td class="py-4 px-6 text-right whitespace-nowrap">
+                <button *ngIf="u.is_active" (click)="openAction(u, 'suspend')" class="mr-2 rounded-lg border border-amber-400/20 px-3 py-1.5 text-[10px] font-bold text-amber-300 hover:bg-amber-400/10">SUSPEND</button>
+                <button *ngIf="!u.is_active && !u.deleted_at" (click)="openAction(u, 'reactivate')" class="mr-2 rounded-lg border border-emerald-400/20 px-3 py-1.5 text-[10px] font-bold text-emerald-300 hover:bg-emerald-400/10">REACTIVATE</button>
+                <button *ngIf="!u.deleted_at" (click)="openAction(u, 'delete')" class="rounded-lg border border-red-400/20 px-3 py-1.5 text-[10px] font-bold text-red-300 hover:bg-red-400/10">DELETE</button>
               </td>
 
             </tr>
 
             <tr *ngIf="users.length === 0">
-              <td colspan="5" class="py-12 text-center text-gray-500 text-sm">
+              <td colspan="6" class="py-12 text-center text-gray-500 text-sm">
                 No users found matching the selected filters.
               </td>
             </tr>
@@ -113,5 +119,20 @@
       </div>
     </app-glass-card>
 
+  </div>
+
+  <div *ngIf="actionUser" class="fixed inset-0 z-50 grid place-items-center bg-black/75 p-4 backdrop-blur-sm">
+    <div class="w-full max-w-lg rounded-2xl border border-white/10 bg-[#111] p-6 shadow-2xl">
+      <p class="text-[10px] font-bold uppercase tracking-[.2em] text-secondary">User lifecycle</p>
+      <h2 class="mt-2 text-2xl font-light">{{ action | titlecase }} {{ actionUser.email }}</h2>
+      <p class="mt-2 text-xs leading-5 text-gray-400">This action is audited. Active sessions are blocked on their next API request.</p>
+      <textarea [(ngModel)]="actionReason" rows="3" placeholder="Required reason (minimum 5 characters)" class="mt-5 w-full rounded-xl border border-white/10 bg-black/40 p-3 text-sm text-white outline-none focus:border-secondary"></textarea>
+      <input *ngIf="action === 'delete'" [(ngModel)]="actionConfirmation" [placeholder]="'Type ' + actionUser.email + ' to confirm'" class="mt-3 w-full rounded-xl border border-red-400/20 bg-black/40 p-3 text-sm text-white outline-none focus:border-red-300">
+      <label *ngIf="action === 'delete'" class="mt-3 flex items-start gap-2 text-xs text-gray-400"><input [(ngModel)]="firebaseCleanupConfirmed" type="checkbox" class="mt-0.5 accent-secondary">I confirm the Firebase identity was manually removed if automatic cleanup is unavailable.</label>
+      <div class="mt-6 flex justify-end gap-3">
+        <button (click)="closeAction()" [disabled]="actionSaving" class="rounded-full border border-white/10 px-5 py-2 text-xs text-gray-300">CANCEL</button>
+        <button (click)="submitAction()" [disabled]="!actionValid || actionSaving" class="rounded-full bg-secondary px-5 py-2 text-xs font-bold text-black disabled:opacity-40">{{ actionSaving ? 'SAVING…' : 'CONFIRM' }}</button>
+      </div>
+    </div>
   </div>
 </div>

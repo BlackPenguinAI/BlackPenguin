@@ -11,6 +11,8 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 
 from .models import ProjectOnboardingSource, SalesAssetShare
+from app.modules.governance.models import SalesAssetAccessEvent
+from app.modules.governance.services import enqueue_notification
 
 
 def issue(db: Session, *, company_id: str, project_id: str, lead_id: str, source_id: str) -> str:
@@ -27,7 +29,7 @@ def issue(db: Session, *, company_id: str, project_id: str, lead_id: str, source
     return f"{settings.PUBLIC_APP_URL.rstrip('/')}/api/v1/projects/shared-assets/{token}"
 
 
-def resolve(db: Session, token: str) -> ProjectOnboardingSource:
+def resolve(db: Session, token: str) -> tuple[ProjectOnboardingSource, SalesAssetShare]:
     parts = token.split(".")
     if len(parts) != 7:
         raise HTTPException(status_code=404, detail="Shared image not found.")
@@ -49,5 +51,31 @@ def resolve(db: Session, token: str) -> ProjectOnboardingSource:
     ).first()
     if not source:
         raise HTTPException(status_code=404, detail="Shared image not found.")
-    share.access_count += 1; share.last_accessed_at = datetime.utcnow(); db.add(share); db.commit()
-    return source
+    return source, share
+
+
+def record_access(
+    db: Session, *, share: SalesAssetShare, event_type: str,
+    ip_hash: str | None, user_agent_hash: str | None, user_agent: str | None,
+) -> None:
+    automated = any(value in (user_agent or "").casefold() for value in (
+        "bot", "crawler", "spider", "preview", "slackbot", "whatsapp", "facebookexternalhit",
+    ))
+    now = datetime.utcnow()
+    share.access_count += 1; share.last_accessed_at = now
+    db.add(SalesAssetAccessEvent(
+        share_id=share.id, event_type=event_type, ip_hash=ip_hash,
+        user_agent_hash=user_agent_hash, is_automated=automated,
+    ))
+    if not automated and share.first_human_access_at is None:
+        share.first_human_access_at = now
+        enqueue_notification(
+            db, company_id=share.company_id, project_id=share.project_id,
+            event_type="asset_high_interest", entity_type="lead", entity_id=share.lead_id,
+            payload={
+                "title": "Sales material opened",
+                "body": "A lead opened shared sales material. This may indicate high interest.",
+                "action_url": f"/app/leads?lead={share.lead_id}",
+            }, dedupe_key=f"asset-first-human:{share.id}",
+        )
+    db.add(share); db.commit()

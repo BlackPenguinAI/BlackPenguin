@@ -21,7 +21,10 @@ def test_project_file_is_stored_under_company_project_and_source(monkeypatch, tm
     assert stored.relative_path == (
         f"companies/{company_id}/projects/{project_id}/sources/{source_id}/original.pdf"
     )
-    assert storage_service.resolve_project_file(stored.relative_path).read_bytes() == b"%PDF-test"
+    raw = storage_service.resolve_project_file(stored.relative_path).read_bytes()
+    assert raw != b"%PDF-test"
+    assert stored.encryption_key_id
+    assert storage_service.read_project_file(stored.relative_path, encrypted=True) == b"%PDF-test"
 
 
 def test_storage_rejects_path_traversal(monkeypatch, tmp_path: Path):

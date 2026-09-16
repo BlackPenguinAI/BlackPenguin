@@ -52,6 +52,9 @@ class User(Base):
     role = Column(SqlaEnum(UserRole), default=UserRole.ADMIN, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
     project_access_scope = Column(String(20), default="all", nullable=False)
+    deleted_at = Column(DateTime, nullable=True, index=True)
+    deleted_by_user_id = Column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    deletion_reason = Column(String(500), nullable=True)
 
     # 🚀 CONSUMO INDIVIDUAL DE OPENROUTER
     ai_tokens_used = Column(Integer, default=0)

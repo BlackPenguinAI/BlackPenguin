@@ -3,11 +3,11 @@ from __future__ import annotations
 import json
 import re
 from typing import Any
+from urllib.parse import quote
 import uuid
 
 import httpx
 from fastapi import APIRouter, Depends, File, Header, HTTPException, Response, UploadFile
-from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session, joinedload
 
 from app.db.postgres import get_db
@@ -163,8 +163,12 @@ def get_company_media_file(
         raise HTTPException(status_code=404, detail="Company image not found.") from exc
     if not path.is_file():
         raise HTTPException(status_code=404, detail="Company image not found.")
-    return FileResponse(path, media_type=asset.mime_type, filename=asset.name,
-                        headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"})
+    try:
+        content = storage_service.read_company_file(asset.storage_path, encrypted=bool(asset.is_encrypted))
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail="The stored Company image failed integrity verification.") from exc
+    return Response(content=content, media_type=asset.mime_type,
+                    headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff", "Content-Disposition": f"inline; filename*=UTF-8''{quote(asset.name)}"})
 
 
 def _is_authorized_admin(user: User) -> bool:
@@ -1219,10 +1223,13 @@ def download_source_file(
     try: path = storage_service.resolve_company_file(source.storage_path)
     except ValueError as exc: raise HTTPException(status_code=404, detail="File not found.") from exc
     if not path.is_file(): raise HTTPException(status_code=404, detail="File not found.")
-    return FileResponse(
-        path, media_type=source.mime_type or "application/octet-stream",
-        filename=source.original_filename or source.name,
-        headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"},
+    try:
+        content = storage_service.read_company_file(source.storage_path, encrypted=bool(source.is_encrypted))
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail="The stored Company file failed integrity verification.") from exc
+    return Response(
+        content=content, media_type=source.mime_type or "application/octet-stream",
+        headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff", "Content-Disposition": f"attachment; filename*=UTF-8''{quote(source.original_filename or source.name)}"},
     )
 
 

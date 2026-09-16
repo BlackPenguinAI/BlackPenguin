@@ -56,6 +56,19 @@ describe('LeadsComponent', () => {
     expect(value.structuredSummary('Human-readable summary')).toBeNull();
   });
 
+  it('opens the lead referenced by a notification after the list loads', () => {
+    const lead = { id: 'lead-1', full_name: 'Interested Lead', phone: '+15550001' };
+    const http = { get: (url: string) => of(url.includes('/leads/lead-1') ? lead : [lead]) };
+    const value = new LeadsComponent(
+      http as any,
+      { markForCheck: () => undefined } as any,
+      { navigate: () => Promise.resolve(true) } as any,
+      { snapshot: { queryParamMap: { get: (key: string) => key === 'lead' ? 'lead-1' : null } } } as any,
+    );
+    value.ngOnInit();
+    expect(value.selected).toEqual(lead);
+  });
+
   it('exports the active filters and downloads an individual Lead Record', () => {
     const calls: Array<{ url: string; options: any }> = [];
     const http = { get: (url: string, options: any) => { calls.push({ url, options }); return of(new Blob(['ok'])); } };

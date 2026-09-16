@@ -1,0 +1,13 @@
+<section class="audit-page">
+  <header><div><p>COMPLIANCE</p><h1>Data export audit</h1><span>Append-only traceability for every generated Lead export.</span></div><span class="immutable">LOCKED RECORDS</span></header>
+  <div class="filters">
+    <select [(ngModel)]="companyId" (change)="load()"><option value="">All Companies</option><option *ngFor="let company of companies" [value]="company.id">{{company.name}}</option></select>
+    <select [(ngModel)]="exportType" (change)="load()"><option value="">All formats</option><option value="leads_csv">Lead list CSV</option><option value="lead_json">Lead Record JSON</option></select>
+    <button (click)="load()">REFRESH</button>
+  </div>
+  <p *ngIf="error" class="error">{{error}}</p><p *ngIf="loading" class="empty">Loading immutable events…</p>
+  <div class="table" *ngIf="!loading"><div class="row head"><span>Generated</span><span>Company</span><span>Actor</span><span>Export</span><span>Rows</span><span>SHA-256 / chain</span></div>
+    <div class="row" *ngFor="let event of events"><span>{{event.created_at | date:'medium'}}</span><span>{{companyName(event.company_id)}}</span><span>{{event.actor_role}}<small>{{short(event.actor_user_id)}}</small></span><span>{{event.export_type}}</span><span>{{event.record_count}}</span><span class="hash">{{short(event.content_hash)}}<small>{{short(event.event_hash)}}</small></span></div>
+    <p class="empty" *ngIf="!events.length">No export events match these filters.</p>
+  </div>
+</section>

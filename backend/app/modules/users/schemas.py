@@ -50,6 +50,8 @@ class UserAdminListResponse(BaseModel):
     company: Optional[CompanyBasicResponse] = None
     ai_tokens_used: Optional[int] = 0
     ai_cost_usd: Optional[float] = 0.0
+    auth_status: Optional[str] = None
+    deleted_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
 

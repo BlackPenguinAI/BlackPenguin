@@ -45,9 +45,10 @@ export class AuthService {
       .pipe(catchError(this.handleError));
   }
 
-  completeActivation(state: string, oobCode: string, newPassword: string): Observable<any> {
+  completeActivation(state: string, oobCode: string, newPassword: string, acceptedLegalVersions: Record<string, string>): Observable<any> {
     return this.http.post(this.apiUrl + '/auth/firebase/complete-invitation', {
       state, oob_code: oobCode, new_password: newPassword,
+      legal_accepted: true, accepted_legal_versions: acceptedLegalVersions,
     }).pipe(tap((response: any) => this.saveSession(response)), catchError(this.handleError));
   }
 

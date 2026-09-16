@@ -60,6 +60,8 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str = ""
     EMAILS_FROM_EMAIL: str = "info@blackpenguin.ai"
     EMAILS_FROM_NAME: str = "Black Penguin"
+    SUPPORT_EMAIL: str = "info@blackpenguin.ai"
+    MATERIAL_ENCRYPTION_KEY: str = ""
 
     model_config = SettingsConfigDict(
         env_file=".env",

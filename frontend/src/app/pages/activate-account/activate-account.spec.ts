@@ -5,6 +5,12 @@ import { describe, expect, it, vi } from 'vitest';
 import { ActivateAccountComponent } from './activate-account';
 
 describe('ActivateAccountComponent', () => {
+  const legalDocuments = [
+    { doc_type: 'privacy', version_id: 'privacy-v1', url: '/legal/privacy' },
+    { doc_type: 'terms', version_id: 'terms-v1', url: '/legal/terms' },
+    { doc_type: 'data_deletion', version_id: 'deletion-v1', url: '/legal/data-deletion' },
+  ];
+
   function component(code = 'valid-code', state = 'signed-invitation-state') {
     const params: Record<string, string | null> = { oobCode: code, state, continueUrl: null };
     const route = {
@@ -19,6 +25,7 @@ describe('ActivateAccountComponent', () => {
     const auth = {
       inspectActivation: vi.fn().mockReturnValue(of({
         email: 'sales@example.com', first_name: 'Sam', role: 'sales', company_name: 'Northstar', flow: 'invitation',
+        legal_documents: legalDocuments,
       })),
       completeActivation: vi.fn().mockReturnValue(of({ role: 'sales', access_token: 'token' })),
       defaultRouteForRole: vi.fn().mockReturnValue('/app/dashboard'),
@@ -39,10 +46,12 @@ describe('ActivateAccountComponent', () => {
     value.ngOnInit();
     value.password = 'Secure#Pass1';
     value.confirmPassword = 'Secure#Pass1';
+    value.legalAccepted = true;
     expect(value.valid).toBe(true);
     value.activate();
     expect(auth.completeActivation).toHaveBeenCalledWith(
       'signed-invitation-state', 'valid-code', 'Secure#Pass1',
+      { privacy: 'privacy-v1', terms: 'terms-v1', data_deletion: 'deletion-v1' },
     );
     expect(router.navigateByUrl).toHaveBeenCalledWith('/app/dashboard', { replaceUrl: true });
   });
@@ -79,6 +88,7 @@ describe('ActivateAccountComponent', () => {
 
       auth.inspectActivation.mockReturnValue(of({
         email: 'sales@example.com', first_name: 'Sam', role: 'sales', company_name: 'Northstar', flow: 'invitation',
+        legal_documents: legalDocuments,
       }));
       value.retryValidation();
       expect(auth.inspectActivation).toHaveBeenCalledTimes(2);
@@ -94,6 +104,7 @@ describe('ActivateAccountComponent', () => {
     value.ngOnInit();
     value.password = 'Secure#Pass1';
     value.confirmPassword = 'Secure#Pass1';
+    value.legalAccepted = true;
     auth.completeActivation.mockReturnValue(throwError(() => new Error('Firebase rejected the link')));
 
     value.activate();

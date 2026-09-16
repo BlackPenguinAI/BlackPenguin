@@ -1,17 +1,22 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import base64
+import hashlib
 import os
 from pathlib import Path
 import tempfile
 import uuid
 
 from app.core.config import settings
+from cryptography.fernet import Fernet, InvalidToken
 
 
 @dataclass(frozen=True)
 class StoredMeetingFile:
     relative_path: str
+    content_hash: str
+    encryption_key_id: str
 
 
 def upload_root() -> Path:
@@ -34,7 +39,7 @@ def store_meeting_attachment(*, company_id: str, meeting_id: str, attachment_id:
     descriptor, temporary_name = tempfile.mkstemp(prefix=".upload-", dir=directory)
     try:
         with os.fdopen(descriptor, "wb") as temporary:
-            temporary.write(content)
+            temporary.write(_fernet().encrypt(content))
             temporary.flush()
             os.fsync(temporary.fileno())
         os.chmod(temporary_name, 0o640)
@@ -45,7 +50,59 @@ def store_meeting_attachment(*, company_id: str, meeting_id: str, attachment_id:
         except FileNotFoundError:
             pass
         raise
-    return StoredMeetingFile(destination.relative_to(upload_root()).as_posix())
+    return StoredMeetingFile(
+        destination.relative_to(upload_root()).as_posix(),
+        hashlib.sha256(content).hexdigest(), _key_id(),
+    )
+
+
+def _seed() -> str:
+    return settings.MATERIAL_ENCRYPTION_KEY or settings.SETTINGS_ENCRYPTION_KEY or settings.SECRET_KEY
+
+
+def _fernet() -> Fernet:
+    key = base64.urlsafe_b64encode(hashlib.sha256(_seed().encode()).digest())
+    return Fernet(key)
+
+
+def _key_id() -> str:
+    return hashlib.sha256(_seed().encode()).hexdigest()[:16]
+
+
+def read_meeting_attachment(relative_path: str, *, encrypted: bool) -> bytes:
+    content = resolve_meeting_attachment(relative_path).read_bytes()
+    if not encrypted:
+        return content
+    try:
+        return _fernet().decrypt(content)
+    except InvalidToken as exc:
+        raise ValueError("Stored meeting attachment failed integrity verification.") from exc
+
+
+def encrypt_legacy_meeting_attachment(relative_path: str) -> tuple[str, str]:
+    """Atomically encrypt one legacy plaintext attachment and return its metadata."""
+    destination = resolve_meeting_attachment(relative_path)
+    content = destination.read_bytes()
+    try:
+        plaintext = _fernet().decrypt(content)
+        return hashlib.sha256(plaintext).hexdigest(), _key_id()
+    except InvalidToken:
+        pass
+    descriptor, temporary_name = tempfile.mkstemp(prefix=".encrypt-", dir=destination.parent)
+    try:
+        with os.fdopen(descriptor, "wb") as temporary:
+            temporary.write(_fernet().encrypt(content))
+            temporary.flush()
+            os.fsync(temporary.fileno())
+        os.chmod(temporary_name, 0o640)
+        os.replace(temporary_name, destination)
+    except Exception:
+        try:
+            os.unlink(temporary_name)
+        except FileNotFoundError:
+            pass
+        raise
+    return hashlib.sha256(content).hexdigest(), _key_id()
 
 
 def resolve_meeting_attachment(relative_path: str) -> Path:

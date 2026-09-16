@@ -9,6 +9,7 @@ from app.db.postgres import get_db
 
 # 🚀 IMPORTAMOS USER DESDE SU NUEVO MÓDULO
 from app.modules.users.models import User, UserAuthStatus
+from app.modules.governance.services import assert_company_license
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login")
 
@@ -27,8 +28,9 @@ def get_current_user(db: Session = Depends(get_db), token: str = Depends(oauth2_
         raise credentials_exception
         
     user = db.query(User).filter(User.email == token_email).first()
-    if user is None or not user.is_active or user.auth_status == UserAuthStatus.SUSPENDED:
+    if user is None or not user.is_active or user.auth_status == UserAuthStatus.SUSPENDED or user.deleted_at is not None:
         raise credentials_exception
+    assert_company_license(db, user)
     return user
 
 class RoleChecker:

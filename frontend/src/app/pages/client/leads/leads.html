@@ -5,13 +5,17 @@
       <h1>Leads</h1>
       <span>Qualification, intent, segment and full contact traceability.</span>
     </div>
-    <button class="export" (click)="exportCurrentView()" [disabled]="exporting || loading">
+    <button *ngIf="!isSuperadmin" class="export" (click)="exportCurrentView()" [disabled]="exporting || loading">
       <span class="material-symbols-outlined">download</span>
       {{ exporting ? 'EXPORTING…' : 'EXPORT CURRENT VIEW' }}
     </button>
   </header>
 
   <div class="filters">
+    <select *ngIf="isSuperadmin" [(ngModel)]="companyId" (change)="selectCompany()">
+      <option value="">Select a Company</option>
+      <option *ngFor="let company of companies" [value]="company.id">{{company.name}}</option>
+    </select>
     <select [(ngModel)]="projectId" (change)="reload()">
       <option value="">All Projects</option>
       <option *ngFor="let project of projects" [value]="project.id">{{project.name}}</option>
@@ -52,10 +56,10 @@
       <div class="detail-head">
         <span><small>LEAD RECORD · {{leadKind(selected)}}</small><h2>{{selected.full_name}}</h2></span>
         <div class="detail-actions">
-          <button (click)="downloadSourceData()" [disabled]="downloadingSource">
+          <button *ngIf="!isSuperadmin" (click)="downloadSourceData()" [disabled]="downloadingSource">
             {{downloadingSource ? 'DOWNLOADING…' : 'DOWNLOAD JSON'}}
           </button>
-          <a *ngIf="selected.conversation_id" routerLink="/app/agent" [queryParams]="{project:selected.project_id,lead:selected.id}">OPEN AGENT</a>
+          <a *ngIf="selected.conversation_id && !isSuperadmin" routerLink="/app/agent" [queryParams]="{project:selected.project_id,lead:selected.id}">OPEN AGENT</a>
         </div>
       </div>
       <div class="summary">
@@ -92,6 +96,15 @@
       </section>
       <section *ngIf="selected.objections?.length"><h3>Objections</h3><p *ngFor="let item of selected.objections"><b>{{label(item.type)}}</b> · {{item.count}} occurrence(s)<br>{{item.evidence}}</p></section>
       <section><h3>Sales recommendations</h3><p>{{selected.visit_recommendations}}</p></section>
+      <section *ngIf="isSuperadmin" class="danger-zone">
+        <h3>Delete lead</h3>
+        <p>This anonymizes personal data, pauses automation, cancels follow-ups and revokes shared links. Audit and appointment evidence is preserved.</p>
+        <input [(ngModel)]="deleteReason" placeholder="Required deletion reason">
+        <input [(ngModel)]="deleteConfirmation" [placeholder]="'Type ' + selected.full_name + ' to confirm'">
+        <button (click)="deleteLead()" [disabled]="deleting || !deleteReason.trim() || deleteConfirmation !== selected.full_name">
+          {{deleting ? 'DELETING…' : 'DELETE LEAD'}}
+        </button>
+      </section>
     </aside>
     <ng-template #choose><aside class="choose">Select a lead to inspect its profile, score, segment, objections and source data.</aside></ng-template>
   </div>

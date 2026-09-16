@@ -39,5 +39,9 @@ aside p { color: #aaa; line-height: 1.5; font-size: 12px; }
 .data-tree > div.group span { color: #d0a532; font-weight: 700; }.data-tree > div.group strong { color: #777; }
 .loading, .empty, .choose { padding: 40px; color: #777; }
 .notice { padding: 10px; background: #2a0d0d; color: #ffaaaa; border-radius: 9px; margin: 12px 0; }
+.danger-zone { border: 1px solid rgba(248,113,113,.25) !important; border-radius: 10px; background: rgba(127,29,29,.08); padding: 14px; }
+.danger-zone input { width: 100%; margin-top: 8px; border: 1px solid rgba(255,255,255,.1); border-radius: 8px; background: rgba(0,0,0,.35); padding: 10px; color: white; }
+.danger-zone button { margin-top: 10px; border: 1px solid rgba(248,113,113,.4); border-radius: 8px; padding: 9px 12px; color: #fca5a5; font-size: 11px; font-weight: 700; }
+.danger-zone button:disabled { opacity: .35; }
 @media(max-width: 1050px) { header { align-items: start; }.filters { grid-template-columns: 1fr 1fr; }.workspace { grid-template-columns: 1fr; }aside { border-left: 0; border-top: 1px solid #252525; } }
 @media(max-width: 620px) { header { flex-direction: column; }.filters { grid-template-columns: 1fr; }.detail-head { flex-direction: column; }.detail-actions { width: 100%; } }

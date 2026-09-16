@@ -49,6 +49,17 @@
         <li [class.ok]="confirmPassword && password === confirmPassword">Passwords match</li>
       </ul>
 
+      <label class="legal-consent">
+        <input [(ngModel)]="legalAccepted" name="legal_accepted" type="checkbox" required>
+        <span>
+          I have read and accept the
+          <a routerLink="/legal/terms" target="_blank" rel="noopener noreferrer">Terms &amp; Conditions</a>
+          and <a routerLink="/legal/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>,
+          and acknowledge the
+          <a routerLink="/legal/data-deletion" target="_blank" rel="noopener noreferrer">Data Deletion Policy</a>.
+        </span>
+      </label>
+
       <p *ngIf="error" class="error">{{ error }}</p>
       <button class="activate" type="submit" [disabled]="!valid">
         {{ saving ? 'Activating…' : 'Activate account' }}

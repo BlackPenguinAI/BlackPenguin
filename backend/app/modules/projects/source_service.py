@@ -163,6 +163,7 @@ async def _capture_website_images(
                 source_id=child.id, original_filename=filename, content=content,
             )
             child.storage_path, child.stored_filename = stored.relative_path, stored.stored_filename
+            child.is_encrypted, child.content_hash, child.encryption_key_id = True, stored.content_hash, stored.encryption_key_id
             db.add(child)
         except Exception:
             continue
@@ -228,6 +229,9 @@ async def create_file_source(
         )
         source.storage_path = stored.relative_path
         source.stored_filename = stored.stored_filename
+        source.is_encrypted = True
+        source.content_hash = stored.content_hash
+        source.encryption_key_id = stored.encryption_key_id
         _validate_signature(content, mime_type)
         db.add(source); db.commit(); db.refresh(source)
     except Exception as exc:
@@ -247,8 +251,7 @@ async def process_stored_file_source(
     if source.status != ProjectSourceStatus.PROCESSING or not source.storage_path:
         return source
     try:
-        path = storage_service.resolve_project_file(source.storage_path)
-        content = path.read_bytes()
+        content = storage_service.read_project_file(source.storage_path, encrypted=bool(source.is_encrypted))
         if len(content) > MAX_FILE_BYTES:
             raise ValueError("The file exceeds the 15 MB limit.")
         _validate_signature(content, source.mime_type or "application/octet-stream")

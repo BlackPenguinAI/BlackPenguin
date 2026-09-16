@@ -29,6 +29,11 @@ from .service import (
 )
 from app.modules.sales_crm.scheduling import create_agent_appointment, next_cadence_time
 from app.modules.ai_core.services import get_ai_config
+from app.modules.governance.services import (
+    create_intervention_case, escalation_reason, next_allowed_proactive_time,
+    operating_policy_for,
+)
+from app.core.config import settings
 
 
 def normalize_phone(value: str) -> str:
@@ -217,6 +222,9 @@ def _schedule_next_action(db: Session, conversation: SalesConversation, lead: Le
     scheduled_at = next_cadence_time(
         now=datetime.utcnow(), timezone_name=project.timezone if project else "UTC", delay_hours=hours,
     )
+    scheduled_at = max(scheduled_at, next_allowed_proactive_time(
+        db, company_id=conversation.company_id, project_id=conversation.project_id, now=scheduled_at,
+    ))
     if not db.query(SalesFollowUpJob).filter(
         SalesFollowUpJob.conversation_id == conversation.id,
         SalesFollowUpJob.status == "pending",
@@ -315,6 +323,21 @@ async def launch_live_lead(db: Session, lead: Lead) -> tuple[SalesConversation |
     ).count()
     if not should_send and prior_message_count:
         return conversation, None
+    allowed_at = next_allowed_proactive_time(
+        db, company_id=lead.company_id, project_id=lead.project_id, now=datetime.utcnow(),
+    )
+    if allowed_at > datetime.utcnow():
+        if not db.query(SalesFollowUpJob).filter(
+            SalesFollowUpJob.conversation_id == conversation.id,
+            SalesFollowUpJob.status == "pending",
+        ).first():
+            db.add(SalesFollowUpJob(
+                conversation_id=conversation.id, idempotency_key=f"operating-window-initial:{lead.id}",
+                scheduled_at=allowed_at, status="pending", reason="operating_window_initial", attempt_number=1,
+            ))
+        lead.next_action_at = allowed_at; lead.agent_status = "scheduled"
+        db.commit()
+        return conversation, None
     content = _initial_message(lead, project, campaign)
     event_kind = "meta_lead_first_contact"
     if prior_message_count:
@@ -354,6 +377,21 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
             db.commit()
             await _dispatch(db, conversation=conversation, lead=lead, content="You have been unsubscribed and will not receive further messages.", role="assistant", agent_run_id=None, metadata={"event_kind": "opt_out"})
             return
+        mandatory_reason = escalation_reason(inbound.content)
+        if mandatory_reason:
+            create_intervention_case(
+                db, conversation=conversation, lead=lead, reason=mandatory_reason,
+                evidence=inbound.content,
+            )
+            db.commit()
+            await _dispatch(
+                db, conversation=conversation, lead=lead,
+                content=f"I’ve paused the automated conversation so a human can review your request. You can also contact Black Penguin at {settings.SUPPORT_EMAIL}.",
+                role="assistant", agent_run_id=None,
+                metadata={"event_kind": "human_intervention", "reason": mandatory_reason},
+                idempotency_key=f"human-intervention:{conversation.id}:{inbound.id}",
+            )
+            return
         event_id = f"twilio:{inbound.provider_message_id or inbound.id}"
         run = AgentRun(
             conversation_id=conversation.id, event_id=event_id, mode="live", status="running",
@@ -369,6 +407,13 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
         })
         reply = result.get("proposed_reply")
         actions = result.get("proposed_actions", [])
+        if result.get("requires_human"):
+            create_intervention_case(
+                db, conversation=conversation, lead=lead,
+                reason="LOW_CONFIDENCE" if not result.get("policy_violations") else "POLICY_VIOLATION",
+                evidence=inbound.content,
+            )
+            reply = f"I’ve paused the automated conversation for human review. You can also contact Black Penguin at {settings.SUPPORT_EMAIL}."
         offered_slots = []
         selected = _offered_slot_selection(db, conversation_id=conversation.id, inbound_text=inbound.content, project=project, now=datetime.utcnow())
         if selected:
@@ -403,7 +448,9 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
             SalesConversation.id == conversation.id,
         ).populate_existing().with_for_update().one()
         if reply and (
-            not conversation.is_paused or conversation.pause_reason == "Appointment confirmed"
+            not conversation.is_paused
+            or conversation.pause_reason == "Appointment confirmed"
+            or (conversation.pause_reason or "").startswith("Human intervention")
         ):
             await _dispatch(db, conversation=conversation, lead=lead, content=reply, role="assistant", agent_run_id=run.id, metadata={"appointment_offer": {"slots": [slot.isoformat() for slot in offered_slots], "duration_minutes": 45, "project_timezone": project.timezone or "UTC"}} if offered_slots else {})
         _schedule_next_action(db, conversation, lead, event_id)
@@ -429,6 +476,20 @@ async def send_manual_message(db: Session, *, conversation_id: str, company_id: 
     lead = db.query(Lead).filter(Lead.id == conversation.lead_id, Lead.company_id == company_id).one()
     if lead.is_opt_out:
         raise HTTPException(status_code=409, detail="This lead opted out of messaging.")
+    policy = operating_policy_for(
+        db, company_id=conversation.company_id, project_id=conversation.project_id,
+    )
+    if policy and policy.is_enabled and policy.enforce_manual_messages:
+        now = datetime.utcnow()
+        allowed_at = next_allowed_proactive_time(
+            db, company_id=conversation.company_id, project_id=conversation.project_id, now=now,
+        )
+        if allowed_at > now:
+            raise HTTPException(status_code=409, detail={
+                "code": "OUTSIDE_OPERATING_WINDOW",
+                "message": "This manual message is outside the configured contact window.",
+                "next_allowed_at": allowed_at.isoformat(),
+            })
     message = await _dispatch(
         db, conversation=conversation, lead=lead, content=content,
         role="human", agent_run_id=None, author_user_id=user_id,
@@ -462,6 +523,11 @@ async def process_live_followup_job(job_id: str) -> None:
             Project.id == conversation.project_id,
             Project.company_id == conversation.company_id,
         ).one()
+        allowed_at = next_allowed_proactive_time(
+            db, company_id=conversation.company_id, project_id=conversation.project_id, now=datetime.utcnow(),
+        )
+        if allowed_at > datetime.utcnow():
+            job.status = "pending"; job.scheduled_at = allowed_at; db.commit(); return
         event_id = f"followup:{job.id}"
         run = AgentRun(
             conversation_id=conversation.id, event_id=event_id, mode="live", status="running",
@@ -484,7 +550,15 @@ async def process_live_followup_job(job_id: str) -> None:
         run.prompt_snapshot = result.get("prompt_snapshot", {})
         run.model = result.get("model", "unknown")
         run.output_snapshot = {"reply": reply, "proposed_actions": result.get("proposed_actions", [])}
-        run.status = "completed" if reply and not result.get("requires_human") else "failed"
+        if result.get("requires_human"):
+            create_intervention_case(
+                db, conversation=conversation, lead=lead,
+                reason="LOW_CONFIDENCE" if not result.get("policy_violations") else "POLICY_VIOLATION",
+                evidence="Scheduled follow-up generation required human review.",
+            )
+        run.status = "completed" if reply and not result.get("requires_human") else (
+            "blocked" if result.get("requires_human") else "failed"
+        )
         run.error_code = result.get("error_code")
         run.completed_at = datetime.utcnow()
         db.add(run); db.commit()

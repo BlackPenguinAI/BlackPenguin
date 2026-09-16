@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import FileResponse, RedirectResponse, Response, StreamingResponse
 from sqlalchemy.orm import Session
@@ -6,6 +6,7 @@ from sqlalchemy.orm.exc import NoResultFound
 from typing import List, Optional
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import quote
 import hashlib
 import io
 import json
@@ -37,6 +38,10 @@ from . import services
 from . import scheduling
 from . import storage_service
 from app.modules.projects.models import Project, ProjectUnit
+from app.modules.projects.models import SalesAssetShare
+from app.modules.sales_agent.models import SalesConversation, SalesFollowUpJob
+from app.modules.governance.schemas import DeletePayload
+from app.modules.governance.services import enqueue_notification, record_export_event, record_platform_event
 
 router = APIRouter()
 
@@ -121,6 +126,78 @@ def get_company_leads(
     )
 
 
+@router.get("/admin/leads", response_model=List[LeadResponse], summary="Superadmin Company Lead index")
+def get_platform_company_leads(
+    company_id: str, project_id: Optional[str] = None, tier: Optional[str] = None,
+    segment: Optional[str] = None, stage: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN])),
+):
+    project_ids = [row[0] for row in db.query(Project.id).filter(Project.company_id == company_id).all()]
+    return services.get_company_leads(
+        db, company_id, project_ids=project_ids, project_id=project_id,
+        tier=tier, segment=segment, stage=stage,
+    )
+
+
+@router.get("/admin/companies/{company_id}/projects")
+def get_platform_company_projects(
+    company_id: str, db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN])),
+):
+    return [{"id": item.id, "name": item.name} for item in db.query(Project).filter(
+        Project.company_id == company_id,
+    ).order_by(Project.name).all()]
+
+
+@router.get("/admin/leads/{lead_id}", response_model=SalesLeadDetailResponse)
+def get_platform_lead_detail(
+    lead_id: str, company_id: str, db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN])),
+):
+    return services.get_lead_detail(db, lead_id, company_id)
+
+
+@router.delete("/admin/leads/{lead_id}")
+def delete_platform_lead(
+    lead_id: str, company_id: str, payload: DeletePayload, request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN])),
+):
+    lead = db.query(Lead).filter(
+        Lead.id == lead_id, Lead.company_id == company_id, Lead.deleted_at.is_(None),
+    ).with_for_update().first()
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found.")
+    if payload.confirmation.strip().casefold() != lead.full_name.strip().casefold():
+        raise HTTPException(status_code=422, detail="Type the lead's full name exactly to confirm deletion.")
+    conversations = db.query(SalesConversation).filter(SalesConversation.lead_id == lead.id).all()
+    conversation_ids = [item.id for item in conversations]
+    if conversation_ids:
+        db.query(SalesFollowUpJob).filter(
+            SalesFollowUpJob.conversation_id.in_(conversation_ids),
+            SalesFollowUpJob.status.in_(["pending", "processing"]),
+        ).update({SalesFollowUpJob.status: "cancelled"}, synchronize_session=False)
+    for conversation in conversations:
+        conversation.is_paused = True; conversation.pause_reason = "Lead deleted by Black Penguin administrator"
+    db.query(SalesAssetShare).filter(SalesAssetShare.lead_id == lead.id).update(
+        {SalesAssetShare.revoked: True}, synchronize_session=False,
+    )
+    original_name = lead.full_name
+    lead.deleted_at = datetime.utcnow(); lead.deleted_by_user_id = current_user.id; lead.deletion_reason = payload.reason
+    lead.full_name = "Deleted lead"; lead.phone = f"deleted-{lead.id}"; lead.email = None
+    lead.channel_address = None; lead.external_lead_id = None; lead.meta_form_data = {}
+    lead.qualification_summary = None; lead.visit_recommendations = None
+    lead.agent_status = "deleted"; lead.next_action_at = None
+    record_platform_event(
+        db, actor=current_user, event_type="LEAD_DELETED", entity_type="lead",
+        entity_id=lead.id, company_id=company_id, reason=payload.reason,
+        payload={"name_hash": hashlib.sha256(original_name.encode()).hexdigest()}, request=request,
+    )
+    db.commit()
+    return {"detail": "Lead anonymized, automation paused and shared links revoked."}
+
+
 @router.get("/leads/export.csv", summary="Download the filtered Company Lead report")
 def export_company_leads(
     project_id: Optional[str] = None,
@@ -130,6 +207,7 @@ def export_company_leads(
     search: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker(TENANT_MANAGER_ROLES)),
+    request: Request = None,
 ):
     if project_id:
         require_project_access(db, current_user, project_id)
@@ -137,6 +215,16 @@ def export_company_leads(
         db, current_user.company_id, project_ids=project_ids_for_user(db, current_user),
         project_id=project_id, tier=tier, segment=segment, stage=stage, search=search,
     )
+    rows = services.get_company_leads(
+        db, current_user.company_id, project_ids=project_ids_for_user(db, current_user),
+        project_id=project_id, tier=tier, segment=segment, stage=stage, search=search,
+    )
+    record_export_event(
+        db, actor=current_user, export_type="leads_csv",
+        filters={"project_id": project_id, "tier": tier, "segment": segment, "stage": stage, "search": search},
+        record_count=len(rows), content=content.encode("utf-8"), request=request,
+    )
+    db.commit()
     filename = f"black-penguin-leads-{datetime.now(timezone.utc).date().isoformat()}.csv"
     return StreamingResponse(
         io.BytesIO(content.encode("utf-8")),
@@ -177,6 +265,7 @@ def export_lead_record(
     lead_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.MKT, UserRole.SALES])),
+    request: Request = None,
 ):
     detail = services.get_lead_detail(
         db, lead_id, current_user.company_id,
@@ -187,6 +276,11 @@ def export_lead_record(
         "lead": detail,
     }
     content = json.dumps(jsonable_encoder(payload), ensure_ascii=False, indent=2)
+    record_export_event(
+        db, actor=current_user, export_type="lead_json", filters={"lead_id": lead_id},
+        record_count=1, content=content.encode("utf-8"), request=request,
+    )
+    db.commit()
     return Response(
         content=content,
         media_type="application/json",
@@ -285,10 +379,26 @@ def update_meeting(
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.SALES])),
 ):
+    previous_status = services.get_tenant_meeting(
+        db, meeting_id, current_user.company_id,
+        current_user.id if current_user.role == UserRole.SALES else None,
+    ).status
     meeting = services.update_meeting(
         db, meeting_id, current_user.company_id, payload,
         current_user.id if current_user.role == UserRole.SALES else None,
     )
+    if meeting.status != previous_status and meeting.status in {MeetingStatus.CONFIRMED, MeetingStatus.CANCELLED}:
+        enqueue_notification(
+            db, company_id=current_user.company_id, project_id=meeting.project_id,
+            event_type="appointment_confirmed" if meeting.status == MeetingStatus.CONFIRMED else "appointment_cancelled",
+            entity_type="lead", entity_id=meeting.lead_id,
+            payload={
+                "title": "Appointment confirmed" if meeting.status == MeetingStatus.CONFIRMED else "Appointment cancelled",
+                "body": f"Appointment status changed to {meeting.status.value}.",
+                "action_url": "/app/schedule",
+            }, dedupe_key=f"appointment-{meeting.status.value}:{meeting.id}",
+        )
+        db.commit()
     return _meeting_response(meeting, db)
 
 
@@ -563,7 +673,8 @@ async def upload_meeting_attachment(
     attachment = MeetingAttachment(
         id=attachment_id, meeting_id=meeting.id, uploaded_by_user_id=current_user.id, kind=kind,
         storage_path=stored.relative_path, original_filename=Path(file.filename or f"attachment{extension}").name[:255],
-        mime_type=content_type, size_bytes=len(content),
+        mime_type=content_type, size_bytes=len(content), is_encrypted=True,
+        content_hash=stored.content_hash, encryption_key_id=stored.encryption_key_id,
     )
     db.add(attachment); db.commit(); db.refresh(attachment)
     return MeetingAttachmentResponse.model_validate(attachment).model_copy(update={
@@ -593,10 +704,14 @@ def download_meeting_attachment(
         raise HTTPException(status_code=404, detail="Attachment not found.") from exc
     if not path.is_file():
         raise HTTPException(status_code=404, detail="Attachment not found.")
-    return FileResponse(
-        path, media_type=attachment.mime_type, filename=attachment.original_filename,
-        headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"},
-    )
+    try:
+        content = storage_service.read_meeting_attachment(attachment.storage_path, encrypted=bool(attachment.is_encrypted))
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail="The stored attachment failed integrity verification.") from exc
+    return Response(content=content, media_type=attachment.mime_type, headers={
+        "Content-Disposition": f"attachment; filename*=UTF-8''{quote(attachment.original_filename)}",
+        "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff",
+    })
 
 
 @router.get("/calendar-connections/me", response_model=List[CalendarConnectionResponse])

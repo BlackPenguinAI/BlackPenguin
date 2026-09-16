@@ -14,6 +14,7 @@ from app.integrations.gcalendar_client import (
     is_calendar_free,
 )
 from app.modules.projects.models import Project
+from app.modules.governance.services import enqueue_notification
 
 from .models import (
     CalendarConnection, FunnelStage, Lead, Meeting, MeetingStatus,
@@ -433,6 +434,15 @@ def create_agent_appointment(
     lead.stage_changed_at = datetime.utcnow()
     db.add_all([meeting, lead])
     db.flush()
+    enqueue_notification(
+        db, company_id=lead.company_id, project_id=lead.project_id,
+        event_type="appointment_confirmed", entity_type="lead", entity_id=lead.id,
+        payload={
+            "title": "Appointment confirmed",
+            "body": f"{lead.full_name} confirmed an appointment for {starts_at.isoformat()}.",
+            "action_url": "/app/schedule",
+        }, dedupe_key=f"appointment-confirmed:{meeting.id}",
+    )
     if google_connection and not lead.is_demo:
         project = db.query(Project).filter(Project.id == lead.project_id).one()
         location = ", ".join(value for value in (project.name, project.address, project.city, project.country) if value)

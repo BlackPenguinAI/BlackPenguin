@@ -152,6 +152,9 @@ class ProjectOnboardingSource(Base):
     original_filename = Column(String(255), nullable=True)
     stored_filename = Column(String(255), nullable=True)
     storage_path = Column(Text, nullable=True)
+    is_encrypted = Column(Boolean, default=False, nullable=False)
+    content_hash = Column(String(64), nullable=True)
+    encryption_key_id = Column(String(64), nullable=True)
     extracted_text = Column(Text, nullable=True)
     error_message = Column(Text, nullable=True)
     is_primary = Column(Boolean, default=False, nullable=False)
@@ -250,6 +253,7 @@ class SalesAssetShare(Base):
     revoked = Column(Boolean, default=False, nullable=False)
     access_count = Column(Integer, default=0, nullable=False)
     last_accessed_at = Column(DateTime, nullable=True)
+    first_human_access_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
 

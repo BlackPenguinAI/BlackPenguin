@@ -319,6 +319,9 @@ def _upsert_company_image(
             content=content,
         )
         asset.storage_path = stored.relative_path
+        asset.is_encrypted = True
+        asset.content_hash = stored.content_hash
+        asset.encryption_key_id = stored.encryption_key_id
     return asset
 
 
@@ -591,6 +594,9 @@ def _upsert_project_image(
         )
         source.storage_path = stored.relative_path
         source.stored_filename = stored.stored_filename
+        source.is_encrypted = True
+        source.content_hash = stored.content_hash
+        source.encryption_key_id = stored.encryption_key_id
     return source
 
 

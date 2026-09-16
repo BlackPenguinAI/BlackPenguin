@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
-import { Router, RouterModule } from '@angular/router';
+import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { finalize } from 'rxjs';
 import { API_V1_URL } from '../../../core/config/api.config';
 
@@ -16,6 +16,7 @@ interface LeadDataRow {
 @Component({ selector: 'app-leads', standalone: true, imports: [CommonModule, FormsModule, RouterModule], templateUrl: './leads.html', styleUrls: ['./leads.scss'] })
 export class LeadsComponent implements OnInit, OnDestroy {
   projects: any[] = []; leads: any[] = []; selected: any = null;
+  companies: any[] = []; companyId = ''; deleting = false; deleteReason = ''; deleteConfirmation = '';
   projectId = ''; tier = ''; segment = ''; stage = ''; search = '';
   loading = true; detailLoading = false; exporting = false; downloadingSource = false; error = '';
   private pollTimer?: ReturnType<typeof setTimeout>;
@@ -24,15 +25,29 @@ export class LeadsComponent implements OnInit, OnDestroy {
   private snapshotReady = false;
   private knownLeadIds = new Set<string>();
   private pendingMetaLeadId = '';
+  private requestedLeadId = '';
   readonly segments = ['first_time_buyer','move_up_buyer','relocation','downsizing','rental_yield_investor','appreciation_resale_investor','portfolio_diversification'];
   readonly stages = ['S00_CAPTURE','S01_RESEARCH','S02_QUALIFICATION','S03_PROBLEM_SOLUTION','S04_SCORING','S05_SEGMENTATION','S06_NURTURE','S07_OBJECTION','S08_APPOINTMENT','S09_HANDOFF'];
-  constructor(private http: HttpClient, private cdr: ChangeDetectorRef, private router: Router) {}
-  ngOnInit(): void { this.pollingEnabled = true; this.loadProjects(); this.reload(); }
+  constructor(private http: HttpClient, private cdr: ChangeDetectorRef, private router: Router, private route?: ActivatedRoute) {}
+  readonly isSuperadmin = typeof localStorage !== 'undefined' && localStorage.getItem('bp_role') === 'superadmin';
+  ngOnInit(): void {
+    this.pollingEnabled = true;
+    this.requestedLeadId = this.route?.snapshot.queryParamMap.get('lead') || '';
+    if (this.isSuperadmin) this.loadCompanies(); else { this.loadProjects(); this.reload(); }
+  }
   ngOnDestroy(): void { this.pollingEnabled = false; if (this.pollTimer) clearTimeout(this.pollTimer); }
   loadProjects(): void { this.http.get<any[]>(`${API_V1_URL}/projects/`).subscribe(rows => { this.projects = rows || []; this.cdr.markForCheck(); }); }
+  loadCompanies(): void { this.http.get<any[]>(`${API_V1_URL}/companies/`).subscribe(rows => { this.companies = rows || []; this.loading = false; this.cdr.markForCheck(); }); }
+  selectCompany(): void {
+    this.projects = []; this.leads = []; this.selected = null; this.projectId = '';
+    if (!this.companyId) { this.loading = false; return; }
+    this.http.get<any[]>(`${API_V1_URL}/sales/admin/companies/${this.companyId}/projects`).subscribe(rows => { this.projects = rows || []; this.reload(); });
+  }
   reload(): void {
+    if (this.isSuperadmin && !this.companyId) { this.loading = false; return; }
     this.loading = true; this.error = ''; const params = this.filterParams(false);
-    this.http.get<any[]>(`${API_V1_URL}/sales/leads?${params}`).subscribe({ next: rows => { this.leads = rows || []; this.rememberLeads(this.leads); this.loading = false; this.cdr.markForCheck(); this.schedulePoll(); }, error: err => { this.loading = false; this.error = err.error?.detail || 'Leads could not be loaded.'; this.cdr.markForCheck(); this.schedulePoll(); } });
+    const endpoint = this.isSuperadmin ? `${API_V1_URL}/sales/admin/leads?${params}` : `${API_V1_URL}/sales/leads?${params}`;
+    this.http.get<any[]>(endpoint).subscribe({ next: rows => { this.leads = rows || []; this.rememberLeads(this.leads); this.loading = false; if (this.requestedLeadId && this.leads.some(item => item.id === this.requestedLeadId)) { const id = this.requestedLeadId; this.requestedLeadId = ''; this.loadDetail(id, false); } this.cdr.markForCheck(); this.schedulePoll(); }, error: err => { this.loading = false; this.error = err.error?.detail?.message || err.error?.detail || 'Leads could not be loaded.'; this.cdr.markForCheck(); this.schedulePoll(); } });
   }
   open(lead: any): void { this.pendingMetaLeadId = ''; this.loadDetail(lead.id, false); }
 
@@ -43,6 +58,7 @@ export class LeadsComponent implements OnInit, OnDestroy {
   }
 
   private pollLeads(): void {
+    if (this.isSuperadmin) { this.polling = false; return; }
     if (this.polling || (typeof document !== 'undefined' && document.hidden)) {
       this.schedulePoll();
       return;
@@ -72,7 +88,10 @@ export class LeadsComponent implements OnInit, OnDestroy {
 
   private loadDetail(leadId: string, openConversation: boolean): void {
     this.detailLoading = true;
-    this.http.get<any>(`${API_V1_URL}/sales/leads/${leadId}`).subscribe({
+    const endpoint = this.isSuperadmin
+      ? `${API_V1_URL}/sales/admin/leads/${leadId}?company_id=${encodeURIComponent(this.companyId)}`
+      : `${API_V1_URL}/sales/leads/${leadId}`;
+    this.http.get<any>(endpoint).subscribe({
       next: row => {
         this.selected = row;
         this.detailLoading = false;
@@ -174,8 +193,20 @@ export class LeadsComponent implements OnInit, OnDestroy {
       });
   }
 
+  deleteLead(): void {
+    if (!this.isSuperadmin || !this.selected?.id || !this.deleteReason.trim() || this.deleteConfirmation !== this.selected.full_name) return;
+    this.deleting = true; this.error = '';
+    this.http.delete(`${API_V1_URL}/sales/admin/leads/${this.selected.id}?company_id=${encodeURIComponent(this.companyId)}`, {
+      body: { reason: this.deleteReason.trim(), confirmation: this.deleteConfirmation },
+    }).subscribe({
+      next: () => { this.deleting = false; this.selected = null; this.deleteReason = ''; this.deleteConfirmation = ''; this.reload(); },
+      error: err => { this.deleting = false; this.error = err.error?.detail?.message || err.error?.detail || 'The lead could not be deleted.'; this.cdr.markForCheck(); },
+    });
+  }
+
   private filterParams(includeSearch: boolean): URLSearchParams {
     const params = new URLSearchParams();
+    if (this.isSuperadmin && this.companyId) params.set('company_id', this.companyId);
     if (this.projectId) params.set('project_id', this.projectId);
     if (this.tier) params.set('tier', this.tier);
     if (this.segment) params.set('segment', this.segment);

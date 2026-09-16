@@ -69,6 +69,9 @@ class Lead(Base):
     longitude = Column(Float, nullable=True)
     
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    deleted_at = Column(DateTime, nullable=True, index=True)
+    deleted_by_user_id = Column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    deletion_reason = Column(Text, nullable=True)
     
     # Relaciones del módulo
     messages = relationship("SmsChatMessage", back_populates="lead", cascade="all, delete-orphan")
@@ -219,6 +222,9 @@ class MeetingAttachment(Base):
     original_filename = Column(String(255), nullable=False)
     mime_type = Column(String(100), nullable=False)
     size_bytes = Column(Integer, nullable=False)
+    is_encrypted = Column(Boolean, default=False, nullable=False)
+    content_hash = Column(String(64), nullable=True)
+    encryption_key_id = Column(String(64), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     meeting = relationship("Meeting", back_populates="attachments")

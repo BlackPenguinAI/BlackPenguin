@@ -28,6 +28,7 @@ from app.modules.meta_leads.router import router as meta_leads_router
 from app.modules.sales_agent.provider_router import router as sales_provider_router
 from app.modules.sales_agent.live_worker import run_live_followup_worker
 from app.modules.seo.router import router as seo_router
+from app.modules.governance.router import router as governance_router
 
 from sqlalchemy import text
 from app.db.postgres import engine
@@ -86,6 +87,7 @@ app.include_router(sales_agent_router, prefix=f"{settings.API_V1_STR}/sales-agen
 app.include_router(meta_leads_router, prefix=f"{settings.API_V1_STR}/webhooks", tags=["Meta Lead Ads"])
 app.include_router(sales_provider_router, prefix=f"{settings.API_V1_STR}/webhooks/twilio", tags=["Twilio Messaging"])
 app.include_router(seo_router, prefix=f"{settings.API_V1_STR}/seo", tags=["SEO Monitoring"])
+app.include_router(governance_router, prefix=f"{settings.API_V1_STR}/governance", tags=["Compliance & Operations"])
 
 @app.get("/", tags=["Health"])
 def health_check():

@@ -23,6 +23,7 @@ from app.modules.auth.router import (
     forgot_password,
     inspect_firebase_action,
 )
+from app.modules.governance.services import published_legal_versions
 from app.modules.companies.models import Company
 from app.modules.subscriptions.models import SubscriptionPlan
 from app.modules.system_settings.models import FirebaseConfig
@@ -162,6 +163,8 @@ def test_activation_is_one_time_and_returns_a_tenant_session(caplog):
         db.add(invitation)
         db.commit()
         state = create_invitation_state(invitation.id, user.id)
+        legal_versions = published_legal_versions(db)
+        db.commit()
         with caplog.at_level(logging.INFO), patch(
             "app.integrations.firebase_client.sign_in_with_email_link",
             return_value={"localId": "firebase-sales", "idToken": "email-link-id-token"},
@@ -169,6 +172,8 @@ def test_activation_is_one_time_and_returns_a_tenant_session(caplog):
             response = complete_firebase_invitation(
                 CompleteInvitationPayload(
                     state=state, oob_code="valid-action-code", new_password="Secure#Pass1",
+                    legal_accepted=True,
+                    accepted_legal_versions={key: value.id for key, value in legal_versions.items()},
                 ),
                 db,
             )

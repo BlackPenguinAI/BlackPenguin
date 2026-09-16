@@ -99,6 +99,14 @@ export const routes: Routes = [
           ).then((m) => m.UsersPageComponent),
       },
       {
+        path: 'leads',
+        loadComponent: () => import('./pages/client/leads/leads').then((m) => m.LeadsComponent),
+      },
+      {
+        path: 'data-export-audit',
+        loadComponent: () => import('./features/admin-panel/export-audit/export-audit').then((m) => m.ExportAuditComponent),
+      },
+      {
         path: 'plans',
         loadComponent: () =>
           import(
@@ -225,7 +233,7 @@ export const routes: Routes = [
       {
         path: 'leads',
         canActivate: [roleGuard],
-        data: { roles: ['admin', 'assistant'] },
+        data: { roles: ['superadmin', 'admin', 'assistant'] },
         loadComponent: () =>
           import('./pages/client/leads/leads').then((m) => m.LeadsComponent),
       },
@@ -243,6 +251,18 @@ export const routes: Routes = [
         data: { roles: ['admin', 'assistant', 'mkt'] },
         loadComponent: () =>
           import('./pages/client/agent/agent').then((m) => m.AgentComponent),
+      },
+      {
+        path: 'agent-settings',
+        canActivate: [roleGuard],
+        data: { roles: ['admin', 'assistant', 'mkt'] },
+        loadComponent: () => import('./pages/client/agent-settings/agent-settings').then((m) => m.AgentSettingsComponent),
+      },
+      {
+        path: 'notifications',
+        canActivate: [roleGuard],
+        data: { roles: ['admin', 'assistant', 'mkt', 'sales'] },
+        loadComponent: () => import('./pages/client/notifications/notifications').then((m) => m.NotificationsComponent),
       },
       {
         path: 'projects/:id/onboarding',

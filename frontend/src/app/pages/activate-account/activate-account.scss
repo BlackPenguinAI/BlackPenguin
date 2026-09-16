@@ -8,6 +8,9 @@ h1 { margin: 0; font-size: 30px; }.subtitle { margin: -10px 0 0; color: #999; li
 label { display: flex; flex-direction: column; gap: 7px; color: #aaa; font-size: 12px; } input { width: 100%; box-sizing: border-box; border: 1px solid rgba(255,255,255,.12); border-radius: 12px; padding: 13px 14px; background: #090909; color: #fff; outline: none; } input:focus { border-color: #f5c400; }
 .password-field { position: relative; }.password-field button { position: absolute; top: 8px; right: 8px; border: 0; background: transparent; color: #888; cursor: pointer; }
 .checks { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; color: #777; font-size: 12px; }.checks li::before { content: '○'; margin-right: 8px; }.checks li.ok { color: #7ed99b; }.checks li.ok::before { content: '✓'; }
+.legal-consent { display: flex; align-items: flex-start; gap: 10px; padding: 12px; border: 1px solid rgba(255,255,255,.09); border-radius: 12px; background: rgba(255,255,255,.025); color: #aaa; font-size: 11px; line-height: 1.55; }
+.legal-consent input { margin-top: 3px; accent-color: #f4c400; }
+.legal-consent a { color: #f4c400; text-decoration: underline; text-underline-offset: 2px; }
 .activate,.primary-link { border: 0; border-radius: 999px; padding: 13px 18px; background: #f5c400; color: #070707; font-weight: 700; text-align: center; text-decoration: none; cursor: pointer; }.activate:disabled { cursor: not-allowed; opacity: .35; }.error { color: #fca5a5; font-size: 12px; }
 .state-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }.secondary-link { border: 1px solid rgba(255,255,255,.15); border-radius: 999px; padding: 12px 18px; color: #ddd; font-weight: 600; text-decoration: none; }
 @media (max-width: 520px) { .activation-card { padding: 24px; }.context { grid-template-columns: 1fr; } }

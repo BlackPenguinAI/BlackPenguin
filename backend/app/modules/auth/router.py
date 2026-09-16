@@ -1,7 +1,7 @@
 from datetime import datetime
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.orm import Session
@@ -18,6 +18,7 @@ from app.modules.auth.deps import get_current_user
 from app.modules.system_settings.services import get_firebase_config
 from app.modules.users import services as user_services
 from app.modules.users.models import User, UserAuthStatus, UserInvitation
+from app.modules.governance import services as governance_services
 
 from .schemas import TokenResponse
 
@@ -32,6 +33,8 @@ class FirebaseActionCodePayload(BaseModel):
 class CompleteInvitationPayload(FirebaseActionCodePayload):
     oob_code: str = Field(min_length=8, max_length=2048)
     new_password: str = Field(min_length=10, max_length=128)
+    legal_accepted: bool = False
+    accepted_legal_versions: dict[str, str] = Field(default_factory=dict)
 
 
 class ForgotPasswordPayload(BaseModel):
@@ -94,6 +97,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
 
     if not authenticated:
         raise HTTPException(status_code=400, detail="Email or password is incorrect.")
+    governance_services.assert_company_license(db, user)
     response = _session_response(user)
     db.commit()
     return response
@@ -183,15 +187,34 @@ def inspect_firebase_action(payload: FirebaseActionCodePayload, db: Session = De
         "Firebase invitation validated company_id=%s user_id=%s invitation_id=%s status=%s",
         user.company_id, user.id, invitation.id, invitation.status,
     )
+    versions = governance_services.published_legal_versions(db)
+    db.commit()
     return {
         "email": user.email, "first_name": user.first_name, "role": user.role,
         "company_name": user.company.name if user.company else None, "flow": "invitation",
+        "legal_documents": governance_services.legal_version_payload(versions),
     }
 
 
 @router.post("/firebase/complete-invitation", response_model=TokenResponse)
-def complete_firebase_invitation(payload: CompleteInvitationPayload, db: Session = Depends(get_db)):
+def complete_firebase_invitation(
+    payload: CompleteInvitationPayload,
+    db: Session = Depends(get_db),
+    request: Request = None,
+):
     user, invitation = _pending_invitation_from_state(payload.state, db)
+    # Reject inactive or out-of-window tenants before consuming the one-time
+    # Firebase action or changing any provider-side credential.
+    governance_services.assert_company_license(db, user)
+    if not payload.legal_accepted:
+        raise HTTPException(status_code=422, detail={
+            "code": "LEGAL_ACCEPTANCE_REQUIRED",
+            "message": "Accept the Privacy Policy, Terms and Data Deletion Policy to activate your account.",
+        })
+    governance_services.record_legal_acceptance(
+        db, user=user, invitation_id=invitation.id,
+        accepted_version_ids=payload.accepted_legal_versions, request=request,
+    )
     logger.info(
         "Firebase email-link activation started company_id=%s user_id=%s invitation_id=%s",
         user.company_id, user.id, invitation.id,
@@ -233,6 +256,7 @@ def exchange_firebase_token(payload: FirebaseExchangePayload, db: Session = Depe
     user = db.query(User).filter(User.firebase_uid == identity.get("uid")).first()
     if not user or not user.is_active or user.auth_status != UserAuthStatus.ACTIVE:
         raise HTTPException(status_code=403, detail="Black Penguin account is not active.")
+    governance_services.assert_company_license(db, user)
     response = _session_response(user)
     db.commit()
     return response

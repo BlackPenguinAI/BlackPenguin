@@ -47,4 +47,10 @@ from app.modules.project_team.models import ProjectRoutingState, ProjectUserAssi
 from app.modules.sales_agent.models import AgentRun, ExternalWebhookEvent, OutboundMessage, SalesAgentSimulation, SalesConversation, SalesFollowUpJob, SalesMessage
 from app.modules.onboarding_jobs.models import OnboardingSourceJob
 from app.modules.seo.models import SeoAuditRun
+from app.modules.governance.models import (
+    AgentOperatingPolicy, ConversationKpiTarget, DataExportAuditEvent,
+    HumanInterventionCase, KnowledgeGuidanceItem, LegalDocumentVersion,
+    Notification, NotificationOutbox, PlatformAuditEvent,
+    SalesAssetAccessEvent, UserLegalAcceptance,
+)
 from app.db.schema import SchemaVersion

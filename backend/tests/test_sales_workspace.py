@@ -324,7 +324,9 @@ def test_sales_uploads_visit_photo_only_to_assigned_meeting(db, monkeypatch, tmp
     result = asyncio.run(upload_meeting_attachment(meeting.id, "visit_photo", upload, db, sales_a))
     assert result.kind == "visit_photo"
     attachment = db.query(MeetingAttachment).filter(MeetingAttachment.id == result.id).one()
-    assert storage_service.resolve_meeting_attachment(attachment.storage_path).read_bytes() == b"safe-image-content"
+    assert attachment.is_encrypted is True
+    assert storage_service.resolve_meeting_attachment(attachment.storage_path).read_bytes() != b"safe-image-content"
+    assert storage_service.read_meeting_attachment(attachment.storage_path, encrypted=True) == b"safe-image-content"
     denied_upload = UploadFile(
         filename="other.jpg", file=BytesIO(b"other"), headers=Headers({"content-type": "image/jpeg"}),
     )

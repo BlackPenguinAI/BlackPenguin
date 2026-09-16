@@ -1,6 +1,7 @@
-from fastapi import APIRouter, Depends, Header, HTTPException, status, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status, Query
 from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
+from datetime import datetime
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from app.db.postgres import get_db
@@ -15,6 +16,10 @@ from .schemas import (
 )
 from app.modules.companies.models import Company
 from app.modules.projects.models import Project
+from app.modules.governance.schemas import DeletePayload, UserStatusPayload
+from app.modules.governance.services import record_platform_event
+from app.integrations import firebase_admin_client
+from app.modules.system_settings.services import get_firebase_config
 
 router = APIRouter()
 
@@ -143,12 +148,90 @@ def get_all_users_for_admin(
     return query.order_by(User.email.asc()).all()
 
 
+@router.patch("/admin/{user_id}/status", response_model=UserAdminListResponse)
+def set_platform_user_status(
+    user_id: str, payload: UserStatusPayload, request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN])),
+):
+    user = db.query(User).filter(User.id == user_id, User.deleted_at.is_(None)).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+    if user.id == current_user.id:
+        raise HTTPException(status_code=409, detail="You cannot suspend your own account.")
+    if user.role == UserRole.SUPERADMIN and payload.action == "suspend":
+        remaining = db.query(User).filter(
+            User.role == UserRole.SUPERADMIN, User.id != user.id,
+            User.is_active.is_(True), User.deleted_at.is_(None),
+        ).count()
+        if not remaining:
+            raise HTTPException(status_code=409, detail="The last active Superadmin cannot be suspended.")
+    services.set_user_enabled(db, user=user, enabled=payload.action == "reactivate")
+    record_platform_event(
+        db, actor=current_user, event_type=f"USER_{payload.action.upper()}",
+        entity_type="user", entity_id=user.id, company_id=user.company_id,
+        reason=payload.reason, request=request,
+    )
+    db.commit(); db.refresh(user)
+    return user
+
+
+@router.delete("/admin/{user_id}")
+def delete_platform_user(
+    user_id: str, payload: DeletePayload, request: Request,
+    firebase_cleanup_confirmed: bool = Query(False), db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN])),
+):
+    user = db.query(User).filter(User.id == user_id, User.deleted_at.is_(None)).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+    if user.id == current_user.id:
+        raise HTTPException(status_code=409, detail="You cannot delete your own account.")
+    if payload.confirmation.strip().casefold() != user.email.casefold():
+        raise HTTPException(status_code=422, detail="Type the user's email exactly to confirm deletion.")
+    if user.role == UserRole.SUPERADMIN:
+        remaining = db.query(User).filter(
+            User.role == UserRole.SUPERADMIN, User.id != user.id,
+            User.is_active.is_(True), User.deleted_at.is_(None),
+        ).count()
+        if not remaining:
+            raise HTTPException(status_code=409, detail="The last active Superadmin cannot be deleted.")
+    if user.role == UserRole.ADMIN:
+        replacement = db.query(User).filter(
+            User.company_id == user.company_id, User.role == UserRole.ADMIN,
+            User.id != user.id, User.is_active.is_(True), User.deleted_at.is_(None),
+        ).count()
+        if not replacement:
+            raise HTTPException(status_code=409, detail="Assign a replacement Company administrator before deleting this user.")
+    original_email = user.email
+    if user.firebase_uid and not firebase_cleanup_confirmed:
+        config = get_firebase_config(db)
+        firebase_admin_client.delete_identity(
+            project_id=config.project_id or "", firebase_uid=user.firebase_uid, email=user.email,
+        )
+    now = datetime.utcnow()
+    services.set_user_enabled(db, user=user, enabled=False)
+    user.deleted_at = now; user.deleted_by_user_id = current_user.id; user.deletion_reason = payload.reason
+    user.email = f"deleted+{user.id}@blackpenguin.invalid"
+    user.first_name = None; user.last_name = None; user.phone = None; user.country = None; user.firebase_uid = None
+    record_platform_event(
+        db, actor=current_user, event_type="USER_DELETED", entity_type="user",
+        entity_id=user.id, company_id=user.company_id, reason=payload.reason,
+        payload={"email_hash": __import__("hashlib").sha256(original_email.casefold().encode()).hexdigest()},
+        request=request,
+    )
+    db.commit()
+    return {"detail": "User access removed and personal profile anonymized."}
+
+
 @router.get("/company", response_model=List[TenantUserResponse])
 def list_company_users(
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker(TENANT_MANAGER_ROLES)),
 ):
-    users = db.query(User).filter(User.company_id == current_user.company_id).order_by(User.email.asc()).all()
+    users = db.query(User).filter(
+        User.company_id == current_user.company_id, User.deleted_at.is_(None),
+    ).order_by(User.email.asc()).all()
     return [_tenant_user_response(db, user) for user in users]
 
 
