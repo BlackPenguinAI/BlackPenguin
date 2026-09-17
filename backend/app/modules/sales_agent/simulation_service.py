@@ -344,6 +344,7 @@ async def generate_initial_message(
     *,
     company_id: str,
     simulation_id: str,
+    actor_user_id: str | None = None,
 ) -> dict:
     simulation = _simulation(db, company_id=company_id, simulation_id=simulation_id)
     event_prefix = f"{INITIAL_EVENT_PREFIX}{simulation.id}"
@@ -362,6 +363,7 @@ async def generate_initial_message(
             record_inbound=False,
             event_kind="lead_form_submitted",
             virtual_now=simulation.virtual_now,
+            actor_user_id=actor_user_id,
         )
         lead = db.query(Lead).filter(Lead.id == simulation.lead_id).one()
         simulation.prompt_snapshot = completed.prompt_snapshot or {}
@@ -401,6 +403,7 @@ async def generate_initial_message(
             record_inbound=False,
             event_kind="lead_form_submitted",
             virtual_now=simulation.virtual_now,
+            actor_user_id=actor_user_id,
         )
     except Exception:
         db.rollback()
@@ -544,6 +547,7 @@ async def advance_simulation(
     company_id: str,
     simulation_id: str,
     hours: int,
+    actor_user_id: str | None = None,
 ) -> dict:
     simulation = _simulation(db, company_id=company_id, simulation_id=simulation_id)
     if simulation.status != "active":
@@ -581,6 +585,7 @@ async def advance_simulation(
             event_kind="follow_up",
             follow_up_hours=24 if job.attempt_number == 1 else 48,
             virtual_now=simulation.virtual_now,
+            actor_user_id=actor_user_id,
         )
         processed += 1
     db.refresh(simulation)

@@ -52,7 +52,11 @@
       </article>
 
       <article class="overflow-hidden rounded-[1.75rem] border border-white/10 bg-[#101010]">
-        <div class="p-5 md:p-7"><p class="eyebrow">Project location</p><h2 class="mt-2 text-2xl font-light">Map</h2><p class="mt-2 text-sm text-gray-500">{{ project.location.address || 'Geolocation pending' }}</p></div>
+        <div class="p-5 md:p-7"><p class="eyebrow">Project location</p><h2 class="mt-2 text-2xl font-light">Map</h2><p class="mt-2 text-sm text-gray-500">{{ project.location.address || 'Geolocation pending' }}</p>
+          <div *ngIf="project.locations.length > 1" class="location-list mt-4 grid gap-2">
+            <div *ngFor="let location of project.locations" class="rounded-xl border border-white/5 bg-black/20 px-3 py-2.5"><p class="text-[10px] font-bold uppercase tracking-wider text-secondary">{{ location.label }}</p><p class="mt-1 text-xs leading-5 text-gray-400">{{ location.address }}</p></div>
+          </div>
+        </div>
         <iframe *ngIf="mapSafeUrl; else pendingMap" [src]="mapSafeUrl" title="Project location" class="h-72 w-full border-0 grayscale-[.25]" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
         <ng-template #pendingMap><div class="map-placeholder flex h-72 items-center justify-center"><div class="text-center"><span class="material-symbols-outlined text-4xl text-secondary">location_off</span><p class="mt-2 text-sm text-gray-500">Add an exact address to activate the map.</p></div></div></ng-template>
       </article>

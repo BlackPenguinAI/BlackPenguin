@@ -41,7 +41,13 @@ export class LeadsComponent implements OnInit, OnDestroy {
   selectCompany(): void {
     this.projects = []; this.leads = []; this.selected = null; this.projectId = '';
     if (!this.companyId) { this.loading = false; return; }
-    this.http.get<any[]>(`${API_V1_URL}/sales/admin/companies/${this.companyId}/projects`).subscribe(rows => { this.projects = rows || []; this.reload(); });
+    // Lead visibility is company-scoped and must not depend on the optional
+    // project-filter request succeeding.
+    this.reload();
+    this.http.get<any[]>(`${API_V1_URL}/sales/admin/companies/${this.companyId}/projects`).subscribe({
+      next: rows => { this.projects = rows || []; this.cdr.markForCheck(); },
+      error: () => { this.projects = []; this.cdr.markForCheck(); },
+    });
   }
   reload(): void {
     if (this.isSuperadmin && !this.companyId) { this.loading = false; return; }

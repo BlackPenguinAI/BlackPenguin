@@ -133,9 +133,8 @@ def get_platform_company_leads(
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN])),
 ):
-    project_ids = [row[0] for row in db.query(Project.id).filter(Project.company_id == company_id).all()]
     return services.get_company_leads(
-        db, company_id, project_ids=project_ids, project_id=project_id,
+        db, company_id, project_ids=None, project_id=project_id,
         tier=tier, segment=segment, stage=stage,
     )
 

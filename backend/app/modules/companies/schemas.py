@@ -32,6 +32,8 @@ class CompanyResponse(BaseModel):
     payment_receipt_url: Optional[str] = None
     plan_id: Optional[str] = None
     created_at: Optional[datetime] = None
+    ai_tokens_used: int = 0
+    ai_cost_usd: float = 0.0
     
     plan: Optional[PlanBasicResponse] = None
     users: List[UserBasicResponse] = []

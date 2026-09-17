@@ -19,6 +19,7 @@ from alembic.operations import Operations
 import app.db.base  # noqa: F401 - register every foreign-key target
 from app.db.postgres import Base
 from app.modules.companies.models import Company
+from app.modules.governance.models import DataExportAuditEvent
 from app.modules.projects.models import Project
 from app.modules.sales_agent.models import SalesConversation, SalesMessage
 from app.modules.sales_agent.service import conversation_messages
@@ -31,7 +32,7 @@ from app.modules.sales_crm.scheduling import (
 from app.modules.sales_crm.router import export_lead_record, get_company_sales_schedule, upload_meeting_attachment
 from app.modules.sales_crm import storage_service
 from app.modules.sales_crm.services import (
-    create_meeting, delete_meeting, get_lead_detail, leads_csv_report, update_meeting,
+    create_meeting, delete_meeting, get_company_leads, get_lead_detail, leads_csv_report, update_meeting,
 )
 from app.modules.sales_crm.schemas import MeetingCreate
 from app.modules.users.models import User, UserRole
@@ -101,6 +102,23 @@ def test_filtered_lead_csv_is_excel_safe_and_keeps_structured_meta_data(db):
     assert list(csv.DictReader(StringIO(empty.lstrip("\ufeff")))) == []
 
 
+def test_superadmin_company_leads_include_legacy_rows_without_a_project(db):
+    company, _, _, project, assigned, _ = _fixture(db)
+    legacy = Lead(
+        company_id=company.id, project_id=None, full_name="Legacy Lead",
+        phone="+15550009999", platform="manual", source="Imported",
+    )
+    db.add(legacy); db.commit()
+
+    platform_rows = get_company_leads(db, company.id, project_ids=None)
+    tenant_rows = get_company_leads(db, company.id, project_ids=[project.id])
+    no_access_rows = get_company_leads(db, company.id, project_ids=[])
+
+    assert {item.id for item in platform_rows} == {assigned.id, legacy.id}
+    assert {item.id for item in tenant_rows} == {assigned.id}
+    assert no_access_rows == []
+
+
 def test_individual_lead_record_is_a_private_download_for_the_assigned_sales_user(db):
     _, sales_a, _, _, lead, _ = _fixture(db)
 
@@ -112,6 +130,12 @@ def test_individual_lead_record_is_a_private_download_for_the_assigned_sales_use
     assert response.headers["cache-control"] == "private, no-store"
     assert payload["lead"]["id"] == lead.id
     assert payload["lead"]["meta_form_data"] == {"budget": "600000", "bedrooms": "3"}
+    event = db.query(DataExportAuditEvent).one()
+    assert event.company_id == sales_a.company_id
+    assert event.actor_user_id == sales_a.id
+    assert event.export_type == "lead_json"
+    assert event.record_count == 1
+    assert len(event.content_hash) == 64
 
 
 def test_sales_user_manages_date_specific_availability_blocks(db):

@@ -294,6 +294,7 @@ class ProjectOverviewResponse(BaseModel):
     status: str | None = None
     description: str | None = None
     address: str | None = None
+    locations: list[dict[str, str]] = Field(default_factory=list)
     city: str | None = None
     country: str | None = None
     delivery_dates: Any = None

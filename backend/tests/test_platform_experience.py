@@ -208,9 +208,21 @@ class _Response:
 
 def test_seo_audit_persists_repeatable_technical_checks():
     db = _db()
-    html = """<html lang="en"><head><title>Black Penguin autonomous real estate platform</title><meta name="description" content="A sufficiently descriptive explanation of the Black Penguin real estate automation platform."><link rel="canonical" href="https://blackpenguin.ai/"><meta property="og:title" content="Black Penguin"><script type="application/ld+json">{}</script></head></html>"""
-    with patch("app.modules.seo.service.httpx.get", side_effect=[_Response(html), _Response("User-agent: *"), _Response("<urlset/>\n")]):
+    html = """<html lang="en"><head><title>Black Penguin real estate platform</title><meta name="description" content="A sufficiently descriptive explanation of the Black Penguin real estate automation platform."><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="canonical" href="https://blackpenguin.ai/"><meta property="og:title" content="Black Penguin"><meta property="og:description" content="AI sales automation for real estate teams"><script type="application/ld+json">{"@type":"Organization"}</script></head><body><h1>Black Penguin</h1></body></html>"""
+    with patch("app.modules.seo.service.httpx.get", side_effect=[_Response(html), _Response("User-agent: *\nDisallow:"), _Response("<urlset/>\n")]):
         audit = run_audit(db)
     assert audit.status == "healthy"
     assert audit.score == 100
     assert all(audit.details.values())
+
+
+def test_seo_audit_detects_noindex_invalid_sitemap_and_blocked_robots():
+    db = _db()
+    html = """<html lang="es"><head><title>Short</title><meta name="robots" content="noindex"><meta name="viewport" content="width=device-width"></head><body><h1>One</h1><h1>Two</h1></body></html>"""
+    with patch("app.modules.seo.service.httpx.get", side_effect=[_Response(html), _Response("User-agent: *\nDisallow: /"), _Response("not xml")]):
+        audit = run_audit(db)
+    assert audit.status == "needs_attention"
+    assert audit.details["indexable"] is False
+    assert audit.details["robots_txt"] is False
+    assert audit.details["sitemap_xml"] is False
+    assert audit.details["single_h1"] is False

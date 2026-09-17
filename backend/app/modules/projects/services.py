@@ -587,6 +587,30 @@ def complete_onboarding(db: Session, project: Project, user_id: str) -> ProjectP
     return profile
 
 
+def normalized_project_locations(value: Any, fallback: str | None = None) -> list[dict[str, str]]:
+    """Convert legacy scalar and extracted structured addresses to one stable shape."""
+
+    candidates = value if isinstance(value, list) else [value]
+    locations: list[dict[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+    for index, candidate in enumerate(candidates):
+        label = "Primary location" if index == 0 else f"Location {index + 1}"
+        address: Any = candidate
+        if isinstance(candidate, dict):
+            label = candidate.get("label") or candidate.get("name") or label
+            address = candidate.get("address") or candidate.get("exact_address") or candidate.get("value")
+        if not isinstance(address, str) or not address.strip():
+            continue
+        item = (str(label).strip()[:180], address.strip()[:500])
+        if item in seen:
+            continue
+        seen.add(item)
+        locations.append({"label": item[0], "address": item[1]})
+    if not locations and isinstance(fallback, str) and fallback.strip():
+        locations.append({"label": "Primary location", "address": fallback.strip()[:500]})
+    return locations
+
+
 def serialize_overview(db: Session, project: Project) -> dict[str, Any]:
     profile = get_profile(project)
     data = profile.profile_data or {}
@@ -658,12 +682,14 @@ def serialize_overview(db: Session, project: Project) -> dict[str, Any]:
          "status": "available" if starting_price else "pending"},
         {"key": "target_roi", "label": "Target ROI (Return on Investment)", "value": None, "display_value": "Pending", "status": "pending"},
     ]
-    address_parts = [data.get("exact_address") or project.address, data.get("city") or project.city, data.get("country") or project.country]
+    locations = normalized_project_locations(data.get("exact_address"), project.address)
+    primary_address = locations[0]["address"] if locations else None
+    address_parts = [primary_address, data.get("city") or project.city, data.get("country") or project.country]
     address = ", ".join(str(part) for part in address_parts if part)
     return {
         "id": project.id, "name": data.get("project_name") or project.name,
         "status": data.get("project_status"), "description": data.get("short_description") or project.description,
-        "address": data.get("exact_address") or project.address, "city": data.get("city") or project.city,
+        "address": primary_address, "locations": locations, "city": data.get("city") or project.city,
         "country": data.get("country") or project.country, "delivery_dates": data.get("delivery_dates"),
         "cover_image_url": f"/api/v1/projects/{project.id}/sources/{cover.id}/file" if cover else None,
         "cover_focal_point": {"x": cover.focal_point_x, "y": cover.focal_point_y} if cover else {"x": .5, "y": .5},

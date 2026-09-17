@@ -16,6 +16,7 @@ from app.core.config import settings
 from app.db.postgres import get_db
 from app.integrations.openrouter_client import generate_llm_response
 from app.modules.ai_core.services import get_ai_config
+from app.modules.ai_core.usage import LLMUsageContext
 from app.modules.auth.deps import RoleChecker
 from app.modules.company_onboarding.models import CompanyProfile
 from app.modules.onboarding_questions import build_next_question
@@ -415,6 +416,12 @@ async def _complete_chat_turn(
             ai_config.openrouter_api_key, model, messages,
             response_format={"type": "json_object"}, temperature=0.25, raise_on_error=True,
             timeout_seconds=20.0,
+            usage_context=LLMUsageContext(
+                company_id=current_user.company_id,
+                user_id=current_user.id,
+                project_id=project.id,
+                feature="project_onboarding_chat",
+            ),
         )
         parsed = _parse_agent_response(raw)
     except (httpx.HTTPError, ValueError) as exc:

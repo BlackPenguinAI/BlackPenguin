@@ -7,6 +7,7 @@ from bs4 import BeautifulSoup
 from app.db.postgres import SessionLocal
 from app.integrations.openrouter_client import generate_llm_response
 from app.modules.ai_core.services import get_ai_config
+from app.modules.ai_core.usage import LLMUsageContext
 
 from . import services
 
@@ -69,7 +70,15 @@ async def scrape_and_enrich_profile(company_id: str, url: str) -> None:
                     ),
                 },
             ]
-            raw = await generate_llm_response(config.openrouter_api_key, model, messages)
+            raw = await generate_llm_response(
+                config.openrouter_api_key,
+                model,
+                messages,
+                usage_context=LLMUsageContext(
+                    company_id=company_id,
+                    feature="company_website_extraction",
+                ),
+            )
             clean = raw.replace("```json", "").replace("```", "").strip()
             payload = json.loads(clean)
             updates = payload.get("updates", []) if isinstance(payload, dict) else []

@@ -1,6 +1,6 @@
 import '@angular/compiler';
-import { of } from 'rxjs';
-import { describe, expect, it } from 'vitest';
+import { of, throwError } from 'rxjs';
+import { describe, expect, it, vi } from 'vitest';
 import { LeadsComponent } from './leads';
 
 describe('LeadsComponent', () => {
@@ -67,6 +67,23 @@ describe('LeadsComponent', () => {
     );
     value.ngOnInit();
     expect(value.selected).toEqual(lead);
+  });
+
+  it('loads superadmin leads even when the project filter request fails', () => {
+    const lead = { id: 'legacy-lead', project_id: null, full_name: 'Legacy Lead' };
+    const http = { get: vi.fn((url: string) => url.includes('/admin/companies/') ? throwError(() => new Error('failed')) : of([lead])) };
+    const value = new LeadsComponent(
+      http as any,
+      { markForCheck: () => undefined } as any,
+      { navigate: () => Promise.resolve(true) } as any,
+    );
+    Object.defineProperty(value, 'isSuperadmin', { value: true });
+    value.companyId = 'company-1';
+
+    value.selectCompany();
+
+    expect(value.leads).toEqual([lead]);
+    expect(http.get).toHaveBeenCalledWith(expect.stringContaining('/sales/admin/leads?company_id=company-1'));
   });
 
   it('exports the active filters and downloads an individual Lead Record', () => {

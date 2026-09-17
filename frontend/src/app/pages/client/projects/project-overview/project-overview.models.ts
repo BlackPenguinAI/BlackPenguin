@@ -25,6 +25,7 @@ export interface ProjectOverview {
   status: string | null;
   description: string | null;
   address: string | null;
+  locations: Array<{ label: string; address: string }>;
   city: string | null;
   country: string | null;
   delivery_dates: unknown;

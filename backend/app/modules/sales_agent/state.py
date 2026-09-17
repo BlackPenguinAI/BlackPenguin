@@ -6,6 +6,7 @@ class SalesAgentState(TypedDict, total=False):
     mode: str
     conversation_id: str
     company_id: str
+    actor_user_id: str | None
     project_id: str
     campaign_id: str | None
     lead_id: str

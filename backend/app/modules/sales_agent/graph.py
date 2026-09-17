@@ -7,6 +7,7 @@ from langgraph.graph import END, START, StateGraph
 from sqlalchemy.orm import Session
 
 from app.integrations.openrouter_client import generate_llm_response
+from app.modules.ai_core.usage import LLMUsageContext
 from app.modules.ai_core.services import get_ai_config
 from app.modules.companies.models import Company
 from app.modules.projects import asset_share_service
@@ -204,6 +205,13 @@ def build_sales_graph(db: Session):
             response_format={"type": "json_object"},
             temperature=0.2,
             raise_on_error=True,
+            usage_context=LLMUsageContext(
+                company_id=state["company_id"],
+                user_id=state.get("actor_user_id"),
+                project_id=state.get("project_id"),
+                feature="sales_agent",
+                agent_run_event_id=state.get("event_id"),
+            ),
         )
         value = _json_object(raw)
         return {

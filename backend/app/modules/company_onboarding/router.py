@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.db.postgres import get_db
 from app.integrations.openrouter_client import generate_llm_response
 from app.modules.ai_core.services import get_ai_config
+from app.modules.ai_core.usage import LLMUsageContext
 from app.modules.auth.deps import RoleChecker
 from app.modules.companies.models import Company
 from app.modules.onboarding_questions import build_next_question
@@ -1095,6 +1096,11 @@ async def send_chat_message(
             response_format={"type": "json_object"},
             temperature=0.25,
             raise_on_error=True,
+            usage_context=LLMUsageContext(
+                company_id=current_user.company_id,
+                user_id=current_user.id,
+                feature="company_onboarding_chat",
+            ),
         )
         parsed = _parse_agent_response(raw)
         if parsed is None:
@@ -1112,6 +1118,11 @@ async def send_chat_message(
                 response_format={"type": "json_object"},
                 temperature=0,
                 raise_on_error=True,
+                usage_context=LLMUsageContext(
+                    company_id=current_user.company_id,
+                    user_id=current_user.id,
+                    feature="company_onboarding_chat_repair",
+                ),
             )
             parsed = _parse_agent_response(repaired)
     except (httpx.HTTPError, ValueError) as exc:

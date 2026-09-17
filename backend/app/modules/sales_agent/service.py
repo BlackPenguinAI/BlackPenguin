@@ -405,6 +405,7 @@ async def simulate_turn(
     follow_up_hours: int | None = None,
     virtual_now: datetime | None = None,
     sales_user_id: str | None = None,
+    actor_user_id: str | None = None,
 ) -> dict:
     lead_query = db.query(Lead).filter(Lead.id == lead_id, Lead.company_id == company_id)
     if sales_user_id:
@@ -520,6 +521,7 @@ async def simulate_turn(
             "mode": "simulation",
             "conversation_id": conversation.id,
             "company_id": company_id,
+            "actor_user_id": actor_user_id,
             "project_id": project.id,
             "campaign_id": lead.campaign_id,
             "lead_id": lead.id,

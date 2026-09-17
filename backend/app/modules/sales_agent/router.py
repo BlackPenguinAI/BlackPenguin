@@ -112,6 +112,7 @@ async def start_initial_message(
         db,
         company_id=current_user.company_id,
         simulation_id=simulation_id,
+        actor_user_id=current_user.id,
     )
 
 
@@ -162,6 +163,7 @@ async def advance_clock(
         company_id=current_user.company_id,
         simulation_id=simulation_id,
         hours=payload.hours,
+        actor_user_id=current_user.id,
     )
 
 
@@ -200,6 +202,7 @@ async def simulate(
         inbound_text=payload.message,
         event_id=payload.event_id,
         sales_user_id=None,
+        actor_user_id=current_user.id,
     )
 
 

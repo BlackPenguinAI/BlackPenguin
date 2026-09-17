@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session
 
 from app.integrations.openrouter_client import generate_llm_response
 from app.modules.ai_core.services import get_ai_config
+from app.modules.ai_core.usage import LLMUsageContext
 from app.modules.onboarding_jobs.errors import (
     AccessRestrictedError,
     NoReadableContentError,
@@ -409,6 +410,11 @@ async def _extract_proposals(
             response_format={"type": "json_object"},
             temperature=0.1,
             raise_on_error=True,
+            usage_context=LLMUsageContext(
+                company_id=source.company_id,
+                user_id=source.uploaded_by_user_id,
+                feature="company_source_extraction",
+            ),
         )
         payload = json.loads(_strip_fences(raw))
     except Exception:

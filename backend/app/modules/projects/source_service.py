@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 
 from app.integrations.openrouter_client import generate_llm_response
 from app.modules.ai_core.services import get_ai_config
+from app.modules.ai_core.usage import LLMUsageContext
 from app.modules.onboarding_questions import validate_onboarding_value
 from app.modules.onboarding_jobs.errors import (
     AccessRestrictedError,
@@ -319,6 +320,12 @@ async def _extract_proposals(
         config.openrouter_api_key, model,
         [{"role": "system", "content": instruction}, {"role": "user", "content": user_content}],
         response_format={"type": "json_object"}, temperature=0.1, raise_on_error=True,
+        usage_context=LLMUsageContext(
+            company_id=project.company_id,
+            user_id=source.uploaded_by_user_id,
+            project_id=project.id,
+            feature="project_source_extraction",
+        ),
     )
     payload = json.loads(raw.replace("```json", "").replace("```", "").strip())
     existing_names = {

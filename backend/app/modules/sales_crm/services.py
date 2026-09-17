@@ -29,12 +29,15 @@ def get_project_leads(db: Session, company_id: str, project_id: str, sales_user_
 
 
 def get_company_leads(
-    db: Session, company_id: str, *, project_ids: list[str], project_id: str | None = None,
+    db: Session, company_id: str, *, project_ids: list[str] | None, project_id: str | None = None,
     tier: str | None = None, segment: str | None = None, stage: str | None = None,
     search: str | None = None,
 ) -> List[Lead]:
     query = db.query(Lead).filter(Lead.company_id == company_id, Lead.deleted_at.is_(None))
-    query = query.filter(Lead.project_id.in_(project_ids)) if project_ids else query.filter(Lead.project_id == "")
+    # ``None`` means platform-wide access inside this Company. An explicit list
+    # remains the tenant user's project ACL; an empty ACL must return no rows.
+    if project_ids is not None:
+        query = query.filter(Lead.project_id.in_(project_ids)) if project_ids else query.filter(False)
     if project_id: query = query.filter(Lead.project_id == project_id)
     if tier: query = query.filter(Lead.intent_tier == tier)
     if segment: query = query.filter(Lead.assigned_segment == segment)
@@ -74,7 +77,7 @@ def _csv_safe(value) -> str:
 
 
 def leads_csv_report(
-    db: Session, company_id: str, *, project_ids: list[str], project_id: str | None = None,
+    db: Session, company_id: str, *, project_ids: list[str] | None, project_id: str | None = None,
     tier: str | None = None, segment: str | None = None, stage: str | None = None,
     search: str | None = None,
 ) -> str:
