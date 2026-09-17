@@ -21,6 +21,27 @@ After deployment, add these GitHub Actions repository secrets:
 The service accepts only short-lived HMAC-signed deletion requests. Configure
 Cloud Run ingress and rate limits as narrowly as your deployment permits.
 
+## Automated deployment
+
+The repository workflow `.github/workflows/deploy-firebase-admin-bridge.yml`
+deploys this directory whenever it changes on `main`. It authenticates to
+Google Cloud with Workload Identity Federation, so no service-account JSON is
+stored in GitHub.
+
+Configure these GitHub Actions secrets once:
+
+- `GCP_WORKLOAD_IDENTITY_PROVIDER`: full Workload Identity Provider resource.
+- `GCP_DEPLOY_SERVICE_ACCOUNT`: deployer service-account email.
+- `FIREBASE_ADMIN_BRIDGE_URL`: stable Cloud Run service URL consumed by the API.
+- `FIREBASE_ADMIN_BRIDGE_SECRET`: the same HMAC value exposed to Cloud Run from
+  `blackpenguin-firebase-admin-bridge-secret`.
+
+The deployer identity needs permission to deploy Cloud Run from source and to
+act as `blackpenguin-firebase-admin@blackpenguinai.iam.gserviceaccount.com`.
+The runtime identity keeps `roles/firebaseauth.admin`, `roles/datastore.user`,
+and access to the bridge secret. The main DigitalOcean workflow validates that
+the URL and HMAC secret are non-empty before it recreates production.
+
 ## Example deployment
 
 Replace the uppercase placeholders and run from this directory:

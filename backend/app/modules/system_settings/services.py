@@ -145,11 +145,27 @@ def verify_appointment_email_transport(db: Session, recipient: str) -> FirebaseC
             reply_to=config.appointment_reply_to,
             mail_collection=config.appointment_mail_collection or "mail",
         )
+    except HTTPException as exc:
+        detail = exc.detail
+        if isinstance(detail, dict):
+            error_message = str(detail.get("message") or detail.get("code") or "The Firebase Admin bridge is unavailable.")
+        else:
+            error_message = str(detail)
+        config.appointment_transport_status = "failed"
+        config.appointment_transport_error = error_message[:500]
+        db.commit()
+        raise
     except Exception as exc:
         config.appointment_transport_status = "failed"
-        config.appointment_transport_error = str(exc)[:500]
+        config.appointment_transport_error = "The Firestore email test could not be queued."
         db.commit()
-        raise HTTPException(status_code=502, detail="The Firestore email test could not be queued.") from exc
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "code": "FIREBASE_ADMIN_EMAIL_QUEUE_FAILED",
+                "message": "The Firestore email test could not be queued. Check the Admin bridge logs and configuration.",
+            },
+        ) from exc
     config.appointment_transport_status = "queued"
     config.appointment_transport_error = None
     db.commit(); db.refresh(config)

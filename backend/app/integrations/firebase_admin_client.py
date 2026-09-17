@@ -25,6 +25,14 @@ def admin_deletion_is_configured() -> bool:
     )
 
 
+def email_bridge_is_configured() -> bool:
+    """Return whether the email bridge can be reached from this API."""
+    return bool(
+        settings.FIREBASE_ADMIN_BRIDGE_URL
+        and settings.FIREBASE_ADMIN_BRIDGE_SECRET
+    )
+
+
 def ensure_admin_deletion_ready() -> None:
     if not admin_deletion_is_configured():
         raise HTTPException(
@@ -37,6 +45,21 @@ def ensure_admin_deletion_ready() -> None:
                     "Company identities were already removed manually from Firebase."
                 ),
                 "can_confirm_manual_cleanup": True,
+            },
+        )
+
+
+def ensure_email_bridge_ready() -> None:
+    if not email_bridge_is_configured():
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "FIREBASE_ADMIN_EMAIL_UNAVAILABLE",
+                "message": (
+                    "The Firebase Admin bridge for appointment email is not configured. "
+                    "Set FIREBASE_ADMIN_BRIDGE_URL and FIREBASE_ADMIN_BRIDGE_SECRET, "
+                    "then redeploy the API and worker."
+                ),
             },
         )
 
@@ -55,7 +78,7 @@ def _signed_headers(body: bytes, timestamp: str) -> dict[str, str]:
 
 
 def _bridge_post(path: str, payload: dict) -> dict:
-    ensure_admin_deletion_ready()
+    ensure_email_bridge_ready()
     body = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
     timestamp = str(int(time.time()))
     try:

@@ -35,6 +35,13 @@ export class EmailSettingsPageComponent implements OnInit {
     return new HttpHeaders().set('Authorization', 'Bearer ' + localStorage.getItem('bp_token'));
   }
 
+  private apiErrorMessage(error: any, fallback: string): string {
+    const detail = error?.error?.detail;
+    if (typeof detail === 'string' && detail.trim()) return detail;
+    if (detail && typeof detail.message === 'string' && detail.message.trim()) return detail.message;
+    return fallback;
+  }
+
   loadConfig() {
     this.isLoading = true;
     this.http.get<any>(this.baseUrl + '/api/v1/system/email-settings', { headers: this.headers }).subscribe({
@@ -67,7 +74,7 @@ export class EmailSettingsPageComponent implements OnInit {
         this.toast.showSuccess('Firebase settings saved successfully.');
         this.isSaving = false; this.cdr.detectChanges();
       },
-      error: err => { this.toast.showError(err.error?.detail || 'Failed to save Firebase settings.'); this.isSaving = false; this.cdr.detectChanges(); }
+      error: err => { this.toast.showError(this.apiErrorMessage(err, 'Failed to save Firebase settings.')); this.isSaving = false; this.cdr.detectChanges(); }
     });
   }
 
@@ -80,7 +87,7 @@ export class EmailSettingsPageComponent implements OnInit {
       },
       error: err => {
         this.isTesting = false; this.firebaseConfig.verification_status = 'failed';
-        this.toast.showError(err.error?.detail || 'Firebase verification failed.'); this.cdr.detectChanges();
+        this.toast.showError(this.apiErrorMessage(err, 'Firebase verification failed.')); this.cdr.detectChanges();
       }
     });
   }
@@ -97,7 +104,7 @@ export class EmailSettingsPageComponent implements OnInit {
     const payload = { is_enabled: this.transport.is_enabled, from_name: this.transport.from_name, from_email: this.transport.from_email, reply_to: this.transport.reply_to, mail_collection: this.transport.mail_collection };
     this.http.put<any>(this.baseUrl + '/api/v1/system/email-settings/appointment-transport', payload, { headers: this.headers }).subscribe({
       next: data => { this.transport = { ...this.transport, ...data }; this.transportSaving = false; this.toast.showSuccess('Appointment email transport saved.'); this.cdr.detectChanges(); },
-      error: err => { this.transportSaving = false; this.toast.showError(err.error?.detail || 'Appointment email transport could not be saved.'); this.cdr.detectChanges(); },
+      error: err => { this.transportSaving = false; this.toast.showError(this.apiErrorMessage(err, 'Appointment email transport could not be saved.')); this.cdr.detectChanges(); },
     });
   }
 
@@ -106,7 +113,7 @@ export class EmailSettingsPageComponent implements OnInit {
     this.transportTesting = true;
     this.http.post<any>(this.baseUrl + '/api/v1/system/email-settings/appointment-transport/verify', { test_recipient: this.testRecipient }, { headers: this.headers }).subscribe({
       next: data => { this.transport = { ...this.transport, ...data }; this.transportTesting = false; this.toast.showSuccess('Test email queued in Firestore.'); this.cdr.detectChanges(); },
-      error: err => { this.transportTesting = false; this.toast.showError(err.error?.detail || 'Test email could not be queued.'); this.cdr.detectChanges(); },
+      error: err => { this.transportTesting = false; this.toast.showError(this.apiErrorMessage(err, 'Test email could not be queued.')); this.cdr.detectChanges(); },
     });
   }
 
