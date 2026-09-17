@@ -1,5 +1,6 @@
 from app.modules.projects.schemas import ProjectOverviewResponse
 from app.modules.projects.services import normalized_project_locations
+from app.modules.projects.locations import resolve_visit_location
 
 
 def test_project_overview_normalizes_multiple_model_home_addresses():
@@ -26,3 +27,22 @@ def test_project_overview_keeps_legacy_scalar_address_compatible():
     locations = normalized_project_locations("123 Main Street", None)
     assert locations == [{"label": "Primary location", "address": "123 Main Street"}]
     assert normalized_project_locations(None, "456 Legacy Avenue")[0]["address"] == "456 Legacy Avenue"
+
+
+def test_legacy_python_list_is_parsed_but_truncated_structure_is_never_displayed():
+    legacy = "[{'label': 'Villa', 'address': '100 Main St'}, {'label': 'Loft', 'address': '200 Oak St'}]"
+    assert [item["address"] for item in normalized_project_locations(legacy)] == ["100 Main St", "200 Oak St"]
+    assert normalized_project_locations("[{'label': 'Villa', 'address': '100 Main") == []
+
+
+def test_multiple_locations_require_an_explicit_match():
+    class Profile:
+        profile_data = {"exact_address": [
+            {"label": "Villa", "address": "100 Main St"},
+            {"label": "Loft", "address": "200 Oak St"},
+        ]}
+    class Project:
+        profile = Profile()
+        address = "100 Main St"
+    assert resolve_visit_location(Project()) is None
+    assert resolve_visit_location(Project(), "2") == {"label": "Loft", "address": "200 Oak St"}

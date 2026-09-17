@@ -479,7 +479,10 @@ def apply_field_updates(
         elif key == "short_description" and value:
             profile.project.description = str(value)
         elif key == "exact_address" and value:
-            profile.project.address = str(value)[:255]
+            locations = normalized_project_locations(value)
+            # ``Project.address`` remains a legacy scalar summary. The complete
+            # list lives in ProjectProfile and must never be serialized here.
+            profile.project.address = locations[0]["address"][:255] if locations else None
         elif key == "city" and value:
             profile.project.city = str(value)[:100]
         elif key == "country" and value:
@@ -590,27 +593,9 @@ def complete_onboarding(db: Session, project: Project, user_id: str) -> ProjectP
 
 
 def normalized_project_locations(value: Any, fallback: str | None = None) -> list[dict[str, str]]:
-    """Convert legacy scalar and extracted structured addresses to one stable shape."""
-
-    candidates = value if isinstance(value, list) else [value]
-    locations: list[dict[str, str]] = []
-    seen: set[tuple[str, str]] = set()
-    for index, candidate in enumerate(candidates):
-        label = "Primary location" if index == 0 else f"Location {index + 1}"
-        address: Any = candidate
-        if isinstance(candidate, dict):
-            label = candidate.get("label") or candidate.get("name") or label
-            address = candidate.get("address") or candidate.get("exact_address") or candidate.get("value")
-        if not isinstance(address, str) or not address.strip():
-            continue
-        item = (str(label).strip()[:180], address.strip()[:500])
-        if item in seen:
-            continue
-        seen.add(item)
-        locations.append({"label": item[0], "address": item[1]})
-    if not locations and isinstance(fallback, str) and fallback.strip():
-        locations.append({"label": "Primary location", "address": fallback.strip()[:500]})
-    return locations
+    # Backwards-compatible import for overview consumers and tests.
+    from app.modules.projects.locations import normalize_project_locations
+    return normalize_project_locations(value, fallback)
 
 
 def serialize_overview(db: Session, project: Project, viewer_user: User | None = None) -> dict[str, Any]:

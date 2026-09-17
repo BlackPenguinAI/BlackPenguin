@@ -54,6 +54,7 @@ class SalesLeadDetailResponse(LeadResponse):
     segment_history: List[dict] = Field(default_factory=list)
     objections: List[dict] = Field(default_factory=list)
     conversation: Optional[dict] = None
+    presentation: dict = Field(default_factory=dict)
 
 class LeadUpdate(BaseModel):
     funnel_stage: FunnelStage
@@ -66,6 +67,7 @@ class MeetingCreate(BaseModel):
     meeting_time: datetime
     duration_minutes: int = Field(default=45, ge=15, le=480)
     modality: str = "virtual"
+    visit_location: Optional[str] = None
     notes: Optional[str] = None
 
 class MeetingUpdate(BaseModel):
@@ -80,6 +82,7 @@ class MeetingUpdate(BaseModel):
     assigned_sales_user_id: Optional[str] = None
     meeting_time: Optional[datetime] = None
     duration_minutes: Optional[int] = Field(default=None, ge=15, le=480)
+    visit_location: Optional[str] = None
 
 
 class MeetingAttachmentResponse(BaseModel):
@@ -104,6 +107,11 @@ class MeetingResponse(BaseModel):
     confirmation_status: str = "pending"
     calendar_sync_status: str = "not_connected"
     meeting_url: Optional[str] = None
+    visit_location_label: Optional[str] = None
+    visit_address: Optional[str] = None
+    location_confirmation_status: str = "required"
+    location_confirmed_at: Optional[datetime] = None
+    location_confirmed_by: Optional[str] = None
     notes: Optional[str] = None
     visit_notes: Optional[str] = None
     visit_details: Optional[str] = None

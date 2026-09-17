@@ -14,6 +14,7 @@ from .models import (
 from .schemas import LeadUpdate, MeetingCreate, MeetingUpdate
 from app.modules.brokers.models import Broker
 from app.modules.projects.models import Project
+from app.modules.projects.locations import locations_for_project, resolve_visit_location
 from app.modules.users.models import User, UserRole
 from app.integrations.gcalendar_client import create_calendar_event
 
@@ -177,6 +178,11 @@ def get_lead_detail(db: Session, lead_id: str, company_id: str, sales_user_id: s
         "Review the captured preferences, confirm any unresolved requirements and use the chat history "
         "to prepare a relevant property visit."
     )
+    objection_rows = [
+        {"type": item.objection_type, "evidence": item.evidence, "status": item.status, "count": item.occurrence_count, "updated_at": item.updated_at}
+        for item in db.query(LeadObjection).filter(LeadObjection.lead_id == lead.id).order_by(LeadObjection.updated_at.desc())
+    ]
+    from .presentation import lead_presentation
     return {
         **{column.name: getattr(lead, column.name) for column in Lead.__table__.columns},
         "project_name": project.name if project else None,
@@ -200,10 +206,8 @@ def get_lead_detail(db: Session, lead_id: str, company_id: str, sales_user_id: s
             {"segment": item.segment, "confidence": float(item.confidence or 0), "reasons": item.reasons, "version": item.strategy_version, "is_current": item.is_current, "created_at": item.created_at}
             for item in db.query(LeadSegmentAssignment).filter(LeadSegmentAssignment.lead_id == lead.id).order_by(LeadSegmentAssignment.created_at.desc()).limit(20)
         ],
-        "objections": [
-            {"type": item.objection_type, "evidence": item.evidence, "status": item.status, "count": item.occurrence_count, "updated_at": item.updated_at}
-            for item in db.query(LeadObjection).filter(LeadObjection.lead_id == lead.id).order_by(LeadObjection.updated_at.desc())
-        ],
+        "objections": objection_rows,
+        "presentation": lead_presentation(lead, meta_form_data, chat_summary, objection_rows),
         "conversation": ({
             "id": conversation.id, "channel": conversation.channel, "stage": conversation.stage,
             "is_paused": conversation.is_paused, "pause_reason": conversation.pause_reason,
@@ -277,6 +281,13 @@ def create_meeting(db: Session, payload: MeetingCreate, company_id: str, assigne
     
     if not lead or not project or lead.project_id != project.id or (payload.broker_id and not broker):
         raise HTTPException(status_code=400, detail="Lead o Broker inválido.")
+    selected_location = resolve_visit_location(project, payload.visit_location)
+    if not selected_location:
+        raise HTTPException(status_code=409, detail={
+            "code": "APPOINTMENT_LOCATION_REQUIRED",
+            "message": "Select the exact property location before creating the appointment.",
+            "locations": locations_for_project(project),
+        })
     if project.is_demo:
         raise HTTPException(status_code=409, detail="Demo Projects cannot create real meetings.")
         
@@ -304,6 +315,11 @@ def create_meeting(db: Session, payload: MeetingCreate, company_id: str, assigne
         meeting_time=payload.meeting_time,
         duration_minutes=payload.duration_minutes,
         modality=payload.modality,
+        visit_location_label=selected_location["label"],
+        visit_address=selected_location["address"],
+        location_confirmation_status="confirmed",
+        location_confirmed_at=datetime.utcnow(),
+        location_confirmed_by="staff",
         notes=payload.notes,
         status=MeetingStatus.SCHEDULED,
         gcal_event_id=gcal_id
@@ -353,6 +369,17 @@ def get_tenant_meeting(db: Session, meeting_id: str, company_id: str, sales_user
 def update_meeting(db: Session, meeting_id: str, company_id: str, payload: MeetingUpdate, sales_user_id: str | None = None) -> Meeting:
     meeting = get_tenant_meeting(db, meeting_id, company_id, sales_user_id)
     updates = payload.model_dump(exclude_unset=True)
+    selected_location_value = updates.pop("visit_location", None)
+    if selected_location_value is not None:
+        project = db.query(Project).filter(Project.id == meeting.project_id).one()
+        selected_location = resolve_visit_location(project, selected_location_value)
+        if not selected_location:
+            raise HTTPException(status_code=422, detail="Choose one of the Project's available locations.")
+        meeting.visit_location_label = selected_location["label"]
+        meeting.visit_address = selected_location["address"]
+        meeting.location_confirmation_status = "confirmed"
+        meeting.location_confirmed_at = datetime.utcnow()
+        meeting.location_confirmed_by = "staff"
     if "assigned_sales_user_id" in updates:
         _company_sales_user(db, company_id, updates["assigned_sales_user_id"])
     if updates.get("broker_id"):

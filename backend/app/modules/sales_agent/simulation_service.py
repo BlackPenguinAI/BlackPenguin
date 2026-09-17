@@ -115,6 +115,7 @@ def _products(db: Session, project: Project) -> list[dict]:
 
 
 def simulation_options(db: Session, *, company_id: str) -> list[dict]:
+    from app.modules.projects.locations import locations_for_project
     projects = db.query(Project).filter(
         Project.company_id == company_id,
         Project.is_active.is_(True),
@@ -145,6 +146,7 @@ def simulation_options(db: Session, *, company_id: str) -> list[dict]:
             "products": _products(db, project),
             "delivery_timeline": _delivery_timeline(project),
             "eligible_sales_users": len(eligible_sales_assignments(db, project.id)),
+            "locations": locations_for_project(project),
         })
     return result
 
@@ -494,6 +496,7 @@ def confirm_simulation_appointment(
     starts_at: datetime,
     duration_minutes: int,
     modality: str,
+    visit_location: str | None = None,
 ) -> dict:
     simulation = _simulation(db, company_id=company_id, simulation_id=simulation_id)
     if simulation.status == "appointment_confirmed":
@@ -515,6 +518,7 @@ def confirm_simulation_appointment(
         starts_at=starts_at,
         duration_minutes=duration_minutes,
         modality=modality,
+        visit_location=visit_location,
     )
     project = db.query(Project).filter(Project.id == simulation.project_id).one()
     db.add(SalesMessage(

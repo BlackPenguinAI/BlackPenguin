@@ -22,9 +22,13 @@ export class EmailSettingsPageComponent implements OnInit {
   isLoading = true;
   isSaving = false;
   isTesting = false;
+  transport = { is_enabled: false, from_name: 'Black Penguin', from_email: 'info@blackpenguin.ai', reply_to: 'info@blackpenguin.ai', mail_collection: 'mail', bridge_configured: false, firebase_project_id: '', status: 'not_configured', last_error: '' };
+  testRecipient = '';
+  transportSaving = false;
+  transportTesting = false;
 
   constructor(private http: HttpClient, private toast: ToastService, private cdr: ChangeDetectorRef) {}
-  ngOnInit() { this.loadConfig(); }
+  ngOnInit() { this.loadConfig(); this.loadTransport(); }
 
   private get baseUrl() { return isDevMode() ? 'http://localhost:8000' : 'https://blackpenguin.ai'; }
   private get headers() {
@@ -78,6 +82,31 @@ export class EmailSettingsPageComponent implements OnInit {
         this.isTesting = false; this.firebaseConfig.verification_status = 'failed';
         this.toast.showError(err.error?.detail || 'Firebase verification failed.'); this.cdr.detectChanges();
       }
+    });
+  }
+
+  loadTransport() {
+    this.http.get<any>(this.baseUrl + '/api/v1/system/email-settings/appointment-transport', { headers: this.headers }).subscribe({
+      next: data => { this.transport = { ...this.transport, ...data }; this.cdr.detectChanges(); },
+      error: () => this.toast.showError('Failed to load appointment email transport.'),
+    });
+  }
+
+  saveTransport() {
+    this.transportSaving = true;
+    const payload = { is_enabled: this.transport.is_enabled, from_name: this.transport.from_name, from_email: this.transport.from_email, reply_to: this.transport.reply_to, mail_collection: this.transport.mail_collection };
+    this.http.put<any>(this.baseUrl + '/api/v1/system/email-settings/appointment-transport', payload, { headers: this.headers }).subscribe({
+      next: data => { this.transport = { ...this.transport, ...data }; this.transportSaving = false; this.toast.showSuccess('Appointment email transport saved.'); this.cdr.detectChanges(); },
+      error: err => { this.transportSaving = false; this.toast.showError(err.error?.detail || 'Appointment email transport could not be saved.'); this.cdr.detectChanges(); },
+    });
+  }
+
+  testTransport() {
+    if (!this.testRecipient) return;
+    this.transportTesting = true;
+    this.http.post<any>(this.baseUrl + '/api/v1/system/email-settings/appointment-transport/verify', { test_recipient: this.testRecipient }, { headers: this.headers }).subscribe({
+      next: data => { this.transport = { ...this.transport, ...data }; this.transportTesting = false; this.toast.showSuccess('Test email queued in Firestore.'); this.cdr.detectChanges(); },
+      error: err => { this.transportTesting = false; this.toast.showError(err.error?.detail || 'Test email could not be queued.'); this.cdr.detectChanges(); },
     });
   }
 

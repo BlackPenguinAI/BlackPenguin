@@ -20,7 +20,7 @@ from app.modules.project_team.models import ProjectUserAssignment
 from app.modules.projects.models import Project, ProjectCampaign, ProjectProfile, ProjectPropertyType, ProjectUnit
 from app.modules.sales_agent.models import SalesAgentSimulation, SalesConversation, SalesFollowUpJob, SalesMessage
 from app.modules.sales_agent.schemas import SimulationLeadForm
-from app.modules.sales_agent.service import simulate_turn
+from app.modules.sales_agent.service import _confirm_or_request_location, simulate_turn
 from app.modules.sales_agent.simulation_service import (
     advance_simulation,
     confirm_simulation_appointment,
@@ -79,7 +79,7 @@ def _fixture(db):
     sales_a = User(company_id=company.id, email="sales-a@tenant.test", hashed_password="x", role=UserRole.SALES, first_name="Ava")
     sales_b = User(company_id=company.id, email="sales-b@tenant.test", hashed_password="x", role=UserRole.SALES, first_name="Ben")
     db.add_all([admin, sales_a, sales_b]); db.flush()
-    project = Project(company_id=company.id, name="Approved Project", onboarding_status="completed")
+    project = Project(company_id=company.id, name="Approved Project", address="100 Test Avenue", onboarding_status="completed")
     db.add(project); db.flush()
     profile = ProjectProfile(project_id=project.id, final_approved=True, profile_data={"short_description": "Homes"}, field_states={"short_description": {"status": "confirmed"}})
     campaign = ProjectCampaign(project_id=project.id, name="Meta Family Campaign", status="draft")
@@ -441,8 +441,8 @@ def test_sms_selection_books_once_and_closes_with_timezone_sales_location_and_em
     assert "UTC-05:00, America/Lima" in confirmed["reply"]
     assert "lead1@example.test" in confirmed["reply"]
     assert "will also be sent" in confirmed["reply"]
-    assert "calendar.google.com/calendar/render" in confirmed["reply"]
-    assert "/api/v1/sales/public/meetings/" in confirmed["reply"]
+    assert "calendar.google.com/calendar/render" not in confirmed["reply"]
+    assert "/api/v1/sales/public/meetings/" not in confirmed["reply"]
     assert "just booked by another lead" in stale["reply"]
     assert "9:00 AM" in stale["reply"]
     assert db.query(Meeting).count() == 1
@@ -485,6 +485,20 @@ def test_single_verified_slot_accepts_an_affirmative_reply_and_creates_the_meeti
     assert "3:00 PM" in offer["reply"]
     assert confirmed["intent"] == "appointment_confirmed"
     assert db.query(Meeting).filter_by(lead_id=result["lead_id"]).count() == 1
+
+
+def test_multiple_project_locations_are_confirmed_before_resuming_availability():
+    project = Project(name="Project", address="Legacy")
+    project.profile = ProjectProfile(profile_data={"exact_address": [
+        {"label": "Villa", "address": "100 Main St"},
+        {"label": "Loft", "address": "200 Oak St"},
+    ]})
+    lead = Lead(full_name="Lead", phone="+15550000000", meta_form_data={})
+    ready, question, resume = _confirm_or_request_location(project, lead, "What about August 31st?")
+    assert ready is False and "1. Villa" in question and resume is None
+    ready, question, resume = _confirm_or_request_location(project, lead, "2")
+    assert ready is True and question is None and resume == "What about August 31st?"
+    assert lead.meta_form_data["selected_visit_location"]["address"] == "200 Oak St"
 
 
 def test_simulation_calendar_event_is_explicit_and_reversible():

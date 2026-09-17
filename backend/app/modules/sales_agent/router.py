@@ -147,6 +147,7 @@ def confirm_appointment(
         starts_at=payload.start_at,
         duration_minutes=payload.duration_minutes,
         modality=payload.modality,
+        visit_location=payload.visit_location,
     )
 
 

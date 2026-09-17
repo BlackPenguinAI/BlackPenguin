@@ -310,13 +310,23 @@ def test_appointment_email_outbox_is_idempotent_and_builds_both_messages(db, mon
     sent: list[dict] = []
     monkeypatch.setattr(
         "app.modules.governance.services.send_appointment_email",
-        lambda **values: sent.append(values),
+        lambda **values: sent.append(values) or {"status": "queued", "document_id": values["document_id"]},
     )
-    assert process_appointment_email_outbox(db) == 2
+    assert process_appointment_email_outbox(db) == 0
     assert {item["recipient"] for item in sent} == {lead.email, sales.email}
-    assert all("Alex Rivera" in item["body"] for item in sent)
+    lead_mail = next(item for item in sent if item["recipient"] == lead.email)
+    sales_mail = next(item for item in sent if item["recipient"] == sales.email)
+    assert "Alex Rivera" in lead_mail["body"]
+    assert "Taylor Morgan" in sales_mail["body"]
+    assert "/app/schedule?meeting=" in sales_mail["body"]
     assert all("100 Ocean Ave" in item["body"] for item in sent)
     assert all("BEGIN:VCALENDAR" in item["ics_content"] for item in sent)
+    assert {item.status for item in db.query(AppointmentEmailOutbox).all()} == {"queued"}
+    monkeypatch.setattr(
+        "app.modules.governance.services.email_status",
+        lambda **values: {"status": "success", "document_id": values["document_id"]},
+    )
+    assert process_appointment_email_outbox(db) == 2
     assert {item.status for item in db.query(AppointmentEmailOutbox).all()} == {"sent"}
 
 

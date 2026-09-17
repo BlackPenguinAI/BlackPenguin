@@ -14,6 +14,7 @@ from app.integrations.gcalendar_client import (
     is_calendar_free,
 )
 from app.modules.projects.models import Project
+from app.modules.projects.locations import locations_for_project, resolve_visit_location
 from app.modules.governance.services import enqueue_appointment_emails, enqueue_notification
 
 from .models import (
@@ -386,6 +387,7 @@ def create_agent_appointment(
     starts_at: datetime,
     duration_minutes: int,
     modality: str,
+    visit_location: object | None = None,
 ) -> tuple[Meeting, User]:
     starts_at = starts_at.replace(tzinfo=None) if starts_at.tzinfo else starts_at
     # Lock every candidate Sales user in a stable order before rechecking
@@ -414,6 +416,19 @@ def create_agent_appointment(
     user = db.query(User).filter(User.id == assigned_user_id, User.company_id == lead.company_id).one()
     connections = calendar_connections_for_user(db, user.id)
     google_connection = next((item for item in connections if item.provider == "google" and item.status == "connected"), None)
+    project = db.query(Project).filter(Project.id == lead.project_id).one()
+    selected_location = resolve_visit_location(
+        project, visit_location or (lead.meta_form_data or {}).get("selected_visit_location"),
+    )
+    if not selected_location:
+        raise HTTPException(status_code=409, detail={
+            "code": "APPOINTMENT_LOCATION_REQUIRED",
+            "message": "Confirm which property location the lead will visit before scheduling.",
+            "locations": locations_for_project(project),
+        })
+    form = dict(lead.meta_form_data or {})
+    form["selected_visit_location"] = selected_location
+    lead.meta_form_data = form
     meeting = Meeting(
         project_id=lead.project_id,
         lead_id=lead.id,
@@ -424,6 +439,11 @@ def create_agent_appointment(
         modality=modality,
         confirmation_status="confirmed",
         calendar_sync_status="simulation_ready" if lead.is_demo and connections else ("pending" if google_connection else "not_connected"),
+        visit_location_label=selected_location["label"],
+        visit_address=selected_location["address"],
+        location_confirmation_status="confirmed",
+        location_confirmed_at=datetime.utcnow(),
+        location_confirmed_by="lead",
         status=MeetingStatus.CONFIRMED,
         is_demo=bool(lead.is_demo),
         source="agent_simulation" if lead.is_demo else "agent_sms",
@@ -449,8 +469,7 @@ def create_agent_appointment(
         lead_email=lead.email, sales_email=user.email,
     )
     if google_connection and not lead.is_demo:
-        project = db.query(Project).filter(Project.id == lead.project_id).one()
-        location = ", ".join(value for value in (project.name, project.address, project.city, project.country) if value)
+        location = ", ".join(value for value in (project.name, meeting.visit_address) if value)
         try:
             event = create_calendar_event_for_connection(
                 db, google_connection, title=f"{project.name} visit with {lead.full_name}",

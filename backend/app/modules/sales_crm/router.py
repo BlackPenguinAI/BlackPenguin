@@ -41,7 +41,7 @@ from app.modules.projects.models import Project, ProjectUnit
 from app.modules.projects.models import SalesAssetShare
 from app.modules.sales_agent.models import SalesConversation, SalesFollowUpJob
 from app.modules.governance.schemas import DeletePayload
-from app.modules.governance.services import enqueue_notification, record_export_event, record_platform_event
+from app.modules.governance.services import enqueue_appointment_emails, enqueue_notification, record_export_event, record_platform_event
 
 router = APIRouter()
 
@@ -65,7 +65,7 @@ def public_calendar_invite(meeting_id: str, token: str, db: Session = Depends(ge
     project = db.query(Project).filter(Project.id == meeting.project_id).one()
     end = meeting.meeting_time + timedelta(minutes=meeting.duration_minutes)
     stamp = lambda value: value.strftime("%Y%m%dT%H%M%SZ")
-    location = ", ".join(value for value in (project.name, project.address, project.city, project.country) if value).replace(",", "\\,")
+    location = ", ".join(value for value in (project.name, meeting.visit_address) if value).replace(",", "\\,")
     content = "\r\n".join([
         "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Black Penguin//AI Sales Agent//EN",
         "BEGIN:VEVENT", f"UID:{meeting.id}@blackpenguin.ai", f"DTSTAMP:{stamp(datetime.utcnow())}",
@@ -81,8 +81,10 @@ def _meeting_response(meeting: Meeting, db: Session) -> MeetingResponse:
     item = MeetingResponse.model_validate(meeting)
     project = db.query(Project).filter(Project.id == meeting.project_id).first()
     if project:
+        from app.modules.projects.locations import resolve_visit_location
+        legacy_location = resolve_visit_location(project)
         item.project_name = project.name
-        item.project_address = project.address
+        item.project_address = meeting.visit_address or (legacy_location["address"] if legacy_location else None)
         item.project_timezone = project.timezone or "UTC"
     if meeting.lead:
         item.lead_name = meeting.lead.full_name
@@ -387,6 +389,13 @@ def update_meeting(
         current_user.id if current_user.role == UserRole.SALES else None,
     )
     if meeting.status != previous_status and meeting.status in {MeetingStatus.CONFIRMED, MeetingStatus.CANCELLED}:
+        if meeting.status == MeetingStatus.CONFIRMED:
+            lead = db.query(Lead).filter(Lead.id == meeting.lead_id).one()
+            sales = db.query(User).filter(User.id == meeting.assigned_sales_user_id).first() if meeting.assigned_sales_user_id else None
+            enqueue_appointment_emails(
+                db, company_id=current_user.company_id, meeting_id=meeting.id,
+                lead_email=lead.email, sales_email=sales.email if sales else None,
+            )
         enqueue_notification(
             db, company_id=current_user.company_id, project_id=meeting.project_id,
             event_type="appointment_confirmed" if meeting.status == MeetingStatus.CONFIRMED else "appointment_cancelled",

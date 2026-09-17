@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from .models import FirebaseConfig, GoogleCalendarConfig, MetaPlatformConfig, TwilioConfig, LegalDocument
 from .schemas import (
+    AppointmentEmailTransportUpdate,
     FirebaseConfigUpdate, GoogleCalendarConfigUpdate, LegalDocumentPayload,
     MetaPlatformConfigUpdate, TwilioConfigUpdate,
 )
@@ -96,6 +97,61 @@ def verify_firebase_config(db: Session) -> FirebaseConfig:
     config.verification_status = "verified"
     config.verified_at = datetime.utcnow()
     config.last_error = None
+    db.commit(); db.refresh(config)
+    return config
+
+
+def appointment_email_transport_response(config: FirebaseConfig) -> dict:
+    return {
+        "is_enabled": bool(config.appointment_email_enabled),
+        "from_name": config.appointment_from_name or settings.EMAILS_FROM_NAME,
+        "from_email": config.appointment_from_email or settings.EMAILS_FROM_EMAIL,
+        "reply_to": config.appointment_reply_to or config.appointment_from_email or settings.EMAILS_FROM_EMAIL,
+        "mail_collection": config.appointment_mail_collection or "mail",
+        "bridge_configured": bool(settings.FIREBASE_ADMIN_BRIDGE_URL and settings.FIREBASE_ADMIN_BRIDGE_SECRET),
+        "firebase_project_id": config.project_id or settings.FIREBASE_PROJECT_ID or None,
+        "status": config.appointment_transport_status or "not_configured",
+        "last_error": config.appointment_transport_error,
+    }
+
+
+def update_appointment_email_transport(db: Session, payload: AppointmentEmailTransportUpdate) -> FirebaseConfig:
+    config = get_firebase_config(db)
+    config.appointment_email_enabled = payload.is_enabled
+    config.appointment_from_name = payload.from_name.strip()
+    config.appointment_from_email = payload.from_email.strip().casefold()
+    config.appointment_reply_to = (payload.reply_to or payload.from_email).strip().casefold()
+    config.appointment_mail_collection = payload.mail_collection.strip()
+    if payload.is_enabled and not (settings.FIREBASE_ADMIN_BRIDGE_URL and settings.FIREBASE_ADMIN_BRIDGE_SECRET and (config.project_id or settings.FIREBASE_PROJECT_ID)):
+        raise HTTPException(status_code=422, detail="Configure the Firebase Project and authenticated Admin bridge before enabling appointment email.")
+    config.appointment_transport_status = "pending"
+    config.appointment_transport_error = None
+    db.commit(); db.refresh(config)
+    return config
+
+
+def verify_appointment_email_transport(db: Session, recipient: str) -> FirebaseConfig:
+    from app.integrations.firebase_admin_client import enqueue_email
+    config = get_firebase_config(db)
+    try:
+        enqueue_email(
+            project_id=config.project_id or settings.FIREBASE_PROJECT_ID,
+            document_id=f"transport-test-{secrets.token_hex(12)}",
+            recipient=recipient.strip().casefold(),
+            subject="Black Penguin appointment email transport test",
+            text="Trigger Email from Firestore accepted this Black Penguin test message.",
+            html="<p><strong>Black Penguin</strong> appointment email transport test.</p>",
+            from_email=f"{config.appointment_from_name} <{config.appointment_from_email}>",
+            reply_to=config.appointment_reply_to,
+            mail_collection=config.appointment_mail_collection or "mail",
+        )
+    except Exception as exc:
+        config.appointment_transport_status = "failed"
+        config.appointment_transport_error = str(exc)[:500]
+        db.commit()
+        raise HTTPException(status_code=502, detail="The Firestore email test could not be queued.") from exc
+    config.appointment_transport_status = "queued"
+    config.appointment_transport_error = None
     db.commit(); db.refresh(config)
     return config
 

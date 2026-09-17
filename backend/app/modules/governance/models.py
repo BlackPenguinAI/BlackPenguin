@@ -208,6 +208,9 @@ class AppointmentEmailOutbox(Base):
     status = Column(String(20), nullable=False, default="pending", index=True)
     attempts = Column(Integer, nullable=False, default=0)
     last_error = Column(String(120), nullable=True)
+    provider_message_id = Column(String(255), nullable=True)
+    delivery_status = Column(String(30), nullable=True)
+    delivered_at = Column(DateTime, nullable=True)
     sent_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 

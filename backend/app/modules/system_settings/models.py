@@ -22,6 +22,13 @@ class FirebaseConfig(Base):
     last_error = Column(Text, nullable=True)
     auth_mode = Column(String(20), default="rest", nullable=False)
     action_handler_url = Column(String(500), default="https://blackpenguin.ai/activate-account", nullable=False)
+    appointment_email_enabled = Column(Boolean, default=False, nullable=False)
+    appointment_from_name = Column(String(120), default="Black Penguin", nullable=False)
+    appointment_from_email = Column(String(255), nullable=True)
+    appointment_reply_to = Column(String(255), nullable=True)
+    appointment_mail_collection = Column(String(120), default="mail", nullable=False)
+    appointment_transport_status = Column(String(30), default="not_configured", nullable=False)
+    appointment_transport_error = Column(Text, nullable=True)
     # Legacy plaintext column retained only so the migration can encrypt it.
     credentials_json = Column(Text, nullable=True)
     

@@ -85,10 +85,15 @@ select,input,textarea { background:#0b0b0b; border:1px solid #333; color:#fff; p
 .row-actions { display:flex; }
 .row-actions .material-symbols-outlined { font-size:16px; }
 .lead-context { text-align:left; border-top:1px solid #292929; margin-top:18px; padding-top:5px; }
-.lead-context>div { display:flex; justify-content:space-between; gap:10px; padding:7px 0; border-bottom:1px solid #202020; }
+.lead-context>.fact-row { display:flex; justify-content:space-between; gap:10px; padding:7px 0; border-bottom:1px solid #202020; }
 .lead-context small { color:#777; text-transform:capitalize; }
 .lead-context span { font-size:11px; text-align:right; }
 .lead-context p { font-size:11px; color:#aaa; line-height:1.5; white-space:pre-wrap; }
+.lead-context h4{margin:12px 0 5px;color:#ddd;font-size:10px;text-transform:uppercase;letter-spacing:.08em}.lead-context ul{margin:0 0 10px;padding-left:18px;color:#aaa;font-size:11px;line-height:1.55}
+.chat-modal{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;padding:24px;background:rgba(0,0,0,.82);backdrop-filter:blur(8px)}
+.chat-modal>section{display:flex;flex-direction:column;width:min(760px,100%);height:min(82vh,820px);overflow:hidden;border:1px solid #393100;border-radius:16px;background:#0d0d0d;box-shadow:0 24px 90px #000}
+.chat-modal header{display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid #292929}.chat-modal header small{color:#e9ad00;font-size:9px;letter-spacing:.14em}.chat-modal header h2{margin:4px 0 0;font-size:20px}.chat-modal header button{border:1px solid #444;border-radius:50%;width:34px;height:34px;background:#171717;color:#fff;font-size:21px}
+.chat-thread{display:flex;flex-direction:column;gap:12px;overflow-y:auto;overflow-x:hidden;padding:22px}.chat-thread article{align-self:flex-end;max-width:72%;padding:12px 14px;border:1px solid #5c4700;border-radius:14px 14px 3px;background:#201900;overflow-wrap:anywhere}.chat-thread article.inbound{align-self:flex-start;border-color:#26402d;border-radius:14px 14px 14px 3px;background:#152019}.chat-thread small{color:#e9ad00;font-size:9px}.chat-thread p{margin:5px 0 0;color:#eee;line-height:1.55;white-space:pre-wrap}
 .lead-loading { color:#777; font-size:11px; margin-top:15px; }
 .chat { margin-top:10px; max-height:240px; overflow:auto; }
 .chat article { margin:7px 0 7px 18px; padding:8px; background:#201900; border-radius:8px; }

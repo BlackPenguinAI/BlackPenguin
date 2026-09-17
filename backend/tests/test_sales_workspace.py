@@ -54,7 +54,7 @@ def _fixture(db):
     sales_a = User(company=company, email="a@example.com", hashed_password="x", role=UserRole.SALES)
     sales_b = User(company=company, email="b@example.com", hashed_password="x", role=UserRole.SALES)
     db.add_all([company, sales_a, sales_b]); db.flush()
-    project = Project(company_id=company.id, name="Project", onboarding_status="completed", is_active=True)
+    project = Project(company_id=company.id, name="Project", address="100 Test Avenue", onboarding_status="completed", is_active=True)
     db.add(project); db.flush()
     lead = Lead(
         company_id=company.id, project_id=project.id, assigned_sales_user_id=sales_a.id,

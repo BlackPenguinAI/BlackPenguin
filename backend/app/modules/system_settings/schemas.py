@@ -31,6 +31,25 @@ class FirebaseConfigSchema(BaseModel):
     
     model_config = ConfigDict(from_attributes=True)
 
+
+class AppointmentEmailTransportUpdate(BaseModel):
+    is_enabled: bool = False
+    from_name: str = Field(default="Black Penguin", min_length=1, max_length=120)
+    from_email: str = Field(min_length=3, max_length=255)
+    reply_to: Optional[str] = Field(default=None, max_length=255)
+    mail_collection: str = Field(default="mail", pattern=r"^[A-Za-z0-9_-]{1,120}$")
+
+
+class AppointmentEmailTransportSchema(AppointmentEmailTransportUpdate):
+    bridge_configured: bool = False
+    firebase_project_id: Optional[str] = None
+    status: str = "not_configured"
+    last_error: Optional[str] = None
+
+
+class AppointmentEmailTransportVerify(BaseModel):
+    test_recipient: str = Field(min_length=3, max_length=255)
+
 # =========================================================================
 # SCHEMAS DE MESSAGING SETTINGS (TWILIO)
 # =========================================================================

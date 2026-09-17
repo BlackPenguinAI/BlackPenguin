@@ -68,23 +68,26 @@
       </div>
       <section>
         <h3>AI profile summary</h3>
-        <ng-container *ngIf="structuredSummary(selected.chat_summary) as summary; else summaryText">
-          <div class="data-tree">
-            <div *ngFor="let item of dataRows(summary)" [class.group]="item.group" [style.padding-left.px]="item.depth * 12">
-              <span>{{item.label}}</span><strong *ngIf="item.value">{{item.value}}</strong>
-            </div>
-          </div>
-        </ng-container>
-        <ng-template #summaryText><p>{{selected.chat_summary || 'The profile will be generated as the conversation progresses.'}}</p></ng-template>
+        <p>{{selected.presentation?.summary || 'The profile will be generated as the conversation progresses.'}}</p>
       </section>
       <section>
-        <h3>Meta and source data</h3>
-        <div class="data-tree" *ngIf="dataRows(selected.meta_form_data) as rows">
-          <div *ngFor="let item of rows" [class.group]="item.group" [style.padding-left.px]="item.depth * 12">
-            <span>{{item.label}}</span><strong *ngIf="item.value">{{item.value}}</strong>
-          </div>
-          <p *ngIf="!rows.length">No source data was provided.</p>
+        <h3>Lead information</h3>
+        <div class="data-tree">
+          <ng-container *ngFor="let group of [selected.presentation?.contact,selected.presentation?.interest,selected.presentation?.budget,selected.presentation?.custom_answers]">
+            <div *ngFor="let item of group">
+              <span>{{item.label}}</span><strong>{{item.value}}</strong>
+            </div>
+          </ng-container>
+          <p *ngIf="!selected.presentation">No source data was provided.</p>
         </div>
+      </section>
+      <section *ngIf="selected.presentation?.visit_playbook as playbook">
+        <h3>Visit playbook</h3><p><b>Objective</b><br>{{playbook.objective}}</p>
+        <div class="data-tree">
+          <div *ngFor="let item of playbook.questions"><span>Suggested question</span><strong>{{item}}</strong></div>
+          <div *ngFor="let item of playbook.actions"><span>Recommended action</span><strong>{{item}}</strong></div>
+          <div *ngFor="let item of playbook.watch_for"><span>Watch for</span><strong>{{item}}</strong></div>
+          </div>
       </section>
       <section *ngIf="selected.score_history?.length">
         <h3>Intent score breakdown</h3>

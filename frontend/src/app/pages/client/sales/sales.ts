@@ -30,7 +30,7 @@ export class SalesComponent implements OnInit {
     { value: 6, label: 'Sun' },
   ];
   visitPhoto: File | null = null; saleEvidence: File | null = null; managerMeetingTime = ''; calendarStatus = 'not_connected'; calendarPlatformAvailable = true; calendarAccountEmail = ''; calendarLastSyncedAt = '';
-  newAppointment = { lead_id: '', time: '10:00', duration_minutes: 45, modality: 'in_person', notes: '' };
+  newAppointment = { lead_id: '', time: '10:00', duration_minutes: 45, modality: 'in_person', notes: '', visit_location: '' };
 
   constructor(private http: HttpClient, private cdr: ChangeDetectorRef) {}
 
@@ -45,7 +45,15 @@ export class SalesComponent implements OnInit {
     }
   }
   get isManager(): boolean { return this.role === 'admin' || this.role === 'assistant'; }
-  get selectedProject(): any { return this.projects.find(project => project.id === this.projectId); }
+  get selectedProject(): any { return this.projects.find(project => project.id === (this.projectId || this.selected?.project_id)); }
+  get projectLocations(): any[] {
+    const value = this.selectedProject?.profile?.data?.exact_address || this.selectedProject?.address;
+    const rows = Array.isArray(value) ? value : (value ? [value] : []);
+    return rows.map((item: any, index: number) => typeof item === 'string'
+      ? { label: index ? `Location ${index + 1}` : 'Primary location', address: item }
+      : { label: item?.label || item?.name || `Location ${index + 1}`, address: item?.address || item?.exact_address || '' })
+      .filter((item: any) => item.address);
+  }
 
   get range(): { start: string; end: string } {
     let start: Date; let end: Date;
@@ -166,14 +174,15 @@ export class SalesComponent implements OnInit {
       project_id: this.projectId, lead_id: this.newAppointment.lead_id, broker_id: null, assigned_sales_user_id: this.salesUserId,
       meeting_time: this.wallTimeToUtc(this.selectedDay, this.newAppointment.time, this.timezone).toISOString(), duration_minutes: Number(this.newAppointment.duration_minutes),
       modality: this.newAppointment.modality, notes: this.newAppointment.notes || null,
+      visit_location: this.newAppointment.visit_location || null,
     }).subscribe({
-      next: () => { this.saving = false; this.success = 'Appointment created and assigned.'; this.newAppointment = { lead_id: '', time: '10:00', duration_minutes: 45, modality: 'in_person', notes: '' }; this.reload(); },
-      error: err => { this.saving = false; this.error = err.error?.detail || 'Appointment could not be created.'; this.cdr.markForCheck(); },
+      next: () => { this.saving = false; this.success = 'Appointment created and assigned.'; this.newAppointment = { lead_id: '', time: '10:00', duration_minutes: 45, modality: 'in_person', notes: '', visit_location: '' }; this.reload(); },
+      error: err => { this.saving = false; this.error = this.apiError(err, 'Appointment could not be created.'); this.cdr.markForCheck(); },
     });
   }
 
   selectMeeting(meeting: any): void {
-    this.selected = { ...meeting }; this.selectedDay = null; this.selectedLead = null; this.chatOpen = false; this.persistedStatus = meeting.status;
+    this.selected = { ...meeting, visit_location: meeting.visit_address || '' }; this.selectedDay = null; this.selectedLead = null; this.chatOpen = false; this.persistedStatus = meeting.status;
     this.closingDate = meeting.sale_closed_at ? String(meeting.sale_closed_at).slice(0, 10) : '';
     this.managerMeetingTime = this.datetimeLocalValue(meeting.meeting_time, meeting.project_timezone || this.timezone);
     if (!meeting.lead_id) return; this.leadLoading = true;
@@ -188,6 +197,7 @@ export class SalesComponent implements OnInit {
       meeting_time: this.wallTimeToUtc(wallDay, time, this.selected.project_timezone || this.timezone).toISOString(),
       duration_minutes: Number(this.selected.duration_minutes), modality: this.selected.modality, status: this.selected.status,
       confirmation_status: this.selected.confirmation_status, notes: this.selected.notes || null,
+      visit_location: this.selected.visit_location || null,
     }).subscribe({ next: row => { this.saving = false; this.success = 'Appointment updated.'; this.selected = row; this.persistedStatus = row.status; this.reload(); }, error: err => { this.saving = false; this.error = err.error?.detail || 'Appointment could not be updated.'; this.cdr.markForCheck(); } });
   }
 
@@ -231,7 +241,7 @@ export class SalesComponent implements OnInit {
   goToday(): void { this.cursor = new Date(); this.selectedDay = null; this.selected = null; this.reload(); }
   count(status: string): number { return this.meetings.filter(item => item.status === status).length; }
   trackById(_: number, item: any): string { return item.id; }
-  objectEntries(value: any): { key: string; value: any }[] { return Object.entries(value || {}).map(([key, item]) => ({ key, value: item && typeof item === 'object' ? JSON.stringify(item) : item })); }
+  closeChat(): void { this.chatOpen = false; }
   hasEvidence(): boolean { return (this.selected?.attachments || []).some((item: any) => item.kind === 'sale_evidence'); }
 
   private acceptSchedule(data: any): void { this.meetings = data.meetings || []; this.availability = data.availability || []; this.loading = false; this.cdr.markForCheck(); }
@@ -273,6 +283,10 @@ export class SalesComponent implements OnInit {
       return `${detail.message} Conflicting date${dates.length === 1 ? '' : 's'}: ${dates.join(', ')}.`;
     }
     return typeof detail === 'string' ? detail : 'Availability could not be saved.';
+  }
+  private apiError(error: any, fallback: string): string {
+    const detail = error?.error?.detail;
+    return typeof detail === 'string' ? detail : detail?.message || fallback;
   }
   private fail(message: string): void { this.loading = false; this.error = message; this.cdr.markForCheck(); }
 }

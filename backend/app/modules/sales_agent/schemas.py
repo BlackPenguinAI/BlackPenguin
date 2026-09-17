@@ -78,6 +78,7 @@ class AppointmentConfirm(BaseModel):
     start_at: datetime
     duration_minutes: int = Field(default=45, ge=15, le=240)
     modality: str = Field(default="virtual", pattern="^(virtual|phone|showroom|in_person)$")
+    visit_location: str | None = None
 
 
 class AgentRunResponse(BaseModel):
@@ -199,6 +200,7 @@ class SimulationOptionProject(BaseModel):
     products: list[SimulationOptionProduct]
     delivery_timeline: str | None = None
     eligible_sales_users: int
+    locations: list[dict[str, str]] = Field(default_factory=list)
 
 
 class AppointmentSlot(BaseModel):

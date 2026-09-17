@@ -1,30 +1,32 @@
-"""Minimal SMTP transport for appointment confirmations.
+"""Trigger Email from Firestore transport for appointment confirmations."""
 
-Authentication/invitation mail remains in Firebase. This transport is only for
-operational messages generated after a verified appointment transaction.
-"""
-
-from email.message import EmailMessage
-import smtplib
+import base64
 
 from app.core.config import settings
+from app.integrations.firebase_admin_client import enqueue_email
 
 
-def send_appointment_email(*, recipient: str, subject: str, body: str, ics_content: str) -> None:
-    if not settings.SMTP_SERVER or not settings.EMAILS_FROM_EMAIL:
-        raise RuntimeError("Transactional email transport is not configured.")
-    message = EmailMessage()
-    message["From"] = f"{settings.EMAILS_FROM_NAME} <{settings.EMAILS_FROM_EMAIL}>"
-    message["To"] = recipient
-    message["Subject"] = subject
-    message.set_content(body)
-    message.add_attachment(
-        ics_content.encode("utf-8"),
-        maintype="text", subtype="calendar", filename="black-penguin-appointment.ics",
-        params={"method": "PUBLISH"},
+def send_appointment_email(*, document_id: str, recipient: str, subject: str, body: str,
+                           html: str, ics_content: str, from_email: str | None = None,
+                           reply_to: str | None = None, mail_collection: str = "mail",
+                           project_id: str | None = None) -> dict:
+    firebase_project_id = project_id or settings.FIREBASE_PROJECT_ID
+    if not firebase_project_id:
+        raise RuntimeError("Firebase Project ID is not configured.")
+    return enqueue_email(
+        project_id=firebase_project_id,
+        document_id=document_id,
+        recipient=recipient,
+        subject=subject,
+        text=body,
+        html=html,
+        from_email=from_email or (f"{settings.EMAILS_FROM_NAME} <{settings.EMAILS_FROM_EMAIL}>" if settings.EMAILS_FROM_EMAIL else None),
+        reply_to=reply_to or settings.EMAILS_FROM_EMAIL or None,
+        mail_collection=mail_collection,
+        attachments=[{
+            "filename": "black-penguin-appointment.ics",
+            "content": base64.b64encode(ics_content.encode("utf-8")).decode("ascii"),
+            "encoding": "base64",
+            "contentType": "text/calendar; method=PUBLISH",
+        }],
     )
-    with smtplib.SMTP(settings.SMTP_SERVER, settings.SMTP_PORT, timeout=20) as client:
-        client.starttls()
-        if settings.SMTP_USER:
-            client.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
-        client.send_message(message)

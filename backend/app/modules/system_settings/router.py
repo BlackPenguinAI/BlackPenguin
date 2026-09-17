@@ -9,6 +9,7 @@ from sqlalchemy import func
 from app.modules.companies.models import Company
 
 from .schemas import (
+    AppointmentEmailTransportSchema, AppointmentEmailTransportUpdate, AppointmentEmailTransportVerify,
     FirebaseConfigSchema, FirebaseConfigUpdate, GoogleCalendarConfigSchema, GoogleCalendarConfigUpdate,
     MetaPlatformConfigSchema, MetaPlatformConfigUpdate,
     TwilioConfigSchema, TwilioConfigUpdate,
@@ -43,6 +44,21 @@ def verify_email_settings(
     current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN])),
 ):
     return services.firebase_config_response(services.verify_firebase_config(db))
+
+
+@router.get("/email-settings/appointment-transport", response_model=AppointmentEmailTransportSchema)
+def get_appointment_email_transport(db: Session = Depends(get_db), current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN]))):
+    return services.appointment_email_transport_response(services.get_firebase_config(db))
+
+
+@router.put("/email-settings/appointment-transport", response_model=AppointmentEmailTransportSchema)
+def update_appointment_email_transport(payload: AppointmentEmailTransportUpdate, db: Session = Depends(get_db), current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN]))):
+    return services.appointment_email_transport_response(services.update_appointment_email_transport(db, payload))
+
+
+@router.post("/email-settings/appointment-transport/verify", response_model=AppointmentEmailTransportSchema)
+def verify_appointment_email_transport(payload: AppointmentEmailTransportVerify, db: Session = Depends(get_db), current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN]))):
+    return services.appointment_email_transport_response(services.verify_appointment_email_transport(db, payload.test_recipient))
 
 # =========================================================
 # ⚙️ MESSAGING SETTINGS (TWILIO)

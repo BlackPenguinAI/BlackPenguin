@@ -334,6 +334,10 @@
       </div>
       <div class="appointment" *ngIf="selected.simulation_id && !selected.appointment_id">
         <strong>Appointment confirmation</strong
+        ><select [(ngModel)]="selectedVisitLocation" *ngIf="appointmentLocations.length > 1">
+          <option value="">Choose the property location</option>
+          <option *ngFor="let location of appointmentLocations" [value]="location.address">{{location.label}} · {{location.address}}</option>
+        </select
         ><small *ngIf="!slots.length"
           >No slots are available. A Sales user must configure availability and be assigned to this
           Project.</small
@@ -342,7 +346,7 @@
           <option *ngFor="let slot of slots" [value]="slot.start_at">
             {{ slot.start_at | date: 'medium' }} · {{ slot.eligible_sales_users }} eligible
           </option></select
-        ><button class="primary" (click)="confirmSlot()" [disabled]="!selectedSlot || confirming">
+        ><button class="primary" (click)="confirmSlot()" [disabled]="!selectedSlot || (appointmentLocations.length > 1 && !selectedVisitLocation) || confirming">
           {{ confirming ? 'Confirming…' : 'Confirm as lead' }}
         </button>
       </div>

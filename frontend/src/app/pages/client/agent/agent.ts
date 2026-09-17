@@ -17,6 +17,7 @@ export class AgentComponent implements OnInit, OnDestroy {
   role = typeof localStorage === 'undefined' ? '' : localStorage.getItem('bp_role') || '';
   @ViewChild('thread') thread?: ElementRef<HTMLElement>;
   options: any[] = [];
+  selectedVisitLocation = '';
   conversations: any[] = [];
   messages: any[] = [];
   slots: any[] = [];
@@ -544,6 +545,7 @@ export class AgentComponent implements OnInit, OnDestroy {
   }
 
   get isLive(): boolean { return this.selected?.channel === 'sms'; }
+  get appointmentLocations(): any[] { return this.currentProject?.locations || []; }
   get isMetaSimulation(): boolean { return this.selected?.platform === 'meta' && !this.isLive; }
   get canManualControl(): boolean { return this.role === 'admin' || this.role === 'assistant'; }
 
@@ -592,6 +594,7 @@ export class AgentComponent implements OnInit, OnDestroy {
           start_at: this.selectedSlot,
           duration_minutes: 45,
           modality: 'virtual',
+          visit_location: this.selectedVisitLocation || null,
         },
       )
       .subscribe({

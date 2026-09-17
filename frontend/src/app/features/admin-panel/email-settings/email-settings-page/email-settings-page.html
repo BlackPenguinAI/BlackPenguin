@@ -62,6 +62,35 @@
         </app-glass-card>
 
       </form>
+
+      <form (ngSubmit)="saveTransport()">
+        <app-glass-card title="Appointment Email Transport" icon="mark_email_read">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <app-input label="Sender name" [(ngModel)]="transport.from_name" name="appointment_from_name"></app-input>
+            <app-input label="Corporate sender email" [(ngModel)]="transport.from_email" name="appointment_from_email" placeholder="appointments@company.com"></app-input>
+            <app-input label="Reply-to email" [(ngModel)]="transport.reply_to" name="appointment_reply_to"></app-input>
+            <app-input label="Firestore mail collection" [(ngModel)]="transport.mail_collection" name="mail_collection" placeholder="mail"></app-input>
+          </div>
+          <div class="mt-4 grid gap-3 md:grid-cols-3 text-xs">
+            <div class="rounded-xl border border-white/10 p-3"><span class="text-gray-500">Firebase project</span><strong class="mt-1 block">{{transport.firebase_project_id || 'Not configured'}}</strong></div>
+            <div class="rounded-xl border border-white/10 p-3"><span class="text-gray-500">Admin bridge</span><strong class="mt-1 block" [class.text-green-400]="transport.bridge_configured">{{transport.bridge_configured ? 'CONNECTED' : 'NOT CONFIGURED'}}</strong></div>
+            <div class="rounded-xl border border-white/10 p-3"><span class="text-gray-500">Last test</span><strong class="mt-1 block uppercase">{{transport.status}}</strong></div>
+          </div>
+          <p class="mt-4 rounded-xl border border-yellow-500/20 bg-yellow-500/5 p-3 text-xs leading-relaxed text-gray-300">
+            The Gmail or Google Workspace App Password is configured only inside Firebase → Extensions → Trigger Email from Firestore. Black Penguin never receives or stores it. The extension collection must exactly match <strong>{{transport.mail_collection}}</strong>.
+          </p>
+          <div class="mt-4 flex items-center justify-between rounded-xl border border-white/10 p-4">
+            <div><p class="text-sm font-medium">Enable appointment confirmations</p><p class="text-xs text-gray-500">Sends separate lead and assigned Sales messages with an ICS invitation.</p></div>
+            <input type="checkbox" [(ngModel)]="transport.is_enabled" name="appointment_email_enabled" class="h-5 w-5 accent-yellow-400">
+          </div>
+          <div class="mt-4 grid gap-3 md:grid-cols-[1fr_auto_auto] items-end">
+            <app-input label="Test recipient" [(ngModel)]="testRecipient" name="test_recipient" placeholder="you@company.com"></app-input>
+            <app-button type="button" variant="ghost" [isLoading]="transportTesting" (onClick)="testTransport()">Queue test</app-button>
+            <app-button type="submit" variant="primary" [isLoading]="transportSaving">Save transport</app-button>
+          </div>
+          <p *ngIf="transport.last_error" class="mt-3 text-xs text-red-300">{{transport.last_error}}</p>
+        </app-glass-card>
+      </form>
     </div>
   </div>
 </div>

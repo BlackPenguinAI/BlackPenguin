@@ -54,6 +54,47 @@ def _signed_headers(body: bytes, timestamp: str) -> dict[str, str]:
     }
 
 
+def _bridge_post(path: str, payload: dict) -> dict:
+    ensure_admin_deletion_ready()
+    body = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    timestamp = str(int(time.time()))
+    try:
+        response = httpx.post(
+            settings.FIREBASE_ADMIN_BRIDGE_URL.rstrip("/") + path,
+            content=body,
+            headers=_signed_headers(body, timestamp),
+            timeout=settings.FIREBASE_ADMIN_BRIDGE_TIMEOUT_SECONDS,
+        )
+        data = response.json()
+    except (httpx.HTTPError, ValueError) as exc:
+        raise RuntimeError("Firebase Admin bridge is temporarily unavailable.") from exc
+    if response.is_error:
+        raise RuntimeError(str(data.get("detail") or "Firebase Admin bridge rejected the request."))
+    return data
+
+
+def enqueue_email(*, project_id: str, document_id: str, recipient: str, subject: str,
+                  text: str, html: str, attachments: list[dict] | None = None,
+                  from_email: str | None = None, reply_to: str | None = None,
+                  mail_collection: str = "mail") -> dict:
+    payload = {
+        "project_id": project_id,
+        "document_id": document_id,
+        "mail_collection": mail_collection,
+        "to": [recipient],
+        "message": {"subject": subject, "text": text, "html": html, "attachments": attachments or []},
+    }
+    if from_email:
+        payload["from"] = from_email
+    if reply_to:
+        payload["replyTo"] = reply_to
+    return _bridge_post("/mail/enqueue", payload)
+
+
+def email_status(*, project_id: str, document_id: str, mail_collection: str = "mail") -> dict:
+    return _bridge_post("/mail/status", {"project_id": project_id, "document_id": document_id, "mail_collection": mail_collection})
+
+
 def delete_identity(*, project_id: str, firebase_uid: str | None, email: str) -> str:
     """Delete one identity idempotently; a missing identity is successful."""
     ensure_admin_deletion_ready()

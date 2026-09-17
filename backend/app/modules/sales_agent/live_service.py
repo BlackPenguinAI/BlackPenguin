@@ -14,7 +14,6 @@ from app.integrations.twilio_client import send_sms
 from app.modules.projects.models import Project, ProjectCampaign
 from app.modules.sales_crm.intelligence import update_lead_intelligence
 from app.modules.sales_crm.models import FunnelStage, Lead, LeadContact
-from app.modules.sales_crm.calendar_links import calendar_invite_url, google_calendar_add_url
 from app.modules.system_settings.services import get_twilio_config
 
 from .graph import GRAPH_VERSION, TOOLSET_VERSION, build_sales_graph
@@ -24,7 +23,7 @@ from .models import (
 )
 from .service import (
     _action_types, _appointment_confirmation, _availability_reply,
-    _is_availability_request, _offered_slot_selection, _project_zone,
+    _confirm_or_request_location, _is_availability_request, _offered_slot_selection, _project_zone,
     get_or_create_conversation,
 )
 from app.modules.sales_crm.scheduling import create_agent_appointment, next_cadence_time
@@ -416,14 +415,22 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
             reply = f"I’ve paused the automated conversation for human review. You can also contact Black Penguin at {settings.SUPPORT_EMAIL}."
         offered_slots = []
         selected = _offered_slot_selection(db, conversation_id=conversation.id, inbound_text=inbound.content, project=project, now=datetime.utcnow())
-        if selected:
+        location_needed = bool(selected) or _is_availability_request(inbound.content, now=datetime.utcnow(), zone=_project_zone(project)) or "request_available_slots" in _action_types(actions)
+        awaiting_location = bool((lead.meta_form_data or {}).get("pending_location_request"))
+        location_ready, location_question, location_resume = (
+            _confirm_or_request_location(project, lead, inbound.content)
+            if location_needed or awaiting_location else (True, None, None)
+        )
+        if location_resume:
+            reply, offered_slots = _availability_reply(db, project=project, inbound_text=location_resume, now=datetime.utcnow())
+            actions = [{"type": "request_available_slots"}, {"type": "offer_appointment"}]
+        elif location_needed and not location_ready:
+            reply = location_question
+            actions = [{"type": "request_visit_location"}]
+        elif selected:
             try:
                 meeting, user = create_agent_appointment(db, lead=lead, starts_at=selected, duration_minutes=45, modality="showroom")
                 reply = _appointment_confirmation(project=project, lead=lead, user=user, starts_at=meeting.meeting_time)
-                reply += (
-                    f" Add to Google Calendar: {google_calendar_add_url(project=project, lead=lead, starts_at=meeting.meeting_time)}. "
-                    f"Other calendar apps: {calendar_invite_url(meeting.id)}"
-                )
                 conversation.stage = "appointment_confirmed"; conversation.is_paused = True; conversation.pause_reason = "Appointment confirmed"
                 lead.pipeline_stage = "S09_HANDOFF"; lead.agent_status = "appointment_confirmed"; lead.next_action_at = None
                 actions = [{"type": "appointment_confirmed", "meeting_id": meeting.id}]

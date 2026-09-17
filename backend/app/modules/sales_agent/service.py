@@ -11,9 +11,9 @@ from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 
 from app.modules.projects.models import Project, ProjectCampaign
+from app.modules.projects.locations import locations_for_project, resolve_visit_location
 from app.modules.sales_crm.models import FunnelStage, Lead, Meeting
 from app.modules.sales_crm.scheduling import available_slots, create_agent_appointment, next_cadence_time
-from app.modules.sales_crm.calendar_links import calendar_invite_url, google_calendar_add_url
 from app.modules.users.models import User
 
 from .graph import GRAPH_VERSION, TOOLSET_VERSION, build_sales_graph
@@ -255,7 +255,8 @@ def _appointment_confirmation(
     sales_name = " ".join(
         value for value in (user.first_name, user.last_name) if value
     ) or user.email
-    location_parts = [project.address, project.city, project.country]
+    selected_location = resolve_visit_location(project, (lead.meta_form_data or {}).get("selected_visit_location"))
+    location_parts = [selected_location["address"] if selected_location else None, project.city, project.country]
     location = ", ".join(dict.fromkeys(value.strip() for value in location_parts if value and value.strip()))
     location = f"{project.name}, {location}" if location else project.name
     email = lead.email or "the email address provided in your lead form"
@@ -266,6 +267,32 @@ def _appointment_confirmation(
         f"A confirmation with these appointment details will also be sent to {email}. "
         "We look forward to welcoming you!"
     )
+
+
+def _confirm_or_request_location(project: Project, lead: Lead, inbound_text: str) -> tuple[bool, str | None, str | None]:
+    """Persist an explicit visit location or return a concise disambiguation question."""
+    locations = locations_for_project(project)
+    if not locations:
+        return False, "I need the exact property address before I can schedule your visit.", None
+    form = dict(lead.meta_form_data or {})
+    current = resolve_visit_location(project, form.get("selected_visit_location"))
+    if current:
+        return True, None, None
+    if len(locations) == 1:
+        selected = locations[0]
+    else:
+        normalized = inbound_text.strip().casefold()
+        ordinals = {"first": 1, "1": 1, "one": 1, "second": 2, "2": 2, "two": 2, "third": 3, "3": 3, "three": 3}
+        selected = resolve_visit_location(project, str(ordinals.get(normalized, normalized)))
+        if not selected:
+            choices = " ".join(f"{index}. {item['label']} — {item['address']}" for index, item in enumerate(locations, 1))
+            form["pending_location_request"] = inbound_text
+            lead.meta_form_data = form
+            return False, f"Which property location would you like to visit? {choices} Reply with the number or location name.", None
+    resume = form.pop("pending_location_request", None)
+    form["selected_visit_location"] = selected
+    lead.meta_form_data = form
+    return True, None, resume
 
 
 def conversation_summaries(
@@ -578,7 +605,21 @@ async def simulate_turn(
             project=project,
             now=now,
         ) if record_inbound and event_kind == "lead_message" else None
-        if not result.get("policy_violations") and selected_slot is not None:
+        location_needed = selected_slot is not None or _is_availability_request(inbound_text, now=now, zone=_project_zone(project)) or "request_available_slots" in _action_types(proposed_actions)
+        awaiting_location = bool((lead.meta_form_data or {}).get("pending_location_request"))
+        location_ready, location_question, location_resume = (
+            _confirm_or_request_location(project, lead, inbound_text)
+            if location_needed or awaiting_location else (True, None, None)
+        )
+        if not result.get("policy_violations") and location_resume:
+            proposed_reply, offered_slots = _availability_reply(db, project=project, inbound_text=location_resume, now=now)
+            proposed_actions = [{"type": "request_available_slots"}, {"type": "offer_appointment"}]
+            availability_handled = True
+        elif not result.get("policy_violations") and location_needed and not location_ready:
+            proposed_reply = location_question
+            proposed_actions = [{"type": "request_visit_location"}]
+            availability_handled = True
+        elif not result.get("policy_violations") and selected_slot is not None:
             try:
                 meeting, assigned_user = create_agent_appointment(
                     db,
@@ -610,10 +651,6 @@ async def simulate_turn(
                     lead=lead,
                     user=assigned_user,
                     starts_at=meeting.meeting_time,
-                )
-                proposed_reply += (
-                    f" Add to Google Calendar: {google_calendar_add_url(project=project, lead=lead, starts_at=meeting.meeting_time)}. "
-                    f"Other calendar apps: {calendar_invite_url(meeting.id)}"
                 )
                 proposed_actions = [{
                     "type": "appointment_confirmed",
