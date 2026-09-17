@@ -89,7 +89,8 @@ def run_audit(db: Session) -> SeoAuditRun:
         sitemap_response = httpx.get(urljoin(target, "sitemap.xml"), follow_redirects=True, timeout=10.0)
         details["sitemap_xml"] = sitemap_response.status_code == 200 and _valid_sitemap(sitemap_response.text)
         score = round(100 * sum(value is True for value in details.values()) / len(details))
-        status = "healthy" if score >= 90 else "needs_attention"
+        critical_checks = ("title", "description", "canonical", "single_h1", "indexable", "https")
+        status = "healthy" if score >= 90 and all(details.get(key) is True for key in critical_checks) else "needs_attention"
     except httpx.HTTPError as exc:
         details = {"fetch_error": type(exc).__name__}
         score = 0; status = "unreachable"

@@ -29,12 +29,21 @@ export class SalesComponent implements OnInit {
     { value: 3, label: 'Thu' }, { value: 4, label: 'Fri' }, { value: 5, label: 'Sat' },
     { value: 6, label: 'Sun' },
   ];
-  visitPhoto: File | null = null; saleEvidence: File | null = null; managerMeetingTime = ''; calendarStatus = 'not_connected'; calendarPlatformAvailable = true;
+  visitPhoto: File | null = null; saleEvidence: File | null = null; managerMeetingTime = ''; calendarStatus = 'not_connected'; calendarPlatformAvailable = true; calendarAccountEmail = ''; calendarLastSyncedAt = '';
   newAppointment = { lead_id: '', time: '10:00', duration_minutes: 45, modality: 'in_person', notes: '' };
 
   constructor(private http: HttpClient, private cdr: ChangeDetectorRef) {}
 
-  ngOnInit(): void { this.loadProfile(); this.loadProjects(); this.reload(); if (this.role === 'sales') this.loadCalendarConnection(); }
+  ngOnInit(): void {
+    this.loadProfile(); this.loadProjects(); this.reload();
+    if (this.role === 'sales') {
+      const result = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('calendar');
+      if (result === 'connected') this.success = 'Google Calendar connected successfully.';
+      if (result === 'failed') this.error = 'Google Calendar connection failed. Verify the Google OAuth test-user or production approval settings.';
+      if (result === 'cancelled') this.error = 'Google Calendar connection was cancelled.';
+      this.loadCalendarConnection();
+    }
+  }
   get isManager(): boolean { return this.role === 'admin' || this.role === 'assistant'; }
   get selectedProject(): any { return this.projects.find(project => project.id === this.projectId); }
 
@@ -231,10 +240,16 @@ export class SalesComponent implements OnInit {
   private loadLeads(): void { this.http.get<any[]>(`${API_V1_URL}/sales/projects/${this.projectId}/leads-report`).subscribe({ next: rows => { this.leads = rows || []; this.cdr.markForCheck(); }, error: () => { this.leads = []; this.cdr.markForCheck(); } }); }
   private loadCalendarConnection(): void {
     this.http.get<any>(`${API_V1_URL}/sales/calendar/google/platform-status`).subscribe({ next: value => { this.calendarPlatformAvailable = !!value.available; this.cdr.markForCheck(); } });
-    this.http.get<any[]>(`${API_V1_URL}/sales/calendar-connections/me`).subscribe({ next: rows => { this.calendarStatus = rows[0]?.status || 'not_connected'; this.cdr.markForCheck(); } });
+    this.http.get<any[]>(`${API_V1_URL}/sales/calendar-connections/me`).subscribe({ next: rows => {
+      const connection = rows.find(row => row.provider === 'google');
+      this.calendarStatus = connection?.status || 'not_connected';
+      this.calendarAccountEmail = connection?.account_email || '';
+      this.calendarLastSyncedAt = connection?.last_synced_at || '';
+      this.cdr.markForCheck();
+    } });
   }
   connectGoogleCalendar(): void { this.http.get<any>(`${API_V1_URL}/sales/calendar/google/connect`).subscribe({ next: value => window.location.assign(value.authorization_url), error: err => { this.error = err.error?.detail || 'Google Calendar connection could not start.'; this.cdr.markForCheck(); } }); }
-  disconnectGoogleCalendar(): void { this.http.delete(`${API_V1_URL}/sales/calendar/google`).subscribe({ next: () => { this.calendarStatus = 'not_connected'; this.success = 'Google Calendar disconnected.'; this.cdr.markForCheck(); }, error: err => { this.error = err.error?.detail || 'Google Calendar could not be disconnected.'; } }); }
+  disconnectGoogleCalendar(): void { this.http.delete(`${API_V1_URL}/sales/calendar/google`).subscribe({ next: () => { this.calendarStatus = 'not_connected'; this.calendarAccountEmail = ''; this.calendarLastSyncedAt = ''; this.success = 'Google Calendar disconnected.'; this.cdr.markForCheck(); }, error: err => { this.error = err.error?.detail || 'Google Calendar could not be disconnected.'; } }); }
   private refreshMeeting(row: any): void { const index = this.meetings.findIndex(item => item.id === row.id); if (index >= 0) this.meetings[index] = row; }
   private startOfDay(value: Date): Date { return new Date(value.getFullYear(), value.getMonth(), value.getDate()); }
   private localDateKey(date: Date): string { return `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`; }

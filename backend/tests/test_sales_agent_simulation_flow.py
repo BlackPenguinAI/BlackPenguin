@@ -24,13 +24,15 @@ from app.modules.sales_agent.service import simulate_turn
 from app.modules.sales_agent.simulation_service import (
     advance_simulation,
     confirm_simulation_appointment,
+    create_simulation_calendar_test,
     create_simulation,
+    delete_simulation_calendar_test,
     delete_simulation,
     generate_initial_message,
     simulation_options,
     slots_for_simulation,
 )
-from app.modules.sales_crm.models import Lead, Meeting, SalesAvailabilityBlock, SalesAvailabilityWindow
+from app.modules.sales_crm.models import CalendarConnection, Lead, Meeting, SalesAvailabilityBlock, SalesAvailabilityWindow
 from app.modules.users.models import User, UserRole
 
 
@@ -53,6 +55,13 @@ HUMAN_REVIEW_REPLY = (
     '"intent":"appointment_request","extracted_facts":[],'
     '"proposed_actions":[{"type":"request_human_review"}],'
     '"requires_human":true,"reason":"Availability was not checked"}'
+)
+
+FALSE_CONFIRMATION_REPLY = (
+    '{"reply":"Your appointment is confirmed for Friday at 3:00 PM.",'
+    '"intent":"appointment_confirmed","extracted_facts":[],'
+    '"proposed_actions":[{"type":"appointment_confirmed"}],'
+    '"requires_human":false,"reason":"Lead agreed"}'
 )
 
 
@@ -456,6 +465,74 @@ def test_sms_selection_books_once_and_closes_with_timezone_sales_location_and_em
         direction="outbound",
     ).order_by(SalesMessage.created_at.desc()).first()
     assert confirmation_message.metadata_json["appointment_confirmed"] is True
+
+
+def test_single_verified_slot_accepts_an_affirmative_reply_and_creates_the_meeting():
+    db = _db(); company, _, admin, sales_a, sales_b, project, campaign, product = _fixture(db)
+    project.timezone = "UTC"; sales_b.is_active = False
+    db.query(SalesAvailabilityWindow).delete(synchronize_session=False)
+    db.add(SalesAvailabilityBlock(
+        user_id=sales_a.id, starts_at=datetime(2026, 8, 31, 15, 0),
+        ends_at=datetime(2026, 8, 31, 15, 45), timezone="UTC",
+    ))
+    db.add_all([project, sales_b]); db.commit()
+    result = _start(db, company, admin, project, campaign, product)
+    simulation = db.query(SalesAgentSimulation).filter_by(id=result["simulation_id"]).one()
+    simulation.virtual_now = datetime(2026, 8, 25, 18, 0); db.add(simulation); db.commit()
+    with patch("app.modules.sales_agent.graph.generate_llm_response", new=AsyncMock(return_value=SLOTS_REPLY)):
+        offer = asyncio.run(simulate_turn(db, company_id=company.id, lead_id=result["lead_id"], inbound_text="August 31st"))
+        confirmed = asyncio.run(simulate_turn(db, company_id=company.id, lead_id=result["lead_id"], inbound_text="It's ok"))
+    assert "3:00 PM" in offer["reply"]
+    assert confirmed["intent"] == "appointment_confirmed"
+    assert db.query(Meeting).filter_by(lead_id=result["lead_id"]).count() == 1
+
+
+def test_simulation_calendar_event_is_explicit_and_reversible():
+    db = _db(); company, _, admin, sales_a, sales_b, project, campaign, product = _fixture(db)
+    sales_b.is_active = False
+    result = _start(db, company, admin, project, campaign, product)
+    slot = slots_for_simulation(db, company_id=company.id, simulation_id=result["simulation_id"])[0]
+    confirmed = confirm_simulation_appointment(
+        db, company_id=company.id, simulation_id=result["simulation_id"],
+        starts_at=slot["start_at"], duration_minutes=45, modality="in_person",
+    )
+    meeting = db.query(Meeting).filter_by(id=confirmed["meeting_id"]).one()
+    assert meeting.gcal_event_id is None
+
+    db.add(CalendarConnection(
+        user_id=sales_a.id, provider="google", calendar_id="primary",
+        account_email=sales_a.email, status="connected",
+    ))
+    db.commit()
+    event = {"id": "test-event-1", "htmlLink": "https://calendar.google.com/test-event-1"}
+    with patch("app.modules.sales_agent.simulation_service.create_calendar_event_for_connection", return_value=event) as create_event:
+        created = create_simulation_calendar_test(
+            db, company_id=company.id, simulation_id=result["simulation_id"],
+        )
+    assert create_event.call_args.kwargs["attendee_email"] is None
+    assert create_event.call_args.kwargs["send_updates"] == "none"
+    assert created["status"] == "test_synced"
+
+    with patch("app.modules.sales_agent.simulation_service.delete_calendar_event_for_connection") as delete_event:
+        delete_simulation_calendar_test(
+            db, company_id=company.id, simulation_id=result["simulation_id"],
+        )
+    delete_event.assert_called_once()
+    db.refresh(meeting)
+    assert meeting.gcal_event_id is None
+    assert meeting.calendar_sync_status == "simulation_ready"
+
+
+def test_model_confirmation_is_replaced_when_no_meeting_was_created():
+    db = _db(); company, _, admin, _, _, project, campaign, product = _fixture(db)
+    result = _start(db, company, admin, project, campaign, product)
+    with patch("app.modules.sales_agent.graph.generate_llm_response", new=AsyncMock(return_value=FALSE_CONFIRMATION_REPLY)):
+        response = asyncio.run(simulate_turn(
+            db, company_id=company.id, lead_id=result["lead_id"], inbound_text="It's ok",
+        ))
+    assert "haven't reserved" in response["reply"]
+    assert response["intent"] != "appointment_confirmed"
+    assert db.query(Meeting).filter_by(lead_id=result["lead_id"]).count() == 0
 
 
 def test_simulation_migration_adopts_existing_schema_and_is_repeatable(monkeypatch):

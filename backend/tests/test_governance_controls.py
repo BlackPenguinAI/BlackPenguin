@@ -12,20 +12,20 @@ import app.db.base  # noqa: F401
 from app.db.postgres import Base
 from app.modules.companies.models import Company
 from app.modules.governance.models import (
-    AgentOperatingPolicy, LegalDocumentVersion, Notification, NotificationOutbox,
+    AgentOperatingPolicy, AppointmentEmailOutbox, LegalDocumentVersion, Notification, NotificationOutbox,
     PlatformAuditEvent, SalesAssetAccessEvent, UserLegalAcceptance,
 )
 from app.modules.governance.schemas import DeletePayload, UserStatusPayload
 from app.modules.governance.services import (
-    assert_company_license, enqueue_notification, escalation_reason,
-    next_allowed_proactive_time, process_notification_outbox,
+    assert_company_license, enqueue_appointment_emails, enqueue_notification, escalation_reason,
+    next_allowed_proactive_time, process_appointment_email_outbox, process_notification_outbox,
     published_legal_versions, record_legal_acceptance, record_platform_event,
 )
 from app.modules.users.models import User, UserRole
 from app.modules.users.router import delete_platform_user, set_platform_user_status
 from app.modules.projects.asset_share_service import record_access
 from app.modules.projects.models import Project, ProjectOnboardingSource, ProjectSourceKind, SalesAssetShare
-from app.modules.sales_crm.models import Lead
+from app.modules.sales_crm.models import Lead, Meeting, MeetingStatus
 from app.modules.sales_crm.router import delete_platform_lead
 
 
@@ -248,6 +248,78 @@ def test_notification_outbox_is_idempotent_and_fans_out_to_tenant_roles(db):
     assert process_notification_outbox(db, company_id=company.id) == 0
 
 
+def test_notification_recipient_roles_exclude_unrequested_tenant_roles(db):
+    company, admin = _tenant(db)
+    assistant = User(
+        company_id=company.id, email="assistant-filter@example.com", hashed_password="unused",
+        role=UserRole.ASSISTANT, is_active=True,
+    )
+    mkt = User(
+        company_id=company.id, email="mkt-filter@example.com", hashed_password="unused",
+        role=UserRole.MKT, is_active=True,
+    )
+    db.add_all([assistant, mkt]); db.commit()
+    enqueue_notification(
+        db, company_id=company.id, project_id=None, event_type="new_lead",
+        entity_type="lead", entity_id="lead-1",
+        payload={
+            "title": "New lead", "body": "A new lead arrived.",
+            "recipient_roles": ["admin", "assistant"],
+        },
+        dedupe_key="new-lead:lead-1",
+    )
+    assert process_notification_outbox(db, company_id=company.id) == 2
+    assert {item.recipient_user_id for item in db.query(Notification).all()} == {admin.id, assistant.id}
+
+
+def test_appointment_email_outbox_is_idempotent_and_builds_both_messages(db, monkeypatch):
+    company, _ = _tenant(db)
+    project = Project(
+        company_id=company.id, name="Harbor Homes", address="100 Ocean Ave",
+        city="Miami", country="USA", timezone="America/New_York",
+    )
+    sales = User(
+        company_id=company.id, email="sales-calendar@example.com", hashed_password="unused",
+        first_name="Alex", last_name="Rivera", role=UserRole.SALES, is_active=True,
+    )
+    db.add_all([project, sales]); db.flush()
+    lead = Lead(
+        company_id=company.id, project_id=project.id, full_name="Taylor Morgan",
+        phone="+15550003333", email="taylor@example.com",
+    )
+    db.add(lead); db.flush()
+    meeting = Meeting(
+        project_id=project.id, lead_id=lead.id, assigned_sales_user_id=sales.id,
+        meeting_time=datetime(2026, 9, 18, 19, 0), duration_minutes=45,
+        status=MeetingStatus.CONFIRMED, confirmation_status="confirmed",
+    )
+    db.add(meeting); db.flush()
+
+    first = enqueue_appointment_emails(
+        db, company_id=company.id, meeting_id=meeting.id,
+        lead_email=lead.email, sales_email=sales.email,
+    )
+    second = enqueue_appointment_emails(
+        db, company_id=company.id, meeting_id=meeting.id,
+        lead_email=lead.email, sales_email=sales.email,
+    )
+    db.commit()
+    assert {item.id for item in first} == {item.id for item in second}
+    assert db.query(AppointmentEmailOutbox).count() == 2
+
+    sent: list[dict] = []
+    monkeypatch.setattr(
+        "app.modules.governance.services.send_appointment_email",
+        lambda **values: sent.append(values),
+    )
+    assert process_appointment_email_outbox(db) == 2
+    assert {item["recipient"] for item in sent} == {lead.email, sales.email}
+    assert all("Alex Rivera" in item["body"] for item in sent)
+    assert all("100 Ocean Ave" in item["body"] for item in sent)
+    assert all("BEGIN:VCALENDAR" in item["ics_content"] for item in sent)
+    assert {item.status for item in db.query(AppointmentEmailOutbox).all()} == {"sent"}
+
+
 def test_shared_material_tracks_successful_human_interest_once_and_ignores_preview_bots(db):
     company, _ = _tenant(db)
     project = Project(company_id=company.id, name="Material Project")
@@ -294,3 +366,11 @@ def test_compliance_migration_is_attached_to_the_current_revision_chain():
     spec.loader.exec_module(migration)
     assert migration.revision == "20260915_compliance_ops"
     assert migration.down_revision == "20260907_project_receipts"
+
+    calendar_path = Path(__file__).parents[1] / "alembic" / "versions" / "20260917_calendar_email_readiness.py"
+    calendar_spec = importlib.util.spec_from_file_location("calendar_email_readiness_migration", calendar_path)
+    assert calendar_spec and calendar_spec.loader
+    calendar_migration = importlib.util.module_from_spec(calendar_spec)
+    calendar_spec.loader.exec_module(calendar_migration)
+    assert calendar_migration.revision == "20260917_calendar_email"
+    assert calendar_migration.down_revision == migration.revision

@@ -127,6 +127,10 @@ class ConversationSummary(BaseModel):
     virtual_now: datetime | None = None
     appointment_id: str | None = None
     assigned_sales_user_id: str | None = None
+    assigned_sales_name: str | None = None
+    appointment_time: datetime | None = None
+    calendar_sync_status: str | None = None
+    meeting_url: str | None = None
     model_config = ConfigDict(from_attributes=True)
 
 

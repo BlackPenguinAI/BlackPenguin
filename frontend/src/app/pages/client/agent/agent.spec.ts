@@ -159,6 +159,19 @@ describe('AgentComponent simulation form', () => {
     expect(sends).toBe(1);
   });
 
+  it('renders the lead message optimistically while the AI turn is pending', () => {
+    let observer: any;
+    const value = component({ post: () => ({ pipe: () => ({ subscribe: (next: any) => { observer = next; } }) }) });
+    value.selected = { id: 'conversation', lead_id: 'lead', channel: 'simulation', is_paused: false };
+    value.draft = 'towards the down payment';
+    value.send();
+    expect(value.draft).toBe('');
+    expect(value.messages.at(-1)?.content).toBe('towards the down payment');
+    expect(value.messages.at(-1)?.status).toBe('sending');
+    expect(value.sending).toBe(true);
+    expect(observer).toBeTruthy();
+  });
+
   it('saves the lead before requesting the initial SMS and always clears loading state', () => {
     const calls: string[] = [];
     const conversation = {

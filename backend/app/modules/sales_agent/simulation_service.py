@@ -10,20 +10,22 @@ from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session
 
 from app.modules.project_team.service import eligible_sales_assignments
+from app.modules.governance.services import enqueue_notification
 from app.modules.projects.models import Project, ProjectCampaign, ProjectPropertyType, ProjectUnit, SalesAssetShare
 from app.modules.sales_crm import storage_service
 from app.modules.sales_crm.models import (
-    Lead, LeadConsentEvent, LeadObjection, LeadScoreSnapshot, LeadSegmentAssignment,
+    CalendarConnection, Lead, LeadConsentEvent, LeadObjection, LeadScoreSnapshot, LeadSegmentAssignment,
     LeadStageHistory, Meeting, MeetingAttachment, SmsChatMessage,
 )
 from app.modules.sales_crm.scheduling import available_slots, create_agent_appointment
 from app.modules.users.models import User
+from app.integrations.gcalendar_client import create_calendar_event_for_connection, delete_calendar_event_for_connection
 
 from .models import (
     AgentRun, OutboundMessage, SalesAgentSimulation, SalesConversation,
     SalesConversationLeadContext, SalesFollowUpJob, SalesMessage,
 )
-from .service import get_or_create_conversation, simulate_turn
+from .service import _appointment_confirmation, get_or_create_conversation, simulate_turn
 
 
 COMPLETED_PROJECT_STATUSES = {"complete", "completed"}
@@ -221,6 +223,17 @@ def create_simulation(
     )
     db.add(lead)
     db.flush()
+    enqueue_notification(
+        db, company_id=company_id, project_id=project.id,
+        event_type="new_lead", entity_type="lead", entity_id=lead.id,
+        payload={
+            "title": "New simulation lead",
+            "body": f"{lead.full_name} entered the AI Sales simulation.",
+            "action_url": f"/app/agent?project={project.id}&lead={lead.id}",
+            "recipient_roles": ["admin", "assistant"],
+        },
+        dedupe_key=f"new-simulation-lead:{lead.id}",
+    )
     conversation = get_or_create_conversation(db, lead, channel="simulation")
     conversation.is_paused = False
     conversation.pause_reason = None
@@ -503,7 +516,7 @@ def confirm_simulation_appointment(
         duration_minutes=duration_minutes,
         modality=modality,
     )
-    sales_name = " ".join(value for value in (user.first_name, user.last_name) if value) or user.email
+    project = db.query(Project).filter(Project.id == simulation.project_id).one()
     db.add(SalesMessage(
         conversation_id=simulation.conversation_id,
         channel="simulation",
@@ -518,9 +531,11 @@ def confirm_simulation_appointment(
         channel="simulation",
         direction="outbound",
         role="assistant",
-        content=(
-            f"Your appointment is confirmed for {starts_at.strftime('%A, %B %d at %H:%M')} "
-            f"with {sales_name}. We look forward to speaking with you."
+        content=_appointment_confirmation(
+            project=project,
+            lead=lead,
+            user=user,
+            starts_at=meeting.meeting_time,
         ),
         status="simulated",
         created_at=simulation.virtual_now + timedelta(seconds=1),
@@ -539,6 +554,64 @@ def confirm_simulation_appointment(
     db.commit()
     db.refresh(meeting)
     return _appointment_response(meeting, user)
+
+
+def create_simulation_calendar_test(db: Session, *, company_id: str, simulation_id: str) -> dict:
+    simulation = _simulation(db, company_id=company_id, simulation_id=simulation_id)
+    meeting = db.query(Meeting).filter(
+        Meeting.lead_id == simulation.lead_id,
+        Meeting.source == "agent_simulation",
+    ).order_by(Meeting.created_at.desc()).first()
+    if not meeting or not meeting.assigned_sales_user_id:
+        raise HTTPException(status_code=409, detail="Confirm the simulated appointment before testing Google Calendar.")
+    connection = db.query(CalendarConnection).filter(
+        CalendarConnection.user_id == meeting.assigned_sales_user_id,
+        CalendarConnection.provider == "google",
+        CalendarConnection.status == "connected",
+    ).first()
+    if not connection:
+        raise HTTPException(status_code=409, detail="The assigned Sales user has not connected Google Calendar.")
+    if meeting.gcal_event_id and meeting.calendar_sync_status == "test_synced":
+        return {"meeting_id": meeting.id, "status": meeting.calendar_sync_status, "event_id": meeting.gcal_event_id, "event_url": meeting.meeting_url}
+    project = db.query(Project).filter(Project.id == meeting.project_id).one()
+    lead = db.query(Lead).filter(Lead.id == meeting.lead_id).one()
+    location = ", ".join(value for value in (project.name, project.address, project.city, project.country) if value)
+    event = create_calendar_event_for_connection(
+        db, connection,
+        title=f"[TEST] {project.name} visit with {lead.full_name}",
+        description="Explicit Google Calendar integration test from Black Penguin. No lead invitation was sent.",
+        location=location,
+        start_time=meeting.meeting_time,
+        end_time=meeting.meeting_time + timedelta(minutes=meeting.duration_minutes),
+        timezone_name=project.timezone or "UTC",
+        attendee_email=None,
+        send_updates="none",
+    )
+    meeting.gcal_event_id = event.get("id")
+    meeting.meeting_url = event.get("htmlLink")
+    meeting.calendar_sync_status = "test_synced"
+    db.add(meeting); db.commit()
+    return {"meeting_id": meeting.id, "status": meeting.calendar_sync_status, "event_id": meeting.gcal_event_id, "event_url": meeting.meeting_url}
+
+
+def delete_simulation_calendar_test(db: Session, *, company_id: str, simulation_id: str) -> None:
+    simulation = _simulation(db, company_id=company_id, simulation_id=simulation_id)
+    meeting = db.query(Meeting).filter(Meeting.lead_id == simulation.lead_id, Meeting.source == "agent_simulation").order_by(Meeting.created_at.desc()).first()
+    if not meeting or not meeting.gcal_event_id or meeting.calendar_sync_status != "test_synced":
+        return
+    connection = db.query(CalendarConnection).filter(
+        CalendarConnection.user_id == meeting.assigned_sales_user_id,
+        CalendarConnection.provider == "google",
+        CalendarConnection.status == "connected",
+    ).first()
+    if not connection:
+        raise HTTPException(
+            status_code=409,
+            detail="Reconnect the assigned Sales user's Google Calendar before removing the test event.",
+        )
+    delete_calendar_event_for_connection(db, connection, meeting.gcal_event_id)
+    meeting.gcal_event_id = None; meeting.meeting_url = None; meeting.calendar_sync_status = "simulation_ready"
+    db.add(meeting); db.commit()
 
 
 async def advance_simulation(

@@ -22,7 +22,7 @@ from .live_service import send_manual_message
 from .live_test_service import create_live_meta_test
 from .simulation_service import (
     advance_simulation, approve_simulation, confirm_simulation_appointment,
-    create_simulation, delete_simulation, generate_initial_message, simulation_options,
+    create_simulation, create_simulation_calendar_test, delete_simulation, delete_simulation_calendar_test, generate_initial_message, simulation_options,
     slots_for_simulation,
 )
 
@@ -148,6 +148,27 @@ def confirm_appointment(
         duration_minutes=payload.duration_minutes,
         modality=payload.modality,
     )
+
+
+@router.post("/simulations/{simulation_id}/calendar-test")
+def test_simulation_calendar(
+    simulation_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.MKT])),
+):
+    _require_simulation_access(db, current_user, simulation_id)
+    return create_simulation_calendar_test(db, company_id=current_user.company_id, simulation_id=simulation_id)
+
+
+@router.delete("/simulations/{simulation_id}/calendar-test", status_code=status.HTTP_204_NO_CONTENT)
+def remove_simulation_calendar_test(
+    simulation_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.MKT])),
+):
+    _require_simulation_access(db, current_user, simulation_id)
+    delete_simulation_calendar_test(db, company_id=current_user.company_id, simulation_id=simulation_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post("/simulations/{simulation_id}/advance")

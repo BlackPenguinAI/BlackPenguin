@@ -30,6 +30,7 @@ export class AgentComponent implements OnInit, OnDestroy {
   creating = false;
   advancing = false;
   confirming = false;
+  calendarTesting = false;
   deletingSimulation = false;
   generatingInitial = false;
   setupOpen = true;
@@ -477,10 +478,29 @@ export class AgentComponent implements OnInit, OnDestroy {
       return;
     }
     if (this.selected.is_paused) return;
+    const eventId = `ui:${this.newRequestId()}`;
+    const optimisticId = `pending:${eventId}`;
     this.sending = true;
     this.error = '';
+    this.draft = '';
+    this.messages = [...this.messages, {
+      id: optimisticId,
+      conversation_id: this.selected.id,
+      direction: 'inbound',
+      role: 'user',
+      content: message,
+      status: 'sending',
+      created_at: new Date().toISOString(),
+      optimistic: true,
+    }];
+    this.cdr.markForCheck();
+    setTimeout(() => this.scrollEnd());
     this.http
-      .post(`${API_V1_URL}/sales-agent/simulate`, { lead_id: this.selected.lead_id, message })
+      .post(`${API_V1_URL}/sales-agent/simulate`, {
+        lead_id: this.selected.lead_id,
+        message,
+        event_id: eventId,
+      })
       .pipe(
         finalize(() => {
           this.sending = false;
@@ -489,13 +509,16 @@ export class AgentComponent implements OnInit, OnDestroy {
       )
       .subscribe({
         next: () => {
-          this.draft = '';
           this.refreshMessages(true);
           this.refreshConversationSummaries();
         },
         error: (err) => {
+          const pending = this.messages.find((item) => item.id === optimisticId);
+          if (pending) pending.status = 'failed';
+          if (!this.draft) this.draft = message;
           this.error = err.error?.detail || 'The simulated turn could not be completed.';
           this.cdr.markForCheck();
+          this.refreshMessages(true);
         },
       });
   }
@@ -582,6 +605,37 @@ export class AgentComponent implements OnInit, OnDestroy {
           this.error = err.error?.detail || 'The appointment could not be confirmed.';
           this.loadSlots();
         },
+      });
+  }
+
+  testCalendar(): void {
+    if (!this.selected?.simulation_id || this.calendarTesting) return;
+    this.calendarTesting = true; this.error = '';
+    this.http.post<any>(`${API_V1_URL}/sales-agent/simulations/${this.selected.simulation_id}/calendar-test`, {})
+      .pipe(finalize(() => { this.calendarTesting = false; this.cdr.markForCheck(); }))
+      .subscribe({
+        next: result => {
+          this.selected.calendar_sync_status = result.status;
+          this.selected.meeting_url = result.event_url;
+          this.success = 'A test event was created in the assigned Sales user’s Google Calendar.';
+          this.refreshConversationSummaries();
+        },
+        error: err => { this.error = err.error?.detail || 'The Google Calendar test failed.'; },
+      });
+  }
+
+  removeCalendarTest(): void {
+    if (!this.selected?.simulation_id || this.calendarTesting) return;
+    this.calendarTesting = true; this.error = '';
+    this.http.delete(`${API_V1_URL}/sales-agent/simulations/${this.selected.simulation_id}/calendar-test`)
+      .pipe(finalize(() => { this.calendarTesting = false; this.cdr.markForCheck(); }))
+      .subscribe({
+        next: () => {
+          this.selected.calendar_sync_status = 'simulation_ready'; this.selected.meeting_url = null;
+          this.success = 'The Google Calendar test event was removed.';
+          this.refreshConversationSummaries();
+        },
+        error: err => { this.error = err.error?.detail || 'The test event could not be removed.'; },
       });
   }
 

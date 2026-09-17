@@ -9,6 +9,11 @@
 .eyebrow { font-size: .65rem; font-weight: 700; letter-spacing: .17em; text-transform: uppercase; color: #71717a; }
 .map-placeholder { background-color: #0b0b0b; background-image: linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px); background-size: 28px 28px; }
 .intelligence-card { background: radial-gradient(circle at 90% 20%, rgba(233,158,16,.18), transparent 32%), #101010; }
+.integration-card .material-symbols-outlined { color: #6b7280; }
+.integration-card small { color: #6b7280; }
+.integration-card.connected { border-color: rgba(74,222,128,.28); background: rgba(20,83,45,.08); }
+.integration-card.connected .material-symbols-outlined,
+.integration-card.connected small { color: #4ade80; }
 .skeleton { background: linear-gradient(90deg, #111 25%, #1b1b1b 50%, #111 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite; }
 @keyframes reveal { from { opacity: 0; transform: translateY(10px); } }
 @keyframes shimmer { to { background-position: -200% 0; } }

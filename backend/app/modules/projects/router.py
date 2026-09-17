@@ -553,7 +553,7 @@ def get_project_overview(
 ):
     require_project_access(db, current_user, project_id)
     project = services.get_project(db, project_id, current_user.company_id)
-    return services.serialize_overview(db, project)
+    return services.serialize_overview(db, project, current_user)
 
 
 @router.post("/{project_id}/onboarding/complete", response_model=ProjectCompleteResponse)

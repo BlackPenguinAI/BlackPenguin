@@ -36,6 +36,14 @@ export interface ProjectOverview {
   location: { address: string | null; latitude: number | null; longitude: number | null };
   market_intelligence: { report_url: string; total_revenue: number | null; target_roi: number | null; status: string };
   data_completeness: { percentage: number; onboarding_status: string; last_updated_at: string | null };
+  integrations: Array<{
+    key: 'meta' | 'sms' | 'calendar';
+    label: string;
+    icon: string;
+    status: 'connected' | 'simulation_only' | 'action_required' | 'unavailable';
+    detail: string;
+    accounts?: Array<{ user_id: string; name: string; email: string }>;
+  }>;
 }
 
 export interface SalesReport {

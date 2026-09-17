@@ -50,7 +50,7 @@ from app.modules.seo.models import SeoAuditRun
 from app.modules.governance.models import (
     AgentOperatingPolicy, ConversationKpiTarget, DataExportAuditEvent,
     HumanInterventionCase, KnowledgeGuidanceItem, LegalDocumentVersion,
-    Notification, NotificationOutbox, PlatformAuditEvent,
+    AppointmentEmailOutbox, Notification, NotificationOutbox, PlatformAuditEvent,
     SalesAssetAccessEvent, UserLegalAcceptance,
 )
 from app.db.schema import SchemaVersion

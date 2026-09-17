@@ -221,6 +221,7 @@ class CalendarConnectionUpdate(BaseModel):
 class CalendarConnectionResponse(BaseModel):
     provider: str
     calendar_id: Optional[str] = None
+    account_email: Optional[str] = None
     status: str
     last_synced_at: Optional[datetime] = None
     last_error: Optional[str] = None

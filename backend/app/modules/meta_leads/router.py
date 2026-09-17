@@ -19,6 +19,7 @@ from app.modules.sales_agent.models import ExternalWebhookEvent
 from app.modules.sales_agent.live_service import start_live_lead
 from app.modules.sales_crm.models import Lead, LeadConsentEvent
 from app.modules.system_settings import services as system_settings
+from app.modules.governance.services import enqueue_notification
 
 
 router = APIRouter()
@@ -189,6 +190,17 @@ async def receive(
                     assigned_sales_user_id=None,
                 )
                 db.add(lead); db.flush()
+                enqueue_notification(
+                    db, company_id=project.company_id, project_id=project.id,
+                    event_type="new_lead", entity_type="lead", entity_id=lead.id,
+                    payload={
+                        "title": "New Meta lead",
+                        "body": f"{lead.full_name} was captured from {campaign.name}.",
+                        "action_url": f"/app/leads?lead={lead.id}",
+                        "recipient_roles": ["admin", "assistant"],
+                    },
+                    dedupe_key=f"new-meta-lead:{lead.id}",
+                )
                 db.add(LeadConsentEvent(
                     lead_id=lead.id, channel="sms", action="consent_captured",
                     source="meta_lead_form", evidence="Captured by configured Meta lead form.",

@@ -14,6 +14,7 @@ from app.modules.projects.models import Project, ProjectCampaign
 from app.modules.sales_crm.models import FunnelStage, Lead, Meeting
 from app.modules.sales_crm.scheduling import available_slots, create_agent_appointment, next_cadence_time
 from app.modules.sales_crm.calendar_links import calendar_invite_url, google_calendar_add_url
+from app.modules.users.models import User
 
 from .graph import GRAPH_VERSION, TOOLSET_VERSION, build_sales_graph
 from .models import AgentRun, OutboundMessage, SalesAgentSimulation, SalesConversation, SalesFollowUpJob, SalesMessage
@@ -155,6 +156,24 @@ def _selected_time(text: str) -> time | None:
     return time(hour, minute)
 
 
+def _affirmative_slot_reply(text: str) -> bool:
+    normalized = re.sub(r"[^a-záéíóúñ]+", " ", text.casefold()).strip()
+    return bool(re.fullmatch(
+        r"(?:yes|yes please|ok|okay|it s ok|that works|works for me|confirm|confirmed|"
+        r"sí|si|sí por favor|si por favor|está bien|esta bien|me parece bien|confirmo|de acuerdo)",
+        normalized,
+    ))
+
+
+def _claims_confirmed_appointment(text: str | None) -> bool:
+    if not text:
+        return False
+    return bool(re.search(
+        r"\b(?:appointment|visit|meeting|cita|visita)\b.{0,45}\b(?:is|has been|está|esta|ha sido)\b.{0,20}\b(?:confirmed|scheduled|confirmada|agendada)\b",
+        text.casefold(),
+    ))
+
+
 def _offered_slot_selection(
     db: Session,
     *,
@@ -165,8 +184,6 @@ def _offered_slot_selection(
 ) -> datetime | None:
     """Resolve a choice only against a recent verified offer from this chat."""
     selected = _selected_time(inbound_text)
-    if selected is None:
-        return None
     zone = _project_zone(project)
     messages = db.query(SalesMessage).filter(
         SalesMessage.conversation_id == conversation_id,
@@ -176,14 +193,27 @@ def _offered_slot_selection(
         offer = (message.metadata_json or {}).get("appointment_offer")
         if not isinstance(offer, dict):
             continue
+        offered: list[datetime] = []
         for raw_slot in offer.get("slots", []):
             try:
                 start_utc = datetime.fromisoformat(raw_slot)
             except (TypeError, ValueError):
                 continue
+            offered.append(start_utc)
             local_start = start_utc.replace(tzinfo=timezone.utc).astimezone(zone)
-            if local_start.time().replace(second=0, microsecond=0) == selected:
+            if selected is not None and local_start.time().replace(second=0, microsecond=0) == selected:
                 return start_utc.replace(tzinfo=None)
+        ordinal = re.search(r"\b(first|second|third|primero|primera|segundo|segunda|tercero|tercera)\b", inbound_text.casefold())
+        if ordinal:
+            index = {
+                "first": 0, "primero": 0, "primera": 0,
+                "second": 1, "segundo": 1, "segunda": 1,
+                "third": 2, "tercero": 2, "tercera": 2,
+            }[ordinal.group(1)]
+            if index < len(offered):
+                return offered[index].replace(tzinfo=None)
+        if selected is None and len(offered) == 1 and _affirmative_slot_reply(inbound_text):
+            return offered[0].replace(tzinfo=None)
         # Only the latest structured offer is actionable. Older offers may have
         # been superseded by a different date or refreshed availability.
         return None
@@ -194,7 +224,7 @@ def _offered_slot_selection(
         (message for message in messages if "verified appointment times" in message.content.casefold()),
         None,
     )
-    if not legacy_offer:
+    if not legacy_offer or selected is None:
         return None
     requested = _requested_date(legacy_offer.content, now=now, zone=zone)
     if requested is None:
@@ -268,6 +298,7 @@ def conversation_summaries(
         ).first()
         campaign = db.query(ProjectCampaign).filter(ProjectCampaign.id == conversation.campaign_id).first() if conversation.campaign_id else None
         meeting = db.query(Meeting).filter(Meeting.lead_id == lead.id).order_by(Meeting.created_at.desc()).first()
+        assigned_sales = db.query(User).filter(User.id == meeting.assigned_sales_user_id).first() if meeting and meeting.assigned_sales_user_id else None
         result.append({
             "id": conversation.id, "lead_id": lead.id, "project_id": project.id,
             "campaign_id": conversation.campaign_id, "channel": conversation.channel,
@@ -290,6 +321,10 @@ def conversation_summaries(
             "virtual_now": simulation.virtual_now if simulation else None,
             "appointment_id": meeting.id if meeting else None,
             "assigned_sales_user_id": lead.assigned_sales_user_id,
+            "assigned_sales_name": ((" ".join(filter(None, [assigned_sales.first_name, assigned_sales.last_name])) or assigned_sales.email) if assigned_sales else None),
+            "appointment_time": meeting.meeting_time if meeting else None,
+            "calendar_sync_status": meeting.calendar_sync_status if meeting else None,
+            "meeting_url": meeting.meeting_url if meeting else None,
         })
     return result
 
@@ -617,6 +652,18 @@ async def simulate_turn(
                 proposed_actions.append({"type": "request_available_slots"})
             if offered_slots and "offer_appointment" not in _action_types(proposed_actions):
                 proposed_actions.append({"type": "offer_appointment"})
+        if not appointment_confirmed and _claims_confirmed_appointment(proposed_reply):
+            result["intent"] = "appointment_request"
+            proposed_reply = (
+                "I haven't reserved that appointment yet. Please choose one of the verified times "
+                "I offered, or tell me another day so I can check current availability."
+            )
+            proposed_actions = [
+                action for action in proposed_actions
+                if not isinstance(action, dict) or action.get("type") != "appointment_confirmed"
+            ]
+            if "request_available_slots" not in _action_types(proposed_actions):
+                proposed_actions.append({"type": "request_available_slots"})
         run.prompt_configuration_id = result.get("prompt_configuration_id")
         run.prompt_snapshot = result.get("prompt_snapshot", {})
         run.model = result.get("model", "unknown")

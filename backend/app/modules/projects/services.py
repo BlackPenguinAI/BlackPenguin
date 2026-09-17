@@ -12,7 +12,9 @@ from sqlalchemy.orm.attributes import flag_modified
 from app.modules.companies.models import Company
 from app.modules.onboarding_questions import validate_onboarding_value
 from app.modules.project_team.models import ProjectUserAssignment
-from app.modules.users.models import User
+from app.modules.users.models import User, UserRole
+from app.modules.sales_crm.models import CalendarConnection
+from app.modules.system_settings.models import GoogleCalendarConfig, TwilioConfig
 from app.modules.users.project_access import sync_all_scope_users_for_project
 
 from .completion import FIELD_BY_KEY, VALID_STATUSES, calculate_completion, field_progress, normalize_field_key
@@ -611,7 +613,7 @@ def normalized_project_locations(value: Any, fallback: str | None = None) -> lis
     return locations
 
 
-def serialize_overview(db: Session, project: Project) -> dict[str, Any]:
+def serialize_overview(db: Session, project: Project, viewer_user: User | None = None) -> dict[str, Any]:
     profile = get_profile(project)
     data = profile.profile_data or {}
     units = db.query(ProjectUnit).filter(ProjectUnit.project_id == project.id).all()
@@ -686,6 +688,58 @@ def serialize_overview(db: Session, project: Project) -> dict[str, Any]:
     primary_address = locations[0]["address"] if locations else None
     address_parts = [primary_address, data.get("city") or project.city, data.get("country") or project.country]
     address = ", ".join(str(part) for part in address_parts if part)
+    meta_rows = db.query(ProjectCampaign, MetaConnection).join(
+        MetaConnection, MetaConnection.id == ProjectCampaign.meta_connection_id,
+    ).filter(ProjectCampaign.project_id == project.id).all()
+    meta_real = any(connection.verification_mode == "real" and connection.verification_status == "succeeded" and campaign.lead_form_id for campaign, connection in meta_rows)
+    meta_simulated = any(connection.verification_mode == "simulated" and campaign.lead_form_id for campaign, connection in meta_rows)
+    twilio = db.query(TwilioConfig).first()
+    sms_ready = bool(twilio and twilio.live_sms_enabled and twilio.verification_status == "verified")
+    google = db.query(GoogleCalendarConfig).first()
+    google_platform_ready = bool(google and google.is_enabled and google.verification_status == "ready")
+    assigned_sales = db.query(User).join(
+        ProjectUserAssignment, ProjectUserAssignment.user_id == User.id,
+    ).filter(
+        ProjectUserAssignment.project_id == project.id,
+        ProjectUserAssignment.is_active.is_(True),
+        User.role == UserRole.SALES,
+        User.is_active.is_(True),
+    ).all()
+    if viewer_user and viewer_user.role == UserRole.SALES:
+        assigned_sales = [user for user in assigned_sales if user.id == viewer_user.id]
+    sales_ids = [user.id for user in assigned_sales]
+    calendar_connections = db.query(CalendarConnection).filter(
+        CalendarConnection.user_id.in_(sales_ids) if sales_ids else CalendarConnection.user_id == "",
+        CalendarConnection.provider == "google",
+        CalendarConnection.status == "connected",
+    ).all()
+    connected_by_user = {connection.user_id: connection for connection in calendar_connections}
+    calendar_accounts = [
+        {
+            "user_id": user.id,
+            "name": " ".join(filter(None, [user.first_name, user.last_name])) or user.email,
+            "email": connected_by_user[user.id].account_email or user.email,
+        }
+        for user in assigned_sales if user.id in connected_by_user
+    ]
+    integrations = [
+        {
+            "key": "meta", "label": "Meta Lead Ads", "icon": "campaign",
+            "status": "connected" if meta_real else ("simulation_only" if meta_simulated else "action_required"),
+            "detail": "Real Lead Form connected" if meta_real else ("Simulation configuration only" if meta_simulated else "Complete Meta setup in Project onboarding"),
+        },
+        {
+            "key": "sms", "label": "SMS messaging", "icon": "sms",
+            "status": "connected" if sms_ready else "unavailable",
+            "detail": "Live SMS delivery is enabled" if sms_ready else "Messaging provider is not operational yet",
+        },
+        {
+            "key": "calendar", "label": "Google Calendar", "icon": "calendar_month",
+            "status": "connected" if google_platform_ready and calendar_accounts else ("action_required" if google_platform_ready else "unavailable"),
+            "detail": (f"{len(calendar_accounts)} of {len(assigned_sales)} assigned Sales accounts connected" if google_platform_ready else "Black Penguin platform configuration is not ready"),
+            "accounts": calendar_accounts,
+        },
+    ]
     return {
         "id": project.id, "name": data.get("project_name") or project.name,
         "status": data.get("project_status"), "description": data.get("short_description") or project.description,
@@ -699,6 +753,7 @@ def serialize_overview(db: Session, project: Project) -> dict[str, Any]:
                                 "target_roi": None, "status": "available" if units else "pending"},
         "data_completeness": {"percentage": profile.completion_percentage, "onboarding_status": project.onboarding_status,
                               "last_updated_at": profile.updated_at},
+        "integrations": integrations,
     }
 
 

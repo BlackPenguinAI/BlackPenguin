@@ -195,6 +195,23 @@ class NotificationOutbox(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
 
+class AppointmentEmailOutbox(Base):
+    __tablename__ = "appointment_email_outbox"
+    __table_args__ = (UniqueConstraint("dedupe_key", name="uq_appointment_email_outbox_dedupe"),)
+
+    id = Column(String(36), primary_key=True, default=_id)
+    company_id = Column(String(36), ForeignKey("companies.id", ondelete="CASCADE"), nullable=False, index=True)
+    meeting_id = Column(String(36), ForeignKey("meetings.id", ondelete="CASCADE"), nullable=False, index=True)
+    recipient_email = Column(String(255), nullable=False)
+    recipient_kind = Column(String(20), nullable=False)
+    dedupe_key = Column(String(180), nullable=False)
+    status = Column(String(20), nullable=False, default="pending", index=True)
+    attempts = Column(Integer, nullable=False, default=0)
+    last_error = Column(String(120), nullable=True)
+    sent_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
 class SalesAssetAccessEvent(Base):
     __tablename__ = "sales_asset_access_events"
 

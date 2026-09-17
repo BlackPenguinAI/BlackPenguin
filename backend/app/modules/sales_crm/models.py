@@ -277,6 +277,7 @@ class CalendarConnection(Base):
     user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     provider = Column(String(30), nullable=False)
     calendar_id = Column(String(255), nullable=True)
+    account_email = Column(String(255), nullable=True)
     access_token_ciphertext = Column(Text, nullable=True)
     refresh_token_ciphertext = Column(Text, nullable=True)
     token_expires_at = Column(DateTime, nullable=True)

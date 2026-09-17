@@ -7,7 +7,7 @@ from sqlalchemy.orm import sessionmaker
 
 import app.db.base  # noqa: F401
 from app.db.postgres import Base
-from app.integrations.gcalendar_client import authorization_url
+from app.integrations.gcalendar_client import authorization_url, primary_calendar_identity
 from app.modules.ai_core.services import (
     create_prompt_draft, prompt_version, prompt_versions, publish_prompt_version,
 )
@@ -39,7 +39,24 @@ def test_google_calendar_secret_is_write_only_and_runtime_uses_database_configur
     assert secret == "google-secret-value"
     url = authorization_url(db, "signed-state", "sales@example.com")
     assert "calendar.events" in url and "calendar.freebusy" in url
+    scopes = parse_qs(urlparse(url).query)["scope"][0].split()
+    assert {"openid", "email"}.issubset(scopes)
     assert "calendar.readonly" not in url
+
+
+def test_google_calendar_identity_uses_the_authorized_google_account():
+    class IdentityResponse:
+        def raise_for_status(self): return None
+        def json(self): return {"email": "sales-calendar@example.com", "name": "Sales User"}
+
+    with patch("app.integrations.gcalendar_client.httpx.get", return_value=IdentityResponse()) as request:
+        identity = primary_calendar_identity("access-token")
+    assert request.call_args.args[0].endswith("/oauth2/v3/userinfo")
+    assert identity == {
+        "calendar_id": "primary",
+        "account_email": "sales-calendar@example.com",
+        "summary": "Sales User",
+    }
 
 
 def test_meta_platform_secret_is_write_only_and_must_be_verified_before_enabling():
@@ -226,3 +243,13 @@ def test_seo_audit_detects_noindex_invalid_sitemap_and_blocked_robots():
     assert audit.details["robots_txt"] is False
     assert audit.details["sitemap_xml"] is False
     assert audit.details["single_h1"] is False
+
+
+def test_seo_audit_never_reports_healthy_when_single_h1_is_missing():
+    db = _db()
+    html = """<html lang="en"><head><title>Black Penguin real estate platform</title><meta name="description" content="A sufficiently descriptive explanation of the Black Penguin real estate automation platform."><meta name="viewport" content="width=device-width"><link rel="canonical" href="https://blackpenguin.ai/"><meta property="og:title" content="Black Penguin"><meta property="og:description" content="AI sales automation"><script type="application/ld+json">{"@type":"Organization"}</script></head><body></body></html>"""
+    with patch("app.modules.seo.service.httpx.get", side_effect=[_Response(html), _Response("User-agent: *\nDisallow:"), _Response("<urlset/>\n")]):
+        audit = run_audit(db)
+    assert audit.score == 92
+    assert audit.details["single_h1"] is False
+    assert audit.status == "needs_attention"

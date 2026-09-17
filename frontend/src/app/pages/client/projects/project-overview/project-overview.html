@@ -38,6 +38,18 @@
       </article>
     </section>
 
+    <section class="mt-10 rounded-[1.75rem] border border-white/10 bg-[#101010] p-5 md:p-7">
+      <div><p class="eyebrow">Operational readiness</p><h2 class="mt-2 text-2xl font-light">Project integrations</h2><p class="mt-2 text-sm text-gray-500">Live status from Project onboarding and Black Penguin platform connections.</p></div>
+      <div class="mt-6 grid gap-3 md:grid-cols-3">
+        <article *ngFor="let integration of project.integrations" class="integration-card rounded-2xl border border-white/10 bg-black/25 p-4" [class.connected]="integration.status==='connected'">
+          <div class="flex items-start justify-between gap-3"><span class="material-symbols-outlined text-2xl">{{integration.icon}}</span><span class="material-symbols-outlined status-icon">{{integration.status==='connected'?'check_circle':(integration.status==='simulation_only'?'science':'radio_button_unchecked')}}</span></div>
+          <h3 class="mt-4 font-medium">{{integration.label}}</h3><p class="mt-1 text-xs leading-5 text-gray-500">{{integration.detail}}</p>
+          <div *ngIf="integration.accounts?.length" class="mt-3 border-t border-white/5 pt-3"><p *ngFor="let account of integration.accounts" class="truncate text-[11px] text-gray-400">{{account.name}} · {{account.email}}</p></div>
+          <small class="mt-3 block uppercase tracking-wider">{{integration.status.replaceAll('_',' ')}}</small>
+        </article>
+      </div>
+    </section>
+
     <section class="mt-10 grid gap-6 lg:grid-cols-[1.15fr_.85fr]">
       <article class="rounded-[1.75rem] border border-white/10 bg-[#101010] p-5 md:p-7">
         <div class="flex items-end justify-between gap-4"><div><p class="eyebrow">Portfolio visibility</p><h2 class="mt-2 text-2xl font-light">Unit Inventory</h2></div><span class="text-xs text-gray-500">Live when inventory is connected</span></div>

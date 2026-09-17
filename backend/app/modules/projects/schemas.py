@@ -305,6 +305,7 @@ class ProjectOverviewResponse(BaseModel):
     location: dict[str, Any] = Field(default_factory=dict)
     market_intelligence: dict[str, Any] = Field(default_factory=dict)
     data_completeness: dict[str, Any] = Field(default_factory=dict)
+    integrations: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class PropertyTypeBase(BaseModel):

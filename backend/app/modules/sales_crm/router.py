@@ -19,7 +19,7 @@ from jose import JWTError, jwt
 from app.db.postgres import get_db
 from app.core.config import settings
 from app.core.secret_store import encrypt_secret
-from app.integrations.gcalendar_client import authorization_url, exchange_code, SCOPES
+from app.integrations.gcalendar_client import authorization_url, exchange_code, primary_calendar_identity, SCOPES
 from app.modules.auth.deps import RoleChecker
 from app.modules.users.models import TENANT_MANAGER_ROLES, User, UserRole
 from app.modules.users.project_access import project_ids_for_user, require_project_access
@@ -790,12 +790,15 @@ def google_calendar_callback(
         db.commit()
         user = db.query(User).filter(User.id == payload.get("sub"), User.role == UserRole.SALES, User.is_active.is_(True)).one()
         tokens = exchange_code(db, code)
-    except (JWTError, httpx.HTTPError, ValueError, NoResultFound, HTTPException):
+        identity = primary_calendar_identity(tokens["access_token"])
+    except (JWTError, KeyError, httpx.HTTPError, ValueError, NoResultFound, HTTPException):
         db.rollback()
         return RedirectResponse(f"{settings.PUBLIC_APP_URL}/app/schedule?calendar=failed")
     item = db.query(CalendarConnection).filter(CalendarConnection.user_id == user.id, CalendarConnection.provider == "google").first()
     if not item:
         item = CalendarConnection(user_id=user.id, provider="google", calendar_id="primary")
+    item.calendar_id = identity["calendar_id"]
+    item.account_email = identity["account_email"]
     item.access_token_ciphertext = encrypt_secret(tokens.get("access_token"))
     if tokens.get("refresh_token"): item.refresh_token_ciphertext = encrypt_secret(tokens["refresh_token"])
     item.token_expires_at = datetime.utcnow() + timedelta(seconds=int(tokens.get("expires_in", 3600)))

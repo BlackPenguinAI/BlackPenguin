@@ -129,3 +129,50 @@ html, body {
     transform: translateY(0);
   }
 }
+
+/* Markdown rendered with [innerHTML] does not receive Angular's scoped style
+   attributes. Keep public legal typography global and shared by all policies. */
+.legal-markdown {
+  color: #d1d5db;
+  font-size: .95rem;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+.legal-markdown > :first-child { margin-top: 0; }
+.legal-markdown > :last-child { margin-bottom: 0; }
+.legal-markdown h1,
+.legal-markdown h2,
+.legal-markdown h3,
+.legal-markdown h4 {
+  color: #fff;
+  font-weight: 500;
+  line-height: 1.25;
+  letter-spacing: -.02em;
+  margin: 2.25rem 0 .8rem;
+}
+.legal-markdown h1 { font-size: 1.9rem; }
+.legal-markdown h2 { font-size: 1.45rem; padding-bottom: .55rem; border-bottom: 1px solid rgba(255,255,255,.1); }
+.legal-markdown h3 { font-size: 1.15rem; }
+.legal-markdown h4 { font-size: 1rem; }
+.legal-markdown p { margin: .8rem 0; }
+.legal-markdown strong { color: #f9fafb; font-weight: 600; }
+.legal-markdown a { color: #f2bd16; text-decoration: underline; text-underline-offset: 3px; }
+.legal-markdown ul,
+.legal-markdown ol { margin: .85rem 0 1.15rem; padding-left: 1.5rem; }
+.legal-markdown ul { list-style: disc; }
+.legal-markdown ol { list-style: decimal; }
+.legal-markdown li { margin: .4rem 0; padding-left: .25rem; }
+.legal-markdown li::marker { color: #f2bd16; font-weight: 600; }
+.legal-markdown blockquote { margin: 1.25rem 0; border-left: 3px solid #f2bd16; background: rgba(242,189,22,.06); padding: .8rem 1rem; color: #e5e7eb; }
+.legal-markdown hr { margin: 2rem 0; border-color: rgba(255,255,255,.12); }
+.legal-markdown table { display: block; width: 100%; overflow-x: auto; margin: 1.25rem 0; border-collapse: collapse; }
+.legal-markdown th,
+.legal-markdown td { border: 1px solid rgba(255,255,255,.12); padding: .65rem .8rem; text-align: left; }
+.legal-markdown th { background: rgba(255,255,255,.05); color: #fff; font-weight: 600; }
+.legal-markdown code { border-radius: .3rem; background: rgba(255,255,255,.08); padding: .12rem .32rem; color: #fde68a; }
+
+@media (max-width: 640px) {
+  .legal-markdown { font-size: .9rem; line-height: 1.7; }
+  .legal-markdown h1 { font-size: 1.55rem; }
+  .legal-markdown h2 { font-size: 1.25rem; }
+}

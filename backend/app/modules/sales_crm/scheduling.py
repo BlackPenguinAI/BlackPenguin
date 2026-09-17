@@ -14,7 +14,7 @@ from app.integrations.gcalendar_client import (
     is_calendar_free,
 )
 from app.modules.projects.models import Project
-from app.modules.governance.services import enqueue_notification
+from app.modules.governance.services import enqueue_appointment_emails, enqueue_notification
 
 from .models import (
     CalendarConnection, FunnelStage, Lead, Meeting, MeetingStatus,
@@ -441,7 +441,12 @@ def create_agent_appointment(
             "title": "Appointment confirmed",
             "body": f"{lead.full_name} confirmed an appointment for {starts_at.isoformat()}.",
             "action_url": "/app/schedule",
+            "recipient_roles": ["admin", "assistant", "sales"],
         }, dedupe_key=f"appointment-confirmed:{meeting.id}",
+    )
+    enqueue_appointment_emails(
+        db, company_id=lead.company_id, meeting_id=meeting.id,
+        lead_email=lead.email, sales_email=user.email,
     )
     if google_connection and not lead.is_demo:
         project = db.query(Project).filter(Project.id == lead.project_id).one()

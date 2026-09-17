@@ -22,7 +22,7 @@
     <div>
       <strong>{{ setupOpen && setupMode === 'live_meta' ? 'Live delivery test' : (isMetaSimulation ? 'Real Meta lead · simulated delivery' : 'Safe simulation') }}</strong
       ><small
-        >{{ setupOpen && setupMode === 'live_meta' ? 'One submission creates a test-marked lead and sends a real SMS through Twilio. Carrier charges apply.' : (isMetaSimulation ? 'This lead came from the configured Meta form. Twilio is disabled, so replies stay inside Black Penguin and no SMS is sent.' : 'No SMS or calendar event is sent. The same prompt, Project context, follow-up and routing contracts are exercised.') }}</small
+        >{{ setupOpen && setupMode === 'live_meta' ? 'One submission creates a test-marked lead and sends a real SMS through Twilio. Carrier charges apply.' : (isMetaSimulation ? 'This lead came from the configured Meta form. Twilio is disabled, so replies stay inside Black Penguin and no SMS is sent.' : 'No SMS is sent. Calendar availability is checked; a real test event is created only when you explicitly request it after booking.') }}</small
       >
     </div>
   </div>
@@ -265,6 +265,9 @@
             </div>
           </ng-template>
         </ng-container>
+        <div class="bubble-row agent agent-typing" *ngIf="sending && !isLive" aria-live="polite">
+          <div class="bubble"><small>AI sales agent</small><p><span></span><span></span><span></span></p><time>Preparing a grounded response…</time></div>
+        </div>
       </div>
       <div class="composer" *ngIf="role !== 'sales' && (!isLive || canManualControl); else salesReadOnly">
         <textarea
@@ -346,7 +349,10 @@
       <div class="confirmed" *ngIf="selected.appointment_id">
         <span class="material-symbols-outlined">event_available</span
         ><strong>Appointment confirmed</strong
-        ><small>It is now visible to the assigned Sales user.</small>
+        ><small>Assigned to {{selected.assigned_sales_name || 'the selected Sales user'}}{{selected.appointment_time ? ' · '+(selected.appointment_time|date:'medium') : ''}}. It is visible in Schedule.</small>
+        <a *ngIf="selected.meeting_url" [href]="selected.meeting_url" target="_blank" rel="noopener">Open test event</a>
+        <button *ngIf="selected.calendar_sync_status!=='test_synced'" (click)="testCalendar()" [disabled]="calendarTesting">{{calendarTesting?'Testing…':'Create real Google Calendar test event'}}</button>
+        <button *ngIf="selected.calendar_sync_status==='test_synced'" (click)="removeCalendarTest()" [disabled]="calendarTesting">Remove Calendar test event</button>
       </div>
       <div class="review" *ngIf="selected.simulation_id">
         <strong>Client protocol approval</strong>

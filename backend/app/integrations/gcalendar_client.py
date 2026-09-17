@@ -14,7 +14,12 @@ from app.modules.system_settings.services import google_calendar_credentials
 AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 TOKEN_URL = "https://oauth2.googleapis.com/token"
 CALENDAR_API = "https://www.googleapis.com/calendar/v3"
-SCOPES = ["https://www.googleapis.com/auth/calendar.events", "https://www.googleapis.com/auth/calendar.freebusy"]
+USERINFO_URL = "https://www.googleapis.com/oauth2/v3/userinfo"
+SCOPES = [
+    "openid", "email",
+    "https://www.googleapis.com/auth/calendar.events",
+    "https://www.googleapis.com/auth/calendar.freebusy",
+]
 
 
 def authorization_url(db: Session, state: str, login_hint: str | None = None) -> str:
@@ -28,6 +33,21 @@ def exchange_code(db: Session, code: str) -> dict:
     config, secret = google_calendar_credentials(db)
     response = httpx.post(TOKEN_URL, data={"code": code, "client_id": config.client_id, "client_secret": secret, "redirect_uri": config.redirect_uri, "grant_type": "authorization_code"}, timeout=20.0)
     response.raise_for_status(); return response.json()
+
+
+def primary_calendar_identity(access_token: str) -> dict:
+    response = httpx.get(
+        USERINFO_URL,
+        headers={"Authorization": f"Bearer {access_token}"},
+        timeout=15.0,
+    )
+    response.raise_for_status()
+    data = response.json()
+    return {
+        "calendar_id": "primary",
+        "account_email": str(data.get("email") or "") or None,
+        "summary": data.get("name"),
+    }
 
 
 def _access_token(db: Session, connection) -> str:
@@ -69,12 +89,24 @@ def is_calendar_free(db: Session, connection, *, starts_at: datetime, ends_at: d
     return not calendar_busy_ranges(db, connection, starts_at=starts_at, ends_at=ends_at)
 
 
-def create_calendar_event_for_connection(db: Session, connection, *, title: str, description: str, location: str, start_time: datetime, end_time: datetime, timezone_name: str, attendee_email: str | None) -> dict:
+def create_calendar_event_for_connection(db: Session, connection, *, title: str, description: str, location: str, start_time: datetime, end_time: datetime, timezone_name: str, attendee_email: str | None, send_updates: str = "all") -> dict:
     token = _access_token(db, connection)
     body = {"summary": title, "description": description, "location": location, "start": {"dateTime": start_time.replace(tzinfo=timezone.utc).isoformat(), "timeZone": timezone_name}, "end": {"dateTime": end_time.replace(tzinfo=timezone.utc).isoformat(), "timeZone": timezone_name}, "reminders": {"useDefault": False, "overrides": [{"method": "email", "minutes": 1440}, {"method": "popup", "minutes": 60}]}}
     if attendee_email: body["attendees"] = [{"email": attendee_email}]
-    response = httpx.post(f"{CALENDAR_API}/calendars/{connection.calendar_id or 'primary'}/events", params={"sendUpdates": "all"}, headers={"Authorization": f"Bearer {token}"}, json=body, timeout=20.0)
+    response = httpx.post(f"{CALENDAR_API}/calendars/{connection.calendar_id or 'primary'}/events", params={"sendUpdates": send_updates}, headers={"Authorization": f"Bearer {token}"}, json=body, timeout=20.0)
     response.raise_for_status(); return response.json()
+
+
+def delete_calendar_event_for_connection(db: Session, connection, event_id: str) -> None:
+    token = _access_token(db, connection)
+    response = httpx.delete(
+        f"{CALENDAR_API}/calendars/{connection.calendar_id or 'primary'}/events/{event_id}",
+        params={"sendUpdates": "none"},
+        headers={"Authorization": f"Bearer {token}"},
+        timeout=20.0,
+    )
+    if response.status_code != 404:
+        response.raise_for_status()
 
 
 def create_calendar_event(calendar_id: str, title: str, start_time: datetime, attendee_email: str) -> str:
