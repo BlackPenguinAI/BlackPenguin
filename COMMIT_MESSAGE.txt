@@ -1,9 +1,0 @@
-feat(messaging): add Telnyx routing and retire appointment email transport
-
-- add encrypted Telnyx configuration, verification and signed webhooks
-- route new SMS conversations through the selected verified provider
-- pin existing conversations to their original provider and sender
-- preserve Twilio behavior and provider-specific delivery status handling
-- remove appointment email UI, enqueueing and worker processing
-- remove the GCP Workload Identity deployment dependency
-- add forward-only migration and end-to-end provider regression tests
