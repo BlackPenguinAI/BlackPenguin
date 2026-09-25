@@ -87,7 +87,7 @@ def get_or_create_live_conversation(db: Session, lead: Lead, *, provider: str | 
     if pinned:
         return pinned, False
     provider = provider or default_provider(db)
-    sender = provider_sender(db, provider)
+    sender = provider_sender(db, provider, company_id=lead.company_id)
     thread_key = f"{provider}:{normalize_phone(sender)}:{normalize_phone(lead.phone)}"
     existing = db.query(SalesConversation).filter(
         SalesConversation.provider_thread_key == thread_key,
@@ -206,7 +206,10 @@ async def _dispatch(
     )
     db.add_all([outbound, message]); db.commit()
     try:
-        result = await send_sms(db, provider=conversation.provider, to=lead.phone, body=content)
+        result = await send_sms(
+            db, provider=conversation.provider, company_id=conversation.company_id,
+            to=lead.phone, body=content,
+        )
     except Exception as exc:
         outbound.status = "failed"; outbound.last_error = type(exc).__name__
         message.status = "failed"
@@ -318,7 +321,7 @@ def prepare_meta_simulation(db: Session, lead: Lead) -> tuple[SalesConversation,
 
 async def launch_live_lead(db: Session, lead: Lead) -> tuple[SalesConversation | None, SalesMessage | None]:
     """Start or safely re-contextualize the one physical SMS thread for this sender/recipient."""
-    provider = live_provider(db)
+    provider = live_provider(db, company_id=lead.company_id)
     if not provider:
         return prepare_meta_simulation(db, lead)
     project = db.query(Project).filter(Project.id == lead.project_id, Project.company_id == lead.company_id).one()

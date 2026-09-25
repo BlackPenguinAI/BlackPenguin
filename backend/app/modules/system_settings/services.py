@@ -7,12 +7,13 @@ from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from .models import (
     FirebaseConfig, GoogleCalendarConfig, LegalDocument, MessagingRoutingConfig,
-    MetaPlatformConfig, TelnyxConfig, TwilioConfig,
+    MetaPlatformConfig, TelnyxCompanyConfig, TelnyxConfig, TwilioConfig,
 )
 from .schemas import (
     FirebaseConfigUpdate, GoogleCalendarConfigUpdate, LegalDocumentPayload,
-    MetaPlatformConfigUpdate, TelnyxConfigUpdate, TwilioConfigUpdate,
+    MetaPlatformConfigUpdate, TelnyxCompanyConfigUpdate, TelnyxConfigUpdate, TwilioConfigUpdate,
 )
+from app.modules.companies.models import Company
 from app.core.config import settings
 from app.core.secret_store import decrypt_secret, encrypt_secret
 
@@ -250,8 +251,6 @@ def telnyx_config_response(config: TelnyxConfig) -> dict:
         "id": config.id,
         "api_key_configured": bool(config.api_key_ciphertext),
         "api_key_hint": config.api_key_hint,
-        "messaging_profile_id": config.messaging_profile_id,
-        "from_phone_number": config.from_phone_number,
         "webhook_public_key_configured": bool(config.webhook_public_key),
         "live_sms_enabled": bool(config.live_sms_enabled),
         "verification_status": config.verification_status or "not_configured",
@@ -270,8 +269,8 @@ def telnyx_credentials(db: Session) -> tuple[TelnyxConfig, str]:
         config.last_error = "credential_decryption_failed"
         db.commit()
         raise HTTPException(status_code=409, detail="The stored Telnyx API key cannot be decrypted. Replace and save it.") from exc
-    if not api_key or not config.messaging_profile_id or not config.from_phone_number or not config.webhook_public_key:
-        raise HTTPException(status_code=409, detail="Telnyx is not fully configured.")
+    if not api_key or not config.webhook_public_key:
+        raise HTTPException(status_code=409, detail="Telnyx platform credentials are not fully configured.")
     return config, api_key
 
 
@@ -279,25 +278,20 @@ def update_telnyx_config(db: Session, payload: TelnyxConfigUpdate) -> TelnyxConf
     config = get_telnyx_config(db)
     values = payload.model_dump(exclude_unset=True)
     api_key = (values.pop("api_key", None) or "").strip()
-    if "from_phone_number" in values:
-        values["from_phone_number"] = _normalize_e164(values["from_phone_number"])
-    for key in ("messaging_profile_id", "webhook_public_key"):
+    for key in ("webhook_public_key",):
         if key in values and isinstance(values[key], str):
             values[key] = values[key].strip() or None
     credentials_changed = bool(api_key) or any(
         key in values and values[key] != getattr(config, key)
-        for key in ("messaging_profile_id", "from_phone_number", "webhook_public_key")
+        for key in ("webhook_public_key",)
     )
     if api_key:
         config.api_key_ciphertext = encrypt_secret(api_key)
         config.api_key_hint = api_key[-4:]
     for key, value in values.items():
         setattr(config, key, value)
-    if config.live_sms_enabled and not (
-        config.api_key_ciphertext and config.messaging_profile_id
-        and config.from_phone_number and config.webhook_public_key
-    ):
-        raise HTTPException(status_code=422, detail="Complete the Telnyx credentials before enabling live SMS.")
+    if config.live_sms_enabled and not (config.api_key_ciphertext and config.webhook_public_key):
+        raise HTTPException(status_code=422, detail="Complete the Telnyx platform credentials before enabling live SMS.")
     if config.live_sms_enabled and config.verification_status != "verified" and not credentials_changed:
         raise HTTPException(status_code=422, detail="Verify Telnyx before enabling live SMS.")
     if credentials_changed:
@@ -313,23 +307,10 @@ def verify_telnyx_config(db: Session) -> TelnyxConfig:
     config, api_key = telnyx_credentials(db)
     headers = {"Authorization": f"Bearer {api_key}"}
     try:
-        profile = httpx.get(
-            f"https://api.telnyx.com/v2/messaging_profiles/{config.messaging_profile_id}",
-            headers=headers, timeout=15.0,
-        )
-        profile.raise_for_status()
-        numbers = httpx.get(
-            "https://api.telnyx.com/v2/phone_numbers",
-            params={"filter[phone_number]": config.from_phone_number, "page[size]": 1},
-            headers=headers, timeout=15.0,
-        )
-        numbers.raise_for_status()
-        matches = numbers.json().get("data") or []
-        if not matches:
-            raise HTTPException(status_code=422, detail="The SMS From number was not found in this Telnyx account.")
-        assigned_profile = matches[0].get("messaging_profile_id")
-        if assigned_profile and assigned_profile != config.messaging_profile_id:
-            raise HTTPException(status_code=422, detail="The Telnyx number is assigned to a different Messaging Profile.")
+        from app.integrations.telnyx_client import validate_telnyx_public_key
+        validate_telnyx_public_key(config.webhook_public_key)
+        response = httpx.get("https://api.telnyx.com/v2/balance", headers=headers, timeout=15.0)
+        response.raise_for_status()
     except HTTPException as exc:
         config.verification_status = "failed"; config.last_error = str(exc.detail)[:500]
         db.commit(); raise
@@ -340,6 +321,148 @@ def verify_telnyx_config(db: Session) -> TelnyxConfig:
     config.verification_status = "verified"; config.verified_at = datetime.utcnow(); config.last_error = None
     db.commit(); db.refresh(config)
     return config
+
+
+def get_telnyx_company_config(db: Session, company_id: str, *, create: bool = False) -> TelnyxCompanyConfig | None:
+    company = db.query(Company).filter(Company.id == company_id).first()
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found.")
+    config = db.query(TelnyxCompanyConfig).filter(TelnyxCompanyConfig.company_id == company_id).first()
+    if not config and create:
+        config = TelnyxCompanyConfig(company_id=company_id)
+        db.add(config); db.commit(); db.refresh(config)
+    return config
+
+
+def telnyx_company_config_response(company: Company, config: TelnyxCompanyConfig | None) -> dict:
+    return {
+        "id": config.id if config else None,
+        "company_id": company.id,
+        "company_name": company.name,
+        "company_is_active": bool(company.is_active),
+        "messaging_profile_id": config.messaging_profile_id if config else None,
+        "from_phone_number": config.from_phone_number if config else None,
+        "telnyx_phone_number_id": config.telnyx_phone_number_id if config else None,
+        "regulatory_status": (config.regulatory_status or "pending") if config else "pending",
+        "live_sms_enabled": bool(config.live_sms_enabled) if config else False,
+        "verification_status": (config.verification_status or "not_configured") if config else "not_configured",
+        "verified_at": config.verified_at if config else None,
+        "last_error": config.last_error if config else None,
+        "updated_at": config.updated_at if config else None,
+    }
+
+
+def list_telnyx_company_configs(db: Session) -> list[dict]:
+    companies = db.query(Company).order_by(Company.name.asc()).all()
+    configs = {
+        item.company_id: item for item in db.query(TelnyxCompanyConfig).all()
+    }
+    return [telnyx_company_config_response(company, configs.get(company.id)) for company in companies]
+
+
+def update_telnyx_company_config(db: Session, company_id: str, payload: TelnyxCompanyConfigUpdate) -> TelnyxCompanyConfig:
+    config = get_telnyx_company_config(db, company_id, create=True)
+    assert config is not None
+    values = payload.model_dump(exclude_unset=True)
+    if "from_phone_number" in values:
+        values["from_phone_number"] = _normalize_e164(values["from_phone_number"]) if values["from_phone_number"] else None
+    for key in ("messaging_profile_id", "telnyx_phone_number_id"):
+        if key in values and isinstance(values[key], str):
+            values[key] = values[key].strip() or None
+    for field, label in (
+        ("messaging_profile_id", "Messaging Profile"),
+        ("from_phone_number", "sender number"),
+        ("telnyx_phone_number_id", "Telnyx phone number ID"),
+    ):
+        value = values.get(field)
+        if value and db.query(TelnyxCompanyConfig).filter(
+            getattr(TelnyxCompanyConfig, field) == value,
+            TelnyxCompanyConfig.id != config.id,
+        ).first():
+            raise HTTPException(status_code=409, detail=f"That Telnyx {label} is already assigned to another Company.")
+    connection_changed = any(
+        key in values and values[key] != getattr(config, key)
+        for key in ("messaging_profile_id", "from_phone_number", "telnyx_phone_number_id")
+    )
+    for key, value in values.items():
+        setattr(config, key, value)
+    if config.live_sms_enabled:
+        platform = get_telnyx_config(db)
+        if not (platform.live_sms_enabled and platform.verification_status == "verified"):
+            raise HTTPException(status_code=422, detail="Verify and enable the global Telnyx platform credentials first.")
+        if not config.messaging_profile_id or not config.from_phone_number:
+            raise HTTPException(status_code=422, detail="Complete the Company Messaging Profile and sender number.")
+        if config.regulatory_status not in {"approved", "not_required"}:
+            raise HTTPException(status_code=422, detail="Confirm the Company's regulatory status before enabling live SMS.")
+        if config.verification_status != "verified" and not connection_changed:
+            raise HTTPException(status_code=422, detail="Verify the Company Telnyx sender before enabling live SMS.")
+    if connection_changed:
+        config.live_sms_enabled = False
+        config.verification_status = "pending"
+        config.verified_at = None
+        config.last_error = None
+    db.commit(); db.refresh(config)
+    return config
+
+
+def verify_telnyx_company_config(db: Session, company_id: str) -> TelnyxCompanyConfig:
+    platform, api_key = telnyx_credentials(db)
+    if platform.verification_status != "verified":
+        raise HTTPException(status_code=422, detail="Verify the global Telnyx platform credentials first.")
+    config = get_telnyx_company_config(db, company_id)
+    if not config or not config.messaging_profile_id or not config.from_phone_number:
+        raise HTTPException(status_code=409, detail="The Company Telnyx sender is not fully configured.")
+    headers = {"Authorization": f"Bearer {api_key}"}
+    expected_webhook = f"{settings.PUBLIC_APP_URL.rstrip('/')}{settings.API_V1_STR}/webhooks/telnyx/messaging"
+    try:
+        profile_response = httpx.get(
+            f"https://api.telnyx.com/v2/messaging_profiles/{config.messaging_profile_id}",
+            headers=headers, timeout=15.0,
+        )
+        profile_response.raise_for_status()
+        profile = profile_response.json().get("data") or {}
+        webhook_url = profile.get("webhook_url")
+        if webhook_url and webhook_url.rstrip("/") != expected_webhook.rstrip("/"):
+            raise HTTPException(status_code=422, detail=f"The Messaging Profile webhook must be {expected_webhook}.")
+        number_response = httpx.get(
+            "https://api.telnyx.com/v2/phone_numbers",
+            params={"filter[phone_number]": config.from_phone_number, "page[size]": 1},
+            headers=headers, timeout=15.0,
+        )
+        number_response.raise_for_status()
+        matches = [
+            item for item in (number_response.json().get("data") or [])
+            if _normalize_e164(item.get("phone_number")) == config.from_phone_number
+        ]
+        if not matches:
+            raise HTTPException(status_code=422, detail="The SMS From number was not found in this Telnyx account.")
+        assigned_profile = matches[0].get("messaging_profile_id")
+        if assigned_profile != config.messaging_profile_id:
+            raise HTTPException(status_code=422, detail="The Telnyx number is not assigned to this Company's Messaging Profile.")
+        remote_number_id = matches[0].get("id")
+        if remote_number_id:
+            config.telnyx_phone_number_id = str(remote_number_id)
+    except HTTPException as exc:
+        config.live_sms_enabled = False
+        config.verification_status = "failed"; config.last_error = str(exc.detail)[:500]
+        db.commit(); raise
+    except (httpx.HTTPError, ValueError, KeyError) as exc:
+        config.live_sms_enabled = False
+        config.verification_status = "failed"; config.last_error = type(exc).__name__
+        db.commit()
+        raise HTTPException(status_code=422, detail="The Company Telnyx sender could not be verified.") from exc
+    config.verification_status = "verified"; config.verified_at = datetime.utcnow(); config.last_error = None
+    db.commit(); db.refresh(config)
+    return config
+
+
+def telnyx_company_for_number(db: Session, phone_number: str) -> TelnyxCompanyConfig | None:
+    normalized = _normalize_e164(phone_number)
+    return db.query(TelnyxCompanyConfig).filter(
+        TelnyxCompanyConfig.from_phone_number == normalized,
+        TelnyxCompanyConfig.live_sms_enabled.is_(True),
+        TelnyxCompanyConfig.verification_status == "verified",
+    ).first()
 
 
 def get_messaging_routing_config(db: Session) -> MessagingRoutingConfig:
@@ -354,14 +477,23 @@ def messaging_routing_response(config: MessagingRoutingConfig) -> dict:
     return {"default_provider": config.default_provider or "twilio"}
 
 
-def provider_is_ready(db: Session, provider: str) -> bool:
+def provider_is_ready(db: Session, provider: str, company_id: str | None = None) -> bool:
     if provider == "twilio":
         config = get_twilio_config(db)
     elif provider == "telnyx":
         config = get_telnyx_config(db)
     else:
         return False
-    return bool(config.live_sms_enabled and config.verification_status == "verified")
+    ready = bool(config.live_sms_enabled and config.verification_status == "verified")
+    if provider != "telnyx" or not ready:
+        return ready
+    query = db.query(TelnyxCompanyConfig).filter(
+        TelnyxCompanyConfig.live_sms_enabled.is_(True),
+        TelnyxCompanyConfig.verification_status == "verified",
+    )
+    if company_id:
+        query = query.filter(TelnyxCompanyConfig.company_id == company_id)
+    return query.first() is not None
 
 
 def update_default_provider(db: Session, provider: str) -> MessagingRoutingConfig:

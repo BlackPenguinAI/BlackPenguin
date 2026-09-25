@@ -13,7 +13,7 @@ from app.db.postgres import get_db
 from app.integrations.telnyx_client import validate_telnyx_signature
 from app.integrations.twilio_client import public_webhook_url, validate_twilio_signature
 from app.modules.sales_crm.models import Lead
-from app.modules.system_settings.services import telnyx_credentials, twilio_credentials
+from app.modules.system_settings.services import telnyx_company_for_number, telnyx_credentials, twilio_credentials
 
 from .live_service import process_live_inbound, resolve_inbound_conversation
 from .models import ExternalWebhookEvent, OutboundMessage, SalesConversation, SalesMessage
@@ -23,7 +23,11 @@ twilio_router = APIRouter()
 telnyx_router = APIRouter()
 
 
-def _record_inbound(db: Session, *, provider: str, event_id: str, to_number: str, from_number: str, body: str, payload: dict, background_tasks: BackgroundTasks):
+def _record_inbound(
+    db: Session, *, provider: str, event_id: str, to_number: str, from_number: str,
+    body: str, payload: dict, background_tasks: BackgroundTasks,
+    expected_company_id: str | None = None,
+):
     if db.query(ExternalWebhookEvent).filter(
         ExternalWebhookEvent.platform == provider,
         ExternalWebhookEvent.external_event_id == event_id,
@@ -32,7 +36,7 @@ def _record_inbound(db: Session, *, provider: str, event_id: str, to_number: str
     conversation = resolve_inbound_conversation(db, provider=provider, to_number=to_number, from_number=from_number)
     event = ExternalWebhookEvent(platform=provider, external_event_id=event_id, event_type="incoming_sms", payload_json=payload, status="received")
     db.add(event)
-    if not conversation:
+    if not conversation or (expected_company_id and conversation.company_id != expected_company_id):
         event.status = "ignored"; event.error_message = "No unambiguous active provider thread."
         event.processed_at = datetime.utcnow(); db.commit(); return
     message = SalesMessage(
@@ -94,7 +98,7 @@ async def twilio_message_status(request: Request, x_twilio_signature: str | None
 
 @telnyx_router.post("/messaging")
 async def telnyx_messaging_webhook(request: Request, background_tasks: BackgroundTasks, telnyx_signature_ed25519: str | None = Header(None), telnyx_timestamp: str | None = Header(None), db: Session = Depends(get_db)):
-    config, _ = telnyx_credentials(db)
+    platform, _ = telnyx_credentials(db)
     body = await request.body()
     try:
         timestamp = int(telnyx_timestamp or "")
@@ -102,7 +106,7 @@ async def telnyx_messaging_webhook(request: Request, background_tasks: Backgroun
         raise HTTPException(status_code=401, detail="Invalid Telnyx timestamp.") from exc
     if abs(int(time.time()) - timestamp) > 300:
         raise HTTPException(status_code=401, detail="Expired Telnyx webhook.")
-    if not validate_telnyx_signature(public_key=config.webhook_public_key, payload=body, signature=telnyx_signature_ed25519, timestamp=telnyx_timestamp):
+    if not validate_telnyx_signature(public_key=platform.webhook_public_key, payload=body, signature=telnyx_signature_ed25519, timestamp=telnyx_timestamp):
         raise HTTPException(status_code=401, detail="Invalid Telnyx signature.")
     try:
         envelope = json.loads(body)
@@ -115,9 +119,15 @@ async def telnyx_messaging_webhook(request: Request, background_tasks: Backgroun
         to_number = str((destinations[0] if destinations else {}).get("phone_number") or "")
         from_number = str((payload.get("from") or {}).get("phone_number") or "")
         message_id = str(payload.get("id") or event_id)
-        if to_number != config.from_phone_number or not from_number:
+        company_config = telnyx_company_for_number(db, to_number)
+        if not company_config or not from_number:
             raise HTTPException(status_code=422, detail="Invalid Telnyx message payload.")
-        _record_inbound(db, provider="telnyx", event_id=message_id, to_number=to_number, from_number=from_number, body=str(payload.get("text") or ""), payload=envelope, background_tasks=background_tasks)
+        _record_inbound(
+            db, provider="telnyx", event_id=message_id, to_number=to_number,
+            from_number=from_number, body=str(payload.get("text") or ""),
+            payload=envelope, background_tasks=background_tasks,
+            expected_company_id=company_config.company_id,
+        )
     elif event_type.startswith("message."):
         message_id = str(payload.get("id") or "")
         if message_id:

@@ -3,22 +3,22 @@
   <div class="bp-page__container bp-page__container--form">
     <div class="mb-8 border-b border-white/10 pb-6">
       <h1 class="text-3xl font-light tracking-tight">Messaging <span class="text-secondary font-medium">Providers</span></h1>
-      <p class="text-sm text-gray-400 mt-1">Configure Twilio and Telnyx, then choose the verified provider used for new SMS conversations.</p>
+      <p class="text-sm text-gray-400 mt-1">Configure provider credentials and isolate each Company behind its own Telnyx sender.</p>
     </div>
 
     <div *ngIf="isLoading" class="flex justify-center py-24"><div class="animate-spin h-8 w-8 border-2 border-secondary border-t-transparent rounded-full"></div></div>
 
     <div *ngIf="!isLoading" class="flex flex-col gap-8 animate-fade-in">
       <app-glass-card title="Default SMS Provider" icon="swap_horiz">
-        <p class="text-xs text-gray-400 mb-5">Existing conversations stay pinned to the provider and sender that opened them. This selection applies only to new conversations.</p>
+        <p class="text-xs text-gray-400 mb-5">Existing conversations remain pinned to their original provider and sender. Telnyx is available only to Companies with a verified, enabled sender.</p>
         <div class="grid gap-4 md:grid-cols-2">
           <button type="button" (click)="setDefault('twilio')" [disabled]="switching || !twilio.live_sms_enabled || twilio.verification_status !== 'verified'" class="rounded-xl border p-4 text-left transition disabled:cursor-not-allowed disabled:opacity-40" [ngClass]="defaultProvider === 'twilio' ? 'border-secondary bg-secondary/10' : 'border-white/10'">
             <span class="flex items-center justify-between"><strong>Twilio</strong><span class="text-[10px] uppercase tracking-wider" [class.text-secondary]="defaultProvider === 'twilio'">{{defaultProvider === 'twilio' ? 'Default' : twilio.verification_status}}</span></span>
             <span class="mt-2 block text-xs text-gray-500">{{twilio.from_phone_number || 'No sender configured'}}</span>
           </button>
-          <button type="button" (click)="setDefault('telnyx')" [disabled]="switching || !telnyx.live_sms_enabled || telnyx.verification_status !== 'verified'" class="rounded-xl border p-4 text-left transition disabled:cursor-not-allowed disabled:opacity-40" [ngClass]="defaultProvider === 'telnyx' ? 'border-secondary bg-secondary/10' : 'border-white/10'">
+          <button type="button" (click)="setDefault('telnyx')" [disabled]="switching || !telnyx.live_sms_enabled || telnyx.verification_status !== 'verified' || configuredCompanyCount === 0" class="rounded-xl border p-4 text-left transition disabled:cursor-not-allowed disabled:opacity-40" [ngClass]="defaultProvider === 'telnyx' ? 'border-secondary bg-secondary/10' : 'border-white/10'">
             <span class="flex items-center justify-between"><strong>Telnyx</strong><span class="text-[10px] uppercase tracking-wider" [class.text-secondary]="defaultProvider === 'telnyx'">{{defaultProvider === 'telnyx' ? 'Default' : telnyx.verification_status}}</span></span>
-            <span class="mt-2 block text-xs text-gray-500">{{telnyx.from_phone_number || 'No sender configured'}}</span>
+            <span class="mt-2 block text-xs text-gray-500">{{configuredCompanyCount}} verified Company sender{{configuredCompanyCount === 1 ? '' : 's'}}</span>
           </button>
         </div>
       </app-glass-card>
@@ -42,23 +42,64 @@
       </form>
 
       <form (ngSubmit)="saveTelnyx()">
-        <app-glass-card title="Telnyx API Credentials" icon="forum">
-          <p class="text-xs text-gray-400 mb-6">Assign the sender number to this Messaging Profile in Telnyx. The API Key is encrypted and write-only.</p>
+        <app-glass-card title="Telnyx Platform Credentials" icon="vpn_key">
+          <p class="text-xs text-gray-400 mb-6">These account credentials are shared securely by all Companies. Sender numbers and Messaging Profiles are configured separately below.</p>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div><app-input label="Replace API Key" type="password" [(ngModel)]="telnyx.api_key" (ngModelChange)="dirty.telnyx=true" name="telnyx_api_key" placeholder="Leave blank to keep stored key"></app-input><span *ngIf="telnyx.api_key_configured" class="text-[10px] text-green-300">Stored securely{{telnyx.api_key_hint ? ' · ending in ••••'+telnyx.api_key_hint : ''}}</span></div>
-            <app-input label="Messaging Profile ID" [(ngModel)]="telnyx.messaging_profile_id" (ngModelChange)="dirty.telnyx=true" name="telnyx_profile" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"></app-input>
-            <app-input label="From Phone Number (E.164)" [(ngModel)]="telnyx.from_phone_number" (ngModelChange)="dirty.telnyx=true" name="telnyx_from" placeholder="+1234567890"></app-input>
             <div><app-input label="Webhook Ed25519 Public Key" type="password" [(ngModel)]="telnyx.webhook_public_key" (ngModelChange)="dirty.telnyx=true" name="telnyx_public_key" placeholder="Leave blank to keep stored key"></app-input><span *ngIf="telnyx.webhook_public_key_configured" class="text-[10px] text-green-300">Webhook verification key configured</span></div>
           </div>
           <div class="mt-6 rounded-xl border border-white/10 bg-black/30 p-4 text-xs text-gray-400">
-            <div class="flex flex-wrap items-center justify-between gap-3"><span><b class="text-white">Status:</b> <span class="uppercase">{{telnyx.verification_status}}</span></span><button type="button" class="rounded-lg border border-secondary px-3 py-2 text-secondary disabled:opacity-40" (click)="verify('telnyx')" [disabled]="verifying==='telnyx' || dirty.telnyx">{{verifying==='telnyx'?'Verifying…':'Test stored connection'}}</button></div>
-            <label class="mt-4 flex items-center gap-3"><input type="checkbox" [(ngModel)]="telnyx.live_sms_enabled" (ngModelChange)="dirty.telnyx=true" name="telnyx_live" [disabled]="telnyx.verification_status!=='verified'" class="h-5 w-5 accent-yellow-400"><span>Enable live SMS</span></label>
-            <p class="mt-3 break-all">Configure this webhook in the Telnyx Messaging Profile:<br><code>https://blackpenguin.ai/api/v1/webhooks/telnyx/messaging</code></p>
+            <div class="flex flex-wrap items-center justify-between gap-3"><span><b class="text-white">Platform status:</b> <span class="uppercase">{{telnyx.verification_status}}</span></span><button type="button" class="rounded-lg border border-secondary px-3 py-2 text-secondary disabled:opacity-40" (click)="verify('telnyx')" [disabled]="verifying==='telnyx' || dirty.telnyx">{{verifying==='telnyx'?'Verifying…':'Test account credentials'}}</button></div>
+            <label class="mt-4 flex items-center gap-3"><input type="checkbox" [(ngModel)]="telnyx.live_sms_enabled" (ngModelChange)="dirty.telnyx=true" name="telnyx_live" [disabled]="telnyx.verification_status!=='verified'" class="h-5 w-5 accent-yellow-400"><span>Enable Telnyx platform</span></label>
+            <p class="mt-3 break-all">Configure this API v2 webhook in every Company Messaging Profile:<br><code>https://blackpenguin.ai/api/v1/webhooks/telnyx/messaging</code></p>
           </div>
           <p *ngIf="telnyx.last_error" class="mt-3 text-xs text-red-300">{{telnyx.last_error}}</p>
-          <div class="flex justify-end border-t border-white/10 pt-6 mt-6"><app-button type="submit" variant="primary" icon="save" [isLoading]="saving==='telnyx'">Save Telnyx</app-button></div>
+          <div class="flex justify-end border-t border-white/10 pt-6 mt-6"><app-button type="submit" variant="primary" icon="save" [isLoading]="saving==='telnyx'">Save Telnyx Platform</app-button></div>
         </app-glass-card>
       </form>
+
+      <app-glass-card title="Telnyx Company Senders" icon="domain">
+        <div class="mb-6 rounded-xl border border-secondary/20 bg-secondary/5 p-4 text-xs text-gray-300">
+          Each Company must use a unique Messaging Profile and sender number. This keeps lead threads and STOP opt-outs isolated between tenants.
+        </div>
+
+        <div *ngIf="telnyxCompanies.length === 0" class="rounded-xl border border-white/10 bg-black/20 p-6 text-sm text-gray-400">Create a Company before assigning a Telnyx sender.</div>
+
+        <ng-container *ngIf="telnyxCompanies.length > 0">
+          <label class="mb-2 block text-[10px] font-bold uppercase tracking-[0.16em] text-gray-500">Company</label>
+          <select [ngModel]="selectedCompanyId" (ngModelChange)="selectCompany($event)" name="telnyx_company" class="w-full rounded-xl border border-white/10 bg-black/50 px-4 py-3 text-sm text-white outline-none focus:border-secondary">
+            <option *ngFor="let company of telnyxCompanies" [value]="company.company_id">{{company.company_name}} · {{company.verification_status}}</option>
+          </select>
+
+          <form *ngIf="selectedCompany as company" (ngSubmit)="saveTelnyxCompany()" class="mt-6">
+            <div class="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/10 bg-black/30 p-4">
+              <div><p class="font-medium text-white">{{company.company_name}}</p><p class="mt-1 text-xs text-gray-500">{{company.company_is_active ? 'Active Company' : 'Inactive Company'}} · {{company.from_phone_number || 'No sender assigned'}}</p></div>
+              <span class="rounded-full border px-3 py-1 text-[10px] uppercase tracking-wider" [ngClass]="company.verification_status === 'verified' ? 'border-green-400/30 text-green-300' : 'border-secondary/30 text-secondary'">{{company.verification_status}}</span>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <app-input label="Messaging Profile ID" [(ngModel)]="company.messaging_profile_id" (ngModelChange)="dirty.telnyxCompany=true" name="company_profile" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"></app-input>
+              <app-input label="From Phone Number (E.164)" [(ngModel)]="company.from_phone_number" (ngModelChange)="dirty.telnyxCompany=true" name="company_from" placeholder="+1234567890"></app-input>
+              <app-input label="Telnyx Phone Number ID (optional)" [(ngModel)]="company.telnyx_phone_number_id" (ngModelChange)="dirty.telnyxCompany=true" name="company_number_id" placeholder="Filled automatically after verification"></app-input>
+              <div>
+                <label class="mb-2 block text-[10px] font-bold uppercase tracking-[0.16em] text-gray-500">Regulatory status</label>
+                <select [(ngModel)]="company.regulatory_status" (ngModelChange)="dirty.telnyxCompany=true" name="company_regulatory" class="w-full rounded-xl border border-white/10 bg-black/50 px-4 py-3 text-sm text-white outline-none focus:border-secondary">
+                  <option value="pending">Pending verification</option>
+                  <option value="approved">Approved</option>
+                  <option value="not_required">Not required</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="mt-6 rounded-xl border border-white/10 bg-black/30 p-4 text-xs text-gray-400">
+              <div class="flex flex-wrap items-center justify-between gap-3"><span><b class="text-white">Sender status:</b> <span class="uppercase">{{company.verification_status}}</span></span><button type="button" class="rounded-lg border border-secondary px-3 py-2 text-secondary disabled:opacity-40" (click)="verifyTelnyxCompany()" [disabled]="verifying==='company:'+company.company_id || dirty.telnyxCompany || telnyx.verification_status!=='verified'">{{verifying==='company:'+company.company_id?'Verifying…':'Verify Company sender'}}</button></div>
+              <label class="mt-4 flex items-center gap-3"><input type="checkbox" [(ngModel)]="company.live_sms_enabled" (ngModelChange)="dirty.telnyxCompany=true" name="company_live" [disabled]="company.verification_status!=='verified' || (company.regulatory_status!=='approved' && company.regulatory_status!=='not_required') || !telnyx.live_sms_enabled" class="h-5 w-5 accent-yellow-400"><span>Enable live SMS for this Company</span></label>
+            </div>
+            <p *ngIf="company.last_error" class="mt-3 text-xs text-red-300">{{company.last_error}}</p>
+            <div class="flex justify-end border-t border-white/10 pt-6 mt-6"><app-button type="submit" variant="primary" icon="save" [isLoading]="saving==='company:'+company.company_id">Save Company Sender</app-button></div>
+          </form>
+        </ng-container>
+      </app-glass-card>
     </div>
   </div>
 </div>

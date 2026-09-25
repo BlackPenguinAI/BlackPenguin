@@ -76,8 +76,6 @@ class TwilioConfigSchema(BaseModel):
 
 class TelnyxConfigUpdate(BaseModel):
     api_key: Optional[str] = None
-    messaging_profile_id: Optional[str] = None
-    from_phone_number: Optional[str] = None
     webhook_public_key: Optional[str] = None
     live_sms_enabled: Optional[bool] = None
 
@@ -86,9 +84,31 @@ class TelnyxConfigSchema(BaseModel):
     id: Optional[str] = None
     api_key_configured: bool = False
     api_key_hint: Optional[str] = None
+    webhook_public_key_configured: bool = False
+    live_sms_enabled: bool = False
+    verification_status: str = "not_configured"
+    verified_at: Optional[datetime] = None
+    last_error: Optional[str] = None
+    updated_at: Optional[datetime] = None
+
+
+class TelnyxCompanyConfigUpdate(BaseModel):
+    messaging_profile_id: Optional[str] = Field(default=None, max_length=100)
+    from_phone_number: Optional[str] = Field(default=None, max_length=50)
+    telnyx_phone_number_id: Optional[str] = Field(default=None, max_length=100)
+    regulatory_status: Optional[Literal["pending", "approved", "not_required"]] = None
+    live_sms_enabled: Optional[bool] = None
+
+
+class TelnyxCompanyConfigSchema(BaseModel):
+    id: Optional[str] = None
+    company_id: str
+    company_name: str
+    company_is_active: bool = True
     messaging_profile_id: Optional[str] = None
     from_phone_number: Optional[str] = None
-    webhook_public_key_configured: bool = False
+    telnyx_phone_number_id: Optional[str] = None
+    regulatory_status: Literal["pending", "approved", "not_required"] = "pending"
     live_sms_enabled: bool = False
     verification_status: str = "not_configured"
     verified_at: Optional[datetime] = None

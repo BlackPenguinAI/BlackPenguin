@@ -12,6 +12,7 @@ from .schemas import (
     FirebaseConfigSchema, FirebaseConfigUpdate, GoogleCalendarConfigSchema, GoogleCalendarConfigUpdate,
     MessagingRoutingSchema, MessagingRoutingUpdate,
     MetaPlatformConfigSchema, MetaPlatformConfigUpdate,
+    TelnyxCompanyConfigSchema, TelnyxCompanyConfigUpdate,
     TelnyxConfigSchema, TelnyxConfigUpdate, TwilioConfigSchema, TwilioConfigUpdate,
     LegalDocumentResponse, LegalDocumentPayload
 )
@@ -86,6 +87,37 @@ def update_telnyx_settings(payload: TelnyxConfigUpdate, db: Session = Depends(ge
 @router.post("/messaging-settings/telnyx/verify", response_model=TelnyxConfigSchema)
 def verify_telnyx_settings(db: Session = Depends(get_db), current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN]))):
     return services.telnyx_config_response(services.verify_telnyx_config(db))
+
+
+@router.get("/messaging-settings/telnyx/companies", response_model=list[TelnyxCompanyConfigSchema])
+def get_telnyx_company_settings(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN])),
+):
+    return services.list_telnyx_company_configs(db)
+
+
+@router.put("/messaging-settings/telnyx/companies/{company_id}", response_model=TelnyxCompanyConfigSchema)
+def update_telnyx_company_settings(
+    company_id: str,
+    payload: TelnyxCompanyConfigUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN])),
+):
+    config = services.update_telnyx_company_config(db, company_id, payload)
+    company = db.query(Company).filter(Company.id == company_id).one()
+    return services.telnyx_company_config_response(company, config)
+
+
+@router.post("/messaging-settings/telnyx/companies/{company_id}/verify", response_model=TelnyxCompanyConfigSchema)
+def verify_telnyx_company_settings(
+    company_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN])),
+):
+    config = services.verify_telnyx_company_config(db, company_id)
+    company = db.query(Company).filter(Company.id == company_id).one()
+    return services.telnyx_company_config_response(company, config)
 
 
 @router.get("/messaging-settings/default-provider", response_model=MessagingRoutingSchema)

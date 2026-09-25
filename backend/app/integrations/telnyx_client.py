@@ -11,9 +11,6 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from sqlalchemy.orm import Session
 
-from app.modules.system_settings.services import telnyx_credentials
-
-
 def _public_key(value: str) -> Ed25519PublicKey:
     cleaned = value.strip()
     if cleaned.startswith("-----BEGIN"):
@@ -30,6 +27,11 @@ def _public_key(value: str) -> Ed25519PublicKey:
     return Ed25519PublicKey.from_public_bytes(raw)
 
 
+def validate_telnyx_public_key(value: str) -> None:
+    """Raise ValueError unless the configured webhook key is Ed25519."""
+    _public_key(value)
+
+
 def validate_telnyx_signature(*, public_key: str, payload: bytes, signature: str | None, timestamp: str | None) -> bool:
     if not signature or not timestamp:
         return False
@@ -41,9 +43,14 @@ def validate_telnyx_signature(*, public_key: str, payload: bytes, signature: str
         return False
 
 
-async def send_sms(db: Session, *, to: str, body: str) -> dict:
-    config, api_key = telnyx_credentials(db)
-    if not config.live_sms_enabled or config.verification_status != "verified":
+async def send_sms(db: Session, *, company_id: str, to: str, body: str) -> dict:
+    from app.modules.system_settings.services import get_telnyx_company_config, telnyx_credentials
+
+    platform, api_key = telnyx_credentials(db)
+    config = get_telnyx_company_config(db, company_id)
+    if not platform.live_sms_enabled or platform.verification_status != "verified":
+        raise RuntimeError("Live Telnyx SMS is disabled or not verified.")
+    if not config or not config.live_sms_enabled or config.verification_status != "verified":
         raise RuntimeError("Live Telnyx SMS is disabled or not verified.")
     async with httpx.AsyncClient(timeout=20.0) as client:
         response = await client.post(

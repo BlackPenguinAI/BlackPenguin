@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, String, DateTime, ForeignKey, JSON, Text
+from sqlalchemy import Boolean, Column, String, DateTime, ForeignKey, JSON, Text, UniqueConstraint
 import uuid
 from datetime import datetime
 from app.db.postgres import Base
@@ -61,6 +61,29 @@ class TelnyxConfig(Base):
     messaging_profile_id = Column(String(100), nullable=True)
     from_phone_number = Column(String(50), nullable=True)
     webhook_public_key = Column(Text, nullable=True)
+    live_sms_enabled = Column(Boolean, default=False, nullable=False)
+    verification_status = Column(String(30), default="not_configured", nullable=False)
+    verified_at = Column(DateTime, nullable=True)
+    last_error = Column(Text, nullable=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class TelnyxCompanyConfig(Base):
+    """One isolated Telnyx sender and Messaging Profile per tenant."""
+
+    __tablename__ = "telnyx_company_configurations"
+    __table_args__ = (
+        UniqueConstraint("company_id", name="uq_telnyx_company_config_company"),
+        UniqueConstraint("messaging_profile_id", name="uq_telnyx_company_config_profile"),
+        UniqueConstraint("from_phone_number", name="uq_telnyx_company_config_number"),
+    )
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    company_id = Column(String(36), ForeignKey("companies.id", ondelete="CASCADE"), nullable=False, index=True)
+    messaging_profile_id = Column(String(100), nullable=True)
+    from_phone_number = Column(String(50), nullable=True)
+    telnyx_phone_number_id = Column(String(100), nullable=True, unique=True)
+    regulatory_status = Column(String(30), default="pending", nullable=False)
     live_sms_enabled = Column(Boolean, default=False, nullable=False)
     verification_status = Column(String(30), default="not_configured", nullable=False)
     verified_at = Column(DateTime, nullable=True)

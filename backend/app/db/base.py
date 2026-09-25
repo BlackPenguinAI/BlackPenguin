@@ -10,7 +10,7 @@ from app.modules.companies.models import Company
 from app.modules.users.models import User
 from app.modules.system_settings.models import (
     CalendarOAuthAttempt, FirebaseConfig, GoogleCalendarConfig, LegalDocument,
-    MessagingRoutingConfig, MetaOAuthAttempt, MetaPlatformConfig, TelnyxConfig, TwilioConfig,
+    MessagingRoutingConfig, MetaOAuthAttempt, MetaPlatformConfig, TelnyxCompanyConfig, TelnyxConfig, TwilioConfig,
 )
 from app.modules.ai_core.models import AIConfiguration, PromptVersion
 from app.modules.company_onboarding.models import (
