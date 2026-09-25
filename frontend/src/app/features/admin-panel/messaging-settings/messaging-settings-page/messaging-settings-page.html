@@ -1,68 +1,63 @@
 <div class="bp-page">
   <div class="absolute top-0 right-1/4 w-96 h-96 bg-secondary/5 rounded-full blur-[120px] pointer-events-none"></div>
-
   <div class="bp-page__container bp-page__container--form">
-    
     <div class="mb-8 border-b border-white/10 pb-6">
-      <h1 class="text-3xl font-light tracking-tight">Messaging <span class="text-secondary font-medium">Settings</span></h1>
-      <p class="text-sm text-gray-400 mt-1">Configure Twilio Programmable Messaging for automated and manual SMS.</p>
+      <h1 class="text-3xl font-light tracking-tight">Messaging <span class="text-secondary font-medium">Providers</span></h1>
+      <p class="text-sm text-gray-400 mt-1">Configure Twilio and Telnyx, then choose the verified provider used for new SMS conversations.</p>
     </div>
 
-    <div *ngIf="isLoading" class="flex justify-center py-24">
-      <div class="animate-spin h-8 w-8 border-2 border-secondary border-t-transparent rounded-full"></div>
-    </div>
+    <div *ngIf="isLoading" class="flex justify-center py-24"><div class="animate-spin h-8 w-8 border-2 border-secondary border-t-transparent rounded-full"></div></div>
 
     <div *ngIf="!isLoading" class="flex flex-col gap-8 animate-fade-in">
-      <form (ngSubmit)="saveConfig()">
-        
-        <app-glass-card title="Twilio API Credentials" icon="sms" class="mb-6 block">
-          <p class="text-xs text-gray-400 mb-6 leading-relaxed">
-            Credentials are encrypted at rest. The Auth Token is write-only and is never returned to the browser. Rotate the previously exposed token before enabling live SMS.
-          </p>
+      <app-glass-card title="Default SMS Provider" icon="swap_horiz">
+        <p class="text-xs text-gray-400 mb-5">Existing conversations stay pinned to the provider and sender that opened them. This selection applies only to new conversations.</p>
+        <div class="grid gap-4 md:grid-cols-2">
+          <button type="button" (click)="setDefault('twilio')" [disabled]="switching || !twilio.live_sms_enabled || twilio.verification_status !== 'verified'" class="rounded-xl border p-4 text-left transition disabled:cursor-not-allowed disabled:opacity-40" [ngClass]="defaultProvider === 'twilio' ? 'border-secondary bg-secondary/10' : 'border-white/10'">
+            <span class="flex items-center justify-between"><strong>Twilio</strong><span class="text-[10px] uppercase tracking-wider" [class.text-secondary]="defaultProvider === 'twilio'">{{defaultProvider === 'twilio' ? 'Default' : twilio.verification_status}}</span></span>
+            <span class="mt-2 block text-xs text-gray-500">{{twilio.from_phone_number || 'No sender configured'}}</span>
+          </button>
+          <button type="button" (click)="setDefault('telnyx')" [disabled]="switching || !telnyx.live_sms_enabled || telnyx.verification_status !== 'verified'" class="rounded-xl border p-4 text-left transition disabled:cursor-not-allowed disabled:opacity-40" [ngClass]="defaultProvider === 'telnyx' ? 'border-secondary bg-secondary/10' : 'border-white/10'">
+            <span class="flex items-center justify-between"><strong>Telnyx</strong><span class="text-[10px] uppercase tracking-wider" [class.text-secondary]="defaultProvider === 'telnyx'">{{defaultProvider === 'telnyx' ? 'Default' : telnyx.verification_status}}</span></span>
+            <span class="mt-2 block text-xs text-gray-500">{{telnyx.from_phone_number || 'No sender configured'}}</span>
+          </button>
+        </div>
+      </app-glass-card>
 
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-            <app-input 
-              label="Account SID" 
-              [(ngModel)]="twilioConfig.account_sid" (ngModelChange)="markDirty()"
-              name="account_sid" 
-              placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
-            </app-input>
-
-            <div class="flex flex-col gap-1">
-              <app-input 
-                label="Replace Auth Token"
-                type="password"
-                [(ngModel)]="twilioConfig.auth_token" (ngModelChange)="markDirty()"
-                name="auth_token" 
-                placeholder="Enter a new or rotated token">
-              </app-input>
-              <span class="text-[10px] text-green-300 ml-1" *ngIf="twilioConfig.auth_token_configured">Auth Token configured{{twilioConfig.auth_token_hint ? ' · ending in ••••'+twilioConfig.auth_token_hint : ''}}. It is encrypted and cannot be displayed again. Leave blank to keep it.</span>
-            </div>
-          </div>
-
-          <div class="mt-6 rounded-xl border border-white/10 bg-black/30 p-4 text-xs text-gray-400">
-            <div class="flex items-center justify-between gap-4"><span><b class="text-white">Connection status:</b> {{twilioConfig.verification_status}}</span><button type="button" class="rounded-lg border border-secondary px-3 py-2 text-secondary disabled:opacity-40" (click)="verifyConfig()" [disabled]="isVerifying || isDirty" [title]="isDirty ? 'Save changes before testing' : 'Test the stored credentials'">{{isVerifying?'Verifying…':'Test stored connection'}}</button></div>
-            <p *ngIf="isDirty" class="mt-2 text-secondary">Unsaved changes · save before testing the connection.</p>
-            <label class="mt-4 flex items-center gap-3"><input type="checkbox" [(ngModel)]="twilioConfig.live_sms_enabled" (ngModelChange)="markDirty()" name="live_sms_enabled" [disabled]="twilioConfig.verification_status!=='verified'"><span>Enable live SMS after successful verification</span></label>
-            <p class="mt-3">Inbound webhook: <code>https://blackpenguin.ai/api/v1/webhooks/twilio/sms</code><br>Status callback: <code>https://blackpenguin.ai/api/v1/webhooks/twilio/status</code></p>
-          </div>
-
+      <form (ngSubmit)="saveTwilio()">
+        <app-glass-card title="Twilio API Credentials" icon="sms">
+          <p class="text-xs text-gray-400 mb-6">The Auth Token is encrypted, write-only and never returned to the browser.</p>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <app-input 
-              label="From Phone Number (SMS)"
-              [(ngModel)]="twilioConfig.from_phone_number" (ngModelChange)="markDirty()"
-              name="from_phone_number" 
-              placeholder="+1234567890">
-            </app-input>
+            <app-input label="Account SID" [(ngModel)]="twilio.account_sid" (ngModelChange)="dirty.twilio=true" name="twilio_account_sid" placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"></app-input>
+            <div><app-input label="Replace Auth Token" type="password" [(ngModel)]="twilio.auth_token" (ngModelChange)="dirty.twilio=true" name="twilio_auth_token" placeholder="Leave blank to keep stored token"></app-input><span *ngIf="twilio.auth_token_configured" class="text-[10px] text-green-300">Stored securely{{twilio.auth_token_hint ? ' · ending in ••••'+twilio.auth_token_hint : ''}}</span></div>
+            <app-input label="From Phone Number (E.164)" [(ngModel)]="twilio.from_phone_number" (ngModelChange)="dirty.twilio=true" name="twilio_from" placeholder="+1234567890"></app-input>
           </div>
-
-          <div class="flex justify-end border-t border-white/10 pt-6 mt-8">
-            <app-button type="submit" variant="primary" icon="save" [isLoading]="isSaving">
-              Save Messaging Config
-            </app-button>
+          <div class="mt-6 rounded-xl border border-white/10 bg-black/30 p-4 text-xs text-gray-400">
+            <div class="flex flex-wrap items-center justify-between gap-3"><span><b class="text-white">Status:</b> <span class="uppercase">{{twilio.verification_status}}</span></span><button type="button" class="rounded-lg border border-secondary px-3 py-2 text-secondary disabled:opacity-40" (click)="verify('twilio')" [disabled]="verifying==='twilio' || dirty.twilio">{{verifying==='twilio'?'Verifying…':'Test stored connection'}}</button></div>
+            <label class="mt-4 flex items-center gap-3"><input type="checkbox" [(ngModel)]="twilio.live_sms_enabled" (ngModelChange)="dirty.twilio=true" name="twilio_live" [disabled]="twilio.verification_status!=='verified'" class="h-5 w-5 accent-yellow-400"><span>Enable live SMS</span></label>
+            <p class="mt-3 break-all">Inbound: <code>https://blackpenguin.ai/api/v1/webhooks/twilio/sms</code><br>Status: <code>https://blackpenguin.ai/api/v1/webhooks/twilio/status</code></p>
           </div>
+          <p *ngIf="twilio.last_error" class="mt-3 text-xs text-red-300">{{twilio.last_error}}</p>
+          <div class="flex justify-end border-t border-white/10 pt-6 mt-6"><app-button type="submit" variant="primary" icon="save" [isLoading]="saving==='twilio'">Save Twilio</app-button></div>
         </app-glass-card>
+      </form>
 
+      <form (ngSubmit)="saveTelnyx()">
+        <app-glass-card title="Telnyx API Credentials" icon="forum">
+          <p class="text-xs text-gray-400 mb-6">Assign the sender number to this Messaging Profile in Telnyx. The API Key is encrypted and write-only.</p>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div><app-input label="Replace API Key" type="password" [(ngModel)]="telnyx.api_key" (ngModelChange)="dirty.telnyx=true" name="telnyx_api_key" placeholder="Leave blank to keep stored key"></app-input><span *ngIf="telnyx.api_key_configured" class="text-[10px] text-green-300">Stored securely{{telnyx.api_key_hint ? ' · ending in ••••'+telnyx.api_key_hint : ''}}</span></div>
+            <app-input label="Messaging Profile ID" [(ngModel)]="telnyx.messaging_profile_id" (ngModelChange)="dirty.telnyx=true" name="telnyx_profile" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"></app-input>
+            <app-input label="From Phone Number (E.164)" [(ngModel)]="telnyx.from_phone_number" (ngModelChange)="dirty.telnyx=true" name="telnyx_from" placeholder="+1234567890"></app-input>
+            <div><app-input label="Webhook Ed25519 Public Key" type="password" [(ngModel)]="telnyx.webhook_public_key" (ngModelChange)="dirty.telnyx=true" name="telnyx_public_key" placeholder="Leave blank to keep stored key"></app-input><span *ngIf="telnyx.webhook_public_key_configured" class="text-[10px] text-green-300">Webhook verification key configured</span></div>
+          </div>
+          <div class="mt-6 rounded-xl border border-white/10 bg-black/30 p-4 text-xs text-gray-400">
+            <div class="flex flex-wrap items-center justify-between gap-3"><span><b class="text-white">Status:</b> <span class="uppercase">{{telnyx.verification_status}}</span></span><button type="button" class="rounded-lg border border-secondary px-3 py-2 text-secondary disabled:opacity-40" (click)="verify('telnyx')" [disabled]="verifying==='telnyx' || dirty.telnyx">{{verifying==='telnyx'?'Verifying…':'Test stored connection'}}</button></div>
+            <label class="mt-4 flex items-center gap-3"><input type="checkbox" [(ngModel)]="telnyx.live_sms_enabled" (ngModelChange)="dirty.telnyx=true" name="telnyx_live" [disabled]="telnyx.verification_status!=='verified'" class="h-5 w-5 accent-yellow-400"><span>Enable live SMS</span></label>
+            <p class="mt-3 break-all">Configure this webhook in the Telnyx Messaging Profile:<br><code>https://blackpenguin.ai/api/v1/webhooks/telnyx/messaging</code></p>
+          </div>
+          <p *ngIf="telnyx.last_error" class="mt-3 text-xs text-red-300">{{telnyx.last_error}}</p>
+          <div class="flex justify-end border-t border-white/10 pt-6 mt-6"><app-button type="submit" variant="primary" icon="save" [isLoading]="saving==='telnyx'">Save Telnyx</app-button></div>
+        </app-glass-card>
       </form>
     </div>
   </div>

@@ -10,11 +10,10 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.db.postgres import SessionLocal
-from app.integrations.twilio_client import send_sms
+from app.integrations.messaging_gateway import default_provider, live_provider, provider_sender, send_sms
 from app.modules.projects.models import Project, ProjectCampaign
 from app.modules.sales_crm.intelligence import update_lead_intelligence
 from app.modules.sales_crm.models import FunnelStage, Lead, LeadContact
-from app.modules.system_settings.services import get_twilio_config
 
 from .graph import GRAPH_VERSION, TOOLSET_VERSION, build_sales_graph
 from .models import (
@@ -78,9 +77,18 @@ def ensure_contact(db: Session, lead: Lead) -> LeadContact:
     return contact
 
 
-def get_or_create_live_conversation(db: Session, lead: Lead) -> tuple[SalesConversation, bool]:
-    config = get_twilio_config(db)
-    thread_key = f"twilio:{normalize_phone(config.from_phone_number or '')}:{normalize_phone(lead.phone)}"
+def get_or_create_live_conversation(db: Session, lead: Lead, *, provider: str | None = None) -> tuple[SalesConversation, bool]:
+    # A provider switch affects only new threads. A lead that already owns a
+    # physical SMS conversation must keep its original sender and webhook path.
+    pinned = db.query(SalesConversation).filter(
+        SalesConversation.lead_id == lead.id,
+        SalesConversation.channel == "sms",
+    ).first()
+    if pinned:
+        return pinned, False
+    provider = provider or default_provider(db)
+    sender = provider_sender(db, provider)
+    thread_key = f"{provider}:{normalize_phone(sender)}:{normalize_phone(lead.phone)}"
     existing = db.query(SalesConversation).filter(
         SalesConversation.provider_thread_key == thread_key,
     ).first()
@@ -128,7 +136,7 @@ def get_or_create_live_conversation(db: Session, lead: Lead) -> tuple[SalesConve
         return existing, False
     conversation = SalesConversation(
         company_id=lead.company_id, project_id=lead.project_id, campaign_id=lead.campaign_id,
-        lead_id=lead.id, channel="sms", provider_thread_key=thread_key,
+        lead_id=lead.id, channel="sms", provider=provider, provider_thread_key=thread_key,
         automation_level=2, is_paused=False,
     )
     db.add(conversation); db.flush()
@@ -137,8 +145,8 @@ def get_or_create_live_conversation(db: Session, lead: Lead) -> tuple[SalesConve
     return conversation, True
 
 
-def resolve_inbound_conversation(db: Session, *, to_number: str, from_number: str) -> SalesConversation | None:
-    key = f"twilio:{normalize_phone(to_number)}:{normalize_phone(from_number)}"
+def resolve_inbound_conversation(db: Session, *, provider: str = "twilio", to_number: str, from_number: str) -> SalesConversation | None:
+    key = f"{provider}:{normalize_phone(to_number)}:{normalize_phone(from_number)}"
     return db.query(SalesConversation).filter(SalesConversation.provider_thread_key == key).first()
 
 
@@ -185,7 +193,8 @@ async def _dispatch(
         message = None
     outbound = outbound or OutboundMessage(
         conversation_id=conversation.id, agent_run_id=agent_run_id,
-        idempotency_key=idempotency_key or f"twilio:{conversation.id}:{uuid.uuid4()}", channel="sms",
+        idempotency_key=idempotency_key or f"{conversation.provider}:{conversation.id}:{uuid.uuid4()}", channel="sms",
+        provider=conversation.provider,
         recipient=lead.phone, content=content, status="queued",
         approved_by_user_id=author_user_id,
         approved_at=datetime.utcnow() if author_user_id else None,
@@ -197,7 +206,7 @@ async def _dispatch(
     )
     db.add_all([outbound, message]); db.commit()
     try:
-        result = await send_sms(db, to=lead.phone, body=content)
+        result = await send_sms(db, provider=conversation.provider, to=lead.phone, body=content)
     except Exception as exc:
         outbound.status = "failed"; outbound.last_error = type(exc).__name__
         message.status = "failed"
@@ -289,7 +298,7 @@ def prepare_meta_simulation(db: Session, lead: Lead) -> tuple[SalesConversation,
         metadata_json={
             "event_kind": "meta_lead_simulation_started",
             "delivery": "not_sent",
-            "reason": "twilio_disabled",
+            "reason": "sms_provider_disabled",
             "lead_id": lead.id,
             "project_id": project.id,
         },
@@ -309,13 +318,13 @@ def prepare_meta_simulation(db: Session, lead: Lead) -> tuple[SalesConversation,
 
 async def launch_live_lead(db: Session, lead: Lead) -> tuple[SalesConversation | None, SalesMessage | None]:
     """Start or safely re-contextualize the one physical SMS thread for this sender/recipient."""
-    config = get_twilio_config(db)
-    if not config.live_sms_enabled or config.verification_status != "verified":
+    provider = live_provider(db)
+    if not provider:
         return prepare_meta_simulation(db, lead)
     project = db.query(Project).filter(Project.id == lead.project_id, Project.company_id == lead.company_id).one()
     campaign = db.query(ProjectCampaign).filter(ProjectCampaign.id == lead.campaign_id).first() if lead.campaign_id else None
     ensure_contact(db, lead)
-    conversation, should_send = get_or_create_live_conversation(db, lead)
+    conversation, should_send = get_or_create_live_conversation(db, lead, provider=provider)
     prior_message_count = db.query(SalesMessage).filter(
         SalesMessage.conversation_id == conversation.id,
         SalesMessage.status != "failed",
@@ -391,7 +400,7 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
                 idempotency_key=f"human-intervention:{conversation.id}:{inbound.id}",
             )
             return
-        event_id = f"twilio:{inbound.provider_message_id or inbound.id}"
+        event_id = f"{conversation.provider}:{inbound.provider_message_id or inbound.id}"
         run = AgentRun(
             conversation_id=conversation.id, event_id=event_id, mode="live", status="running",
             graph_version=GRAPH_VERSION, toolset_version=TOOLSET_VERSION,
@@ -523,7 +532,7 @@ async def process_live_followup_job(job_id: str) -> None:
         ).one()
         if conversation.channel != "sms" or conversation.is_paused or lead.is_opt_out:
             job.status = "cancelled"; job.processed_at = datetime.utcnow(); db.commit(); return
-        dispatch_key = f"twilio-followup:{job.id}"
+        dispatch_key = f"{conversation.provider}-followup:{job.id}"
         if db.query(OutboundMessage).filter(OutboundMessage.idempotency_key == dispatch_key).first():
             job.status = "processed"; job.processed_at = datetime.utcnow(); db.commit(); return
         project = db.query(Project).filter(

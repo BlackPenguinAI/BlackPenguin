@@ -52,6 +52,30 @@ class TwilioConfig(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class TelnyxConfig(Base):
+    __tablename__ = "telnyx_configurations"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    api_key_ciphertext = Column(Text, nullable=True)
+    api_key_hint = Column(String(12), nullable=True)
+    messaging_profile_id = Column(String(100), nullable=True)
+    from_phone_number = Column(String(50), nullable=True)
+    webhook_public_key = Column(Text, nullable=True)
+    live_sms_enabled = Column(Boolean, default=False, nullable=False)
+    verification_status = Column(String(30), default="not_configured", nullable=False)
+    verified_at = Column(DateTime, nullable=True)
+    last_error = Column(Text, nullable=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class MessagingRoutingConfig(Base):
+    __tablename__ = "messaging_routing_configurations"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    default_provider = Column(String(20), default="twilio", nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class GoogleCalendarConfig(Base):
     __tablename__ = "google_calendar_configurations"
 

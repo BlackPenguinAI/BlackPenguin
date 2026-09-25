@@ -7,7 +7,7 @@ from datetime import datetime
 import logging
 
 from app.db.postgres import SessionLocal
-from app.modules.governance.services import process_appointment_email_outbox, process_notification_outbox
+from app.modules.governance.services import process_notification_outbox
 
 from .live_service import process_live_followup_job
 from .models import SalesConversation, SalesFollowUpJob
@@ -19,7 +19,6 @@ def _process_operational_outboxes() -> None:
     db = SessionLocal()
     try:
         process_notification_outbox(db)
-        process_appointment_email_outbox(db)
     finally:
         db.close()
 
@@ -54,7 +53,7 @@ async def run_live_followup_worker(stop_event: asyncio.Event) -> None:
         try:
             await asyncio.to_thread(_process_operational_outboxes)
         except Exception:
-            logger.exception("Operational notification/email outbox processing failed")
+            logger.exception("Operational notification outbox processing failed")
         for job_id in await asyncio.to_thread(_claim_due_jobs):
             try:
                 await process_live_followup_job(job_id)

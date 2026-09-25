@@ -25,14 +25,6 @@ def admin_deletion_is_configured() -> bool:
     )
 
 
-def email_bridge_is_configured() -> bool:
-    """Return whether the email bridge can be reached from this API."""
-    return bool(
-        settings.FIREBASE_ADMIN_BRIDGE_URL
-        and settings.FIREBASE_ADMIN_BRIDGE_SECRET
-    )
-
-
 def ensure_admin_deletion_ready() -> None:
     if not admin_deletion_is_configured():
         raise HTTPException(
@@ -45,21 +37,6 @@ def ensure_admin_deletion_ready() -> None:
                     "Company identities were already removed manually from Firebase."
                 ),
                 "can_confirm_manual_cleanup": True,
-            },
-        )
-
-
-def ensure_email_bridge_ready() -> None:
-    if not email_bridge_is_configured():
-        raise HTTPException(
-            status_code=409,
-            detail={
-                "code": "FIREBASE_ADMIN_EMAIL_UNAVAILABLE",
-                "message": (
-                    "The Firebase Admin bridge for appointment email is not configured. "
-                    "Set FIREBASE_ADMIN_BRIDGE_URL and FIREBASE_ADMIN_BRIDGE_SECRET, "
-                    "then redeploy the API and worker."
-                ),
             },
         )
 
@@ -77,45 +54,14 @@ def _signed_headers(body: bytes, timestamp: str) -> dict[str, str]:
     }
 
 
-def _bridge_post(path: str, payload: dict) -> dict:
-    ensure_email_bridge_ready()
-    body = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
-    timestamp = str(int(time.time()))
-    try:
-        response = httpx.post(
-            settings.FIREBASE_ADMIN_BRIDGE_URL.rstrip("/") + path,
-            content=body,
-            headers=_signed_headers(body, timestamp),
-            timeout=settings.FIREBASE_ADMIN_BRIDGE_TIMEOUT_SECONDS,
-        )
-        data = response.json()
-    except (httpx.HTTPError, ValueError) as exc:
-        raise RuntimeError("Firebase Admin bridge is temporarily unavailable.") from exc
-    if response.is_error:
-        raise RuntimeError(str(data.get("detail") or "Firebase Admin bridge rejected the request."))
-    return data
+def enqueue_email(**_: object) -> dict:
+    """Retained only for safe imports from historical migrations; no transport exists."""
+    raise RuntimeError("Appointment email transport has been retired.")
 
 
-def enqueue_email(*, project_id: str, document_id: str, recipient: str, subject: str,
-                  text: str, html: str, attachments: list[dict] | None = None,
-                  from_email: str | None = None, reply_to: str | None = None,
-                  mail_collection: str = "mail") -> dict:
-    payload = {
-        "project_id": project_id,
-        "document_id": document_id,
-        "mail_collection": mail_collection,
-        "to": [recipient],
-        "message": {"subject": subject, "text": text, "html": html, "attachments": attachments or []},
-    }
-    if from_email:
-        payload["from"] = from_email
-    if reply_to:
-        payload["replyTo"] = reply_to
-    return _bridge_post("/mail/enqueue", payload)
-
-
-def email_status(*, project_id: str, document_id: str, mail_collection: str = "mail") -> dict:
-    return _bridge_post("/mail/status", {"project_id": project_id, "document_id": document_id, "mail_collection": mail_collection})
+def email_status(**_: object) -> dict:
+    """Retained only for safe imports from historical outbox code; no transport exists."""
+    raise RuntimeError("Appointment email transport has been retired.")
 
 
 def delete_identity(*, project_id: str, firebase_uid: str | None, email: str) -> str:

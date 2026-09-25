@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.modules.projects.models import Project, ProjectCampaign
 from app.modules.sales_crm.models import Lead, LeadConsentEvent
-from app.modules.system_settings.services import get_twilio_config
+from app.integrations.messaging_gateway import live_provider, provider_sender
 
 from .live_service import launch_live_lead, normalize_phone
 from .models import SalesConversation
@@ -28,10 +28,10 @@ async def create_live_meta_test(
     lead_form: dict,
     idempotency_key: str,
 ) -> dict:
-    config = get_twilio_config(db)
-    if not config.live_sms_enabled or config.verification_status != "verified":
-        raise HTTPException(status_code=409, detail="Verify and enable Twilio live SMS before submitting a live test lead.")
-    thread_key = f"twilio:{normalize_phone(config.from_phone_number or '')}:{normalize_phone(lead_form['phone'])}"
+    provider = live_provider(db)
+    if not provider:
+        raise HTTPException(status_code=409, detail="Verify and enable the default SMS provider before submitting a live test lead.")
+    thread_key = f"{provider}:{normalize_phone(provider_sender(db, provider))}:{normalize_phone(lead_form['phone'])}"
     foreign_thread = db.query(SalesConversation).filter(
         SalesConversation.provider_thread_key == thread_key,
         SalesConversation.company_id != company_id,

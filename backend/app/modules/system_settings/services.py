@@ -5,11 +5,13 @@ import secrets
 import httpx
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
-from .models import FirebaseConfig, GoogleCalendarConfig, MetaPlatformConfig, TwilioConfig, LegalDocument
+from .models import (
+    FirebaseConfig, GoogleCalendarConfig, LegalDocument, MessagingRoutingConfig,
+    MetaPlatformConfig, TelnyxConfig, TwilioConfig,
+)
 from .schemas import (
-    AppointmentEmailTransportUpdate,
     FirebaseConfigUpdate, GoogleCalendarConfigUpdate, LegalDocumentPayload,
-    MetaPlatformConfigUpdate, TwilioConfigUpdate,
+    MetaPlatformConfigUpdate, TelnyxConfigUpdate, TwilioConfigUpdate,
 )
 from app.core.config import settings
 from app.core.secret_store import decrypt_secret, encrypt_secret
@@ -100,76 +102,6 @@ def verify_firebase_config(db: Session) -> FirebaseConfig:
     db.commit(); db.refresh(config)
     return config
 
-
-def appointment_email_transport_response(config: FirebaseConfig) -> dict:
-    return {
-        "is_enabled": bool(config.appointment_email_enabled),
-        "from_name": config.appointment_from_name or settings.EMAILS_FROM_NAME,
-        "from_email": config.appointment_from_email or settings.EMAILS_FROM_EMAIL,
-        "reply_to": config.appointment_reply_to or config.appointment_from_email or settings.EMAILS_FROM_EMAIL,
-        "mail_collection": config.appointment_mail_collection or "mail",
-        "bridge_configured": bool(settings.FIREBASE_ADMIN_BRIDGE_URL and settings.FIREBASE_ADMIN_BRIDGE_SECRET),
-        "firebase_project_id": config.project_id or settings.FIREBASE_PROJECT_ID or None,
-        "status": config.appointment_transport_status or "not_configured",
-        "last_error": config.appointment_transport_error,
-    }
-
-
-def update_appointment_email_transport(db: Session, payload: AppointmentEmailTransportUpdate) -> FirebaseConfig:
-    config = get_firebase_config(db)
-    config.appointment_email_enabled = payload.is_enabled
-    config.appointment_from_name = payload.from_name.strip()
-    config.appointment_from_email = payload.from_email.strip().casefold()
-    config.appointment_reply_to = (payload.reply_to or payload.from_email).strip().casefold()
-    config.appointment_mail_collection = payload.mail_collection.strip()
-    if payload.is_enabled and not (settings.FIREBASE_ADMIN_BRIDGE_URL and settings.FIREBASE_ADMIN_BRIDGE_SECRET and (config.project_id or settings.FIREBASE_PROJECT_ID)):
-        raise HTTPException(status_code=422, detail="Configure the Firebase Project and authenticated Admin bridge before enabling appointment email.")
-    config.appointment_transport_status = "pending"
-    config.appointment_transport_error = None
-    db.commit(); db.refresh(config)
-    return config
-
-
-def verify_appointment_email_transport(db: Session, recipient: str) -> FirebaseConfig:
-    from app.integrations.firebase_admin_client import enqueue_email
-    config = get_firebase_config(db)
-    try:
-        enqueue_email(
-            project_id=config.project_id or settings.FIREBASE_PROJECT_ID,
-            document_id=f"transport-test-{secrets.token_hex(12)}",
-            recipient=recipient.strip().casefold(),
-            subject="Black Penguin appointment email transport test",
-            text="Trigger Email from Firestore accepted this Black Penguin test message.",
-            html="<p><strong>Black Penguin</strong> appointment email transport test.</p>",
-            from_email=f"{config.appointment_from_name} <{config.appointment_from_email}>",
-            reply_to=config.appointment_reply_to,
-            mail_collection=config.appointment_mail_collection or "mail",
-        )
-    except HTTPException as exc:
-        detail = exc.detail
-        if isinstance(detail, dict):
-            error_message = str(detail.get("message") or detail.get("code") or "The Firebase Admin bridge is unavailable.")
-        else:
-            error_message = str(detail)
-        config.appointment_transport_status = "failed"
-        config.appointment_transport_error = error_message[:500]
-        db.commit()
-        raise
-    except Exception as exc:
-        config.appointment_transport_status = "failed"
-        config.appointment_transport_error = "The Firestore email test could not be queued."
-        db.commit()
-        raise HTTPException(
-            status_code=502,
-            detail={
-                "code": "FIREBASE_ADMIN_EMAIL_QUEUE_FAILED",
-                "message": "The Firestore email test could not be queued. Check the Admin bridge logs and configuration.",
-            },
-        ) from exc
-    config.appointment_transport_status = "queued"
-    config.appointment_transport_error = None
-    db.commit(); db.refresh(config)
-    return config
 
 # --- TWILIO ---
 def get_twilio_config(db: Session) -> TwilioConfig:
@@ -300,6 +232,143 @@ def verify_twilio_config(db: Session) -> TwilioConfig:
     config.verification_status = "verified"
     config.verified_at = datetime.utcnow()
     config.last_error = None
+    db.commit(); db.refresh(config)
+    return config
+
+
+# --- TELNYX ---
+def get_telnyx_config(db: Session) -> TelnyxConfig:
+    config = db.query(TelnyxConfig).first()
+    if not config:
+        config = TelnyxConfig()
+        db.add(config); db.commit(); db.refresh(config)
+    return config
+
+
+def telnyx_config_response(config: TelnyxConfig) -> dict:
+    return {
+        "id": config.id,
+        "api_key_configured": bool(config.api_key_ciphertext),
+        "api_key_hint": config.api_key_hint,
+        "messaging_profile_id": config.messaging_profile_id,
+        "from_phone_number": config.from_phone_number,
+        "webhook_public_key_configured": bool(config.webhook_public_key),
+        "live_sms_enabled": bool(config.live_sms_enabled),
+        "verification_status": config.verification_status or "not_configured",
+        "verified_at": config.verified_at,
+        "last_error": config.last_error,
+        "updated_at": config.updated_at,
+    }
+
+
+def telnyx_credentials(db: Session) -> tuple[TelnyxConfig, str]:
+    config = get_telnyx_config(db)
+    try:
+        api_key = decrypt_secret(config.api_key_ciphertext)
+    except ValueError as exc:
+        config.verification_status = "failed"
+        config.last_error = "credential_decryption_failed"
+        db.commit()
+        raise HTTPException(status_code=409, detail="The stored Telnyx API key cannot be decrypted. Replace and save it.") from exc
+    if not api_key or not config.messaging_profile_id or not config.from_phone_number or not config.webhook_public_key:
+        raise HTTPException(status_code=409, detail="Telnyx is not fully configured.")
+    return config, api_key
+
+
+def update_telnyx_config(db: Session, payload: TelnyxConfigUpdate) -> TelnyxConfig:
+    config = get_telnyx_config(db)
+    values = payload.model_dump(exclude_unset=True)
+    api_key = (values.pop("api_key", None) or "").strip()
+    if "from_phone_number" in values:
+        values["from_phone_number"] = _normalize_e164(values["from_phone_number"])
+    for key in ("messaging_profile_id", "webhook_public_key"):
+        if key in values and isinstance(values[key], str):
+            values[key] = values[key].strip() or None
+    credentials_changed = bool(api_key) or any(
+        key in values and values[key] != getattr(config, key)
+        for key in ("messaging_profile_id", "from_phone_number", "webhook_public_key")
+    )
+    if api_key:
+        config.api_key_ciphertext = encrypt_secret(api_key)
+        config.api_key_hint = api_key[-4:]
+    for key, value in values.items():
+        setattr(config, key, value)
+    if config.live_sms_enabled and not (
+        config.api_key_ciphertext and config.messaging_profile_id
+        and config.from_phone_number and config.webhook_public_key
+    ):
+        raise HTTPException(status_code=422, detail="Complete the Telnyx credentials before enabling live SMS.")
+    if config.live_sms_enabled and config.verification_status != "verified" and not credentials_changed:
+        raise HTTPException(status_code=422, detail="Verify Telnyx before enabling live SMS.")
+    if credentials_changed:
+        config.live_sms_enabled = False
+        config.verification_status = "pending"
+        config.verified_at = None
+        config.last_error = None
+    db.commit(); db.refresh(config)
+    return config
+
+
+def verify_telnyx_config(db: Session) -> TelnyxConfig:
+    config, api_key = telnyx_credentials(db)
+    headers = {"Authorization": f"Bearer {api_key}"}
+    try:
+        profile = httpx.get(
+            f"https://api.telnyx.com/v2/messaging_profiles/{config.messaging_profile_id}",
+            headers=headers, timeout=15.0,
+        )
+        profile.raise_for_status()
+        numbers = httpx.get(
+            "https://api.telnyx.com/v2/phone_numbers",
+            params={"filter[phone_number]": config.from_phone_number, "page[size]": 1},
+            headers=headers, timeout=15.0,
+        )
+        numbers.raise_for_status()
+        matches = numbers.json().get("data") or []
+        if not matches:
+            raise HTTPException(status_code=422, detail="The SMS From number was not found in this Telnyx account.")
+        assigned_profile = matches[0].get("messaging_profile_id")
+        if assigned_profile and assigned_profile != config.messaging_profile_id:
+            raise HTTPException(status_code=422, detail="The Telnyx number is assigned to a different Messaging Profile.")
+    except HTTPException as exc:
+        config.verification_status = "failed"; config.last_error = str(exc.detail)[:500]
+        db.commit(); raise
+    except (httpx.HTTPError, ValueError, KeyError) as exc:
+        config.verification_status = "failed"; config.last_error = type(exc).__name__
+        db.commit()
+        raise HTTPException(status_code=422, detail="Telnyx credentials could not be verified.") from exc
+    config.verification_status = "verified"; config.verified_at = datetime.utcnow(); config.last_error = None
+    db.commit(); db.refresh(config)
+    return config
+
+
+def get_messaging_routing_config(db: Session) -> MessagingRoutingConfig:
+    config = db.query(MessagingRoutingConfig).first()
+    if not config:
+        config = MessagingRoutingConfig(default_provider="twilio")
+        db.add(config); db.commit(); db.refresh(config)
+    return config
+
+
+def messaging_routing_response(config: MessagingRoutingConfig) -> dict:
+    return {"default_provider": config.default_provider or "twilio"}
+
+
+def provider_is_ready(db: Session, provider: str) -> bool:
+    if provider == "twilio":
+        config = get_twilio_config(db)
+    elif provider == "telnyx":
+        config = get_telnyx_config(db)
+    else:
+        return False
+    return bool(config.live_sms_enabled and config.verification_status == "verified")
+
+
+def update_default_provider(db: Session, provider: str) -> MessagingRoutingConfig:
+    if not provider_is_ready(db, provider):
+        raise HTTPException(status_code=422, detail=f"Verify and enable {provider.title()} before making it the default provider.")
+    config = get_messaging_routing_config(db)
+    config.default_provider = provider
     db.commit(); db.refresh(config)
     return config
 

@@ -23,14 +23,14 @@ describe('EmailSettingsPageComponent', () => {
     expect(payload.credentials_json).toBeUndefined();
   });
 
-  it('shows the bridge message instead of rendering a structured API error', () => {
+  it('shows a clean Firebase Authentication error instead of raw JSON', () => {
     vi.stubGlobal('localStorage', { getItem: vi.fn().mockReturnValue('test-token') });
     const http = {
       post: vi.fn().mockReturnValue(throwError(() => ({
         error: {
           detail: {
-            code: 'FIREBASE_ADMIN_EMAIL_UNAVAILABLE',
-            message: 'Configure the Firebase Admin bridge for appointment email.',
+            code: 'FIREBASE_AUTH_UNAVAILABLE',
+            message: 'Enable Firebase Authentication before sending invitations.',
           },
         },
       }))),
@@ -39,13 +39,11 @@ describe('EmailSettingsPageComponent', () => {
     const component = new EmailSettingsPageComponent(
       http as any, toast as any, { detectChanges: vi.fn() } as any,
     );
-    component.testRecipient = 'test@example.com';
-
-    component.testTransport();
+    component.testConnection();
 
     expect(toast.showError).toHaveBeenCalledWith(
-      'Configure the Firebase Admin bridge for appointment email.',
+      'Enable Firebase Authentication before sending invitations.',
     );
-    expect(component.transportTesting).toBe(false);
+    expect(component.isTesting).toBe(false);
   });
 });

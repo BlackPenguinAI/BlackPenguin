@@ -9,10 +9,10 @@ from sqlalchemy import func
 from app.modules.companies.models import Company
 
 from .schemas import (
-    AppointmentEmailTransportSchema, AppointmentEmailTransportUpdate, AppointmentEmailTransportVerify,
     FirebaseConfigSchema, FirebaseConfigUpdate, GoogleCalendarConfigSchema, GoogleCalendarConfigUpdate,
+    MessagingRoutingSchema, MessagingRoutingUpdate,
     MetaPlatformConfigSchema, MetaPlatformConfigUpdate,
-    TwilioConfigSchema, TwilioConfigUpdate,
+    TelnyxConfigSchema, TelnyxConfigUpdate, TwilioConfigSchema, TwilioConfigUpdate,
     LegalDocumentResponse, LegalDocumentPayload
 )
 from . import services
@@ -46,22 +46,8 @@ def verify_email_settings(
     return services.firebase_config_response(services.verify_firebase_config(db))
 
 
-@router.get("/email-settings/appointment-transport", response_model=AppointmentEmailTransportSchema)
-def get_appointment_email_transport(db: Session = Depends(get_db), current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN]))):
-    return services.appointment_email_transport_response(services.get_firebase_config(db))
-
-
-@router.put("/email-settings/appointment-transport", response_model=AppointmentEmailTransportSchema)
-def update_appointment_email_transport(payload: AppointmentEmailTransportUpdate, db: Session = Depends(get_db), current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN]))):
-    return services.appointment_email_transport_response(services.update_appointment_email_transport(db, payload))
-
-
-@router.post("/email-settings/appointment-transport/verify", response_model=AppointmentEmailTransportSchema)
-def verify_appointment_email_transport(payload: AppointmentEmailTransportVerify, db: Session = Depends(get_db), current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN]))):
-    return services.appointment_email_transport_response(services.verify_appointment_email_transport(db, payload.test_recipient))
-
 # =========================================================
-# ⚙️ MESSAGING SETTINGS (TWILIO)
+# ⚙️ MESSAGING SETTINGS (TWILIO + TELNYX)
 # =========================================================
 @router.get("/messaging-settings", response_model=TwilioConfigSchema, summary="Obtener configuración de Twilio SMS")
 def get_messaging_settings(
@@ -85,6 +71,31 @@ def verify_messaging_settings(
     current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN])),
 ):
     return services.twilio_config_response(services.verify_twilio_config(db))
+
+
+@router.get("/messaging-settings/telnyx", response_model=TelnyxConfigSchema)
+def get_telnyx_settings(db: Session = Depends(get_db), current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN]))):
+    return services.telnyx_config_response(services.get_telnyx_config(db))
+
+
+@router.put("/messaging-settings/telnyx", response_model=TelnyxConfigSchema)
+def update_telnyx_settings(payload: TelnyxConfigUpdate, db: Session = Depends(get_db), current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN]))):
+    return services.telnyx_config_response(services.update_telnyx_config(db, payload))
+
+
+@router.post("/messaging-settings/telnyx/verify", response_model=TelnyxConfigSchema)
+def verify_telnyx_settings(db: Session = Depends(get_db), current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN]))):
+    return services.telnyx_config_response(services.verify_telnyx_config(db))
+
+
+@router.get("/messaging-settings/default-provider", response_model=MessagingRoutingSchema)
+def get_default_messaging_provider(db: Session = Depends(get_db), current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN]))):
+    return services.messaging_routing_response(services.get_messaging_routing_config(db))
+
+
+@router.put("/messaging-settings/default-provider", response_model=MessagingRoutingSchema)
+def update_default_messaging_provider(payload: MessagingRoutingUpdate, db: Session = Depends(get_db), current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN]))):
+    return services.messaging_routing_response(services.update_default_provider(db, payload.default_provider))
 
 
 @router.get("/integrations/google-calendar", response_model=GoogleCalendarConfigSchema)

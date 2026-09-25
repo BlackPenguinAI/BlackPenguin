@@ -41,7 +41,7 @@ from app.modules.projects.models import Project, ProjectUnit
 from app.modules.projects.models import SalesAssetShare
 from app.modules.sales_agent.models import SalesConversation, SalesFollowUpJob
 from app.modules.governance.schemas import DeletePayload
-from app.modules.governance.services import enqueue_appointment_emails, enqueue_notification, record_export_event, record_platform_event
+from app.modules.governance.services import enqueue_notification, record_export_event, record_platform_event
 
 router = APIRouter()
 
@@ -389,13 +389,6 @@ def update_meeting(
         current_user.id if current_user.role == UserRole.SALES else None,
     )
     if meeting.status != previous_status and meeting.status in {MeetingStatus.CONFIRMED, MeetingStatus.CANCELLED}:
-        if meeting.status == MeetingStatus.CONFIRMED:
-            lead = db.query(Lead).filter(Lead.id == meeting.lead_id).one()
-            sales = db.query(User).filter(User.id == meeting.assigned_sales_user_id).first() if meeting.assigned_sales_user_id else None
-            enqueue_appointment_emails(
-                db, company_id=current_user.company_id, meeting_id=meeting.id,
-                lead_email=lead.email, sales_email=sales.email if sales else None,
-            )
         enqueue_notification(
             db, company_id=current_user.company_id, project_id=meeting.project_id,
             event_type="appointment_confirmed" if meeting.status == MeetingStatus.CONFIRMED else "appointment_cancelled",

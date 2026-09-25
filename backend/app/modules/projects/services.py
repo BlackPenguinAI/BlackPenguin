@@ -14,7 +14,7 @@ from app.modules.onboarding_questions import validate_onboarding_value
 from app.modules.project_team.models import ProjectUserAssignment
 from app.modules.users.models import User, UserRole
 from app.modules.sales_crm.models import CalendarConnection
-from app.modules.system_settings.models import GoogleCalendarConfig, TwilioConfig
+from app.modules.system_settings.models import GoogleCalendarConfig
 from app.modules.users.project_access import sync_all_scope_users_for_project
 
 from .completion import FIELD_BY_KEY, VALID_STATUSES, calculate_completion, field_progress, normalize_field_key
@@ -678,8 +678,9 @@ def serialize_overview(db: Session, project: Project, viewer_user: User | None =
     ).filter(ProjectCampaign.project_id == project.id).all()
     meta_real = any(connection.verification_mode == "real" and connection.verification_status == "succeeded" and campaign.lead_form_id for campaign, connection in meta_rows)
     meta_simulated = any(connection.verification_mode == "simulated" and campaign.lead_form_id for campaign, connection in meta_rows)
-    twilio = db.query(TwilioConfig).first()
-    sms_ready = bool(twilio and twilio.live_sms_enabled and twilio.verification_status == "verified")
+    from app.modules.system_settings.services import get_messaging_routing_config, provider_is_ready
+    messaging = get_messaging_routing_config(db)
+    sms_ready = provider_is_ready(db, messaging.default_provider)
     google = db.query(GoogleCalendarConfig).first()
     google_platform_ready = bool(google and google.is_enabled and google.verification_status == "ready")
     assigned_sales = db.query(User).join(

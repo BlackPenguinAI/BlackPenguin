@@ -74,6 +74,36 @@ class TwilioConfigSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class TelnyxConfigUpdate(BaseModel):
+    api_key: Optional[str] = None
+    messaging_profile_id: Optional[str] = None
+    from_phone_number: Optional[str] = None
+    webhook_public_key: Optional[str] = None
+    live_sms_enabled: Optional[bool] = None
+
+
+class TelnyxConfigSchema(BaseModel):
+    id: Optional[str] = None
+    api_key_configured: bool = False
+    api_key_hint: Optional[str] = None
+    messaging_profile_id: Optional[str] = None
+    from_phone_number: Optional[str] = None
+    webhook_public_key_configured: bool = False
+    live_sms_enabled: bool = False
+    verification_status: str = "not_configured"
+    verified_at: Optional[datetime] = None
+    last_error: Optional[str] = None
+    updated_at: Optional[datetime] = None
+
+
+class MessagingRoutingSchema(BaseModel):
+    default_provider: Literal["twilio", "telnyx"] = "twilio"
+
+
+class MessagingRoutingUpdate(BaseModel):
+    default_provider: Literal["twilio", "telnyx"]
+
+
 class GoogleCalendarConfigUpdate(BaseModel):
     client_id: Optional[str] = None
     client_secret: Optional[str] = None
