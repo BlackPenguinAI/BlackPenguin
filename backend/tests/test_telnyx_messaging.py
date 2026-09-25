@@ -96,9 +96,38 @@ def test_global_verification_rejects_an_invalid_webhook_public_key():
         api_key_ciphertext=encrypt_secret("KEY"), webhook_public_key="not-an-ed25519-key",
         verification_status="pending",
     )); db.commit()
-    with pytest.raises(HTTPException, match="could not be verified"):
+    with pytest.raises(HTTPException, match="not a valid Ed25519 key"):
         verify_telnyx_config(db)
     assert db.query(TelnyxConfig).one().verification_status == "failed"
+
+
+def test_global_verification_rejects_api_key_authentication_failure_with_specific_error():
+    db = _db(); _, public_key = _public_key()
+    db.add(TelnyxConfig(
+        api_key_ciphertext=encrypt_secret("KEY-invalid"), webhook_public_key=public_key,
+        verification_status="pending",
+    )); db.commit()
+    rejected = Mock(status_code=401)
+    with patch("app.modules.system_settings.services.httpx.get", return_value=rejected):
+        with pytest.raises(HTTPException, match="rejected the API Key") as exc_info:
+            verify_telnyx_config(db)
+    assert exc_info.value.status_code == 422
+    assert "rejected the API Key" in db.query(TelnyxConfig).one().last_error
+
+
+def test_global_verification_rejects_public_key_from_another_account():
+    db = _db(); _, configured_key = _public_key(); _, account_key = _public_key()
+    db.add(TelnyxConfig(
+        api_key_ciphertext=encrypt_secret("KEY-valid"), webhook_public_key=configured_key,
+        verification_status="pending",
+    )); db.commit()
+    response = Mock(status_code=200)
+    response.raise_for_status.return_value = None
+    response.json.return_value = {"data": {"public": account_key}}
+    with patch("app.modules.system_settings.services.httpx.get", return_value=response):
+        with pytest.raises(HTTPException, match="does not belong") as exc_info:
+            verify_telnyx_config(db)
+    assert exc_info.value.status_code == 422
 
 
 def test_global_and_company_verification_are_independent():
@@ -112,8 +141,10 @@ def test_global_and_company_verification_are_independent():
         company_id=company.id, messaging_profile_id="profile-1", from_phone_number="+13055550142",
         regulatory_status="approved",
     )); db.commit()
-    balance = Mock(); balance.raise_for_status.return_value = None
-    with patch("app.modules.system_settings.services.httpx.get", return_value=balance):
+    public_key_response = Mock(status_code=200)
+    public_key_response.raise_for_status.return_value = None
+    public_key_response.json.return_value = {"data": {"public": public_key}}
+    with patch("app.modules.system_settings.services.httpx.get", return_value=public_key_response):
         platform = verify_telnyx_config(db)
     assert platform.verification_status == "verified"
     profile = Mock(); profile.raise_for_status.return_value = None

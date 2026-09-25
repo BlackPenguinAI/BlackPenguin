@@ -32,6 +32,14 @@ def validate_telnyx_public_key(value: str) -> None:
     _public_key(value)
 
 
+def telnyx_public_key_bytes(value: str) -> bytes:
+    """Return the canonical raw bytes for an Ed25519 public key."""
+    return _public_key(value).public_bytes(
+        encoding=serialization.Encoding.Raw,
+        format=serialization.PublicFormat.Raw,
+    )
+
+
 def validate_telnyx_signature(*, public_key: str, payload: bytes, signature: str | None, timestamp: str | None) -> bool:
     if not signature or not timestamp:
         return False

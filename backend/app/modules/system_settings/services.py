@@ -307,17 +307,58 @@ def verify_telnyx_config(db: Session) -> TelnyxConfig:
     config, api_key = telnyx_credentials(db)
     headers = {"Authorization": f"Bearer {api_key}"}
     try:
-        from app.integrations.telnyx_client import validate_telnyx_public_key
-        validate_telnyx_public_key(config.webhook_public_key)
-        response = httpx.get("https://api.telnyx.com/v2/balance", headers=headers, timeout=15.0)
+        from app.integrations.telnyx_client import telnyx_public_key_bytes
+
+        try:
+            configured_key = telnyx_public_key_bytes(config.webhook_public_key)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=422,
+                detail="The configured Telnyx webhook public key is not a valid Ed25519 key.",
+            ) from exc
+        response = httpx.get("https://api.telnyx.com/v2/public_key", headers=headers, timeout=15.0)
+        if response.status_code == 401:
+            raise HTTPException(
+                status_code=422,
+                detail="Telnyx rejected the API Key. Replace it with an active API v2 key.",
+            )
+        if response.status_code == 403:
+            raise HTTPException(
+                status_code=422,
+                detail="The Telnyx API Key cannot read this account's webhook public key.",
+            )
+        if response.status_code == 429:
+            raise HTTPException(
+                status_code=429,
+                detail="Telnyx temporarily rate-limited the credential test. Try again shortly.",
+            )
         response.raise_for_status()
+        account_key_value = (response.json().get("data") or {}).get("public")
+        if not account_key_value:
+            raise ValueError("Telnyx did not return an account webhook public key.")
+        account_key = telnyx_public_key_bytes(account_key_value)
+        if configured_key != account_key:
+            raise HTTPException(
+                status_code=422,
+                detail="The configured webhook public key does not belong to this Telnyx account.",
+            )
     except HTTPException as exc:
         config.verification_status = "failed"; config.last_error = str(exc.detail)[:500]
         db.commit(); raise
-    except (httpx.HTTPError, ValueError, KeyError) as exc:
+    except httpx.HTTPError as exc:
         config.verification_status = "failed"; config.last_error = type(exc).__name__
         db.commit()
-        raise HTTPException(status_code=422, detail="Telnyx credentials could not be verified.") from exc
+        raise HTTPException(
+            status_code=502,
+            detail="Black Penguin could not reach the Telnyx credential service.",
+        ) from exc
+    except (ValueError, KeyError) as exc:
+        config.verification_status = "failed"; config.last_error = str(exc)[:500]
+        db.commit()
+        raise HTTPException(
+            status_code=422,
+            detail="Telnyx returned an invalid webhook public key response.",
+        ) from exc
     config.verification_status = "verified"; config.verified_at = datetime.utcnow(); config.last_error = None
     db.commit(); db.refresh(config)
     return config
