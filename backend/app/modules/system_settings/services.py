@@ -466,7 +466,7 @@ def verify_telnyx_company_config(db: Session, company_id: str) -> TelnyxCompanyC
         if webhook_url and webhook_url.rstrip("/") != expected_webhook.rstrip("/"):
             raise HTTPException(status_code=422, detail=f"The Messaging Profile webhook must be {expected_webhook}.")
         number_response = httpx.get(
-            "https://api.telnyx.com/v2/phone_numbers",
+            "https://api.telnyx.com/v2/phone_numbers/messaging",
             params={"filter[phone_number]": config.from_phone_number, "page[size]": 1},
             headers=headers, timeout=15.0,
         )

@@ -157,10 +157,26 @@ def test_global_and_company_verification_are_independent():
         "id": "number-id-1", "phone_number": "+13055550142",
         "messaging_profile_id": "profile-1",
     }]}
-    with patch("app.modules.system_settings.services.httpx.get", side_effect=[profile, number]):
+    requested_urls = []
+
+    def telnyx_get(url, **kwargs):
+        requested_urls.append((url, kwargs))
+        if url.endswith("/messaging_profiles/profile-1"):
+            return profile
+        if url == "https://api.telnyx.com/v2/phone_numbers/messaging":
+            return number
+        raise AssertionError(f"Unexpected Telnyx URL: {url}")
+
+    with patch("app.modules.system_settings.services.httpx.get", side_effect=telnyx_get):
         sender = verify_telnyx_company_config(db, company.id)
     assert sender.verification_status == "verified"
     assert sender.telnyx_phone_number_id == "number-id-1"
+    number_url, number_kwargs = requested_urls[1]
+    assert number_url == "https://api.telnyx.com/v2/phone_numbers/messaging"
+    assert number_kwargs["params"] == {
+        "filter[phone_number]": "+13055550142",
+        "page[size]": 1,
+    }
 
 
 def test_company_sender_and_profile_cannot_be_shared_across_tenants():
