@@ -16,7 +16,7 @@ from app.db.postgres import Base, get_db
 from app.modules.companies.models import Company
 from app.modules.meta_leads.router import _resolve_campaign, router as meta_leads_router
 from app.modules.projects.models import MetaConnection, Project, ProjectCampaign, ProjectProfile, ProjectPropertyType
-from app.modules.sales_agent.live_test_service import create_live_meta_test
+from app.modules.sales_agent.live_test_service import create_live_lead, create_live_meta_test, live_lead_source_options
 from app.modules.sales_agent.live_service import launch_live_lead
 from app.modules.sales_agent.service import simulate_turn
 from app.modules.sales_agent.models import SalesConversation, SalesConversationLeadContext, SalesMessage
@@ -100,6 +100,40 @@ def test_manual_meta_control_is_one_idempotent_real_sms_action():
     assert db.query(Lead).filter_by(platform="meta_test").count() == 1
     assert db.query(SalesMessage).count() == 1
     assert sms.await_count == 1
+
+
+def test_manual_live_lead_does_not_require_or_fake_meta_attribution():
+    db = _db(); company = Company(name="Tenant A"); db.add(company); db.flush()
+    project, _, product = _project(db, company)
+    db.add(TwilioConfig(
+        account_sid="AC" + ("1" * 32), from_phone_number="+18573824206",
+        live_sms_enabled=True, verification_status="verified",
+    )); db.commit()
+    with patch("app.modules.sales_agent.live_service.send_sms", new=AsyncMock(return_value={"sid": "SM1", "status": "queued"})):
+        result = asyncio.run(create_live_lead(
+            db, company_id=company.id, project_id=project.id, source_code="manual",
+            campaign_id=None, lead_form=_lead_form(product), idempotency_key="manual-live-request-0001",
+        ))
+    lead = db.query(Lead).filter_by(id=result["lead_id"]).one()
+    assert result["provider"] == "twilio" and result["source_code"] == "manual"
+    assert lead.platform == "manual" and lead.source == "Manual registration"
+    assert lead.campaign_id is None and lead.meta_form_data == {}
+
+
+def test_meta_source_requires_a_campaign_but_source_catalog_remains_extensible():
+    db = _db(); company = Company(name="Tenant A"); db.add(company); db.flush()
+    project, _, product = _project(db, company)
+    db.add(TwilioConfig(
+        account_sid="AC" + ("1" * 32), from_phone_number="+18573824206",
+        live_sms_enabled=True, verification_status="verified",
+    )); db.commit()
+    with pytest.raises(HTTPException, match="campaign is required") as missing_campaign:
+        asyncio.run(create_live_lead(
+            db, company_id=company.id, project_id=project.id, source_code="meta",
+            campaign_id=None, lead_form=_lead_form(product), idempotency_key="meta-live-request-0001",
+        ))
+    assert missing_campaign.value.status_code == 422
+    assert {item["code"] for item in live_lead_source_options()} == {"manual", "meta"}
 
 
 def test_real_meta_lead_opens_an_idempotent_simulation_when_twilio_is_disabled():
@@ -197,6 +231,36 @@ def test_failed_twilio_dispatch_can_retry_without_duplicate_lead_or_message():
     assert db.query(Lead).count() == 1
     assert db.query(SalesMessage).count() == 1
     assert db.query(SalesMessage).one().status == "queued"
+
+
+def test_actionable_provider_rejection_remains_idempotently_retryable():
+    db = _db(); company = Company(name="Tenant A"); db.add(company); db.flush()
+    project, _, product = _project(db, company)
+    db.add(TwilioConfig(
+        account_sid="AC" + ("1" * 32), from_phone_number="+18573824206",
+        live_sms_enabled=True, verification_status="verified",
+    )); db.commit()
+    rejection = HTTPException(status_code=422, detail={
+        "code": "TELNYX_MESSAGE_REJECTED",
+        "message": "Telnyx rejected the outbound SMS.",
+        "provider_detail": "International outbound messaging is not enabled.",
+    })
+    with patch("app.modules.sales_agent.live_service.send_sms", new=AsyncMock(side_effect=rejection)):
+        with pytest.raises(HTTPException) as failed:
+            asyncio.run(create_live_lead(
+                db, company_id=company.id, project_id=project.id, source_code="manual",
+                campaign_id=None, lead_form=_lead_form(product), idempotency_key="provider-retry-0001",
+            ))
+    assert failed.value.detail["code"] == "TELNYX_MESSAGE_REJECTED"
+    assert db.query(Lead).one().agent_status == "delivery_failed"
+    with patch("app.modules.sales_agent.live_service.send_sms", new=AsyncMock(return_value={"sid": "MSG-retry", "status": "queued"})):
+        replay = asyncio.run(create_live_lead(
+            db, company_id=company.id, project_id=project.id, source_code="manual",
+            campaign_id=None, lead_form=_lead_form(product), idempotency_key="provider-retry-0001",
+        ))
+    assert replay["replayed"] is True and replay["message_id"]
+    assert db.query(Lead).count() == 1
+    assert db.query(SalesMessage).count() == 1
 
 
 def test_shared_sender_blocks_cross_company_phone_collision_before_creating_lead():

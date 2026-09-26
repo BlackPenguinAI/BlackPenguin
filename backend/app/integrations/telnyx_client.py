@@ -9,6 +9,7 @@ import httpx
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 def _public_key(value: str) -> Ed25519PublicKey:
@@ -51,6 +52,28 @@ def validate_telnyx_signature(*, public_key: str, payload: bytes, signature: str
         return False
 
 
+def _message_error(response: httpx.Response) -> HTTPException:
+    try:
+        payload = response.json()
+    except ValueError:
+        payload = {}
+    errors = payload.get("errors") if isinstance(payload, dict) else None
+    error = errors[0] if isinstance(errors, list) and errors and isinstance(errors[0], dict) else {}
+    provider_code = str(error.get("code") or response.status_code)
+    provider_detail = str(error.get("detail") or error.get("title") or "Telnyx rejected the outbound SMS.")
+    status_code = 429 if response.status_code == 429 else (422 if response.status_code < 500 else 502)
+    return HTTPException(
+        status_code=status_code,
+        detail={
+            "code": "TELNYX_MESSAGE_REJECTED",
+            "message": "Telnyx rejected the outbound SMS.",
+            "provider_code": provider_code[:80],
+            "provider_detail": provider_detail[:500],
+            "provider_request_id": (response.headers.get("x-request-id") or "")[:120] or None,
+        },
+    )
+
+
 async def send_sms(db: Session, *, company_id: str, to: str, body: str) -> dict:
     from app.modules.system_settings.services import get_telnyx_company_config, telnyx_credentials
 
@@ -60,17 +83,35 @@ async def send_sms(db: Session, *, company_id: str, to: str, body: str) -> dict:
         raise RuntimeError("Live Telnyx SMS is disabled or not verified.")
     if not config or not config.live_sms_enabled or config.verification_status != "verified":
         raise RuntimeError("Live Telnyx SMS is disabled or not verified.")
-    async with httpx.AsyncClient(timeout=20.0) as client:
-        response = await client.post(
-            "https://api.telnyx.com/v2/messages",
-            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-            json={
-                "from": config.from_phone_number,
-                "to": to,
-                "text": body,
-                "messaging_profile_id": config.messaging_profile_id,
+    try:
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            response = await client.post(
+                "https://api.telnyx.com/v2/messages",
+                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                json={
+                    "from": config.from_phone_number,
+                    "to": to,
+                    "text": body,
+                    "messaging_profile_id": config.messaging_profile_id,
+                },
+            )
+    except httpx.RequestError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "code": "TELNYX_UNAVAILABLE",
+                "message": "Black Penguin could not reach the Telnyx messaging service.",
+            },
+        ) from exc
+    if response.status_code >= 400:
+        raise _message_error(response)
+    data = response.json().get("data") or {}
+    if not data.get("id"):
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "code": "TELNYX_INVALID_RESPONSE",
+                "message": "Telnyx accepted the request but did not return a message identifier.",
             },
         )
-        response.raise_for_status()
-    data = response.json().get("data") or {}
     return {"sid": data.get("id"), "status": data.get("status") or "queued", "raw": data}

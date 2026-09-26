@@ -3,7 +3,7 @@ import { ChangeDetectorRef, Component, ElementRef, OnDestroy, OnInit, ViewChild 
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { ActivatedRoute } from '@angular/router';
-import { finalize } from 'rxjs';
+import { catchError, finalize, forkJoin, of } from 'rxjs';
 import { API_V1_URL } from '../../../core/config/api.config';
 
 @Component({
@@ -36,6 +36,11 @@ export class AgentComponent implements OnInit, OnDestroy {
   generatingInitial = false;
   setupOpen = true;
   setupMode: 'simulation' | 'live_meta' = 'simulation';
+  leadSourceCode = 'manual';
+  leadSources: any[] = [
+    { code: 'manual', label: 'Manual registration', requires_campaign: false, campaign_platform: null },
+    { code: 'meta', label: 'Meta Lead Ads', requires_campaign: true, campaign_platform: 'meta' },
+  ];
   liveProgress = '';
   private liveProgressTimer?: ReturnType<typeof setInterval>;
   private liveSubmissionKey = '';
@@ -86,11 +91,17 @@ export class AgentComponent implements OnInit, OnDestroy {
   loadOptions(): void {
     this.loading = true;
     this.error = '';
-    this.http.get<any[]>(`${API_V1_URL}/sales-agent/simulation-options`).subscribe({
-      next: (rows) => {
-        this.options = rows;
+    forkJoin({
+      projects: this.http.get<any[]>(`${API_V1_URL}/sales-agent/simulation-options`),
+      sources: this.http.get<any[]>(`${API_V1_URL}/sales-agent/live-lead-sources`).pipe(
+        catchError(() => of(this.leadSources)),
+      ),
+    }).subscribe({
+      next: ({ projects, sources }) => {
+        this.options = projects;
+        this.leadSources = sources?.length ? sources : this.leadSources;
         const requested = this.route.snapshot.queryParamMap.get('project');
-        this.projectId = rows.find((row) => row.id === requested)?.id || '';
+        this.projectId = projects.find((row) => row.id === requested)?.id || '';
         this.campaignId = this.campaigns[0]?.id || '';
         this.loadConversations();
       },
@@ -104,7 +115,9 @@ export class AgentComponent implements OnInit, OnDestroy {
 
   projectChanged(): void {
     const preserveSetup = this.setupOpen;
-    this.campaignId = this.availableCampaigns[0]?.id || '';
+    this.campaignId = this.currentLeadSource?.requires_campaign || this.setupMode === 'simulation'
+      ? this.availableCampaigns[0]?.id || ''
+      : '';
     this.form.product_id = '';
     this.form.budget_min = null;
     this.form.budget_max = null;
@@ -119,8 +132,19 @@ export class AgentComponent implements OnInit, OnDestroy {
   }
   get availableCampaigns(): any[] {
     return this.setupMode === 'live_meta'
-      ? this.campaigns.filter((campaign) => campaign.live_test_ready)
+      ? (this.currentLeadSource?.requires_campaign
+        ? this.campaigns.filter((campaign) => campaign.live_test_ready)
+        : [])
       : this.campaigns;
+  }
+  get currentLeadSource(): any {
+    return this.leadSources.find((source) => source.code === this.leadSourceCode);
+  }
+  sourceChanged(): void {
+    this.campaignId = this.currentLeadSource?.requires_campaign
+      ? this.availableCampaigns[0]?.id || ''
+      : '';
+    this.liveSubmissionKey = '';
   }
   get currentProject(): any {
     return this.options.find((row) => row.id === this.projectId);
@@ -147,10 +171,15 @@ export class AgentComponent implements OnInit, OnDestroy {
     return minimum > 0 && (maximum === null || (maximum > 0 && maximum >= minimum));
   }
   get formComplete(): boolean {
+    const campaignComplete = this.setupMode === 'simulation'
+      ? !!this.campaignId
+      : !!this.currentLeadSource && (
+        !this.currentLeadSource.requires_campaign ||
+        (!!this.campaignId && this.availableCampaigns.some((row) => row.id === this.campaignId))
+      );
     return !!(
       this.projectId &&
-      this.campaignId &&
-      (this.setupMode === 'simulation' || this.availableCampaigns.some((row) => row.id === this.campaignId)) &&
+      campaignComplete &&
       this.form.first_name.trim() &&
       this.form.last_name.trim() &&
       this.form.phone.trim() &&
@@ -293,9 +322,12 @@ export class AgentComponent implements OnInit, OnDestroy {
   openSetup(mode: 'simulation' | 'live_meta'): void {
     this.setupMode = mode;
     this.setupOpen = true;
-    this.campaignId = this.availableCampaigns.some((row) => row.id === this.campaignId)
-      ? this.campaignId
-      : this.availableCampaigns[0]?.id || '';
+    if (mode === 'live_meta' && !this.currentLeadSource) this.leadSourceCode = 'manual';
+    this.campaignId = this.currentLeadSource?.requires_campaign || mode === 'simulation'
+      ? (this.availableCampaigns.some((row) => row.id === this.campaignId)
+        ? this.campaignId
+        : this.availableCampaigns[0]?.id || '')
+      : '';
     this.error = '';
     this.success = '';
   }
@@ -312,10 +344,10 @@ export class AgentComponent implements OnInit, OnDestroy {
     this.success = '';
     this.liveSubmissionKey ||= this.newRequestId();
     const stages = [
-      'Validating Project and Meta attribution…',
+      `Validating Project and ${this.currentLeadSource?.label || 'lead'} source…`,
       'Creating the lead and consent trace…',
       'Opening the protected SMS conversation…',
-      'Asking Twilio to deliver the first message…',
+      'Asking the configured SMS provider to deliver the first message…',
     ];
     let stage = 0;
     this.liveProgress = stages[stage];
@@ -324,9 +356,10 @@ export class AgentComponent implements OnInit, OnDestroy {
       this.liveProgress = stages[stage];
       this.cdr.markForCheck();
     }, 1200);
-    this.http.post<any>(`${API_V1_URL}/sales-agent/meta-test-leads`, {
+    this.http.post<any>(`${API_V1_URL}/sales-agent/live-leads`, {
+      source_code: this.leadSourceCode,
       project_id: this.projectId,
-      campaign_id: this.campaignId,
+      campaign_id: this.currentLeadSource?.requires_campaign ? this.campaignId : null,
       lead: {
         first_name: this.form.first_name.trim(), last_name: this.form.last_name.trim(),
         phone: this.form.phone.trim(), email: this.form.email.trim(), product_id: this.form.product_id,
@@ -346,14 +379,15 @@ export class AgentComponent implements OnInit, OnDestroy {
         next: (result) => {
           this.liveSubmissionKey = '';
           this.setupOpen = false;
+          const provider = result.provider ? result.provider.charAt(0).toUpperCase() + result.provider.slice(1) : 'the configured provider';
           this.success = result.replayed
             ? 'This submission was already received; the existing SMS conversation was reopened.'
-            : 'The Meta test lead was created and the first real SMS was handed to Twilio.';
+            : `The ${this.currentLeadSource?.label || 'lead'} lead was created and the first real SMS was submitted through ${provider}.`;
           this.resetForm();
           this.loadConversations(false, result.conversation_id);
         },
         error: (err) => {
-          this.error = err.error?.detail || this.validationMessage(err.error) || 'The live Meta test could not be started.';
+          this.error = this.apiErrorMessage(err, 'The live lead could not be created or sent.');
           this.cdr.markForCheck();
         },
       });
@@ -759,6 +793,15 @@ export class AgentComponent implements OnInit, OnDestroy {
   }
   private validationMessage(error: any): string {
     return Array.isArray(error?.detail) ? error.detail.map((item: any) => item.msg).join(' ') : '';
+  }
+  private apiErrorMessage(error: any, fallback: string): string {
+    const detail = error?.error?.detail;
+    if (typeof detail === 'string') return detail;
+    if (detail && typeof detail === 'object' && !Array.isArray(detail)) {
+      const message = detail.message || fallback;
+      return detail.provider_detail ? `${message} ${detail.provider_detail}` : message;
+    }
+    return this.validationMessage(error?.error) || fallback;
   }
   private isNearBottom(): boolean {
     const node = this.thread?.nativeElement;

@@ -22,7 +22,7 @@
     <div>
       <strong>{{ setupOpen && setupMode === 'live_meta' ? 'Live delivery test' : (isMetaSimulation ? 'Real Meta lead · simulated delivery' : 'Safe simulation') }}</strong
       ><small
-        >{{ setupOpen && setupMode === 'live_meta' ? 'One submission creates a test-marked lead and sends a real SMS through Twilio. Carrier charges apply.' : (isMetaSimulation ? 'This lead came from the configured Meta form. Twilio is disabled, so replies stay inside Black Penguin and no SMS is sent.' : 'No SMS is sent. Calendar availability is checked; a real test event is created only when you explicitly request it after booking.') }}</small
+        >{{ setupOpen && setupMode === 'live_meta' ? 'One submission registers the selected lead source and sends a real SMS through the configured provider. Carrier charges apply.' : (isMetaSimulation ? 'This lead came from the configured Meta form. Live SMS is disabled, so replies stay inside Black Penguin and no SMS is sent.' : 'No SMS is sent. Calendar availability is checked; a real test event is created only when you explicitly request it after booking.') }}</small
       >
     </div>
   </div>
@@ -34,13 +34,20 @@
   <section class="setup-card" *ngIf="setupOpen && role !== 'sales'">
     <div class="setup-head">
       <div>
-        <p>{{ setupMode === 'live_meta' ? 'MANUAL META LEAD ADS CONTROL' : 'SIMULATED META LEAD FORM' }}</p>
-        <h2>{{ setupMode === 'live_meta' ? 'Submit a lead and start a real SMS' : 'Create a test lead' }}</h2>
-        <span>{{ setupMode === 'live_meta' ? 'This reproduces one Meta form submission from the control panel; creating the lead and starting SMS remain one action.' : "The form submission starts the agent's first simulated SMS automatically." }}</span>
+        <p>{{ setupMode === 'live_meta' ? 'LIVE LEAD INTAKE' : 'SIMULATED META LEAD FORM' }}</p>
+        <h2>{{ setupMode === 'live_meta' ? 'Register a lead and start SMS' : 'Create a test lead' }}</h2>
+        <span>{{ setupMode === 'live_meta' ? 'Register a manual or Meta lead and start its real SMS conversation in one controlled action.' : "The form submission starts the agent's first simulated SMS automatically." }}</span>
       </div>
       <button (click)="setupOpen = false" *ngIf="selected">×</button>
     </div>
     <div class="setup-grid">
+      <label *ngIf="setupMode === 'live_meta'"
+        >Lead source *<select [(ngModel)]="leadSourceCode" (change)="sourceChanged()">
+          <option *ngFor="let source of leadSources" [value]="source.code">
+            {{ source.label }}
+          </option></select
+        ><small>Meta fields are requested only when Meta Lead Ads is selected.</small></label
+      >
       <label
         >Project *<select [(ngModel)]="projectId" (change)="projectChanged()">
           <option value="" disabled>Select a Project</option>
@@ -49,14 +56,14 @@
           </option></select
         ><small>Only completed and approved Projects are available.</small></label
       >
-      <label
+      <label *ngIf="setupMode === 'simulation' || currentLeadSource?.requires_campaign"
         >Campaign *<select [(ngModel)]="campaignId">
           <option value="" disabled>Select a campaign</option>
           <option *ngFor="let campaign of availableCampaigns" [value]="campaign.id">
             {{ campaign.name }} · {{ campaign.status }}
           </option></select
         ><small *ngIf="!availableCampaigns.length" class="field-error"
-          >{{ setupMode === 'live_meta' ? 'Map at least one campaign to a Meta Lead Form in Project onboarding.' : 'This Project needs a campaign before it can be tested.' }}</small
+          >{{ setupMode === 'live_meta' ? 'Map at least one Meta campaign to a Lead Form in Project onboarding.' : 'This Project needs a campaign before it can be tested.' }}</small
         ></label
       >
       <label
@@ -173,7 +180,7 @@
     <label class="consent" [class.invalid-consent]="!form.consent"
       ><input type="checkbox" [(ngModel)]="form.consent" /><span
         ><b>SMS communication consent *</b
-        ><small>{{ setupMode === 'live_meta' ? 'I confirm that this phone owner consented to receive real test and follow-up SMS messages.' : 'I agree to receive follow-up messages for this simulation.' }}</small></span
+        ><small>{{ setupMode === 'live_meta' ? 'I confirm that this phone owner consented to receive real and follow-up SMS messages.' : 'I agree to receive follow-up messages for this simulation.' }}</small></span
       ></label
     >
     <div class="setup-footer">
@@ -181,7 +188,7 @@
         >Complete all required contact, product, budget and consent fields to start.</span
       ><span class="agent-progress" *ngIf="creating && liveProgress">{{ liveProgress }}</span
       ><button class="primary" (click)="submitLead()" [disabled]="!formComplete || creating">
-        {{ creating ? (setupMode === 'live_meta' ? 'Starting live test…' : 'Creating lead…') : (setupMode === 'live_meta' ? 'Submit once and send real SMS' : 'Submit form and start simulation') }}
+        {{ creating ? (setupMode === 'live_meta' ? 'Registering lead…' : 'Creating lead…') : (setupMode === 'live_meta' ? 'Register lead and send real SMS' : 'Submit form and start simulation') }}
       </button>
     </div>
   </section>

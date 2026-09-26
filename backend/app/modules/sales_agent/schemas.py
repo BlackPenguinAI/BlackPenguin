@@ -57,12 +57,28 @@ class LiveMetaTestCreate(BaseModel):
     lead: SimulationLeadForm
 
 
+class LiveLeadCreate(BaseModel):
+    source_code: str = Field(default="manual", min_length=2, max_length=40, pattern="^[a-z][a-z0-9_]*$")
+    project_id: str
+    campaign_id: str | None = None
+    lead: SimulationLeadForm
+
+
+class LiveLeadSourceOption(BaseModel):
+    code: str
+    label: str
+    requires_campaign: bool
+    campaign_platform: str | None = None
+
+
 class LiveMetaTestResponse(BaseModel):
     lead_id: str
     conversation_id: str
     message_id: str | None = None
     status: str
     replayed: bool = False
+    provider: str | None = None
+    source_code: str | None = None
 
 
 class SimulationApproval(BaseModel):

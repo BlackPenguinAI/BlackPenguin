@@ -1,11 +1,13 @@
 import base64
+import asyncio
 import importlib.util
 import json
 import time
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
+import httpx
 from alembic.migration import MigrationContext
 from alembic.operations import Operations
 from cryptography.hazmat.primitives import serialization
@@ -20,7 +22,7 @@ import app.db.base  # noqa: F401
 from app.core.secret_store import decrypt_secret, encrypt_secret
 from app.db.postgres import Base, get_db
 from app.integrations.messaging_gateway import default_provider, live_provider
-from app.integrations.telnyx_client import validate_telnyx_signature
+from app.integrations.telnyx_client import send_sms as send_telnyx_sms, validate_telnyx_signature
 from app.modules.companies.models import Company
 from app.modules.projects.models import Project
 from app.modules.sales_agent.live_service import get_or_create_live_conversation
@@ -176,6 +178,45 @@ def test_global_and_company_verification_are_independent():
     assert number_kwargs["params"] == {
         "filter[phone_number]": "+13055550142",
         "page[size]": 1,
+    }
+
+
+def test_telnyx_delivery_rejection_is_returned_as_an_actionable_safe_error():
+    db = _db(); _, public_key = _public_key()
+    company = Company(name="Tenant"); db.add(company); db.flush()
+    db.add_all([
+        TelnyxConfig(
+            api_key_ciphertext=encrypt_secret("KEY-valid"), webhook_public_key=public_key,
+            verification_status="verified", live_sms_enabled=True,
+        ),
+        TelnyxCompanyConfig(
+            company_id=company.id, messaging_profile_id="profile-1",
+            from_phone_number="+17865550142", verification_status="verified",
+            live_sms_enabled=True, regulatory_status="approved",
+        ),
+    ]); db.commit()
+    response = httpx.Response(
+        400,
+        json={"errors": [{
+            "code": "40300", "title": "Message rejected",
+            "detail": "The destination is not enabled for international outbound messaging.",
+        }]},
+        headers={"x-request-id": "telnyx-request-1"},
+    )
+    client = AsyncMock()
+    client.__aenter__.return_value = client
+    client.__aexit__.return_value = None
+    client.post.return_value = response
+    with patch("app.integrations.telnyx_client.httpx.AsyncClient", return_value=client):
+        with pytest.raises(HTTPException) as rejected:
+            asyncio.run(send_telnyx_sms(db, company_id=company.id, to="+51999888777", body="Hello"))
+    assert rejected.value.status_code == 422
+    assert rejected.value.detail == {
+        "code": "TELNYX_MESSAGE_REJECTED",
+        "message": "Telnyx rejected the outbound SMS.",
+        "provider_code": "40300",
+        "provider_detail": "The destination is not enabled for international outbound messaging.",
+        "provider_request_id": "telnyx-request-1",
     }
 
 

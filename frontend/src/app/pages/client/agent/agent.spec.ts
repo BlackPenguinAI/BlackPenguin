@@ -1,6 +1,6 @@
 import '@angular/compiler';
-import { of } from 'rxjs';
-import { describe, expect, it } from 'vitest';
+import { of, throwError } from 'rxjs';
+import { describe, expect, it, vi } from 'vitest';
 import { AgentComponent } from './agent';
 
 describe('AgentComponent simulation form', () => {
@@ -47,16 +47,18 @@ describe('AgentComponent simulation form', () => {
     ], products: [] }];
     value.projectId = 'p1';
     value.openSetup('live_meta');
+    value.leadSourceCode = 'meta';
+    value.sourceChanged();
     expect(value.availableCampaigns.map((item) => item.id)).toEqual(['mapped']);
     expect(value.campaignId).toBe('mapped');
   });
 
   it('submits one idempotent request that creates the lead and starts real SMS', () => {
-    const calls: Array<{ url: string; options: any }> = [];
+    const calls: Array<{ url: string; body: any; options: any }> = [];
     const http = {
-      post: (url: string, _body: any, options: any) => {
-        calls.push({ url, options });
-        return of({ conversation_id: 'live-conversation', replayed: false });
+      post: (url: string, body: any, options: any) => {
+        calls.push({ url, body, options });
+        return of({ conversation_id: 'live-conversation', replayed: false, provider: 'telnyx' });
       },
       get: () => of([]),
     };
@@ -69,9 +71,45 @@ describe('AgentComponent simulation form', () => {
     };
     value.startLiveMetaTest();
     expect(calls).toHaveLength(1);
-    expect(calls[0].url.endsWith('/sales-agent/meta-test-leads')).toBe(true);
+    expect(calls[0].url.endsWith('/sales-agent/live-leads')).toBe(true);
+    expect(calls[0].body.source_code).toBe('manual');
+    expect(calls[0].body.campaign_id).toBeNull();
     expect(calls[0].options.headers['Idempotency-Key'].length).toBeGreaterThanOrEqual(16);
+    expect(value.success).toContain('Telnyx');
     expect(value.creating).toBe(false);
+  });
+
+  it('requires a mapped campaign only when the selected source is Meta', () => {
+    const value = component();
+    value.options = [{ id: 'project', campaigns: [], products: [{ id: 'property_type:home' }] }];
+    value.projectId = 'project'; value.openSetup('live_meta');
+    value.form = {
+      first_name: 'Taylor', last_name: 'Morgan', phone: '+13055550142', email: 'taylor@example.com',
+      product_id: 'property_type:home', budget_min: 600000, budget_max: null, consent: true,
+    };
+    expect(value.leadSourceCode).toBe('manual');
+    expect(value.formComplete).toBe(true);
+    value.leadSourceCode = 'meta'; value.sourceChanged();
+    expect(value.formComplete).toBe(false);
+  });
+
+  it('renders the safe Telnyx provider detail instead of a generic Meta error', () => {
+    const http = {
+      post: () => throwError(() => ({ error: { detail: {
+        code: 'TELNYX_MESSAGE_REJECTED', message: 'Telnyx rejected the outbound SMS.',
+        provider_detail: 'The destination is not enabled for international outbound messaging.',
+      } } })),
+    };
+    const value = component(http);
+    value.options = [{ id: 'project', campaigns: [], products: [{ id: 'property_type:home' }] }];
+    value.projectId = 'project'; value.openSetup('live_meta');
+    value.form = {
+      first_name: 'Taylor', last_name: 'Morgan', phone: '+51999888777', email: 'taylor@example.com',
+      product_id: 'property_type:home', budget_min: 600000, budget_max: null, consent: true,
+    };
+    value.startLiveMetaTest();
+    expect(value.error).toContain('international outbound messaging');
+    expect(value.error).not.toContain('Meta test');
   });
 
   it('shows only products from the selected Project and validates the budget range', () => {
@@ -127,6 +165,7 @@ describe('AgentComponent simulation form', () => {
 
   it('deletes only the selected synthetic Agent lead and clears its conversation', () => {
     const calls: string[] = [];
+    const confirmation = vi.spyOn(window, 'confirm').mockReturnValue(true);
     const value = component({ delete: (url: string) => { calls.push(url); return of(null); } });
     value.selected = {
       id: 'conversation-1', simulation_id: 'simulation-1', platform: 'demo_meta_form',
@@ -140,6 +179,7 @@ describe('AgentComponent simulation form', () => {
     expect(value.conversations).toEqual([]);
     expect(value.selected).toBeNull();
     expect(value.success).toContain('synthetic lead');
+    confirmation.mockRestore();
   });
 
   it('never exposes synthetic deletion for a real Meta lead', () => {
