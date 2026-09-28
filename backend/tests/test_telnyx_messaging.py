@@ -13,6 +13,7 @@ from alembic.operations import Operations
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import JSONResponse
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -20,13 +21,14 @@ from sqlalchemy.pool import StaticPool
 
 import app.db.base  # noqa: F401
 from app.core.secret_store import decrypt_secret, encrypt_secret
+from app.core.middleware import MultiTenantMiddleware
 from app.db.postgres import Base, get_db
 from app.integrations.messaging_gateway import default_provider, live_provider
 from app.integrations.telnyx_client import send_sms as send_telnyx_sms, validate_telnyx_signature
 from app.modules.companies.models import Company
 from app.modules.projects.models import Project
 from app.modules.sales_agent.live_service import get_or_create_live_conversation
-from app.modules.sales_agent.models import SalesConversation, SalesMessage
+from app.modules.sales_agent.models import ExternalWebhookEvent, SalesConversation, SalesMessage
 from app.modules.sales_agent.provider_router import telnyx_router
 from app.modules.sales_crm.models import Lead
 from app.modules.system_settings.models import (
@@ -36,6 +38,7 @@ from app.modules.system_settings.schemas import TelnyxCompanyConfigUpdate, Telny
 from app.modules.system_settings.services import (
     telnyx_config_response, update_default_provider, update_telnyx_company_config,
     update_telnyx_config, verify_telnyx_company_config, verify_telnyx_config,
+    telnyx_coverage_snapshot,
 )
 
 
@@ -90,6 +93,39 @@ def test_telnyx_signature_accepts_exact_body_and_rejects_tampering():
     signature = base64.b64encode(private.sign(timestamp.encode() + b"|" + payload)).decode()
     assert validate_telnyx_signature(public_key=public_key, payload=payload, signature=signature, timestamp=timestamp)
     assert not validate_telnyx_signature(public_key=public_key, payload=payload + b" ", signature=signature, timestamp=timestamp)
+
+
+def test_provider_webhooks_bypass_user_jwt_but_other_api_posts_remain_protected():
+    app = FastAPI()
+    app.add_middleware(MultiTenantMiddleware)
+    for path in (
+        "/api/v1/webhooks/telnyx/messaging",
+        "/api/v1/webhooks/twilio/sms",
+        "/api/v1/webhooks/twilio/status",
+    ):
+        app.add_api_route(path, lambda: JSONResponse({"ok": True}), methods=["POST"])
+    app.add_api_route("/api/v1/private", lambda: JSONResponse({"ok": True}), methods=["POST"])
+    client = TestClient(app)
+    assert all(client.post(path).status_code == 200 for path in (
+        "/api/v1/webhooks/telnyx/messaging",
+        "/api/v1/webhooks/twilio/sms",
+        "/api/v1/webhooks/twilio/status",
+    ))
+    assert client.post("/api/v1/private").status_code == 401
+
+
+def test_coverage_marks_us_two_way_and_international_rewrite_as_outbound_only():
+    snapshot = telnyx_coverage_snapshot(
+        {"whitelisted_destinations": ["MX", "PE", "AR"]}, "+17865550142",
+    )
+    rows = {row["country_code"]: row for row in snapshot["destinations"]}
+    assert rows["US"]["conversational"] is True
+    assert rows["US"]["route_identity"] == "numeric_sender"
+    for country in ("MX", "PE", "AR"):
+        assert rows[country]["outbound"] is True
+        assert rows[country]["inbound"] is False
+        assert rows[country]["conversational"] is False
+        assert rows[country]["status"] == "outbound_only"
 
 
 def test_global_verification_rejects_an_invalid_webhook_public_key():
@@ -320,6 +356,48 @@ def test_signed_webhook_routes_by_destination_number_and_company():
     assert message.conversation_id == conversation.id and message.content == "I want a visit"
 
 
+def test_telnyx_finalized_uses_destination_delivery_status_and_is_idempotent():
+    db = _db(); private, public_key = _public_key()
+    db.add(TelnyxConfig(
+        api_key_ciphertext=encrypt_secret("KEY"), webhook_public_key=public_key,
+        verification_status="verified", live_sms_enabled=True,
+    )); db.flush()
+    company, project, lead, _ = _company_project_lead(
+        db, company_name="Tenant", sender_phone="+17865550142", lead_phone="+13055550142",
+    )
+    conversation = SalesConversation(
+        company_id=company.id, project_id=project.id, lead_id=lead.id,
+        channel="sms", provider="telnyx",
+        provider_thread_key="telnyx:+17865550142:+13055550142", is_paused=True,
+    )
+    db.add(conversation); db.flush()
+    message = SalesMessage(
+        conversation_id=conversation.id, channel="sms", direction="outbound", role="assistant",
+        content="Hello", provider_message_id="telnyx-message-1", status="queued",
+    )
+    db.add(message); db.commit()
+    envelope = {"data": {"id": "status-event-1", "event_type": "message.finalized", "payload": {
+        "id": "telnyx-message-1", "errors": [],
+        "to": [{"phone_number": "+13055550142", "status": "delivered"}],
+    }}}
+    body = json.dumps(envelope, separators=(",", ":")).encode()
+    timestamp = str(int(time.time()))
+    signature = base64.b64encode(private.sign(timestamp.encode() + b"|" + body)).decode()
+    app = FastAPI(); app.include_router(telnyx_router, prefix="/webhooks/telnyx")
+    app.dependency_overrides[get_db] = lambda: db
+    client = TestClient(app)
+    headers = {
+        "Content-Type": "application/json",
+        "telnyx-signature-ed25519": signature,
+        "telnyx-timestamp": timestamp,
+    }
+    assert client.post("/webhooks/telnyx/messaging", content=body, headers=headers).status_code == 200
+    assert client.post("/webhooks/telnyx/messaging", content=body, headers=headers).status_code == 200
+    db.refresh(message)
+    assert message.status == "delivered"
+    assert db.query(ExternalWebhookEvent).filter_by(external_event_id="status-event-1").count() == 1
+
+
 def test_tenant_migration_is_repeatable_on_current_schema(monkeypatch):
     path = Path(__file__).parents[1] / "alembic" / "versions" / "20260925_telnyx_company_senders.py"
     spec = importlib.util.spec_from_file_location("telnyx_tenant_migration", path)
@@ -333,6 +411,23 @@ def test_tenant_migration_is_repeatable_on_current_schema(monkeypatch):
         columns = {item["name"] for item in connection.dialect.get_columns(connection, "telnyx_company_configurations")}
     assert "telnyx_company_configurations" in tables
     assert {"company_id", "messaging_profile_id", "from_phone_number", "regulatory_status"}.issubset(columns)
+
+
+def test_sender_capability_migration_is_repeatable(monkeypatch):
+    path = Path(__file__).parents[1] / "alembic" / "versions" / "20260928_telnyx_sender_capabilities.py"
+    spec = importlib.util.spec_from_file_location("telnyx_capability_migration", path)
+    assert spec and spec.loader
+    migration = importlib.util.module_from_spec(spec); spec.loader.exec_module(migration)
+    engine = create_engine("sqlite://"); Base.metadata.create_all(engine)
+    with engine.begin() as connection:
+        monkeypatch.setattr(migration, "op", Operations(MigrationContext.configure(connection)))
+        migration.upgrade(); migration.upgrade()
+        columns = {
+            item["name"] for item in connection.dialect.get_columns(
+                connection, "telnyx_company_configurations",
+            )
+        }
+    assert {"sender_country_code", "coverage_snapshot", "coverage_checked_at"}.issubset(columns)
 
 
 def test_twilio_remains_default_for_existing_installations():

@@ -108,6 +108,9 @@ class TelnyxCompanyConfigSchema(BaseModel):
     messaging_profile_id: Optional[str] = None
     from_phone_number: Optional[str] = None
     telnyx_phone_number_id: Optional[str] = None
+    sender_country_code: Optional[str] = None
+    coverage_snapshot: dict = Field(default_factory=dict)
+    coverage_checked_at: Optional[datetime] = None
     regulatory_status: Literal["pending", "approved", "not_required"] = "pending"
     live_sms_enabled: bool = False
     verification_status: str = "not_configured"

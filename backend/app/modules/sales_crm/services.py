@@ -215,24 +215,54 @@ def get_lead_detail(db: Session, lead_id: str, company_id: str, sales_user_id: s
     }
 
 def update_lead(db: Session, lead_id: str, company_id: str, payload: LeadUpdate, actor_id: str | None = None, sales_user_id: str | None = None) -> Lead:
-    query = db.query(Lead).filter(Lead.id == lead_id, Lead.company_id == company_id)
+    query = db.query(Lead).filter(
+        Lead.id == lead_id, Lead.company_id == company_id, Lead.deleted_at.is_(None),
+    )
     if sales_user_id:
         query = query.filter(Lead.assigned_sales_user_id == sales_user_id)
     lead = query.first()
     if not lead:
         raise HTTPException(status_code=404, detail="Prospecto no encontrado.")
     
-    previous = lead.funnel_stage.value if hasattr(lead.funnel_stage, "value") else str(lead.funnel_stage)
-    lead.funnel_stage = payload.funnel_stage
-    lead.stage_changed_at = datetime.utcnow()
-    db.add(LeadStageHistory(
-        lead_id=lead.id,
-        from_stage=previous,
-        to_stage=payload.funnel_stage.value,
-        actor_type="user",
-        actor_id=actor_id,
-        reason="Manual CRM update",
-    ))
+    values = payload.model_dump(exclude_unset=True)
+    next_stage = values.pop("funnel_stage", None)
+    raw_phone = values.get("phone")
+    if "phone" in values and (not isinstance(raw_phone, str) or not raw_phone.strip()):
+        raise HTTPException(status_code=422, detail="Phone is required.")
+    if "phone" in values and raw_phone.strip() != lead.phone.strip():
+        # Re-keying a physical SMS thread would mix identity and opt-out history.
+        # Administrators must anonymize the old record and create a new lead.
+        from app.modules.sales_agent.models import SalesConversation
+        if db.query(SalesConversation).filter(
+            SalesConversation.lead_id == lead.id,
+        ).first():
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "The phone cannot be changed after an SMS conversation starts. "
+                    "Anonymize this Lead and create a new one with the correct number."
+                ),
+            )
+    for field in ("full_name", "phone", "email", "preferred_channel"):
+        if field in values:
+            value = values[field]
+            if isinstance(value, str):
+                value = value.strip() or None
+            if field in {"full_name", "phone"} and not value:
+                raise HTTPException(status_code=422, detail=f"{field.replace('_', ' ').title()} is required.")
+            setattr(lead, field, value)
+    if next_stage is not None:
+        previous = lead.funnel_stage.value if hasattr(lead.funnel_stage, "value") else str(lead.funnel_stage)
+        lead.funnel_stage = next_stage
+        lead.stage_changed_at = datetime.utcnow()
+        db.add(LeadStageHistory(
+            lead_id=lead.id,
+            from_stage=previous,
+            to_stage=next_stage.value,
+            actor_type="user",
+            actor_id=actor_id,
+            reason="Manual CRM update",
+        ))
     db.commit()
     db.refresh(lead)
     return lead

@@ -19,6 +19,20 @@ interface TelnyxCompanySender {
   messaging_profile_id: string;
   from_phone_number: string;
   telnyx_phone_number_id: string;
+  sender_country_code?: string | null;
+  coverage_snapshot?: {
+    note?: string;
+    destinations?: Array<{
+      country_code: string;
+      country_name: string;
+      outbound: boolean;
+      inbound: boolean;
+      conversational: boolean;
+      route_identity: string;
+      status: string;
+    }>;
+  };
+  coverage_checked_at?: string | null;
   regulatory_status: RegulatoryStatus;
   live_sms_enabled: boolean;
   verification_status: string;
@@ -77,6 +91,7 @@ export class MessagingSettingsPageComponent implements OnInit {
           messaging_profile_id: item.messaging_profile_id || '',
           from_phone_number: item.from_phone_number || '',
           telnyx_phone_number_id: item.telnyx_phone_number_id || '',
+          coverage_snapshot: item.coverage_snapshot || {},
           last_error: item.last_error || '',
         }));
         if (!this.selectedCompanyId || !this.telnyxCompanies.some(item => item.company_id === this.selectedCompanyId)) {

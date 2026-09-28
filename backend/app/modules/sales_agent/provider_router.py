@@ -26,7 +26,7 @@ telnyx_router = APIRouter()
 def _record_inbound(
     db: Session, *, provider: str, event_id: str, to_number: str, from_number: str,
     body: str, payload: dict, background_tasks: BackgroundTasks,
-    expected_company_id: str | None = None,
+    expected_company_id: str | None = None, provider_message_id: str | None = None,
 ):
     if db.query(ExternalWebhookEvent).filter(
         ExternalWebhookEvent.platform == provider,
@@ -41,7 +41,7 @@ def _record_inbound(
         event.processed_at = datetime.utcnow(); db.commit(); return
     message = SalesMessage(
         conversation_id=conversation.id, channel="sms", direction="inbound", role="user",
-        content=body, provider_message_id=event_id, status="received",
+        content=body, provider_message_id=provider_message_id or event_id, status="received",
         metadata_json={"provider": provider, "from": from_number, "to": to_number},
     )
     db.add(message); event.status = "processed"; event.processed_at = datetime.utcnow()
@@ -64,6 +64,18 @@ def _apply_status(db: Session, *, provider: str, message_id: str, status: str, e
         outbound.status = status; outbound.last_error = error
     if message or outbound:
         db.commit()
+
+
+def _status_from_telnyx(event_type: str, payload: dict) -> str:
+    """Return the delivery state, not Telnyx's generic event lifecycle name."""
+    destinations = payload.get("to") or []
+    destination_statuses = [
+        str(item.get("status") or "").strip().lower()
+        for item in destinations if isinstance(item, dict) and item.get("status")
+    ]
+    if destination_statuses:
+        return destination_statuses[0]
+    return event_type.removeprefix("message.") or "queued"
 
 
 def _validate_twilio(request: Request, params: dict[str, str], signature: str | None, db: Session):
@@ -114,6 +126,11 @@ async def telnyx_messaging_webhook(request: Request, background_tasks: Backgroun
         event_id = str(data["id"]); event_type = str(data["event_type"])
     except (KeyError, TypeError, ValueError) as exc:
         raise HTTPException(status_code=422, detail="Invalid Telnyx webhook payload.") from exc
+    if db.query(ExternalWebhookEvent).filter(
+        ExternalWebhookEvent.platform == "telnyx",
+        ExternalWebhookEvent.external_event_id == event_id,
+    ).first():
+        return {"status": "accepted"}
     if event_type == "message.received":
         destinations = payload.get("to") or []
         to_number = str((destinations[0] if destinations else {}).get("phone_number") or "")
@@ -123,17 +140,29 @@ async def telnyx_messaging_webhook(request: Request, background_tasks: Backgroun
         if not company_config or not from_number:
             raise HTTPException(status_code=422, detail="Invalid Telnyx message payload.")
         _record_inbound(
-            db, provider="telnyx", event_id=message_id, to_number=to_number,
+            db, provider="telnyx", event_id=event_id, to_number=to_number,
             from_number=from_number, body=str(payload.get("text") or ""),
             payload=envelope, background_tasks=background_tasks,
             expected_company_id=company_config.company_id,
+            provider_message_id=message_id,
         )
     elif event_type.startswith("message."):
+        event = ExternalWebhookEvent(
+            platform="telnyx", external_event_id=event_id,
+            event_type=event_type, payload_json=envelope,
+            status="processed", processed_at=datetime.utcnow(),
+        )
+        db.add(event)
         message_id = str(payload.get("id") or "")
         if message_id:
             errors = payload.get("errors") or []
             error = str(errors[0].get("detail") or errors[0].get("code")) if errors else None
-            _apply_status(db, provider="telnyx", message_id=message_id, status=event_type.removeprefix("message."), error=error)
+            _apply_status(
+                db, provider="telnyx", message_id=message_id,
+                status=_status_from_telnyx(event_type, payload), error=error,
+            )
+        else:
+            db.commit()
     return {"status": "accepted"}
 
 

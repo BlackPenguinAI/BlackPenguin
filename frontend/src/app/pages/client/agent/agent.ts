@@ -46,6 +46,7 @@ export class AgentComponent implements OnInit, OnDestroy {
   private liveSubmissionKey = '';
   private conversationPollTimer?: ReturnType<typeof setTimeout>;
   private conversationPolling = false;
+  private messagePolling = false;
   private conversationPollingEnabled = false;
   private knownConversationIds = new Set<string>();
   private conversationSnapshotReady = false;
@@ -260,7 +261,10 @@ export class AgentComponent implements OnInit, OnDestroy {
           this.select(incoming);
         } else {
           const current = rows.find((row) => row.id === this.selected?.id);
-          if (current) this.selected = current;
+          if (current) {
+            this.selected = current;
+            this.refreshMessages(false, true);
+          }
         }
         this.cdr.markForCheck();
       },
@@ -444,13 +448,19 @@ export class AgentComponent implements OnInit, OnDestroy {
       });
   }
 
-  refreshMessages(forceBottom = false): void {
-    if (!this.selected?.id) return;
+  refreshMessages(forceBottom = false, silent = false): void {
+    if (!this.selected?.id || this.messagePolling) return;
     const conversationId = this.selected.id;
     const stayAtBottom = forceBottom || this.isNearBottom();
-    this.loadingMessages = true;
+    this.messagePolling = true;
+    if (!silent) this.loadingMessages = true;
     this.http
       .get<any[]>(`${API_V1_URL}/sales-agent/conversations/${conversationId}/messages`)
+      .pipe(finalize(() => {
+        this.messagePolling = false;
+        if (!silent) this.loadingMessages = false;
+        this.cdr.markForCheck();
+      }))
       .subscribe({
         next: (rows) => {
           if (this.selected?.id !== conversationId) return;
@@ -461,13 +471,11 @@ export class AgentComponent implements OnInit, OnDestroy {
             const byDirection = (a.direction === 'inbound' ? 0 : 1) - (b.direction === 'inbound' ? 0 : 1);
             return byTime || byDirection || String(a.id).localeCompare(String(b.id));
           });
-          this.loadingMessages = false;
           this.cdr.markForCheck();
           if (stayAtBottom) setTimeout(() => this.scrollEnd());
         },
         error: () => {
-          this.loadingMessages = false;
-          this.error = 'The conversation could not be loaded.';
+          if (!silent) this.error = 'The conversation could not be loaded.';
           this.cdr.markForCheck();
         },
       });

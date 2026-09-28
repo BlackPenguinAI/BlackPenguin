@@ -51,6 +51,44 @@ ATTACHMENT_RULES = {
 }
 
 
+def _anonymize_lead(
+    db: Session, *, lead_id: str, company_id: str, payload: DeletePayload,
+    current_user: User, request: Request,
+) -> None:
+    lead = db.query(Lead).filter(
+        Lead.id == lead_id, Lead.company_id == company_id, Lead.deleted_at.is_(None),
+    ).with_for_update().first()
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found.")
+    if payload.confirmation.strip().casefold() != lead.full_name.strip().casefold():
+        raise HTTPException(status_code=422, detail="Type the lead's full name exactly to confirm deletion.")
+    conversations = db.query(SalesConversation).filter(SalesConversation.lead_id == lead.id).all()
+    conversation_ids = [item.id for item in conversations]
+    if conversation_ids:
+        db.query(SalesFollowUpJob).filter(
+            SalesFollowUpJob.conversation_id.in_(conversation_ids),
+            SalesFollowUpJob.status.in_(["pending", "processing"]),
+        ).update({SalesFollowUpJob.status: "cancelled"}, synchronize_session=False)
+    for conversation in conversations:
+        conversation.is_paused = True
+        conversation.pause_reason = "Lead deleted by an authorized administrator"
+    db.query(SalesAssetShare).filter(SalesAssetShare.lead_id == lead.id).update(
+        {SalesAssetShare.revoked: True}, synchronize_session=False,
+    )
+    original_name = lead.full_name
+    lead.deleted_at = datetime.utcnow(); lead.deleted_by_user_id = current_user.id; lead.deletion_reason = payload.reason
+    lead.full_name = "Deleted lead"; lead.phone = f"deleted-{lead.id}"; lead.email = None
+    lead.channel_address = None; lead.external_lead_id = None; lead.meta_form_data = {}
+    lead.qualification_summary = None; lead.visit_recommendations = None
+    lead.agent_status = "deleted"; lead.next_action_at = None
+    record_platform_event(
+        db, actor=current_user, event_type="LEAD_DELETED", entity_type="lead",
+        entity_id=lead.id, company_id=company_id, reason=payload.reason,
+        payload={"name_hash": hashlib.sha256(original_name.encode()).hexdigest()}, request=request,
+    )
+    db.commit()
+
+
 @router.get("/public/meetings/{meeting_id}.ics")
 def public_calendar_invite(meeting_id: str, token: str, db: Session = Depends(get_db)):
     try:
@@ -165,37 +203,23 @@ def delete_platform_lead(
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN])),
 ):
-    lead = db.query(Lead).filter(
-        Lead.id == lead_id, Lead.company_id == company_id, Lead.deleted_at.is_(None),
-    ).with_for_update().first()
-    if not lead:
-        raise HTTPException(status_code=404, detail="Lead not found.")
-    if payload.confirmation.strip().casefold() != lead.full_name.strip().casefold():
-        raise HTTPException(status_code=422, detail="Type the lead's full name exactly to confirm deletion.")
-    conversations = db.query(SalesConversation).filter(SalesConversation.lead_id == lead.id).all()
-    conversation_ids = [item.id for item in conversations]
-    if conversation_ids:
-        db.query(SalesFollowUpJob).filter(
-            SalesFollowUpJob.conversation_id.in_(conversation_ids),
-            SalesFollowUpJob.status.in_(["pending", "processing"]),
-        ).update({SalesFollowUpJob.status: "cancelled"}, synchronize_session=False)
-    for conversation in conversations:
-        conversation.is_paused = True; conversation.pause_reason = "Lead deleted by Black Penguin administrator"
-    db.query(SalesAssetShare).filter(SalesAssetShare.lead_id == lead.id).update(
-        {SalesAssetShare.revoked: True}, synchronize_session=False,
+    _anonymize_lead(
+        db, lead_id=lead_id, company_id=company_id, payload=payload,
+        current_user=current_user, request=request,
     )
-    original_name = lead.full_name
-    lead.deleted_at = datetime.utcnow(); lead.deleted_by_user_id = current_user.id; lead.deletion_reason = payload.reason
-    lead.full_name = "Deleted lead"; lead.phone = f"deleted-{lead.id}"; lead.email = None
-    lead.channel_address = None; lead.external_lead_id = None; lead.meta_form_data = {}
-    lead.qualification_summary = None; lead.visit_recommendations = None
-    lead.agent_status = "deleted"; lead.next_action_at = None
-    record_platform_event(
-        db, actor=current_user, event_type="LEAD_DELETED", entity_type="lead",
-        entity_id=lead.id, company_id=company_id, reason=payload.reason,
-        payload={"name_hash": hashlib.sha256(original_name.encode()).hexdigest()}, request=request,
+    return {"detail": "Lead anonymized, automation paused and shared links revoked."}
+
+
+@router.delete("/leads/{lead_id}")
+def delete_company_lead(
+    lead_id: str, payload: DeletePayload, request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker(TENANT_MANAGER_ROLES)),
+):
+    _anonymize_lead(
+        db, lead_id=lead_id, company_id=current_user.company_id, payload=payload,
+        current_user=current_user, request=request,
     )
-    db.commit()
     return {"detail": "Lead anonymized, automation paused and shared links revoked."}
 
 
@@ -299,6 +323,8 @@ def update_lead_status(
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.SALES]))
 ):
+    if current_user.role == UserRole.SALES and payload.model_fields_set - {"funnel_stage"}:
+        raise HTTPException(status_code=403, detail="Sales users can update only the funnel stage.")
     return services.update_lead(
         db, lead_id, current_user.company_id, payload, current_user.id,
         current_user.id if current_user.role == UserRole.SALES else None,

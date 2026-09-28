@@ -23,6 +23,13 @@ META_OAUTH_SCOPES = [
     "pages_manage_metadata", "pages_manage_ads", "leads_retrieval", "ads_read",
 ]
 
+TELNYX_COVERAGE_COUNTRIES = {
+    "US": "United States",
+    "MX": "Mexico",
+    "PE": "Peru",
+    "AR": "Argentina",
+}
+
 
 def meta_oauth_scopes(config: MetaPlatformConfig) -> list[str]:
     """Return configured scopes plus permissions required by this release."""
@@ -171,6 +178,62 @@ def _normalize_e164(value: str | None) -> str | None:
     if not re.fullmatch(r"\+[1-9]\d{7,14}", compact):
         raise HTTPException(status_code=422, detail="From Phone Number must use E.164 format.")
     return compact
+
+
+def _country_from_e164(phone_number: str) -> str | None:
+    number = _normalize_e164(phone_number)
+    if number and number.startswith("+1"):
+        return "US"
+    for prefix, country in (("+52", "MX"), ("+51", "PE"), ("+54", "AR")):
+        if number and number.startswith(prefix):
+            return country
+    return None
+
+
+def _telnyx_whitelisted_destinations(profile: dict) -> set[str]:
+    values = profile.get("whitelisted_destinations") or []
+    destinations: set[str] = set()
+    for value in values:
+        code = value.get("country_code") if isinstance(value, dict) else value
+        if isinstance(code, str) and len(code.strip()) == 2:
+            destinations.add(code.strip().upper())
+    return destinations
+
+
+def telnyx_coverage_snapshot(profile: dict, from_phone_number: str) -> dict:
+    """Calculate routing expectations without claiming an untested delivery path."""
+    sender_country = _country_from_e164(from_phone_number)
+    whitelisted = _telnyx_whitelisted_destinations(profile)
+    rows = []
+    for country, label in TELNYX_COVERAGE_COUNTRIES.items():
+        domestic = sender_country == country
+        outbound = domestic or country in whitelisted
+        inbound = domestic
+        conversational = domestic
+        if not outbound:
+            status = "not_enabled"
+        elif conversational:
+            status = "two_way_configured"
+        else:
+            status = "outbound_only"
+        rows.append({
+            "country_code": country,
+            "country_name": label,
+            "outbound": outbound,
+            "inbound": inbound,
+            "conversational": conversational,
+            "route_identity": "numeric_sender" if domestic else "provider_rewrite_possible",
+            "status": status,
+        })
+    return {
+        "version": 1,
+        "sender_country_code": sender_country,
+        "destinations": rows,
+        "note": (
+            "International delivery may replace the sender identity. Only a stable local "
+            "two-way route should be treated as conversational."
+        ),
+    }
 
 def update_twilio_config(db: Session, payload: TwilioConfigUpdate) -> TwilioConfig:
     config = get_twilio_config(db)
@@ -384,6 +447,9 @@ def telnyx_company_config_response(company: Company, config: TelnyxCompanyConfig
         "messaging_profile_id": config.messaging_profile_id if config else None,
         "from_phone_number": config.from_phone_number if config else None,
         "telnyx_phone_number_id": config.telnyx_phone_number_id if config else None,
+        "sender_country_code": config.sender_country_code if config else None,
+        "coverage_snapshot": (config.coverage_snapshot or {}) if config else {},
+        "coverage_checked_at": config.coverage_checked_at if config else None,
         "regulatory_status": (config.regulatory_status or "pending") if config else "pending",
         "live_sms_enabled": bool(config.live_sms_enabled) if config else False,
         "verification_status": (config.verification_status or "not_configured") if config else "not_configured",
@@ -442,6 +508,9 @@ def update_telnyx_company_config(db: Session, company_id: str, payload: TelnyxCo
         config.verification_status = "pending"
         config.verified_at = None
         config.last_error = None
+        config.sender_country_code = None
+        config.coverage_snapshot = {}
+        config.coverage_checked_at = None
     db.commit(); db.refresh(config)
     return config
 
@@ -483,6 +552,9 @@ def verify_telnyx_company_config(db: Session, company_id: str) -> TelnyxCompanyC
         remote_number_id = matches[0].get("id")
         if remote_number_id:
             config.telnyx_phone_number_id = str(remote_number_id)
+        config.sender_country_code = _country_from_e164(config.from_phone_number)
+        config.coverage_snapshot = telnyx_coverage_snapshot(profile, config.from_phone_number)
+        config.coverage_checked_at = datetime.utcnow()
     except HTTPException as exc:
         config.live_sms_enabled = False
         config.verification_status = "failed"; config.last_error = str(exc.detail)[:500]

@@ -41,6 +41,14 @@ class MultiTenantMiddleware(BaseHTTPMiddleware):
             request.method in {"GET", "POST"}
             and path == f"{settings.API_V1_STR}/webhooks/meta"
         )
+        # Messaging providers cannot present a Black Penguin user JWT. These
+        # exact POST routes remain protected by the provider signature checks
+        # implemented in the webhook routers themselves.
+        is_messaging_provider_webhook = request.method == "POST" and path in {
+            f"{settings.API_V1_STR}/webhooks/telnyx/messaging",
+            f"{settings.API_V1_STR}/webhooks/twilio/sms",
+            f"{settings.API_V1_STR}/webhooks/twilio/status",
+        }
         is_public_calendar_invite = (
             request.method == "GET"
             and path.startswith(f"{settings.API_V1_STR}/sales/public/meetings/")
@@ -68,6 +76,7 @@ class MultiTenantMiddleware(BaseHTTPMiddleware):
             or is_google_calendar_callback
             or is_meta_oauth_callback
             or is_meta_webhook
+            or is_messaging_provider_webhook
             or is_public_calendar_invite
             or is_public_firebase_action
         ):

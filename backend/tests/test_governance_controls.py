@@ -26,7 +26,10 @@ from app.modules.users.router import delete_platform_user, set_platform_user_sta
 from app.modules.projects.asset_share_service import record_access
 from app.modules.projects.models import Project, ProjectOnboardingSource, ProjectSourceKind, SalesAssetShare
 from app.modules.sales_crm.models import Lead, Meeting, MeetingStatus
-from app.modules.sales_crm.router import delete_platform_lead
+from app.modules.sales_crm.router import delete_company_lead, delete_platform_lead
+from app.modules.sales_crm.schemas import LeadUpdate
+from app.modules.sales_crm.services import update_lead
+from app.modules.sales_agent.models import SalesConversation
 
 
 @pytest.fixture()
@@ -155,6 +158,48 @@ def test_superadmin_lead_deletion_is_tenant_scoped_and_stops_automation(db):
     assert lead.agent_status == "deleted"
     assert lead.email is None
     assert lead.full_name == "Deleted lead"
+
+
+def test_company_admin_can_correct_and_anonymize_only_its_own_lead(db):
+    company, admin = _tenant(db)
+    other = Company(name="Other Company", is_active=True)
+    project = Project(company_id=company.id, name="Project")
+    db.add_all([other, project]); db.flush()
+    lead = Lead(
+        company_id=company.id, project_id=project.id, full_name="Original Name",
+        phone="+15550002222", email="old@example.com", agent_status="active",
+    )
+    db.add(lead); db.commit()
+
+    updated = update_lead(
+        db, lead.id, company.id,
+        LeadUpdate(full_name="Correct Name", email="new@example.com", preferred_channel="sms"),
+        actor_id=admin.id,
+    )
+    assert updated.full_name == "Correct Name"
+    assert updated.email == "new@example.com"
+
+    db.add(SalesConversation(
+        company_id=company.id, project_id=project.id, lead_id=lead.id,
+        provider="telnyx", channel="sms",
+        provider_thread_key="telnyx:+17865550142:+15550002222",
+    )); db.commit()
+    with pytest.raises(HTTPException) as unsafe_rekey:
+        update_lead(
+            db, lead.id, company.id, LeadUpdate(phone="+15550003333"),
+            actor_id=admin.id,
+        )
+    assert unsafe_rekey.value.status_code == 409
+
+    delete_company_lead(
+        lead.id,
+        DeletePayload(reason="Customer deletion request", confirmation="Correct Name"),
+        None, db, admin,
+    )
+    db.refresh(lead)
+    assert lead.deleted_at is not None
+    assert lead.agent_status == "deleted"
+    assert lead.email is None
 
 
 def test_legal_acceptance_is_versioned_and_requires_the_current_snapshot(db):

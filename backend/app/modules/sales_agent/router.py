@@ -259,13 +259,14 @@ async def simulate(
 def conversations(
     project_id: str | None = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.MKT])),
+    current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.MKT, UserRole.SALES])),
 ):
     if project_id:
         require_project_access(db, current_user, project_id)
     return conversation_summaries(
         db, company_id=current_user.company_id, project_id=project_id,
-        sales_user_id=None, allowed_project_ids=project_ids_for_user(db, current_user),
+        sales_user_id=current_user.id if current_user.role == UserRole.SALES else None,
+        allowed_project_ids=project_ids_for_user(db, current_user),
     )
 
 
@@ -273,7 +274,7 @@ def conversations(
 def messages(
     conversation_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.MKT])),
+    current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.MKT, UserRole.SALES])),
 ):
     conversation = db.query(SalesConversation).filter(
         SalesConversation.id == conversation_id,
@@ -284,7 +285,7 @@ def messages(
     require_project_access(db, current_user, conversation.project_id)
     return conversation_messages(
         db, company_id=current_user.company_id, conversation_id=conversation_id,
-        sales_user_id=None,
+        sales_user_id=current_user.id if current_user.role == UserRole.SALES else None,
     )
 
 

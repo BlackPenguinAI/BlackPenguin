@@ -19,6 +19,8 @@ export class LeadsComponent implements OnInit, OnDestroy {
   companies: any[] = []; companyId = ''; deleting = false; deleteReason = ''; deleteConfirmation = '';
   projectId = ''; tier = ''; segment = ''; stage = ''; search = '';
   loading = true; detailLoading = false; exporting = false; downloadingSource = false; error = '';
+  editing = false; savingLead = false;
+  leadDraft = { full_name: '', phone: '', email: '', preferred_channel: 'sms', funnel_stage: 'new' };
   private pollTimer?: ReturnType<typeof setTimeout>;
   private polling = false;
   private pollingEnabled = false;
@@ -30,6 +32,7 @@ export class LeadsComponent implements OnInit, OnDestroy {
   readonly stages = ['S00_CAPTURE','S01_RESEARCH','S02_QUALIFICATION','S03_PROBLEM_SOLUTION','S04_SCORING','S05_SEGMENTATION','S06_NURTURE','S07_OBJECTION','S08_APPOINTMENT','S09_HANDOFF'];
   constructor(private http: HttpClient, private cdr: ChangeDetectorRef, private router: Router, private route?: ActivatedRoute) {}
   readonly isSuperadmin = typeof localStorage !== 'undefined' && localStorage.getItem('bp_role') === 'superadmin';
+  readonly canMaintainLeads = typeof localStorage !== 'undefined' && ['admin', 'assistant'].includes(localStorage.getItem('bp_role') || '');
   ngOnInit(): void {
     this.pollingEnabled = true;
     this.requestedLeadId = this.route?.snapshot.queryParamMap.get('lead') || '';
@@ -55,7 +58,7 @@ export class LeadsComponent implements OnInit, OnDestroy {
     const endpoint = this.isSuperadmin ? `${API_V1_URL}/sales/admin/leads?${params}` : `${API_V1_URL}/sales/leads?${params}`;
     this.http.get<any[]>(endpoint).subscribe({ next: rows => { this.leads = rows || []; this.rememberLeads(this.leads); this.loading = false; if (this.requestedLeadId && this.leads.some(item => item.id === this.requestedLeadId)) { const id = this.requestedLeadId; this.requestedLeadId = ''; this.loadDetail(id, false); } this.cdr.markForCheck(); this.schedulePoll(); }, error: err => { this.loading = false; this.error = err.error?.detail?.message || err.error?.detail || 'Leads could not be loaded.'; this.cdr.markForCheck(); this.schedulePoll(); } });
   }
-  open(lead: any): void { this.pendingMetaLeadId = ''; this.loadDetail(lead.id, false); }
+  open(lead: any): void { this.pendingMetaLeadId = ''; this.editing = false; this.loadDetail(lead.id, false); }
 
   private schedulePoll(): void {
     if (!this.pollingEnabled) return;
@@ -100,6 +103,10 @@ export class LeadsComponent implements OnInit, OnDestroy {
     this.http.get<any>(endpoint).subscribe({
       next: row => {
         this.selected = row;
+        this.leadDraft = {
+          full_name: row.full_name || '', phone: row.phone || '', email: row.email || '',
+          preferred_channel: row.preferred_channel || 'sms', funnel_stage: row.funnel_stage || 'new',
+        };
         this.detailLoading = false;
         if (openConversation && row.conversation_id) {
           this.pendingMetaLeadId = '';
@@ -200,13 +207,34 @@ export class LeadsComponent implements OnInit, OnDestroy {
   }
 
   deleteLead(): void {
-    if (!this.isSuperadmin || !this.selected?.id || !this.deleteReason.trim() || this.deleteConfirmation !== this.selected.full_name) return;
+    if ((!this.isSuperadmin && !this.canMaintainLeads) || !this.selected?.id || !this.deleteReason.trim() || this.deleteConfirmation !== this.selected.full_name) return;
     this.deleting = true; this.error = '';
-    this.http.delete(`${API_V1_URL}/sales/admin/leads/${this.selected.id}?company_id=${encodeURIComponent(this.companyId)}`, {
+    const endpoint = this.isSuperadmin
+      ? `${API_V1_URL}/sales/admin/leads/${this.selected.id}?company_id=${encodeURIComponent(this.companyId)}`
+      : `${API_V1_URL}/sales/leads/${this.selected.id}`;
+    this.http.delete(endpoint, {
       body: { reason: this.deleteReason.trim(), confirmation: this.deleteConfirmation },
     }).subscribe({
       next: () => { this.deleting = false; this.selected = null; this.deleteReason = ''; this.deleteConfirmation = ''; this.reload(); },
       error: err => { this.deleting = false; this.error = err.error?.detail?.message || err.error?.detail || 'The lead could not be deleted.'; this.cdr.markForCheck(); },
+    });
+  }
+
+  saveLead(): void {
+    if (!this.canMaintainLeads || !this.selected?.id || this.savingLead) return;
+    this.savingLead = true; this.error = '';
+    this.http.put<any>(`${API_V1_URL}/sales/leads/${this.selected.id}`, {
+      full_name: this.leadDraft.full_name.trim(), phone: this.leadDraft.phone.trim(),
+      email: this.leadDraft.email.trim() || null,
+      preferred_channel: this.leadDraft.preferred_channel,
+      funnel_stage: this.leadDraft.funnel_stage,
+    }).pipe(finalize(() => { this.savingLead = false; this.cdr.markForCheck(); })).subscribe({
+      next: row => {
+        this.selected = { ...this.selected, ...row };
+        this.leads = this.leads.map(item => item.id === row.id ? { ...item, ...row } : item);
+        this.editing = false;
+      },
+      error: err => { this.error = err.error?.detail || 'The Lead Record could not be updated.'; },
     });
   }
 

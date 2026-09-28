@@ -37,6 +37,10 @@ aside p { color: #aaa; line-height: 1.5; font-size: 12px; }
 .data-tree span { color: #777; }.data-tree strong { color: #ddd; font-weight: 500; word-break: break-word; }
 .data-tree > div.group { grid-template-columns: 1fr auto; margin-top: 5px; border-bottom-color: #302710; }
 .data-tree > div.group span { color: #d0a532; font-weight: 700; }.data-tree > div.group strong { color: #777; }
+.edit-grid label { display: grid; gap: 6px; margin-bottom: 8px; }
+.edit-grid label span { color: #777; font-size: 9px; letter-spacing: .12em; text-transform: uppercase; }
+.edit-grid input, .edit-grid select { width: 100%; border: 1px solid #303030; border-radius: 8px; background: #090909; color: #fff; padding: 10px; outline: none; }
+.edit-grid input:focus, .edit-grid select:focus { border-color: #e9ad00; }
 .loading, .empty, .choose { padding: 40px; color: #777; }
 .notice { padding: 10px; background: #2a0d0d; color: #ffaaaa; border-radius: 9px; margin: 12px 0; }
 .danger-zone { border: 1px solid rgba(248,113,113,.25) !important; border-radius: 10px; background: rgba(127,29,29,.08); padding: 14px; }

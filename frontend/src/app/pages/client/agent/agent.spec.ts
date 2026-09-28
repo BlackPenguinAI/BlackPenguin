@@ -163,6 +163,22 @@ describe('AgentComponent simulation form', () => {
     expect(value.success).toContain('New Meta lead received');
   });
 
+  it('refreshes the selected message thread while polling conversation summaries', () => {
+    const conversation = { id: 'live-conversation', lead_id: 'lead', platform: 'manual', channel: 'sms' };
+    const inbound = { id: 'inbound-1', direction: 'inbound', content: 'Hello', created_at: '2026-09-27T00:11:28Z' };
+    const http = {
+      get: (url: string) => url.includes('/messages') ? of([inbound]) : of([conversation]),
+    };
+    const value = component(http);
+    value.selected = conversation;
+    (value as any).conversationSnapshotReady = true;
+    (value as any).knownConversationIds = new Set(['live-conversation']);
+
+    (value as any).pollConversations();
+
+    expect(value.messages).toEqual([inbound]);
+  });
+
   it('deletes only the selected synthetic Agent lead and clears its conversation', () => {
     const calls: string[] = [];
     const confirmation = vi.spyOn(window, 'confirm').mockReturnValue(true);

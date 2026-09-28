@@ -56,12 +56,24 @@
       <div class="detail-head">
         <span><small>LEAD RECORD · {{leadKind(selected)}}</small><h2>{{selected.full_name}}</h2></span>
         <div class="detail-actions">
+          <button *ngIf="canMaintainLeads" (click)="editing=!editing">{{editing ? 'CANCEL EDIT' : 'EDIT LEAD'}}</button>
           <button *ngIf="!isSuperadmin" (click)="downloadSourceData()" [disabled]="downloadingSource">
             {{downloadingSource ? 'DOWNLOADING…' : 'DOWNLOAD JSON'}}
           </button>
           <a *ngIf="selected.conversation_id && !isSuperadmin" routerLink="/app/agent" [queryParams]="{project:selected.project_id,lead:selected.id}">OPEN AGENT</a>
         </div>
       </div>
+      <section *ngIf="editing && canMaintainLeads">
+        <h3>Maintain Lead Record</h3>
+        <div class="data-tree edit-grid">
+          <label><span>Full name</span><input [(ngModel)]="leadDraft.full_name" maxlength="150"></label>
+          <label><span>Phone (E.164)</span><input [(ngModel)]="leadDraft.phone" maxlength="50"></label>
+          <label><span>Email</span><input [(ngModel)]="leadDraft.email" type="email" maxlength="150"></label>
+          <label><span>Preferred channel</span><select [(ngModel)]="leadDraft.preferred_channel"><option value="sms">SMS</option><option value="email">Email</option><option value="phone">Phone</option></select></label>
+          <label><span>Funnel stage</span><select [(ngModel)]="leadDraft.funnel_stage"><option value="new">New</option><option value="contacted">Contacted</option><option value="qualified">Qualified</option><option value="appointment_set">Appointment set</option><option value="closed">Closed</option><option value="lost">Lost</option></select></label>
+        </div>
+        <button class="export" (click)="saveLead()" [disabled]="savingLead || !leadDraft.full_name.trim() || !leadDraft.phone.trim()">{{savingLead ? 'SAVING…' : 'SAVE LEAD'}}</button>
+      </section>
       <div class="summary">
         <b class="score">{{score(selected)}}<small>{{selected.intent_tier}}</small></b>
         <div><small>SEGMENT</small><strong>{{label(selected.assigned_segment)}}</strong><small>PIPELINE</small><strong>{{selected.pipeline_stage}}</strong></div>
@@ -99,7 +111,7 @@
       </section>
       <section *ngIf="selected.objections?.length"><h3>Objections</h3><p *ngFor="let item of selected.objections"><b>{{label(item.type)}}</b> · {{item.count}} occurrence(s)<br>{{item.evidence}}</p></section>
       <section><h3>Sales recommendations</h3><p>{{selected.visit_recommendations}}</p></section>
-      <section *ngIf="isSuperadmin" class="danger-zone">
+      <section *ngIf="isSuperadmin || canMaintainLeads" class="danger-zone">
         <h3>Delete lead</h3>
         <p>This anonymizes personal data, pauses automation, cancels follow-ups and revokes shared links. Audit and appointment evidence is preserved.</p>
         <input [(ngModel)]="deleteReason" placeholder="Required deletion reason">

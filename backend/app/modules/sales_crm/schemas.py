@@ -57,7 +57,17 @@ class SalesLeadDetailResponse(LeadResponse):
     presentation: dict = Field(default_factory=dict)
 
 class LeadUpdate(BaseModel):
-    funnel_stage: FunnelStage
+    funnel_stage: Optional[FunnelStage] = None
+    full_name: Optional[str] = Field(default=None, min_length=2, max_length=150)
+    phone: Optional[str] = Field(default=None, min_length=8, max_length=50)
+    email: Optional[str] = Field(default=None, max_length=150)
+    preferred_channel: Optional[str] = Field(default=None, pattern="^(sms|email|phone)$")
+
+    @model_validator(mode="after")
+    def require_change(self):
+        if not self.model_fields_set:
+            raise ValueError("At least one Lead field is required.")
+        return self
 
 class MeetingCreate(BaseModel):
     project_id: str
