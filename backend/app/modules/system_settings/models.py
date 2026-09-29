@@ -69,7 +69,7 @@ class TelnyxConfig(Base):
 
 
 class TelnyxCompanyConfig(Base):
-    """One isolated Telnyx sender and Messaging Profile per tenant."""
+    """One isolated Telnyx SMS/WhatsApp messaging boundary per tenant."""
 
     __tablename__ = "telnyx_company_configurations"
     __table_args__ = (
@@ -88,6 +88,16 @@ class TelnyxCompanyConfig(Base):
     coverage_checked_at = Column(DateTime, nullable=True)
     regulatory_status = Column(String(30), default="pending", nullable=False)
     live_sms_enabled = Column(Boolean, default=False, nullable=False)
+    primary_channel = Column(String(20), default="sms", nullable=False)
+    whatsapp_business_account_id = Column(String(120), nullable=True)
+    whatsapp_phone_number_id = Column(String(120), nullable=True, unique=True)
+    whatsapp_from_phone_number = Column(String(50), nullable=True, unique=True)
+    whatsapp_template_name = Column(String(180), nullable=True)
+    whatsapp_template_language = Column(String(20), default="es", nullable=False)
+    live_whatsapp_enabled = Column(Boolean, default=False, nullable=False)
+    whatsapp_verification_status = Column(String(30), default="not_configured", nullable=False)
+    whatsapp_verified_at = Column(DateTime, nullable=True)
+    whatsapp_last_error = Column(Text, nullable=True)
     verification_status = Column(String(30), default="not_configured", nullable=False)
     verified_at = Column(DateTime, nullable=True)
     last_error = Column(Text, nullable=True)

@@ -128,6 +128,7 @@ FIELD_ALIASES = {
     "social profiles": "corporate_social_profiles",
     "social media profiles": "corporate_social_profiles",
     "headquarters": "headquarters",
+    "hq": "headquarters",
     "year established": "year_established",
     "business model": "primary_business_model",
     "core focus": "primary_business_model",

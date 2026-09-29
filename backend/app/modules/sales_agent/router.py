@@ -123,6 +123,7 @@ async def start_live_lead(
         project_id=payload.project_id,
         source_code=payload.source_code,
         campaign_id=payload.campaign_id,
+        channel=payload.channel,
         lead_form=payload.lead.model_dump(),
         idempotency_key=idempotency_key,
     )

@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.modules.projects.models import Project, ProjectCampaign
 from app.modules.sales_crm.models import Lead, LeadConsentEvent
-from app.integrations.messaging_gateway import live_provider, provider_sender
+from app.integrations.messaging_gateway import channel_sender, company_live_channel, live_provider
 
 from .live_service import launch_live_lead, normalize_phone
 from .models import SalesConversation
@@ -56,16 +56,25 @@ async def create_live_lead(
     project_id: str,
     source_code: str,
     campaign_id: str | None,
+    channel: str | None = None,
     lead_form: dict,
     idempotency_key: str,
 ) -> dict:
     source_definition = LIVE_LEAD_SOURCES.get(source_code)
     if not source_definition:
         raise HTTPException(status_code=422, detail="Select a supported lead source.")
-    provider = live_provider(db, company_id=company_id)
+    channel = company_live_channel(db, company_id=company_id, requested=channel)
+    if not channel:
+        raise HTTPException(status_code=409, detail="Verify and enable an SMS or WhatsApp channel for this Company before starting the agent.")
+    provider = "telnyx" if channel == "whatsapp" else live_provider(db, company_id=company_id)
     if not provider:
-        raise HTTPException(status_code=409, detail="Verify and enable the default SMS provider before submitting a live test lead.")
-    thread_key = f"{provider}:{normalize_phone(provider_sender(db, provider, company_id=company_id))}:{normalize_phone(lead_form['phone'])}"
+        raise HTTPException(status_code=409, detail="The selected Company messaging channel is not ready.")
+    sender = normalize_phone(channel_sender(db, provider=provider, company_id=company_id, channel=channel))
+    thread_key = (
+        f"{provider}:{sender}:{normalize_phone(lead_form['phone'])}"
+        if channel == "sms" else
+        f"{provider}:{channel}:{sender}:{normalize_phone(lead_form['phone'])}"
+    )
     foreign_thread = db.query(SalesConversation).filter(
         SalesConversation.provider_thread_key == thread_key,
         SalesConversation.company_id != company_id,
@@ -73,7 +82,7 @@ async def create_live_lead(
     if foreign_thread:
         raise HTTPException(
             status_code=409,
-            detail="This phone already has a conversation for another Company on the shared SMS sender.",
+            detail="This phone already has a conversation for another Company on the shared sender.",
         )
     project = db.query(Project).filter(
         Project.id == project_id,
@@ -100,7 +109,7 @@ async def create_live_lead(
     if source_code == "meta" and campaign and not campaign.lead_form_id:
         raise HTTPException(status_code=409, detail="Map this campaign to a Meta Lead Form before submitting a Meta lead.")
     if not lead_form.get("consent"):
-        raise HTTPException(status_code=422, detail="Explicit SMS consent is required.")
+        raise HTTPException(status_code=422, detail=f"Explicit {channel.upper()} consent is required.")
 
     stable_id = hashlib.sha256(f"{company_id}:{source_code}:{idempotency_key}".encode()).hexdigest()[:48]
     external_id = f"manual:{stable_id}"
@@ -117,6 +126,7 @@ async def create_live_lead(
         if not conversation or existing.agent_status in {
             "delivery_failed", "queued", "routing_blocked", "waiting_for_twilio",
         }:
+            existing.preferred_channel = channel
             conversation, message = await launch_live_lead(db, existing)
         else:
             message = None
@@ -127,6 +137,7 @@ async def create_live_lead(
             "status": existing.agent_status,
             "replayed": True,
             "provider": provider,
+            "channel": channel,
             "source_code": source_code,
         }
 
@@ -152,7 +163,7 @@ async def create_live_lead(
         source=source_definition["lead_source"],
         platform=source_definition["lead_platform"],
         external_lead_id=external_id,
-        preferred_channel="sms",
+        preferred_channel=channel,
         channel_address=lead_form["phone"],
         consent_status="granted_manual_meta_test",
         consent_captured_at=now,
@@ -174,10 +185,10 @@ async def create_live_lead(
     db.add(lead); db.flush()
     db.add(LeadConsentEvent(
         lead_id=lead.id,
-        channel="sms",
+        channel=channel,
         action="consent_captured",
         source=f"live_lead_intake:{source_code}",
-        evidence=f"Submitted by an authorized Company user as {source_definition['label']} with explicit SMS consent.",
+        evidence=f"Submitted by an authorized Company user as {source_definition['label']} with explicit {channel.upper()} consent.",
     ))
     db.commit(); db.refresh(lead)
     try:
@@ -191,7 +202,7 @@ async def create_live_lead(
         db.commit()
         raise
     if not conversation:
-        raise HTTPException(status_code=409, detail="The live SMS provider became unavailable before dispatch.")
+        raise HTTPException(status_code=409, detail="The live messaging provider became unavailable before dispatch.")
     return {
         "lead_id": lead.id,
         "conversation_id": conversation.id,
@@ -199,6 +210,7 @@ async def create_live_lead(
         "status": lead.agent_status,
         "replayed": False,
         "provider": provider,
+        "channel": channel,
         "source_code": source_code,
     }
 
@@ -219,6 +231,7 @@ async def create_live_meta_test(
         project_id=project_id,
         source_code="meta",
         campaign_id=campaign_id,
+        channel="sms",
         lead_form=lead_form,
         idempotency_key=idempotency_key,
     )

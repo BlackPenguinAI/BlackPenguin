@@ -52,7 +52,7 @@ def validate_telnyx_signature(*, public_key: str, payload: bytes, signature: str
         return False
 
 
-def _message_error(response: httpx.Response) -> HTTPException:
+def _message_error(response: httpx.Response, channel: str = "SMS") -> HTTPException:
     try:
         payload = response.json()
     except ValueError:
@@ -60,13 +60,14 @@ def _message_error(response: httpx.Response) -> HTTPException:
     errors = payload.get("errors") if isinstance(payload, dict) else None
     error = errors[0] if isinstance(errors, list) and errors and isinstance(errors[0], dict) else {}
     provider_code = str(error.get("code") or response.status_code)
-    provider_detail = str(error.get("detail") or error.get("title") or "Telnyx rejected the outbound SMS.")
+    channel_label = "SMS" if channel == "SMS" else f"{channel} message"
+    provider_detail = str(error.get("detail") or error.get("title") or f"Telnyx rejected the outbound {channel_label}.")
     status_code = 429 if response.status_code == 429 else (422 if response.status_code < 500 else 502)
     return HTTPException(
         status_code=status_code,
         detail={
             "code": "TELNYX_MESSAGE_REJECTED",
-            "message": "Telnyx rejected the outbound SMS.",
+            "message": f"Telnyx rejected the outbound {channel_label}.",
             "provider_code": provider_code[:80],
             "provider_detail": provider_detail[:500],
             "provider_request_id": (response.headers.get("x-request-id") or "")[:120] or None,
@@ -114,4 +115,54 @@ async def send_sms(db: Session, *, company_id: str, to: str, body: str) -> dict:
                 "message": "Telnyx accepted the request but did not return a message identifier.",
             },
         )
+    return {"sid": data.get("id"), "status": data.get("status") or "queued", "raw": data}
+
+
+async def send_whatsapp(
+    db: Session, *, company_id: str, to: str, body: str,
+    use_initial_template: bool = False,
+) -> dict:
+    """Send through Telnyx's WhatsApp API using the Company-owned sender."""
+    from app.modules.system_settings.services import get_telnyx_company_config, telnyx_credentials
+
+    platform, api_key = telnyx_credentials(db)
+    config = get_telnyx_company_config(db, company_id)
+    if not platform.live_sms_enabled or platform.verification_status != "verified":
+        raise RuntimeError("The Telnyx platform is disabled or not verified.")
+    if not config or not config.live_whatsapp_enabled or config.whatsapp_verification_status != "verified":
+        raise RuntimeError("Live Telnyx WhatsApp is disabled or not verified.")
+    if use_initial_template:
+        message = {
+            "type": "template",
+            "template": {
+                "name": config.whatsapp_template_name,
+                "language": {"policy": "deterministic", "code": config.whatsapp_template_language or "es"},
+            },
+        }
+    else:
+        message = {"type": "text", "text": {"body": body}}
+    try:
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            response = await client.post(
+                "https://api.telnyx.com/v2/messages/whatsapp",
+                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                json={
+                    "from": config.whatsapp_from_phone_number,
+                    "to": to,
+                    "whatsapp_message": message,
+                },
+            )
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=502, detail={
+            "code": "TELNYX_WHATSAPP_UNAVAILABLE",
+            "message": "Black Penguin could not reach the Telnyx WhatsApp service.",
+        }) from exc
+    if response.status_code >= 400:
+        raise _message_error(response, "WhatsApp")
+    data = response.json().get("data") or {}
+    if not data.get("id"):
+        raise HTTPException(status_code=502, detail={
+            "code": "TELNYX_INVALID_RESPONSE",
+            "message": "Telnyx accepted the WhatsApp request but did not return a message identifier.",
+        })
     return {"sid": data.get("id"), "status": data.get("status") or "queued", "raw": data}

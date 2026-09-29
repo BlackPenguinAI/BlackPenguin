@@ -24,6 +24,7 @@
           <thead class="bg-white/5 border-b border-white/10 text-xs font-mono uppercase tracking-widest text-gray-400">
             <tr>
               <th class="py-4 px-6">Company</th>
+              <th class="py-4 px-6">Country</th>
               <th class="py-4 px-6">Subscription Plan</th>
               <th class="py-4 px-6">License Period</th>
               <th class="py-4 px-6 text-center">OpenRouter Usage</th>
@@ -44,6 +45,8 @@
                   <span>{{ item.name }}</span>
                 </div>
               </td>
+
+              <td class="py-4 px-6 font-mono text-xs text-gray-400">{{ item.country_code || '—' }}</td>
 
               <td class="py-4 px-6 font-mono text-xs text-secondary font-bold">
                 {{ item.plan?.name || 'Standard' }}
@@ -103,7 +106,7 @@
             </tr>
 
             <tr *ngIf="companies.length === 0">
-              <td colspan="7" class="py-12 text-center text-gray-500 text-sm">
+              <td colspan="8" class="py-12 text-center text-gray-500 text-sm">
                 No companies registered yet.
               </td>
             </tr>
@@ -127,6 +130,14 @@
           <option *ngFor="let p of plans" [value]="p.id" class="bg-[#111] text-white">{{ p.name }}</option>
         </select>
       </div>
+    </div>
+
+    <div class="flex flex-col gap-1.5 w-full">
+      <label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold ml-1">Operating Country</label>
+      <select [(ngModel)]="form.country_code" name="country_code" class="w-full bg-black/50 border border-white/10 focus:border-secondary rounded-xl py-3 px-4 text-sm text-white outline-none transition-colors">
+        <option *ngFor="let country of countries" [value]="country.code">{{ country.name }} ({{ country.code }})</option>
+      </select>
+      <span class="text-[10px] text-gray-500">New Projects inherit this country and the Company's messaging channels.</span>
     </div>
 
     <div class="flex items-center justify-between p-3 bg-white/5 border border-white/10 rounded-xl">
@@ -219,6 +230,14 @@
           <option *ngFor="let p of plans" [value]="p.id" class="bg-[#111] text-white">{{ p.name }}</option>
         </select>
       </div>
+    </div>
+
+    <div class="flex flex-col gap-1.5 w-full">
+      <label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold ml-1">Operating Country</label>
+      <select [(ngModel)]="editForm.country_code" name="edit_country_code" class="w-full bg-black/50 border border-white/10 focus:border-secondary rounded-xl py-3 px-4 text-sm text-white outline-none transition-colors">
+        <option *ngFor="let country of countries" [value]="country.code">{{ country.name }} ({{ country.code }})</option>
+      </select>
+      <span class="text-[10px] text-gray-500">All Projects inherit this country. Review active messaging before changing it.</span>
     </div>
 
     <div class="flex items-center justify-between p-3 bg-white/5 border border-white/10 rounded-xl">

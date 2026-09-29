@@ -13,6 +13,7 @@ from .schemas import (
     MessagingRoutingSchema, MessagingRoutingUpdate,
     MetaPlatformConfigSchema, MetaPlatformConfigUpdate,
     TelnyxCompanyConfigSchema, TelnyxCompanyConfigUpdate,
+    TelnyxWhatsAppResources,
     TelnyxConfigSchema, TelnyxConfigUpdate, TwilioConfigSchema, TwilioConfigUpdate,
     LegalDocumentResponse, LegalDocumentPayload
 )
@@ -116,6 +117,25 @@ def verify_telnyx_company_settings(
     current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN])),
 ):
     config = services.verify_telnyx_company_config(db, company_id)
+    company = db.query(Company).filter(Company.id == company_id).one()
+    return services.telnyx_company_config_response(company, config)
+
+
+@router.get("/messaging-settings/telnyx/whatsapp/resources", response_model=TelnyxWhatsAppResources)
+def get_telnyx_whatsapp_resources(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN])),
+):
+    return services.list_telnyx_whatsapp_resources(db)
+
+
+@router.post("/messaging-settings/telnyx/companies/{company_id}/verify-whatsapp", response_model=TelnyxCompanyConfigSchema)
+def verify_telnyx_company_whatsapp(
+    company_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN])),
+):
+    config = services.verify_telnyx_company_whatsapp(db, company_id)
     company = db.query(Company).filter(Company.id == company_id).one()
     return services.telnyx_company_config_response(company, config)
 

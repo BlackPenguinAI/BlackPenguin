@@ -1,4 +1,4 @@
-"""Provider-neutral SMS routing used by live conversations."""
+"""Provider-neutral SMS/WhatsApp routing used by live conversations."""
 
 from __future__ import annotations
 
@@ -28,6 +28,31 @@ def provider_sender(db: Session, provider: str, *, company_id: str) -> str:
     return sender
 
 
+def company_live_channel(db: Session, *, company_id: str, requested: str | None = None) -> str | None:
+    """Resolve only a verified channel owned by the Company."""
+    config = get_telnyx_company_config(db, company_id)
+    choices = [requested] if requested else ([config.primary_channel or "sms"] if config else ["sms"])
+    for channel in choices:
+        if channel == "sms":
+            provider = default_provider(db)
+            if provider_is_ready(db, provider, company_id=company_id):
+                return "sms"
+        if channel == "whatsapp" and config and config.live_whatsapp_enabled and config.whatsapp_verification_status == "verified":
+            return "whatsapp"
+    return None
+
+
+def channel_sender(db: Session, *, company_id: str, channel: str, provider: str = "telnyx") -> str:
+    if channel == "sms":
+        return provider_sender(db, provider, company_id=company_id)
+    if channel == "whatsapp":
+        config = get_telnyx_company_config(db, company_id)
+        if config and config.whatsapp_from_phone_number:
+            return config.whatsapp_from_phone_number
+        raise HTTPException(status_code=409, detail="Telnyx does not have a WhatsApp sender configured for this Company.")
+    raise HTTPException(status_code=422, detail="Unsupported messaging channel.")
+
+
 async def send_sms(db: Session, *, provider: str, company_id: str, to: str, body: str) -> dict:
     if provider == "twilio":
         from app.integrations.twilio_client import send_sms as send_twilio_sms
@@ -36,6 +61,21 @@ async def send_sms(db: Session, *, provider: str, company_id: str, to: str, body
         from app.integrations.telnyx_client import send_sms as send_telnyx_sms
         return await send_telnyx_sms(db, company_id=company_id, to=to, body=body)
     raise HTTPException(status_code=422, detail="Unsupported SMS provider.")
+
+
+async def send_message(
+    db: Session, *, provider: str, channel: str, company_id: str, to: str,
+    body: str, use_initial_template: bool = False,
+) -> dict:
+    if channel == "sms":
+        return await send_sms(db, provider=provider, company_id=company_id, to=to, body=body)
+    if channel == "whatsapp" and provider == "telnyx":
+        from app.integrations.telnyx_client import send_whatsapp
+        return await send_whatsapp(
+            db, company_id=company_id, to=to, body=body,
+            use_initial_template=use_initial_template,
+        )
+    raise HTTPException(status_code=422, detail="Unsupported provider/channel combination.")
 
 
 def live_provider(db: Session, *, company_id: str) -> str | None:

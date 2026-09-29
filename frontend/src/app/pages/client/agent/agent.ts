@@ -75,6 +75,11 @@ export class AgentComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.conversationPollingEnabled = true;
+    if (this.route.snapshot.queryParamMap.get('new') === '1') {
+      this.setupMode = 'live_meta';
+      this.leadSourceCode = 'manual';
+      this.setupOpen = true;
+    }
     if (this.role === 'sales') {
       this.setupOpen = false;
       this.loadConversations();
@@ -309,7 +314,7 @@ export class AgentComponent implements OnInit, OnDestroy {
       .subscribe({
         next: (result) => {
           this.setupOpen = false;
-          this.success = 'Lead created. The AI sales agent is preparing the first SMS.';
+          this.success = 'Lead created. The AI sales agent is preparing the first message.';
           this.resetForm();
           this.loadConversations(false, result.conversation_id);
         },
@@ -350,8 +355,8 @@ export class AgentComponent implements OnInit, OnDestroy {
     const stages = [
       `Validating Project and ${this.currentLeadSource?.label || 'lead'} source…`,
       'Creating the lead and consent trace…',
-      'Opening the protected SMS conversation…',
-      'Asking the configured SMS provider to deliver the first message…',
+      'Opening the protected Company conversation…',
+      'Asking the configured Telnyx channel to deliver the first message…',
     ];
     let stage = 0;
     this.liveProgress = stages[stage];
@@ -384,9 +389,10 @@ export class AgentComponent implements OnInit, OnDestroy {
           this.liveSubmissionKey = '';
           this.setupOpen = false;
           const provider = result.provider ? result.provider.charAt(0).toUpperCase() + result.provider.slice(1) : 'the configured provider';
+          const channel = result.channel === 'whatsapp' ? 'WhatsApp' : 'SMS';
           this.success = result.replayed
-            ? 'This submission was already received; the existing SMS conversation was reopened.'
-            : `The ${this.currentLeadSource?.label || 'lead'} lead was created and the first real SMS was submitted through ${provider}.`;
+            ? 'This submission was already received; the existing conversation was reopened.'
+            : `The ${this.currentLeadSource?.label || 'lead'} lead was created and the first real ${channel} message was submitted through ${provider}.`;
           this.resetForm();
           this.loadConversations(false, result.conversation_id);
         },

@@ -9,6 +9,7 @@ class Company(Base):
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     name = Column(String(150), nullable=False)
+    country_code = Column(String(2), default="US", nullable=True, index=True)
     
     plan_id = Column(String(36), ForeignKey("subscription_plans.id", ondelete="SET NULL"), nullable=True)
     

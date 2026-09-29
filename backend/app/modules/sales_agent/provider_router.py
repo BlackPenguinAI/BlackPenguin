@@ -13,7 +13,10 @@ from app.db.postgres import get_db
 from app.integrations.telnyx_client import validate_telnyx_signature
 from app.integrations.twilio_client import public_webhook_url, validate_twilio_signature
 from app.modules.sales_crm.models import Lead
-from app.modules.system_settings.services import telnyx_company_for_number, telnyx_credentials, twilio_credentials
+from app.modules.system_settings.services import (
+    telnyx_company_for_number, telnyx_company_for_whatsapp_number,
+    telnyx_credentials, twilio_credentials,
+)
 
 from .live_service import process_live_inbound, resolve_inbound_conversation
 from .models import ExternalWebhookEvent, OutboundMessage, SalesConversation, SalesMessage
@@ -27,20 +30,23 @@ def _record_inbound(
     db: Session, *, provider: str, event_id: str, to_number: str, from_number: str,
     body: str, payload: dict, background_tasks: BackgroundTasks,
     expected_company_id: str | None = None, provider_message_id: str | None = None,
+    channel: str = "sms",
 ):
     if db.query(ExternalWebhookEvent).filter(
         ExternalWebhookEvent.platform == provider,
         ExternalWebhookEvent.external_event_id == event_id,
     ).first():
         return
-    conversation = resolve_inbound_conversation(db, provider=provider, to_number=to_number, from_number=from_number)
-    event = ExternalWebhookEvent(platform=provider, external_event_id=event_id, event_type="incoming_sms", payload_json=payload, status="received")
+    conversation = resolve_inbound_conversation(
+        db, provider=provider, channel=channel, to_number=to_number, from_number=from_number,
+    )
+    event = ExternalWebhookEvent(platform=provider, external_event_id=event_id, event_type=f"incoming_{channel}", payload_json=payload, status="received")
     db.add(event)
     if not conversation or (expected_company_id and conversation.company_id != expected_company_id):
         event.status = "ignored"; event.error_message = "No unambiguous active provider thread."
         event.processed_at = datetime.utcnow(); db.commit(); return
     message = SalesMessage(
-        conversation_id=conversation.id, channel="sms", direction="inbound", role="user",
+        conversation_id=conversation.id, channel=channel, direction="inbound", role="user",
         content=body, provider_message_id=provider_message_id or event_id, status="received",
         metadata_json={"provider": provider, "from": from_number, "to": to_number},
     )
@@ -76,6 +82,27 @@ def _status_from_telnyx(event_type: str, payload: dict) -> str:
     if destination_statuses:
         return destination_statuses[0]
     return event_type.removeprefix("message.") or "queued"
+
+
+def _telnyx_phone(value) -> str:
+    if isinstance(value, dict):
+        return str(value.get("phone_number") or value.get("number") or "")
+    return str(value or "")
+
+
+def _telnyx_channel(payload: dict) -> str:
+    marker = " ".join(str(payload.get(key) or "") for key in ("type", "record_type", "channel")).casefold()
+    return "whatsapp" if "whatsapp" in marker or isinstance(payload.get("whatsapp_message"), dict) else "sms"
+
+
+def _telnyx_text(payload: dict, channel: str) -> str:
+    if channel == "sms":
+        return str(payload.get("text") or "")
+    message = payload.get("whatsapp_message") or {}
+    text = message.get("text") if isinstance(message, dict) else None
+    if isinstance(text, dict):
+        return str(text.get("body") or "")
+    return str(text or payload.get("text") or "")
 
 
 def _validate_twilio(request: Request, params: dict[str, str], signature: str | None, db: Session):
@@ -131,22 +158,28 @@ async def telnyx_messaging_webhook(request: Request, background_tasks: Backgroun
         ExternalWebhookEvent.external_event_id == event_id,
     ).first():
         return {"status": "accepted"}
-    if event_type == "message.received":
+    if event_type in {"message.received", "whatsapp.message.received"}:
+        channel = _telnyx_channel(payload)
         destinations = payload.get("to") or []
-        to_number = str((destinations[0] if destinations else {}).get("phone_number") or "")
-        from_number = str((payload.get("from") or {}).get("phone_number") or "")
+        destination = destinations[0] if isinstance(destinations, list) and destinations else destinations
+        to_number = _telnyx_phone(destination)
+        from_number = _telnyx_phone(payload.get("from"))
         message_id = str(payload.get("id") or event_id)
-        company_config = telnyx_company_for_number(db, to_number)
+        company_config = (
+            telnyx_company_for_whatsapp_number(db, to_number)
+            if channel == "whatsapp" else telnyx_company_for_number(db, to_number)
+        )
         if not company_config or not from_number:
             raise HTTPException(status_code=422, detail="Invalid Telnyx message payload.")
         _record_inbound(
             db, provider="telnyx", event_id=event_id, to_number=to_number,
-            from_number=from_number, body=str(payload.get("text") or ""),
+            from_number=from_number, body=_telnyx_text(payload, channel),
             payload=envelope, background_tasks=background_tasks,
             expected_company_id=company_config.company_id,
             provider_message_id=message_id,
+            channel=channel,
         )
-    elif event_type.startswith("message."):
+    elif event_type.startswith("message.") or event_type.startswith("whatsapp.message."):
         event = ExternalWebhookEvent(
             platform="telnyx", external_event_id=event_id,
             event_type=event_type, payload_json=envelope,

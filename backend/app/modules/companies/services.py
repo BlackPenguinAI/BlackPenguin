@@ -10,6 +10,7 @@ from app.modules.system_settings.services import get_firebase_config
 from app.modules.users.models import User, UserAuthStatus
 
 from .models import Company
+from .country import sync_project_country
 
 UPLOAD_DIR = "uploads/receipts"
 os.makedirs(UPLOAD_DIR, exist_ok=True)

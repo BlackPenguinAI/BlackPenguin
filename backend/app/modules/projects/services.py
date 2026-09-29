@@ -63,6 +63,19 @@ def get_project(db: Session, project_id: str, company_id: str) -> Project:
 
 
 def create_project_with_onboarding(db: Session, *, company_id: str, payload: dict[str, Any], draft: bool = False) -> Project:
+    company = db.query(Company).filter(Company.id == company_id).first()
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found.")
+    inherited_country = (company.country_code or "").strip().upper() or None
+    if not inherited_country:
+        raise HTTPException(
+            status_code=409,
+            detail="The Company operating country must be configured before creating Projects.",
+        )
+    payload = dict(payload)
+    # A Project currently operates in the same market as its Company. Keep the
+    # persisted Project value for compatibility, but never trust a client value.
+    payload["country"] = inherited_country
     project = Project(**payload, company_id=company_id, is_active=True)
     db.add(project)
     db.flush()

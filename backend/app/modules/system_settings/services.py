@@ -444,6 +444,7 @@ def telnyx_company_config_response(company: Company, config: TelnyxCompanyConfig
         "company_id": company.id,
         "company_name": company.name,
         "company_is_active": bool(company.is_active),
+        "country_code": company.country_code,
         "messaging_profile_id": config.messaging_profile_id if config else None,
         "from_phone_number": config.from_phone_number if config else None,
         "telnyx_phone_number_id": config.telnyx_phone_number_id if config else None,
@@ -452,6 +453,16 @@ def telnyx_company_config_response(company: Company, config: TelnyxCompanyConfig
         "coverage_checked_at": config.coverage_checked_at if config else None,
         "regulatory_status": (config.regulatory_status or "pending") if config else "pending",
         "live_sms_enabled": bool(config.live_sms_enabled) if config else False,
+        "primary_channel": (config.primary_channel or "sms") if config else ("sms" if company.country_code == "US" else "whatsapp"),
+        "whatsapp_business_account_id": config.whatsapp_business_account_id if config else None,
+        "whatsapp_phone_number_id": config.whatsapp_phone_number_id if config else None,
+        "whatsapp_from_phone_number": config.whatsapp_from_phone_number if config else None,
+        "whatsapp_template_name": config.whatsapp_template_name if config else None,
+        "whatsapp_template_language": (config.whatsapp_template_language or "es") if config else "es",
+        "live_whatsapp_enabled": bool(config.live_whatsapp_enabled) if config else False,
+        "whatsapp_verification_status": (config.whatsapp_verification_status or "not_configured") if config else "not_configured",
+        "whatsapp_verified_at": config.whatsapp_verified_at if config else None,
+        "whatsapp_last_error": config.whatsapp_last_error if config else None,
         "verification_status": (config.verification_status or "not_configured") if config else "not_configured",
         "verified_at": config.verified_at if config else None,
         "last_error": config.last_error if config else None,
@@ -471,15 +482,31 @@ def update_telnyx_company_config(db: Session, company_id: str, payload: TelnyxCo
     config = get_telnyx_company_config(db, company_id, create=True)
     assert config is not None
     values = payload.model_dump(exclude_unset=True)
+    country_code = values.pop("country_code", None)
+    if country_code:
+        company = db.query(Company).filter(Company.id == company_id).one()
+        normalized_country = country_code.strip().upper()
+        if company.country_code != normalized_country:
+            company.country_code = normalized_country
+            from app.modules.companies.country import sync_project_country
+            sync_project_country(db, company_id=company.id, country_code=normalized_country)
+        db.add(company)
     if "from_phone_number" in values:
         values["from_phone_number"] = _normalize_e164(values["from_phone_number"]) if values["from_phone_number"] else None
-    for key in ("messaging_profile_id", "telnyx_phone_number_id"):
+    if "whatsapp_from_phone_number" in values:
+        values["whatsapp_from_phone_number"] = _normalize_e164(values["whatsapp_from_phone_number"]) if values["whatsapp_from_phone_number"] else None
+    for key in (
+        "messaging_profile_id", "telnyx_phone_number_id", "whatsapp_business_account_id",
+        "whatsapp_phone_number_id", "whatsapp_template_name", "whatsapp_template_language",
+    ):
         if key in values and isinstance(values[key], str):
             values[key] = values[key].strip() or None
     for field, label in (
         ("messaging_profile_id", "Messaging Profile"),
         ("from_phone_number", "sender number"),
         ("telnyx_phone_number_id", "Telnyx phone number ID"),
+        ("whatsapp_phone_number_id", "WhatsApp phone number ID"),
+        ("whatsapp_from_phone_number", "WhatsApp number"),
     ):
         value = values.get(field)
         if value and db.query(TelnyxCompanyConfig).filter(
@@ -490,6 +517,13 @@ def update_telnyx_company_config(db: Session, company_id: str, payload: TelnyxCo
     connection_changed = any(
         key in values and values[key] != getattr(config, key)
         for key in ("messaging_profile_id", "from_phone_number", "telnyx_phone_number_id")
+    )
+    whatsapp_changed = any(
+        key in values and values[key] != getattr(config, key)
+        for key in (
+            "messaging_profile_id", "whatsapp_business_account_id", "whatsapp_phone_number_id",
+            "whatsapp_from_phone_number", "whatsapp_template_name", "whatsapp_template_language",
+        )
     )
     for key, value in values.items():
         setattr(config, key, value)
@@ -503,6 +537,18 @@ def update_telnyx_company_config(db: Session, company_id: str, payload: TelnyxCo
             raise HTTPException(status_code=422, detail="Confirm the Company's regulatory status before enabling live SMS.")
         if config.verification_status != "verified" and not connection_changed:
             raise HTTPException(status_code=422, detail="Verify the Company Telnyx sender before enabling live SMS.")
+    if config.live_whatsapp_enabled:
+        platform = get_telnyx_config(db)
+        if not (platform.live_sms_enabled and platform.verification_status == "verified"):
+            raise HTTPException(status_code=422, detail="Verify and enable the global Telnyx platform credentials first.")
+        if not all((
+            config.messaging_profile_id, config.whatsapp_business_account_id,
+            config.whatsapp_phone_number_id, config.whatsapp_from_phone_number,
+            config.whatsapp_template_name,
+        )):
+            raise HTTPException(status_code=422, detail="Complete the Company WhatsApp account, number and initial template.")
+        if config.whatsapp_verification_status != "verified" and not whatsapp_changed:
+            raise HTTPException(status_code=422, detail="Verify the Company WhatsApp sender before enabling live WhatsApp.")
     if connection_changed:
         config.live_sms_enabled = False
         config.verification_status = "pending"
@@ -511,6 +557,11 @@ def update_telnyx_company_config(db: Session, company_id: str, payload: TelnyxCo
         config.sender_country_code = None
         config.coverage_snapshot = {}
         config.coverage_checked_at = None
+    if whatsapp_changed:
+        config.live_whatsapp_enabled = False
+        config.whatsapp_verification_status = "pending"
+        config.whatsapp_verified_at = None
+        config.whatsapp_last_error = None
     db.commit(); db.refresh(config)
     return config
 
@@ -576,6 +627,127 @@ def telnyx_company_for_number(db: Session, phone_number: str) -> TelnyxCompanyCo
         TelnyxCompanyConfig.live_sms_enabled.is_(True),
         TelnyxCompanyConfig.verification_status == "verified",
     ).first()
+
+
+def telnyx_company_for_whatsapp_number(db: Session, phone_number: str) -> TelnyxCompanyConfig | None:
+    normalized = _normalize_e164(phone_number)
+    return db.query(TelnyxCompanyConfig).filter(
+        TelnyxCompanyConfig.whatsapp_from_phone_number == normalized,
+        TelnyxCompanyConfig.live_whatsapp_enabled.is_(True),
+        TelnyxCompanyConfig.whatsapp_verification_status == "verified",
+    ).first()
+
+
+def list_telnyx_whatsapp_resources(db: Session) -> dict:
+    """Read the Telnyx-owned WABAs, numbers and templates for safe UI selectors."""
+    platform, api_key = telnyx_credentials(db)
+    if platform.verification_status != "verified":
+        raise HTTPException(status_code=422, detail="Verify the global Telnyx platform credentials first.")
+    headers = {"Authorization": f"Bearer {api_key}"}
+    try:
+        accounts_response = httpx.get(
+            "https://api.telnyx.com/v2/whatsapp/business_accounts", headers=headers, timeout=20.0,
+        )
+        accounts_response.raise_for_status()
+        templates_response = httpx.get(
+            "https://api.telnyx.com/v2/whatsapp/message_templates", headers=headers, timeout=20.0,
+        )
+        templates_response.raise_for_status()
+        accounts = []
+        for raw in accounts_response.json().get("data") or []:
+            resource_id = str(raw.get("id") or "")
+            if not resource_id:
+                continue
+            numbers_response = httpx.get(
+                f"https://api.telnyx.com/v2/whatsapp/business_accounts/{resource_id}/phone_numbers",
+                headers=headers, timeout=20.0,
+            )
+            numbers_response.raise_for_status()
+            accounts.append({
+                "id": resource_id,
+                "name": str(raw.get("name") or raw.get("business_name") or ""),
+                "status": raw.get("status"),
+                "waba_id": raw.get("waba_id"),
+                "phone_numbers": numbers_response.json().get("data") or [],
+            })
+        templates = []
+        for raw in templates_response.json().get("data") or []:
+            language = raw.get("language")
+            if isinstance(language, dict):
+                language = language.get("code")
+            templates.append({
+                "id": str(raw.get("id") or "") or None,
+                "name": str(raw.get("name") or ""),
+                "language": str(language or raw.get("language_code") or ""),
+                "status": str(raw.get("status") or "unknown").lower(),
+            })
+        return {"business_accounts": accounts, "templates": templates}
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=502, detail="Telnyx WhatsApp resources could not be loaded.") from exc
+
+
+def verify_telnyx_company_whatsapp(db: Session, company_id: str) -> TelnyxCompanyConfig:
+    config = get_telnyx_company_config(db, company_id)
+    if not config or not all((
+        config.messaging_profile_id, config.whatsapp_business_account_id,
+        config.whatsapp_phone_number_id, config.whatsapp_from_phone_number,
+        config.whatsapp_template_name,
+    )):
+        raise HTTPException(status_code=409, detail="The Company WhatsApp sender is not fully configured.")
+    try:
+        _, api_key = telnyx_credentials(db)
+        expected_webhook = f"{settings.PUBLIC_APP_URL.rstrip('/')}{settings.API_V1_STR}/webhooks/telnyx/messaging"
+        profile_response = httpx.get(
+            f"https://api.telnyx.com/v2/messaging_profiles/{config.messaging_profile_id}",
+            headers={"Authorization": f"Bearer {api_key}"}, timeout=15.0,
+        )
+        profile_response.raise_for_status()
+        profile = profile_response.json().get("data") or {}
+        webhook_url = profile.get("webhook_url")
+        if webhook_url and webhook_url.rstrip("/") != expected_webhook.rstrip("/"):
+            raise HTTPException(status_code=422, detail=f"The Messaging Profile webhook must be {expected_webhook}.")
+        resources = list_telnyx_whatsapp_resources(db)
+        account = next(
+            (item for item in resources["business_accounts"] if item["id"] == config.whatsapp_business_account_id),
+            None,
+        )
+        if not account:
+            raise HTTPException(status_code=422, detail="The selected WhatsApp Business Account was not found in Telnyx.")
+        number = next((item for item in account["phone_numbers"] if str(
+            item.get("phone_number_id") or item.get("id") or ""
+        ) == config.whatsapp_phone_number_id), None)
+        remote_number = _normalize_e164((number or {}).get("phone_number"))
+        if not number or remote_number != config.whatsapp_from_phone_number:
+            raise HTTPException(status_code=422, detail="The WhatsApp number does not belong to the selected Telnyx WABA.")
+        number_status = str(number.get("status") or number.get("verification_status") or "").lower()
+        if number_status and number_status not in {"verified", "approved", "connected", "active"}:
+            raise HTTPException(status_code=422, detail=f"The WhatsApp number is not active in Telnyx ({number_status}).")
+        template = next((item for item in resources["templates"] if
+            item["name"] == config.whatsapp_template_name and
+            item["language"] == config.whatsapp_template_language
+        ), None)
+        if not template or template["status"] not in {"approved", "active"}:
+            raise HTTPException(status_code=422, detail="The selected WhatsApp initial template is not approved.")
+    except HTTPException as exc:
+        config.live_whatsapp_enabled = False
+        config.whatsapp_verification_status = "failed"
+        config.whatsapp_last_error = str(exc.detail)[:500]
+        db.commit()
+        raise
+    except (httpx.HTTPError, ValueError, KeyError) as exc:
+        config.live_whatsapp_enabled = False
+        config.whatsapp_verification_status = "failed"
+        config.whatsapp_last_error = type(exc).__name__
+        db.commit()
+        raise HTTPException(
+            status_code=502,
+            detail="The Company Telnyx WhatsApp sender could not be verified.",
+        ) from exc
+    config.whatsapp_verification_status = "verified"
+    config.whatsapp_verified_at = datetime.utcnow()
+    config.whatsapp_last_error = None
+    db.commit(); db.refresh(config)
+    return config
 
 
 def get_messaging_routing_config(db: Session) -> MessagingRoutingConfig:

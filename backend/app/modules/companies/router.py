@@ -16,6 +16,15 @@ from app.modules.subscriptions.models import SubscriptionPlan
 
 router = APIRouter()
 
+
+def _country_code(value: str) -> str:
+    # Direct service-level tests call the FastAPI endpoint function without
+    # dependency injection, in which case its default is a Form marker.
+    code = (value if isinstance(value, str) else "US").strip().upper()
+    if len(code) != 2 or not code.isalpha():
+        raise HTTPException(status_code=422, detail="Select a valid two-letter Company country code.")
+    return code
+
 # ==========================================
 # 1. CREAR EMPRESA Y ADMIN
 # ==========================================
@@ -27,6 +36,7 @@ def create_company_workspace(
     admin_first_name: str = Form(...),
     admin_last_name: str = Form(...),
     admin_email: str = Form(...),
+    country_code: str = Form("US"),
     is_active: str = Form('true'),       # 🚀 Company Status (default 'true')
     admin_is_active: str = Form('true'), # 🚀 User Status (default 'true')
     start_date: Optional[str] = Form(None),
@@ -60,7 +70,8 @@ def create_company_workspace(
         license_start=parsed_start_date, 
         license_end=parsed_start_date + relativedelta(months=duration_months),
         payment_receipt_url=receipt_url, 
-        is_active=is_active_bool
+        is_active=is_active_bool,
+        country_code=_country_code(country_code),
     )
     db.add(new_company)
     db.flush()
@@ -107,6 +118,7 @@ def update_company(
     admin_first_name: str = Form(...),
     admin_last_name: str = Form(...),
     admin_email: str = Form(...),
+    country_code: str = Form("US"),
     is_active: str = Form('true'),       
     admin_is_active: str = Form('true'), 
     start_date: Optional[str] = Form(None),
@@ -126,6 +138,10 @@ def update_company(
     admin_is_active_bool = str(admin_is_active).lower() == 'true'
 
     company.name = name
+    normalized_country = _country_code(country_code)
+    if company.country_code != normalized_country:
+        company.country_code = normalized_country
+        services.sync_project_country(db, company_id=company.id, country_code=normalized_country)
     company.plan_id = plan_id
     company.is_active = is_active_bool
 

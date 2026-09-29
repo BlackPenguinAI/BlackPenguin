@@ -10,12 +10,14 @@ import { ButtonComponent } from '../../../../shared/ui/button/button';
 
 type Provider = 'twilio' | 'telnyx';
 type RegulatoryStatus = 'pending' | 'approved' | 'not_required';
+type MessagingChannel = 'sms' | 'whatsapp';
 
 interface TelnyxCompanySender {
   id: string | null;
   company_id: string;
   company_name: string;
   company_is_active: boolean;
+  country_code?: string | null;
   messaging_profile_id: string;
   from_phone_number: string;
   telnyx_phone_number_id: string;
@@ -35,6 +37,16 @@ interface TelnyxCompanySender {
   coverage_checked_at?: string | null;
   regulatory_status: RegulatoryStatus;
   live_sms_enabled: boolean;
+  primary_channel?: MessagingChannel;
+  whatsapp_business_account_id?: string;
+  whatsapp_phone_number_id?: string;
+  whatsapp_from_phone_number?: string;
+  whatsapp_template_name?: string;
+  whatsapp_template_language?: string;
+  live_whatsapp_enabled?: boolean;
+  whatsapp_verification_status?: string;
+  whatsapp_verified_at?: string | null;
+  whatsapp_last_error?: string;
   verification_status: string;
   verified_at: string | null;
   last_error: string;
@@ -51,6 +63,9 @@ export class MessagingSettingsPageComponent implements OnInit {
   twilio = { account_sid: '', auth_token: '', from_phone_number: '', auth_token_configured: false, auth_token_hint: '', live_sms_enabled: false, verification_status: 'not_configured', verified_at: null as string | null, last_error: '' };
   telnyx = { api_key: '', webhook_public_key: '', api_key_configured: false, api_key_hint: '', webhook_public_key_configured: false, live_sms_enabled: false, verification_status: 'not_configured', verified_at: null as string | null, last_error: '' };
   telnyxCompanies: TelnyxCompanySender[] = [];
+  whatsappAccounts: any[] = [];
+  whatsappTemplates: any[] = [];
+  loadingWhatsAppResources = false;
   selectedCompanyId = '';
   isLoading = true;
   saving = '';
@@ -91,6 +106,16 @@ export class MessagingSettingsPageComponent implements OnInit {
           messaging_profile_id: item.messaging_profile_id || '',
           from_phone_number: item.from_phone_number || '',
           telnyx_phone_number_id: item.telnyx_phone_number_id || '',
+          primary_channel: item.primary_channel || (item.country_code === 'US' ? 'sms' : 'whatsapp'),
+          whatsapp_business_account_id: item.whatsapp_business_account_id || '',
+          whatsapp_phone_number_id: item.whatsapp_phone_number_id || '',
+          whatsapp_from_phone_number: item.whatsapp_from_phone_number || '',
+          whatsapp_template_name: item.whatsapp_template_name || '',
+          whatsapp_template_language: item.whatsapp_template_language || 'es',
+          live_whatsapp_enabled: !!item.live_whatsapp_enabled,
+          whatsapp_verification_status: item.whatsapp_verification_status || 'not_configured',
+          whatsapp_verified_at: item.whatsapp_verified_at || null,
+          whatsapp_last_error: item.whatsapp_last_error || '',
           coverage_snapshot: item.coverage_snapshot || {},
           last_error: item.last_error || '',
         }));
@@ -143,15 +168,26 @@ export class MessagingSettingsPageComponent implements OnInit {
   saveTelnyxCompany() {
     const company = this.selectedCompany;
     if (!company) return;
-    if (!company.messaging_profile_id || !company.from_phone_number) {
-      this.toast.showError('Complete the Company Messaging Profile ID and From number.'); return;
+    if (!company.messaging_profile_id) {
+      this.toast.showError('Complete the Company Messaging Profile ID.'); return;
+    }
+    if ((company.primary_channel === 'sms' || company.live_sms_enabled) && !company.from_phone_number) {
+      this.toast.showError('Complete the Company SMS From number.'); return;
     }
     const payload = {
+      country_code: company.country_code,
       messaging_profile_id: company.messaging_profile_id,
       from_phone_number: company.from_phone_number,
       telnyx_phone_number_id: company.telnyx_phone_number_id || null,
       regulatory_status: company.regulatory_status,
       live_sms_enabled: company.live_sms_enabled,
+      primary_channel: company.primary_channel,
+      whatsapp_business_account_id: company.whatsapp_business_account_id || null,
+      whatsapp_phone_number_id: company.whatsapp_phone_number_id || null,
+      whatsapp_from_phone_number: company.whatsapp_from_phone_number || null,
+      whatsapp_template_name: company.whatsapp_template_name || null,
+      whatsapp_template_language: company.whatsapp_template_language || 'es',
+      live_whatsapp_enabled: company.live_whatsapp_enabled,
     };
     this.saving = `company:${company.company_id}`;
     this.http.put<TelnyxCompanySender>(`${this.baseUrl}/api/v1/system/messaging-settings/telnyx/companies/${company.company_id}`, payload, { headers: this.headers }).subscribe({
@@ -178,6 +214,49 @@ export class MessagingSettingsPageComponent implements OnInit {
     this.http.post<TelnyxCompanySender>(`${this.baseUrl}/api/v1/system/messaging-settings/telnyx/companies/${company.company_id}/verify`, {}, { headers: this.headers }).subscribe({
       next: data => { this.replaceCompany(data); this.verifying = ''; this.toast.showSuccess(`${data.company_name} sender verified.`); this.cdr.detectChanges(); },
       error: err => { this.verifying = ''; this.toast.showError(this.message(err, 'Company sender verification failed.')); this.cdr.detectChanges(); }
+    });
+  }
+
+  loadWhatsAppResources() {
+    if (this.dirty.telnyx) { this.toast.showError('Save and verify Telnyx platform credentials first.'); return; }
+    this.loadingWhatsAppResources = true;
+    this.http.get<any>(`${this.baseUrl}/api/v1/system/messaging-settings/telnyx/whatsapp/resources`, { headers: this.headers }).subscribe({
+      next: data => {
+        this.whatsappAccounts = data.business_accounts || [];
+        this.whatsappTemplates = (data.templates || []).filter((item: any) => ['approved', 'active'].includes(String(item.status).toLowerCase()));
+        this.loadingWhatsAppResources = false;
+        this.cdr.detectChanges();
+      },
+      error: err => { this.loadingWhatsAppResources = false; this.toast.showError(this.message(err, 'WhatsApp resources could not be loaded from Telnyx.')); this.cdr.detectChanges(); }
+    });
+  }
+
+  whatsappNumbers(company: TelnyxCompanySender): any[] {
+    return this.whatsappAccounts.find(item => item.id === company.whatsapp_business_account_id)?.phone_numbers || [];
+  }
+
+  selectWhatsAppNumber(company: TelnyxCompanySender, phoneNumberId: string) {
+    company.whatsapp_phone_number_id = phoneNumberId;
+    const item = this.whatsappNumbers(company).find(number => String(number.phone_number_id || number.id) === phoneNumberId);
+    company.whatsapp_from_phone_number = item?.phone_number || '';
+    this.dirty.telnyxCompany = true;
+  }
+
+  selectWhatsAppTemplate(company: TelnyxCompanySender, value: string) {
+    const [name, language] = value.split('|');
+    company.whatsapp_template_name = name || '';
+    company.whatsapp_template_language = language || 'es';
+    this.dirty.telnyxCompany = true;
+  }
+
+  verifyTelnyxWhatsApp() {
+    const company = this.selectedCompany;
+    if (!company) return;
+    if (this.dirty.telnyxCompany) { this.toast.showError('Save Company changes before verification.'); return; }
+    this.verifying = `whatsapp:${company.company_id}`;
+    this.http.post<TelnyxCompanySender>(`${this.baseUrl}/api/v1/system/messaging-settings/telnyx/companies/${company.company_id}/verify-whatsapp`, {}, { headers: this.headers }).subscribe({
+      next: data => { this.replaceCompany(data); this.verifying = ''; this.toast.showSuccess(`${data.company_name} WhatsApp sender verified.`); this.cdr.detectChanges(); },
+      error: err => { this.verifying = ''; this.toast.showError(this.message(err, 'Company WhatsApp verification failed.')); this.cdr.detectChanges(); }
     });
   }
 

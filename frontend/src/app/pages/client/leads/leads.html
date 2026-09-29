@@ -5,10 +5,13 @@
       <h1>Leads</h1>
       <span>Qualification, intent, segment and full contact traceability.</span>
     </div>
-    <button *ngIf="!isSuperadmin" class="export" (click)="exportCurrentView()" [disabled]="exporting || loading">
-      <span class="material-symbols-outlined">download</span>
-      {{ exporting ? 'EXPORTING…' : 'EXPORT CURRENT VIEW' }}
-    </button>
+    <div class="detail-actions" *ngIf="!isSuperadmin">
+      <a *ngIf="canMaintainLeads" class="export" routerLink="/app/agent" [queryParams]="{new:'1'}"><span class="material-symbols-outlined">person_add</span> REGISTER LEAD</a>
+      <button class="export" (click)="exportCurrentView()" [disabled]="exporting || loading">
+        <span class="material-symbols-outlined">download</span>
+        {{ exporting ? 'EXPORTING…' : 'EXPORT CURRENT VIEW' }}
+      </button>
+    </div>
   </header>
 
   <div class="filters">
@@ -69,7 +72,7 @@
           <label><span>Full name</span><input [(ngModel)]="leadDraft.full_name" maxlength="150"></label>
           <label><span>Phone (E.164)</span><input [(ngModel)]="leadDraft.phone" maxlength="50"></label>
           <label><span>Email</span><input [(ngModel)]="leadDraft.email" type="email" maxlength="150"></label>
-          <label><span>Preferred channel</span><select [(ngModel)]="leadDraft.preferred_channel"><option value="sms">SMS</option><option value="email">Email</option><option value="phone">Phone</option></select></label>
+          <label><span>Preferred channel</span><select [(ngModel)]="leadDraft.preferred_channel"><option value="sms">SMS</option><option value="whatsapp">WhatsApp via Telnyx</option><option value="email">Email</option><option value="phone">Phone</option></select></label>
           <label><span>Funnel stage</span><select [(ngModel)]="leadDraft.funnel_stage"><option value="new">New</option><option value="contacted">Contacted</option><option value="qualified">Qualified</option><option value="appointment_set">Appointment set</option><option value="closed">Closed</option><option value="lost">Lost</option></select></label>
         </div>
         <button class="export" (click)="saveLead()" [disabled]="savingLead || !leadDraft.full_name.trim() || !leadDraft.phone.trim()">{{savingLead ? 'SAVING…' : 'SAVE LEAD'}}</button>

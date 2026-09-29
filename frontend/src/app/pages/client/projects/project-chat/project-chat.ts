@@ -182,27 +182,17 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   get hasProcessingSources(): boolean { return this.sources.some((source) => source.status === 'processing'); }
   get nextBlocker(): string { return this.profile.completion.blockers[0]?.label || 'Final profile approval'; }
   get profileSections(): SectionProgress[] {
-    return this.profile.completion.sections
-      .filter((section) => !['routing', 'campaigns'].includes(section.key))
-      .map((section) => {
-        const fields = this.fieldsForSection(section.key);
-        const completed = fields.filter((field) => this.isResolvedStatus(field.status)).length;
-        return {
-          ...section,
-          completed,
-          total: fields.length,
-          percentage: fields.length ? Math.round(100 * completed / fields.length) : 100,
-        };
-      })
-      .filter((section) => section.total > 0);
+    return this.profile.completion.sections.filter((section) => section.total > 0);
   }
   fieldsForSection(section: string): ProjectFieldProgress[] {
     return this.profile.fields.filter((field) => field.section === section && !this.activationFieldKeys.has(field.key));
   }
   get projectProfileProgress(): { completed: number; total: number; percentage: number } {
-    const fields = this.profile.fields.filter((field) => !this.activationFieldKeys.has(field.key));
-    const completed = fields.filter((field) => this.isResolvedStatus(field.status)).length;
-    return { completed, total: fields.length, percentage: fields.length ? Math.round(100 * completed / fields.length) : 0 };
+    return {
+      completed: this.profile.completion.completed,
+      total: this.profile.completion.total,
+      percentage: this.profile.completion.percentage,
+    };
   }
   get aiAuthorizationStatus(): ValidationStatus {
     return this.profile.fields.find((field) => field.key === 'sales_authorization')?.status || 'missing';

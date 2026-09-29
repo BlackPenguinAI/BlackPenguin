@@ -10,7 +10,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.db.postgres import SessionLocal
-from app.integrations.messaging_gateway import default_provider, live_provider, provider_sender, send_sms
+from app.integrations.messaging_gateway import channel_sender, company_live_channel, default_provider, live_provider, send_message, send_sms
 from app.modules.projects.models import Project, ProjectCampaign
 from app.modules.sales_crm.intelligence import update_lead_intelligence
 from app.modules.sales_crm.models import FunnelStage, Lead, LeadContact
@@ -49,7 +49,7 @@ def ensure_contact(db: Session, lead: Lead) -> LeadContact:
         contact = LeadContact(
             company_id=lead.company_id, canonical_phone=phone,
             full_name=lead.full_name, email=lead.email,
-            preferred_channel="sms",
+            preferred_channel=lead.preferred_channel or "sms",
         )
         db.add(contact); db.flush()
     normalized_db_phone = Lead.phone
@@ -80,15 +80,20 @@ def ensure_contact(db: Session, lead: Lead) -> LeadContact:
 def get_or_create_live_conversation(db: Session, lead: Lead, *, provider: str | None = None) -> tuple[SalesConversation, bool]:
     # A provider switch affects only new threads. A lead that already owns a
     # physical SMS conversation must keep its original sender and webhook path.
+    channel = lead.preferred_channel or "sms"
     pinned = db.query(SalesConversation).filter(
         SalesConversation.lead_id == lead.id,
-        SalesConversation.channel == "sms",
+        SalesConversation.channel == channel,
     ).first()
     if pinned:
         return pinned, False
     provider = provider or default_provider(db)
-    sender = provider_sender(db, provider, company_id=lead.company_id)
-    thread_key = f"{provider}:{normalize_phone(sender)}:{normalize_phone(lead.phone)}"
+    sender = channel_sender(db, provider=provider, company_id=lead.company_id, channel=channel)
+    thread_key = (
+        f"{provider}:{normalize_phone(sender)}:{normalize_phone(lead.phone)}"
+        if channel == "sms" else
+        f"{provider}:{channel}:{normalize_phone(sender)}:{normalize_phone(lead.phone)}"
+    )
     existing = db.query(SalesConversation).filter(
         SalesConversation.provider_thread_key == thread_key,
     ).first()
@@ -136,7 +141,7 @@ def get_or_create_live_conversation(db: Session, lead: Lead, *, provider: str | 
         return existing, False
     conversation = SalesConversation(
         company_id=lead.company_id, project_id=lead.project_id, campaign_id=lead.campaign_id,
-        lead_id=lead.id, channel="sms", provider=provider, provider_thread_key=thread_key,
+        lead_id=lead.id, channel=channel, provider=provider, provider_thread_key=thread_key,
         automation_level=2, is_paused=False,
     )
     db.add(conversation); db.flush()
@@ -145,8 +150,12 @@ def get_or_create_live_conversation(db: Session, lead: Lead, *, provider: str | 
     return conversation, True
 
 
-def resolve_inbound_conversation(db: Session, *, provider: str = "twilio", to_number: str, from_number: str) -> SalesConversation | None:
-    key = f"{provider}:{normalize_phone(to_number)}:{normalize_phone(from_number)}"
+def resolve_inbound_conversation(db: Session, *, provider: str = "twilio", channel: str = "sms", to_number: str, from_number: str) -> SalesConversation | None:
+    key = (
+        f"{provider}:{normalize_phone(to_number)}:{normalize_phone(from_number)}"
+        if channel == "sms" else
+        f"{provider}:{channel}:{normalize_phone(to_number)}:{normalize_phone(from_number)}"
+    )
     return db.query(SalesConversation).filter(SalesConversation.provider_thread_key == key).first()
 
 
@@ -160,12 +169,31 @@ def _initial_message(lead: Lead, project: Project, campaign: ProjectCampaign | N
     )
 
 
+def _whatsapp_customer_window_open(db: Session, conversation: SalesConversation) -> bool:
+    """WhatsApp free-form replies are allowed for 24 hours after an inbound message."""
+    cutoff = datetime.utcnow() - timedelta(hours=24)
+    return db.query(SalesMessage.id).filter(
+        SalesMessage.conversation_id == conversation.id,
+        SalesMessage.channel == "whatsapp",
+        SalesMessage.direction == "inbound",
+        SalesMessage.created_at >= cutoff,
+    ).first() is not None
+
+
 async def _dispatch(
     db: Session, *, conversation: SalesConversation, lead: Lead, content: str,
     role: str, agent_run_id: str | None, author_user_id: str | None = None,
     metadata: dict | None = None,
     idempotency_key: str | None = None,
 ) -> SalesMessage:
+    event_kind = (metadata or {}).get("event_kind")
+    uses_whatsapp_template = event_kind in {"meta_lead_first_contact", "manual_lead_first_contact"}
+    if conversation.channel == "whatsapp" and not uses_whatsapp_template:
+        if not _whatsapp_customer_window_open(db, conversation):
+            raise HTTPException(
+                status_code=422,
+                detail="WhatsApp free-form messages require a customer reply in the previous 24 hours.",
+            )
     if idempotency_key:
         existing_outbound = db.query(OutboundMessage).filter(
             OutboundMessage.idempotency_key == idempotency_key,
@@ -193,23 +221,30 @@ async def _dispatch(
         message = None
     outbound = outbound or OutboundMessage(
         conversation_id=conversation.id, agent_run_id=agent_run_id,
-        idempotency_key=idempotency_key or f"{conversation.provider}:{conversation.id}:{uuid.uuid4()}", channel="sms",
+        idempotency_key=idempotency_key or f"{conversation.provider}:{conversation.id}:{uuid.uuid4()}", channel=conversation.channel,
         provider=conversation.provider,
         recipient=lead.phone, content=content, status="queued",
         approved_by_user_id=author_user_id,
         approved_at=datetime.utcnow() if author_user_id else None,
     )
     message = message or SalesMessage(
-        conversation_id=conversation.id, channel="sms", direction="outbound", role=role,
+        conversation_id=conversation.id, channel=conversation.channel, direction="outbound", role=role,
         author_user_id=author_user_id, content=content, status="queued",
         metadata_json=metadata or {}, created_at=datetime.utcnow(),
     )
     db.add_all([outbound, message]); db.commit()
     try:
-        result = await send_sms(
-            db, provider=conversation.provider, company_id=conversation.company_id,
-            to=lead.phone, body=content,
-        )
+        if conversation.channel == "sms":
+            result = await send_sms(
+                db, provider=conversation.provider, company_id=conversation.company_id,
+                to=lead.phone, body=content,
+            )
+        else:
+            result = await send_message(
+                db, provider=conversation.provider, channel=conversation.channel,
+                company_id=conversation.company_id, to=lead.phone, body=content,
+                use_initial_template=uses_whatsapp_template,
+            )
     except Exception as exc:
         outbound.status = "failed"; outbound.last_error = type(exc).__name__
         message.status = "failed"
@@ -321,9 +356,11 @@ def prepare_meta_simulation(db: Session, lead: Lead) -> tuple[SalesConversation,
 
 async def launch_live_lead(db: Session, lead: Lead) -> tuple[SalesConversation | None, SalesMessage | None]:
     """Start or safely re-contextualize the one physical SMS thread for this sender/recipient."""
-    provider = live_provider(db, company_id=lead.company_id)
-    if not provider:
+    channel = company_live_channel(db, company_id=lead.company_id, requested=lead.preferred_channel)
+    provider = "telnyx" if channel == "whatsapp" else live_provider(db, company_id=lead.company_id)
+    if not provider or not channel:
         return prepare_meta_simulation(db, lead)
+    lead.preferred_channel = channel
     project = db.query(Project).filter(Project.id == lead.project_id, Project.company_id == lead.company_id).one()
     campaign = db.query(ProjectCampaign).filter(ProjectCampaign.id == lead.campaign_id).first() if lead.campaign_id else None
     ensure_contact(db, lead)
@@ -350,7 +387,7 @@ async def launch_live_lead(db: Session, lead: Lead) -> tuple[SalesConversation |
         db.commit()
         return conversation, None
     content = _initial_message(lead, project, campaign)
-    event_kind = "meta_lead_first_contact"
+    event_kind = "meta_lead_first_contact" if lead.platform.startswith("meta") else "manual_lead_first_contact"
     if prior_message_count:
         first_name = (lead.full_name or "there").split()[0]
         content = (
@@ -413,7 +450,7 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
         result = await build_sales_graph(db).ainvoke({
             "event_id": event_id, "mode": "live", "conversation_id": conversation.id,
             "company_id": lead.company_id, "project_id": project.id, "campaign_id": lead.campaign_id,
-            "lead_id": lead.id, "channel": "sms", "inbound_text": inbound.content,
+            "lead_id": lead.id, "channel": conversation.channel, "inbound_text": inbound.content,
             "event_kind": "lead_message", "requires_human": False, "policy_violations": [],
         })
         reply = result.get("proposed_reply")
@@ -488,8 +525,8 @@ async def send_manual_message(db: Session, *, conversation_id: str, company_id: 
     ).with_for_update().first()
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found.")
-    if conversation.channel != "sms":
-        raise HTTPException(status_code=409, detail="Manual provider messages are available for live SMS conversations only.")
+    if conversation.channel not in {"sms", "whatsapp"}:
+        raise HTTPException(status_code=409, detail="Manual provider messages are available only for live messaging conversations.")
     if not conversation.is_paused:
         raise HTTPException(status_code=409, detail="Pause the AI before sending a manual SMS.")
     lead = db.query(Lead).filter(Lead.id == conversation.lead_id, Lead.company_id == company_id).one()
@@ -512,7 +549,7 @@ async def send_manual_message(db: Session, *, conversation_id: str, company_id: 
     message = await _dispatch(
         db, conversation=conversation, lead=lead, content=content,
         role="human", agent_run_id=None, author_user_id=user_id,
-        metadata={"event_kind": "manual_sms"},
+        metadata={"event_kind": f"manual_{conversation.channel}"},
     )
     conversation.pause_reason = "Manual control active"
     conversation.updated_at = datetime.utcnow(); db.commit()
@@ -533,7 +570,11 @@ async def process_live_followup_job(job_id: str) -> None:
             Lead.id == conversation.lead_id,
             Lead.company_id == conversation.company_id,
         ).one()
-        if conversation.channel != "sms" or conversation.is_paused or lead.is_opt_out:
+        if conversation.channel not in {"sms", "whatsapp"} or conversation.is_paused or lead.is_opt_out:
+            job.status = "cancelled"; job.processed_at = datetime.utcnow(); db.commit(); return
+        if conversation.channel == "whatsapp" and not _whatsapp_customer_window_open(db, conversation):
+            # Re-engagement outside the customer-service window requires a
+            # separately approved template; never attempt an illegal free-form send.
             job.status = "cancelled"; job.processed_at = datetime.utcnow(); db.commit(); return
         dispatch_key = f"{conversation.provider}-followup:{job.id}"
         if db.query(OutboundMessage).filter(OutboundMessage.idempotency_key == dispatch_key).first():
@@ -557,7 +598,7 @@ async def process_live_followup_job(job_id: str) -> None:
         result = await build_sales_graph(db).ainvoke({
             "event_id": event_id, "mode": "live", "conversation_id": conversation.id,
             "company_id": lead.company_id, "project_id": project.id,
-            "campaign_id": lead.campaign_id, "lead_id": lead.id, "channel": "sms",
+            "campaign_id": lead.campaign_id, "lead_id": lead.id, "channel": conversation.channel,
             "inbound_text": (
                 "Write the next concise, helpful SMS follow-up based only on the verified context and chat. "
                 "Do not invent urgency, inventory, price or availability. Include a simple question and opt-out language."

@@ -61,6 +61,7 @@ class LiveLeadCreate(BaseModel):
     source_code: str = Field(default="manual", min_length=2, max_length=40, pattern="^[a-z][a-z0-9_]*$")
     project_id: str
     campaign_id: str | None = None
+    channel: str | None = Field(default=None, pattern="^(sms|whatsapp)$")
     lead: SimulationLeadForm
 
 
@@ -78,6 +79,7 @@ class LiveMetaTestResponse(BaseModel):
     status: str
     replayed: bool = False
     provider: str | None = None
+    channel: str | None = None
     source_code: str | None = None
 
 

@@ -39,6 +39,7 @@ FIELD_ALIASES = {
     "official website": "official_corporate_website",
     "corporate website": "official_corporate_website",
     "headquarters": "headquarters",
+    "hq": "headquarters",
     "business model": "primary_business_model",
     "asset classes": "core_asset_classes",
     "operating footprint": "current_operating_footprint",
@@ -90,7 +91,7 @@ DOMAIN_PATTERN = re.compile(
     r"(?<![@\w])(?:https?://)?(?:www\.)?(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}(?::\d+)?(?:/[^\s<>]*)?",
     re.IGNORECASE,
 )
-TRACKING_PARAMETERS = {"fbclid", "gclid", "dclid", "msclkid"}
+TRACKING_PARAMETERS = {"fbclid", "gclid", "dclid", "msclkid", "__d"}
 
 
 def normalize_field_key(value: Any) -> str | None:
@@ -101,6 +102,50 @@ def normalize_field_key(value: Any) -> str | None:
         return candidate
     normalized = re.sub(r"[_\-]+", " ", candidate).strip().lower()
     return FIELD_ALIASES.get(normalized)
+
+
+def _labeled_company_updates(answer: str, profile: CompanyProfile) -> list[dict[str, Any]]:
+    """Parse two or more explicit ``Field: value`` pairs without model inference.
+
+    This deliberately does not guess unlabeled prose. It prevents a whole
+    multi-field message from being persisted as the active question's value.
+    """
+    labels = set(FIELD_ALIASES)
+    labels.update(field.label.casefold() for field in FIELD_BY_KEY.values())
+    ordered = sorted(labels, key=len, reverse=True)
+    pattern = re.compile(
+        r"(?i)(?:^|[\n;]\s*|\.\s+)(?P<label>" + "|".join(re.escape(item) for item in ordered) + r")\s*:\s*"
+    )
+    matches = list(pattern.finditer(answer))
+    if len(matches) < 2:
+        return []
+    updates: list[dict[str, Any]] = []
+    for index, match in enumerate(matches):
+        field = normalize_field_key(match.group("label"))
+        if not field:
+            continue
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(answer)
+        raw = answer[match.end():end].strip().strip(".;")
+        if not raw:
+            continue
+        value: Any = raw
+        urls = extract_urls(raw)
+        if field == "official_corporate_website":
+            if not urls:
+                continue
+            value = {"exists": True, "url": urls[0]}
+        elif field == "corporate_social_profiles":
+            if not urls:
+                continue
+            value = urls
+        elif field in {"public_contact_emails", "public_contact_phones", "core_asset_classes", "additional_corporate_languages"}:
+            value = [item.strip() for item in re.split(r"[,;]", raw) if item.strip()]
+        if validate_onboarding_value(field, value):
+            continue
+        existing = (profile.profile_data or {}).get(field)
+        status = "corrected_by_user" if existing not in (None, "", []) and existing != value else "confirmed"
+        updates.append(_user_update(field, value, status=status))
+    return updates if len(updates) >= 2 else []
 
 
 def get_or_create_profile(db: Session, company_id: str) -> CompanyProfile:
@@ -309,6 +354,10 @@ def resolve_answer_to_question(
     if not text:
         return QuestionResolution(True, "rejected", [], "empty_answer", question)
 
+    labeled_updates = _labeled_company_updates(answer, profile)
+    if labeled_updates:
+        return QuestionResolution(True, "accepted", labeled_updates, question=question)
+
     answer_actions = question.ui_payload.get("answer_actions")
     if isinstance(answer_actions, dict):
         action = next(
@@ -465,6 +514,22 @@ def apply_field_updates(
             continue
         if status in {"confirmed", "corrected_by_user", "not_applicable"} and not allow_authoritative_statuses:
             status = "pending_confirmation"
+
+        current_state = states.get(field_key, {}).get("status")
+        current_value = data.get(field_key)
+        incoming_value = update.get("value")
+        if (
+            not allow_authoritative_statuses
+            and current_state in {"confirmed", "corrected_by_user"}
+            and current_value not in (None, "", [])
+            and incoming_value != current_value
+        ):
+            rejected.append({
+                "update": raw_update,
+                "reason": "confirmed_value_conflict",
+                "current_value": current_value,
+            })
+            continue
 
         value = update.get("value")
         if status not in {"missing", "not_applicable", "deferred"} and value in (None, "", []):

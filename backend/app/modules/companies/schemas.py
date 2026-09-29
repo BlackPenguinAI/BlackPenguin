@@ -26,6 +26,7 @@ class UserBasicResponse(BaseModel):
 class CompanyResponse(BaseModel):
     id: str
     name: str
+    country_code: Optional[str] = None
     is_active: bool
     license_start: datetime
     license_end: datetime

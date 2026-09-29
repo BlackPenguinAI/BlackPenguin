@@ -46,4 +46,38 @@ describe('MessagingSettingsPageComponent', () => {
     ];
     expect(component.configuredCompanyCount).toBe(1);
   });
+
+  it('selects a WhatsApp number returned by the Company WABA', () => {
+    const component = new MessagingSettingsPageComponent({} as any, {} as any, {} as any);
+    const company: any = {
+      id: '1', company_id: 'a', company_name: 'A', company_is_active: true,
+      whatsapp_business_account_id: 'waba-1', whatsapp_phone_number_id: '',
+      whatsapp_from_phone_number: '', verification_status: 'verified',
+    };
+    component.whatsappAccounts = [{ id: 'waba-1', phone_numbers: [{
+      phone_number_id: 'phone-1', phone_number: '+51999000111', status: 'verified',
+    }] }];
+    component.selectWhatsAppNumber(company, 'phone-1');
+    expect(company.whatsapp_from_phone_number).toBe('+51999000111');
+    expect(component.dirty.telnyxCompany).toBe(true);
+  });
+
+  it('saves a WhatsApp-only Company without requiring an SMS sender', () => {
+    let requested = false;
+    const response = { subscribe: ({ next }: any) => { requested = true; next({ company_id: 'a', company_name: 'A' }); } };
+    const component = new MessagingSettingsPageComponent(
+      { put: () => response } as any,
+      { showError: () => { throw new Error('must not reject'); }, showSuccess: () => undefined } as any,
+      { detectChanges: () => undefined } as any,
+    );
+    component.telnyxCompanies = [{
+      id: '1', company_id: 'a', company_name: 'A', company_is_active: true,
+      messaging_profile_id: 'profile-1', from_phone_number: '', telnyx_phone_number_id: '',
+      regulatory_status: 'not_required', live_sms_enabled: false, primary_channel: 'whatsapp',
+      live_whatsapp_enabled: false, verification_status: 'not_configured', verified_at: null, last_error: '',
+    }];
+    component.selectedCompanyId = 'a';
+    component.saveTelnyxCompany();
+    expect(requested).toBe(true);
+  });
 });

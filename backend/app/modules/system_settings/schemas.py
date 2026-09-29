@@ -93,11 +93,19 @@ class TelnyxConfigSchema(BaseModel):
 
 
 class TelnyxCompanyConfigUpdate(BaseModel):
+    country_code: Optional[str] = Field(default=None, min_length=2, max_length=2, pattern=r"^[A-Za-z]{2}$")
     messaging_profile_id: Optional[str] = Field(default=None, max_length=100)
     from_phone_number: Optional[str] = Field(default=None, max_length=50)
     telnyx_phone_number_id: Optional[str] = Field(default=None, max_length=100)
     regulatory_status: Optional[Literal["pending", "approved", "not_required"]] = None
     live_sms_enabled: Optional[bool] = None
+    primary_channel: Optional[Literal["sms", "whatsapp"]] = None
+    whatsapp_business_account_id: Optional[str] = Field(default=None, max_length=120)
+    whatsapp_phone_number_id: Optional[str] = Field(default=None, max_length=120)
+    whatsapp_from_phone_number: Optional[str] = Field(default=None, max_length=50)
+    whatsapp_template_name: Optional[str] = Field(default=None, max_length=180)
+    whatsapp_template_language: Optional[str] = Field(default=None, max_length=20)
+    live_whatsapp_enabled: Optional[bool] = None
 
 
 class TelnyxCompanyConfigSchema(BaseModel):
@@ -105,6 +113,7 @@ class TelnyxCompanyConfigSchema(BaseModel):
     company_id: str
     company_name: str
     company_is_active: bool = True
+    country_code: Optional[str] = None
     messaging_profile_id: Optional[str] = None
     from_phone_number: Optional[str] = None
     telnyx_phone_number_id: Optional[str] = None
@@ -113,10 +122,40 @@ class TelnyxCompanyConfigSchema(BaseModel):
     coverage_checked_at: Optional[datetime] = None
     regulatory_status: Literal["pending", "approved", "not_required"] = "pending"
     live_sms_enabled: bool = False
+    primary_channel: Literal["sms", "whatsapp"] = "sms"
+    whatsapp_business_account_id: Optional[str] = None
+    whatsapp_phone_number_id: Optional[str] = None
+    whatsapp_from_phone_number: Optional[str] = None
+    whatsapp_template_name: Optional[str] = None
+    whatsapp_template_language: str = "es"
+    live_whatsapp_enabled: bool = False
+    whatsapp_verification_status: str = "not_configured"
+    whatsapp_verified_at: Optional[datetime] = None
+    whatsapp_last_error: Optional[str] = None
     verification_status: str = "not_configured"
     verified_at: Optional[datetime] = None
     last_error: Optional[str] = None
     updated_at: Optional[datetime] = None
+
+
+class TelnyxWhatsAppBusinessAccount(BaseModel):
+    id: str
+    name: str = ""
+    status: Optional[str] = None
+    waba_id: Optional[str] = None
+    phone_numbers: list[dict] = Field(default_factory=list)
+
+
+class TelnyxWhatsAppTemplate(BaseModel):
+    id: Optional[str] = None
+    name: str
+    language: str
+    status: str
+
+
+class TelnyxWhatsAppResources(BaseModel):
+    business_accounts: list[TelnyxWhatsAppBusinessAccount] = Field(default_factory=list)
+    templates: list[TelnyxWhatsAppTemplate] = Field(default_factory=list)
 
 
 class MessagingRoutingSchema(BaseModel):
