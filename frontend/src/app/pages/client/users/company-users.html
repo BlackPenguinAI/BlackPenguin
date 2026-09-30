@@ -74,6 +74,6 @@
       Black Penguin will email a secure Firebase activation link. Work and personal email addresses are accepted, and the user creates their own password.
     </p>
     <p *ngIf="invite.project_access_scope === 'selected' && !(invite.project_ids || []).length" class="text-xs text-amber-300">Select at least one Project.</p>
-    <div class="mt-3 flex justify-end gap-3 border-t border-white/10 pt-4"><app-button variant="ghost" (onClick)="closeAddModal()">Cancel</app-button><app-button type="submit" variant="secondary" [isLoading]="saving" [disabled]="!formValid">{{ editingUserId ? 'Save Changes' : 'Send Invitation' }}</app-button></div>
+    <div class="sticky bottom-0 z-10 mt-3 flex justify-end gap-3 border-t border-white/10 bg-[#111111]/95 py-4 backdrop-blur"><app-button variant="ghost" (onClick)="closeAddModal()">Cancel</app-button><app-button type="submit" variant="secondary" [isLoading]="saving" [disabled]="!formValid">{{ editingUserId ? 'Save Changes' : 'Send Invitation' }}</app-button></div>
   </form>
 </app-modal>

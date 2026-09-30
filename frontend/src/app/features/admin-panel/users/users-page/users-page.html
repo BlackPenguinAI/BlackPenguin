@@ -121,8 +121,8 @@
 
   </div>
 
-  <div *ngIf="actionUser" class="fixed inset-0 z-50 grid place-items-center bg-black/75 p-4 backdrop-blur-sm">
-    <div class="w-full max-w-lg rounded-2xl border border-white/10 bg-[#111] p-6 shadow-2xl">
+  <div *ngIf="actionUser" class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/75 p-4 backdrop-blur-sm sm:items-center sm:p-6">
+    <div class="my-auto max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto overscroll-contain rounded-2xl border border-white/10 bg-[#111] p-6 shadow-2xl sm:max-h-[calc(100dvh-3rem)]">
       <p class="text-[10px] font-bold uppercase tracking-[.2em] text-secondary">User lifecycle</p>
       <h2 class="mt-2 text-2xl font-light">{{ action | titlecase }} {{ actionUser.email }}</h2>
       <p class="mt-2 text-xs leading-5 text-gray-400">This action is audited. Active sessions are blocked on their next API request.</p>

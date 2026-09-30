@@ -60,15 +60,15 @@
     </div>
   </div>
 
-  <div *ngIf="showModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
-    <div class="bg-[#111111] border border-white/10 rounded-2xl w-full max-w-2xl shadow-2xl my-auto animate-fade-in">
+  <div *ngIf="showModal" class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4 backdrop-blur-sm sm:items-center sm:p-6">
+    <div class="my-auto flex max-h-[calc(100dvh-2rem)] w-full max-w-2xl min-h-0 flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#111111] shadow-2xl animate-fade-in sm:max-h-[calc(100dvh-3rem)]">
       
-      <div class="p-6 border-b border-white/10 flex justify-between items-center bg-white/5">
+      <div class="flex shrink-0 items-center justify-between border-b border-white/10 bg-white/5 p-6">
         <h2 class="text-xl font-medium text-white">{{ isEditing ? ('PLANS_PAGE.EDIT_PLAN' | translate) : ('PLANS_PAGE.ADD_NEW' | translate) }}</h2>
         <button (click)="closeModal()" class="text-gray-400 hover:text-white"><span class="material-symbols-outlined">close</span></button>
       </div>
 
-      <form (ngSubmit)="savePlan()" class="p-6 flex flex-col gap-5">
+      <form (ngSubmit)="savePlan()" class="flex min-h-0 flex-col gap-5 overflow-y-auto overscroll-contain p-6">
         
         <div class="grid grid-cols-1 gap-4">
           <div class="flex flex-col gap-1.5">
@@ -123,8 +123,8 @@
     </div>
   </div>
 
-  <div *ngIf="showDeleteModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-    <div class="bg-[#111111] border border-red-500/20 rounded-3xl w-full max-w-sm shadow-[0_0_50px_rgba(239,68,68,0.1)] p-8 flex flex-col items-center text-center animate-fade-in">
+  <div *ngIf="showDeleteModal" class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 p-4 backdrop-blur-sm sm:items-center sm:p-6">
+    <div class="my-auto flex max-h-[calc(100dvh-2rem)] w-full max-w-sm flex-col items-center overflow-y-auto overscroll-contain rounded-3xl border border-red-500/20 bg-[#111111] p-8 text-center shadow-[0_0_50px_rgba(239,68,68,0.1)] animate-fade-in sm:max-h-[calc(100dvh-3rem)]">
       <div class="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center mb-5 border border-red-500/20">
         <span class="material-symbols-outlined text-red-500 text-4xl">warning</span>
       </div>

@@ -1,19 +1,25 @@
-<div *ngIf="isOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-fade-in" role="dialog" aria-modal="true" [attr.aria-label]="title || 'Dialog'">
+<div *ngIf="isOpen"
+     class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/75 p-4 backdrop-blur-sm animate-fade-in sm:items-center sm:p-6"
+     role="dialog"
+     aria-modal="true"
+     [attr.aria-labelledby]="title ? titleId : null"
+     [attr.aria-label]="title ? null : 'Dialog'">
   
-  <div 
-    class="bg-[#111111] rounded-3xl w-full flex flex-col relative animate-fade-in shadow-2xl border"
+  <div #dialogPanel
+    tabindex="-1"
+    class="relative flex max-h-[calc(100dvh-2rem)] w-full min-h-0 flex-col overflow-hidden rounded-3xl border bg-[#111111] shadow-2xl outline-none animate-fade-in sm:max-h-[calc(100dvh-3rem)]"
     [ngClass]="[maxWidthClass, variant === 'danger' ? 'border-red-500/20 shadow-[0_24px_80px_rgba(0,0,0,.55)]' : 'border-white/10']">
     
     <button *ngIf="showCloseButton" (click)="close.emit()" class="absolute top-6 right-6 rounded-lg p-1 text-gray-500 hover:bg-white/5 hover:text-white transition-colors focus:outline-none z-10" aria-label="Close dialog">
       <span class="material-symbols-outlined text-[24px]">close</span>
     </button>
 
-    <div *ngIf="title" class="flex items-start gap-3 border-b px-8 pb-5 pt-8 pr-16" [ngClass]="variant === 'danger' ? 'border-red-500/10' : 'border-white/10'">
+    <div *ngIf="title" class="flex shrink-0 items-start gap-3 border-b px-6 pb-5 pt-6 pr-16 sm:px-8 sm:pt-8" [ngClass]="variant === 'danger' ? 'border-red-500/10' : 'border-white/10'">
       <span *ngIf="variant === 'danger'" class="material-symbols-outlined mt-0.5 rounded-xl border border-red-500/20 bg-red-500/10 p-2 text-xl text-red-400">warning</span>
-      <div><h2 class="text-2xl font-light text-white">{{ title }}</h2><p *ngIf="subtitle" class="text-sm text-gray-400 mt-1">{{ subtitle }}</p></div>
+      <div><h2 [id]="titleId" class="text-2xl font-light text-white">{{ title }}</h2><p *ngIf="subtitle" class="text-sm text-gray-400 mt-1">{{ subtitle }}</p></div>
     </div>
 
-    <div class="w-full px-8 pb-8 pt-6">
+    <div class="min-h-0 w-full overflow-y-auto overscroll-contain px-6 pb-6 pt-6 sm:px-8 sm:pb-8" data-modal-scroll-region>
       <ng-content></ng-content>
     </div>
 

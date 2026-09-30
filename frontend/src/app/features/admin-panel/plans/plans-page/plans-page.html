@@ -122,7 +122,7 @@
       </label>
     </div>
 
-    <div class="flex justify-end gap-3 mt-2 border-t border-white/10 pt-4">
+    <div class="sticky bottom-0 z-10 mt-2 flex justify-end gap-3 border-t border-white/10 bg-[#111111]/95 py-4 backdrop-blur">
       <app-button variant="ghost" (onClick)="closeModal()">Cancel</app-button>
       <app-button type="submit" variant="secondary" [isLoading]="isSaving">Create Plan</app-button>
     </div>
@@ -163,7 +163,7 @@
       </label>
     </div>
 
-    <div class="flex justify-end gap-3 mt-2 border-t border-white/10 pt-4">
+    <div class="sticky bottom-0 z-10 mt-2 flex justify-end gap-3 border-t border-white/10 bg-[#111111]/95 py-4 backdrop-blur">
       <app-button variant="ghost" (onClick)="closeEditModal()">Cancel</app-button>
       <app-button type="submit" variant="secondary" [isLoading]="isSaving">Save Changes</app-button>
     </div>
