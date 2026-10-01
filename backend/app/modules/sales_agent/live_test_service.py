@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from datetime import datetime
 import hashlib
-import json
 
 from fastapi import HTTPException
 from fastapi.encoders import jsonable_encoder
@@ -12,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.modules.projects.models import Project, ProjectCampaign
 from app.modules.sales_crm.models import Lead, LeadConsentEvent
+from app.modules.sales_crm.intelligence import initial_lead_profile, lead_profile_summary
 from app.integrations.messaging_gateway import channel_sender, company_live_channel, live_provider
 
 from .live_service import launch_live_lead, normalize_phone
@@ -141,18 +141,23 @@ async def create_live_lead(
             "source_code": source_code,
         }
 
-    product = _selected_product(db, project=project, product_id=lead_form["product_id"])
+    product = (
+        _selected_product(db, project=project, product_id=lead_form["product_id"])
+        if lead_form.get("product_id") else None
+    )
     now = datetime.utcnow()
-    budget = {
-        "minimum": _number(lead_form["budget_min"]),
-        "maximum": _number(lead_form.get("budget_max")),
-        "currency": product.get("currency"),
-    }
-    qualification = {
-        "selected_product": product,
-        "budget": budget,
-        "custom_answers": lead_form.get("custom_answers") or {},
-    }
+    budget = None
+    if lead_form.get("budget_min") is not None or lead_form.get("budget_max") is not None:
+        budget = {
+            "minimum": _number(lead_form.get("budget_min")),
+            "maximum": _number(lead_form.get("budget_max")),
+            "currency": product.get("currency") if product else None,
+        }
+    custom_answers = lead_form.get("custom_answers") or {}
+    profile_source = "meta_form" if source_code == "meta" else "manual_registration"
+    lead_profile = initial_lead_profile(
+        product=product, budget=budget, custom_answers=custom_answers, source=profile_source,
+    )
     lead = Lead(
         company_id=company_id,
         project_id=project.id,
@@ -165,22 +170,25 @@ async def create_live_lead(
         external_lead_id=external_id,
         preferred_channel=channel,
         channel_address=lead_form["phone"],
-        consent_status="granted_manual_meta_test",
+        consent_status="granted",
         consent_captured_at=now,
-        qualification_summary=json.dumps(qualification, ensure_ascii=False, default=str),
+        qualification_summary=lead_profile_summary(lead_profile),
         meta_form_data=jsonable_encoder({
+            "schema_version": 1,
             "test_mode": "manual_meta_lead_ads",
             "form_id": campaign.lead_form_id,
             "campaign_id": campaign.external_campaign_id,
             "adset_id": campaign.external_adset_id,
             "ad_id": campaign.external_ad_id,
-            "selected_product": product,
-            "budget": budget,
-            "custom_answers": lead_form.get("custom_answers") or {},
+            "answers": [
+                {"key": str(key), "value": value}
+                for key, value in custom_answers.items()
+            ],
         }) if source_code == "meta" and campaign else {},
+        lead_profile_data=jsonable_encoder(lead_profile),
         agent_status="queued",
         is_demo=False,
-        is_test=True,
+        is_test=source_code == "meta",
     )
     db.add(lead); db.flush()
     db.add(LeadConsentEvent(

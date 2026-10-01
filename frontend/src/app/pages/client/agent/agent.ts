@@ -35,7 +35,7 @@ export class AgentComponent implements OnInit, OnDestroy {
   deletingSimulation = false;
   generatingInitial = false;
   setupOpen = true;
-  setupMode: 'simulation' | 'live_meta' = 'simulation';
+  setupMode: 'simulation' | 'live_meta' = 'live_meta';
   leadSourceCode = 'manual';
   leadSources: any[] = [
     { code: 'manual', label: 'Manual registration', requires_campaign: false, campaign_platform: null },
@@ -105,7 +105,11 @@ export class AgentComponent implements OnInit, OnDestroy {
     }).subscribe({
       next: ({ projects, sources }) => {
         this.options = projects;
-        this.leadSources = sources?.length ? sources : this.leadSources;
+        // Real Meta webhook ingestion remains backend-ready but is not exposed
+        // as a manual intake choice until its production E2E is validated.
+        const availableSources = (sources?.length ? sources : this.leadSources)
+          .filter((source: any) => source.code !== 'meta');
+        this.leadSources = availableSources.length ? availableSources : [this.leadSources[0]];
         const requested = this.route.snapshot.queryParamMap.get('project');
         this.projectId = projects.find((row) => row.id === requested)?.id || '';
         this.campaignId = this.campaigns[0]?.id || '';
@@ -113,7 +117,7 @@ export class AgentComponent implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.loading = false;
-        this.error = err.error?.detail || 'Simulation projects could not be loaded.';
+        this.error = err.error?.detail || 'Agent projects could not be loaded.';
         this.cdr.markForCheck();
       },
     });
@@ -183,17 +187,18 @@ export class AgentComponent implements OnInit, OnDestroy {
         !this.currentLeadSource.requires_campaign ||
         (!!this.campaignId && this.availableCampaigns.some((row) => row.id === this.campaignId))
       );
-    return !!(
+    const contactComplete = !!(
       this.projectId &&
       campaignComplete &&
       this.form.first_name.trim() &&
       this.form.last_name.trim() &&
       this.form.phone.trim() &&
       this.emailValid &&
-      this.form.product_id &&
-      this.budgetValid &&
       this.form.consent
     );
+    return this.setupMode === 'live_meta'
+      ? contactComplete
+      : contactComplete && !!this.form.product_id && this.budgetValid;
   }
 
   loadConversations(keep = false, preferredConversationId = '', preserveSetup = false): void {
@@ -371,9 +376,7 @@ export class AgentComponent implements OnInit, OnDestroy {
       campaign_id: this.currentLeadSource?.requires_campaign ? this.campaignId : null,
       lead: {
         first_name: this.form.first_name.trim(), last_name: this.form.last_name.trim(),
-        phone: this.form.phone.trim(), email: this.form.email.trim(), product_id: this.form.product_id,
-        budget_min: Number(this.form.budget_min),
-        budget_max: this.form.budget_max === null || this.form.budget_max === undefined ? null : Number(this.form.budget_max),
+        phone: this.form.phone.trim(), email: this.form.email.trim(),
         consent: this.form.consent, custom_answers: {},
       },
     }, { headers: { 'Idempotency-Key': this.liveSubmissionKey } })
@@ -598,6 +601,17 @@ export class AgentComponent implements OnInit, OnDestroy {
   }
   get liveControlLabel(): string {
     return this.selected?.channel === 'whatsapp' ? 'LIVE WHATSAPP CONTROL' : 'LIVE SMS CONTROL';
+  }
+  get operationalStatusLabel(): string {
+    if (!this.selected) return 'UNKNOWN';
+    if (!this.isLive) return this.selected.simulation_status || this.selected.agent_status || 'SIMULATION';
+    if (this.selected.appointment_id) return 'APPOINTMENT CONFIRMED';
+    if (this.selected.is_paused) return this.selected.pause_reason?.includes('Human') ? 'HUMAN CONTROL' : 'AI PAUSED';
+    return 'AI ACTIVE';
+  }
+  get leadSourceLabel(): string {
+    if (this.selected?.platform?.startsWith('meta')) return 'Meta Lead Ads';
+    return this.selected?.source || 'Manual registration';
   }
   asUtcDate(value: string | Date | null | undefined): string | Date {
     if (!value || typeof value !== 'string') return value || '';

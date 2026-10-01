@@ -121,6 +121,7 @@ def build_sales_graph(db: Session):
                 "segment_guardrail": BASE_SEGMENT_GUARDRAIL,
                 "qualification_summary": lead.qualification_summary,
                 "meta_form_data": lead.meta_form_data or {},
+                "profile_data": lead.lead_profile_data or {},
                 "prior_history_for_phone": contact.previous_projects if contact else [],
             },
             "conversation_history": [
@@ -179,7 +180,7 @@ def build_sales_graph(db: Session):
         contract = {
             "reply": "string",
             "intent": "string",
-            "extracted_facts": [],
+            "extracted_facts": [{"key": "approved_profile_fact", "value": "explicit lead value"}],
             "proposed_actions": [],
             "requires_human": False,
             "reason": "string",
@@ -190,7 +191,7 @@ def build_sales_graph(db: Session):
                 "company": state["company_context"], "project": state["project_context"],
                 "inventory": state["inventory_context"], "lead": state["lead_context"],
                 "event_kind": state.get("event_kind", "lead_message"),
-                "allowed_actions": ["answer_question", "ask_qualification_question", "search_inventory", "request_available_slots", "offer_appointment", "schedule_follow_up", "request_human_review"],
+                "allowed_actions": ["answer_question", "ask_qualification_question", "search_inventory", "request_visit_location", "request_available_slots", "offer_appointment", "schedule_follow_up", "request_human_review"],
                 "contract": contract,
             }, ensure_ascii=False, default=str)},
         ]
@@ -226,7 +227,7 @@ def build_sales_graph(db: Session):
 
     async def validate_output(state: SalesAgentState) -> dict[str, Any]:
         violations = list(state.get("policy_violations", []))
-        allowed = {"answer_question", "ask_qualification_question", "search_inventory", "request_available_slots", "offer_appointment", "schedule_follow_up", "request_human_review"}
+        allowed = {"answer_question", "ask_qualification_question", "search_inventory", "request_visit_location", "request_available_slots", "offer_appointment", "schedule_follow_up", "request_human_review"}
         for action in state.get("proposed_actions", []):
             if not isinstance(action, dict) or action.get("type") not in allowed:
                 violations.append("unsupported_action")

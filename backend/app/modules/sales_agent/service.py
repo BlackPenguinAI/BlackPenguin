@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.modules.projects.models import Project, ProjectCampaign
 from app.modules.projects.locations import locations_for_project, resolve_visit_location
+from app.modules.governance.models import HumanInterventionCase
 from app.modules.sales_crm.models import FunnelStage, Lead, Meeting
 from app.modules.sales_crm.scheduling import available_slots, create_agent_appointment, next_cadence_time
 from app.modules.users.models import User
@@ -277,7 +278,9 @@ def _confirm_or_request_location(project: Project, lead: Lead, inbound_text: str
     form = dict(lead.meta_form_data or {})
     current = resolve_visit_location(project, form.get("selected_visit_location"))
     if current:
-        return True, None, None
+        resume = form.pop("pending_location_request", None)
+        lead.meta_form_data = form
+        return True, None, resume
     if len(locations) == 1:
         selected = locations[0]
     else:
@@ -336,6 +339,8 @@ def conversation_summaries(
             "funnel_stage": lead.funnel_stage.value if hasattr(lead.funnel_stage, "value") else str(lead.funnel_stage),
             "intent_score": float(lead.intent_score or 0),
             "intent_tier": lead.intent_tier, "assigned_segment": lead.assigned_segment,
+            "qualification_summary": lead.qualification_summary,
+            "lead_profile_data": lead.lead_profile_data or {},
             "pipeline_stage": lead.pipeline_stage, "pause_reason": conversation.pause_reason,
             "last_message": last.content if last else None,
             "last_message_at": last.created_at if last else None,
@@ -381,7 +386,7 @@ def conversation_messages(
 
 def set_conversation_action(
     db: Session, *, company_id: str, conversation_id: str, action: str,
-    sales_user_id: str | None = None,
+    sales_user_id: str | None = None, actor_user_id: str | None = None,
 ) -> SalesConversation:
     query = db.query(SalesConversation).join(Lead, Lead.id == SalesConversation.lead_id).filter(
         SalesConversation.id == conversation_id,
@@ -401,8 +406,16 @@ def set_conversation_action(
         conversation.is_paused = False
         conversation.pause_reason = None
         if lead:
-            lead.agent_status = "active" if conversation.channel == "sms" else "simulation"
-            if conversation.channel == "sms" and not db.query(SalesFollowUpJob).filter(
+            lead.agent_status = "active" if conversation.channel in {"sms", "whatsapp"} else "simulation"
+            db.query(HumanInterventionCase).filter(
+                HumanInterventionCase.conversation_id == conversation.id,
+                HumanInterventionCase.status == "open",
+            ).update({
+                HumanInterventionCase.status: "resolved",
+                HumanInterventionCase.resolved_at: datetime.utcnow(),
+                HumanInterventionCase.resolved_by_user_id: actor_user_id,
+            }, synchronize_session=False)
+            if conversation.channel in {"sms", "whatsapp"} and not db.query(SalesFollowUpJob).filter(
                 SalesFollowUpJob.conversation_id == conversation.id,
                 SalesFollowUpJob.status == "pending",
             ).first():

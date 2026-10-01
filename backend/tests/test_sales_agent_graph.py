@@ -65,3 +65,30 @@ def test_langgraph_simulation_creates_a_draft_without_dispatching():
     draft = db.query(OutboundMessage).one()
     assert draft.status == "draft"
     assert draft.sent_at is None
+
+
+def test_visit_location_action_is_valid_workflow_output_not_a_policy_violation():
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    db = sessionmaker(bind=engine)()
+    company = Company(name="Test Company"); db.add(company); db.flush()
+    admin = User(company_id=company.id, email="admin2@example.com", hashed_password="x", role=UserRole.ADMIN)
+    db.add(admin); db.flush()
+    project = provision_demo_project(db, company_id=company.id, approved_by_user_id=admin.id)
+    db.add(AIConfiguration(
+        company_id=company.id, openrouter_api_key="test",
+        agent_ventas={"model": "test/model", "system_prompt": "Help", "protocol_prompt": "Qualify", "guardrails_prompt": "Safe"},
+    )); db.commit()
+    lead = db.query(Lead).filter(Lead.project_id == project.id).first()
+    llm_json = (
+        '{"reply":"Which property would you like to visit?","intent":"appointment_request",'
+        '"extracted_facts":[],"proposed_actions":[{"type":"request_visit_location"}],'
+        '"requires_human":false,"reason":"Need an explicit location"}'
+    )
+    with patch("app.modules.sales_agent.graph.generate_llm_response", new=AsyncMock(return_value=llm_json)):
+        result = asyncio.run(simulate_turn(
+            db, company_id=company.id, lead_id=lead.id,
+            inbound_text="I would like to schedule a visit.",
+        ))
+    assert result["status"] == "completed"
+    assert result["policy_violations"] == []

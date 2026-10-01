@@ -13,6 +13,7 @@ describe('AgentComponent simulation form', () => {
 
   it('prevents starting a simulation until every required field is complete', () => {
     const value = component();
+    value.openSetup('simulation');
     value.options = [
       { id: 'project', campaigns: [{ id: 'campaign' }], products: [{ id: 'property_type:home' }] },
     ];
@@ -74,9 +75,36 @@ describe('AgentComponent simulation form', () => {
     expect(calls[0].url.endsWith('/sales-agent/live-leads')).toBe(true);
     expect(calls[0].body.source_code).toBe('manual');
     expect(calls[0].body.campaign_id).toBeNull();
+    expect(calls[0].body.lead.product_id).toBeUndefined();
+    expect(calls[0].body.lead.budget_min).toBeUndefined();
     expect(calls[0].options.headers['Idempotency-Key'].length).toBeGreaterThanOrEqual(16);
     expect(value.success).toContain('Telnyx');
     expect(value.creating).toBe(false);
+  });
+
+  it('accepts the minimal live lead identity without product or budget', () => {
+    const value = component();
+    value.options = [{ id: 'project', campaigns: [], products: [] }];
+    value.projectId = 'project';
+    value.openSetup('live_meta');
+    value.form.first_name = 'Taylor';
+    value.form.last_name = 'Morgan';
+    value.form.phone = '+51999888777';
+    value.form.email = 'taylor@example.com';
+    value.form.consent = true;
+    expect(value.form.product_id).toBe('');
+    expect(value.form.budget_min).toBeNull();
+    expect(value.formComplete).toBe(true);
+  });
+
+  it('keeps progressively qualified lead facts in the live conversation context', () => {
+    const value = component();
+    value.selected = {
+      id: 'live-conversation', channel: 'whatsapp', platform: 'manual', is_paused: false,
+      qualification_summary: 'Minimum budget: 400000; Property interest: 40 Villa',
+    };
+    expect(value.selected.qualification_summary).toContain('Minimum budget');
+    expect(value.operationalStatusLabel).toBe('AI ACTIVE');
   });
 
   it('requires a mapped campaign only when the selected source is Meta', () => {
@@ -238,10 +266,12 @@ describe('AgentComponent simulation form', () => {
     });
     value.selected = {
       id: 'whatsapp-conversation', lead_id: 'lead', channel: 'whatsapp', is_paused: true,
+      pause_reason: 'Human intervention: review',
     };
     value.draft = 'Manual takeover message';
     expect(value.isLive).toBe(true);
     expect(value.liveControlLabel).toBe('LIVE WHATSAPP CONTROL');
+    expect(value.operationalStatusLabel).toBe('HUMAN CONTROL');
     value.send();
     expect(urls[0]).toContain('/conversations/whatsapp-conversation/manual-message');
     expect(urls[0]).not.toContain('/simulate');

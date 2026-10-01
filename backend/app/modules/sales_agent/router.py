@@ -305,7 +305,7 @@ def conversation_action(
     require_project_access(db, current_user, existing.project_id)
     conversation = set_conversation_action(
         db, company_id=current_user.company_id, conversation_id=conversation_id, action=payload.action,
-        sales_user_id=None,
+        sales_user_id=None, actor_user_id=current_user.id,
     )
     return next(item for item in conversation_summaries(
         db, company_id=current_user.company_id,

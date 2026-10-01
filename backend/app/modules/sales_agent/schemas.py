@@ -45,6 +45,46 @@ class SimulationLeadForm(BaseModel):
         return self
 
 
+class LiveLeadForm(BaseModel):
+    """Minimal identity and consent required to open a real provider thread."""
+
+    first_name: str = Field(min_length=1, max_length=80)
+    last_name: str = Field(min_length=1, max_length=80)
+    phone: str = Field(min_length=7, max_length=30)
+    email: EmailStr
+    consent: bool
+    custom_answers: dict[str, Any] = Field(default_factory=dict)
+    # Accepted for backwards compatibility and source imports, but deliberately
+    # optional: the agent qualifies these facts during the conversation.
+    product_id: str | None = Field(default=None, min_length=3, max_length=260)
+    budget_min: Decimal | None = Field(default=None, gt=0, max_digits=16, decimal_places=2)
+    budget_max: Decimal | None = Field(default=None, gt=0, max_digits=16, decimal_places=2)
+
+    @field_validator("first_name", "last_name")
+    @classmethod
+    def normalize_name(cls, value: str) -> str:
+        normalized = " ".join(value.split())
+        if not normalized:
+            raise ValueError("First and last name are required.")
+        return normalized
+
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, value: str) -> str:
+        compact = "".join(character for character in value if character.isdigit() or character == "+")
+        if len([character for character in compact if character.isdigit()]) < 7:
+            raise ValueError("Enter a valid phone number.")
+        return compact
+
+    @model_validator(mode="after")
+    def validate_optional_budget_range(self):
+        if self.budget_max is not None and self.budget_min is None:
+            raise ValueError("Minimum budget is required when a maximum budget is supplied.")
+        if self.budget_max is not None and self.budget_min is not None and self.budget_max < self.budget_min:
+            raise ValueError("Maximum budget must be greater than or equal to minimum budget.")
+        return self
+
+
 class SimulationCreate(BaseModel):
     project_id: str
     campaign_id: str
@@ -62,7 +102,7 @@ class LiveLeadCreate(BaseModel):
     project_id: str
     campaign_id: str | None = None
     channel: str | None = Field(default=None, pattern="^(sms|whatsapp)$")
-    lead: SimulationLeadForm
+    lead: LiveLeadForm
 
 
 class LiveLeadSourceOption(BaseModel):
@@ -130,6 +170,8 @@ class ConversationSummary(BaseModel):
     intent_score: float = 0
     intent_tier: str = "cold"
     assigned_segment: str | None = None
+    qualification_summary: str | None = None
+    lead_profile_data: dict[str, Any] = Field(default_factory=dict)
     pipeline_stage: str = "S00_CAPTURE"
     pause_reason: str | None = None
     last_message: str | None = None

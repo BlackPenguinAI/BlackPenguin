@@ -18,14 +18,15 @@ from app.core.secret_store import decrypt_secret
 from app.db.postgres import Base
 from app.integrations.twilio_client import validate_twilio_signature
 from app.modules.companies.models import Company
+from app.modules.governance.models import HumanInterventionCase
 from app.modules.project_team.models import ProjectUserAssignment
 from app.modules.projects.models import Project
-from app.modules.sales_crm.intelligence import update_lead_intelligence
+from app.modules.sales_crm.intelligence import merge_extracted_facts, update_lead_intelligence
 from app.modules.sales_crm.models import CalendarConnection, Lead, SalesAvailabilityWindow
 from app.modules.sales_crm.scheduling import available_slots, next_cadence_time
 from app.modules.sales_agent.live_service import ensure_contact, get_or_create_live_conversation
 from app.modules.sales_agent.models import SalesConversation
-from app.modules.sales_agent.service import set_conversation_action
+from app.modules.sales_agent.service import conversation_summaries, set_conversation_action
 from app.modules.system_settings.models import TwilioConfig
 from app.modules.system_settings.schemas import TwilioConfigUpdate
 from app.modules.system_settings.services import (
@@ -222,6 +223,82 @@ def test_closed_or_opted_out_live_conversation_cannot_be_resumed():
     conversation.pause_reason = "Lead opted out"; lead.is_opt_out = True; db.commit()
     with pytest.raises(HTTPException, match="opted-out"):
         set_conversation_action(db, company_id=company.id, conversation_id=conversation.id, action="resume")
+
+
+def test_resuming_live_whatsapp_closes_intervention_without_marking_simulation():
+    db = _db()
+    company = Company(name="Tenant"); db.add(company); db.flush()
+    project = Project(company_id=company.id, name="Project", timezone="America/Lima")
+    db.add(project); db.flush()
+    user = User(company_id=company.id, email="admin@example.com", hashed_password="x", role=UserRole.ADMIN)
+    lead = Lead(
+        company_id=company.id, project_id=project.id, full_name="Lead", phone="+51999888777",
+        source="Manual registration", platform="manual", agent_status="human_control",
+    )
+    db.add_all([user, lead]); db.flush()
+    conversation = SalesConversation(
+        company_id=company.id, project_id=project.id, lead_id=lead.id,
+        channel="whatsapp", provider="telnyx", provider_thread_key="wa-thread",
+        is_paused=True, pause_reason="Human intervention: POLICY_VIOLATION",
+    )
+    db.add(conversation); db.flush()
+    intervention = HumanInterventionCase(
+        company_id=company.id, project_id=project.id, lead_id=lead.id,
+        conversation_id=conversation.id, reason="POLICY_VIOLATION",
+        status="open", dedupe_key="POLICY_VIOLATION:open",
+    )
+    db.add(intervention); db.commit()
+
+    set_conversation_action(
+        db, company_id=company.id, conversation_id=conversation.id,
+        action="resume", actor_user_id=user.id,
+    )
+
+    db.refresh(lead); db.refresh(intervention); db.refresh(conversation)
+    assert conversation.is_paused is False
+    assert lead.agent_status == "active"
+    assert intervention.status == "resolved"
+    assert intervention.resolved_by_user_id == user.id
+
+
+def test_agent_facts_update_a_source_aware_progressive_profile():
+    lead = Lead(
+        company_id="company", project_id="project", full_name="Lead", phone="+51999888777",
+        source="Manual registration", platform="manual", lead_profile_data={},
+    )
+    profile = merge_extracted_facts(lead, [
+        {"key": "budget_min", "value": 400000},
+        {"field": "property_type", "value": "40 Villa model home"},
+        {"key": "internal_instruction", "value": "must be ignored"},
+    ], evidence="My budget starts at 400000 and I prefer the 40 Villa.")
+    assert profile["facts"]["budget_minimum"]["value"] == 400000
+    assert profile["facts"]["budget_minimum"]["source"] == "agent_conversation"
+    assert profile["facts"]["property_interest"]["confirmed"] is True
+    assert "internal_instruction" not in profile["facts"]
+    assert "Minimum budget" in lead.qualification_summary
+
+
+def test_conversation_summary_exposes_progressive_profile_to_operations_ui():
+    db = _db()
+    company = Company(name="Tenant"); db.add(company); db.flush()
+    project = Project(company_id=company.id, name="Project"); db.add(project); db.flush()
+    lead = Lead(
+        company_id=company.id, project_id=project.id, full_name="Progressive Lead",
+        phone="+51999888777", source="Manual registration", platform="manual",
+        qualification_summary="Minimum budget: 400000",
+        lead_profile_data={"schema_version": 1, "facts": {"budget_minimum": {"value": 400000}}},
+    )
+    db.add(lead); db.flush()
+    conversation = SalesConversation(
+        company_id=company.id, project_id=project.id, lead_id=lead.id,
+        channel="whatsapp", provider="telnyx", provider_thread_key="profile-thread",
+    )
+    db.add(conversation); db.commit()
+
+    summary = conversation_summaries(db, company_id=company.id)[0]
+
+    assert summary["qualification_summary"] == "Minimum budget: 400000"
+    assert summary["lead_profile_data"]["facts"]["budget_minimum"]["value"] == 400000
 
 
 def test_live_sales_agent_migration_is_repeatable_on_current_schema(monkeypatch):

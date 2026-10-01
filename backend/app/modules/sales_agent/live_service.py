@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from app.db.postgres import SessionLocal
 from app.integrations.messaging_gateway import channel_sender, company_live_channel, default_provider, live_provider, send_message, send_sms
 from app.modules.projects.models import Project, ProjectCampaign
-from app.modules.sales_crm.intelligence import update_lead_intelligence
+from app.modules.sales_crm.intelligence import merge_extracted_facts, update_lead_intelligence
 from app.modules.sales_crm.models import FunnelStage, Lead, LeadContact
 
 from .graph import GRAPH_VERSION, TOOLSET_VERSION, build_sales_graph
@@ -459,6 +459,69 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
                 idempotency_key=f"human-intervention:{conversation.id}:{inbound.id}",
             )
             return
+        awaiting_location = bool((lead.meta_form_data or {}).get("pending_location_request"))
+        if awaiting_location:
+            # A location choice is deterministic workflow input, not an LLM
+            # policy decision. Resolve it before the graph so valid replies such
+            # as "the first property" can never become false policy violations.
+            location_ready, location_question, location_resume = _confirm_or_request_location(
+                project, lead, inbound.content,
+            )
+            offered_slots = []
+            if location_resume:
+                reply, offered_slots = _availability_reply(
+                    db, project=project, inbound_text=location_resume, now=datetime.utcnow(),
+                )
+                actions = [{"type": "request_available_slots"}]
+                if offered_slots:
+                    actions.append({"type": "offer_appointment"})
+            elif not location_ready:
+                reply = location_question
+                actions = [{"type": "request_visit_location"}]
+            else:
+                reply, offered_slots = _availability_reply(
+                    db, project=project, inbound_text="available visit times", now=datetime.utcnow(),
+                )
+                actions = [{"type": "request_available_slots"}]
+                if offered_slots:
+                    actions.append({"type": "offer_appointment"})
+            event_id = f"{conversation.provider}:{inbound.provider_message_id or inbound.id}"
+            run = AgentRun(
+                conversation_id=conversation.id, event_id=event_id, mode="live", status="completed",
+                graph_version=GRAPH_VERSION, toolset_version=TOOLSET_VERSION,
+                prompt_snapshot={}, model="deterministic/location-routing",
+                input_snapshot={"message_id": inbound.id, "pending_location": True},
+                output_snapshot={
+                    "reply": reply, "proposed_actions": actions, "requires_human": False,
+                    "policy_violations": [], "error_code": None,
+                },
+                completed_at=datetime.utcnow(),
+            )
+            history = db.query(SalesMessage).filter(
+                SalesMessage.conversation_id == conversation.id,
+            ).order_by(SalesMessage.created_at).all()
+            update_lead_intelligence(
+                db, lead, inbound_text=inbound.content,
+                conversation_text=" ".join(item.content for item in history[-20:]),
+                message_count=len(history),
+            )
+            conversation.updated_at = datetime.utcnow(); lead.last_interaction_at = datetime.utcnow()
+            db.add_all([run, conversation, lead]); db.commit()
+            await _dispatch(
+                db, conversation=conversation, lead=lead, content=reply,
+                role="assistant", agent_run_id=run.id,
+                metadata={
+                    "event_kind": "deterministic_location_routing",
+                    "appointment_offer": {
+                        "slots": [slot.isoformat() for slot in offered_slots],
+                        "duration_minutes": 45,
+                        "project_timezone": project.timezone or "UTC",
+                    },
+                },
+            )
+            _schedule_next_action(db, conversation, lead, event_id)
+            db.commit()
+            return
         event_id = f"{conversation.provider}:{inbound.provider_message_id or inbound.id}"
         run = AgentRun(
             conversation_id=conversation.id, event_id=event_id, mode="live", status="running",
@@ -474,6 +537,10 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
         })
         reply = result.get("proposed_reply")
         actions = result.get("proposed_actions", [])
+        if not result.get("policy_violations"):
+            merge_extracted_facts(
+                lead, result.get("extracted_facts"), evidence=inbound.content,
+            )
         if result.get("requires_human"):
             create_intervention_case(
                 db, conversation=conversation, lead=lead,
@@ -512,7 +579,13 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
         run.prompt_configuration_id = result.get("prompt_configuration_id")
         run.prompt_snapshot = result.get("prompt_snapshot", {})
         run.model = result.get("model", "unknown")
-        run.output_snapshot = {"reply": reply, "proposed_actions": actions, "requires_human": result.get("requires_human", False)}
+        run.output_snapshot = {
+            "reply": reply, "proposed_actions": actions,
+            "extracted_facts": result.get("extracted_facts", []),
+            "requires_human": result.get("requires_human", False),
+            "policy_violations": result.get("policy_violations", []),
+            "error_code": result.get("error_code"),
+        }
         run.status = "completed"; run.completed_at = datetime.utcnow()
         conversation.updated_at = datetime.utcnow(); lead.last_interaction_at = datetime.utcnow()
         db.add_all([run, conversation, lead]); db.commit()

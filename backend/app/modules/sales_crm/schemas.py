@@ -47,6 +47,7 @@ class SalesLeadDetailResponse(LeadResponse):
     campaign_name: Optional[str] = None
     conversation_id: Optional[str] = None
     meta_form_data: dict = Field(default_factory=dict)
+    lead_profile_data: dict = Field(default_factory=dict)
     chat_summary: Optional[str] = None
     visit_recommendations: Optional[str] = None
     chat_messages: List[SmsChatMessageSchema] = Field(default_factory=list)

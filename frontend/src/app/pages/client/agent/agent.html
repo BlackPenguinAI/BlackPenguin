@@ -1,10 +1,10 @@
 <section class="agent-page">
   <header class="agent-header">
     <div>
-      <p>{{ role === 'sales' ? 'ASSIGNED LEAD CONVERSATIONS' : 'AI SALES AGENT LAB' }}</p>
-      <h1>{{ role === 'sales' ? 'Lead chats' : 'Sales protocol simulation' }}</h1>
+      <p>{{ role === 'sales' ? 'ASSIGNED LEAD CONVERSATIONS' : 'AI SALES AGENT' }}</p>
+      <h1>{{ role === 'sales' ? 'Lead chats' : 'Lead conversations' }}</h1>
       <span
-        >{{ role === 'sales' ? 'Review the messaging history and context for leads assigned to you.' : 'Test approved Project knowledge and Sales Agent prompts before live SMS or WhatsApp delivery.' }}</span
+        >{{ role === 'sales' ? 'Review the messaging history and context for leads assigned to you.' : 'Monitor live SMS and WhatsApp conversations, AI activity and human handoffs.' }}</span
       >
     </div>
     <div class="header-actions" *ngIf="role !== 'sales'">
@@ -13,16 +13,15 @@
         <option *ngFor="let project of options" [value]="project.id">
           {{ project.name }}
         </option></select
-      ><button (click)="openSetup('simulation')">New simulation</button
-      ><button class="primary" (click)="openSetup('live_meta')">Register live lead</button>
+      ><button class="primary" (click)="openSetup('live_meta')">Add lead</button>
     </div>
   </header>
   <div class="demo-banner" [class.live-warning]="setupOpen && setupMode === 'live_meta'" *ngIf="role !== 'sales' && (setupOpen || !selected || !isLive)">
     <span class="material-symbols-outlined">science</span>
     <div>
-      <strong>{{ setupOpen && setupMode === 'live_meta' ? 'Live delivery test' : (isMetaSimulation ? 'Real Meta lead · simulated delivery' : 'Safe simulation') }}</strong
+      <strong>{{ setupOpen && setupMode === 'live_meta' ? 'Live messaging' : (isMetaSimulation ? 'Real Meta lead · simulated delivery' : 'Safe simulation') }}</strong
       ><small
-        >{{ setupOpen && setupMode === 'live_meta' ? 'One submission registers the selected lead source and sends through the Company’s verified SMS or WhatsApp channel. Provider charges apply.' : (isMetaSimulation ? 'This lead came from the configured Meta form. Live messaging is disabled, so replies stay inside Black Penguin.' : 'No external message is sent. Calendar availability is checked; a real test event is created only when explicitly requested after booking.') }}</small
+        >{{ setupOpen && setupMode === 'live_meta' ? 'The lead is registered and contacted through the Company’s verified SMS or WhatsApp channel. Provider charges apply.' : (isMetaSimulation ? 'This lead came from the configured Meta form. Live messaging is disabled, so replies stay inside Black Penguin.' : 'No external message is sent. Calendar availability is checked; a real test event is created only when explicitly requested after booking.') }}</small
       >
     </div>
   </div>
@@ -34,9 +33,9 @@
   <section class="setup-card" *ngIf="setupOpen && role !== 'sales'">
     <div class="setup-head">
       <div>
-        <p>{{ setupMode === 'live_meta' ? 'LIVE LEAD INTAKE' : 'SIMULATED META LEAD FORM' }}</p>
-        <h2>{{ setupMode === 'live_meta' ? 'Register a lead and start messaging' : 'Create a test lead' }}</h2>
-        <span>{{ setupMode === 'live_meta' ? 'Register a manual or Meta lead and use the verified channel inherited from its Company.' : "The form submission starts the agent's first simulated message automatically." }}</span>
+        <p>{{ setupMode === 'live_meta' ? 'NEW LEAD' : 'SIMULATED META LEAD FORM' }}</p>
+        <h2>{{ setupMode === 'live_meta' ? 'Add a lead and start messaging' : 'Create a test lead' }}</h2>
+        <span>{{ setupMode === 'live_meta' ? 'Enter the minimum contact data. Commercial preferences are qualified progressively by the agent.' : "The form submission starts the agent's first simulated message automatically." }}</span>
       </div>
       <button (click)="setupOpen = false" *ngIf="selected">×</button>
     </div>
@@ -46,7 +45,7 @@
           <option *ngFor="let source of leadSources" [value]="source.code">
             {{ source.label }}
           </option></select
-        ><small>Meta fields are requested only when Meta Lead Ads is selected.</small></label
+        ><small>Additional source data is captured automatically when an integration supplies it.</small></label
       >
       <label
         >Project *<select [(ngModel)]="projectId" (change)="projectChanged()">
@@ -92,7 +91,7 @@
           placeholder="lead@example.com"
           [class.invalid]="form.email.length > 0 && !emailValid"
       /></label>
-      <label
+      <label *ngIf="setupMode === 'simulation'"
         >Product interested *<select
           [(ngModel)]="form.product_id"
           [class.invalid]="!form.product_id"
@@ -105,7 +104,7 @@
           >This Project has no confirmed property types.</small
         ></label
       >
-      <label
+      <label *ngIf="setupMode === 'simulation'"
         >Budget minimum *
         <div class="money-input">
           <span>{{ currentProduct?.currency || '—' }}</span
@@ -118,7 +117,7 @@
             [class.invalid]="form.budget_min !== null && !budgetValid"
           /></div
       ></label>
-      <label
+      <label *ngIf="setupMode === 'simulation'"
         >Budget maximum
         <div class="money-input">
           <span>{{ currentProduct?.currency || '—' }}</span
@@ -134,7 +133,7 @@
         <small>Optional. Must be equal to or above the minimum.</small></label
       >
     </div>
-    <div class="product-card" *ngIf="currentProduct">
+    <div class="product-card" *ngIf="setupMode === 'simulation' && currentProduct">
       <div>
         <small>SELECTED PRODUCT</small><strong>{{ currentProduct.name }}</strong
         ><span>{{ currentProduct.description || 'Confirmed during Project onboarding.' }}</span>
@@ -185,10 +184,10 @@
     >
     <div class="setup-footer">
       <span *ngIf="!formComplete"
-        >Complete all required contact, product, budget and consent fields to start.</span
+        >{{ setupMode === 'live_meta' ? 'Complete the required contact and consent fields to start.' : 'Complete all required contact, product, budget and consent fields to start.' }}</span
       ><span class="agent-progress" *ngIf="creating && liveProgress">{{ liveProgress }}</span
       ><button class="primary" (click)="submitLead()" [disabled]="!formComplete || creating">
-        {{ creating ? (setupMode === 'live_meta' ? 'Registering lead…' : 'Creating lead…') : (setupMode === 'live_meta' ? 'Register lead and start messaging' : 'Submit form and start simulation') }}
+        {{ creating ? (setupMode === 'live_meta' ? 'Adding lead…' : 'Creating lead…') : (setupMode === 'live_meta' ? 'Add lead and start messaging' : 'Submit form and start simulation') }}
       </button>
     </div>
   </section>
@@ -215,13 +214,13 @@
       >
         <i>{{ initials(row.lead_name) }}</i
         ><span
-          ><strong>{{ row.lead_name }} <em *ngIf="row.is_test" class="test-badge">LIVE TEST</em><em *ngIf="row.simulation_id" class="test-badge">SIMULATION</em></strong
+          ><strong>{{ row.lead_name }} <em *ngIf="!row.simulation_id && row.platform === 'manual'" class="test-badge">MANUAL</em><em *ngIf="!row.simulation_id && row.platform?.startsWith('meta')" class="test-badge">META</em><em *ngIf="row.simulation_id" class="test-badge">SIMULATION</em></strong
           ><small>{{ row.last_message || 'No messages yet' }}</small></span
         ><time>{{ asUtcDate(row.last_message_at) | date: 'shortTime' }}</time>
       </button>
       <div class="empty" *ngIf="!loading && !visible.length">
-        <p>No simulations for this Project yet.</p>
-        <button class="primary" (click)="setupOpen = true">Create test lead</button>
+        <p>No lead conversations for this Project yet.</p>
+        <button class="primary" (click)="openSetup('live_meta')">Add lead</button>
       </div>
     </aside>
     <main class="chat" *ngIf="selected; else noSelection">
@@ -229,8 +228,8 @@
         <div>
           <i>{{ initials(selected.lead_name) }}</i
           ><span
-            ><strong>{{ selected.lead_name }} <em *ngIf="selected.is_test" class="test-badge">LIVE TEST</em></strong
-            ><small>{{ selected.phone }} · {{ selected.campaign_name || 'Campaign' }}</small></span
+            ><strong>{{ selected.lead_name }} <em class="test-badge">{{ selected.channel === 'whatsapp' ? 'WHATSAPP' : (selected.channel === 'sms' ? 'SMS' : 'SIMULATION') }}</em></strong
+            ><small>{{ selected.phone }} · {{ selected.campaign_name || leadSourceLabel }}</small></span
           >
         </div>
         <button class="pause" (click)="action(selected.is_paused ? 'resume' : 'pause')">
@@ -313,16 +312,18 @@
     <aside class="context" *ngIf="selected">
       <p>{{ isLive ? liveControlLabel : 'SIMULATION CONTROL' }}</p>
       <div class="stage">
-        <span>{{ selected.simulation_status || selected.agent_status || selected.stage }}</span
+        <span>{{ operationalStatusLabel }}</span
         ><b>{{ selected.pipeline_stage || selected.funnel_stage }}</b>
       </div>
       <dl>
         <dt>Intent</dt><dd>{{ selected.intent_tier || 'unscored' }} · {{ (selected.intent_score || 0) * 100 | number:'1.0-0' }}/100</dd>
         <dt>Segment</dt><dd>{{ selected.assigned_segment || 'Unsegmented' }}</dd>
+        <ng-container *ngIf="selected.qualification_summary"><dt>Known lead facts</dt><dd>{{ selected.qualification_summary }}</dd></ng-container>
         <dt>Project</dt>
         <dd>{{ selected.project_name }}</dd>
-        <dt>Campaign</dt>
-        <dd>{{ selected.campaign_name || 'Not attributed' }}</dd>
+        <dt>Source</dt><dd>{{ leadSourceLabel }}</dd>
+        <dt>Channel</dt><dd>{{ selected.channel === 'whatsapp' ? 'WhatsApp via Telnyx' : (selected.channel === 'sms' ? 'SMS' : 'Simulation') }}</dd>
+        <ng-container *ngIf="selected.campaign_name"><dt>Campaign</dt><dd>{{ selected.campaign_name }}</dd></ng-container>
         <ng-container *ngIf="!isLive"><dt>Virtual time</dt><dd>{{ asUtcDate(selected.virtual_now) | date: 'medium' }}</dd></ng-container>
         <dt>Next follow-up</dt>
         <dd>
@@ -330,8 +331,7 @@
             selected.next_action_at ? (asUtcDate(selected.next_action_at) | date: 'medium') : 'Not scheduled'
           }}
         </dd>
-        <dt>Protocol review</dt>
-        <dd>{{ selected.approval_status || 'pending' }}</dd>
+        <ng-container *ngIf="!isLive"><dt>Protocol review</dt><dd>{{ selected.approval_status || 'pending' }}</dd></ng-container>
         <ng-container *ngIf="selected.pause_reason"><dt>Pause reason</dt><dd>{{ selected.pause_reason }}</dd></ng-container>
       </dl>
       <div class="clock" *ngIf="selected.simulation_id && !selected.appointment_id">
@@ -374,7 +374,7 @@
           ><button (click)="approve('changes_requested')">Request changes</button>
         </div>
       </div>
-      <button class="handoff" (click)="action('human_handoff')">Request human handoff</button>
+      <button class="handoff" *ngIf="isLive && !selected.is_paused" (click)="action('human_handoff')">Take manual control</button>
       <button class="handoff error" *ngIf="canDeleteSimulation" (click)="deleteSelectedSimulation()" [disabled]="deletingSimulation">
         <span class="material-symbols-outlined">delete</span>
         {{ deletingSimulation ? 'Deleting simulation…' : 'Delete synthetic lead' }}
@@ -384,8 +384,8 @@
   <ng-template #noSelection
     ><main class="chat no-selection">
       <span class="material-symbols-outlined">forum</span>
-      <h2>Select a test lead</h2>
-      <p>Choose a conversation or create a new Meta form simulation.</p>
+      <h2>Select a lead</h2>
+      <p>Choose a conversation or add a new lead to start live messaging.</p>
     </main></ng-template
   >
 </section>

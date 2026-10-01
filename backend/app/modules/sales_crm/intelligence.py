@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import json
 import re
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy.orm import Session
 
@@ -15,10 +17,119 @@ from .models import Lead, LeadObjection, LeadScoreSnapshot, LeadSegmentAssignmen
 
 SCORING_VERSION = "intent-score-v1"
 
+PROFILE_FACT_ALIASES = {
+    "budget_min": "budget_minimum",
+    "minimum_budget": "budget_minimum",
+    "budget_max": "budget_maximum",
+    "maximum_budget": "budget_maximum",
+    "currency": "budget_currency",
+    "product": "property_interest",
+    "product_interest": "property_interest",
+    "property_type": "property_interest",
+    "timeline": "purchase_timeline",
+    "location": "location_preference",
+}
+PROFILE_FACT_KEYS = {
+    "budget", "budget_minimum", "budget_maximum", "budget_currency",
+    "property_interest", "bedrooms", "bathrooms", "location_preference",
+    "purchase_timeline", "financing", "buyer_type", "motivation",
+    "decision_structure", "move_in_timing",
+}
+
+
+def _fact_key(value: Any) -> str:
+    normalized = re.sub(r"[^a-z0-9]+", "_", str(value or "").strip().casefold()).strip("_")
+    return PROFILE_FACT_ALIASES.get(normalized, normalized)
+
+
+def _json_value(value: Any) -> Any:
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, dict):
+        return {str(key): _json_value(item) for key, item in list(value.items())[:40]}
+    if isinstance(value, (list, tuple)):
+        return [_json_value(item) for item in list(value)[:40]]
+    return str(value)
+
+
+def initial_lead_profile(
+    *, product: dict | None = None, budget: dict | None = None,
+    custom_answers: dict | None = None, source: str,
+) -> dict:
+    """Build a versioned profile without turning source-specific questions into columns."""
+    captured_at = datetime.utcnow().isoformat() + "Z"
+    facts: dict[str, dict] = {}
+    if product:
+        facts["property_interest"] = {
+            "value": _json_value(product), "source": source,
+            "captured_at": captured_at, "confirmed": source == "manual_registration",
+        }
+    if budget and any(value is not None for value in budget.values()):
+        facts["budget"] = {
+            "value": _json_value(budget), "source": source,
+            "captured_at": captured_at, "confirmed": source == "manual_registration",
+        }
+    answers = [
+        {"key": _fact_key(key), "label": str(key), "value": _json_value(value), "source": source}
+        for key, value in (custom_answers or {}).items()
+    ]
+    return {"schema_version": 1, "facts": facts, "source_answers": answers}
+
+
+def merge_extracted_facts(
+    lead: Lead, facts: list[dict] | None, *, evidence: str,
+    source: str = "agent_conversation",
+) -> dict:
+    """Persist explicit model facts with provenance; unknown keys never mutate the profile."""
+    profile = dict(lead.lead_profile_data or {})
+    stored = dict(profile.get("facts") or {})
+    captured_at = datetime.utcnow().isoformat() + "Z"
+    for item in facts or []:
+        if not isinstance(item, dict):
+            continue
+        key = _fact_key(item.get("key") or item.get("field") or item.get("name") or item.get("fact"))
+        if key not in PROFILE_FACT_KEYS or "value" not in item:
+            continue
+        stored[key] = {
+            "value": _json_value(item.get("value")),
+            "source": source,
+            "captured_at": captured_at,
+            "confirmed": True,
+            "evidence": evidence[:500],
+        }
+    profile.update({"schema_version": 1, "facts": stored})
+    profile.setdefault("source_answers", [])
+    lead.lead_profile_data = profile
+    lead.qualification_summary = lead_profile_summary(profile)
+    return profile
+
+
+def lead_profile_summary(profile: dict) -> str | None:
+    facts = profile.get("facts") if isinstance(profile, dict) else {}
+    if not isinstance(facts, dict) or not facts:
+        return None
+    labels = {
+        "property_interest": "Property interest", "budget": "Budget",
+        "budget_minimum": "Minimum budget", "budget_maximum": "Maximum budget",
+        "budget_currency": "Currency", "bedrooms": "Bedrooms", "bathrooms": "Bathrooms",
+        "location_preference": "Location preference", "purchase_timeline": "Purchase timeline",
+        "financing": "Financing", "buyer_type": "Buyer type", "motivation": "Motivation",
+        "decision_structure": "Decision structure", "move_in_timing": "Move-in timing",
+    }
+    parts = []
+    for key, item in facts.items():
+        if key not in labels or not isinstance(item, dict):
+            continue
+        value = item.get("value")
+        rendered = json.dumps(value, ensure_ascii=False, default=str) if isinstance(value, (dict, list)) else str(value)
+        parts.append(f"{labels[key]}: {rendered}")
+    return "; ".join(parts) or None
+
 
 def _text(lead: Lead, conversation_text: str) -> str:
     form = " ".join(str(value) for value in (lead.meta_form_data or {}).values())
-    return f"{form} {lead.qualification_summary or ''} {conversation_text}".casefold()
+    profile = json.dumps(lead.lead_profile_data or {}, ensure_ascii=False, default=str)
+    return f"{form} {profile} {lead.qualification_summary or ''} {conversation_text}".casefold()
 
 
 def assign_segment(db: Session, lead: Lead, conversation_text: str) -> LeadSegmentAssignment | None:
@@ -90,7 +201,10 @@ def calculate_score(db: Session, lead: Lead, conversation_text: str, message_cou
     factors = {
         "timeline": weight("timeline", 20) if re.search(r"\b(30|60|90) days?\b|this month|next month|<90", text) else weight("timeline", 20) // 2 if "month" in text else 0,
         "financial_readiness": weight("financial_readiness", 20) if any(term in text for term in ("pre-approved", "preapproved", "cash buyer", "paying cash")) else weight("financial_readiness", 20) // 2 if any(term in text for term in ("financing", "mortgage", "loan")) else 0,
-        "budget_fit": weight("budget_fit", 20) if any(key in (lead.meta_form_data or {}) for key in ("budget", "budget_min", "budget_max")) else 0,
+        "budget_fit": weight("budget_fit", 20) if (
+            any(key in (lead.meta_form_data or {}) for key in ("budget", "budget_min", "budget_max"))
+            or any(key in ((lead.lead_profile_data or {}).get("facts") or {}) for key in ("budget", "budget_minimum", "budget_maximum"))
+        ) else 0,
         "engagement": min(weight("engagement", 15), message_count * 3),
         "decision_authority": weight("decision_authority", 15) if any(term in text for term in ("i decide", "decide alone", "my decision")) else weight("decision_authority", 15) // 2 if any(term in text for term in ("partner", "family", "spouse")) else 0,
         "specificity": weight("specificity", 10) if any(term in text for term in ("bedroom", "unit", "tower", "phase", "floor", "m2", "sq ft")) else 0,

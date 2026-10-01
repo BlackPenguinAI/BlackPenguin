@@ -56,6 +56,13 @@ def _lead_form(product, phone="+13055550142"):
     }
 
 
+def _minimal_lead_form(phone="+13055550142"):
+    return {
+        "first_name": "Taylor", "last_name": "Morgan", "phone": phone,
+        "email": "taylor@example.com", "consent": True, "custom_answers": {},
+    }
+
+
 def test_meta_webhook_verification_echoes_an_opaque_challenge_as_plain_text():
     app = FastAPI()
     app.include_router(meta_leads_router, prefix="/webhooks")
@@ -118,6 +125,25 @@ def test_manual_live_lead_does_not_require_or_fake_meta_attribution():
     assert result["provider"] == "twilio" and result["source_code"] == "manual"
     assert lead.platform == "manual" and lead.source == "Manual registration"
     assert lead.campaign_id is None and lead.meta_form_data == {}
+
+
+def test_manual_live_lead_accepts_minimal_contact_data_and_starts_progressive_profile():
+    db = _db(); company = Company(name="Tenant A"); db.add(company); db.flush()
+    project, _, _ = _project(db, company)
+    db.add(TwilioConfig(
+        account_sid="AC" + ("1" * 32), from_phone_number="+18573824206",
+        live_sms_enabled=True, verification_status="verified",
+    )); db.commit()
+    with patch("app.modules.sales_agent.live_service.send_sms", new=AsyncMock(return_value={"sid": "SM1", "status": "queued"})):
+        result = asyncio.run(create_live_lead(
+            db, company_id=company.id, project_id=project.id, source_code="manual",
+            campaign_id=None, lead_form=_minimal_lead_form(), idempotency_key="minimal-manual-lead-0001",
+        ))
+    lead = db.query(Lead).filter_by(id=result["lead_id"]).one()
+    assert result["channel"] == "sms"
+    assert lead.is_test is False
+    assert lead.qualification_summary is None
+    assert lead.lead_profile_data == {"schema_version": 1, "facts": {}, "source_answers": []}
 
 
 def test_meta_source_requires_a_campaign_but_source_catalog_remains_extensible():

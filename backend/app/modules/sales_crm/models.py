@@ -55,6 +55,7 @@ class Lead(Base):
     is_opt_out = Column(Boolean, default=False)
     qualification_summary = Column(Text, nullable=True)
     meta_form_data = Column(JSON, default=dict, nullable=False)
+    lead_profile_data = Column(JSON, default=dict, nullable=False)
     visit_recommendations = Column(Text, nullable=True)
     agent_status = Column(String(30), default="paused", nullable=False)
     is_demo = Column(Boolean, default=False, nullable=False)
