@@ -18,8 +18,8 @@ from app.modules.system_settings.services import (
     telnyx_credentials, twilio_credentials,
 )
 
-from .live_service import process_live_inbound, resolve_inbound_conversation
-from .models import ExternalWebhookEvent, OutboundMessage, SalesConversation, SalesMessage
+from .live_service import resolve_inbound_conversation
+from .models import ExternalWebhookEvent, OutboundMessage, SalesConversation, SalesInboundJob, SalesMessage
 
 
 twilio_router = APIRouter()
@@ -54,18 +54,27 @@ def _record_inbound(
         metadata_json={
             "provider": provider, "from": from_number, "to": to_number,
             "message_type": message_type, "content_supported": content_supported,
+            "webhook_event_id": event_id,
         },
     )
     db.add(message)
-    event.status = "processed" if content_supported else "ignored"
+    db.flush()
+    should_queue = content_supported and not conversation.is_paused
+    if should_queue:
+        db.add(SalesInboundJob(
+            conversation_id=conversation.id,
+            message_id=message.id,
+            status="pending",
+            scheduled_at=datetime.utcnow(),
+        ))
+        message.metadata_json = {**message.metadata_json, "agent_turn_status": "pending"}
+    event.status = "queued" if should_queue else ("processed" if content_supported else "ignored")
     event.error_message = None if content_supported else "Inbound content was empty or unsupported; agent execution skipped."
-    event.processed_at = datetime.utcnow()
+    event.processed_at = None if should_queue else datetime.utcnow()
     lead = db.query(Lead).filter(Lead.id == conversation.lead_id).first()
     if lead:
         lead.last_interaction_at = datetime.utcnow()
     db.commit(); db.refresh(message)
-    if content_supported and not conversation.is_paused:
-        background_tasks.add_task(process_live_inbound, conversation.id, message.id)
 
 
 def _apply_status(db: Session, *, provider: str, message_id: str, status: str, error: str | None = None):

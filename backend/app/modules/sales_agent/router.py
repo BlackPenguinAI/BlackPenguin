@@ -19,7 +19,7 @@ from .schemas import (
     SimulationOptionProject, SimulationRequest,
 )
 from .service import conversation_messages, conversation_summaries, set_conversation_action, simulate_turn
-from .live_service import send_manual_message
+from .live_service import retry_failed_inbound_turn, send_manual_message
 from .live_test_service import create_live_lead, create_live_meta_test, live_lead_source_options
 from .simulation_service import (
     advance_simulation, approve_simulation, confirm_simulation_appointment,
@@ -330,6 +330,28 @@ async def manual_message(
         db, conversation_id=conversation_id, company_id=current_user.company_id,
         user_id=current_user.id, content=payload.content.strip(),
     )
+
+
+@router.post("/conversations/{conversation_id}/retry-turn", response_model=ConversationSummary)
+def retry_conversation_turn(
+    conversation_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker(TENANT_MANAGER_ROLES)),
+):
+    existing = db.query(SalesConversation).filter(
+        SalesConversation.id == conversation_id,
+        SalesConversation.company_id == current_user.company_id,
+    ).first()
+    if not existing:
+        raise HTTPException(status_code=404, detail="Conversation not found.")
+    require_project_access(db, current_user, existing.project_id)
+    retry_failed_inbound_turn(
+        db, company_id=current_user.company_id, conversation_id=conversation_id,
+    )
+    return next(item for item in conversation_summaries(
+        db, company_id=current_user.company_id,
+        allowed_project_ids=project_ids_for_user(db, current_user),
+    ) if item["id"] == conversation_id)
 
 
 @router.post("/drafts/{draft_id}/decision")

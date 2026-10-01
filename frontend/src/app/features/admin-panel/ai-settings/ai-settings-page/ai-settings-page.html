@@ -53,6 +53,10 @@
           </div>
 
           <ng-container *ngIf="activeTab === 'ventas'">
+            <section class="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+              <h3 class="text-sm font-medium uppercase tracking-wider text-emerald-300">Protected runtime guarantees</h3>
+              <p class="mt-1 text-xs leading-relaxed text-gray-400">English-only lead messaging, tenant isolation, consent and opt-out, verified inventory, deterministic appointment slots, FIFO inbound processing and delivery idempotency are enforced by the platform. Prompt edits cannot disable them.</p>
+            </section>
             <section class="rounded-xl border border-white/10 bg-black/20 p-4">
               <h3 class="text-sm font-medium uppercase tracking-wider text-secondary">10-stage workflow playbook</h3>
               <p class="mt-1 text-xs text-gray-500">These instructions guide conversation behavior. Tenant isolation, consent, verified slots and transactional bookings remain protected in code.</p>
@@ -69,7 +73,7 @@
             </section>
 
             <section class="grid gap-4 rounded-xl border border-white/10 bg-black/20 p-4 md:grid-cols-2">
-              <div><h3 class="text-sm font-medium uppercase tracking-wider text-secondary">Intent scoring</h3><label class="mt-3 grid gap-1 text-xs text-gray-400">Hot threshold<input type="number" name="hot_threshold" [(ngModel)]="activeAgent.scoring_config.hot_threshold" class="rounded-lg border border-white/10 bg-black/50 p-2 text-white"></label><label class="mt-3 grid gap-1 text-xs text-gray-400">Warm threshold<input type="number" name="warm_threshold" [(ngModel)]="activeAgent.scoring_config.warm_threshold" class="rounded-lg border border-white/10 bg-black/50 p-2 text-white"></label></div>
+              <div><h3 class="text-sm font-medium uppercase tracking-wider text-secondary">Intent scoring</h3><p class="mt-1 text-xs text-gray-500">Weights are independent signals; the backend caps the total at 100.</p><label class="mt-3 grid gap-1 text-xs text-gray-400">Hot threshold<input type="number" name="hot_threshold" [(ngModel)]="activeAgent.scoring_config.hot_threshold" class="rounded-lg border border-white/10 bg-black/50 p-2 text-white"></label><label class="mt-3 grid gap-1 text-xs text-gray-400">Warm threshold<input type="number" name="warm_threshold" [(ngModel)]="activeAgent.scoring_config.warm_threshold" class="rounded-lg border border-white/10 bg-black/50 p-2 text-white"></label><label *ngFor="let key of scoringWeightKeys; trackBy: trackByKey" class="mt-3 grid gap-1 text-xs capitalize text-gray-400">{{ key.replace('_', ' ') }}<input type="number" min="0" max="100" [(ngModel)]="activeAgent.scoring_config[key]" [name]="'score_'+key" class="rounded-lg border border-white/10 bg-black/50 p-2 text-white"></label></div>
               <div><h3 class="text-sm font-medium uppercase tracking-wider text-secondary">Cadence hours</h3><label class="mt-3 grid gap-1 text-xs text-gray-400">Hot<input type="number" name="hot_hours" [(ngModel)]="activeAgent.cadence_config.hot_hours" class="rounded-lg border border-white/10 bg-black/50 p-2 text-white"></label><label class="mt-3 grid gap-1 text-xs text-gray-400">Warm<input type="number" name="warm_hours" [(ngModel)]="activeAgent.cadence_config.warm_hours" class="rounded-lg border border-white/10 bg-black/50 p-2 text-white"></label><label class="mt-3 grid gap-1 text-xs text-gray-400">Cold<input type="number" name="cold_hours" [(ngModel)]="activeAgent.cadence_config.cold_hours" class="rounded-lg border border-white/10 bg-black/50 p-2 text-white"></label></div>
             </section>
 

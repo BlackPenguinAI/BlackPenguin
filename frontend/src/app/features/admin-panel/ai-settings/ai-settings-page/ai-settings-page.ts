@@ -39,6 +39,10 @@ export class AiSettingsPageComponent implements OnInit {
   segmentPromptKeys: string[] = [];
   restoringVersionId = '';
   changeNote = '';
+  readonly scoringWeightKeys = [
+    'timeline', 'financial_readiness', 'budget_fit', 'engagement',
+    'decision_authority', 'specificity', 'appointment_intent'
+  ];
 
   constructor(
     private aiService: AiConfigService, 

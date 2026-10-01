@@ -71,12 +71,13 @@ def update_ai_config(db: Session, payload: AIConfigUpdatePayload, company_id: st
         flag_modified(config, "agent_onboarding_proyectos")
 
     if payload.agent_ventas is not None:
-        validate_sales_configuration(payload.agent_ventas.model_dump())
-        config.agent_ventas = payload.agent_ventas.model_dump()
+        sales_configuration = merge_sales_agent_defaults(payload.agent_ventas.model_dump())
+        validate_sales_configuration(sales_configuration)
+        config.agent_ventas = sales_configuration
         flag_modified(config, "agent_ventas")
         latest = db.query(PromptVersion).filter(PromptVersion.company_id == company_id, PromptVersion.agent_key == "sales").order_by(PromptVersion.version_number.desc()).first()
         db.query(PromptVersion).filter(PromptVersion.company_id == company_id, PromptVersion.agent_key == "sales", PromptVersion.is_published.is_(True)).update({PromptVersion.is_published: False}, synchronize_session=False)
-        db.add(PromptVersion(company_id=company_id, agent_key="sales", version_number=(latest.version_number + 1 if latest else 1), configuration=payload.agent_ventas.model_dump(), is_published=True, created_by_user_id=actor_id))
+        db.add(PromptVersion(company_id=company_id, agent_key="sales", version_number=(latest.version_number + 1 if latest else 1), configuration=sales_configuration, is_published=True, created_by_user_id=actor_id))
 
     if payload.agent_reporteria is not None:
         config.agent_reporteria = payload.agent_reporteria.model_dump()
@@ -114,6 +115,7 @@ def prompt_version(
 
 
 def create_prompt_draft(db: Session, *, company_id: str | None, agent_key: str, configuration: dict, change_note: str, actor_id: str) -> PromptVersion:
+    configuration = merge_sales_agent_defaults(configuration)
     validate_sales_configuration(configuration)
     config = get_ai_config(db, company_id)
     db.query(AIConfiguration).filter(AIConfiguration.id == config.id).with_for_update().one()
@@ -127,7 +129,7 @@ def validate_sales_configuration(configuration: dict) -> None:
     hot = int(scoring.get("hot_threshold", 70)); warm = int(scoring.get("warm_threshold", 40))
     if not 0 <= warm < hot <= 100:
         raise HTTPException(status_code=422, detail="Scoring thresholds must satisfy 0 ≤ warm < hot ≤ 100.")
-    for key in ("timeline", "financial_readiness", "budget_fit", "engagement", "decision_authority", "specificity"):
+    for key in ("timeline", "financial_readiness", "budget_fit", "engagement", "decision_authority", "specificity", "appointment_intent"):
         value = int(scoring.get(key, SALES_AGENT_DEFAULT_CONFIG["scoring_config"][key]))
         if value < 0 or value > 100:
             raise HTTPException(status_code=422, detail=f"Scoring weight {key} must be between 0 and 100.")
@@ -166,10 +168,12 @@ def restore_prompt_version(db: Session, *, company_id: str | None, agent_key: st
         db.add(config); db.flush()
     config = db.query(AIConfiguration).filter(AIConfiguration.id == config.id).with_for_update().one()
     if agent_key != "sales": raise HTTPException(status_code=422, detail="Only the Sales Agent registry is available in this release.")
-    config.agent_ventas = dict(version.configuration); flag_modified(config, "agent_ventas")
+    restored_configuration = merge_sales_agent_defaults(version.configuration)
+    validate_sales_configuration(restored_configuration)
+    config.agent_ventas = restored_configuration; flag_modified(config, "agent_ventas")
     latest = db.query(PromptVersion).filter(PromptVersion.company_id == company_id, PromptVersion.agent_key == agent_key).order_by(PromptVersion.version_number.desc()).first()
     db.query(PromptVersion).filter(PromptVersion.company_id == company_id, PromptVersion.agent_key == agent_key, PromptVersion.is_published.is_(True)).update({PromptVersion.is_published: False}, synchronize_session=False)
-    db.add(PromptVersion(company_id=company_id, agent_key=agent_key, version_number=(latest.version_number + 1 if latest else 1), configuration=dict(version.configuration), is_published=True, created_by_user_id=actor_id))
+    db.add(PromptVersion(company_id=company_id, agent_key=agent_key, version_number=(latest.version_number + 1 if latest else 1), configuration=restored_configuration, is_published=True, created_by_user_id=actor_id))
     db.commit(); db.refresh(config); return config
 
 def get_consumption(db: Session, company_id: str = None) -> dict:

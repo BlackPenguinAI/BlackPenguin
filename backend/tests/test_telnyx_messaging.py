@@ -28,7 +28,7 @@ from app.integrations.telnyx_client import send_sms as send_telnyx_sms, validate
 from app.modules.companies.models import Company
 from app.modules.projects.models import Project
 from app.modules.sales_agent.live_service import get_or_create_live_conversation
-from app.modules.sales_agent.models import ExternalWebhookEvent, SalesConversation, SalesMessage
+from app.modules.sales_agent.models import ExternalWebhookEvent, SalesConversation, SalesInboundJob, SalesMessage
 from app.modules.sales_agent.provider_router import _status_from_telnyx, telnyx_router
 from app.modules.sales_crm.models import Lead
 from app.modules.system_settings.models import (
@@ -330,7 +330,7 @@ def test_signed_webhook_routes_by_destination_number_and_company():
     conversation = SalesConversation(
         company_id=company.id, project_id=project.id, lead_id=lead.id,
         channel="sms", provider="telnyx",
-        provider_thread_key="telnyx:+18573824206:+13055550142", is_paused=True,
+        provider_thread_key="telnyx:+18573824206:+13055550142", is_paused=False,
     )
     db.add(conversation); db.commit()
     envelope = {"data": {"id": "event-1", "event_type": "message.received", "payload": {
@@ -354,6 +354,9 @@ def test_signed_webhook_routes_by_destination_number_and_company():
     assert response.status_code == 200
     message = db.query(SalesMessage).one()
     assert message.conversation_id == conversation.id and message.content == "I want a visit"
+    job = db.query(SalesInboundJob).one()
+    assert job.message_id == message.id and job.status == "pending"
+    assert db.query(ExternalWebhookEvent).one().status == "queued"
 
 
 def test_signed_whatsapp_webhook_reads_unified_body_and_routes_the_company_thread():
@@ -436,21 +439,20 @@ def test_empty_whatsapp_content_is_traced_without_running_the_agent():
     signature = base64.b64encode(private.sign(timestamp.encode() + b"|" + body)).decode()
     app = FastAPI(); app.include_router(telnyx_router, prefix="/webhooks/telnyx")
     app.dependency_overrides[get_db] = lambda: db
-    with patch("app.modules.sales_agent.provider_router.process_live_inbound") as agent:
-        response = TestClient(app).post(
-            "/webhooks/telnyx/messaging", content=body,
-            headers={
-                "Content-Type": "application/json",
-                "telnyx-signature-ed25519": signature,
-                "telnyx-timestamp": timestamp,
-            },
-        )
+    response = TestClient(app).post(
+        "/webhooks/telnyx/messaging", content=body,
+        headers={
+            "Content-Type": "application/json",
+            "telnyx-signature-ed25519": signature,
+            "telnyx-timestamp": timestamp,
+        },
+    )
     assert response.status_code == 200
     message = db.query(SalesMessage).one()
     assert message.content == "[Unsupported WHATSAPP image message]"
     assert message.metadata_json["content_supported"] is False
     assert db.query(ExternalWebhookEvent).one().status == "ignored"
-    agent.assert_not_called()
+    assert db.query(SalesInboundJob).count() == 0
 
 
 def test_whatsapp_delivery_event_uses_the_short_status_name():

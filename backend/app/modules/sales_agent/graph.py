@@ -12,7 +12,7 @@ from app.modules.ai_core.services import get_ai_config
 from app.modules.companies.models import Company
 from app.modules.projects import asset_share_service
 from app.modules.projects.models import Project, ProjectPropertyType, ProjectUnit
-from app.modules.sales_crm.models import Lead, LeadContact
+from app.modules.sales_crm.models import Lead, LeadContact, LeadObjection
 from .segment_strategies import BASE_SEGMENT_GUARDRAIL, STRATEGY_VERSION
 
 from .models import SalesMessage
@@ -137,10 +137,19 @@ def build_sales_graph(db: Session):
         config = get_ai_config(db, None)
         agent = config.agent_ventas or {}
         segment = (state.get("lead_context") or {}).get("assigned_segment") or ""
+        stage = (state.get("lead_context") or {}).get("pipeline_stage") or "S00_CAPTURE"
+        objection = db.query(LeadObjection).filter(
+            LeadObjection.lead_id == state["lead_id"],
+            LeadObjection.status == "open",
+        ).order_by(LeadObjection.updated_at.desc()).first()
         playbook = {
-            "stage_prompts": agent.get("stage_prompts", {}),
+            "active_stage": stage,
+            "stage_prompt": (agent.get("stage_prompts", {}) or {}).get(stage, ""),
             "segment_prompt": (agent.get("segment_prompts", {}) or {}).get(segment, ""),
-            "objection_prompts": agent.get("objection_prompts", {}),
+            "objection_prompt": (
+                (agent.get("objection_prompts", {}) or {}).get(objection.objection_type, "")
+                if objection else ""
+            ),
             "sms_templates": agent.get("sms_templates", {}),
         }
         return {

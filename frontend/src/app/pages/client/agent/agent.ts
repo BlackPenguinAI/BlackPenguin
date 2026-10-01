@@ -34,6 +34,7 @@ export class AgentComponent implements OnInit, OnDestroy {
   calendarTesting = false;
   deletingSimulation = false;
   generatingInitial = false;
+  retryingTurn = false;
   setupOpen = true;
   setupMode: 'simulation' | 'live_meta' = 'live_meta';
   leadSourceCode = 'manual';
@@ -607,6 +608,9 @@ export class AgentComponent implements OnInit, OnDestroy {
     if (!this.isLive) return this.selected.simulation_status || this.selected.agent_status || 'SIMULATION';
     if (this.selected.appointment_id) return 'APPOINTMENT CONFIRMED';
     if (this.selected.is_paused) return this.selected.pause_reason?.includes('Human') ? 'HUMAN CONTROL' : 'AI PAUSED';
+    if (this.selected.agent_turn_status === 'failed') return 'AI NEEDS ATTENTION';
+    if (this.selected.agent_turn_status === 'retry') return 'AI RETRY SCHEDULED';
+    if (['pending', 'processing'].includes(this.selected.agent_turn_status)) return 'AI PROCESSING';
     return 'AI ACTIVE';
   }
   get leadSourceLabel(): string {
@@ -620,6 +624,24 @@ export class AgentComponent implements OnInit, OnDestroy {
   get appointmentLocations(): any[] { return this.currentProject?.locations || []; }
   get isMetaSimulation(): boolean { return this.selected?.platform === 'meta' && !this.isLive; }
   get canManualControl(): boolean { return this.role === 'admin' || this.role === 'assistant'; }
+
+  retryFailedTurn(): void {
+    if (!this.selected?.id || this.retryingTurn) return;
+    this.retryingTurn = true;
+    this.error = '';
+    this.http.post<any>(`${API_V1_URL}/sales-agent/conversations/${this.selected.id}/retry-turn`, {})
+      .pipe(finalize(() => { this.retryingTurn = false; this.cdr.markForCheck(); }))
+      .subscribe({
+        next: row => {
+          this.selected = row;
+          this.success = 'The failed agent turn was queued for a safe retry.';
+          this.refreshConversationSummaries();
+        },
+        error: err => {
+          this.error = err.error?.detail || 'The failed agent turn could not be retried.';
+        },
+      });
+  }
 
   refreshConversationSummaries(): void {
     const url = this.projectId

@@ -87,6 +87,24 @@ class AgentRun(Base):
     completed_at = Column(DateTime, nullable=True)
 
 
+class SalesInboundJob(Base):
+    """Durable FIFO work item for one persisted provider inbound message."""
+
+    __tablename__ = "sales_inbound_jobs"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    conversation_id = Column(String(36), ForeignKey("sales_conversations.id", ondelete="CASCADE"), nullable=False, index=True)
+    message_id = Column(String(36), ForeignKey("sales_messages.id", ondelete="CASCADE"), nullable=False, unique=True, index=True)
+    status = Column(String(30), default="pending", nullable=False, index=True)
+    attempt_number = Column(Integer, default=0, nullable=False)
+    scheduled_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    claimed_at = Column(DateTime, nullable=True)
+    processed_at = Column(DateTime, nullable=True)
+    error_code = Column(String(120), nullable=True)
+    error_message = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
 class OutboundMessage(Base):
     __tablename__ = "outbound_messages"
 

@@ -18,13 +18,17 @@ from app.modules.sales_crm.scheduling import available_slots, create_agent_appoi
 from app.modules.users.models import User
 
 from .graph import GRAPH_VERSION, TOOLSET_VERSION, build_sales_graph
-from .models import AgentRun, OutboundMessage, SalesAgentSimulation, SalesConversation, SalesFollowUpJob, SalesMessage
+from .models import AgentRun, OutboundMessage, SalesAgentSimulation, SalesConversation, SalesFollowUpJob, SalesInboundJob, SalesMessage
 
 
 MONTHS = {
     name.lower(): index
     for index in range(1, 13)
     for name in (calendar.month_name[index], calendar.month_abbr[index])
+}
+WEEKDAYS = {
+    "monday": 0, "tuesday": 1, "wednesday": 2, "thursday": 3,
+    "friday": 4, "saturday": 5, "sunday": 6,
 }
 
 
@@ -35,43 +39,79 @@ def _project_zone(project: Project) -> ZoneInfo:
         return ZoneInfo("UTC")
 
 
-def _requested_date(text: str, *, now: datetime, zone: ZoneInfo) -> date | None:
-    """Resolve an explicit date without inventing one when the lead did not provide it."""
+def _requested_period(text: str, *, now: datetime, zone: ZoneInfo) -> tuple[date, date] | None:
+    """Resolve an English date/day/range into an inclusive Project-local period."""
+    local_now = now.replace(tzinfo=timezone.utc).astimezone(zone)
+    lowered = text.casefold()
     iso = re.search(r"\b(20\d{2})-(\d{1,2})-(\d{1,2})\b", text)
     if iso:
         try:
-            return date(int(iso.group(1)), int(iso.group(2)), int(iso.group(3)))
+            value = date(int(iso.group(1)), int(iso.group(2)), int(iso.group(3)))
+            return value, value
         except ValueError:
             return None
-    lowered = text.lower()
-    month_match = re.search(
-        r"\b(" + "|".join(sorted(MONTHS, key=len, reverse=True)) + r")\s+(\d{1,2})(?:st|nd|rd|th)?\b",
+    month_names = "|".join(sorted(MONTHS, key=len, reverse=True))
+    range_match = re.search(
+        rf"\b({month_names})\s+(\d{{1,2}})(?:st|nd|rd|th)?\s+"
+        rf"(?:and|to|through|until|-)\s+(?:({month_names})\s+)?(\d{{1,2}})(?:st|nd|rd|th)?\b",
         lowered,
     )
-    local_now = now.replace(tzinfo=timezone.utc).astimezone(zone)
-    if month_match:
-        month = MONTHS[month_match.group(1)]
-        year = local_now.year + (1 if month < local_now.month else 0)
+    if range_match:
+        start_month = MONTHS[range_match.group(1)]
+        end_month = MONTHS[range_match.group(3)] if range_match.group(3) else start_month
+        start_year = local_now.year + (1 if start_month < local_now.month else 0)
+        end_year = start_year + (1 if end_month < start_month else 0)
         try:
-            return date(year, month, int(month_match.group(2)))
+            start = date(start_year, start_month, int(range_match.group(2)))
+            end = date(end_year, end_month, int(range_match.group(4)))
         except ValueError:
             return None
-    ordinal = re.search(r"\b(?:the\s+)?(\d{1,2})(?:st|nd|rd|th)\b", lowered)
-    if not ordinal:
-        return None
-    day = int(ordinal.group(1))
-    year, month = local_now.year, local_now.month
-    for _ in range(2):
+        return (start, end) if end >= start else None
+    month_match = re.search(
+        rf"\b({month_names})\s+(\d{{1,2}})(?:st|nd|rd|th)?(?:,?\s+(20\d{{2}}))?\b",
+        lowered,
+    )
+    if month_match:
+        month = MONTHS[month_match.group(1)]
+        year = int(month_match.group(3)) if month_match.group(3) else local_now.year + (1 if month < local_now.month else 0)
         try:
-            candidate = date(year, month, day)
+            value = date(year, month, int(month_match.group(2)))
+            return value, value
         except ValueError:
-            candidate = None
-        if candidate and candidate >= local_now.date():
-            return candidate
-        month += 1
-        if month == 13:
-            month, year = 1, year + 1
+            return None
+    if re.search(r"\btoday\b", lowered):
+        return local_now.date(), local_now.date()
+    if re.search(r"\btomorrow\b", lowered):
+        value = local_now.date() + timedelta(days=1)
+        return value, value
+    ordinal = re.search(r"\b(?:the\s+)?(\d{1,2})(?:st|nd|rd|th)\b", lowered)
+    if ordinal:
+        day = int(ordinal.group(1))
+        year, month = local_now.year, local_now.month
+        for _ in range(2):
+            try:
+                candidate = date(year, month, day)
+            except ValueError:
+                candidate = None
+            if candidate and candidate >= local_now.date():
+                return candidate, candidate
+            month += 1
+            if month == 13:
+                month, year = 1, year + 1
+    weekday = re.search(r"\b(next\s+)?(" + "|".join(WEEKDAYS) + r")\b", lowered)
+    if weekday:
+        target = WEEKDAYS[weekday.group(2)]
+        offset = (target - local_now.weekday()) % 7
+        if weekday.group(1) or offset == 0:
+            offset += 7
+        value = local_now.date() + timedelta(days=offset)
+        return value, value
     return None
+
+
+def _requested_date(text: str, *, now: datetime, zone: ZoneInfo) -> date | None:
+    period = _requested_period(text, now=now, zone=zone)
+    return period[0] if period and period[0] == period[1] else None
 
 
 def _action_types(actions: list[dict] | None) -> set[str]:
@@ -89,7 +129,7 @@ def _is_availability_request(text: str, *, now: datetime, zone: ZoneInfo) -> boo
         "appointment", "schedule", "availability", "available", "slot", "visit",
         "cita", "agendar", "horario", "disponible", "visita",
     )
-    return any(word in lowered for word in scheduling_words) or _requested_date(text, now=now, zone=zone) is not None
+    return any(word in lowered for word in scheduling_words) or _requested_period(text, now=now, zone=zone) is not None
 
 
 def _availability_reply(
@@ -97,39 +137,54 @@ def _availability_reply(
 ) -> tuple[str, list[datetime]]:
     """Execute the model's slot request and return a complete, grounded SMS."""
     zone = _project_zone(project)
-    requested = _requested_date(inbound_text, now=now, zone=zone)
+    requested_period = _requested_period(inbound_text, now=now, zone=zone)
+    requested_start, requested_end = requested_period or (None, None)
     search_after = now
     days = 14
-    if requested:
-        local_midnight = datetime.combine(requested, time.min, tzinfo=zone)
+    if requested_start and requested_end:
+        local_midnight = datetime.combine(requested_start, time.min, tzinfo=zone)
         search_after = local_midnight.astimezone(timezone.utc).replace(tzinfo=None) - timedelta(microseconds=1)
-        days = 2
+        days = max(1, (requested_end - requested_start).days + 1)
     slots = available_slots(
         db,
         project_id=project.id,
         after=search_after,
         duration_minutes=45,
         days=days,
-        limit=48 if requested else 3,
+        limit=max(48, days * 12) if requested_period else 3,
     )
-    if requested:
+    if requested_start and requested_end:
         slots = [
             slot for slot in slots
-            if slot["start_at"].replace(tzinfo=timezone.utc).astimezone(zone).date() == requested
+            if requested_start <= slot["start_at"].replace(tzinfo=timezone.utc).astimezone(zone).date() <= requested_end
         ]
     slots = slots[:3]
     if not slots:
-        when = requested.strftime("%A, %B %-d") if requested else "the next 14 days"
+        when = (
+            requested_start.strftime("%A, %B %-d")
+            if requested_start == requested_end and requested_start
+            else f"{requested_start.strftime('%B %-d')} through {requested_end.strftime('%B %-d')}"
+            if requested_start and requested_end
+            else "the next 14 days"
+        )
         return (
             f"I couldn't find a verified appointment time for {when}. "
             "Would you like another day, or should I ask the sales team to contact you?",
             [],
         )
     local_starts = [slot["start_at"].replace(tzinfo=timezone.utc).astimezone(zone) for slot in slots]
+    same_day = all(value.date() == local_starts[0].date() for value in local_starts)
     day_label = local_starts[0].strftime("%A, %B %-d")
     times = [value.strftime("%-I:%M %p") for value in local_starts]
     time_list = times[0] if len(times) == 1 else f"{', '.join(times[:-1])} or {times[-1]}"
     zone_label = _timezone_label(slots[0]["start_at"], zone, project.timezone or "UTC")
+    if not same_day:
+        options = "; ".join(value.strftime("%A, %B %-d at %-I:%M %p") for value in local_starts)
+        return (
+            f"I found these verified appointment times: {options} "
+            f"({zone_label}, Project local time). Which one works best for you?",
+            [slot["start_at"] for slot in slots],
+        )
     return (
         f"I found these verified appointment times for {day_label}: {time_list} "
         f"({zone_label}, Project local time). Which one works best for you?",
@@ -245,7 +300,7 @@ def _timezone_label(value: datetime, zone: ZoneInfo, timezone_name: str) -> str:
     local = value.replace(tzinfo=timezone.utc).astimezone(zone)
     offset = local.strftime("%z")
     formatted_offset = f"UTC{offset[:3]}:{offset[3:]}" if offset else "UTC+00:00"
-    return f"{formatted_offset}, {timezone_name}"
+    return "UTC" if timezone_name == "UTC" else f"{formatted_offset}, {timezone_name}"
 
 
 def _appointment_confirmation(
@@ -284,9 +339,11 @@ def _confirm_or_request_location(project: Project, lead: Lead, inbound_text: str
     if len(locations) == 1:
         selected = locations[0]
     else:
-        normalized = inbound_text.strip().casefold()
+        normalized = re.sub(r"[^a-z0-9]+", " ", inbound_text.casefold()).strip()
         ordinals = {"first": 1, "1": 1, "one": 1, "second": 2, "2": 2, "two": 2, "third": 3, "3": 3, "three": 3}
-        selected = resolve_visit_location(project, str(ordinals.get(normalized, normalized)))
+        ordinal_match = re.search(r"\b(first|second|third|one|two|three|1|2|3)\b", normalized)
+        ordinal_value = ordinals.get(ordinal_match.group(1)) if ordinal_match else None
+        selected = resolve_visit_location(project, str(ordinal_value or normalized))
         if not selected:
             choices = " ".join(f"{index}. {item['label']} — {item['address']}" for index, item in enumerate(locations, 1))
             form["pending_location_request"] = inbound_text
@@ -329,6 +386,9 @@ def conversation_summaries(
         campaign = db.query(ProjectCampaign).filter(ProjectCampaign.id == conversation.campaign_id).first() if conversation.campaign_id else None
         meeting = db.query(Meeting).filter(Meeting.lead_id == lead.id).order_by(Meeting.created_at.desc()).first()
         assigned_sales = db.query(User).filter(User.id == meeting.assigned_sales_user_id).first() if meeting and meeting.assigned_sales_user_id else None
+        inbound_job = db.query(SalesInboundJob).filter(
+            SalesInboundJob.conversation_id == conversation.id,
+        ).order_by(SalesInboundJob.created_at.desc()).first()
         result.append({
             "id": conversation.id, "lead_id": lead.id, "project_id": project.id,
             "campaign_id": conversation.campaign_id, "channel": conversation.channel,
@@ -345,7 +405,10 @@ def conversation_summaries(
             "last_message": last.content if last else None,
             "last_message_at": last.created_at if last else None,
             "next_action_at": lead.next_action_at, "agent_status": lead.agent_status,
+            "agent_turn_status": inbound_job.status if inbound_job else None,
+            "agent_turn_error": inbound_job.error_message if inbound_job else None,
             "project_name": project.name, "is_demo": bool(project.is_demo), "is_test": bool(lead.is_test),
+            "project_timezone": project.timezone or "UTC",
             "campaign_name": campaign.name if campaign else None,
             "simulation_id": simulation.id if simulation else None,
             "simulation_status": simulation.status if simulation else None,

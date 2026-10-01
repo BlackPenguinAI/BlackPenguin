@@ -107,6 +107,29 @@ describe('AgentComponent simulation form', () => {
     expect(value.operationalStatusLabel).toBe('AI ACTIVE');
   });
 
+  it('shows durable turn state and safely retries a failed live response', () => {
+    const calls: string[] = [];
+    const value = component({
+      post: (url: string) => {
+        calls.push(url);
+        return of({
+          id: 'live-conversation', channel: 'whatsapp', is_paused: false,
+          agent_turn_status: 'retry', project_timezone: 'America/Lima',
+        });
+      },
+      get: () => of([]),
+    });
+    value.selected = {
+      id: 'live-conversation', channel: 'whatsapp', is_paused: false,
+      agent_turn_status: 'failed', agent_turn_error: 'Agent turn processing failed.',
+    };
+    expect(value.operationalStatusLabel).toBe('AI NEEDS ATTENTION');
+    value.retryFailedTurn();
+    expect(calls[0]).toContain('/conversations/live-conversation/retry-turn');
+    expect(value.operationalStatusLabel).toBe('AI RETRY SCHEDULED');
+    expect(value.retryingTurn).toBe(false);
+  });
+
   it('requires a mapped campaign only when the selected source is Meta', () => {
     const value = component();
     value.options = [{ id: 'project', campaigns: [], products: [{ id: 'property_type:home' }] }];

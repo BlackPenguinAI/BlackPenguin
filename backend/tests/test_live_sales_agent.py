@@ -5,6 +5,8 @@ import hmac
 import importlib.util
 from pathlib import Path
 from unittest.mock import patch
+from unittest.mock import AsyncMock
+import asyncio
 
 import pytest
 from fastapi import HTTPException
@@ -24,9 +26,17 @@ from app.modules.projects.models import Project
 from app.modules.sales_crm.intelligence import merge_extracted_facts, update_lead_intelligence
 from app.modules.sales_crm.models import CalendarConnection, Lead, SalesAvailabilityWindow
 from app.modules.sales_crm.scheduling import available_slots, next_cadence_time
-from app.modules.sales_agent.live_service import ensure_contact, get_or_create_live_conversation
-from app.modules.sales_agent.models import SalesConversation
-from app.modules.sales_agent.service import conversation_summaries, set_conversation_action
+from app.modules.sales_agent.default_prompt import merge_sales_agent_defaults
+from app.modules.sales_agent.live_service import (
+    ensure_contact, get_or_create_live_conversation, process_live_inbound,
+    process_live_inbound_job,
+)
+from app.modules.sales_agent.models import SalesConversation, SalesInboundJob, SalesMessage
+from app.modules.sales_agent.live_worker import _claim_inbound_jobs
+from app.modules.sales_agent.service import (
+    _requested_period, conversation_summaries,
+    set_conversation_action,
+)
 from app.modules.system_settings.models import TwilioConfig
 from app.modules.system_settings.schemas import TwilioConfigUpdate
 from app.modules.system_settings.services import (
@@ -35,6 +45,7 @@ from app.modules.system_settings.services import (
     update_twilio_config,
 )
 from app.modules.users.models import User, UserRole
+from zoneinfo import ZoneInfo
 
 
 TEST_ACCOUNT_SID = "AC" + ("1" * 32)
@@ -130,6 +141,196 @@ def test_lead_intelligence_scores_explicit_context_and_does_not_infer_protected_
     assert lead.intent_tier == "hot"
     serialized = str(lead.meta_form_data).lower()
     assert "gender" not in serialized and "age" not in serialized
+
+
+def test_appointment_intent_advances_stage_and_contributes_to_score():
+    db = _db()
+    company = Company(name="Tenant"); db.add(company); db.flush()
+    project = Project(company_id=company.id, name="Project", timezone="America/Chicago")
+    lead = Lead(
+        company_id=company.id, project_id=project.id, full_name="Taylor Morgan",
+        phone="+13055550000", email="taylor@example.test", source="manual", platform="manual",
+    )
+    db.add_all([project, lead]); db.flush()
+    update_lead_intelligence(
+        db, lead, inbound_text="Can I schedule a tour on Friday?",
+        conversation_text="Can I schedule a tour on Friday?", message_count=2,
+    )
+    db.flush()
+    assert lead.pipeline_stage == "S08_APPOINTMENT"
+    assert lead.intent_tier in {"warm", "hot"}
+
+
+def test_requested_period_handles_weekdays_and_month_ranges_in_project_timezone():
+    now = datetime(2026, 10, 1, 15, 0)
+    zone = ZoneInfo("America/Chicago")
+    assert _requested_period("What do you have Friday?", now=now, zone=zone) == (
+        datetime(2026, 10, 2).date(), datetime(2026, 10, 2).date(),
+    )
+    assert _requested_period("Between October 10 and 20", now=now, zone=zone) == (
+        datetime(2026, 10, 10).date(), datetime(2026, 10, 20).date(),
+    )
+    assert _requested_period("October 30 through November 2", now=now, zone=zone) == (
+        datetime(2026, 10, 30).date(), datetime(2026, 11, 2).date(),
+    )
+
+
+def test_legacy_prompt_pack_is_normalized_to_runtime_stage_ids_and_english():
+    merged = merge_sales_agent_defaults({
+        "model": "test/model",
+        "system_prompt": "Use the lead's language and be concise.",
+        "protocol_prompt": "Protocol",
+        "guardrails_prompt": "Guardrails",
+        "stage_prompts": {"S01_CAPTURE": "Capture", "S10_HANDOFF": "Handoff"},
+    })
+    assert merged["system_prompt"].startswith("Communicate with leads in English only")
+    assert merged["stage_prompts"]["S00_CAPTURE"] == "Capture"
+    assert merged["stage_prompts"]["S09_HANDOFF"] == "Handoff"
+    assert "S10_HANDOFF" not in merged["stage_prompts"]
+
+
+def test_durable_inbound_job_records_success_and_terminal_failure():
+    db = _db()
+    company = Company(name="Tenant"); db.add(company); db.flush()
+    project = Project(company_id=company.id, name="Project")
+    lead = Lead(
+        company_id=company.id, project_id=project.id, full_name="Lead",
+        phone="+13055550000", source="manual", platform="manual",
+    )
+    db.add_all([project, lead]); db.flush()
+    conversation = SalesConversation(
+        company_id=company.id, project_id=project.id, lead_id=lead.id,
+        channel="sms", provider="telnyx", provider_thread_key="thread",
+    )
+    db.add(conversation); db.flush()
+    message = SalesMessage(
+        conversation_id=conversation.id, channel="sms", direction="inbound",
+        role="user", content="Friday?", status="received", metadata_json={},
+    )
+    db.add(message); db.flush()
+    job = SalesInboundJob(
+        conversation_id=conversation.id, message_id=message.id,
+        status="processing", attempt_number=1,
+    )
+    db.add(job); db.commit()
+    job_id, message_id, lead_id = job.id, message.id, lead.id
+    with patch("app.modules.sales_agent.live_service.SessionLocal", return_value=db), patch(
+        "app.modules.sales_agent.live_service.process_live_inbound", new=AsyncMock(return_value=None),
+    ):
+        asyncio.run(process_live_inbound_job(job_id))
+    job = db.query(SalesInboundJob).filter_by(id=job_id).one()
+    message = db.query(SalesMessage).filter_by(id=message_id).one()
+    assert job.status == "processed"
+    assert message.metadata_json["agent_turn_status"] == "processed"
+
+    job.status = "processing"; job.attempt_number = 3; job.processed_at = None; db.commit()
+    with patch("app.modules.sales_agent.live_service.SessionLocal", return_value=db), patch(
+        "app.modules.sales_agent.live_service.process_live_inbound",
+        new=AsyncMock(side_effect=RuntimeError("provider unavailable")),
+    ), pytest.raises(RuntimeError):
+        asyncio.run(process_live_inbound_job(job_id))
+    job = db.query(SalesInboundJob).filter_by(id=job_id).one()
+    lead = db.query(Lead).filter_by(id=lead_id).one()
+    assert job.status == "failed"
+    assert job.error_message == "Agent turn processing failed. Retry is available."
+    assert lead.agent_status == "attention_required"
+
+
+def test_inbound_job_migration_is_repeatable_on_current_schema(monkeypatch):
+    path = Path(__file__).parents[1] / "alembic" / "versions" / "20261001_sales_inbound_jobs.py"
+    spec = importlib.util.spec_from_file_location("sales_inbound_job_migration", path)
+    assert spec and spec.loader
+    migration = importlib.util.module_from_spec(spec); spec.loader.exec_module(migration)
+    engine = create_engine("sqlite://"); Base.metadata.create_all(engine)
+    with engine.begin() as connection:
+        monkeypatch.setattr(migration, "op", Operations(MigrationContext.configure(connection)))
+        migration.upgrade(); migration.upgrade()
+        tables = set(connection.dialect.get_table_names(connection))
+        columns = {
+            item["name"] for item in connection.dialect.get_columns(connection, "sales_inbound_jobs")
+        }
+    assert "sales_inbound_jobs" in tables
+    assert {"conversation_id", "message_id", "status", "attempt_number", "scheduled_at"}.issubset(columns)
+
+
+def test_live_appointment_request_uses_deterministic_slots_without_calling_the_model():
+    db = _db()
+    company = Company(name="Tenant"); db.add(company); db.flush()
+    project = Project(
+        company_id=company.id, name="Project", address="100 Main Street",
+        timezone="America/Chicago",
+    )
+    lead = Lead(
+        company_id=company.id, project_id=project.id, full_name="Lead",
+        phone="+13055550000", source="manual", platform="manual", consent_status="granted",
+    )
+    db.add_all([project, lead]); db.flush()
+    conversation = SalesConversation(
+        company_id=company.id, project_id=project.id, lead_id=lead.id,
+        channel="sms", provider="telnyx", provider_thread_key="deterministic-thread", is_paused=False,
+    )
+    db.add(conversation); db.flush()
+    message = SalesMessage(
+        conversation_id=conversation.id, channel="sms", direction="inbound", role="user",
+        content="What appointment times are available?", provider_message_id="inbound-1", status="received",
+    )
+    db.add(message); db.commit()
+    conversation_id, message_id, lead_id = conversation.id, message.id, lead.id
+    slot = datetime(2026, 10, 2, 15, 0)
+    with patch("app.modules.sales_agent.live_service.SessionLocal", return_value=db), patch(
+        "app.modules.sales_agent.live_service.build_sales_graph",
+    ) as graph, patch(
+        "app.modules.sales_agent.service.available_slots",
+        return_value=[{"start_at": slot, "end_at": slot + timedelta(minutes=45), "eligible_sales_users": 1}],
+    ), patch(
+        "app.modules.sales_agent.live_service._dispatch", new=AsyncMock(return_value=SalesMessage()),
+    ) as dispatch:
+        asyncio.run(process_live_inbound(conversation_id, message_id))
+    graph.assert_not_called()
+    assert "verified appointment times" in dispatch.await_args.kwargs["content"]
+    lead = db.query(Lead).filter_by(id=lead_id).one()
+    assert lead.pipeline_stage == "S08_APPOINTMENT"
+
+
+def test_inbound_worker_claims_fifo_and_only_one_turn_per_conversation():
+    db = _db()
+    company = Company(name="Tenant"); db.add(company); db.flush()
+    project = Project(company_id=company.id, name="Project"); db.add(project); db.flush()
+    leads = [
+        Lead(company_id=company.id, project_id=project.id, full_name=f"Lead {index}", phone=f"+1305555000{index}", source="manual", platform="manual")
+        for index in range(2)
+    ]
+    db.add_all(leads); db.flush()
+    conversations = [
+        SalesConversation(
+            company_id=company.id, project_id=project.id, lead_id=lead.id,
+            channel="sms", provider="telnyx", provider_thread_key=f"fifo-{index}", is_paused=False,
+        )
+        for index, lead in enumerate(leads)
+    ]
+    db.add_all(conversations); db.flush()
+    created = datetime(2026, 10, 1, 12, 0)
+    messages = [
+        SalesMessage(
+            conversation_id=conversation_id, channel="sms", direction="inbound", role="user",
+            content=f"Message {index}", provider_message_id=f"fifo-message-{index}",
+            created_at=created + timedelta(seconds=index),
+        )
+        for index, conversation_id in enumerate((conversations[0].id, conversations[0].id, conversations[1].id))
+    ]
+    db.add_all(messages); db.flush()
+    jobs = [
+        SalesInboundJob(
+            conversation_id=message.conversation_id, message_id=message.id, status="pending",
+            scheduled_at=created, created_at=message.created_at,
+        )
+        for message in messages
+    ]
+    db.add_all(jobs); db.commit()
+    expected = {jobs[0].id, jobs[2].id}
+    with patch("app.modules.sales_agent.live_worker.SessionLocal", return_value=db):
+        claimed = set(_claim_inbound_jobs(limit=10))
+    assert claimed == expected
 
 
 def test_slot_scan_fetches_google_busy_ranges_once_per_sales_user():

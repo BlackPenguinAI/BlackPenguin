@@ -178,7 +178,10 @@ class ConversationSummary(BaseModel):
     last_message_at: datetime | None = None
     next_action_at: datetime | None = None
     agent_status: str = "simulation"
+    agent_turn_status: str | None = None
+    agent_turn_error: str | None = None
     project_name: str
+    project_timezone: str = "UTC"
     is_demo: bool = False
     is_test: bool = False
     campaign_name: str | None = None

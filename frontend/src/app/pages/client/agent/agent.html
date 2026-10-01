@@ -255,6 +255,10 @@
             ><button (click)="generateInitial()">Retry first {{ channelLabel }}</button>
           </div>
         </div>
+        <div class="generation-state" *ngIf="isLive && ['pending', 'processing', 'retry'].includes(selected.agent_turn_status)">
+          <span class="material-symbols-outlined">{{ selected.agent_turn_status === 'retry' ? 'refresh' : 'smart_toy' }}</span>
+          <div><strong>{{ selected.agent_turn_status === 'retry' ? 'Agent retry scheduled' : 'AI sales agent is responding' }}</strong><small>The inbound message is safely stored and processed in conversation order.</small></div>
+        </div>
         <ng-container *ngFor="let message of messages">
           <div *ngIf="isReminder(message); else smsBubble" class="my-2 ml-auto flex max-w-[72%] items-start gap-2 rounded-lg border border-dashed border-[#6b5206] bg-[#151104] px-3 py-2 text-[#a98b31]">
             <span class="material-symbols-outlined text-base">schedule</span>
@@ -315,12 +319,21 @@
         <span>{{ operationalStatusLabel }}</span
         ><b>{{ selected.pipeline_stage || selected.funnel_stage }}</b>
       </div>
+      <div class="generation-state failed" *ngIf="isLive && selected.agent_turn_status === 'failed'">
+        <span class="material-symbols-outlined">error</span>
+        <div><strong>Agent turn needs attention</strong><small>{{ selected.agent_turn_error || 'The inbound message is stored, but the response could not be completed.' }}</small><button *ngIf="canManualControl" (click)="retryFailedTurn()" [disabled]="retryingTurn">{{ retryingTurn ? 'Queuing…' : 'Retry agent turn' }}</button></div>
+      </div>
+      <div class="generation-state failed" *ngIf="isLive && selected.project_timezone === 'UTC'">
+        <span class="material-symbols-outlined">schedule</span>
+        <div><strong>Project timezone requires review</strong><small>UTC is configured. Set the Project's real IANA timezone before confirming local appointment times.</small></div>
+      </div>
       <dl>
         <dt>Intent</dt><dd>{{ selected.intent_tier || 'unscored' }} · {{ (selected.intent_score || 0) * 100 | number:'1.0-0' }}/100</dd>
         <dt>Segment</dt><dd>{{ selected.assigned_segment || 'Unsegmented' }}</dd>
         <ng-container *ngIf="selected.qualification_summary"><dt>Known lead facts</dt><dd>{{ selected.qualification_summary }}</dd></ng-container>
         <dt>Project</dt>
         <dd>{{ selected.project_name }}</dd>
+        <dt>Appointment timezone</dt><dd>{{ selected.project_timezone || 'UTC' }}</dd>
         <dt>Source</dt><dd>{{ leadSourceLabel }}</dd>
         <dt>Channel</dt><dd>{{ selected.channel === 'whatsapp' ? 'WhatsApp via Telnyx' : (selected.channel === 'sms' ? 'SMS' : 'Simulation') }}</dd>
         <ng-container *ngIf="selected.campaign_name"><dt>Campaign</dt><dd>{{ selected.campaign_name }}</dd></ng-container>

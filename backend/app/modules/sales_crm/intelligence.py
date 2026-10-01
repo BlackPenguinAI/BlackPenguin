@@ -198,8 +198,14 @@ def calculate_score(db: Session, lead: Lead, conversation_text: str, message_cou
     text = _text(lead, conversation_text)
     config = (get_ai_config(db, None).agent_ventas or {}).get("scoring_config", {})
     weight = lambda key, fallback: int(config.get(key, fallback))
+    appointment_signal = bool(re.search(
+        r"\b(appointment|schedule|openings?|available\s+times?|visit|tour|showing|"
+        r"monday|tuesday|wednesday|thursday|friday|saturday|sunday|"
+        r"january|february|march|april|may|june|july|august|september|october|november|december)\b",
+        text,
+    ))
     factors = {
-        "timeline": weight("timeline", 20) if re.search(r"\b(30|60|90) days?\b|this month|next month|<90", text) else weight("timeline", 20) // 2 if "month" in text else 0,
+        "timeline": weight("timeline", 20) if re.search(r"\b(30|60|90) days?\b|this month|next month|<90|\b\d{1,2}(?:st|nd|rd|th)\b", text) else weight("timeline", 20) // 2 if "month" in text else 0,
         "financial_readiness": weight("financial_readiness", 20) if any(term in text for term in ("pre-approved", "preapproved", "cash buyer", "paying cash")) else weight("financial_readiness", 20) // 2 if any(term in text for term in ("financing", "mortgage", "loan")) else 0,
         "budget_fit": weight("budget_fit", 20) if (
             any(key in (lead.meta_form_data or {}) for key in ("budget", "budget_min", "budget_max"))
@@ -208,6 +214,7 @@ def calculate_score(db: Session, lead: Lead, conversation_text: str, message_cou
         "engagement": min(weight("engagement", 15), message_count * 3),
         "decision_authority": weight("decision_authority", 15) if any(term in text for term in ("i decide", "decide alone", "my decision")) else weight("decision_authority", 15) // 2 if any(term in text for term in ("partner", "family", "spouse")) else 0,
         "specificity": weight("specificity", 10) if any(term in text for term in ("bedroom", "unit", "tower", "phase", "floor", "m2", "sq ft")) else 0,
+        "appointment_intent": weight("appointment_intent", 35) if appointment_signal else 0,
     }
     total = max(0, min(100, sum(factors.values())))
     tier = "hot" if total >= int(config.get("hot_threshold", 70)) else "warm" if total >= int(config.get("warm_threshold", 40)) else "cold"
@@ -232,8 +239,16 @@ def update_lead_intelligence(db: Session, lead: Lead, *, inbound_text: str, conv
         lead.intent_tier = "cold"
         lead.intent_score = snapshot.total_score / 100
         snapshot.assigned_tier = "cold"
+    appointment_signal = bool(re.search(
+        r"\b(appointment|schedule|openings?|available\s+times?|visit|tour|showing|"
+        r"monday|tuesday|wednesday|thursday|friday|saturday|sunday|"
+        r"january|february|march|april|may|june|july|august|september|october|november|december)\b",
+        inbound_text.casefold(),
+    ))
     if objection:
         lead.pipeline_stage = "S07_OBJECTION"
+    elif appointment_signal:
+        lead.pipeline_stage = "S08_APPOINTMENT"
     elif lead.assigned_segment:
         lead.pipeline_stage = "S05_SEGMENTATION"
     elif message_count >= 3:

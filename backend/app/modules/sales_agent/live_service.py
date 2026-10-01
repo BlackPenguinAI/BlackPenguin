@@ -17,11 +17,11 @@ from app.modules.sales_crm.models import FunnelStage, Lead, LeadContact
 
 from .graph import GRAPH_VERSION, TOOLSET_VERSION, build_sales_graph
 from .models import (
-    AgentRun, OutboundMessage, SalesConversation, SalesConversationLeadContext,
+    AgentRun, ExternalWebhookEvent, OutboundMessage, SalesConversation, SalesConversationLeadContext, SalesInboundJob,
     SalesFollowUpJob, SalesMessage,
 )
 from .service import (
-    _action_types, _appointment_confirmation, _availability_reply,
+    _appointment_confirmation, _availability_reply,
     _confirm_or_request_location, _is_availability_request, _offered_slot_selection, _project_zone,
     get_or_create_conversation,
 )
@@ -426,6 +426,129 @@ async def launch_live_lead(db: Session, lead: Lead) -> tuple[SalesConversation |
     return conversation, message
 
 
+def _prepare_run(
+    db: Session, *, conversation: SalesConversation, event_id: str,
+    message_id: str, model: str = "pending",
+) -> AgentRun | None:
+    existing = db.query(AgentRun).filter(AgentRun.event_id == event_id).first()
+    if existing and existing.status in {"completed", "blocked"}:
+        return None
+    run = existing or AgentRun(
+        conversation_id=conversation.id, event_id=event_id, mode="live",
+        graph_version=GRAPH_VERSION, toolset_version=TOOLSET_VERSION,
+        prompt_snapshot={}, model=model, input_snapshot={"message_id": message_id},
+    )
+    run.status = "running"
+    run.error_code = None
+    run.completed_at = None
+    if existing:
+        run.model = model
+        run.input_snapshot = {"message_id": message_id, "retry": True}
+    db.add(run); db.commit(); db.refresh(run)
+    return run
+
+
+async def _process_deterministic_appointment_turn(
+    db: Session, *, conversation: SalesConversation, lead: Lead,
+    project: Project, inbound: SalesMessage, event_id: str,
+) -> bool:
+    """Own every appointment turn before the LLM so provider/model failures cannot block scheduling."""
+    now = datetime.utcnow()
+    selected = _offered_slot_selection(
+        db, conversation_id=conversation.id, inbound_text=inbound.content,
+        project=project, now=now,
+    )
+    awaiting_location = bool((lead.meta_form_data or {}).get("pending_location_request"))
+    scheduling_request = _is_availability_request(
+        inbound.content, now=now, zone=_project_zone(project),
+    )
+    if not (selected or awaiting_location or scheduling_request):
+        return False
+
+    run = _prepare_run(
+        db, conversation=conversation, event_id=event_id,
+        message_id=inbound.id, model="deterministic/appointment-routing",
+    )
+    if run is None:
+        return True
+
+    location_ready, location_question, location_resume = _confirm_or_request_location(
+        project, lead, inbound.content,
+    )
+    offered_slots: list[datetime] = []
+    if not location_ready:
+        reply = location_question
+        actions = [{"type": "request_visit_location"}]
+    elif selected:
+        try:
+            meeting, user = create_agent_appointment(
+                db, lead=lead, starts_at=selected, duration_minutes=45, modality="showroom",
+            )
+            reply = _appointment_confirmation(
+                project=project, lead=lead, user=user, starts_at=meeting.meeting_time,
+            )
+            conversation.stage = "appointment_confirmed"
+            conversation.is_paused = True
+            conversation.pause_reason = "Appointment confirmed"
+            lead.pipeline_stage = "S09_HANDOFF"
+            lead.agent_status = "appointment_confirmed"
+            lead.next_action_at = None
+            actions = [{"type": "appointment_confirmed", "meeting_id": meeting.id}]
+        except HTTPException as exc:
+            if exc.status_code != 409:
+                raise
+            reply, offered_slots = _availability_reply(
+                db, project=project, inbound_text=location_resume or inbound.content, now=now,
+            )
+            actions = [{"type": "request_available_slots"}]
+            if offered_slots:
+                actions.append({"type": "offer_appointment"})
+    else:
+        reply, offered_slots = _availability_reply(
+            db, project=project, inbound_text=location_resume or inbound.content, now=now,
+        )
+        actions = [{"type": "request_available_slots"}]
+        if offered_slots:
+            actions.append({"type": "offer_appointment"})
+
+    history = db.query(SalesMessage).filter(
+        SalesMessage.conversation_id == conversation.id,
+    ).order_by(SalesMessage.created_at).all()
+    update_lead_intelligence(
+        db, lead, inbound_text=inbound.content,
+        conversation_text=" ".join(item.content for item in history[-20:]),
+        message_count=len(history),
+    )
+    if lead.agent_status != "appointment_confirmed":
+        lead.pipeline_stage = "S08_APPOINTMENT"
+    run.output_snapshot = {
+        "reply": reply, "proposed_actions": actions,
+        "requires_human": False, "policy_violations": [], "error_code": None,
+    }
+    run.status = "completed"
+    run.completed_at = datetime.utcnow()
+    conversation.updated_at = datetime.utcnow()
+    lead.last_interaction_at = datetime.utcnow()
+    db.add_all([run, conversation, lead]); db.commit()
+    await _dispatch(
+        db, conversation=conversation, lead=lead, content=reply,
+        role="assistant", agent_run_id=run.id,
+        metadata={
+            "event_kind": "deterministic_appointment_routing",
+            "appointment_offer": {
+                "slots": [slot.isoformat() for slot in offered_slots],
+                "duration_minutes": 45,
+                "project_timezone": project.timezone or "UTC",
+            },
+        },
+        idempotency_key=f"appointment-turn:{event_id}",
+    )
+    if lead.agent_status != "appointment_confirmed":
+        _schedule_next_action(db, conversation, lead, event_id)
+    db.commit()
+    return True
+
+
 async def process_live_inbound(conversation_id: str, inbound_message_id: str) -> None:
     db = SessionLocal()
     try:
@@ -459,76 +582,17 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
                 idempotency_key=f"human-intervention:{conversation.id}:{inbound.id}",
             )
             return
-        awaiting_location = bool((lead.meta_form_data or {}).get("pending_location_request"))
-        if awaiting_location:
-            # A location choice is deterministic workflow input, not an LLM
-            # policy decision. Resolve it before the graph so valid replies such
-            # as "the first property" can never become false policy violations.
-            location_ready, location_question, location_resume = _confirm_or_request_location(
-                project, lead, inbound.content,
-            )
-            offered_slots = []
-            if location_resume:
-                reply, offered_slots = _availability_reply(
-                    db, project=project, inbound_text=location_resume, now=datetime.utcnow(),
-                )
-                actions = [{"type": "request_available_slots"}]
-                if offered_slots:
-                    actions.append({"type": "offer_appointment"})
-            elif not location_ready:
-                reply = location_question
-                actions = [{"type": "request_visit_location"}]
-            else:
-                reply, offered_slots = _availability_reply(
-                    db, project=project, inbound_text="available visit times", now=datetime.utcnow(),
-                )
-                actions = [{"type": "request_available_slots"}]
-                if offered_slots:
-                    actions.append({"type": "offer_appointment"})
-            event_id = f"{conversation.provider}:{inbound.provider_message_id or inbound.id}"
-            run = AgentRun(
-                conversation_id=conversation.id, event_id=event_id, mode="live", status="completed",
-                graph_version=GRAPH_VERSION, toolset_version=TOOLSET_VERSION,
-                prompt_snapshot={}, model="deterministic/location-routing",
-                input_snapshot={"message_id": inbound.id, "pending_location": True},
-                output_snapshot={
-                    "reply": reply, "proposed_actions": actions, "requires_human": False,
-                    "policy_violations": [], "error_code": None,
-                },
-                completed_at=datetime.utcnow(),
-            )
-            history = db.query(SalesMessage).filter(
-                SalesMessage.conversation_id == conversation.id,
-            ).order_by(SalesMessage.created_at).all()
-            update_lead_intelligence(
-                db, lead, inbound_text=inbound.content,
-                conversation_text=" ".join(item.content for item in history[-20:]),
-                message_count=len(history),
-            )
-            conversation.updated_at = datetime.utcnow(); lead.last_interaction_at = datetime.utcnow()
-            db.add_all([run, conversation, lead]); db.commit()
-            await _dispatch(
-                db, conversation=conversation, lead=lead, content=reply,
-                role="assistant", agent_run_id=run.id,
-                metadata={
-                    "event_kind": "deterministic_location_routing",
-                    "appointment_offer": {
-                        "slots": [slot.isoformat() for slot in offered_slots],
-                        "duration_minutes": 45,
-                        "project_timezone": project.timezone or "UTC",
-                    },
-                },
-            )
-            _schedule_next_action(db, conversation, lead, event_id)
-            db.commit()
-            return
         event_id = f"{conversation.provider}:{inbound.provider_message_id or inbound.id}"
-        run = AgentRun(
-            conversation_id=conversation.id, event_id=event_id, mode="live", status="running",
-            graph_version=GRAPH_VERSION, toolset_version=TOOLSET_VERSION,
-            prompt_snapshot={}, model="pending", input_snapshot={"message_id": inbound.id},
+        if await _process_deterministic_appointment_turn(
+            db, conversation=conversation, lead=lead, project=project,
+            inbound=inbound, event_id=event_id,
+        ):
+            return
+        run = _prepare_run(
+            db, conversation=conversation, event_id=event_id, message_id=inbound.id,
         )
-        db.add(run); db.commit(); db.refresh(run)
+        if run is None:
+            return
         result = await build_sales_graph(db).ainvoke({
             "event_id": event_id, "mode": "live", "conversation_id": conversation.id,
             "company_id": lead.company_id, "project_id": project.id, "campaign_id": lead.campaign_id,
@@ -537,6 +601,8 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
         })
         reply = result.get("proposed_reply")
         actions = result.get("proposed_actions", [])
+        if result.get("error_code") == "invalid_model_contract":
+            raise RuntimeError("The Sales Agent returned an invalid response contract.")
         if not result.get("policy_violations"):
             merge_extracted_facts(
                 lead, result.get("extracted_facts"), evidence=inbound.content,
@@ -548,32 +614,6 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
                 evidence=inbound.content,
             )
             reply = f"I’ve paused the automated conversation for human review. You can also contact Black Penguin at {settings.SUPPORT_EMAIL}."
-        offered_slots = []
-        selected = _offered_slot_selection(db, conversation_id=conversation.id, inbound_text=inbound.content, project=project, now=datetime.utcnow())
-        location_needed = bool(selected) or _is_availability_request(inbound.content, now=datetime.utcnow(), zone=_project_zone(project)) or "request_available_slots" in _action_types(actions)
-        awaiting_location = bool((lead.meta_form_data or {}).get("pending_location_request"))
-        location_ready, location_question, location_resume = (
-            _confirm_or_request_location(project, lead, inbound.content)
-            if location_needed or awaiting_location else (True, None, None)
-        )
-        if location_resume:
-            reply, offered_slots = _availability_reply(db, project=project, inbound_text=location_resume, now=datetime.utcnow())
-            actions = [{"type": "request_available_slots"}, {"type": "offer_appointment"}]
-        elif location_needed and not location_ready:
-            reply = location_question
-            actions = [{"type": "request_visit_location"}]
-        elif selected:
-            try:
-                meeting, user = create_agent_appointment(db, lead=lead, starts_at=selected, duration_minutes=45, modality="showroom")
-                reply = _appointment_confirmation(project=project, lead=lead, user=user, starts_at=meeting.meeting_time)
-                conversation.stage = "appointment_confirmed"; conversation.is_paused = True; conversation.pause_reason = "Appointment confirmed"
-                lead.pipeline_stage = "S09_HANDOFF"; lead.agent_status = "appointment_confirmed"; lead.next_action_at = None
-                actions = [{"type": "appointment_confirmed", "meeting_id": meeting.id}]
-            except HTTPException as exc:
-                if exc.status_code != 409: raise
-                reply, offered_slots = _availability_reply(db, project=project, inbound_text=inbound.content, now=datetime.utcnow())
-        elif _is_availability_request(inbound.content, now=datetime.utcnow(), zone=_project_zone(project)) or "request_available_slots" in _action_types(actions):
-            reply, offered_slots = _availability_reply(db, project=project, inbound_text=inbound.content, now=datetime.utcnow())
         history = db.query(SalesMessage).filter(SalesMessage.conversation_id == conversation.id).order_by(SalesMessage.created_at).all()
         update_lead_intelligence(db, lead, inbound_text=inbound.content, conversation_text=" ".join(item.content for item in history[-20:]), message_count=len(history))
         run.prompt_configuration_id = result.get("prompt_configuration_id")
@@ -586,7 +626,7 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
             "policy_violations": result.get("policy_violations", []),
             "error_code": result.get("error_code"),
         }
-        run.status = "completed"; run.completed_at = datetime.utcnow()
+        run.status = "blocked" if result.get("requires_human") else "completed"; run.completed_at = datetime.utcnow()
         conversation.updated_at = datetime.utcnow(); lead.last_interaction_at = datetime.utcnow()
         db.add_all([run, conversation, lead]); db.commit()
         # The LLM call runs without holding a database lock. Re-lock immediately
@@ -600,14 +640,125 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
             or conversation.pause_reason == "Appointment confirmed"
             or (conversation.pause_reason or "").startswith("Human intervention")
         ):
-            await _dispatch(db, conversation=conversation, lead=lead, content=reply, role="assistant", agent_run_id=run.id, metadata={"appointment_offer": {"slots": [slot.isoformat() for slot in offered_slots], "duration_minutes": 45, "project_timezone": project.timezone or "UTC"}} if offered_slots else {})
+            await _dispatch(db, conversation=conversation, lead=lead, content=reply, role="assistant", agent_run_id=run.id)
         _schedule_next_action(db, conversation, lead, event_id)
         db.commit()
-    except Exception:
+    except Exception as exc:
         db.rollback()
+        event_id = None
+        inbound = db.query(SalesMessage).filter(SalesMessage.id == inbound_message_id).first()
+        conversation = db.query(SalesConversation).filter(SalesConversation.id == conversation_id).first()
+        if inbound and conversation:
+            event_id = f"{conversation.provider}:{inbound.provider_message_id or inbound.id}"
+        run = db.query(AgentRun).filter(AgentRun.event_id == event_id).first() if event_id else None
+        if run:
+            run.status = "failed"
+            run.error_code = type(exc).__name__[:80]
+            run.output_snapshot = {**(run.output_snapshot or {}), "safe_error": "Agent turn processing failed."}
+            run.completed_at = datetime.utcnow()
+            db.commit()
         raise
     finally:
         db.close()
+
+
+async def process_live_inbound_job(job_id: str) -> None:
+    """Process one durable inbound turn and expose bounded retry state to operators."""
+    db = SessionLocal()
+    try:
+        job = db.query(SalesInboundJob).filter(SalesInboundJob.id == job_id).first()
+        if not job or job.status != "processing":
+            return
+        message = db.query(SalesMessage).filter(SalesMessage.id == job.message_id).one()
+        message.metadata_json = {**(message.metadata_json or {}), "agent_turn_status": "processing"}
+        db.commit()
+        await process_live_inbound(job.conversation_id, job.message_id)
+        db.expire_all()
+        job = db.query(SalesInboundJob).filter(SalesInboundJob.id == job_id).one()
+        message = db.query(SalesMessage).filter(SalesMessage.id == job.message_id).one()
+        job.status = "processed"
+        job.processed_at = datetime.utcnow()
+        job.error_code = None
+        job.error_message = None
+        message.metadata_json = {
+            **(message.metadata_json or {}),
+            "agent_turn_status": "processed",
+            "agent_turn_error": None,
+        }
+        webhook_event_id = (message.metadata_json or {}).get("webhook_event_id")
+        if webhook_event_id:
+            event = db.query(ExternalWebhookEvent).filter(
+                ExternalWebhookEvent.platform == (message.metadata_json or {}).get("provider"),
+                ExternalWebhookEvent.external_event_id == webhook_event_id,
+            ).first()
+            if event:
+                event.status = "processed"
+                event.processed_at = datetime.utcnow()
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        job = db.query(SalesInboundJob).filter(SalesInboundJob.id == job_id).first()
+        if job:
+            terminal = (job.attempt_number or 0) >= 3
+            job.status = "failed" if terminal else "retry"
+            job.claimed_at = None
+            job.scheduled_at = datetime.utcnow() + timedelta(minutes=5 if (job.attempt_number or 0) > 1 else 1)
+            job.error_code = type(exc).__name__[:80]
+            job.error_message = "Agent turn processing failed. Retry is available."
+            message = db.query(SalesMessage).filter(SalesMessage.id == job.message_id).first()
+            if message:
+                message.metadata_json = {
+                    **(message.metadata_json or {}),
+                    "agent_turn_status": job.status,
+                    "agent_turn_error": job.error_message,
+                }
+            if terminal:
+                conversation = db.query(SalesConversation).filter(
+                    SalesConversation.id == job.conversation_id,
+                ).first()
+                lead = db.query(Lead).filter(Lead.id == conversation.lead_id).first() if conversation else None
+                if lead:
+                    lead.agent_status = "attention_required"
+            db.commit()
+        raise
+    finally:
+        db.close()
+
+
+def retry_failed_inbound_turn(
+    db: Session, *, company_id: str, conversation_id: str,
+) -> SalesInboundJob:
+    conversation = db.query(SalesConversation).filter(
+        SalesConversation.id == conversation_id,
+        SalesConversation.company_id == company_id,
+    ).first()
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found.")
+    job = db.query(SalesInboundJob).filter(
+        SalesInboundJob.conversation_id == conversation_id,
+        SalesInboundJob.status == "failed",
+    ).order_by(SalesInboundJob.created_at.desc()).first()
+    if not job:
+        raise HTTPException(status_code=409, detail="This conversation has no failed agent turn to retry.")
+    job.status = "retry"
+    job.attempt_number = 0
+    job.scheduled_at = datetime.utcnow()
+    job.claimed_at = None
+    job.processed_at = None
+    job.error_code = None
+    job.error_message = None
+    message = db.query(SalesMessage).filter(SalesMessage.id == job.message_id).first()
+    if message:
+        message.metadata_json = {
+            **(message.metadata_json or {}),
+            "agent_turn_status": "retry",
+            "agent_turn_error": None,
+        }
+    lead = db.query(Lead).filter(Lead.id == conversation.lead_id).first()
+    if lead and not conversation.is_paused:
+        lead.agent_status = "active"
+    db.commit()
+    return job
 
 
 async def send_manual_message(db: Session, *, conversation_id: str, company_id: str, user_id: str, content: str) -> SalesMessage:
