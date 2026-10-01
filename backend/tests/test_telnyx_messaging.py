@@ -29,7 +29,7 @@ from app.modules.companies.models import Company
 from app.modules.projects.models import Project
 from app.modules.sales_agent.live_service import get_or_create_live_conversation
 from app.modules.sales_agent.models import ExternalWebhookEvent, SalesConversation, SalesMessage
-from app.modules.sales_agent.provider_router import telnyx_router
+from app.modules.sales_agent.provider_router import _status_from_telnyx, telnyx_router
 from app.modules.sales_crm.models import Lead
 from app.modules.system_settings.models import (
     MessagingRoutingConfig, TelnyxCompanyConfig, TelnyxConfig, TwilioConfig,
@@ -354,6 +354,107 @@ def test_signed_webhook_routes_by_destination_number_and_company():
     assert response.status_code == 200
     message = db.query(SalesMessage).one()
     assert message.conversation_id == conversation.id and message.content == "I want a visit"
+
+
+def test_signed_whatsapp_webhook_reads_unified_body_and_routes_the_company_thread():
+    db = _db(); private, public_key = _public_key()
+    db.add(TelnyxConfig(
+        api_key_ciphertext=encrypt_secret("KEY"), webhook_public_key=public_key,
+        verification_status="verified", live_sms_enabled=True,
+    )); db.flush()
+    company, project, lead, config = _company_project_lead(
+        db, company_name="WhatsApp Tenant", sender_phone="+17865550142", lead_phone="+51997889851",
+    )
+    config.whatsapp_business_account_id = "waba-1"
+    config.whatsapp_phone_number_id = "wa-phone-1"
+    config.whatsapp_from_phone_number = "+17865151731"
+    config.whatsapp_template_name = "welcome_en"
+    config.whatsapp_template_language = "en_US"
+    config.whatsapp_verification_status = "verified"
+    config.live_whatsapp_enabled = True
+    conversation = SalesConversation(
+        company_id=company.id, project_id=project.id, lead_id=lead.id,
+        channel="whatsapp", provider="telnyx",
+        provider_thread_key="telnyx:whatsapp:+17865151731:+51997889851", is_paused=True,
+    )
+    db.add(conversation); db.commit()
+    envelope = {"data": {"id": "wa-event-1", "event_type": "message.received", "payload": {
+        "id": "wa-message-1", "type": "WhatsApp", "direction": "inbound",
+        "from": "+51997889851", "to": "+17865151731",
+        "body": {"type": "text", "text": {"body": "Hola"}},
+    }}}
+    body = json.dumps(envelope, separators=(",", ":")).encode()
+    timestamp = str(int(time.time()))
+    signature = base64.b64encode(private.sign(timestamp.encode() + b"|" + body)).decode()
+    app = FastAPI(); app.include_router(telnyx_router, prefix="/webhooks/telnyx")
+    app.dependency_overrides[get_db] = lambda: db
+    response = TestClient(app).post(
+        "/webhooks/telnyx/messaging", content=body,
+        headers={
+            "Content-Type": "application/json",
+            "telnyx-signature-ed25519": signature,
+            "telnyx-timestamp": timestamp,
+        },
+    )
+    assert response.status_code == 200
+    message = db.query(SalesMessage).one()
+    assert message.content == "Hola"
+    assert message.channel == "whatsapp"
+    assert message.metadata_json["message_type"] == "text"
+    assert message.metadata_json["content_supported"] is True
+
+
+def test_empty_whatsapp_content_is_traced_without_running_the_agent():
+    db = _db(); private, public_key = _public_key()
+    db.add(TelnyxConfig(
+        api_key_ciphertext=encrypt_secret("KEY"), webhook_public_key=public_key,
+        verification_status="verified", live_sms_enabled=True,
+    )); db.flush()
+    company, project, lead, config = _company_project_lead(
+        db, company_name="Media Tenant", sender_phone="+17865550143", lead_phone="+51997889852",
+    )
+    config.whatsapp_business_account_id = "waba-2"
+    config.whatsapp_phone_number_id = "wa-phone-2"
+    config.whatsapp_from_phone_number = "+17865151732"
+    config.whatsapp_template_name = "welcome_en"
+    config.whatsapp_template_language = "en_US"
+    config.whatsapp_verification_status = "verified"
+    config.live_whatsapp_enabled = True
+    conversation = SalesConversation(
+        company_id=company.id, project_id=project.id, lead_id=lead.id,
+        channel="whatsapp", provider="telnyx",
+        provider_thread_key="telnyx:whatsapp:+17865151732:+51997889852", is_paused=False,
+    )
+    db.add(conversation); db.commit()
+    envelope = {"data": {"id": "wa-event-media", "event_type": "message.received", "payload": {
+        "id": "wa-message-media", "type": "WhatsApp", "direction": "inbound",
+        "from": "+51997889852", "to": "+17865151732",
+        "body": {"type": "image", "image": {"id": "media-1"}},
+    }}}
+    body = json.dumps(envelope, separators=(",", ":")).encode()
+    timestamp = str(int(time.time()))
+    signature = base64.b64encode(private.sign(timestamp.encode() + b"|" + body)).decode()
+    app = FastAPI(); app.include_router(telnyx_router, prefix="/webhooks/telnyx")
+    app.dependency_overrides[get_db] = lambda: db
+    with patch("app.modules.sales_agent.provider_router.process_live_inbound") as agent:
+        response = TestClient(app).post(
+            "/webhooks/telnyx/messaging", content=body,
+            headers={
+                "Content-Type": "application/json",
+                "telnyx-signature-ed25519": signature,
+                "telnyx-timestamp": timestamp,
+            },
+        )
+    assert response.status_code == 200
+    message = db.query(SalesMessage).one()
+    assert message.content == "[Unsupported WHATSAPP image message]"
+    assert message.metadata_json["content_supported"] is False
+    assert db.query(ExternalWebhookEvent).one().status == "ignored"
+    agent.assert_not_called()
+
+
+def test_whatsapp_delivery_event_uses_the_short_status_name():
+    assert _status_from_telnyx("whatsapp.message.delivered", {}) == "delivered"
 
 
 def test_telnyx_finalized_uses_destination_delivery_status_and_is_idempotent():

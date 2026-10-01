@@ -153,6 +153,9 @@
                   <select [ngModel]="company.whatsapp_template_name ? company.whatsapp_template_name+'|'+company.whatsapp_template_language : ''" (ngModelChange)="selectWhatsAppTemplate(company, $event)" name="company_whatsapp_template" class="w-full rounded-xl border border-white/10 bg-black/50 px-4 py-3 text-sm text-white outline-none focus:border-secondary">
                     <option value="">Select a template</option><option *ngFor="let template of whatsappTemplates" [value]="template.name+'|'+template.language">{{template.name}} · {{template.language}}</option>
                   </select>
+                  <p *ngIf="company.whatsapp_template_content" class="mt-2 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-xs leading-5 text-gray-400">
+                    <span class="font-medium text-white">Lead-visible template:</span> {{company.whatsapp_template_content}}
+                  </p>
                 </div>
                 <div class="rounded-xl border border-white/10 bg-black/30 p-4 text-xs text-gray-400">
                   <div class="flex items-center justify-between gap-3"><span><b class="text-white">Status:</b> {{company.whatsapp_verification_status | uppercase}}</span><button type="button" class="rounded-lg border border-secondary px-3 py-2 text-secondary disabled:opacity-40" (click)="verifyTelnyxWhatsApp()" [disabled]="dirty.telnyxCompany || verifying==='whatsapp:'+company.company_id">{{verifying==='whatsapp:'+company.company_id ? 'Verifying…' : 'Verify WhatsApp'}}</button></div>

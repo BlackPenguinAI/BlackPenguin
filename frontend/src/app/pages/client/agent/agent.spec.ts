@@ -228,6 +228,32 @@ describe('AgentComponent simulation form', () => {
     expect(observer).toBeTruthy();
   });
 
+  it('treats WhatsApp as a live provider conversation and never as a simulation', () => {
+    const urls: string[] = [];
+    const value = component({
+      post: (url: string) => {
+        urls.push(url);
+        return { pipe: () => ({ subscribe: () => undefined }) };
+      },
+    });
+    value.selected = {
+      id: 'whatsapp-conversation', lead_id: 'lead', channel: 'whatsapp', is_paused: true,
+    };
+    value.draft = 'Manual takeover message';
+    expect(value.isLive).toBe(true);
+    expect(value.liveControlLabel).toBe('LIVE WHATSAPP CONTROL');
+    value.send();
+    expect(urls[0]).toContain('/conversations/whatsapp-conversation/manual-message');
+    expect(urls[0]).not.toContain('/simulate');
+  });
+
+  it('marks timezone-less backend timestamps as UTC before rendering', () => {
+    const value = component();
+    expect(value.asUtcDate('2026-09-30T22:52:00')).toBe('2026-09-30T22:52:00Z');
+    expect(value.asUtcDate('2026-09-30T22:52:00Z')).toBe('2026-09-30T22:52:00Z');
+    expect(value.asUtcDate('2026-09-30T17:52:00-05:00')).toBe('2026-09-30T17:52:00-05:00');
+  });
+
   it('saves the lead before requesting the initial SMS and always clears loading state', () => {
     const calls: string[] = [];
     const conversation = {

@@ -25,6 +25,7 @@ TOOLSET_VERSION = "sales-tools-v1"
 PLATFORM_GUARDRAILS = (
     "Never cross Company boundaries. Never invent prices, inventory or appointment slots. "
     "Respect consent and opt-out. Demo data may be used only in simulation and can never be dispatched. "
+    "Communicate with leads in English only until Black Penguin explicitly enables localization. "
     "Return only JSON matching the requested contract."
 )
 

@@ -136,7 +136,7 @@ async def send_whatsapp(
             "type": "template",
             "template": {
                 "name": config.whatsapp_template_name,
-                "language": {"policy": "deterministic", "code": config.whatsapp_template_language or "es"},
+                "language": {"policy": "deterministic", "code": config.whatsapp_template_language or "en_US"},
             },
         }
     else:

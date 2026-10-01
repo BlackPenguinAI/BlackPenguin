@@ -15,8 +15,11 @@ from app.modules.companies.models import Company
 from app.modules.companies.country import sync_project_country
 from app.modules.projects.models import Project, ProjectProfile
 from app.modules.system_settings.models import TelnyxCompanyConfig, TelnyxConfig
-from app.modules.sales_agent.live_service import _whatsapp_customer_window_open
+from app.modules.sales_agent.live_service import _dispatch, _whatsapp_customer_window_open
+from app.modules.sales_agent.graph import PLATFORM_GUARDRAILS
 from app.modules.sales_agent.models import SalesConversation, SalesMessage
+from app.modules.sales_crm.models import Lead
+from app.modules.system_settings.services import _whatsapp_template_content
 
 
 def _db():
@@ -41,6 +44,7 @@ def _configured(db):
             primary_channel="whatsapp", whatsapp_business_account_id="waba-1",
             whatsapp_phone_number_id="wa-phone-1", whatsapp_from_phone_number="+51999000111",
             whatsapp_template_name="lead_welcome_es", whatsapp_template_language="es_PE",
+            whatsapp_template_content="Approved welcome message.",
             whatsapp_verification_status="verified", live_whatsapp_enabled=True,
         ),
     ])
@@ -55,6 +59,10 @@ def test_company_primary_channel_does_not_fall_back_to_sms():
     config.live_whatsapp_enabled = False
     db.commit()
     assert company_live_channel(db, company_id=company.id) is None
+
+
+def test_live_agent_language_is_centralized_in_english():
+    assert "Communicate with leads in English only" in PLATFORM_GUARDRAILS
 
 
 def test_telnyx_whatsapp_initial_message_uses_company_template():
@@ -80,6 +88,42 @@ def test_telnyx_whatsapp_initial_message_uses_company_template():
             "language": {"policy": "deterministic", "code": "es_PE"},
         },
     }
+
+
+def test_template_body_is_extracted_for_an_auditable_snapshot():
+    assert _whatsapp_template_content({
+        "components": [
+            {"type": "HEADER", "text": "Header"},
+            {"type": "BODY", "text": "The message the lead receives."},
+        ],
+    }) == "The message the lead receives."
+
+
+def test_initial_whatsapp_trace_stores_the_approved_template_not_the_unused_draft():
+    db = _db(); company = _configured(db)
+    project = Project(company_id=company.id, name="Project", country="PE")
+    db.add(project); db.flush()
+    lead = Lead(
+        company_id=company.id, project_id=project.id, full_name="Lead", phone="+51999888777",
+        source="manual", platform="manual",
+    )
+    db.add(lead); db.flush()
+    conversation = SalesConversation(
+        company_id=company.id, project_id=project.id, lead_id=lead.id,
+        channel="whatsapp", provider="telnyx", provider_thread_key="wa-thread",
+    )
+    db.add(conversation); db.commit()
+    with patch("app.modules.sales_agent.live_service.send_message", new=AsyncMock(
+        return_value={"sid": "wa-message-1", "status": "queued"},
+    )):
+        message = asyncio.run(_dispatch(
+            db, conversation=conversation, lead=lead,
+            content="Unused generated English draft", role="assistant", agent_run_id=None,
+            metadata={"event_kind": "manual_lead_first_contact"},
+        ))
+    assert message.content == "Approved welcome message."
+    assert message.metadata_json["delivery_kind"] == "whatsapp_template"
+    assert message.metadata_json["generated_draft"] == "Unused generated English draft"
 
 
 def test_company_country_change_is_inherited_by_existing_projects():

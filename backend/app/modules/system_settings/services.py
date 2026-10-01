@@ -458,7 +458,8 @@ def telnyx_company_config_response(company: Company, config: TelnyxCompanyConfig
         "whatsapp_phone_number_id": config.whatsapp_phone_number_id if config else None,
         "whatsapp_from_phone_number": config.whatsapp_from_phone_number if config else None,
         "whatsapp_template_name": config.whatsapp_template_name if config else None,
-        "whatsapp_template_language": (config.whatsapp_template_language or "es") if config else "es",
+        "whatsapp_template_language": (config.whatsapp_template_language or "en_US") if config else "en_US",
+        "whatsapp_template_content": config.whatsapp_template_content if config else None,
         "live_whatsapp_enabled": bool(config.live_whatsapp_enabled) if config else False,
         "whatsapp_verification_status": (config.whatsapp_verification_status or "not_configured") if config else "not_configured",
         "whatsapp_verified_at": config.whatsapp_verified_at if config else None,
@@ -498,6 +499,7 @@ def update_telnyx_company_config(db: Session, company_id: str, payload: TelnyxCo
     for key in (
         "messaging_profile_id", "telnyx_phone_number_id", "whatsapp_business_account_id",
         "whatsapp_phone_number_id", "whatsapp_template_name", "whatsapp_template_language",
+        "whatsapp_template_content",
     ):
         if key in values and isinstance(values[key], str):
             values[key] = values[key].strip() or None
@@ -523,6 +525,7 @@ def update_telnyx_company_config(db: Session, company_id: str, payload: TelnyxCo
         for key in (
             "messaging_profile_id", "whatsapp_business_account_id", "whatsapp_phone_number_id",
             "whatsapp_from_phone_number", "whatsapp_template_name", "whatsapp_template_language",
+            "whatsapp_template_content",
         )
     )
     for key, value in values.items():
@@ -638,6 +641,22 @@ def telnyx_company_for_whatsapp_number(db: Session, phone_number: str) -> Telnyx
     ).first()
 
 
+def _whatsapp_template_content(raw: dict) -> str | None:
+    """Return the lead-visible BODY text from a Telnyx template resource."""
+    components = raw.get("components") or raw.get("template_components") or []
+    if isinstance(raw.get("template"), dict):
+        components = components or raw["template"].get("components") or []
+    for component in components if isinstance(components, list) else []:
+        if not isinstance(component, dict) or str(component.get("type") or "").upper() != "BODY":
+            continue
+        text = component.get("text") or component.get("content")
+        if isinstance(text, dict):
+            text = text.get("body") or text.get("text")
+        if text is not None and str(text).strip():
+            return str(text).strip()
+    return None
+
+
 def list_telnyx_whatsapp_resources(db: Session) -> dict:
     """Read the Telnyx-owned WABAs, numbers and templates for safe UI selectors."""
     platform, api_key = telnyx_credentials(db)
@@ -680,6 +699,7 @@ def list_telnyx_whatsapp_resources(db: Session) -> dict:
                 "name": str(raw.get("name") or ""),
                 "language": str(language or raw.get("language_code") or ""),
                 "status": str(raw.get("status") or "unknown").lower(),
+                "content": _whatsapp_template_content(raw),
             })
         return {"business_accounts": accounts, "templates": templates}
     except httpx.HTTPError as exc:
@@ -728,6 +748,7 @@ def verify_telnyx_company_whatsapp(db: Session, company_id: str) -> TelnyxCompan
         ), None)
         if not template or template["status"] not in {"approved", "active"}:
             raise HTTPException(status_code=422, detail="The selected WhatsApp initial template is not approved.")
+        config.whatsapp_template_content = template.get("content") or config.whatsapp_template_content
     except HTTPException as exc:
         config.live_whatsapp_enabled = False
         config.whatsapp_verification_status = "failed"

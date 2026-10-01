@@ -105,6 +105,7 @@ class TelnyxCompanyConfigUpdate(BaseModel):
     whatsapp_from_phone_number: Optional[str] = Field(default=None, max_length=50)
     whatsapp_template_name: Optional[str] = Field(default=None, max_length=180)
     whatsapp_template_language: Optional[str] = Field(default=None, max_length=20)
+    whatsapp_template_content: Optional[str] = Field(default=None, max_length=4096)
     live_whatsapp_enabled: Optional[bool] = None
 
 
@@ -127,7 +128,8 @@ class TelnyxCompanyConfigSchema(BaseModel):
     whatsapp_phone_number_id: Optional[str] = None
     whatsapp_from_phone_number: Optional[str] = None
     whatsapp_template_name: Optional[str] = None
-    whatsapp_template_language: str = "es"
+    whatsapp_template_language: str = "en_US"
+    whatsapp_template_content: Optional[str] = None
     live_whatsapp_enabled: bool = False
     whatsapp_verification_status: str = "not_configured"
     whatsapp_verified_at: Optional[datetime] = None

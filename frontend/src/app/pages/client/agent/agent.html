@@ -217,7 +217,7 @@
         ><span
           ><strong>{{ row.lead_name }} <em *ngIf="row.is_test" class="test-badge">LIVE TEST</em><em *ngIf="row.simulation_id" class="test-badge">SIMULATION</em></strong
           ><small>{{ row.last_message || 'No messages yet' }}</small></span
-        ><time>{{ row.last_message_at | date: 'shortTime' }}</time>
+        ><time>{{ asUtcDate(row.last_message_at) | date: 'shortTime' }}</time>
       </button>
       <div class="empty" *ngIf="!loading && !visible.length">
         <p>No simulations for this Project yet.</p>
@@ -245,29 +245,31 @@
         <div class="generation-state" *ngIf="generatingInitial">
           <span class="material-symbols-outlined">hourglass_top</span>
           <div>
-            <strong>Preparing the first SMS…</strong
+            <strong>Preparing the first {{ channelLabel }}…</strong
             ><small>The lead is already saved. You can remain on this conversation.</small>
           </div>
         </div>
         <div class="generation-state failed" *ngIf="initialGenerationError && !generatingInitial">
           <span class="material-symbols-outlined">error</span>
           <div>
-            <strong>First SMS needs attention</strong><small>{{ initialGenerationError }}</small
-            ><button (click)="generateInitial()">Retry first SMS</button>
+            <strong>First {{ channelLabel }} needs attention</strong><small>{{ initialGenerationError }}</small
+            ><button (click)="generateInitial()">Retry first {{ channelLabel }}</button>
           </div>
         </div>
         <ng-container *ngFor="let message of messages">
           <div *ngIf="isReminder(message); else smsBubble" class="my-2 ml-auto flex max-w-[72%] items-start gap-2 rounded-lg border border-dashed border-[#6b5206] bg-[#151104] px-3 py-2 text-[#a98b31]">
             <span class="material-symbols-outlined text-base">schedule</span>
             <div class="min-w-0 flex-1"><strong class="block text-[9px]">{{ reminderLabel(message) }}</strong><p class="my-1 overflow-hidden text-ellipsis whitespace-nowrap text-[11px] text-[#9a9589]">{{ message.content }}</p></div>
-            <time class="whitespace-nowrap text-[9px]">{{ message.created_at | date: 'short' }}</time>
+            <time class="whitespace-nowrap text-[9px]">{{ asUtcDate(message.created_at) | date: 'short' }}</time>
           </div>
           <ng-template #smsBubble>
             <div class="bubble-row" [class.agent]="message.role === 'assistant' || message.role === 'human'" [class.human]="message.role === 'human'">
-              <div class="bubble">
-                <small>{{ message.role === 'assistant' ? 'AI sales agent' : (message.role === 'human' ? 'Company team · manual SMS' : selected.lead_name) }}</small>
+              <div class="bubble" [class.unsupported]="message.metadata_json?.content_supported === false">
+                <small>{{ message.role === 'assistant' ? 'AI sales agent' : (message.role === 'human' ? 'Company team · manual ' + channelLabel : selected.lead_name) }}</small>
+                <span *ngIf="message.metadata_json?.delivery_kind === 'whatsapp_template'" class="message-kind">WHATSAPP TEMPLATE · {{message.metadata_json?.template_language}}</span>
+                <span *ngIf="message.metadata_json?.content_supported === false" class="message-kind warning">NOT SENT TO AI</span>
                 <p>{{ message.content }}</p>
-                <time>{{ message.created_at | date: 'short' }} · {{ message.status }}</time>
+                <time>{{ asUtcDate(message.created_at) | date: 'short' }} · {{ message.status }}</time>
               </div>
             </div>
           </ng-template>
@@ -284,14 +286,14 @@
           rows="2"
           [placeholder]="
             isLive && selected.is_paused
-              ? 'Send a manual SMS while AI is paused…'
+              ? 'Send a manual ' + channelLabel + ' while AI is paused…'
               : isLive
                 ? 'Pause the AI to take manual control'
             : selected.is_paused
               ? 'Resume the simulation to continue'
               : sending
                 ? 'Waiting for the AI sales agent…'
-                : 'Reply as the lead, exactly as an inbound SMS…'
+                : 'Reply as the lead, exactly as an inbound message…'
           "
         ></textarea
         ><button
@@ -303,13 +305,13 @@
             sending ? 'hourglass_top' : 'arrow_upward'
           }}</span></button
         ><small
-          >{{ isLive ? 'Enter to send · Shift + Enter for a new line. Manual SMS is stored in the same trace and delivered through the conversation provider.' : 'Enter to send · Shift + Enter for a new line. Write as the lead; the agent uses the published prompt pack.' }}</small
+          >{{ isLive ? 'Enter to send · Shift + Enter for a new line. The manual ' + channelLabel + ' is stored in the same trace and delivered through the conversation provider.' : 'Enter to send · Shift + Enter for a new line. Write as the lead; the agent uses the published prompt pack.' }}</small
         >
       </div>
-      <ng-template #salesReadOnly><div class="composer"><small>Read-only Sales view. The AI Agent manages the SMS conversation; use this history to prepare for the appointment.</small></div></ng-template>
+      <ng-template #salesReadOnly><div class="composer"><small>Read-only Sales view. The AI Agent manages the {{ channelLabel }} conversation; use this history to prepare for the appointment.</small></div></ng-template>
     </main>
     <aside class="context" *ngIf="selected">
-      <p>{{ isLive ? 'LIVE SMS CONTROL' : 'SIMULATION CONTROL' }}</p>
+      <p>{{ isLive ? liveControlLabel : 'SIMULATION CONTROL' }}</p>
       <div class="stage">
         <span>{{ selected.simulation_status || selected.agent_status || selected.stage }}</span
         ><b>{{ selected.pipeline_stage || selected.funnel_stage }}</b>
@@ -321,11 +323,11 @@
         <dd>{{ selected.project_name }}</dd>
         <dt>Campaign</dt>
         <dd>{{ selected.campaign_name || 'Not attributed' }}</dd>
-        <ng-container *ngIf="!isLive"><dt>Virtual time</dt><dd>{{ selected.virtual_now | date: 'medium' }}</dd></ng-container>
+        <ng-container *ngIf="!isLive"><dt>Virtual time</dt><dd>{{ asUtcDate(selected.virtual_now) | date: 'medium' }}</dd></ng-container>
         <dt>Next follow-up</dt>
         <dd>
           {{
-            selected.next_action_at ? (selected.next_action_at | date: 'medium') : 'Not scheduled'
+            selected.next_action_at ? (asUtcDate(selected.next_action_at) | date: 'medium') : 'Not scheduled'
           }}
         </dd>
         <dt>Protocol review</dt>
@@ -351,7 +353,7 @@
         ><select [(ngModel)]="selectedSlot" *ngIf="slots.length">
           <option value="">Choose a verified slot</option>
           <option *ngFor="let slot of slots" [value]="slot.start_at">
-            {{ slot.start_at | date: 'medium' }} · {{ slot.eligible_sales_users }} eligible
+            {{ asUtcDate(slot.start_at) | date: 'medium' }} · {{ slot.eligible_sales_users }} eligible
           </option></select
         ><button class="primary" (click)="confirmSlot()" [disabled]="!selectedSlot || (appointmentLocations.length > 1 && !selectedVisitLocation) || confirming">
           {{ confirming ? 'Confirming…' : 'Confirm as lead' }}
@@ -360,7 +362,7 @@
       <div class="confirmed" *ngIf="selected.appointment_id">
         <span class="material-symbols-outlined">event_available</span
         ><strong>Appointment confirmed</strong
-        ><small>Assigned to {{selected.assigned_sales_name || 'the selected Sales user'}}{{selected.appointment_time ? ' · '+(selected.appointment_time|date:'medium') : ''}}. It is visible in Schedule.</small>
+        ><small>Assigned to {{selected.assigned_sales_name || 'the selected Sales user'}}{{selected.appointment_time ? ' · '+(asUtcDate(selected.appointment_time)|date:'medium') : ''}}. It is visible in Schedule.</small>
         <a *ngIf="selected.meeting_url" [href]="selected.meeting_url" target="_blank" rel="noopener">Open test event</a>
         <button *ngIf="selected.calendar_sync_status!=='test_synced'" (click)="testCalendar()" [disabled]="calendarTesting">{{calendarTesting?'Testing…':'Create real Google Calendar test event'}}</button>
         <button *ngIf="selected.calendar_sync_status==='test_synced'" (click)="removeCalendarTest()" [disabled]="calendarTesting">Remove Calendar test event</button>

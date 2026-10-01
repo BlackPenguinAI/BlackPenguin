@@ -433,6 +433,21 @@ textarea {
   font-size: 9px;
   color: #777;
 }
+.bubble.unsupported {
+  border-color: #704d00;
+  background: #171205;
+}
+.message-kind {
+  display: block;
+  margin-top: 4px;
+  color: #8f8a7d;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: .12em;
+}
+.message-kind.warning {
+  color: #e0a04f;
+}
 .composer {
   flex: 0 0 auto;
   border-top: 1px solid #242424;

@@ -30,7 +30,7 @@ def _record_inbound(
     db: Session, *, provider: str, event_id: str, to_number: str, from_number: str,
     body: str, payload: dict, background_tasks: BackgroundTasks,
     expected_company_id: str | None = None, provider_message_id: str | None = None,
-    channel: str = "sms",
+    channel: str = "sms", message_type: str = "text",
 ):
     if db.query(ExternalWebhookEvent).filter(
         ExternalWebhookEvent.platform == provider,
@@ -45,17 +45,26 @@ def _record_inbound(
     if not conversation or (expected_company_id and conversation.company_id != expected_company_id):
         event.status = "ignored"; event.error_message = "No unambiguous active provider thread."
         event.processed_at = datetime.utcnow(); db.commit(); return
+    normalized_body = body.strip()
+    content_supported = bool(normalized_body)
+    display_body = normalized_body or f"[Unsupported {channel.upper()} {message_type} message]"
     message = SalesMessage(
         conversation_id=conversation.id, channel=channel, direction="inbound", role="user",
-        content=body, provider_message_id=provider_message_id or event_id, status="received",
-        metadata_json={"provider": provider, "from": from_number, "to": to_number},
+        content=display_body, provider_message_id=provider_message_id or event_id, status="received",
+        metadata_json={
+            "provider": provider, "from": from_number, "to": to_number,
+            "message_type": message_type, "content_supported": content_supported,
+        },
     )
-    db.add(message); event.status = "processed"; event.processed_at = datetime.utcnow()
+    db.add(message)
+    event.status = "processed" if content_supported else "ignored"
+    event.error_message = None if content_supported else "Inbound content was empty or unsupported; agent execution skipped."
+    event.processed_at = datetime.utcnow()
     lead = db.query(Lead).filter(Lead.id == conversation.lead_id).first()
     if lead:
         lead.last_interaction_at = datetime.utcnow()
     db.commit(); db.refresh(message)
-    if not conversation.is_paused:
+    if content_supported and not conversation.is_paused:
         background_tasks.add_task(process_live_inbound, conversation.id, message.id)
 
 
@@ -81,7 +90,10 @@ def _status_from_telnyx(event_type: str, payload: dict) -> str:
     ]
     if destination_statuses:
         return destination_statuses[0]
-    return event_type.removeprefix("message.") or "queued"
+    for prefix in ("whatsapp.message.", "message."):
+        if event_type.startswith(prefix):
+            return event_type.removeprefix(prefix) or "queued"
+    return event_type or "queued"
 
 
 def _telnyx_phone(value) -> str:
@@ -98,11 +110,34 @@ def _telnyx_channel(payload: dict) -> str:
 def _telnyx_text(payload: dict, channel: str) -> str:
     if channel == "sms":
         return str(payload.get("text") or "")
+    # The unified Telnyx webhook schema uses payload.body for WhatsApp and RCS.
+    # Keep the preview-era whatsapp_message shape as a compatibility fallback.
+    body = payload.get("body") or {}
+    if isinstance(body, dict):
+        text = body.get("text")
+        if isinstance(text, dict):
+            value = text.get("body")
+            if value is not None:
+                return str(value)
+        elif text is not None:
+            return str(text)
     message = payload.get("whatsapp_message") or {}
     text = message.get("text") if isinstance(message, dict) else None
     if isinstance(text, dict):
         return str(text.get("body") or "")
     return str(text or payload.get("text") or "")
+
+
+def _telnyx_message_type(payload: dict, channel: str) -> str:
+    if channel == "sms":
+        return "text"
+    body = payload.get("body")
+    if isinstance(body, dict) and body.get("type"):
+        return str(body["type"]).strip().lower()
+    message = payload.get("whatsapp_message")
+    if isinstance(message, dict) and message.get("type"):
+        return str(message["type"]).strip().lower()
+    return "unknown"
 
 
 def _validate_twilio(request: Request, params: dict[str, str], signature: str | None, db: Session):
@@ -178,6 +213,7 @@ async def telnyx_messaging_webhook(request: Request, background_tasks: Backgroun
             expected_company_id=company_config.company_id,
             provider_message_id=message_id,
             channel=channel,
+            message_type=_telnyx_message_type(payload, channel),
         )
     elif event_type.startswith("message.") or event_type.startswith("whatsapp.message."):
         event = ExternalWebhookEvent(

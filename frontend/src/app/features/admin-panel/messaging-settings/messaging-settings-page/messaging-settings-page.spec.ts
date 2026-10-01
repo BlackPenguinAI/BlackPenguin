@@ -62,6 +62,19 @@ describe('MessagingSettingsPageComponent', () => {
     expect(component.dirty.telnyxCompany).toBe(true);
   });
 
+  it('keeps the lead-visible template snapshot with the selected template', () => {
+    const component = new MessagingSettingsPageComponent({} as any, {} as any, {} as any);
+    const company: any = {};
+    component.whatsappTemplates = [{
+      name: 'welcome_en', language: 'en_US', content: 'Welcome to Black Penguin.', status: 'approved',
+    }];
+    component.selectWhatsAppTemplate(company, 'welcome_en|en_US');
+    expect(company.whatsapp_template_name).toBe('welcome_en');
+    expect(company.whatsapp_template_language).toBe('en_US');
+    expect(company.whatsapp_template_content).toBe('Welcome to Black Penguin.');
+    expect(component.dirty.telnyxCompany).toBe(true);
+  });
+
   it('saves a WhatsApp-only Company without requiring an SMS sender', () => {
     let requested = false;
     const response = { subscribe: ({ next }: any) => { requested = true; next({ company_id: 'a', company_name: 'A' }); } };

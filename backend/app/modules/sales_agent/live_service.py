@@ -186,8 +186,27 @@ async def _dispatch(
     metadata: dict | None = None,
     idempotency_key: str | None = None,
 ) -> SalesMessage:
-    event_kind = (metadata or {}).get("event_kind")
+    message_metadata = dict(metadata or {})
+    event_kind = message_metadata.get("event_kind")
     uses_whatsapp_template = event_kind in {"meta_lead_first_contact", "manual_lead_first_contact"}
+    persisted_content = content
+    if conversation.channel == "whatsapp" and uses_whatsapp_template:
+        from app.modules.system_settings.services import get_telnyx_company_config
+
+        company_config = get_telnyx_company_config(db, conversation.company_id)
+        template_name = company_config.whatsapp_template_name if company_config else None
+        template_language = company_config.whatsapp_template_language if company_config else None
+        template_content = company_config.whatsapp_template_content if company_config else None
+        persisted_content = template_content or (
+            f"[WhatsApp template: {template_name or 'configured template'}"
+            f" ({template_language or 'default language'})]"
+        )
+        message_metadata.update({
+            "delivery_kind": "whatsapp_template",
+            "template_name": template_name,
+            "template_language": template_language,
+            "generated_draft": content,
+        })
     if conversation.channel == "whatsapp" and not uses_whatsapp_template:
         if not _whatsapp_customer_window_open(db, conversation):
             raise HTTPException(
@@ -223,14 +242,14 @@ async def _dispatch(
         conversation_id=conversation.id, agent_run_id=agent_run_id,
         idempotency_key=idempotency_key or f"{conversation.provider}:{conversation.id}:{uuid.uuid4()}", channel=conversation.channel,
         provider=conversation.provider,
-        recipient=lead.phone, content=content, status="queued",
+        recipient=lead.phone, content=persisted_content, status="queued",
         approved_by_user_id=author_user_id,
         approved_at=datetime.utcnow() if author_user_id else None,
     )
     message = message or SalesMessage(
         conversation_id=conversation.id, channel=conversation.channel, direction="outbound", role=role,
-        author_user_id=author_user_id, content=content, status="queued",
-        metadata_json=metadata or {}, created_at=datetime.utcnow(),
+        author_user_id=author_user_id, content=persisted_content, status="queued",
+        metadata_json=message_metadata, created_at=datetime.utcnow(),
     )
     db.add_all([outbound, message]); db.commit()
     try:
@@ -528,7 +547,8 @@ async def send_manual_message(db: Session, *, conversation_id: str, company_id: 
     if conversation.channel not in {"sms", "whatsapp"}:
         raise HTTPException(status_code=409, detail="Manual provider messages are available only for live messaging conversations.")
     if not conversation.is_paused:
-        raise HTTPException(status_code=409, detail="Pause the AI before sending a manual SMS.")
+        label = "WhatsApp message" if conversation.channel == "whatsapp" else "SMS"
+        raise HTTPException(status_code=409, detail=f"Pause the AI before sending a manual {label}.")
     lead = db.query(Lead).filter(Lead.id == conversation.lead_id, Lead.company_id == company_id).one()
     if lead.is_opt_out:
         raise HTTPException(status_code=409, detail="This lead opted out of messaging.")

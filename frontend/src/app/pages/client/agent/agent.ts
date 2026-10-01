@@ -473,7 +473,7 @@ export class AgentComponent implements OnInit, OnDestroy {
           // API order is chronological. Keep an explicit stable client order as
           // a safeguard against cached/proxy responses with equal timestamps.
           this.messages = [...rows].sort((a, b) => {
-            const byTime = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+            const byTime = new Date(this.asUtcDate(a.created_at)).getTime() - new Date(this.asUtcDate(b.created_at)).getTime();
             const byDirection = (a.direction === 'inbound' ? 0 : 1) - (b.direction === 'inbound' ? 0 : 1);
             return byTime || byDirection || String(a.id).localeCompare(String(b.id));
           });
@@ -504,16 +504,16 @@ export class AgentComponent implements OnInit, OnDestroy {
       )
       .subscribe({
         next: () => {
-          this.success = 'The first SMS is ready.';
+          this.success = `The first ${this.channelLabel} is ready.`;
           if (this.selected?.id === conversationId) this.refreshMessages(true);
           this.refreshConversationSummaries();
         },
         error: (err) => {
           this.initialGenerationError =
             err.status === 409
-              ? 'The first SMS is still being generated. You can refresh the conversation or retry shortly.'
+              ? `The first ${this.channelLabel} is still being generated. You can refresh the conversation or retry shortly.`
               : err.error?.detail ||
-                'The first SMS could not be generated. The lead was saved and you can retry safely.';
+                `The first ${this.channelLabel} could not be generated. The lead was saved and you can retry safely.`;
           this.refreshConversationSummaries();
         },
       });
@@ -522,7 +522,7 @@ export class AgentComponent implements OnInit, OnDestroy {
   send(): void {
     const message = this.draft.trim();
     if (!message || !this.selected || this.sending) return;
-    if (this.selected.channel === 'sms') {
+    if (this.isLive) {
       this.sendManual(message);
       return;
     }
@@ -580,7 +580,7 @@ export class AgentComponent implements OnInit, OnDestroy {
 
   private sendManual(message: string): void {
     if (!this.selected?.is_paused) {
-      this.error = 'Pause the AI before sending a manual SMS.';
+      this.error = `Pause the AI before sending a manual ${this.channelLabel}.`;
       return;
     }
     this.sending = true; this.error = '';
@@ -588,11 +588,21 @@ export class AgentComponent implements OnInit, OnDestroy {
       .pipe(finalize(() => { this.sending = false; this.cdr.markForCheck(); }))
       .subscribe({
         next: () => { this.draft = ''; this.refreshMessages(true); this.refreshConversationSummaries(); },
-        error: err => { this.error = err.error?.detail || 'The manual SMS could not be sent.'; },
+        error: err => { this.error = err.error?.detail || `The manual ${this.channelLabel} could not be sent.`; },
       });
   }
 
-  get isLive(): boolean { return this.selected?.channel === 'sms'; }
+  get isLive(): boolean { return ['sms', 'whatsapp'].includes(this.selected?.channel); }
+  get channelLabel(): string {
+    return this.selected?.channel === 'whatsapp' ? 'WhatsApp message' : 'SMS';
+  }
+  get liveControlLabel(): string {
+    return this.selected?.channel === 'whatsapp' ? 'LIVE WHATSAPP CONTROL' : 'LIVE SMS CONTROL';
+  }
+  asUtcDate(value: string | Date | null | undefined): string | Date {
+    if (!value || typeof value !== 'string') return value || '';
+    return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?$/.test(value) ? `${value}Z` : value;
+  }
   get appointmentLocations(): any[] { return this.currentProject?.locations || []; }
   get isMetaSimulation(): boolean { return this.selected?.platform === 'meta' && !this.isLive; }
   get canManualControl(): boolean { return this.role === 'admin' || this.role === 'assistant'; }

@@ -43,6 +43,7 @@ interface TelnyxCompanySender {
   whatsapp_from_phone_number?: string;
   whatsapp_template_name?: string;
   whatsapp_template_language?: string;
+  whatsapp_template_content?: string;
   live_whatsapp_enabled?: boolean;
   whatsapp_verification_status?: string;
   whatsapp_verified_at?: string | null;
@@ -111,7 +112,8 @@ export class MessagingSettingsPageComponent implements OnInit {
           whatsapp_phone_number_id: item.whatsapp_phone_number_id || '',
           whatsapp_from_phone_number: item.whatsapp_from_phone_number || '',
           whatsapp_template_name: item.whatsapp_template_name || '',
-          whatsapp_template_language: item.whatsapp_template_language || 'es',
+          whatsapp_template_language: item.whatsapp_template_language || 'en_US',
+          whatsapp_template_content: item.whatsapp_template_content || '',
           live_whatsapp_enabled: !!item.live_whatsapp_enabled,
           whatsapp_verification_status: item.whatsapp_verification_status || 'not_configured',
           whatsapp_verified_at: item.whatsapp_verified_at || null,
@@ -186,7 +188,8 @@ export class MessagingSettingsPageComponent implements OnInit {
       whatsapp_phone_number_id: company.whatsapp_phone_number_id || null,
       whatsapp_from_phone_number: company.whatsapp_from_phone_number || null,
       whatsapp_template_name: company.whatsapp_template_name || null,
-      whatsapp_template_language: company.whatsapp_template_language || 'es',
+      whatsapp_template_language: company.whatsapp_template_language || 'en_US',
+      whatsapp_template_content: company.whatsapp_template_content || null,
       live_whatsapp_enabled: company.live_whatsapp_enabled,
     };
     this.saving = `company:${company.company_id}`;
@@ -245,7 +248,9 @@ export class MessagingSettingsPageComponent implements OnInit {
   selectWhatsAppTemplate(company: TelnyxCompanySender, value: string) {
     const [name, language] = value.split('|');
     company.whatsapp_template_name = name || '';
-    company.whatsapp_template_language = language || 'es';
+    company.whatsapp_template_language = language || 'en_US';
+    const template = this.whatsappTemplates.find(item => item.name === name && item.language === language);
+    company.whatsapp_template_content = template?.content || '';
     this.dirty.telnyxCompany = true;
   }
 
