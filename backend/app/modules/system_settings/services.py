@@ -550,6 +550,12 @@ def update_telnyx_company_config(db: Session, company_id: str, payload: TelnyxCo
             config.whatsapp_template_name,
         )):
             raise HTTPException(status_code=422, detail="Complete the Company WhatsApp account, number and initial template.")
+        compatible, compatibility_error = _whatsapp_initial_template_compatibility(
+            language=config.whatsapp_template_language,
+            content=config.whatsapp_template_content,
+        )
+        if not compatible:
+            raise HTTPException(status_code=422, detail=compatibility_error)
         if config.whatsapp_verification_status != "verified" and not whatsapp_changed:
             raise HTTPException(status_code=422, detail="Verify the Company WhatsApp sender before enabling live WhatsApp.")
     if connection_changed:
@@ -657,6 +663,16 @@ def _whatsapp_template_content(raw: dict) -> str | None:
     return None
 
 
+def _whatsapp_initial_template_compatibility(*, language: str | None, content: str | None) -> tuple[bool, str | None]:
+    from app.integrations.whatsapp_templates import validate_initial_template
+
+    try:
+        validate_initial_template(language=language, content=content)
+        return True, None
+    except ValueError as exc:
+        return False, str(exc)
+
+
 def list_telnyx_whatsapp_resources(db: Session) -> dict:
     """Read the Telnyx-owned WABAs, numbers and templates for safe UI selectors."""
     platform, api_key = telnyx_credentials(db)
@@ -694,12 +710,19 @@ def list_telnyx_whatsapp_resources(db: Session) -> dict:
             language = raw.get("language")
             if isinstance(language, dict):
                 language = language.get("code")
+            language = str(language or raw.get("language_code") or "")
+            content = _whatsapp_template_content(raw)
+            compatible, compatibility_error = _whatsapp_initial_template_compatibility(
+                language=language, content=content,
+            )
             templates.append({
                 "id": str(raw.get("id") or "") or None,
                 "name": str(raw.get("name") or ""),
-                "language": str(language or raw.get("language_code") or ""),
+                "language": language,
                 "status": str(raw.get("status") or "unknown").lower(),
-                "content": _whatsapp_template_content(raw),
+                "content": content,
+                "is_initial_lead_template_compatible": compatible,
+                "compatibility_error": compatibility_error,
             })
         return {"business_accounts": accounts, "templates": templates}
     except httpx.HTTPError as exc:
@@ -749,6 +772,12 @@ def verify_telnyx_company_whatsapp(db: Session, company_id: str) -> TelnyxCompan
         if not template or template["status"] not in {"approved", "active"}:
             raise HTTPException(status_code=422, detail="The selected WhatsApp initial template is not approved.")
         config.whatsapp_template_content = template.get("content") or config.whatsapp_template_content
+        compatible, compatibility_error = _whatsapp_initial_template_compatibility(
+            language=config.whatsapp_template_language,
+            content=config.whatsapp_template_content,
+        )
+        if not compatible:
+            raise HTTPException(status_code=422, detail=compatibility_error)
     except HTTPException as exc:
         config.live_whatsapp_enabled = False
         config.whatsapp_verification_status = "failed"

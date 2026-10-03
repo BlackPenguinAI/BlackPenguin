@@ -176,6 +176,12 @@ export class MessagingSettingsPageComponent implements OnInit {
     if ((company.primary_channel === 'sms' || company.live_sms_enabled) && !company.from_phone_number) {
       this.toast.showError('Complete the Company SMS From number.'); return;
     }
+    if (company.live_whatsapp_enabled && company.whatsapp_template_language !== 'en_US') {
+      this.toast.showError('Select an approved English (en_US) WhatsApp template.'); return;
+    }
+    if (company.live_whatsapp_enabled && !this.isCompatibleInitialTemplate(company.whatsapp_template_content)) {
+      this.toast.showError('The initial WhatsApp template must contain {{1}} for the lead name and {{2}} for the Project name.'); return;
+    }
     const payload = {
       country_code: company.country_code,
       messaging_profile_id: company.messaging_profile_id,
@@ -226,8 +232,14 @@ export class MessagingSettingsPageComponent implements OnInit {
     this.http.get<any>(`${this.baseUrl}/api/v1/system/messaging-settings/telnyx/whatsapp/resources`, { headers: this.headers }).subscribe({
       next: data => {
         this.whatsappAccounts = data.business_accounts || [];
-        this.whatsappTemplates = (data.templates || []).filter((item: any) => ['approved', 'active'].includes(String(item.status).toLowerCase()));
+        this.whatsappTemplates = (data.templates || []).filter((item: any) =>
+          ['approved', 'active'].includes(String(item.status).toLowerCase()) &&
+          item.language === 'en_US' && item.is_initial_lead_template_compatible === true
+        );
         this.loadingWhatsAppResources = false;
+        if (!this.whatsappTemplates.length) {
+          this.toast.showError('No approved en_US template with {{1}} lead name and {{2}} Project name was found.');
+        }
         this.cdr.detectChanges();
       },
       error: err => { this.loadingWhatsAppResources = false; this.toast.showError(this.message(err, 'WhatsApp resources could not be loaded from Telnyx.')); this.cdr.detectChanges(); }
@@ -252,6 +264,18 @@ export class MessagingSettingsPageComponent implements OnInit {
     const template = this.whatsappTemplates.find(item => item.name === name && item.language === language);
     company.whatsapp_template_content = template?.content || '';
     this.dirty.telnyxCompany = true;
+  }
+
+  isCompatibleInitialTemplate(content?: string): boolean {
+    if (!content) return false;
+    const indexes = [...content.matchAll(/\{\{\s*(\d+)\s*\}\}/g)].map(match => Number(match[1]));
+    return new Set(indexes).size === 2 && indexes.every(index => index === 1 || index === 2) && indexes.includes(1) && indexes.includes(2);
+  }
+
+  whatsappTemplatePreview(company: TelnyxCompanySender): string {
+    return (company.whatsapp_template_content || '')
+      .replace(/\{\{\s*1\s*\}\}/g, 'Alex')
+      .replace(/\{\{\s*2\s*\}\}/g, 'Example Project');
   }
 
   verifyTelnyxWhatsApp() {

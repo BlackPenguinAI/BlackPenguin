@@ -121,6 +121,7 @@ async def send_sms(db: Session, *, company_id: str, to: str, body: str) -> dict:
 async def send_whatsapp(
     db: Session, *, company_id: str, to: str, body: str,
     use_initial_template: bool = False,
+    template_parameters: list[str] | None = None,
 ) -> dict:
     """Send through Telnyx's WhatsApp API using the Company-owned sender."""
     from app.modules.system_settings.services import get_telnyx_company_config, telnyx_credentials
@@ -132,11 +133,27 @@ async def send_whatsapp(
     if not config or not config.live_whatsapp_enabled or config.whatsapp_verification_status != "verified":
         raise RuntimeError("Live Telnyx WhatsApp is disabled or not verified.")
     if use_initial_template:
+        if not config.whatsapp_template_name:
+            raise HTTPException(status_code=409, detail="The Company does not have an initial WhatsApp template configured.")
+        if config.whatsapp_template_language != "en_US":
+            raise HTTPException(status_code=422, detail="The initial WhatsApp template must use English (en_US).")
+        if not template_parameters or len(template_parameters) != 2:
+            raise HTTPException(
+                status_code=422,
+                detail="The initial WhatsApp template requires the lead first name and Project name.",
+            )
         message = {
             "type": "template",
             "template": {
                 "name": config.whatsapp_template_name,
                 "language": {"policy": "deterministic", "code": config.whatsapp_template_language or "en_US"},
+                "components": [{
+                    "type": "body",
+                    "parameters": [
+                        {"type": "text", "text": value}
+                        for value in template_parameters
+                    ],
+                }],
             },
         }
     else:

@@ -11,6 +11,11 @@ from app.core.secret_store import encrypt_secret
 from app.db.postgres import Base
 from app.integrations.messaging_gateway import company_live_channel
 from app.integrations.telnyx_client import send_whatsapp
+from app.integrations.whatsapp_templates import (
+    initial_template_parameters,
+    render_initial_template,
+    validate_initial_template,
+)
 from app.modules.companies.models import Company
 from app.modules.companies.country import sync_project_country
 from app.modules.projects.models import Project, ProjectProfile
@@ -43,8 +48,8 @@ def _configured(db):
             company_id=company.id, messaging_profile_id="profile-1",
             primary_channel="whatsapp", whatsapp_business_account_id="waba-1",
             whatsapp_phone_number_id="wa-phone-1", whatsapp_from_phone_number="+51999000111",
-            whatsapp_template_name="lead_welcome_es", whatsapp_template_language="es_PE",
-            whatsapp_template_content="Approved welcome message.",
+            whatsapp_template_name="lead_welcome_en", whatsapp_template_language="en_US",
+            whatsapp_template_content="Hi {{1}}, thanks for your interest in {{2}}.",
             whatsapp_verification_status="verified", live_whatsapp_enabled=True,
         ),
     ])
@@ -75,7 +80,7 @@ def test_telnyx_whatsapp_initial_message_uses_company_template():
     with patch("app.integrations.telnyx_client.httpx.AsyncClient", return_value=client):
         result = asyncio.run(send_whatsapp(
             db, company_id=company.id, to="+51999888777", body="Hello",
-            use_initial_template=True,
+            use_initial_template=True, template_parameters=["Taylor", "Project One"],
         ))
     assert result["sid"] == "wa-message-1"
     assert client.post.await_args.args[0] == "https://api.telnyx.com/v2/messages/whatsapp"
@@ -84,8 +89,15 @@ def test_telnyx_whatsapp_initial_message_uses_company_template():
     assert request["json"]["whatsapp_message"] == {
         "type": "template",
         "template": {
-            "name": "lead_welcome_es",
-            "language": {"policy": "deterministic", "code": "es_PE"},
+            "name": "lead_welcome_en",
+            "language": {"policy": "deterministic", "code": "en_US"},
+            "components": [{
+                "type": "body",
+                "parameters": [
+                    {"type": "text", "text": "Taylor"},
+                    {"type": "text", "text": "Project One"},
+                ],
+            }],
         },
     }
 
@@ -99,7 +111,7 @@ def test_template_body_is_extracted_for_an_auditable_snapshot():
     }) == "The message the lead receives."
 
 
-def test_initial_whatsapp_trace_stores_the_approved_template_not_the_unused_draft():
+def test_initial_whatsapp_trace_stores_the_rendered_template_not_a_technical_placeholder():
     db = _db(); company = _configured(db)
     project = Project(company_id=company.id, name="Project", country="PE")
     db.add(project); db.flush()
@@ -115,15 +127,41 @@ def test_initial_whatsapp_trace_stores_the_approved_template_not_the_unused_draf
     db.add(conversation); db.commit()
     with patch("app.modules.sales_agent.live_service.send_message", new=AsyncMock(
         return_value={"sid": "wa-message-1", "status": "queued"},
-    )):
+    )) as sender:
         message = asyncio.run(_dispatch(
             db, conversation=conversation, lead=lead,
             content="Unused generated English draft", role="assistant", agent_run_id=None,
             metadata={"event_kind": "manual_lead_first_contact"},
         ))
-    assert message.content == "Approved welcome message."
+    assert message.content == "Hi Lead, thanks for your interest in Project."
     assert message.metadata_json["delivery_kind"] == "whatsapp_template"
     assert message.metadata_json["generated_draft"] == "Unused generated English draft"
+    assert message.metadata_json["template_parameters"] == {
+        "lead_first_name": "Lead", "project_name": "Project",
+    }
+    assert sender.await_args.kwargs["template_parameters"] == ["Lead", "Project"]
+
+
+def test_initial_template_contract_requires_english_name_and_project_parameters():
+    content = "Hi {{1}}, thanks for your interest in {{2}}."
+    validate_initial_template(language="en_US", content=content)
+    parameters = initial_template_parameters(lead_name="Taylor Morgan", project_name="Project One")
+    assert parameters == ["Taylor", "Project One"]
+    assert render_initial_template(content, parameters) == "Hi Taylor, thanks for your interest in Project One."
+
+
+def test_initial_template_contract_rejects_fixed_or_non_english_templates():
+    for language, content in (
+        ("es_PE", "Hola {{1}}, gracias por tu interés en {{2}}."),
+        ("en_US", "Welcome to Black Penguin."),
+        ("en_US", "Hi {{1}}, your reference is {{3}}."),
+    ):
+        try:
+            validate_initial_template(language=language, content=content)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("The incompatible template should have been rejected.")
 
 
 def test_company_country_change_is_inherited_by_existing_projects():

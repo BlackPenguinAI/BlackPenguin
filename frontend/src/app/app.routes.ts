@@ -254,9 +254,8 @@ export const routes: Routes = [
       },
       {
         path: 'agent-settings',
-        canActivate: [roleGuard],
-        data: { roles: ['admin', 'assistant', 'mkt'] },
-        loadComponent: () => import('./pages/client/agent-settings/agent-settings').then((m) => m.AgentSettingsComponent),
+        redirectTo: 'agent',
+        pathMatch: 'full',
       },
       {
         path: 'notifications',

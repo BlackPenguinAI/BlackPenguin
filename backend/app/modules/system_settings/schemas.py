@@ -153,6 +153,9 @@ class TelnyxWhatsAppTemplate(BaseModel):
     name: str
     language: str
     status: str
+    content: Optional[str] = None
+    is_initial_lead_template_compatible: bool = False
+    compatibility_error: Optional[str] = None
 
 
 class TelnyxWhatsAppResources(BaseModel):

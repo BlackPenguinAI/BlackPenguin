@@ -66,13 +66,21 @@ describe('MessagingSettingsPageComponent', () => {
     const component = new MessagingSettingsPageComponent({} as any, {} as any, {} as any);
     const company: any = {};
     component.whatsappTemplates = [{
-      name: 'welcome_en', language: 'en_US', content: 'Welcome to Black Penguin.', status: 'approved',
+      name: 'welcome_en', language: 'en_US', content: 'Hi {{1}}, welcome to {{2}}.', status: 'approved',
     }];
     component.selectWhatsAppTemplate(company, 'welcome_en|en_US');
     expect(company.whatsapp_template_name).toBe('welcome_en');
     expect(company.whatsapp_template_language).toBe('en_US');
-    expect(company.whatsapp_template_content).toBe('Welcome to Black Penguin.');
+    expect(company.whatsapp_template_content).toBe('Hi {{1}}, welcome to {{2}}.');
+    expect(component.whatsappTemplatePreview(company)).toBe('Hi Alex, welcome to Example Project.');
     expect(component.dirty.telnyxCompany).toBe(true);
+  });
+
+  it('accepts only the English two-parameter initial template contract', () => {
+    const component = new MessagingSettingsPageComponent({} as any, {} as any, {} as any);
+    expect(component.isCompatibleInitialTemplate('Hi {{1}}, welcome to {{2}}.')).toBe(true);
+    expect(component.isCompatibleInitialTemplate('Welcome to Black Penguin.')).toBe(false);
+    expect(component.isCompatibleInitialTemplate('Hi {{1}}, reference {{3}}.')).toBe(false);
   });
 
   it('saves a WhatsApp-only Company without requiring an SMS sender', () => {

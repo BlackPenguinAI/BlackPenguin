@@ -66,6 +66,7 @@ async def send_sms(db: Session, *, provider: str, company_id: str, to: str, body
 async def send_message(
     db: Session, *, provider: str, channel: str, company_id: str, to: str,
     body: str, use_initial_template: bool = False,
+    template_parameters: list[str] | None = None,
 ) -> dict:
     if channel == "sms":
         return await send_sms(db, provider=provider, company_id=company_id, to=to, body=body)
@@ -74,6 +75,7 @@ async def send_message(
         return await send_whatsapp(
             db, company_id=company_id, to=to, body=body,
             use_initial_template=use_initial_template,
+            template_parameters=template_parameters,
         )
     raise HTTPException(status_code=422, detail="Unsupported provider/channel combination.")
 

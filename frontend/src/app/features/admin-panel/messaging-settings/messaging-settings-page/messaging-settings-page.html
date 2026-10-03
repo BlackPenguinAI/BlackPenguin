@@ -131,7 +131,7 @@
 
             <div class="mt-6 rounded-xl border border-secondary/20 bg-secondary/[0.04] p-5">
               <div class="flex flex-wrap items-start justify-between gap-3">
-                <div><p class="text-sm font-medium text-white">WhatsApp via Telnyx</p><p class="mt-1 text-xs text-gray-500">WABA, numbers and approved templates are loaded from the verified Telnyx account.</p></div>
+                <div><p class="text-sm font-medium text-white">WhatsApp via Telnyx</p><p class="mt-1 text-xs text-gray-500">Only approved English templates using &#123;&#123;1&#125;&#125; for the lead name and &#123;&#123;2&#125;&#125; for the Project are available.</p></div>
                 <button type="button" class="rounded-lg border border-secondary px-3 py-2 text-xs text-secondary disabled:opacity-40" (click)="loadWhatsAppResources()" [disabled]="loadingWhatsAppResources || telnyx.verification_status!=='verified'">{{loadingWhatsAppResources ? 'Loading…' : 'Load from Telnyx'}}</button>
               </div>
 
@@ -154,7 +154,7 @@
                     <option value="">Select a template</option><option *ngFor="let template of whatsappTemplates" [value]="template.name+'|'+template.language">{{template.name}} · {{template.language}}</option>
                   </select>
                   <p *ngIf="company.whatsapp_template_content" class="mt-2 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-xs leading-5 text-gray-400">
-                    <span class="font-medium text-white">Lead-visible template:</span> {{company.whatsapp_template_content}}
+                    <span class="font-medium text-white">Example visible to the lead:</span> {{whatsappTemplatePreview(company)}}
                   </p>
                 </div>
                 <div class="rounded-xl border border-white/10 bg-black/30 p-4 text-xs text-gray-400">

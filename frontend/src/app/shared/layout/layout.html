@@ -140,11 +140,6 @@
         Agent
       </a>
 
-      <a *ngIf="userRole === 'admin' || userRole === 'assistant' || userRole === 'mkt'" routerLink="/app/agent-settings" routerLinkActive="bg-white/10 text-white" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors flex items-center gap-2 cursor-pointer">
-        <span class="material-symbols-outlined text-[18px]">tune</span>
-        Agent operations
-      </a>
-
       <a *ngIf="userRole === 'admin' || userRole === 'assistant' || userRole === 'sales'" routerLink="/app/schedule" routerLinkActive="bg-white/10 text-white" class="px-3 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors flex items-center gap-2 cursor-pointer">
         <span class="material-symbols-outlined text-[18px]">calendar_month</span>
         Schedule

@@ -32,6 +32,11 @@ from app.modules.governance.services import (
     operating_policy_for,
 )
 from app.core.config import settings
+from app.integrations.whatsapp_templates import (
+    initial_template_parameters,
+    render_initial_template,
+    validate_initial_template,
+)
 
 
 def normalize_phone(value: str) -> str:
@@ -190,6 +195,7 @@ async def _dispatch(
     event_kind = message_metadata.get("event_kind")
     uses_whatsapp_template = event_kind in {"meta_lead_first_contact", "manual_lead_first_contact"}
     persisted_content = content
+    template_parameters = None
     if conversation.channel == "whatsapp" and uses_whatsapp_template:
         from app.modules.system_settings.services import get_telnyx_company_config
 
@@ -197,14 +203,30 @@ async def _dispatch(
         template_name = company_config.whatsapp_template_name if company_config else None
         template_language = company_config.whatsapp_template_language if company_config else None
         template_content = company_config.whatsapp_template_content if company_config else None
-        persisted_content = template_content or (
-            f"[WhatsApp template: {template_name or 'configured template'}"
-            f" ({template_language or 'default language'})]"
-        )
+        project = db.query(Project).filter(
+            Project.id == conversation.project_id,
+            Project.company_id == conversation.company_id,
+        ).first()
+        if not company_config or not template_name:
+            raise HTTPException(status_code=409, detail="The Company does not have an initial WhatsApp template configured.")
+        try:
+            validate_initial_template(language=template_language, content=template_content)
+            template_parameters = initial_template_parameters(
+                lead_name=lead.full_name,
+                project_name=project.name if project else None,
+            )
+            persisted_content = render_initial_template(template_content or "", template_parameters)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
         message_metadata.update({
             "delivery_kind": "whatsapp_template",
             "template_name": template_name,
             "template_language": template_language,
+            "template_parameters": {
+                "lead_first_name": template_parameters[0],
+                "project_name": template_parameters[1],
+            },
+            "rendered_content": persisted_content,
             "generated_draft": content,
         })
     if conversation.channel == "whatsapp" and not uses_whatsapp_template:
@@ -263,6 +285,7 @@ async def _dispatch(
                 db, provider=conversation.provider, channel=conversation.channel,
                 company_id=conversation.company_id, to=lead.phone, body=content,
                 use_initial_template=uses_whatsapp_template,
+                template_parameters=template_parameters,
             )
     except Exception as exc:
         outbound.status = "failed"; outbound.last_error = type(exc).__name__
