@@ -112,6 +112,25 @@ class LiveLeadSourceOption(BaseModel):
     campaign_platform: str | None = None
 
 
+class MetaLeadFormQuestion(BaseModel):
+    key: str
+    label: str
+    type: str
+    required: bool = False
+    options: list[str] = Field(default_factory=list)
+
+
+class MetaLeadFormPreview(BaseModel):
+    form_id: str
+    name: str
+    status: str
+    campaign_id: str
+    external_campaign_id: str | None = None
+    external_adset_id: str | None = None
+    external_ad_id: str | None = None
+    questions: list[MetaLeadFormQuestion] = Field(default_factory=list)
+
+
 class LiveMetaTestResponse(BaseModel):
     lead_id: str
     conversation_id: str

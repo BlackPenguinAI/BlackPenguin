@@ -13,14 +13,16 @@ from app.modules.sales_crm.models import Lead
 from .schemas import (
     AgentRunResponse, AppointmentConfirmationResponse, AppointmentConfirm, AppointmentSlot,
     ConversationAction, ConversationSummary, DraftDecision, LiveLeadCreate, LiveLeadSourceOption,
-    LiveMetaTestCreate, LiveMetaTestResponse,
+    LiveMetaTestCreate, LiveMetaTestResponse, MetaLeadFormPreview,
     ManualMessageCreate, SalesMessageResponse,
     SimulationAdvance, SimulationApproval, SimulationCreate, SimulationCreateResponse,
     SimulationOptionProject, SimulationRequest,
 )
 from .service import conversation_messages, conversation_summaries, set_conversation_action, simulate_turn
 from .live_service import retry_failed_inbound_turn, send_manual_message
-from .live_test_service import create_live_lead, create_live_meta_test, live_lead_source_options
+from .live_test_service import (
+    create_live_lead, create_live_meta_test, live_lead_source_options, meta_lead_form_preview,
+)
 from .simulation_service import (
     advance_simulation, approve_simulation, confirm_simulation_appointment,
     create_simulation, create_simulation_calendar_test, delete_simulation, delete_simulation_calendar_test, generate_initial_message, simulation_options,
@@ -107,6 +109,22 @@ def get_live_lead_sources(
     current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.MKT])),
 ):
     return live_lead_source_options()
+
+
+@router.get("/meta-form-preview", response_model=MetaLeadFormPreview)
+async def get_meta_lead_form_preview(
+    project_id: str,
+    campaign_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.MKT])),
+):
+    require_project_access(db, current_user, project_id)
+    return await meta_lead_form_preview(
+        db,
+        company_id=current_user.company_id,
+        project_id=project_id,
+        campaign_id=campaign_id,
+    )
 
 
 @router.post("/live-leads", response_model=LiveMetaTestResponse, status_code=201)

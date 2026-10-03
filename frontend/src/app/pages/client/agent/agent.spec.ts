@@ -41,7 +41,9 @@ describe('AgentComponent simulation form', () => {
   });
 
   it('offers only Meta-mapped campaigns for a real SMS test', () => {
-    const value = component();
+    const value = component({ get: () => of({
+      form_id: '12345', name: 'Project inquiry', status: 'ACTIVE', campaign_id: 'mapped', questions: [],
+    }) });
     value.options = [{ id: 'p1', campaigns: [
       { id: 'draft', live_test_ready: false },
       { id: 'mapped', live_test_ready: true, lead_form_id: '12345' },
@@ -52,6 +54,23 @@ describe('AgentComponent simulation form', () => {
     value.sourceChanged();
     expect(value.availableCampaigns.map((item) => item.id)).toEqual(['mapped']);
     expect(value.campaignId).toBe('mapped');
+    expect(value.metaFormPreview?.name).toBe('Project inquiry');
+  });
+
+  it('exposes Meta as a visible live lead source returned by the backend', () => {
+    const http = {
+      get: (url: string) => url.endsWith('/simulation-options')
+        ? of([])
+        : url.endsWith('/live-lead-sources')
+          ? of([
+              { code: 'manual', label: 'Manual registration', requires_campaign: false },
+              { code: 'meta', label: 'Meta Lead Ads', requires_campaign: true, campaign_platform: 'meta' },
+            ])
+          : of([]),
+    };
+    const value = component(http);
+    value.loadOptions();
+    expect(value.leadSources.map(source => source.code)).toEqual(['manual', 'meta']);
   });
 
   it('submits one idempotent request that creates the lead and starts real SMS', () => {
@@ -131,7 +150,9 @@ describe('AgentComponent simulation form', () => {
   });
 
   it('requires a mapped campaign only when the selected source is Meta', () => {
-    const value = component();
+    const value = component({ get: () => of({
+      form_id: 'form', name: 'Lead form', status: 'ACTIVE', campaign_id: 'campaign', questions: [],
+    }) });
     value.options = [{ id: 'project', campaigns: [], products: [{ id: 'property_type:home' }] }];
     value.projectId = 'project'; value.openSetup('live_meta');
     value.form = {
@@ -142,6 +163,45 @@ describe('AgentComponent simulation form', () => {
     expect(value.formComplete).toBe(true);
     value.leadSourceCode = 'meta'; value.sourceChanged();
     expect(value.formComplete).toBe(false);
+  });
+
+  it('loads mapped Meta questions and persists their answers in the demo lead', () => {
+    const calls: Array<{ url: string; body?: any }> = [];
+    const http = {
+      get: (url: string) => {
+        calls.push({ url });
+        return url.includes('/meta-form-preview')
+          ? of({
+              form_id: 'meta-form', name: 'Project inquiry', status: 'ACTIVE', campaign_id: 'campaign',
+              questions: [
+                { key: 'preferred_home', label: 'Preferred home', type: 'CUSTOM', required: false, options: ['Villa', 'Lot'] },
+                { key: 'purchase_timeline', label: 'Purchase timeline', type: 'CUSTOM', required: false, options: [] },
+              ],
+            })
+          : of([]);
+      },
+      post: (url: string, body: any) => {
+        calls.push({ url, body });
+        return of({ conversation_id: 'conversation', provider: 'telnyx', channel: 'whatsapp', replayed: false });
+      },
+    };
+    const value = component(http);
+    value.options = [{ id: 'project', campaigns: [{ id: 'campaign', live_test_ready: true }], products: [] }];
+    value.projectId = 'project'; value.openSetup('live_meta');
+    value.leadSourceCode = 'meta'; value.sourceChanged();
+    value.setMetaAnswer('preferred_home', 'Villa');
+    value.setMetaAnswer('purchase_timeline', 'This year');
+    value.form = {
+      first_name: 'Taylor', last_name: 'Morgan', phone: '+51999888777', email: 'taylor@example.com',
+      product_id: '', budget_min: null, budget_max: null, consent: true,
+    };
+    value.startLiveMetaTest();
+    const submission = calls.find(call => call.url.endsWith('/sales-agent/live-leads'));
+    expect(submission?.body.source_code).toBe('meta');
+    expect(submission?.body.campaign_id).toBe('campaign');
+    expect(submission?.body.lead.custom_answers).toEqual({
+      preferred_home: 'Villa', purchase_timeline: 'This year',
+    });
   });
 
   it('renders the safe Telnyx provider detail instead of a generic Meta error', () => {

@@ -1,8 +1,10 @@
 import asyncio
 import importlib.util
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
+import httpx
 import pytest
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
@@ -16,12 +18,43 @@ from app.db.postgres import Base, get_db
 from app.modules.companies.models import Company
 from app.modules.meta_leads.router import _resolve_campaign, router as meta_leads_router
 from app.modules.projects.models import MetaConnection, Project, ProjectCampaign, ProjectProfile, ProjectPropertyType
-from app.modules.sales_agent.live_test_service import create_live_lead, create_live_meta_test, live_lead_source_options
+from app.modules.sales_agent.live_test_service import (
+    create_live_lead, create_live_meta_test, live_lead_source_options, meta_lead_form_preview,
+)
 from app.modules.sales_agent.live_service import launch_live_lead
 from app.modules.sales_agent.service import simulate_turn
 from app.modules.sales_agent.models import SalesConversation, SalesConversationLeadContext, SalesMessage
 from app.modules.sales_crm.models import Lead, LeadContact
 from app.modules.system_settings.models import TwilioConfig
+
+
+class _MetaResponse:
+    def __init__(self, payload: dict, status_code: int = 200):
+        self._payload = payload
+        self.status_code = status_code
+
+    def raise_for_status(self):
+        if self.status_code >= 400:
+            raise httpx.HTTPStatusError("Meta error", request=httpx.Request("GET", "https://graph.facebook.com"), response=httpx.Response(self.status_code))
+
+    def json(self):
+        return self._payload
+
+
+class _MetaClient:
+    def __init__(self, response: _MetaResponse):
+        self.response = response
+        self.request = None
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *_args):
+        return None
+
+    async def get(self, url: str, params: dict):
+        self.request = (url, params)
+        return self.response
 
 
 def _db():
@@ -84,6 +117,52 @@ def test_meta_webhook_verification_echoes_an_opaque_challenge_as_plain_text():
     assert response.status_code == 200
     assert response.text == "opaque-challenge-value"
     assert response.headers["content-type"].startswith("text/plain")
+
+
+def test_meta_form_preview_is_tenant_safe_and_normalizes_custom_questions():
+    db = _db(); company = Company(name="Tenant A"); db.add(company); db.flush()
+    project, campaign, _ = _project(db, company)
+    connection = MetaConnection(
+        company_id=company.id,
+        label="Page",
+        token_ciphertext="encrypted",
+        verification_mode="real",
+        verification_status="succeeded",
+    )
+    db.add(connection); db.flush()
+    campaign.meta_connection_id = connection.id
+    db.commit()
+    response = _MetaResponse({
+        "id": campaign.lead_form_id,
+        "name": "Project inquiry",
+        "status": "ACTIVE",
+        "questions": [
+            {"key": "full_name", "label": "Full name", "type": "FULL_NAME"},
+            {"key": "phone_number", "label": "Phone", "type": "PHONE"},
+            {"key": "preferred_home", "label": "Preferred home", "type": "CUSTOM", "options": [
+                {"key": "villa", "value": "Villa"}, {"key": "lot", "value": "Lot"},
+            ]},
+            {"key": "purchase_timeline", "label": "Purchase timeline", "type": "CUSTOM"},
+        ],
+    })
+    client = _MetaClient(response)
+    with patch("app.modules.sales_agent.live_test_service.decrypt_connection_token", return_value="page-token"), patch(
+        "app.modules.sales_agent.live_test_service.get_meta_platform_config",
+        return_value=SimpleNamespace(graph_api_version="v26.0"),
+    ), patch("app.modules.sales_agent.live_test_service.httpx.AsyncClient", return_value=client):
+        result = asyncio.run(meta_lead_form_preview(
+            db, company_id=company.id, project_id=project.id, campaign_id=campaign.id,
+        ))
+    assert result["name"] == "Project inquiry"
+    assert [question["key"] for question in result["questions"]] == ["preferred_home", "purchase_timeline"]
+    assert result["questions"][0]["options"] == ["Villa", "Lot"]
+    assert client.request[0].endswith(f"/{campaign.lead_form_id}")
+    assert client.request[1]["access_token"] == "page-token"
+    with pytest.raises(HTTPException) as foreign:
+        asyncio.run(meta_lead_form_preview(
+            db, company_id="another-company", project_id=project.id, campaign_id=campaign.id,
+        ))
+    assert foreign.value.status_code == 404
 
 
 def test_manual_meta_control_is_one_idempotent_real_sms_action():

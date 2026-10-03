@@ -178,6 +178,64 @@ textarea {
 .money-input input {
   width: 100%;
 }
+.product-card.meta-form-card { display: block; }
+.meta-form-card header {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+.meta-form-card header > span {
+  color: #e9ad00;
+}
+.meta-form-card header div {
+  min-width: 0;
+  flex: 1;
+}
+.meta-form-card header small {
+  font-size: 9px;
+  letter-spacing: .13em;
+}
+.meta-form-card footer { color: #8f8a7d; font-size: 10px; }
+.meta-question-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 16px 0 0;
+}
+.meta-question-grid textarea {
+  min-height: 76px;
+  resize: vertical;
+}
+.meta-form-state {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  color: #a98b31;
+  font-size: 11px;
+}
+.meta-form-state > .material-symbols-outlined {
+  animation: agentPulse 1.2s ease-in-out infinite;
+}
+.meta-form-state.failed {
+  color: #e09b76;
+}
+.meta-form-state button {
+  margin-left: auto;
+  border: 1px solid #745800;
+  border-radius: 8px;
+  background: transparent;
+  color: #efb600;
+  padding: 6px 10px;
+}
+.meta-no-questions {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: #8f8a7d;
+  font-size: 11px;
+}
+.meta-form-card footer {
+  padding-top: 12px;
+  border-top: 1px solid #332807;
+}
 .product-card {
   display: grid;
   grid-template-columns: 1fr 2fr;
@@ -634,6 +692,9 @@ textarea {
   }
   .product-card {
     grid-template-columns: 1fr;
+  }
+  .meta-form-card header {
+    align-items: flex-start;
   }
   .setup-footer {
     align-items: stretch;

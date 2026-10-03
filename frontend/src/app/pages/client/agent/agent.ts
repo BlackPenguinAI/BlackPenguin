@@ -6,6 +6,25 @@ import { ActivatedRoute } from '@angular/router';
 import { catchError, finalize, forkJoin, of } from 'rxjs';
 import { API_V1_URL } from '../../../core/config/api.config';
 
+interface MetaLeadFormQuestion {
+  key: string;
+  label: string;
+  type: string;
+  required: boolean;
+  options: string[];
+}
+
+interface MetaLeadFormPreview {
+  form_id: string;
+  name: string;
+  status: string;
+  campaign_id: string;
+  external_campaign_id?: string | null;
+  external_adset_id?: string | null;
+  external_ad_id?: string | null;
+  questions: MetaLeadFormQuestion[];
+}
+
 @Component({
   selector: 'app-agent',
   standalone: true,
@@ -42,6 +61,10 @@ export class AgentComponent implements OnInit, OnDestroy {
     { code: 'manual', label: 'Manual registration', requires_campaign: false, campaign_platform: null },
     { code: 'meta', label: 'Meta Lead Ads', requires_campaign: true, campaign_platform: 'meta' },
   ];
+  metaFormPreview: MetaLeadFormPreview | null = null;
+  metaFormLoading = false;
+  metaFormError = '';
+  metaAnswers: Record<string, string> = {};
   liveProgress = '';
   private liveProgressTimer?: ReturnType<typeof setInterval>;
   private liveSubmissionKey = '';
@@ -51,6 +74,7 @@ export class AgentComponent implements OnInit, OnDestroy {
   private conversationPollingEnabled = false;
   private knownConversationIds = new Set<string>();
   private conversationSnapshotReady = false;
+  private metaFormRequest = 0;
   search = '';
   filter = 'all';
   draft = '';
@@ -106,11 +130,9 @@ export class AgentComponent implements OnInit, OnDestroy {
     }).subscribe({
       next: ({ projects, sources }) => {
         this.options = projects;
-        // Real Meta webhook ingestion remains backend-ready but is not exposed
-        // as a manual intake choice until its production E2E is validated.
-        const availableSources = (sources?.length ? sources : this.leadSources)
-          .filter((source: any) => source.code !== 'meta');
+        const availableSources = sources?.length ? sources : this.leadSources;
         this.leadSources = availableSources.length ? availableSources : [this.leadSources[0]];
+        if (!this.currentLeadSource) this.leadSourceCode = 'manual';
         const requested = this.route.snapshot.queryParamMap.get('project');
         this.projectId = projects.find((row) => row.id === requested)?.id || '';
         this.campaignId = this.campaigns[0]?.id || '';
@@ -135,6 +157,8 @@ export class AgentComponent implements OnInit, OnDestroy {
     this.selected = null;
     this.messages = [];
     this.slots = [];
+    this.clearMetaForm();
+    this.loadMetaFormPreview();
     this.loadConversations(false, '', preserveSetup);
   }
 
@@ -156,6 +180,47 @@ export class AgentComponent implements OnInit, OnDestroy {
       ? this.availableCampaigns[0]?.id || ''
       : '';
     this.liveSubmissionKey = '';
+    this.clearMetaForm();
+    this.loadMetaFormPreview();
+  }
+  campaignChanged(): void {
+    this.liveSubmissionKey = '';
+    this.clearMetaForm();
+    this.loadMetaFormPreview();
+  }
+  loadMetaFormPreview(): void {
+    const request = ++this.metaFormRequest;
+    if (this.setupMode !== 'live_meta' || this.leadSourceCode !== 'meta' || !this.projectId || !this.campaignId) {
+      this.metaFormLoading = false;
+      return;
+    }
+    this.metaFormLoading = true;
+    this.metaFormError = '';
+    const query = new URLSearchParams({ project_id: this.projectId, campaign_id: this.campaignId });
+    this.http.get<MetaLeadFormPreview>(`${API_V1_URL}/sales-agent/meta-form-preview?${query.toString()}`)
+      .pipe(finalize(() => {
+        if (request === this.metaFormRequest) {
+          this.metaFormLoading = false;
+          this.cdr.markForCheck();
+        }
+      }))
+      .subscribe({
+        next: preview => {
+          if (request !== this.metaFormRequest || preview.campaign_id !== this.campaignId) return;
+          this.metaFormPreview = preview;
+          this.metaAnswers = Object.fromEntries((preview.questions || []).map(question => [question.key, '']));
+          this.cdr.markForCheck();
+        },
+        error: err => {
+          if (request !== this.metaFormRequest) return;
+          this.metaFormPreview = null;
+          this.metaFormError = err.error?.detail || 'The mapped Meta Lead Form could not be loaded.';
+          this.cdr.markForCheck();
+        },
+      });
+  }
+  setMetaAnswer(key: string, value: unknown): void {
+    this.metaAnswers = { ...this.metaAnswers, [key]: String(value ?? '') };
   }
   get currentProject(): any {
     return this.options.find((row) => row.id === this.projectId);
@@ -345,6 +410,8 @@ export class AgentComponent implements OnInit, OnDestroy {
       : '';
     this.error = '';
     this.success = '';
+    this.clearMetaForm();
+    this.loadMetaFormPreview();
   }
 
   submitLead(): void {
@@ -378,7 +445,10 @@ export class AgentComponent implements OnInit, OnDestroy {
       lead: {
         first_name: this.form.first_name.trim(), last_name: this.form.last_name.trim(),
         phone: this.form.phone.trim(), email: this.form.email.trim(),
-        consent: this.form.consent, custom_answers: {},
+        consent: this.form.consent,
+        custom_answers: this.leadSourceCode === 'meta'
+          ? Object.fromEntries(Object.entries(this.metaAnswers).filter(([, value]) => value.trim()))
+          : {},
       },
     }, { headers: { 'Idempotency-Key': this.liveSubmissionKey } })
       .pipe(finalize(() => {
@@ -847,6 +917,14 @@ export class AgentComponent implements OnInit, OnDestroy {
   }
   private resetForm(): void {
     this.form = this.emptyForm();
+    this.metaAnswers = {};
+  }
+  private clearMetaForm(): void {
+    this.metaFormRequest += 1;
+    this.metaFormPreview = null;
+    this.metaFormError = '';
+    this.metaFormLoading = false;
+    this.metaAnswers = {};
   }
   private newRequestId(): string {
     return globalThis.crypto?.randomUUID?.() || `meta-test-${Date.now()}-${Math.random().toString(16).slice(2)}`;

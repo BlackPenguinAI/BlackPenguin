@@ -5,13 +5,16 @@ from __future__ import annotations
 from datetime import datetime
 import hashlib
 
+import httpx
 from fastapi import HTTPException
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session
 
-from app.modules.projects.models import Project, ProjectCampaign
+from app.modules.projects.meta_service import decrypt_connection_token
+from app.modules.projects.models import MetaConnection, Project, ProjectCampaign
 from app.modules.sales_crm.models import Lead, LeadConsentEvent
 from app.modules.sales_crm.intelligence import initial_lead_profile, lead_profile_summary
+from app.modules.system_settings.services import get_meta_platform_config
 from app.integrations.messaging_gateway import channel_sender, company_live_channel, live_provider
 
 from .live_service import launch_live_lead, normalize_phone
@@ -47,6 +50,103 @@ def live_lead_source_options() -> list[dict]:
         }
         for code, definition in LIVE_LEAD_SOURCES.items()
     ]
+
+
+_META_CONTACT_QUESTION_KEYS = {
+    "email", "first_name", "full_name", "last_name", "name",
+    "phone", "phone_number",
+}
+
+
+def _meta_question_options(question: dict) -> list[str]:
+    values: list[str] = []
+    for option in question.get("options") or []:
+        if isinstance(option, dict):
+            value = option.get("value") or option.get("label") or option.get("key")
+        else:
+            value = option
+        if value not in (None, ""):
+            values.append(str(value))
+    return values
+
+
+def _meta_form_questions(payload: dict) -> list[dict]:
+    """Normalize Meta's question contract without exposing provider-only data."""
+    questions: list[dict] = []
+    for index, question in enumerate(payload.get("questions") or []):
+        if not isinstance(question, dict):
+            continue
+        key = str(question.get("key") or question.get("name") or f"question_{index + 1}").strip()
+        if not key or key.casefold() in _META_CONTACT_QUESTION_KEYS:
+            continue
+        label = str(question.get("label") or question.get("name") or key.replace("_", " ").title()).strip()
+        questions.append({
+            "key": key[:160],
+            "label": label[:240],
+            "type": str(question.get("type") or "CUSTOM").upper()[:40],
+            "required": bool(question.get("required", False)),
+            "options": _meta_question_options(question)[:100],
+        })
+    return questions
+
+
+async def meta_lead_form_preview(
+    db: Session, *, company_id: str, project_id: str, campaign_id: str,
+) -> dict:
+    """Load the mapped Lead Form definition for an authorized tenant Project."""
+    campaign = db.query(ProjectCampaign).join(Project).filter(
+        ProjectCampaign.id == campaign_id,
+        ProjectCampaign.project_id == project_id,
+        ProjectCampaign.platform == "meta",
+        Project.company_id == company_id,
+        Project.is_active.is_(True),
+        Project.is_demo.is_(False),
+    ).first()
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Meta campaign not found for this Project.")
+    if not campaign.lead_form_id:
+        raise HTTPException(status_code=409, detail="Map this campaign to a Meta Lead Form before loading its fields.")
+    connection = db.query(MetaConnection).filter(
+        MetaConnection.id == campaign.meta_connection_id,
+        MetaConnection.company_id == company_id,
+        MetaConnection.verification_mode == "real",
+        MetaConnection.verification_status == "succeeded",
+    ).first()
+    if not connection:
+        raise HTTPException(status_code=409, detail="Reconnect the verified Meta Page used by this campaign.")
+    try:
+        access_token = decrypt_connection_token(connection)
+    except (HTTPException, ValueError) as exc:
+        raise HTTPException(status_code=409, detail="Reconnect Meta before loading this Lead Form.") from exc
+    graph_version = get_meta_platform_config(db).graph_api_version
+    try:
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            response = await client.get(
+                f"https://graph.facebook.com/{graph_version}/{campaign.lead_form_id}",
+                params={
+                    "access_token": access_token,
+                    "fields": "id,name,status,questions",
+                },
+            )
+            response.raise_for_status()
+            payload = response.json()
+    except (httpx.HTTPError, ValueError) as exc:
+        raise HTTPException(
+            status_code=502,
+            detail="Meta could not load the mapped Lead Form. Reconnect Meta and confirm Leads Access.",
+        ) from exc
+    if str(payload.get("id") or "") != str(campaign.lead_form_id):
+        raise HTTPException(status_code=502, detail="Meta returned a different Lead Form than the mapped campaign.")
+    return {
+        "form_id": str(campaign.lead_form_id),
+        "name": str(payload.get("name") or f"Meta Lead Form {campaign.lead_form_id}"),
+        "status": str(payload.get("status") or "UNKNOWN"),
+        "campaign_id": campaign.id,
+        "external_campaign_id": campaign.external_campaign_id,
+        "external_adset_id": campaign.external_adset_id,
+        "external_ad_id": campaign.external_ad_id,
+        "questions": _meta_form_questions(payload),
+    }
 
 
 async def create_live_lead(

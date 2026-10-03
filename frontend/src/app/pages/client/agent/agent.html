@@ -56,7 +56,7 @@
         ><small>Only completed and approved Projects are available.</small></label
       >
       <label *ngIf="setupMode === 'simulation' || currentLeadSource?.requires_campaign"
-        >Campaign *<select [(ngModel)]="campaignId">
+        >Campaign *<select [(ngModel)]="campaignId" (change)="campaignChanged()">
           <option value="" disabled>Select a campaign</option>
           <option *ngFor="let campaign of availableCampaigns" [value]="campaign.id">
             {{ campaign.name }} · {{ campaign.status }}
@@ -133,6 +133,58 @@
         <small>Optional. Must be equal to or above the minimum.</small></label
       >
     </div>
+    <section class="meta-form-card product-card" *ngIf="setupMode === 'live_meta' && leadSourceCode === 'meta'">
+      <header>
+        <span class="material-symbols-outlined">dynamic_form</span>
+        <div>
+          <small>MAPPED META LEAD FORM</small>
+          <strong>{{ metaFormPreview?.name || 'Loading form definition…' }}</strong>
+          <p *ngIf="metaFormPreview">Form {{ metaFormPreview.form_id }} · {{ metaFormPreview.status }}</p>
+        </div>
+        <em class="test-badge" *ngIf="metaFormPreview">DEMO INTAKE</em>
+      </header>
+      <div class="meta-form-state" *ngIf="metaFormLoading">
+        <span class="material-symbols-outlined">sync</span> Loading the questions configured in Meta…
+      </div>
+      <div class="meta-form-state failed" *ngIf="metaFormError && !metaFormLoading">
+        <span class="material-symbols-outlined">warning</span>
+        <span>{{ metaFormError }}</span>
+        <button type="button" (click)="loadMetaFormPreview()">Retry</button>
+      </div>
+      <div class="meta-question-grid setup-grid" *ngIf="metaFormPreview && !metaFormLoading">
+        <label *ngFor="let question of metaFormPreview.questions">
+          {{ question.label }}<span *ngIf="question.required"> *</span>
+          <select
+            *ngIf="question.options.length; else metaFreeText"
+            [ngModel]="metaAnswers[question.key]"
+            (ngModelChange)="setMetaAnswer(question.key, $event)"
+          >
+            <option value="">Select an answer</option>
+            <option *ngFor="let option of question.options" [value]="option">{{ option }}</option>
+          </select>
+          <ng-template #metaFreeText>
+            <textarea
+              *ngIf="question.type === 'LONG_TEXT'; else metaShortText"
+              rows="3"
+              [ngModel]="metaAnswers[question.key]"
+              (ngModelChange)="setMetaAnswer(question.key, $event)"
+            ></textarea>
+            <ng-template #metaShortText>
+              <input
+                [ngModel]="metaAnswers[question.key]"
+                (ngModelChange)="setMetaAnswer(question.key, $event)"
+              />
+            </ng-template>
+          </ng-template>
+        </label>
+        <p class="meta-no-questions" *ngIf="!metaFormPreview.questions.length">
+          This form has no additional questions. Contact identity is captured in the required fields above.
+        </p>
+      </div>
+      <footer *ngIf="metaFormPreview">
+        This control reproduces the mapped form for an end-to-end demo. The lead is stored internally as a Meta test lead; real webhook leads remain distinguishable.
+      </footer>
+    </section>
     <div class="product-card" *ngIf="setupMode === 'simulation' && currentProduct">
       <div>
         <small>SELECTED PRODUCT</small><strong>{{ currentProduct.name }}</strong
