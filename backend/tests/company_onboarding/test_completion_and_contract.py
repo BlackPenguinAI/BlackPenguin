@@ -34,6 +34,9 @@ from app.modules.company_onboarding.models import CompanyProfile, SenderType
 from app.modules.company_onboarding.source_service import (
     _extract_bytes,
     _embedded_link_values,
+    _logo_candidate_urls,
+    _logo_urls_from_json_ld,
+    _prepare_logo_candidate,
     classify_url,
     validate_public_url,
 )
@@ -394,8 +397,71 @@ def test_html_keeps_public_contact_and_social_links_for_extraction():
 
     values = _embedded_link_values(text)
     assert values["public_contact_emails"] == ["info@example.com"]
-    assert values["public_contact_phones"] == ["+1-305-555-0100"]
+    assert values["public_contact_phones"] == ["+13055550100"]
     assert values["corporate_social_profiles"] == ["https://www.linkedin.com/company/example"]
+
+
+def test_html_deduplicates_phone_formats_and_extracts_schema_org_company_facts():
+    html = b'''<html><head><script type="application/ld+json">{
+      "@context": "https://schema.org", "@type": "Organization",
+      "name": "Fouquet's Miami", "telephone": "(305) 230-4300",
+      "address": {"@type": "PostalAddress", "streetAddress": "5000 Biscayne Blvd",
+        "addressLocality": "Miami", "addressRegion": "FL", "postalCode": "33137",
+        "addressCountry": "US"}
+    }</script></head><body><a href="tel:3052304300">Call</a></body></html>'''
+
+    values = _embedded_link_values(_extract_bytes(html, "text/html", "https://example.com"))
+
+    assert values["official_company_name"] == "Fouquet's Miami"
+    assert values["headquarters"] == "5000 Biscayne Blvd, Miami, FL, 33137, US"
+    assert values["public_contact_phones"] == ["3052304300"]
+
+
+def test_svg_logo_candidates_are_sanitized_before_storage():
+    svg = b'''<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)">
+      <script>alert(1)</script><foreignObject><div>unsafe</div></foreignObject>
+      <path d="M0 0h10v10z" fill="#000"/>
+    </svg>'''
+
+    sanitized = _prepare_logo_candidate(svg, "image/svg+xml")
+
+    assert b"<script" not in sanitized
+    assert b"foreignObject" not in sanitized
+    assert b"onload" not in sanitized
+    assert b"path" in sanitized
+
+
+def test_schema_org_logo_is_rankable_as_an_official_candidate():
+    from bs4 import BeautifulSoup
+
+    soup = BeautifulSoup('''<script type="application/ld+json">{
+      "@context":"https://schema.org", "@type":"Organization",
+      "logo":{"@type":"ImageObject", "contentUrl":"/assets/brand.svg"}
+    }</script>''', "html.parser")
+
+    assert _logo_urls_from_json_ld(soup, "https://example.com/about") == [
+        "https://example.com/assets/brand.svg"
+    ]
+
+
+def test_logo_candidates_include_srcset_and_css_before_generic_photos():
+    from bs4 import BeautifulSoup
+
+    soup = BeautifulSoup('''
+      <style>.brand-logo { background-image: url('/assets/logo.svg'); }</style>
+      <img class="brand" src="/assets/logo-small.png"
+           srcset="/assets/logo-small.png 1x, /assets/logo-large.png 2x">
+      <img src="/photos/residence.jpg">
+    ''', "html.parser")
+
+    candidates = _logo_candidate_urls(soup, "https://example.com")
+
+    assert candidates[:3] == [
+        "https://example.com/assets/logo-small.png",
+        "https://example.com/assets/logo-large.png",
+        "https://example.com/assets/logo.svg",
+    ]
+    assert candidates[-1] == "https://example.com/photos/residence.jpg"
 
 
 def test_public_contact_and_social_values_are_validated():

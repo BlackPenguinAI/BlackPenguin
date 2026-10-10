@@ -72,4 +72,38 @@ describe('OnboardingResponseOptionsComponent', () => {
     component.question = { ...component.question, suggestion_origin: 'generic_fallback' };
     expect(component.suggestionLabel).toBe('Starter suggestions');
   });
+
+  it('emits ordinary chips immediately', () => {
+    const component = new OnboardingResponseOptionsComponent();
+    component.question = {
+      field: 'project_status', label: 'Status', prompt: 'Choose', input_type: 'choice',
+      options: ['Pre-sales'], examples: [], allow_custom: true, minimum_words: null,
+    };
+    const emitted: string[] = [];
+    component.selected.subscribe(value => emitted.push(value));
+
+    component.choose('Pre-sales');
+
+    expect(emitted).toEqual(['Pre-sales']);
+  });
+
+  it('keeps multiple compliance chips selected until they are submitted together', () => {
+    const component = new OnboardingResponseOptionsComponent();
+    component.question = {
+      field: 'compliance_notes', label: 'Compliance', prompt: 'Choose', input_type: 'multi_select',
+      options: ['Advertising disclaimer', 'Financing disclaimer'], examples: [],
+      allow_custom: true, minimum_words: null,
+    };
+    const emitted: string[] = [];
+    component.selected.subscribe(value => emitted.push(value));
+
+    component.choose('Advertising disclaimer');
+    component.choose('Financing disclaimer');
+    expect(emitted).toEqual([]);
+    expect(component.isSelected('Advertising disclaimer')).toBe(true);
+    expect(component.isSelected('Financing disclaimer')).toBe(true);
+
+    component.submitSelection();
+    expect(emitted).toEqual(['Advertising disclaimer; Financing disclaimer']);
+  });
 });

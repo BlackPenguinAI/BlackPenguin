@@ -11,11 +11,12 @@
       *ngFor="let choice of choices"
       type="button"
       class="choice"
-      [class.choice--selected]="choice === selectedChoice"
+      [class.choice--selected]="isSelected(choice)"
+      [attr.aria-pressed]="isMultiSelect ? isSelected(choice) : null"
       [disabled]="disabled"
-      (click)="selected.emit(choice)"
+      (click)="choose(choice)"
     >
-      <span *ngIf="choice === selectedChoice" class="material-symbols-outlined">check</span>{{ choice }}
+      <span *ngIf="isSelected(choice)" class="material-symbols-outlined">check</span>{{ choice }}
     </button>
     <button
       *ngIf="question.allow_custom"
@@ -27,6 +28,15 @@
       Other / write my own
     </button>
   </div>
+  <button
+    *ngIf="isMultiSelect && !answered"
+    type="button"
+    class="submit-selection"
+    [disabled]="disabled || !selectedValues.size"
+    (click)="submitSelection()"
+  >
+    Continue with {{ selectedValues.size }} selected
+  </button>
   <p *ngIf="question.minimum_words" class="hint">Use at least {{ question.minimum_words }} words for a complete answer.</p>
   <p *ngIf="question.minimum_characters" class="hint">Use at least {{ question.minimum_characters }} characters for a complete answer.</p>
 </section>

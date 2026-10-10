@@ -52,7 +52,9 @@ export class ProjectOverviewComponent implements OnInit, OnDestroy {
 
   get locationLabel(): string {
     if (!this.overview) return 'Pending';
-    return [this.overview.address, this.overview.city, this.overview.country].filter(Boolean).join(', ') || 'Pending';
+    return this.overview.location?.address
+      || [this.overview.address, this.overview.city, this.overview.country].filter(Boolean).join(', ')
+      || 'Pending';
   }
 
   private buildMapUrl(overview: ProjectOverview): SafeResourceUrl | null {
@@ -60,7 +62,7 @@ export class ProjectOverviewComponent implements OnInit, OnDestroy {
     if (!location) return null;
     const query = location.latitude != null && location.longitude != null
       ? `${location.latitude},${location.longitude}` : location.address;
-    return query ? this.sanitizer.bypassSecurityTrustResourceUrl(`https://www.google.com/maps?q=${encodeURIComponent(query)}&output=embed`) : null;
+    return query ? this.sanitizer.bypassSecurityTrustResourceUrl(`https://www.google.com/maps?q=${encodeURIComponent(query)}&output=embed&hl=en`) : null;
   }
 
   formatMoney(value: number | null, currency?: string | null): string {

@@ -9,7 +9,8 @@ import re
 import socket
 from typing import Any
 from pathlib import Path
-from urllib.parse import unquote, urljoin, urlparse
+from urllib.parse import quote, unquote, urljoin, urlparse
+from xml.etree import ElementTree
 from zipfile import BadZipFile, ZipFile
 
 from bs4 import BeautifulSoup
@@ -54,6 +55,160 @@ ALLOWED_FILE_TYPES = {
     "text/plain": ".txt",
 }
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
+ALLOWED_LOGO_CANDIDATE_TYPES = ALLOWED_IMAGE_TYPES | {"image/svg+xml"}
+
+STRUCTURED_ORGANIZATION_TYPES = {
+    "organization", "corporation", "localbusiness", "realestateagent",
+    "hotel", "lodgingbusiness",
+}
+
+
+def _json_ld_records(soup: BeautifulSoup) -> list[dict[str, Any]]:
+    records: list[dict[str, Any]] = []
+
+    def visit(value: Any) -> None:
+        if isinstance(value, list):
+            for item in value:
+                visit(item)
+            return
+        if not isinstance(value, dict):
+            return
+        records.append(value)
+        graph = value.get("@graph")
+        if graph is not None:
+            visit(graph)
+
+    for script in soup.find_all("script", attrs={"type": re.compile(r"ld\+json", re.I)}):
+        try:
+            visit(json.loads(script.get_text(" ", strip=True)))
+        except (json.JSONDecodeError, TypeError, ValueError):
+            continue
+    return records
+
+
+def _schema_types(record: dict[str, Any]) -> set[str]:
+    raw = record.get("@type")
+    values = raw if isinstance(raw, list) else [raw]
+    return {str(value).casefold() for value in values if value}
+
+
+def _structured_address(value: Any) -> str | None:
+    if isinstance(value, str):
+        return re.sub(r"\s+", " ", value).strip() or None
+    if not isinstance(value, dict):
+        return None
+    parts: list[str] = []
+    for key in ("streetAddress", "addressLocality", "addressRegion", "postalCode", "addressCountry"):
+        candidate = value.get(key)
+        if isinstance(candidate, dict):
+            candidate = candidate.get("name") or candidate.get("@id")
+        text = re.sub(r"\s+", " ", str(candidate or "")).strip(" ,")
+        if text and not any(text.casefold() in part.casefold() for part in parts):
+            parts.append(text)
+    return ", ".join(parts) or None
+
+
+def _phone_key(value: str) -> str:
+    digits = re.sub(r"\D", "", value)
+    if len(digits) == 11 and digits.startswith("1"):
+        return digits[-10:]
+    return digits
+
+
+def _canonical_phones(values: list[Any]) -> list[str]:
+    phones: dict[str, str] = {}
+    for raw in values:
+        value = re.sub(r"\s+", " ", str(raw or "")).strip()
+        digits = re.sub(r"\D", "", value)
+        if not 7 <= len(digits) <= 15:
+            continue
+        key = _phone_key(value)
+        canonical = f"+{digits}" if value.startswith("+") else digits
+        if key not in phones or canonical.startswith("+"):
+            phones[key] = canonical
+    return list(phones.values())
+
+
+def _structured_company_facts(soup: BeautifulSoup) -> dict[str, Any]:
+    names: list[str] = []
+    addresses: list[str] = []
+    phones: list[Any] = []
+    for record in _json_ld_records(soup):
+        if not (_schema_types(record) & STRUCTURED_ORGANIZATION_TYPES):
+            continue
+        name = record.get("legalName") or record.get("name")
+        if isinstance(name, str) and name.strip() and name.strip() not in names:
+            names.append(name.strip())
+        address = _structured_address(record.get("address"))
+        if address and address not in addresses:
+            addresses.append(address)
+        telephone = record.get("telephone")
+        phones.extend(telephone if isinstance(telephone, list) else [telephone])
+    facts: dict[str, Any] = {}
+    if names:
+        facts["official_company_name"] = names[0]
+    if addresses:
+        facts["headquarters"] = addresses[0]
+    canonical_phones = _canonical_phones(phones)
+    if canonical_phones:
+        facts["public_contact_phones"] = canonical_phones
+    return facts
+
+
+def _logo_urls_from_json_ld(soup: BeautifulSoup, base_url: str) -> list[str]:
+    urls: list[str] = []
+    for record in _json_ld_records(soup):
+        if not (_schema_types(record) & STRUCTURED_ORGANIZATION_TYPES):
+            continue
+        logo = record.get("logo")
+        candidates = logo if isinstance(logo, list) else [logo]
+        for candidate in candidates:
+            if isinstance(candidate, dict):
+                candidate = candidate.get("contentUrl") or candidate.get("url") or candidate.get("@id")
+            if isinstance(candidate, str) and candidate.strip():
+                urls.append(urljoin(base_url, candidate.strip()))
+    return urls
+
+
+def _logo_candidate_urls(soup: BeautifulSoup, base_url: str) -> list[str]:
+    candidates: list[tuple[int, str]] = []
+    candidates.extend((0, url) for url in _logo_urls_from_json_ld(soup, base_url))
+    for link in soup.find_all("link", href=True):
+        rel = " ".join(str(item) for item in (link.get("rel") or [])).casefold()
+        if any(token in rel for token in ("icon", "apple-touch-icon", "mask-icon")):
+            candidates.append((1, urljoin(base_url, str(link["href"]))))
+    for meta in soup.select('meta[itemprop="logo"], meta[property="og:logo"]'):
+        if meta.get("content"):
+            candidates.append((0, urljoin(base_url, str(meta["content"]))))
+    for meta in soup.select('meta[property="og:image"], meta[name="twitter:image"]'):
+        if meta.get("content"):
+            candidates.append((4, urljoin(base_url, str(meta["content"]))))
+    for image in soup.find_all("img"):
+        raw = image.get("src") or image.get("data-src")
+        descriptor = " ".join(str(image.get(key) or "") for key in ("alt", "class", "id", "itemprop")).casefold()
+        priority = 1 if any(token in descriptor for token in ("logo", "brand")) else 5
+        if raw:
+            candidates.append((priority, urljoin(base_url, str(raw))))
+        for srcset in (image.get("srcset"), image.get("data-srcset")):
+            if not srcset:
+                continue
+            for candidate in str(srcset).split(","):
+                srcset_url = candidate.strip().split(" ", 1)[0]
+                if srcset_url:
+                    candidates.append((priority, urljoin(base_url, srcset_url)))
+    css_sources = [str(element.get("style") or "") for element in soup.find_all(style=True)]
+    css_sources.extend(style.get_text(" ", strip=True) for style in soup.find_all("style"))
+    for css in css_sources:
+        for match in re.finditer(r"url\(\s*(['\"]?)(?P<url>[^)'\"]+)\1\s*\)", css, re.I):
+            raw = match.group("url").strip()
+            if raw and not raw.startswith("data:"):
+                priority = 1 if any(token in css.casefold() for token in ("logo", "brand")) else 5
+                candidates.append((priority, urljoin(base_url, raw)))
+    ordered: list[str] = []
+    for _, url in sorted(candidates, key=lambda item: item[0]):
+        if url not in ordered:
+            ordered.append(url)
+    return ordered
 
 
 def classify_url(url: str) -> SourceKind:
@@ -169,35 +324,32 @@ async def _capture_logo_candidates(
     db: Session, client: httpx.AsyncClient, source: CompanyOnboardingSource, html: bytes, base_url: str,
 ) -> None:
     soup = BeautifulSoup(html, "html.parser")
-    candidates: list[tuple[int, str]] = []
-    for meta in soup.select('meta[property="og:image"], meta[name="twitter:image"]'):
-        if meta.get("content"):
-            candidates.append((1, urljoin(base_url, str(meta["content"]))))
-    for image in soup.find_all("img"):
-        raw = image.get("src") or image.get("data-src")
-        descriptor = " ".join(str(image.get(key) or "") for key in ("alt", "class", "id")).casefold()
-        if raw:
-            candidates.append((0 if "logo" in descriptor else 2, urljoin(base_url, str(raw))))
     seen: set[str] = set()
-    for _, image_url in sorted(candidates, key=lambda value: value[0]):
-        if image_url in seen or len(seen) >= 10 or image_url.startswith("data:"):
+    accepted = 0
+    for image_url in _logo_candidate_urls(soup, base_url):
+        if image_url in seen or accepted >= 10 or len(seen) >= 40 or image_url.startswith("data:"):
             continue
         seen.add(image_url)
         try:
             response = await _get_public_url(client, image_url)
             response.raise_for_status()
             mime_type = response.headers.get("content-type", "").split(";", 1)[0].lower()
-            content = response.content
-            if mime_type not in ALLOWED_IMAGE_TYPES or not 2_048 <= len(content) <= 5 * 1024 * 1024:
+            if mime_type in {"application/octet-stream", "text/xml", "application/xml"} and urlparse(str(response.url)).path.casefold().endswith(".svg"):
+                mime_type = "image/svg+xml"
+            content = _prepare_logo_candidate(response.content, mime_type)
+            minimum_size = 64 if mime_type == "image/svg+xml" else 2_048
+            if mime_type not in ALLOWED_LOGO_CANDIDATE_TYPES or not minimum_size <= len(content) <= 5 * 1024 * 1024:
                 continue
-            _validate_image(content, mime_type)
             digest = hashlib.sha256(content).hexdigest()
             if db.query(CompanyMediaAsset).filter(
                 CompanyMediaAsset.company_id == source.company_id,
                 CompanyMediaAsset.sha256 == digest,
             ).first():
                 continue
-            filename = (Path(urlparse(str(response.url)).path).name or f"logo-candidate-{len(seen)}")[:255]
+            filename = Path(urlparse(str(response.url)).path).name or f"logo-candidate-{accepted + 1}"
+            if mime_type == "image/svg+xml" and not filename.casefold().endswith(".svg"):
+                filename += ".svg"
+            filename = filename[:255]
             asset = CompanyMediaAsset(
                 company_id=source.company_id, source_id=source.id,
                 uploaded_by_user_id=source.uploaded_by_user_id, name=filename,
@@ -214,6 +366,7 @@ async def _capture_logo_candidates(
             asset.content_hash = stored.content_hash
             asset.encryption_key_id = stored.encryption_key_id
             db.add(asset)
+            accepted += 1
         except Exception:
             continue
 
@@ -258,6 +411,31 @@ def _validate_image(content: bytes, mime_type: str) -> None:
         raise ValueError("Invalid PNG image.")
     if mime_type == "image/webp" and not (content.startswith(b"RIFF") and content[8:12] == b"WEBP"):
         raise ValueError("Invalid WEBP image.")
+
+
+def _prepare_logo_candidate(content: bytes, mime_type: str) -> bytes:
+    if mime_type != "image/svg+xml":
+        _validate_image(content, mime_type)
+        return content
+    if b"<!DOCTYPE" in content.upper() or b"<!ENTITY" in content.upper():
+        raise ValueError("Unsafe SVG image.")
+    try:
+        root = ElementTree.fromstring(content)
+    except ElementTree.ParseError as exc:
+        raise ValueError("Invalid SVG image.") from exc
+    if root.tag.rsplit("}", 1)[-1].casefold() != "svg":
+        raise ValueError("Invalid SVG image.")
+    blocked = {"script", "foreignobject", "iframe", "object", "embed"}
+    for parent in root.iter():
+        for child in list(parent):
+            if child.tag.rsplit("}", 1)[-1].casefold() in blocked:
+                parent.remove(child)
+        for attribute in list(parent.attrib):
+            name = attribute.rsplit("}", 1)[-1].casefold()
+            value = parent.attrib[attribute].strip().casefold()
+            if name.startswith("on") or (name == "href" and not value.startswith(("#", "data:image/"))):
+                del parent.attrib[attribute]
+    return ElementTree.tostring(root, encoding="utf-8", xml_declaration=True)
 
 
 async def _get_public_url(client: httpx.AsyncClient, url: str) -> httpx.Response:
@@ -468,7 +646,7 @@ def _proposals_from_embedded_links(
             source_id=source.id,
             field_key=field,
             value=value,
-            evidence="Detected in a link published by the source website.",
+            evidence="Detected in structured data or a link published by the source website.",
             confidence="high",
             status=ProposalStatus.PENDING,
         )
@@ -477,10 +655,10 @@ def _proposals_from_embedded_links(
     ]
 
 
-def _embedded_link_values(text: str) -> dict[str, list[str]]:
+def _embedded_link_values(text: str) -> dict[str, Any]:
     links = re.findall(r"ONBOARDING_LINK:([^\s]+)", text)
     emails: list[str] = []
-    phones: list[str] = []
+    phones: list[Any] = []
     social_profiles: list[str] = []
     for raw_link in links:
         link = unquote(raw_link).strip()
@@ -493,17 +671,33 @@ def _embedded_link_values(text: str) -> dict[str, list[str]]:
                     emails.append(normalized)
         elif lowered.startswith("tel:"):
             number = link[4:].split("?", 1)[0].strip()
-            if number and number not in phones:
+            if number:
                 phones.append(number)
         elif lowered.startswith(("http://", "https://")) and _social_host(link):
             if link not in social_profiles:
                 social_profiles.append(link)
 
-    return {
+    values: dict[str, Any] = {
         "public_contact_emails": emails,
-        "public_contact_phones": phones,
+        "public_contact_phones": _canonical_phones(phones),
         "corporate_social_profiles": social_profiles,
     }
+    for raw_payload in re.findall(r"ONBOARDING_JSONLD:([^\s]+)", text):
+        try:
+            payload = json.loads(unquote(raw_payload))
+        except (json.JSONDecodeError, TypeError, ValueError):
+            continue
+        if not isinstance(payload, dict):
+            continue
+        for field in ("official_company_name", "headquarters"):
+            if payload.get(field) and not values.get(field):
+                values[field] = payload[field]
+        structured_phones = payload.get("public_contact_phones")
+        if isinstance(structured_phones, list):
+            values["public_contact_phones"] = _canonical_phones([
+                *values["public_contact_phones"], *structured_phones,
+            ])
+    return values
 
 
 def review_proposal(
@@ -640,6 +834,10 @@ def _extract_bytes(content: bytes, mime_type: str, name: str) -> str:
         return content.decode("utf-8", errors="replace")
     soup = BeautifulSoup(content, "html.parser")
     embedded_links = []
+    structured_facts = _structured_company_facts(soup)
+    if structured_facts:
+        payload = json.dumps(structured_facts, ensure_ascii=False, separators=(",", ":"))
+        embedded_links.append(f"ONBOARDING_JSONLD:{quote(payload, safe='')}")
     for anchor in soup.find_all("a", href=True):
         href = str(anchor.get("href") or "").strip()
         if href.casefold().startswith(("mailto:", "tel:")) or _social_host(href):

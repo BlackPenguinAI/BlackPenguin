@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from decimal import Decimal, InvalidOperation
 import re
 from typing import Any
 
@@ -644,6 +645,41 @@ def company_messaging_integration(db: Session, company_id: str) -> dict[str, Any
     }
 
 
+def format_overview_money(value: Any, currency: Any = None) -> str:
+    """Render a stable English commercial amount for overview metric cards."""
+    if value in (None, ""):
+        return "Pending"
+    try:
+        amount = Decimal(str(value))
+    except (InvalidOperation, TypeError, ValueError):
+        return "Pending"
+    decimals = 0 if amount == amount.to_integral_value() else 2
+    code = str(currency or "USD").strip().upper() or "USD"
+    return f"{code} {amount:,.{decimals}f}"
+
+
+def overview_address(primary: str | None, *context: Any) -> str | None:
+    """Append only context that is not already present in the main address."""
+    country_aliases = {
+        "us": ("united states", "united states of america", "usa"),
+        "mx": ("mexico",),
+        "pe": ("peru", "perú"),
+        "ar": ("argentina",),
+    }
+    parts: list[str] = []
+    for candidate in (primary, *context):
+        value = str(candidate or "").strip(" ,")
+        if not value:
+            continue
+        current = ", ".join(parts).casefold()
+        normalized = value.casefold()
+        aliases = country_aliases.get(normalized, ())
+        if normalized in current or any(alias in current for alias in aliases):
+            continue
+        parts.append(value)
+    return ", ".join(parts) or None
+
+
 def serialize_overview(db: Session, project: Project, viewer_user: User | None = None) -> dict[str, Any]:
     profile = get_profile(project)
     data = profile.profile_data or {}
@@ -706,19 +742,23 @@ def serialize_overview(db: Session, project: Project, viewer_user: User | None =
     revenue = sum(float(unit.list_price) for unit in units if unit.status == "sold" and unit.list_price is not None) if units else None
     currency = data.get("currency")
     starting_price = data.get("starting_price")
+    has_starting_price = starting_price not in (None, "")
     metrics = [
         {"key": "available_inventory", "label": "Available Inventory", "value": available_count,
          "display_value": str(available_count) if available_count is not None else str(data.get("available_inventory") or "Pending"),
          "status": "available" if available_count is not None or data.get("available_inventory") else "pending"},
         {"key": "starting_price", "label": "Starting Price", "value": starting_price,
-         "display_value": f"{currency or ''} {starting_price}".strip() if starting_price else "Pending",
-         "status": "available" if starting_price else "pending"},
+         "display_value": format_overview_money(starting_price, currency),
+         "status": "available" if has_starting_price else "pending"},
         {"key": "target_roi", "label": "Target ROI (Return on Investment)", "value": None, "display_value": "Pending", "status": "pending"},
     ]
     locations = normalized_project_locations(data.get("exact_address"), project.address)
     primary_address = locations[0]["address"] if locations else None
-    address_parts = [primary_address, data.get("city") or project.city, data.get("country") or project.country]
-    address = ", ".join(str(part) for part in address_parts if part)
+    address = overview_address(
+        primary_address,
+        data.get("city") or project.city,
+        data.get("country") or project.country,
+    )
     meta_rows = db.query(ProjectCampaign, MetaConnection).join(
         MetaConnection, MetaConnection.id == ProjectCampaign.meta_connection_id,
     ).filter(ProjectCampaign.project_id == project.id).all()
@@ -774,7 +814,7 @@ def serialize_overview(db: Session, project: Project, viewer_user: User | None =
         "cover_image_url": f"/api/v1/projects/{project.id}/sources/{cover.id}/file" if cover else None,
         "cover_focal_point": {"x": cover.focal_point_x, "y": cover.focal_point_y} if cover else {"x": .5, "y": .5},
         "metrics": metrics, "inventory": inventory,
-        "location": {"address": address or None, "latitude": project.latitude, "longitude": project.longitude},
+        "location": {"address": address, "latitude": project.latitude, "longitude": project.longitude},
         "market_intelligence": {"report_url": f"/app/projects/{project.id}/sales-report", "total_revenue": revenue,
                                 "target_roi": None, "status": "available" if units else "pending"},
         "data_completeness": {"percentage": profile.completion_percentage, "onboarding_status": project.onboarding_status,

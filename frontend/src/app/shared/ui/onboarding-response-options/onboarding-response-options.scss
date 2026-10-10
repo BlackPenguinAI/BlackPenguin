@@ -18,6 +18,8 @@
 .choice:disabled { cursor: not-allowed; opacity: .45; }
 .choice-list--examples .choice { border-radius: .75rem; line-height: 1.35; }
 .choice--custom { border-color: rgba(255,255,255,.15); background: rgba(255,255,255,.04); color: #d1d5db; }
+.submit-selection { margin-top: .7rem; border-radius: .65rem; background: #e99e10; padding: .55rem .85rem; color: #080808; font-size: .7rem; font-weight: 700; }
+.submit-selection:disabled { cursor: not-allowed; opacity: .35; }
 .hint { margin-top: .45rem; color: #6b7280; font-size: .64rem; }
 .suggestion-origin { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem; margin: .55rem 0; color: #86efac; font-size: .64rem; }
 .suggestion-origin .material-symbols-outlined { font-size: 14px; }

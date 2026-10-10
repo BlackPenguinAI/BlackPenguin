@@ -291,7 +291,11 @@ export class ChatComponent implements OnInit, OnDestroy {
     this.syncState();
   }
 
-  chooseAnswer(value: string, message?: ChatMessage): void { this.prompt = value; this.replyToMessageId = message?.id || null; }
+  chooseAnswer(value: string, message?: ChatMessage): void {
+    this.prompt = value;
+    this.replyToMessageId = message?.id || null;
+    this.sendMessage();
+  }
   writeCustomAnswer(message?: ChatMessage): void { this.prompt = ''; this.replyToMessageId = message?.id || null; }
   isActiveQuestion(message: ChatMessage): boolean {
     return !this.hasPendingReview && !this.hasExclusiveStep && message.sender === 'ai' && this.hasQuestionPayload(message) && !message.response_payload

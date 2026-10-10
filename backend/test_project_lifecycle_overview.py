@@ -1,5 +1,6 @@
 from app.modules.projects.completion import FIELDS, calculate_completion
 from app.modules.projects.schemas import ProjectOverviewResponse
+from app.modules.projects.services import format_overview_money, overview_address
 from app.modules.sales_crm.schemas import SalesReportResponse
 
 
@@ -54,3 +55,19 @@ def test_overview_accepts_pending_inventory_and_location():
 
     assert overview.cover_image_url is None
     assert overview.inventory == []
+
+
+def test_overview_formats_commercial_prices_in_english():
+    assert format_overview_money("1500000.0", "usd") == "USD 1,500,000"
+    assert format_overview_money("1499.95", "USD") == "USD 1,499.95"
+
+
+def test_overview_does_not_duplicate_city_or_country_already_in_address():
+    assert overview_address(
+        "5000 Biscayne Blvd, Miami, Florida 33137, United States",
+        "Miami",
+        "US",
+    ) == "5000 Biscayne Blvd, Miami, Florida 33137, United States"
+    assert overview_address("5000 Biscayne Blvd", "Miami", "United States") == (
+        "5000 Biscayne Blvd, Miami, United States"
+    )

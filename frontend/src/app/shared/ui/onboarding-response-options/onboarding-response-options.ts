@@ -32,6 +32,7 @@ export class OnboardingResponseOptionsComponent {
   @Input() showPrompt = true;
   @Output() selected = new EventEmitter<string>();
   @Output() custom = new EventEmitter<void>();
+  readonly selectedValues = new Set<string>();
 
   get choices(): string[] {
     const options = Array.isArray(this.question?.options) ? this.question.options : [];
@@ -41,6 +42,28 @@ export class OnboardingResponseOptionsComponent {
 
   get isStructuredStep(): boolean {
     return ['ai_sales_authorization', 'project_sales_team', 'meta_lead_setup'].includes(this.question?.input_type || '');
+  }
+
+  get isMultiSelect(): boolean {
+    return this.question?.input_type === 'multi_select' && Array.isArray(this.question?.options) && this.question.options.length > 0;
+  }
+
+  choose(choice: string): void {
+    if (!this.isMultiSelect) {
+      this.selected.emit(choice);
+      return;
+    }
+    if (this.selectedValues.has(choice)) this.selectedValues.delete(choice);
+    else this.selectedValues.add(choice);
+  }
+
+  isSelected(choice: string): boolean {
+    return this.isMultiSelect ? this.selectedValues.has(choice) : choice === this.selectedChoice;
+  }
+
+  submitSelection(): void {
+    if (!this.selectedValues.size || this.disabled) return;
+    this.selected.emit([...this.selectedValues].join('; '));
   }
 
   get suggestionLabel(): string {

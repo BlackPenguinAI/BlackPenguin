@@ -11,7 +11,7 @@
       <label for="onboarding-url">{{ kind === 'company' ? 'Company' : 'Project' }} website</label>
       <div class="url-row" [class.invalid]="touched && !valid">
         <span class="material-symbols-outlined">language</span>
-        <input id="onboarding-url" name="url" [(ngModel)]="url" [disabled]="busy" placeholder="https://example.com" autocomplete="url" />
+        <input id="onboarding-url" name="url" [(ngModel)]="url" (blur)="normalizeUrlInput()" [disabled]="busy" placeholder="https://example.com" autocomplete="url" />
         <button type="submit" [disabled]="busy || !url.trim()">
           <span *ngIf="!busy">Continue</span><span *ngIf="busy" class="material-symbols-outlined spin">progress_activity</span>
         </button>
