@@ -54,6 +54,9 @@ export function toPropertyTypePayload(
 export function validatePropertyType(value: Partial<ProjectPropertyType>): FormErrors {
   const errors: FormErrors = {};
   if (!value.name?.trim()) errors['name'] = 'Enter the property type name.';
+  if (present(value.bedrooms) && (!/^\d+$/.test(String(value.bedrooms).trim()) || Number(value.bedrooms) > 50)) {
+    errors['bedrooms'] = 'Enter one whole number from 0 to 50. Bedroom ranges are qualified by the agent.';
+  }
   if (!present(value.available_units)) errors['available_units'] = 'Enter the currently available units.';
   if (!present(value.starting_price)) errors['starting_price'] = 'Enter the starting price.';
   if (!value.currency?.trim()) errors['currency'] = 'Select the commercial currency.';

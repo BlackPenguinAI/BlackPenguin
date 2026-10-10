@@ -1,4 +1,6 @@
+import '@angular/compiler';
 import { of, throwError } from 'rxjs';
+import { describe, expect, it, vi } from 'vitest';
 
 import { CompaniesPageComponent } from './companies-page';
 
@@ -46,6 +48,7 @@ describe('CompaniesPageComponent company deletion', () => {
   it('deletes locally only after the administrator confirms manual Firebase cleanup', () => {
     const { component, companyService, toast } = setup();
     component.manualFirebaseCleanupRequired = true;
+    component.manualFirebaseCleanupConfirmed = true;
     companyService.deleteCompany.mockReturnValue(of({ firebase_cleanup: 'confirmed_manual' }));
 
     component.confirmDelete();
@@ -54,6 +57,17 @@ describe('CompaniesPageComponent company deletion', () => {
     expect(component.showDeleteModal).toBe(false);
     expect(component.manualFirebaseCleanupRequired).toBe(false);
     expect(toast.showSuccess).toHaveBeenCalledWith('Company removed successfully.');
+  });
+
+  it('does not delete locally until manual Firebase cleanup is explicitly confirmed', () => {
+    const { component, companyService } = setup();
+    component.manualFirebaseCleanupRequired = true;
+    component.manualFirebaseCleanupConfirmed = false;
+
+    component.confirmDelete();
+
+    expect(companyService.deleteCompany).not.toHaveBeenCalled();
+    expect(component.showDeleteModal).toBe(true);
   });
 
   it('keeps the dialog open when deletion fails for an unrelated reason', () => {

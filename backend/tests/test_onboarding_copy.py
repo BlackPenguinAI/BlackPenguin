@@ -34,3 +34,23 @@ def test_deferred_acknowledgement_explains_that_the_step_can_be_resumed():
     )
 
     assert "return to **Meta Lead Ads setup** later" in response
+
+
+def test_multiple_deferred_fields_are_not_described_as_verified_or_updated():
+    labels = {
+        "campaigns_defined": "Meta Lead Ads setup",
+        "meta_connection_verified": "Meta connection verified",
+    }
+    response = conversational_acknowledgement(
+        accepted=[
+            {"field": "campaigns_defined", "value": None, "status": "deferred"},
+            {"field": "meta_connection_verified", "value": None, "status": "deferred"},
+        ],
+        label_for=lambda field: labels[field],
+        next_prompt="Review the remaining information.",
+    )
+
+    assert "return to" in response
+    assert "later" in response
+    assert "verified" not in response.casefold()
+    assert "I updated" not in response

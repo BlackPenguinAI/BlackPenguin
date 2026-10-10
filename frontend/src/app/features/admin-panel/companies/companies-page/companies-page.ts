@@ -46,6 +46,7 @@ export class CompaniesPageComponent implements OnInit {
   showDeleteModal: boolean = false;
   companyToDeleteId: string | null = null;
   manualFirebaseCleanupRequired: boolean = false;
+  manualFirebaseCleanupConfirmed: boolean = false;
   deleteWarningMessage: string = '';
   selectedFile: File | null = null;
 
@@ -303,6 +304,7 @@ export class CompaniesPageComponent implements OnInit {
   openDeleteModal(id: string): void {
     this.companyToDeleteId = id;
     this.manualFirebaseCleanupRequired = false;
+    this.manualFirebaseCleanupConfirmed = false;
     this.deleteWarningMessage = '';
     this.showDeleteModal = true;
     this.cdr.detectChanges();
@@ -312,12 +314,14 @@ export class CompaniesPageComponent implements OnInit {
     this.showDeleteModal = false;
     this.companyToDeleteId = null;
     this.manualFirebaseCleanupRequired = false;
+    this.manualFirebaseCleanupConfirmed = false;
     this.deleteWarningMessage = '';
     this.cdr.detectChanges();
   }
 
   confirmDelete(): void {
     if (!this.companyToDeleteId) return;
+    if (this.manualFirebaseCleanupRequired && !this.manualFirebaseCleanupConfirmed) return;
     this.isDeleting = true;
     this.cdr.detectChanges();
 
@@ -340,6 +344,7 @@ export class CompaniesPageComponent implements OnInit {
           detail?.can_confirm_manual_cleanup === true
         ) {
           this.manualFirebaseCleanupRequired = true;
+          this.manualFirebaseCleanupConfirmed = false;
           this.deleteWarningMessage = detail.message;
           this.cdr.detectChanges();
           return;

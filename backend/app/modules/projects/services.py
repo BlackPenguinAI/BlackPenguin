@@ -611,6 +611,39 @@ def normalized_project_locations(value: Any, fallback: str | None = None) -> lis
     return normalize_project_locations(value, fallback)
 
 
+def company_messaging_integration(db: Session, company_id: str) -> dict[str, Any]:
+    """Return the Project badge from the owning Company's live route only."""
+    from app.integrations.messaging_gateway import company_live_channel
+    from app.modules.system_settings.services import get_telnyx_company_config
+
+    company_messaging = get_telnyx_company_config(db, company_id)
+    live_channel = company_live_channel(db, company_id=company_id)
+    configured_channel = (
+        company_messaging.primary_channel
+        if company_messaging and company_messaging.primary_channel in {"sms", "whatsapp"}
+        else None
+    )
+    displayed_channel = live_channel or configured_channel
+    return {
+        # Keep the historical key for API compatibility; ``channel`` and the
+        # label expose the actual Company route.
+        "key": "sms",
+        "channel": displayed_channel,
+        "label": "WhatsApp messaging" if displayed_channel == "whatsapp" else (
+            "SMS messaging" if displayed_channel == "sms" else "Company messaging"
+        ),
+        "icon": "chat" if displayed_channel == "whatsapp" else "sms",
+        "status": "connected" if live_channel else "action_required",
+        "detail": (
+            "Live WhatsApp delivery is enabled for this Company"
+            if live_channel == "whatsapp"
+            else "Live SMS delivery is enabled for this Company"
+            if live_channel == "sms"
+            else "Verify and enable this Company's SMS or WhatsApp sender in Messaging settings"
+        ),
+    }
+
+
 def serialize_overview(db: Session, project: Project, viewer_user: User | None = None) -> dict[str, Any]:
     profile = get_profile(project)
     data = profile.profile_data or {}
@@ -691,9 +724,7 @@ def serialize_overview(db: Session, project: Project, viewer_user: User | None =
     ).filter(ProjectCampaign.project_id == project.id).all()
     meta_real = any(connection.verification_mode == "real" and connection.verification_status == "succeeded" and campaign.lead_form_id for campaign, connection in meta_rows)
     meta_simulated = any(connection.verification_mode == "simulated" and campaign.lead_form_id for campaign, connection in meta_rows)
-    from app.modules.system_settings.services import get_messaging_routing_config, provider_is_ready
-    messaging = get_messaging_routing_config(db)
-    sms_ready = provider_is_ready(db, messaging.default_provider)
+    messaging_integration = company_messaging_integration(db, project.company_id)
     google = db.query(GoogleCalendarConfig).first()
     google_platform_ready = bool(google and google.is_enabled and google.verification_status == "ready")
     assigned_sales = db.query(User).join(
@@ -727,11 +758,7 @@ def serialize_overview(db: Session, project: Project, viewer_user: User | None =
             "status": "connected" if meta_real else ("simulation_only" if meta_simulated else "action_required"),
             "detail": "Real Lead Form connected" if meta_real else ("Simulation configuration only" if meta_simulated else "Complete Meta setup in Project onboarding"),
         },
-        {
-            "key": "sms", "label": "SMS messaging", "icon": "sms",
-            "status": "connected" if sms_ready else "unavailable",
-            "detail": "Live SMS delivery is enabled" if sms_ready else "Messaging provider is not operational yet",
-        },
+        messaging_integration,
         {
             "key": "calendar", "label": "Google Calendar", "icon": "calendar_month",
             "status": "connected" if google_platform_ready and calendar_accounts else ("action_required" if google_platform_ready else "unavailable"),

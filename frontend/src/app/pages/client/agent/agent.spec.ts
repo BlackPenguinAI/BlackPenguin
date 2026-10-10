@@ -116,6 +116,33 @@ describe('AgentComponent simulation form', () => {
     expect(value.formComplete).toBe(true);
   });
 
+  it('explains invalid phone and email fields instead of only disabling submit', () => {
+    const value = component();
+    value.options = [{ id: 'project', campaigns: [], products: [] }];
+    value.projectId = 'project';
+    value.openSetup('live_meta');
+    value.form.first_name = 'QA';
+    value.form.last_name = 'Tester';
+    value.form.phone = '12345';
+    value.form.email = 'notanemail';
+    value.form.consent = true;
+
+    expect(value.phoneValid).toBe(false);
+    expect(value.phoneError).toContain('7 to 15 digits');
+    expect(value.emailValid).toBe(false);
+    expect(value.emailError).toContain('valid email address');
+    expect(value.formComplete).toBe(false);
+  });
+
+  it('adds the failing field name to backend validation messages', () => {
+    const value = component();
+    const message = (value as any).validationMessage({ detail: [{
+      loc: ['body', 'lead', 'phone'], msg: 'Value error, Enter a valid phone number.',
+    }] });
+
+    expect(message).toBe('Cellphone: Enter a valid phone number.');
+  });
+
   it('keeps progressively qualified lead facts in the live conversation context', () => {
     const value = component();
     value.selected = {

@@ -332,12 +332,16 @@
         Continue only if you already deleted every Company user in Firebase Authentication.
         This removes the Company, its users, invitations, projects, and related local data.
       </p>
+      <label class="mt-4 flex cursor-pointer items-start gap-3 rounded-lg border border-red-500/20 bg-black/20 p-3 text-xs leading-relaxed text-gray-300">
+        <input type="checkbox" [(ngModel)]="manualFirebaseCleanupConfirmed" class="mt-0.5 h-4 w-4 accent-red-500">
+        <span>I confirm that every user identity for this Company has already been removed from Firebase Authentication.</span>
+      </label>
     </div>
   }
   
   <div class="flex gap-3 w-full">
     <app-button variant="ghost" [fullWidth]="true" (onClick)="closeDeleteModal()">Cancel</app-button>
-    <app-button variant="danger" [fullWidth]="true" [isLoading]="isDeleting" (onClick)="confirmDelete()">
+    <app-button variant="danger" [fullWidth]="true" [isLoading]="isDeleting" [disabled]="manualFirebaseCleanupRequired && !manualFirebaseCleanupConfirmed" (onClick)="confirmDelete()">
       {{ manualFirebaseCleanupRequired ? 'Confirm local cascade' : 'Delete Company' }}
     </app-button>
   </div>

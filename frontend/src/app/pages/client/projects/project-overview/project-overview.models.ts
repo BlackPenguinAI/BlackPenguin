@@ -38,6 +38,7 @@ export interface ProjectOverview {
   data_completeness: { percentage: number; onboarding_status: string; last_updated_at: string | null };
   integrations: Array<{
     key: 'meta' | 'sms' | 'calendar';
+    channel?: 'sms' | 'whatsapp' | null;
     label: string;
     icon: string;
     status: 'connected' | 'simulation_only' | 'action_required' | 'unavailable';

@@ -53,6 +53,16 @@ describe('project chat form validation', () => {
     expect(errors['inventory_updated_at']).toBeTruthy();
   });
 
+  it('never silently discards a bedroom range entered in a single-number field', () => {
+    const errors = validatePropertyType({
+      name: 'Residences', bedrooms: '1-4' as any,
+      available_units: 5, starting_price: 300000, currency: 'USD',
+      inventory_updated_at: '2026-10-10',
+    });
+
+    expect(errors['bedrooms']).toContain('one whole number');
+  });
+
   it('builds a normalized writable property type payload without response-only fields', () => {
     const payload = toPropertyTypePayload({
       id: 'type-2', project_id: 'project-1', name: '  Four bedrooms  ',

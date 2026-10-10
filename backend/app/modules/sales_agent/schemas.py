@@ -14,7 +14,10 @@ class SimulationRequest(BaseModel):
 class SimulationLeadForm(BaseModel):
     first_name: str = Field(min_length=1, max_length=80)
     last_name: str = Field(min_length=1, max_length=80)
-    phone: str = Field(min_length=7, max_length=30)
+    # Let the field validator own the user-facing phone rule. A Pydantic
+    # min_length here would pre-empt it with the raw "String should have..."
+    # transport error exposed by the UI.
+    phone: str = Field(min_length=1, max_length=30)
     email: EmailStr
     product_id: str = Field(min_length=3, max_length=260)
     budget_min: Decimal = Field(gt=0, max_digits=16, decimal_places=2)
@@ -50,7 +53,7 @@ class LiveLeadForm(BaseModel):
 
     first_name: str = Field(min_length=1, max_length=80)
     last_name: str = Field(min_length=1, max_length=80)
-    phone: str = Field(min_length=7, max_length=30)
+    phone: str = Field(min_length=1, max_length=30)
     email: EmailStr
     consent: bool
     custom_answers: dict[str, Any] = Field(default_factory=dict)

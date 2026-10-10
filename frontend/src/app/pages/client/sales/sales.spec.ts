@@ -70,6 +70,27 @@ describe('SalesComponent scheduling view', () => {
     expect(component.success).toBe('2 availability blocks added.');
   });
 
+  it('replaces a previous availability success with the latest overlap error', () => {
+    vi.stubGlobal('localStorage', { getItem: () => 'sales' });
+    const http = {
+      post: () => ({ subscribe: (observer: any) => observer.error({
+        error: { detail: 'Availability blocks cannot overlap.' },
+      }) }),
+      get: () => ({ subscribe: () => undefined }),
+    };
+    const component = new SalesComponent(http as any, { markForCheck: () => undefined } as any);
+    component.selectedDay = new Date(2026, 9, 10);
+    component.rangeStartDate = '2026-10-10';
+    component.rangeEndDate = '2026-10-10';
+    component.timezone = 'America/Lima';
+    component.success = '1 availability block added.';
+
+    component.saveAvailability();
+
+    expect(component.success).toBe('');
+    expect(component.error).toContain('cannot overlap');
+  });
+
   it('renders timezone choices with a UTC offset and the exact IANA city', () => {
     vi.stubGlobal('localStorage', { getItem: () => 'sales' });
     const component = new SalesComponent({} as any, { markForCheck: () => undefined } as any);

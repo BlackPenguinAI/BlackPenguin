@@ -30,7 +30,7 @@ from app.modules.company_onboarding.services import (
     resolve_answer_to_question,
     supersede_unanswered_questions,
 )
-from app.modules.company_onboarding.models import SenderType
+from app.modules.company_onboarding.models import CompanyProfile, SenderType
 from app.modules.company_onboarding.source_service import (
     _extract_bytes,
     _embedded_link_values,
@@ -455,6 +455,56 @@ def test_direct_display_name_is_applied_to_the_linked_question():
     assert result.status == "accepted"
     assert result.updates[0]["field"] == "preferred_display_name"
     assert result.updates[0]["value"] == "Bloomfield Homes"
+
+
+def test_linked_answer_discards_confirmation_prefix_before_persisting():
+    result = _resolve("headquarters", "Confirm: 35 NE 40th Street, Miami, FL 33137")
+
+    assert result.status == "accepted"
+    assert result.updates[0]["value"] == "35 NE 40th Street, Miami, FL 33137"
+
+
+def test_explicit_profile_correction_is_resolved_without_model_inference():
+    profile = SimpleNamespace(
+        profile_data={"headquarters": "Old address"},
+        field_states={"headquarters": {"status": "confirmed", "applicable": True}},
+        final_approved=True,
+    )
+
+    updates = deterministic_context_update(
+        'Correction: Headquarters should be exactly "35 NE 40th Street, Miami, FL 33137" (remove the extra text).',
+        profile,
+    )
+
+    assert len(updates) == 1
+    assert updates[0]["field"] == "headquarters"
+    assert updates[0]["value"] == "35 NE 40th Street, Miami, FL 33137"
+    assert updates[0]["status"] == "corrected_by_user"
+    assert updates[0]["source_type"] == "user_input"
+
+
+def test_model_update_cannot_regress_an_authorized_resolved_field():
+    class Db:
+        def add(self, _): pass
+        def flush(self): pass
+
+    profile = CompanyProfile(
+        company_id="company-1",
+        profile_data={"headquarters": "Old address"},
+        field_states={"headquarters": {"status": "confirmed", "applicable": True}},
+        field_sources={},
+        final_approved=True,
+    )
+    result = company_services.apply_field_updates(
+        Db(), profile,
+        [{"field": "headquarters", "value": "New address", "status": "extracted"}],
+        allow_authoritative_statuses=True,
+        commit=False,
+    )
+
+    assert result.accepted[0]["status"] == "corrected_by_user"
+    assert profile.field_states["headquarters"]["status"] == "corrected_by_user"
+    assert profile.final_approved is True
 
 
 def test_final_approval_is_resolved_as_an_application_action():

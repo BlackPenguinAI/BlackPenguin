@@ -19,6 +19,7 @@ from app.integrations.whatsapp_templates import (
 from app.modules.companies.models import Company
 from app.modules.companies.country import sync_project_country
 from app.modules.projects.models import Project, ProjectProfile
+from app.modules.projects.services import company_messaging_integration
 from app.modules.system_settings.models import TelnyxCompanyConfig, TelnyxConfig
 from app.modules.sales_agent.live_service import _dispatch, _whatsapp_customer_window_open
 from app.modules.sales_agent.graph import PLATFORM_GUARDRAILS
@@ -64,6 +65,22 @@ def test_company_primary_channel_does_not_fall_back_to_sms():
     config.live_whatsapp_enabled = False
     db.commit()
     assert company_live_channel(db, company_id=company.id) is None
+
+
+def test_project_badge_uses_only_the_owning_company_channel():
+    db = _db(); ready_company = _configured(db)
+    unconfigured_company = Company(name="Unconfigured Realty", country_code="US")
+    db.add(unconfigured_company); db.commit()
+
+    ready = company_messaging_integration(db, ready_company.id)
+    missing = company_messaging_integration(db, unconfigured_company.id)
+
+    assert ready["status"] == "connected"
+    assert ready["channel"] == "whatsapp"
+    assert ready["label"] == "WhatsApp messaging"
+    assert missing["status"] == "action_required"
+    assert missing["channel"] is None
+    assert "this Company's" in missing["detail"]
 
 
 def test_live_agent_language_is_centralized_in_english():

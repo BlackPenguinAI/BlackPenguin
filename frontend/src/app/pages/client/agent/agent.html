@@ -82,15 +82,15 @@
           [(ngModel)]="form.phone"
           type="tel"
           placeholder="e.g. +1 305 555 0142"
-          [class.invalid]="!form.phone.trim()"
-      /></label>
+          [class.invalid]="form.phone.length > 0 && !phoneValid"
+        /><small *ngIf="form.phone.length > 0 && phoneError" class="field-error">{{ phoneError }}</small></label>
       <label
         >Email *<input
           [(ngModel)]="form.email"
           type="email"
           placeholder="lead@example.com"
           [class.invalid]="form.email.length > 0 && !emailValid"
-      /></label>
+        /><small *ngIf="form.email.length > 0 && emailError" class="field-error">{{ emailError }}</small></label>
       <label *ngIf="setupMode === 'simulation'"
         >Product interested *<select
           [(ngModel)]="form.product_id"

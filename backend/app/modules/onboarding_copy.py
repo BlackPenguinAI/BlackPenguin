@@ -40,10 +40,13 @@ def conversational_acknowledgement(
     for item in accepted:
         field = str(item["field"])
         status = str(item.get("status") or "confirmed")
+        label = label_for(field)
+        if status == "deferred" and label.casefold().endswith(" verified"):
+            label = label[:-len(" verified")]
         display = "Not applicable" if status == "not_applicable" else (
             "Saved for later" if status == "deferred" else format_user_facing_value(item.get("value"))
         )
-        normalized.append((field, label_for(field), display, status))
+        normalized.append((field, label, display, status))
 
     seed = "|".join(f"{field}:{status}" for field, _, _, status in normalized)
     variant = int(hashlib.sha256(seed.encode("utf-8")).hexdigest()[:8], 16) % 4
@@ -64,13 +67,23 @@ def conversational_acknowledgement(
             )
             opening = templates[variant]
     else:
-        labels = ", ".join(f"**{label}**" for _, label, _, _ in normalized)
-        templates = (
-            f"Perfect{name}. I've incorporated the new details for {labels}.",
-            f"Great{name} — the {scope} is clearer now. I updated {labels}.",
-            f"Thanks{name}. I've saved the confirmed information for {labels}.",
-            f"All set{name}. I updated {labels} and kept the onboarding moving.",
-        )
-        opening = templates[variant]
+        deferred = [label for _, label, _, status in normalized if status == "deferred"]
+        changed = [label for _, label, _, status in normalized if status != "deferred"]
+        if deferred and not changed:
+            labels = ", ".join(f"**{label}**" for label in deferred)
+            opening = f"No problem{name}. We can return to {labels} later."
+        elif deferred:
+            changed_labels = ", ".join(f"**{label}**" for label in changed)
+            deferred_labels = ", ".join(f"**{label}**" for label in deferred)
+            opening = f"Thanks{name}. I updated {changed_labels}; we can return to {deferred_labels} later."
+        else:
+            labels = ", ".join(f"**{label}**" for _, label, _, _ in normalized)
+            templates = (
+                f"Perfect{name}. I've incorporated the new details for {labels}.",
+                f"Great{name} — the {scope} is clearer now. I updated {labels}.",
+                f"Thanks{name}. I've saved the confirmed information for {labels}.",
+                f"All set{name}. I updated {labels} and kept the onboarding moving.",
+            )
+            opening = templates[variant]
 
     return opening + (f"\n\n{next_prompt}" if next_prompt else "")

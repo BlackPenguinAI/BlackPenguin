@@ -237,6 +237,19 @@ export class AgentComponent implements OnInit, OnDestroy {
   get emailValid(): boolean {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(this.form.email.trim());
   }
+  get phoneValid(): boolean {
+    const phone = this.form.phone.trim();
+    const digits = phone.replace(/\D/g, '');
+    return /^[+()\d.\-\s]+$/.test(phone) && digits.length >= 7 && digits.length <= 15;
+  }
+  get phoneError(): string {
+    if (!this.form.phone.trim()) return 'Enter the lead cellphone or WhatsApp number.';
+    return this.phoneValid ? '' : 'Enter a valid phone number with 7 to 15 digits.';
+  }
+  get emailError(): string {
+    if (!this.form.email.trim()) return 'Enter the lead email address.';
+    return this.emailValid ? '' : 'Enter a valid email address, for example lead@example.com.';
+  }
   get budgetValid(): boolean {
     const minimum = Number(this.form.budget_min);
     const maximumValue = this.form.budget_max;
@@ -258,7 +271,7 @@ export class AgentComponent implements OnInit, OnDestroy {
       campaignComplete &&
       this.form.first_name.trim() &&
       this.form.last_name.trim() &&
-      this.form.phone.trim() &&
+      this.phoneValid &&
       this.emailValid &&
       this.form.consent
     );
@@ -930,7 +943,13 @@ export class AgentComponent implements OnInit, OnDestroy {
     return globalThis.crypto?.randomUUID?.() || `meta-test-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   }
   private validationMessage(error: any): string {
-    return Array.isArray(error?.detail) ? error.detail.map((item: any) => item.msg).join(' ') : '';
+    if (!Array.isArray(error?.detail)) return '';
+    return error.detail.map((item: any) => {
+      const field = String(item?.loc?.at?.(-1) || '').replaceAll('_', ' ');
+      const label = field === 'phone' ? 'Cellphone' : field === 'email' ? 'Email' : field;
+      const message = String(item?.msg || 'Invalid value.').replace(/^Value error,\s*/i, '');
+      return label ? `${label}: ${message}` : message;
+    }).join(' ');
   }
   private apiErrorMessage(error: any, fallback: string): string {
     const detail = error?.error?.detail;

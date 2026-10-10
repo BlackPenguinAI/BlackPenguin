@@ -109,6 +109,8 @@ export class SalesComponent implements OnInit {
 
   saveAvailability(): void {
     if (!this.selectedDay || this.availabilitySaving || this.blockEnd <= this.blockStart || this.rangeDateError) return;
+    this.error = '';
+    this.success = '';
     const target = this.role === 'sales' ? 'me' : this.salesUserId;
     if (!target) { this.error = 'Select a Sales user before managing availability.'; return; }
     const body = { starts_at: this.wallTimeToUtc(this.selectedDay, this.blockStart, this.timezone).toISOString(), ends_at: this.wallTimeToUtc(this.selectedDay, this.blockEnd, this.timezone).toISOString(), timezone: this.timezone };
@@ -125,11 +127,12 @@ export class SalesComponent implements OnInit {
     request.subscribe({
       next: result => {
         this.availabilitySaving = false;
+        this.error = '';
         const created = Array.isArray(result) ? result.length : 1;
         this.success = this.editingBlock ? 'Availability block updated.' : `${created} availability block${created === 1 ? '' : 's'} added.`;
         this.editingBlock = null; this.reload();
       },
-      error: err => { this.availabilitySaving = false; this.error = this.availabilityError(err); this.cdr.markForCheck(); },
+      error: err => { this.availabilitySaving = false; this.success = ''; this.error = this.availabilityError(err); this.cdr.markForCheck(); },
     });
   }
 

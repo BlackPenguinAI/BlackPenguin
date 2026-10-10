@@ -92,6 +92,10 @@ DOMAIN_PATTERN = re.compile(
     re.IGNORECASE,
 )
 TRACKING_PARAMETERS = {"fbclid", "gclid", "dclid", "msclkid", "__d"}
+CONFIRMATION_PREFIX = re.compile(
+    r"^(?:confirm(?:ed)?|correction|corrected\s+value|answer)\s*:\s*",
+    re.IGNORECASE,
+)
 
 
 def normalize_field_key(value: Any) -> str | None:
@@ -102,6 +106,16 @@ def normalize_field_key(value: Any) -> str | None:
         return candidate
     normalized = re.sub(r"[_\-]+", " ", candidate).strip().lower()
     return FIELD_ALIASES.get(normalized)
+
+
+def normalize_structured_answer(value: str) -> str:
+    """Remove UI-style confirmation prefixes from a linked field answer.
+
+    The persisted AI question already identifies the destination field, so a
+    leading ``Confirm:`` is interaction metadata rather than business data.
+    """
+    normalized = re.sub(r"\s+", " ", value).strip()
+    return CONFIRMATION_PREFIX.sub("", normalized, count=1).strip()
 
 
 def _labeled_company_updates(answer: str, profile: CompanyProfile) -> list[dict[str, Any]]:
@@ -350,7 +364,7 @@ def resolve_answer_to_question(
     if unanswered and unanswered[0].id != question.id:
         return QuestionResolution(True, "rejected", [], "stale_question", question)
 
-    text = re.sub(r"\s+", " ", answer).strip()
+    text = normalize_structured_answer(answer)
     if not text:
         return QuestionResolution(True, "rejected", [], "empty_answer", question)
 
@@ -531,6 +545,18 @@ def apply_field_updates(
             })
             continue
 
+        # An authorized correction to a resolved field is itself authoritative.
+        # Do not let an LLM-proposed ``extracted`` status regress an approved
+        # profile back into onboarding or make the assistant ask for the same
+        # value again.
+        if (
+            allow_authoritative_statuses
+            and current_state in {"confirmed", "corrected_by_user"}
+            and current_value not in (None, "", [])
+            and incoming_value not in (None, "", [])
+        ):
+            status = "corrected_by_user" if incoming_value != current_value else current_state
+
         value = update.get("value")
         if status not in {"missing", "not_applicable", "deferred"} and value in (None, "", []):
             rejected.append({"update": raw_update, "reason": "missing_value"})
@@ -589,10 +615,37 @@ def apply_field_updates(
 
 def deterministic_context_update(message: str, profile: CompanyProfile) -> list[dict[str, Any]]:
     """Resolve a few contextual answers that should not depend on LLM formatting."""
-    text = re.sub(r"\s+", " ", message.strip()).lower()
+    normalized_message = re.sub(r"\s+", " ", message.strip())
+    text = normalized_message.lower()
     completion = calculate_completion(profile.field_states, final_approved=profile.final_approved)
     next_field = completion["blockers"][0]["field"] if completion["blockers"] else None
     data = profile.profile_data or {}
+
+    # Corrections to an already-approved profile must not depend on the model
+    # choosing a state transition. Support the explicit edit phrasing used by
+    # the UI and preserve a fully approved profile after the value changes.
+    if re.match(r"^(?:correction|correct|update|change)\b", text):
+        labels = sorted(
+            set(FIELD_ALIASES) | {field.label.casefold() for field in FIELD_BY_KEY.values()},
+            key=len,
+            reverse=True,
+        )
+        label_pattern = "|".join(re.escape(label) for label in labels)
+        correction = re.search(
+            rf"(?i)(?P<label>{label_pattern})\s+(?:should\s+be|must\s+be|is|to)\s+(?:exactly\s+)?(?P<value>.+)$",
+            normalized_message,
+        )
+        if correction:
+            field = normalize_field_key(correction.group("label"))
+            supplied = correction.group("value").strip()
+            quoted = re.match(r'^["\'](?P<value>.+?)["\'](?:\s*\([^)]*\)\s*\.?\s*)?$', supplied)
+            raw_value = (
+                quoted.group("value").strip()
+                if quoted
+                else re.sub(r"\s*\([^)]*\)\s*\.?\s*$", "", supplied).strip().strip('"\'')
+            )
+            if field and raw_value and not validate_onboarding_value(field, raw_value):
+                return [_user_update(field, raw_value, status="corrected_by_user")]
 
     if next_field == "preferred_display_name" and text in {
         "same", "same name", "the same", "use the same name", "same as company name",
