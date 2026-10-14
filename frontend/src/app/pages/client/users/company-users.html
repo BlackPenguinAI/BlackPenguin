@@ -60,6 +60,7 @@
     <div class="rounded-xl border border-white/10 bg-white/[0.02] p-4 space-y-3">
       <div><label class="ml-1 text-[10px] font-bold uppercase tracking-widest text-gray-500">Timezone</label><p class="mt-1 text-xs text-gray-500">Preselected from this device. Search by city, IANA zone or UTC offset.</p></div>
       <app-timezone-select [value]="invite.timezone || 'UTC'" (valueChange)="invite.timezone = $event" ariaLabel="Company user timezone"></app-timezone-select>
+      <span *ngIf="!editingUserId" class="text-[10px] text-gray-500">Defaults to the Company timezone ({{ companyTimezone }}).</span>
     </div>
     <div class="rounded-xl border border-white/10 bg-white/[0.02] p-4 space-y-3">
       <label class="text-[10px] font-bold uppercase tracking-widest text-gray-500">Project access</label>

@@ -7,7 +7,7 @@ import {
   CompanyProjectOption, CompanyUser, CompanyUserInvite, CompanyUserLimits,
   CompanyUserRole, CompanyUsersService,
 } from '../../../core/services/company-users.service';
-import { deviceTimezone, timezoneLabel } from '../../../core/timezones';
+import { timezoneLabel } from '../../../core/timezones';
 import { ToastService } from '../../../core/services/toast';
 import { ButtonComponent } from '../../../shared/ui/button/button';
 import { InputComponent } from '../../../shared/ui/input/input';
@@ -24,6 +24,7 @@ export class CompanyUsersComponent implements OnInit {
   projects: CompanyProjectOption[] = [];
   limits: CompanyUserLimits | null = null;
   loading = true; saving = false; showAddModal = false;
+  companyTimezone = 'UTC';
   editingUserId: string | null = null;
   invite: CompanyUserInvite = this.emptyForm();
   readonly timezoneLabel = timezoneLabel;
@@ -35,9 +36,11 @@ export class CompanyUsersComponent implements OnInit {
 
   load(): void {
     this.loading = true;
-    forkJoin({ users: this.companyUsers.list(), limits: this.companyUsers.limits(), projects: this.companyUsers.projects() }).subscribe({
-      next: ({ users, limits, projects }) => {
-        this.users = users; this.limits = limits; this.projects = projects; this.loading = false; this.cdr.markForCheck();
+    forkJoin({ users: this.companyUsers.list(), limits: this.companyUsers.limits(), projects: this.companyUsers.projects(), defaults: this.companyUsers.defaults() }).subscribe({
+      next: ({ users, limits, projects, defaults }) => {
+        this.users = users; this.limits = limits; this.projects = projects;
+        this.companyTimezone = defaults.timezone || 'UTC';
+        this.loading = false; this.cdr.markForCheck();
       },
       error: err => { this.loading = false; this.toast.showError(err.error?.detail || 'Could not load users'); this.cdr.markForCheck(); },
     });
@@ -54,7 +57,7 @@ export class CompanyUsersComponent implements OnInit {
     this.invite = {
       first_name: user.first_name || '', last_name: user.last_name || '', email: user.email,
       role: user.role === 'admin' ? 'assistant' : user.role, is_active: user.is_active,
-      timezone: user.timezone || deviceTimezone(), project_access_scope: user.project_access_scope || 'all',
+      timezone: user.timezone || this.companyTimezone, project_access_scope: user.project_access_scope || 'all',
       project_ids: [...(user.project_ids || [])],
     };
     this.showAddModal = true;
@@ -68,7 +71,7 @@ export class CompanyUsersComponent implements OnInit {
     const request = this.editingUserId
       ? this.companyUsers.update(this.editingUserId, {
           first_name: this.invite.first_name, last_name: this.invite.last_name, role: this.invite.role,
-          is_active: this.invite.is_active, timezone: this.invite.timezone || deviceTimezone(),
+          is_active: this.invite.is_active, timezone: this.invite.timezone || this.companyTimezone,
           project_access_scope: this.invite.project_access_scope || 'all', project_ids: this.invite.project_ids || [],
         })
       : this.companyUsers.invite(this.invite, this.invitationRequestKey());
@@ -146,7 +149,7 @@ export class CompanyUsersComponent implements OnInit {
 
   private emptyForm(): CompanyUserInvite {
     return { first_name: '', last_name: '', email: '', role: 'assistant', is_active: true,
-      timezone: deviceTimezone(), project_access_scope: 'all', project_ids: [] };
+      timezone: this.companyTimezone, project_access_scope: 'all', project_ids: [] };
   }
   private invitationRequestKey(): string {
     const fingerprint = JSON.stringify({

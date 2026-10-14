@@ -10,6 +10,7 @@ import { GlassCardComponent } from '../../../../shared/ui/glass-card/glass-card'
 import { InputComponent } from '../../../../shared/ui/input/input';
 import { ButtonComponent } from '../../../../shared/ui/button/button';
 import { ModalComponent } from '../../../../shared/ui/modal/modal';
+import { TimezoneSelectComponent } from '../../../../shared/ui/timezone-select/timezone-select';
 
 @Component({
   selector: 'app-companies-page',
@@ -21,7 +22,8 @@ import { ModalComponent } from '../../../../shared/ui/modal/modal';
     GlassCardComponent,
     InputComponent,
     ButtonComponent,
-    ModalComponent
+    ModalComponent,
+    TimezoneSelectComponent
   ],
   providers: [DatePipe],
   templateUrl: './companies-page.html'
@@ -53,6 +55,7 @@ export class CompaniesPageComponent implements OnInit {
   form: any = {
     name: '',
     country_code: 'US',
+    timezone: 'UTC',
     plan_id: '',
     start_date: new Date().toISOString().split('T')[0],
     duration_months: 12,
@@ -67,6 +70,7 @@ export class CompaniesPageComponent implements OnInit {
     id: '',
     name: '',
     country_code: 'US',
+    timezone: 'UTC',
     plan_id: '',
     start_date: '',
     duration_months: 12,
@@ -134,6 +138,7 @@ export class CompaniesPageComponent implements OnInit {
     this.form = {
       name: '',
       country_code: 'US',
+      timezone: 'UTC',
       plan_id: this.plans.length > 0 ? this.plans[0].id : '',
       start_date: new Date().toISOString().split('T')[0],
       duration_months: 12,
@@ -162,6 +167,7 @@ export class CompaniesPageComponent implements OnInit {
       id: item.id,
       name: item.name,
       country_code: item.country_code || 'US',
+      timezone: item.timezone || 'UTC',
       plan_id: item.plan_id || (item.plan?.id) || (this.plans.length > 0 ? this.plans[0].id : ''),
       start_date: item.license_start ? item.license_start.split('T')[0] : new Date().toISOString().split('T')[0],
       duration_months: 12,
@@ -189,7 +195,7 @@ export class CompaniesPageComponent implements OnInit {
   }
 
   saveCompany(): void {
-    if (!this.form.name || !this.form.country_code || !this.form.admin_email || !this.form.plan_id) {
+    if (!this.form.name || !this.form.country_code || !this.form.timezone || !this.form.admin_email || !this.form.plan_id) {
       this.toast.showError('Please complete all required fields.');
       return;
     }
@@ -200,6 +206,7 @@ export class CompaniesPageComponent implements OnInit {
     const formData = new FormData();
     formData.append('name', this.form.name);
     formData.append('country_code', this.form.country_code);
+    formData.append('timezone', this.form.timezone);
     formData.append('plan_id', this.form.plan_id);
     formData.append('duration_months', this.form.duration_months);
     formData.append('admin_first_name', this.form.admin_first_name);
@@ -239,7 +246,7 @@ export class CompaniesPageComponent implements OnInit {
   }
 
   updateCompany(): void {
-    if (!this.editForm.name || !this.editForm.country_code || !this.editForm.plan_id) {
+    if (!this.editForm.name || !this.editForm.country_code || !this.editForm.timezone || !this.editForm.plan_id) {
       this.toast.showError('Company name and plan are required.');
       return;
     }
@@ -251,6 +258,7 @@ export class CompaniesPageComponent implements OnInit {
     const formData = new FormData();
     formData.append('name', this.editForm.name);
     formData.append('country_code', this.editForm.country_code);
+    formData.append('timezone', this.editForm.timezone);
     formData.append('plan_id', this.editForm.plan_id);
     formData.append('duration_months', this.editForm.duration_months);
     formData.append('admin_first_name', this.editForm.admin_first_name);

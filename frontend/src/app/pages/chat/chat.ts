@@ -380,6 +380,7 @@ export class ChatComponent implements OnInit, OnDestroy {
 
   get teamInviteErrorCount(): number { return Object.keys(this.teamInviteErrors).length; }
   get canInviteTeamMember(): boolean { return !this.teamSaving && this.teamInviteErrorCount === 0; }
+  get companyTimezone(): string { return this.team.timezone || 'UTC'; }
 
   publicPresenceFieldError(field: string): string {
     if (!this.editablePublicPresenceFields.includes(field)) return '';
@@ -440,7 +441,7 @@ export class ChatComponent implements OnInit, OnDestroy {
             : `Invitation sent to ${submittedEmail}. The user is pending activation.`;
         }
         this.teamInvite = { first_name: '', last_name: '', email: '', role: 'assistant',
-          timezone: deviceTimezone(), project_access_scope: 'all', project_ids: [] };
+          timezone: this.companyTimezone, project_access_scope: 'all', project_ids: [] };
         this.teamInviteAttempted = false;
         this.teamInviteRequestKey = '';
         this.teamInviteRequestFingerprint = '';
@@ -760,7 +761,7 @@ export class ChatComponent implements OnInit, OnDestroy {
   }
 
   confirmAllUnchanged(source: OnboardingSource): void {
-    const pending = source.proposals.filter(proposal => proposal.status === 'pending' && !proposal.submitting);
+    const pending = this.unchangedPendingProposals(source);
     if (!pending.length || this.confirmingSourceIds.has(source.id)) return;
     const anchor = captureReviewScrollAnchor(this.chatScroll?.nativeElement, pending[0].id);
     this.confirmingSourceIds.add(source.id);
@@ -793,6 +794,42 @@ export class ChatComponent implements OnInit, OnDestroy {
         this.cdr.detectChanges();
       }),
     ).subscribe();
+  }
+
+  unchangedPendingProposals(source: OnboardingSource): SourceProposal[] {
+    return source.proposals.filter(proposal => proposal.status === 'pending'
+      && !proposal.submitting
+      && (proposal.draftValue ?? this.formatProposalValue(proposal)).trim() === this.formatProposalValue(proposal).trim());
+  }
+
+  editProposalRevision(source: OnboardingSource, proposal: SourceProposal): void {
+    if (proposal.status !== 'corrected' || proposal.submitting) return;
+    this.updateProposal(source.id, proposal.id, { editing: true, errorMessage: undefined });
+  }
+
+  cancelProposalRevision(source: OnboardingSource, proposal: SourceProposal): void {
+    this.updateProposal(source.id, proposal.id, {
+      editing: false, draftValue: this.formatProposalValue(proposal), errorMessage: undefined,
+    });
+  }
+
+  saveProposalRevision(source: OnboardingSource, proposal: SourceProposal): void {
+    if (proposal.status !== 'corrected' || !proposal.editing || proposal.submitting) return;
+    const value = this.parseDraftValue(proposal, proposal.draftValue || '');
+    this.updateProposal(source.id, proposal.id, { submitting: true, errorMessage: undefined });
+    this.onboarding.reviseProposal(proposal.id, value).subscribe({
+      next: result => {
+        this.updateProposal(source.id, proposal.id, {
+          ...result.proposal, draftValue: this.formatProposalValue(result.proposal),
+          editing: false, submitting: false, errorMessage: undefined,
+        });
+        this.profile = result.profile;
+        this.cdr.detectChanges();
+      },
+      error: (error: HttpErrorResponse) => this.updateProposal(source.id, proposal.id, {
+        submitting: false, errorMessage: this.proposalErrorMessage(error),
+      }),
+    });
   }
 
   retrySource(source: OnboardingSource): void {
@@ -968,6 +1005,9 @@ export class ChatComponent implements OnInit, OnDestroy {
     this.currentStage = state.stage;
     this.team = state.team || EMPTY_TEAM_ONBOARDING;
     this.teamProjects = this.team.projects || [];
+    if (!this.teamInvite.first_name && !this.teamInvite.last_name && !this.teamInvite.email) {
+      this.teamInvite.timezone = this.companyTimezone;
+    }
     this.initializePublicPresence(state.profile.data);
     this.isCompleted = state.profile.completion.can_complete;
     this.showWelcome = state.stage === 'website';
@@ -1005,6 +1045,9 @@ export class ChatComponent implements OnInit, OnDestroy {
       next: team => {
         this.team = team;
         this.teamProjects = team.projects || [];
+        if (!this.teamInvite.first_name && !this.teamInvite.last_name && !this.teamInvite.email) {
+          this.teamInvite.timezone = this.companyTimezone;
+        }
         if (syncStage) this.syncState('bottom');
         this.cdr.detectChanges();
       },

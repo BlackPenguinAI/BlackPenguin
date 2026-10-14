@@ -3,6 +3,15 @@ import { describe, expect, it } from 'vitest';
 import { CompanyUsersComponent } from './company-users';
 
 describe('CompanyUsersComponent', () => {
+  it('defaults a new user to the authoritative Company timezone', () => {
+    const component = new CompanyUsersComponent({} as any, {} as any, {} as any);
+    component.companyTimezone = 'America/Lima';
+
+    component.openAddModal();
+
+    expect(component.invite.timezone).toBe('America/Lima');
+  });
+
   it('validates identity fields without asking for an initial password', () => {
     const component = new CompanyUsersComponent({} as any, {} as any, {} as any);
     component.invite = {

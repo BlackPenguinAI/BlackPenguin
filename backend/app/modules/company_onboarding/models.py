@@ -156,6 +156,8 @@ class CompanyOnboardingProposal(Base):
     status = Column(SqlaEnum(ProposalStatus), default=ProposalStatus.PENDING, nullable=False)
     reviewed_by_user_id = Column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     reviewed_at = Column(DateTime, nullable=True)
+    revision = Column(Integer, default=1, nullable=False)
+    review_history = Column(JSON, default=list, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     source = relationship("CompanyOnboardingSource", back_populates="proposals")

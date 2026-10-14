@@ -11,7 +11,7 @@ from .models import TENANT_MANAGER_ROLES, User, UserAuthStatus, UserRole
 from .project_access import project_ids_for_user, sync_user_project_access
 from . import services
 from .schemas import (
-    CompanyProjectOption, MyProfileUpdate, MyProfileResponse, PasswordUpdatePayload, SetPasswordPayload,
+    CompanyProjectOption, CompanyUserDefaultsResponse, MyProfileUpdate, MyProfileResponse, PasswordUpdatePayload, SetPasswordPayload,
     TenantUserCreate, TenantUserResponse, TenantUserUpdate, UserAdminListResponse,
 )
 from app.modules.companies.models import Company
@@ -235,6 +235,17 @@ def list_company_users(
     return [_tenant_user_response(db, user) for user in users]
 
 
+@router.get("/company/settings", response_model=CompanyUserDefaultsResponse)
+def get_company_user_defaults(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker(TENANT_MANAGER_ROLES)),
+):
+    company = db.query(Company).filter(Company.id == current_user.company_id).first()
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found.")
+    return {"timezone": company.timezone or "UTC"}
+
+
 @router.post("/company", response_model=TenantUserResponse, status_code=status.HTTP_201_CREATED)
 def invite_company_user(
     payload: TenantUserCreate,
@@ -246,12 +257,16 @@ def invite_company_user(
         role = UserRole(payload.role)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail="Role must be assistant, mkt or sales.") from exc
+    company = db.query(Company).filter(Company.id == current_user.company_id).first()
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found.")
+    timezone = payload.timezone or company.timezone or "UTC"
     key = services.normalize_idempotency_key(idempotency_key)
     if key:
         replay = services.invitation_for_idempotency_key(
             db, idempotency_key=key, company_id=current_user.company_id,
             email=str(payload.email), first_name=payload.first_name,
-            last_name=payload.last_name, role=role, timezone=payload.timezone,
+            last_name=payload.last_name, role=role, timezone=timezone,
             project_access_scope=payload.project_access_scope,
             project_ids=payload.project_ids,
         )
@@ -264,7 +279,7 @@ def invite_company_user(
         first_name=payload.first_name,
         last_name=payload.last_name,
         role=role,
-        timezone=payload.timezone,
+        timezone=timezone,
         project_access_scope=payload.project_access_scope,
         project_ids=payload.project_ids,
         invited_by_user_id=current_user.id,

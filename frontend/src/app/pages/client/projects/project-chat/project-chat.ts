@@ -4,7 +4,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { marked } from 'marked';
-import { catchError, finalize, of, Subscription, switchMap, timeout } from 'rxjs';
+import { catchError, concatMap, finalize, from, of, Subscription, switchMap, tap, timeout, toArray } from 'rxjs';
 
 import { SpeechRecognitionService } from '../../../../core/services/speech-recognition.service';
 import { OnboardingQuestion } from '../../../../shared/ui/onboarding-response-options/onboarding-response-options';
@@ -130,6 +130,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   private pollingStartedAt = 0;
   private propertyCatalogRequestVersion = 0;
   private readonly expandedSourceIds = new Set<string>();
+  readonly confirmingSourceIds = new Set<string>();
   private readonly activationFieldKeys = new Set([
     'sales_authorization', 'sales_contacts', 'appointment_routing', 'campaigns_defined', 'meta_connection_verified',
   ]);
@@ -954,6 +955,76 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     return !proposal.submitting
       && (proposal.draftValue || '').trim() !== this.formatProposalValue(proposal).trim()
       && !this.proposalDraftError(proposal);
+  }
+
+  unchangedPendingProposals(source: ProjectSource): SourceProposal[] {
+    return source.proposals.filter(proposal => proposal.status === 'pending'
+      && this.proposalCanConfirm(proposal)
+      && (proposal.draftValue ?? this.formatProposalValue(proposal)).trim() === this.formatProposalValue(proposal).trim());
+  }
+
+  confirmAllUnchanged(source: ProjectSource): void {
+    const pending = this.unchangedPendingProposals(source);
+    if (!pending.length || this.confirmingSourceIds.has(source.id)) return;
+    const anchor = captureReviewScrollAnchor(this.chatScroll?.nativeElement, pending[0].id);
+    this.confirmingSourceIds.add(source.id);
+    pending.forEach(proposal => this.updateProposal(source.id, proposal.id, { submitting: true, inlineError: undefined }));
+    from(pending).pipe(
+      concatMap(proposal => this.onboarding.decideProposal(this.projectId, proposal.id, 'confirm').pipe(
+        tap(result => {
+          this.updateProposal(source.id, proposal.id, {
+            ...result.proposal,
+            draftValue: this.formatProposalValue(result.proposal),
+            submitting: false,
+            inlineError: undefined,
+          });
+          this.profile = result.profile;
+        }),
+        catchError((error: HttpErrorResponse) => {
+          this.updateProposal(source.id, proposal.id, {
+            submitting: false,
+            inlineError: this.apiDetail(error, 'That proposal could not be updated.'),
+          });
+          return of(null);
+        }),
+      )),
+      toArray(),
+      finalize(() => {
+        this.confirmingSourceIds.delete(source.id);
+        this.syncState('preserve', anchor);
+        this.cdr.detectChanges();
+      }),
+    ).subscribe();
+  }
+
+  editProposalRevision(source: ProjectSource, proposal: SourceProposal): void {
+    if (proposal.status !== 'corrected' || proposal.submitting) return;
+    this.updateProposal(source.id, proposal.id, { editing: true, inlineError: undefined });
+  }
+
+  cancelProposalRevision(source: ProjectSource, proposal: SourceProposal): void {
+    this.updateProposal(source.id, proposal.id, {
+      editing: false, draftValue: this.formatProposalValue(proposal), inlineError: undefined,
+    });
+  }
+
+  saveProposalRevision(source: ProjectSource, proposal: SourceProposal): void {
+    if (proposal.status !== 'corrected' || !proposal.editing || proposal.submitting) return;
+    const value = parseProposalValue(proposal.field, proposal.draftValue || '', proposal.value);
+    this.updateProposal(source.id, proposal.id, { submitting: true, inlineError: undefined });
+    this.onboarding.reviseProposal(this.projectId, proposal.id, value).subscribe({
+      next: result => {
+        this.updateProposal(source.id, proposal.id, {
+          ...result.proposal, draftValue: this.formatProposalValue(result.proposal),
+          editing: false, submitting: false, inlineError: undefined,
+        });
+        this.profile = result.profile;
+        this.cdr.detectChanges();
+      },
+      error: (error: HttpErrorResponse) => this.updateProposal(source.id, proposal.id, {
+        submitting: false, inlineError: this.apiDetail(error, 'That revision could not be saved.'),
+      }),
+    });
   }
 
   retrySource(source: ProjectSource): void {

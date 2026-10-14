@@ -169,14 +169,14 @@ def invite_tenant_user(
 
 def invite_company_administrator(
     db: Session, *, company_id: str, email: str, first_name: str, last_name: str,
-    is_active: bool = True, invited_by_user_id: str | None = None,
+    is_active: bool = True, timezone: str = "UTC", invited_by_user_id: str | None = None,
 ) -> User:
     from app.integrations.firebase_client import ensure_firebase_ready
     if is_active:
         ensure_firebase_ready(db)
     user = _create_pending_user(
         db, company_id=company_id, email=email, first_name=first_name, last_name=last_name,
-        role=UserRole.ADMIN, timezone="UTC", project_access_scope="all", project_ids=[],
+        role=UserRole.ADMIN, timezone=timezone, project_access_scope="all", project_ids=[],
         invited_by_user_id=invited_by_user_id, enforce_limit=False,
         require_active_company=False,
     )

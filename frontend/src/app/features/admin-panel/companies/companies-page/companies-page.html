@@ -140,6 +140,12 @@
       <span class="text-[10px] text-gray-500">New Projects inherit this country and the Company's messaging channels.</span>
     </div>
 
+    <div class="flex flex-col gap-1.5 w-full">
+      <label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold ml-1">Company Timezone</label>
+      <app-timezone-select [value]="form.timezone" (valueChange)="form.timezone = $event" ariaLabel="Company timezone"></app-timezone-select>
+      <span class="text-[10px] text-gray-500">New administrators and team invitations default to this timezone.</span>
+    </div>
+
     <div class="flex items-center justify-between p-3 bg-white/5 border border-white/10 rounded-xl">
       <div class="flex flex-col">
         <span class="text-xs font-mono uppercase tracking-widest text-gray-200">Company Status</span>
@@ -238,6 +244,12 @@
         <option *ngFor="let country of countries" [value]="country.code">{{ country.name }} ({{ country.code }})</option>
       </select>
       <span class="text-[10px] text-gray-500">All Projects inherit this country. Review active messaging before changing it.</span>
+    </div>
+
+    <div class="flex flex-col gap-1.5 w-full">
+      <label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold ml-1">Company Timezone</label>
+      <app-timezone-select [value]="editForm.timezone" (valueChange)="editForm.timezone = $event" ariaLabel="Company timezone"></app-timezone-select>
+      <span class="text-[10px] text-gray-500">New team invitations inherit this timezone. Existing user preferences are preserved.</span>
     </div>
 
     <div class="flex items-center justify-between p-3 bg-white/5 border border-white/10 rounded-xl">

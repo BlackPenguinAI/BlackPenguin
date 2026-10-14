@@ -61,7 +61,7 @@ class TenantUserCreate(BaseModel):
     first_name: str = Field(min_length=1, max_length=150)
     last_name: str = Field(min_length=1, max_length=100)
     role: str
-    timezone: str = Field(default="UTC", min_length=1, max_length=80)
+    timezone: Optional[str] = Field(default=None, min_length=1, max_length=80)
     project_access_scope: Literal["all", "selected"] = "all"
     project_ids: List[str] = Field(default_factory=list)
 
@@ -100,6 +100,10 @@ class TenantUserResponse(BaseModel):
     request_replayed: bool = False
     activated_at: Optional[datetime] = None
     model_config = ConfigDict(from_attributes=True)
+
+
+class CompanyUserDefaultsResponse(BaseModel):
+    timezone: str = "UTC"
 
 
 class CompanyProjectOption(BaseModel):

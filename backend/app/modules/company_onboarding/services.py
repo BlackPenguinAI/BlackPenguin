@@ -13,6 +13,7 @@ from app.modules.onboarding_questions import validate_onboarding_value
 from app.modules.users import services as user_services
 from app.modules.users.models import User, UserAuthStatus, UserRole
 from app.modules.projects.models import Project
+from app.modules.companies.models import Company
 
 from .completion import FIELD_BY_KEY, VALID_STATUSES, calculate_completion, field_progress
 from .models import CompanyProfile, OnboardingMessage, OnboardingSession, SenderType
@@ -759,6 +760,7 @@ def team_member_payload(db: Session, user: User | None, *, request_replayed: boo
 def serialize_team(db: Session, company_id: str, profile: CompanyProfile | None = None) -> dict[str, Any]:
     """Return onboarding team progress derived from the canonical users table."""
     profile = profile or get_or_create_profile(db, company_id)
+    company = db.query(Company).filter(Company.id == company_id).first()
     users = db.query(User).filter(User.company_id == company_id).order_by(User.email.asc()).all()
     administrator = next((user for user in users if user.role == UserRole.ADMIN), None)
     states = profile.field_states or {}
@@ -793,6 +795,7 @@ def serialize_team(db: Session, company_id: str, profile: CompanyProfile | None 
         })
 
     return {
+        "timezone": company.timezone if company and company.timezone else "UTC",
         "administrator": team_member_payload(db, administrator),
         "members": [team_member_payload(db, user) for user in users if user.role != UserRole.ADMIN],
         "roles": roles,

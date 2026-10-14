@@ -46,7 +46,7 @@ from .schemas import (
     ProjectOverviewResponse, ProjectProfileResponse, ProjectResponse,
     PropertyTypeCatalogResponse, PropertyTypeCreate, PropertyTypeMediaAttach,
     PropertyTypeResponse, PropertyTypeUpdate, ProjectMarketingSummary,
-    OnboardingStateResponse, ProposalDecision, ProposalDecisionResponse,
+    OnboardingStateResponse, ProposalDecision, ProposalDecisionResponse, ProposalRevision,
     SourceResponse, UrlSourceRequest,
 )
 from app.modules.demo_projects.service import provision_demo_project
@@ -1522,6 +1522,22 @@ def decide_proposal(project_id: str, proposal_id: str, payload: ProposalDecision
     _continue_after_source_review(db, proposal=proposal, profile=profile)
     db.commit()
     db.refresh(proposal)
+    return {"proposal": source_service.serialize_proposal(proposal), "profile": services.serialize_profile(profile)}
+
+
+@router.post("/{project_id}/proposals/{proposal_id}/revision", response_model=ProposalDecisionResponse)
+def revise_proposal(project_id: str, proposal_id: str, payload: ProposalRevision, db: Session = Depends(get_db), current_user: User = Depends(RoleChecker(TENANT_MANAGER_ROLES))):
+    services.get_project(db, project_id, current_user.company_id)
+    proposal = db.query(ProjectOnboardingProposal).join(ProjectOnboardingSource).filter(
+        ProjectOnboardingProposal.id == proposal_id,
+        ProjectOnboardingSource.project_id == project_id,
+    ).first()
+    if not proposal:
+        raise HTTPException(status_code=404, detail="Proposal not found.")
+    proposal, profile = source_service.revise_proposal(
+        db, proposal=proposal, company_id=current_user.company_id,
+        user_id=current_user.id, corrected_value=payload.value,
+    )
     return {"proposal": source_service.serialize_proposal(proposal), "profile": services.serialize_profile(profile)}
 
 

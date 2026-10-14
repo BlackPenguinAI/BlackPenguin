@@ -227,7 +227,16 @@
         </div>
         <p *ngIf="source.status === 'ready' && !source.proposals.length" class="mt-3 text-xs text-gray-400">No reliable project details were found.</p>
         <div *ngIf="source.proposals.length" class="mt-3 space-y-3 border-t border-white/5 pt-3">
-          <p class="text-[10px] font-bold uppercase tracking-wider text-secondary">Review {{ source.proposals.length }} extracted proposal{{ source.proposals.length === 1 ? '' : 's' }}</p>
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <p class="text-[10px] font-bold uppercase tracking-wider text-secondary">Review {{ source.proposals.length }} extracted proposal{{ source.proposals.length === 1 ? '' : 's' }}</p>
+            <button
+              *ngIf="unchangedPendingProposals(source).length"
+              type="button"
+              (click)="confirmAllUnchanged(source)"
+              [disabled]="confirmingSourceIds.has(source.id)"
+              class="rounded-lg border border-secondary/30 px-3 py-1.5 text-[10px] font-semibold text-secondary disabled:opacity-50"
+            >{{ confirmingSourceIds.has(source.id) ? 'Confirming...' : 'Confirm all unchanged (' + unchangedPendingProposals(source).length + ')' }}</button>
+          </div>
           <article
             *ngFor="let proposal of source.proposals; trackBy: trackProposal"
             [attr.data-proposal-id]="proposal.id"
@@ -237,7 +246,7 @@
             <textarea
               [(ngModel)]="proposal.draftValue"
               (ngModelChange)="onProposalDraftChange(source, proposal, $event)"
-              [disabled]="proposal.status !== 'pending' || proposal.submitting === true"
+              [disabled]="(proposal.status !== 'pending' && !proposal.editing) || proposal.submitting === true"
               [attr.aria-invalid]="!!proposalDraftError(proposal)"
               [attr.aria-describedby]="proposalDraftError(proposal) ? 'proposal-error-' + proposal.id : null"
               [rows]="isStructuredProposal(proposal) ? 4 : 2"
@@ -250,6 +259,14 @@
               <button (click)="decideProposal(source, proposal, 'confirm')" [disabled]="!proposalCanConfirm(proposal)" [title]="proposal.validation ? 'Edit the value so it meets the requirement before saving.' : ''" class="proposal-action primary disabled:cursor-not-allowed disabled:opacity-40">Confirm</button>
               <button (click)="decideProposal(source, proposal, 'correct')" [disabled]="!proposalCanSave(proposal)" [title]="proposalCanSave(proposal) ? '' : 'Change the value and complete the requirement to save it.'" class="proposal-action disabled:cursor-not-allowed disabled:opacity-40">Save edit</button>
               <button (click)="decideProposal(source, proposal, 'reject')" [disabled]="proposal.submitting === true" class="proposal-action danger disabled:opacity-50">Reject</button>
+            </div>
+            <div *ngIf="proposal.status === 'corrected' && !proposal.editing" class="mt-3 flex flex-wrap items-center gap-2">
+              <button type="button" (click)="editProposalRevision(source, proposal)" class="proposal-action">Re-edit</button>
+              <span class="text-[10px] text-gray-500">Revision {{ proposal.revision || 1 }}</span>
+            </div>
+            <div *ngIf="proposal.status === 'corrected' && proposal.editing" class="mt-3 flex flex-wrap gap-2">
+              <button type="button" (click)="saveProposalRevision(source, proposal)" [disabled]="proposal.submitting === true || !!proposalDraftError(proposal)" class="proposal-action primary disabled:opacity-50">{{ proposal.submitting ? 'Saving...' : 'Save revision' }}</button>
+              <button type="button" (click)="cancelProposalRevision(source, proposal)" [disabled]="proposal.submitting === true" class="proposal-action disabled:opacity-50">Cancel</button>
             </div>
           </article>
         </div>

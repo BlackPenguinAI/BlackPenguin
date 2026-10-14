@@ -161,6 +161,10 @@ export class CompanyOnboardingService {
     );
   }
 
+  reviseProposal(proposalId: string, value: unknown): Observable<ProposalDecisionResponse> {
+    return this.http.post<ProposalDecisionResponse>(`${this.baseUrl}/proposals/${proposalId}/revision`, { value });
+  }
+
   downloadAttachment(url: string): Observable<Blob> {
     return this.http.get(url, { responseType: 'blob' });
   }

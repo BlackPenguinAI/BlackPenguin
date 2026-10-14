@@ -186,7 +186,12 @@ class SourceProposalResponse(BaseModel):
     evidence: str | None = None
     confidence: str | None = None
     status: str
+    revision: int = 1
     validation: dict[str, Any] | None = None
+
+
+class ProposalRevision(BaseModel):
+    value: Any
 
 
 class SourceResponse(BaseModel):

@@ -208,6 +208,11 @@ class SourceProposalResponse(BaseModel):
     evidence: str | None = None
     confidence: str | None = None
     status: ProposalStatus
+    revision: int = 1
+
+
+class ProposalRevision(BaseModel):
+    value: Any
 
 
 class SourceResponse(BaseModel):
@@ -267,7 +272,7 @@ class TeamMemberCreate(BaseModel):
     last_name: str = Field(min_length=1, max_length=100)
     email: EmailStr
     role: TeamRole
-    timezone: str = Field(default="UTC", min_length=1, max_length=80)
+    timezone: str | None = Field(default=None, min_length=1, max_length=80)
     project_access_scope: Literal["all", "selected"] = "all"
     project_ids: list[str] = Field(default_factory=list)
 
@@ -306,6 +311,7 @@ class TeamRoleProgress(BaseModel):
 
 
 class TeamOnboardingResponse(BaseModel):
+    timezone: str = "UTC"
     administrator: TeamMemberResponse | None = None
     members: list[TeamMemberResponse] = Field(default_factory=list)
     roles: list[TeamRoleProgress] = Field(default_factory=list)

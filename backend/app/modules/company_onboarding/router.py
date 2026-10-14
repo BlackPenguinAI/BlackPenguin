@@ -46,6 +46,7 @@ from .schemas import (
     OnboardingStateResponse,
     ProposalDecision,
     ProposalDecisionResponse,
+    ProposalRevision,
     ScrapeRequest,
     SessionResponse,
     SourceResponse,
@@ -555,12 +556,16 @@ def create_onboarding_team_member(
         role = UserRole(payload.role)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail="Role must be assistant, mkt or sales.") from exc
+    company = db.query(Company).filter(Company.id == current_user.company_id).first()
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found.")
+    timezone = payload.timezone or company.timezone or "UTC"
     key = user_services.normalize_idempotency_key(idempotency_key)
     if key:
         replay = user_services.invitation_for_idempotency_key(
             db, idempotency_key=key, company_id=current_user.company_id,
             email=str(payload.email), first_name=payload.first_name,
-            last_name=payload.last_name, role=role, timezone=payload.timezone,
+            last_name=payload.last_name, role=role, timezone=timezone,
             project_access_scope=payload.project_access_scope,
             project_ids=payload.project_ids,
         )
@@ -573,7 +578,7 @@ def create_onboarding_team_member(
         first_name=payload.first_name,
         last_name=payload.last_name,
         role=role,
-        timezone=payload.timezone,
+        timezone=timezone,
         project_access_scope=payload.project_access_scope,
         project_ids=payload.project_ids,
         invited_by_user_id=current_user.id,
@@ -1355,6 +1360,24 @@ def decide_proposal(
         "proposal": source_service.serialize_proposal(proposal),
         "profile": services.serialize_profile(profile),
     }
+
+
+@router.post("/proposals/{proposal_id}/revision", response_model=ProposalDecisionResponse)
+def revise_proposal(
+    proposal_id: str,
+    payload: ProposalRevision,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker(TENANT_MANAGER_ROLES)),
+):
+    proposal = db.query(CompanyOnboardingProposal).filter(CompanyOnboardingProposal.id == proposal_id).first()
+    if not proposal or proposal.source.company_id != current_user.company_id:
+        raise HTTPException(status_code=404, detail="Proposal not found.")
+    proposal, profile = source_service.revise_proposal(
+        db, proposal=proposal, company_id=current_user.company_id,
+        user_id=current_user.id, corrected_value=payload.value,
+    )
+    db.refresh(proposal)
+    return {"proposal": source_service.serialize_proposal(proposal), "profile": services.serialize_profile(profile)}
 
 
 @router.post("/scrape-website", response_model=SourceResponse, deprecated=True)

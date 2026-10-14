@@ -27,6 +27,7 @@ class CompanyResponse(BaseModel):
     id: str
     name: str
     country_code: Optional[str] = None
+    timezone: str = "UTC"
     is_active: bool
     license_start: datetime
     license_end: datetime

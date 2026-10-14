@@ -103,8 +103,10 @@ export interface SourceProposal {
   evidence: string | null;
   confidence: 'high' | 'medium' | 'low' | null;
   status: ProposalStatus;
+  revision?: number;
   draftValue?: string;
   submitting?: boolean;
+  editing?: boolean;
   errorMessage?: string;
 }
 
@@ -207,6 +209,7 @@ export interface TeamRoleProgress {
 }
 
 export interface TeamOnboarding {
+  timezone?: string;
   administrator: TeamMember | null;
   members: TeamMember[];
   roles: TeamRoleProgress[];
@@ -214,6 +217,7 @@ export interface TeamOnboarding {
 }
 
 export const EMPTY_TEAM_ONBOARDING: TeamOnboarding = {
+  timezone: 'UTC',
   administrator: null,
   members: [],
   roles: [

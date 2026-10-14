@@ -50,6 +50,9 @@ export class ProjectOnboardingService {
   decideProposal(id: string, proposalId: string, action: 'confirm' | 'correct' | 'reject', value?: unknown): Observable<{ proposal: SourceProposal; profile: ProjectProfile }> {
     return this.http.post<{ proposal: SourceProposal; profile: ProjectProfile }>(`${this.baseUrl}/${id}/proposals/${proposalId}/decision`, { action, value });
   }
+  reviseProposal(id: string, proposalId: string, value: unknown): Observable<{ proposal: SourceProposal; profile: ProjectProfile }> {
+    return this.http.post<{ proposal: SourceProposal; profile: ProjectProfile }>(`${this.baseUrl}/${id}/proposals/${proposalId}/revision`, { value });
+  }
   setCover(id: string, sourceId: string): Observable<ProjectSource> {
     return this.http.post<ProjectSource>(`${this.baseUrl}/${id}/sources/${sourceId}/cover`, {});
   }

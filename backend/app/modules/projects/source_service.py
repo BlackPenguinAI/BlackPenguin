@@ -436,6 +436,45 @@ def review_proposal(db: Session, *, proposal: ProjectOnboardingProposal, company
         proposal.value = value
         proposal.status = ProjectProposalStatus.CORRECTED if action == "correct" else ProjectProposalStatus.CONFIRMED
     proposal.reviewed_by_user_id, proposal.reviewed_at = user_id, datetime.utcnow()
+    proposal.review_history = [*(proposal.review_history or []), {
+        "revision": proposal.revision or 1, "action": action, "value": proposal.value,
+        "reviewed_by_user_id": user_id, "reviewed_at": proposal.reviewed_at.isoformat(),
+    }]
+    db.add(proposal); db.commit(); db.refresh(proposal)
+    return proposal, profile
+
+
+def revise_proposal(db: Session, *, proposal: ProjectOnboardingProposal, company_id: str, user_id: str, corrected_value: Any):
+    proposal = db.query(ProjectOnboardingProposal).filter(
+        ProjectOnboardingProposal.id == proposal.id,
+    ).populate_existing().with_for_update().first()
+    if not proposal or proposal.source.project.company_id != company_id:
+        raise HTTPException(status_code=404, detail="Proposal not found.")
+    if proposal.status != ProjectProposalStatus.CORRECTED:
+        raise HTTPException(status_code=409, detail="Only a corrected proposal can be revised.")
+    if corrected_value in (None, "", []):
+        raise HTTPException(status_code=422, detail="A corrected value is required.")
+    profile = services.get_profile(proposal.source.project)
+    result = services.apply_field_updates(db, profile, [{
+        "field": proposal.field_key, "value": corrected_value,
+        "status": "corrected_by_user", "applicable": True,
+        "source_type": proposal.source.kind.value,
+        "source_reference": proposal.source.url or proposal.source.name,
+        "confidence": proposal.confidence,
+    }], allow_authoritative_statuses=True)
+    if not result.accepted:
+        rejected = result.rejected[0] if result.rejected else {}
+        raise HTTPException(status_code=422, detail=rejected.get("validation") or {
+            "code": rejected.get("reason", "invalid_value"), "field": proposal.field_key,
+            "message": "The revised value could not be applied.",
+        })
+    proposal.revision = (proposal.revision or 1) + 1
+    proposal.value = corrected_value
+    proposal.reviewed_by_user_id, proposal.reviewed_at = user_id, datetime.utcnow()
+    proposal.review_history = [*(proposal.review_history or []), {
+        "revision": proposal.revision, "action": "revise", "value": corrected_value,
+        "reviewed_by_user_id": user_id, "reviewed_at": proposal.reviewed_at.isoformat(),
+    }]
     db.add(proposal); db.commit(); db.refresh(proposal)
     return proposal, profile
 
@@ -460,7 +499,7 @@ def serialize_proposal(proposal: ProjectOnboardingProposal) -> dict[str, Any]:
     return {
         "id": proposal.id, "field": proposal.field_key, "label": FIELD_BY_KEY[proposal.field_key].label,
         "value": proposal.value, "evidence": proposal.evidence, "confidence": proposal.confidence,
-        "status": proposal.status.value,
+        "status": proposal.status.value, "revision": getattr(proposal, "revision", 1) or 1,
         "validation": validate_onboarding_value(proposal.field_key, proposal.value),
     }
 

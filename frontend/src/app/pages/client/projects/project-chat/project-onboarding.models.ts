@@ -81,7 +81,7 @@ export interface ProjectChatArtifact {
 export interface SourceProposal {
   id: string; field: string; label: string; value: unknown; evidence: string | null;
   confidence: string | null; status: 'pending' | 'confirmed' | 'corrected' | 'rejected'; draftValue?: string;
-  submitting?: boolean; inlineError?: string;
+  revision?: number; submitting?: boolean; editing?: boolean; inlineError?: string;
   validation?: {
     code: string; field: string; message: string;
     minimum_words?: number; minimum_characters?: number;

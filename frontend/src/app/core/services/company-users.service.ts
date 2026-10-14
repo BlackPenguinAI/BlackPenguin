@@ -44,6 +44,7 @@ export interface CompanyUserInvite {
 export interface CompanyUserUpdate extends Omit<CompanyUserInvite, 'email'> {}
 
 export interface CompanyProjectOption { id: string; name: string; }
+export interface CompanyUserDefaults { timezone: string; }
 
 export type CompanyUserLimits = Record<InvitableCompanyUserRole, {
   used: number;
@@ -60,6 +61,10 @@ export class CompanyUsersService {
 
   limits(): Observable<CompanyUserLimits> {
     return this.http.get<CompanyUserLimits>(`${API_V1_URL}/users/company/limits`);
+  }
+
+  defaults(): Observable<CompanyUserDefaults> {
+    return this.http.get<CompanyUserDefaults>(`${API_V1_URL}/users/company/settings`);
   }
 
   invite(payload: CompanyUserInvite, idempotencyKey: string): Observable<CompanyUser> {

@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from app.db.postgres import get_db
 from app.modules.auth.deps import RoleChecker
@@ -25,6 +26,15 @@ def _country_code(value: str) -> str:
         raise HTTPException(status_code=422, detail="Select a valid two-letter Company country code.")
     return code
 
+
+def _timezone(value: str) -> str:
+    timezone = (value if isinstance(value, str) else "UTC").strip() or "UTC"
+    try:
+        ZoneInfo(timezone)
+    except ZoneInfoNotFoundError as exc:
+        raise HTTPException(status_code=422, detail="Select a valid IANA Company timezone.") from exc
+    return timezone
+
 # ==========================================
 # 1. CREAR EMPRESA Y ADMIN
 # ==========================================
@@ -37,6 +47,7 @@ def create_company_workspace(
     admin_last_name: str = Form(...),
     admin_email: str = Form(...),
     country_code: str = Form("US"),
+    timezone: str = Form("UTC"),
     is_active: str = Form('true'),       # 🚀 Company Status (default 'true')
     admin_is_active: str = Form('true'), # 🚀 User Status (default 'true')
     start_date: Optional[str] = Form(None),
@@ -72,6 +83,7 @@ def create_company_workspace(
         payment_receipt_url=receipt_url, 
         is_active=is_active_bool,
         country_code=_country_code(country_code),
+        timezone=_timezone(timezone),
     )
     db.add(new_company)
     db.flush()
@@ -84,6 +96,7 @@ def create_company_workspace(
             first_name=admin_first_name,
             last_name=admin_last_name,
             is_active=admin_is_active_bool,
+            timezone=new_company.timezone,
             invited_by_user_id=current_user.id,
         )
         db.refresh(new_company)
@@ -119,6 +132,7 @@ def update_company(
     admin_last_name: str = Form(...),
     admin_email: str = Form(...),
     country_code: str = Form("US"),
+    timezone: str = Form("UTC"),
     is_active: str = Form('true'),       
     admin_is_active: str = Form('true'), 
     start_date: Optional[str] = Form(None),
@@ -142,6 +156,7 @@ def update_company(
     if company.country_code != normalized_country:
         company.country_code = normalized_country
         services.sync_project_country(db, company_id=company.id, country_code=normalized_country)
+    company.timezone = _timezone(timezone)
     company.plan_id = plan_id
     company.is_active = is_active_bool
 
