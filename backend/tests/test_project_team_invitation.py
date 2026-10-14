@@ -2,12 +2,15 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 from types import SimpleNamespace
+import pytest
+from fastapi import HTTPException
 
 from app.db.base import Base
 from app.modules.companies.models import Company
 from app.modules.project_team.models import ProjectUserAssignment
-from app.modules.project_team.router import invite_and_assign_sales_user
-from app.modules.project_team.schemas import SalesUserInviteAndAssign
+from app.modules.project_team.router import invite_and_assign_sales_user, list_sales_candidates, upsert_assignment
+from app.modules.project_team.schemas import AssignmentUpsert, SalesUserInviteAndAssign
+from app.modules.project_team.service import eligible_sales_assignments
 from app.modules.projects.models import Project
 from app.modules.subscriptions.models import SubscriptionPlan
 from app.modules.users.models import User, UserAuthStatus, UserRole
@@ -55,5 +58,57 @@ def test_sales_invitation_flushes_assignment_when_autoflush_is_disabled(monkeypa
         assert assignment.accepts_new_leads is True
         assert result["invitation_id"] == "invitation-1"
         assert result["delivery_status"] == "accepted"
+    finally:
+        db.close(); engine.dispose()
+
+
+def test_company_administrator_can_be_assigned_as_project_sales_without_an_extra_user():
+    engine = create_engine(
+        "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool,
+    )
+    Base.metadata.create_all(engine)
+    db = sessionmaker(bind=engine)()
+    try:
+        company = Company(name="Administrator Sales Company", is_active=True)
+        other_company = Company(name="Other Company", is_active=True)
+        db.add_all([company, other_company]); db.flush()
+        administrator = User(
+            company_id=company.id, email="admin@sales.example", first_name="Company",
+            last_name="Administrator", role=UserRole.ADMIN, hashed_password="unused",
+            auth_status=UserAuthStatus.ACTIVE, is_active=True,
+        )
+        other_administrator = User(
+            company_id=other_company.id, email="other@sales.example", role=UserRole.ADMIN,
+            hashed_password="unused", auth_status=UserAuthStatus.ACTIVE, is_active=True,
+        )
+        project = Project(company_id=company.id, name="E2E Project", is_active=True)
+        db.add_all([administrator, other_administrator, project]); db.commit()
+
+        candidates = list_sales_candidates(project.id, db, administrator)
+        assert [item.id for item in candidates] == [administrator.id]
+
+        assignment = upsert_assignment(
+            project.id,
+            administrator.id,
+            AssignmentUpsert(
+                user_id=administrator.id, responsibility="sales", is_primary=True,
+                accepts_new_leads=True, is_active=True,
+            ),
+            db,
+            administrator,
+        )
+        assert assignment["user_id"] == administrator.id
+        assert assignment["responsibility"] == "sales"
+        assert [item.user_id for item in eligible_sales_assignments(db, project.id)] == [administrator.id]
+
+        with pytest.raises(HTTPException) as denied:
+            upsert_assignment(
+                project.id,
+                other_administrator.id,
+                AssignmentUpsert(user_id=other_administrator.id, responsibility="sales"),
+                db,
+                administrator,
+            )
+        assert denied.value.status_code == 422
     finally:
         db.close(); engine.dispose()

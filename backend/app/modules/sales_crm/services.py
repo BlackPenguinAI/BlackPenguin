@@ -15,7 +15,7 @@ from .schemas import LeadUpdate, MeetingCreate, MeetingUpdate
 from app.modules.brokers.models import Broker
 from app.modules.projects.models import Project
 from app.modules.projects.locations import locations_for_project, resolve_visit_location
-from app.modules.users.models import User, UserRole
+from app.modules.users.models import SALES_ACTOR_ROLES, User, UserRole
 from app.integrations.gcalendar_client import create_calendar_event
 
 def get_project_leads(db: Session, company_id: str, project_id: str, sales_user_id: str | None = None) -> List[Lead]:
@@ -271,7 +271,7 @@ def _company_sales_user(db: Session, company_id: str, user_id: str | None) -> Us
     if not user_id:
         return None
     user = db.query(User).filter(
-        User.id == user_id, User.company_id == company_id, User.role == UserRole.SALES,
+        User.id == user_id, User.company_id == company_id, User.role.in_(SALES_ACTOR_ROLES),
         User.is_active.is_(True),
     ).first()
     if not user:

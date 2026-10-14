@@ -21,7 +21,7 @@ from app.core.config import settings
 from app.core.secret_store import encrypt_secret
 from app.integrations.gcalendar_client import authorization_url, exchange_code, primary_calendar_identity, SCOPES
 from app.modules.auth.deps import RoleChecker
-from app.modules.users.models import TENANT_MANAGER_ROLES, User, UserRole
+from app.modules.users.models import SALES_ACTOR_ROLES, TENANT_MANAGER_ROLES, User, UserRole
 from app.modules.users.project_access import project_ids_for_user, require_project_access
 from app.modules.project_team.service import eligible_sales_assignments
 from app.modules.system_settings.models import CalendarOAuthAttempt
@@ -441,7 +441,7 @@ def delete_meeting(
 @router.get("/availability/me", response_model=List[AvailabilityWindowResponse])
 def get_my_availability(
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([UserRole.SALES])),
+    current_user: User = Depends(RoleChecker(SALES_ACTOR_ROLES)),
 ):
     return scheduling.availability_for_user(db, current_user.id)
 
@@ -450,7 +450,7 @@ def get_my_availability(
 def set_my_availability(
     payload: AvailabilityUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([UserRole.SALES])),
+    current_user: User = Depends(RoleChecker(SALES_ACTOR_ROLES)),
 ):
     return scheduling.replace_availability(
         db,
@@ -465,7 +465,7 @@ def get_my_availability_blocks(
     start: datetime,
     end: datetime,
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([UserRole.SALES])),
+    current_user: User = Depends(RoleChecker(SALES_ACTOR_ROLES)),
 ):
     return scheduling.availability_blocks_for_user(
         db, user_id=current_user.id, starts_at=start, ends_at=end,
@@ -476,7 +476,7 @@ def get_my_availability_blocks(
 def add_my_availability_block(
     payload: AvailabilityBlockCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([UserRole.SALES])),
+    current_user: User = Depends(RoleChecker(SALES_ACTOR_ROLES)),
 ):
     return scheduling.create_availability_block(
         db, user=current_user, starts_at=payload.starts_at, ends_at=payload.ends_at,
@@ -488,7 +488,7 @@ def add_my_availability_block(
 def add_my_availability_range(
     payload: AvailabilityBlockRangeCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([UserRole.SALES])),
+    current_user: User = Depends(RoleChecker(SALES_ACTOR_ROLES)),
 ):
     return scheduling.create_availability_range(
         db, user=current_user, timezone_name=payload.timezone,
@@ -503,7 +503,7 @@ def edit_my_availability_block(
     block_id: str,
     payload: AvailabilityBlockCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([UserRole.SALES])),
+    current_user: User = Depends(RoleChecker(SALES_ACTOR_ROLES)),
 ):
     return scheduling.update_availability_block(
         db, user=current_user, block_id=block_id, starts_at=payload.starts_at,
@@ -515,14 +515,14 @@ def edit_my_availability_block(
 def remove_my_availability_block(
     block_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([UserRole.SALES])),
+    current_user: User = Depends(RoleChecker(SALES_ACTOR_ROLES)),
 ):
     scheduling.delete_availability_block(db, user_id=current_user.id, block_id=block_id)
 
 
 def _company_sales_user(db: Session, company_id: str, user_id: str) -> User:
     user = db.query(User).filter(
-        User.id == user_id, User.company_id == company_id, User.role == UserRole.SALES,
+        User.id == user_id, User.company_id == company_id, User.role.in_(SALES_ACTOR_ROLES),
     ).first()
     if not user:
         raise HTTPException(status_code=404, detail="Sales user not found.")
@@ -592,7 +592,7 @@ def get_my_schedule(
     end: datetime,
     project_id: Optional[str] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([UserRole.SALES])),
+    current_user: User = Depends(RoleChecker(SALES_ACTOR_ROLES)),
 ):
     start_value = start.astimezone(timezone.utc).replace(tzinfo=None) if start.tzinfo else start
     end_value = end.astimezone(timezone.utc).replace(tzinfo=None) if end.tzinfo else end
@@ -627,7 +627,7 @@ def get_company_sales_schedule(
     project_id: Optional[str] = None,
 ):
     sales_query = db.query(User).filter(
-        User.company_id == current_user.company_id, User.role == UserRole.SALES, User.is_active.is_(True),
+        User.company_id == current_user.company_id, User.role.in_(SALES_ACTOR_ROLES), User.is_active.is_(True),
     ).order_by(User.first_name, User.last_name, User.email)
     sales_users = sales_query.all()
     allowed_ids = {user.id for user in sales_users}
@@ -744,7 +744,7 @@ def download_meeting_attachment(
 @router.get("/calendar-connections/me", response_model=List[CalendarConnectionResponse])
 def get_my_calendar_connections(
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([UserRole.SALES])),
+    current_user: User = Depends(RoleChecker(SALES_ACTOR_ROLES)),
 ):
     return scheduling.calendar_connections_for_user(db, current_user.id)
 
@@ -753,7 +753,7 @@ def get_my_calendar_connections(
 def set_my_calendar_connection(
     payload: CalendarConnectionUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([UserRole.SALES])),
+    current_user: User = Depends(RoleChecker(SALES_ACTOR_ROLES)),
 ):
     return scheduling.upsert_calendar_connection(
         db,
@@ -766,7 +766,7 @@ def set_my_calendar_connection(
 @router.get("/calendar/google/connect")
 def connect_google_calendar(
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([UserRole.SALES])),
+    current_user: User = Depends(RoleChecker(SALES_ACTOR_ROLES)),
 ):
     google_calendar_credentials(db)
     nonce = secrets.token_urlsafe(32)
@@ -789,7 +789,7 @@ def connect_google_calendar(
 @router.get("/calendar/google/platform-status")
 def google_calendar_platform_status(
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([UserRole.SALES])),
+    current_user: User = Depends(RoleChecker(SALES_ACTOR_ROLES)),
 ):
     config = get_google_calendar_config(db)
     return {
@@ -816,7 +816,9 @@ def google_calendar_callback(
         ).with_for_update().one()
         attempt.consumed_at = datetime.utcnow()
         db.commit()
-        user = db.query(User).filter(User.id == payload.get("sub"), User.role == UserRole.SALES, User.is_active.is_(True)).one()
+        user = db.query(User).filter(
+            User.id == payload.get("sub"), User.role.in_(SALES_ACTOR_ROLES), User.is_active.is_(True),
+        ).one()
         tokens = exchange_code(db, code)
         identity = primary_calendar_identity(tokens["access_token"])
     except (JWTError, KeyError, httpx.HTTPError, ValueError, NoResultFound, HTTPException):
@@ -839,7 +841,7 @@ def google_calendar_callback(
 @router.delete("/calendar/google", status_code=status.HTTP_204_NO_CONTENT)
 def disconnect_google_calendar(
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([UserRole.SALES])),
+    current_user: User = Depends(RoleChecker(SALES_ACTOR_ROLES)),
 ):
     item = db.query(CalendarConnection).filter(CalendarConnection.user_id == current_user.id, CalendarConnection.provider == "google").first()
     if item: db.delete(item); db.commit()

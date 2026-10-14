@@ -98,4 +98,31 @@ describe('SalesComponent scheduling view', () => {
     expect(component.timezoneLabel('America/Lima')).toContain('Lima — America/Lima');
     expect(component.timezoneLabel('America/Bogota')).toContain('Bogotá — America/Bogota');
   });
+
+  it('lets a Company administrator act as Sales only for appointments assigned to that administrator', () => {
+    vi.stubGlobal('localStorage', { getItem: () => 'admin' });
+    const component = new SalesComponent({} as any, { markForCheck: () => undefined } as any);
+    component.administratorSalesUserId = 'admin-1';
+    component.selected = { assigned_sales_user_id: 'admin-1' };
+    expect(component.isManager).toBe(true);
+    expect(component.isPersonalSalesActor).toBe(true);
+    expect(component.canReportSelectedMeeting).toBe(true);
+
+    component.selected = { assigned_sales_user_id: 'sales-2' };
+    expect(component.canReportSelectedMeeting).toBe(false);
+  });
+
+  it('auto-selects the administrator when the Company has no dedicated Sales users', () => {
+    vi.stubGlobal('localStorage', { getItem: () => 'admin' });
+    const http = {
+      get: () => ({ subscribe: (observer: any) => observer.next({
+        sales_users: [{ id: 'admin-1', role: 'admin', first_name: 'A', last_name: 'D', email: 'admin@example.com' }],
+        availability: [], meetings: [],
+      }) }),
+    };
+    const component = new SalesComponent(http as any, { markForCheck: () => undefined } as any);
+    component.loadManagerSchedule();
+    expect(component.administratorSalesUserId).toBe('admin-1');
+    expect(component.salesUserId).toBe('admin-1');
+  });
 });

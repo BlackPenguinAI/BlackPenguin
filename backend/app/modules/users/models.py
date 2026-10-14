@@ -27,6 +27,13 @@ class UserAuthStatus(str, enum.Enum):
 # be managed through the superadmin Company workflow.
 TENANT_MANAGER_ROLES = [UserRole.ADMIN, UserRole.ASSISTANT]
 
+# A Company administrator may explicitly act as the Sales owner of a Project
+# for end-to-end validation without provisioning an additional paid seat.  The
+# capability is intentionally narrower than TENANT_MANAGER_ROLES: assistants
+# retain supervisory access, but they are not eligible for lead routing or a
+# personal Sales calendar.
+SALES_ACTOR_ROLES = [UserRole.ADMIN, UserRole.SALES]
+
 class User(Base):
     __tablename__ = "users"
     

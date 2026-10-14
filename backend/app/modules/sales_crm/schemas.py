@@ -2,6 +2,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from typing import Optional, List
 from datetime import date, datetime, time
 from .models import FunnelStage, MeetingStatus
+from app.modules.users.models import UserRole
 
 class SmsChatMessageSchema(BaseModel):
     id: str
@@ -226,6 +227,8 @@ class SalesUserOption(BaseModel):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     email: str
+    role: UserRole
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ManagerSalesScheduleResponse(SalesScheduleResponse):

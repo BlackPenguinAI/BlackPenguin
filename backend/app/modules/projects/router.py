@@ -26,7 +26,7 @@ from app.modules.onboarding_jobs.models import OnboardingSourceJob
 from app.modules.onboarding_copy import conversational_acknowledgement
 from app.modules.system_settings import services as system_settings_service
 from app.modules.project_team.models import ProjectUserAssignment
-from app.modules.users.models import TENANT_MANAGER_ROLES, User, UserRole
+from app.modules.users.models import SALES_ACTOR_ROLES, TENANT_MANAGER_ROLES, User, UserRole
 from app.modules.users.project_access import project_ids_for_user, require_project_access
 from app.modules.governance.services import request_fingerprint
 
@@ -909,7 +909,7 @@ def apply_onboarding_action(
                     ProjectUserAssignment.is_active.is_(True),
                     ProjectUserAssignment.accepts_new_leads.is_(True),
                     User.is_active.is_(True),
-                    User.role == UserRole.SALES,
+                    User.role.in_(SALES_ACTOR_ROLES),
                 )
                 .all()
             )

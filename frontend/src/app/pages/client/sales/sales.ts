@@ -18,7 +18,7 @@ export class SalesComponent implements OnInit {
   meetings: any[] = []; availability: any[] = []; salesUsers: any[] = []; projects: any[] = []; leads: any[] = [];
   role = typeof localStorage === 'undefined' ? '' : localStorage.getItem('bp_role') || '';
   section: ScheduleSection = 'availability'; view: CalendarView = 'month'; cursor = new Date();
-  salesUserId = ''; projectId = ''; userTimezone = 'UTC'; timezone = 'UTC';
+  salesUserId = ''; administratorSalesUserId = ''; projectId = ''; userTimezone = 'UTC'; timezone = 'UTC';
   readonly timezoneLabel = timezoneLabel;
   loading = true; saving = false; availabilitySaving = false; attachmentSaving = false; projectTimezoneSaving = false;
   error = ''; success = ''; selected: any = null; selectedLead: any = null; selectedDay: Date | null = null; editingBlock: any = null;
@@ -36,7 +36,7 @@ export class SalesComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadProfile(); this.loadProjects(); this.reload();
-    if (this.role === 'sales') {
+    if (this.isPersonalSalesActor) {
       const result = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('calendar');
       if (result === 'connected') this.success = 'Google Calendar connected successfully.';
       if (result === 'failed') this.error = 'Google Calendar connection failed. Verify the Google OAuth test-user or production approval settings.';
@@ -45,6 +45,13 @@ export class SalesComponent implements OnInit {
     }
   }
   get isManager(): boolean { return this.role === 'admin' || this.role === 'assistant'; }
+  get isPersonalSalesActor(): boolean { return this.role === 'admin' || this.role === 'sales'; }
+  get canReportSelectedMeeting(): boolean {
+    return !!this.selected && (
+      this.role === 'sales'
+      || (this.role === 'admin' && this.selected.assigned_sales_user_id === this.administratorSalesUserId)
+    );
+  }
   get selectedProject(): any { return this.projects.find(project => project.id === (this.projectId || this.selected?.project_id)); }
   get projectLocations(): any[] {
     const value = this.selectedProject?.profile?.data?.exact_address || this.selectedProject?.address;
@@ -90,7 +97,15 @@ export class SalesComponent implements OnInit {
     const userFilter = this.salesUserId ? `&sales_user_id=${encodeURIComponent(this.salesUserId)}` : '';
     const projectFilter = this.projectId ? `&project_id=${encodeURIComponent(this.projectId)}` : '';
     this.http.get<any>(`${API_V1_URL}/sales/schedule?start=${encodeURIComponent(range.start)}&end=${encodeURIComponent(range.end)}${userFilter}${projectFilter}`).subscribe({
-      next: data => { this.salesUsers = data.sales_users || this.salesUsers; this.acceptSchedule(data); },
+      next: data => {
+        this.salesUsers = data.sales_users || this.salesUsers;
+        this.administratorSalesUserId = this.salesUsers.find(user => user.role === 'admin')?.id || '';
+        const dedicatedSalesUsers = this.salesUsers.filter(user => user.role === 'sales');
+        if (this.role === 'admin' && !this.salesUserId && !dedicatedSalesUsers.length) {
+          this.salesUserId = this.administratorSalesUserId;
+        }
+        this.acceptSchedule(data);
+      },
       error: err => this.fail(err.error?.detail || 'Company schedule could not be loaded.'),
     });
   }
@@ -210,7 +225,7 @@ export class SalesComponent implements OnInit {
   }
 
   saveMeeting(): void {
-    if (!this.selected || this.role !== 'sales') return; this.saving = true;
+    if (!this.canReportSelectedMeeting) return; this.saving = true;
     const payload: any = { status: this.selected.status, confirmation_status: this.selected.confirmation_status, visit_notes: this.selected.visit_notes || null, visit_details: this.selected.visit_details || null };
     if (this.selected.status === 'sale_closed' && this.closingDate) payload.sale_closed_at = `${this.closingDate}T12:00:00`;
     this.http.put<any>(`${API_V1_URL}/sales/meetings/${this.selected.id}`, payload).subscribe({ next: row => { Object.assign(this.selected, row); this.persistedStatus = row.status; this.saving = false; this.success = 'Appointment report updated.'; this.refreshMeeting(row); this.cdr.markForCheck(); }, error: err => { this.saving = false; this.error = err.error?.detail || 'Appointment could not be updated.'; this.cdr.markForCheck(); } });
@@ -235,6 +250,10 @@ export class SalesComponent implements OnInit {
     return [...current, ...(next[status] || []).map(value => ({ value, label: this.statusLabel(value) }))];
   }
   statusLabel(status: string): string { return ({ scheduled: 'Scheduled', confirmed: 'Confirmed', in_progress: 'Visit in progress', completed: 'Completed', completed_sale_pending: 'Completed · sale pending', sale_closed: 'Sale completed', cancelled: 'Cancelled', no_show: 'No show' } as any)[status] || status; }
+  salesUserLabel(user: any): string {
+    const name = `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email;
+    return user.role === 'admin' ? `${name} · Company Administrator` : name;
+  }
   meetingsFor(day: Date): any[] { return this.meetings.filter(item => this.dateKey(item.meeting_time, item.project_timezone || this.timezone) === this.localDateKey(day)); }
   availabilityFor(day: Date): any[] { return this.availability.filter(item => this.dateKey(item.starts_at, item.timezone) === this.localDateKey(day)); }
   formatBlockTime(value: string, timezone: string): string { return this.timeValue(value, timezone); }

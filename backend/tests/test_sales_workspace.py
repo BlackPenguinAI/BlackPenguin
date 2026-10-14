@@ -24,7 +24,7 @@ from app.modules.projects.models import Project
 from app.modules.sales_agent.models import SalesConversation, SalesMessage
 from app.modules.sales_agent.service import conversation_messages
 from app.modules.sales_crm.models import Lead, Meeting, MeetingAttachment, MeetingStatus, SalesAvailabilityBlock
-from app.modules.sales_crm.schemas import MeetingUpdate
+from app.modules.sales_crm.schemas import ManagerSalesScheduleResponse, MeetingUpdate
 from app.modules.sales_crm.scheduling import (
     availability_blocks_for_user, create_availability_block, create_availability_range, delete_availability_block,
     update_availability_block,
@@ -296,17 +296,46 @@ def test_manager_schedule_lists_and_filters_company_sales_users(db):
         db, user=sales_b, starts_at=start + timedelta(days=3, hours=9),
         ends_at=start + timedelta(days=3, hours=12), timezone_name="America/Toronto",
     )
+    create_availability_block(
+        db, user=manager, starts_at=start + timedelta(days=4, hours=9),
+        ends_at=start + timedelta(days=4, hours=12), timezone_name="America/Lima",
+    )
     db.add_all([
         Meeting(project_id=project.id, lead_id=lead.id, assigned_sales_user_id=sales_a.id, meeting_time=start + timedelta(days=2, hours=10)),
         Meeting(project_id=project.id, lead_id=lead.id, assigned_sales_user_id=sales_b.id, meeting_time=start + timedelta(days=3, hours=10)),
+        Meeting(project_id=project.id, lead_id=lead.id, assigned_sales_user_id=manager.id, meeting_time=start + timedelta(days=4, hours=10)),
     ]); db.commit()
     all_users = get_company_sales_schedule(start, start + timedelta(days=31), None, db, manager)
-    assert {user.id for user in all_users["sales_users"]} == {sales_a.id, sales_b.id}
-    assert len(all_users["availability"]) == 2
-    assert len(all_users["meetings"]) == 2
+    serialized = ManagerSalesScheduleResponse.model_validate(all_users)
+    assert {user.id for user in all_users["sales_users"]} == {manager.id, sales_a.id, sales_b.id}
+    assert {user.role for user in serialized.sales_users} == {UserRole.ADMIN, UserRole.SALES}
+    assert len(all_users["availability"]) == 3
+    assert len(all_users["meetings"]) == 3
     filtered = get_company_sales_schedule(start, start + timedelta(days=31), sales_b.id, db, manager)
     assert {item.user_id for item in filtered["availability"]} == {sales_b.id}
     assert {item.assigned_sales_user_id for item in filtered["meetings"]} == {sales_b.id}
+
+
+def test_company_administrator_can_own_a_real_appointment(db):
+    company, _, _, project, lead, _ = _fixture(db)
+    administrator = User(
+        company_id=company.id, email="administrator-sales@example.com",
+        hashed_password="x", role=UserRole.ADMIN,
+    )
+    db.add(administrator); db.commit()
+
+    meeting = create_meeting(
+        db,
+        MeetingCreate(
+            project_id=project.id, lead_id=lead.id,
+            assigned_sales_user_id=administrator.id,
+            meeting_time=datetime(2026, 9, 7, 15, 0),
+            duration_minutes=45, modality="in_person",
+        ),
+        company.id,
+    )
+
+    assert meeting.assigned_sales_user_id == administrator.id
 
 
 def test_manager_creates_updates_and_deletes_assigned_appointment(db):

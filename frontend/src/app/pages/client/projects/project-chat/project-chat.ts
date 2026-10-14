@@ -30,6 +30,7 @@ import {
   ProjectPropertyType, PropertyTypeCatalog,
 } from './project-onboarding.models';
 import { ProjectOnboardingService } from './project-onboarding.service';
+import { availableProjectSalesCandidates, companyAdministratorSalesCandidate } from './project-sales-capabilities';
 import {
   errorCount,
   FormErrors,
@@ -622,8 +623,10 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   }
 
   get availableSalesUsers(): ProjectSalesCandidate[] {
-    const assigned = new Set(this.projectTeam.filter((item) => item.responsibility === 'sales').map((item) => item.user_id));
-    return this.companyUsers.filter((item) => item.role === 'sales' && item.is_active && !assigned.has(item.id));
+    return availableProjectSalesCandidates(this.companyUsers, this.projectTeam);
+  }
+  get administratorSalesCandidate(): ProjectSalesCandidate | undefined {
+    return companyAdministratorSalesCandidate(this.companyUsers, this.projectTeam);
   }
   get assignedSalesUsers(): ProjectAssignment[] {
     return this.projectTeam.filter((item) => item.responsibility === 'sales' && item.is_active);
@@ -655,6 +658,12 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
         this.cdr.detectChanges();
       },
     });
+  }
+  useAdministratorAsSales(message: ChatMessage): void {
+    const administrator = this.administratorSalesCandidate;
+    if (!administrator || this.teamBusy) return;
+    this.selectedSalesUserId = administrator.id;
+    this.assignSelectedSalesUser(message);
   }
   inviteSalesUser(message: ChatMessage): void {
     if (!this.canInviteSalesUser) return;

@@ -163,7 +163,7 @@ export interface ProjectAssignment {
 
 export interface ProjectSalesCandidate {
   id: string; email: string; first_name?: string; last_name?: string;
-  role: 'sales'; is_active: boolean;
+  role: 'admin' | 'sales'; is_active: boolean;
 }
 
 export interface MetaSetupConfiguration {

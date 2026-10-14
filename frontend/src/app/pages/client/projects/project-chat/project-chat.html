@@ -86,7 +86,7 @@
               <div class="flex items-start justify-between gap-3">
                 <div>
                   <h2 class="text-sm font-semibold">Assign the project Sales team</h2>
-                  <p class="mt-1 text-xs leading-relaxed text-gray-400">Select an existing Sales user or create one here. Login emails are separate from public project contact information.</p>
+                  <p class="mt-1 text-xs leading-relaxed text-gray-400">Select an existing Sales user or let the Company Administrator act as Sales for end-to-end testing without creating another user.</p>
                 </div>
                 <span class="material-symbols-outlined text-secondary">group_add</span>
               </div>
@@ -98,10 +98,11 @@
               </div>
               <p *ngIf="teamSetupMessage" class="mt-3 rounded-lg border border-green-500/20 bg-green-500/10 p-3 text-xs text-green-300">{{ teamSetupMessage }}</p>
               <p *ngIf="teamSetupWarning" class="mt-3 rounded-lg border border-amber-500/25 bg-amber-500/[0.08] p-3 text-xs text-amber-200">{{ teamSetupWarning }}</p>
+              <button *ngIf="administratorSalesCandidate" type="button" (click)="useAdministratorAsSales(msg)" [disabled]="teamBusy" class="structured-primary mt-4">Use Company Administrator for testing</button>
               <div class="mt-4 grid gap-2 sm:grid-cols-[1fr_auto]">
                 <select [(ngModel)]="selectedSalesUserId" class="secure-input">
-                  <option value="">Select an existing Sales user</option>
-                  <option *ngFor="let user of availableSalesUsers" [value]="user.id">{{ user.first_name }} {{ user.last_name }} · {{ user.email }}</option>
+                  <option value="">Select an existing Sales-capable user</option>
+                  <option *ngFor="let user of availableSalesUsers" [value]="user.id">{{ user.first_name }} {{ user.last_name }} · {{ user.email }}{{ user.role === 'admin' ? ' · Company Administrator' : '' }}</option>
                 </select>
                 <button (click)="assignSelectedSalesUser(msg)" [disabled]="!selectedSalesUserId || teamBusy" class="structured-primary">Assign</button>
               </div>
@@ -422,7 +423,7 @@
       <section class="rounded-xl border border-white/10 bg-white/[0.025] p-4">
         <h3 class="text-xs font-bold uppercase tracking-wider">Sales activation</h3>
         <div class="mt-3 flex items-center justify-between text-[11px]"><span class="text-gray-400">AI-assisted sales</span><span>{{ aiAuthorizationStatus === 'confirmed' || aiAuthorizationStatus === 'corrected_by_user' ? 'Authorized' : 'Pending' }}</span></div>
-        <div class="mt-3 flex items-center justify-between text-[11px]"><span class="text-gray-400">Assigned Sales users</span><span>{{ assignedSalesUsers.length }}</span></div>
+        <div class="mt-3 flex items-center justify-between text-[11px]"><span class="text-gray-400">Assigned Sales-capable users</span><span>{{ assignedSalesUsers.length }}</span></div>
         <div class="mt-2 flex items-center justify-between text-[11px]"><span class="text-gray-400">Lead distribution</span><span>Round robin · Automatic</span></div>
         <p class="mt-1 text-[10px] leading-relaxed text-gray-600">Each new lead goes to the next available Sales user. Manual reassignment is always available.</p>
         <div class="mt-3 flex items-center justify-between text-[11px]"><span class="text-gray-400">Meta Lead Ads</span><span>{{ metaActivationLabel }}</span></div>

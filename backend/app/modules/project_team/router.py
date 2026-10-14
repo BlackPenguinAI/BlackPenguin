@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.db.postgres import get_db
 from app.modules.auth.deps import RoleChecker
 from app.modules.projects.models import Project
-from app.modules.users.models import TENANT_MANAGER_ROLES, User, UserRole
+from app.modules.users.models import SALES_ACTOR_ROLES, TENANT_MANAGER_ROLES, User, UserRole
 from app.modules.users import services as user_services
 from app.modules.users.schemas import TenantUserResponse
 from app.modules.users.project_access import require_project_access
@@ -66,9 +66,9 @@ def list_sales_candidates(
     _project(db, project_id, current_user)
     return db.query(User).filter(
         User.company_id == current_user.company_id,
-        User.role == UserRole.SALES,
+        User.role.in_(SALES_ACTOR_ROLES),
         User.is_active.is_(True),
-    ).order_by(User.email.asc()).all()
+    ).order_by(User.role.asc(), User.email.asc()).all()
 
 
 @router.put("/{project_id}/team/{user_id}", response_model=AssignmentResponse)
@@ -83,8 +83,8 @@ def upsert_assignment(
     if payload.user_id != user_id:
         raise HTTPException(status_code=422, detail="Path and payload user IDs differ.")
     user = db.query(User).filter(User.id == user_id, User.company_id == current_user.company_id).first()
-    expected_role = UserRole.MKT if payload.responsibility == "marketing" else UserRole.SALES
-    if not user or user.role != expected_role or not user.is_active:
+    allowed_roles = [UserRole.MKT] if payload.responsibility == "marketing" else SALES_ACTOR_ROLES
+    if not user or user.role not in allowed_roles or not user.is_active:
         raise HTTPException(status_code=422, detail=f"A {payload.responsibility} assignment requires a matching active Company user.")
     item = db.query(ProjectUserAssignment).filter(
         ProjectUserAssignment.project_id == project_id,

@@ -2,14 +2,15 @@ from __future__ import annotations
 
 from sqlalchemy.orm import Session
 
-from app.modules.users.models import User
+from app.modules.users.models import SALES_ACTOR_ROLES, User
 
 from .models import ProjectRoutingState, ProjectUserAssignment
 
 
 ROUND_ROBIN_DESCRIPTION = (
-    "Round robin assigns each new lead or appointment to the next active Sales user "
-    "assigned to the project. Managers can always reassign it manually."
+    "Round robin assigns each new lead or appointment to the next active Sales-capable user "
+    "assigned to the project. A Company Administrator may be assigned for end-to-end testing "
+    "without creating another user. Managers can always reassign it manually."
 )
 
 
@@ -23,6 +24,7 @@ def eligible_sales_assignments(db: Session, project_id: str) -> list[ProjectUser
             ProjectUserAssignment.is_active.is_(True),
             ProjectUserAssignment.accepts_new_leads.is_(True),
             User.is_active.is_(True),
+            User.role.in_(SALES_ACTOR_ROLES),
         )
         .order_by(ProjectUserAssignment.created_at.asc(), ProjectUserAssignment.user_id.asc())
         .all()

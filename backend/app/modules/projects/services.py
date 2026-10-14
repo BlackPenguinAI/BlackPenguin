@@ -13,7 +13,7 @@ from sqlalchemy.orm.attributes import flag_modified
 from app.modules.companies.models import Company
 from app.modules.onboarding_questions import validate_onboarding_value
 from app.modules.project_team.models import ProjectUserAssignment
-from app.modules.users.models import User, UserRole
+from app.modules.users.models import SALES_ACTOR_ROLES, User, UserRole
 from app.modules.sales_crm.models import CalendarConnection
 from app.modules.system_settings.models import GoogleCalendarConfig
 from app.modules.users.project_access import sync_all_scope_users_for_project
@@ -772,7 +772,7 @@ def serialize_overview(db: Session, project: Project, viewer_user: User | None =
     ).filter(
         ProjectUserAssignment.project_id == project.id,
         ProjectUserAssignment.is_active.is_(True),
-        User.role == UserRole.SALES,
+        User.role.in_(SALES_ACTOR_ROLES),
         User.is_active.is_(True),
     ).all()
     if viewer_user and viewer_user.role == UserRole.SALES:
