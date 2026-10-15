@@ -44,8 +44,11 @@ class PlatformAuditEvent(Base):
     __tablename__ = "platform_audit_events"
 
     id = Column(String(36), primary_key=True, default=_id)
-    company_id = Column(String(36), ForeignKey("companies.id", ondelete="SET NULL"), nullable=True, index=True)
-    actor_user_id = Column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    # Audit subjects are historical identifiers, not live relationships.
+    # Foreign keys with ON DELETE SET NULL would mutate this immutable table
+    # whenever a Company or actor is deleted.
+    company_id = Column(String(36), nullable=True, index=True)
+    actor_user_id = Column(String(36), nullable=True, index=True)
     actor_role = Column(String(30), nullable=True)
     event_type = Column(String(80), nullable=False, index=True)
     entity_type = Column(String(60), nullable=True)
@@ -63,8 +66,10 @@ class DataExportAuditEvent(Base):
     __tablename__ = "data_export_audit_events"
 
     id = Column(String(36), primary_key=True, default=_id)
-    company_id = Column(String(36), ForeignKey("companies.id", ondelete="SET NULL"), nullable=True, index=True)
-    actor_user_id = Column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    # Keep the original identifiers after their parent records are removed so
+    # export evidence remains immutable and attributable.
+    company_id = Column(String(36), nullable=True, index=True)
+    actor_user_id = Column(String(36), nullable=True, index=True)
     actor_role = Column(String(30), nullable=False)
     export_type = Column(String(40), nullable=False, index=True)
     filters_json = Column(JSON, default=dict, nullable=False)
