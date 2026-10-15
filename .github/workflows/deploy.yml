@@ -268,6 +268,8 @@ jobs:
               echo "MAILCHIMP_API_KEY=$MAILCHIMP_KEY"
               echo "MAILCHIMP_LIST_ID=$MAILCHIMP_LIST"
               echo "MAILCHIMP_SERVER=$MAILCHIMP_SERVER"
+              echo "FIREBASE_ADMIN_BRIDGE_URL=$FIREBASE_ADMIN_BRIDGE_URL"
+              echo "FIREBASE_ADMIN_BRIDGE_SECRET=$FIREBASE_ADMIN_BRIDGE_SECRET"
               echo "PROJECT_UPLOAD_ROOT=$UPLOAD_DIR"
               echo "SEED_MINTO_DEMO=true"
               echo "MINTO_DEMO_EMAIL=test@minto.com"
