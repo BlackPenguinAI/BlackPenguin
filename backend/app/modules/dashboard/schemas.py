@@ -1,4 +1,6 @@
 from datetime import datetime
+from typing import Literal
+
 from pydantic import BaseModel
 
 
@@ -16,3 +18,23 @@ class DashboardStats(BaseModel):
     leads_count: int
     ai_interactions_count: int
     sales: dict | None = None
+
+
+SetupStepId = Literal["company", "project", "availability", "lead"]
+SetupStepStatus = Literal["complete", "current", "locked"]
+
+
+class SetupProgressStep(BaseModel):
+    id: SetupStepId
+    label: str
+    status: SetupStepStatus
+    url: str
+    entity_id: str | None = None
+    detail: str
+
+
+class SetupProgress(BaseModel):
+    current_step: SetupStepId | Literal["complete"]
+    next_url: str
+    is_complete: bool
+    steps: list[SetupProgressStep]

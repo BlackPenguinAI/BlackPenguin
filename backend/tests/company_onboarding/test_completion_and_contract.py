@@ -37,6 +37,7 @@ from app.modules.company_onboarding.source_service import (
     _logo_candidate_urls,
     _logo_urls_from_json_ld,
     _prepare_logo_candidate,
+    _structured_company_facts,
     classify_url,
     validate_public_url,
 )
@@ -415,6 +416,29 @@ def test_html_deduplicates_phone_formats_and_extracts_schema_org_company_facts()
     assert values["official_company_name"] == "Fouquet's Miami"
     assert values["headquarters"] == "5000 Biscayne Blvd, Miami, FL, 33137, US"
     assert values["public_contact_phones"] == ["3052304300"]
+
+
+def test_semantic_address_is_a_headquarters_candidate_when_json_ld_is_missing():
+    from bs4 import BeautifulSoup
+
+    soup = BeautifulSoup('''<html><body><footer>
+      <address itemprop="address">35 NE 40th Street, Miami, FL 33137, United States</address>
+    </footer></body></html>''', "html.parser")
+
+    facts = _structured_company_facts(soup)
+
+    assert facts["headquarters"] == "35 NE 40th Street, Miami, FL 33137, United States"
+
+
+def test_generic_project_city_text_is_not_promoted_to_company_headquarters():
+    from bs4 import BeautifulSoup
+
+    soup = BeautifulSoup('''<html><body>
+      <h1>New residences in Miami, United States</h1>
+      <p>Explore our latest waterfront Project.</p>
+    </body></html>''', "html.parser")
+
+    assert "headquarters" not in _structured_company_facts(soup)
 
 
 def test_svg_logo_candidates_are_sanitized_before_storage():

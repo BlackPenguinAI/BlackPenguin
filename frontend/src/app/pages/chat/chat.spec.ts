@@ -189,6 +189,47 @@ describe('ChatComponent', () => {
     expect(component.visibleMessages.map(message => message.id)).toEqual(['next-question']);
   });
 
+  it('brings the next required question back beside the composer after the logo step', () => {
+    vi.useFakeTimers();
+    const activeStep = document.createElement('div');
+    vi.spyOn(activeStep, 'getBoundingClientRect').mockReturnValue({
+      top: 560, bottom: 620, height: 60, left: 0, right: 400, width: 400, x: 0, y: 560,
+      toJSON: () => ({}),
+    });
+    const container = document.createElement('div');
+    container.scrollTop = 0;
+    vi.spyOn(container, 'getBoundingClientRect').mockReturnValue({
+      top: 0, bottom: 500, height: 500, left: 0, right: 500, width: 500, x: 0, y: 0,
+      toJSON: () => ({}),
+    });
+    vi.spyOn(container, 'querySelector').mockReturnValue(activeStep);
+    component.chatScroll = { nativeElement: container } as never;
+    component.currentStage = 'logo_review';
+    (component as any).lastStateVersion = 0;
+    vi.spyOn(component, 'loadCompanyMedia').mockImplementation(() => undefined);
+    const transitionScroll = vi.spyOn(component as any, 'scrollActiveStepIntoView');
+
+    (component as any).applyState({
+      messages: [{
+        id: 'headquarters-question', sender: 'ai', content: 'What should I record for Headquarters?',
+        created_at: new Date().toISOString(), attachments: [],
+        ui_payload: { field: 'headquarters', label: 'Headquarters', prompt: 'Headquarters?', input_type: 'text', options: [], examples: [], allow_custom: true, minimum_words: null },
+      }],
+      profile: EMPTY_COMPANY_PROFILE, sources: [], stage: 'required', version: 1,
+      team: { administrator: null, members: [], roles: [] },
+      next_question: null,
+    });
+    expect(transitionScroll).toHaveBeenCalledOnce();
+
+    transitionScroll.mockRestore();
+    component.chatScroll = { nativeElement: container } as never;
+    (component as any).scrollActiveStepIntoView();
+    vi.runAllTimers();
+
+    expect(container.scrollTop).toBeGreaterThan(0);
+    vi.useRealTimers();
+  });
+
   it('should save public contact information as structured lists', () => {
     component.currentStage = 'enrichment';
     component.publicEmails = 'info@example.com, sales@example.com';

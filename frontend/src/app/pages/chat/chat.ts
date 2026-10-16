@@ -114,6 +114,7 @@ export class ChatComponent implements OnInit, OnDestroy {
   private teamInviteRequestKey = '';
   private teamInviteRequestFingerprint = '';
   private pollingStartedAt = 0;
+  private readonly activeStepScrollTimers = new Set<ReturnType<typeof setTimeout>>();
   private readonly expandedSourceIds = new Set<string>();
   readonly savingWebsiteSourceIds = new Set<string>();
   readonly confirmingSourceIds = new Set<string>();
@@ -153,6 +154,7 @@ export class ChatComponent implements OnInit, OnDestroy {
     this.speech.abort();
     this.speechSubscriptions.unsubscribe();
     if (this.pollingTimer) clearTimeout(this.pollingTimer);
+    for (const timer of this.activeStepScrollTimers) clearTimeout(timer);
     for (const url of this.companyMediaUrls.values()) URL.revokeObjectURL(url);
   }
 
@@ -1015,8 +1017,10 @@ export class ChatComponent implements OnInit, OnDestroy {
     if (state.stage === 'processing') this.schedulePolling();
     else this.pollingStartedAt = 0;
     this.cdr.detectChanges();
-    if (previousStage !== state.stage && ['logo_review', 'team', 'enrichment'].includes(state.stage)) {
-      this.scrollToBottom();
+    if (previousStage !== state.stage && [
+      'logo_review', 'required', 'team', 'conditional', 'enrichment', 'approval', 'complete',
+    ].includes(state.stage)) {
+      this.scrollActiveStepIntoView();
     }
   }
 
@@ -1180,5 +1184,25 @@ export class ChatComponent implements OnInit, OnDestroy {
       const element = this.chatScroll?.nativeElement;
       if (element) element.scrollTop = element.scrollHeight;
     }, 100);
+  }
+
+  private scrollActiveStepIntoView(): void {
+    for (const delay of [0, 120, 320]) {
+      const timer = setTimeout(() => {
+        this.activeStepScrollTimers.delete(timer);
+        const container = this.chatScroll?.nativeElement;
+        const target = container?.querySelector<HTMLElement>('[data-active-onboarding-step="true"]');
+        if (!container || !target) return;
+        const containerRect = container.getBoundingClientRect();
+        const targetRect = target.getBoundingClientRect();
+        const preferredBottom = containerRect.bottom - 24;
+        if (targetRect.height >= containerRect.height - 48) {
+          container.scrollTop += targetRect.top - containerRect.top - 24;
+        } else if (targetRect.bottom > preferredBottom || targetRect.top < containerRect.top + 24) {
+          container.scrollTop += targetRect.bottom - preferredBottom;
+        }
+      }, delay);
+      this.activeStepScrollTimers.add(timer);
+    }
   }
 }

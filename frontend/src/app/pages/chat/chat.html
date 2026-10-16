@@ -42,7 +42,11 @@
           class="flex w-full"
           [ngClass]="msg.sender === 'user' ? 'justify-end' : 'justify-start'"
         >
-          <div *ngIf="msg.sender === 'ai'" class="min-w-0 w-full">
+          <div
+            *ngIf="msg.sender === 'ai'"
+            class="min-w-0 w-full"
+            [attr.data-active-onboarding-step]="isActiveQuestion(msg) ? 'true' : null"
+          >
             <app-onboarding-ai-message
               [message]="msg"
               [active]="isActiveQuestion(msg)"
@@ -180,7 +184,7 @@
       </details>
       </ng-template>
 
-      <div *ngIf="currentStage === 'enrichment'" class="flex max-w-3xl gap-4">
+      <div *ngIf="currentStage === 'enrichment'" class="flex max-w-3xl gap-4" data-active-onboarding-step="true">
         <div class="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-secondary/50 bg-secondary/20">
           <span class="material-symbols-outlined text-[18px] text-secondary">contact_phone</span>
         </div>
@@ -205,7 +209,7 @@
         </section>
       </div>
 
-      <div *ngIf="currentStage === 'team'" class="flex max-w-3xl gap-4">
+      <div *ngIf="currentStage === 'team'" class="flex max-w-3xl gap-4" data-active-onboarding-step="true">
         <div class="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-secondary/50 bg-secondary/20">
           <span class="material-symbols-outlined text-[18px] text-secondary">group_add</span>
         </div>
@@ -275,7 +279,7 @@
         </section>
       </div>
 
-      <div *ngIf="currentStage === 'logo_review'" class="flex max-w-3xl gap-4" data-testid="company-logo-step">
+      <div *ngIf="currentStage === 'logo_review'" class="flex max-w-3xl gap-4" data-testid="company-logo-step" data-active-onboarding-step="true">
         <div class="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-secondary/50 bg-secondary/20"><span class="material-symbols-outlined text-[18px] text-secondary">image</span></div>
         <section class="w-full rounded-2xl rounded-tl-sm border border-white/10 bg-white/5 p-4 md:p-5">
           <h2 class="text-sm font-semibold">Company logo</h2><p class="mt-1 text-xs leading-relaxed text-gray-400">Choose a candidate extracted from the website, upload the official logo, or provide it later.</p>
@@ -290,7 +294,7 @@
         </section>
       </div>
 
-      <div *ngIf="isCompleted" class="flex max-w-3xl gap-4" data-testid="company-onboarding-complete">
+      <div *ngIf="isCompleted" class="flex max-w-3xl gap-4" data-testid="company-onboarding-complete" data-active-onboarding-step="true">
         <div class="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-green-500/40 bg-green-500/10">
           <span class="material-symbols-outlined text-[18px] text-green-400">verified</span>
         </div>
