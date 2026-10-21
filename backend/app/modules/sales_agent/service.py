@@ -122,14 +122,76 @@ def _action_types(actions: list[dict] | None) -> set[str]:
     }
 
 
-def _is_availability_request(text: str, *, now: datetime, zone: ZoneInfo) -> bool:
-    """Detect scheduling turns independently from the model's optional tool action."""
-    lowered = text.casefold()
-    scheduling_words = (
-        "appointment", "schedule", "availability", "available", "slot", "visit",
-        "cita", "agendar", "horario", "disponible", "visita",
+def _recent_appointment_context(db: Session, conversation_id: str) -> bool:
+    """Return whether the latest agent turn established scheduling context."""
+    recent = db.query(SalesMessage).filter(
+        SalesMessage.conversation_id == conversation_id,
+        SalesMessage.direction == "outbound",
+    ).order_by(SalesMessage.created_at.desc()).first()
+    if not recent:
+        return False
+    metadata = recent.metadata_json or {}
+    offer = metadata.get("appointment_offer")
+    if isinstance(offer, dict) and offer.get("slots"):
+        return True
+    appointment_actions = {
+        "request_visit_location", "request_available_slots", "offer_appointment",
+    }
+    return bool(_action_types(metadata.get("proposed_actions")) & appointment_actions)
+
+
+def _is_availability_request(
+    text: str, *, now: datetime, zone: ZoneInfo,
+    appointment_context: bool = False,
+) -> bool:
+    """Detect an actual scheduling turn without confusing inventory availability.
+
+    ``available`` and a date are both common in inventory and delivery questions,
+    so neither is sufficient on its own. A date-only follow-up is accepted only
+    when the immediately preceding agent turn established appointment context.
+    """
+    lowered = re.sub(r"\s+", " ", text.casefold()).strip()
+    if not lowered:
+        return False
+
+    appointment_denial = re.search(
+        r"\b(?:not|no|don'?t|do not|isn'?t|is not|wasn'?t|was not)\b.{0,40}"
+        r"\b(?:appointment|appointments|schedule|scheduling|slot|slots|time|times|visit|tour|showing)\b|"
+        r"\b(?:no|not)\s+(?:appointment|appointments|slot|slots|time|times|visit|tour)\b|"
+        r"\b(?:no|not)\s+(?:es|son)\s+(?:cita|citas|horario|horarios|visita|visitas)\b",
+        lowered,
     )
-    return any(word in lowered for word in scheduling_words) or _requested_period(text, now=now, zone=zone) is not None
+    if appointment_denial:
+        return False
+
+    inventory_context = bool(re.search(
+        r"\b(?:unit|units|inventory|home|homes|house|houses|property|properties|"
+        r"floor\s*plan|floor\s*plans|model|models|bedroom|bedrooms|price|prices|"
+        r"delivery|completion|ready|move[- ]?in|"
+        r"unidad|unidades|inventario|casa|casas|propiedad|propiedades|plano|planos|"
+        r"modelo|modelos|dormitorio|dormitorios|precio|precios|entrega)\b",
+        lowered,
+    ))
+    explicit_scheduling = bool(re.search(
+        r"\b(?:appointment|appointments|time\s*slot|time\s*slots|showing|showings)\b|"
+        r"\b(?:schedule|book|arrange|set up|confirm|reschedule)\b.{0,35}"
+        r"\b(?:appointment|visit|tour|showing|meeting)\b|"
+        r"\b(?:can|could|may|would|want|like|ready|when|how)\b.{0,35}"
+        r"\b(?:visit|tour|see|view|schedule|book)\b|"
+        r"\b(?:visit|tour|showing)\b.{0,35}\b(?:available|availability|time|slot|schedule|book)\b|"
+        r"\b(?:what|which)\s+(?:appointment\s+)?times?\s+(?:are|is)\s+available\b|"
+        r"\b(?:cita|citas)\b|"
+        r"\b(?:agendar|programar|reservar|confirmar|reprogramar)\b.{0,35}"
+        r"\b(?:cita|visita|recorrido|reuni[oó]n)\b|"
+        r"\b(?:quiero|quisiera|puedo|podr[ií]a|cu[aá]ndo)\b.{0,35}"
+        r"\b(?:visitar|ver|conocer|agendar|programar)\b",
+        lowered,
+    ))
+    if explicit_scheduling:
+        return True
+    if inventory_context:
+        return False
+    return bool(appointment_context and _requested_period(text, now=now, zone=zone) is not None)
 
 
 def _availability_reply(
@@ -681,7 +743,16 @@ async def simulate_turn(
             project=project,
             now=now,
         ) if record_inbound and event_kind == "lead_message" else None
-        location_needed = selected_slot is not None or _is_availability_request(inbound_text, now=now, zone=_project_zone(project)) or "request_available_slots" in _action_types(proposed_actions)
+        appointment_context = _recent_appointment_context(db, conversation.id)
+        scheduling_request = _is_availability_request(
+            inbound_text, now=now, zone=_project_zone(project),
+            appointment_context=appointment_context,
+        )
+        location_needed = (
+            selected_slot is not None
+            or scheduling_request
+            or "request_available_slots" in _action_types(proposed_actions)
+        )
         awaiting_location = bool((lead.meta_form_data or {}).get("pending_location_request"))
         location_ready, location_question, location_resume = (
             _confirm_or_request_location(project, lead, inbound_text)
@@ -751,7 +822,7 @@ async def simulate_turn(
             availability_handled = True
         elif not result.get("policy_violations") and (
             "request_available_slots" in _action_types(proposed_actions)
-            or _is_availability_request(inbound_text, now=now, zone=_project_zone(project))
+            or scheduling_request
         ):
             proposed_reply, offered_slots = _availability_reply(
                 db, project=project, inbound_text=inbound_text, now=now,
@@ -813,6 +884,7 @@ async def simulate_turn(
                 metadata_json={
                     "event_kind": event_kind,
                     "follow_up_hours": follow_up_hours,
+                    "proposed_actions": proposed_actions,
                     **({
                         "appointment_offer": {
                             "duration_minutes": 45,

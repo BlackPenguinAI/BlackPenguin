@@ -24,17 +24,17 @@ from app.modules.governance.models import HumanInterventionCase
 from app.modules.project_team.models import ProjectUserAssignment
 from app.modules.projects.models import Project
 from app.modules.sales_crm.intelligence import merge_extracted_facts, update_lead_intelligence
-from app.modules.sales_crm.models import CalendarConnection, Lead, SalesAvailabilityWindow
+from app.modules.sales_crm.models import CalendarConnection, Lead, LeadScoreSnapshot, SalesAvailabilityWindow
 from app.modules.sales_crm.scheduling import available_slots, next_cadence_time
 from app.modules.sales_agent.default_prompt import merge_sales_agent_defaults
 from app.modules.sales_agent.live_service import (
-    ensure_contact, get_or_create_live_conversation, process_live_inbound,
+    _lead_intelligence_input, ensure_contact, get_or_create_live_conversation, process_live_inbound,
     process_live_inbound_job,
 )
 from app.modules.sales_agent.models import SalesConversation, SalesInboundJob, SalesMessage
 from app.modules.sales_agent.live_worker import _claim_inbound_jobs
 from app.modules.sales_agent.service import (
-    _requested_period, conversation_summaries,
+    _is_availability_request, _requested_period, conversation_summaries,
     set_conversation_action,
 )
 from app.modules.system_settings.models import TwilioConfig
@@ -159,6 +159,55 @@ def test_appointment_intent_advances_stage_and_contributes_to_score():
     db.flush()
     assert lead.pipeline_stage == "S08_APPOINTMENT"
     assert lead.intent_tier in {"warm", "hot"}
+
+
+@pytest.mark.parametrize("message", [
+    "What units are available?",
+    "What floor plans do you have available?",
+    "What is available under $300,000?",
+    "When will the homes be ready in October?",
+    "I'm asking what units you have available. Not times!",
+    "Do you have availability?",
+])
+def test_inventory_availability_does_not_trigger_appointment_routing(message):
+    assert _is_availability_request(
+        message, now=datetime(2026, 10, 20, 15, 0),
+        zone=ZoneInfo("America/Chicago"),
+    ) is False
+
+
+@pytest.mark.parametrize("message", [
+    "What appointment times are available?",
+    "Can I schedule a visit on Wednesday?",
+    "I would like to tour the property.",
+    "Quisiera agendar una visita.",
+])
+def test_explicit_appointment_requests_keep_deterministic_routing(message):
+    assert _is_availability_request(
+        message, now=datetime(2026, 10, 20, 15, 0),
+        zone=ZoneInfo("America/Chicago"),
+    ) is True
+
+
+def test_date_only_follow_up_requires_prior_appointment_context():
+    kwargs = {
+        "now": datetime(2026, 10, 20, 15, 0),
+        "zone": ZoneInfo("America/Chicago"),
+    }
+    assert _is_availability_request("Wednesday?", **kwargs) is False
+    assert _is_availability_request(
+        "Wednesday?", appointment_context=True, **kwargs,
+    ) is True
+
+
+def test_lead_intelligence_input_excludes_agent_authored_appointment_language():
+    messages = [
+        SalesMessage(direction="outbound", role="assistant", content="I found appointment times for Wednesday."),
+        SalesMessage(direction="inbound", role="user", content="What units are available?"),
+    ]
+    text, count = _lead_intelligence_input(messages)
+    assert text == "What units are available?"
+    assert count == 1
 
 
 def test_requested_period_handles_weekdays_and_month_ranges_in_project_timezone():
@@ -290,6 +339,59 @@ def test_live_appointment_request_uses_deterministic_slots_without_calling_the_m
     assert "verified appointment times" in dispatch.await_args.kwargs["content"]
     lead = db.query(Lead).filter_by(id=lead_id).one()
     assert lead.pipeline_stage == "S08_APPOINTMENT"
+
+
+def test_live_inventory_availability_reaches_agent_without_false_appointment_stage():
+    db = _db()
+    company = Company(name="Tenant"); db.add(company); db.flush()
+    project = Project(
+        company_id=company.id, name="Project", address="100 Main Street",
+        timezone="America/Chicago",
+    )
+    lead = Lead(
+        company_id=company.id, project_id=project.id, full_name="Lead",
+        phone="+13055550000", source="manual", platform="manual", consent_status="granted",
+        pipeline_stage="S08_APPOINTMENT",
+    )
+    db.add_all([project, lead]); db.flush()
+    conversation = SalesConversation(
+        company_id=company.id, project_id=project.id, lead_id=lead.id,
+        channel="sms", provider="telnyx", provider_thread_key="inventory-thread", is_paused=False,
+    )
+    db.add(conversation); db.flush()
+    db.add(SalesMessage(
+        conversation_id=conversation.id, channel="sms", direction="outbound", role="assistant",
+        content="I found these verified appointment times for Wednesday.", status="delivered",
+    ))
+    message = SalesMessage(
+        conversation_id=conversation.id, channel="sms", direction="inbound", role="user",
+        content="I'm asking what units you have available. Not times!",
+        provider_message_id="inventory-inbound-1", status="received",
+    )
+    db.add(message); db.commit()
+    conversation_id, message_id, lead_id = conversation.id, message.id, lead.id
+    graph = AsyncMock()
+    graph.ainvoke.return_value = {
+        "proposed_reply": "We currently have five three-bedroom homes available.",
+        "proposed_actions": [{"type": "answer_question"}],
+        "extracted_facts": [], "requires_human": False,
+        "policy_violations": [], "error_code": None,
+        "prompt_configuration_id": None, "prompt_snapshot": {}, "model": "test/model",
+    }
+    with patch("app.modules.sales_agent.live_service.SessionLocal", return_value=db), patch(
+        "app.modules.sales_agent.live_service.build_sales_graph", return_value=graph,
+    ), patch(
+        "app.modules.sales_agent.live_service._dispatch", new=AsyncMock(return_value=SalesMessage()),
+    ) as dispatch, patch("app.modules.sales_agent.live_service._schedule_next_action"):
+        asyncio.run(process_live_inbound(conversation_id, message_id))
+    graph.ainvoke.assert_awaited_once()
+    assert dispatch.await_args.kwargs["content"].startswith("We currently have")
+    lead = db.query(Lead).filter_by(id=lead_id).one()
+    assert lead.pipeline_stage != "S08_APPOINTMENT"
+    score = db.query(LeadScoreSnapshot).filter_by(lead_id=lead_id).order_by(
+        LeadScoreSnapshot.created_at.desc(),
+    ).first()
+    assert score.factor_breakdown["appointment_intent"] == 0
 
 
 def test_inbound_worker_claims_fifo_and_only_one_turn_per_conversation():

@@ -23,7 +23,7 @@ from .models import (
 from .service import (
     _appointment_confirmation, _availability_reply,
     _confirm_or_request_location, _is_availability_request, _offered_slot_selection, _project_zone,
-    get_or_create_conversation,
+    _recent_appointment_context, get_or_create_conversation,
 )
 from app.modules.sales_crm.scheduling import create_agent_appointment, next_cadence_time
 from app.modules.ai_core.services import get_ai_config
@@ -471,6 +471,15 @@ def _prepare_run(
     return run
 
 
+def _lead_intelligence_input(history: list[SalesMessage]) -> tuple[str, int]:
+    """Return lead-authored evidence only; agent copy must never inflate intent."""
+    lead_messages = [
+        item for item in history
+        if item.direction == "inbound" or item.role == "user"
+    ]
+    return " ".join(item.content for item in lead_messages[-20:]), len(lead_messages)
+
+
 async def _process_deterministic_appointment_turn(
     db: Session, *, conversation: SalesConversation, lead: Lead,
     project: Project, inbound: SalesMessage, event_id: str,
@@ -484,6 +493,7 @@ async def _process_deterministic_appointment_turn(
     awaiting_location = bool((lead.meta_form_data or {}).get("pending_location_request"))
     scheduling_request = _is_availability_request(
         inbound.content, now=now, zone=_project_zone(project),
+        appointment_context=_recent_appointment_context(db, conversation.id),
     )
     if not (selected or awaiting_location or scheduling_request):
         return False
@@ -537,10 +547,11 @@ async def _process_deterministic_appointment_turn(
     history = db.query(SalesMessage).filter(
         SalesMessage.conversation_id == conversation.id,
     ).order_by(SalesMessage.created_at).all()
+    lead_history, lead_message_count = _lead_intelligence_input(history)
     update_lead_intelligence(
         db, lead, inbound_text=inbound.content,
-        conversation_text=" ".join(item.content for item in history[-20:]),
-        message_count=len(history),
+        conversation_text=lead_history,
+        message_count=lead_message_count,
     )
     if lead.agent_status != "appointment_confirmed":
         lead.pipeline_stage = "S08_APPOINTMENT"
@@ -638,7 +649,11 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
             )
             reply = f"I’ve paused the automated conversation for human review. You can also contact Black Penguin at {settings.SUPPORT_EMAIL}."
         history = db.query(SalesMessage).filter(SalesMessage.conversation_id == conversation.id).order_by(SalesMessage.created_at).all()
-        update_lead_intelligence(db, lead, inbound_text=inbound.content, conversation_text=" ".join(item.content for item in history[-20:]), message_count=len(history))
+        lead_history, lead_message_count = _lead_intelligence_input(history)
+        update_lead_intelligence(
+            db, lead, inbound_text=inbound.content,
+            conversation_text=lead_history, message_count=lead_message_count,
+        )
         run.prompt_configuration_id = result.get("prompt_configuration_id")
         run.prompt_snapshot = result.get("prompt_snapshot", {})
         run.model = result.get("model", "unknown")
@@ -663,7 +678,11 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
             or conversation.pause_reason == "Appointment confirmed"
             or (conversation.pause_reason or "").startswith("Human intervention")
         ):
-            await _dispatch(db, conversation=conversation, lead=lead, content=reply, role="assistant", agent_run_id=run.id)
+            await _dispatch(
+                db, conversation=conversation, lead=lead, content=reply,
+                role="assistant", agent_run_id=run.id,
+                metadata={"event_kind": "agent_reply", "proposed_actions": actions},
+            )
         _schedule_next_action(db, conversation, lead, event_id)
         db.commit()
     except Exception as exc:

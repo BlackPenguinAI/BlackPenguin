@@ -371,12 +371,19 @@ def test_slot_request_is_executed_and_returns_verified_times_in_the_same_turn():
     assert "hold on" not in response["reply"].lower()
 
 
-def test_explicit_date_forces_verified_availability_even_if_model_requests_human_review():
+def test_date_follow_up_forces_verified_availability_after_an_appointment_offer():
     db = _db(); company, _, admin, _, _, project, campaign, product = _fixture(db)
     project.timezone = "UTC"; db.add(project); db.commit()
     result = _start(db, company, admin, project, campaign, product)
     simulation = db.query(SalesAgentSimulation).filter_by(id=result["simulation_id"]).one()
     simulation.virtual_now = datetime(2026, 8, 25, 18, 0); db.add(simulation); db.commit()
+    db.add(SalesMessage(
+        conversation_id=simulation.conversation_id,
+        channel="simulation", direction="outbound", role="assistant",
+        content="Would you like me to check appointment times?", status="simulated",
+        metadata_json={"proposed_actions": [{"type": "offer_appointment"}]},
+    ))
+    db.commit()
     with patch("app.modules.sales_agent.graph.generate_llm_response", new=AsyncMock(return_value=HUMAN_REVIEW_REPLY)):
         response = asyncio.run(simulate_turn(
             db, company_id=company.id, lead_id=result["lead_id"], inbound_text="What about August 31st?",
