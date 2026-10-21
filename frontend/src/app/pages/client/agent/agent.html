@@ -80,10 +80,19 @@
       <label
         >Cellphone *<input
           [(ngModel)]="form.phone"
+          (ngModelChange)="phoneChanged()"
+          (blur)="previewLiveChannel()"
           type="tel"
           placeholder="e.g. +1 305 555 0142"
           [class.invalid]="form.phone.length > 0 && !phoneValid"
         /><small *ngIf="form.phone.length > 0 && phoneError" class="field-error">{{ phoneError }}</small></label>
+      <div *ngIf="setupMode === 'live_meta' && (channelPreviewLoading || channelPreview)" class="flex min-h-[58px] items-center gap-2 rounded-[10px] border px-3 py-2 text-xs" [ngClass]="channelPreview?.ready ? 'border-green-800 bg-green-950/40 text-green-300' : channelPreview ? 'border-red-900 bg-red-950/40 text-red-300' : 'border-yellow-800 bg-yellow-950/40 text-yellow-400'">
+        <span class="material-symbols-outlined">{{ channelPreview?.channel === 'whatsapp' ? 'chat' : 'sms' }}</span>
+        <div class="flex flex-col gap-1">
+          <strong class="text-[10px] tracking-wider">{{ channelPreviewLoading ? 'Checking Company route…' : ((channelPreview.channel || 'No channel') | uppercase) + ' · ' + (channelPreview.country_name || 'Unsupported destination') }}</strong>
+          <small *ngIf="!channelPreviewLoading" class="text-[10px] leading-snug text-gray-500">{{ channelPreview.detail }}</small>
+        </div>
+      </div>
       <label
         >Email *<input
           [(ngModel)]="form.email"

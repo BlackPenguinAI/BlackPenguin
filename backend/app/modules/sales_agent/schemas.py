@@ -115,6 +115,15 @@ class LiveLeadSourceOption(BaseModel):
     campaign_platform: str | None = None
 
 
+class LiveChannelPreview(BaseModel):
+    country_code: str | None = None
+    country_name: str | None = None
+    channel: str | None = None
+    ready: bool
+    policy: str
+    detail: str
+
+
 class MetaLeadFormQuestion(BaseModel):
     key: str
     label: str

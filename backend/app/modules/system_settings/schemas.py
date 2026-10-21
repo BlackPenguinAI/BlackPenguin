@@ -99,7 +99,7 @@ class TelnyxCompanyConfigUpdate(BaseModel):
     telnyx_phone_number_id: Optional[str] = Field(default=None, max_length=100)
     regulatory_status: Optional[Literal["pending", "approved", "not_required"]] = None
     live_sms_enabled: Optional[bool] = None
-    primary_channel: Optional[Literal["sms", "whatsapp"]] = None
+    primary_channel: Optional[Literal["automatic", "sms", "whatsapp"]] = None
     whatsapp_business_account_id: Optional[str] = Field(default=None, max_length=120)
     whatsapp_phone_number_id: Optional[str] = Field(default=None, max_length=120)
     whatsapp_from_phone_number: Optional[str] = Field(default=None, max_length=50)
@@ -123,7 +123,7 @@ class TelnyxCompanyConfigSchema(BaseModel):
     coverage_checked_at: Optional[datetime] = None
     regulatory_status: Literal["pending", "approved", "not_required"] = "pending"
     live_sms_enabled: bool = False
-    primary_channel: Literal["sms", "whatsapp"] = "sms"
+    primary_channel: Literal["automatic", "sms", "whatsapp"] = "automatic"
     whatsapp_business_account_id: Optional[str] = None
     whatsapp_phone_number_id: Optional[str] = None
     whatsapp_from_phone_number: Optional[str] = None
@@ -138,6 +138,10 @@ class TelnyxCompanyConfigSchema(BaseModel):
     verified_at: Optional[datetime] = None
     last_error: Optional[str] = None
     updated_at: Optional[datetime] = None
+
+
+class TelnyxCompanyDisconnect(BaseModel):
+    scope: Literal["sms", "whatsapp", "all"] = "all"
 
 
 class TelnyxWhatsAppBusinessAccount(BaseModel):

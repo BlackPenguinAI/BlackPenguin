@@ -74,7 +74,6 @@ class TelnyxCompanyConfig(Base):
     __tablename__ = "telnyx_company_configurations"
     __table_args__ = (
         UniqueConstraint("company_id", name="uq_telnyx_company_config_company"),
-        UniqueConstraint("messaging_profile_id", name="uq_telnyx_company_config_profile"),
         UniqueConstraint("from_phone_number", name="uq_telnyx_company_config_number"),
     )
 
@@ -88,7 +87,7 @@ class TelnyxCompanyConfig(Base):
     coverage_checked_at = Column(DateTime, nullable=True)
     regulatory_status = Column(String(30), default="pending", nullable=False)
     live_sms_enabled = Column(Boolean, default=False, nullable=False)
-    primary_channel = Column(String(20), default="sms", nullable=False)
+    primary_channel = Column(String(20), default="automatic", nullable=False)
     whatsapp_business_account_id = Column(String(120), nullable=True)
     whatsapp_phone_number_id = Column(String(120), nullable=True, unique=True)
     whatsapp_from_phone_number = Column(String(50), nullable=True, unique=True)

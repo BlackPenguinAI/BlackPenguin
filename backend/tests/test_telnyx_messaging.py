@@ -3,6 +3,7 @@ import asyncio
 import importlib.util
 import json
 import time
+from datetime import datetime
 from pathlib import Path
 from unittest.mock import AsyncMock, Mock, patch
 
@@ -28,17 +29,21 @@ from app.integrations.telnyx_client import send_sms as send_telnyx_sms, validate
 from app.modules.companies.models import Company
 from app.modules.projects.models import Project
 from app.modules.sales_agent.live_service import get_or_create_live_conversation
-from app.modules.sales_agent.models import ExternalWebhookEvent, SalesConversation, SalesInboundJob, SalesMessage
+from app.modules.sales_agent.models import (
+    ExternalWebhookEvent, OutboundMessage, SalesConversation, SalesFollowUpJob,
+    SalesInboundJob, SalesMessage,
+)
 from app.modules.sales_agent.provider_router import _status_from_telnyx, telnyx_router
 from app.modules.sales_crm.models import Lead
 from app.modules.system_settings.models import (
     MessagingRoutingConfig, TelnyxCompanyConfig, TelnyxConfig, TwilioConfig,
 )
+from app.modules.governance.models import PlatformAuditEvent
 from app.modules.system_settings.schemas import TelnyxCompanyConfigUpdate, TelnyxConfigUpdate
 from app.modules.system_settings.services import (
     telnyx_config_response, update_default_provider, update_telnyx_company_config,
     update_telnyx_config, verify_telnyx_company_config, verify_telnyx_config,
-    telnyx_coverage_snapshot,
+    disconnect_telnyx_company_config, telnyx_coverage_snapshot,
 )
 
 
@@ -256,7 +261,7 @@ def test_telnyx_delivery_rejection_is_returned_as_an_actionable_safe_error():
     }
 
 
-def test_company_sender_and_profile_cannot_be_shared_across_tenants():
+def test_messaging_profile_can_be_shared_but_sender_number_cannot():
     db = _db()
     first = Company(name="First"); second = Company(name="Second")
     db.add_all([first, second]); db.commit()
@@ -264,14 +269,100 @@ def test_company_sender_and_profile_cannot_be_shared_across_tenants():
         messaging_profile_id="profile-first", from_phone_number="+13055550101",
         regulatory_status="approved",
     ))
-    with pytest.raises(HTTPException, match="already assigned"):
-        update_telnyx_company_config(db, second.id, TelnyxCompanyConfigUpdate(
-            messaging_profile_id="profile-first", from_phone_number="+13055550102",
-        ))
+    shared = update_telnyx_company_config(db, second.id, TelnyxCompanyConfigUpdate(
+        messaging_profile_id="profile-first", from_phone_number="+13055550102",
+    ))
+    assert shared.messaging_profile_id == "profile-first"
     with pytest.raises(HTTPException, match="already assigned"):
         update_telnyx_company_config(db, second.id, TelnyxCompanyConfigUpdate(
             messaging_profile_id="profile-second", from_phone_number="+13055550101",
         ))
+
+
+def test_disconnect_releases_resources_and_stops_pending_automation():
+    db = _db()
+    company = Company(name="Release Realty", country_code="US")
+    db.add(company); db.flush()
+    project = Project(company_id=company.id, name="Project")
+    db.add(project); db.flush()
+    lead = Lead(
+        company_id=company.id, project_id=project.id, full_name="Lead",
+        phone="+13055550999", platform="manual", source="Manual registration",
+        agent_status="active", next_action_at=datetime.utcnow(),
+    )
+    db.add(lead); db.flush()
+    conversation = SalesConversation(
+        company_id=company.id, project_id=project.id, lead_id=lead.id,
+        provider="telnyx", channel="sms", is_paused=False,
+    )
+    db.add(conversation); db.flush()
+    db.add_all([
+        SalesFollowUpJob(
+            conversation_id=conversation.id, idempotency_key="follow-up-release",
+            scheduled_at=datetime.utcnow(), status="pending", reason="follow_up",
+        ),
+        OutboundMessage(
+            conversation_id=conversation.id, idempotency_key="outbound-release",
+            channel="sms", provider="telnyx", recipient=lead.phone,
+            content="Pending", status="queued",
+        ),
+        TelnyxCompanyConfig(
+            company_id=company.id, messaging_profile_id="shared-profile",
+            from_phone_number="+13055550101", telnyx_phone_number_id="number-id",
+            verification_status="verified", live_sms_enabled=True,
+            regulatory_status="approved", primary_channel="sms",
+        ),
+    ])
+    db.commit()
+
+    config = disconnect_telnyx_company_config(db, company.id, scope="sms")
+    db.refresh(conversation); db.refresh(lead)
+    follow_up = db.query(SalesFollowUpJob).one()
+    outbound = db.query(OutboundMessage).one()
+    assert config.from_phone_number is None
+    assert config.messaging_profile_id is None
+    assert config.verification_status == "not_configured"
+    assert config.primary_channel == "automatic"
+    assert conversation.is_paused is True
+    assert follow_up.status == "cancelled"
+    assert outbound.status == "cancelled"
+    assert lead.agent_status == "paused"
+    event = db.query(PlatformAuditEvent).one()
+    assert event.event_type == "telnyx_company_sender_disconnected"
+    assert event.payload_json["released_resources"]["from_phone_number"] == "+13055550101"
+
+
+def test_disconnect_whatsapp_keeps_verified_sms_and_releases_number_for_another_company():
+    db = _db()
+    first = Company(name="First", country_code="US")
+    second = Company(name="Second", country_code="PE")
+    db.add_all([first, second]); db.flush()
+    config = TelnyxCompanyConfig(
+        company_id=first.id, messaging_profile_id="shared-profile",
+        from_phone_number="+13055550101", telnyx_phone_number_id="sms-number",
+        verification_status="verified", live_sms_enabled=True,
+        regulatory_status="approved", primary_channel="automatic",
+        whatsapp_business_account_id="waba-1", whatsapp_phone_number_id="wa-number-id",
+        whatsapp_from_phone_number="+51999000111", whatsapp_template_name="welcome_en",
+        whatsapp_template_content="Hi {{1}}, welcome to {{2}}.",
+        whatsapp_verification_status="verified", live_whatsapp_enabled=True,
+    )
+    db.add(config); db.commit()
+
+    released = disconnect_telnyx_company_config(db, first.id, scope="whatsapp")
+    assert released.messaging_profile_id == "shared-profile"
+    assert released.from_phone_number == "+13055550101"
+    assert released.live_sms_enabled is True
+    assert released.primary_channel == "sms"
+    assert released.whatsapp_business_account_id is None
+    assert released.whatsapp_phone_number_id is None
+    assert released.whatsapp_from_phone_number is None
+
+    reassigned = update_telnyx_company_config(db, second.id, TelnyxCompanyConfigUpdate(
+        messaging_profile_id="shared-profile", whatsapp_business_account_id="waba-1",
+        whatsapp_phone_number_id="wa-number-id", whatsapp_from_phone_number="+51999000111",
+    ))
+    assert reassigned.whatsapp_phone_number_id == "wa-number-id"
 
 
 def test_same_lead_phone_uses_distinct_threads_for_distinct_companies():

@@ -12,7 +12,7 @@ from .models import AgentRun, OutboundMessage, SalesAgentSimulation, SalesConver
 from app.modules.sales_crm.models import Lead
 from .schemas import (
     AgentRunResponse, AppointmentConfirmationResponse, AppointmentConfirm, AppointmentSlot,
-    ConversationAction, ConversationSummary, DraftDecision, LiveLeadCreate, LiveLeadSourceOption,
+    ConversationAction, ConversationSummary, DraftDecision, LiveChannelPreview, LiveLeadCreate, LiveLeadSourceOption,
     LiveMetaTestCreate, LiveMetaTestResponse, MetaLeadFormPreview,
     ManualMessageCreate, SalesMessageResponse,
     SimulationAdvance, SimulationApproval, SimulationCreate, SimulationCreateResponse,
@@ -109,6 +109,19 @@ def get_live_lead_sources(
     current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.MKT])),
 ):
     return live_lead_source_options()
+
+
+@router.get("/live-leads/channel-preview", response_model=LiveChannelPreview)
+def preview_live_lead_channel(
+    phone: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.MKT])),
+):
+    from app.integrations.messaging_gateway import company_channel_preview
+
+    return company_channel_preview(
+        db, company_id=current_user.company_id, destination_phone=phone,
+    )
 
 
 @router.get("/meta-form-preview", response_model=MetaLeadFormPreview)

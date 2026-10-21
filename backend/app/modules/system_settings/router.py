@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.db.postgres import get_db
@@ -12,7 +12,7 @@ from .schemas import (
     FirebaseConfigSchema, FirebaseConfigUpdate, GoogleCalendarConfigSchema, GoogleCalendarConfigUpdate,
     MessagingRoutingSchema, MessagingRoutingUpdate,
     MetaPlatformConfigSchema, MetaPlatformConfigUpdate,
-    TelnyxCompanyConfigSchema, TelnyxCompanyConfigUpdate,
+    TelnyxCompanyConfigSchema, TelnyxCompanyConfigUpdate, TelnyxCompanyDisconnect,
     TelnyxWhatsAppResources,
     TelnyxConfigSchema, TelnyxConfigUpdate, TwilioConfigSchema, TwilioConfigUpdate,
     LegalDocumentResponse, LegalDocumentPayload
@@ -117,6 +117,21 @@ def verify_telnyx_company_settings(
     current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN])),
 ):
     config = services.verify_telnyx_company_config(db, company_id)
+    company = db.query(Company).filter(Company.id == company_id).one()
+    return services.telnyx_company_config_response(company, config)
+
+
+@router.post("/messaging-settings/telnyx/companies/{company_id}/disconnect", response_model=TelnyxCompanyConfigSchema)
+def disconnect_telnyx_company_settings(
+    company_id: str,
+    payload: TelnyxCompanyDisconnect,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN])),
+):
+    config = services.disconnect_telnyx_company_config(
+        db, company_id, scope=payload.scope, actor=current_user, request=request,
+    )
     company = db.query(Company).filter(Company.id == company_id).one()
     return services.telnyx_company_config_response(company, config)
 

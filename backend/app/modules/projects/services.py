@@ -614,29 +614,40 @@ def normalized_project_locations(value: Any, fallback: str | None = None) -> lis
 
 def company_messaging_integration(db: Session, company_id: str) -> dict[str, Any]:
     """Return the Project badge from the owning Company's live route only."""
-    from app.integrations.messaging_gateway import company_live_channel
+    from app.integrations.messaging_gateway import company_live_channel, default_provider, provider_is_ready
     from app.modules.system_settings.services import get_telnyx_company_config
 
     company_messaging = get_telnyx_company_config(db, company_id)
-    live_channel = company_live_channel(db, company_id=company_id)
+    automatic = bool(company_messaging and company_messaging.primary_channel == "automatic")
+    sms_ready = provider_is_ready(db, default_provider(db), company_id=company_id)
+    whatsapp_ready = bool(
+        company_messaging and company_messaging.live_whatsapp_enabled
+        and company_messaging.whatsapp_verification_status == "verified"
+    )
+    live_channel = None if automatic else company_live_channel(db, company_id=company_id)
     configured_channel = (
         company_messaging.primary_channel
         if company_messaging and company_messaging.primary_channel in {"sms", "whatsapp"}
         else None
     )
-    displayed_channel = live_channel or configured_channel
+    displayed_channel = "automatic" if automatic else (live_channel or configured_channel)
+    automatic_ready = automatic and sms_ready and whatsapp_ready
     return {
         # Keep the historical key for API compatibility; ``channel`` and the
         # label expose the actual Company route.
         "key": "sms",
         "channel": displayed_channel,
-        "label": "WhatsApp messaging" if displayed_channel == "whatsapp" else (
+        "label": "Automatic SMS / WhatsApp" if automatic else ("WhatsApp messaging" if displayed_channel == "whatsapp" else (
             "SMS messaging" if displayed_channel == "sms" else "Company messaging"
-        ),
-        "icon": "chat" if displayed_channel == "whatsapp" else "sms",
-        "status": "connected" if live_channel else "action_required",
+        )),
+        "icon": "route" if automatic else ("chat" if displayed_channel == "whatsapp" else "sms"),
+        "status": "connected" if live_channel or automatic_ready else "action_required",
         "detail": (
-            "Live WhatsApp delivery is enabled for this Company"
+            "Automatic routing is ready: United States uses SMS; Mexico, Peru and Argentina use WhatsApp"
+            if automatic_ready
+            else "Automatic routing still requires verified and enabled SMS and WhatsApp Company senders"
+            if automatic
+            else "Live WhatsApp delivery is enabled for this Company"
             if live_channel == "whatsapp"
             else "Live SMS delivery is enabled for this Company"
             if live_channel == "sms"

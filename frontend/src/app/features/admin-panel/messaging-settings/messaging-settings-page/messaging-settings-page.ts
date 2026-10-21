@@ -10,7 +10,7 @@ import { ButtonComponent } from '../../../../shared/ui/button/button';
 
 type Provider = 'twilio' | 'telnyx';
 type RegulatoryStatus = 'pending' | 'approved' | 'not_required';
-type MessagingChannel = 'sms' | 'whatsapp';
+type MessagingChannel = 'automatic' | 'sms' | 'whatsapp';
 
 interface TelnyxCompanySender {
   id: string | null;
@@ -107,7 +107,7 @@ export class MessagingSettingsPageComponent implements OnInit {
           messaging_profile_id: item.messaging_profile_id || '',
           from_phone_number: item.from_phone_number || '',
           telnyx_phone_number_id: item.telnyx_phone_number_id || '',
-          primary_channel: item.primary_channel || (item.country_code === 'US' ? 'sms' : 'whatsapp'),
+          primary_channel: item.primary_channel || 'automatic',
           whatsapp_business_account_id: item.whatsapp_business_account_id || '',
           whatsapp_phone_number_id: item.whatsapp_phone_number_id || '',
           whatsapp_from_phone_number: item.whatsapp_from_phone_number || '',
@@ -289,9 +289,61 @@ export class MessagingSettingsPageComponent implements OnInit {
     });
   }
 
+  hasSmsResources(company: TelnyxCompanySender): boolean {
+    return !!(company.from_phone_number || company.telnyx_phone_number_id || company.live_sms_enabled);
+  }
+
+  hasWhatsAppResources(company: TelnyxCompanySender): boolean {
+    return !!(
+      company.whatsapp_business_account_id || company.whatsapp_phone_number_id ||
+      company.whatsapp_from_phone_number || company.live_whatsapp_enabled
+    );
+  }
+
+  disconnectTelnyxCompany(scope: 'sms' | 'whatsapp' | 'all') {
+    const company = this.selectedCompany;
+    if (!company) return;
+    if (this.dirty.telnyxCompany) {
+      this.toast.showError('Save or reload Company changes before disconnecting resources.');
+      return;
+    }
+    const label = scope === 'all' ? 'all SMS and WhatsApp resources' : `${scope.toUpperCase()} resources`;
+    if (!window.confirm(
+      `Disconnect ${label} from ${company.company_name}? Pending automated messages on the affected channel will be cancelled and its conversations paused. Message history will be preserved.`
+    )) return;
+    this.saving = `disconnect:${scope}`;
+    this.http.post<TelnyxCompanySender>(
+      `${this.baseUrl}/api/v1/system/messaging-settings/telnyx/companies/${company.company_id}/disconnect`,
+      { scope }, { headers: this.headers },
+    ).subscribe({
+      next: data => {
+        this.replaceCompany(data);
+        this.saving = '';
+        this.dirty.telnyxCompany = false;
+        this.toast.showSuccess(`${data.company_name} ${label} disconnected.`);
+        this.cdr.detectChanges();
+      },
+      error: err => {
+        this.saving = '';
+        this.toast.showError(this.message(err, `Company ${label} could not be disconnected.`));
+        this.cdr.detectChanges();
+      },
+    });
+  }
+
   private replaceCompany(data: TelnyxCompanySender) {
     const index = this.telnyxCompanies.findIndex(item => item.company_id === data.company_id);
-    if (index >= 0) this.telnyxCompanies[index] = { ...this.telnyxCompanies[index], ...data };
+    if (index >= 0) this.telnyxCompanies[index] = {
+      ...this.telnyxCompanies[index], ...data,
+      messaging_profile_id: data.messaging_profile_id || '',
+      from_phone_number: data.from_phone_number || '',
+      telnyx_phone_number_id: data.telnyx_phone_number_id || '',
+      whatsapp_business_account_id: data.whatsapp_business_account_id || '',
+      whatsapp_phone_number_id: data.whatsapp_phone_number_id || '',
+      whatsapp_from_phone_number: data.whatsapp_from_phone_number || '',
+      whatsapp_template_name: data.whatsapp_template_name || '',
+      whatsapp_template_content: data.whatsapp_template_content || '',
+    };
   }
 
   setDefault(provider: Provider) {

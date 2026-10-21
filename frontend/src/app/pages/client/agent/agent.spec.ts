@@ -101,6 +101,25 @@ describe('AgentComponent simulation form', () => {
     expect(value.creating).toBe(false);
   });
 
+  it('previews the authoritative channel selected from the destination', () => {
+    const urls: string[] = [];
+    const value = component({
+      get: (url: string) => {
+        urls.push(url);
+        return of({
+          country_code: 'US', country_name: 'United States', channel: 'sms',
+          ready: true, policy: 'automatic', detail: 'New conversations use SMS.',
+        });
+      },
+    });
+    value.openSetup('live_meta');
+    value.form.phone = '+1 305 555 0142';
+    value.previewLiveChannel();
+    expect(urls[0]).toContain('/live-leads/channel-preview?phone=%2B1%20305%20555%200142');
+    expect(value.channelPreview.channel).toBe('sms');
+    expect(value.channelPreview.ready).toBe(true);
+  });
+
   it('accepts the minimal live lead identity without product or budget', () => {
     const value = component();
     value.options = [{ id: 'project', campaigns: [], products: [] }];

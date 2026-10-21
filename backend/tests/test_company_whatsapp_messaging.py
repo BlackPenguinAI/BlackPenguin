@@ -20,7 +20,7 @@ from app.modules.companies.models import Company
 from app.modules.companies.country import sync_project_country
 from app.modules.projects.models import Project, ProjectProfile
 from app.modules.projects.services import company_messaging_integration
-from app.modules.system_settings.models import TelnyxCompanyConfig, TelnyxConfig
+from app.modules.system_settings.models import MessagingRoutingConfig, TelnyxCompanyConfig, TelnyxConfig
 from app.modules.sales_agent.live_service import _dispatch, _whatsapp_customer_window_open
 from app.modules.sales_agent.graph import PLATFORM_GUARDRAILS
 from app.modules.sales_agent.models import SalesConversation, SalesMessage
@@ -65,6 +65,28 @@ def test_company_primary_channel_does_not_fall_back_to_sms():
     config.live_whatsapp_enabled = False
     db.commit()
     assert company_live_channel(db, company_id=company.id) is None
+
+
+def test_automatic_channel_routes_us_to_sms_and_supported_latam_to_whatsapp_without_fallback():
+    db = _db(); company = _configured(db)
+    config = db.query(TelnyxCompanyConfig).filter_by(company_id=company.id).one()
+    config.primary_channel = "automatic"
+    config.from_phone_number = "+13055550142"
+    config.verification_status = "verified"
+    config.live_sms_enabled = True
+    config.regulatory_status = "approved"
+    db.add(MessagingRoutingConfig(default_provider="telnyx"))
+    db.commit()
+
+    assert company_live_channel(db, company_id=company.id, destination_phone="+13055550999") == "sms"
+    assert company_live_channel(db, company_id=company.id, destination_phone="+51999888777") == "whatsapp"
+    assert company_live_channel(db, company_id=company.id, destination_phone="+525512345678") == "whatsapp"
+    assert company_live_channel(db, company_id=company.id, destination_phone="+541112345678") == "whatsapp"
+    assert company_live_channel(db, company_id=company.id, destination_phone="+34911234567") is None
+
+    config.live_sms_enabled = False
+    db.commit()
+    assert company_live_channel(db, company_id=company.id, destination_phone="+13055550999") is None
 
 
 def test_project_badge_uses_only_the_owning_company_channel():

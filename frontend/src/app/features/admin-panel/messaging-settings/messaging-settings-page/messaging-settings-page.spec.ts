@@ -1,5 +1,6 @@
 import '@angular/compiler';
-import { describe, expect, it } from 'vitest';
+import { of } from 'rxjs';
+import { describe, expect, it, vi } from 'vitest';
 import { MessagingSettingsPageComponent } from './messaging-settings-page';
 
 describe('MessagingSettingsPageComponent', () => {
@@ -100,5 +101,38 @@ describe('MessagingSettingsPageComponent', () => {
     component.selectedCompanyId = 'a';
     component.saveTelnyxCompany();
     expect(requested).toBe(true);
+  });
+
+  it('disconnects Company resources only after explicit confirmation', () => {
+    const calls: any[] = [];
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const component = new MessagingSettingsPageComponent(
+      { post: (url: string, body: any) => {
+        calls.push({ url, body });
+        return of({
+          company_id: 'a', company_name: 'A', messaging_profile_id: null,
+          from_phone_number: null, telnyx_phone_number_id: null,
+          verification_status: 'not_configured', primary_channel: 'automatic',
+        });
+      } } as any,
+      { showSuccess: () => undefined, showError: () => undefined } as any,
+      { detectChanges: () => undefined } as any,
+    );
+    component.telnyxCompanies = [{
+      id: '1', company_id: 'a', company_name: 'A', company_is_active: true,
+      messaging_profile_id: 'shared-profile', from_phone_number: '+13055550142',
+      telnyx_phone_number_id: 'number-1', regulatory_status: 'approved',
+      live_sms_enabled: true, primary_channel: 'automatic', verification_status: 'verified',
+      verified_at: null, last_error: '',
+    }];
+    component.selectedCompanyId = 'a';
+
+    component.disconnectTelnyxCompany('sms');
+
+    expect(calls[0].url).toContain('/companies/a/disconnect');
+    expect(calls[0].body).toEqual({ scope: 'sms' });
+    expect(component.selectedCompany?.from_phone_number).toBe('');
+    expect(component.selectedCompany?.primary_channel).toBe('automatic');
+    confirm.mockRestore();
   });
 });

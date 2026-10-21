@@ -66,6 +66,8 @@ export class AgentComponent implements OnInit, OnDestroy {
   metaFormError = '';
   metaAnswers: Record<string, string> = {};
   liveProgress = '';
+  channelPreview: any = null;
+  channelPreviewLoading = false;
   private liveProgressTimer?: ReturnType<typeof setInterval>;
   private liveSubmissionKey = '';
   private conversationPollTimer?: ReturnType<typeof setTimeout>;
@@ -187,6 +189,22 @@ export class AgentComponent implements OnInit, OnDestroy {
     this.liveSubmissionKey = '';
     this.clearMetaForm();
     this.loadMetaFormPreview();
+  }
+  phoneChanged(): void {
+    this.channelPreview = null;
+  }
+  previewLiveChannel(): void {
+    if (this.setupMode !== 'live_meta' || !this.phoneValid) return;
+    this.channelPreviewLoading = true;
+    this.http.get<any>(
+      `${API_V1_URL}/sales-agent/live-leads/channel-preview?phone=${encodeURIComponent(this.form.phone.trim())}`,
+    ).pipe(finalize(() => {
+      this.channelPreviewLoading = false;
+      this.cdr.markForCheck();
+    })).subscribe({
+      next: preview => { this.channelPreview = preview; },
+      error: () => { this.channelPreview = null; },
+    });
   }
   loadMetaFormPreview(): void {
     const request = ++this.metaFormRequest;
@@ -931,6 +949,7 @@ export class AgentComponent implements OnInit, OnDestroy {
   private resetForm(): void {
     this.form = this.emptyForm();
     this.metaAnswers = {};
+    this.channelPreview = null;
   }
   private clearMetaForm(): void {
     this.metaFormRequest += 1;

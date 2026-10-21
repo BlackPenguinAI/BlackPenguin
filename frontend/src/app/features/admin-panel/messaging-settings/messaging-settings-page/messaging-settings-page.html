@@ -87,8 +87,9 @@
               <div>
                 <label class="mb-2 block text-[10px] font-bold uppercase tracking-[0.16em] text-gray-500">Primary channel</label>
                 <select [(ngModel)]="company.primary_channel" (ngModelChange)="dirty.telnyxCompany=true" name="company_primary_channel" class="w-full rounded-xl border border-white/10 bg-black/50 px-4 py-3 text-sm text-white outline-none focus:border-secondary">
-                  <option value="sms">SMS</option><option value="whatsapp">WhatsApp via Telnyx</option>
+                  <option value="automatic">Automatic by lead destination</option><option value="sms">SMS only</option><option value="whatsapp">WhatsApp only via Telnyx</option>
                 </select>
+                <p *ngIf="company.primary_channel === 'automatic'" class="mt-2 text-[10px] leading-5 text-gray-500">United States uses SMS. Mexico, Peru and Argentina use WhatsApp. A missing required route blocks the send instead of silently switching channels.</p>
               </div>
               <app-input label="Messaging Profile ID" [(ngModel)]="company.messaging_profile_id" (ngModelChange)="dirty.telnyxCompany=true" name="company_profile" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"></app-input>
               <app-input label="From Phone Number (E.164)" [(ngModel)]="company.from_phone_number" (ngModelChange)="dirty.telnyxCompany=true" name="company_from" placeholder="+1234567890"></app-input>
@@ -104,7 +105,7 @@
             </div>
 
             <div class="mt-6 rounded-xl border border-white/10 bg-black/30 p-4 text-xs text-gray-400">
-              <div class="flex flex-wrap items-center justify-between gap-3"><span><b class="text-white">Sender status:</b> <span class="uppercase">{{company.verification_status}}</span></span><button type="button" class="rounded-lg border border-secondary px-3 py-2 text-secondary disabled:opacity-40" (click)="verifyTelnyxCompany()" [disabled]="verifying==='company:'+company.company_id || dirty.telnyxCompany || telnyx.verification_status!=='verified'">{{verifying==='company:'+company.company_id?'Verifying…':'Verify Company sender'}}</button></div>
+              <div class="flex flex-wrap items-center justify-between gap-3"><span><b class="text-white">Sender status:</b> <span class="uppercase">{{company.verification_status}}</span></span><button type="button" class="rounded-lg border border-secondary px-3 py-2 text-secondary disabled:opacity-40" (click)="verifyTelnyxCompany()" [disabled]="verifying==='company:'+company.company_id || dirty.telnyxCompany || telnyx.verification_status!=='verified'">{{verifying==='company:'+company.company_id?'Verifying…':'Verify SMS sender'}}</button></div>
               <label class="mt-4 flex items-center gap-3"><input type="checkbox" [(ngModel)]="company.live_sms_enabled" (ngModelChange)="dirty.telnyxCompany=true" name="company_live" [disabled]="company.verification_status!=='verified' || (company.regulatory_status!=='approved' && company.regulatory_status!=='not_required') || !telnyx.live_sms_enabled" class="h-5 w-5 accent-yellow-400"><span>Enable live SMS for this Company</span></label>
             </div>
             <div *ngIf="company.coverage_snapshot?.destinations?.length" class="mt-6 overflow-hidden rounded-xl border border-white/10 bg-black/30">
@@ -165,6 +166,15 @@
               <p *ngIf="company.whatsapp_last_error" class="mt-3 text-xs text-red-300">{{company.whatsapp_last_error}}</p>
             </div>
             <p *ngIf="company.last_error" class="mt-3 text-xs text-red-300">{{company.last_error}}</p>
+            <div *ngIf="hasSmsResources(company) || hasWhatsAppResources(company)" class="mt-6 rounded-xl border border-red-400/20 bg-red-950/10 p-5">
+              <p class="text-sm font-medium text-white">Release Company messaging resources</p>
+              <p class="mt-1 text-xs leading-5 text-gray-500">Use this before assigning a number or WABA to another Company. Conversation history remains available; affected automation is paused and pending unsent messages are cancelled.</p>
+              <div class="mt-4 flex flex-wrap gap-3">
+                <button *ngIf="hasSmsResources(company)" type="button" class="rounded-lg border border-red-400/40 px-3 py-2 text-xs text-red-300 disabled:opacity-40" (click)="disconnectTelnyxCompany('sms')" [disabled]="!!saving || dirty.telnyxCompany">Disconnect SMS</button>
+                <button *ngIf="hasWhatsAppResources(company)" type="button" class="rounded-lg border border-red-400/40 px-3 py-2 text-xs text-red-300 disabled:opacity-40" (click)="disconnectTelnyxCompany('whatsapp')" [disabled]="!!saving || dirty.telnyxCompany">Disconnect WhatsApp</button>
+                <button *ngIf="hasSmsResources(company) && hasWhatsAppResources(company)" type="button" class="rounded-lg bg-red-500/15 px-3 py-2 text-xs text-red-200 disabled:opacity-40" (click)="disconnectTelnyxCompany('all')" [disabled]="!!saving || dirty.telnyxCompany">Disconnect all</button>
+              </div>
+            </div>
             <div class="flex justify-end border-t border-white/10 pt-6 mt-6"><app-button type="submit" variant="primary" icon="save" [isLoading]="saving==='company:'+company.company_id">Save Company Sender</app-button></div>
           </form>
         </ng-container>

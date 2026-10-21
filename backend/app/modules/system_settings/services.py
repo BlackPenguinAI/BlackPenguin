@@ -453,7 +453,7 @@ def telnyx_company_config_response(company: Company, config: TelnyxCompanyConfig
         "coverage_checked_at": config.coverage_checked_at if config else None,
         "regulatory_status": (config.regulatory_status or "pending") if config else "pending",
         "live_sms_enabled": bool(config.live_sms_enabled) if config else False,
-        "primary_channel": (config.primary_channel or "sms") if config else ("sms" if company.country_code == "US" else "whatsapp"),
+        "primary_channel": (config.primary_channel or "automatic") if config else "automatic",
         "whatsapp_business_account_id": config.whatsapp_business_account_id if config else None,
         "whatsapp_phone_number_id": config.whatsapp_phone_number_id if config else None,
         "whatsapp_from_phone_number": config.whatsapp_from_phone_number if config else None,
@@ -504,7 +504,6 @@ def update_telnyx_company_config(db: Session, company_id: str, payload: TelnyxCo
         if key in values and isinstance(values[key], str):
             values[key] = values[key].strip() or None
     for field, label in (
-        ("messaging_profile_id", "Messaging Profile"),
         ("from_phone_number", "sender number"),
         ("telnyx_phone_number_id", "Telnyx phone number ID"),
         ("whatsapp_phone_number_id", "WhatsApp phone number ID"),
@@ -571,6 +570,109 @@ def update_telnyx_company_config(db: Session, company_id: str, payload: TelnyxCo
         config.whatsapp_verification_status = "pending"
         config.whatsapp_verified_at = None
         config.whatsapp_last_error = None
+    db.commit(); db.refresh(config)
+    return config
+
+
+def disconnect_telnyx_company_config(
+    db: Session, company_id: str, *, scope: str, actor=None, request=None,
+) -> TelnyxCompanyConfig:
+    """Release Company-owned Telnyx identities without deleting message history."""
+    config = get_telnyx_company_config(db, company_id)
+    if not config:
+        raise HTTPException(status_code=404, detail="The Company Telnyx sender is not configured.")
+    if scope not in {"sms", "whatsapp", "all"}:
+        raise HTTPException(status_code=422, detail="Select SMS, WhatsApp or all Telnyx resources.")
+
+    from app.modules.sales_agent.models import OutboundMessage, SalesConversation, SalesFollowUpJob
+    from app.modules.sales_crm.models import Lead
+    from app.modules.governance.services import record_platform_event
+
+    channels = {"sms", "whatsapp"} if scope == "all" else {scope}
+    conversations = db.query(SalesConversation).filter(
+        SalesConversation.company_id == company_id,
+        SalesConversation.provider == "telnyx",
+        SalesConversation.channel.in_(channels),
+    ).all()
+    conversation_ids = [item.id for item in conversations]
+    lead_ids = {item.lead_id for item in conversations}
+    pause_reason = f"Telnyx {scope} resources disconnected by a platform administrator."
+    now = datetime.utcnow()
+    for conversation in conversations:
+        conversation.is_paused = True
+        conversation.pause_reason = pause_reason
+    if conversation_ids:
+        db.query(SalesFollowUpJob).filter(
+            SalesFollowUpJob.conversation_id.in_(conversation_ids),
+            SalesFollowUpJob.status == "pending",
+        ).update({
+            SalesFollowUpJob.status: "cancelled",
+            SalesFollowUpJob.processed_at: now,
+        }, synchronize_session=False)
+        db.query(OutboundMessage).filter(
+            OutboundMessage.conversation_id.in_(conversation_ids),
+            OutboundMessage.provider == "telnyx",
+            OutboundMessage.channel.in_(channels),
+            OutboundMessage.status.in_(("draft", "queued")),
+            OutboundMessage.provider_message_id.is_(None),
+        ).update({
+            OutboundMessage.status: "cancelled",
+            OutboundMessage.last_error: pause_reason,
+        }, synchronize_session=False)
+    if lead_ids:
+        db.query(Lead).filter(Lead.id.in_(lead_ids)).update({
+            Lead.agent_status: "paused",
+            Lead.next_action_at: None,
+        }, synchronize_session=False)
+
+    resource_snapshot = {
+        "messaging_profile_id": config.messaging_profile_id,
+        "from_phone_number": config.from_phone_number,
+        "telnyx_phone_number_id": config.telnyx_phone_number_id,
+        "whatsapp_business_account_id": config.whatsapp_business_account_id,
+        "whatsapp_phone_number_id": config.whatsapp_phone_number_id,
+        "whatsapp_from_phone_number": config.whatsapp_from_phone_number,
+    }
+    if "sms" in channels:
+        config.live_sms_enabled = False
+        config.from_phone_number = None
+        config.telnyx_phone_number_id = None
+        config.sender_country_code = None
+        config.coverage_snapshot = {}
+        config.coverage_checked_at = None
+        config.regulatory_status = "pending"
+        config.verification_status = "not_configured"
+        config.verified_at = None
+        config.last_error = None
+    if "whatsapp" in channels:
+        config.live_whatsapp_enabled = False
+        config.whatsapp_business_account_id = None
+        config.whatsapp_phone_number_id = None
+        config.whatsapp_from_phone_number = None
+        config.whatsapp_template_name = None
+        config.whatsapp_template_content = None
+        config.whatsapp_template_language = "en_US"
+        config.whatsapp_verification_status = "not_configured"
+        config.whatsapp_verified_at = None
+        config.whatsapp_last_error = None
+    sms_remains = bool(config.from_phone_number)
+    whatsapp_remains = bool(config.whatsapp_from_phone_number)
+    if not sms_remains and not whatsapp_remains:
+        config.messaging_profile_id = None
+        config.primary_channel = "automatic"
+    elif sms_remains and whatsapp_remains:
+        config.primary_channel = "automatic"
+    elif sms_remains:
+        config.primary_channel = "sms"
+    else:
+        config.primary_channel = "whatsapp"
+
+    record_platform_event(
+        db, actor=actor, event_type="telnyx_company_sender_disconnected",
+        entity_type="telnyx_company_config", entity_id=config.id,
+        company_id=company_id, reason=pause_reason,
+        payload={"scope": scope, "released_resources": resource_snapshot}, request=request,
+    )
     db.commit(); db.refresh(config)
     return config
 

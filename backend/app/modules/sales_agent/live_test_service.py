@@ -163,9 +163,17 @@ async def create_live_lead(
     source_definition = LIVE_LEAD_SOURCES.get(source_code)
     if not source_definition:
         raise HTTPException(status_code=422, detail="Select a supported lead source.")
-    channel = company_live_channel(db, company_id=company_id, requested=channel)
+    channel = company_live_channel(
+        db, company_id=company_id, requested=channel,
+        destination_phone=lead_form.get("phone"),
+    )
     if not channel:
-        raise HTTPException(status_code=409, detail="Verify and enable an SMS or WhatsApp channel for this Company before starting the agent.")
+        from app.integrations.messaging_gateway import company_channel_preview
+
+        preview = company_channel_preview(
+            db, company_id=company_id, destination_phone=lead_form.get("phone") or "",
+        )
+        raise HTTPException(status_code=409, detail=preview["detail"])
     provider = "telnyx" if channel == "whatsapp" else live_provider(db, company_id=company_id)
     if not provider:
         raise HTTPException(status_code=409, detail="The selected Company messaging channel is not ready.")
