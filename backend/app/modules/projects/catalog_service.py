@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from decimal import Decimal
+import re
 from typing import Any
 
 from fastapi import HTTPException
@@ -35,6 +36,14 @@ def _utc_naive(value: datetime) -> datetime:
 def _latest_inventory_update(items: list[ProjectPropertyType]) -> datetime | None:
     values = [_utc_naive(item.inventory_updated_at) for item in items if item.inventory_updated_at is not None]
     return max(values) if values else None
+
+
+def _bedroom_signature(value: Any) -> str | None:
+    text = str(value or "").casefold()
+    if re.search(r"\b4\s*\+|\b4(?:br|\s*bed)", text):
+        return "4+"
+    match = re.search(r"\b([0-3])(?:br|\s*bed)", text)
+    return match.group(1) if match else None
 
 
 def confirmation_field_errors(item: ProjectPropertyType) -> dict[str, str]:
@@ -261,7 +270,34 @@ def confirm_catalog(db: Session, project: Project) -> dict[str, Any]:
     if len(currencies) > 1:
         raise HTTPException(status_code=422, detail="Use one commercial currency across the confirmed property catalog.")
 
+    # A profile may still contain typologies extracted before the structured
+    # catalog existed. Do not approve a catalog that would make those products
+    # disappear from the Sales Agent context without an explicit review.
     profile = services.get_profile(project)
+    profile_typologies = (profile.profile_data or {}).get("typologies") or []
+    if isinstance(profile_typologies, str):
+        profile_typologies = [value.strip() for value in profile_typologies.split(",") if value.strip()]
+    catalog_names = {item.name.casefold() for item in confirmed}
+    catalog_bedrooms = {
+        signature for item in confirmed
+        if (signature := _bedroom_signature(item.name)) is not None
+    }
+    missing_typologies = [
+        str(value) for value in profile_typologies
+        if str(value).strip()
+        and str(value).casefold() not in catalog_names
+        and (
+            (signature := _bedroom_signature(value)) is not None
+            and signature not in catalog_bedrooms
+        )
+    ]
+    if missing_typologies:
+        raise HTTPException(status_code=409, detail={
+            "code": "profile_catalog_conflict",
+            "message": "Review the Project typologies that are missing from the property catalog.",
+            "missing_typologies": missing_typologies,
+        })
+
     states = dict(profile.field_states or {})
     states["property_type_catalog"] = {"status": "confirmed", "applicable": True}
     profile.field_states = states

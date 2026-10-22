@@ -524,6 +524,24 @@ def validate_onboarding_value(field: str, value: Any) -> dict[str, Any] | None:
                 "field": field,
                 "message": "Enter one or more complete HTTP or HTTPS social profile URLs.",
             }
+    if field == "exact_address" and isinstance(value, str):
+        # Keep commercial facts out of the location field. Those facts must be
+        # reviewed independently so that correcting an address cannot silently
+        # overwrite pricing, inventory or financing context.
+        commercial_terms = re.compile(
+            r"\b(prices?|financing|bedrooms?|bathrooms?|amenities|available units?|"
+            r"sq\.?\s*ft|square feet|delivery|move-in|fha|conventional loan)\b",
+            re.IGNORECASE,
+        )
+        if commercial_terms.search(value):
+            return {
+                "code": "mixed_field_content",
+                "field": field,
+                "message": (
+                    "Enter only the postal address here. Confirm pricing, financing, "
+                    "inventory and property details in their corresponding fields."
+                ),
+            }
     config = QUESTION_CATALOG.get(field, {})
     if not isinstance(value, str):
         return None

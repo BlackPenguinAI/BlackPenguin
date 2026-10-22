@@ -16,6 +16,7 @@ from app.modules.sales_crm.intelligence import merge_extracted_facts, update_lea
 from app.modules.sales_crm.models import FunnelStage, Lead, LeadContact
 
 from .graph import GRAPH_VERSION, TOOLSET_VERSION, build_sales_graph
+from .response_policy import action_types
 from .models import (
     AgentRun, ExternalWebhookEvent, OutboundMessage, SalesConversation, SalesConversationLeadContext, SalesInboundJob,
     SalesFollowUpJob, SalesMessage,
@@ -42,6 +43,26 @@ from app.integrations.whatsapp_templates import (
 def normalize_phone(value: str) -> str:
     digits = "".join(character for character in value if character.isdigit())
     return f"+{digits}"
+
+
+def _confirmed_handoff_reply(inbound_text: str, actions: list[dict]) -> str:
+    """Confirm only the durable intervention created by the runtime."""
+    requested = action_types(actions)
+    if "request_callback" in requested:
+        return (
+            "I’ve sent your callback request to the Sales team with this conversation context. "
+            "A team member will review it and follow up."
+        )
+    material_terms = ("brochure", "floor plan", "blueprint", "price list", "email", "document")
+    if any(term in (inbound_text or "").casefold() for term in material_terms):
+        return (
+            "I don’t currently have an approved document available to share here. "
+            "I’ve asked the Sales team to review your request and follow up."
+        )
+    return (
+        "I’ve sent your request and this conversation context for human review. "
+        "A Sales team member will follow up."
+    )
 
 
 def ensure_contact(db: Session, lead: Lead) -> LeadContact:
@@ -603,6 +624,9 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
             return
         mandatory_reason = escalation_reason(inbound.content)
         if mandatory_reason:
+            intervention_actions = [{
+                "type": "request_callback" if mandatory_reason == "HUMAN_REQUESTED" else "request_human_review",
+            }]
             create_intervention_case(
                 db, conversation=conversation, lead=lead, reason=mandatory_reason,
                 evidence=inbound.content,
@@ -610,9 +634,13 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
             db.commit()
             await _dispatch(
                 db, conversation=conversation, lead=lead,
-                content=f"I’ve paused the automated conversation so a human can review your request. You can also contact Black Penguin at {settings.SUPPORT_EMAIL}.",
+                content=_confirmed_handoff_reply(inbound.content, intervention_actions),
                 role="assistant", agent_run_id=None,
-                metadata={"event_kind": "human_intervention", "reason": mandatory_reason},
+                metadata={
+                    "event_kind": "human_intervention",
+                    "reason": mandatory_reason,
+                    "proposed_actions": intervention_actions,
+                },
                 idempotency_key=f"human-intervention:{conversation.id}:{inbound.id}",
             )
             return
@@ -647,7 +675,7 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
                 reason="LOW_CONFIDENCE" if not result.get("policy_violations") else "POLICY_VIOLATION",
                 evidence=inbound.content,
             )
-            reply = f"I’ve paused the automated conversation for human review. You can also contact Black Penguin at {settings.SUPPORT_EMAIL}."
+            reply = _confirmed_handoff_reply(inbound.content, actions)
         history = db.query(SalesMessage).filter(SalesMessage.conversation_id == conversation.id).order_by(SalesMessage.created_at).all()
         lead_history, lead_message_count = _lead_intelligence_input(history)
         update_lead_intelligence(

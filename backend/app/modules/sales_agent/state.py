@@ -15,6 +15,7 @@ class SalesAgentState(TypedDict, total=False):
     channel: str
     company_context: dict[str, Any]
     project_context: dict[str, Any]
+    commercial_context: dict[str, Any]
     inventory_context: list[dict[str, Any]]
     lead_context: dict[str, Any]
     conversation_history: list[dict[str, str]]

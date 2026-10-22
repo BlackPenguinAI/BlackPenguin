@@ -10,12 +10,18 @@ from app.integrations.openrouter_client import generate_llm_response
 from app.modules.ai_core.usage import LLMUsageContext
 from app.modules.ai_core.services import get_ai_config
 from app.modules.companies.models import Company
-from app.modules.projects import asset_share_service
-from app.modules.projects.models import Project, ProjectPropertyType, ProjectUnit
+from app.modules.projects.models import Project
 from app.modules.sales_crm.models import Lead, LeadContact, LeadObjection
 from .segment_strategies import BASE_SEGMENT_GUARDRAIL, STRATEGY_VERSION
 
 from .models import SalesMessage
+from .commercial_context import build_commercial_context
+from .response_policy import (
+    appointment_intent_present,
+    plain_channel_text,
+    remove_unsolicited_appointment_offer,
+    repeats_recent_assistant_reply,
+)
 from .state import SalesAgentState
 from app.modules.governance.services import guidance_context
 
@@ -68,51 +74,22 @@ def build_sales_graph(db: Session):
             LeadContact.id == lead.contact_id,
             LeadContact.company_id == state["company_id"],
         ).first() if lead.contact_id else None
-        profile = project.profile
-        confirmed = {}
-        if profile:
-            confirmed = {
-                key: value for key, value in (profile.profile_data or {}).items()
-                if (profile.field_states or {}).get(key, {}).get("status") in {"confirmed", "corrected_by_user", "not_applicable"}
-            }
-        units = db.query(ProjectUnit).filter(ProjectUnit.project_id == project.id).all()
-        property_types = db.query(ProjectPropertyType).filter(
-            ProjectPropertyType.project_id == project.id,
-            ProjectPropertyType.review_status == "confirmed",
-        ).all()
-        structured_inventory = []
-        for item in property_types:
-            links = [
-                asset_share_service.issue(
-                    db, company_id=company.id, project_id=project.id, lead_id=lead.id, source_id=media.source_id,
-                )
-                for media in sorted(item.media, key=lambda value: value.sort_order)[:6]
-            ]
-            structured_inventory.append({
-                "property_type": item.name, "description": item.description,
-                "bedrooms": item.bedrooms, "bathrooms": item.bathrooms,
-                "area_min": float(item.area_min) if item.area_min is not None else None,
-                "area_max": float(item.area_max) if item.area_max is not None else None,
-                "area_unit": item.area_unit, "available_units": item.available_units,
-                "starting_price": float(item.starting_price) if item.starting_price is not None else None,
-                "maximum_price": float(item.maximum_price) if item.maximum_price is not None else None,
-                "currency": item.currency, "features": item.features or [],
-                "inventory_updated_at": item.inventory_updated_at, "image_links": links,
-            })
-        if structured_inventory:
+        commercial = build_commercial_context(
+            db, project=project, company_id=company.id, lead_id=lead.id,
+        )
+        if commercial["available_assets"]:
             db.commit()
         history = db.query(SalesMessage).filter(
             SalesMessage.conversation_id == state["conversation_id"],
         ).order_by(SalesMessage.created_at.asc()).all()
         return {
             "company_context": {"id": company.id, "name": company.name},
-            "project_context": {"id": project.id, "name": project.name, "is_demo": project.is_demo, "profile": confirmed},
-            "inventory_context": structured_inventory or [
-                {"unit_code": unit.unit_code, "typology": unit.typology, "bedrooms": unit.bedrooms,
-                 "bathrooms": unit.bathrooms, "price": float(unit.list_price) if unit.list_price is not None else None,
-                 "currency": unit.currency, "status": unit.status}
-                for unit in units
-            ],
+            "project_context": {
+                "id": project.id, "name": project.name, "is_demo": project.is_demo,
+                "profile": commercial["confirmed_project_facts"],
+            },
+            "commercial_context": commercial,
+            "inventory_context": commercial["inventory"],
             "lead_context": {
                 "id": lead.id, "name": lead.full_name, "stage": lead.funnel_stage.value,
                 "intent_score": float(lead.intent_score or 0), "consent_status": lead.consent_status,
@@ -200,9 +177,9 @@ def build_sales_graph(db: Session):
             {"role": "system", "content": "\n\n".join(state["prompt_snapshot"].values())},
             {"role": "system", "content": "RUNTIME CONTEXT:\n" + json.dumps({
                 "company": state["company_context"], "project": state["project_context"],
-                "inventory": state["inventory_context"], "lead": state["lead_context"],
+                "commercial": state["commercial_context"], "lead": state["lead_context"],
                 "event_kind": state.get("event_kind", "lead_message"),
-                "allowed_actions": ["answer_question", "ask_qualification_question", "search_inventory", "request_visit_location", "request_available_slots", "offer_appointment", "schedule_follow_up", "request_human_review"],
+                "allowed_actions": ["answer_question", "ask_qualification_question", "search_inventory", "share_asset", "request_callback", "request_visit_location", "request_available_slots", "offer_appointment", "schedule_follow_up", "request_human_review"],
                 "contract": contract,
             }, ensure_ascii=False, default=str)},
         ]
@@ -238,13 +215,41 @@ def build_sales_graph(db: Session):
 
     async def validate_output(state: SalesAgentState) -> dict[str, Any]:
         violations = list(state.get("policy_violations", []))
-        allowed = {"answer_question", "ask_qualification_question", "search_inventory", "request_visit_location", "request_available_slots", "offer_appointment", "schedule_follow_up", "request_human_review"}
-        for action in state.get("proposed_actions", []):
+        allowed = {"answer_question", "ask_qualification_question", "search_inventory", "share_asset", "request_callback", "request_visit_location", "request_available_slots", "offer_appointment", "schedule_follow_up", "request_human_review"}
+        actions = list(state.get("proposed_actions", []))
+        for action in actions:
             if not isinstance(action, dict) or action.get("type") not in allowed:
                 violations.append("unsupported_action")
-        if not state.get("proposed_reply"):
+        appointment_actions = {"request_visit_location", "request_available_slots", "offer_appointment"}
+        appointment_intent = appointment_intent_present(
+            state.get("inbound_text", ""), state.get("conversation_history", []),
+        )
+        if not appointment_intent:
+            actions = [
+                action for action in actions
+                if not isinstance(action, dict) or action.get("type") not in appointment_actions
+            ]
+        reply = plain_channel_text(state.get("proposed_reply"))
+        if not appointment_intent:
+            reply = remove_unsolicited_appointment_offer(reply)
+        if repeats_recent_assistant_reply(reply, state.get("conversation_history", [])):
+            reply = (
+                "What would be most helpful to review next: available homes, pricing, "
+                "financing, delivery timing, or project features?"
+            )
+            actions = [{"type": "ask_qualification_question"}]
+        if not reply:
             violations.append("missing_reply")
-        return {"policy_violations": sorted(set(violations)), "requires_human": bool(violations) or state.get("requires_human", False)}
+        requires_human = bool(violations) or state.get("requires_human", False) or any(
+            isinstance(action, dict) and action.get("type") in {"request_callback", "request_human_review"}
+            for action in actions
+        )
+        return {
+            "proposed_reply": reply,
+            "proposed_actions": actions,
+            "policy_violations": sorted(set(violations)),
+            "requires_human": requires_human,
+        }
 
     def after_validation(state: SalesAgentState) -> str:
         return "stop" if state.get("policy_violations") else "continue"
