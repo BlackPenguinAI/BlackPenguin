@@ -6,16 +6,18 @@ from sqlalchemy.orm import Session
 from app.db.postgres import get_db
 from app.modules.auth.deps import RoleChecker, get_current_user
 from app.modules.projects.models import Project
+from app.modules.projects.models import SalesAssetShare
+from app.modules.projects import asset_share_service
 from app.modules.users.models import TENANT_MANAGER_ROLES, User, UserRole
 from app.modules.users.project_access import require_project_access
 
 from . import services
 from .models import (
     AgentOperatingPolicy, ConversationKpiTarget, DataExportAuditEvent,
-    KnowledgeGuidanceItem, Notification,
+    KnowledgeGuidanceItem, Notification, SalesAssetAccessEvent,
 )
 from .schemas import (
-    AuditEventResponse, GuidanceItemPayload, GuidanceItemResponse,
+    AuditEventResponse, SalesAssetAuditResponse, GuidanceItemPayload, GuidanceItemResponse,
     KpiTargetPayload, KpiTargetResponse, NotificationResponse,
     OperatingPolicyPayload, OperatingPolicyResponse,
 )
@@ -45,6 +47,47 @@ def export_audit(
     if actor_user_id: query = query.filter(DataExportAuditEvent.actor_user_id == actor_user_id)
     if export_type: query = query.filter(DataExportAuditEvent.export_type == export_type)
     return query.order_by(DataExportAuditEvent.created_at.desc()).limit(limit).all()
+
+
+@router.get("/admin/sales-asset-audit", response_model=list[SalesAssetAuditResponse])
+def sales_asset_audit(
+    company_id: str | None = None, project_id: str | None = None,
+    lead_id: str | None = None, event_type: str | None = None,
+    channel: str | None = None, human_only: bool = False,
+    limit: int = Query(100, ge=1, le=500), db: Session = Depends(get_db),
+    _: User = Depends(RoleChecker([UserRole.SUPERADMIN])),
+):
+    query = db.query(SalesAssetAccessEvent)
+    if company_id: query = query.filter(SalesAssetAccessEvent.company_id == company_id)
+    if project_id: query = query.filter(SalesAssetAccessEvent.project_id == project_id)
+    if lead_id: query = query.filter(SalesAssetAccessEvent.lead_id == lead_id)
+    if event_type: query = query.filter(SalesAssetAccessEvent.event_type == event_type)
+    if channel: query = query.filter(SalesAssetAccessEvent.channel == channel)
+    if human_only: query = query.filter(SalesAssetAccessEvent.is_automated.is_(False))
+    rows = query.order_by(SalesAssetAccessEvent.created_at.desc()).limit(limit).all()
+    share_ids = {row.share_id for row in rows if row.share_id}
+    shares = {
+        item.id: item for item in db.query(SalesAssetShare).filter(SalesAssetShare.id.in_(share_ids)).all()
+    } if share_ids else {}
+    return [
+        {
+            **{column.name: getattr(row, column.name) for column in SalesAssetAccessEvent.__table__.columns},
+            "share_revoked": shares[row.share_id].revoked if row.share_id in shares else None,
+            "share_expires_at": shares[row.share_id].expires_at if row.share_id in shares else None,
+        }
+        for row in rows
+    ]
+
+
+@router.post("/admin/sales-asset-shares/{share_id}/revoke", status_code=status.HTTP_204_NO_CONTENT)
+def revoke_sales_asset_share(
+    share_id: str, db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([UserRole.SUPERADMIN])),
+):
+    share = db.query(SalesAssetShare).filter(SalesAssetShare.id == share_id).first()
+    if not share:
+        raise HTTPException(status_code=404, detail="Shared material link not found.")
+    asset_share_service.revoke(db, share, user_id=current_user.id)
 
 
 @router.get("/operating-policy", response_model=OperatingPolicyResponse | None)

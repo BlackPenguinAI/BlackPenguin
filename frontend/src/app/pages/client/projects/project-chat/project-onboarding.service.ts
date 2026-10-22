@@ -8,6 +8,7 @@ import {
   Campaign, ChatMessage, ChatTurn, MetaAssetDiscovery, MetaAuthorization, MetaConnection, MetaSetupConfiguration, MetaSetupResult,
   OnboardingState, ProjectAssignment, ProjectOnboardingActionPayload, ProjectProfile,
   ProjectSalesCandidate, ProjectSource, SourceProposal, ProjectPropertyType, ProjectPropertyTypePayload, PropertyTypeCatalog,
+  ProjectSalesAsset, SalesAssetType,
 } from './project-onboarding.models';
 
 @Injectable({ providedIn: 'root' })
@@ -80,6 +81,22 @@ export class ProjectOnboardingService {
   }
   deferPropertyTypeImages(id: string, propertyTypeId: string): Observable<ProjectPropertyType> {
     return this.http.post<ProjectPropertyType>(`${this.baseUrl}/${id}/property-types/${propertyTypeId}/defer-images`, {});
+  }
+  getSalesAssets(id: string): Observable<ProjectSalesAsset[]> {
+    return this.http.get<ProjectSalesAsset[]>(`${this.baseUrl}/${id}/sales-assets`);
+  }
+  createSalesAsset(id: string, payload: {
+    source_id: string; property_type_id: string | null; asset_type: SalesAssetType;
+    display_name: string; description: string | null; valid_from: string | null;
+    valid_until: string | null; allowed_channels: Array<'sms' | 'whatsapp'>;
+  }): Observable<ProjectSalesAsset> {
+    return this.http.post<ProjectSalesAsset>(`${this.baseUrl}/${id}/sales-assets`, payload);
+  }
+  approveSalesAsset(id: string, assetId: string): Observable<ProjectSalesAsset> {
+    return this.http.post<ProjectSalesAsset>(`${this.baseUrl}/${id}/sales-assets/${assetId}/approve`, {});
+  }
+  archiveSalesAsset(id: string, assetId: string): Observable<void> {
+    return this.http.delete<void>(`${this.baseUrl}/${id}/sales-assets/${assetId}`);
   }
   getCampaigns(id: string): Observable<Campaign[]> { return this.http.get<Campaign[]>(`${this.baseUrl}/${id}/campaigns`); }
   createCampaign(id: string, campaign: Partial<Campaign>): Observable<Campaign> { return this.http.post<Campaign>(`${this.baseUrl}/${id}/campaigns`, campaign); }

@@ -27,7 +27,7 @@ import {
   Campaign, ChatAttachment, ChatMessage, ChatTurn, EMPTY_PROJECT_PROFILE, MetaAssetDiscovery, MetaAssetOption, MetaAuthorization, MetaConnection,
   MetaSetupConfiguration, OnboardingState, ProjectAssignment, ProjectFieldProgress, ProjectProfile,
   ProjectSalesCandidate, ProjectSource, SectionProgress, SourceProposal, ValidationStatus,
-  ProjectPropertyType, PropertyTypeCatalog,
+  ProjectPropertyType, ProjectSalesAsset, PropertyTypeCatalog, SalesAssetType,
 } from './project-onboarding.models';
 import { ProjectOnboardingService } from './project-onboarding.service';
 import { availableProjectSalesCandidates, companyAdministratorSalesCandidate } from './project-sales-capabilities';
@@ -91,6 +91,19 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   metaSetupBusy = false;
   metaSetupMessage = '';
   propertyCatalog: PropertyTypeCatalog = { items: [], confirmed_count: 0, candidate_count: 0, limit: 0, remaining: 0, catalog_complete: false };
+  salesAssets: ProjectSalesAsset[] = [];
+  salesAssetBusy = false;
+  showSalesAssetForm = false;
+  salesAssetDraft: {
+    source_id: string; asset_type: SalesAssetType; display_name: string; description: string;
+    property_type_id: string; valid_until: string; sms: boolean; whatsapp: boolean;
+  } = { source_id: '', asset_type: 'brochure', display_name: '', description: '', property_type_id: '', valid_until: '', sms: true, whatsapp: true };
+  readonly salesAssetTypes: Array<{ value: SalesAssetType; label: string }> = [
+    { value: 'brochure', label: 'Brochure' }, { value: 'floor_plan', label: 'Floor plan' },
+    { value: 'unit_sheet', label: 'Unit sheet' }, { value: 'price_list', label: 'Price list' },
+    { value: 'amenities', label: 'Amenities' }, { value: 'location_map', label: 'Location map' },
+    { value: 'legal_disclaimer', label: 'Legal disclaimer' }, { value: 'other', label: 'Other' },
+  ];
   readonly savingPropertyTypeIds = new Set<string>();
   readonly removingPropertyTypeIds = new Set<string>();
   readonly propertyTypeServerErrors = new Map<string, FormErrors>();
@@ -181,6 +194,10 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
 
   get canSend(): boolean { return (!!this.prompt.trim() || !!this.selectedFiles.length) && !this.isAnalyzing && !this.hasPendingReview; }
   get projectName(): string { return this.profile.project_name || 'Untitled Project'; }
+  get availableSalesAssetSources(): ProjectSource[] {
+    const registered = new Set(this.salesAssets.map(item => item.source_id));
+    return this.sources.filter(source => source.status === 'ready' && !!source.download_url && !registered.has(source.id));
+  }
   get hasProcessingSources(): boolean { return this.sources.some((source) => source.status === 'processing'); }
   get nextBlocker(): string { return this.profile.completion.blockers[0]?.label || 'Final profile approval'; }
   get profileSections(): SectionProgress[] {
@@ -299,6 +316,50 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     });
   }
   loadSources(): void { this.onboarding.getSources(this.projectId).subscribe({ next: (items) => { this.sources = this.prepareSources(items); this.loadSourceImagePreviews(); } }); }
+  loadSalesAssets(): void {
+    this.onboarding.getSalesAssets(this.projectId).subscribe({
+      next: items => { this.salesAssets = items; this.cdr.detectChanges(); },
+      error: () => { this.errorMessage = 'Approved sales materials could not be loaded.'; },
+    });
+  }
+  salesAssetSourceChanged(): void {
+    const source = this.sources.find(item => item.id === this.salesAssetDraft.source_id);
+    if (source && !this.salesAssetDraft.display_name.trim()) this.salesAssetDraft.display_name = source.name;
+  }
+  createSalesAsset(): void {
+    const draft = this.salesAssetDraft;
+    const channels = [draft.sms ? 'sms' : null, draft.whatsapp ? 'whatsapp' : null].filter((value): value is 'sms' | 'whatsapp' => !!value);
+    if (this.salesAssetBusy || !draft.source_id || !draft.display_name.trim() || !channels.length) return;
+    this.salesAssetBusy = true; this.errorMessage = '';
+    this.onboarding.createSalesAsset(this.projectId, {
+      source_id: draft.source_id, property_type_id: draft.property_type_id || null,
+      asset_type: draft.asset_type, display_name: draft.display_name.trim(),
+      description: draft.description.trim() || null, valid_from: null,
+      valid_until: draft.valid_until ? new Date(`${draft.valid_until}T23:59:59Z`).toISOString() : null,
+      allowed_channels: channels,
+    }).subscribe({
+      next: item => {
+        this.salesAssets = [item, ...this.salesAssets]; this.salesAssetBusy = false; this.showSalesAssetForm = false;
+        this.salesAssetDraft = { source_id: '', asset_type: 'brochure', display_name: '', description: '', property_type_id: '', valid_until: '', sms: true, whatsapp: true };
+        this.cdr.detectChanges();
+      },
+      error: (error: HttpErrorResponse) => { this.salesAssetBusy = false; this.errorMessage = this.apiDetail(error, 'Sales material could not be registered.'); this.cdr.detectChanges(); },
+    });
+  }
+  approveSalesAsset(item: ProjectSalesAsset): void {
+    if (this.salesAssetBusy) return; this.salesAssetBusy = true; this.errorMessage = '';
+    this.onboarding.approveSalesAsset(this.projectId, item.id).subscribe({
+      next: updated => { this.salesAssets = this.salesAssets.map(row => row.id === updated.id ? updated : row); this.salesAssetBusy = false; this.cdr.detectChanges(); },
+      error: (error: HttpErrorResponse) => { this.salesAssetBusy = false; this.errorMessage = this.apiDetail(error, 'Sales material could not be approved.'); this.cdr.detectChanges(); },
+    });
+  }
+  archiveSalesAsset(item: ProjectSalesAsset): void {
+    if (this.salesAssetBusy) return; this.salesAssetBusy = true; this.errorMessage = '';
+    this.onboarding.archiveSalesAsset(this.projectId, item.id).subscribe({
+      next: () => { this.salesAssets = this.salesAssets.filter(row => row.id !== item.id); this.salesAssetBusy = false; this.cdr.detectChanges(); },
+      error: (error: HttpErrorResponse) => { this.salesAssetBusy = false; this.errorMessage = this.apiDetail(error, 'Sales material could not be archived.'); this.cdr.detectChanges(); },
+    });
+  }
   loadCampaigns(): void { this.onboarding.getCampaigns(this.projectId).subscribe({ next: (items) => this.campaigns = items }); }
   loadMetaConnections(): void { this.onboarding.getMetaConnections().subscribe({ next: (items) => this.metaConnections = items }); }
   selectMetaConnection(): void {
@@ -1278,6 +1339,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     this.sources = this.prepareSources(state.sources); this.nextQuestion = state.next_question;
     this.loadSourceImagePreviews();
     this.loadPropertyTypes();
+    this.loadSalesAssets();
     for (const source of this.sources) if (this.hasPendingProposals(source)) this.expandedSourceIds.add(source.id);
     this.showWelcome = state.stage === 'website';
     if (this.pollingTimer) clearTimeout(this.pollingTimer);

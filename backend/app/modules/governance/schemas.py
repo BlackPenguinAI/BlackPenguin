@@ -99,3 +99,24 @@ class AuditEventResponse(BaseModel):
     event_hash: str
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
+
+
+class SalesAssetAuditResponse(BaseModel):
+    id: str
+    share_id: str | None = None
+    company_id: str | None = None
+    project_id: str | None = None
+    lead_id: str | None = None
+    sales_asset_id: str | None = None
+    source_id: str | None = None
+    outbound_message_id: str | None = None
+    channel: str | None = None
+    asset_type: str | None = None
+    asset_name: str | None = None
+    event_type: str
+    is_automated: bool
+    previous_hash: str | None = None
+    event_hash: str
+    created_at: datetime
+    share_revoked: bool | None = None
+    share_expires_at: datetime | None = None

@@ -11,12 +11,13 @@ from sqlalchemy.orm import Session
 
 from app.db.postgres import SessionLocal
 from app.integrations.messaging_gateway import channel_sender, company_live_channel, default_provider, live_provider, send_message, send_sms
-from app.modules.projects.models import Project, ProjectCampaign
+from app.modules.projects import asset_share_service
+from app.modules.projects.models import Project, ProjectCampaign, ProjectSalesAsset, SalesAssetShare
 from app.modules.sales_crm.intelligence import merge_extracted_facts, update_lead_intelligence
 from app.modules.sales_crm.models import FunnelStage, Lead, LeadContact
 
 from .graph import GRAPH_VERSION, TOOLSET_VERSION, build_sales_graph
-from .response_policy import action_types
+from .response_policy import action_types, requested_topics
 from .models import (
     AgentRun, ExternalWebhookEvent, OutboundMessage, SalesConversation, SalesConversationLeadContext, SalesInboundJob,
     SalesFollowUpJob, SalesMessage,
@@ -295,6 +296,17 @@ async def _dispatch(
         metadata_json=message_metadata, created_at=datetime.utcnow(),
     )
     db.add_all([outbound, message]); db.commit()
+    share_ids = [str(value) for value in message_metadata.get("sales_asset_share_ids", []) if value]
+    if share_ids:
+        shares = db.query(SalesAssetShare).filter(
+            SalesAssetShare.id.in_(share_ids),
+            SalesAssetShare.company_id == conversation.company_id,
+            SalesAssetShare.lead_id == lead.id,
+        ).all()
+        for share in shares:
+            share.outbound_message_id = outbound.id
+            db.add(share)
+        db.commit()
     try:
         if conversation.channel == "sms":
             result = await send_sms(
@@ -311,14 +323,92 @@ async def _dispatch(
     except Exception as exc:
         outbound.status = "failed"; outbound.last_error = type(exc).__name__
         message.status = "failed"
+        for share in db.query(SalesAssetShare).filter(SalesAssetShare.id.in_(share_ids)).all() if share_ids else []:
+            asset_share_service.record_event(db, share=share, event_type="delivery_failed")
         db.commit()
         raise
     sid = result.get("sid")
     status = result.get("status") or "queued"
     outbound.provider_message_id = sid; outbound.status = status; outbound.sent_at = datetime.utcnow()
     message.provider_message_id = sid; message.status = status
+    for share in db.query(SalesAssetShare).filter(SalesAssetShare.id.in_(share_ids)).all() if share_ids else []:
+        asset_share_service.record_event(db, share=share, event_type="message_dispatched")
     db.commit(); db.refresh(message)
     return message
+
+
+def _asset_request_count(history: list[SalesMessage], inbound_text: str) -> int:
+    return sum(
+        "assets" in requested_topics(item.content)
+        for item in history if item.direction == "inbound" or item.role == "user"
+    )
+
+
+def _select_asset_for_request(assets: list[dict], inbound_text: str) -> dict | None:
+    if not assets:
+        return None
+    text = (inbound_text or "").casefold()
+    preferred = (
+        "floor_plan" if any(term in text for term in ("floor plan", "blueprint", "plan")) else
+        "price_list" if "price" in text else
+        "brochure" if any(term in text for term in ("brochure", "document", "pdf")) else None
+    )
+    return next((item for item in assets if item.get("asset_type") == preferred), assets[0])
+
+
+def _execute_share_actions(
+    db: Session, *, conversation: SalesConversation, lead: Lead, run: AgentRun,
+    reply: str | None, actions: list[dict], commercial: dict, inbound_text: str,
+) -> tuple[str | None, list[dict], list[str]]:
+    """Validate model proposals and mint links only at the dispatch boundary."""
+    approved = {item["asset_id"]: item for item in commercial.get("available_assets", [])}
+    requested = "assets" in requested_topics(inbound_text)
+    if requested and approved and not any(
+        isinstance(action, dict) and action.get("type") == "share_asset" for action in actions
+    ):
+        selected = _select_asset_for_request(list(approved.values()), inbound_text)
+        if selected:
+            actions = [*actions, {"type": "share_asset", "asset_id": selected["asset_id"], "reason": "lead_requested_material"}]
+
+    links: list[str] = []
+    share_ids: list[str] = []
+    seen: set[str] = set()
+    for action in actions:
+        if not isinstance(action, dict) or action.get("type") != "share_asset":
+            continue
+        asset_id = str(action.get("asset_id") or "")
+        metadata = approved.get(asset_id)
+        if not metadata or asset_id in seen:
+            continue
+        asset = db.query(ProjectSalesAsset).filter(
+            ProjectSalesAsset.id == asset_id,
+            ProjectSalesAsset.company_id == conversation.company_id,
+            ProjectSalesAsset.project_id == conversation.project_id,
+            ProjectSalesAsset.approval_status == "approved",
+        ).first()
+        if not asset:
+            continue
+        url, share = asset_share_service.issue(
+            db,
+            company_id=conversation.company_id,
+            project_id=conversation.project_id,
+            lead_id=lead.id,
+            source_id=asset.source_id,
+            sales_asset_id=asset.id,
+            channel=conversation.channel,
+            agent_run_id=run.id,
+        )
+        links.append(f"{asset.display_name}: {url}")
+        share_ids.append(share.id)
+        seen.add(asset_id)
+        if len(links) == 2:
+            break
+    if links:
+        cleaned = (reply or "").strip()
+        if not cleaned or any(phrase in cleaned.casefold() for phrase in ("cannot share", "can't share", "unable to share")):
+            cleaned = "Here is the approved information you requested."
+        reply = f"{cleaned}\n\n" + "\n".join(links)
+    return reply, actions, share_ids
 
 
 def _schedule_next_action(db: Session, conversation: SalesConversation, lead: Lead, event_id: str) -> None:
@@ -669,6 +759,19 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
             merge_extracted_facts(
                 lead, result.get("extracted_facts"), evidence=inbound.content,
             )
+        history = db.query(SalesMessage).filter(
+            SalesMessage.conversation_id == conversation.id,
+        ).order_by(SalesMessage.created_at).all()
+        commercial = result.get("commercial_context") or {}
+        available_assets = commercial.get("available_assets") or []
+        if "assets" in requested_topics(inbound.content):
+            if available_assets and not result.get("policy_violations"):
+                # A verified material request is executable; model uncertainty
+                # must not incorrectly force a handoff.
+                result["requires_human"] = False
+            elif not available_assets and _asset_request_count(history, inbound.content) >= 2:
+                result["requires_human"] = True
+                actions = [*actions, {"type": "request_human_review", "reason": "approved_material_unavailable"}]
         if result.get("requires_human"):
             create_intervention_case(
                 db, conversation=conversation, lead=lead,
@@ -676,7 +779,13 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
                 evidence=inbound.content,
             )
             reply = _confirmed_handoff_reply(inbound.content, actions)
-        history = db.query(SalesMessage).filter(SalesMessage.conversation_id == conversation.id).order_by(SalesMessage.created_at).all()
+        share_ids: list[str] = []
+        if not result.get("requires_human"):
+            reply, actions, share_ids = _execute_share_actions(
+                db, conversation=conversation, lead=lead, run=run,
+                reply=reply, actions=actions, commercial=commercial,
+                inbound_text=inbound.content,
+            )
         lead_history, lead_message_count = _lead_intelligence_input(history)
         update_lead_intelligence(
             db, lead, inbound_text=inbound.content,
@@ -709,7 +818,10 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
             await _dispatch(
                 db, conversation=conversation, lead=lead, content=reply,
                 role="assistant", agent_run_id=run.id,
-                metadata={"event_kind": "agent_reply", "proposed_actions": actions},
+                metadata={
+                    "event_kind": "agent_reply", "proposed_actions": actions,
+                    "sales_asset_share_ids": share_ids,
+                },
             )
         _schedule_next_action(db, conversation, lead, event_id)
         db.commit()

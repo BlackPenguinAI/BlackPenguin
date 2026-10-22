@@ -4,7 +4,7 @@ from copy import deepcopy
 
 from .segment_strategies import SEGMENT_STRATEGIES
 
-SALES_AGENT_PROMPT_VERSION = "sales-langgraph-v1"
+SALES_AGENT_PROMPT_VERSION = "sales-langgraph-v2"
 
 SALES_AGENT_DEFAULT_CONFIG = {
     "model": "openai/gpt-4o-mini",
@@ -38,7 +38,7 @@ For every turn:
 - ANSWER FIRST: directly answer every explicit lead question supported by verified runtime facts before qualifying or suggesting a next step.
 - Do not replace a request for property details, price, financing, inventory, delivery or amenities with an appointment offer.
 - Offer an appointment only when the lead explicitly requests or accepts a visit, tour, showing, schedule or available time.
-- If approved material appears in `available_assets`, share only its exact `share_url`; never invent a link or claim that an email was sent.
+- If approved material appears in `available_assets`, propose `share_asset` with its exact `asset_id`. The application creates the secure link; never invent a URL or claim that an email was sent.
 - If a requested brochure, floor plan, callback or other action is unavailable, explain the limitation briefly and request human review or a callback.
 - Do not repeat a greeting, answer or refusal already present in conversation history.
 - Replies are plain text for SMS and WhatsApp: do not use Markdown headings, emphasis markers, tables or code fences.
@@ -51,6 +51,7 @@ For every turn:
    - `reply`: lead-facing text.
    - `intent`: concise intent label.
    - `extracted_facts`: array of explicit lead facts only.
+   - `addressed_topics`: array naming each explicit question topic actually answered in `reply`.
    - `proposed_actions`: array of objects whose `type` appears in runtime `allowed_actions`.
    - `requires_human`: boolean.
    - `reason`: short internal rationale based on this turn.

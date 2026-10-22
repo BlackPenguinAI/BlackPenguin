@@ -6,11 +6,10 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.modules.projects import asset_share_service
+from app.modules.projects import sales_asset_service
 from app.modules.projects.models import (
     Project,
     ProjectPropertyType,
-    ProjectSourceStatus,
     ProjectUnit,
 )
 
@@ -140,7 +139,7 @@ def _catalog_conflicts(
 
 
 def build_commercial_context(
-    db: Session, *, project: Project, company_id: str, lead_id: str,
+    db: Session, *, project: Project, company_id: str, lead_id: str, channel: str = "sms",
 ) -> dict[str, Any]:
     """Build the one customer-facing commercial source of truth for a turn."""
     facts = confirmed_profile_facts(project.profile)
@@ -150,31 +149,25 @@ def build_commercial_context(
     ).order_by(ProjectPropertyType.sort_order, ProjectPropertyType.created_at).all()
     units = db.query(ProjectUnit).filter(ProjectUnit.project_id == project.id).all()
 
-    assets: list[dict[str, Any]] = []
-    seen_sources: set[str] = set()
-    for item in property_types:
-        for media in sorted(item.media, key=lambda value: value.sort_order)[:6]:
-            source = media.source
-            if (
-                not source or source.id in seen_sources
-                or source.status != ProjectSourceStatus.READY or not source.storage_path
-            ):
-                continue
-            seen_sources.add(source.id)
-            assets.append({
-                "source_id": source.id,
-                "property_type": item.name,
-                "name": source.original_filename or source.name,
-                "mime_type": source.mime_type,
-                "caption": media.caption,
-                "share_url": asset_share_service.issue(
-                    db,
-                    company_id=company_id,
-                    project_id=project.id,
-                    lead_id=lead_id,
-                    source_id=source.id,
-                ),
-            })
+    # Give the model identifiers and customer-facing metadata only. A link is
+    # minted later by the deterministic action executor, never while context is
+    # loaded and never for an unapproved onboarding source.
+    assets = [
+        {
+            "asset_id": item.id,
+            "asset_type": item.asset_type,
+            "property_type": item.property_type.name if item.property_type else None,
+            "name": item.display_name,
+            "description": item.description,
+            "mime_type": item.source.mime_type if item.source else None,
+            "version": item.version,
+            "valid_until": _iso(item.valid_until),
+            "allowed_channels": item.allowed_channels or [],
+        }
+        for item in sales_asset_service.approved_for_turn(
+            db, project_id=project.id, company_id=company_id, channel=channel,
+        )
+    ]
 
     latest_values = [
         value for value in [

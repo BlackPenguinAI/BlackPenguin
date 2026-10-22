@@ -18,16 +18,18 @@ from .models import SalesMessage
 from .commercial_context import build_commercial_context
 from .response_policy import (
     appointment_intent_present,
+    complete_requested_commercial_topics,
     plain_channel_text,
     remove_unsolicited_appointment_offer,
+    repeats_introduction_after_greeting,
     repeats_recent_assistant_reply,
 )
 from .state import SalesAgentState
 from app.modules.governance.services import guidance_context
 
 
-GRAPH_VERSION = "sales-v1"
-TOOLSET_VERSION = "sales-tools-v1"
+GRAPH_VERSION = "sales-v2"
+TOOLSET_VERSION = "sales-tools-v2"
 PLATFORM_GUARDRAILS = (
     "Never cross Company boundaries. Never invent prices, inventory or appointment slots. "
     "Respect consent and opt-out. Demo data may be used only in simulation and can never be dispatched. "
@@ -76,9 +78,8 @@ def build_sales_graph(db: Session):
         ).first() if lead.contact_id else None
         commercial = build_commercial_context(
             db, project=project, company_id=company.id, lead_id=lead.id,
+            channel=state.get("channel", "sms"),
         )
-        if commercial["available_assets"]:
-            db.commit()
         history = db.query(SalesMessage).filter(
             SalesMessage.conversation_id == state["conversation_id"],
         ).order_by(SalesMessage.created_at.asc()).all()
@@ -169,6 +170,7 @@ def build_sales_graph(db: Session):
             "reply": "string",
             "intent": "string",
             "extracted_facts": [{"key": "approved_profile_fact", "value": "explicit lead value"}],
+            "addressed_topics": ["requested topic answered in reply"],
             "proposed_actions": [],
             "requires_human": False,
             "reason": "string",
@@ -207,6 +209,7 @@ def build_sales_graph(db: Session):
         return {
             "intent": value.get("intent"),
             "extracted_facts": value.get("extracted_facts") if isinstance(value.get("extracted_facts"), list) else [],
+            "addressed_topics": value.get("addressed_topics") if isinstance(value.get("addressed_topics"), list) else [],
             "proposed_actions": value.get("proposed_actions") if isinstance(value.get("proposed_actions"), list) else [],
             "proposed_reply": value.get("reply") if isinstance(value.get("reply"), str) else None,
             "requires_human": bool(value.get("requires_human")),
@@ -220,6 +223,12 @@ def build_sales_graph(db: Session):
         for action in actions:
             if not isinstance(action, dict) or action.get("type") not in allowed:
                 violations.append("unsupported_action")
+            elif action.get("type") == "share_asset" and not action.get("asset_id"):
+                violations.append("share_asset_missing_id")
+            elif action.get("type") == "share_asset" and action.get("asset_id") not in {
+                item.get("asset_id") for item in (state.get("commercial_context") or {}).get("available_assets", [])
+            }:
+                violations.append("share_asset_not_approved")
         appointment_actions = {"request_visit_location", "request_available_slots", "offer_appointment"}
         appointment_intent = appointment_intent_present(
             state.get("inbound_text", ""), state.get("conversation_history", []),
@@ -232,12 +241,20 @@ def build_sales_graph(db: Session):
         reply = plain_channel_text(state.get("proposed_reply"))
         if not appointment_intent:
             reply = remove_unsolicited_appointment_offer(reply)
-        if repeats_recent_assistant_reply(reply, state.get("conversation_history", [])):
+        if repeats_recent_assistant_reply(reply, state.get("conversation_history", [])) or repeats_introduction_after_greeting(
+            reply, state.get("inbound_text"), state.get("conversation_history", []),
+        ):
             reply = (
                 "What would be most helpful to review next: available homes, pricing, "
                 "financing, delivery timing, or project features?"
             )
             actions = [{"type": "ask_qualification_question"}]
+        reply, supplemented_topics = complete_requested_commercial_topics(
+            reply,
+            inbound=state.get("inbound_text"),
+            actions=actions,
+            commercial=state.get("commercial_context") or {},
+        )
         if not reply:
             violations.append("missing_reply")
         requires_human = bool(violations) or state.get("requires_human", False) or any(
@@ -249,6 +266,7 @@ def build_sales_graph(db: Session):
             "proposed_actions": actions,
             "policy_violations": sorted(set(violations)),
             "requires_human": requires_human,
+            "addressed_topics": sorted(set(state.get("addressed_topics", [])) | set(supplemented_topics)),
         }
 
     def after_validation(state: SalesAgentState) -> str:

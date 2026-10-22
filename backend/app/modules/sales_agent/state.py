@@ -25,6 +25,7 @@ class SalesAgentState(TypedDict, total=False):
     model: str
     intent: str | None
     extracted_facts: list[dict[str, Any]]
+    addressed_topics: list[str]
     proposed_actions: list[dict[str, Any]]
     proposed_reply: str | None
     requires_human: bool

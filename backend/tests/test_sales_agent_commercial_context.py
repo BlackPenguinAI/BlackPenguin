@@ -15,6 +15,7 @@ from app.modules.sales_agent.commercial_context import (
 )
 from app.modules.sales_agent.response_policy import (
     appointment_intent_present,
+    complete_requested_commercial_topics,
     plain_channel_text,
     remove_unsolicited_appointment_offer,
     repeats_recent_assistant_reply,
@@ -118,4 +119,22 @@ def test_handoff_copy_confirms_the_persisted_action_instead_of_showing_a_dead_en
     )
     assert "approved document" in material_reply
     assert "Sales team" in material_reply
+
+
+def test_multi_topic_question_is_completed_from_confirmed_context():
+    reply, supplemented = complete_requested_commercial_topics(
+        "We offer three-bedroom homes.",
+        inbound="What types are available, how many, what are the prices, and do you offer financing?",
+        actions=[],
+        commercial={
+            "inventory_source": "property_type_catalog",
+            "inventory": [{"property_type": "3BR", "available_units": 5, "starting_price": 280000, "currency": "USD"}],
+            "property_types": [{"property_type": "3BR"}],
+            "confirmed_project_facts": {"payment_methods": "Cash and bank financing"},
+        },
+    )
+    assert "Current availability: 5 homes." in reply
+    assert "Confirmed starting price: USD 280,000." in reply
+    assert "Payment and financing: Cash and bank financing." in reply
+    assert {"inventory", "pricing", "financing"}.issubset(supplemented)
 

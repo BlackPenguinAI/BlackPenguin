@@ -40,6 +40,7 @@ describe('ProjectChatComponent', () => {
         limit: 20, remaining: 20, catalog_complete: false,
       });
     }
+    for (const request of http.match((candidate) => candidate.url.endsWith('/sales-assets'))) request.flush([]);
     http.verify();
   });
 

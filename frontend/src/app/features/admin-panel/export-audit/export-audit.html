@@ -1,13 +1,21 @@
 <section class="audit-page">
-  <header><div><p>COMPLIANCE</p><h1>Data export audit</h1><span>Append-only traceability for every generated Lead export.</span></div><span class="immutable">LOCKED RECORDS</span></header>
+  <header><div><p>COMPLIANCE</p><h1>Data and material audit</h1><span>Append-only traceability for Lead exports and customer-facing sales materials.</span></div><span class="immutable">LOCKED RECORDS</span></header>
+  <nav class="tabs" aria-label="Audit record type"><button (click)="selectTab('exports')" [class.active]="activeTab === 'exports'">Lead data exports</button><button (click)="selectTab('materials')" [class.active]="activeTab === 'materials'">Shared sales materials</button></nav>
   <div class="filters">
     <select [(ngModel)]="companyId" (change)="load()"><option value="">All Companies</option><option *ngFor="let company of companies" [value]="company.id">{{company.name}}</option></select>
-    <select [(ngModel)]="exportType" (change)="load()"><option value="">All formats</option><option value="leads_csv">Lead list CSV</option><option value="lead_json">Lead Record JSON</option></select>
+    <select *ngIf="activeTab === 'exports'" [(ngModel)]="exportType" (change)="load()"><option value="">All formats</option><option value="leads_csv">Lead list CSV</option><option value="lead_json">Lead Record JSON</option></select>
+    <select *ngIf="activeTab === 'materials'" [(ngModel)]="assetEventType" (change)="load()"><option value="">All events</option><option value="link_issued">Link issued</option><option value="message_dispatched">Message dispatched</option><option value="human_view">Human view</option><option value="download">Download</option><option value="automated_preview">Automated preview</option><option value="delivery_failed">Delivery failed</option><option value="revoked">Revoked</option></select>
+    <select *ngIf="activeTab === 'materials'" [(ngModel)]="assetChannel" (change)="load()"><option value="">All channels</option><option value="sms">SMS</option><option value="whatsapp">WhatsApp</option></select>
+    <label *ngIf="activeTab === 'materials'" class="human"><input type="checkbox" [(ngModel)]="humanOnly" (change)="load()" /> Human activity only</label>
     <button (click)="load()">REFRESH</button>
   </div>
   <p *ngIf="error" class="error">{{error}}</p><p *ngIf="loading" class="empty">Loading immutable events…</p>
-  <div class="table" *ngIf="!loading"><div class="row head"><span>Generated</span><span>Company</span><span>Actor</span><span>Export</span><span>Rows</span><span>SHA-256 / chain</span></div>
-    <div class="row" *ngFor="let event of events"><span>{{event.created_at | date:'medium'}}</span><span>{{companyName(event.company_id)}}</span><span>{{event.actor_role}}<small>{{short(event.actor_user_id)}}</small></span><span>{{event.export_type}}</span><span>{{event.record_count}}</span><span class="hash">{{short(event.content_hash)}}<small>{{short(event.event_hash)}}</small></span></div>
+  <div class="table" *ngIf="!loading && activeTab === 'exports'"><div class="row export head"><span>Generated</span><span>Company</span><span>Actor</span><span>Export</span><span>Rows</span><span>SHA-256 / chain</span></div>
+    <div class="row export" *ngFor="let event of events"><span>{{event.created_at | date:'medium'}}</span><span>{{companyName(event.company_id)}}</span><span>{{event.actor_role}}<small>{{short(event.actor_user_id)}}</small></span><span>{{event.export_type}}</span><span>{{event.record_count}}</span><span class="hash">{{short(event.content_hash)}}<small>{{short(event.event_hash)}}</small></span></div>
     <p class="empty" *ngIf="!events.length">No export events match these filters.</p>
+  </div>
+  <div class="table" *ngIf="!loading && activeTab === 'materials'"><div class="row material head"><span>Event time</span><span>Company / Project</span><span>Material</span><span>Channel</span><span>Event</span><span>Evidence / control</span></div>
+    <div class="row material" *ngFor="let event of assetEvents"><span>{{event.created_at | date:'medium'}}</span><span>{{companyName(event.company_id)}}<small>{{short(event.project_id)}} · Lead {{short(event.lead_id)}}</small></span><span>{{event.asset_name || event.asset_type || 'Legacy material'}}<small>{{event.asset_type || 'unclassified'}}</small></span><span>{{event.channel || '—'}}</span><span>{{event.event_type.replace('_', ' ')}}<small *ngIf="event.is_automated">Automated client</small></span><span class="hash">{{short(event.event_hash)}}<small>{{event.share_revoked ? 'Revoked' : (event.share_expires_at ? ('Expires ' + (event.share_expires_at | date:'mediumDate':'UTC')) : 'Historical record')}}</small><button *ngIf="event.share_id && event.share_revoked === false" (click)="revoke(event)" [disabled]="revoking === event.share_id">{{revoking === event.share_id ? 'Revoking…' : 'Revoke link'}}</button></span></div>
+    <p class="empty" *ngIf="!assetEvents.length">No material events match these filters.</p>
   </div>
 </section>

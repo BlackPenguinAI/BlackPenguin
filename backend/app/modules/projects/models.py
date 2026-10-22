@@ -70,6 +70,7 @@ class Project(Base):
     campaigns = relationship("ProjectCampaign", back_populates="project", cascade="all, delete-orphan")
     units = relationship("ProjectUnit", back_populates="project", cascade="all, delete-orphan")
     property_types = relationship("ProjectPropertyType", back_populates="project", cascade="all, delete-orphan")
+    sales_assets = relationship("ProjectSalesAsset", back_populates="project", cascade="all, delete-orphan")
 
 
 class ProjectProfile(Base):
@@ -240,6 +241,43 @@ class ProjectPropertyTypeMedia(Base):
     source = relationship("ProjectOnboardingSource")
 
 
+class ProjectSalesAsset(Base):
+    """A reviewed Project source that may be disclosed to a lead.
+
+    Onboarding sources remain private evidence by default.  This separate
+    record provides the explicit approval boundary required before an agent
+    can expose a brochure, floor plan or other sales document.
+    """
+
+    __tablename__ = "project_sales_assets"
+    __table_args__ = (
+        UniqueConstraint("project_id", "source_id", name="uq_project_sales_asset_source"),
+    )
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    company_id = Column(String(36), ForeignKey("companies.id", ondelete="CASCADE"), nullable=False, index=True)
+    project_id = Column(String(36), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
+    property_type_id = Column(String(36), ForeignKey("project_property_types.id", ondelete="SET NULL"), nullable=True, index=True)
+    source_id = Column(String(36), ForeignKey("project_onboarding_sources.id", ondelete="RESTRICT"), nullable=False, index=True)
+    asset_type = Column(String(40), nullable=False, default="other", index=True)
+    display_name = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    approval_status = Column(String(30), nullable=False, default="draft", index=True)
+    version = Column(Integer, nullable=False, default=1)
+    valid_from = Column(DateTime, nullable=True)
+    valid_until = Column(DateTime, nullable=True, index=True)
+    allowed_channels = Column(JSON, default=lambda: ["sms", "whatsapp"], nullable=False)
+    created_by_user_id = Column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    approved_by_user_id = Column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    approved_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    project = relationship("Project", back_populates="sales_assets")
+    property_type = relationship("ProjectPropertyType")
+    source = relationship("ProjectOnboardingSource")
+
+
 class SalesAssetShare(Base):
     __tablename__ = "sales_asset_shares"
 
@@ -248,9 +286,15 @@ class SalesAssetShare(Base):
     project_id = Column(String(36), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
     lead_id = Column(String(36), ForeignKey("leads.id", ondelete="CASCADE"), nullable=False, index=True)
     source_id = Column(String(36), ForeignKey("project_onboarding_sources.id", ondelete="CASCADE"), nullable=False, index=True)
+    sales_asset_id = Column(String(36), ForeignKey("project_sales_assets.id", ondelete="SET NULL"), nullable=True, index=True)
+    outbound_message_id = Column(String(36), ForeignKey("outbound_messages.id", ondelete="SET NULL"), nullable=True, index=True)
+    agent_run_id = Column(String(36), ForeignKey("agent_runs.id", ondelete="SET NULL"), nullable=True, index=True)
+    channel = Column(String(30), nullable=True, index=True)
     token_hash = Column(String(64), unique=True, nullable=False, index=True)
     expires_at = Column(DateTime, nullable=False, index=True)
     revoked = Column(Boolean, default=False, nullable=False)
+    revoked_at = Column(DateTime, nullable=True)
+    revoked_by_user_id = Column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     access_count = Column(Integer, default=0, nullable=False)
     last_accessed_at = Column(DateTime, nullable=True)
     first_human_access_at = Column(DateTime, nullable=True)

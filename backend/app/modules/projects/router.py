@@ -30,11 +30,11 @@ from app.modules.users.models import SALES_ACTOR_ROLES, TENANT_MANAGER_ROLES, Us
 from app.modules.users.project_access import project_ids_for_user, require_project_access
 from app.modules.governance.services import request_fingerprint
 
-from . import asset_share_service, catalog_service, meta_oauth_service, meta_service, services, source_service, storage_service
+from . import asset_share_service, catalog_service, meta_oauth_service, meta_service, sales_asset_service, services, source_service, storage_service
 from .completion import FIELD_BY_KEY
 from .models import (
     MetaConnection, Project, ProjectCampaign, ProjectMessage, ProjectOnboardingProposal,
-    ProjectOnboardingSource, ProjectPropertyType, ProjectSession, ProjectSourceKind, ProjectSourceStatus, SenderType,
+    ProjectOnboardingSource, ProjectPropertyType, ProjectSalesAsset, ProjectSession, ProjectSourceKind, ProjectSourceStatus, SenderType,
 )
 from .schemas import (
     CampaignCreate, CampaignResponse, ChatBootstrapRequest, ChatMessagePayload, ChatMessageResponse, ChatTurnResponse,
@@ -47,7 +47,7 @@ from .schemas import (
     PropertyTypeCatalogResponse, PropertyTypeCreate, PropertyTypeMediaAttach,
     PropertyTypeResponse, PropertyTypeUpdate, ProjectMarketingSummary,
     OnboardingStateResponse, ProposalDecision, ProposalDecisionResponse, ProposalRevision,
-    SourceResponse, UrlSourceRequest,
+    SalesAssetPayload, SalesAssetResponse, SalesAssetUpdate, SourceResponse, UrlSourceRequest,
 )
 from app.modules.demo_projects.service import provision_demo_project
 
@@ -64,13 +64,13 @@ def download_shared_sales_asset(token: str, request: Request, download: bool = F
     try:
         path = storage_service.resolve_project_file(source.storage_path)
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail="Shared image not found.") from exc
+        raise HTTPException(status_code=404, detail="Shared sales material not found.") from exc
     if not path.is_file():
-        raise HTTPException(status_code=404, detail="Shared image not found.")
+        raise HTTPException(status_code=404, detail="Shared sales material not found.")
     try:
         content = storage_service.read_project_file(source.storage_path, encrypted=bool(source.is_encrypted))
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail="Shared image not found.") from exc
+        raise HTTPException(status_code=404, detail="Shared sales material not found.") from exc
     ip_hash, user_agent_hash, _ = request_fingerprint(request)
     asset_share_service.record_access(
         db, share=share, event_type="download" if download else "view",
@@ -81,6 +81,12 @@ def download_shared_sales_asset(token: str, request: Request, download: bool = F
         "Content-Disposition": f"{'attachment' if download else 'inline'}; filename*=UTF-8''{quote(source.original_filename or source.name)}",
         "Cache-Control": "private, max-age=300", "X-Content-Type-Options": "nosniff",
     })
+
+
+@router.get("/a/{token}", include_in_schema=False)
+def download_short_sales_asset(token: str, request: Request, download: bool = False, db: Session = Depends(get_db)):
+    """Short, provider-safe alias used in SMS and WhatsApp messages."""
+    return download_shared_sales_asset(token, request, download, db)
 
 
 def _parse_agent_response(raw: str) -> tuple[str, list[dict[str, Any]], bool | None] | None:
@@ -744,6 +750,73 @@ def defer_property_type_images(
     item = _property_type(db, project.id, property_type_id)
     item.images_status = "deferred"; db.add(item); db.commit(); db.refresh(item)
     return catalog_service.serialize(item)
+
+
+def _sales_asset(db: Session, project_id: str, asset_id: str) -> ProjectSalesAsset:
+    item = db.query(ProjectSalesAsset).filter(
+        ProjectSalesAsset.id == asset_id,
+        ProjectSalesAsset.project_id == project_id,
+    ).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Sales material not found.")
+    return item
+
+
+@router.get("/{project_id}/sales-assets", response_model=list[SalesAssetResponse])
+def list_sales_assets(
+    project_id: str, include_archived: bool = False,
+    db: Session = Depends(get_db), current_user: User = Depends(RoleChecker(VIEWER_ROLES)),
+):
+    project = services.get_project(db, project_id, current_user.company_id)
+    require_project_access(db, current_user, project_id)
+    return [
+        sales_asset_service.serialize(item)
+        for item in sales_asset_service.list_for_project(db, project, include_archived=include_archived)
+    ]
+
+
+@router.post("/{project_id}/sales-assets", response_model=SalesAssetResponse, status_code=201)
+def create_sales_asset(
+    project_id: str, payload: SalesAssetPayload,
+    db: Session = Depends(get_db), current_user: User = Depends(RoleChecker(EDITOR_ROLES)),
+):
+    project = services.get_project(db, project_id, current_user.company_id)
+    require_project_access(db, current_user, project_id)
+    item = sales_asset_service.create(db, project, payload.model_dump(), user_id=current_user.id)
+    return sales_asset_service.serialize(item)
+
+
+@router.put("/{project_id}/sales-assets/{asset_id}", response_model=SalesAssetResponse)
+def update_sales_asset(
+    project_id: str, asset_id: str, payload: SalesAssetUpdate,
+    db: Session = Depends(get_db), current_user: User = Depends(RoleChecker(EDITOR_ROLES)),
+):
+    project = services.get_project(db, project_id, current_user.company_id)
+    require_project_access(db, current_user, project_id)
+    item = _sales_asset(db, project.id, asset_id)
+    return sales_asset_service.serialize(sales_asset_service.update(db, item, payload.model_dump()))
+
+
+@router.post("/{project_id}/sales-assets/{asset_id}/approve", response_model=SalesAssetResponse)
+def approve_sales_asset(
+    project_id: str, asset_id: str, db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker(EDITOR_ROLES)),
+):
+    project = services.get_project(db, project_id, current_user.company_id)
+    require_project_access(db, current_user, project_id)
+    item = _sales_asset(db, project.id, asset_id)
+    return sales_asset_service.serialize(sales_asset_service.approve(db, item, user_id=current_user.id))
+
+
+@router.delete("/{project_id}/sales-assets/{asset_id}", status_code=204)
+def archive_sales_asset(
+    project_id: str, asset_id: str, db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker(EDITOR_ROLES)),
+):
+    project = services.get_project(db, project_id, current_user.company_id)
+    require_project_access(db, current_user, project_id)
+    sales_asset_service.archive(db, _sales_asset(db, project.id, asset_id))
+    return Response(status_code=204)
 
 
 @router.get("/{project_id}/deletion-impact", response_model=ProjectDeletionImpact)

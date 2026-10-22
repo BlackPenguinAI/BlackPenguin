@@ -224,9 +224,22 @@ class SalesAssetAccessEvent(Base):
     __tablename__ = "sales_asset_access_events"
 
     id = Column(String(36), primary_key=True, default=_id)
-    share_id = Column(String(36), ForeignKey("sales_asset_shares.id", ondelete="CASCADE"), nullable=False, index=True)
-    event_type = Column(String(20), nullable=False, index=True)
+    # Historical snapshots deliberately do not reference live rows.  Deleting
+    # a lead, Project or share must not erase disclosure evidence.
+    share_id = Column(String(36), nullable=True, index=True)
+    company_id = Column(String(36), nullable=True, index=True)
+    project_id = Column(String(36), nullable=True, index=True)
+    lead_id = Column(String(36), nullable=True, index=True)
+    sales_asset_id = Column(String(36), nullable=True, index=True)
+    source_id = Column(String(36), nullable=True, index=True)
+    outbound_message_id = Column(String(36), nullable=True, index=True)
+    channel = Column(String(30), nullable=True, index=True)
+    asset_type = Column(String(40), nullable=True, index=True)
+    asset_name = Column(String(255), nullable=True)
+    event_type = Column(String(30), nullable=False, index=True)
     ip_hash = Column(String(64), nullable=True)
     user_agent_hash = Column(String(64), nullable=True)
     is_automated = Column(Boolean, default=False, nullable=False)
+    previous_hash = Column(String(64), nullable=True)
+    event_hash = Column(String(64), nullable=False, unique=True, index=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)

@@ -211,6 +211,55 @@ class SourceResponse(BaseModel):
     updated_at: datetime
 
 
+class SalesAssetPayload(BaseModel):
+    source_id: str
+    property_type_id: str | None = None
+    asset_type: Literal[
+        "brochure", "floor_plan", "unit_sheet", "price_list", "amenities",
+        "location_map", "legal_disclaimer", "other",
+    ]
+    display_name: str = Field(min_length=1, max_length=255)
+    description: str | None = Field(default=None, max_length=2000)
+    valid_from: datetime | None = None
+    valid_until: datetime | None = None
+    allowed_channels: list[Literal["sms", "whatsapp"]] = Field(default_factory=lambda: ["sms", "whatsapp"])
+
+
+class SalesAssetUpdate(BaseModel):
+    property_type_id: str | None = None
+    asset_type: Literal[
+        "brochure", "floor_plan", "unit_sheet", "price_list", "amenities",
+        "location_map", "legal_disclaimer", "other",
+    ]
+    display_name: str = Field(min_length=1, max_length=255)
+    description: str | None = Field(default=None, max_length=2000)
+    valid_from: datetime | None = None
+    valid_until: datetime | None = None
+    allowed_channels: list[Literal["sms", "whatsapp"]]
+
+
+class SalesAssetResponse(BaseModel):
+    id: str
+    company_id: str
+    project_id: str
+    property_type_id: str | None = None
+    source_id: str
+    asset_type: str
+    display_name: str
+    description: str | None = None
+    approval_status: str
+    version: int
+    valid_from: datetime | None = None
+    valid_until: datetime | None = None
+    allowed_channels: list[str]
+    approved_by_user_id: str | None = None
+    approved_at: datetime | None = None
+    source_name: str | None = None
+    mime_type: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
 class ChatTurnResponse(BaseModel):
     request_id: str | None = None
     message_saved: bool = True

@@ -94,6 +94,15 @@ export interface ProjectSource {
   is_primary: boolean;
   proposals: SourceProposal[]; created_at: string; updated_at: string;
 }
+export type SalesAssetType = 'brochure' | 'floor_plan' | 'unit_sheet' | 'price_list' | 'amenities' | 'location_map' | 'legal_disclaimer' | 'other';
+export interface ProjectSalesAsset {
+  id: string; company_id: string; project_id: string; property_type_id: string | null; source_id: string;
+  asset_type: SalesAssetType; display_name: string; description: string | null;
+  approval_status: 'draft' | 'approved' | 'archived'; version: number;
+  valid_from: string | null; valid_until: string | null; allowed_channels: Array<'sms' | 'whatsapp'>;
+  approved_by_user_id: string | null; approved_at: string | null;
+  source_name: string | null; mime_type: string | null; created_at: string; updated_at: string;
+}
 export interface ChatTurn {
   message: ChatMessage; user_message: ChatMessage | null; profile: ProjectProfile; accepted_fields: string[];
   rejected_updates: Array<{ field: string | null; reason: string }>; sources: ProjectSource[];
