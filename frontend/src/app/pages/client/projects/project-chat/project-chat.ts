@@ -27,7 +27,7 @@ import {
   Campaign, ChatAttachment, ChatMessage, ChatTurn, EMPTY_PROJECT_PROFILE, MetaAssetDiscovery, MetaAssetOption, MetaAuthorization, MetaConnection,
   MetaSetupConfiguration, OnboardingState, ProjectAssignment, ProjectFieldProgress, ProjectProfile,
   ProjectSalesCandidate, ProjectSource, SectionProgress, SourceProposal, ValidationStatus,
-  ProjectPropertyType, ProjectSalesAsset, PropertyTypeCatalog, SalesAssetType,
+  ProjectFileIntent, ProjectPropertyType, ProjectSalesAsset, PropertyTypeCatalog, SalesAssetType,
 } from './project-onboarding.models';
 import { ProjectOnboardingService } from './project-onboarding.service';
 import { availableProjectSalesCandidates, companyAdministratorSalesCandidate } from './project-sales-capabilities';
@@ -57,6 +57,15 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   isCompleting = false;
   readonly speechSupported: boolean;
   selectedFiles: File[] = [];
+  selectedFileIntents: ProjectFileIntent[] = [];
+  pendingFiles: File[] = [];
+  pendingFileIntents: ProjectFileIntent[] = [];
+  showFileClassification = false;
+  onboardingStage: OnboardingState['stage'] = 'website';
+  isEditingProjectName = false;
+  projectNameDraft = '';
+  projectNameBusy = false;
+  projectNameError = '';
   errorMessage = '';
   messages: ChatMessage[] = [];
   sources: ProjectSource[] = [];
@@ -103,6 +112,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     { value: 'unit_sheet', label: 'Unit sheet' }, { value: 'price_list', label: 'Price list' },
     { value: 'amenities', label: 'Amenities' }, { value: 'location_map', label: 'Location map' },
     { value: 'legal_disclaimer', label: 'Legal disclaimer' }, { value: 'other', label: 'Other' },
+    { value: 'gallery_image', label: 'Gallery image' },
   ];
   readonly savingPropertyTypeIds = new Set<string>();
   readonly removingPropertyTypeIds = new Set<string>();
@@ -194,6 +204,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
 
   get canSend(): boolean { return (!!this.prompt.trim() || !!this.selectedFiles.length) && !this.isAnalyzing && !this.hasPendingReview; }
   get projectName(): string { return this.profile.project_name || 'Untitled Project'; }
+  get showSalesMaterials(): boolean { return this.profile.completion.final_approved; }
   get availableSalesAssetSources(): ProjectSource[] {
     const registered = new Set(this.salesAssets.map(item => item.source_id));
     return this.sources.filter(source => source.status === 'ready' && !!source.download_url && !registered.has(source.id));
@@ -201,7 +212,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   get hasProcessingSources(): boolean { return this.sources.some((source) => source.status === 'processing'); }
   get nextBlocker(): string { return this.profile.completion.blockers[0]?.label || 'Final profile approval'; }
   get profileSections(): SectionProgress[] {
-    return this.profile.completion.sections.filter((section) => section.total > 0);
+    return this.profile.completion.sections.filter((section) => section.total > 0 && this.fieldsForSection(section.key).length > 0);
   }
   fieldsForSection(section: string): ProjectFieldProgress[] {
     return this.profile.fields.filter((field) => field.section === section && !this.activationFieldKeys.has(field.key));
@@ -325,6 +336,40 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   salesAssetSourceChanged(): void {
     const source = this.sources.find(item => item.id === this.salesAssetDraft.source_id);
     if (source && !this.salesAssetDraft.display_name.trim()) this.salesAssetDraft.display_name = source.name;
+  }
+  startProjectNameEdit(): void {
+    if (this.projectNameBusy) return;
+    this.projectNameDraft = this.projectName;
+    this.projectNameError = '';
+    this.isEditingProjectName = true;
+  }
+  cancelProjectNameEdit(): void {
+    this.projectNameDraft = this.projectName;
+    this.projectNameError = '';
+    this.isEditingProjectName = false;
+  }
+  saveProjectName(): void {
+    const value = this.projectNameDraft.trim();
+    if (!value || value.length > 150 || this.projectNameBusy) {
+      this.projectNameError = value ? 'Project name must be 150 characters or fewer.' : 'Enter a Project name.';
+      return;
+    }
+    if (value === this.projectName) { this.cancelProjectNameEdit(); return; }
+    this.projectNameBusy = true; this.projectNameError = '';
+    this.onboarding.patchProfile(this.projectId, [{
+      field: 'project_name', value, status: 'corrected_by_user', applicable: true,
+      source_type: 'user', source_reference: 'project_onboarding_header', confidence: 'high',
+    }]).subscribe({
+      next: profile => {
+        this.profile = profile; this.projectNameDraft = profile.project_name;
+        this.projectNameBusy = false; this.isEditingProjectName = false; this.cdr.detectChanges();
+      },
+      error: (error: HttpErrorResponse) => {
+        this.projectNameBusy = false;
+        this.projectNameError = this.apiDetail(error, 'The Project name could not be updated.');
+        this.cdr.detectChanges();
+      },
+    });
   }
   createSalesAsset(): void {
     const draft = this.salesAssetDraft;
@@ -897,6 +942,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     if (this.isRecording) this.speech.stop();
     const content = this.prompt.trim();
     const files = [...this.selectedFiles];
+    const fileIntents = this.selectedFileIntents.map(item => ({ ...item, allowed_channels: [...item.allowed_channels] }));
     const clientMessageId = this.retryClientMessageId || this.createClientMessageId();
     const optimistic: ChatMessage = {
       id: clientMessageId,
@@ -909,10 +955,10 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
         url: null, download_url: null,
       })),
     };
-    this.prompt = ''; this.selectedFiles = []; this.errorMessage = '';
+    this.prompt = ''; this.selectedFiles = []; this.selectedFileIntents = []; this.errorMessage = '';
     this.messages = [...this.messages, optimistic]; this.isAnalyzing = true; this.isUploading = !!files.length; this.scrollToBottom();
     const request = files.length
-      ? this.onboarding.sendMessageWithFiles(this.projectId, content, files, this.replyToMessageId, clientMessageId)
+      ? this.onboarding.sendMessageWithFiles(this.projectId, content, files, fileIntents, this.replyToMessageId, clientMessageId)
       : this.onboarding.sendMessage(this.projectId, content, this.replyToMessageId, clientMessageId);
     const replyTo = this.replyToMessageId;
     this.replyToMessageId = null;
@@ -926,7 +972,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
       },
       error: (error: HttpErrorResponse) => {
         this.messages = this.messages.filter((message) => message !== optimistic);
-        this.recoverFailedSend(error, content, files, replyTo, clientMessageId);
+        this.recoverFailedSend(error, content, files, fileIntents, replyTo, clientMessageId);
       },
     });
   }
@@ -935,10 +981,34 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     const input = event.target as HTMLInputElement; const files = Array.from(input.files || []); input.value = '';
     if (!files.length || this.isUploading) return;
     const remaining = Math.max(0, 10 - this.selectedFiles.length);
-    this.selectedFiles = [...this.selectedFiles, ...files.slice(0, remaining)];
+    this.pendingFiles = files.slice(0, remaining);
+    this.pendingFileIntents = this.pendingFiles.map(file => ({
+      sharing_intent: 'internal', asset_type: this.defaultAssetType(file),
+      display_name: file.name.replace(/\.[^.]+$/, ''), allowed_channels: ['sms', 'whatsapp'],
+    }));
+    this.showFileClassification = this.pendingFiles.length > 0;
     if (files.length > remaining) this.errorMessage = 'A maximum of 10 files can be attached to one message.';
   }
-  removeSelectedFile(index: number): void { this.selectedFiles = this.selectedFiles.filter((_, itemIndex) => itemIndex !== index); }
+  confirmFileClassification(): void {
+    const invalid = this.pendingFileIntents.some(item => item.sharing_intent === 'sales_candidate'
+      && (!item.display_name.trim() || !item.allowed_channels.length));
+    if (invalid) { this.errorMessage = 'Enter a customer-facing name and select at least one channel for every lead-sharing file.'; return; }
+    this.selectedFiles = [...this.selectedFiles, ...this.pendingFiles];
+    this.selectedFileIntents = [...this.selectedFileIntents, ...this.pendingFileIntents];
+    this.closeFileClassification();
+  }
+  closeFileClassification(): void {
+    this.pendingFiles = []; this.pendingFileIntents = []; this.showFileClassification = false;
+  }
+  setIntentChannel(intent: ProjectFileIntent, channel: 'sms' | 'whatsapp', enabled: boolean): void {
+    intent.allowed_channels = enabled
+      ? Array.from(new Set([...intent.allowed_channels, channel]))
+      : intent.allowed_channels.filter(item => item !== channel);
+  }
+  removeSelectedFile(index: number): void {
+    this.selectedFiles = this.selectedFiles.filter((_, itemIndex) => itemIndex !== index);
+    this.selectedFileIntents = this.selectedFileIntents.filter((_, itemIndex) => itemIndex !== index);
+  }
 
   toggleRecording(): void {
     if (!this.speechSupported || this.isAnalyzing) return;
@@ -1233,22 +1303,22 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     });
   }
   private restoreFailedSend(
-    content: string, files: File[], replyTo: string | null, clientMessageId: string, message: string,
+    content: string, files: File[], intents: ProjectFileIntent[], replyTo: string | null, clientMessageId: string, message: string,
   ): void {
-    this.prompt = content; this.selectedFiles = files; this.replyToMessageId = replyTo;
+    this.prompt = content; this.selectedFiles = files; this.selectedFileIntents = intents; this.replyToMessageId = replyTo;
     this.retryClientMessageId = clientMessageId;
     this.isAnalyzing = false; this.isUploading = false; this.errorMessage = message;
     this.cdr.detectChanges();
   }
   private recoverFailedSend(
-    error: HttpErrorResponse, content: string, files: File[], replyTo: string | null, clientMessageId: string,
+    error: HttpErrorResponse, content: string, files: File[], intents: ProjectFileIntent[], replyTo: string | null, clientMessageId: string,
   ): void {
     const uncertainDelivery = [0, 409, 502, 503, 504].includes(error.status);
     if (!uncertainDelivery) {
       const message = error.status === 422
         ? 'That answer is not valid for the current question. Review it and try again.'
         : 'The message could not be processed. Your text and selected files were restored.';
-      this.restoreFailedSend(content, files, replyTo, clientMessageId, message);
+      this.restoreFailedSend(content, files, intents, replyTo, clientMessageId, message);
       return;
     }
     this.onboarding.getState(this.projectId).subscribe({
@@ -1256,7 +1326,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
         const saved = state.messages.some((message) => message.id === clientMessageId);
         if (!saved) {
           this.restoreFailedSend(
-            content, files, replyTo, clientMessageId,
+            content, files, intents, replyTo, clientMessageId,
             'The connection was interrupted. Your text and selected files were restored so you can retry safely.',
           );
           return;
@@ -1268,7 +1338,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
         this.cdr.detectChanges();
       },
       error: () => this.restoreFailedSend(
-        content, files, replyTo, clientMessageId,
+        content, files, intents, replyTo, clientMessageId,
         'The connection was interrupted. Your text and selected files were restored so you can retry safely.',
       ),
     });
@@ -1336,6 +1406,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     if (state.version < this.lastStateVersion) return;
     this.lastStateVersion = state.version;
     this.messages = [...state.messages]; this.profile = state.profile;
+    this.onboardingStage = state.stage;
     this.sources = this.prepareSources(state.sources); this.nextQuestion = state.next_question;
     this.loadSourceImagePreviews();
     this.loadPropertyTypes();
@@ -1406,4 +1477,11 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     });
   }
   private scrollToBottom(): void { setTimeout(() => { const element = this.chatScroll?.nativeElement; if (element) element.scrollTop = element.scrollHeight; this.cdr.detectChanges(); }, 100); }
+  private defaultAssetType(file: File): SalesAssetType {
+    const name = file.name.toLocaleLowerCase();
+    if (file.type.startsWith('image/')) return 'gallery_image';
+    if (name.includes('floor') || name.includes('plano')) return 'floor_plan';
+    if (name.includes('price') || name.includes('precio')) return 'price_list';
+    return 'brochure';
+  }
 }

@@ -220,6 +220,49 @@ describe('ProjectChatComponent', () => {
     expect(component.projectName).toBe('Riverstone Homes');
   });
 
+  it('updates the Project name from the header without answering the active chat question', () => {
+    component.projectId = 'project-1';
+    component.profile = { ...EMPTY_PROJECT_PROFILE, project_name: 'Coahuila 34' };
+    component.startProjectNameEdit();
+    component.projectNameDraft = 'Coahuila 34 Project';
+
+    component.saveProjectName();
+
+    const request = http.expectOne('http://localhost:8000/api/v1/projects/project-1/profile');
+    expect(request.request.method).toBe('PATCH');
+    expect(request.request.body.updates[0]).toEqual(expect.objectContaining({
+      field: 'project_name', value: 'Coahuila 34 Project', status: 'corrected_by_user',
+    }));
+    request.flush({ ...EMPTY_PROJECT_PROFILE, project_name: 'Coahuila 34 Project' });
+    expect(component.projectName).toBe('Coahuila 34 Project');
+    expect(component.isEditingProjectName).toBe(false);
+  });
+
+  it('keeps lead-safe materials hidden until the Project Profile is approved', () => {
+    component.profile = { ...EMPTY_PROJECT_PROFILE, completion: { ...EMPTY_PROJECT_PROFILE.completion, final_approved: false } };
+    expect(component.showSalesMaterials).toBe(false);
+    component.profile = { ...component.profile, completion: { ...component.profile.completion, final_approved: true } };
+    expect(component.showSalesMaterials).toBe(true);
+  });
+
+  it('classifies attached files before adding them to the message', () => {
+    const file = new File(['brochure'], 'project-brochure.pdf', { type: 'application/pdf' });
+    const input = document.createElement('input');
+    Object.defineProperty(input, 'files', { value: [file] });
+
+    component.onFilesSelected({ target: input } as unknown as Event);
+    expect(component.showFileClassification).toBe(true);
+    expect(component.selectedFiles).toEqual([]);
+    component.pendingFileIntents[0].sharing_intent = 'sales_candidate';
+    component.confirmFileClassification();
+
+    expect(component.selectedFiles).toEqual([file]);
+    expect(component.selectedFileIntents[0]).toEqual(expect.objectContaining({
+      sharing_intent: 'sales_candidate', asset_type: 'brochure',
+      allowed_channels: ['sms', 'whatsapp'],
+    }));
+  });
+
   it('keeps processing feedback active for background sources', () => {
     component.isAnalyzing = false;
     component.sources = [{

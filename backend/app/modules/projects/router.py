@@ -58,6 +58,56 @@ VIEWER_ROLES = [*TENANT_MANAGER_ROLES, UserRole.MKT, UserRole.SALES]
 URL_PATTERN = re.compile(r"https?://[^\s<>]+", re.IGNORECASE)
 
 
+def _project_name_command(message: str) -> str | None:
+    """Return an explicit rename target without consuming the active field question."""
+    text = re.sub(r"\s+", " ", message).strip()
+    patterns = (
+        r"(?:change|rename|update)\s+(?:the\s+)?project(?:'s)?\s+name\s+(?:to|as|new\s+name\s*:)\s*(.+)",
+        r"(?:change|rename|update)\s+(?:the\s+)?name\s+of\s+(?:the\s+)?project(?:\s+(?:to|as))?\s*(?:new\s+name\s*:\s*)?(.+)",
+        r"(?:cambia|cambiar|renombra|renombrar|actualiza|actualizar)\s+(?:el\s+)?nombre\s+(?:del\s+proyecto|de\s+project)\s+(?:a|por|como|nuevo\s+nombre\s*:)\s*(.+)",
+    )
+    for pattern in patterns:
+        match = re.search(pattern, text, re.IGNORECASE)
+        if not match:
+            continue
+        value = match.group(1).strip(" \t\r\n.\"'")
+        value = re.sub(r"^(?:new\s+name|nuevo\s+nombre)\s*:\s*", "", value, flags=re.IGNORECASE).strip()
+        return value[:150] if value else None
+    return None
+
+
+def _file_upload_intents(raw: str, count: int) -> list[dict[str, Any]]:
+    try:
+        payload = json.loads(raw or "[]")
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=422, detail="File classification is not valid JSON.") from exc
+    if not isinstance(payload, list) or len(payload) > count:
+        raise HTTPException(status_code=422, detail="File classification does not match the uploaded files.")
+    results: list[dict[str, Any]] = []
+    for index in range(count):
+        item = payload[index] if index < len(payload) and isinstance(payload[index], dict) else {}
+        sharing_intent = str(item.get("sharing_intent") or "internal")
+        if sharing_intent not in {"internal", "sales_candidate"}:
+            raise HTTPException(status_code=422, detail="Select Internal only or Candidate for lead sharing.")
+        asset_type = str(item.get("asset_type") or "") or None
+        display_name = str(item.get("display_name") or "").strip() or None
+        channels = list(dict.fromkeys(item.get("allowed_channels") or [])) if isinstance(item.get("allowed_channels"), list) else []
+        if sharing_intent == "sales_candidate":
+            if asset_type not in sales_asset_service.ASSET_TYPES:
+                raise HTTPException(status_code=422, detail="Select a supported sales material type.")
+            if not display_name or len(display_name) > 255:
+                raise HTTPException(status_code=422, detail="Enter a customer-facing material name.")
+            if not channels or any(channel not in sales_asset_service.CHANNELS for channel in channels):
+                raise HTTPException(status_code=422, detail="Select SMS, WhatsApp, or both channels.")
+        results.append({
+            "sharing_intent": sharing_intent,
+            "intended_asset_type": asset_type if sharing_intent == "sales_candidate" else None,
+            "intended_display_name": display_name if sharing_intent == "sales_candidate" else None,
+            "intended_allowed_channels": channels if sharing_intent == "sales_candidate" else None,
+        })
+    return results
+
+
 @router.get("/shared-assets/{token}", include_in_schema=False)
 def download_shared_sales_asset(token: str, request: Request, download: bool = False, db: Session = Depends(get_db)):
     source, share = asset_share_service.resolve(db, token)
@@ -1237,6 +1287,46 @@ async def send_chat(
         project.session.id,
         payload.in_reply_to_message_id,
     )
+    rename_target = _project_name_command(payload.message)
+    if rename_target:
+        user_message = services.save_message(
+            db, project.session.id, SenderType.USER, payload.message,
+            in_reply_to_message_id=None,
+            message_id=payload.client_message_id,
+            commit=False,
+        )
+        profile = services.get_profile(project)
+        result = services.apply_field_updates(
+            db,
+            profile,
+            [services.user_field_update("project_name", rename_target, status="corrected_by_user")],
+            allow_authoritative_statuses=True,
+            commit=False,
+        )
+        if result.rejected:
+            db.rollback()
+            raise HTTPException(status_code=422, detail="Enter a valid Project name.")
+        pending = active_question.ui_payload.get("prompt") if active_question and active_question.ui_payload else _next_prompt(profile)
+        ai_message = services.save_message(
+            db,
+            project.session.id,
+            SenderType.AI,
+            f"I've updated the Project name to **{rename_target}**. Your current onboarding step is still pending: {pending}",
+            ui_payload=None,
+            in_reply_to_message_id=user_message.id,
+            commit=False,
+        )
+        db.commit()
+        for item in (user_message, ai_message, profile):
+            db.refresh(item)
+        return _turn_payload(
+            request_id=request_id,
+            ai_message=ai_message,
+            user_message=user_message,
+            profile=profile,
+            accepted=result.accepted,
+            assistant_status="deterministic",
+        )
     resolved_question_id = payload.in_reply_to_message_id or (active_question.id if active_question else None)
     user_message = services.save_message(
         db, project.session.id, SenderType.USER, payload.message,
@@ -1385,6 +1475,7 @@ async def send_chat_with_files(
     message: str = Form(""),
     in_reply_to_message_id: str | None = Form(None),
     client_message_id: str | None = Form(None),
+    file_intents: str = Form("[]"),
     files: list[UploadFile] = File(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker(EDITOR_ROLES)),
@@ -1406,6 +1497,7 @@ async def send_chat_with_files(
         raise HTTPException(status_code=422, detail=f"Upload between 1 and {source_service.MAX_FILES} files.")
     if len(clean_message) > 20000:
         raise HTTPException(status_code=422, detail="The message is too long.")
+    upload_intents = _file_upload_intents(file_intents, len(files))
     visible_message = clean_message or f"Attached {len(files)} project file{'s' if len(files) != 1 else ''}."
     user_message = services.save_message(
         db, project.session.id, SenderType.USER, visible_message,
@@ -1435,10 +1527,11 @@ async def send_chat_with_files(
         except Exception:
             db.rollback()
             raise
-    for upload in files:
+    for index, upload in enumerate(files):
         source = await source_service.create_file_source(
             db, project_id=project.id, company_id=current_user.company_id,
             user_id=current_user.id, upload=upload, message_id=user_message.id,
+            **upload_intents[index],
         )
         sources.append(source)
         if source.status.value == "processing":
@@ -1490,10 +1583,14 @@ async def add_url(project_id: str, payload: UrlSourceRequest, db: Session = Depe
 
 
 @router.post("/{project_id}/sources/files", response_model=list[SourceResponse], status_code=202)
-async def add_files(project_id: str, files: list[UploadFile] = File(...), db: Session = Depends(get_db), current_user: User = Depends(RoleChecker(TENANT_MANAGER_ROLES))):
+async def add_files(
+    project_id: str, files: list[UploadFile] = File(...), file_intents: str = Form("[]"),
+    db: Session = Depends(get_db), current_user: User = Depends(RoleChecker(TENANT_MANAGER_ROLES)),
+):
     project = services.get_project(db, project_id, current_user.company_id)
     if not files or len(files) > source_service.MAX_FILES:
         raise HTTPException(status_code=422, detail=f"Upload between 1 and {source_service.MAX_FILES} files.")
+    upload_intents = _file_upload_intents(file_intents, len(files))
     user_message = services.save_message(
         db,
         project.session.id,
@@ -1501,10 +1598,11 @@ async def add_files(project_id: str, files: list[UploadFile] = File(...), db: Se
         f"Attached {len(files)} project file{'s' if len(files) != 1 else ''}.",
     )
     sources = []
-    for upload in files:
+    for index, upload in enumerate(files):
         source = await source_service.create_file_source(
             db, project_id=project_id, company_id=current_user.company_id,
             user_id=current_user.id, upload=upload, message_id=user_message.id,
+            **upload_intents[index],
         )
         sources.append(source)
         if source.status.value == "processing":

@@ -29,8 +29,20 @@
   <section class="flex min-w-0 flex-1 flex-col">
     <header class="flex items-center gap-4 border-b border-white/5 bg-black/40 p-4 backdrop-blur-md md:p-6">
       <a routerLink="/app/projects" class="flex h-9 w-9 items-center justify-center rounded-full text-gray-400 hover:bg-white/10 hover:text-white"><span class="material-symbols-outlined">arrow_back</span></a>
-      <div>
-        <h1 class="text-xl font-light"><span class="font-medium text-white">{{ projectName }}</span> <span class="font-medium text-secondary">Onboarding</span></h1>
+      <div class="min-w-0 flex-1">
+        <div *ngIf="!isEditingProjectName" class="flex min-w-0 items-center gap-2">
+          <button type="button" (click)="startProjectNameEdit()" class="group flex min-w-0 items-center gap-2 rounded-lg text-left outline-none focus-visible:ring-2 focus-visible:ring-secondary/60" aria-label="Edit Project name" title="Edit Project name">
+            <h1 class="min-w-0 truncate text-xl font-medium text-white group-hover:text-secondary">{{ projectName }}</h1>
+            <span class="material-symbols-outlined shrink-0 text-lg text-gray-500 transition group-hover:text-secondary">edit</span>
+          </button>
+          <span class="shrink-0 rounded-full border border-secondary/25 bg-secondary/[0.08] px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-secondary">Onboarding</span>
+        </div>
+        <div *ngIf="isEditingProjectName" class="flex max-w-xl flex-wrap items-center gap-2">
+          <input [(ngModel)]="projectNameDraft" (keydown.enter)="saveProjectName()" (keydown.escape)="cancelProjectNameEdit()" [disabled]="projectNameBusy" maxlength="150" autofocus class="min-w-56 flex-1 rounded-xl border border-secondary/40 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-secondary" aria-label="Project name" />
+          <button type="button" (click)="saveProjectName()" [disabled]="projectNameBusy" class="rounded-lg bg-secondary px-3 py-2 text-xs font-semibold text-black disabled:opacity-50">{{ projectNameBusy ? 'Saving...' : 'Save' }}</button>
+          <button type="button" (click)="cancelProjectNameEdit()" [disabled]="projectNameBusy" class="rounded-lg border border-white/10 px-3 py-2 text-xs text-gray-300">Cancel</button>
+        </div>
+        <p *ngIf="projectNameError" class="mt-1 text-xs text-red-300" role="alert">{{ projectNameError }}</p>
         <p class="mt-1 text-xs text-gray-400">Build, validate, and prepare this project for artificial intelligence (AI)-assisted sales.</p>
       </div>
     </header>
@@ -355,7 +367,7 @@
         <div *ngIf="propertyCatalog.confirmed_count && propertyCatalog.candidate_count === 0" class="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-5"><p class="text-xs text-gray-400">{{ catalogReady ? 'Confirm that the reviewed types represent the current Project catalog.' : 'Complete every required field before confirming the catalog.' }}</p><button (click)="confirmPropertyCatalog()" [disabled]="confirmingPropertyCatalog || !catalogReady" [title]="catalogReady ? '' : 'Complete every confirmed property type.'" class="rounded-xl bg-secondary px-5 py-2.5 text-xs font-semibold text-black disabled:cursor-not-allowed disabled:opacity-40">{{ confirmingPropertyCatalog ? 'Confirming...' : (catalogReady ? 'Confirm catalog and continue' : 'Complete catalog fields') }}</button></div>
       </section>
 
-      <section class="ml-0 max-w-3xl rounded-2xl border border-white/10 bg-white/[0.025] p-5 md:ml-11" data-testid="sales-materials">
+      <section *ngIf="showSalesMaterials" class="ml-0 max-w-3xl rounded-2xl border border-white/10 bg-white/[0.025] p-5 md:ml-11" data-testid="sales-materials">
         <div class="flex flex-wrap items-start justify-between gap-3">
           <div><p class="text-[10px] font-bold uppercase tracking-[.18em] text-secondary">Lead-safe materials</p><h2 class="mt-1 text-lg font-medium">Sales brochures and documents</h2><p class="mt-2 text-xs leading-5 text-gray-500">Uploaded files remain private until you classify and approve them. The Sales Agent can then send expiring links through SMS or WhatsApp.</p></div>
           <button type="button" (click)="showSalesAssetForm = !showSalesAssetForm" [disabled]="!availableSalesAssetSources.length" class="rounded-xl border border-secondary/30 px-4 py-2.5 text-xs font-semibold text-secondary disabled:cursor-not-allowed disabled:opacity-40"><span class="material-symbols-outlined mr-1 align-middle text-base">add_link</span>Add material</button>
@@ -409,6 +421,7 @@
             <div *ngFor="let file of selectedFiles; let index = index" class="flex max-w-full items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-[10px] text-gray-300">
               <span class="material-symbols-outlined text-[15px] text-secondary">description</span>
               <span class="max-w-48 truncate">{{ file.name }}</span>
+              <span class="rounded-full border px-2 py-0.5 text-[9px]" [ngClass]="selectedFileIntents[index]?.sharing_intent === 'sales_candidate' ? 'border-secondary/30 text-secondary' : 'border-white/10 text-gray-500'">{{ selectedFileIntents[index]?.sharing_intent === 'sales_candidate' ? 'Lead-sharing draft' : 'Internal only' }}</span>
               <button (click)="removeSelectedFile(index)" [disabled]="isUploading" class="text-gray-500 hover:text-red-300"><span class="material-symbols-outlined text-[14px]">close</span></button>
             </div>
           </div>
@@ -425,6 +438,35 @@
         <p class="mt-2 text-center text-[10px] text-gray-600">Paste URLs or attach up to 10 project files. Extracted data is never confirmed automatically. Enter Meta tokens only in the secure connection form.</p>
       </div>
     </footer>
+
+    <div *ngIf="showFileClassification" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="file-purpose-title">
+      <section class="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-white/15 bg-[#0b0b0b] shadow-2xl">
+        <header class="border-b border-white/10 p-5">
+          <p class="text-[10px] font-bold uppercase tracking-[.18em] text-secondary">Document purpose</p>
+          <h2 id="file-purpose-title" class="mt-1 text-lg font-medium text-white">How should Black Penguin use these files?</h2>
+          <p class="mt-2 text-xs leading-5 text-gray-400">Internal files help build the Project Profile. Lead-sharing files are registered only as drafts and still require approval after processing.</p>
+        </header>
+        <div class="space-y-4 overflow-y-auto p-5">
+          <article *ngFor="let file of pendingFiles; let index = index" class="rounded-xl border border-white/10 bg-white/[0.025] p-4">
+            <div class="flex items-center gap-2"><span class="material-symbols-outlined text-lg text-secondary">description</span><p class="min-w-0 truncate text-sm font-medium text-white">{{ file.name }}</p></div>
+            <div class="mt-4 grid gap-2 sm:grid-cols-2">
+              <button type="button" (click)="pendingFileIntents[index].sharing_intent = 'internal'" class="rounded-xl border p-3 text-left transition" [ngClass]="pendingFileIntents[index].sharing_intent === 'internal' ? 'border-secondary/50 bg-secondary/[0.08]' : 'border-white/10 bg-black/20'">
+                <span class="block text-xs font-semibold text-white">Internal only</span><span class="mt-1 block text-[10px] leading-4 text-gray-500">Use for onboarding and agent knowledge. Never send it to leads.</span>
+              </button>
+              <button type="button" (click)="pendingFileIntents[index].sharing_intent = 'sales_candidate'" class="rounded-xl border p-3 text-left transition" [ngClass]="pendingFileIntents[index].sharing_intent === 'sales_candidate' ? 'border-secondary/50 bg-secondary/[0.08]' : 'border-white/10 bg-black/20'">
+                <span class="block text-xs font-semibold text-white">Candidate for lead sharing</span><span class="mt-1 block text-[10px] leading-4 text-gray-500">Prepare a reviewable draft for secure SMS or WhatsApp links.</span>
+              </button>
+            </div>
+            <div *ngIf="pendingFileIntents[index].sharing_intent === 'sales_candidate'" class="mt-4 grid gap-3 sm:grid-cols-2">
+              <label class="field-label">Material type *<select [(ngModel)]="pendingFileIntents[index].asset_type" class="catalog-input"><option *ngFor="let type of salesAssetTypes" [value]="type.value">{{ type.label }}</option></select></label>
+              <label class="field-label">Customer-facing name *<input [(ngModel)]="pendingFileIntents[index].display_name" maxlength="255" class="catalog-input" /></label>
+              <div class="sm:col-span-2"><p class="field-label">Allowed channels *</p><div class="mt-2 flex gap-4 text-xs text-gray-300"><label class="flex items-center gap-2"><input type="checkbox" [checked]="pendingFileIntents[index].allowed_channels.includes('sms')" (change)="setIntentChannel(pendingFileIntents[index], 'sms', $any($event.target).checked)" class="accent-yellow-400" /> SMS</label><label class="flex items-center gap-2"><input type="checkbox" [checked]="pendingFileIntents[index].allowed_channels.includes('whatsapp')" (change)="setIntentChannel(pendingFileIntents[index], 'whatsapp', $any($event.target).checked)" class="accent-yellow-400" /> WhatsApp</label></div></div>
+            </div>
+          </article>
+        </div>
+        <footer class="flex flex-wrap justify-end gap-3 border-t border-white/10 p-4"><button type="button" (click)="closeFileClassification()" class="rounded-xl border border-white/10 px-4 py-2.5 text-xs text-gray-300">Cancel</button><button type="button" (click)="confirmFileClassification()" class="rounded-xl bg-secondary px-5 py-2.5 text-xs font-semibold text-black">Add to message</button></footer>
+      </section>
+    </div>
   </section>
 
   <aside class="flex h-full w-full shrink-0 flex-col border-l border-white/10 bg-[#0a0a0a] md:w-[390px]">

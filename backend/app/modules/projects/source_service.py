@@ -34,7 +34,7 @@ from app.modules.onboarding_jobs.errors import (
     raise_for_access_restriction,
 )
 
-from . import services, storage_service
+from . import sales_asset_service, services, storage_service
 from .completion import FIELD_BY_KEY
 from .models import (
     ProjectOnboardingProposal, ProjectOnboardingSource, ProjectPropertyType, ProjectProposalStatus,
@@ -203,7 +203,9 @@ async def ingest_file(
 
 async def create_file_source(
     db: Session, *, project_id: str, company_id: str, user_id: str, upload: UploadFile,
-    message_id: str | None = None,
+    message_id: str | None = None, sharing_intent: str = "internal",
+    intended_asset_type: str | None = None, intended_display_name: str | None = None,
+    intended_allowed_channels: list[str] | None = None,
 ) -> ProjectOnboardingSource:
     """Validate and durably store an upload without waiting for AI extraction."""
     content = await upload.read(MAX_FILE_BYTES + 1)
@@ -217,6 +219,13 @@ async def create_file_source(
         project_id=project_id, message_id=message_id, uploaded_by_user_id=user_id, kind=kind,
         status=ProjectSourceStatus.PROCESSING, name=filename, mime_type=mime_type,
         size_bytes=len(content), sha256=hashlib.sha256(content).hexdigest(), original_filename=filename,
+        sharing_intent="sales_candidate" if sharing_intent == "sales_candidate" else "internal",
+        intended_asset_type=intended_asset_type if intended_asset_type in sales_asset_service.ASSET_TYPES else None,
+        intended_display_name=(intended_display_name or "").strip()[:255] or None,
+        intended_allowed_channels=(
+            list(dict.fromkeys(channel for channel in (intended_allowed_channels or []) if channel in sales_asset_service.CHANNELS))
+            or None
+        ),
     )
     db.add(source); db.commit(); db.refresh(source)
     try:
@@ -279,7 +288,9 @@ async def _finish_source(
     for proposal in await _extract_proposals(db, source, normalized, image_content):
         db.add(proposal)
     source.status, source.error_message = ProjectSourceStatus.READY, None
-    db.add(source); db.commit(); db.refresh(source)
+    db.add(source); db.flush()
+    sales_asset_service.materialize_source_candidate(db, source)
+    db.commit(); db.refresh(source)
 
 
 async def _extract_proposals(
@@ -368,10 +379,20 @@ async def _extract_proposals(
             sort_order=index,
         )
         db.add(candidate)
+    profile = services.get_profile(project)
+    protected_fields = {
+        key
+        for key, state in (profile.field_states or {}).items()
+        if state.get("status") == "corrected_by_user"
+        or (
+            state.get("status") == "confirmed"
+            and (profile.field_sources or {}).get(key, {}).get("source_type") == "user"
+        )
+    }
     proposals, seen = [], set()
     for item in payload.get("proposals", []) if isinstance(payload, dict) else []:
         key = services.normalize_field_key(item.get("field")) if isinstance(item, dict) else None
-        if not key or key in seen or item.get("value") in (None, "", []):
+        if not key or key in seen or key in protected_fields or item.get("value") in (None, "", []):
             continue
         seen.add(key)
         proposals.append(ProjectOnboardingProposal(
@@ -490,6 +511,10 @@ def serialize_source(source: ProjectOnboardingSource) -> dict[str, Any]:
         ),
         "error_message": source.error_message,
         "is_primary": source.is_primary,
+        "sharing_intent": source.sharing_intent or "internal",
+        "intended_asset_type": source.intended_asset_type,
+        "intended_display_name": source.intended_display_name,
+        "intended_allowed_channels": source.intended_allowed_channels or [],
         "proposals": [serialize_proposal(item) for item in source.proposals],
         "created_at": source.created_at, "updated_at": source.updated_at,
     }

@@ -92,9 +92,19 @@ export interface ProjectSource {
   url: string | null; mime_type: string | null; size_bytes: number | null; error_message: string | null;
   message_id: string | null; download_url: string | null;
   is_primary: boolean;
+  sharing_intent?: 'internal' | 'sales_candidate';
+  intended_asset_type?: SalesAssetType | null;
+  intended_display_name?: string | null;
+  intended_allowed_channels?: Array<'sms' | 'whatsapp'>;
   proposals: SourceProposal[]; created_at: string; updated_at: string;
 }
-export type SalesAssetType = 'brochure' | 'floor_plan' | 'unit_sheet' | 'price_list' | 'amenities' | 'location_map' | 'legal_disclaimer' | 'other';
+export type SalesAssetType = 'brochure' | 'floor_plan' | 'unit_sheet' | 'price_list' | 'amenities' | 'location_map' | 'legal_disclaimer' | 'gallery_image' | 'other';
+export interface ProjectFileIntent {
+  sharing_intent: 'internal' | 'sales_candidate';
+  asset_type: SalesAssetType;
+  display_name: string;
+  allowed_channels: Array<'sms' | 'whatsapp'>;
+}
 export interface ProjectSalesAsset {
   id: string; company_id: string; project_id: string; property_type_id: string | null; source_id: string;
   asset_type: SalesAssetType; display_name: string; description: string | null;

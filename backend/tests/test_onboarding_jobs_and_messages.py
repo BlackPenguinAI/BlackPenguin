@@ -225,6 +225,26 @@ def test_project_structured_answers_are_resolved_without_an_llm_round_trip(monke
     assert resolution.updates[0]["status"] == "confirmed"
 
 
+def test_project_rename_command_is_not_an_answer_to_payment_methods():
+    assert project_router._project_name_command(
+        "I need to change the name of the project New name: Coahuila 34 Project"
+    ) == "Coahuila 34 Project"
+    assert project_router._project_name_command("Cash and bank financing") is None
+
+
+def test_file_intent_defaults_private_and_validates_lead_sharing():
+    assert project_router._file_upload_intents("[]", 1) == [{
+        "sharing_intent": "internal",
+        "intended_asset_type": None,
+        "intended_display_name": None,
+        "intended_allowed_channels": None,
+    }]
+    assert project_router._file_upload_intents(
+        '[{"sharing_intent":"sales_candidate","asset_type":"brochure","display_name":"Buyer brochure","allowed_channels":["whatsapp"]}]',
+        1,
+    )[0]["intended_asset_type"] == "brochure"
+
+
 def test_ai_sales_authorization_rejects_free_text_and_requires_the_typed_action(monkeypatch):
     question = ProjectMessage(
         id="authorization-question",

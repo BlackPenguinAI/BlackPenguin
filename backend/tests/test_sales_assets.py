@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime, timedelta
 
 import pytest
@@ -9,7 +10,7 @@ from sqlalchemy.pool import StaticPool
 import app.db.base  # noqa: F401
 from app.db.postgres import Base
 from app.modules.companies.models import Company
-from app.modules.projects import asset_share_service, sales_asset_service
+from app.modules.projects import asset_share_service, sales_asset_service, source_service
 from app.modules.projects.models import (
     Project, ProjectOnboardingSource, ProjectProfile, ProjectSalesAsset,
     ProjectSourceKind, ProjectSourceStatus,
@@ -76,6 +77,49 @@ def test_onboarding_file_is_private_until_separately_approved():
         "capabilities": [],
     }]
     assert "share_url" not in context["available_assets"][0]
+
+
+def test_upload_intent_materializes_a_draft_but_never_approves_it():
+    db = _db()
+    _, project, source = _project_source(db)
+    source.sharing_intent = "sales_candidate"
+    source.intended_asset_type = "brochure"
+    source.intended_display_name = "Riverside buyer brochure"
+    source.intended_allowed_channels = ["whatsapp"]
+    db.add(source); db.commit(); db.refresh(source)
+
+    item = sales_asset_service.materialize_source_candidate(db, source)
+    db.commit()
+
+    assert item is not None
+    assert item.project_id == project.id
+    assert item.display_name == "Riverside buyer brochure"
+    assert item.allowed_channels == ["whatsapp"]
+    assert item.approval_status == "draft"
+    assert item.approved_at is None
+    assert sales_asset_service.materialize_source_candidate(db, source).id == item.id
+
+
+def test_source_extraction_does_not_reopen_a_manually_corrected_name(monkeypatch):
+    db = _db()
+    _, project, source = _project_source(db)
+    project.profile.profile_data = {"project_name": "Riverside Project"}
+    project.profile.field_states = {"project_name": {"status": "corrected_by_user", "applicable": True}}
+    project.profile.field_sources = {"project_name": {"source_type": "user"}}
+    db.add(project.profile); db.commit(); db.refresh(source)
+    monkeypatch.setattr(
+        source_service,
+        "get_ai_config",
+        lambda *_args: type("Config", (), {"openrouter_api_key": "test", "agent_onboarding_proyectos": {}})(),
+    )
+    async def response(*_args, **_kwargs):
+        return '{"proposals":[{"field":"project_name","value":"Riverside","evidence":"Cover"},{"field":"short_description","value":"A complete residential development with homes and shared amenities.","evidence":"Overview"}]}'
+
+    monkeypatch.setattr(source_service, "generate_llm_response", response)
+    proposals = asyncio.run(source_service._extract_proposals(db, source, "Riverside brochure content", None))
+
+    assert [item.field_key for item in proposals] == ["short_description"]
+    assert project.profile.profile_data["project_name"] == "Riverside Project"
 
 
 def test_asset_channel_and_expiration_are_enforced():

@@ -11,7 +11,7 @@ from .models import Project, ProjectOnboardingSource, ProjectSalesAsset, Project
 
 ASSET_TYPES = {
     "brochure", "floor_plan", "unit_sheet", "price_list", "amenities",
-    "location_map", "legal_disclaimer", "other",
+    "location_map", "legal_disclaimer", "gallery_image", "other",
 }
 CHANNELS = {"sms", "whatsapp"}
 
@@ -98,6 +98,35 @@ def create(db: Session, project: Project, payload: dict[str, Any], *, user_id: s
     db.add(item)
     db.commit()
     db.refresh(item)
+    return item
+
+
+def materialize_source_candidate(db: Session, source: ProjectOnboardingSource) -> ProjectSalesAsset | None:
+    """Create the reviewable draft selected at upload time, never an approved asset."""
+    if source.sharing_intent != "sales_candidate" or source.status != ProjectSourceStatus.READY:
+        return None
+    existing = db.query(ProjectSalesAsset).filter(
+        ProjectSalesAsset.project_id == source.project_id,
+        ProjectSalesAsset.source_id == source.id,
+    ).first()
+    if existing:
+        return existing
+    asset_type = source.intended_asset_type or "other"
+    channels = list(dict.fromkeys(source.intended_allowed_channels or ["sms", "whatsapp"]))
+    if asset_type not in ASSET_TYPES or not channels or any(channel not in CHANNELS for channel in channels):
+        return None
+    item = ProjectSalesAsset(
+        company_id=source.project.company_id,
+        project_id=source.project_id,
+        source_id=source.id,
+        asset_type=asset_type,
+        display_name=(source.intended_display_name or source.original_filename or source.name)[:255],
+        allowed_channels=channels,
+        created_by_user_id=source.uploaded_by_user_id,
+        approval_status="draft",
+    )
+    db.add(item)
+    db.flush()
     return item
 
 

@@ -206,6 +206,10 @@ class SourceResponse(BaseModel):
     download_url: str | None = None
     error_message: str | None = None
     is_primary: bool = False
+    sharing_intent: Literal["internal", "sales_candidate"] = "internal"
+    intended_asset_type: str | None = None
+    intended_display_name: str | None = None
+    intended_allowed_channels: list[str] = Field(default_factory=list)
     proposals: list[SourceProposalResponse] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
@@ -216,7 +220,7 @@ class SalesAssetPayload(BaseModel):
     property_type_id: str | None = None
     asset_type: Literal[
         "brochure", "floor_plan", "unit_sheet", "price_list", "amenities",
-        "location_map", "legal_disclaimer", "other",
+        "location_map", "legal_disclaimer", "gallery_image", "other",
     ]
     display_name: str = Field(min_length=1, max_length=255)
     description: str | None = Field(default=None, max_length=2000)
@@ -229,7 +233,7 @@ class SalesAssetUpdate(BaseModel):
     property_type_id: str | None = None
     asset_type: Literal[
         "brochure", "floor_plan", "unit_sheet", "price_list", "amenities",
-        "location_map", "legal_disclaimer", "other",
+        "location_map", "legal_disclaimer", "gallery_image", "other",
     ]
     display_name: str = Field(min_length=1, max_length=255)
     description: str | None = Field(default=None, max_length=2000)

@@ -8,7 +8,7 @@ import {
   Campaign, ChatMessage, ChatTurn, MetaAssetDiscovery, MetaAuthorization, MetaConnection, MetaSetupConfiguration, MetaSetupResult,
   OnboardingState, ProjectAssignment, ProjectOnboardingActionPayload, ProjectProfile,
   ProjectSalesCandidate, ProjectSource, SourceProposal, ProjectPropertyType, ProjectPropertyTypePayload, PropertyTypeCatalog,
-  ProjectSalesAsset, SalesAssetType,
+  ProjectFileIntent, ProjectSalesAsset, SalesAssetType,
 } from './project-onboarding.models';
 
 @Injectable({ providedIn: 'root' })
@@ -29,13 +29,17 @@ export class ProjectOnboardingService {
       message, in_reply_to_message_id: inReplyToMessageId || null, client_message_id: clientMessageId,
     });
   }
-  sendMessageWithFiles(id: string, message: string, files: File[], inReplyToMessageId: string | null, clientMessageId: string): Observable<ChatTurn> {
+  sendMessageWithFiles(id: string, message: string, files: File[], intents: ProjectFileIntent[], inReplyToMessageId: string | null, clientMessageId: string): Observable<ChatTurn> {
     const body = new FormData();
     body.append('message', message);
     if (inReplyToMessageId) body.append('in_reply_to_message_id', inReplyToMessageId);
     body.append('client_message_id', clientMessageId);
+    body.append('file_intents', JSON.stringify(intents));
     files.forEach((file) => body.append('files', file, file.name));
     return this.http.post<ChatTurn>(`${this.baseUrl}/${id}/chat/with-files`, body);
+  }
+  patchProfile(id: string, updates: Array<Record<string, unknown>>): Observable<ProjectProfile> {
+    return this.http.patch<ProjectProfile>(`${this.baseUrl}/${id}/profile`, { updates });
   }
   getSources(id: string): Observable<ProjectSource[]> { return this.http.get<ProjectSource[]>(`${this.baseUrl}/${id}/sources`); }
   retrySource(id: string, sourceId: string): Observable<ProjectSource> {
