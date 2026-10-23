@@ -10,14 +10,15 @@ from sqlalchemy.pool import StaticPool
 import app.db.base  # noqa: F401
 from app.db.postgres import Base
 from app.modules.companies.models import Company
-from app.modules.projects import asset_share_service, sales_asset_service, source_service
+from app.modules.projects import asset_share_service, sales_asset_service, source_service, services as project_services
 from app.modules.projects.models import (
     Project, ProjectOnboardingSource, ProjectProfile, ProjectSalesAsset,
     ProjectSourceKind, ProjectSourceStatus,
 )
 from app.modules.sales_agent.commercial_context import build_commercial_context
-from app.modules.sales_agent.live_service import _denies_available_asset, _select_asset_for_request
-from app.modules.sales_agent.response_policy import repeats_introduction_after_greeting
+from app.modules.sales_agent.live_service import _denies_available_asset, _execute_share_actions, _select_asset_for_request
+from app.modules.sales_agent.models import SalesConversation
+from app.modules.sales_agent.response_policy import concise_channel_text, plain_channel_text, repeats_introduction_after_greeting
 
 
 def _db():
@@ -84,6 +85,7 @@ def test_upload_intent_materializes_a_draft_but_never_approves_it():
     _, project, source = _project_source(db)
     source.sharing_intent = "sales_candidate"
     source.intended_asset_type = "brochure"
+    source.intended_content_tags = ["brochure", "floor_plan"]
     source.intended_display_name = "Riverside buyer brochure"
     source.intended_allowed_channels = ["whatsapp"]
     db.add(source); db.commit(); db.refresh(source)
@@ -95,6 +97,7 @@ def test_upload_intent_materializes_a_draft_but_never_approves_it():
     assert item.project_id == project.id
     assert item.display_name == "Riverside buyer brochure"
     assert item.allowed_channels == ["whatsapp"]
+    assert item.content_tags == ["brochure", "floor_plan"]
     assert item.approval_status == "draft"
     assert item.approved_at is None
     assert sales_asset_service.materialize_source_candidate(db, source).id == item.id
@@ -197,3 +200,77 @@ def test_approved_brochure_with_floor_plans_is_selected_for_a_plan_request():
     assert available[0]["capabilities"] == ["floor_plans", "virtual_tour"]
     assert _select_asset_for_request(available, "Can you send me the floor plans?")["asset_id"] == asset.id
     assert _denies_available_asset("I cannot send brochures directly.") is True
+
+
+def test_draft_sales_material_blocks_final_confirmation():
+    db = _db()
+    company, project, source = _project_source(db)
+    db.add(ProjectSalesAsset(
+        company_id=company.id, project_id=project.id, source_id=source.id,
+        asset_type="brochure", content_tags=["brochure"], display_name="Buyer brochure",
+        approval_status="draft", allowed_channels=["whatsapp"],
+    ))
+    db.commit()
+
+    ready, reasons = project_services.readiness_for_confirmation(db, project)
+
+    assert ready is False
+    assert "pending_sales_materials" in reasons
+
+
+def test_material_is_offered_before_a_secure_link_is_issued(monkeypatch):
+    db = _db()
+    company, project, source = _project_source(db)
+    asset = ProjectSalesAsset(
+        company_id=company.id, project_id=project.id, source_id=source.id,
+        asset_type="brochure", content_tags=["brochure", "floor_plan"],
+        display_name="Project brochure and plans", approval_status="approved",
+        approved_at=datetime.utcnow(), allowed_channels=["whatsapp"],
+    )
+    db.add(asset); db.flush()
+    conversation = SalesConversation(
+        company_id=company.id, project_id=project.id, lead_id="lead-1",
+        provider="telnyx", channel="whatsapp", is_paused=False,
+    )
+    db.add(conversation); db.commit()
+    commercial = {"available_assets": [{
+        "asset_id": asset.id, "name": asset.display_name, "asset_type": "brochure",
+        "capabilities": ["floor_plans"],
+    }]}
+
+    reply, actions, shares = _execute_share_actions(
+        db, conversation=conversation, lead=type("Lead", (), {"id": "lead-1"})(),
+        run=type("Run", (), {"id": "run-1"})(), reply="I can help.", actions=[],
+        commercial=commercial, inbound_text="Can you send me the floor plans?",
+    )
+    assert "Would you like me to send the secure link here?" in reply
+    assert actions == []
+    assert shares == []
+    assert conversation.pending_asset_id == asset.id
+
+    monkeypatch.setattr(
+        asset_share_service, "issue",
+        lambda *_args, **_kwargs: ("https://blackpenguin.ai/a/token", type("Share", (), {"id": "share-1"})()),
+    )
+    reply, actions, shares = _execute_share_actions(
+        db, conversation=conversation, lead=type("Lead", (), {"id": "lead-1"})(),
+        run=type("Run", (), {"id": "run-1"})(), reply="Yes.", actions=[],
+        commercial=commercial, inbound_text="Yes, please",
+    )
+    assert "https://blackpenguin.ai/a/token" in reply
+    assert shares == ["share-1"]
+    assert conversation.pending_asset_id is None
+
+
+def test_channel_text_converts_markdown_links_to_clickable_plain_urls():
+    assert plain_channel_text("See [Project website](https://example.com/project).") == (
+        "See Project website: https://example.com/project."
+    )
+
+
+def test_channel_text_keeps_mobile_replies_concise_at_sentence_boundaries():
+    reply = " ".join(["Confirmed project information is available."] * 40)
+    concise = concise_channel_text(reply, "sms")
+    assert concise is not None
+    assert len(concise) <= 700
+    assert concise.endswith("I can share more detail on any of these points.")

@@ -19,7 +19,7 @@ from app.modules.sales_crm.models import FunnelStage, Lead, LeadContact
 
 from .graph import GRAPH_VERSION, TOOLSET_VERSION, build_sales_graph
 from .conversation_scope import scoped_messages_query
-from .response_policy import action_types, requested_topics
+from .response_policy import AFFIRMATIVE, action_types, requested_topics
 from .models import (
     AgentRun, ExternalWebhookEvent, OutboundMessage, SalesConversation, SalesConversationLeadContext, SalesInboundJob,
     SalesFollowUpJob, SalesMessage,
@@ -385,12 +385,46 @@ def _execute_share_actions(
     """Validate model proposals and mint links only at the dispatch boundary."""
     approved = {item["asset_id"]: item for item in commercial.get("available_assets", [])}
     requested = "assets" in requested_topics(inbound_text)
-    if requested and approved and not any(
-        isinstance(action, dict) and action.get("type") == "share_asset" for action in actions
-    ):
+    pending = approved.get(conversation.pending_asset_id or "")
+    consented = bool(pending and AFFIRMATIVE.match(inbound_text or ""))
+    if consented:
+        actions = [
+            action for action in actions
+            if not isinstance(action, dict) or action.get("type") != "share_asset"
+        ]
+        actions.append({
+            "type": "share_asset", "asset_id": pending["asset_id"],
+            "reason": "lead_confirmed_material_offer",
+        })
+        conversation.pending_asset_id = None
+        conversation.pending_asset_offered_at = None
+        db.add(conversation)
+        db.flush()
+    elif requested and approved:
         selected = _select_asset_for_request(list(approved.values()), inbound_text)
         if selected:
-            actions = [*actions, {"type": "share_asset", "asset_id": selected["asset_id"], "reason": "lead_requested_material"}]
+            conversation.pending_asset_id = selected["asset_id"]
+            conversation.pending_asset_offered_at = datetime.utcnow()
+            db.add(conversation)
+            db.flush()
+            actions = [
+                action for action in actions
+                if not isinstance(action, dict) or action.get("type") != "share_asset"
+            ]
+            capabilities = selected.get("capabilities") or []
+            detail = " It includes floor plans." if "floor_plans" in capabilities else ""
+            return (
+                f"I have an approved file called {selected.get('name') or 'Project material'}.{detail} "
+                "Would you like me to send the secure link here?",
+                actions,
+                [],
+            )
+
+    if not consented:
+        actions = [
+            action for action in actions
+            if not isinstance(action, dict) or action.get("type") != "share_asset"
+        ]
 
     links: list[str] = []
     share_ids: list[str] = []

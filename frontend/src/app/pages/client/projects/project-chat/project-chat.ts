@@ -104,9 +104,9 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   salesAssetBusy = false;
   showSalesAssetForm = false;
   salesAssetDraft: {
-    source_id: string; asset_type: SalesAssetType; display_name: string; description: string;
+    source_id: string; asset_type: SalesAssetType; content_tags: SalesAssetType[]; display_name: string; description: string;
     property_type_id: string; valid_until: string; sms: boolean; whatsapp: boolean;
-  } = { source_id: '', asset_type: 'brochure', display_name: '', description: '', property_type_id: '', valid_until: '', sms: true, whatsapp: true };
+  } = { source_id: '', asset_type: 'brochure', content_tags: ['brochure'], display_name: '', description: '', property_type_id: '', valid_until: '', sms: true, whatsapp: true };
   readonly salesAssetTypes: Array<{ value: SalesAssetType; label: string }> = [
     { value: 'brochure', label: 'Brochure' }, { value: 'floor_plan', label: 'Floor plan' },
     { value: 'unit_sheet', label: 'Unit sheet' }, { value: 'price_list', label: 'Price list' },
@@ -202,9 +202,9 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     for (const url of this.sourceImageUrls.values()) URL.revokeObjectURL(url);
   }
 
-  get canSend(): boolean { return (!!this.prompt.trim() || !!this.selectedFiles.length) && !this.isAnalyzing && !this.hasPendingReview; }
+  get canSend(): boolean { return (!!this.prompt.trim() || !!this.selectedFiles.length) && !this.isAnalyzing && !this.hasExclusiveSourceFlow; }
   get projectName(): string { return this.profile.project_name || 'Untitled Project'; }
-  get showSalesMaterials(): boolean { return this.profile.completion.final_approved; }
+  get showSalesMaterials(): boolean { return this.salesAssets.length > 0 || this.profile.completion.final_approved; }
   get availableSalesAssetSources(): ProjectSource[] {
     const registered = new Set(this.salesAssets.map(item => item.source_id));
     return this.sources.filter(source => source.status === 'ready' && !!source.download_url && !registered.has(source.id));
@@ -379,13 +379,14 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     this.onboarding.createSalesAsset(this.projectId, {
       source_id: draft.source_id, property_type_id: draft.property_type_id || null,
       asset_type: draft.asset_type, display_name: draft.display_name.trim(),
+      content_tags: draft.content_tags.length ? draft.content_tags : [draft.asset_type],
       description: draft.description.trim() || null, valid_from: null,
       valid_until: draft.valid_until ? new Date(`${draft.valid_until}T23:59:59Z`).toISOString() : null,
       allowed_channels: channels,
     }).subscribe({
       next: item => {
         this.salesAssets = [item, ...this.salesAssets]; this.salesAssetBusy = false; this.showSalesAssetForm = false;
-        this.salesAssetDraft = { source_id: '', asset_type: 'brochure', display_name: '', description: '', property_type_id: '', valid_until: '', sms: true, whatsapp: true };
+        this.salesAssetDraft = { source_id: '', asset_type: 'brochure', content_tags: ['brochure'], display_name: '', description: '', property_type_id: '', valid_until: '', sms: true, whatsapp: true };
         this.cdr.detectChanges();
       },
       error: (error: HttpErrorResponse) => { this.salesAssetBusy = false; this.errorMessage = this.apiDetail(error, 'Sales material could not be registered.'); this.cdr.detectChanges(); },
@@ -394,14 +395,14 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   approveSalesAsset(item: ProjectSalesAsset): void {
     if (this.salesAssetBusy) return; this.salesAssetBusy = true; this.errorMessage = '';
     this.onboarding.approveSalesAsset(this.projectId, item.id).subscribe({
-      next: updated => { this.salesAssets = this.salesAssets.map(row => row.id === updated.id ? updated : row); this.salesAssetBusy = false; this.cdr.detectChanges(); },
+      next: updated => { this.salesAssets = this.salesAssets.map(row => row.id === updated.id ? updated : row); this.salesAssetBusy = false; this.syncState('bottom'); },
       error: (error: HttpErrorResponse) => { this.salesAssetBusy = false; this.errorMessage = this.apiDetail(error, 'Sales material could not be approved.'); this.cdr.detectChanges(); },
     });
   }
   archiveSalesAsset(item: ProjectSalesAsset): void {
     if (this.salesAssetBusy) return; this.salesAssetBusy = true; this.errorMessage = '';
     this.onboarding.archiveSalesAsset(this.projectId, item.id).subscribe({
-      next: () => { this.salesAssets = this.salesAssets.filter(row => row.id !== item.id); this.salesAssetBusy = false; this.cdr.detectChanges(); },
+      next: () => { this.salesAssets = this.salesAssets.filter(row => row.id !== item.id); this.salesAssetBusy = false; this.syncState('bottom'); },
       error: (error: HttpErrorResponse) => { this.salesAssetBusy = false; this.errorMessage = this.apiDetail(error, 'Sales material could not be archived.'); this.cdr.detectChanges(); },
     });
   }
@@ -896,18 +897,21 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   }
   writeCustomAnswer(message?: ChatMessage): void { this.prompt = ''; this.replyToMessageId = message?.id || null; }
   isActiveQuestion(message: ChatMessage): boolean {
-    return !this.hasPendingReview && message.sender === 'ai' && !!message.ui_payload && !message.response_payload
+    return !this.hasExclusiveSourceFlow && message.sender === 'ai' && !!message.ui_payload && !message.response_payload
       && this.visibleMessages.filter((item) => item.sender === 'ai' && !!item.ui_payload && !item.response_payload).at(-1) === message;
   }
 
   get hasPendingReview(): boolean {
     return this.sources.some((source) => this.isReviewableSource(source) && this.hasPendingProposals(source));
   }
+  get hasExclusiveSourceFlow(): boolean { return this.hasProcessingSources || this.hasPendingReview; }
   get visibleMessages(): ChatMessage[] {
-    if (!this.hasPendingReview) return this.messages;
-    return this.messages.filter((message) => !(
-      message.sender === 'ai' && !!message.ui_payload && !message.response_payload
-    ));
+    return this.messages.filter((message) => {
+      const unanswered = message.sender === 'ai' && !!message.ui_payload && !message.response_payload;
+      if (this.hasExclusiveSourceFlow && unanswered) return false;
+      const finalApproval = message.ui_payload?.field === null && message.ui_payload?.label === 'Final approval';
+      return !(unanswered && finalApproval && !this.profile.completion.ready_for_confirmation);
+    });
   }
   sourcesForMessage(messageId?: string): ProjectSource[] {
     return messageId ? this.sources.filter((source) => source.message_id === messageId && this.isReviewableSource(source)) : [];
@@ -984,6 +988,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     this.pendingFiles = files.slice(0, remaining);
     this.pendingFileIntents = this.pendingFiles.map(file => ({
       sharing_intent: 'internal', asset_type: this.defaultAssetType(file),
+      content_tags: [this.defaultAssetType(file)],
       display_name: file.name.replace(/\.[^.]+$/, ''), allowed_channels: ['sms', 'whatsapp'],
     }));
     this.showFileClassification = this.pendingFiles.length > 0;
@@ -991,8 +996,8 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   }
   confirmFileClassification(): void {
     const invalid = this.pendingFileIntents.some(item => item.sharing_intent === 'sales_candidate'
-      && (!item.display_name.trim() || !item.allowed_channels.length));
-    if (invalid) { this.errorMessage = 'Enter a customer-facing name and select at least one channel for every lead-sharing file.'; return; }
+      && (!item.display_name.trim() || !item.allowed_channels.length || !item.content_tags.length));
+    if (invalid) { this.errorMessage = 'Enter a customer-facing name, content type, and at least one channel for every lead-sharing file.'; return; }
     this.selectedFiles = [...this.selectedFiles, ...this.pendingFiles];
     this.selectedFileIntents = [...this.selectedFileIntents, ...this.pendingFileIntents];
     this.closeFileClassification();
@@ -1004,6 +1009,12 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     intent.allowed_channels = enabled
       ? Array.from(new Set([...intent.allowed_channels, channel]))
       : intent.allowed_channels.filter(item => item !== channel);
+  }
+  setIntentContentTag(intent: ProjectFileIntent, tag: SalesAssetType, enabled: boolean): void {
+    intent.content_tags = enabled
+      ? Array.from(new Set([...intent.content_tags, tag]))
+      : intent.content_tags.filter(item => item !== tag);
+    intent.asset_type = intent.content_tags[0] || 'other';
   }
   removeSelectedFile(index: number): void {
     this.selectedFiles = this.selectedFiles.filter((_, itemIndex) => itemIndex !== index);

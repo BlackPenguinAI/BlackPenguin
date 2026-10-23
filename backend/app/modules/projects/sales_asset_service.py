@@ -25,6 +25,7 @@ def serialize(item: ProjectSalesAsset) -> dict[str, Any]:
         "property_type_id": item.property_type_id,
         "source_id": item.source_id,
         "asset_type": item.asset_type,
+        "content_tags": item.content_tags or [item.asset_type],
         "display_name": item.display_name,
         "description": item.description,
         "approval_status": item.approval_status,
@@ -65,7 +66,10 @@ def _validate_payload(payload: dict[str, Any]) -> dict[str, Any]:
     valid_until = payload.get("valid_until")
     if valid_from and valid_until and valid_until <= valid_from:
         raise HTTPException(status_code=422, detail="The material expiration must be after its start date.")
-    return {**payload, "asset_type": asset_type, "display_name": name, "allowed_channels": channels}
+    tags = list(dict.fromkeys(payload.get("content_tags") or [asset_type]))
+    if not tags or any(tag not in ASSET_TYPES for tag in tags):
+        raise HTTPException(status_code=422, detail="Select at least one supported content type.")
+    return {**payload, "asset_type": asset_type, "content_tags": tags, "display_name": name, "allowed_channels": channels}
 
 
 def create(db: Session, project: Project, payload: dict[str, Any], *, user_id: str) -> ProjectSalesAsset:
@@ -120,6 +124,7 @@ def materialize_source_candidate(db: Session, source: ProjectOnboardingSource) -
         project_id=source.project_id,
         source_id=source.id,
         asset_type=asset_type,
+        content_tags=source.intended_content_tags or [asset_type],
         display_name=(source.intended_display_name or source.original_filename or source.name)[:255],
         allowed_channels=channels,
         created_by_user_id=source.uploaded_by_user_id,

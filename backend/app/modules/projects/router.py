@@ -90,11 +90,14 @@ def _file_upload_intents(raw: str, count: int) -> list[dict[str, Any]]:
         if sharing_intent not in {"internal", "sales_candidate"}:
             raise HTTPException(status_code=422, detail="Select Internal only or Candidate for lead sharing.")
         asset_type = str(item.get("asset_type") or "") or None
+        content_tags = list(dict.fromkeys(item.get("content_tags") or [])) if isinstance(item.get("content_tags"), list) else []
         display_name = str(item.get("display_name") or "").strip() or None
         channels = list(dict.fromkeys(item.get("allowed_channels") or [])) if isinstance(item.get("allowed_channels"), list) else []
         if sharing_intent == "sales_candidate":
             if asset_type not in sales_asset_service.ASSET_TYPES:
                 raise HTTPException(status_code=422, detail="Select a supported sales material type.")
+            if not content_tags or any(tag not in sales_asset_service.ASSET_TYPES for tag in content_tags):
+                raise HTTPException(status_code=422, detail="Select at least one supported content type.")
             if not display_name or len(display_name) > 255:
                 raise HTTPException(status_code=422, detail="Enter a customer-facing material name.")
             if not channels or any(channel not in sales_asset_service.CHANNELS for channel in channels):
@@ -102,6 +105,7 @@ def _file_upload_intents(raw: str, count: int) -> list[dict[str, Any]]:
         results.append({
             "sharing_intent": sharing_intent,
             "intended_asset_type": asset_type if sharing_intent == "sales_candidate" else None,
+            "intended_content_tags": content_tags if sharing_intent == "sales_candidate" else None,
             "intended_display_name": display_name if sharing_intent == "sales_candidate" else None,
             "intended_allowed_channels": channels if sharing_intent == "sales_candidate" else None,
         })
@@ -319,6 +323,10 @@ def _continue_after_source_review(
 
 def _state_payload(db: Session, project: Project) -> dict[str, Any]:
     profile = services.get_profile(project)
+    if services.ensure_system_managed_fields(profile):
+        db.add(profile)
+        db.commit()
+        db.refresh(profile)
     messages = (
         db.query(ProjectMessage)
         .options(joinedload(ProjectMessage.attachments))
@@ -619,6 +627,13 @@ def complete_project_onboarding(
 ):
     project = services.get_project(db, project_id, current_user.company_id)
     profile = services.complete_onboarding(db, project, current_user.id)
+    active_question = services.get_active_question(db, project.session.id)
+    active_payload = active_question.ui_payload if active_question else {}
+    if active_question and active_payload and active_payload.get("field") is None and active_payload.get("label") == "Final approval":
+        services.record_message_response(
+            db, active_question, status="accepted", answer="Approve profile",
+            selected_option="Approve profile", commit=True,
+        )
     return {"completed": True, "redirect_url": f"/app/projects/{project.id}", "profile": services.serialize_profile(profile)}
 
 
@@ -855,7 +870,12 @@ def approve_sales_asset(
     project = services.get_project(db, project_id, current_user.company_id)
     require_project_access(db, current_user, project_id)
     item = _sales_asset(db, project.id, asset_id)
-    return sales_asset_service.serialize(sales_asset_service.approve(db, item, user_id=current_user.id))
+    item = sales_asset_service.approve(db, item, user_id=current_user.id)
+    services.save_message(
+        db, project.session.id, SenderType.AI,
+        f"**{item.display_name}** is approved for secure lead sharing through {', '.join(item.allowed_channels or [])}.",
+    )
+    return sales_asset_service.serialize(item)
 
 
 @router.delete("/{project_id}/sales-assets/{asset_id}", status_code=204)
@@ -865,7 +885,13 @@ def archive_sales_asset(
 ):
     project = services.get_project(db, project_id, current_user.company_id)
     require_project_access(db, current_user, project_id)
-    sales_asset_service.archive(db, _sales_asset(db, project.id, asset_id))
+    item = _sales_asset(db, project.id, asset_id)
+    display_name = item.display_name
+    sales_asset_service.archive(db, item)
+    services.save_message(
+        db, project.session.id, SenderType.AI,
+        f"**{display_name}** will remain internal and will not be shared with leads.",
+    )
     return Response(status_code=204)
 
 

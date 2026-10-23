@@ -19,7 +19,7 @@ from app.modules.company_onboarding import router as company_router
 from app.modules.projects import router as project_router
 from app.modules.projects import services as project_services
 from app.modules.projects import source_service as project_source_service
-from app.modules.projects.models import ProjectMessage, SenderType
+from app.modules.projects.models import ProjectMessage, ProjectProfile, SenderType
 
 
 def test_url_normalization_supports_idempotent_jobs():
@@ -236,13 +236,27 @@ def test_file_intent_defaults_private_and_validates_lead_sharing():
     assert project_router._file_upload_intents("[]", 1) == [{
         "sharing_intent": "internal",
         "intended_asset_type": None,
+        "intended_content_tags": None,
         "intended_display_name": None,
         "intended_allowed_channels": None,
     }]
     assert project_router._file_upload_intents(
-        '[{"sharing_intent":"sales_candidate","asset_type":"brochure","display_name":"Buyer brochure","allowed_channels":["whatsapp"]}]',
+        '[{"sharing_intent":"sales_candidate","asset_type":"brochure","content_tags":["brochure","floor_plan"],"display_name":"Buyer brochure","allowed_channels":["whatsapp"]}]',
         1,
     )[0]["intended_asset_type"] == "brochure"
+
+
+def test_round_robin_is_resolved_automatically_after_sales_team_setup():
+    profile = ProjectProfile(
+        profile_data={},
+        field_states={"sales_contacts": {"status": "confirmed", "applicable": True}},
+        field_sources={},
+    )
+
+    assert project_services.ensure_system_managed_fields(profile) is True
+    assert profile.profile_data["appointment_routing"] == "round_robin"
+    assert profile.field_states["appointment_routing"]["status"] == "confirmed"
+    assert project_services.ensure_system_managed_fields(profile) is False
 
 
 def test_ai_sales_authorization_rejects_free_text_and_requires_the_typed_action(monkeypatch):

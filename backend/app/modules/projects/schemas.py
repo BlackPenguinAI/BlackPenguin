@@ -208,6 +208,7 @@ class SourceResponse(BaseModel):
     is_primary: bool = False
     sharing_intent: Literal["internal", "sales_candidate"] = "internal"
     intended_asset_type: str | None = None
+    intended_content_tags: list[str] = Field(default_factory=list)
     intended_display_name: str | None = None
     intended_allowed_channels: list[str] = Field(default_factory=list)
     proposals: list[SourceProposalResponse] = Field(default_factory=list)
@@ -222,6 +223,7 @@ class SalesAssetPayload(BaseModel):
         "brochure", "floor_plan", "unit_sheet", "price_list", "amenities",
         "location_map", "legal_disclaimer", "gallery_image", "other",
     ]
+    content_tags: list[str] = Field(default_factory=list)
     display_name: str = Field(min_length=1, max_length=255)
     description: str | None = Field(default=None, max_length=2000)
     valid_from: datetime | None = None
@@ -235,6 +237,7 @@ class SalesAssetUpdate(BaseModel):
         "brochure", "floor_plan", "unit_sheet", "price_list", "amenities",
         "location_map", "legal_disclaimer", "gallery_image", "other",
     ]
+    content_tags: list[str] = Field(default_factory=list)
     display_name: str = Field(min_length=1, max_length=255)
     description: str | None = Field(default=None, max_length=2000)
     valid_from: datetime | None = None
@@ -249,6 +252,7 @@ class SalesAssetResponse(BaseModel):
     property_type_id: str | None = None
     source_id: str
     asset_type: str
+    content_tags: list[str]
     display_name: str
     description: str | None = None
     approval_status: str

@@ -6,7 +6,7 @@
     <span>{{ suggestionLabel }}</span>
     <small *ngIf="question.suggestion_sources?.length">{{ question.suggestion_sources?.join(' · ') }}</small>
   </div>
-  <div class="choice-list" [class.choice-list--examples]="!question.options.length">
+  <div *ngIf="!answered" class="choice-list" [class.choice-list--examples]="!question.options.length">
     <button
       *ngFor="let choice of choices"
       type="button"
@@ -37,6 +37,7 @@
   >
     Continue with {{ selectedValues.size }} selected
   </button>
-  <p *ngIf="question.minimum_words" class="hint">Use at least {{ question.minimum_words }} words for a complete answer.</p>
-  <p *ngIf="question.minimum_characters" class="hint">Use at least {{ question.minimum_characters }} characters for a complete answer.</p>
+  <p *ngIf="answered" class="hint"><span class="material-symbols-outlined">check_circle</span> Answer recorded.</p>
+  <p *ngIf="question.minimum_words && !answered" class="hint">Use at least {{ question.minimum_words }} words for a complete answer.</p>
+  <p *ngIf="question.minimum_characters && !answered" class="hint">Use at least {{ question.minimum_characters }} characters for a complete answer.</p>
 </section>

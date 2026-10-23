@@ -23,6 +23,8 @@ class SalesConversation(Base):
     automation_level = Column(Integer, default=0, nullable=False)
     is_paused = Column(Boolean, default=True, nullable=False)
     pause_reason = Column(Text, nullable=True)
+    pending_asset_id = Column(String(36), ForeignKey("project_sales_assets.id", ondelete="SET NULL"), nullable=True, index=True)
+    pending_asset_offered_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 

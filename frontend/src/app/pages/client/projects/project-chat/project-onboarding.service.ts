@@ -91,6 +91,7 @@ export class ProjectOnboardingService {
   }
   createSalesAsset(id: string, payload: {
     source_id: string; property_type_id: string | null; asset_type: SalesAssetType;
+    content_tags?: SalesAssetType[];
     display_name: string; description: string | null; valid_from: string | null;
     valid_until: string | null; allowed_channels: Array<'sms' | 'whatsapp'>;
   }): Observable<ProjectSalesAsset> {

@@ -43,11 +43,40 @@ def plain_channel_text(value: str | None) -> str | None:
     if value is None:
         return None
     text = value.replace("```", "")
+    text = re.sub(
+        r"\[([^\]]+)\]\((https?://[^)\s]+)\)",
+        lambda match: match.group(2) if match.group(1).strip().rstrip("/") in match.group(2) else f"{match.group(1).strip()}: {match.group(2)}",
+        text,
+    )
     text = re.sub(r"(?m)^\s{0,3}#{1,6}\s*", "", text)
     text = re.sub(r"\*\*(.+?)\*\*|__(.+?)__", lambda m: m.group(1) or m.group(2), text)
     text = re.sub(r"(?<!\*)\*([^*\n]+)\*(?!\*)", r"\1", text)
     text = re.sub(r"(?m)^\s*[-*]\s+", "• ", text)
     return re.sub(r"[ \t]+", " ", text).strip()
+
+
+def concise_channel_text(value: str | None, channel: str) -> str | None:
+    """Keep mobile replies readable without cutting a sentence or secure URL."""
+    text = plain_channel_text(value)
+    if not text:
+        return text
+    limit = 700 if channel == "sms" else 1200
+    if len(text) <= limit:
+        return text
+    segments = re.split(r"(?<=[.!?])\s+|\n+", text)
+    kept: list[str] = []
+    length = 0
+    for segment in segments:
+        segment = segment.strip()
+        if not segment:
+            continue
+        extra = len(segment) + (1 if kept else 0)
+        if length + extra > limit - 55:
+            break
+        kept.append(segment)
+        length += extra
+    base = " ".join(kept).strip() or text[:limit - 55].rsplit(" ", 1)[0]
+    return f"{base}\n\nI can share more detail on any of these points."
 
 
 def normalized_reply(value: str | None) -> str:

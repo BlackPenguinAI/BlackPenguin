@@ -20,7 +20,7 @@ from .commercial_context import build_commercial_context
 from .response_policy import (
     appointment_intent_present,
     complete_requested_commercial_topics,
-    plain_channel_text,
+    concise_channel_text, plain_channel_text,
     remove_unsolicited_appointment_offer,
     repeats_introduction_after_greeting,
     repeats_recent_assistant_reply,
@@ -260,6 +260,7 @@ def build_sales_graph(db: Session):
             actions=actions,
             commercial=state.get("commercial_context") or {},
         )
+        reply = concise_channel_text(reply, state.get("channel", "sms"))
         if not reply:
             violations.append("missing_reply")
         requires_human = bool(violations) or state.get("requires_human", False) or any(

@@ -94,6 +94,7 @@ export interface ProjectSource {
   is_primary: boolean;
   sharing_intent?: 'internal' | 'sales_candidate';
   intended_asset_type?: SalesAssetType | null;
+  intended_content_tags?: SalesAssetType[];
   intended_display_name?: string | null;
   intended_allowed_channels?: Array<'sms' | 'whatsapp'>;
   proposals: SourceProposal[]; created_at: string; updated_at: string;
@@ -102,12 +103,13 @@ export type SalesAssetType = 'brochure' | 'floor_plan' | 'unit_sheet' | 'price_l
 export interface ProjectFileIntent {
   sharing_intent: 'internal' | 'sales_candidate';
   asset_type: SalesAssetType;
+  content_tags: SalesAssetType[];
   display_name: string;
   allowed_channels: Array<'sms' | 'whatsapp'>;
 }
 export interface ProjectSalesAsset {
   id: string; company_id: string; project_id: string; property_type_id: string | null; source_id: string;
-  asset_type: SalesAssetType; display_name: string; description: string | null;
+  asset_type: SalesAssetType; content_tags: SalesAssetType[]; display_name: string; description: string | null;
   approval_status: 'draft' | 'approved' | 'archived'; version: number;
   valid_from: string | null; valid_until: string | null; allowed_channels: Array<'sms' | 'whatsapp'>;
   approved_by_user_id: string | null; approved_at: string | null;

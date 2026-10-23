@@ -53,6 +53,19 @@ ALLOWED_FILE_TYPES = {
 }
 
 
+def _canonical_property_type_name(item: dict[str, Any]) -> str:
+    """Avoid treating translated generic labels as distinct unit types."""
+    raw = str(item.get("name") or "").strip()
+    generic = raw.casefold().strip(" .") in {
+        "apartment", "apartments", "departamento", "departamentos", "depto", "deptos", "unit", "units",
+    }
+    bedrooms = item.get("bedrooms")
+    if generic and isinstance(bedrooms, int):
+        return f"{bedrooms}-bedroom apartment"
+    code = str(item.get("code") or "").strip()
+    return code if generic and code else raw
+
+
 def validate_public_url(url: str) -> None:
     parsed = urlparse(url)
     if parsed.scheme not in {"http", "https"} or not parsed.hostname or parsed.username or parsed.password:
@@ -205,6 +218,7 @@ async def create_file_source(
     db: Session, *, project_id: str, company_id: str, user_id: str, upload: UploadFile,
     message_id: str | None = None, sharing_intent: str = "internal",
     intended_asset_type: str | None = None, intended_display_name: str | None = None,
+    intended_content_tags: list[str] | None = None,
     intended_allowed_channels: list[str] | None = None,
 ) -> ProjectOnboardingSource:
     """Validate and durably store an upload without waiting for AI extraction."""
@@ -221,6 +235,9 @@ async def create_file_source(
         size_bytes=len(content), sha256=hashlib.sha256(content).hexdigest(), original_filename=filename,
         sharing_intent="sales_candidate" if sharing_intent == "sales_candidate" else "internal",
         intended_asset_type=intended_asset_type if intended_asset_type in sales_asset_service.ASSET_TYPES else None,
+        intended_content_tags=list(dict.fromkeys(
+            tag for tag in (intended_content_tags or []) if tag in sales_asset_service.ASSET_TYPES
+        )) or None,
         intended_display_name=(intended_display_name or "").strip()[:255] or None,
         intended_allowed_channels=(
             list(dict.fromkeys(channel for channel in (intended_allowed_channels or []) if channel in sales_asset_service.CHANNELS))
@@ -318,6 +335,8 @@ async def _extract_proposals(
         "Each property type is only a candidate and may contain name, code, description, bedrooms, bathrooms, area_min, "
         "area_max, area_unit, total_units, available_units, starting_price, maximum_price, currency, features, "
         "inventory_updated_at, and evidence. Omit unsupported values and never treat the extracted count as definitive. "
+        "Use a stable English property-type name based on bedroom count, layout, or code. Never create separate types "
+        "only because the same generic word appears translated (for example Apartment and Departamento). "
         "Use only supplied canonical fields for proposals."
     )
     if image_content is not None:
@@ -347,7 +366,7 @@ async def _extract_proposals(
     for index, item in enumerate(payload.get("property_types", []) if isinstance(payload, dict) else []):
         if not isinstance(item, dict):
             continue
-        name = str(item.get("name") or "").strip()[:180]
+        name = _canonical_property_type_name(item)[:180]
         if not name or name.casefold() in existing_names or index >= 100:
             continue
         existing_names.add(name.casefold())
@@ -513,6 +532,7 @@ def serialize_source(source: ProjectOnboardingSource) -> dict[str, Any]:
         "is_primary": source.is_primary,
         "sharing_intent": source.sharing_intent or "internal",
         "intended_asset_type": source.intended_asset_type,
+        "intended_content_tags": source.intended_content_tags or [],
         "intended_display_name": source.intended_display_name,
         "intended_allowed_channels": source.intended_allowed_channels or [],
         "proposals": [serialize_proposal(item) for item in source.proposals],

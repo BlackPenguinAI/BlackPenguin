@@ -6,7 +6,6 @@ import { RouterTestingModule } from '@angular/router/testing';
 import { ProjectChatComponent } from './project-chat';
 import { EMPTY_PROJECT_PROFILE, ProjectPropertyType } from './project-onboarding.models';
 
-
 describe('ProjectChatComponent', () => {
   let component: ProjectChatComponent;
   let fixture: ComponentFixture<ProjectChatComponent>;
@@ -238,10 +237,10 @@ describe('ProjectChatComponent', () => {
     expect(component.isEditingProjectName).toBe(false);
   });
 
-  it('keeps lead-safe materials hidden until the Project Profile is approved', () => {
+  it('shows draft lead-safe materials before final approval so they can be resolved', () => {
     component.profile = { ...EMPTY_PROJECT_PROFILE, completion: { ...EMPTY_PROJECT_PROFILE.completion, final_approved: false } };
     expect(component.showSalesMaterials).toBe(false);
-    component.profile = { ...component.profile, completion: { ...component.profile.completion, final_approved: true } };
+    component.salesAssets = [{ id: 'asset-1' } as never];
     expect(component.showSalesMaterials).toBe(true);
   });
 
@@ -259,6 +258,7 @@ describe('ProjectChatComponent', () => {
     expect(component.selectedFiles).toEqual([file]);
     expect(component.selectedFileIntents[0]).toEqual(expect.objectContaining({
       sharing_intent: 'sales_candidate', asset_type: 'brochure',
+      content_tags: ['brochure'],
       allowed_channels: ['sms', 'whatsapp'],
     }));
   });

@@ -56,7 +56,8 @@ def _asset_capabilities(item: Any) -> list[str]:
         re.search(r"\b(?:depto\.?|departamento|garden house|unit)\b", text)
         and re.search(r"\b\d+(?:[.,]\d+)?\s*m(?:²|2)\b", text)
     )
-    if item.asset_type == "floor_plan" or any(term in text for term in floor_plan_terms) or looks_like_unit_plans:
+    tags = set(item.content_tags or [item.asset_type])
+    if "floor_plan" in tags or item.asset_type == "floor_plan" or any(term in text for term in floor_plan_terms) or looks_like_unit_plans:
         capabilities.append("floor_plans")
     if "recorrido 360" in text or "virtual tour" in text or "matterport" in text:
         capabilities.append("virtual_tour")

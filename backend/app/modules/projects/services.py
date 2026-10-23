@@ -22,7 +22,7 @@ from .completion import FIELD_BY_KEY, VALID_STATUSES, calculate_completion, fiel
 from . import storage_service
 from .models import (
     MetaConnection, Project, ProjectCampaign, ProjectMessage, ProjectOnboardingProposal, ProjectOnboardingSource, ProjectProfile,
-    ProjectProposalStatus, ProjectPropertyType, ProjectSourceKind, ProjectSourceStatus, ProjectUnit,
+    ProjectProposalStatus, ProjectPropertyType, ProjectSalesAsset, ProjectSourceKind, ProjectSourceStatus, ProjectUnit,
     ProjectSession, SenderType,
 )
 
@@ -531,6 +531,30 @@ def refresh_completion(profile: ProjectProfile) -> dict[str, Any]:
     return result
 
 
+def ensure_system_managed_fields(profile: ProjectProfile) -> bool:
+    """Resolve platform-owned choices without asking the Company administrator."""
+    states = dict(profile.field_states or {})
+    data = dict(profile.profile_data or {})
+    current = states.get("appointment_routing", {})
+    if current.get("status") in {"confirmed", "corrected_by_user", "deferred", "not_applicable"}:
+        return False
+    sales_team = states.get("sales_contacts", {})
+    if sales_team.get("status") not in {"confirmed", "corrected_by_user", "deferred"}:
+        return False
+    data["appointment_routing"] = "round_robin"
+    states["appointment_routing"] = {
+        "status": "deferred" if sales_team.get("status") == "deferred" else "confirmed",
+        "applicable": True,
+        "updated_at": datetime.utcnow().isoformat(),
+    }
+    profile.profile_data = data
+    profile.field_states = states
+    flag_modified(profile, "profile_data")
+    flag_modified(profile, "field_states")
+    refresh_completion(profile)
+    return True
+
+
 def serialize_profile(profile: ProjectProfile) -> dict[str, Any]:
     completion = refresh_completion(profile)
     completion["ready_for_confirmation"] = (
@@ -582,6 +606,11 @@ def readiness_for_confirmation(db: Session, project: Project) -> tuple[bool, lis
         ProjectOnboardingProposal.status == ProjectProposalStatus.PENDING,
     ).first():
         reasons.append("pending_proposals")
+    if db.query(ProjectSalesAsset).filter(
+        ProjectSalesAsset.project_id == project.id,
+        ProjectSalesAsset.approval_status == "draft",
+    ).first():
+        reasons.append("pending_sales_materials")
     return not reasons, reasons
 
 
