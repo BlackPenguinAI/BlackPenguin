@@ -55,6 +55,8 @@ def _record_inbound(
             "provider": provider, "from": from_number, "to": to_number,
             "message_type": message_type, "content_supported": content_supported,
             "webhook_event_id": event_id,
+            "lead_id": conversation.lead_id,
+            "project_id": conversation.project_id,
         },
     )
     db.add(message)

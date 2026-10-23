@@ -103,7 +103,7 @@
   <div class="chat-modal" *ngIf="chatOpen && selectedLead" (click)="closeChat()">
     <section (click)="$event.stopPropagation()" role="dialog" aria-modal="true" aria-label="Full lead conversation">
       <header><div><small>LEAD CONVERSATION</small><h2>{{selectedLead.full_name}}</h2></div><button (click)="closeChat()" aria-label="Close conversation">×</button></header>
-      <div class="chat-thread"><article *ngFor="let message of selectedLead.chat_messages" [class.inbound]="message.role==='user'"><small>{{message.role==='user'?'Lead':'AI Sales Agent'}}</small><p>{{message.content}}</p></article></div>
+      <div class="chat-thread"><article *ngFor="let message of selectedLead.chat_messages" [class.inbound]="message.role==='user'"><small>{{message.role==='user'?'Lead':'AI Sales Agent'}}</small><p><ng-container *ngFor="let part of messageParts(message.content)"><a *ngIf="part.url; else plainLeadMessagePart" class="break-all text-[#e9ad00] underline underline-offset-2" [href]="part.url" target="_blank" rel="noopener noreferrer">{{part.text}}</a><ng-template #plainLeadMessagePart>{{part.text}}</ng-template></ng-container></p></article></div>
     </section>
   </div>
 </section>

@@ -1,3 +1,5 @@
+import re
+
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
@@ -54,6 +56,17 @@ class MultiTenantMiddleware(BaseHTTPMiddleware):
             and path.startswith(f"{settings.API_V1_STR}/sales/public/meetings/")
             and path.endswith(".ics")
         )
+        # Sales materials are disclosed through short-lived opaque tokens.
+        # Only these exact GET shapes bypass the user JWT; the route itself
+        # still validates expiration, revocation and the stored token hash.
+        asset_prefixes = (
+            f"{settings.API_V1_STR}/projects/a/",
+            f"{settings.API_V1_STR}/projects/shared-assets/",
+        )
+        is_public_sales_asset = request.method == "GET" and any(
+            re.fullmatch(re.escape(prefix) + r"[^/]+", path)
+            for prefix in asset_prefixes
+        )
         is_public_firebase_action = request.method == "POST" and path in {
             f"{settings.API_V1_STR}/auth/firebase/action-code",
             f"{settings.API_V1_STR}/auth/firebase/complete-invitation",
@@ -78,6 +91,7 @@ class MultiTenantMiddleware(BaseHTTPMiddleware):
             or is_meta_webhook
             or is_messaging_provider_webhook
             or is_public_calendar_invite
+            or is_public_sales_asset
             or is_public_firebase_action
         ):
             return await call_next(request)

@@ -14,7 +14,8 @@ from app.modules.projects.models import Project
 from app.modules.sales_crm.models import Lead, LeadContact, LeadObjection
 from .segment_strategies import BASE_SEGMENT_GUARDRAIL, STRATEGY_VERSION
 
-from .models import SalesMessage
+from .models import SalesConversation, SalesMessage
+from .conversation_scope import scoped_messages_query
 from .commercial_context import build_commercial_context
 from .response_policy import (
     appointment_intent_present,
@@ -80,8 +81,12 @@ def build_sales_graph(db: Session):
             db, project=project, company_id=company.id, lead_id=lead.id,
             channel=state.get("channel", "sms"),
         )
-        history = db.query(SalesMessage).filter(
-            SalesMessage.conversation_id == state["conversation_id"],
+        conversation = db.query(SalesConversation).filter(
+            SalesConversation.id == state["conversation_id"],
+            SalesConversation.company_id == state["company_id"],
+        ).one()
+        history = scoped_messages_query(
+            db, conversation, lead_id=lead.id,
         ).order_by(SalesMessage.created_at.asc()).all()
         return {
             "company_context": {"id": company.id, "name": company.name},

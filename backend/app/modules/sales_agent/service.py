@@ -18,6 +18,7 @@ from app.modules.sales_crm.scheduling import available_slots, create_agent_appoi
 from app.modules.users.models import User
 
 from .graph import GRAPH_VERSION, TOOLSET_VERSION, build_sales_graph
+from .conversation_scope import scoped_messages_query
 from .models import AgentRun, OutboundMessage, SalesAgentSimulation, SalesConversation, SalesFollowUpJob, SalesInboundJob, SalesMessage
 
 
@@ -439,8 +440,8 @@ def conversation_summaries(
     rows = query.order_by(SalesConversation.updated_at.desc()).all()
     result = []
     for conversation, lead, project in rows:
-        last = db.query(SalesMessage).filter(
-            SalesMessage.conversation_id == conversation.id,
+        last = scoped_messages_query(
+            db, conversation, lead_id=lead.id,
         ).order_by(SalesMessage.created_at.desc()).first()
         simulation = db.query(SalesAgentSimulation).filter(
             SalesAgentSimulation.conversation_id == conversation.id,
@@ -500,8 +501,8 @@ def conversation_messages(
         raise HTTPException(status_code=404, detail="Conversation not found.")
     # A lead message and its generated answer can share virtual time. Direction
     # preserves the causal order before the stable id tie-breaker.
-    return db.query(SalesMessage).filter(
-        SalesMessage.conversation_id == conversation.id,
+    return scoped_messages_query(
+        db, conversation, lead_id=conversation.lead_id,
     ).order_by(
         SalesMessage.created_at.asc(),
         case((SalesMessage.direction == "inbound", 0), else_=1),

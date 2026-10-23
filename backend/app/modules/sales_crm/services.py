@@ -151,7 +151,9 @@ def get_lead_sms_chat(
 
 def get_lead_detail(db: Session, lead_id: str, company_id: str, sales_user_id: str | None = None) -> dict:
     from app.modules.projects.models import Project, ProjectCampaign
+    from app.modules.sales_agent.conversation_scope import scoped_messages_query
     from app.modules.sales_agent.models import SalesAgentSimulation, SalesConversation, SalesMessage
+    from app.modules.sales_crm.intelligence import lead_profile_summary
 
     query = db.query(Lead).filter(Lead.id == lead_id, Lead.company_id == company_id, Lead.deleted_at.is_(None))
     if sales_user_id:
@@ -166,14 +168,16 @@ def get_lead_detail(db: Session, lead_id: str, company_id: str, sales_user_id: s
     meta_form_data = lead.meta_form_data or (simulation.form_snapshot if simulation else {}) or {}
     messages = []
     if conversation:
-        messages = db.query(SalesMessage).filter(
-            SalesMessage.conversation_id == conversation.id,
+        messages = scoped_messages_query(
+            db, conversation, lead_id=lead.id,
         ).order_by(SalesMessage.created_at.asc()).limit(100).all()
-    chat_summary = lead.qualification_summary
-    if not chat_summary and messages:
-        chat_summary = "Recent conversation: " + " | ".join(
-            f"{message.role}: {message.content}" for message in reversed(messages)
-        )
+    # Never substitute a transcript for a summary. The progressive Lead profile
+    # contains confirmed facts and remains concise enough for operational use.
+    chat_summary = (
+        lead.qualification_summary
+        or lead_profile_summary(lead.lead_profile_data or {})
+        or "Qualification is in progress; no confirmed preferences have been captured yet."
+    )
     recommendations = lead.visit_recommendations or (
         "Review the captured preferences, confirm any unresolved requirements and use the chat history "
         "to prepare a relevant property visit."

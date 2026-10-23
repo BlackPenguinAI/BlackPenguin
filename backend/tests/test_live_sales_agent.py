@@ -34,7 +34,7 @@ from app.modules.sales_agent.live_service import (
 from app.modules.sales_agent.models import SalesConversation, SalesInboundJob, SalesMessage
 from app.modules.sales_agent.live_worker import _claim_inbound_jobs
 from app.modules.sales_agent.service import (
-    _is_availability_request, _requested_period, conversation_summaries,
+    _is_availability_request, _requested_period, conversation_messages, conversation_summaries,
     set_conversation_action,
 )
 from app.modules.system_settings.models import TwilioConfig
@@ -488,6 +488,38 @@ def test_same_company_phone_history_is_reused_as_one_physical_thread():
     db.commit()
     assert fresh_lead is True and reused.id == conversation.id and reused.lead_id == second.id
     assert contact.previous_projects[0]["lead_id"] == first.id
+
+
+def test_reused_physical_thread_exposes_only_the_active_opportunity_messages():
+    db = _db()
+    company = Company(name="Tenant"); db.add(company); db.flush()
+    first_project = Project(company_id=company.id, name="First Project")
+    second_project = Project(company_id=company.id, name="Second Project")
+    db.add_all([first_project, second_project]); db.flush()
+    db.add(TwilioConfig(account_sid=TEST_ACCOUNT_SID, from_phone_number="+18573824206"))
+    first = Lead(
+        company_id=company.id, project_id=first_project.id, full_name="Contact",
+        phone="+15550000000", source="manual", platform="manual",
+    )
+    second = Lead(
+        company_id=company.id, project_id=second_project.id, full_name="Contact",
+        phone="+15550000000", source="manual", platform="manual",
+    )
+    db.add_all([first, second]); db.flush()
+    conversation, _ = get_or_create_live_conversation(db, first)
+    db.add(SalesMessage(
+        conversation_id=conversation.id, channel="sms", direction="inbound", role="user",
+        content="Tell me about First Project", created_at=datetime.utcnow(),
+    )); db.commit()
+
+    reused, _ = get_or_create_live_conversation(db, second)
+    db.add(SalesMessage(
+        conversation_id=reused.id, channel="sms", direction="inbound", role="user",
+        content="Tell me about Second Project", created_at=datetime.utcnow() + timedelta(seconds=1),
+    )); db.commit()
+
+    visible = conversation_messages(db, company_id=company.id, conversation_id=reused.id)
+    assert [message.content for message in visible] == ["Tell me about Second Project"]
 
 
 def test_shared_sender_never_reassigns_a_phone_thread_between_companies():

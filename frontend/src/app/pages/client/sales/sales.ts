@@ -5,6 +5,7 @@ import { HttpClient } from '@angular/common/http';
 
 import { API_V1_URL } from '../../../core/config/api.config';
 import { canonicalTimezone, timezoneLabel } from '../../../core/timezones';
+import { messageParts, MessagePart } from '../../../core/message-parts';
 import { TimezoneSelectComponent } from '../../../shared/ui/timezone-select/timezone-select';
 
 type ScheduleSection = 'availability' | 'appointments';
@@ -33,6 +34,8 @@ export class SalesComponent implements OnInit {
   newAppointment = { lead_id: '', time: '10:00', duration_minutes: 45, modality: 'in_person', notes: '', visit_location: '' };
 
   constructor(private http: HttpClient, private cdr: ChangeDetectorRef) {}
+
+  messageParts(content: unknown): MessagePart[] { return messageParts(content); }
 
   ngOnInit(): void {
     this.loadProfile(); this.loadProjects(); this.reload();

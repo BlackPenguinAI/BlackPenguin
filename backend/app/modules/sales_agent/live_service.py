@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+import re
 import uuid
 
 from fastapi import HTTPException
@@ -17,6 +18,7 @@ from app.modules.sales_crm.intelligence import merge_extracted_facts, update_lea
 from app.modules.sales_crm.models import FunnelStage, Lead, LeadContact
 
 from .graph import GRAPH_VERSION, TOOLSET_VERSION, build_sales_graph
+from .conversation_scope import scoped_messages_query
 from .response_policy import action_types, requested_topics
 from .models import (
     AgentRun, ExternalWebhookEvent, OutboundMessage, SalesConversation, SalesConversationLeadContext, SalesInboundJob,
@@ -214,6 +216,8 @@ async def _dispatch(
     idempotency_key: str | None = None,
 ) -> SalesMessage:
     message_metadata = dict(metadata or {})
+    message_metadata.setdefault("lead_id", lead.id)
+    message_metadata.setdefault("project_id", conversation.project_id)
     event_kind = message_metadata.get("event_kind")
     uses_whatsapp_template = event_kind in {"meta_lead_first_contact", "manual_lead_first_contact"}
     persisted_content = content
@@ -353,7 +357,25 @@ def _select_asset_for_request(assets: list[dict], inbound_text: str) -> dict | N
         "price_list" if "price" in text else
         "brochure" if any(term in text for term in ("brochure", "document", "pdf")) else None
     )
+    if preferred == "floor_plan":
+        capable = next((item for item in assets if "floor_plans" in (item.get("capabilities") or [])), None)
+        if capable:
+            return capable
+    if "virtual tour" in text or "360" in text:
+        capable = next((item for item in assets if "virtual_tour" in (item.get("capabilities") or [])), None)
+        if capable:
+            return capable
     return next((item for item in assets if item.get("asset_type") == preferred), assets[0])
+
+
+def _denies_available_asset(reply: str | None) -> bool:
+    """Detect a model refusal that contradicts the deterministic share action."""
+    return bool(re.search(
+        r"\b(?:cannot|can't|can not|unable to|not able to|do not have (?:the )?(?:ability|option) to)\b"
+        r"[^.!?\n]{0,100}\b(?:share|send|provide|attach|access)\b",
+        reply or "",
+        re.IGNORECASE,
+    ))
 
 
 def _execute_share_actions(
@@ -405,7 +427,7 @@ def _execute_share_actions(
             break
     if links:
         cleaned = (reply or "").strip()
-        if not cleaned or any(phrase in cleaned.casefold() for phrase in ("cannot share", "can't share", "unable to share")):
+        if not cleaned or _denies_available_asset(cleaned):
             cleaned = "Here is the approved information you requested."
         reply = f"{cleaned}\n\n" + "\n".join(links)
     return reply, actions, share_ids
@@ -518,8 +540,7 @@ async def launch_live_lead(db: Session, lead: Lead) -> tuple[SalesConversation |
     campaign = db.query(ProjectCampaign).filter(ProjectCampaign.id == lead.campaign_id).first() if lead.campaign_id else None
     ensure_contact(db, lead)
     conversation, should_send = get_or_create_live_conversation(db, lead, provider=provider)
-    prior_message_count = db.query(SalesMessage).filter(
-        SalesMessage.conversation_id == conversation.id,
+    prior_message_count = scoped_messages_query(db, conversation, lead_id=lead.id).filter(
         SalesMessage.status != "failed",
     ).count()
     if not should_send and prior_message_count:
@@ -655,8 +676,8 @@ async def _process_deterministic_appointment_turn(
         if offered_slots:
             actions.append({"type": "offer_appointment"})
 
-    history = db.query(SalesMessage).filter(
-        SalesMessage.conversation_id == conversation.id,
+    history = scoped_messages_query(
+        db, conversation, lead_id=lead.id,
     ).order_by(SalesMessage.created_at).all()
     lead_history, lead_message_count = _lead_intelligence_input(history)
     update_lead_intelligence(
@@ -759,8 +780,8 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
             merge_extracted_facts(
                 lead, result.get("extracted_facts"), evidence=inbound.content,
             )
-        history = db.query(SalesMessage).filter(
-            SalesMessage.conversation_id == conversation.id,
+        history = scoped_messages_query(
+            db, conversation, lead_id=lead.id,
         ).order_by(SalesMessage.created_at).all()
         commercial = result.get("commercial_context") or {}
         available_assets = commercial.get("available_assets") or []

@@ -85,6 +85,26 @@ def test_individual_units_take_precedence_and_conflicts_are_explicit():
     assert context["data_conflicts"][0]["canonical_value"] == 1
 
 
+def test_future_inventory_dates_are_withheld_and_reported_as_conflicts():
+    db = _db()
+    company = Company(name="Coahuila Company"); db.add(company); db.flush()
+    project = Project(company_id=company.id, name="Coahuila 34")
+    project.profile = ProjectProfile(profile_data={}, field_states={})
+    product = ProjectPropertyType(
+        project=project, name="Two bedroom", bedrooms=2, review_status="confirmed",
+        inventory_updated_at=datetime(2099, 10, 31),
+    )
+    db.add_all([project, product]); db.commit()
+
+    context = build_commercial_context(
+        db, project=project, company_id=company.id, lead_id="lead-1",
+    )
+
+    assert context["property_types"][0]["inventory_updated_at"] is None
+    assert context["inventory_updated_at"] is None
+    assert {item["code"] for item in context["data_conflicts"]} == {"future_inventory_timestamp"}
+
+
 def test_exact_address_rejects_embedded_commercial_facts():
     error = validate_onboarding_value(
         "exact_address",

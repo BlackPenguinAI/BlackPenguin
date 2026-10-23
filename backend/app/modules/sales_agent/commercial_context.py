@@ -38,6 +38,31 @@ def _iso(value: datetime | None) -> str | None:
     return value.astimezone(timezone.utc).isoformat()
 
 
+def _trusted_inventory_date(value: datetime | None) -> datetime | None:
+    """A future timestamp cannot prove that inventory was recently verified."""
+    if value is None:
+        return None
+    aware = value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
+    return value if aware <= datetime.now(timezone.utc) else None
+
+
+def _asset_capabilities(item: Any) -> list[str]:
+    """Infer non-sensitive capabilities from an approved source's extracted text."""
+    source_text = item.source.extracted_text if item.source else ""
+    text = f"{item.display_name or ''} {item.description or ''} {source_text or ''}".casefold()
+    capabilities: list[str] = []
+    floor_plan_terms = ("floor plan", "blueprint", "plano", "planta arquitect")
+    looks_like_unit_plans = bool(
+        re.search(r"\b(?:depto\.?|departamento|garden house|unit)\b", text)
+        and re.search(r"\b\d+(?:[.,]\d+)?\s*m(?:²|2)\b", text)
+    )
+    if item.asset_type == "floor_plan" or any(term in text for term in floor_plan_terms) or looks_like_unit_plans:
+        capabilities.append("floor_plans")
+    if "recorrido 360" in text or "virtual tour" in text or "matterport" in text:
+        capabilities.append("virtual_tour")
+    return capabilities
+
+
 def confirmed_profile_facts(profile: Any) -> dict[str, Any]:
     """Return only affirmative, administrator-confirmed Project facts.
 
@@ -72,7 +97,7 @@ def _property_type_payload(item: ProjectPropertyType) -> dict[str, Any]:
         "maximum_price": _number(item.maximum_price),
         "currency": item.currency,
         "features": item.features or [],
-        "inventory_updated_at": _iso(item.inventory_updated_at),
+        "inventory_updated_at": _iso(_trusted_inventory_date(item.inventory_updated_at)),
     }
 
 
@@ -88,7 +113,7 @@ def _unit_payload(unit: ProjectUnit) -> dict[str, Any]:
         "price": _number(unit.list_price),
         "currency": unit.currency,
         "status": unit.status,
-        "inventory_updated_at": _iso(unit.inventory_updated_at),
+        "inventory_updated_at": _iso(_trusted_inventory_date(unit.inventory_updated_at)),
     }
 
 
@@ -96,6 +121,19 @@ def _catalog_conflicts(
     facts: dict[str, Any], property_types: list[ProjectPropertyType], units: list[ProjectUnit],
 ) -> list[dict[str, Any]]:
     conflicts: list[dict[str, Any]] = []
+    future_inventory = [
+        {"record_type": "unit", "record_id": unit.id, "value": _iso(unit.inventory_updated_at)}
+        for unit in units if unit.inventory_updated_at and not _trusted_inventory_date(unit.inventory_updated_at)
+    ] + [
+        {"record_type": "property_type", "record_id": item.id, "value": _iso(item.inventory_updated_at)}
+        for item in property_types if item.inventory_updated_at and not _trusted_inventory_date(item.inventory_updated_at)
+    ]
+    if future_inventory:
+        conflicts.append({
+            "code": "future_inventory_timestamp",
+            "records": future_inventory,
+            "resolution": "Do not present this date as verified; an administrator must enter the actual verification time.",
+        })
     if units:
         available_units = sum(
             str(unit.status or "").casefold() in AVAILABLE_UNIT_STATUSES for unit in units
@@ -163,6 +201,7 @@ def build_commercial_context(
             "version": item.version,
             "valid_until": _iso(item.valid_until),
             "allowed_channels": item.allowed_channels or [],
+            "capabilities": _asset_capabilities(item),
         }
         for item in sales_asset_service.approved_for_turn(
             db, project_id=project.id, company_id=company_id, channel=channel,
@@ -171,8 +210,8 @@ def build_commercial_context(
 
     latest_values = [
         value for value in [
-            *(unit.inventory_updated_at for unit in units),
-            *(item.inventory_updated_at for item in property_types),
+            *(_trusted_inventory_date(unit.inventory_updated_at) for unit in units),
+            *(_trusted_inventory_date(item.inventory_updated_at) for item in property_types),
         ] if value is not None
     ]
     latest = max(latest_values) if latest_values else None

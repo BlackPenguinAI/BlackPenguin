@@ -29,6 +29,14 @@ def build_test_app() -> FastAPI:
     def meta_webhook_delivery() -> dict[str, bool]:
         return {"ok": True}
 
+    @app.get(f"{settings.API_V1_STR}/projects/a/{{token}}")
+    def short_sales_asset(token: str) -> dict[str, str]:
+        return {"token": token}
+
+    @app.get(f"{settings.API_V1_STR}/projects/shared-assets/{{token}}")
+    def shared_sales_asset(token: str) -> dict[str, str]:
+        return {"token": token}
+
     return app
 
 
@@ -97,3 +105,16 @@ def test_meta_provider_callbacks_are_public_without_exposing_other_project_route
     assert webhook_verify.status_code == 200
     assert webhook_delivery.status_code == 200
     assert protected.status_code == 401
+
+
+def test_only_exact_read_only_sales_asset_token_routes_bypass_user_jwt():
+    with TestClient(build_test_app()) as client:
+        short = client.get(f"{settings.API_V1_STR}/projects/a/opaque-token_123")
+        full = client.get(f"{settings.API_V1_STR}/projects/shared-assets/opaque-token_123")
+        nested = client.get(f"{settings.API_V1_STR}/projects/a/opaque-token_123/extra")
+        mutation = client.post(f"{settings.API_V1_STR}/projects/a/opaque-token_123")
+
+    assert short.status_code == 200
+    assert full.status_code == 200
+    assert nested.status_code == 401
+    assert mutation.status_code == 401

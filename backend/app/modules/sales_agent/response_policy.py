@@ -32,7 +32,7 @@ TOPIC_PATTERNS = {
     "financing": re.compile(r"\b(financing|finance|mortgage|loan|payment method)\b", re.IGNORECASE),
     "delivery": re.compile(r"\b(move[- ]?in|delivery|ready|completion)\b", re.IGNORECASE),
     "amenities": re.compile(r"\b(amenities|features|included)\b", re.IGNORECASE),
-    "assets": re.compile(r"\b(brochure|floor plan|blueprint|price list|document|pdf|plans?)\b", re.IGNORECASE),
+    "assets": re.compile(r"\b(brochure|floor plan|blueprint|price list|document|pdf|plans?|virtual tour|360(?:°|\s*degree)?)\b", re.IGNORECASE),
     "appointment": APPOINTMENT_TERMS,
     "callback": re.compile(r"\b(call me|callback|phone call|speak to (?:sales|a person|someone))\b", re.IGNORECASE),
 }

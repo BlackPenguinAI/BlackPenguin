@@ -15,6 +15,7 @@ from app.modules.projects.models import (
     ProjectSourceKind, ProjectSourceStatus,
 )
 from app.modules.sales_agent.commercial_context import build_commercial_context
+from app.modules.sales_agent.live_service import _denies_available_asset, _select_asset_for_request
 from app.modules.sales_agent.response_policy import repeats_introduction_after_greeting
 
 
@@ -72,6 +73,7 @@ def test_onboarding_file_is_private_until_separately_approved():
         "mime_type": "application/pdf", "version": 1,
         "valid_until": context["available_assets"][0]["valid_until"],
         "allowed_channels": ["sms", "whatsapp"],
+        "capabilities": [],
     }]
     assert "share_url" not in context["available_assets"][0]
 
@@ -131,3 +133,23 @@ def test_semantic_welcome_is_not_repeated_after_initial_template():
     assert repeats_introduction_after_greeting(
         "Hello Jorge! How can I assist you today?", "Hello", history,
     ) is True
+
+
+def test_approved_brochure_with_floor_plans_is_selected_for_a_plan_request():
+    db = _db()
+    company, project, source = _project_source(db)
+    source.extracted_text = "Depto. 508 Nivel 5 56.62 m². Recorrido 360."
+    asset = ProjectSalesAsset(
+        company_id=company.id, project_id=project.id, source_id=source.id,
+        asset_type="brochure", display_name="Project brochure", approval_status="approved",
+        approved_at=datetime.utcnow(), allowed_channels=["whatsapp"],
+    )
+    db.add(asset); db.commit()
+    context = build_commercial_context(
+        db, project=project, company_id=company.id, lead_id="lead-1", channel="whatsapp",
+    )
+
+    available = context["available_assets"]
+    assert available[0]["capabilities"] == ["floor_plans", "virtual_tour"]
+    assert _select_asset_for_request(available, "Can you send me the floor plans?")["asset_id"] == asset.id
+    assert _denies_available_asset("I cannot send brochures directly.") is True

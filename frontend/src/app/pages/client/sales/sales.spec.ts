@@ -4,6 +4,14 @@ import { SalesComponent } from './sales';
 import { supportedTimezones } from '../../../core/timezones';
 
 describe('SalesComponent scheduling view', () => {
+  it('renders audited material URLs as safe link parts in the full chat', () => {
+    const component = new SalesComponent({} as any, { markForCheck: () => undefined } as any);
+    expect(component.messageParts('Floor plans: https://blackpenguin.ai/api/v1/projects/a/token')).toEqual([
+      { text: 'Floor plans: ' },
+      { text: 'https://blackpenguin.ai/api/v1/projects/a/token', url: 'https://blackpenguin.ai/api/v1/projects/a/token' },
+    ]);
+  });
+
   it('keeps simulated appointments in the same calendar collection', () => {
     vi.stubGlobal('localStorage', { getItem: () => 'sales' });
     const component = new SalesComponent({} as any, { markForCheck: () => undefined } as any);

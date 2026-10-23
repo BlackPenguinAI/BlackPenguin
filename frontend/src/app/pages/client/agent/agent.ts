@@ -5,6 +5,7 @@ import { HttpClient } from '@angular/common/http';
 import { ActivatedRoute } from '@angular/router';
 import { catchError, finalize, forkJoin, of } from 'rxjs';
 import { API_V1_URL } from '../../../core/config/api.config';
+import { messageParts, MessagePart } from '../../../core/message-parts';
 
 interface MetaLeadFormQuestion {
   key: string;
@@ -99,6 +100,10 @@ export class AgentComponent implements OnInit, OnDestroy {
     private cdr: ChangeDetectorRef,
     private route: ActivatedRoute,
   ) {}
+
+  messageParts(content: unknown): MessagePart[] {
+    return messageParts(content);
+  }
 
   ngOnInit(): void {
     this.conversationPollingEnabled = true;

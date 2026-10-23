@@ -244,6 +244,19 @@ def test_sales_lead_detail_and_chat_are_limited_to_assignee(db):
     assert chat_error.value.status_code == 404
 
 
+def test_lead_detail_never_uses_the_full_transcript_as_summary(db):
+    company, sales_a, _, _, lead, _ = _fixture(db)
+    lead.qualification_summary = None
+    lead.lead_profile_data = {}
+    db.commit()
+
+    detail = get_lead_detail(db, lead.id, company.id, sales_a.id)
+
+    assert detail["chat_summary"] == "Qualification is in progress; no confirmed preferences have been captured yet."
+    assert "I prefer three bedrooms" not in detail["chat_summary"]
+    assert detail["chat_messages"][0]["content"] == "I prefer three bedrooms."
+
+
 def test_sales_visit_requires_assignee_evidence_and_closing_date(db):
     company, sales_a, sales_b, project, lead, _ = _fixture(db)
     meeting = Meeting(

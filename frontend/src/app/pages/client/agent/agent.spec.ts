@@ -11,6 +11,18 @@ describe('AgentComponent simulation form', () => {
       { snapshot: { queryParamMap: { get: () => null } } } as any,
     );
 
+  it('splits provider-safe URLs into clickable message parts without using raw HTML', () => {
+    const value = component();
+    expect(value.messageParts('Brochure: https://blackpenguin.ai/api/v1/projects/a/token.')).toEqual([
+      { text: 'Brochure: ' },
+      { text: 'https://blackpenguin.ai/api/v1/projects/a/token', url: 'https://blackpenguin.ai/api/v1/projects/a/token' },
+      { text: '.' },
+    ]);
+    expect(value.messageParts('<script>alert(1)</script>')).toEqual([
+      { text: '<script>alert(1)</script>' },
+    ]);
+  });
+
   it('prevents starting a simulation until every required field is complete', () => {
     const value = component();
     value.openSetup('simulation');
