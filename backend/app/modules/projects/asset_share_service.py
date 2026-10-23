@@ -66,6 +66,7 @@ def issue(
     db: Session, *, company_id: str, project_id: str, lead_id: str,
     source_id: str, sales_asset_id: str | None = None, channel: str | None = None,
     agent_run_id: str | None = None, expires_in_days: int = 7,
+    target_url: str | None = None,
 ) -> tuple[str, SalesAssetShare]:
     """Issue a short opaque token. The raw token never persists in storage."""
     token = secrets.token_urlsafe(18)
@@ -77,6 +78,7 @@ def issue(
         sales_asset_id=sales_asset_id,
         agent_run_id=agent_run_id,
         channel=channel,
+        target_url=target_url,
         token_hash=hashlib.sha256(token.encode()).hexdigest(),
         expires_at=datetime.utcnow() + timedelta(days=max(1, min(expires_in_days, 30))),
     )

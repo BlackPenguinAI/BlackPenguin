@@ -48,18 +48,14 @@ def _bedroom_signature(value: Any) -> str | None:
 
 def confirmation_field_errors(item: ProjectPropertyType) -> dict[str, str]:
     errors: dict[str, str] = {}
-    if item.available_units is None:
-        errors["available_units"] = "Enter the currently available units."
-    elif item.available_units < 0:
+    if item.available_units is not None and item.available_units < 0:
         errors["available_units"] = "Available units cannot be negative."
-    if item.starting_price is None:
-        errors["starting_price"] = "Enter the starting price."
-    elif item.starting_price < 0:
+    if item.starting_price is not None and item.starting_price < 0:
         errors["starting_price"] = "Starting price cannot be negative."
-    if not str(item.currency or "").strip():
-        errors["currency"] = "Select the commercial currency."
-    if item.inventory_updated_at is None:
-        errors["inventory_updated_at"] = "Select the inventory update date."
+    if (item.starting_price is not None or item.maximum_price is not None) and not str(item.currency or "").strip():
+        errors["currency"] = "Select a currency when a price is provided."
+    if item.available_units is not None and item.inventory_updated_at is None:
+        errors["inventory_updated_at"] = "Select the verification date when availability is provided."
     if item.total_units is not None and item.available_units is not None and item.available_units > item.total_units:
         errors["available_units"] = "Available units cannot exceed total units."
     if item.area_min is not None and item.area_max is not None and item.area_min > item.area_max:

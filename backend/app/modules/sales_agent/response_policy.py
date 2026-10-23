@@ -149,9 +149,16 @@ def complete_requested_commercial_topics(
         additions.append("Home types: " + ", ".join(str(item.get("property_type")) for item in property_types if item.get("property_type")) + ".")
     if "inventory" in missing and inventory:
         if commercial.get("inventory_source") == "individual_units":
-            count = sum(str(item.get("status") or "").casefold() in {"available", "active", "ready"} for item in inventory)
+            trusted = [item for item in inventory if item.get("inventory_updated_at")]
+            count = (
+                sum(str(item.get("status") or "").casefold() in {"available", "active", "ready"} for item in trusted)
+                if trusted else None
+            )
         else:
-            values = [item.get("available_units") for item in inventory if item.get("available_units") is not None]
+            values = [
+                item.get("available_units") for item in inventory
+                if item.get("available_units") is not None and item.get("inventory_updated_at")
+            ]
             count = sum(int(value) for value in values) if values else None
         if count is not None:
             additions.append(f"Current availability: {count} home{'s' if count != 1 else ''}.")
@@ -183,6 +190,52 @@ def complete_requested_commercial_topics(
     completed = f"{base}\n\n" if base else ""
     completed += "\n".join(f"• {item}" for item in additions)
     return completed, sorted(missing)
+
+
+def grounded_catalog_reply(inbound: str | None, commercial: dict[str, Any]) -> str | None:
+    """Render catalog facts predictably for mobile channels.
+
+    The model may choose what to discuss, but it must not concatenate numbered
+    records or turn absent price and inventory fields into invented values.
+    """
+    topics = requested_topics(inbound)
+    if not topics.intersection({"property_types", "inventory", "pricing"}):
+        return None
+    items = commercial.get("property_types") or []
+    if not items:
+        return "The property catalog has not been confirmed yet. I can ask the sales team to provide the current options."
+
+    lines = ["Here are the confirmed home types:"]
+    has_price = False
+    has_inventory = False
+    for index, item in enumerate(items[:6], 1):
+        name = str(item.get("property_type") or f"Home type {index}").strip()
+        lines.extend(["", f"{index}. {name}"])
+        details: list[str] = []
+        if item.get("bedrooms") is not None:
+            details.append(f"{item['bedrooms']:g} bedroom{'s' if float(item['bedrooms']) != 1 else ''}")
+        if item.get("bathrooms") is not None:
+            details.append(f"{item['bathrooms']:g} bathroom{'s' if float(item['bathrooms']) != 1 else ''}")
+        if details:
+            lines.append("• " + " · ".join(details))
+        area_min, area_max, area_unit = item.get("area_min"), item.get("area_max"), item.get("area_unit")
+        if area_min is not None or area_max is not None:
+            area = f"{area_min:g}" if area_min is not None else ""
+            if area_max is not None and area_max != area_min:
+                area = f"{area}–{area_max:g}" if area else f"Up to {area_max:g}"
+            lines.append(f"• Area: {area} {area_unit or ''}".rstrip())
+        if item.get("starting_price") is not None and item.get("currency"):
+            has_price = True
+            lines.append(f"• Starting price: {item['starting_price']:,.0f} {item['currency']}")
+        if item.get("available_units") is not None and item.get("inventory_updated_at"):
+            has_inventory = True
+            lines.append(f"• Confirmed availability: {item['available_units']} unit{'s' if item['available_units'] != 1 else ''}")
+
+    if "pricing" in topics and not has_price:
+        lines.extend(["", "Current pricing has not been confirmed."])
+    if "inventory" in topics and not has_inventory:
+        lines.extend(["", "Current unit availability has not been confirmed."])
+    return "\n".join(lines)
 
 
 def appointment_intent_present(inbound: str, history: list[dict[str, str]]) -> bool:

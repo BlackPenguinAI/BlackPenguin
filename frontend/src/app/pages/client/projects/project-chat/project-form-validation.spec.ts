@@ -63,6 +63,13 @@ describe('project chat form validation', () => {
     expect(errors['bedrooms']).toContain('one whole number');
   });
 
+  it('allows structural property data without invented price or availability', () => {
+    expect(validatePropertyType({
+      name: 'Garden house', bedrooms: 2, bathrooms: 2,
+      available_units: null, starting_price: null, currency: null, inventory_updated_at: null,
+    })).toEqual({});
+  });
+
   it('builds a normalized writable property type payload without response-only fields', () => {
     const payload = toPropertyTypePayload({
       id: 'type-2', project_id: 'project-1', name: '  Four bedrooms  ',

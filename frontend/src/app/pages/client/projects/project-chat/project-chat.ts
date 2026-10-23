@@ -60,6 +60,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   selectedFileIntents: ProjectFileIntent[] = [];
   pendingFiles: File[] = [];
   pendingFileIntents: ProjectFileIntent[] = [];
+  pendingFilePreviewUrls: string[] = [];
   showFileClassification = false;
   onboardingStage: OnboardingState['stage'] = 'website';
   isEditingProjectName = false;
@@ -200,11 +201,13 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     this.speechSubscriptions.unsubscribe();
     if (this.pollingTimer) clearTimeout(this.pollingTimer);
     for (const url of this.sourceImageUrls.values()) URL.revokeObjectURL(url);
+    for (const url of this.pendingFilePreviewUrls) URL.revokeObjectURL(url);
   }
 
   get canSend(): boolean { return (!!this.prompt.trim() || !!this.selectedFiles.length) && !this.isAnalyzing && !this.hasExclusiveSourceFlow; }
   get projectName(): string { return this.profile.project_name || 'Untitled Project'; }
-  get showSalesMaterials(): boolean { return this.salesAssets.length > 0 || this.profile.completion.final_approved; }
+  get pendingSalesAssets(): ProjectSalesAsset[] { return this.salesAssets.filter(item => item.approval_status === 'draft'); }
+  get showSalesMaterials(): boolean { return this.pendingSalesAssets.length > 0; }
   get availableSalesAssetSources(): ProjectSource[] {
     const registered = new Set(this.salesAssets.map(item => item.source_id));
     return this.sources.filter(source => source.status === 'ready' && !!source.download_url && !registered.has(source.id));
@@ -664,7 +667,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   private emptyPropertyType(): Partial<ProjectPropertyType> {
     return { name: '', code: null, description: null, bedrooms: null, bathrooms: null, area_min: null, area_max: null,
       area_unit: 'm²', total_units: null, available_units: null, starting_price: null, maximum_price: null,
-      currency: 'USD', features: [], inventory_updated_at: new Date().toISOString().slice(0, 10), images_status: 'pending', sort_order: 0 };
+      currency: null, features: [], inventory_updated_at: null, images_status: 'pending', sort_order: 0 };
   }
 
   private replacePropertyType(updated: ProjectPropertyType): void {
@@ -986,6 +989,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     if (!files.length || this.isUploading) return;
     const remaining = Math.max(0, 10 - this.selectedFiles.length);
     this.pendingFiles = files.slice(0, remaining);
+    this.pendingFilePreviewUrls = this.pendingFiles.map(file => URL.createObjectURL(file));
     this.pendingFileIntents = this.pendingFiles.map(file => ({
       sharing_intent: 'internal', asset_type: this.defaultAssetType(file),
       content_tags: [this.defaultAssetType(file)],
@@ -1003,7 +1007,29 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     this.closeFileClassification();
   }
   closeFileClassification(): void {
+    for (const url of this.pendingFilePreviewUrls) URL.revokeObjectURL(url);
+    this.pendingFilePreviewUrls = [];
     this.pendingFiles = []; this.pendingFileIntents = []; this.showFileClassification = false;
+  }
+  isPendingImage(file: File): boolean { return file.type.startsWith('image/'); }
+  previewPendingFile(index: number): void {
+    const url = this.pendingFilePreviewUrls[index];
+    if (url) window.open(url, '_blank', 'noopener,noreferrer');
+  }
+  sourceForSalesAsset(item: ProjectSalesAsset): ProjectSource | undefined {
+    return this.sources.find(source => source.id === item.source_id);
+  }
+  previewSalesAsset(item: ProjectSalesAsset): void {
+    const source = this.sourceForSalesAsset(item);
+    if (!source?.download_url) return;
+    this.onboarding.downloadAttachment(source.download_url).subscribe({
+      next: blob => {
+        const url = URL.createObjectURL(blob);
+        window.open(url, '_blank', 'noopener,noreferrer');
+        setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      },
+      error: () => this.errorMessage = 'The material could not be previewed.',
+    });
   }
   setIntentChannel(intent: ProjectFileIntent, channel: 'sms' | 'whatsapp', enabled: boolean): void {
     intent.allowed_channels = enabled

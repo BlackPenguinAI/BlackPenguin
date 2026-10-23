@@ -20,6 +20,7 @@ from .commercial_context import build_commercial_context
 from .response_policy import (
     appointment_intent_present,
     complete_requested_commercial_topics,
+    grounded_catalog_reply,
     concise_channel_text, plain_channel_text,
     remove_unsolicited_appointment_offer,
     repeats_introduction_after_greeting,
@@ -254,6 +255,13 @@ def build_sales_graph(db: Session):
                 "financing, delivery timing, or project features?"
             )
             actions = [{"type": "ask_qualification_question"}]
+        catalog_reply = (
+            grounded_catalog_reply(state.get("inbound_text"), state.get("commercial_context") or {})
+            if state.get("event_kind", "lead_message") == "lead_message"
+            else None
+        )
+        if catalog_reply:
+            reply = catalog_reply
         reply, supplemented_topics = complete_requested_commercial_topics(
             reply,
             inbound=state.get("inbound_text"),

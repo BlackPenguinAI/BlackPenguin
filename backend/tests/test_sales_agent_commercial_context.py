@@ -16,6 +16,7 @@ from app.modules.sales_agent.commercial_context import (
 from app.modules.sales_agent.response_policy import (
     appointment_intent_present,
     complete_requested_commercial_topics,
+    grounded_catalog_reply,
     plain_channel_text,
     remove_unsolicited_appointment_offer,
     repeats_recent_assistant_reply,
@@ -148,7 +149,7 @@ def test_multi_topic_question_is_completed_from_confirmed_context():
         actions=[],
         commercial={
             "inventory_source": "property_type_catalog",
-            "inventory": [{"property_type": "3BR", "available_units": 5, "starting_price": 280000, "currency": "USD"}],
+            "inventory": [{"property_type": "3BR", "available_units": 5, "inventory_updated_at": "2026-10-20T00:00:00Z", "starting_price": 280000, "currency": "USD"}],
             "property_types": [{"property_type": "3BR"}],
             "confirmed_project_facts": {"payment_methods": "Cash and bank financing"},
         },
@@ -157,4 +158,23 @@ def test_multi_topic_question_is_completed_from_confirmed_context():
     assert "Confirmed starting price: USD 280,000." in reply
     assert "Payment and financing: Cash and bank financing." in reply
     assert {"inventory", "pricing", "financing"}.issubset(supplemented)
+
+
+def test_catalog_reply_separates_items_and_never_invents_missing_commercial_values():
+    reply = grounded_catalog_reply(
+        "Which unit types, prices and available units do you have?",
+        {"property_types": [
+            {"property_type": "Studio", "bedrooms": 0, "bathrooms": 1, "area_min": 42.5,
+             "area_max": 42.5, "area_unit": "m²", "starting_price": None,
+             "currency": None, "available_units": None, "inventory_updated_at": None},
+            {"property_type": "Two bedrooms", "bedrooms": 2, "bathrooms": 2,
+             "area_min": 80, "area_max": 95, "area_unit": "m²", "starting_price": 250000,
+             "currency": "USD", "available_units": 3, "inventory_updated_at": "2026-10-23T00:00:00Z"},
+        ]},
+    )
+    assert "1. Studio\n" in reply
+    assert "2. Two bedrooms\n" in reply
+    assert "Starting price: 250,000 USD" in reply
+    assert "Confirmed availability: 3 units" in reply
+    assert "Starting price: 0" not in reply
 

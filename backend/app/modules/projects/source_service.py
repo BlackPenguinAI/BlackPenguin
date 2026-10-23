@@ -119,9 +119,10 @@ async def process_url_source(db: Session, source: ProjectOnboardingSource) -> Pr
             if len(response.content) > MAX_FILE_BYTES:
                 raise ValueError("The remote content exceeds the 15 MB limit.")
             text = _extract_bytes(response.content, content_type, str(response.url))
+            links = _extract_pdf_links(response.content) if content_type == "application/pdf" else []
             if content_type in {"text/html", "application/xhtml+xml"}:
                 await _capture_website_images(db, client, source, response.content, str(response.url))
-        await _finish_source(db, source, text=text)
+        await _finish_source(db, source, text=text, extracted_links=links)
     except AccessRestrictedError as exc:
         _fail_source(db, source, str(exc))
         raise
@@ -289,6 +290,8 @@ async def process_stored_file_source(
                 db,
                 source,
                 text=_extract_bytes(content, source.mime_type or "application/octet-stream", source.name),
+                extracted_links=_extract_pdf_links(content)
+                if source.mime_type == "application/pdf" or source.name.lower().endswith(".pdf") else [],
             )
     except Exception as exc:
         _fail_source(db, source, _safe_error(exc))
@@ -296,12 +299,14 @@ async def process_stored_file_source(
 
 
 async def _finish_source(
-    db: Session, source: ProjectOnboardingSource, *, text: str | None = None, image_content: bytes | None = None,
+    db: Session, source: ProjectOnboardingSource, *, text: str | None = None,
+    image_content: bytes | None = None, extracted_links: list[dict[str, Any]] | None = None,
 ) -> None:
     normalized = re.sub(r"\s+", " ", text or "").strip()[:MAX_SOURCE_TEXT]
     if image_content is None and len(normalized) < 20:
         raise NoReadableContentError()
     source.extracted_text = normalized or "[Image analyzed; original retained in protected storage]"
+    source.extracted_links = extracted_links or []
     for proposal in await _extract_proposals(db, source, normalized, image_content):
         db.add(proposal)
     source.status, source.error_message = ProjectSourceStatus.READY, None
@@ -535,6 +540,7 @@ def serialize_source(source: ProjectOnboardingSource) -> dict[str, Any]:
         "intended_content_tags": source.intended_content_tags or [],
         "intended_display_name": source.intended_display_name,
         "intended_allowed_channels": source.intended_allowed_channels or [],
+        "extracted_links": source.extracted_links or [],
         "proposals": [serialize_proposal(item) for item in source.proposals],
         "created_at": source.created_at, "updated_at": source.updated_at,
     }
@@ -606,6 +612,56 @@ def _extract_bytes(content: bytes, mime_type: str, name: str) -> str:
     for element in soup(["script", "style", "noscript", "svg"]):
         element.decompose()
     return soup.get_text(separator=" ", strip=True)
+
+
+def _pdf_link_kind(url: str, page_text: str) -> str:
+    value = f"{url} {page_text}".casefold()
+    if any(term in value for term in ("matterport", "virtual tour", "recorrido 360", "360°", "360 degree")):
+        return "virtual_tour"
+    if any(term in value for term in ("maps.app", "google.com/maps", "location map", "ubicación", "ubicacion", "mapa")):
+        return "location_map"
+    return "external_reference"
+
+
+def _pdf_link_label(kind: str, url: str) -> str:
+    if kind == "virtual_tour":
+        return "360° virtual tour"
+    if kind == "location_map":
+        return "Location map"
+    return urlparse(url).hostname or "External reference"
+
+
+def _extract_pdf_links(content: bytes) -> list[dict[str, Any]]:
+    """Extract safe HTTP links from annotations without assuming a PDF layout or vendor."""
+    try:
+        reader = PdfReader(BytesIO(content))
+        if reader.is_encrypted and not reader.decrypt(""):
+            return []
+    except (FileNotDecryptedError, PdfReadError, OSError, ValueError):
+        return []
+    links: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for page_number, page in enumerate(reader.pages[:150], 1):
+        page_text = page.extract_text() or ""
+        for reference in page.get("/Annots") or []:
+            try:
+                annotation = reference.get_object()
+                action = annotation.get("/A")
+                url = str(action.get("/URI") or "").strip() if action else ""
+                parsed = urlparse(url)
+                if parsed.scheme not in {"http", "https"} or not parsed.netloc or url in seen:
+                    continue
+                seen.add(url)
+                kind = _pdf_link_kind(url, page_text)
+                links.append({
+                    "url": url[:2000], "label": _pdf_link_label(kind, url)[:255],
+                    "kind": kind, "page": page_number,
+                })
+            except (AttributeError, KeyError, TypeError, ValueError):
+                continue
+            if len(links) >= 100:
+                return links
+    return links
 
 
 def _validate_signature(content: bytes, mime_type: str) -> None:

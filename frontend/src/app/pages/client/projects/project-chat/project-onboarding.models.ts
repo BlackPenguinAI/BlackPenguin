@@ -97,6 +97,7 @@ export interface ProjectSource {
   intended_content_tags?: SalesAssetType[];
   intended_display_name?: string | null;
   intended_allowed_channels?: Array<'sms' | 'whatsapp'>;
+  extracted_links?: Array<{ url: string; label: string; kind: string; page?: number | null }>;
   proposals: SourceProposal[]; created_at: string; updated_at: string;
 }
 export type SalesAssetType = 'brochure' | 'floor_plan' | 'unit_sheet' | 'price_list' | 'amenities' | 'location_map' | 'legal_disclaimer' | 'gallery_image' | 'other';

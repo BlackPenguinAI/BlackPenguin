@@ -1,4 +1,5 @@
 import asyncio
+from io import BytesIO
 from datetime import datetime, timedelta
 
 import pytest
@@ -6,6 +7,7 @@ from fastapi import HTTPException
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
+from pypdf import PdfWriter
 
 import app.db.base  # noqa: F401
 from app.db.postgres import Base
@@ -76,6 +78,7 @@ def test_onboarding_file_is_private_until_separately_approved():
         "valid_until": context["available_assets"][0]["valid_until"],
         "allowed_channels": ["sms", "whatsapp"],
         "capabilities": [],
+        "links": [],
     }]
     assert "share_url" not in context["available_assets"][0]
 
@@ -218,7 +221,7 @@ def test_draft_sales_material_blocks_final_confirmation():
     assert "pending_sales_materials" in reasons
 
 
-def test_material_is_offered_before_a_secure_link_is_issued(monkeypatch):
+def test_generic_material_question_is_offered_before_a_secure_link_is_issued(monkeypatch):
     db = _db()
     company, project, source = _project_source(db)
     asset = ProjectSalesAsset(
@@ -241,7 +244,7 @@ def test_material_is_offered_before_a_secure_link_is_issued(monkeypatch):
     reply, actions, shares = _execute_share_actions(
         db, conversation=conversation, lead=type("Lead", (), {"id": "lead-1"})(),
         run=type("Run", (), {"id": "run-1"})(), reply="I can help.", actions=[],
-        commercial=commercial, inbound_text="Can you send me the floor plans?",
+        commercial=commercial, inbound_text="Do you have floor plans?",
     )
     assert "Would you like me to send the secure link here?" in reply
     assert actions == []
@@ -260,6 +263,51 @@ def test_material_is_offered_before_a_secure_link_is_issued(monkeypatch):
     assert "https://blackpenguin.ai/a/token" in reply
     assert shares == ["share-1"]
     assert conversation.pending_asset_id is None
+
+
+def test_explicit_material_request_issues_secure_link_without_redundant_confirmation(monkeypatch):
+    db = _db()
+    company, project, source = _project_source(db)
+    asset = ProjectSalesAsset(
+        company_id=company.id, project_id=project.id, source_id=source.id,
+        asset_type="brochure", content_tags=["brochure", "floor_plan"],
+        display_name="Project brochure and plans", approval_status="approved",
+        approved_at=datetime.utcnow(), allowed_channels=["whatsapp"],
+    )
+    db.add(asset); db.flush()
+    conversation = SalesConversation(
+        company_id=company.id, project_id=project.id, lead_id="lead-1",
+        provider="telnyx", channel="whatsapp", is_paused=False,
+    )
+    db.add(conversation); db.commit()
+    monkeypatch.setattr(
+        asset_share_service, "issue",
+        lambda *_args, **_kwargs: ("https://blackpenguin.ai/a/token", type("Share", (), {"id": "share-1"})()),
+    )
+    reply, _, shares = _execute_share_actions(
+        db, conversation=conversation, lead=type("Lead", (), {"id": "lead-1"})(),
+        run=type("Run", (), {"id": "run-1"})(), reply="I can help.", actions=[],
+        commercial={"available_assets": [{
+            "asset_id": asset.id, "name": asset.display_name, "asset_type": "brochure",
+            "capabilities": ["floor_plans"], "links": [],
+        }]}, inbound_text="Can you send me the floor plans?",
+    )
+    assert "https://blackpenguin.ai/a/token" in reply
+    assert shares == ["share-1"]
+    assert conversation.pending_asset_id is None
+
+
+def test_pdf_link_extraction_is_generic_and_classifies_virtual_tours():
+    output = BytesIO()
+    writer = PdfWriter()
+    writer.add_blank_page(width=612, height=792)
+    writer.add_uri(0, "https://my.matterport.com/show/?m=example", (10, 10, 200, 40))
+    writer.add_uri(0, "https://example.com/project", (10, 50, 200, 80))
+    writer.write(output)
+
+    links = source_service._extract_pdf_links(output.getvalue())
+    assert [item["kind"] for item in links] == ["virtual_tour", "external_reference"]
+    assert all(item["page"] == 1 for item in links)
 
 
 def test_channel_text_converts_markdown_links_to_clickable_plain_urls():

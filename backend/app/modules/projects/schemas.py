@@ -211,6 +211,7 @@ class SourceResponse(BaseModel):
     intended_content_tags: list[str] = Field(default_factory=list)
     intended_display_name: str | None = None
     intended_allowed_channels: list[str] = Field(default_factory=list)
+    extracted_links: list[dict[str, Any]] = Field(default_factory=list)
     proposals: list[SourceProposalResponse] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime

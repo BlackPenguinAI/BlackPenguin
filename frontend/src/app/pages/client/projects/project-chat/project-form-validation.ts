@@ -57,10 +57,12 @@ export function validatePropertyType(value: Partial<ProjectPropertyType>): FormE
   if (present(value.bedrooms) && (!/^\d+$/.test(String(value.bedrooms).trim()) || Number(value.bedrooms) > 50)) {
     errors['bedrooms'] = 'Enter one whole number from 0 to 50. Bedroom ranges are qualified by the agent.';
   }
-  if (!present(value.available_units)) errors['available_units'] = 'Enter the currently available units.';
-  if (!present(value.starting_price)) errors['starting_price'] = 'Enter the starting price.';
-  if (!value.currency?.trim()) errors['currency'] = 'Select the commercial currency.';
-  if (!value.inventory_updated_at) errors['inventory_updated_at'] = 'Select the inventory update date.';
+  if ((present(value.starting_price) || present(value.maximum_price)) && !value.currency?.trim()) {
+    errors['currency'] = 'Select a currency when a price is provided.';
+  }
+  if (present(value.available_units) && !value.inventory_updated_at) {
+    errors['inventory_updated_at'] = 'Select the verification date when availability is provided.';
+  }
   if ((present(value.area_min) || present(value.area_max)) && !value.area_unit) {
     errors['area_unit'] = 'Select the unit used for the area.';
   }

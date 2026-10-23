@@ -43,6 +43,13 @@ from app.integrations.whatsapp_templates import (
 )
 
 
+EXPLICIT_ASSET_SHARE = re.compile(
+    r"\b(?:send|share|give|download|can i get|could i get|email me|"
+    r"env[ií]a|comparte|m[aá]ndame|puedo (?:tener|recibir|descargar))\b",
+    re.IGNORECASE,
+)
+
+
 def normalize_phone(value: str) -> str:
     digits = "".join(character for character in value if character.isdigit())
     return f"+{digits}"
@@ -387,6 +394,7 @@ def _execute_share_actions(
     requested = "assets" in requested_topics(inbound_text)
     pending = approved.get(conversation.pending_asset_id or "")
     consented = bool(pending and AFFIRMATIVE.match(inbound_text or ""))
+    explicit_request = bool(requested and EXPLICIT_ASSET_SHARE.search(inbound_text or ""))
     if consented:
         actions = [
             action for action in actions
@@ -403,22 +411,42 @@ def _execute_share_actions(
     elif requested and approved:
         selected = _select_asset_for_request(list(approved.values()), inbound_text)
         if selected:
-            conversation.pending_asset_id = selected["asset_id"]
-            conversation.pending_asset_offered_at = datetime.utcnow()
-            db.add(conversation)
-            db.flush()
-            actions = [
-                action for action in actions
-                if not isinstance(action, dict) or action.get("type") != "share_asset"
-            ]
-            capabilities = selected.get("capabilities") or []
-            detail = " It includes floor plans." if "floor_plans" in capabilities else ""
-            return (
-                f"I have an approved file called {selected.get('name') or 'Project material'}.{detail} "
-                "Would you like me to send the secure link here?",
-                actions,
-                [],
-            )
+            if explicit_request:
+                actions = [
+                    action for action in actions
+                    if not isinstance(action, dict) or action.get("type") != "share_asset"
+                ]
+                actions.append({
+                    "type": "share_asset", "asset_id": selected["asset_id"],
+                    "reason": "lead_explicitly_requested_material",
+                })
+                consented = True
+                conversation.pending_asset_id = None
+                conversation.pending_asset_offered_at = None
+                db.add(conversation)
+                db.flush()
+            else:
+                conversation.pending_asset_id = selected["asset_id"]
+                conversation.pending_asset_offered_at = datetime.utcnow()
+                db.add(conversation)
+                db.flush()
+                actions = [
+                    action for action in actions
+                    if not isinstance(action, dict) or action.get("type") != "share_asset"
+                ]
+                capabilities = selected.get("capabilities") or []
+                details = []
+                if "floor_plans" in capabilities:
+                    details.append("floor plans")
+                if "virtual_tour" in capabilities:
+                    details.append("a virtual tour")
+                detail = f" It includes {' and '.join(details)}." if details else ""
+                return (
+                    f"I have an approved file called {selected.get('name') or 'Project material'}.{detail} "
+                    "Would you like me to send the secure link here?",
+                    actions,
+                    [],
+                )
 
     if not consented:
         actions = [
@@ -456,8 +484,26 @@ def _execute_share_actions(
         )
         links.append(f"{asset.display_name}: {url}")
         share_ids.append(share.id)
+        for embedded in metadata.get("links") or []:
+            if len(links) >= 3:
+                break
+            if embedded.get("kind") not in {"virtual_tour", "location_map"}:
+                continue
+            external_url, external_share = asset_share_service.issue(
+                db,
+                company_id=conversation.company_id,
+                project_id=conversation.project_id,
+                lead_id=lead.id,
+                source_id=asset.source_id,
+                sales_asset_id=asset.id,
+                channel=conversation.channel,
+                agent_run_id=run.id,
+                target_url=str(embedded.get("url") or ""),
+            )
+            links.append(f"{embedded.get('label') or 'Related resource'}: {external_url}")
+            share_ids.append(external_share.id)
         seen.add(asset_id)
-        if len(links) == 2:
+        if len(links) >= 3:
             break
     if links:
         cleaned = (reply or "").strip()

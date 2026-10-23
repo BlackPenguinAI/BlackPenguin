@@ -240,8 +240,10 @@ describe('ProjectChatComponent', () => {
   it('shows draft lead-safe materials before final approval so they can be resolved', () => {
     component.profile = { ...EMPTY_PROJECT_PROFILE, completion: { ...EMPTY_PROJECT_PROFILE.completion, final_approved: false } };
     expect(component.showSalesMaterials).toBe(false);
-    component.salesAssets = [{ id: 'asset-1' } as never];
+    component.salesAssets = [{ id: 'asset-1', approval_status: 'draft' } as never];
     expect(component.showSalesMaterials).toBe(true);
+    component.salesAssets = [{ id: 'asset-1', approval_status: 'approved' } as never];
+    expect(component.showSalesMaterials).toBe(false);
   });
 
   it('classifies attached files before adding them to the message', () => {

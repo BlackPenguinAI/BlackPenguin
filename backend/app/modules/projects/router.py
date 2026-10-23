@@ -5,7 +5,7 @@ import re
 import uuid
 from datetime import datetime
 from typing import Any
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, Response, UploadFile, status
 from fastapi.responses import FileResponse, RedirectResponse
@@ -115,6 +115,16 @@ def _file_upload_intents(raw: str, count: int) -> list[dict[str, Any]]:
 @router.get("/shared-assets/{token}", include_in_schema=False)
 def download_shared_sales_asset(token: str, request: Request, download: bool = False, db: Session = Depends(get_db)):
     source, share = asset_share_service.resolve(db, token)
+    if share.target_url:
+        parsed = urlparse(share.target_url)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            raise HTTPException(status_code=404, detail="Shared sales material not found.")
+        ip_hash, user_agent_hash, _ = request_fingerprint(request)
+        asset_share_service.record_access(
+            db, share=share, event_type="view", ip_hash=ip_hash,
+            user_agent_hash=user_agent_hash, user_agent=request.headers.get("user-agent"),
+        )
+        return RedirectResponse(share.target_url, status_code=302, headers={"Cache-Control": "no-store"})
     try:
         path = storage_service.resolve_project_file(source.storage_path)
     except ValueError as exc:

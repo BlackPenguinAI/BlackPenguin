@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 import re
 from typing import Any
+from urllib.parse import urlparse
 
 from sqlalchemy.orm import Session
 
@@ -61,7 +62,28 @@ def _asset_capabilities(item: Any) -> list[str]:
         capabilities.append("floor_plans")
     if "recorrido 360" in text or "virtual tour" in text or "matterport" in text:
         capabilities.append("virtual_tour")
+    link_kinds = {str(link.get("kind") or "") for link in ((item.source.extracted_links or []) if item.source else [])}
+    if "virtual_tour" in link_kinds and "virtual_tour" not in capabilities:
+        capabilities.append("virtual_tour")
+    if "location_map" in link_kinds:
+        capabilities.append("location_map")
     return capabilities
+
+
+def _safe_asset_links(item: Any) -> list[dict[str, Any]]:
+    links: list[dict[str, Any]] = []
+    for link in ((item.source.extracted_links or []) if item.source else []):
+        url = str(link.get("url") or "").strip()
+        parsed = urlparse(url)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            continue
+        links.append({
+            "url": url,
+            "label": str(link.get("label") or "Related resource")[:120],
+            "kind": str(link.get("kind") or "external_reference")[:40],
+            "page": link.get("page"),
+        })
+    return links[:10]
 
 
 def confirmed_profile_facts(profile: Any) -> dict[str, Any]:
@@ -203,6 +225,7 @@ def build_commercial_context(
             "valid_until": _iso(item.valid_until),
             "allowed_channels": item.allowed_channels or [],
             "capabilities": _asset_capabilities(item),
+            "links": _safe_asset_links(item),
         }
         for item in sales_asset_service.approved_for_turn(
             db, project_id=project.id, company_id=company_id, channel=channel,
