@@ -222,7 +222,7 @@ class SalesAssetPayload(BaseModel):
     property_type_id: str | None = None
     asset_type: Literal[
         "brochure", "floor_plan", "unit_sheet", "price_list", "amenities",
-        "location_map", "legal_disclaimer", "gallery_image", "other",
+        "location_map", "virtual_tour", "legal_disclaimer", "gallery_image", "other",
     ]
     content_tags: list[str] = Field(default_factory=list)
     display_name: str = Field(min_length=1, max_length=255)
@@ -236,7 +236,7 @@ class SalesAssetUpdate(BaseModel):
     property_type_id: str | None = None
     asset_type: Literal[
         "brochure", "floor_plan", "unit_sheet", "price_list", "amenities",
-        "location_map", "legal_disclaimer", "gallery_image", "other",
+        "location_map", "virtual_tour", "legal_disclaimer", "gallery_image", "other",
     ]
     content_tags: list[str] = Field(default_factory=list)
     display_name: str = Field(min_length=1, max_length=255)
@@ -265,6 +265,8 @@ class SalesAssetResponse(BaseModel):
     approved_at: datetime | None = None
     source_name: str | None = None
     mime_type: str | None = None
+    source_download_url: str | None = None
+    extracted_links: list[dict[str, Any]] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
 
@@ -365,6 +367,7 @@ class ProjectOverviewResponse(BaseModel):
     cover_focal_point: dict[str, float] = Field(default_factory=dict)
     metrics: list[ProjectOverviewMetric] = Field(default_factory=list)
     inventory: list[ProjectInventorySummary] = Field(default_factory=list)
+    materials: list[dict[str, Any]] = Field(default_factory=list)
     location: dict[str, Any] = Field(default_factory=dict)
     market_intelligence: dict[str, Any] = Field(default_factory=dict)
     data_completeness: dict[str, Any] = Field(default_factory=dict)

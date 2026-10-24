@@ -87,7 +87,7 @@ export class ProjectOnboardingService {
     return this.http.post<ProjectPropertyType>(`${this.baseUrl}/${id}/property-types/${propertyTypeId}/defer-images`, {});
   }
   getSalesAssets(id: string): Observable<ProjectSalesAsset[]> {
-    return this.http.get<ProjectSalesAsset[]>(`${this.baseUrl}/${id}/sales-assets`);
+    return this.http.get<ProjectSalesAsset[]>(`${this.baseUrl}/${id}/sales-assets?include_archived=true`);
   }
   createSalesAsset(id: string, payload: {
     source_id: string; property_type_id: string | null; asset_type: SalesAssetType;

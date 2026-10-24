@@ -121,6 +121,7 @@ async def process_url_source(db: Session, source: ProjectOnboardingSource) -> Pr
             text = _extract_bytes(response.content, content_type, str(response.url))
             links = _extract_pdf_links(response.content) if content_type == "application/pdf" else []
             if content_type in {"text/html", "application/xhtml+xml"}:
+                links = _extract_html_links(response.content, str(response.url))
                 await _capture_website_images(db, client, source, response.content, str(response.url))
         await _finish_source(db, source, text=text, extracted_links=links)
     except AccessRestrictedError as exc:
@@ -312,6 +313,7 @@ async def _finish_source(
     source.status, source.error_message = ProjectSourceStatus.READY, None
     db.add(source); db.flush()
     sales_asset_service.materialize_source_candidate(db, source)
+    sales_asset_service.materialize_discovered_link_candidate(db, source)
     db.commit(); db.refresh(source)
 
 
@@ -631,8 +633,70 @@ def _pdf_link_label(kind: str, url: str) -> str:
     return urlparse(url).hostname or "External reference"
 
 
+def _safe_discovered_url(raw_url: str, base_url: str | None = None) -> str | None:
+    """Normalize a discovered link without allowing local/private destinations.
+
+    These links still require an administrator's explicit material approval
+    before they can be disclosed to a lead.
+    """
+    url = urljoin(base_url, raw_url) if base_url else raw_url
+    parsed = urlparse(url.strip())
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname or parsed.username or parsed.password:
+        return None
+    hostname = parsed.hostname.casefold().rstrip(".")
+    if hostname == "localhost" or hostname.endswith((".localhost", ".local", ".internal")):
+        return None
+    try:
+        if not ipaddress.ip_address(hostname).is_global:
+            return None
+    except ValueError:
+        pass
+    return url[:2000]
+
+
+def _extract_html_links(content: bytes, base_url: str) -> list[dict[str, Any]]:
+    """Extract useful Project links from generic HTML elements.
+
+    This deliberately does not depend on a specific website or PDF layout.
+    Navigation, legal and social links are ignored so the review queue focuses
+    on Project resources such as tours, maps, brochures and external details.
+    """
+    soup = BeautifulSoup(content, "html.parser")
+    links: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    ignored_terms = ("privacy", "cookie", "terms", "login", "sign in", "facebook", "instagram", "linkedin", "youtube")
+    for element in soup.select("a[href], iframe[src]"):
+        raw = str(element.get("href") or element.get("src") or "").strip()
+        url = _safe_discovered_url(raw, base_url)
+        if not url or url in seen:
+            continue
+        label = " ".join(element.stripped_strings).strip() or str(element.get("title") or element.get("aria-label") or "")
+        context = f"{label} {url}".casefold()
+        if any(term in context for term in ignored_terms):
+            continue
+        kind = _pdf_link_kind(url, label)
+        useful = kind != "external_reference" or any(
+            term in context for term in (
+                "brochure", "floor plan", "blueprint", "price list", "amenities",
+                "download", ".pdf", "project", "development", "property", "details",
+            )
+        )
+        if not useful:
+            continue
+        seen.add(url)
+        links.append({
+            "url": url,
+            "label": (label or _pdf_link_label(kind, url))[:255],
+            "kind": kind,
+            "page": None,
+        })
+        if len(links) >= 100:
+            break
+    return links
+
+
 def _extract_pdf_links(content: bytes) -> list[dict[str, Any]]:
-    """Extract safe HTTP links from annotations without assuming a PDF layout or vendor."""
+    """Extract safe annotation and visible-text links without assuming a PDF layout."""
     try:
         reader = PdfReader(BytesIO(content))
         if reader.is_encrypted and not reader.decrypt(""):
@@ -647,9 +711,8 @@ def _extract_pdf_links(content: bytes) -> list[dict[str, Any]]:
             try:
                 annotation = reference.get_object()
                 action = annotation.get("/A")
-                url = str(action.get("/URI") or "").strip() if action else ""
-                parsed = urlparse(url)
-                if parsed.scheme not in {"http", "https"} or not parsed.netloc or url in seen:
+                url = _safe_discovered_url(str(action.get("/URI") or "").strip()) if action else None
+                if not url or url in seen:
                     continue
                 seen.add(url)
                 kind = _pdf_link_kind(url, page_text)
@@ -659,6 +722,18 @@ def _extract_pdf_links(content: bytes) -> list[dict[str, Any]]:
                 })
             except (AttributeError, KeyError, TypeError, ValueError):
                 continue
+            if len(links) >= 100:
+                return links
+        for raw_url in re.findall(r"https?://[^\s<>\]\[()]+", page_text, flags=re.IGNORECASE):
+            url = _safe_discovered_url(raw_url.rstrip(".,;:!?\"'"))
+            if not url or url in seen:
+                continue
+            seen.add(url)
+            kind = _pdf_link_kind(url, page_text)
+            links.append({
+                "url": url, "label": _pdf_link_label(kind, url)[:255],
+                "kind": kind, "page": page_number,
+            })
             if len(links) >= 100:
                 return links
     return links

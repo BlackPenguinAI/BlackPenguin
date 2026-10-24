@@ -734,6 +734,10 @@ def serialize_overview(db: Session, project: Project, viewer_user: User | None =
         ProjectPropertyType.project_id == project.id,
         ProjectPropertyType.review_status == "confirmed",
     ).order_by(ProjectPropertyType.sort_order, ProjectPropertyType.created_at).all()
+    sales_materials = db.query(ProjectSalesAsset).filter(
+        ProjectSalesAsset.project_id == project.id,
+        ProjectSalesAsset.company_id == project.company_id,
+    ).order_by(ProjectSalesAsset.updated_at.desc()).all()
     inventory: list[dict[str, Any]] = []
     if property_types:
         for item in property_types:
@@ -854,6 +858,27 @@ def serialize_overview(db: Session, project: Project, viewer_user: User | None =
         "cover_image_url": f"/api/v1/projects/{project.id}/sources/{cover.id}/file" if cover else None,
         "cover_focal_point": {"x": cover.focal_point_x, "y": cover.focal_point_y} if cover else {"x": .5, "y": .5},
         "metrics": metrics, "inventory": inventory,
+        "materials": [
+            {
+                "id": item.id,
+                "display_name": item.display_name,
+                "asset_type": item.asset_type,
+                "content_tags": item.content_tags or [item.asset_type],
+                "description": item.description,
+                "approval_status": item.approval_status,
+                "allowed_channels": item.allowed_channels or [],
+                "source_name": item.source.original_filename or item.source.name if item.source else None,
+                "mime_type": item.source.mime_type if item.source else None,
+                "download_url": (
+                    f"/api/v1/projects/{project.id}/sources/{item.source_id}/file"
+                    if item.source and item.source.storage_path else None
+                ),
+                "extracted_links": item.source.extracted_links or [] if item.source else [],
+                "approved_at": item.approved_at,
+                "updated_at": item.updated_at,
+            }
+            for item in sales_materials
+        ],
         "location": {"address": address, "latitude": project.latitude, "longitude": project.longitude},
         "market_intelligence": {"report_url": f"/app/projects/{project.id}/sales-report", "total_revenue": revenue,
                                 "target_roi": None, "status": "available" if units else "pending"},

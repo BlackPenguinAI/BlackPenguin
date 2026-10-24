@@ -33,6 +33,13 @@ export interface ProjectOverview {
   cover_focal_point: { x: number; y: number };
   metrics: ProjectOverviewMetric[];
   inventory: ProjectInventorySummary[];
+  materials?: Array<{
+    id: string; display_name: string; asset_type: string; content_tags: string[];
+    description: string | null; approval_status: 'draft' | 'approved' | 'archived';
+    allowed_channels: string[]; source_name: string | null; mime_type: string | null;
+    download_url: string | null; extracted_links: Array<{ url: string; label: string; kind: string; page?: number | null }>;
+    approved_at: string | null; updated_at: string;
+  }>;
   location: { address: string | null; latitude: number | null; longitude: number | null };
   market_intelligence: { report_url: string; total_revenue: number | null; target_roi: number | null; status: string };
   data_completeness: { percentage: number; onboarding_status: string; last_updated_at: string | null };

@@ -11,7 +11,7 @@ from .models import Project, ProjectOnboardingSource, ProjectSalesAsset, Project
 
 ASSET_TYPES = {
     "brochure", "floor_plan", "unit_sheet", "price_list", "amenities",
-    "location_map", "legal_disclaimer", "gallery_image", "other",
+    "location_map", "virtual_tour", "legal_disclaimer", "gallery_image", "other",
 }
 CHANNELS = {"sms", "whatsapp"}
 
@@ -37,6 +37,11 @@ def serialize(item: ProjectSalesAsset) -> dict[str, Any]:
         "approved_at": item.approved_at,
         "source_name": source.original_filename or source.name if source else None,
         "mime_type": source.mime_type if source else None,
+        "source_download_url": (
+            f"/api/v1/projects/{item.project_id}/sources/{item.source_id}/file"
+            if source and source.storage_path else None
+        ),
+        "extracted_links": source.extracted_links or [] if source else [],
         "created_at": item.created_at,
         "updated_at": item.updated_at,
     }
@@ -78,10 +83,9 @@ def create(db: Session, project: Project, payload: dict[str, Any], *, user_id: s
         ProjectOnboardingSource.id == values.pop("source_id"),
         ProjectOnboardingSource.project_id == project.id,
         ProjectOnboardingSource.status == ProjectSourceStatus.READY,
-        ProjectOnboardingSource.storage_path.isnot(None),
     ).first()
-    if not source:
-        raise HTTPException(status_code=422, detail="Choose a processed Project file.")
+    if not source or (not source.storage_path and not (source.extracted_links or [])):
+        raise HTTPException(status_code=422, detail="Choose a processed Project file or detected external resource.")
     duplicate = db.query(ProjectSalesAsset).filter(
         ProjectSalesAsset.project_id == project.id,
         ProjectSalesAsset.source_id == source.id,
@@ -135,6 +139,39 @@ def materialize_source_candidate(db: Session, source: ProjectOnboardingSource) -
     return item
 
 
+def materialize_discovered_link_candidate(db: Session, source: ProjectOnboardingSource) -> ProjectSalesAsset | None:
+    """Create one reviewable bundle for useful links found on an official website."""
+    links = source.extracted_links or []
+    if source.status != ProjectSourceStatus.READY or source.storage_path or not links:
+        return None
+    existing = db.query(ProjectSalesAsset).filter(
+        ProjectSalesAsset.project_id == source.project_id,
+        ProjectSalesAsset.source_id == source.id,
+    ).first()
+    if existing:
+        return existing
+    kinds = {str(link.get("kind") or "") for link in links}
+    preferred = "virtual_tour" if "virtual_tour" in kinds else (
+        "location_map" if "location_map" in kinds else "other"
+    )
+    tags = [kind for kind in ("virtual_tour", "location_map") if kind in kinds] or ["other"]
+    item = ProjectSalesAsset(
+        company_id=source.project.company_id,
+        project_id=source.project_id,
+        source_id=source.id,
+        asset_type=preferred,
+        content_tags=tags,
+        display_name=f"Resources from {source.name}"[:255],
+        description="External Project resources detected during onboarding. Review every contained link before approval.",
+        allowed_channels=["sms", "whatsapp"],
+        created_by_user_id=source.uploaded_by_user_id,
+        approval_status="draft",
+    )
+    db.add(item)
+    db.flush()
+    return item
+
+
 def update(db: Session, item: ProjectSalesAsset, payload: dict[str, Any]) -> ProjectSalesAsset:
     values = _validate_payload(payload)
     for key, value in values.items():
@@ -153,7 +190,9 @@ def update(db: Session, item: ProjectSalesAsset, payload: dict[str, Any]) -> Pro
 
 def approve(db: Session, item: ProjectSalesAsset, *, user_id: str) -> ProjectSalesAsset:
     source = item.source
-    if not source or source.status != ProjectSourceStatus.READY or not source.storage_path:
+    if not source or source.status != ProjectSourceStatus.READY or (
+        not source.storage_path and not (source.extracted_links or [])
+    ):
         raise HTTPException(status_code=409, detail="The source file is not ready for sharing.")
     now = datetime.utcnow()
     if item.valid_until and item.valid_until <= now:
@@ -189,6 +228,9 @@ def approved_for_turn(
         (ProjectSalesAsset.valid_from.is_(None) | (ProjectSalesAsset.valid_from <= now)),
         (ProjectSalesAsset.valid_until.is_(None) | (ProjectSalesAsset.valid_until > now)),
         ProjectOnboardingSource.status == ProjectSourceStatus.READY,
-        ProjectOnboardingSource.storage_path.isnot(None),
     ).all()
-    return [item for item in rows if channel in (item.allowed_channels or [])]
+    return [
+        item for item in rows
+        if channel in (item.allowed_channels or [])
+        and bool(item.source and (item.source.storage_path or (item.source.extracted_links or [])))
+    ]

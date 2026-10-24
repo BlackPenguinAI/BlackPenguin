@@ -100,7 +100,7 @@ export interface ProjectSource {
   extracted_links?: Array<{ url: string; label: string; kind: string; page?: number | null }>;
   proposals: SourceProposal[]; created_at: string; updated_at: string;
 }
-export type SalesAssetType = 'brochure' | 'floor_plan' | 'unit_sheet' | 'price_list' | 'amenities' | 'location_map' | 'legal_disclaimer' | 'gallery_image' | 'other';
+export type SalesAssetType = 'brochure' | 'floor_plan' | 'unit_sheet' | 'price_list' | 'amenities' | 'location_map' | 'virtual_tour' | 'legal_disclaimer' | 'gallery_image' | 'other';
 export interface ProjectFileIntent {
   sharing_intent: 'internal' | 'sales_candidate';
   asset_type: SalesAssetType;
@@ -114,7 +114,9 @@ export interface ProjectSalesAsset {
   approval_status: 'draft' | 'approved' | 'archived'; version: number;
   valid_from: string | null; valid_until: string | null; allowed_channels: Array<'sms' | 'whatsapp'>;
   approved_by_user_id: string | null; approved_at: string | null;
-  source_name: string | null; mime_type: string | null; created_at: string; updated_at: string;
+  source_name: string | null; mime_type: string | null; source_download_url: string | null;
+  extracted_links: Array<{ url: string; label: string; kind: string; page?: number | null }>;
+  created_at: string; updated_at: string;
 }
 export interface ChatTurn {
   message: ChatMessage; user_message: ChatMessage | null; profile: ProjectProfile; accepted_fields: string[];

@@ -39,7 +39,7 @@ describe('ProjectChatComponent', () => {
         limit: 20, remaining: 20, catalog_complete: false,
       });
     }
-    for (const request of http.match((candidate) => candidate.url.endsWith('/sales-assets'))) request.flush([]);
+    for (const request of http.match((candidate) => candidate.url.includes('/sales-assets'))) request.flush([]);
     http.verify();
   });
 
@@ -237,13 +237,15 @@ describe('ProjectChatComponent', () => {
     expect(component.isEditingProjectName).toBe(false);
   });
 
-  it('shows draft lead-safe materials before final approval so they can be resolved', () => {
+  it('keeps lead-safe material decisions visible after review', () => {
     component.profile = { ...EMPTY_PROJECT_PROFILE, completion: { ...EMPTY_PROJECT_PROFILE.completion, final_approved: false } };
     expect(component.showSalesMaterials).toBe(false);
     component.salesAssets = [{ id: 'asset-1', approval_status: 'draft' } as never];
     expect(component.showSalesMaterials).toBe(true);
     component.salesAssets = [{ id: 'asset-1', approval_status: 'approved' } as never];
-    expect(component.showSalesMaterials).toBe(false);
+    expect(component.showSalesMaterials).toBe(true);
+    component.salesAssets = [{ id: 'asset-1', approval_status: 'archived' } as never];
+    expect(component.showSalesMaterials).toBe(true);
   });
 
   it('classifies attached files before adding them to the message', () => {

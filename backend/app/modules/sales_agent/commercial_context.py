@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import ipaddress
 import re
 from typing import Any
 from urllib.parse import urlparse
@@ -77,6 +78,14 @@ def _safe_asset_links(item: Any) -> list[dict[str, Any]]:
         parsed = urlparse(url)
         if parsed.scheme not in {"http", "https"} or not parsed.netloc:
             continue
+        hostname = (parsed.hostname or "").casefold().rstrip(".")
+        if hostname == "localhost" or hostname.endswith((".localhost", ".local", ".internal")):
+            continue
+        try:
+            if not ipaddress.ip_address(hostname).is_global:
+                continue
+        except ValueError:
+            pass
         links.append({
             "url": url,
             "label": str(link.get("label") or "Related resource")[:120],
@@ -217,10 +226,12 @@ def build_commercial_context(
         {
             "asset_id": item.id,
             "asset_type": item.asset_type,
+            "content_tags": item.content_tags or [item.asset_type],
             "property_type": item.property_type.name if item.property_type else None,
             "name": item.display_name,
             "description": item.description,
             "mime_type": item.source.mime_type if item.source else None,
+            "has_file": bool(item.source and item.source.storage_path),
             "version": item.version,
             "valid_until": _iso(item.valid_until),
             "allowed_channels": item.allowed_channels or [],

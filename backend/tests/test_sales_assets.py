@@ -18,7 +18,10 @@ from app.modules.projects.models import (
     ProjectSourceKind, ProjectSourceStatus,
 )
 from app.modules.sales_agent.commercial_context import build_commercial_context
-from app.modules.sales_agent.live_service import _denies_available_asset, _execute_share_actions, _select_asset_for_request
+from app.modules.sales_agent.live_service import (
+    _denies_available_asset, _execute_share_actions, _normalize_asset_request_result,
+    _select_asset_for_request, _select_assets_for_request,
+)
 from app.modules.sales_agent.models import SalesConversation
 from app.modules.sales_agent.response_policy import concise_channel_text, plain_channel_text, repeats_introduction_after_greeting
 
@@ -73,8 +76,9 @@ def test_onboarding_file_is_private_until_separately_approved():
     )
     assert context["available_assets"] == [{
         "asset_id": item.id, "asset_type": "brochure", "property_type": None,
+        "content_tags": ["brochure"],
         "name": "Riverside brochure", "description": "Approved project overview",
-        "mime_type": "application/pdf", "version": 1,
+        "mime_type": "application/pdf", "has_file": True, "version": 1,
         "valid_until": context["available_assets"][0]["valid_until"],
         "allowed_channels": ["sms", "whatsapp"],
         "capabilities": [],
@@ -308,6 +312,142 @@ def test_pdf_link_extraction_is_generic_and_classifies_virtual_tours():
     links = source_service._extract_pdf_links(output.getvalue())
     assert [item["kind"] for item in links] == ["virtual_tour", "external_reference"]
     assert all(item["page"] == 1 for item in links)
+
+
+def test_website_link_extraction_keeps_useful_project_resources_only():
+    html = b"""
+    <html><body>
+      <a href="/downloads/brochure.pdf">Download brochure</a>
+      <iframe src="https://my.matterport.com/show/?m=abc" title="360 tour"></iframe>
+      <a href="https://example.com/privacy">Privacy</a>
+      <a href="http://127.0.0.1/private.pdf">Project PDF</a>
+    </body></html>
+    """
+    links = source_service._extract_html_links(html, "https://example.com/project")
+
+    assert [item["kind"] for item in links] == ["external_reference", "virtual_tour"]
+    assert links[0]["url"] == "https://example.com/downloads/brochure.pdf"
+    assert all("privacy" not in item["url"] and "127.0.0.1" not in item["url"] for item in links)
+
+
+def test_discovered_website_links_create_a_reviewable_draft():
+    db = _db()
+    _, _, source = _project_source(db)
+    source.kind = ProjectSourceKind.URL
+    source.storage_path = None
+    source.url = "https://example.com/project"
+    source.name = "example.com"
+    source.extracted_links = [{
+        "url": "https://my.matterport.com/show/?m=abc", "label": "360 tour",
+        "kind": "virtual_tour", "page": None,
+    }]
+    db.add(source); db.commit(); db.refresh(source)
+
+    item = sales_asset_service.materialize_discovered_link_candidate(db, source)
+    db.commit()
+
+    assert item is not None
+    assert item.asset_type == "virtual_tour"
+    assert item.content_tags == ["virtual_tour"]
+    assert item.approval_status == "draft"
+    sales_asset_service.approve(db, item, user_id="admin-1")
+    assert sales_asset_service.approved_for_turn(
+        db, project_id=item.project_id, company_id=item.company_id, channel="whatsapp",
+    )[0].id == item.id
+
+    tracked_url, share = asset_share_service.issue(
+        db, company_id=item.company_id, project_id=item.project_id, lead_id="lead-1",
+        source_id=source.id, sales_asset_id=item.id, channel="whatsapp",
+        target_url=source.extracted_links[0]["url"],
+    )
+    db.commit()
+    token = tracked_url.rsplit("/", 1)[-1]
+    resolved_source, resolved_share = asset_share_service.resolve(db, token)
+    assert resolved_source.id == source.id
+    assert resolved_share.target_url == "https://my.matterport.com/show/?m=abc"
+    overview = project_services.serialize_overview(db, source.project)
+    assert overview["materials"][0]["approval_status"] == "approved"
+    assert overview["materials"][0]["content_tags"] == ["virtual_tour"]
+    assert overview["materials"][0]["extracted_links"][0]["kind"] == "virtual_tour"
+
+
+def test_partial_topic_matching_returns_every_useful_approved_resource():
+    assets = [
+        {"asset_id": "a-c", "asset_type": "brochure", "content_tags": ["brochure", "floor_plan"], "capabilities": []},
+        {"asset_id": "c-only", "asset_type": "floor_plan", "content_tags": ["floor_plan"], "capabilities": []},
+        {"asset_id": "unrelated", "asset_type": "legal_disclaimer", "content_tags": ["legal_disclaimer"], "capabilities": []},
+    ]
+
+    selected = _select_assets_for_request(
+        assets, "Please send the brochure, price list and floor plans.",
+    )
+
+    assert [item["asset_id"] for item in selected] == ["a-c", "c-only"]
+
+
+def test_invalid_model_asset_id_does_not_force_human_review_when_library_can_resolve_it():
+    result, actions = _normalize_asset_request_result(
+        {
+            "policy_violations": ["share_asset_not_approved"],
+            "requires_human": True,
+        },
+        [{"type": "share_asset", "asset_id": "invented"}],
+        [{"asset_id": "approved"}],
+    )
+
+    assert result["policy_violations"] == []
+    assert result["requires_human"] is False
+    assert actions == []
+
+
+def test_explicit_multi_topic_request_shares_all_partially_matching_assets(monkeypatch):
+    db = _db()
+    company, project, source = _project_source(db)
+    assets = []
+    second_source = ProjectOnboardingSource(
+        project_id=project.id, kind=ProjectSourceKind.UPLOADED_FILE,
+        status=ProjectSourceStatus.READY, name="plans.pdf", original_filename="plans.pdf",
+        mime_type="application/pdf", storage_path="projects/riverside/plans.enc", is_encrypted=True,
+    )
+    db.add(second_source); db.flush()
+    for asset_id, tags, name, source_id in (
+        ("asset-a-c", ["brochure", "floor_plan"], "Brochure and plans", source.id),
+        ("asset-c", ["floor_plan"], "Additional plans", second_source.id),
+    ):
+        item = ProjectSalesAsset(
+            id=asset_id, company_id=company.id, project_id=project.id, source_id=source_id,
+            asset_type=tags[0], content_tags=tags, display_name=name,
+            approval_status="approved", approved_at=datetime.utcnow(), allowed_channels=["whatsapp"],
+        )
+        db.add(item)
+        assets.append(item)
+    conversation = SalesConversation(
+        company_id=company.id, project_id=project.id, lead_id="lead-1",
+        provider="telnyx", channel="whatsapp", is_paused=False,
+    )
+    db.add(conversation); db.commit()
+    issued = []
+
+    def issue(*_args, **kwargs):
+        issued.append(kwargs["sales_asset_id"])
+        number = len(issued)
+        return f"https://blackpenguin.ai/a/token-{number}", type("Share", (), {"id": f"share-{number}"})()
+
+    monkeypatch.setattr(asset_share_service, "issue", issue)
+    reply, _, shares = _execute_share_actions(
+        db, conversation=conversation, lead=type("Lead", (), {"id": "lead-1"})(),
+        run=type("Run", (), {"id": "run-1"})(), reply="Here are the resources.", actions=[],
+        commercial={"available_assets": [
+            {"asset_id": assets[0].id, "name": assets[0].display_name, "asset_type": "brochure", "content_tags": assets[0].content_tags, "capabilities": [], "links": [], "has_file": True},
+            {"asset_id": assets[1].id, "name": assets[1].display_name, "asset_type": "floor_plan", "content_tags": assets[1].content_tags, "capabilities": [], "links": [], "has_file": True},
+        ]},
+        inbound_text="Please send the brochure, price list and floor plans.",
+    )
+
+    assert issued == ["asset-a-c", "asset-c"]
+    assert shares == ["share-1", "share-2"]
+    assert "token-1" in reply and "token-2" in reply
+    assert "don't currently have an approved price list" in reply
 
 
 def test_channel_text_converts_markdown_links_to_clickable_plain_urls():

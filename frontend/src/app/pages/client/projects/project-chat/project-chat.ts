@@ -112,6 +112,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     { value: 'brochure', label: 'Brochure' }, { value: 'floor_plan', label: 'Floor plan' },
     { value: 'unit_sheet', label: 'Unit sheet' }, { value: 'price_list', label: 'Price list' },
     { value: 'amenities', label: 'Amenities' }, { value: 'location_map', label: 'Location map' },
+    { value: 'virtual_tour', label: '360° virtual tour' },
     { value: 'legal_disclaimer', label: 'Legal disclaimer' }, { value: 'other', label: 'Other' },
     { value: 'gallery_image', label: 'Gallery image' },
   ];
@@ -207,7 +208,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   get canSend(): boolean { return (!!this.prompt.trim() || !!this.selectedFiles.length) && !this.isAnalyzing && !this.hasExclusiveSourceFlow; }
   get projectName(): string { return this.profile.project_name || 'Untitled Project'; }
   get pendingSalesAssets(): ProjectSalesAsset[] { return this.salesAssets.filter(item => item.approval_status === 'draft'); }
-  get showSalesMaterials(): boolean { return this.pendingSalesAssets.length > 0; }
+  get showSalesMaterials(): boolean { return this.salesAssets.length > 0; }
   get availableSalesAssetSources(): ProjectSource[] {
     const registered = new Set(this.salesAssets.map(item => item.source_id));
     return this.sources.filter(source => source.status === 'ready' && !!source.download_url && !registered.has(source.id));
@@ -398,14 +399,19 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   approveSalesAsset(item: ProjectSalesAsset): void {
     if (this.salesAssetBusy) return; this.salesAssetBusy = true; this.errorMessage = '';
     this.onboarding.approveSalesAsset(this.projectId, item.id).subscribe({
-      next: updated => { this.salesAssets = this.salesAssets.map(row => row.id === updated.id ? updated : row); this.salesAssetBusy = false; this.syncState('bottom'); },
+      next: updated => { this.salesAssets = this.salesAssets.map(row => row.id === updated.id ? updated : row); this.salesAssetBusy = false; this.syncState('none'); },
       error: (error: HttpErrorResponse) => { this.salesAssetBusy = false; this.errorMessage = this.apiDetail(error, 'Sales material could not be approved.'); this.cdr.detectChanges(); },
     });
   }
   archiveSalesAsset(item: ProjectSalesAsset): void {
     if (this.salesAssetBusy) return; this.salesAssetBusy = true; this.errorMessage = '';
     this.onboarding.archiveSalesAsset(this.projectId, item.id).subscribe({
-      next: () => { this.salesAssets = this.salesAssets.filter(row => row.id !== item.id); this.salesAssetBusy = false; this.syncState('bottom'); },
+      next: () => {
+        this.salesAssets = this.salesAssets.map(row => row.id === item.id
+          ? { ...row, approval_status: 'archived', approved_at: null, approved_by_user_id: null }
+          : row);
+        this.salesAssetBusy = false; this.syncState('none');
+      },
       error: (error: HttpErrorResponse) => { this.salesAssetBusy = false; this.errorMessage = this.apiDetail(error, 'Sales material could not be archived.'); this.cdr.detectChanges(); },
     });
   }
@@ -1019,9 +1025,16 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   sourceForSalesAsset(item: ProjectSalesAsset): ProjectSource | undefined {
     return this.sources.find(source => source.id === item.source_id);
   }
+  salesAssetsForSource(sourceId: string): ProjectSalesAsset[] {
+    return this.salesAssets.filter(item => item.source_id === sourceId);
+  }
   previewSalesAsset(item: ProjectSalesAsset): void {
     const source = this.sourceForSalesAsset(item);
-    if (!source?.download_url) return;
+    if (!source?.download_url) {
+      const url = item.extracted_links?.[0]?.url || source?.url;
+      if (url) window.open(url, '_blank', 'noopener,noreferrer');
+      return;
+    }
     this.onboarding.downloadAttachment(source.download_url).subscribe({
       next: blob => {
         const url = URL.createObjectURL(blob);

@@ -111,9 +111,8 @@ def resolve(db: Session, token: str) -> tuple[ProjectOnboardingSource, SalesAsse
     source = db.query(ProjectOnboardingSource).filter(
         ProjectOnboardingSource.id == share.source_id,
         ProjectOnboardingSource.project_id == share.project_id,
-        ProjectOnboardingSource.storage_path.isnot(None),
     ).first()
-    if not source:
+    if not source or (not share.target_url and not source.storage_path):
         raise HTTPException(status_code=404, detail="Shared sales material not found.")
     return source, share
 

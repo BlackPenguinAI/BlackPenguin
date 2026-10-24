@@ -81,4 +81,16 @@ export class ProjectOverviewComponent implements OnInit, OnDestroy {
       this.inventoryImageUrls.set(url, URL.createObjectURL(blob)); this.cdr.detectChanges();
     }});
   }
+
+  previewMaterial(url: string | null): void {
+    if (!url) return;
+    this.overviewService.getCover(url).subscribe({
+      next: blob => {
+        const objectUrl = URL.createObjectURL(blob);
+        window.open(objectUrl, '_blank', 'noopener,noreferrer');
+        setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+      },
+      error: () => { this.errorMessage = 'The Project material could not be previewed.'; this.cdr.detectChanges(); },
+    });
+  }
 }

@@ -356,23 +356,62 @@ def _asset_request_count(history: list[SalesMessage], inbound_text: str) -> int:
 
 
 def _select_asset_for_request(assets: list[dict], inbound_text: str) -> dict | None:
-    if not assets:
-        return None
+    selected = _select_assets_for_request(assets, inbound_text, limit=1)
+    return selected[0] if selected else None
+
+
+def _requested_asset_tags(inbound_text: str) -> set[str]:
     text = (inbound_text or "").casefold()
-    preferred = (
-        "floor_plan" if any(term in text for term in ("floor plan", "blueprint", "plan")) else
-        "price_list" if "price" in text else
-        "brochure" if any(term in text for term in ("brochure", "document", "pdf")) else None
+    tags: set[str] = set()
+    if any(term in text for term in ("floor plan", "blueprint", "plano", "plans")):
+        tags.add("floor_plan")
+    if "price list" in text or "pricing sheet" in text or "lista de precios" in text:
+        tags.add("price_list")
+    if any(term in text for term in ("amenities", "amenity", "servicios", "amenidades")):
+        tags.add("amenities")
+    if any(term in text for term in ("virtual tour", "360", "recorrido virtual")):
+        tags.add("virtual_tour")
+    if any(term in text for term in ("location map", "map of", "mapa", "ubicación", "ubicacion")):
+        tags.add("location_map")
+    if any(term in text for term in ("brochure", "folleto")):
+        tags.add("brochure")
+    return tags
+
+
+def _asset_tags(asset: dict) -> set[str]:
+    tags = {str(value) for value in (asset.get("content_tags") or []) if value}
+    if asset.get("asset_type"):
+        tags.add(str(asset["asset_type"]))
+    capabilities = set(asset.get("capabilities") or [])
+    if "floor_plans" in capabilities:
+        tags.add("floor_plan")
+    tags.update(capabilities.intersection({"virtual_tour", "location_map"}))
+    tags.update(
+        str(link.get("kind")) for link in (asset.get("links") or [])
+        if link.get("kind") in {"virtual_tour", "location_map"}
     )
-    if preferred == "floor_plan":
-        capable = next((item for item in assets if "floor_plans" in (item.get("capabilities") or [])), None)
-        if capable:
-            return capable
-    if "virtual tour" in text or "360" in text:
-        capable = next((item for item in assets if "virtual_tour" in (item.get("capabilities") or [])), None)
-        if capable:
-            return capable
-    return next((item for item in assets if item.get("asset_type") == preferred), assets[0])
+    return tags
+
+
+def _select_assets_for_request(assets: list[dict], inbound_text: str, *, limit: int = 5) -> list[dict]:
+    """Return every useful approved resource, ranked by partial topic coverage.
+
+    A resource does not need to satisfy the whole request. If one approved file
+    covers A+C and another covers C, both remain useful and may be shared.
+    """
+    requested = _requested_asset_tags(inbound_text)
+    ranked: list[tuple[int, int, dict]] = []
+    for position, asset in enumerate(assets):
+        covered = requested.intersection(_asset_tags(asset))
+        if requested and not covered:
+            continue
+        ranked.append((len(covered), -position, asset))
+    if not ranked and assets:
+        # A generic document/PDF request is best served by the approved library,
+        # even when the administrator used only a broad content label.
+        ranked = [(0, -position, asset) for position, asset in enumerate(assets)]
+    ranked.sort(key=lambda item: (item[0], item[1]), reverse=True)
+    return [item[2] for item in ranked[:max(1, limit)]]
 
 
 def _denies_available_asset(reply: str | None) -> bool:
@@ -383,6 +422,31 @@ def _denies_available_asset(reply: str | None) -> bool:
         reply or "",
         re.IGNORECASE,
     ))
+
+
+def _normalize_asset_request_result(
+    result: dict, actions: list[dict], available_assets: list[dict],
+) -> tuple[dict, list[dict]]:
+    """Let the trusted runtime repair model-only asset selection mistakes."""
+    share_violations = {"share_asset_missing_id", "share_asset_not_approved"}
+    remaining_violations = [
+        value for value in (result.get("policy_violations") or [])
+        if value not in share_violations
+    ]
+    normalized = {**result, "policy_violations": remaining_violations}
+    approved_ids = {item.get("asset_id") for item in available_assets}
+    normalized_actions = [
+        action for action in actions
+        if not isinstance(action, dict)
+        or action.get("type") != "share_asset"
+        or action.get("asset_id") in approved_ids
+    ]
+    if not remaining_violations and not any(
+        isinstance(action, dict) and action.get("type") in {"request_callback", "request_human_review"}
+        for action in normalized_actions
+    ):
+        normalized["requires_human"] = False
+    return normalized, normalized_actions
 
 
 def _execute_share_actions(
@@ -409,17 +473,18 @@ def _execute_share_actions(
         db.add(conversation)
         db.flush()
     elif requested and approved:
-        selected = _select_asset_for_request(list(approved.values()), inbound_text)
+        selected_assets = _select_assets_for_request(list(approved.values()), inbound_text)
+        selected = selected_assets[0] if selected_assets else None
         if selected:
             if explicit_request:
                 actions = [
                     action for action in actions
                     if not isinstance(action, dict) or action.get("type") != "share_asset"
                 ]
-                actions.append({
-                    "type": "share_asset", "asset_id": selected["asset_id"],
+                actions.extend({
+                    "type": "share_asset", "asset_id": asset["asset_id"],
                     "reason": "lead_explicitly_requested_material",
-                })
+                } for asset in selected_assets)
                 consented = True
                 conversation.pending_asset_id = None
                 conversation.pending_asset_offered_at = None
@@ -457,13 +522,17 @@ def _execute_share_actions(
     links: list[str] = []
     share_ids: list[str] = []
     seen: set[str] = set()
+    covered_tags: set[str] = set()
     for action in actions:
+        if len(links) >= 5:
+            break
         if not isinstance(action, dict) or action.get("type") != "share_asset":
             continue
         asset_id = str(action.get("asset_id") or "")
         metadata = approved.get(asset_id)
         if not metadata or asset_id in seen:
             continue
+        covered_tags.update(_requested_asset_tags(inbound_text).intersection(_asset_tags(metadata)))
         asset = db.query(ProjectSalesAsset).filter(
             ProjectSalesAsset.id == asset_id,
             ProjectSalesAsset.company_id == conversation.company_id,
@@ -472,22 +541,23 @@ def _execute_share_actions(
         ).first()
         if not asset:
             continue
-        url, share = asset_share_service.issue(
-            db,
-            company_id=conversation.company_id,
-            project_id=conversation.project_id,
-            lead_id=lead.id,
-            source_id=asset.source_id,
-            sales_asset_id=asset.id,
-            channel=conversation.channel,
-            agent_run_id=run.id,
-        )
-        links.append(f"{asset.display_name}: {url}")
-        share_ids.append(share.id)
+        if metadata.get("has_file", True):
+            url, share = asset_share_service.issue(
+                db,
+                company_id=conversation.company_id,
+                project_id=conversation.project_id,
+                lead_id=lead.id,
+                source_id=asset.source_id,
+                sales_asset_id=asset.id,
+                channel=conversation.channel,
+                agent_run_id=run.id,
+            )
+            links.append(f"{asset.display_name}: {url}")
+            share_ids.append(share.id)
         for embedded in metadata.get("links") or []:
-            if len(links) >= 3:
+            if len(links) >= 5:
                 break
-            if embedded.get("kind") not in {"virtual_tour", "location_map"}:
+            if embedded.get("kind") not in {"virtual_tour", "location_map", "external_reference"}:
                 continue
             external_url, external_share = asset_share_service.issue(
                 db,
@@ -503,12 +573,24 @@ def _execute_share_actions(
             links.append(f"{embedded.get('label') or 'Related resource'}: {external_url}")
             share_ids.append(external_share.id)
         seen.add(asset_id)
-        if len(links) >= 3:
+        if len(links) >= 5:
             break
     if links:
         cleaned = (reply or "").strip()
         if not cleaned or _denies_available_asset(cleaned):
             cleaned = "Here is the approved information you requested."
+        missing_tags = _requested_asset_tags(inbound_text) - covered_tags
+        if missing_tags:
+            labels = {
+                "brochure": "brochure", "floor_plan": "floor plans",
+                "price_list": "price list", "amenities": "amenities document",
+                "virtual_tour": "360° virtual tour", "location_map": "location map",
+            }
+            missing_values = [labels[tag] for tag in sorted(missing_tags) if tag in labels]
+            if len(missing_values) == 1:
+                cleaned = f"{cleaned}\n\nI don't currently have an approved {missing_values[0]} to share."
+            elif missing_values:
+                cleaned = f"{cleaned}\n\nI don't currently have approved materials for: {', '.join(missing_values)}."
         reply = f"{cleaned}\n\n" + "\n".join(links)
     return reply, actions, share_ids
 
@@ -866,10 +948,12 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
         commercial = result.get("commercial_context") or {}
         available_assets = commercial.get("available_assets") or []
         if "assets" in requested_topics(inbound.content):
-            if available_assets and not result.get("policy_violations"):
-                # A verified material request is executable; model uncertainty
-                # must not incorrectly force a handoff.
-                result["requires_human"] = False
+            if available_assets:
+                # The runtime, not the model, owns disclosure. Invalid model
+                # asset IDs are discarded and deterministically replaced from
+                # the approved, tenant-scoped library below. They must not
+                # create a false POLICY_VIOLATION or pause the conversation.
+                result, actions = _normalize_asset_request_result(result, actions, available_assets)
             elif not available_assets and _asset_request_count(history, inbound.content) >= 2:
                 result["requires_human"] = True
                 actions = [*actions, {"type": "request_human_review", "reason": "approved_material_unavailable"}]
