@@ -515,6 +515,20 @@ def create_intervention_case(
         HumanInterventionCase.status == "open",
     ).first()
     if existing:
+        # Reassert the operational state. An open case and an active agent are
+        # an invalid combination, even if an earlier retry partially updated
+        # the conversation.
+        conversation.is_paused = True
+        conversation.pause_reason = f"Human intervention: {reason}"
+        lead.agent_status = "human_control"
+        lead.pipeline_stage = "S09_HANDOFF"
+        lead.next_action_at = None
+        db.query(SalesFollowUpJob).filter(
+            SalesFollowUpJob.conversation_id == conversation.id,
+            SalesFollowUpJob.status.in_(["pending", "processing"]),
+        ).update({SalesFollowUpJob.status: "cancelled"}, synchronize_session=False)
+        db.add_all([conversation, lead])
+        db.flush()
         return existing
     case = HumanInterventionCase(
         company_id=conversation.company_id, project_id=conversation.project_id,

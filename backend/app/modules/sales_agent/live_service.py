@@ -75,6 +75,39 @@ def _confirmed_handoff_reply(inbound_text: str, actions: list[dict]) -> str:
     )
 
 
+def _persist_intervention_before_confirmation(
+    db: Session, *, conversation: SalesConversation, lead: Lead,
+    reason: str, evidence: str | None,
+) -> tuple[SalesConversation, Lead, object]:
+    """Commit and verify a handoff before any lead-facing confirmation.
+
+    This intentionally creates a transaction boundary before dispatch. A
+    provider failure may leave a durable case for Sales to handle, but a case
+    persistence failure can never produce a false "sent for review" message.
+    """
+    case = create_intervention_case(
+        db, conversation=conversation, lead=lead, reason=reason, evidence=evidence,
+    )
+    case_id = case.id
+    db.commit()
+    persisted_case = db.query(type(case)).filter(type(case).id == case_id).first()
+    persisted_conversation = db.query(SalesConversation).filter(
+        SalesConversation.id == conversation.id,
+    ).populate_existing().first()
+    persisted_lead = db.query(Lead).filter(Lead.id == lead.id).populate_existing().first()
+    if not (
+        persisted_case
+        and persisted_conversation
+        and persisted_conversation.is_paused
+        and (persisted_conversation.pause_reason or "").startswith("Human intervention")
+        and persisted_lead
+        and persisted_lead.agent_status == "human_control"
+        and persisted_lead.pipeline_stage == "S09_HANDOFF"
+    ):
+        raise RuntimeError("Human intervention could not be persisted consistently.")
+    return persisted_conversation, persisted_lead, persisted_case
+
+
 def ensure_contact(db: Session, lead: Lead) -> LeadContact:
     phone = normalize_phone(lead.phone)
     contact = db.query(LeadContact).filter(
@@ -406,7 +439,7 @@ def _select_assets_for_request(assets: list[dict], inbound_text: str, *, limit: 
         if requested and not covered:
             continue
         ranked.append((len(covered), -position, asset))
-    if not ranked and assets:
+    if not ranked and assets and not requested:
         # A generic document/PDF request is best served by the approved library,
         # even when the administrator used only a broad content label.
         ranked = [(0, -position, asset) for position, asset in enumerate(assets)]
@@ -433,31 +466,44 @@ def _reconcile_shared_asset_reply(reply: str | None) -> str:
     text = (reply or "").strip()
     if not text:
         return "Here is the approved information you requested."
-    sentence_pattern = re.compile(r"(?is)(?:^|(?<=[.!?])\s+)([^.!?]*(?:[.!?]|$))")
+    sentence_pattern = re.compile(r"(?is)([^.!?]*(?:[.!?]|$))")
     removed = False
-    kept: list[str] = []
-    for match in sentence_pattern.finditer(text):
-        sentence = match.group(1).strip()
-        lowered = sentence.casefold()
-        contradicts_share = bool(
-            re.search(r"\b(?:cannot|can't|can not|unable to|not able to|do not|don't)\b", lowered)
-            and re.search(r"\b(?:share|send|provide|attach|access|have)\b", lowered)
-            and re.search(r"\b(?:document|brochure|blueprint|floor plan|pdf|file|material|link|email)\w*\b", lowered)
-        )
-        unsupported_email = bool(
-            re.search(r"\b(?:email|e-mail)\b", lowered)
-            and re.search(r"\b(?:send|share|provide|address|via)\b", lowered)
-        )
-        deferred_delivery = bool(
-            re.search(r"\b(?:sales team|someone|representative)\b", lowered)
-            and re.search(r"\b(?:follow up|send|share|review)\b", lowered)
-            and re.search(r"\b(?:document|brochure|file|material|request)\w*\b", lowered)
-        )
-        if contradicts_share or unsupported_email or deferred_delivery:
-            removed = True
+    kept_lines: list[str] = []
+    for line in text.splitlines():
+        if not line.strip():
+            kept_lines.append("")
             continue
-        kept.append(sentence)
-    cleaned = " ".join(kept).strip()
+        kept_sentences: list[str] = []
+        for match in sentence_pattern.finditer(line):
+            sentence = match.group(1).strip()
+            if not sentence:
+                continue
+            lowered = sentence.casefold()
+            contradicts_share = bool(
+                re.search(r"\b(?:cannot|can't|can not|unable to|not able to|do not|don't)\b", lowered)
+                and re.search(r"\b(?:share|send|provide|attach|access|have)\b", lowered)
+                and re.search(r"\b(?:document|brochure|blueprint|floor plan|pdf|file|material|link|email)\w*\b", lowered)
+            )
+            unsupported_email = bool(
+                re.search(r"\b(?:email|e-mail)\b", lowered)
+                and re.search(r"\b(?:send|share|provide|address|via)\b", lowered)
+            )
+            deferred_delivery = bool(
+                re.search(r"\b(?:sales team|someone|representative)\b", lowered)
+                and re.search(r"\b(?:follow up|send|share|review)\b", lowered)
+                and re.search(r"\b(?:document|brochure|file|material|request)\w*\b", lowered)
+            )
+            if contradicts_share or unsupported_email or deferred_delivery:
+                removed = True
+                continue
+            kept_sentences.append(sentence)
+        if kept_sentences:
+            prefix = line[:len(line) - len(line.lstrip())]
+            kept_lines.append(prefix + " ".join(kept_sentences))
+        elif line.strip():
+            removed = True
+    cleaned = "\n".join(kept_lines)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned).strip()
     if not cleaned or (removed and len(cleaned) < 12):
         return "Here is the approved information you requested."
     return cleaned
@@ -494,6 +540,7 @@ def _execute_share_actions(
 ) -> tuple[str | None, list[dict], list[str]]:
     """Validate model proposals and mint links only at the dispatch boundary."""
     approved = {item["asset_id"]: item for item in commercial.get("available_assets", [])}
+    requested_asset_tags = _requested_asset_tags(inbound_text)
     requested = "assets" in requested_topics(inbound_text)
     pending = approved.get(conversation.pending_asset_id or "")
     consented = bool(pending and AFFIRMATIVE.match(inbound_text or ""))
@@ -571,7 +618,7 @@ def _execute_share_actions(
         metadata = approved.get(asset_id)
         if not metadata or asset_id in seen:
             continue
-        covered_tags.update(_requested_asset_tags(inbound_text).intersection(_asset_tags(metadata)))
+        covered_tags.update(requested_asset_tags.intersection(_asset_tags(metadata)))
         asset = db.query(ProjectSalesAsset).filter(
             ProjectSalesAsset.id == asset_id,
             ProjectSalesAsset.company_id == conversation.company_id,
@@ -598,6 +645,12 @@ def _execute_share_actions(
                 break
             if embedded.get("kind") not in {"virtual_tour", "location_map", "external_reference"}:
                 continue
+            # The approved file may contain several useful resources, but a
+            # request for floor plans must not unexpectedly fan out into maps,
+            # tours, and unrelated external references.
+            embedded_tag = str(embedded.get("kind") or "")
+            if requested_asset_tags and embedded_tag not in requested_asset_tags:
+                continue
             external_url, external_share = asset_share_service.issue(
                 db,
                 company_id=conversation.company_id,
@@ -616,7 +669,7 @@ def _execute_share_actions(
             break
     if links:
         cleaned = _reconcile_shared_asset_reply(reply)
-        missing_tags = _requested_asset_tags(inbound_text) - covered_tags
+        missing_tags = requested_asset_tags - covered_tags
         if missing_tags:
             labels = {
                 "brochure": "brochure", "floor_plan": "floor plans",
@@ -937,11 +990,10 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
             intervention_actions = [{
                 "type": "request_callback" if mandatory_reason == "HUMAN_REQUESTED" else "request_human_review",
             }]
-            create_intervention_case(
+            conversation, lead, intervention_case = _persist_intervention_before_confirmation(
                 db, conversation=conversation, lead=lead, reason=mandatory_reason,
                 evidence=inbound.content,
             )
-            db.commit()
             await _dispatch(
                 db, conversation=conversation, lead=lead,
                 content=_confirmed_handoff_reply(inbound.content, intervention_actions),
@@ -949,6 +1001,7 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
                 metadata={
                     "event_kind": "human_intervention",
                     "reason": mandatory_reason,
+                    "human_intervention_case_id": intervention_case.id,
                     "proposed_actions": intervention_actions,
                 },
                 idempotency_key=f"human-intervention:{conversation.id}:{inbound.id}",
@@ -994,8 +1047,9 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
             elif not available_assets and _asset_request_count(history, inbound.content) >= 2:
                 result["requires_human"] = True
                 actions = [*actions, {"type": "request_human_review", "reason": "approved_material_unavailable"}]
+        intervention_case = None
         if result.get("requires_human"):
-            create_intervention_case(
+            conversation, lead, intervention_case = _persist_intervention_before_confirmation(
                 db, conversation=conversation, lead=lead,
                 reason="LOW_CONFIDENCE" if not result.get("policy_violations") else "POLICY_VIOLATION",
                 evidence=inbound.content,
@@ -1008,11 +1062,12 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
                 reply=reply, actions=actions, commercial=commercial,
                 inbound_text=inbound.content,
             )
-        lead_history, lead_message_count = _lead_intelligence_input(history)
-        update_lead_intelligence(
-            db, lead, inbound_text=inbound.content,
-            conversation_text=lead_history, message_count=lead_message_count,
-        )
+        if not result.get("requires_human"):
+            lead_history, lead_message_count = _lead_intelligence_input(history)
+            update_lead_intelligence(
+                db, lead, inbound_text=inbound.content,
+                conversation_text=lead_history, message_count=lead_message_count,
+            )
         run.prompt_configuration_id = result.get("prompt_configuration_id")
         run.prompt_snapshot = result.get("prompt_snapshot", {})
         run.model = result.get("model", "unknown")
@@ -1022,6 +1077,16 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
             "requires_human": result.get("requires_human", False),
             "policy_violations": result.get("policy_violations", []),
             "error_code": result.get("error_code"),
+            "model_reason": result.get("model_reason"),
+            "data_conflicts": commercial.get("data_conflicts", []),
+            "addressed_topics": result.get("addressed_topics", []),
+            "selected_asset_ids": [
+                action.get("asset_id") for action in actions
+                if isinstance(action, dict) and action.get("type") == "share_asset" and action.get("asset_id")
+            ],
+            "handoff_requested": bool(result.get("requires_human")),
+            "handoff_case_id": getattr(intervention_case, "id", None),
+            "handoff_persisted": bool(intervention_case),
         }
         run.status = "blocked" if result.get("requires_human") else "completed"; run.completed_at = datetime.utcnow()
         conversation.updated_at = datetime.utcnow(); lead.last_interaction_at = datetime.utcnow()

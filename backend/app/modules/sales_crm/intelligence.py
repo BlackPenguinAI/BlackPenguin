@@ -229,6 +229,11 @@ def calculate_score(db: Session, lead: Lead, conversation_text: str, message_cou
 
 
 def update_lead_intelligence(db: Session, lead: Lead, *, inbound_text: str, conversation_text: str, message_count: int) -> None:
+    workflow_locked = bool(
+        lead.is_opt_out
+        or lead.agent_status in {"human_control", "appointment_confirmed"}
+        or lead.pipeline_stage == "S09_HANDOFF"
+    )
     objection = record_objection(db, lead, inbound_text)
     complete_context = f"{conversation_text} {inbound_text}"
     assign_segment(db, lead, complete_context)
@@ -245,16 +250,20 @@ def update_lead_intelligence(db: Session, lead: Lead, *, inbound_text: str, conv
         r"january|february|march|april|may|june|july|august|september|october|november|december)\b",
         inbound_text.casefold(),
     ))
-    if objection:
-        lead.pipeline_stage = "S07_OBJECTION"
-    elif appointment_signal:
-        lead.pipeline_stage = "S08_APPOINTMENT"
-    elif lead.assigned_segment:
-        lead.pipeline_stage = "S05_SEGMENTATION"
-    elif message_count >= 3:
-        lead.pipeline_stage = "S04_SCORING"
-    else:
-        lead.pipeline_stage = "S02_QUALIFICATION"
+    # Scoring and segmentation may continue for reporting, but they never own
+    # terminal/operational workflow state. In particular, a handoff must not
+    # be silently turned back into S04_SCORING.
+    if not workflow_locked:
+        if objection:
+            lead.pipeline_stage = "S07_OBJECTION"
+        elif appointment_signal:
+            lead.pipeline_stage = "S08_APPOINTMENT"
+        elif lead.assigned_segment:
+            lead.pipeline_stage = "S05_SEGMENTATION"
+        elif message_count >= 3:
+            lead.pipeline_stage = "S04_SCORING"
+        else:
+            lead.pipeline_stage = "S02_QUALIFICATION"
     db.add(lead)
 
 

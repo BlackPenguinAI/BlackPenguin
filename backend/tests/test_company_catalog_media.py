@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
 from sqlalchemy import create_engine
@@ -132,6 +132,29 @@ def test_property_type_payload_normalizes_utc_datetime_for_naive_database_column
 
     assert payload.inventory_updated_at == datetime(2026, 8, 14, 12, 0)
     assert payload.inventory_updated_at.tzinfo is None
+
+
+def test_property_type_payload_rejects_a_future_inventory_verification_date():
+    import pytest
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError, match="cannot be in the future"):
+        PropertyTypeCreate(
+            name="Oxford F", available_units=1, currency="USD",
+            inventory_updated_at=datetime.now(timezone.utc) + timedelta(days=7),
+        )
+
+
+def test_property_type_confirmation_rejects_legacy_future_inventory_dates():
+    item = ProjectPropertyType(
+        project_id="project-1", name="Oxford F", review_status="confirmed",
+        available_units=1, currency="USD",
+        inventory_updated_at=datetime.utcnow() + timedelta(days=7),
+    )
+
+    assert catalog_service.confirmation_field_errors(item)["inventory_updated_at"] == (
+        "Inventory verification date cannot be in the future."
+    )
 
 
 def test_latest_inventory_update_accepts_mixed_legacy_and_timezone_aware_values():

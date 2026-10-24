@@ -214,6 +214,7 @@ def build_sales_graph(db: Session):
         value = _json_object(raw)
         return {
             "intent": value.get("intent"),
+            "model_reason": value.get("reason") if isinstance(value.get("reason"), str) else None,
             "extracted_facts": value.get("extracted_facts") if isinstance(value.get("extracted_facts"), list) else [],
             "addressed_topics": value.get("addressed_topics") if isinstance(value.get("addressed_topics"), list) else [],
             "proposed_actions": value.get("proposed_actions") if isinstance(value.get("proposed_actions"), list) else [],
@@ -262,16 +263,35 @@ def build_sales_graph(db: Session):
         )
         if catalog_reply:
             reply = catalog_reply
+            # A conflict in one Project fact must not turn a safe catalog
+            # answer into a full human handoff. The unresolved fact remains
+            # explicit in the deterministic reply and is retained in the run
+            # snapshot for administrators to review.
+            if (state.get("commercial_context") or {}).get("data_conflicts") and not violations:
+                actions = [
+                    action for action in actions
+                    if not isinstance(action, dict) or action.get("type") != "request_human_review"
+                ]
         reply, supplemented_topics = complete_requested_commercial_topics(
             reply,
             inbound=state.get("inbound_text"),
             actions=actions,
             commercial=state.get("commercial_context") or {},
         )
-        reply = concise_channel_text(reply, state.get("channel", "sms"))
+        # Never truncate a confirmed property catalog. Telnyx can segment a
+        # long SMS, while WhatsApp supports a substantially larger body; the
+        # application must not silently hide approved options.
+        reply = (
+            plain_channel_text(reply)
+            if catalog_reply
+            else concise_channel_text(reply, state.get("channel", "sms"))
+        )
         if not reply:
             violations.append("missing_reply")
-        requires_human = bool(violations) or state.get("requires_human", False) or any(
+        model_requires_human = bool(state.get("requires_human", False))
+        if catalog_reply and (state.get("commercial_context") or {}).get("data_conflicts") and not violations:
+            model_requires_human = False
+        requires_human = bool(violations) or model_requires_human or any(
             isinstance(action, dict) and action.get("type") in {"request_callback", "request_human_review"}
             for action in actions
         )

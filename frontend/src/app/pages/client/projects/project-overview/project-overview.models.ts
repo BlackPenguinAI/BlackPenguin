@@ -45,6 +45,7 @@ export interface ProjectOverview {
   data_completeness: {
     percentage: number; onboarding_status: string; last_updated_at: string | null;
     final_approved: boolean; approved_for_sales_at: string | null; approved_by_user_id: string | null;
+    issues: Array<{ code: string; fields: string[]; message: string }>;
   };
   operations: {
     routing: string;

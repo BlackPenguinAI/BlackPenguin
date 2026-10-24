@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator, model_validator
@@ -398,9 +398,12 @@ class PropertyTypeBase(BaseModel):
     @field_validator("inventory_updated_at", mode="after")
     @classmethod
     def normalize_inventory_updated_at(cls, value: datetime | None) -> datetime | None:
-        if value is None or value.tzinfo is None:
+        if value is None:
             return value
-        return value.astimezone(timezone.utc).replace(tzinfo=None)
+        normalized = value if value.tzinfo is None else value.astimezone(timezone.utc).replace(tzinfo=None)
+        if normalized > datetime.utcnow() + timedelta(minutes=5):
+            raise ValueError("Inventory verification date cannot be in the future.")
+        return normalized
 
     @model_validator(mode="after")
     def validate_ranges(self):

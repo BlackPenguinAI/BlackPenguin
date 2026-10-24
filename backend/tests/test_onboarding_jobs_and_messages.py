@@ -1,4 +1,5 @@
 import ast
+from datetime import datetime, timezone
 import importlib.util
 import inspect
 from pathlib import Path
@@ -322,6 +323,61 @@ def test_confirmed_project_name_updates_the_canonical_project_in_the_same_unit_o
     assert project.name == "Riverstone Homes"
     assert profile.profile_data["project_name"] == "Riverstone Homes"
     assert db.add.call_args_list[0].args[0] is project
+
+
+def test_project_profile_conflict_keeps_the_latest_approval_and_reopens_the_older_fact(monkeypatch):
+    project = SimpleNamespace(
+        name="Coahuila 34", description=None, address=None, city=None, country=None,
+        onboarding_status="draft", onboarding_completed_at=None,
+        onboarding_approved_by_user_id=None,
+    )
+    profile = SimpleNamespace(
+        project=project,
+        profile_data={
+            "project_status": "Ready for occupancy",
+            "delivery_dates": str(datetime.now(timezone.utc).year),
+        },
+        field_states={
+            "project_status": {"status": "confirmed", "applicable": True},
+            "delivery_dates": {"status": "confirmed", "applicable": True},
+        },
+        field_sources={}, final_approved=False, approved_for_sales_at=None,
+        completion_percentage=0, is_fully_completed=False, sales_activation_status="not_ready",
+    )
+    db = Mock()
+    monkeypatch.setattr(project_services, "flag_modified", lambda *_args: None)
+    monkeypatch.setattr(project_services, "refresh_completion", lambda *_args: {})
+
+    result = project_services.apply_field_updates(
+        db, profile,
+        [project_services.user_field_update(
+            "delivery_dates", str(datetime.now(timezone.utc).year + 1),
+        )],
+        allow_authoritative_statuses=True, commit=False,
+    )
+
+    assert result.rejected == []
+    assert profile.field_states["delivery_dates"]["status"] == "confirmed"
+    assert profile.field_states["project_status"]["status"] == "conflicting"
+    assert profile.field_states["project_status"]["conflict_code"] == (
+        "ready_status_future_delivery"
+    )
+    assert profile.profile_data["project_status"] == "Ready for occupancy"
+
+
+def test_deferred_profile_fact_does_not_create_a_false_consistency_blocker():
+    conflicts = project_services.project_profile_consistency_conflicts(
+        {
+            "project_status": "Ready for occupancy",
+            "delivery_dates": str(datetime.now(timezone.utc).year + 1),
+        },
+        {
+            "project_status": {"status": "confirmed"},
+            "delivery_dates": {"status": "deferred"},
+        },
+    )
+
+    assert conflicts == []
 
 
 def test_project_chat_has_a_bounded_fallback_and_queues_file_extraction():

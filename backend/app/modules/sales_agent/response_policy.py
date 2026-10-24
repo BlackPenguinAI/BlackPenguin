@@ -153,6 +153,24 @@ def _topic_evidenced(topic: str, reply: str | None, actions: list[Any]) -> bool:
     return True
 
 
+def _render_fact_value(value: Any) -> str:
+    """Render approved structured values without leaking Python/JSON syntax."""
+    if isinstance(value, (list, tuple, set)):
+        return ", ".join(
+            rendered for item in value
+            if (rendered := _render_fact_value(item))
+        )
+    if isinstance(value, dict):
+        return ", ".join(
+            f"{str(key).replace('_', ' ')}: {_render_fact_value(item)}"
+            for key, item in value.items()
+            if item not in (None, "", [], {})
+        )
+    if isinstance(value, bool):
+        return "Yes" if value else "No"
+    return str(value).strip() if value is not None else ""
+
+
 def complete_requested_commercial_topics(
     reply: str | None, *, inbound: str | None, actions: list[Any], commercial: dict[str, Any],
 ) -> tuple[str | None, list[str]]:
@@ -197,7 +215,7 @@ def complete_requested_commercial_topics(
     if "financing" in missing:
         value = facts.get("payment_methods") or facts.get("financing_options") or facts.get("financing")
         if value:
-            additions.append(f"Payment and financing: {value}.")
+            additions.append(f"Payment and financing: {_render_fact_value(value)}.")
     if "delivery" in missing:
         value = facts.get("delivery_dates") or facts.get("delivery_timeline")
         if value:
@@ -266,7 +284,9 @@ def grounded_catalog_reply(inbound: str | None, commercial: dict[str, Any]) -> s
         lines.extend(["", "What would you like to review next about this option?"])
         return "\n".join(lines)
 
-    visible = items[:3]
+    # Every confirmed option must be visible. The summaries remain compact and
+    # the detailed view is reserved for the option selected by the lead.
+    visible = items
     project_name = str((commercial.get("confirmed_project_facts") or {}).get("project_name") or "").strip()
     lines = [
         f"{project_name} currently offers these confirmed home types:"
@@ -304,10 +324,10 @@ def grounded_catalog_reply(inbound: str | None, commercial: dict[str, Any]) -> s
         lines.extend(["", "Current pricing has not been confirmed."])
     if "inventory" in topics and not has_inventory:
         lines.extend(["", "Current unit availability has not been confirmed."])
-    if len(items) > len(visible):
-        lines.extend(["", f"There are {len(items) - len(visible)} more confirmed option(s). I can show them or narrow the list by bedrooms, area, or budget."])
-    else:
-        lines.extend(["", "Which option would you like to explore in more detail?"])
+    conflicts = {str(item.get("code")) for item in commercial.get("data_conflicts") or []}
+    if "delivery" in topics and "ready_status_future_delivery" in conflicts:
+        lines.extend(["", "The delivery timeline is currently being verified by the Sales team."])
+    lines.extend(["", "Which option would you like to explore in more detail?"])
     return "\n".join(lines)
 
 

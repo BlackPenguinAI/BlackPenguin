@@ -28,8 +28,8 @@ from app.modules.sales_crm.models import CalendarConnection, Lead, LeadScoreSnap
 from app.modules.sales_crm.scheduling import available_slots, next_cadence_time
 from app.modules.sales_agent.default_prompt import merge_sales_agent_defaults
 from app.modules.sales_agent.live_service import (
-    _lead_intelligence_input, ensure_contact, get_or_create_live_conversation, process_live_inbound,
-    process_live_inbound_job,
+    _lead_intelligence_input, _persist_intervention_before_confirmation,
+    ensure_contact, get_or_create_live_conversation, process_live_inbound, process_live_inbound_job,
 )
 from app.modules.sales_agent.models import SalesConversation, SalesInboundJob, SalesMessage
 from app.modules.sales_agent.live_worker import _claim_inbound_jobs
@@ -159,6 +159,48 @@ def test_appointment_intent_advances_stage_and_contributes_to_score():
     db.flush()
     assert lead.pipeline_stage == "S08_APPOINTMENT"
     assert lead.intent_tier in {"warm", "hot"}
+
+
+def test_persisted_handoff_is_durable_and_scoring_cannot_reopen_the_workflow():
+    db = _db()
+    company = Company(name="Tenant"); db.add(company); db.flush()
+    project = Project(company_id=company.id, name="Project", timezone="America/Lima")
+    db.add(project); db.flush()
+    lead = Lead(
+        company_id=company.id, project_id=project.id, full_name="Lead",
+        phone="+51999888777", source="manual", platform="manual",
+        agent_status="active", pipeline_stage="S04_SCORING",
+    )
+    db.add(lead); db.flush()
+    conversation = SalesConversation(
+        company_id=company.id, project_id=project.id, lead_id=lead.id,
+        channel="whatsapp", provider="telnyx", provider_thread_key="handoff-thread",
+        is_paused=False,
+    )
+    db.add(conversation); db.commit()
+
+    conversation, lead, case = _persist_intervention_before_confirmation(
+        db, conversation=conversation, lead=lead, reason="LOW_CONFIDENCE",
+        evidence="The approved Project data is insufficient for this request.",
+    )
+
+    assert case.status == "open"
+    assert case.evidence == "The approved Project data is insufficient for this request."
+    assert conversation.is_paused is True
+    assert conversation.pause_reason == "Human intervention: LOW_CONFIDENCE"
+    assert lead.agent_status == "human_control"
+    assert lead.pipeline_stage == "S09_HANDOFF"
+
+    update_lead_intelligence(
+        db, lead, inbound_text="I want a two bedroom next month.",
+        conversation_text="I want a two bedroom next month.", message_count=8,
+    )
+    db.commit(); db.refresh(lead)
+
+    assert lead.pipeline_stage == "S09_HANDOFF"
+    assert db.query(HumanInterventionCase).filter_by(id=case.id).one().evidence == (
+        "The approved Project data is insufficient for this request."
+    )
 
 
 @pytest.mark.parametrize("message", [

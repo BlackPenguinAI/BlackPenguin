@@ -181,6 +181,20 @@ def test_multi_topic_question_is_completed_from_confirmed_context():
     assert {"inventory", "pricing", "financing"}.issubset(supplemented)
 
 
+def test_structured_financing_value_is_rendered_without_python_syntax():
+    reply, _ = complete_requested_commercial_topics(
+        "I can review the purchase options.",
+        inbound="Do you offer financing?",
+        actions=[],
+        commercial={
+            "confirmed_project_facts": {"payment_methods": ["Bank financing", "Cash"]},
+        },
+    )
+
+    assert "Payment and financing: Bank financing, Cash." in reply
+    assert "['" not in reply
+
+
 def test_catalog_reply_separates_items_and_never_invents_missing_commercial_values():
     reply = grounded_catalog_reply(
         "Which unit types, prices and available units do you have?",
@@ -224,4 +238,24 @@ def test_catalog_reply_expands_only_the_selected_property_type():
     assert "• Confirmed availability: 3 units" in reply
     assert "One bedroom" not in reply
     assert "Loft" not in reply
+
+
+def test_catalog_reply_lists_every_confirmed_property_type_and_flags_only_conflicted_delivery():
+    property_types = [
+        {"property_type": f"Option {index}", "bedrooms": index}
+        for index in range(1, 6)
+    ]
+
+    reply = grounded_catalog_reply(
+        "What types of units do you have and when will they be ready?",
+        {
+            "property_types": property_types,
+            "confirmed_project_facts": {"project_name": "Riverside"},
+            "data_conflicts": [{"code": "ready_status_future_delivery"}],
+        },
+    )
+
+    assert all(f"{index}. Option {index}" in reply for index in range(1, 6))
+    assert "more confirmed option" not in reply
+    assert "delivery timeline is currently being verified" in reply
 

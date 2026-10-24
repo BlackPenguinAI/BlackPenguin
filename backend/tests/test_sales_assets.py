@@ -213,7 +213,8 @@ def test_approved_brochure_with_floor_plans_is_selected_for_a_plan_request():
     source.extracted_text = "Depto. 508 Nivel 5 56.62 m². Recorrido 360."
     asset = ProjectSalesAsset(
         company_id=company.id, project_id=project.id, source_id=source.id,
-        asset_type="brochure", display_name="Project brochure", approval_status="approved",
+        asset_type="brochure", content_tags=["brochure", "floor_plan"],
+        display_name="Project brochure", approval_status="approved",
         approved_at=datetime.utcnow(), allowed_channels=["whatsapp"],
     )
     db.add(asset); db.commit()
@@ -222,7 +223,7 @@ def test_approved_brochure_with_floor_plans_is_selected_for_a_plan_request():
     )
 
     available = context["available_assets"]
-    assert available[0]["capabilities"] == ["floor_plans", "virtual_tour"]
+    assert available[0]["capabilities"] == ["floor_plans"]
     assert _select_asset_for_request(available, "Can you send me the floor plans?")["asset_id"] == asset.id
     assert _denies_available_asset("I cannot send brochures directly.") is True
 
@@ -302,20 +303,28 @@ def test_explicit_material_request_issues_secure_link_without_redundant_confirma
         provider="telnyx", channel="whatsapp", is_paused=False,
     )
     db.add(conversation); db.commit()
-    monkeypatch.setattr(
-        asset_share_service, "issue",
-        lambda *_args, **_kwargs: ("https://blackpenguin.ai/a/token", type("Share", (), {"id": "share-1"})()),
-    )
+    issued_targets = []
+
+    def issue(*_args, **kwargs):
+        issued_targets.append(kwargs.get("target_url"))
+        return "https://blackpenguin.ai/a/token", type("Share", (), {"id": "share-1"})()
+
+    monkeypatch.setattr(asset_share_service, "issue", issue)
     reply, _, shares = _execute_share_actions(
         db, conversation=conversation, lead=type("Lead", (), {"id": "lead-1"})(),
         run=type("Run", (), {"id": "run-1"})(), reply="I can help.", actions=[],
         commercial={"available_assets": [{
             "asset_id": asset.id, "name": asset.display_name, "asset_type": "brochure",
-            "capabilities": ["floor_plans"], "links": [],
+            "capabilities": ["floor_plans"], "links": [
+                {"url": "https://maps.example/project", "label": "Location map", "kind": "location_map"},
+                {"url": "https://tour.example/project", "label": "360 tour", "kind": "virtual_tour"},
+            ],
         }]}, inbound_text="Can you send me the floor plans?",
     )
     assert "https://blackpenguin.ai/a/token" in reply
     assert shares == ["share-1"]
+    assert issued_targets == [None]
+    assert "Location map" not in reply and "360 tour" not in reply
     assert conversation.pending_asset_id is None
 
 
@@ -497,3 +506,48 @@ def test_shared_asset_reconciliation_removes_denial_and_email_promise_only():
     )
     cleaned = _reconcile_shared_asset_reply(reply)
     assert cleaned == "The confirmed starting price is 250,000 USD."
+
+
+def test_shared_asset_reconciliation_preserves_catalog_line_breaks():
+    reply = (
+        "Confirmed home types:\n\n"
+        "1. Studio\n"
+        "   42 m².\n\n"
+        "2. Two bedrooms\n"
+        "   80–95 m².\n\n"
+        "I can't provide the floor plans directly."
+    )
+
+    cleaned = _reconcile_shared_asset_reply(reply)
+
+    assert "1. Studio\n" in cleaned
+    assert "\n\n2. Two bedrooms\n" in cleaned
+    assert "can't provide" not in cleaned
+
+
+def test_location_map_source_text_cannot_masquerade_as_floor_plan_capability():
+    db = _db()
+    company, project, source = _project_source(db)
+    source.kind = ProjectSourceKind.URL
+    source.storage_path = None
+    source.extracted_text = "Apartments, units and 56.62 m² floor plan information."
+    source.extracted_links = [{
+        "url": "https://example.com/map", "label": "Location map",
+        "kind": "location_map", "page": None,
+    }]
+    asset = ProjectSalesAsset(
+        company_id=company.id, project_id=project.id, source_id=source.id,
+        asset_type="location_map", content_tags=["location_map"],
+        display_name="Project map", approval_status="approved",
+        approved_at=datetime.utcnow(), allowed_channels=["whatsapp"],
+    )
+    db.add_all([source, asset]); db.commit()
+
+    context = build_commercial_context(
+        db, project=project, company_id=company.id, lead_id="lead-1", channel="whatsapp",
+    )
+
+    assert context["available_assets"][0]["capabilities"] == ["location_map"]
+    assert _select_assets_for_request(
+        context["available_assets"], "Please send the blueprints.",
+    ) == []

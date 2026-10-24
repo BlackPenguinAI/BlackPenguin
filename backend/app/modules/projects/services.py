@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 import re
 from typing import Any
@@ -41,6 +41,61 @@ class QuestionResolution:
     reason: str | None = None
     question: ProjectMessage | None = None
     action: str | None = None
+
+
+def project_profile_consistency_conflicts(
+    data: dict[str, Any],
+    states: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
+    """Return cross-field conflicts without deleting their source evidence."""
+    def is_active(field: str) -> bool:
+        if states is None:
+            return True
+        return str((states.get(field) or {}).get("status") or "") in {
+            "confirmed", "corrected_by_user", "conflicting",
+        }
+
+    conflicts: list[dict[str, Any]] = []
+    status = str(data.get("project_status") or "").casefold()
+    delivery = str(data.get("delivery_dates") or data.get("delivery_timeline") or "")
+    ready_now = any(
+        term in status
+        for term in ("ready for occupancy", "move-in ready", "ready to move", "completed")
+    )
+    delivery_years = [int(value) for value in re.findall(r"\b20\d{2}\b", delivery)]
+    if (
+        is_active("project_status")
+        and (is_active("delivery_dates") or is_active("delivery_timeline"))
+        and ready_now
+        and any(year > datetime.now(timezone.utc).year for year in delivery_years)
+    ):
+        conflicts.append({
+            "code": "ready_status_future_delivery",
+            "fields": ["project_status", "delivery_dates"],
+            "message": "Development status conflicts with the approved future delivery date.",
+        })
+    inventory_value = data.get("inventory_updated_at")
+    if inventory_value and is_active("inventory_updated_at"):
+        try:
+            inventory_date = datetime.fromisoformat(str(inventory_value).replace("Z", "+00:00"))
+            inventory_aware = (
+                inventory_date.replace(tzinfo=timezone.utc)
+                if inventory_date.tzinfo is None
+                else inventory_date.astimezone(timezone.utc)
+            )
+            if inventory_aware > datetime.now(timezone.utc):
+                conflicts.append({
+                    "code": "future_inventory_timestamp",
+                    "fields": ["inventory_updated_at"],
+                    "message": "Inventory verification date cannot be in the future.",
+                })
+        except (TypeError, ValueError):
+            conflicts.append({
+                "code": "invalid_inventory_timestamp",
+                "fields": ["inventory_updated_at"],
+                "message": "Inventory verification date is invalid.",
+            })
+    return conflicts
 
 
 def check_project_limits(db: Session, company_id: str) -> None:
@@ -501,6 +556,47 @@ def apply_field_updates(
             profile.project.city = str(value)[:100]
         elif key == "country" and value:
             profile.project.country = str(value)[:100]
+    accepted_fields = {item["field"] for item in accepted}
+    active_conflict_codes: set[str] = set()
+    for conflict in project_profile_consistency_conflicts(data, states):
+        code = str(conflict["code"])
+        active_conflict_codes.add(code)
+        fields = [str(field) for field in conflict.get("fields", [])]
+        recently_updated = [field for field in fields if field in accepted_fields]
+        # When one side of a relational conflict was just approved, preserve
+        # that latest decision and reopen the older counterpart. If both sides
+        # arrived together (or the conflict already existed), both require an
+        # explicit review.
+        fields_to_mark = (
+            [field for field in fields if field not in recently_updated]
+            if len(recently_updated) == 1 and len(fields) > 1
+            else fields
+        )
+        for field in fields_to_mark:
+            current = dict(states.get(field, {}))
+            previous_status = current.get("status", "pending_confirmation")
+            states[field] = {
+                **current,
+                "status": "conflicting",
+                "applicable": current.get("applicable", True),
+                "conflict_code": code,
+                "previous_status": (
+                    current.get("previous_status")
+                    if current.get("status") == "conflicting"
+                    else previous_status
+                ),
+            }
+    for field, state in list(states.items()):
+        if (
+            isinstance(state, dict)
+            and state.get("status") == "conflicting"
+            and state.get("conflict_code")
+            and state.get("conflict_code") not in active_conflict_codes
+        ):
+            restored = dict(state)
+            restored["status"] = restored.pop("previous_status", "pending_confirmation")
+            restored.pop("conflict_code", None)
+            states[field] = restored
     if accepted and profile.project.onboarding_status == "completed":
         profile.final_approved = False
         profile.approved_for_sales_at = None
@@ -592,7 +688,8 @@ def serialize_project(project: Project) -> dict[str, Any]:
 
 
 def readiness_for_confirmation(db: Session, project: Project) -> tuple[bool, list[str]]:
-    completion = refresh_completion(get_profile(project))
+    profile = get_profile(project)
+    completion = refresh_completion(profile)
     reasons: list[str] = []
     if not completion["required_fields_complete"]:
         reasons.append("required_fields")
@@ -611,6 +708,11 @@ def readiness_for_confirmation(db: Session, project: Project) -> tuple[bool, lis
         ProjectSalesAsset.approval_status == "draft",
     ).first():
         reasons.append("pending_sales_materials")
+    for conflict in project_profile_consistency_conflicts(
+        profile.profile_data or {}, profile.field_states or {},
+    ):
+        if conflict["code"] not in reasons:
+            reasons.append(str(conflict["code"]))
     return not reasons, reasons
 
 
@@ -734,6 +836,19 @@ def serialize_overview(db: Session, project: Project, viewer_user: User | None =
         ProjectPropertyType.project_id == project.id,
         ProjectPropertyType.review_status == "confirmed",
     ).order_by(ProjectPropertyType.sort_order, ProjectPropertyType.created_at).all()
+    data_quality_issues = project_profile_consistency_conflicts(data, profile.field_states or {})
+    future_inventory_ids = {
+        item.id for item in property_types
+        if item.inventory_updated_at is not None and item.inventory_updated_at > datetime.utcnow()
+    }
+    if future_inventory_ids and not any(
+        issue.get("code") == "future_inventory_timestamp" for issue in data_quality_issues
+    ):
+        data_quality_issues.append({
+            "code": "future_inventory_timestamp",
+            "fields": ["inventory_updated_at"],
+            "message": "One or more property types have a future inventory verification date.",
+        })
     sales_materials = db.query(ProjectSalesAsset).filter(
         ProjectSalesAsset.project_id == project.id,
         ProjectSalesAsset.company_id == project.company_id,
@@ -746,7 +861,7 @@ def serialize_overview(db: Session, project: Project, viewer_user: User | None =
                 "typology": item.name,
                 "total": item.total_units,
                 "sold": max(0, item.total_units - item.available_units) if item.total_units is not None and item.available_units is not None else None,
-                "available": item.available_units,
+                "available": None if item.id in future_inventory_ids else item.available_units,
                 "starting_price": float(item.starting_price) if item.starting_price is not None else None,
                 "currency": item.currency,
                 "description": item.description,
@@ -782,15 +897,20 @@ def serialize_overview(db: Session, project: Project, viewer_user: User | None =
                       "bedrooms": None, "bathrooms": None, "area_min": None, "area_max": None,
                       "area_unit": None, "images_status": "pending", "images": []} for item in raw_typologies]
 
-    available_count = sum(item.available_units or 0 for item in property_types) if property_types else (sum(1 for unit in units if unit.status == "available") if units else None)
+    trusted_property_types = [item for item in property_types if item.id not in future_inventory_ids]
+    available_count = (
+        sum(item.available_units or 0 for item in trusted_property_types)
+        if property_types and trusted_property_types
+        else (sum(1 for unit in units if unit.status == "available") if units else None)
+    )
     revenue = sum(float(unit.list_price) for unit in units if unit.status == "sold" and unit.list_price is not None) if units else None
     currency = data.get("currency")
     starting_price = data.get("starting_price")
     has_starting_price = starting_price not in (None, "")
     metrics = [
         {"key": "available_inventory", "label": "Available Inventory", "value": available_count,
-         "display_value": str(available_count) if available_count is not None else str(data.get("available_inventory") or "Pending"),
-         "status": "available" if available_count is not None or data.get("available_inventory") else "pending"},
+         "display_value": str(available_count) if available_count is not None else "Pending verification",
+         "status": "available" if available_count is not None else "pending"},
         {"key": "starting_price", "label": "Starting Price", "value": starting_price,
          "display_value": format_overview_money(starting_price, currency),
          "status": "available" if has_starting_price else "pending"},
@@ -888,7 +1008,8 @@ def serialize_overview(db: Session, project: Project, viewer_user: User | None =
                               "last_updated_at": profile.updated_at,
                               "final_approved": profile.final_approved,
                               "approved_for_sales_at": profile.approved_for_sales_at,
-                              "approved_by_user_id": project.onboarding_approved_by_user_id},
+                              "approved_by_user_id": project.onboarding_approved_by_user_id,
+                              "issues": data_quality_issues},
         "operations": {
             "routing": data.get("appointment_routing") or "round_robin",
             "assigned_sales": [

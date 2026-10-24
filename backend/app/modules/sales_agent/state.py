@@ -23,6 +23,7 @@ class SalesAgentState(TypedDict, total=False):
     prompt_snapshot: dict[str, Any]
     prompt_configuration_id: str | None
     model: str
+    model_reason: str | None
     intent: str | None
     extracted_facts: list[dict[str, Any]]
     addressed_topics: list[str]

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 import re
 from typing import Any
@@ -56,6 +56,11 @@ def confirmation_field_errors(item: ProjectPropertyType) -> dict[str, str]:
         errors["currency"] = "Select a currency when a price is provided."
     if item.available_units is not None and item.inventory_updated_at is None:
         errors["inventory_updated_at"] = "Select the verification date when availability is provided."
+    if (
+        item.inventory_updated_at is not None
+        and _utc_naive(item.inventory_updated_at) > datetime.utcnow() + timedelta(minutes=5)
+    ):
+        errors["inventory_updated_at"] = "Inventory verification date cannot be in the future."
     if item.total_units is not None and item.available_units is not None and item.available_units > item.total_units:
         errors["available_units"] = "Available units cannot exceed total units."
     if item.area_min is not None and item.area_max is not None and item.area_min > item.area_max:

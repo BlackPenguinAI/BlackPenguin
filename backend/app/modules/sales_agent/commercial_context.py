@@ -49,24 +49,22 @@ def _trusted_inventory_date(value: datetime | None) -> datetime | None:
 
 
 def _asset_capabilities(item: Any) -> list[str]:
-    """Infer non-sensitive capabilities from an approved source's extracted text."""
-    source_text = item.source.extracted_text if item.source else ""
-    text = f"{item.display_name or ''} {item.description or ''} {source_text or ''}".casefold()
+    """Return only administrator-approved capabilities for a sales asset.
+
+    Extracted source text may contain many unrelated facts. Using it here made
+    a reviewed location-map asset look like a floor-plan asset merely because
+    its source page also discussed units. Once an administrator approves the
+    asset, its explicit type/tags and reviewed embedded-link kinds are the
+    disclosure boundary.
+    """
     capabilities: list[str] = []
-    floor_plan_terms = ("floor plan", "blueprint", "plano", "planta arquitect")
-    looks_like_unit_plans = bool(
-        re.search(r"\b(?:depto\.?|departamento|garden house|unit)\b", text)
-        and re.search(r"\b\d+(?:[.,]\d+)?\s*m(?:²|2)\b", text)
-    )
-    tags = set(item.content_tags or [item.asset_type])
-    if "floor_plan" in tags or item.asset_type == "floor_plan" or any(term in text for term in floor_plan_terms) or looks_like_unit_plans:
+    tags = {str(value) for value in (item.content_tags or [item.asset_type]) if value}
+    if "floor_plan" in tags or item.asset_type == "floor_plan":
         capabilities.append("floor_plans")
-    if "recorrido 360" in text or "virtual tour" in text or "matterport" in text:
-        capabilities.append("virtual_tour")
     link_kinds = {str(link.get("kind") or "") for link in ((item.source.extracted_links or []) if item.source else [])}
-    if "virtual_tour" in link_kinds and "virtual_tour" not in capabilities:
+    if "virtual_tour" in tags or item.asset_type == "virtual_tour" or "virtual_tour" in link_kinds:
         capabilities.append("virtual_tour")
-    if "location_map" in link_kinds:
+    if "location_map" in tags or item.asset_type == "location_map" or "location_map" in link_kinds:
         capabilities.append("location_map")
     return capabilities
 
