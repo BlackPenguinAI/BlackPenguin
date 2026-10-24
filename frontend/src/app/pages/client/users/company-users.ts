@@ -56,9 +56,13 @@ export class CompanyUsersComponent implements OnInit {
     this.editingUserId = user.id;
     this.invite = {
       first_name: user.first_name || '', last_name: user.last_name || '', email: user.email,
-      role: user.role === 'admin' ? 'assistant' : user.role, is_active: user.is_active,
+      role: user.role, is_active: user.is_active,
       timezone: user.timezone || this.companyTimezone, project_access_scope: user.project_access_scope || 'all',
       project_ids: [...(user.project_ids || [])],
+      sales_enabled: user.sales_enabled ?? (user.role === 'admin' || user.role === 'sales'),
+      marketing_enabled: user.marketing_enabled ?? (user.role === 'admin' || user.role === 'mkt'),
+      accepts_new_leads: user.accepts_new_leads ?? (user.role === 'admin' || user.role === 'sales'),
+      accepts_appointments: user.accepts_appointments ?? (user.role === 'admin' || user.role === 'sales'),
     };
     this.showAddModal = true;
   }
@@ -69,7 +73,12 @@ export class CompanyUsersComponent implements OnInit {
     if (!this.formValid) return;
     this.saving = true;
     const request = this.editingUserId
-      ? this.companyUsers.update(this.editingUserId, {
+      ? this.companyUsers.update(this.editingUserId, this.editingAdministrator ? {
+          project_access_scope: this.invite.project_access_scope || 'all', project_ids: this.invite.project_ids || [],
+          sales_enabled: !!this.invite.sales_enabled, marketing_enabled: !!this.invite.marketing_enabled,
+          accepts_new_leads: !!this.invite.sales_enabled && !!this.invite.accepts_new_leads,
+          accepts_appointments: !!this.invite.sales_enabled && !!this.invite.accepts_appointments,
+        } : {
           first_name: this.invite.first_name, last_name: this.invite.last_name, role: this.invite.role,
           is_active: this.invite.is_active, timezone: this.invite.timezone || this.companyTimezone,
           project_access_scope: this.invite.project_access_scope || 'all', project_ids: this.invite.project_ids || [],
@@ -131,6 +140,7 @@ export class CompanyUsersComponent implements OnInit {
   }
 
   get administrator(): CompanyUser | undefined { return this.users.find(user => user.role === 'admin'); }
+  get editingAdministrator(): boolean { return this.users.find(user => user.id === this.editingUserId)?.role === 'admin'; }
   get teamUsers(): CompanyUser[] { return this.users.filter(user => user.role !== 'admin'); }
   roleLabel(role: CompanyUserRole): string { return ({ admin: 'Administrator', assistant: 'Assistant', mkt: 'Marketing', sales: 'Sales' })[role]; }
   projectName(projectId: string): string { return this.projects.find(item => item.id === projectId)?.name || 'Unavailable Project'; }
@@ -144,12 +154,13 @@ export class CompanyUsersComponent implements OnInit {
   get formValid(): boolean {
     return !!(this.invite.first_name.trim() && this.invite.last_name.trim() &&
       /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(this.invite.email.trim()) &&
-      ((this.invite.project_access_scope || 'all') === 'all' || (this.invite.project_ids || []).length > 0));
+      ((this.invite.project_access_scope || 'all') === 'all' || this.editingAdministrator || (this.invite.project_ids || []).length > 0));
   }
 
   private emptyForm(): CompanyUserInvite {
     return { first_name: '', last_name: '', email: '', role: 'assistant', is_active: true,
-      timezone: this.companyTimezone, project_access_scope: 'all', project_ids: [] };
+      timezone: this.companyTimezone, project_access_scope: 'all', project_ids: [],
+      sales_enabled: false, marketing_enabled: false, accepts_new_leads: false, accepts_appointments: false };
   }
   private invitationRequestKey(): string {
     const fingerprint = JSON.stringify({

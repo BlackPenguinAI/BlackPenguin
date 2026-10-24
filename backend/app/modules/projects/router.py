@@ -28,7 +28,7 @@ from app.modules.system_settings import services as system_settings_service
 from app.modules.project_team.models import ProjectUserAssignment
 from app.modules.users.models import SALES_ACTOR_ROLES, TENANT_MANAGER_ROLES, User, UserRole
 from app.modules.users.project_access import project_ids_for_user, require_project_access
-from app.modules.governance.services import request_fingerprint
+from app.modules.governance.services import record_platform_event, request_fingerprint
 
 from . import asset_share_service, catalog_service, meta_oauth_service, meta_service, sales_asset_service, services, source_service, storage_service
 from .completion import FIELD_BY_KEY
@@ -615,8 +615,15 @@ def update_project_timezone(
     except ZoneInfoNotFoundError as exc:
         raise HTTPException(status_code=422, detail="Unknown timezone.") from exc
     project = services.get_project(db, project_id, current_user.company_id)
+    previous_timezone = project.timezone
     project.timezone = payload.timezone
-    db.add(project); db.commit(); db.refresh(project)
+    db.add(project)
+    record_platform_event(
+        db, actor=current_user, event_type="PROJECT_TIMEZONE_UPDATED",
+        entity_type="project", entity_id=project.id, company_id=project.company_id,
+        payload={"before": previous_timezone, "after": payload.timezone},
+    )
+    db.commit(); db.refresh(project)
     return services.serialize_project(project)
 
 

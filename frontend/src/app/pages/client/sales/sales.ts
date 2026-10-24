@@ -23,6 +23,7 @@ export class SalesComponent implements OnInit {
   readonly timezoneLabel = timezoneLabel;
   loading = true; saving = false; availabilitySaving = false; attachmentSaving = false; projectTimezoneSaving = false;
   error = ''; success = ''; selected: any = null; selectedLead: any = null; selectedDay: Date | null = null; editingBlock: any = null;
+  scheduleStatus = 'ready'; scheduleMessage = '';
   leadLoading = false; chatOpen = false; persistedStatus = ''; blockStart = '09:00'; blockEnd = '17:00'; closingDate = '';
   rangeStartDate = ''; rangeEndDate = ''; selectedWeekdays = [0, 1, 2, 3, 4, 5, 6];
   readonly weekdayOptions = [
@@ -102,8 +103,12 @@ export class SalesComponent implements OnInit {
     this.http.get<any>(`${API_V1_URL}/sales/schedule?start=${encodeURIComponent(range.start)}&end=${encodeURIComponent(range.end)}${userFilter}${projectFilter}`).subscribe({
       next: data => {
         this.salesUsers = data.sales_users || this.salesUsers;
+        if (this.salesUserId && !this.salesUsers.some(user => user.id === this.salesUserId)) this.salesUserId = '';
         this.administratorSalesUserId = this.salesUsers.find(user => user.role === 'admin')?.id || '';
         const dedicatedSalesUsers = this.salesUsers.filter(user => user.role === 'sales');
+        if (this.projectId && !this.salesUserId && this.salesUsers.length === 1) {
+          this.salesUserId = this.salesUsers[0].id;
+        }
         if (this.role === 'admin' && !this.salesUserId && !dedicatedSalesUsers.length) {
           this.salesUserId = this.administratorSalesUserId;
         }
@@ -269,9 +274,9 @@ export class SalesComponent implements OnInit {
   closeChat(): void { this.chatOpen = false; }
   hasEvidence(): boolean { return (this.selected?.attachments || []).some((item: any) => item.kind === 'sale_evidence'); }
 
-  private acceptSchedule(data: any): void { this.meetings = data.meetings || []; this.availability = data.availability || []; this.loading = false; this.cdr.markForCheck(); }
+  private acceptSchedule(data: any): void { this.meetings = data.meetings || []; this.availability = data.availability || []; this.scheduleStatus = data.schedule_status || 'ready'; this.scheduleMessage = data.schedule_message || ''; this.loading = false; this.cdr.markForCheck(); }
   private loadProfile(): void { this.http.get<any>(`${API_V1_URL}/users/me`).subscribe({ next: profile => { this.userTimezone = canonicalTimezone(profile.timezone || 'UTC'); if (!this.projectId) this.timezone = this.userTimezone; this.cdr.markForCheck(); } }); }
-  private loadProjects(): void { this.http.get<any[]>(`${API_V1_URL}/projects/`).subscribe({ next: rows => { this.projects = rows || []; this.cdr.markForCheck(); } }); }
+  private loadProjects(): void { this.http.get<any[]>(`${API_V1_URL}/projects/`).subscribe({ next: rows => { this.projects = rows || []; if (!this.projectId && this.projects.length === 1) { this.projectId = this.projects[0].id; this.timezone = canonicalTimezone(this.projects[0].timezone || this.userTimezone); if (this.isManager) this.loadLeads(); this.reload(); } this.cdr.markForCheck(); } }); }
   private loadLeads(): void { this.http.get<any[]>(`${API_V1_URL}/sales/projects/${this.projectId}/leads-report`).subscribe({ next: rows => { this.leads = rows || []; this.cdr.markForCheck(); }, error: () => { this.leads = []; this.cdr.markForCheck(); } }); }
   private loadCalendarConnection(): void {
     this.http.get<any>(`${API_V1_URL}/sales/calendar/google/platform-status`).subscribe({ next: value => { this.calendarPlatformAvailable = !!value.available; this.cdr.markForCheck(); } });

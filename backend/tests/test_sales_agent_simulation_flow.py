@@ -91,7 +91,11 @@ def _fixture(db):
     )
     db.add_all([profile, campaign, product]); db.flush()
     for user in (sales_a, sales_b):
-        db.add(ProjectUserAssignment(project_id=project.id, user_id=user.id, responsibility="sales", is_active=True, accepts_new_leads=True))
+        db.add(ProjectUserAssignment(
+            project_id=project.id, user_id=user.id, responsibility="sales",
+            sales_enabled=True, accepts_appointments=True,
+            is_active=True, accepts_new_leads=True,
+        ))
         for weekday in range(7):
             db.add(SalesAvailabilityWindow(user_id=user.id, weekday=weekday, start_time="00:00", end_time="23:59", timezone="UTC"))
     db.add(AIConfiguration(company_id=company.id, openrouter_api_key="test", agent_ventas={

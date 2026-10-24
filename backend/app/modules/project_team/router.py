@@ -34,6 +34,9 @@ def _serialize(item: ProjectUserAssignment) -> dict:
         "project_id": item.project_id,
         "user_id": item.user_id,
         "responsibility": item.responsibility,
+        "sales_enabled": item.sales_enabled,
+        "marketing_enabled": item.marketing_enabled,
+        "accepts_appointments": item.accepts_appointments,
         "is_primary": item.is_primary,
         "routing_weight": item.routing_weight,
         "accepts_new_leads": item.accepts_new_leads,
@@ -91,7 +94,14 @@ def upsert_assignment(
         ProjectUserAssignment.user_id == user_id,
     ).first() or ProjectUserAssignment(project_id=project_id, user_id=user_id)
     for key, value in payload.model_dump(exclude={"user_id"}).items():
-        setattr(item, key, value)
+        if value is not None:
+            setattr(item, key, value)
+    if payload.sales_enabled is None:
+        item.sales_enabled = payload.responsibility == "sales"
+    if payload.marketing_enabled is None:
+        item.marketing_enabled = payload.responsibility == "marketing"
+    if payload.accepts_appointments is None:
+        item.accepts_appointments = item.sales_enabled
     if payload.is_primary:
         db.query(ProjectUserAssignment).filter(
             ProjectUserAssignment.project_id == project_id,
@@ -142,11 +152,19 @@ def invite_and_assign_sales_user(
                 project_id=project_id,
                 user_id=user.id,
                 responsibility="sales",
+                sales_enabled=True,
+                marketing_enabled=False,
+                accepts_appointments=True,
                 is_active=True,
                 accepts_new_leads=True,
             )
             db.add(assignment)
             db.flush()
+        assignment.sales_enabled = True
+        assignment.marketing_enabled = False
+        assignment.accepts_appointments = True
+        assignment.accepts_new_leads = True
+        assignment.is_active = True
         assignment.is_primary = payload.is_primary
         db.commit()
         assignment = db.query(ProjectUserAssignment).options(joinedload(ProjectUserAssignment.user)).filter(

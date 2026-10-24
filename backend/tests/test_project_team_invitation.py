@@ -10,7 +10,7 @@ from app.modules.companies.models import Company
 from app.modules.project_team.models import ProjectUserAssignment
 from app.modules.project_team.router import invite_and_assign_sales_user, list_sales_candidates, upsert_assignment
 from app.modules.project_team.schemas import AssignmentUpsert, SalesUserInviteAndAssign
-from app.modules.project_team.service import eligible_sales_assignments
+from app.modules.project_team.service import eligible_appointment_assignments, eligible_sales_assignments
 from app.modules.projects.models import Project
 from app.modules.subscriptions.models import SubscriptionPlan
 from app.modules.users.models import User, UserAuthStatus, UserRole
@@ -110,5 +110,31 @@ def test_company_administrator_can_be_assigned_as_project_sales_without_an_extra
                 administrator,
             )
         assert denied.value.status_code == 422
+    finally:
+        db.close(); engine.dispose()
+
+
+def test_appointment_eligibility_is_independent_from_new_lead_routing():
+    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    Base.metadata.create_all(engine)
+    db = sessionmaker(bind=engine)()
+    try:
+        company = Company(name="Capabilities", is_active=True)
+        db.add(company); db.flush()
+        administrator = User(
+            company_id=company.id, email="admin@capabilities.test", role=UserRole.ADMIN,
+            hashed_password="unused", is_active=True,
+        )
+        project = Project(company_id=company.id, name="Project", is_active=True)
+        db.add_all([administrator, project]); db.flush()
+        db.add(ProjectUserAssignment(
+            project_id=project.id, user_id=administrator.id, responsibility="sales",
+            sales_enabled=True, marketing_enabled=True, is_active=True,
+            accepts_new_leads=False, accepts_appointments=True,
+        ))
+        db.commit()
+
+        assert eligible_sales_assignments(db, project.id) == []
+        assert [item.user_id for item in eligible_appointment_assignments(db, project.id)] == [administrator.id]
     finally:
         db.close(); engine.dispose()

@@ -14,15 +14,19 @@ ROUND_ROBIN_DESCRIPTION = (
 )
 
 
-def eligible_sales_assignments(db: Session, project_id: str) -> list[ProjectUserAssignment]:
+def _sales_assignments(db: Session, project_id: str, *, for_appointments: bool) -> list[ProjectUserAssignment]:
+    capability = (
+        ProjectUserAssignment.accepts_appointments
+        if for_appointments else ProjectUserAssignment.accepts_new_leads
+    )
     return (
         db.query(ProjectUserAssignment)
         .join(User, User.id == ProjectUserAssignment.user_id)
         .filter(
             ProjectUserAssignment.project_id == project_id,
-            ProjectUserAssignment.responsibility == "sales",
+            ProjectUserAssignment.sales_enabled.is_(True),
             ProjectUserAssignment.is_active.is_(True),
-            ProjectUserAssignment.accepts_new_leads.is_(True),
+            capability.is_(True),
             User.is_active.is_(True),
             User.role.in_(SALES_ACTOR_ROLES),
         )
@@ -31,11 +35,27 @@ def eligible_sales_assignments(db: Session, project_id: str) -> list[ProjectUser
     )
 
 
+def eligible_lead_routing_assignments(db: Session, project_id: str) -> list[ProjectUserAssignment]:
+    """Sales-capable users that may receive a new lead through round robin."""
+    return _sales_assignments(db, project_id, for_appointments=False)
+
+
+def eligible_appointment_assignments(db: Session, project_id: str) -> list[ProjectUserAssignment]:
+    """Sales-capable users whose availability may be offered for appointments."""
+    return _sales_assignments(db, project_id, for_appointments=True)
+
+
+def eligible_sales_assignments(db: Session, project_id: str) -> list[ProjectUserAssignment]:
+    """Backward-compatible alias for lead-routing eligibility."""
+    return eligible_lead_routing_assignments(db, project_id)
+
+
 def select_next_sales_user(
     db: Session,
     project_id: str,
     *,
     eligible_user_ids: set[str] | None = None,
+    for_appointments: bool = False,
 ) -> str | None:
     """Select the next eligible user while locking the project routing cursor."""
     state = (
@@ -48,7 +68,10 @@ def select_next_sales_user(
         state = ProjectRoutingState(project_id=project_id, policy="round_robin")
         db.add(state)
         db.flush()
-    assignments = eligible_sales_assignments(db, project_id)
+    assignments = (
+        eligible_appointment_assignments(db, project_id)
+        if for_appointments else eligible_lead_routing_assignments(db, project_id)
+    )
     if eligible_user_ids is not None:
         assignments = [item for item in assignments if item.user_id in eligible_user_ids]
     if not assignments:

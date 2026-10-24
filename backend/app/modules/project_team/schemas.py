@@ -9,6 +9,9 @@ class AssignmentUpsert(BaseModel):
     is_primary: bool = False
     routing_weight: int = Field(default=100, ge=0, le=1000)
     accepts_new_leads: bool = True
+    sales_enabled: bool | None = None
+    marketing_enabled: bool | None = None
+    accepts_appointments: bool | None = None
     is_active: bool = True
 
 

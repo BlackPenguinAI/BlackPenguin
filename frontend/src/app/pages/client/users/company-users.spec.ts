@@ -49,4 +49,25 @@ describe('CompanyUsersComponent', () => {
     expect((component as any).invitationResultMessage(user)).toContain('User quota@example.com was saved.');
     expect((component as any).invitationResultMessage(user)).toContain('Use Resend invitation');
   });
+
+  it('loads the administrator operational roles without changing the administrator identity', () => {
+    const component = new CompanyUsersComponent({} as any, {} as any, {} as any);
+    const administrator = {
+      id: 'admin-1', email: 'admin@example.com', first_name: 'Company', last_name: 'Admin',
+      role: 'admin', is_active: true, project_access_scope: 'selected', project_ids: ['project-1'],
+      project_assignment_required: false, auth_status: 'active', sales_enabled: true,
+      marketing_enabled: true, accepts_new_leads: false, accepts_appointments: true,
+    } as any;
+    component.users = [administrator];
+
+    component.openEditModal(administrator);
+
+    expect(component.editingAdministrator).toBe(true);
+    expect(component.invite.role).toBe('admin');
+    expect(component.invite.project_ids).toEqual(['project-1']);
+    expect(component.invite.sales_enabled).toBe(true);
+    expect(component.invite.marketing_enabled).toBe(true);
+    expect(component.invite.accepts_new_leads).toBe(false);
+    expect(component.invite.accepts_appointments).toBe(true);
+  });
 });

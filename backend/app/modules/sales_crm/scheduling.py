@@ -6,7 +6,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from app.modules.project_team.service import eligible_sales_assignments, select_next_sales_user
+from app.modules.project_team.service import eligible_appointment_assignments, select_next_sales_user
 from app.modules.users.models import User
 from app.integrations.gcalendar_client import (
     calendar_busy_ranges,
@@ -305,7 +305,7 @@ def eligible_users_for_slot(
     starts_at = starts_at.replace(tzinfo=None) if starts_at.tzinfo else starts_at
     ends_at = starts_at + timedelta(minutes=duration_minutes)
     eligible = []
-    for assignment in eligible_sales_assignments(db, project_id):
+    for assignment in eligible_appointment_assignments(db, project_id):
         date_blocks = availability_blocks_for_user(
             db, user_id=assignment.user_id, starts_at=starts_at, ends_at=ends_at,
         )
@@ -351,7 +351,7 @@ def available_slots(
         cursor += timedelta(minutes=30)
     end = after + timedelta(days=days)
     external_busy_by_user: dict[str, list[tuple[datetime, datetime]]] = {}
-    for assignment in eligible_sales_assignments(db, project_id):
+    for assignment in eligible_appointment_assignments(db, project_id):
         connection = db.query(CalendarConnection).filter(
             CalendarConnection.user_id == assignment.user_id,
             CalendarConnection.provider == "google",
@@ -394,7 +394,7 @@ def create_agent_appointment(
     # availability. This serializes overlapping bookings even when the same
     # person is assigned to multiple Projects.
     candidate_ids = sorted({
-        assignment.user_id for assignment in eligible_sales_assignments(db, lead.project_id)
+        assignment.user_id for assignment in eligible_appointment_assignments(db, lead.project_id)
     })
     if candidate_ids:
         db.query(User).filter(User.id.in_(candidate_ids)).order_by(User.id).with_for_update().all()
@@ -410,6 +410,7 @@ def create_agent_appointment(
         db,
         lead.project_id,
         eligible_user_ids=set(eligible_user_ids),
+        for_appointments=True,
     )
     if not assigned_user_id:
         raise HTTPException(status_code=409, detail="No eligible Sales user is available for this time.")

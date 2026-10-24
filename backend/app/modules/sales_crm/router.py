@@ -23,7 +23,7 @@ from app.integrations.gcalendar_client import authorization_url, exchange_code, 
 from app.modules.auth.deps import RoleChecker
 from app.modules.users.models import SALES_ACTOR_ROLES, TENANT_MANAGER_ROLES, User, UserRole
 from app.modules.users.project_access import project_ids_for_user, require_project_access
-from app.modules.project_team.service import eligible_sales_assignments
+from app.modules.project_team.service import eligible_appointment_assignments
 from app.modules.system_settings.models import CalendarOAuthAttempt
 from app.modules.system_settings.services import get_google_calendar_config, google_calendar_credentials
 
@@ -634,6 +634,8 @@ def get_company_sales_schedule(
     if sales_user_id and sales_user_id not in allowed_ids:
         raise HTTPException(status_code=404, detail="Sales user not found.")
     selected_ids = {sales_user_id} if sales_user_id else allowed_ids
+    schedule_status = "ready"
+    schedule_message = None
     start_value = start.astimezone(timezone.utc).replace(tzinfo=None) if start.tzinfo else start
     end_value = end.astimezone(timezone.utc).replace(tzinfo=None) if end.tzinfo else end
     meetings_query = db.query(Meeting).join(Project, Project.id == Meeting.project_id).filter(
@@ -644,16 +646,22 @@ def get_company_sales_schedule(
     )
     if project_id:
         require_project_access(db, current_user, project_id)
-        project_sales_ids = {assignment.user_id for assignment in eligible_sales_assignments(db, project_id)}
+        project_sales_ids = {assignment.user_id for assignment in eligible_appointment_assignments(db, project_id)}
         selected_ids &= project_sales_ids
         sales_users = [user for user in sales_users if user.id in project_sales_ids]
         meetings_query = meetings_query.filter(Meeting.project_id == project_id)
+        if not project_sales_ids:
+            schedule_status = "no_sales_assignments"
+            schedule_message = "No Sales-capable users are assigned to receive appointments for this Project."
     meetings = [] if not selected_ids else meetings_query.order_by(Meeting.meeting_time).all()
     blocks = [] if not selected_ids else db.query(SalesAvailabilityBlock).filter(
         SalesAvailabilityBlock.user_id.in_(selected_ids),
         SalesAvailabilityBlock.ends_at > start_value,
         SalesAvailabilityBlock.starts_at < end_value,
     ).order_by(SalesAvailabilityBlock.starts_at).all()
+    if project_id and schedule_status == "ready" and not blocks:
+        schedule_status = "assigned_users_without_availability"
+        schedule_message = "Assigned Sales users do not have availability in the selected period."
     names = {user.id: " ".join(filter(None, [user.first_name, user.last_name])) or user.email for user in sales_users}
     availability = []
     for block in blocks:
@@ -664,6 +672,8 @@ def get_company_sales_schedule(
         "sales_users": sales_users,
         "availability": availability,
         "meetings": [_meeting_response(meeting, db) for meeting in meetings],
+        "schedule_status": schedule_status,
+        "schedule_message": schedule_message,
     }
 
 

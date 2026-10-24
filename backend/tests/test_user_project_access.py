@@ -15,7 +15,8 @@ from app.modules.project_team.models import ProjectUserAssignment
 from app.modules.projects.models import Project
 from app.modules.users.models import User, UserProjectAccess, UserRole
 from app.modules.users.project_access import (
-    project_ids_for_user, sync_all_scope_users_for_project, sync_user_project_access,
+    operational_project_ids_for_user, project_ids_for_user,
+    sync_all_scope_users_for_project, sync_user_project_access,
 )
 
 
@@ -63,6 +64,37 @@ def test_selected_scope_is_validated_and_does_not_assign_other_company_projects(
     with pytest.raises(HTTPException) as error:
         sync_user_project_access(db, user=user, scope="selected", project_ids=[foreign.id])
     assert error.value.status_code == 422
+
+
+def test_administrator_is_operational_sales_and_marketing_by_default_but_keeps_management_access_when_limited():
+    _, db = _db()
+    company = Company(name="Tenant", is_active=True)
+    db.add(company); db.flush()
+    first = Project(company_id=company.id, name="First", is_active=True)
+    second = Project(company_id=company.id, name="Second", is_active=True)
+    administrator = User(
+        company_id=company.id, email="admin@example.test", hashed_password="x",
+        role=UserRole.ADMIN, project_access_scope="all",
+    )
+    db.add_all([first, second, administrator]); db.flush()
+
+    sync_user_project_access(db, user=administrator, scope="all", project_ids=[])
+    db.commit()
+    assignments = db.query(ProjectUserAssignment).filter_by(user_id=administrator.id).all()
+    assert {item.project_id for item in assignments} == {first.id, second.id}
+    assert all(item.sales_enabled and item.marketing_enabled and item.accepts_appointments for item in assignments)
+
+    sync_user_project_access(
+        db, user=administrator, scope="selected", project_ids=[first.id],
+        sales_enabled=True, marketing_enabled=True,
+        accepts_new_leads=False, accepts_appointments=True,
+    )
+    db.commit()
+    assert set(project_ids_for_user(db, administrator)) == {first.id, second.id}
+    assert operational_project_ids_for_user(db, administrator) == [first.id]
+    selected = db.query(ProjectUserAssignment).filter_by(user_id=administrator.id, project_id=first.id).one()
+    assert selected.accepts_new_leads is False
+    assert selected.accepts_appointments is True
 
 
 def test_migration_auto_assigns_only_unambiguous_legacy_users(monkeypatch):

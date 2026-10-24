@@ -50,6 +50,27 @@ EXPLICIT_ASSET_SHARE = re.compile(
 )
 
 
+def _no_slot_alternative_selection(
+    db: Session, *, conversation_id: str, inbound_text: str,
+) -> str | None:
+    """Resolve the two alternatives from the latest no-slots response only."""
+    latest = db.query(SalesMessage).filter(
+        SalesMessage.conversation_id == conversation_id,
+        SalesMessage.direction == "outbound",
+    ).order_by(SalesMessage.created_at.desc()).first()
+    offer = (latest.metadata_json or {}).get("appointment_offer") if latest else None
+    if not isinstance(offer, dict) or offer.get("slots"):
+        return None
+    if not re.search(r"another day|sales team|otro d[ií]a|equipo (?:de )?ventas", latest.content, re.IGNORECASE):
+        return None
+    normalized = re.sub(r"[^a-záéíóúñ0-9]+", " ", inbound_text.casefold()).strip()
+    if re.fullmatch(r"(?:(?:the|la) )?(?:1|first|first option|primero|primera|primera opción|primera opcion)", normalized):
+        return "another_day"
+    if re.fullmatch(r"(?:(?:the|la) )?(?:2|second|second option|segundo|segunda|segunda opción|segunda opcion)", normalized):
+        return "callback"
+    return None
+
+
 def normalize_phone(value: str) -> str:
     digits = "".join(character for character in value if character.isdigit())
     return f"+{digits}"
@@ -1008,6 +1029,53 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
             )
             return
         event_id = f"{conversation.provider}:{inbound.provider_message_id or inbound.id}"
+        no_slot_choice = _no_slot_alternative_selection(
+            db, conversation_id=conversation.id, inbound_text=inbound.content,
+        )
+        if no_slot_choice == "callback":
+            actions = [{"type": "request_callback"}]
+            conversation, lead, intervention_case = _persist_intervention_before_confirmation(
+                db, conversation=conversation, lead=lead, reason="HUMAN_REQUESTED",
+                evidence=inbound.content,
+            )
+            await _dispatch(
+                db, conversation=conversation, lead=lead,
+                content=_confirmed_handoff_reply(inbound.content, actions),
+                role="assistant", agent_run_id=None,
+                metadata={
+                    "event_kind": "deterministic_no_slot_callback",
+                    "human_intervention_case_id": intervention_case.id,
+                    "proposed_actions": actions,
+                },
+                idempotency_key=f"no-slot-callback:{conversation.id}:{inbound.id}",
+            )
+            return
+        if no_slot_choice == "another_day":
+            run = _prepare_run(
+                db, conversation=conversation, event_id=event_id,
+                message_id=inbound.id, model="deterministic/appointment-routing",
+            )
+            if run is None:
+                return
+            reply = "Of course. What day and preferred time would work best for your visit?"
+            actions = [{"type": "request_available_slots"}]
+            run.output_snapshot = {
+                "reply": reply, "proposed_actions": actions,
+                "requires_human": False, "policy_violations": [], "error_code": None,
+            }
+            run.status = "completed"; run.completed_at = datetime.utcnow()
+            db.add(run); db.commit()
+            await _dispatch(
+                db, conversation=conversation, lead=lead, content=reply,
+                role="assistant", agent_run_id=run.id,
+                metadata={
+                    "event_kind": "deterministic_no_slot_new_date",
+                    "appointment_offer": {"slots": [], "project_timezone": project.timezone or "UTC"},
+                    "proposed_actions": actions,
+                },
+                idempotency_key=f"no-slot-new-date:{conversation.id}:{inbound.id}",
+            )
+            return
         if await _process_deterministic_appointment_turn(
             db, conversation=conversation, lead=lead, project=project,
             inbound=inbound, event_id=event_id,

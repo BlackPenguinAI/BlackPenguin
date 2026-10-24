@@ -9,6 +9,7 @@
 
   <div *ngIf="error" class="notice error">{{error}}<button (click)="error=''">×</button></div>
   <div *ngIf="success" class="notice success">{{success}}<button (click)="success=''">×</button></div>
+  <div *ngIf="projectId && scheduleMessage" class="notice" [class.error]="scheduleStatus==='no_sales_assignments'">{{scheduleMessage}}</div>
 
   <nav class="schedule-tabs" aria-label="Schedule sections">
     <button [class.active]="section==='availability'" (click)="setSection('availability')"><span class="material-symbols-outlined">event_available</span><span><b>Available time slots</b><small>Create and maintain working blocks</small></span></button>

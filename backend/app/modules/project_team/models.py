@@ -15,6 +15,11 @@ class ProjectUserAssignment(Base):
     project_id = Column(String(36), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
     user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     responsibility = Column(String(30), nullable=False)
+    # Capability flags are deliberately independent. ``responsibility`` is
+    # retained for backwards compatibility with older clients and audit data.
+    sales_enabled = Column(Boolean, default=False, server_default="false", nullable=False)
+    marketing_enabled = Column(Boolean, default=False, server_default="false", nullable=False)
+    accepts_appointments = Column(Boolean, default=False, server_default="false", nullable=False)
     is_primary = Column(Boolean, default=False, nullable=False)
     routing_weight = Column(Integer, default=100, nullable=False)
     accepts_new_leads = Column(Boolean, default=True, nullable=False)

@@ -76,6 +76,10 @@ class TenantUserUpdate(BaseModel):
     timezone: Optional[str] = Field(default=None, min_length=1, max_length=80)
     project_access_scope: Optional[Literal["all", "selected"]] = None
     project_ids: Optional[List[str]] = None
+    sales_enabled: Optional[bool] = None
+    marketing_enabled: Optional[bool] = None
+    accepts_new_leads: Optional[bool] = None
+    accepts_appointments: Optional[bool] = None
 
 
 class TenantUserResponse(BaseModel):
@@ -91,6 +95,10 @@ class TenantUserResponse(BaseModel):
     project_access_scope: Literal["all", "selected"] = "all"
     project_ids: List[str] = Field(default_factory=list)
     project_assignment_required: bool = False
+    sales_enabled: bool = False
+    marketing_enabled: bool = False
+    accepts_new_leads: bool = False
+    accepts_appointments: bool = False
     auth_status: str = "active"
     invitation_sent_at: Optional[datetime] = None
     invitation_status: Optional[str] = None

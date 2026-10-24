@@ -233,6 +233,8 @@ class SalesUserOption(BaseModel):
 
 class ManagerSalesScheduleResponse(SalesScheduleResponse):
     sales_users: List[SalesUserOption]
+    schedule_status: str = "ready"
+    schedule_message: Optional[str] = None
 
 
 class CalendarConnectionUpdate(BaseModel):

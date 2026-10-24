@@ -13,9 +13,9 @@
         <p class="font-medium">{{ administrator.first_name }} {{ administrator.last_name }}</p>
         <p class="text-sm text-gray-400">{{ administrator.email }}</p>
       </div>
-      <span class="rounded-full border border-secondary/20 bg-secondary/10 px-3 py-1 text-xs text-secondary">{{ authStatusLabel(administrator) }}</span>
+      <div class="flex items-center gap-3"><span class="rounded-full border border-secondary/20 bg-secondary/10 px-3 py-1 text-xs text-secondary">{{ authStatusLabel(administrator) }}</span><button type="button" (click)="openEditModal(administrator)" class="text-sm text-white hover:text-secondary">Edit Project roles</button></div>
     </div>
-    <p class="mt-3 text-xs text-gray-500">Created with the Company and managed only from the Black Penguin administration panel.</p>
+    <p class="mt-3 text-xs text-gray-500">The administrator keeps Company management access. Project Sales, Marketing, lead-routing and appointment participation can be configured here.</p>
   </section>
 
   <section *ngIf="limits" class="grid gap-3 sm:grid-cols-3">
@@ -43,12 +43,12 @@
 <app-modal [isOpen]="showAddModal" [title]="editingUserId ? 'Edit Company User' : 'Add Company User'" maxWidthClass="max-w-2xl" (close)="closeAddModal()">
   <form (ngSubmit)="saveUser()" class="flex flex-col gap-4">
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <app-input label="First Name" placeholder="John" [(ngModel)]="invite.first_name" name="first_name"></app-input>
-      <app-input label="Last Name" placeholder="Doe" [(ngModel)]="invite.last_name" name="last_name"></app-input>
+      <app-input label="First Name" placeholder="John" [(ngModel)]="invite.first_name" name="first_name" [disabled]="editingAdministrator"></app-input>
+      <app-input label="Last Name" placeholder="Doe" [(ngModel)]="invite.last_name" name="last_name" [disabled]="editingAdministrator"></app-input>
     </div>
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
       <app-input label="Email address" type="email" placeholder="name@example.com" [(ngModel)]="invite.email" name="email" [disabled]="!!editingUserId"></app-input>
-      <div *ngIf="editingUserId" class="flex items-center justify-between self-end h-[46px] rounded-xl border border-white/10 bg-white/5 p-2.5">
+      <div *ngIf="editingUserId && !editingAdministrator" class="flex items-center justify-between self-end h-[46px] rounded-xl border border-white/10 bg-white/5 p-2.5">
         <div><span class="block text-xs font-mono uppercase tracking-widest text-gray-300">User Status</span><small class="text-[10px] text-gray-500">Access starts after email activation</small></div>
         <label class="relative inline-flex cursor-pointer items-center"><input type="checkbox" [(ngModel)]="invite.is_active" name="is_active" class="sr-only peer"><div class="w-9 h-5 rounded-full bg-white/10 peer peer-checked:bg-secondary after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all peer-checked:after:translate-x-full"></div></label>
       </div>
@@ -56,14 +56,21 @@
         Status: Pending activation
       </div>
     </div>
-    <div class="flex flex-col gap-1.5"><label class="ml-1 text-[10px] font-bold uppercase tracking-widest text-gray-500">Role</label><select [(ngModel)]="invite.role" name="role" class="w-full rounded-xl border border-white/10 bg-black/50 px-4 py-3 text-sm text-white outline-none focus:border-secondary"><option value="assistant">Assistant</option><option value="mkt">Marketing</option><option value="sales">Sales</option></select><small class="text-xs text-gray-500">Sales users belong only to this Company and see only leads assigned to them.</small></div>
-    <div class="rounded-xl border border-white/10 bg-white/[0.02] p-4 space-y-3">
+    <div *ngIf="!editingAdministrator" class="flex flex-col gap-1.5"><label class="ml-1 text-[10px] font-bold uppercase tracking-widest text-gray-500">Role</label><select [(ngModel)]="invite.role" name="role" class="w-full rounded-xl border border-white/10 bg-black/50 px-4 py-3 text-sm text-white outline-none focus:border-secondary"><option value="assistant">Assistant</option><option value="mkt">Marketing</option><option value="sales">Sales</option></select><small class="text-xs text-gray-500">Sales users belong only to this Company and see only leads assigned to them.</small></div>
+    <div *ngIf="editingAdministrator" class="rounded-xl border border-secondary/20 bg-secondary/5 p-4 space-y-3">
+      <div><p class="text-[10px] font-bold uppercase tracking-widest text-secondary">Operational Project roles</p><p class="mt-1 text-xs text-gray-400">Company administration access remains available even when a Project is excluded here.</p></div>
+      <label class="flex items-center gap-3 text-sm"><input type="checkbox" [(ngModel)]="invite.sales_enabled" name="sales_enabled" class="accent-yellow-400">Act as Sales</label>
+      <label class="flex items-center gap-3 text-sm"><input type="checkbox" [(ngModel)]="invite.marketing_enabled" name="marketing_enabled" class="accent-yellow-400">Act as Marketing</label>
+      <label class="flex items-center gap-3 text-sm" [class.opacity-50]="!invite.sales_enabled"><input type="checkbox" [(ngModel)]="invite.accepts_new_leads" name="accepts_new_leads" [disabled]="!invite.sales_enabled" class="accent-yellow-400">Receive new leads through round robin</label>
+      <label class="flex items-center gap-3 text-sm" [class.opacity-50]="!invite.sales_enabled"><input type="checkbox" [(ngModel)]="invite.accepts_appointments" name="accepts_appointments" [disabled]="!invite.sales_enabled" class="accent-yellow-400">Receive appointments</label>
+    </div>
+    <div class="rounded-xl border border-white/10 bg-white/[0.02] p-4 space-y-3" *ngIf="!editingAdministrator">
       <div><label class="ml-1 text-[10px] font-bold uppercase tracking-widest text-gray-500">Timezone</label><p class="mt-1 text-xs text-gray-500">Preselected from this device. Search by city, IANA zone or UTC offset.</p></div>
       <app-timezone-select [value]="invite.timezone || 'UTC'" (valueChange)="invite.timezone = $event" ariaLabel="Company user timezone"></app-timezone-select>
       <span *ngIf="!editingUserId" class="text-[10px] text-gray-500">Defaults to the Company timezone ({{ companyTimezone }}).</span>
     </div>
     <div class="rounded-xl border border-white/10 bg-white/[0.02] p-4 space-y-3">
-      <label class="text-[10px] font-bold uppercase tracking-widest text-gray-500">Project access</label>
+      <label class="text-[10px] font-bold uppercase tracking-widest text-gray-500">{{editingAdministrator?'Operational Projects':'Project access'}}</label>
       <label class="flex gap-3"><input type="radio" [(ngModel)]="invite.project_access_scope" name="project_scope" value="all" class="accent-yellow-400"><span><strong class="text-sm">All current and future Projects</strong><small class="block text-xs text-gray-500">New Projects will be included automatically.</small></span></label>
       <label class="flex gap-3"><input type="radio" [(ngModel)]="invite.project_access_scope" name="project_scope" value="selected" class="accent-yellow-400"><span><strong class="text-sm">Selected Projects</strong><small class="block text-xs text-gray-500">Limit this user to the checked Projects.</small></span></label>
       <div *ngIf="invite.project_access_scope === 'selected'" class="grid gap-2 sm:grid-cols-2">
@@ -74,7 +81,8 @@
     <p *ngIf="!editingUserId" class="rounded-xl border border-secondary/15 bg-secondary/5 p-3 text-xs text-gray-300">
       Black Penguin will email a secure Firebase activation link. Work and personal email addresses are accepted, and the user creates their own password.
     </p>
-    <p *ngIf="invite.project_access_scope === 'selected' && !(invite.project_ids || []).length" class="text-xs text-amber-300">Select at least one Project.</p>
+    <p *ngIf="invite.project_access_scope === 'selected' && !(invite.project_ids || []).length && !editingAdministrator" class="text-xs text-amber-300">Select at least one Project.</p>
+    <p *ngIf="invite.project_access_scope === 'selected' && !(invite.project_ids || []).length && editingAdministrator" class="text-xs text-amber-300">The administrator will keep Company management access but will not participate operationally in any Project.</p>
     <div class="sticky bottom-0 z-10 mt-3 flex justify-end gap-3 border-t border-white/10 bg-[#111111]/95 py-4 backdrop-blur"><app-button variant="ghost" (onClick)="closeAddModal()">Cancel</app-button><app-button type="submit" variant="secondary" [isLoading]="saving" [disabled]="!formValid">{{ editingUserId ? 'Save Changes' : 'Send Invitation' }}</app-button></div>
   </form>
 </app-modal>

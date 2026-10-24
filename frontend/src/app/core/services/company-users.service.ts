@@ -20,6 +20,10 @@ export interface CompanyUser {
   project_access_scope?: 'all' | 'selected';
   project_ids?: string[];
   project_assignment_required: boolean;
+  sales_enabled?: boolean;
+  marketing_enabled?: boolean;
+  accepts_new_leads?: boolean;
+  accepts_appointments?: boolean;
   auth_status: 'invited' | 'active' | 'suspended' | 'provisioning_failed' | 'migration_required';
   invitation_sent_at?: string;
   invitation_status?: string;
@@ -34,14 +38,18 @@ export interface CompanyUserInvite {
   first_name: string;
   last_name: string;
   email: string;
-  role: InvitableCompanyUserRole;
+  role: CompanyUserRole;
   is_active: boolean;
   timezone?: string;
   project_access_scope?: 'all' | 'selected';
   project_ids?: string[];
+  sales_enabled?: boolean;
+  marketing_enabled?: boolean;
+  accepts_new_leads?: boolean;
+  accepts_appointments?: boolean;
 }
 
-export interface CompanyUserUpdate extends Omit<CompanyUserInvite, 'email'> {}
+export interface CompanyUserUpdate extends Partial<Omit<CompanyUserInvite, 'email'>> {}
 
 export interface CompanyProjectOption { id: string; name: string; }
 export interface CompanyUserDefaults { timezone: string; }

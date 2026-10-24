@@ -8,7 +8,7 @@ from app.db.postgres import get_db
 from app.modules.auth.deps import get_current_user, RoleChecker
 from app.core.security import verify_password, get_password_hash, verify_email_token
 from .models import TENANT_MANAGER_ROLES, User, UserAuthStatus, UserRole
-from .project_access import project_ids_for_user, sync_user_project_access
+from .project_access import operational_project_ids_for_user, project_ids_for_user, sync_user_project_access
 from . import services
 from .schemas import (
     CompanyProjectOption, CompanyUserDefaultsResponse, MyProfileUpdate, MyProfileResponse, PasswordUpdatePayload, SetPasswordPayload,
@@ -16,6 +16,7 @@ from .schemas import (
 )
 from app.modules.companies.models import Company
 from app.modules.projects.models import Project
+from app.modules.project_team.models import ProjectUserAssignment
 from app.modules.governance.schemas import DeletePayload, UserStatusPayload
 from app.modules.governance.services import record_platform_event
 from app.integrations import firebase_admin_client
@@ -25,14 +26,25 @@ router = APIRouter()
 
 
 def _tenant_user_response(db: Session, user: User, *, request_replayed: bool = False) -> dict:
-    project_ids = project_ids_for_user(db, user)
+    project_ids = (
+        operational_project_ids_for_user(db, user)
+        if user.role == UserRole.ADMIN else project_ids_for_user(db, user)
+    )
+    assignments = db.query(ProjectUserAssignment).filter(
+        ProjectUserAssignment.user_id == user.id,
+        ProjectUserAssignment.is_active.is_(True),
+    ).all()
     invitation = services.latest_user_invitation(db, user.id)
     return {
         "id": user.id, "email": user.email, "first_name": user.first_name,
         "last_name": user.last_name, "phone": user.phone, "country": user.country,
         "timezone": user.timezone or "UTC", "role": user.role, "is_active": user.is_active,
-        "project_access_scope": "all" if user.role == UserRole.ADMIN else (user.project_access_scope or "all"),
+        "project_access_scope": user.project_access_scope or "all",
         "project_ids": project_ids,
+        "sales_enabled": any(item.sales_enabled for item in assignments),
+        "marketing_enabled": any(item.marketing_enabled for item in assignments),
+        "accepts_new_leads": any(item.sales_enabled and item.accepts_new_leads for item in assignments),
+        "accepts_appointments": any(item.sales_enabled and item.accepts_appointments for item in assignments),
         "auth_status": user.auth_status.value if hasattr(user.auth_status, "value") else str(user.auth_status or "active").lower(),
         "invitation_sent_at": user.invitation_sent_at,
         "invitation_status": invitation.status if invitation else None,
@@ -340,19 +352,25 @@ def update_company_user(
     user = db.query(User).filter(User.id == user_id, User.company_id == current_user.company_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found.")
-    if user.role == UserRole.ADMIN:
-        raise HTTPException(
-            status_code=403,
-            detail="The Company administrator can only be managed from the superadmin Company panel.",
-        )
+    previous_operational = [{
+        "project_id": item.project_id, "sales_enabled": item.sales_enabled,
+        "marketing_enabled": item.marketing_enabled,
+        "accepts_new_leads": item.accepts_new_leads,
+        "accepts_appointments": item.accepts_appointments, "is_active": item.is_active,
+    } for item in db.query(ProjectUserAssignment).filter(ProjectUserAssignment.user_id == user.id).all()]
+    is_administrator = user.role == UserRole.ADMIN
     try:
         next_role = UserRole(payload.role) if payload.role is not None else user.role
     except ValueError as exc:
         raise HTTPException(status_code=422, detail="Role must be assistant, mkt or sales.") from exc
-    if next_role not in services.INVITABLE_TENANT_ROLES:
+    if is_administrator and payload.role is not None:
+        raise HTTPException(status_code=422, detail="The Company administrator role cannot be changed here.")
+    if not is_administrator and next_role not in services.INVITABLE_TENANT_ROLES:
         raise HTTPException(status_code=422, detail="Role must be assistant, mkt or sales.")
     next_active = payload.is_active if payload.is_active is not None else user.is_active
-    if next_active and (not user.is_active or next_role != user.role):
+    if is_administrator and payload.is_active is not None and payload.is_active != user.is_active:
+        raise HTTPException(status_code=422, detail="The Company administrator status is managed from the Black Penguin admin panel.")
+    if not is_administrator and next_active and (not user.is_active or next_role != user.role):
         company = db.query(Company).options(joinedload(Company.plan)).filter(
             Company.id == current_user.company_id,
         ).first()
@@ -364,7 +382,10 @@ def update_company_user(
             raise HTTPException(status_code=422, detail="Unknown timezone.") from exc
     values = payload.model_dump(
         exclude_unset=True,
-        exclude={"is_active", "project_access_scope", "project_ids", "role"},
+        exclude={
+            "is_active", "project_access_scope", "project_ids", "role",
+            "sales_enabled", "marketing_enabled", "accepts_new_leads", "accepts_appointments",
+        },
     )
     for key, value in values.items():
         setattr(user, key, value)
@@ -372,8 +393,31 @@ def update_company_user(
     if payload.is_active is not None and payload.is_active != user.is_active:
         services.set_user_enabled(db, user=user, enabled=payload.is_active)
     scope = payload.project_access_scope or user.project_access_scope or "all"
-    selected_ids = payload.project_ids if payload.project_ids is not None else project_ids_for_user(db, user)
-    sync_user_project_access(db, user=user, scope=scope, project_ids=selected_ids)
+    current_project_ids = (
+        operational_project_ids_for_user(db, user)
+        if is_administrator else project_ids_for_user(db, user)
+    )
+    selected_ids = payload.project_ids if payload.project_ids is not None else current_project_ids
+    sync_user_project_access(
+        db, user=user, scope=scope, project_ids=selected_ids,
+        allow_empty_selected=is_administrator,
+        sales_enabled=payload.sales_enabled,
+        marketing_enabled=payload.marketing_enabled,
+        accepts_new_leads=payload.accepts_new_leads,
+        accepts_appointments=payload.accepts_appointments,
+    )
+    db.flush()
+    current_operational = [{
+        "project_id": item.project_id, "sales_enabled": item.sales_enabled,
+        "marketing_enabled": item.marketing_enabled,
+        "accepts_new_leads": item.accepts_new_leads,
+        "accepts_appointments": item.accepts_appointments, "is_active": item.is_active,
+    } for item in db.query(ProjectUserAssignment).filter(ProjectUserAssignment.user_id == user.id).all()]
+    record_platform_event(
+        db, actor=current_user, event_type="USER_PROJECT_CAPABILITIES_UPDATED",
+        entity_type="user", entity_id=user.id, company_id=user.company_id,
+        payload={"before": previous_operational, "after": current_operational},
+    )
     db.commit()
     db.refresh(user)
     return _tenant_user_response(db, user)

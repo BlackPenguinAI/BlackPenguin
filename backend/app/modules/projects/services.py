@@ -132,6 +132,20 @@ def create_project_with_onboarding(db: Session, *, company_id: str, payload: dic
     # A Project currently operates in the same market as its Company. Keep the
     # persisted Project value for compatibility, but never trust a client value.
     payload["country"] = inherited_country
+    if not payload.get("timezone") or payload.get("timezone") == "UTC":
+        location = " ".join(str(payload.get(key) or "") for key in ("city", "address")).casefold()
+        known_city_timezones = {
+            "ciudad de méxico": "America/Mexico_City",
+            "ciudad de mexico": "America/Mexico_City",
+            "mexico city": "America/Mexico_City",
+            "lima": "America/Lima",
+            "chicago": "America/Chicago",
+            "miami": "America/New_York",
+        }
+        payload["timezone"] = next(
+            (zone for city, zone in known_city_timezones.items() if city in location),
+            payload.get("timezone") or "UTC",
+        )
     project = Project(**payload, company_id=company_id, is_active=True)
     db.add(project)
     db.flush()

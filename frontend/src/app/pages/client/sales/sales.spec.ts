@@ -133,4 +133,22 @@ describe('SalesComponent scheduling view', () => {
     expect(component.administratorSalesUserId).toBe('admin-1');
     expect(component.salesUserId).toBe('admin-1');
   });
+
+  it('keeps the backend scheduling reason visible when assigned users have no availability', () => {
+    vi.stubGlobal('localStorage', { getItem: () => 'admin' });
+    const http = {
+      get: () => ({ subscribe: (observer: any) => observer.next({
+        sales_users: [{ id: 'sales-1', role: 'sales', email: 'sales@example.com' }],
+        availability: [], meetings: [],
+        schedule_status: 'assigned_users_without_availability',
+        schedule_message: 'Assigned Sales users do not have availability in the selected period.',
+      }) }),
+    };
+    const component = new SalesComponent(http as any, { markForCheck: () => undefined } as any);
+    component.projectId = 'project-1';
+    component.loadManagerSchedule();
+    expect(component.scheduleStatus).toBe('assigned_users_without_availability');
+    expect(component.scheduleMessage).toContain('do not have availability');
+    expect(component.salesUserId).toBe('sales-1');
+  });
 });

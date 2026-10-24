@@ -28,7 +28,7 @@ from app.modules.sales_crm.models import CalendarConnection, Lead, LeadScoreSnap
 from app.modules.sales_crm.scheduling import available_slots, next_cadence_time
 from app.modules.sales_agent.default_prompt import merge_sales_agent_defaults
 from app.modules.sales_agent.live_service import (
-    _lead_intelligence_input, _persist_intervention_before_confirmation,
+    _lead_intelligence_input, _no_slot_alternative_selection, _persist_intervention_before_confirmation,
     ensure_contact, get_or_create_live_conversation, process_live_inbound, process_live_inbound_job,
 )
 from app.modules.sales_agent.models import SalesConversation, SalesInboundJob, SalesMessage
@@ -55,6 +55,32 @@ def _db():
     engine = create_engine("sqlite://")
     Base.metadata.create_all(engine)
     return sessionmaker(bind=engine)()
+
+
+def test_no_slot_alternatives_are_resolved_only_against_the_latest_structured_offer():
+    db = _db()
+    company = Company(name="Tenant"); db.add(company); db.flush()
+    project = Project(company_id=company.id, name="Project"); db.add(project); db.flush()
+    lead = Lead(
+        company_id=company.id, project_id=project.id, full_name="Lead", phone="+13055550100",
+        source="manual", platform="manual",
+    )
+    db.add(lead); db.flush()
+    conversation = SalesConversation(
+        company_id=company.id, project_id=project.id, lead_id=lead.id,
+        channel="sms", provider="telnyx", provider_thread_key="no-slots", is_paused=False,
+    )
+    db.add(conversation); db.flush()
+    db.add(SalesMessage(
+        conversation_id=conversation.id, channel="sms", direction="outbound", role="assistant",
+        content="Would you like another day, or should I ask the Sales team to contact you?",
+        metadata_json={"appointment_offer": {"slots": [], "project_timezone": "UTC"}},
+    ))
+    db.commit()
+
+    assert _no_slot_alternative_selection(db, conversation_id=conversation.id, inbound_text="The first option") == "another_day"
+    assert _no_slot_alternative_selection(db, conversation_id=conversation.id, inbound_text="The second option") == "callback"
+    assert _no_slot_alternative_selection(db, conversation_id=conversation.id, inbound_text="Tell me about pricing") is None
 
 
 def test_twilio_token_is_migrated_to_ciphertext_and_never_returned():
@@ -485,7 +511,11 @@ def test_slot_scan_fetches_google_busy_ranges_once_per_sales_user():
     db.add(sales); db.flush()
     project = Project(company_id=company.id, name="Project", timezone="America/Bogota")
     db.add(project); db.flush()
-    db.add(ProjectUserAssignment(project_id=project.id, user_id=sales.id, responsibility="sales", is_active=True, accepts_new_leads=True))
+    db.add(ProjectUserAssignment(
+        project_id=project.id, user_id=sales.id, responsibility="sales",
+        sales_enabled=True, accepts_appointments=True,
+        is_active=True, accepts_new_leads=True,
+    ))
     for weekday in range(7):
         db.add(SalesAvailabilityWindow(user_id=sales.id, weekday=weekday, start_time="08:00", end_time="18:00", timezone="America/Bogota"))
     db.add(CalendarConnection(
