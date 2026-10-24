@@ -6,6 +6,7 @@ from alembic.migration import MigrationContext
 from alembic.operations import Operations
 from fastapi import HTTPException
 from sqlalchemy import create_engine
+from sqlalchemy import text
 from sqlalchemy.orm import sessionmaker
 
 import app.db.base  # noqa: F401 - register every model
@@ -119,3 +120,65 @@ def test_migration_auto_assigns_only_unambiguous_legacy_users(monkeypatch):
     assert db.query(ProjectUserAssignment).filter_by(user_id=unambiguous.id, project_id=only.id, is_active=True).one()
     assert db.query(UserProjectAccess).filter_by(user_id=ambiguous.id).count() == 0
     assert db.get(User, ambiguous.id).project_access_scope == "selected"
+
+
+def test_capability_migration_populates_required_assignment_timestamps(monkeypatch):
+    path = Path(__file__).parents[1] / "alembic" / "versions" / "20261024_project_user_capabilities.py"
+    spec = importlib.util.spec_from_file_location("project_user_capabilities_migration", path)
+    assert spec and spec.loader
+    migration = importlib.util.module_from_spec(spec); spec.loader.exec_module(migration)
+    engine = create_engine("sqlite://")
+    with engine.begin() as connection:
+        connection.execute(text("""
+            CREATE TABLE users (
+                id VARCHAR(36) PRIMARY KEY,
+                company_id VARCHAR(36) NOT NULL,
+                role VARCHAR(30) NOT NULL,
+                is_active BOOLEAN NOT NULL,
+                project_access_scope VARCHAR(20)
+            )
+        """))
+        connection.execute(text("""
+            CREATE TABLE projects (
+                id VARCHAR(36) PRIMARY KEY,
+                company_id VARCHAR(36) NOT NULL,
+                is_active BOOLEAN NOT NULL,
+                timezone VARCHAR(80),
+                city VARCHAR(120),
+                address VARCHAR(255)
+            )
+        """))
+        connection.execute(text("""
+            CREATE TABLE project_user_assignments (
+                id VARCHAR(36) PRIMARY KEY,
+                project_id VARCHAR(36) NOT NULL,
+                user_id VARCHAR(36) NOT NULL,
+                responsibility VARCHAR(30) NOT NULL,
+                is_primary BOOLEAN NOT NULL,
+                routing_weight INTEGER NOT NULL,
+                accepts_new_leads BOOLEAN NOT NULL,
+                is_active BOOLEAN NOT NULL,
+                created_at DATETIME NOT NULL,
+                updated_at DATETIME NOT NULL,
+                UNIQUE(project_id, user_id)
+            )
+        """))
+        connection.execute(text("""
+            INSERT INTO users (id, company_id, role, is_active, project_access_scope)
+            VALUES ('admin-1', 'company-1', 'ADMIN', TRUE, 'all')
+        """))
+        connection.execute(text("""
+            INSERT INTO projects (id, company_id, is_active, timezone, city, address)
+            VALUES ('project-1', 'company-1', TRUE, 'UTC', 'Ciudad de México', 'Coahuila 34')
+        """))
+        monkeypatch.setattr(migration, "op", Operations(MigrationContext.configure(connection)))
+        migration.upgrade()
+        row = connection.execute(text("""
+            SELECT sales_enabled, marketing_enabled, accepts_appointments,
+                   created_at, updated_at
+            FROM project_user_assignments
+            WHERE project_id = 'project-1' AND user_id = 'admin-1'
+        """)).mappings().one()
+        assert row["sales_enabled"] and row["marketing_enabled"] and row["accepts_appointments"]
+        assert row["created_at"] is not None
+        assert row["updated_at"] is not None

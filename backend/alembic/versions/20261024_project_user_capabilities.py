@@ -6,6 +6,7 @@ Revises: 20261023_grounded_links
 
 from __future__ import annotations
 
+from datetime import datetime
 import uuid
 
 from alembic import op
@@ -58,14 +59,17 @@ def upgrade() -> None:
         sa.column("sales_enabled", sa.Boolean()), sa.column("marketing_enabled", sa.Boolean()),
         sa.column("accepts_appointments", sa.Boolean()), sa.column("is_primary", sa.Boolean()),
         sa.column("routing_weight", sa.Integer()), sa.column("accepts_new_leads", sa.Boolean()),
-        sa.column("is_active", sa.Boolean()),
+        sa.column("is_active", sa.Boolean()), sa.column("created_at", sa.DateTime()),
+        sa.column("updated_at", sa.DateTime()),
     )
     if missing:
+        now = datetime.utcnow()
         op.bulk_insert(assignment_table, [{
             "id": str(uuid.uuid4()), "project_id": row["project_id"], "user_id": row["user_id"],
             "responsibility": "sales", "sales_enabled": True, "marketing_enabled": True,
             "accepts_appointments": True, "is_primary": False, "routing_weight": 100,
             "accepts_new_leads": True, "is_active": True,
+            "created_at": now, "updated_at": now,
         } for row in missing])
 
     # Safe, location-based repair for legacy Mexico City Projects that were
