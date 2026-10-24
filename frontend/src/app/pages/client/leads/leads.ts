@@ -5,6 +5,7 @@ import { HttpClient } from '@angular/common/http';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { finalize } from 'rxjs';
 import { API_V1_URL } from '../../../core/config/api.config';
+import { humanizeApiError } from '../../../core/utils/api-error';
 
 interface LeadDataRow {
   label: string;
@@ -207,7 +208,7 @@ export class LeadsComponent implements OnInit, OnDestroy {
   }
 
   deleteLead(): void {
-    if ((!this.isSuperadmin && !this.canMaintainLeads) || !this.selected?.id || !this.deleteReason.trim() || this.deleteConfirmation !== this.selected.full_name) return;
+    if ((!this.isSuperadmin && !this.canMaintainLeads) || !this.selected?.id || this.deleteReasonError || this.deleteConfirmation !== this.selected.full_name) return;
     this.deleting = true; this.error = '';
     const endpoint = this.isSuperadmin
       ? `${API_V1_URL}/sales/admin/leads/${this.selected.id}?company_id=${encodeURIComponent(this.companyId)}`
@@ -216,8 +217,16 @@ export class LeadsComponent implements OnInit, OnDestroy {
       body: { reason: this.deleteReason.trim(), confirmation: this.deleteConfirmation },
     }).subscribe({
       next: () => { this.deleting = false; this.selected = null; this.deleteReason = ''; this.deleteConfirmation = ''; this.reload(); },
-      error: err => { this.deleting = false; this.error = err.error?.detail?.message || err.error?.detail || 'The lead could not be deleted.'; this.cdr.markForCheck(); },
+      error: err => { this.deleting = false; this.error = humanizeApiError(err, 'The lead could not be deleted.'); this.cdr.markForCheck(); },
     });
+  }
+
+  get deleteReasonError(): string {
+    const length = this.deleteReason.trim().length;
+    if (!length) return 'Enter a deletion reason.';
+    if (length < 5) return `Enter at least 5 characters (${length}/5).`;
+    if (length > 500) return `Use no more than 500 characters (${length}/500).`;
+    return '';
   }
 
   saveLead(): void {

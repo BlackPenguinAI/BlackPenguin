@@ -27,4 +27,19 @@ describe('AiSettingsPageComponent', () => {
     expect(service.getSalesPromptVersions).toHaveBeenCalledTimes(1);
     expect(component.promptVersions).toHaveLength(1);
   });
+
+  it('edits versioned intent examples as one example per line', () => {
+    const component = new AiSettingsPageComponent({} as any, {} as any, {} as any);
+    component.activeTab = 'ventas';
+    component.config.agent_ventas.intent_routing_config = {
+      intent_definitions: {
+        request_appointment: { description: 'Visit', positive_examples: [], negative_examples: [] },
+      },
+    };
+    (component as any).refreshPromptKeys();
+    component.setIntentExamples('request_appointment', 'positive_examples', 'Schedule a visit\nAgendar una visita\n');
+    expect(component.intentRoutingKeys).toEqual(['request_appointment']);
+    expect(component.config.agent_ventas.intent_routing_config.intent_definitions.request_appointment.positive_examples)
+      .toEqual(['Schedule a visit', 'Agendar una visita']);
+  });
 });

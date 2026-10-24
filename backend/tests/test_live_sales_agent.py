@@ -213,7 +213,7 @@ def test_persisted_handoff_is_durable_and_scoring_cannot_reopen_the_workflow():
     assert case.status == "open"
     assert case.evidence == "The approved Project data is insufficient for this request."
     assert conversation.is_paused is True
-    assert conversation.pause_reason == "Human intervention: LOW_CONFIDENCE"
+    assert conversation.pause_reason == "Human intervention: The request requires human clarification"
     assert lead.agent_status == "human_control"
     assert lead.pipeline_stage == "S09_HANDOFF"
 
@@ -241,6 +241,21 @@ def test_inventory_availability_does_not_trigger_appointment_routing(message):
     assert _is_availability_request(
         message, now=datetime(2026, 10, 20, 15, 0),
         zone=ZoneInfo("America/Chicago"),
+    ) is False
+
+
+@pytest.mark.parametrize("message", [
+    "Can I see pictures?",
+    "Can I see pictures of the units or a brochure?",
+    "Could I view the floor plans?",
+    "Do you have a virtual tour?",
+    "¿Puedo ver fotos o el PDF?",
+    "¿Tienen un recorrido virtual de 360 grados?",
+])
+def test_visual_and_document_requests_never_trigger_appointment_routing(message):
+    assert _is_availability_request(
+        message, now=datetime(2026, 10, 20, 15, 0),
+        zone=ZoneInfo("America/Mexico_City"),
     ) is False
 
 
@@ -300,6 +315,9 @@ def test_legacy_prompt_pack_is_normalized_to_runtime_stage_ids_and_english():
         "guardrails_prompt": "Guardrails",
         "stage_prompts": {"S01_CAPTURE": "Capture", "S10_HANDOFF": "Handoff"},
     })
+    assert merged["intent_routing_config"]["enabled"] is True
+    assert merged["intent_routing_config"]["minimum_confidence"] == .8
+    assert "request_appointment" in merged["intent_routing_config"]["intent_definitions"]
     assert merged["system_prompt"].startswith("Communicate with leads in English only")
     assert merged["stage_prompts"]["S00_CAPTURE"] == "Capture"
     assert merged["stage_prompts"]["S09_HANDOFF"] == "Handoff"
@@ -370,7 +388,7 @@ def test_inbound_job_migration_is_repeatable_on_current_schema(monkeypatch):
     assert {"conversation_id", "message_id", "status", "attempt_number", "scheduled_at"}.issubset(columns)
 
 
-def test_live_appointment_request_uses_deterministic_slots_without_calling_the_model():
+def test_live_appointment_intent_is_classified_by_model_and_slots_remain_deterministic():
     db = _db()
     company = Company(name="Tenant"); db.add(company); db.flush()
     project = Project(
@@ -394,17 +412,29 @@ def test_live_appointment_request_uses_deterministic_slots_without_calling_the_m
     db.add(message); db.commit()
     conversation_id, message_id, lead_id = conversation.id, message.id, lead.id
     slot = datetime(2026, 10, 2, 15, 0)
+    graph = AsyncMock()
+    graph.ainvoke.return_value = {
+        "proposed_reply": "I can check current appointment times.",
+        "proposed_actions": [{"type": "request_available_slots"}],
+        "intent": "request_appointment", "primary_intent": "request_appointment",
+        "secondary_intents": [], "intent_confidence": .99, "intent_entities": {},
+        "requires_clarification": False, "commercial_context": {},
+        "extracted_facts": [], "requires_human": False, "policy_violations": [],
+        "error_code": None, "prompt_configuration_id": None, "prompt_snapshot": {},
+        "model": "test/model",
+    }
     with patch("app.modules.sales_agent.live_service.SessionLocal", return_value=db), patch(
-        "app.modules.sales_agent.live_service.build_sales_graph",
-    ) as graph, patch(
+        "app.modules.sales_agent.live_service.build_sales_graph", return_value=graph,
+    ), patch(
         "app.modules.sales_agent.service.available_slots",
         return_value=[{"start_at": slot, "end_at": slot + timedelta(minutes=45), "eligible_sales_users": 1}],
     ), patch(
         "app.modules.sales_agent.live_service._dispatch", new=AsyncMock(return_value=SalesMessage()),
     ) as dispatch:
         asyncio.run(process_live_inbound(conversation_id, message_id))
-    graph.assert_not_called()
+    graph.ainvoke.assert_awaited_once()
     assert "verified appointment times" in dispatch.await_args.kwargs["content"]
+    assert dispatch.await_args.kwargs["metadata"]["appointment_offer"]["project_timezone"] == "America/Chicago"
     lead = db.query(Lead).filter_by(id=lead_id).one()
     assert lead.pipeline_stage == "S08_APPOINTMENT"
 
@@ -641,6 +671,8 @@ def test_resuming_live_whatsapp_closes_intervention_without_marking_simulation()
     lead = Lead(
         company_id=company.id, project_id=project.id, full_name="Lead", phone="+51999888777",
         source="Manual registration", platform="manual", agent_status="human_control",
+        pipeline_stage="S09_HANDOFF",
+        meta_form_data={"pre_handoff_pipeline_stage": "S04_SCORING"},
     )
     db.add_all([user, lead]); db.flush()
     conversation = SalesConversation(
@@ -664,6 +696,8 @@ def test_resuming_live_whatsapp_closes_intervention_without_marking_simulation()
     db.refresh(lead); db.refresh(intervention); db.refresh(conversation)
     assert conversation.is_paused is False
     assert lead.agent_status == "active"
+    assert lead.pipeline_stage == "S04_SCORING"
+    assert "pre_handoff_pipeline_stage" not in (lead.meta_form_data or {})
     assert intervention.status == "resolved"
     assert intervention.resolved_by_user_id == user.id
 

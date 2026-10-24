@@ -508,6 +508,19 @@ def create_intervention_case(
     db: Session, *, conversation: SalesConversation, lead: Lead, reason: str,
     evidence: str | None = None, confidence: str | None = None,
 ) -> HumanInterventionCase:
+    reason_labels = {
+        "HUMAN_REQUESTED": "The lead asked to speak with a person",
+        "SECURITY": "Potential security or unauthorized-access request",
+        "ABUSE": "Abusive behavior requires human review",
+        "LEGAL": "Legal or regulatory review is required",
+        "POLICY_VIOLATION": "A protected policy prevented the automated response",
+        "LOW_CONFIDENCE": "The request requires human clarification",
+    }
+    friendly_reason = reason_labels.get(reason, reason.replace("_", " ").title())
+    lead_meta = dict(lead.meta_form_data or {})
+    if lead.pipeline_stage != "S09_HANDOFF" and not lead_meta.get("pre_handoff_pipeline_stage"):
+        lead_meta["pre_handoff_pipeline_stage"] = lead.pipeline_stage
+        lead.meta_form_data = lead_meta
     dedupe_key = f"{reason}:open"
     existing = db.query(HumanInterventionCase).filter(
         HumanInterventionCase.conversation_id == conversation.id,
@@ -519,7 +532,7 @@ def create_intervention_case(
         # an invalid combination, even if an earlier retry partially updated
         # the conversation.
         conversation.is_paused = True
-        conversation.pause_reason = f"Human intervention: {reason}"
+        conversation.pause_reason = f"Human intervention: {friendly_reason}"
         lead.agent_status = "human_control"
         lead.pipeline_stage = "S09_HANDOFF"
         lead.next_action_at = None
@@ -536,7 +549,7 @@ def create_intervention_case(
         evidence=evidence, confidence=confidence, dedupe_key=dedupe_key,
     )
     conversation.is_paused = True
-    conversation.pause_reason = f"Human intervention: {reason}"
+    conversation.pause_reason = f"Human intervention: {friendly_reason}"
     lead.agent_status = "human_control"
     lead.pipeline_stage = "S09_HANDOFF"
     lead.next_action_at = None
@@ -548,7 +561,16 @@ def create_intervention_case(
     enqueue_notification(
         db, company_id=conversation.company_id, project_id=conversation.project_id,
         event_type="human_intervention", entity_type="lead", entity_id=lead.id,
-        payload={"title": "Human intervention required", "body": f"{lead.full_name}: {reason.replace('_', ' ').title()}", "reason": reason},
+        payload={
+            "title": "Human intervention required",
+            "body": f"{lead.full_name}: {friendly_reason}",
+            "reason": reason,
+            "reason_label": friendly_reason,
+            "evidence": (evidence or "")[:500],
+            "conversation_id": conversation.id,
+            "project_id": conversation.project_id,
+            "action_url": f"/app/agent?conversation={conversation.id}",
+        },
         dedupe_key=f"human-intervention:{case.id}",
     )
     db.flush()

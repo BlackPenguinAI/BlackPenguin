@@ -20,7 +20,8 @@ from app.modules.projects.models import (
 from app.modules.sales_agent.commercial_context import build_commercial_context
 from app.modules.sales_agent.live_service import (
     _denies_available_asset, _execute_share_actions, _normalize_asset_request_result,
-    _reconcile_shared_asset_reply, _select_asset_for_request, _select_assets_for_request,
+    _reconcile_shared_asset_reply, _requested_asset_tags, _select_asset_for_request,
+    _select_assets_for_request,
 )
 from app.modules.sales_agent.models import SalesConversation
 from app.modules.sales_agent.response_policy import concise_channel_text, plain_channel_text, repeats_introduction_after_greeting
@@ -48,6 +49,15 @@ def _project_source(db):
     )
     db.add(source); db.commit()
     return company, project, source
+
+
+@pytest.mark.parametrize("message", [
+    "Can I see pictures of the units?",
+    "Show me photos of option 2.",
+    "¿Puedo ver imágenes de los departamentos?",
+])
+def test_visual_requests_map_to_gallery_assets_instead_of_appointments(message):
+    assert _requested_asset_tags(message) == {"gallery_image"}
 
 
 def test_onboarding_file_is_private_until_separately_approved():

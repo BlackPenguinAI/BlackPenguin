@@ -21,7 +21,7 @@ export class AiSettingsPageComponent implements OnInit {
     available_models: [],
     agent_onboarding_empresa: { model: '', system_prompt: '', protocol_prompt: '', guardrails_prompt: '' },
     agent_onboarding_proyectos: { model: '', system_prompt: '', protocol_prompt: '', guardrails_prompt: '' },
-    agent_ventas: { model: '', system_prompt: '', protocol_prompt: '', guardrails_prompt: '', stage_prompts: {}, segment_prompts: {}, objection_prompts: {}, sms_templates: {}, scoring_config: {}, cadence_config: {} },
+    agent_ventas: { model: '', system_prompt: '', protocol_prompt: '', guardrails_prompt: '', stage_prompts: {}, segment_prompts: {}, objection_prompts: {}, sms_templates: {}, scoring_config: {}, cadence_config: {}, intent_routing_config: { intent_definitions: {} } },
     agent_reporteria: { model: '', system_prompt: '', protocol_prompt: '', guardrails_prompt: '' }
   };
   
@@ -37,6 +37,7 @@ export class AiSettingsPageComponent implements OnInit {
   readonly promptVersionsPageSize = 20;
   stagePromptKeys: string[] = [];
   segmentPromptKeys: string[] = [];
+  intentRoutingKeys: string[] = [];
   restoringVersionId = '';
   changeNote = '';
   readonly scoringWeightKeys = [
@@ -197,13 +198,29 @@ export class AiSettingsPageComponent implements OnInit {
 
   trackByKey(_index: number, key: string): string { return key; }
 
+  intentExamples(key: string, field: 'positive_examples' | 'negative_examples'): string {
+    const values = this.activeAgent?.intent_routing_config?.intent_definitions?.[key]?.[field];
+    return Array.isArray(values) ? values.join('\n') : '';
+  }
+
+  setIntentExamples(key: string, field: 'positive_examples' | 'negative_examples', value: string): void {
+    const routing = this.activeAgent.intent_routing_config ||= { intent_definitions: {} };
+    const definitions = routing.intent_definitions ||= {};
+    const definition = definitions[key] ||= { description: '', positive_examples: [], negative_examples: [] };
+    definition[field] = value.split('\n').map(item => item.trim()).filter(Boolean);
+  }
+
   get hasPreviousPromptPage(): boolean { return this.promptVersionsPage > 1; }
   get hasNextPromptPage(): boolean {
     return this.promptVersionsPage * this.promptVersionsPageSize < this.promptVersionsTotal;
   }
 
   private refreshPromptKeys(): void {
+    const sales = this.config.agent_ventas ||= {};
+    sales.intent_routing_config ||= { intent_definitions: {} };
+    sales.intent_routing_config.intent_definitions ||= {};
     this.stagePromptKeys = Object.keys(this.config.agent_ventas?.stage_prompts || {});
     this.segmentPromptKeys = Object.keys(this.config.agent_ventas?.segment_prompts || {});
+    this.intentRoutingKeys = Object.keys(sales.intent_routing_config.intent_definitions);
   }
 }

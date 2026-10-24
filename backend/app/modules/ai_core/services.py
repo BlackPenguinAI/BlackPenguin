@@ -7,6 +7,7 @@ from .models import AIConfiguration, PromptVersion
 from .schemas import AIConfigUpdatePayload
 from app.integrations.openrouter_client import check_openrouter_consumption
 from app.modules.sales_agent.default_prompt import (
+    SALES_INTENT_KEYS,
     SALES_AGENT_DEFAULT_CONFIG,
     merge_sales_agent_defaults,
     needs_sales_agent_default,
@@ -138,6 +139,23 @@ def validate_sales_configuration(configuration: dict) -> None:
         value = int(cadence.get(key, SALES_AGENT_DEFAULT_CONFIG["cadence_config"][key]))
         if value < 1 or value > 2160:
             raise HTTPException(status_code=422, detail=f"Cadence {key} must be between 1 and 2160 hours.")
+    routing = configuration.get("intent_routing_config") or {}
+    minimum = float(routing.get("minimum_confidence", 0.80))
+    clarification = float(routing.get("clarification_threshold", 0.55))
+    if not 0 <= clarification < minimum <= 1:
+        raise HTTPException(
+            status_code=422,
+            detail="Intent thresholds must satisfy 0 ≤ clarification < minimum confidence ≤ 1.",
+        )
+    maximum = int(routing.get("maximum_intents", 4))
+    if not 1 <= maximum <= 8:
+        raise HTTPException(status_code=422, detail="Maximum intents per turn must be between 1 and 8.")
+    definitions = routing.get("intent_definitions") or {}
+    unknown = sorted(set(definitions) - set(SALES_INTENT_KEYS))
+    if unknown:
+        raise HTTPException(status_code=422, detail=f"Unknown Sales Agent intent keys: {', '.join(unknown)}.")
+    if "unclear" not in SALES_INTENT_KEYS:
+        raise HTTPException(status_code=500, detail="The protected unclear intent is unavailable.")
 
 
 def publish_prompt_version(db: Session, *, company_id: str | None, agent_key: str, version_id: str, actor_id: str) -> AIConfiguration:

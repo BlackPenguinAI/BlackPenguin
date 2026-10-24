@@ -12,6 +12,7 @@ class AgentConfigSchema(BaseModel):
     sms_templates: Dict[str, str] = Field(default_factory=dict)
     scoring_config: Dict[str, Any] = Field(default_factory=dict)
     cadence_config: Dict[str, Any] = Field(default_factory=dict)
+    intent_routing_config: Dict[str, Any] = Field(default_factory=dict)
 
 
 class SalesPromptDraftPayload(BaseModel):

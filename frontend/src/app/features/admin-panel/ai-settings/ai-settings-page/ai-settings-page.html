@@ -72,6 +72,38 @@
               </div>
             </section>
 
+            <section class="rounded-xl border border-white/10 bg-black/20 p-4">
+              <div class="flex flex-col gap-1">
+                <h3 class="text-sm font-medium uppercase tracking-wider text-secondary">Intent classification &amp; routing</h3>
+                <p class="text-xs leading-relaxed text-gray-500">The model interprets one or more lead intents. Protected backend tools still validate assets, appointments, consent and tenant scope.</p>
+              </div>
+              <div class="mt-4 grid gap-3 md:grid-cols-3">
+                <label class="grid gap-1 text-xs text-gray-400">Minimum confidence<input type="number" min="0.01" max="1" step="0.01" name="intent_minimum_confidence" [(ngModel)]="activeAgent.intent_routing_config.minimum_confidence" class="rounded-lg border border-white/10 bg-black/50 p-2 text-white"></label>
+                <label class="grid gap-1 text-xs text-gray-400">Clarification threshold<input type="number" min="0" max="0.99" step="0.01" name="intent_clarification_threshold" [(ngModel)]="activeAgent.intent_routing_config.clarification_threshold" class="rounded-lg border border-white/10 bg-black/50 p-2 text-white"></label>
+                <label class="grid gap-1 text-xs text-gray-400">Maximum intents<input type="number" min="1" max="8" name="intent_maximum" [(ngModel)]="activeAgent.intent_routing_config.maximum_intents" class="rounded-lg border border-white/10 bg-black/50 p-2 text-white"></label>
+              </div>
+              <div class="mt-4 grid gap-2 md:grid-cols-2 text-xs text-gray-300">
+                <label class="flex items-center gap-2"><input type="checkbox" name="intent_enabled" [(ngModel)]="activeAgent.intent_routing_config.enabled"> Enable LLM intent routing</label>
+                <label class="flex items-center gap-2"><input type="checkbox" name="intent_multilingual" [(ngModel)]="activeAgent.intent_routing_config.multilingual_input"> Interpret multilingual input</label>
+                <label class="flex items-center gap-2"><input type="checkbox" name="intent_explicit_appointment" [(ngModel)]="activeAgent.intent_routing_config.appointment_requires_explicit_request"> Require an explicit appointment request</label>
+                <label class="flex items-center gap-2"><input type="checkbox" name="intent_no_missing_material_pause" [checked]="!activeAgent.intent_routing_config.pause_on_missing_material" (change)="activeAgent.intent_routing_config.pause_on_missing_material = !$any($event.target).checked"> Keep AI active when material is missing</label>
+              </div>
+              <label class="mt-4 grid gap-1 text-xs text-gray-400">Classifier instructions<textarea rows="4" name="intent_classifier_instructions" [(ngModel)]="activeAgent.intent_routing_config.classifier_instructions" class="rounded-lg border border-white/10 bg-black/50 p-3 text-xs text-white"></textarea></label>
+              <details class="mt-4 rounded-lg border border-white/10 bg-black/30 p-3">
+                <summary class="cursor-pointer text-xs font-semibold uppercase tracking-wider text-gray-300">Intent examples and disambiguation</summary>
+                <div class="mt-4 grid gap-4">
+                  <article *ngFor="let key of intentRoutingKeys; trackBy: trackByKey" class="rounded-lg border border-white/10 p-3">
+                    <div class="text-xs font-semibold text-secondary">{{ key }}</div>
+                    <label class="mt-2 grid gap-1 text-xs text-gray-400">Description<textarea rows="2" [(ngModel)]="activeAgent.intent_routing_config.intent_definitions[key].description" [name]="'intent_description_'+key" class="rounded-lg border border-white/10 bg-black/50 p-2 text-white"></textarea></label>
+                    <div class="mt-2 grid gap-2 md:grid-cols-2">
+                      <label class="grid gap-1 text-xs text-gray-400">Positive examples — one per line<textarea rows="3" [ngModel]="intentExamples(key, 'positive_examples')" (ngModelChange)="setIntentExamples(key, 'positive_examples', $event)" [name]="'intent_positive_'+key" class="rounded-lg border border-white/10 bg-black/50 p-2 text-white"></textarea></label>
+                      <label class="grid gap-1 text-xs text-gray-400">Negative examples — one per line<textarea rows="3" [ngModel]="intentExamples(key, 'negative_examples')" (ngModelChange)="setIntentExamples(key, 'negative_examples', $event)" [name]="'intent_negative_'+key" class="rounded-lg border border-white/10 bg-black/50 p-2 text-white"></textarea></label>
+                    </div>
+                  </article>
+                </div>
+              </details>
+            </section>
+
             <section class="grid gap-4 rounded-xl border border-white/10 bg-black/20 p-4 md:grid-cols-2">
               <div><h3 class="text-sm font-medium uppercase tracking-wider text-secondary">Intent scoring</h3><p class="mt-1 text-xs text-gray-500">Weights are independent signals; the backend caps the total at 100.</p><label class="mt-3 grid gap-1 text-xs text-gray-400">Hot threshold<input type="number" name="hot_threshold" [(ngModel)]="activeAgent.scoring_config.hot_threshold" class="rounded-lg border border-white/10 bg-black/50 p-2 text-white"></label><label class="mt-3 grid gap-1 text-xs text-gray-400">Warm threshold<input type="number" name="warm_threshold" [(ngModel)]="activeAgent.scoring_config.warm_threshold" class="rounded-lg border border-white/10 bg-black/50 p-2 text-white"></label><label *ngFor="let key of scoringWeightKeys; trackBy: trackByKey" class="mt-3 grid gap-1 text-xs capitalize text-gray-400">{{ key.replace('_', ' ') }}<input type="number" min="0" max="100" [(ngModel)]="activeAgent.scoring_config[key]" [name]="'score_'+key" class="rounded-lg border border-white/10 bg-black/50 p-2 text-white"></label></div>
               <div><h3 class="text-sm font-medium uppercase tracking-wider text-secondary">Cadence hours</h3><label class="mt-3 grid gap-1 text-xs text-gray-400">Hot<input type="number" name="hot_hours" [(ngModel)]="activeAgent.cadence_config.hot_hours" class="rounded-lg border border-white/10 bg-black/50 p-2 text-white"></label><label class="mt-3 grid gap-1 text-xs text-gray-400">Warm<input type="number" name="warm_hours" [(ngModel)]="activeAgent.cadence_config.warm_hours" class="rounded-lg border border-white/10 bg-black/50 p-2 text-white"></label><label class="mt-3 grid gap-1 text-xs text-gray-400">Cold<input type="number" name="cold_hours" [(ngModel)]="activeAgent.cadence_config.cold_hours" class="rounded-lg border border-white/10 bg-black/50 p-2 text-white"></label></div>

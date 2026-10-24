@@ -155,6 +155,22 @@ def _is_availability_request(
     if not lowered:
         return False
 
+    visual_or_document_request = bool(re.search(
+        r"\b(?:pictures?|photos?|images?|gallery|renderings?|brochures?|pdfs?|documents?|"
+        r"floor\s*plans?|blueprints?|virtual\s*tours?|360(?:°|\s*degrees?)?|"
+        r"fotos?|im[aá]genes?|galer[ií]a|renders?|folletos?|documentos?|planos?|"
+        r"recorridos? virtuales?)\b",
+        lowered,
+    ))
+    explicit_physical_visit = bool(re.search(
+        r"\b(?:in person|in-person|physically|presencial(?:mente)?)\b|"
+        r"\b(?:schedule|book|arrange|set up|agendar|programar|reservar)\b.{0,35}"
+        r"\b(?:appointment|visit|tour|showing|meeting|cita|visita|recorrido|reuni[oó]n)\b",
+        lowered,
+    ))
+    if visual_or_document_request and not explicit_physical_visit:
+        return False
+
     appointment_denial = re.search(
         r"\b(?:not|no|don'?t|do not|isn'?t|is not|wasn'?t|was not)\b.{0,40}"
         r"\b(?:appointment|appointments|schedule|scheduling|slot|slots|time|times|visit|tour|showing)\b|"
@@ -178,14 +194,14 @@ def _is_availability_request(
         r"\b(?:schedule|book|arrange|set up|confirm|reschedule)\b.{0,35}"
         r"\b(?:appointment|visit|tour|showing|meeting)\b|"
         r"\b(?:can|could|may|would|want|like|ready|when|how)\b.{0,35}"
-        r"\b(?:visit|tour|see|view|schedule|book)\b|"
+        r"\b(?:visit|tour|schedule|book)\b|"
         r"\b(?:visit|tour|showing)\b.{0,35}\b(?:available|availability|time|slot|schedule|book)\b|"
         r"\b(?:what|which)\s+(?:appointment\s+)?times?\s+(?:are|is)\s+available\b|"
         r"\b(?:cita|citas)\b|"
         r"\b(?:agendar|programar|reservar|confirmar|reprogramar)\b.{0,35}"
         r"\b(?:cita|visita|recorrido|reuni[oó]n)\b|"
         r"\b(?:quiero|quisiera|puedo|podr[ií]a|cu[aá]ndo)\b.{0,35}"
-        r"\b(?:visitar|ver|conocer|agendar|programar)\b",
+        r"\b(?:visitar|agendar|programar)\b",
         lowered,
     ))
     if explicit_scheduling:
@@ -533,6 +549,11 @@ def set_conversation_action(
         conversation.pause_reason = None
         if lead:
             lead.agent_status = "active" if conversation.channel in {"sms", "whatsapp"} else "simulation"
+            lead_meta = dict(lead.meta_form_data or {})
+            previous_stage = lead_meta.pop("pre_handoff_pipeline_stage", None)
+            if lead.pipeline_stage == "S09_HANDOFF":
+                lead.pipeline_stage = previous_stage or "S06_NURTURE"
+            lead.meta_form_data = lead_meta
             db.query(HumanInterventionCase).filter(
                 HumanInterventionCase.conversation_id == conversation.id,
                 HumanInterventionCase.status == "open",

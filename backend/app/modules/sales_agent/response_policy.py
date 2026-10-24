@@ -4,9 +4,16 @@ import re
 from typing import Any
 
 
+VISUAL_MATERIAL_TERMS = re.compile(
+    r"\b(?:pictures?|photos?|images?|gallery|renderings?|brochures?|pdfs?|documents?|"
+    r"floor\s*plans?|blueprints?|virtual\s*tours?|360(?:°|\s*degrees?)?|"
+    r"fotos?|im[aá]genes?|galer[ií]a|renders?|folletos?|documentos?|planos?|recorridos?\s+virtuales?)\b",
+    re.IGNORECASE,
+)
 APPOINTMENT_TERMS = re.compile(
-    r"\b(appointment|visit|tour|showing|schedule|availability|available time|"
-    r"cita|visita|recorrido|agendar|horario|"
+    r"\b(appointment|showing|schedule|book|available time|time slot|"
+    r"in[- ]person (?:visit|tour|showing)|visit (?:the|this|a) (?:property|project|unit|home)|"
+    r"cita|visita presencial|agendar|programar una visita|reservar una cita|"
     r"monday|tuesday|wednesday|thursday|friday|saturday|sunday|"
     r"january|february|march|april|may|june|july|august|september|october|november|december|"
     r"lunes|martes|miércoles|miercoles|jueves|viernes|sábado|sabado|domingo|"
@@ -43,7 +50,8 @@ TOPIC_PATTERNS = {
     "amenities": re.compile(r"\b(amenities|features|included)\b", re.IGNORECASE),
     "assets": re.compile(
         r"\b(?:brochures?|floor\s*plans?|blueprints?|price\s*lists?|documents?|pdfs?|plans?|"
-        r"sales\s+materials?|virtual\s+tours?|walkthroughs?|360(?:°|\s*degrees?)?)\b",
+        r"sales\s+materials?|virtual\s+tours?|walkthroughs?|360(?:°|\s*degrees?)?|"
+        r"pictures?|photos?|images?|gallery|renderings?|fotos?|im[aá]genes?|galer[ií]a|renders?)\b",
         re.IGNORECASE,
     ),
     "appointment": APPOINTMENT_TERMS,
@@ -331,8 +339,21 @@ def grounded_catalog_reply(inbound: str | None, commercial: dict[str, Any]) -> s
     return "\n".join(lines)
 
 
-def appointment_intent_present(inbound: str, history: list[dict[str, str]]) -> bool:
-    if APPOINTMENT_TERMS.search(inbound or ""):
+def appointment_intent_present(
+    inbound: str, history: list[dict[str, str]], *, classified_intent: str | None = None,
+) -> bool:
+    text = inbound or ""
+    explicit_physical = bool(re.search(
+        r"\b(?:in person|in-person|physically|presencial(?:mente)?)\b|"
+        r"\b(?:schedule|book|arrange|agendar|programar|reservar)\b.{0,35}"
+        r"\b(?:appointment|visit|tour|showing|cita|visita|recorrido)\b",
+        text, re.IGNORECASE,
+    ))
+    if classified_intent == "request_appointment" and (explicit_physical or not VISUAL_MATERIAL_TERMS.search(text)):
+        return True
+    if VISUAL_MATERIAL_TERMS.search(text) and not explicit_physical:
+        return False
+    if APPOINTMENT_TERMS.search(text):
         return True
     if not AFFIRMATIVE.search(inbound or ""):
         return False

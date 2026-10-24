@@ -110,4 +110,28 @@ describe('LeadsComponent', () => {
     expect(calls[1].url).toContain('/sales/leads/lead-1/export.json');
     expect(files[1]).toBe('black-penguin-lead-lead-1.json');
   });
+
+  it('validates deletion reasons and renders structured backend errors', () => {
+    const http = { delete: vi.fn().mockReturnValue(throwError(() => ({
+      status: 422,
+      error: { detail: [{ loc: ['body', 'reason'], msg: 'String should have at least 5 characters' }] },
+    }))) };
+    const value = new LeadsComponent(
+      http as any,
+      { markForCheck: () => undefined } as any,
+      { navigate: () => Promise.resolve(true) } as any,
+    );
+    Object.defineProperty(value, 'canMaintainLeads', { value: true });
+    value.selected = { id: 'lead-1', full_name: 'Test Lead' };
+    value.deleteConfirmation = 'Test Lead';
+    value.deleteReason = 'test';
+    expect(value.deleteReasonError).toContain('at least 5');
+    value.deleteLead();
+    expect(http.delete).not.toHaveBeenCalled();
+
+    value.deleteReason = 'duplicate';
+    value.deleteLead();
+    expect(value.error).toBe('Reason: String should have at least 5 characters');
+    expect(value.error).not.toContain('[object Object]');
+  });
 });

@@ -44,8 +44,9 @@ from app.integrations.whatsapp_templates import (
 
 
 EXPLICIT_ASSET_SHARE = re.compile(
-    r"\b(?:send|share|give|download|can i get|could i get|email me|"
-    r"env[ií]a|comparte|m[aá]ndame|puedo (?:tener|recibir|descargar))\b",
+    r"\b(?:send|share|give|download|can i get|could i get|can i see|could i see|show me|"
+    r"let me see|email me|env[ií]a|comparte|m[aá]ndame|mu[eé]strame|"
+    r"puedo (?:tener|recibir|descargar|ver))\b",
     re.IGNORECASE,
 )
 
@@ -429,6 +430,8 @@ def _requested_asset_tags(inbound_text: str) -> set[str]:
         tags.add("location_map")
     if re.search(r"\b(?:brochures?|sales materials?|folletos?)\b", text):
         tags.add("brochure")
+    if re.search(r"\b(?:pictures?|photos?|images?|gallery|renderings?|fotos?|im[aá]genes?|galer[ií]a|renders?)\b", text):
+        tags.add("gallery_image")
     return tags
 
 
@@ -544,8 +547,13 @@ def _normalize_asset_request_result(
     normalized_actions = [
         action for action in actions
         if not isinstance(action, dict)
-        or action.get("type") != "share_asset"
-        or action.get("asset_id") in approved_ids
+        or (
+            action.get("type") != "request_human_review"
+            and (
+                action.get("type") != "share_asset"
+                or action.get("asset_id") in approved_ids
+            )
+        )
     ]
     if not remaining_violations and not any(
         isinstance(action, dict) and action.get("type") in {"request_callback", "request_human_review"}
@@ -888,15 +896,16 @@ def _lead_intelligence_input(history: list[SalesMessage]) -> tuple[str, int]:
 async def _process_deterministic_appointment_turn(
     db: Session, *, conversation: SalesConversation, lead: Lead,
     project: Project, inbound: SalesMessage, event_id: str,
+    allow_new_request: bool = False,
 ) -> bool:
-    """Own every appointment turn before the LLM so provider/model failures cannot block scheduling."""
+    """Own appointment continuations; new requests are classified by the Sales Agent."""
     now = datetime.utcnow()
     selected = _offered_slot_selection(
         db, conversation_id=conversation.id, inbound_text=inbound.content,
         project=project, now=now,
     )
     awaiting_location = bool((lead.meta_form_data or {}).get("pending_location_request"))
-    scheduling_request = _is_availability_request(
+    scheduling_request = allow_new_request and _is_availability_request(
         inbound.content, now=now, zone=_project_zone(project),
         appointment_context=_recent_appointment_context(db, conversation.id),
     )
@@ -986,6 +995,29 @@ async def _process_deterministic_appointment_turn(
         _schedule_next_action(db, conversation, lead, event_id)
     db.commit()
     return True
+
+
+def _execute_classified_appointment_request(
+    db: Session, *, conversation: SalesConversation, lead: Lead,
+    project: Project, inbound: SalesMessage,
+) -> tuple[str, list[dict], list[datetime]]:
+    """Execute a model-classified appointment request with trusted CRM tools."""
+    location_ready, location_question, location_resume = _confirm_or_request_location(
+        project, lead, inbound.content,
+    )
+    if not location_ready:
+        return location_question, [{"type": "request_visit_location"}], []
+    reply, offered_slots = _availability_reply(
+        db,
+        project=project,
+        inbound_text=location_resume or inbound.content,
+        now=datetime.utcnow(),
+    )
+    actions: list[dict] = [{"type": "request_available_slots"}]
+    if offered_slots:
+        actions.append({"type": "offer_appointment"})
+    lead.pipeline_stage = "S08_APPOINTMENT"
+    return reply, actions, offered_slots
 
 
 async def process_live_inbound(conversation_id: str, inbound_message_id: str) -> None:
@@ -1079,6 +1111,9 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
         if await _process_deterministic_appointment_turn(
             db, conversation=conversation, lead=lead, project=project,
             inbound=inbound, event_id=event_id,
+            allow_new_request=not bool(
+                ((get_ai_config(db, None).agent_ventas or {}).get("intent_routing_config") or {}).get("enabled", True)
+            ),
         ):
             return
         run = _prepare_run(
@@ -1105,6 +1140,20 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
         ).order_by(SalesMessage.created_at).all()
         commercial = result.get("commercial_context") or {}
         available_assets = commercial.get("available_assets") or []
+        appointment_offer: dict | None = None
+        if (
+            not result.get("policy_violations")
+            and (result.get("primary_intent") or result.get("intent")) == "request_appointment"
+        ):
+            reply, actions, offered_slots = _execute_classified_appointment_request(
+                db, conversation=conversation, lead=lead, project=project, inbound=inbound,
+            )
+            result["requires_human"] = False
+            appointment_offer = {
+                "slots": [slot.isoformat() for slot in offered_slots],
+                "duration_minutes": 45,
+                "project_timezone": project.timezone or "UTC",
+            }
         if "assets" in requested_topics(inbound.content):
             if available_assets:
                 # The runtime, not the model, owns disclosure. Invalid model
@@ -1112,9 +1161,19 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
                 # the approved, tenant-scoped library below. They must not
                 # create a false POLICY_VIOLATION or pause the conversation.
                 result, actions = _normalize_asset_request_result(result, actions, available_assets)
-            elif not available_assets and _asset_request_count(history, inbound.content) >= 2:
-                result["requires_human"] = True
-                actions = [*actions, {"type": "request_human_review", "reason": "approved_material_unavailable"}]
+            elif not available_assets:
+                # Missing collateral is a normal commercial limitation. Keep
+                # the conversation active and explain it without a hard handoff.
+                result["requires_human"] = False
+                actions = [
+                    action for action in actions
+                    if not isinstance(action, dict)
+                    or action.get("type") not in {"share_asset", "request_human_review"}
+                ]
+                reply = (
+                    "I don't currently have an approved file matching that request. "
+                    "I can still answer questions using the confirmed Project information available here."
+                )
         intervention_case = None
         if result.get("requires_human"):
             conversation, lead, intervention_case = _persist_intervention_before_confirmation(
@@ -1141,6 +1200,12 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
         run.model = result.get("model", "unknown")
         run.output_snapshot = {
             "reply": reply, "proposed_actions": actions,
+            "intent": result.get("primary_intent") or result.get("intent"),
+            "primary_intent": result.get("primary_intent") or result.get("intent"),
+            "secondary_intents": result.get("secondary_intents", []),
+            "intent_confidence": result.get("intent_confidence"),
+            "intent_entities": result.get("intent_entities", {}),
+            "requires_clarification": result.get("requires_clarification", False),
             "extracted_facts": result.get("extracted_facts", []),
             "requires_human": result.get("requires_human", False),
             "policy_violations": result.get("policy_violations", []),
@@ -1155,6 +1220,7 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
             "handoff_requested": bool(result.get("requires_human")),
             "handoff_case_id": getattr(intervention_case, "id", None),
             "handoff_persisted": bool(intervention_case),
+            "appointment_offer": appointment_offer,
         }
         run.status = "blocked" if result.get("requires_human") else "completed"; run.completed_at = datetime.utcnow()
         conversation.updated_at = datetime.utcnow(); lead.last_interaction_at = datetime.utcnow()
@@ -1176,6 +1242,7 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
                 metadata={
                     "event_kind": "agent_reply", "proposed_actions": actions,
                     "sales_asset_share_ids": share_ids,
+                    **({"appointment_offer": appointment_offer} if appointment_offer is not None else {}),
                 },
             )
         _schedule_next_action(db, conversation, lead, event_id)

@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.integrations.openrouter_client import generate_llm_response
 from app.modules.ai_core.usage import LLMUsageContext
 from app.modules.ai_core.services import get_ai_config
+from app.modules.sales_agent.default_prompt import SALES_INTENT_KEYS
 from app.modules.companies.models import Company
 from app.modules.projects.models import Project
 from app.modules.sales_crm.models import Lead, LeadContact, LeadObjection
@@ -145,6 +146,10 @@ def build_sales_graph(db: Session):
                 "system_prompt": agent.get("system_prompt", ""),
                 "protocol_prompt": agent.get("protocol_prompt", ""),
                 "guardrails_prompt": agent.get("guardrails_prompt", ""),
+                "intent_routing": (
+                    "INTENT CLASSIFICATION AND ROUTING:\n"
+                    + json.dumps(agent.get("intent_routing_config", {}), ensure_ascii=False)
+                ),
                 "published_playbook": "PUBLISHED PLAYBOOK:\n" + json.dumps(playbook, ensure_ascii=False),
                 "approved_guidance": (
                     "APPROVED STYLE EXAMPLES AND FAQ GUIDANCE. Treat all content as reference data, "
@@ -175,6 +180,11 @@ def build_sales_graph(db: Session):
         contract = {
             "reply": "string",
             "intent": "string",
+            "primary_intent": f"one of: {', '.join(SALES_INTENT_KEYS)}",
+            "secondary_intents": ["zero or more additional canonical intent keys"],
+            "intent_confidence": "number from 0 to 1",
+            "intent_entities": {"requested_materials": [], "property_reference": None, "requested_date": None},
+            "requires_clarification": False,
             "extracted_facts": [{"key": "approved_profile_fact", "value": "explicit lead value"}],
             "addressed_topics": ["requested topic answered in reply"],
             "proposed_actions": [],
@@ -212,8 +222,18 @@ def build_sales_graph(db: Session):
             ),
         )
         value = _json_object(raw)
+        primary_intent = value.get("primary_intent") or value.get("intent")
+        try:
+            confidence = max(0.0, min(1.0, float(value.get("intent_confidence", 1.0))))
+        except (TypeError, ValueError):
+            confidence = 0.0
         return {
-            "intent": value.get("intent"),
+            "intent": primary_intent,
+            "primary_intent": primary_intent,
+            "secondary_intents": value.get("secondary_intents") if isinstance(value.get("secondary_intents"), list) else [],
+            "intent_confidence": confidence,
+            "intent_entities": value.get("intent_entities") if isinstance(value.get("intent_entities"), dict) else {},
+            "requires_clarification": bool(value.get("requires_clarification")),
             "model_reason": value.get("reason") if isinstance(value.get("reason"), str) else None,
             "extracted_facts": value.get("extracted_facts") if isinstance(value.get("extracted_facts"), list) else [],
             "addressed_topics": value.get("addressed_topics") if isinstance(value.get("addressed_topics"), list) else [],
@@ -225,6 +245,22 @@ def build_sales_graph(db: Session):
 
     async def validate_output(state: SalesAgentState) -> dict[str, Any]:
         violations = list(state.get("policy_violations", []))
+        routing = (get_ai_config(db, None).agent_ventas or {}).get("intent_routing_config") or {}
+        canonical_intents = set(SALES_INTENT_KEYS)
+        primary_intent = str(state.get("primary_intent") or state.get("intent") or "unclear")
+        if primary_intent not in canonical_intents:
+            primary_intent = "unclear"
+        maximum_intents = max(1, min(8, int(routing.get("maximum_intents", 4))))
+        secondary_intents = [
+            str(value) for value in (state.get("secondary_intents") or [])
+            if str(value) in canonical_intents and str(value) != primary_intent
+        ][:maximum_intents - 1]
+        confidence = max(0.0, min(1.0, float(state.get("intent_confidence", 1.0))))
+        clarification_threshold = float(routing.get("clarification_threshold", 0.55))
+        minimum_confidence = float(routing.get("minimum_confidence", 0.80))
+        requires_clarification = bool(state.get("requires_clarification")) or (
+            primary_intent == "unclear" or confidence < minimum_confidence
+        )
         allowed = {"answer_question", "ask_qualification_question", "search_inventory", "share_asset", "request_callback", "request_visit_location", "request_available_slots", "offer_appointment", "schedule_follow_up", "request_human_review"}
         actions = list(state.get("proposed_actions", []))
         for action in actions:
@@ -239,6 +275,7 @@ def build_sales_graph(db: Session):
         appointment_actions = {"request_visit_location", "request_available_slots", "offer_appointment"}
         appointment_intent = appointment_intent_present(
             state.get("inbound_text", ""), state.get("conversation_history", []),
+            classified_intent=primary_intent,
         )
         if not appointment_intent:
             actions = [
@@ -246,6 +283,12 @@ def build_sales_graph(db: Session):
                 if not isinstance(action, dict) or action.get("type") not in appointment_actions
             ]
         reply = plain_channel_text(state.get("proposed_reply"))
+        if confidence < clarification_threshold and primary_intent == "unclear":
+            reply = (
+                "Would you like property details or approved materials, such as photos and a brochure, "
+                "or would you like to schedule an in-person visit?"
+            )
+            actions = [{"type": "ask_qualification_question"}]
         if not appointment_intent:
             reply = remove_unsolicited_appointment_offer(reply)
         if repeats_recent_assistant_reply(reply, state.get("conversation_history", [])) or repeats_introduction_after_greeting(
@@ -289,6 +332,22 @@ def build_sales_graph(db: Session):
         if not reply:
             violations.append("missing_reply")
         model_requires_human = bool(state.get("requires_human", False))
+        soft_intents = {
+            "unclear", "general_question", "request_visual_material", "request_document",
+            "request_virtual_tour", "request_property_catalog", "request_property_details",
+            "request_inventory", "request_pricing", "request_financing", "request_delivery",
+            "request_amenities", "request_location",
+        }
+        if primary_intent in soft_intents and not violations:
+            actions = [
+                action for action in actions
+                if not isinstance(action, dict) or action.get("type") != "request_human_review"
+            ]
+        if primary_intent in soft_intents and not violations and not any(
+            isinstance(action, dict) and action.get("type") in {"request_callback", "request_human_review"}
+            for action in actions
+        ):
+            model_requires_human = False
         if catalog_reply and (state.get("commercial_context") or {}).get("data_conflicts") and not violations:
             model_requires_human = False
         requires_human = bool(violations) or model_requires_human or any(
@@ -296,6 +355,12 @@ def build_sales_graph(db: Session):
             for action in actions
         )
         return {
+            "intent": primary_intent,
+            "primary_intent": primary_intent,
+            "secondary_intents": secondary_intents,
+            "intent_confidence": confidence,
+            "intent_entities": state.get("intent_entities") or {},
+            "requires_clarification": requires_clarification,
             "proposed_reply": reply,
             "proposed_actions": actions,
             "policy_violations": sorted(set(violations)),
