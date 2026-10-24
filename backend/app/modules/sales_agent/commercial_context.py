@@ -208,11 +208,33 @@ def _catalog_conflicts(
     return conflicts
 
 
+def _project_fact_conflicts(facts: dict[str, Any]) -> list[dict[str, Any]]:
+    """Reject combinations that cannot safely become customer-facing truth."""
+    conflicts: list[dict[str, Any]] = []
+    status = str(facts.get("project_status") or "").casefold()
+    delivery = str(facts.get("delivery_dates") or facts.get("delivery_timeline") or "")
+    years = [int(value) for value in re.findall(r"\b20\d{2}\b", delivery)]
+    ready_now = any(term in status for term in ("ready for occupancy", "move-in ready", "ready to move", "completed"))
+    if ready_now and any(year > datetime.now(timezone.utc).year for year in years):
+        conflicts.append({
+            "code": "ready_status_future_delivery",
+            "fields": ["project_status", "delivery_dates"],
+            "values": {"project_status": facts.get("project_status"), "delivery_dates": facts.get("delivery_dates")},
+            "resolution": "An administrator must confirm whether the Project is ready now or has a future delivery date.",
+        })
+    return conflicts
+
+
 def build_commercial_context(
     db: Session, *, project: Project, company_id: str, lead_id: str, channel: str = "sms",
 ) -> dict[str, Any]:
     """Build the one customer-facing commercial source of truth for a turn."""
     facts = confirmed_profile_facts(project.profile)
+    fact_conflicts = _project_fact_conflicts(facts)
+    safe_facts = dict(facts)
+    for conflict in fact_conflicts:
+        for field in conflict.get("fields", []):
+            safe_facts.pop(field, None)
     property_types = db.query(ProjectPropertyType).filter(
         ProjectPropertyType.project_id == project.id,
         ProjectPropertyType.review_status == "confirmed",
@@ -256,12 +278,12 @@ def build_commercial_context(
         if units else [_property_type_payload(item) for item in property_types]
     )
     return {
-        "confirmed_project_facts": facts,
+        "confirmed_project_facts": safe_facts,
         "property_types": [_property_type_payload(item) for item in property_types],
         "inventory": inventory,
         "inventory_source": inventory_source,
         "inventory_updated_at": _iso(latest),
         "available_assets": assets,
-        "data_conflicts": _catalog_conflicts(facts, property_types, units),
+        "data_conflicts": [*_catalog_conflicts(facts, property_types, units), *fact_conflicts],
     }
 

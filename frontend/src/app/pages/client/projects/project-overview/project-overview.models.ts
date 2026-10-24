@@ -38,11 +38,18 @@ export interface ProjectOverview {
     description: string | null; approval_status: 'draft' | 'approved' | 'archived';
     allowed_channels: string[]; source_name: string | null; mime_type: string | null;
     download_url: string | null; extracted_links: Array<{ url: string; label: string; kind: string; page?: number | null }>;
-    approved_at: string | null; updated_at: string;
+    approved_at: string | null; approved_by_user_id: string | null; version: number; updated_at: string;
   }>;
   location: { address: string | null; latitude: number | null; longitude: number | null };
   market_intelligence: { report_url: string; total_revenue: number | null; target_roi: number | null; status: string };
-  data_completeness: { percentage: number; onboarding_status: string; last_updated_at: string | null };
+  data_completeness: {
+    percentage: number; onboarding_status: string; last_updated_at: string | null;
+    final_approved: boolean; approved_for_sales_at: string | null; approved_by_user_id: string | null;
+  };
+  operations: {
+    routing: string;
+    assigned_sales: Array<{ user_id: string; name: string; email: string }>;
+  };
   integrations: Array<{
     key: 'meta' | 'sms' | 'calendar';
     channel?: 'sms' | 'whatsapp' | null;

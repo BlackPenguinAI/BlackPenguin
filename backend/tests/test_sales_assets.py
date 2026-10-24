@@ -20,7 +20,7 @@ from app.modules.projects.models import (
 from app.modules.sales_agent.commercial_context import build_commercial_context
 from app.modules.sales_agent.live_service import (
     _denies_available_asset, _execute_share_actions, _normalize_asset_request_result,
-    _select_asset_for_request, _select_assets_for_request,
+    _reconcile_shared_asset_reply, _select_asset_for_request, _select_assets_for_request,
 )
 from app.modules.sales_agent.models import SalesConversation
 from app.modules.sales_agent.response_policy import concise_channel_text, plain_channel_text, repeats_introduction_after_greeting
@@ -130,6 +130,24 @@ def test_source_extraction_does_not_reopen_a_manually_corrected_name(monkeypatch
 
     assert [item.field_key for item in proposals] == ["short_description"]
     assert project.profile.profile_data["project_name"] == "Riverside Project"
+
+
+def test_source_extraction_never_turns_public_contacts_into_internal_assignments(monkeypatch):
+    db = _db()
+    _, _, source = _project_source(db)
+    monkeypatch.setattr(
+        source_service,
+        "get_ai_config",
+        lambda *_args: type("Config", (), {"openrouter_api_key": "test", "agent_onboarding_proyectos": {}})(),
+    )
+
+    async def response(*_args, **_kwargs):
+        return '{"proposals":[{"field":"sales_contacts","value":[{"name":"Public sales office","phone":"+1 555 0100"}],"evidence":"Footer"},{"field":"appointment_routing","value":"manual","evidence":"Footer"},{"field":"short_description","value":"A residential development with practical layouts.","evidence":"Overview"}]}'
+
+    monkeypatch.setattr(source_service, "generate_llm_response", response)
+    proposals = asyncio.run(source_service._extract_proposals(db, source, "Public sales office +1 555 0100", None))
+
+    assert [item.field_key for item in proposals] == ["short_description"]
 
 
 def test_asset_channel_and_expiration_are_enforced():
@@ -462,3 +480,20 @@ def test_channel_text_keeps_mobile_replies_concise_at_sentence_boundaries():
     assert concise is not None
     assert len(concise) <= 700
     assert concise.endswith("I can share more detail on any of these points.")
+
+
+def test_channel_compaction_preserves_property_list_boundaries():
+    reply = "Here are the options:\n\n1. Studio\n   42 m².\n\n2. Two bedrooms\n   80–95 m².\n\n" + "Details. " * 120
+    concise = concise_channel_text(reply, "sms")
+    assert "1. Studio\n" in concise
+    assert "\n\n2. Two bedrooms\n" in concise
+
+
+def test_shared_asset_reconciliation_removes_denial_and_email_promise_only():
+    reply = (
+        "The confirmed starting price is 250,000 USD. "
+        "I can't provide the floor plans directly. "
+        "I can share the brochure via email if you provide your email address."
+    )
+    cleaned = _reconcile_shared_asset_reply(reply)
+    assert cleaned == "The confirmed starting price is 250,000 USD."

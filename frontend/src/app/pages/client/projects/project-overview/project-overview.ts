@@ -23,6 +23,9 @@ export class ProjectOverviewComponent implements OnInit, OnDestroy {
   isLoading = true;
   errorMessage = '';
   mapSafeUrl: SafeResourceUrl | null = null;
+  materialPreviewUrl: SafeResourceUrl | null = null;
+  materialPreviewObjectUrl: string | null = null;
+  materialPreviewMimeType = '';
 
   constructor(
     private readonly route: ActivatedRoute,
@@ -48,6 +51,7 @@ export class ProjectOverviewComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     if (this.coverObjectUrl) URL.revokeObjectURL(this.coverObjectUrl);
     for (const url of this.inventoryImageUrls.values()) URL.revokeObjectURL(url);
+    this.closeMaterialPreview();
   }
 
   get locationLabel(): string {
@@ -86,11 +90,20 @@ export class ProjectOverviewComponent implements OnInit, OnDestroy {
     if (!url) return;
     this.overviewService.getCover(url).subscribe({
       next: blob => {
-        const objectUrl = URL.createObjectURL(blob);
-        window.open(objectUrl, '_blank', 'noopener,noreferrer');
-        setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+        this.closeMaterialPreview();
+        this.materialPreviewObjectUrl = URL.createObjectURL(blob);
+        this.materialPreviewMimeType = blob.type;
+        this.materialPreviewUrl = this.sanitizer.bypassSecurityTrustResourceUrl(this.materialPreviewObjectUrl);
+        this.cdr.detectChanges();
       },
       error: () => { this.errorMessage = 'The Project material could not be previewed.'; this.cdr.detectChanges(); },
     });
+  }
+
+  closeMaterialPreview(): void {
+    if (this.materialPreviewObjectUrl) URL.revokeObjectURL(this.materialPreviewObjectUrl);
+    this.materialPreviewObjectUrl = null;
+    this.materialPreviewUrl = null;
+    this.materialPreviewMimeType = '';
   }
 }

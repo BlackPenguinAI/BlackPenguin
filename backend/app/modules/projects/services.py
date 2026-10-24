@@ -875,6 +875,8 @@ def serialize_overview(db: Session, project: Project, viewer_user: User | None =
                 ),
                 "extracted_links": item.source.extracted_links or [] if item.source else [],
                 "approved_at": item.approved_at,
+                "approved_by_user_id": item.approved_by_user_id,
+                "version": item.version,
                 "updated_at": item.updated_at,
             }
             for item in sales_materials
@@ -883,7 +885,21 @@ def serialize_overview(db: Session, project: Project, viewer_user: User | None =
         "market_intelligence": {"report_url": f"/app/projects/{project.id}/sales-report", "total_revenue": revenue,
                                 "target_roi": None, "status": "available" if units else "pending"},
         "data_completeness": {"percentage": profile.completion_percentage, "onboarding_status": project.onboarding_status,
-                              "last_updated_at": profile.updated_at},
+                              "last_updated_at": profile.updated_at,
+                              "final_approved": profile.final_approved,
+                              "approved_for_sales_at": profile.approved_for_sales_at,
+                              "approved_by_user_id": project.onboarding_approved_by_user_id},
+        "operations": {
+            "routing": data.get("appointment_routing") or "round_robin",
+            "assigned_sales": [
+                {
+                    "user_id": user.id,
+                    "name": " ".join(filter(None, [user.first_name, user.last_name])) or user.email,
+                    "email": user.email,
+                }
+                for user in assigned_sales
+            ],
+        },
         "integrations": integrations,
     }
 

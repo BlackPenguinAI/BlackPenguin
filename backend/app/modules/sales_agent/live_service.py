@@ -363,17 +363,17 @@ def _select_asset_for_request(assets: list[dict], inbound_text: str) -> dict | N
 def _requested_asset_tags(inbound_text: str) -> set[str]:
     text = (inbound_text or "").casefold()
     tags: set[str] = set()
-    if any(term in text for term in ("floor plan", "blueprint", "plano", "plans")):
+    if re.search(r"\b(?:floor\s*plans?|blueprints?|plans?|planos?)\b", text):
         tags.add("floor_plan")
-    if "price list" in text or "pricing sheet" in text or "lista de precios" in text:
+    if re.search(r"\b(?:price\s*lists?|pricing\s*sheets?|lista(?:s)? de precios)\b", text):
         tags.add("price_list")
     if any(term in text for term in ("amenities", "amenity", "servicios", "amenidades")):
         tags.add("amenities")
-    if any(term in text for term in ("virtual tour", "360", "recorrido virtual")):
+    if re.search(r"\b(?:virtual\s*tours?|walkthroughs?|360|recorridos? virtuales?)\b", text):
         tags.add("virtual_tour")
     if any(term in text for term in ("location map", "map of", "mapa", "ubicación", "ubicacion")):
         tags.add("location_map")
-    if any(term in text for term in ("brochure", "folleto")):
+    if re.search(r"\b(?:brochures?|sales materials?|folletos?)\b", text):
         tags.add("brochure")
     return tags
 
@@ -422,6 +422,45 @@ def _denies_available_asset(reply: str | None) -> bool:
         reply or "",
         re.IGNORECASE,
     ))
+
+
+def _reconcile_shared_asset_reply(reply: str | None) -> str:
+    """Remove claims that contradict a share the runtime is about to execute.
+
+    The model does not own delivery. Preserve useful commercial answers while
+    removing only denial, deferred-delivery and unsupported email promises.
+    """
+    text = (reply or "").strip()
+    if not text:
+        return "Here is the approved information you requested."
+    sentence_pattern = re.compile(r"(?is)(?:^|(?<=[.!?])\s+)([^.!?]*(?:[.!?]|$))")
+    removed = False
+    kept: list[str] = []
+    for match in sentence_pattern.finditer(text):
+        sentence = match.group(1).strip()
+        lowered = sentence.casefold()
+        contradicts_share = bool(
+            re.search(r"\b(?:cannot|can't|can not|unable to|not able to|do not|don't)\b", lowered)
+            and re.search(r"\b(?:share|send|provide|attach|access|have)\b", lowered)
+            and re.search(r"\b(?:document|brochure|blueprint|floor plan|pdf|file|material|link|email)\w*\b", lowered)
+        )
+        unsupported_email = bool(
+            re.search(r"\b(?:email|e-mail)\b", lowered)
+            and re.search(r"\b(?:send|share|provide|address|via)\b", lowered)
+        )
+        deferred_delivery = bool(
+            re.search(r"\b(?:sales team|someone|representative)\b", lowered)
+            and re.search(r"\b(?:follow up|send|share|review)\b", lowered)
+            and re.search(r"\b(?:document|brochure|file|material|request)\w*\b", lowered)
+        )
+        if contradicts_share or unsupported_email or deferred_delivery:
+            removed = True
+            continue
+        kept.append(sentence)
+    cleaned = " ".join(kept).strip()
+    if not cleaned or (removed and len(cleaned) < 12):
+        return "Here is the approved information you requested."
+    return cleaned
 
 
 def _normalize_asset_request_result(
@@ -576,9 +615,7 @@ def _execute_share_actions(
         if len(links) >= 5:
             break
     if links:
-        cleaned = (reply or "").strip()
-        if not cleaned or _denies_available_asset(cleaned):
-            cleaned = "Here is the approved information you requested."
+        cleaned = _reconcile_shared_asset_reply(reply)
         missing_tags = _requested_asset_tags(inbound_text) - covered_tags
         if missing_tags:
             labels = {

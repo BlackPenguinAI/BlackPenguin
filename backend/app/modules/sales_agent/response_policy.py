@@ -26,13 +26,26 @@ INTRODUCTION_TERMS = re.compile(
     re.IGNORECASE,
 )
 TOPIC_PATTERNS = {
-    "property_types": re.compile(r"\b(unit types?|property types?|bedrooms?|homes?|models?)\b", re.IGNORECASE),
-    "inventory": re.compile(r"\b(available units?|availability|inventory|how many)\b", re.IGNORECASE),
+    "property_types": re.compile(
+        r"\b(?:unit|property|home)\s+types?\b|\btypes?\s+of\s+(?:units?|properties|homes?)\b|"
+        r"\b(?:bedrooms?|homes?|models?|layouts?|typologies?)\b",
+        re.IGNORECASE,
+    ),
+    "inventory": re.compile(
+        r"\bavailable\s+(?:units?|homes?|properties)\b|"
+        r"\b(?:units?|homes?|properties)\s+(?:you\s+have\s+)?available\b|"
+        r"\bavailability\b|\binventory\b|\bhow many\b",
+        re.IGNORECASE,
+    ),
     "pricing": re.compile(r"\b(price|prices|pricing|cost|starting at|budget)\b", re.IGNORECASE),
     "financing": re.compile(r"\b(financing|finance|mortgage|loan|payment method)\b", re.IGNORECASE),
     "delivery": re.compile(r"\b(move[- ]?in|delivery|ready|completion)\b", re.IGNORECASE),
     "amenities": re.compile(r"\b(amenities|features|included)\b", re.IGNORECASE),
-    "assets": re.compile(r"\b(brochure|floor plan|blueprint|price list|document|pdf|plans?|virtual tour|360(?:°|\s*degree)?)\b", re.IGNORECASE),
+    "assets": re.compile(
+        r"\b(?:brochures?|floor\s*plans?|blueprints?|price\s*lists?|documents?|pdfs?|plans?|"
+        r"sales\s+materials?|virtual\s+tours?|walkthroughs?|360(?:°|\s*degrees?)?)\b",
+        re.IGNORECASE,
+    ),
     "appointment": APPOINTMENT_TERMS,
     "callback": re.compile(r"\b(call me|callback|phone call|speak to (?:sales|a person|someone))\b", re.IGNORECASE),
 }
@@ -63,19 +76,29 @@ def concise_channel_text(value: str | None, channel: str) -> str | None:
     limit = 700 if channel == "sms" else 1200
     if len(text) <= limit:
         return text
-    segments = re.split(r"(?<=[.!?])\s+|\n+", text)
+    # Keep paragraph and list boundaries. Flattening them here made separate
+    # property records render as one malformed WhatsApp/SMS paragraph.
+    segments = [segment for segment in re.split(r"(\n+|(?<=[.!?])[ \t]+)", text) if segment]
     kept: list[str] = []
     length = 0
     for segment in segments:
-        segment = segment.strip()
-        if not segment:
+        if segment.isspace():
+            if not kept:
+                continue
+            separator = "\n\n" if "\n\n" in segment else ("\n" if "\n" in segment else " ")
+            if length + len(separator) > limit - 55:
+                break
+            kept.append(separator)
+            length += len(separator)
             continue
-        extra = len(segment) + (1 if kept else 0)
-        if length + extra > limit - 55:
+        content = segment.strip()
+        if not content:
+            continue
+        if length + len(content) > limit - 55:
             break
-        kept.append(segment)
-        length += extra
-    base = " ".join(kept).strip() or text[:limit - 55].rsplit(" ", 1)[0]
+        kept.append(content)
+        length += len(content)
+    base = "".join(kept).strip() or text[:limit - 55].rsplit(" ", 1)[0]
     return f"{base}\n\nI can share more detail on any of these points."
 
 
@@ -198,26 +221,35 @@ def grounded_catalog_reply(inbound: str | None, commercial: dict[str, Any]) -> s
     The model may choose what to discuss, but it must not concatenate numbered
     records or turn absent price and inventory fields into invented values.
     """
-    topics = requested_topics(inbound)
-    if not topics.intersection({"property_types", "inventory", "pricing"}):
-        return None
     items = commercial.get("property_types") or []
+    text = (inbound or "").casefold()
+    selected_index: int | None = None
+    numbered = re.search(r"\b(?:option|number|unit|type)\s*(\d{1,2})\b", text)
+    if numbered and 1 <= int(numbered.group(1)) <= len(items):
+        selected_index = int(numbered.group(1)) - 1
+    else:
+        for index, item in enumerate(items):
+            name = str(item.get("property_type") or "").strip().casefold()
+            if name and len(name) >= 4 and name in text:
+                selected_index = index
+                break
+    topics = requested_topics(inbound)
+    if selected_index is None and not topics.intersection({"property_types", "inventory", "pricing"}):
+        return None
     if not items:
         return "The property catalog has not been confirmed yet. I can ask the sales team to provide the current options."
 
-    lines = ["Here are the confirmed home types:"]
-    has_price = False
-    has_inventory = False
-    for index, item in enumerate(items[:6], 1):
-        name = str(item.get("property_type") or f"Home type {index}").strip()
-        lines.extend(["", f"{index}. {name}"])
-        details: list[str] = []
-        if item.get("bedrooms") is not None:
-            details.append(f"{item['bedrooms']:g} bedroom{'s' if float(item['bedrooms']) != 1 else ''}")
-        if item.get("bathrooms") is not None:
-            details.append(f"{item['bathrooms']:g} bathroom{'s' if float(item['bathrooms']) != 1 else ''}")
-        if details:
-            lines.append("• " + " · ".join(details))
+    if selected_index is not None:
+        item = items[selected_index]
+        name = str(item.get("property_type") or f"Home type {selected_index + 1}").strip()
+        lines = [f"Here are the confirmed details for {name}:"]
+        detail_values = (
+            ("Bedrooms", item.get("bedrooms")),
+            ("Bathrooms", item.get("bathrooms")),
+        )
+        for label, value in detail_values:
+            if value is not None:
+                lines.append(f"• {label}: {value:g}")
         area_min, area_max, area_unit = item.get("area_min"), item.get("area_max"), item.get("area_unit")
         if area_min is not None or area_max is not None:
             area = f"{area_min:g}" if area_min is not None else ""
@@ -225,16 +257,57 @@ def grounded_catalog_reply(inbound: str | None, commercial: dict[str, Any]) -> s
                 area = f"{area}–{area_max:g}" if area else f"Up to {area_max:g}"
             lines.append(f"• Area: {area} {area_unit or ''}".rstrip())
         if item.get("starting_price") is not None and item.get("currency"):
-            has_price = True
             lines.append(f"• Starting price: {item['starting_price']:,.0f} {item['currency']}")
         if item.get("available_units") is not None and item.get("inventory_updated_at"):
-            has_inventory = True
             lines.append(f"• Confirmed availability: {item['available_units']} unit{'s' if item['available_units'] != 1 else ''}")
+        description = str(item.get("description") or "").strip()
+        if description:
+            lines.extend(["", description])
+        lines.extend(["", "What would you like to review next about this option?"])
+        return "\n".join(lines)
+
+    visible = items[:3]
+    project_name = str((commercial.get("confirmed_project_facts") or {}).get("project_name") or "").strip()
+    lines = [
+        f"{project_name} currently offers these confirmed home types:"
+        if project_name else "Here are the confirmed home types:"
+    ]
+    has_price = False
+    has_inventory = False
+    for index, item in enumerate(visible, 1):
+        name = str(item.get("property_type") or f"Home type {index}").strip()
+        lines.extend(["", f"{index}. {name}"])
+        details: list[str] = []
+        if item.get("bedrooms") is not None:
+            details.append(f"{item['bedrooms']:g} bedroom{'s' if float(item['bedrooms']) != 1 else ''}")
+        area_min, area_max, area_unit = item.get("area_min"), item.get("area_max"), item.get("area_unit")
+        if area_min is not None or area_max is not None:
+            area = f"{area_min:g}" if area_min is not None else ""
+            if area_max is not None and area_max != area_min:
+                area = f"{area}–{area_max:g}" if area else f"Up to {area_max:g}"
+            details.append(f"{area} {area_unit or ''}".rstrip())
+        if item.get("starting_price") is not None and item.get("currency"):
+            has_price = True
+            details.append(f"from {item['starting_price']:,.0f} {item['currency']}")
+        if item.get("available_units") is not None and item.get("inventory_updated_at"):
+            has_inventory = True
+            if "inventory" in topics:
+                details.append(f"{item['available_units']} currently available")
+        description = str(item.get("description") or "").strip()
+        if details:
+            lines.append("   " + " · ".join(details) + ".")
+        elif description:
+            summary = description.split(".", 1)[0].strip()
+            lines.append(f"   {summary[:160]}.")
 
     if "pricing" in topics and not has_price:
         lines.extend(["", "Current pricing has not been confirmed."])
     if "inventory" in topics and not has_inventory:
         lines.extend(["", "Current unit availability has not been confirmed."])
+    if len(items) > len(visible):
+        lines.extend(["", f"There are {len(items) - len(visible)} more confirmed option(s). I can show them or narrow the list by bedrooms, area, or budget."])
+    else:
+        lines.extend(["", "Which option would you like to explore in more detail?"])
     return "\n".join(lines)
 
 

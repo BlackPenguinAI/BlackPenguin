@@ -20,6 +20,7 @@ from app.modules.sales_agent.response_policy import (
     plain_channel_text,
     remove_unsolicited_appointment_offer,
     repeats_recent_assistant_reply,
+    requested_topics,
 )
 from app.modules.sales_agent.live_service import _confirmed_handoff_reply
 
@@ -106,6 +107,26 @@ def test_future_inventory_dates_are_withheld_and_reported_as_conflicts():
     assert {item["code"] for item in context["data_conflicts"]} == {"future_inventory_timestamp"}
 
 
+def test_conflicting_ready_status_and_future_delivery_are_withheld_from_agent():
+    db = _db()
+    company = Company(name="Conflicted Company"); db.add(company); db.flush()
+    project = Project(company_id=company.id, name="Conflicted Project")
+    project.profile = ProjectProfile(
+        profile_data={"project_status": "Ready for occupancy", "delivery_dates": "Expected in 2099"},
+        field_states={
+            "project_status": {"status": "confirmed", "applicable": True},
+            "delivery_dates": {"status": "confirmed", "applicable": True},
+        },
+    )
+    db.add(project); db.commit()
+
+    context = build_commercial_context(db, project=project, company_id=company.id, lead_id="lead-1")
+
+    assert "project_status" not in context["confirmed_project_facts"]
+    assert "delivery_dates" not in context["confirmed_project_facts"]
+    assert any(item["code"] == "ready_status_future_delivery" for item in context["data_conflicts"])
+
+
 def test_exact_address_rejects_embedded_commercial_facts():
     error = validate_onboarding_value(
         "exact_address",
@@ -174,7 +195,33 @@ def test_catalog_reply_separates_items_and_never_invents_missing_commercial_valu
     )
     assert "1. Studio\n" in reply
     assert "2. Two bedrooms\n" in reply
-    assert "Starting price: 250,000 USD" in reply
-    assert "Confirmed availability: 3 units" in reply
+    assert "from 250,000 USD" in reply
+    assert "3 currently available" in reply
     assert "Starting price: 0" not in reply
+    assert reply.endswith("Which option would you like to explore in more detail?")
+
+
+def test_topic_detection_accepts_plural_and_reordered_lead_phrases():
+    assert {"assets", "inventory", "property_types"}.issubset(requested_topics(
+        "Can I get the blueprints and see the types of units you have available?",
+    ))
+    assert "inventory" in requested_topics("Show me the units available")
+
+
+def test_catalog_reply_expands_only_the_selected_property_type():
+    reply = grounded_catalog_reply(
+        "Tell me more about option 2",
+        {"property_types": [
+            {"property_type": "One bedroom", "bedrooms": 1},
+            {"property_type": "Two bedrooms", "bedrooms": 2, "bathrooms": 2,
+             "area_min": 80, "area_max": 95, "area_unit": "m²", "starting_price": 250000,
+             "currency": "USD", "available_units": 3, "inventory_updated_at": "2026-10-23T00:00:00Z"},
+            {"property_type": "Loft", "bedrooms": None},
+        ]},
+    )
+    assert reply.startswith("Here are the confirmed details for Two bedrooms:")
+    assert "• Bedrooms: 2" in reply
+    assert "• Confirmed availability: 3 units" in reply
+    assert "One bedroom" not in reply
+    assert "Loft" not in reply
 
