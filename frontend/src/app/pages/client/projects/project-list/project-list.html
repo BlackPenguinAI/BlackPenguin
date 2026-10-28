@@ -43,12 +43,15 @@
             <div class="w-full h-1.5 bg-black rounded-full overflow-hidden flex">
               <div class="h-full bg-green-500 transition-all" [style.width.%]="p.profile?.completion?.percentage || 0"></div>
             </div>
+            <p *ngIf="p.profile?.completion?.required_fields_complete && p.profile?.completion?.finalization_blockers?.length" class="rounded-lg border border-amber-500/20 bg-amber-500/[0.07] px-3 py-2 text-[10px] leading-4 text-amber-200">
+              Profile 100% · {{ p.profile.completion.finalization_blockers.length }} final review item{{ p.profile.completion.finalization_blockers.length === 1 ? '' : 's' }} pending
+            </p>
           </div>
         </div>
 
         <div class="flex gap-2">
           <a [routerLink]="isSales || p.onboarding_status === 'completed' ? ['/app/projects', p.id] : ['/app/projects', p.id, 'onboarding']" class="min-w-0 flex-1 py-2.5 bg-black/50 border border-white/10 hover:border-secondary/50 hover:text-secondary text-white text-sm font-medium rounded-xl transition-colors text-center cursor-pointer block">
-            {{ isSales || p.onboarding_status === 'completed' ? 'View Project' : 'Continue Onboarding' }}
+            {{ isSales || p.onboarding_status === 'completed' ? 'View Project' : (p.profile?.completion?.required_fields_complete && p.profile?.completion?.finalization_blockers?.length ? 'Review pending items' : 'Continue Onboarding') }}
           </a>
           <button *ngIf="canManageProjects && !p.is_demo" (click)="openDeleteModal(p)" class="flex w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-black/50 text-gray-400 transition hover:border-red-400/40 hover:bg-red-500/10 hover:text-red-300" [attr.aria-label]="'Delete ' + p.name" title="Archive or delete project">
             <span class="material-symbols-outlined text-[19px]">delete</span>

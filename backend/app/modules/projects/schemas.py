@@ -44,6 +44,7 @@ class ProjectCompletion(BaseModel):
     percentage: int
     required_fields_complete: bool
     ready_for_confirmation: bool
+    can_finalize: bool = False
     can_complete: bool
     final_approved: bool
     completed: int
@@ -51,6 +52,7 @@ class ProjectCompletion(BaseModel):
     remaining: int
     sections: list[SectionProgress] = Field(default_factory=list)
     blockers: list[dict[str, Any]] = Field(default_factory=list)
+    finalization_blockers: list[dict[str, Any]] = Field(default_factory=list)
     sales_activation_status: str
     sales_activation_blockers: list[dict[str, Any]] = Field(default_factory=list)
 

@@ -208,6 +208,10 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   get canSend(): boolean { return (!!this.prompt.trim() || !!this.selectedFiles.length) && !this.isAnalyzing && !this.hasExclusiveSourceFlow; }
   get projectName(): string { return this.profile.project_name || 'Untitled Project'; }
   get pendingSalesAssets(): ProjectSalesAsset[] { return this.salesAssets.filter(item => item.approval_status === 'draft'); }
+  get finalizationBlockers() { return this.profile.completion.finalization_blockers || []; }
+  get showFinalizationReview(): boolean {
+    return this.profile.completion.required_fields_complete && this.finalizationBlockers.length > 0;
+  }
   get showSalesMaterials(): boolean { return this.salesAssets.length > 0; }
   get availableSalesAssetSources(): ProjectSource[] {
     const registered = new Set(this.salesAssets.map(item => item.source_id));
@@ -215,6 +219,10 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   }
   get hasProcessingSources(): boolean { return this.sources.some((source) => source.status === 'processing'); }
   get nextBlocker(): string { return this.profile.completion.blockers[0]?.label || 'Final profile approval'; }
+  reviewFinalizationBlocker(action: string): void {
+    const selector = action === 'review_sales_materials' ? '[data-testid="sales-materials"]' : '[data-active-question="true"]';
+    document.querySelector(selector)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
   get profileSections(): SectionProgress[] {
     return this.profile.completion.sections.filter((section) => section.total > 0 && this.fieldsForSection(section.key).length > 0);
   }
@@ -725,6 +733,17 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     const detail = error.error?.detail;
     if (typeof detail === 'string') return detail;
     if (typeof detail?.message === 'string') {
+      const blockerDetails = Array.isArray(detail.blocker_details)
+        ? detail.blocker_details
+          .map((item: { message?: unknown; labels?: unknown }) => {
+            const message = typeof item?.message === 'string' ? item.message : '';
+            const labels = Array.isArray(item?.labels) && item.labels.length
+              ? ` Pending: ${item.labels.join(', ')}.` : '';
+            return `${message}${labels}`.trim();
+          })
+          .filter((message: string) => !!message)
+        : [];
+      if (blockerDetails.length) return `${detail.message} ${blockerDetails.join(' ')}`;
       return detail.next_action === 'resend_activation'
         ? `${detail.message} Resend the activation invitation from Users.`
         : detail.message;
@@ -1303,9 +1322,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
       next: (result) => this.router.navigateByUrl(result.redirect_url),
       error: (error: HttpErrorResponse) => {
         this.isCompleting = false;
-        this.errorMessage = error.status === 409
-          ? 'The profile changed and needs another review before it can be completed.'
-          : 'The onboarding could not be completed. Please try again.';
+        this.errorMessage = this.apiDetail(error, 'The onboarding could not be completed. Please try again.');
         if (error.status === 409) this.syncState();
         this.cdr.detectChanges();
       },
@@ -1363,11 +1380,11 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   private recoverFailedSend(
     error: HttpErrorResponse, content: string, files: File[], intents: ProjectFileIntent[], replyTo: string | null, clientMessageId: string,
   ): void {
-    const uncertainDelivery = [0, 409, 502, 503, 504].includes(error.status);
+    const uncertainDelivery = [0, 502, 503, 504].includes(error.status);
     if (!uncertainDelivery) {
-      const message = error.status === 422
+      const message = this.apiDetail(error, error.status === 422
         ? 'That answer is not valid for the current question. Review it and try again.'
-        : 'The message could not be processed. Your text and selected files were restored.';
+        : 'The message could not be processed. Your text and selected files were restored.');
       this.restoreFailedSend(content, files, intents, replyTo, clientMessageId, message);
       return;
     }
@@ -1394,7 +1411,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     });
   }
   private handleStructuredActionError(error: HttpErrorResponse, fallback: string): void {
-    this.errorMessage = typeof error.error?.detail === 'string' ? error.error.detail : fallback;
+    this.errorMessage = this.apiDetail(error, fallback);
     if ([0, 409, 502, 504].includes(error.status)) this.syncState();
     this.cdr.detectChanges();
   }

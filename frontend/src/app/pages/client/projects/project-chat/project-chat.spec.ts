@@ -47,6 +47,45 @@ describe('ProjectChatComponent', () => {
     expect(component).toBeTruthy();
   });
 
+  it('keeps profile completion separate from finalization readiness', () => {
+    component.profile = {
+      ...EMPTY_PROJECT_PROFILE,
+      completion: {
+        ...EMPTY_PROJECT_PROFILE.completion,
+        percentage: 100,
+        required_fields_complete: true,
+        ready_for_confirmation: false,
+        can_finalize: false,
+        finalization_blockers: [{
+          code: 'pending_sales_materials', action: 'review_sales_materials', count: 1,
+          message: 'Decide whether the draft file can be shared with leads.', labels: ['Project brochure'],
+        }],
+      },
+    };
+
+    fixture.detectChanges();
+
+    expect(component.finalizationBlockers).toHaveLength(1);
+    expect(fixture.nativeElement.querySelector('[data-testid="finalization-blockers"]')?.textContent)
+      .toContain('Project brochure');
+  });
+
+  it('renders a structured finalization conflict instead of a connection error', () => {
+    const detail = {
+      message: 'The Project Profile is not ready for final confirmation.',
+      blockers: ['pending_sales_materials'],
+      blocker_details: [{ code: 'pending_sales_materials', message: 'Review Project brochure.' }],
+    };
+    const error = { error: { detail }, status: 409 } as never;
+
+    (component as unknown as { handleStructuredActionError(error: unknown, fallback: string): void })
+      .handleStructuredActionError(error, 'Fallback');
+
+    expect(component.errorMessage).toContain(detail.message);
+    expect(component.errorMessage).toContain('Review Project brochure.');
+    expect(component.errorMessage).not.toContain('connection');
+  });
+
   it('should wait for state before showing onboarding UI', () => {
     expect(component.initialState).toBe('loading');
     expect(component.showWelcome).toBe(false);

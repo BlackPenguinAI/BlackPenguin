@@ -7,7 +7,7 @@ import re
 from typing import Any
 
 from fastapi import HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, object_session
 from sqlalchemy.orm.attributes import flag_modified
 
 from app.modules.companies.models import Company
@@ -671,13 +671,24 @@ def serialize_profile(profile: ProjectProfile) -> dict[str, Any]:
         completion["required_fields_complete"] and not profile.final_approved
         and profile.project.onboarding_status in {"in_progress", "awaiting_confirmation"}
     )
-    return {
+    payload = {
         "id": profile.id, "project_id": profile.project_id,
         "project_name": str((profile.profile_data or {}).get("project_name") or profile.project.name),
         "data": profile.profile_data or {},
         "fields": field_progress(profile.field_states), "completion": completion,
         "updated_at": profile.updated_at,
     }
+    db = object_session(profile)
+    if db is not None and profile.project is not None:
+        details = finalization_blocker_details(db, profile.project)
+        can_finalize = not details and not profile.final_approved
+        completion["finalization_blockers"] = details
+        completion["can_finalize"] = can_finalize
+        completion["ready_for_confirmation"] = can_finalize
+    else:
+        completion.setdefault("finalization_blockers", [])
+        completion.setdefault("can_finalize", completion["ready_for_confirmation"])
+    return payload
 
 
 def serialize_project(project: Project) -> dict[str, Any]:
@@ -702,32 +713,94 @@ def serialize_project(project: Project) -> dict[str, Any]:
 
 
 def readiness_for_confirmation(db: Session, project: Project) -> tuple[bool, list[str]]:
+    details = finalization_blocker_details(db, project)
+    reasons: list[str] = []
+    for item in details:
+        code = str(item["code"])
+        if code not in reasons:
+            reasons.append(code)
+    return not reasons, reasons
+
+
+def finalization_blocker_details(db: Session, project: Project) -> list[dict[str, Any]]:
+    """Return actionable blockers that must be resolved before final approval.
+
+    Field completion and finalization are deliberately separate: a Project can
+    have a 100% profile while an uploaded source or lead-sharing decision still
+    needs review.
+    """
     profile = get_profile(project)
     completion = refresh_completion(profile)
-    reasons: list[str] = []
+    blockers: list[dict[str, Any]] = []
     if not completion["required_fields_complete"]:
-        reasons.append("required_fields")
-    if db.query(ProjectOnboardingSource).filter(
+        blockers.append({
+            "code": "required_fields",
+            "message": "Complete the remaining required Project Profile fields.",
+            "action": "continue_onboarding",
+            "count": len(completion.get("blockers") or []),
+        })
+    processing_sources = db.query(ProjectOnboardingSource).filter(
         ProjectOnboardingSource.project_id == project.id,
         ProjectOnboardingSource.status == ProjectSourceStatus.PROCESSING,
-    ).first():
-        reasons.append("processing_sources")
-    if db.query(ProjectOnboardingProposal).join(ProjectOnboardingSource).filter(
+    ).all()
+    if processing_sources:
+        blockers.append({
+            "code": "processing_sources",
+            "message": "Wait for the uploaded Project sources to finish processing.",
+            "action": "review_sources",
+            "count": len(processing_sources),
+            "entity_ids": [item.id for item in processing_sources],
+            "labels": [item.name for item in processing_sources],
+        })
+    pending_proposals = db.query(ProjectOnboardingProposal).join(ProjectOnboardingSource).filter(
         ProjectOnboardingSource.project_id == project.id,
         ProjectOnboardingProposal.status == ProjectProposalStatus.PENDING,
-    ).first():
-        reasons.append("pending_proposals")
-    if db.query(ProjectSalesAsset).filter(
+    ).all()
+    if pending_proposals:
+        blockers.append({
+            "code": "pending_proposals",
+            "message": "Approve, edit, or reject every extracted Project detail.",
+            "action": "review_sources",
+            "count": len(pending_proposals),
+            "entity_ids": [item.id for item in pending_proposals],
+        })
+    pending_materials = db.query(ProjectSalesAsset).filter(
         ProjectSalesAsset.project_id == project.id,
         ProjectSalesAsset.approval_status == "draft",
-    ).first():
-        reasons.append("pending_sales_materials")
+    ).order_by(ProjectSalesAsset.created_at.asc()).all()
+    if pending_materials:
+        blockers.append({
+            "code": "pending_sales_materials",
+            "message": "Decide whether each draft file can be shared with leads or must remain internal.",
+            "action": "review_sales_materials",
+            "count": len(pending_materials),
+            "entity_ids": [item.id for item in pending_materials],
+            "labels": [item.display_name for item in pending_materials],
+        })
     for conflict in project_profile_consistency_conflicts(
         profile.profile_data or {}, profile.field_states or {},
     ):
-        if conflict["code"] not in reasons:
-            reasons.append(str(conflict["code"]))
-    return not reasons, reasons
+        code = str(conflict["code"])
+        if not any(item["code"] == code for item in blockers):
+            blockers.append({
+                "code": code,
+                "message": str(conflict.get("message") or "Resolve the conflicting Project information."),
+                "action": "review_profile",
+            })
+    return blockers
+
+
+def enrich_finalization_readiness(db: Session, project: Project, payload: dict[str, Any]) -> dict[str, Any]:
+    profile_payload = payload.get("profile") if "profile" in payload else payload
+    if not profile_payload:
+        return payload
+    completion = profile_payload["completion"]
+    details = finalization_blocker_details(db, project)
+    can_finalize = not details and not bool(project.profile and project.profile.final_approved)
+    completion["finalization_blockers"] = details
+    completion["can_finalize"] = can_finalize
+    completion["ready_for_confirmation"] = can_finalize
+    return payload
 
 
 def complete_onboarding(db: Session, project: Project, user_id: str) -> ProjectProfile:
@@ -736,9 +809,12 @@ def complete_onboarding(db: Session, project: Project, user_id: str) -> ProjectP
     if project.onboarding_status == "completed" and profile.final_approved:
         return profile
     if not ready:
+        details = finalization_blocker_details(db, project)
         raise HTTPException(status_code=409, detail={
             "message": "The Project Profile is not ready for final confirmation.",
             "blockers": reasons,
+            "blocker_details": details,
+            "next_action": "Resolve the listed onboarding items, then approve the Project Profile.",
         })
     now = datetime.utcnow()
     profile.final_approved = True

@@ -316,6 +316,26 @@ def _next_question(profile) -> dict[str, Any]:
     )
 
 
+def _guided_next_question(db: Session, project: Project, profile) -> dict[str, Any]:
+    details = services.finalization_blocker_details(db, project)
+    field_blockers = services.serialize_profile(profile)["completion"]["blockers"]
+    if field_blockers or not details:
+        return _next_question(profile)
+    count = sum(int(item.get("count") or 1) for item in details)
+    noun = "item" if count == 1 else "items"
+    return {
+        "field": None,
+        "label": "Onboarding review required",
+        "prompt": f"Your Project Profile is 100% complete, but {count} onboarding {noun} still require review before final approval.",
+        "input_type": "finalization_review",
+        "options": [],
+        "examples": [],
+        "allow_custom": False,
+        "minimum_words": None,
+        "help_text": "Use the review card below to resolve each pending item. Your previous decisions remain in the conversation history.",
+    }
+
+
 def _continue_after_source_review(
     db: Session,
     *,
@@ -350,9 +370,10 @@ def _state_payload(db: Session, project: Project) -> dict[str, Any]:
         .order_by(ProjectOnboardingSource.created_at.desc())
         .all()
     )
-    serialized_profile = services.serialize_profile(profile)
-    ready_for_confirmation, _ = services.readiness_for_confirmation(db, project)
-    serialized_profile["completion"]["ready_for_confirmation"] = ready_for_confirmation and not profile.final_approved
+    serialized_profile = services.enrich_finalization_readiness(
+        db, project, services.serialize_profile(profile),
+    )
+    ready_for_confirmation = serialized_profile["completion"]["can_finalize"]
     processing = any(source.status.value == "processing" for source in sources) or db.query(OnboardingSourceJob).filter(
         OnboardingSourceJob.scope == "project",
         OnboardingSourceJob.project_id == project.id,
@@ -366,7 +387,7 @@ def _state_payload(db: Session, project: Project) -> dict[str, Any]:
     )
     if not processing and not pending_review:
         latest_ai = next((item for item in reversed(messages) if item.sender == SenderType.AI), None)
-        desired_question = _next_question(profile)
+        desired_question = _guided_next_question(db, project, profile)
         if latest_ai and not latest_ai.response_payload and (
             not latest_ai.ui_payload
             or (latest_ai.ui_payload or {}).get("field") != desired_question.get("field")
@@ -400,7 +421,7 @@ def _state_payload(db: Session, project: Project) -> dict[str, Any]:
         "messages": [_message(message) for message in messages],
         "profile": serialized_profile,
         "sources": [source_service.serialize_source(source) for source in sources],
-        "next_question": _next_question(profile),
+        "next_question": _guided_next_question(db, project, profile),
         "stage": stage,
         "version": version,
     }
@@ -592,13 +613,14 @@ def list_projects(db: Session = Depends(get_db), current_user: User = Depends(Ro
     )
     allowed = project_ids_for_user(db, current_user)
     projects = (projects.filter(Project.id.in_(allowed)) if allowed else projects.filter(Project.id == "")).order_by(Project.created_at.desc()).all()
-    return [services.serialize_project(project) for project in projects]
+    return [services.enrich_finalization_readiness(db, project, services.serialize_project(project)) for project in projects]
 
 
 @router.get("/{project_id}", response_model=ProjectResponse)
 def get_project(project_id: str, db: Session = Depends(get_db), current_user: User = Depends(RoleChecker(VIEWER_ROLES))):
     require_project_access(db, current_user, project_id)
-    return services.serialize_project(services.get_project(db, project_id, current_user.company_id))
+    project = services.get_project(db, project_id, current_user.company_id)
+    return services.enrich_finalization_readiness(db, project, services.serialize_project(project))
 
 
 @router.patch("/{project_id}/timezone", response_model=ProjectResponse)

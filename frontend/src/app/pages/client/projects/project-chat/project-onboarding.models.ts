@@ -19,6 +19,15 @@ export interface SectionProgress {
   percentage: number;
 }
 
+export interface FinalizationBlocker {
+  code: string;
+  message: string;
+  action: 'continue_onboarding' | 'review_sources' | 'review_sales_materials' | 'review_profile' | string;
+  count?: number;
+  entity_ids?: string[];
+  labels?: string[];
+}
+
 export interface ProjectProfile {
   id: string;
   project_id: string;
@@ -29,6 +38,7 @@ export interface ProjectProfile {
     percentage: number;
     required_fields_complete: boolean;
     ready_for_confirmation: boolean;
+    can_finalize: boolean;
     can_complete: boolean;
     final_approved: boolean;
     completed: number;
@@ -36,6 +46,7 @@ export interface ProjectProfile {
     remaining: number;
     sections: SectionProgress[];
     blockers: Array<{ field: string; label: string; section: string; requirement: string; status: string }>;
+    finalization_blockers: FinalizationBlocker[];
     sales_activation_status: 'ready' | 'not_ready';
     sales_activation_blockers: Array<{ field: string; label: string; section: string; status: string }>;
   };
@@ -254,9 +265,9 @@ export interface ProjectOnboardingActionPayload {
 export const EMPTY_PROJECT_PROFILE: ProjectProfile = {
   id: '', project_id: '', project_name: 'Untitled Project', data: {}, fields: [], updated_at: null,
   completion: {
-    percentage: 0, required_fields_complete: false, ready_for_confirmation: false,
+    percentage: 0, required_fields_complete: false, ready_for_confirmation: false, can_finalize: false,
     can_complete: false, final_approved: false,
-    completed: 0, total: 0, remaining: 0, sections: [], blockers: [],
+    completed: 0, total: 0, remaining: 0, sections: [], blockers: [], finalization_blockers: [],
     sales_activation_status: 'not_ready', sales_activation_blockers: [],
   },
 };
