@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 import re
 from typing import Any
+from app.modules import onboarding_versions as versions
 
 from fastapi import HTTPException
 from sqlalchemy import func
@@ -215,8 +216,8 @@ def _sync_profile(db: Session, project: Project) -> None:
     latest_inventory_update = _latest_inventory_update(confirmed)
     data.update({
         "typologies": [item.name for item in confirmed],
-        "available_inventory": sum(item.available_units or 0 for item in confirmed),
-        "starting_price": min(float(item.starting_price) for item in confirmed if item.starting_price is not None),
+        "available_inventory": sum(item.available_units or 0 for item in confirmed) if any(item.available_units is not None for item in confirmed) else None,
+        "starting_price": min((float(item.starting_price) for item in confirmed if item.starting_price is not None), default=None),
         "currency": next((item.currency for item in confirmed if item.currency), None),
         "inventory_updated_at": latest_inventory_update.isoformat() if latest_inventory_update else None,
         "areas": [
@@ -230,7 +231,7 @@ def _sync_profile(db: Session, project: Project) -> None:
     })
     data["property_type_catalog"] = [item.id for item in confirmed]
     for key in ("typologies", "available_inventory", "starting_price", "currency", "inventory_updated_at"):
-        states[key] = {"status": "confirmed", "applicable": True}
+        states[key] = {"status": "confirmed" if data.get(key) is not None else "missing", "applicable": True}
     current_catalog_status = states.get("property_type_catalog", {}).get("status")
     if has_candidates or current_catalog_status not in {"confirmed", "corrected_by_user"}:
         states["property_type_catalog"] = {"status": "pending_confirmation", "applicable": True}
@@ -310,6 +311,7 @@ def confirm_catalog(db: Session, project: Project) -> dict[str, Any]:
 
 
 def create(db: Session, project: Project, payload: dict[str, Any], *, user_id: str) -> ProjectPropertyType:
+    before = versions.begin_edit(db, services.get_profile(project))
     normalized_name = str(payload.get("name") or "").strip()
     item = db.query(ProjectPropertyType).filter(
         ProjectPropertyType.project_id == project.id,
@@ -328,12 +330,14 @@ def create(db: Session, project: Project, payload: dict[str, Any], *, user_id: s
     db.add(item)
     db.flush()
     _sync_profile(db, project)
+    versions.record_edit(db, project.profile, before, actor_user_id=user_id)
     db.commit()
     db.refresh(item)
     return item
 
 
-def remove(db: Session, project: Project, item: ProjectPropertyType) -> None:
+def remove(db: Session, project: Project, item: ProjectPropertyType, *, user_id: str | None = None) -> None:
+    before = versions.begin_edit(db, services.get_profile(project))
     if item.review_status == "candidate":
         item.review_status = "rejected"
         db.add(item)
@@ -341,10 +345,12 @@ def remove(db: Session, project: Project, item: ProjectPropertyType) -> None:
         db.delete(item)
     db.flush()
     _sync_profile(db, project)
+    versions.record_edit(db, project.profile, before, actor_user_id=user_id)
     db.commit()
 
 
 def update(db: Session, project: Project, item: ProjectPropertyType, payload: dict[str, Any], *, user_id: str) -> ProjectPropertyType:
+    before = versions.begin_edit(db, services.get_profile(project))
     for key, value in payload.items():
         setattr(item, key, value)
     item.updated_by_user_id = user_id
@@ -354,6 +360,7 @@ def update(db: Session, project: Project, item: ProjectPropertyType, payload: di
     db.add(item)
     db.flush()
     _sync_profile(db, project)
+    versions.record_edit(db, project.profile, before, actor_user_id=user_id)
     db.commit()
     db.refresh(item)
     return item

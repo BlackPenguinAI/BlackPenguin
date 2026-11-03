@@ -1,4 +1,5 @@
 from datetime import datetime
+from app.modules.onboarding_versions import active_approved
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
@@ -35,7 +36,7 @@ def _setup_progress(db: Session, user: User) -> dict:
     company_profile = db.query(CompanyProfile).filter(
         CompanyProfile.company_id == user.company_id,
     ).first()
-    company_complete = bool(company_profile and calculate_company_completion(
+    company_complete = bool(active_approved(company_profile) or company_profile and calculate_company_completion(
         company_profile.field_states,
         final_approved=company_profile.final_approved,
     )["can_complete"])
@@ -47,9 +48,7 @@ def _setup_progress(db: Session, user: User) -> dict:
     ).order_by(Project.created_at.asc()).all()
     completed_projects = [
         project for project in projects
-        if project.onboarding_status == "completed"
-        and project.profile is not None
-        and project.profile.final_approved
+        if active_approved(project.profile)
     ]
     project_complete = bool(completed_projects)
     project = completed_projects[0] if completed_projects else (projects[0] if projects else None)

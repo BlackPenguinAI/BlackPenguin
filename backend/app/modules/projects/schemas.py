@@ -41,6 +41,11 @@ class SectionProgress(BaseModel):
 
 
 class ProjectCompletion(BaseModel):
+    draft_revision: int = 0
+    published_revision: int | None = None
+    active_profile_approved: bool = False
+    has_pending_changes: bool = False
+    capabilities: dict[str, Any] = Field(default_factory=dict)
     percentage: int
     required_fields_complete: bool
     ready_for_confirmation: bool
@@ -58,6 +63,7 @@ class ProjectCompletion(BaseModel):
 
 
 class ProjectProfileResponse(BaseModel):
+    published_data: dict[str, Any] | None = None
     id: str
     project_id: str
     project_name: str
@@ -105,6 +111,7 @@ class FieldUpdate(BaseModel):
 
 
 class ProjectProfilePatch(BaseModel):
+    expected_revision: int | None = Field(default=None, ge=0)
     updates: list[FieldUpdate] = Field(default_factory=list)
     final_approved: bool | None = None
 
@@ -396,6 +403,12 @@ class PropertyTypeBase(BaseModel):
     images_status: Literal["pending", "provided", "deferred"] = "pending"
     source_reference: str | None = None
     sort_order: int = 0
+
+    @field_validator("starting_price", "maximum_price", mode="before")
+    @classmethod
+    def monetary_amount(cls, value):
+        from app.modules.money import parse_amount
+        return float(parse_amount(value)) if value is not None else None
 
     @field_validator("inventory_updated_at", mode="after")
     @classmethod

@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
 from app.modules.onboarding_questions import validate_onboarding_value
+from app.modules import onboarding_versions as versions
 from app.modules.users import services as user_services
 from app.modules.users.models import User, UserAuthStatus, UserRole
 from app.modules.projects.models import Project
@@ -509,7 +510,9 @@ def apply_field_updates(
     allow_authoritative_statuses: bool,
     final_approved: bool | None = None,
     commit: bool = True,
+    actor_user_id: str | None = None, expected_revision: int | None = None,
 ) -> ApplyUpdatesResult:
+    before = versions.begin_edit(db, profile, expected_revision=expected_revision)
     data = dict(profile.profile_data or {})
     states = dict(profile.field_states or {})
     sources = dict(profile.field_sources or {})
@@ -527,7 +530,7 @@ def apply_field_updates(
         if status not in VALID_STATUSES:
             rejected.append({"update": raw_update, "reason": "invalid_status"})
             continue
-        if status in {"confirmed", "corrected_by_user", "not_applicable"} and not allow_authoritative_statuses:
+        if status in {"confirmed", "corrected_by_user", "not_applicable", "deferred"} and not allow_authoritative_statuses:
             status = "pending_confirmation"
 
         current_state = states.get(field_key, {}).get("status")
@@ -552,6 +555,7 @@ def apply_field_updates(
         # value again.
         if (
             allow_authoritative_statuses
+            and status not in {"deferred", "not_applicable", "missing"}
             and current_state in {"confirmed", "corrected_by_user"}
             and current_value not in (None, "", [])
             and incoming_value not in (None, "", [])
@@ -594,15 +598,16 @@ def apply_field_updates(
             }
         )
 
-    if final_approved is not None and allow_authoritative_statuses:
-        profile.final_approved = final_approved
-
     profile.profile_data = data
     profile.field_states = states
     profile.field_sources = sources
     flag_modified(profile, "profile_data")
     flag_modified(profile, "field_states")
     flag_modified(profile, "field_sources")
+    if accepted:
+        versions.record_edit(db, profile, before, actor_user_id=actor_user_id)
+    if final_approved is True and allow_authoritative_statuses:
+        approve_profile(db, profile, commit=False, actor_user_id=actor_user_id)
     refresh_completion(profile)
 
     db.add(profile)
@@ -698,6 +703,7 @@ def refresh_completion(profile: CompanyProfile) -> dict[str, Any]:
         final_approved=profile.final_approved,
     )
     profile.completion_percentage = completion["percentage"]
+    completion.update(versions.revision_info(profile))
     profile.is_profile_fully_completed = completion["can_complete"]
     return completion
 
@@ -707,13 +713,16 @@ def approve_profile(
     profile: CompanyProfile,
     *,
     commit: bool = True,
+    actor_user_id: str | None = None,
 ) -> dict[str, Any]:
     """Complete onboarding only when the current profile has no blockers."""
+    versions.lock_for_approval(db, profile)
     readiness = calculate_completion(profile.field_states, final_approved=False)
     if readiness["blockers"]:
         raise ValueError("profile_has_blockers")
 
     profile.final_approved = True
+    versions.publish(db, profile, actor_user_id=actor_user_id)
     completion = refresh_completion(profile)
     db.add(profile)
     if commit:
@@ -730,6 +739,7 @@ def serialize_profile(profile: CompanyProfile) -> dict[str, Any]:
         "id": profile.id,
         "company_id": profile.company_id,
         "data": profile.profile_data or {},
+        "published_data": (versions.published_snapshot(profile) or {}).get("data"),
         "fields": field_progress(profile.field_states),
         "completion": completion,
         "updated_at": profile.updated_at,

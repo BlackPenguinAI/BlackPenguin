@@ -35,6 +35,11 @@ export interface ProjectProfile {
   data: Record<string, unknown>;
   fields: ProjectFieldProgress[];
   completion: {
+    draft_revision?: number;
+    published_revision?: number | null;
+    active_profile_approved?: boolean;
+    has_pending_changes?: boolean;
+    capabilities?: Record<string, { ready: boolean; blockers: Array<{ field: string; label: string; status: string }> }>;
     percentage: number;
     required_fields_complete: boolean;
     ready_for_confirmation: boolean;

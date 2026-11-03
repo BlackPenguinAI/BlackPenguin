@@ -371,7 +371,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     this.onboarding.patchProfile(this.projectId, [{
       field: 'project_name', value, status: 'corrected_by_user', applicable: true,
       source_type: 'user', source_reference: 'project_onboarding_header', confidence: 'high',
-    }]).subscribe({
+    }], this.profile.completion.draft_revision).subscribe({
       next: profile => {
         this.profile = profile; this.projectNameDraft = profile.project_name;
         this.projectNameBusy = false; this.isEditingProjectName = false; this.cdr.detectChanges();

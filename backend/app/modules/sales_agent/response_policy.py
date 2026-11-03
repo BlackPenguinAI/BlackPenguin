@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from typing import Any
+from app.modules.money import format_amount
 
 
 VISUAL_MATERIAL_TERMS = re.compile(
@@ -219,7 +220,7 @@ def complete_requested_commercial_topics(
         ]
         if candidates:
             amount, currency = min(candidates, key=lambda item: float(item[0]))
-            additions.append(f"Confirmed starting price: {currency or ''} {float(amount):,.0f}.".replace(":  ", ": "))
+            additions.append(f"Confirmed starting price: {currency or ''} {format_amount(amount)}.".replace(":  ", ": "))
     if "financing" in missing:
         value = facts.get("payment_methods") or facts.get("financing_options") or facts.get("financing")
         if value:
@@ -283,7 +284,7 @@ def grounded_catalog_reply(inbound: str | None, commercial: dict[str, Any]) -> s
                 area = f"{area}–{area_max:g}" if area else f"Up to {area_max:g}"
             lines.append(f"• Area: {area} {area_unit or ''}".rstrip())
         if item.get("starting_price") is not None and item.get("currency"):
-            lines.append(f"• Starting price: {item['starting_price']:,.0f} {item['currency']}")
+            lines.append(f"• Starting price: {format_amount(item['starting_price'])} {item['currency']}")
         if item.get("available_units") is not None and item.get("inventory_updated_at"):
             lines.append(f"• Confirmed availability: {item['available_units']} unit{'s' if item['available_units'] != 1 else ''}")
         description = str(item.get("description") or "").strip()
@@ -316,7 +317,7 @@ def grounded_catalog_reply(inbound: str | None, commercial: dict[str, Any]) -> s
             details.append(f"{area} {area_unit or ''}".rstrip())
         if item.get("starting_price") is not None and item.get("currency"):
             has_price = True
-            details.append(f"from {item['starting_price']:,.0f} {item['currency']}")
+            details.append(f"from {format_amount(item['starting_price'])} {item['currency']}")
         if item.get("available_units") is not None and item.get("inventory_updated_at"):
             has_inventory = True
             if "inventory" in topics:

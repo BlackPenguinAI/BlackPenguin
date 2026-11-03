@@ -23,6 +23,10 @@ export interface CompanyFieldProgress {
 }
 
 export interface CompanyCompletion {
+  draft_revision?: number;
+  published_revision?: number | null;
+  active_profile_approved?: boolean;
+  has_pending_changes?: boolean;
   percentage: number;
   can_complete: boolean;
   final_approved: boolean;

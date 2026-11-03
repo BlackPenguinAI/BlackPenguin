@@ -61,6 +61,8 @@ class CompanyProfile(Base):
     field_states = Column(JSON, default=dict, nullable=False)
     field_sources = Column(JSON, default=dict, nullable=False)
     final_approved = Column(Boolean, default=False, nullable=False)
+    published_snapshot = Column(JSON, nullable=True)
+    draft_revision = Column(Integer, default=0, server_default="0", nullable=False)
     completion_percentage = Column(Integer, default=0, nullable=False)
 
     # Legacy flags retained temporarily for backward compatibility.

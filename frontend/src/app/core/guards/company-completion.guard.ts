@@ -11,7 +11,7 @@ export const companyCompletionGuard: CanActivateFn = () => {
   const onboardingUrl = router.createUrlTree(['/app/company/onboarding']);
 
   return onboarding.getProfile().pipe(
-    map(profile => profile.completion.can_complete && profile.completion.final_approved
+    map(profile => (profile.completion.active_profile_approved || profile.completion.can_complete && profile.completion.final_approved)
       ? true
       : onboardingUrl),
     catchError(() => of(onboardingUrl)),

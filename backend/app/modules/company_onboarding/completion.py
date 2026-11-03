@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Iterable
 
+from app.modules.onboarding_contract import field_approved, field_resolved
+
 
 RESOLVED_STATUSES = {"confirmed", "corrected_by_user", "deferred"}
 VALID_STATUSES = {
@@ -159,7 +161,7 @@ def normalize_field_key(value: Any) -> str | None:
 
 
 def _is_resolved(status: str) -> bool:
-    return status in RESOLVED_STATUSES
+    return status in {"confirmed", "corrected_by_user"}
 
 
 def _count_captured(fields: Iterable[FieldDefinition], states: dict[str, Any]) -> int:
@@ -178,7 +180,7 @@ def calculate_completion(
     states = states or {}
 
     required_completed = sum(
-        _is_resolved(states.get(field.key, {}).get("status", "missing"))
+        field_approved(states.get(field.key))
         for field in REQUIRED_FIELDS
     )
 
@@ -192,7 +194,7 @@ def calculate_completion(
             unevaluated.append(field)
 
     conditional_completed = sum(
-        _is_resolved(states.get(field.key, {}).get("status", "missing"))
+        field_resolved(states.get(field.key), allow_deferred=True)
         for field in applicable
     )
 
@@ -207,11 +209,11 @@ def calculate_completion(
     blockers = []
     for field in REQUIRED_FIELDS:
         status = states.get(field.key, {}).get("status", "missing")
-        if not _is_resolved(status):
+        if not field_approved(states.get(field.key)):
             blockers.append({"field": field.key, "label": field.label, "status": status})
     for field in applicable:
         status = states.get(field.key, {}).get("status", "missing")
-        if not _is_resolved(status):
+        if not field_resolved(states.get(field.key), allow_deferred=True):
             blockers.append({"field": field.key, "label": field.label, "status": status, "requirement": field.requirement})
     for field in unevaluated:
         blockers.append({"field": field.key, "label": field.label, "status": "applicability_pending", "requirement": field.requirement})

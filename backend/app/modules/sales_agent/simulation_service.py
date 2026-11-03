@@ -1,4 +1,6 @@
 from __future__ import annotations
+from app.modules.onboarding_versions import active_approved, published_snapshot
+from types import SimpleNamespace
 
 from datetime import datetime, timedelta
 import json
@@ -41,14 +43,15 @@ def _delivery_timeline(project: Project) -> str | None:
     profile = project.profile
     if not profile:
         return None
-    states = profile.field_states or {}
-    data = profile.profile_data or {}
+    approved = published_snapshot(profile)
+    states = approved["states"] if approved else profile.field_states or {}
+    data = approved["data"] if approved else profile.profile_data or {}
     for key in ("delivery_dates", "estimated_delivery", "availability_timeline"):
         state = states.get(key, {})
         value = data.get(key)
         if value and state.get("status") in {"confirmed", "corrected_by_user"}:
             return value if isinstance(value, str) else json.dumps(value, ensure_ascii=False)
-    return profile.delivery_dates or None
+    return None if approved else profile.delivery_dates or None
 
 
 def _property_type_product(item: ProjectPropertyType) -> dict:
@@ -71,9 +74,9 @@ def _property_type_product(item: ProjectPropertyType) -> dict:
     }
 
 
-def _unit_products(db: Session, project_id: str) -> list[dict]:
+def _unit_products(db: Session, project_id: str, *, approved_units=None) -> list[dict]:
     """Keep the existing Demo usable when it only has unit-level inventory."""
-    units = db.query(ProjectUnit).filter(ProjectUnit.project_id == project_id).order_by(ProjectUnit.typology).all()
+    units = approved_units if approved_units is not None else db.query(ProjectUnit).filter(ProjectUnit.project_id == project_id).order_by(ProjectUnit.typology).all()
     grouped: dict[str, list[ProjectUnit]] = {}
     for unit in units:
         if unit.typology:
@@ -107,6 +110,16 @@ def _unit_products(db: Session, project_id: str) -> list[dict]:
 
 
 def _products(db: Session, project: Project) -> list[dict]:
+    approved = published_snapshot(project.profile) if project.profile else None
+    if approved:
+        types = [_property_type_product(SimpleNamespace(**item)) for item in approved.get("property_types", [])]
+        units = []
+        for item in approved.get("units", []):
+            row = dict(item)
+            if row.get("inventory_updated_at"):
+                row["inventory_updated_at"] = datetime.fromisoformat(row["inventory_updated_at"])
+            units.append(SimpleNamespace(**row))
+        return types or _unit_products(db, project.id, approved_units=units)
     property_types = db.query(ProjectPropertyType).filter(
         ProjectPropertyType.project_id == project.id,
         ProjectPropertyType.review_status == "confirmed",
@@ -122,8 +135,8 @@ def simulation_options(db: Session, *, company_id: str) -> list[dict]:
     ).order_by(Project.name).all()
     result = []
     for project in projects:
-        approved = bool(project.is_demo or (project.profile and project.profile.final_approved))
-        if project.onboarding_status not in COMPLETED_PROJECT_STATUSES or not approved:
+        approved = bool(project.is_demo or active_approved(project.profile))
+        if not approved:
             continue
         campaigns = db.query(ProjectCampaign).filter(
             ProjectCampaign.project_id == project.id,
@@ -165,8 +178,8 @@ def create_simulation(
         Project.company_id == company_id,
         Project.is_active.is_(True),
     ).first()
-    approved = bool(project and (project.is_demo or (project.profile and project.profile.final_approved)))
-    if not project or project.onboarding_status not in COMPLETED_PROJECT_STATUSES or not approved:
+    approved = bool(project and (project.is_demo or active_approved(project.profile)))
+    if not project or not approved:
         raise HTTPException(status_code=409, detail="Select a Project with completed and approved onboarding.")
     campaign = db.query(ProjectCampaign).filter(
         ProjectCampaign.id == campaign_id,

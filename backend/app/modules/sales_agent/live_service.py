@@ -18,6 +18,9 @@ from app.modules.sales_crm.intelligence import merge_extracted_facts, update_lea
 from app.modules.sales_crm.models import FunnelStage, Lead, LeadContact
 
 from .graph import GRAPH_VERSION, TOOLSET_VERSION, build_sales_graph
+from .commercial_context import build_commercial_context
+from .monetary_policy import validate_monetary_reply
+from app.modules.onboarding_versions import require_capability
 from .conversation_scope import scoped_messages_query
 from .response_policy import AFFIRMATIVE, action_types, requested_topics
 from .models import (
@@ -282,6 +285,18 @@ async def _dispatch(
     message_metadata.setdefault("project_id", conversation.project_id)
     event_kind = message_metadata.get("event_kind")
     uses_whatsapp_template = event_kind in {"meta_lead_first_contact", "manual_lead_first_contact"}
+    if role == "assistant" and agent_run_id and not author_user_id and not uses_whatsapp_template:
+        project = db.query(Project).filter(Project.id == conversation.project_id, Project.company_id == conversation.company_id).one()
+        if project.profile:
+            require_capability(project.profile)
+        commercial = build_commercial_context(db, project=project, company_id=conversation.company_id, lead_id=lead.id, channel=conversation.channel)
+        content, evidence = validate_monetary_reply(content, commercial, lead_profile=lead.lead_profile_data)
+        message_metadata["monetary_validation"] = evidence
+        run = db.query(AgentRun).filter(AgentRun.id == agent_run_id, AgentRun.conversation_id == conversation.id).first()
+        if run:
+            previous = run.output_snapshot or {}
+            run.output_snapshot = {**previous, "reply_before_dispatch": previous.get("reply"), "reply": content, "dispatch_monetary_validation": evidence}
+            db.add(run)
     persisted_content = content
     template_parameters = None
     if conversation.channel == "whatsapp" and uses_whatsapp_template:
@@ -1200,6 +1215,7 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
         run.model = result.get("model", "unknown")
         run.output_snapshot = {
             "reply": reply, "proposed_actions": actions,
+            "monetary_validation": result.get("monetary_validation", {}),
             "intent": result.get("primary_intent") or result.get("intent"),
             "primary_intent": result.get("primary_intent") or result.get("intent"),
             "secondary_intents": result.get("secondary_intents", []),

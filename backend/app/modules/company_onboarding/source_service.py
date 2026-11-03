@@ -793,6 +793,7 @@ def review_proposal(
                 }
             ],
             allow_authoritative_statuses=True,
+            actor_user_id=user_id,
         )
         if not result.accepted:
             rejected = result.rejected[0] if result.rejected else {}
@@ -837,7 +838,7 @@ def revise_proposal(db: Session, *, proposal: CompanyOnboardingProposal, company
         "source_type": proposal.source.kind.value,
         "source_reference": proposal.source.url or proposal.source.name,
         "confidence": proposal.confidence,
-    }], allow_authoritative_statuses=True)
+    }], allow_authoritative_statuses=True, actor_user_id=user_id)
     if not result.accepted:
         rejected = result.rejected[0] if result.rejected else {}
         raise HTTPException(status_code=422, detail=rejected.get("validation") or {

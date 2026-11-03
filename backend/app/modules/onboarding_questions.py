@@ -477,6 +477,12 @@ def is_too_short(field: str, value: Any) -> bool:
 
 def validate_onboarding_value(field: str, value: Any) -> dict[str, Any] | None:
     """Return a stable validation error shared by chat, extraction and review flows."""
+    if field == "starting_price" and value is not None:
+        from app.modules.money import parse_amount
+        try:
+            parse_amount(value)
+        except ValueError as exc:
+            return {"code": "invalid_monetary_amount", "field": field, "message": str(exc)}
     if field == "official_corporate_website":
         exists = value.get("exists") if isinstance(value, dict) else None
         url = value.get("url") if isinstance(value, dict) else None

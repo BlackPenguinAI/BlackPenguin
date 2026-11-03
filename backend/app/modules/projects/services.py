@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session, object_session
 from sqlalchemy.orm.attributes import flag_modified
 
 from app.modules.companies.models import Company
+from app.modules import onboarding_versions as versions
 from app.modules.onboarding_questions import validate_onboarding_value
 from app.modules.project_team.models import ProjectUserAssignment
 from app.modules.users.models import SALES_ACTOR_ROLES, User, UserRole
@@ -524,7 +525,9 @@ def apply_field_updates(
     db: Session, profile: ProjectProfile, updates: list[dict[str, Any]], *,
     allow_authoritative_statuses: bool, final_approved: bool | None = None,
     commit: bool = True,
+    actor_user_id: str | None = None, expected_revision: int | None = None,
 ) -> ApplyUpdatesResult:
+    before = versions.begin_edit(db, profile, expected_revision=expected_revision)
     data, states, sources = dict(profile.profile_data or {}), dict(profile.field_states or {}), dict(profile.field_sources or {})
     accepted, rejected = [], []
     for raw in updates:
@@ -535,9 +538,12 @@ def apply_field_updates(
             rejected.append({"update": raw, "reason": "unknown_field"}); continue
         if status not in VALID_STATUSES:
             rejected.append({"update": raw, "reason": "invalid_status"}); continue
-        if status in {"confirmed", "corrected_by_user", "not_applicable"} and not allow_authoritative_statuses:
+        if status in {"confirmed", "corrected_by_user", "not_applicable", "deferred"} and not allow_authoritative_statuses:
             status = "pending_confirmation"
         value = update.get("value")
+        if (not allow_authoritative_statuses
+                and states.get(key, {}).get("status") in {"confirmed", "corrected_by_user"}):
+            rejected.append({"update": raw, "reason": "confirmed_value_requires_explicit_review"}); continue
         if key == "project_name" and isinstance(value, str):
             value = value.strip()
         if status not in {"missing", "not_applicable", "deferred"} and value in (None, "", []):
@@ -549,6 +555,9 @@ def apply_field_updates(
                 "reason": validation_error["code"],
                 "validation": validation_error,
             }); continue
+        if key == "starting_price" and value is not None:
+            from app.modules.money import parse_amount
+            value = float(parse_amount(value))
         if status not in {"not_applicable", "deferred"} and value is not None:
             data[key] = value
         states[key] = {"status": status, "applicable": False if status == "not_applicable" else update.get("applicable", True)}
@@ -556,6 +565,8 @@ def apply_field_updates(
         if source:
             source["recorded_at"] = datetime.utcnow().isoformat(); sources[key] = source
         accepted.append({"field": key, "value": value, "status": status})
+        if versions.published_snapshot(profile):
+            continue  # Editable values stay in the draft until explicit approval.
         if key == "project_name" and value and status in {"confirmed", "corrected_by_user"}:
             profile.project.name = str(value)[:150]
             db.add(profile.project)
@@ -611,17 +622,13 @@ def apply_field_updates(
             restored["status"] = restored.pop("previous_status", "pending_confirmation")
             restored.pop("conflict_code", None)
             states[field] = restored
-    if accepted and profile.project.onboarding_status == "completed":
-        profile.final_approved = False
-        profile.approved_for_sales_at = None
-        profile.project.onboarding_status = "awaiting_confirmation"
-        profile.project.onboarding_completed_at = None
-        profile.project.onboarding_approved_by_user_id = None
-    elif accepted and profile.project.onboarding_status == "draft":
+    if accepted and profile.project.onboarding_status == "draft":
         profile.project.onboarding_status = "in_progress"
     profile.profile_data, profile.field_states, profile.field_sources = data, states, sources
     for name in ("profile_data", "field_states", "field_sources"):
         flag_modified(profile, name)
+    if accepted:
+        versions.record_edit(db, profile, before, actor_user_id=actor_user_id)
     refresh_completion(profile)
     db.add(profile)
     if commit:
@@ -633,6 +640,17 @@ def apply_field_updates(
 
 def refresh_completion(profile: ProjectProfile) -> dict[str, Any]:
     result = calculate_completion(profile.field_states, final_approved=profile.final_approved)
+    result.update(versions.revision_info(profile))
+    approved = versions.published_snapshot(profile)
+    if approved and not profile.final_approved:
+        active = calculate_completion(approved["states"], final_approved=True)
+        result["capabilities"] = active["capabilities"]
+        result["sales_activation_status"] = active["sales_activation_status"]
+    if (profile.profile_data or {}).get("sales_authorization") is False:
+        for capability in result["capabilities"].values():
+            capability["ready"] = False
+            capability["blockers"].append({"field": "sales_authorization", "label": "AI-assisted sales permission withdrawn", "status": "not_authorized"})
+        result["sales_activation_status"] = "not_ready"
     profile.completion_percentage = result["percentage"]
     profile.is_fully_completed = result["can_complete"]
     profile.sales_activation_status = result["sales_activation_status"]
@@ -675,6 +693,7 @@ def serialize_profile(profile: ProjectProfile) -> dict[str, Any]:
         "id": profile.id, "project_id": profile.project_id,
         "project_name": str((profile.profile_data or {}).get("project_name") or profile.project.name),
         "data": profile.profile_data or {},
+        "published_data": (versions.published_snapshot(profile) or {}).get("data"),
         "fields": field_progress(profile.field_states), "completion": completion,
         "updated_at": profile.updated_at,
     }
@@ -805,6 +824,7 @@ def enrich_finalization_readiness(db: Session, project: Project, payload: dict[s
 
 def complete_onboarding(db: Session, project: Project, user_id: str) -> ProjectProfile:
     profile = get_profile(project)
+    versions.lock_for_approval(db, profile)
     ready, reasons = readiness_for_confirmation(db, project)
     if project.onboarding_status == "completed" and profile.final_approved:
         return profile
@@ -817,7 +837,15 @@ def complete_onboarding(db: Session, project: Project, user_id: str) -> ProjectP
             "next_action": "Resolve the listed onboarding items, then approve the Project Profile.",
         })
     now = datetime.utcnow()
+    data = profile.profile_data or {}
+    for field, attr in (("project_name", "name"), ("short_description", "description"), ("city", "city"), ("country", "country")):
+        if data.get(field) and (profile.field_states or {}).get(field, {}).get("status") in {"confirmed", "corrected_by_user"}:
+            setattr(project, attr, str(data[field]))
+    if data.get("exact_address"):
+        locations = normalized_project_locations(data["exact_address"])
+        project.address = locations[0]["address"][:255] if locations else project.address
     profile.final_approved = True
+    versions.publish(db, profile, actor_user_id=user_id)
     profile.approved_for_sales_at = now
     project.onboarding_status = "completed"
     project.onboarding_completed_at = now

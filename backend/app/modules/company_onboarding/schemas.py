@@ -51,6 +51,10 @@ class CompletionBlocker(BaseModel):
 
 
 class CompletionSummary(BaseModel):
+    draft_revision: int = 0
+    published_revision: int | None = None
+    active_profile_approved: bool = False
+    has_pending_changes: bool = False
     percentage: int
     can_complete: bool
     final_approved: bool
@@ -62,6 +66,7 @@ class CompletionSummary(BaseModel):
 
 
 class CompanyProfileResponse(BaseModel):
+    published_data: dict[str, Any] | None = None
     id: str
     company_id: str
     data: dict[str, Any] = Field(default_factory=dict)
@@ -112,6 +117,7 @@ class FieldUpdate(BaseModel):
 
 
 class CompanyProfilePatch(BaseModel):
+    expected_revision: int | None = Field(default=None, ge=0)
     updates: list[FieldUpdate] = Field(default_factory=list)
     final_approved: bool | None = None
 

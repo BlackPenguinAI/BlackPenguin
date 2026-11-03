@@ -27,6 +27,9 @@
 
 <div *ngIf="initialState === 'ready' && !showWelcome" class="flex h-full w-full flex-col overflow-hidden bg-[#050505] font-sans text-white md:flex-row">
   <section class="relative flex h-full min-w-0 flex-1 flex-col">
+    <p *ngIf="profile.completion.has_pending_changes" role="status" class="border-b border-secondary/20 bg-secondary/10 px-5 py-3 text-sm text-secondary">
+      Changes pending approval. Your previously approved Company Profile remains active. Review and approve this revision to publish the changes; your conversation history is preserved.
+    </p>
     <header class="z-10 flex items-center justify-between border-b border-white/5 bg-black/40 p-4 backdrop-blur-md md:p-6">
       <div>
         <h1 class="text-xl font-light tracking-tight md:text-2xl">

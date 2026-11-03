@@ -7,6 +7,8 @@ from typing import Any
 from urllib.parse import urlparse
 
 from sqlalchemy.orm import Session
+from types import SimpleNamespace
+from app.modules import onboarding_versions as versions
 
 from app.modules.projects import sales_asset_service
 from app.modules.projects.models import (
@@ -102,10 +104,11 @@ def confirmed_profile_facts(profile: Any) -> dict[str, Any]:
     """
     if not profile:
         return {}
-    states = profile.field_states or {}
+    published = versions.published_snapshot(profile)
+    states = published["states"] if published else profile.field_states or {}
     return {
         key: value
-        for key, value in (profile.profile_data or {}).items()
+        for key, value in ((published or {}).get("data") if published else profile.profile_data or {}).items()
         if states.get(key, {}).get("status") in CONFIRMED_STATUSES
         and states.get(key, {}).get("applicable", True) is not False
     }
@@ -227,6 +230,8 @@ def build_commercial_context(
     db: Session, *, project: Project, company_id: str, lead_id: str, channel: str = "sms",
 ) -> dict[str, Any]:
     """Build the one customer-facing commercial source of truth for a turn."""
+    if project.company_id != company_id:
+        raise ValueError("Project does not belong to this Company.")
     facts = confirmed_profile_facts(project.profile)
     fact_conflicts = _project_fact_conflicts(facts)
     safe_facts = dict(facts)
@@ -238,6 +243,26 @@ def build_commercial_context(
         ProjectPropertyType.review_status == "confirmed",
     ).order_by(ProjectPropertyType.sort_order, ProjectPropertyType.created_at).all()
     units = db.query(ProjectUnit).filter(ProjectUnit.project_id == project.id).all()
+    approved = versions.published_snapshot(project.profile) if project.profile else None
+    if approved:
+        def restore(rows):
+            result = []
+            for raw in rows:
+                row = dict(raw)
+                if row.get("inventory_updated_at"):
+                    row["inventory_updated_at"] = datetime.fromisoformat(row["inventory_updated_at"])
+                result.append(SimpleNamespace(**row))
+            return result
+        property_types = restore(approved.get("property_types", []))
+        units = restore(approved.get("units", []))
+    catalog_prices = [item for item in property_types if item.starting_price is not None and item.currency]
+    if catalog_prices:
+        # One canonical source for the LLM and deterministic renderers alike.
+        currencies = {item.currency for item in catalog_prices}
+        safe_facts.pop("starting_price", None)
+        safe_facts.pop("currency", None)
+        if len(currencies) == 1:
+            safe_facts.update(starting_price=min(float(item.starting_price) for item in catalog_prices), currency=next(iter(currencies)))
 
     # Give the model identifiers and customer-facing metadata only. A link is
     # minted later by the deterministic action executor, never while context is
@@ -276,6 +301,7 @@ def build_commercial_context(
         if units else [_property_type_payload(item) for item in property_types]
     )
     return {
+        "approved_revision": approved.get("revision") if approved else None,
         "confirmed_project_facts": safe_facts,
         "property_types": [_property_type_payload(item) for item in property_types],
         "inventory": inventory,

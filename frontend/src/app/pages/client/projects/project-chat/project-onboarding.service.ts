@@ -38,8 +38,8 @@ export class ProjectOnboardingService {
     files.forEach((file) => body.append('files', file, file.name));
     return this.http.post<ChatTurn>(`${this.baseUrl}/${id}/chat/with-files`, body);
   }
-  patchProfile(id: string, updates: Array<Record<string, unknown>>): Observable<ProjectProfile> {
-    return this.http.patch<ProjectProfile>(`${this.baseUrl}/${id}/profile`, { updates });
+  patchProfile(id: string, updates: Array<Record<string, unknown>>, expectedRevision?: number): Observable<ProjectProfile> {
+    return this.http.patch<ProjectProfile>(`${this.baseUrl}/${id}/profile`, { updates, ...(expectedRevision !== undefined ? { expected_revision: expectedRevision } : {}) });
   }
   getSources(id: string): Observable<ProjectSource[]> { return this.http.get<ProjectSource[]>(`${this.baseUrl}/${id}/sources`); }
   retrySource(id: string, sourceId: string): Observable<ProjectSource> {

@@ -1,4 +1,5 @@
 from __future__ import annotations
+from .monetary_policy import validate_monetary_reply
 
 import json
 from typing import Any
@@ -329,6 +330,7 @@ def build_sales_graph(db: Session):
             if catalog_reply
             else concise_channel_text(reply, state.get("channel", "sms"))
         )
+        reply, monetary_validation = validate_monetary_reply(reply, state.get("commercial_context") or {}, lead_profile=(state.get("lead_context") or {}).get("profile_data"))
         if not reply:
             violations.append("missing_reply")
         model_requires_human = bool(state.get("requires_human", False))
@@ -356,6 +358,7 @@ def build_sales_graph(db: Session):
         )
         return {
             "intent": primary_intent,
+            "monetary_validation": monetary_validation,
             "primary_intent": primary_intent,
             "secondary_intents": secondary_intents,
             "intent_confidence": confidence,

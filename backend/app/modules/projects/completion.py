@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from app.modules.onboarding_contract import field_approved, field_resolved
+
 
 RESOLVED_STATUSES = {"confirmed", "corrected_by_user", "not_applicable", "deferred"}
 VALID_STATUSES = {
@@ -10,6 +12,10 @@ VALID_STATUSES = {
     "corrected_by_user", "conflicting", "stale", "expired", "not_applicable",
     "deferred",
 }
+
+# These steps can be postponed without withholding approval of the commercial
+# profile. They still do not authorize messaging, scheduling or Meta ingestion.
+DEFERRABLE_PROFILE_FIELDS = {"project_cover", "sales_contacts", "appointment_routing", "campaigns_defined", "meta_connection_verified"}
 
 
 @dataclass(frozen=True)
@@ -97,7 +103,9 @@ def calculate_completion(states: dict[str, Any] | None, *, final_approved: bool 
         f for f in conditional if states.get(f.key, {}).get("applicable") is None
     ]
     applicable = required + applicable_conditional
-    completed = [f for f in applicable if states.get(f.key, {}).get("status", "missing") in RESOLVED_STATUSES]
+    completed = [f for f in applicable if field_resolved(
+        states.get(f.key), allow_deferred=f.key in DEFERRABLE_PROFILE_FIELDS or f.requirement != "required",
+    )]
     blockers = [
         {
             "field": f.key,
@@ -143,8 +151,22 @@ def calculate_completion(states: dict[str, Any] | None, *, final_approved: bool 
             "requirement": f.requirement,
         }
         for f in activation_fields
-        if states.get(f.key, {}).get("status", "missing") not in {"confirmed", "corrected_by_user", "not_applicable"}
+        if not field_approved(states.get(f.key))
     ]
+    def capability(fields):
+        pending = [{"field": key, "label": FIELD_BY_KEY[key].label,
+                    "status": states.get(key, {}).get("status", "missing")}
+                   for key in fields if not field_approved(states.get(key))]
+        if not final_approved:
+            pending.append({"field": "final_approval", "label": "Final profile approval", "status": "pending"})
+        if blockers:
+            pending.append({"field": "profile_requirements", "label": "Required profile facts", "status": "pending"})
+        return {"ready": not pending, "blockers": pending}
+    capabilities = {
+        "manual_messaging": capability(["sales_authorization"]),
+        "appointments": capability(["sales_authorization", "sales_contacts", "appointment_routing"]),
+        "meta_lead_ads": capability(["sales_authorization", "campaigns_defined", "meta_connection_verified"]),
+    }
     return {
         "percentage": percentage,
         "required_fields_complete": not blockers,
@@ -155,6 +177,7 @@ def calculate_completion(states: dict[str, Any] | None, *, final_approved: bool 
         "sections": sections, "blockers": blockers,
         "sales_activation_status": "ready" if not activation_blockers and final_approved else "not_ready",
         "sales_activation_blockers": activation_blockers,
+        "capabilities": capabilities,
     }
 
 

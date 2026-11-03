@@ -55,8 +55,10 @@ def normalize_project_locations(value: Any, fallback: str | None = None) -> list
 
 
 def locations_for_project(project: Any) -> list[dict[str, str]]:
+    from app.modules.onboarding_versions import published_snapshot
     profile = getattr(project, "profile", None)
-    data = getattr(profile, "profile_data", None) or {}
+    approved = published_snapshot(profile) if profile else None
+    data = approved["data"] if approved else getattr(profile, "profile_data", None) or {}
     return normalize_project_locations(data.get("exact_address"), getattr(project, "address", None))
 
 

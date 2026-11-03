@@ -99,6 +99,8 @@ class ProjectProfile(Base):
     field_sources = Column(JSON, default=dict, nullable=False)
     completion_percentage = Column(Integer, default=0, nullable=False)
     final_approved = Column(Boolean, default=False, nullable=False)
+    published_snapshot = Column(JSON, nullable=True)
+    draft_revision = Column(Integer, default=0, server_default="0", nullable=False)
     sales_activation_status = Column(String(30), default="not_ready", nullable=False)
     inventory_last_updated_at = Column(DateTime, nullable=True)
     approved_for_sales_at = Column(DateTime, nullable=True)

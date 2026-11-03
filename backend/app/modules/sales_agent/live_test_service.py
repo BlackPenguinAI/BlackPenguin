@@ -1,6 +1,7 @@
 """Provider-neutral live lead intake that launches a real SMS conversation."""
 
 from __future__ import annotations
+from app.modules.onboarding_versions import active_approved, require_capability
 
 from datetime import datetime
 import hashlib
@@ -198,9 +199,10 @@ async def create_live_lead(
         Project.is_active.is_(True),
         Project.is_demo.is_(False),
     ).first()
-    approved = bool(project and project.profile and project.profile.final_approved)
-    if not project or project.onboarding_status not in COMPLETED_PROJECT_STATUSES or not approved:
+    approved = bool(project and active_approved(project.profile))
+    if not project or not approved:
         raise HTTPException(status_code=409, detail="Select a completed, approved, non-Demo Project.")
+    require_capability(project.profile, "meta_lead_ads" if source_definition["requires_campaign"] else "manual_messaging")
     if source_definition["requires_campaign"] and not campaign_id:
         raise HTTPException(status_code=422, detail=f"A campaign is required for {source_definition['label']} leads.")
     campaign = None

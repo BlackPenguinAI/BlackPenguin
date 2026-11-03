@@ -27,6 +27,9 @@
 
 <div *ngIf="initialState === 'ready' && !showWelcome" class="flex h-full w-full flex-col overflow-hidden bg-[#050505] text-white md:flex-row">
   <section class="flex min-w-0 flex-1 flex-col">
+    <p *ngIf="profile.completion.has_pending_changes" role="status" class="border-b border-secondary/20 bg-secondary/10 px-5 py-3 text-sm text-secondary">
+      Changes pending approval. Leads continue using the previously approved Project version. Review and approve this revision to publish the changes; completed answers and conversation history are preserved.
+    </p>
     <header class="flex items-center gap-4 border-b border-white/5 bg-black/40 p-4 backdrop-blur-md md:p-6">
       <a routerLink="/app/projects" class="flex h-9 w-9 items-center justify-center rounded-full text-gray-400 hover:bg-white/10 hover:text-white"><span class="material-symbols-outlined">arrow_back</span></a>
       <div class="min-w-0 flex-1">
@@ -486,7 +489,13 @@
     <footer class="border-t border-white/10 p-5">
       <div class="rounded-xl border p-4" [ngClass]="profile.completion.sales_activation_status === 'ready' ? 'border-green-500/30 bg-green-500/10 text-green-300' : 'border-secondary/20 bg-secondary/10 text-secondary'">
         <p class="text-[10px] font-bold uppercase tracking-wider">Sales activation: {{ profile.completion.sales_activation_status.replace('_', ' ') }}</p>
-        <p class="mt-1 text-[11px]">{{ profile.completion.sales_activation_status === 'ready' ? 'Project approved and operationally ready.' : 'Profile, inventory, routing, campaigns, or approval still need attention.' }}</p>
+        <p class="mt-1 text-[11px]">{{ profile.completion.sales_activation_status === 'ready' ? 'Project approved and operationally ready.' : 'Check each capability below. A deferred setup step is not an approval or permission.' }}</p>
+        <div *ngIf="profile.completion.capabilities as capabilities" class="mt-3 space-y-2 text-[11px]">
+          <div *ngFor="let capability of capabilities | keyvalue">
+            <p>{{ capability.key.replaceAll('_', ' ') }}: {{ capability.value.ready ? 'Ready' : 'Pending' }}</p>
+            <p *ngFor="let blocker of capability.value.blockers" class="mt-1 text-[10px]">{{ blocker.label }}: {{ blocker.status.replaceAll('_', ' ') }}</p>
+          </div>
+        </div>
       </div>
     </footer>
   </aside>

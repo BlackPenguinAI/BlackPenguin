@@ -535,6 +535,7 @@ async def _complete_chat_turn(
     result = services.apply_field_updates(
         db, profile, updates, allow_authoritative_statuses=current_user.role in EDITOR_ROLES,
         final_approved=None,
+        actor_user_id=current_user.id,
     )
     if result.accepted:
         assistant_text = conversational_acknowledgement(
@@ -698,7 +699,7 @@ def set_project_cover(
     profile = services.get_profile(source.project)
     active_question = services.get_active_question(db, source.project.session.id)
     updates = [services.user_field_update("project_cover", source.id)]
-    services.apply_field_updates(db, profile, updates, allow_authoritative_statuses=True, commit=False)
+    services.apply_field_updates(db, profile, updates, allow_authoritative_statuses=True, actor_user_id=current_user.id, commit=False)
     if active_question and (active_question.ui_payload or {}).get("input_type") == "project_cover":
         services.record_message_response(
             db, source.project.session.id, active_question.id,
@@ -828,7 +829,7 @@ def delete_property_type(
     project = services.get_project(db, project_id, current_user.company_id)
     item = _property_type(db, project.id, property_type_id)
     try:
-        catalog_service.remove(db, project, item)
+        catalog_service.remove(db, project, item, user_id=current_user.id)
     except Exception:
         db.rollback()
         raise
@@ -999,7 +1000,12 @@ def get_profile(project_id: str, db: Session = Depends(get_db), current_user: Us
 @router.patch("/{project_id}/profile", response_model=ProjectProfileResponse)
 def patch_profile(project_id: str, payload: ProjectProfilePatch, db: Session = Depends(get_db), current_user: User = Depends(RoleChecker(TENANT_MANAGER_ROLES))):
     profile = services.get_profile(services.get_project(db, project_id, current_user.company_id))
-    services.apply_field_updates(db, profile, [item.model_dump() for item in payload.updates], allow_authoritative_statuses=True, final_approved=payload.final_approved)
+    services.apply_field_updates(db, profile, [item.model_dump() for item in payload.updates], allow_authoritative_statuses=True,
+                                 actor_user_id=current_user.id, expected_revision=payload.expected_revision, commit=False)
+    if payload.final_approved is True:
+        services.complete_onboarding(db, profile.project, current_user.id)
+    else:
+        db.commit(); db.refresh(profile)
     return services.serialize_profile(profile)
 
 
@@ -1181,6 +1187,7 @@ def apply_onboarding_action(
             profile,
             updates,
             allow_authoritative_statuses=True,
+            actor_user_id=current_user.id,
             commit=False,
         )
         if result.rejected:
@@ -1366,6 +1373,7 @@ async def send_chat(
             profile,
             [services.user_field_update("project_name", rename_target, status="corrected_by_user")],
             allow_authoritative_statuses=True,
+            actor_user_id=current_user.id,
             commit=False,
         )
         if result.rejected:
@@ -1442,6 +1450,7 @@ async def send_chat(
             profile,
             resolution.updates,
             allow_authoritative_statuses=current_user.role in EDITOR_ROLES,
+            actor_user_id=current_user.id,
             commit=False,
         ) if resolution.updates else services.ApplyUpdatesResult([], [])
         accepted = deterministic_result.accepted
@@ -1865,6 +1874,7 @@ def create_campaign(project_id: str, payload: CampaignCreate, db: Session = Depe
     services.apply_field_updates(
         db, services.get_profile(project), updates,
         allow_authoritative_statuses=current_user.role in TENANT_MANAGER_ROLES,
+        actor_user_id=current_user.id,
     )
     return campaign
 
@@ -2047,7 +2057,7 @@ async def verify_meta_connection(connection_id: str, db: Session = Depends(get_d
                     "status": "confirmed", "applicable": True,
                     "source_type": "meta_verification", "source_reference": verified.id,
                     "confidence": "high",
-                }], allow_authoritative_statuses=True,
+                }], allow_authoritative_statuses=True, actor_user_id=current_user.id,
             )
         return verified
     except (httpx.HTTPError, ValueError) as exc:

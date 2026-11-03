@@ -70,7 +70,7 @@ def get_company_overview(
     current_user: User = Depends(RoleChecker(ALLOWED_ROLES)),
 ):
     profile = services.get_or_create_profile(db, current_user.company_id)
-    if not services.serialize_profile(profile)["completion"]["can_complete"]:
+    if not services.serialize_profile(profile)["completion"]["can_complete"] and not services.versions.active_approved(profile):
         raise HTTPException(
             status_code=409,
             detail={
@@ -131,7 +131,7 @@ def select_company_logo(
     services.apply_field_updates(db, profile, [{
         "field": "company_logo", "value": asset.id, "status": "confirmed", "applicable": True,
         "source_type": "media_selection", "source_reference": asset.source_url or asset.name, "confidence": "high",
-    }], allow_authoritative_statuses=True, commit=False)
+    }], allow_authoritative_statuses=True, actor_user_id=current_user.id, commit=False)
     if not already_selected:
         services.save_message(
             db,
@@ -642,13 +642,22 @@ def patch_company_profile(
     current_user: User = Depends(RoleChecker(TENANT_MANAGER_ROLES)),
 ):
     profile = services.get_or_create_profile(db, current_user.company_id)
-    services.apply_field_updates(
-        db,
-        profile,
-        [update.model_dump() for update in payload.updates],
-        allow_authoritative_statuses=True,
-        final_approved=payload.final_approved,
-    )
+    try:
+        services.apply_field_updates(
+            db,
+            profile,
+            [update.model_dump() for update in payload.updates],
+            allow_authoritative_statuses=True,
+            final_approved=payload.final_approved,
+            actor_user_id=current_user.id,
+            expected_revision=payload.expected_revision,
+        )
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(status_code=409, detail={
+            "code": "profile_has_blockers",
+            "message": "Complete the required Company fields before approving this revision. Your previously approved version has not changed.",
+        }) from exc
     return services.serialize_profile(profile)
 
 
@@ -856,7 +865,7 @@ async def send_chat_message(
                 detail="Only a Company administrator or assistant can approve the Company Profile.",
             )
         try:
-            completion = services.approve_profile(db, profile, commit=False)
+            completion = services.approve_profile(db, profile, commit=False, actor_user_id=current_user.id)
         except ValueError:
             resolution = services.QuestionResolution(
                 True,
@@ -915,6 +924,7 @@ async def send_chat_message(
             profile,
             resolution.updates,
             allow_authoritative_statuses=_is_authorized_admin(current_user),
+            actor_user_id=current_user.id,
             commit=False,
         )
         if deterministic_result.accepted:
@@ -1153,6 +1163,7 @@ async def send_chat_message(
         # Final approval is a server-owned command resolved above. A model
         # response can propose field updates but cannot complete onboarding.
         final_approved=None,
+        actor_user_id=current_user.id,
     )
     accepted = (deterministic_result.accepted if deterministic_result else []) + result.accepted
     rejected = (deterministic_result.rejected if deterministic_result else []) + result.rejected

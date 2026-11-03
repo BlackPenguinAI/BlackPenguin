@@ -37,3 +37,4 @@ class SalesAgentState(TypedDict, total=False):
     requires_human: bool
     policy_violations: list[str]
     error_code: str | None
+    monetary_validation: dict[str, Any]
