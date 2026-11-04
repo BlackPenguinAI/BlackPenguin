@@ -734,6 +734,8 @@ async def simulate_turn(
         model="pending",
         input_snapshot={"lead_id": lead.id, "message": inbound_text, "event_kind": event_kind},
     )
+    from .turn_trace import capture_input
+    run.input_snapshot = {**run.input_snapshot, "turn_trace": capture_input(db, conversation)}
     db.add(run)
     db.commit()
     db.refresh(run)
@@ -873,8 +875,11 @@ async def simulate_turn(
         run.prompt_configuration_id = result.get("prompt_configuration_id")
         run.prompt_snapshot = result.get("prompt_snapshot", {})
         run.model = result.get("model", "unknown")
+        run.input_snapshot = {**run.input_snapshot, "graph_commercial_context": result.get("commercial_context") or {}}
         run.output_snapshot = {
             "reply": proposed_reply,
+            "model_proposed_reply": result.get("model_proposed_reply", result.get("proposed_reply")),
+            "response_policy_trace": result.get("response_policy_trace", {}),
             "intent": "appointment_confirmed" if appointment_confirmed else result.get("intent"),
             "proposed_actions": proposed_actions,
             "requires_human": False if availability_handled else result.get("requires_human", False),

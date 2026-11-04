@@ -4,6 +4,10 @@ import { roleGuard } from './core/guards/role.guard';
 import { companyCompletionGuard } from './core/guards/company-completion.guard';
 
 export const routes: Routes = [
+  {
+    path: 'monitor', canActivate: [authGuard, roleGuard], data: {roles: ['superadmin']},
+    loadComponent: () => import('./pages/monitor/monitor').then(m => m.StaffMonitorComponent),
+  },
   // ==========================================
   // 1. ZONA PÚBLICA (Landing, Auth & Legales)
   // ==========================================

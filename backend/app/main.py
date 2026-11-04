@@ -86,6 +86,8 @@ app.include_router(legacy_dashboard_router, prefix=f"{settings.API_V1_STR}/tenan
 app.include_router(health_router, prefix=f"{settings.API_V1_STR}/health", tags=["Health"])
 app.include_router(project_team_router, prefix=f"{settings.API_V1_STR}/projects", tags=["Project Team & Routing"])
 app.include_router(sales_agent_router, prefix=f"{settings.API_V1_STR}/sales-agent", tags=["Sales Agent"])
+from app.modules.sales_agent.monitor import router as monitor_router
+app.include_router(monitor_router, prefix=f"{settings.API_V1_STR}/monitor", tags=["Staff Monitor"])
 app.include_router(meta_leads_router, prefix=f"{settings.API_V1_STR}/webhooks", tags=["Meta Lead Ads"])
 app.include_router(twilio_router, prefix=f"{settings.API_V1_STR}/webhooks/twilio", tags=["Twilio Messaging"])
 app.include_router(telnyx_router, prefix=f"{settings.API_V1_STR}/webhooks/telnyx", tags=["Telnyx Messaging"])

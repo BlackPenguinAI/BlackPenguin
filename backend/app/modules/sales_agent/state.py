@@ -34,6 +34,8 @@ class SalesAgentState(TypedDict, total=False):
     addressed_topics: list[str]
     proposed_actions: list[dict[str, Any]]
     proposed_reply: str | None
+    model_proposed_reply: str | None
+    response_policy_trace: dict[str, Any]
     requires_human: bool
     policy_violations: list[str]
     error_code: str | None

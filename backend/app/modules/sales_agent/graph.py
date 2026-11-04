@@ -207,6 +207,8 @@ def build_sales_graph(db: Session):
             if message.get("role") in {"user", "assistant"} and message.get("content"):
                 messages.append({"role": message["role"], "content": message["content"]})
         messages.append({"role": "user", "content": state["inbound_text"]})
+        from .turn_trace import capture_model_request
+        capture_model_request(db, state, messages)
         raw = await generate_llm_response(
             config.openrouter_api_key,
             state["model"],
@@ -240,6 +242,7 @@ def build_sales_graph(db: Session):
             "addressed_topics": value.get("addressed_topics") if isinstance(value.get("addressed_topics"), list) else [],
             "proposed_actions": value.get("proposed_actions") if isinstance(value.get("proposed_actions"), list) else [],
             "proposed_reply": value.get("reply") if isinstance(value.get("reply"), str) else None,
+            "model_proposed_reply": value.get("reply") if isinstance(value.get("reply"), str) else None,
             "requires_human": bool(value.get("requires_human")),
             "error_code": None if value.get("reply") else "invalid_model_contract",
         }
@@ -359,6 +362,16 @@ def build_sales_graph(db: Session):
         return {
             "intent": primary_intent,
             "monetary_validation": monetary_validation,
+            "response_policy_trace": {
+                "applied_routing_config": routing,
+                "primary_intent": primary_intent, "confidence": confidence,
+                "clarification_threshold": clarification_threshold,
+                "appointment_intent": appointment_intent,
+                "catalog_reply_applied": bool(catalog_reply),
+                "supplemented_topics": sorted(supplemented_topics),
+                "policy_violations": sorted(set(violations)),
+                "requires_human": requires_human,
+            },
             "primary_intent": primary_intent,
             "secondary_intents": secondary_intents,
             "intent_confidence": confidence,

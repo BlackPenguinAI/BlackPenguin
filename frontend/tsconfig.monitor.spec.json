@@ -1,0 +1,13 @@
+{
+  "extends":"./tsconfig.price-deferrals.spec.json",
+  "include":[
+    "src/**/*.d.ts",
+    "src/app/pages/monitor/monitor.spec.ts",
+    "src/app/shared/ui/configure-later/configure-later.spec.ts",
+    "src/app/core/guards/company-completion.guard.spec.ts",
+    "src/app/pages/onboarding-revisions.spec.ts",
+    "src/app/pages/client/projects/project-chat/project-form-validation.spec.ts",
+    "src/app/pages/client/projects/project-chat/project-sales-capabilities.spec.ts",
+    "src/app/pages/client/projects/project-chat/project-chat-p2.spec.ts"
+  ]
+}

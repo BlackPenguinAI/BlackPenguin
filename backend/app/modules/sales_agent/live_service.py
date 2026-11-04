@@ -280,6 +280,7 @@ async def _dispatch(
     metadata: dict | None = None,
     idempotency_key: str | None = None,
 ) -> SalesMessage:
+    proposed_content = content
     message_metadata = dict(metadata or {})
     message_metadata.setdefault("lead_id", lead.id)
     message_metadata.setdefault("project_id", conversation.project_id)
@@ -332,6 +333,15 @@ async def _dispatch(
             "rendered_content": persisted_content,
             "generated_draft": content,
         })
+    from .turn_trace import capture_input, dispatch_trace
+    message_metadata["agent_run_id"] = agent_run_id
+    message_metadata["turn_trace"] = dispatch_trace(conversation, lead, agent_run_id, event_kind, proposed_content, persisted_content)
+    message_metadata["turn_trace"].update({
+        "inbound_message_id": message_metadata.get("inbound_message_id"),
+        "decision": {key: message_metadata[key] for key in ("reason", "proposed_actions", "human_intervention_case_id") if key in message_metadata},
+    })
+    if not agent_run_id:
+        message_metadata["turn_trace"]["input_evidence"] = capture_input(db, conversation)
     if conversation.channel == "whatsapp" and not uses_whatsapp_template:
         if not _whatsapp_customer_window_open(db, conversation):
             raise HTTPException(
@@ -376,7 +386,11 @@ async def _dispatch(
         author_user_id=author_user_id, content=persisted_content, status="queued",
         metadata_json=message_metadata, created_at=datetime.utcnow(),
     )
-    db.add_all([outbound, message]); db.commit()
+    db.add_all([outbound, message]); db.flush()
+    # Provider failures have no provider_message_id. Keep the durable queue
+    # correlation for those turns too, including non-LLM replies and retries.
+    message.metadata_json = {**(message.metadata_json or {}), "outbound_message_id": outbound.id}
+    db.commit()
     share_ids = [str(value) for value in message_metadata.get("sales_asset_share_ids", []) if value]
     if share_ids:
         shares = db.query(SalesAssetShare).filter(
@@ -884,6 +898,15 @@ def _prepare_run(
     existing = db.query(AgentRun).filter(AgentRun.event_id == event_id).first()
     if existing and existing.status in {"completed", "blocked"}:
         return None
+    prior_attempts = list((existing.input_snapshot or {}).get("trace_attempts", [])) if existing else []
+    if existing and not prior_attempts:
+        prior_attempts = [{"historical_input": existing.input_snapshot or {},
+                           "missing": ["historical code/context trace unavailable"]}]
+    if existing and prior_attempts:
+        prior_attempts[-1] = {**prior_attempts[-1], "status": existing.status,
+                              "error_code": existing.error_code, "model": existing.model,
+                              "prompt_snapshot": existing.prompt_snapshot,
+                              "output_snapshot": existing.output_snapshot}
     run = existing or AgentRun(
         conversation_id=conversation.id, event_id=event_id, mode="live",
         graph_version=GRAPH_VERSION, toolset_version=TOOLSET_VERSION,
@@ -895,6 +918,9 @@ def _prepare_run(
     if existing:
         run.model = model
         run.input_snapshot = {"message_id": message_id, "retry": True}
+    from .turn_trace import capture_input
+    evidence = capture_input(db, conversation)
+    run.input_snapshot = {**run.input_snapshot, "turn_trace": evidence, "trace_attempts": [*prior_attempts, evidence]}
     db.add(run); db.commit(); db.refresh(run)
     return run
 
@@ -998,6 +1024,7 @@ async def _process_deterministic_appointment_turn(
         role="assistant", agent_run_id=run.id,
         metadata={
             "event_kind": "deterministic_appointment_routing",
+            "inbound_message_id": inbound.id,
             "appointment_offer": {
                 "slots": [slot.isoformat() for slot in offered_slots],
                 "duration_minutes": 45,
@@ -1051,7 +1078,7 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
             conversation.is_paused = True; conversation.pause_reason = "Lead opted out"
             db.query(SalesFollowUpJob).filter(SalesFollowUpJob.conversation_id == conversation.id, SalesFollowUpJob.status == "pending").update({SalesFollowUpJob.status: "cancelled"}, synchronize_session=False)
             db.commit()
-            await _dispatch(db, conversation=conversation, lead=lead, content="You have been unsubscribed and will not receive further messages.", role="assistant", agent_run_id=None, metadata={"event_kind": "opt_out"})
+            await _dispatch(db, conversation=conversation, lead=lead, content="You have been unsubscribed and will not receive further messages.", role="assistant", agent_run_id=None, metadata={"event_kind": "opt_out", "inbound_message_id": inbound.id})
             return
         mandatory_reason = escalation_reason(inbound.content)
         if mandatory_reason:
@@ -1068,6 +1095,7 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
                 role="assistant", agent_run_id=None,
                 metadata={
                     "event_kind": "human_intervention",
+                    "inbound_message_id": inbound.id,
                     "reason": mandatory_reason,
                     "human_intervention_case_id": intervention_case.id,
                     "proposed_actions": intervention_actions,
@@ -1091,6 +1119,7 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
                 role="assistant", agent_run_id=None,
                 metadata={
                     "event_kind": "deterministic_no_slot_callback",
+                    "inbound_message_id": inbound.id,
                     "human_intervention_case_id": intervention_case.id,
                     "proposed_actions": actions,
                 },
@@ -1154,6 +1183,7 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
             db, conversation, lead_id=lead.id,
         ).order_by(SalesMessage.created_at).all()
         commercial = result.get("commercial_context") or {}
+        run.input_snapshot = {**run.input_snapshot, "graph_commercial_context": commercial}
         available_assets = commercial.get("available_assets") or []
         appointment_offer: dict | None = None
         if (
@@ -1215,6 +1245,8 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
         run.model = result.get("model", "unknown")
         run.output_snapshot = {
             "reply": reply, "proposed_actions": actions,
+            "model_proposed_reply": result.get("model_proposed_reply", result.get("proposed_reply")),
+            "response_policy_trace": result.get("response_policy_trace", {}),
             "monetary_validation": result.get("monetary_validation", {}),
             "intent": result.get("primary_intent") or result.get("intent"),
             "primary_intent": result.get("primary_intent") or result.get("intent"),
@@ -1257,6 +1289,7 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
                 role="assistant", agent_run_id=run.id,
                 metadata={
                     "event_kind": "agent_reply", "proposed_actions": actions,
+                    "inbound_message_id": inbound.id,
                     "sales_asset_share_ids": share_ids,
                     **({"appointment_offer": appointment_offer} if appointment_offer is not None else {}),
                 },
@@ -1458,6 +1491,8 @@ async def process_live_followup_job(job_id: str) -> None:
             graph_version=GRAPH_VERSION, toolset_version=TOOLSET_VERSION,
             prompt_snapshot={}, model="pending", input_snapshot={"follow_up_job_id": job.id},
         )
+        from .turn_trace import capture_input
+        run.input_snapshot = {**run.input_snapshot, "turn_trace": capture_input(db, conversation)}
         db.add(run); db.commit(); db.refresh(run)
         result = await build_sales_graph(db).ainvoke({
             "event_id": event_id, "mode": "live", "conversation_id": conversation.id,
@@ -1473,7 +1508,13 @@ async def process_live_followup_job(job_id: str) -> None:
         run.prompt_configuration_id = result.get("prompt_configuration_id")
         run.prompt_snapshot = result.get("prompt_snapshot", {})
         run.model = result.get("model", "unknown")
-        run.output_snapshot = {"reply": reply, "proposed_actions": result.get("proposed_actions", [])}
+        run.input_snapshot = {**run.input_snapshot, "graph_commercial_context": result.get("commercial_context") or {}}
+        run.output_snapshot = {"reply": reply, "model_proposed_reply": result.get("model_proposed_reply", result.get("proposed_reply")),
+                               "response_policy_trace": result.get("response_policy_trace", {}),
+                               "proposed_actions": result.get("proposed_actions", []),
+                               "primary_intent": result.get("primary_intent"),
+                               "policy_violations": result.get("policy_violations", []),
+                               "requires_human": result.get("requires_human", False)}
         if result.get("requires_human"):
             create_intervention_case(
                 db, conversation=conversation, lead=lead,
