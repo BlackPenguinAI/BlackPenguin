@@ -8,7 +8,39 @@ CODES = r"USD|MXN|PEN|EUR|COP|BRL|CLP|ARS|CAD|GBP|DOLLAR|PESO"
 NUMBER = r"-?\d+(?:[.,]\d+)*(?:[ \u00a0\u202f]\d{3})*(?:\s*(?:[kKmM]|million|thousand))?"
 JOIN = r"\s*(?:[–—-]|to\b|through\b|and\b|hasta\b|a\b|y\b)\s*"
 CURRENCY = rf"(?:{CODES}|US\$|\$|€|£)"
-CLAIM = re.compile(rf"(?<!\w)(?:(?P<before>{CURRENCY})\s*(?P<a>{NUMBER})(?:{JOIN}(?P<upper_a>{NUMBER})(?:\s*(?P<upper_currency>{CURRENCY}))?)?|(?P<b>{NUMBER})(?:{JOIN}(?P<upper_b>{NUMBER}))?\s*(?P<after>{CURRENCY}))(?!\w)", re.I)
+CLAIM = re.compile(rf"(?<!\w)(?:(?P<before>{CURRENCY})\s*(?P<a>{NUMBER})(?:{JOIN}(?P<upper_a>{NUMBER})(?:\s*(?P<upper_currency>{CURRENCY}))?)?|(?P<b>{NUMBER})(?:{JOIN}(?P<upper_b>{NUMBER}))?\s*(?P<after>{CURRENCY})(?:{JOIN}(?P<upper_c>{NUMBER})(?:\s*(?P<tail_currency>{CURRENCY}))?)?)(?!\w)", re.I)
+
+# A conjunction does not make every quantity after a price another price.
+# These are semantic units, not Project/PDF-specific names. An explicitly
+# currency-labelled endpoint remains monetary even when a unit follows it.
+NON_MONETARY_UNIT = re.compile(
+    r"\s*(?:full\s+|half\s+)?(?:bedrooms?|bathrooms?|beds?|baths?|rooms?|"
+    r"dormitorios?|habitaciones?|rec[aá]maras?|ba[nñ]os?|ambientes?|"
+    r"units?|homes?|apartments?|unidades?|departamentos?|casas?|"
+    r"parking\s+(?:spaces?|slots?)|garages?|plazas?|cajones?|"
+    r"floors?|levels?|storeys?|stories|pisos?|niveles?|"
+    r"days?|weeks?|months?|years?|hours?|minutes?|d[ií]as?|semanas?|meses?|a[nñ]os?|horas?|minutos?|"
+    r"square\s+(?:met(?:er|re)s?|feet|foot)|sq\.?\s*(?:ft|m)|m[²2]|ft[²2]|"
+    r"metros?\s+cuadrados?|acres?|hectares?|hect[aá]reas?|percent|por\s+ciento)\b|\s*%", re.I,
+)
+
+
+def _currency_code(raw):
+    code = (raw or "").upper()
+    return {"US$": "USD", "€": "EUR", "£": "GBP"}.get(code, code)
+
+
+def _range_bounds(claim, text):
+    bounds = []
+    for name, currency in (("upper_a", "upper_currency"), ("upper_b", "after"), ("upper_c", "tail_currency")):
+        raw = claim.group(name)
+        if raw is None:
+            continue
+        explicit_currency = claim.group(currency)
+        if not explicit_currency and NON_MONETARY_UNIT.match(text, claim.end(name)):
+            continue
+        bounds.append((raw, _currency_code(explicit_currency)))
+    return bounds
 
 
 def _normalize_currency_words(text):
@@ -68,18 +100,16 @@ def validate_monetary_reply(reply, commercial, *, lead_profile=None):
     claims = list(CLAIM.finditer(normalized))
     invalid = []
     for claim in claims:
-        code = (claim.group("before") or claim.group("after")).upper()
-        code = {"US$": "USD", "€": "EUR", "£": "GBP"}.get(code, code)
+        code = _currency_code(claim.group("before") or claim.group("after"))
         raw = claim.group("a") or claim.group("b")
-        upper = claim.group("upper_a") or claim.group("upper_b")
-        upper_code = (claim.group("upper_currency") or "").upper()
-        upper_code = {"US$":"USD", "€":"EUR", "£":"GBP"}.get(upper_code, upper_code)
+        bounds = _range_bounds(claim, normalized)
+        range_codes = [currency for _, currency in bounds if currency]
         try:
             # Customer-facing machine output has an explicit English display
             # contract; onboarding input is parsed separately without guessing.
             amount = parse_amount(raw, locale="en_US")
-            upper_amount = parse_amount(upper, locale="en_US") if upper else None
-            if upper_amount is not None and upper_amount < amount:
+            amounts = [amount, *[parse_amount(value, locale="en_US") for value, _ in bounds]]
+            if any(right < left for left, right in zip(amounts, amounts[1:])):
                 invalid.append(claim.group()); continue
         except ValueError:
             invalid.append(claim.group()); continue
@@ -92,9 +122,9 @@ def validate_monetary_reply(reply, commercial, *, lead_profile=None):
             values = [budget.get(key) for key in ("minimum", "maximum")] if isinstance(budget, dict) else []
             values += [(facts.get(key) or {}).get("value") for key in ("budget_minimum", "budget_maximum")]
             currency = str((facts.get("budget_currency") or {}).get("value") or (budget.get("currency") if isinstance(budget, dict) else "") or "").upper()
-            if currency and _currency_matches(code, currency) and (not upper_code or _currency_matches(upper_code, currency)):
+            if currency and all(_currency_matches(c, currency) for c in [code, *range_codes]):
                 known = [Decimal(str(value)) for value in values if isinstance(value, (int, float, Decimal)) and not isinstance(value, bool)]
-                if amount in known and (upper_amount is None or upper_amount in known):
+                if all(value in known for value in amounts):
                     continue
         matching = [(v, c) for _, v, c, _ in prices if _currency_matches(code, c)]
         # If the sentence names a particular record, a price of a different
@@ -103,9 +133,9 @@ def validate_monetary_reply(reply, commercial, *, lead_profile=None):
         if named:
             record_id = max(named, key=lambda pair: pair[0])[1]
             matching = [(v, c) for _, v, c, rid in prices if rid == record_id and _currency_matches(code, c)]
-        if upper_code:
-            matching = [(v,c) for v,c in matching if _currency_matches(upper_code,c)]
-        if (code in {"$", "DOLLAR", "PESO"} and len({c for _, c in matching}) != 1) or not any(v == amount for v, _ in matching) or (upper_amount is not None and not any(v == upper_amount for v, _ in matching)):
+        if range_codes:
+            matching = [(v,c) for v,c in matching if all(_currency_matches(rc,c) for rc in range_codes)]
+        if (code in {"$", "DOLLAR", "PESO"} and len({c for _, c in matching}) != 1) or not all(any(v == value for v, _ in matching) for value in amounts):
             invalid.append(claim.group())
     evidence = {
         "checked": bool(claims), "replaced": bool(invalid), "rejected_claims": invalid,
