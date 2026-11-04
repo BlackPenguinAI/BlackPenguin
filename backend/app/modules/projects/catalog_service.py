@@ -50,14 +50,18 @@ def _bedroom_signature(value: Any) -> str | None:
 
 def confirmation_field_errors(item: ProjectPropertyType) -> dict[str, str]:
     errors: dict[str, str] = {}
+    for key in ("bedrooms", "bathrooms", "area_min", "area_max", "total_units", "maximum_price"):
+        value = getattr(item, key)
+        if value is not None and value < 0:
+            errors[key] = "Enter a non-negative number."
+    if (item.area_min is not None or item.area_max is not None) and not str(item.area_unit or "").strip():
+        errors["area_unit"] = "Select the unit used for the area."
     if item.available_units is not None and item.available_units < 0:
         errors["available_units"] = "Available units cannot be negative."
     if item.starting_price is not None and item.starting_price < 0:
         errors["starting_price"] = "Starting price cannot be negative."
     if (item.starting_price is not None or item.maximum_price is not None) and not str(item.currency or "").strip():
         errors["currency"] = "Select a currency when a price is provided."
-    if item.available_units is not None and item.inventory_updated_at is None:
-        errors["inventory_updated_at"] = "Select the verification date when availability is provided."
     if (
         item.inventory_updated_at is not None
         and _utc_naive(item.inventory_updated_at) > datetime.utcnow() + timedelta(minutes=5)
@@ -100,6 +104,7 @@ def serialize(item: ProjectPropertyType) -> dict[str, Any]:
         "currency": item.currency,
         "features": item.features or [],
         "inventory_updated_at": item.inventory_updated_at,
+        "inventory_confirmed_by_user_id": item.inventory_confirmed_by_user_id,
         "images_status": item.images_status,
         "review_status": item.review_status,
         "source_reference": item.source_reference,
@@ -217,7 +222,7 @@ def _sync_profile(db: Session, project: Project) -> None:
     latest_inventory_update = _latest_inventory_update(confirmed)
     data.update({
         "typologies": [item.name for item in confirmed],
-        "available_inventory": sum(item.available_units or 0 for item in confirmed) if any(item.available_units is not None for item in confirmed) else None,
+        "available_inventory": sum(item.available_units for item in confirmed) if all(item.available_units is not None for item in confirmed) else None,
         "starting_price": min((float(item.starting_price) for item in confirmed if item.starting_price is not None), default=None),
         "currency": next((item.currency for item in confirmed if item.currency), None),
         "inventory_updated_at": latest_inventory_update.isoformat() if latest_inventory_update else None,
@@ -312,7 +317,20 @@ def confirm_catalog(db: Session, project: Project) -> dict[str, Any]:
     return catalog(db, project)
 
 
+def _inventory_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    # Legacy clients may still send a date. It is never evidence of a human
+    # confirmation; only the authenticated server-side action can record that.
+    return {key: value for key, value in payload.items() if key not in {"inventory_updated_at", "inventory_confirmed_by_user_id"}}
+
+
+def _confirm_inventory(item: ProjectPropertyType, user_id: str) -> None:
+    confirmed = item.review_status == "confirmed" and item.available_units is not None
+    item.inventory_updated_at = datetime.utcnow() if confirmed else None
+    item.inventory_confirmed_by_user_id = user_id if confirmed else None
+
+
 def create(db: Session, project: Project, payload: dict[str, Any], *, user_id: str) -> ProjectPropertyType:
+    payload = _inventory_payload(payload)
     before = versions.begin_edit(db, services.get_profile(project))
     normalized_name = str(payload.get("name") or "").strip()
     item = db.query(ProjectPropertyType).filter(
@@ -327,6 +345,7 @@ def create(db: Session, project: Project, payload: dict[str, Any], *, user_id: s
     else:
         item = ProjectPropertyType(project_id=project.id, created_by_user_id=user_id, updated_by_user_id=user_id, **payload)
     _validate_unique_name(db, project, item)
+    _confirm_inventory(item, user_id)
     if item.review_status == "confirmed":
         _validate_confirmation(db, project, item)
     db.add(item)
@@ -353,11 +372,15 @@ def remove(db: Session, project: Project, item: ProjectPropertyType, *, user_id:
 
 
 def update(db: Session, project: Project, item: ProjectPropertyType, payload: dict[str, Any], *, user_id: str) -> ProjectPropertyType:
+    payload = _inventory_payload(payload)
     before = versions.begin_edit(db, services.get_profile(project))
+    previous_status = item.review_status
     for key, value in payload.items():
         setattr(item, key, value)
     item.updated_by_user_id = user_id
     _validate_unique_name(db, project, item)
+    if "available_units" in payload or previous_status != item.review_status:
+        _confirm_inventory(item, user_id)
     if item.review_status == "confirmed":
         _validate_confirmation(db, project, item)
     db.add(item)

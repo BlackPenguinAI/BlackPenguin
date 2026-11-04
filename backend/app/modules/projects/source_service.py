@@ -6,6 +6,7 @@ import hashlib
 from io import BytesIO
 import ipaddress
 import json
+import math
 from pathlib import Path
 import re
 import socket
@@ -53,6 +54,14 @@ ALLOWED_FILE_TYPES = {
 }
 
 
+def _catalog_number(value: Any, *, integer: bool = False, maximum: float | None = None):
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    if not math.isfinite(value) or value < 0 or (integer and not isinstance(value, int)):
+        return None
+    return value if maximum is None or value <= maximum else None
+
+
 def _canonical_property_type_name(item: dict[str, Any]) -> str:
     """Avoid treating translated generic labels as distinct unit types."""
     raw = str(item.get("name") or "").strip()
@@ -60,7 +69,7 @@ def _canonical_property_type_name(item: dict[str, Any]) -> str:
         "apartment", "apartments", "departamento", "departamentos", "depto", "deptos", "unit", "units",
     }
     bedrooms = item.get("bedrooms")
-    if generic and isinstance(bedrooms, int):
+    if generic and _catalog_number(bedrooms, integer=True, maximum=50) is not None:
         return f"{bedrooms}-bedroom apartment"
     code = str(item.get("code") or "").strip()
     return code if generic and code else raw
@@ -346,7 +355,8 @@ async def _extract_proposals(
         "a proposals array containing field, value, evidence, and confidence, plus an optional property_types array. "
         "Each property type is only a candidate and may contain name, code, description, bedrooms, bathrooms, area_min, "
         "area_max, area_unit, total_units, available_units, starting_price, maximum_price, currency, features, "
-        "inventory_updated_at, and evidence. Omit unsupported values and never treat the extracted count as definitive. "
+        "and evidence. Omit unsupported values and never treat the extracted count as definitive. "
+        "Do not generate inventory verification dates; those are recorded when a user confirms the quantity. "
         "Use a stable English property-type name based on bedroom count, layout, or code. Never create separate types "
         "only because the same generic word appears translated (for example Apartment and Departamento). "
         "Never propose internal Sales/Marketing assignments, routing, campaigns, users, roles, or permissions from a document. "
@@ -383,29 +393,24 @@ async def _extract_proposals(
         if not name or name.casefold() in existing_names or index >= 100:
             continue
         existing_names.add(name.casefold())
-        inventory_updated_at = None
-        if item.get("inventory_updated_at"):
-            try:
-                inventory_updated_at = datetime.fromisoformat(str(item["inventory_updated_at"]).replace("Z", "+00:00")).replace(tzinfo=None)
-            except ValueError:
-                inventory_updated_at = None
         candidate = ProjectPropertyType(
             project_id=project.id,
             name=name,
             code=str(item.get("code") or "")[:100] or None,
             description=str(item.get("description") or "")[:4000] or None,
-            bedrooms=item.get("bedrooms") if isinstance(item.get("bedrooms"), int) else None,
-            bathrooms=item.get("bathrooms") if isinstance(item.get("bathrooms"), (int, float)) else None,
-            area_min=item.get("area_min") if isinstance(item.get("area_min"), (int, float)) else None,
-            area_max=item.get("area_max") if isinstance(item.get("area_max"), (int, float)) else None,
+            bedrooms=_catalog_number(item.get("bedrooms"), integer=True, maximum=50),
+            bathrooms=_catalog_number(item.get("bathrooms"), maximum=50),
+            area_min=_catalog_number(item.get("area_min"), maximum=9999999999.99),
+            area_max=_catalog_number(item.get("area_max"), maximum=9999999999.99),
             area_unit=str(item.get("area_unit") or "")[:20] or None,
-            total_units=item.get("total_units") if isinstance(item.get("total_units"), int) and item["total_units"] >= 0 else None,
-            available_units=item.get("available_units") if isinstance(item.get("available_units"), int) and item["available_units"] >= 0 else None,
-            starting_price=item.get("starting_price") if isinstance(item.get("starting_price"), (int, float)) and item["starting_price"] >= 0 else None,
-            maximum_price=item.get("maximum_price") if isinstance(item.get("maximum_price"), (int, float)) and item["maximum_price"] >= 0 else None,
+            total_units=_catalog_number(item.get("total_units"), integer=True, maximum=2147483647),
+            available_units=_catalog_number(item.get("available_units"), integer=True, maximum=2147483647),
+            starting_price=_catalog_number(item.get("starting_price"), maximum=99999999999999.99),
+            maximum_price=_catalog_number(item.get("maximum_price"), maximum=99999999999999.99),
             currency=str(item.get("currency") or "")[:10].upper() or None,
             features=[str(value)[:255] for value in item.get("features", [])[:30]] if isinstance(item.get("features"), list) else [],
-            inventory_updated_at=inventory_updated_at,
+            # Extraction is not an authenticated quantity confirmation.
+            inventory_updated_at=None,
             review_status="candidate",
             source_reference=f"{source.url or source.name}: {str(item.get('evidence') or '')[:800]}",
             sort_order=index,

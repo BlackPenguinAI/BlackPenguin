@@ -131,6 +131,7 @@ def _property_type_payload(item: ProjectPropertyType) -> dict[str, Any]:
         "currency": item.currency,
         "features": item.features or [],
         "inventory_updated_at": _iso(_trusted_inventory_date(item.inventory_updated_at)),
+        "inventory_confirmed_by_user_id": getattr(item, "inventory_confirmed_by_user_id", None),
     }
 
 
@@ -165,7 +166,7 @@ def _catalog_conflicts(
         conflicts.append({
             "code": "future_inventory_timestamp",
             "records": future_inventory,
-            "resolution": "Do not present this date as verified; an administrator must enter the actual verification time.",
+            "resolution": "Do not present this date as verified; an administrator must reconfirm the inventory quantity.",
         })
     if units:
         available_units = sum(

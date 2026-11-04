@@ -88,7 +88,7 @@ def test_company_overview_contacts_are_split_into_individual_rows():
     ]
 
 
-def test_confirmed_property_type_requires_commercial_freshness():
+def test_catalog_completion_does_not_require_a_manual_inventory_date():
     item = ProjectPropertyType(
         project_id="project-1", name="Two bedrooms", review_status="confirmed",
         available_units=4, starting_price=Decimal("350000"), currency="USD",
@@ -96,7 +96,7 @@ def test_confirmed_property_type_requires_commercial_freshness():
     )
     assert catalog_service.is_complete(item) is True
     item.inventory_updated_at = None
-    assert catalog_service.is_complete(item) is False
+    assert catalog_service.is_complete(item) is True
 
 
 def test_confirmed_property_type_can_omit_unverified_commercial_values():
@@ -119,7 +119,6 @@ def test_property_type_confirmation_reports_the_exact_invalid_fields():
         "available_units": "Available units cannot exceed total units.",
         "maximum_price": "Maximum price must be greater than or equal to starting price.",
         "currency": "Select a currency when a price is provided.",
-        "inventory_updated_at": "Select the verification date when availability is provided.",
     }
 
 

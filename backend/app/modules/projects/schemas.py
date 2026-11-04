@@ -391,8 +391,8 @@ class PropertyTypeBase(BaseModel):
     description: str | None = None
     bedrooms: int | None = Field(default=None, ge=0, le=50)
     bathrooms: float | None = Field(default=None, ge=0, le=50)
-    area_min: float | None = Field(default=None, ge=0)
-    area_max: float | None = Field(default=None, ge=0)
+    area_min: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+    area_max: float | None = Field(default=None, ge=0, allow_inf_nan=False)
     area_unit: str | None = Field(default=None, max_length=20)
     total_units: int | None = Field(default=None, ge=0)
     available_units: int | None = Field(default=None, ge=0)
@@ -404,6 +404,14 @@ class PropertyTypeBase(BaseModel):
     images_status: Literal["pending", "provided", "deferred"] = "pending"
     source_reference: str | None = None
     sort_order: int = 0
+
+    @field_validator("bedrooms", "bathrooms", "area_min", "area_max", "total_units", "available_units", mode="before")
+    @classmethod
+    def real_numeric_value(cls, value):
+        import math
+        if isinstance(value, bool) or (value is not None and isinstance(value, (int, float)) and not math.isfinite(value)):
+            raise ValueError("Enter a finite numeric value, not a boolean.")
+        return value
 
     @field_validator("starting_price", "maximum_price", mode="before")
     @classmethod
@@ -455,6 +463,7 @@ class PropertyTypeResponse(PropertyTypeBase):
     project_id: str
     review_status: Literal["candidate", "confirmed", "rejected"]
     is_complete: bool
+    inventory_confirmed_by_user_id: str | None = None
     media: list[PropertyTypeMediaResponse] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime

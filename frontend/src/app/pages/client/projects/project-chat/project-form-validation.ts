@@ -43,7 +43,6 @@ export function toPropertyTypePayload(
     maximum_price: nullableNumber(value.maximum_price),
     currency: nullableText(value.currency)?.toUpperCase() || null,
     features: Array.isArray(value.features) ? value.features.map(item => String(item).trim()).filter(Boolean) : [],
-    inventory_updated_at: normalizeInventoryDate(value.inventory_updated_at),
     images_status: value.images_status || 'pending',
     source_reference: nullableText(value.source_reference),
     sort_order: Number.isFinite(Number(value.sort_order)) ? Number(value.sort_order) : 0,
@@ -60,9 +59,14 @@ export function validatePropertyType(value: Partial<ProjectPropertyType>): FormE
   if ((present(value.starting_price) || present(value.maximum_price)) && !value.currency?.trim()) {
     errors['currency'] = 'Select a currency when a price is provided.';
   }
-  if (present(value.available_units) && !value.inventory_updated_at) {
-    errors['inventory_updated_at'] = 'Select the verification date when availability is provided.';
+  for (const key of ['bathrooms', 'area_min', 'area_max', 'total_units', 'available_units', 'starting_price', 'maximum_price'] as const) {
+    const number = Number(value[key]);
+    if (present(value[key]) && (!Number.isFinite(number) || number < 0)) errors[key] = 'Enter a non-negative number.';
   }
+  for (const key of ['total_units', 'available_units'] as const) {
+    if (present(value[key]) && !Number.isInteger(Number(value[key]))) errors[key] = 'Enter a whole number, or leave blank if unknown.';
+  }
+  if (present(value.bathrooms) && Number(value.bathrooms) > 50) errors['bathrooms'] = 'Enter a number from 0 to 50.';
   if ((present(value.area_min) || present(value.area_max)) && !value.area_unit) {
     errors['area_unit'] = 'Select the unit used for the area.';
   }

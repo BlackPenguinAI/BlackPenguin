@@ -362,4 +362,6 @@ def test_new_migration_preserves_legacy_profiles_and_has_one_head():
             row = connection.exec_driver_sql(f"SELECT profile_data, published_snapshot, draft_revision FROM {table}").one()
             assert tuple(row) == ("original evidence", None, 0)
     cfg = Config(str(root / "alembic.ini")); cfg.set_main_option("script_location", str(root / "alembic"))
-    assert ScriptDirectory.from_config(cfg).get_heads() == [module.revision]
+    scripts = ScriptDirectory.from_config(cfg)
+    assert len(scripts.get_heads()) == 1
+    assert module.revision in {revision.revision for revision in scripts.walk_revisions()}

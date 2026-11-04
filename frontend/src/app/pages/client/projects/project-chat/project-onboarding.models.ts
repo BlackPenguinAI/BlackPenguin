@@ -171,6 +171,7 @@ export interface ProjectPropertyType {
   area_unit: string | null; total_units: number | null; available_units: number | null;
   starting_price: number | null; maximum_price: number | null; currency: string | null;
   features: string[]; inventory_updated_at: string | null; images_status: 'pending' | 'provided' | 'deferred';
+  inventory_confirmed_by_user_id?: string | null;
   review_status: 'candidate' | 'confirmed' | 'rejected'; source_reference: string | null;
   sort_order: number; is_complete: boolean; media: PropertyTypeMedia[]; created_at: string; updated_at: string;
 }
@@ -178,7 +179,7 @@ export interface ProjectPropertyType {
 export type ProjectPropertyTypePayload = Pick<ProjectPropertyType,
   'name' | 'code' | 'description' | 'bedrooms' | 'bathrooms' | 'area_min' | 'area_max'
   | 'area_unit' | 'total_units' | 'available_units' | 'starting_price' | 'maximum_price'
-  | 'currency' | 'features' | 'inventory_updated_at' | 'images_status' | 'source_reference'
+  | 'currency' | 'features' | 'images_status' | 'source_reference'
   | 'sort_order' | 'review_status'
 >;
 

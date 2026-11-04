@@ -369,6 +369,10 @@ def _seed_project(
     cover = images["cover"]
     updates = []
     for key, value in manifest["profile"].items():
+        if key == "inventory_updated_at":
+            # Technical inventory evidence belongs to the structured catalog,
+            # not to a manually answered onboarding field.
+            continue
         generated = key in DEMO_GENERATED_PROJECT_FIELDS
         updates.append({
             "field": key,

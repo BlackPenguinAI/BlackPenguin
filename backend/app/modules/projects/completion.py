@@ -50,7 +50,6 @@ FIELDS = (
     FieldDefinition("promotions", "Current promotions", "commercial", "conditionally_required"),
     FieldDefinition("delivery_dates", "Delivery dates", "commercial"),
     FieldDefinition("available_inventory", "Available inventory", "inventory"),
-    FieldDefinition("inventory_updated_at", "Inventory last updated", "inventory"),
     FieldDefinition("sales_authorization", "Authorization for AI (Artificial Intelligence)-assisted sales", "inventory"),
     FieldDefinition("target_audience", "Target audience", "sales_strategy"),
     FieldDefinition("value_proposition", "Project value proposition", "sales_strategy"),

@@ -50,7 +50,7 @@ describe('project chat form validation', () => {
     expect(errors['maximum_price']).toContain('greater than or equal');
     expect(errors['area_max']).toContain('greater than or equal');
     expect(errors['currency']).toBeTruthy();
-    expect(errors['inventory_updated_at']).toBeTruthy();
+    expect(errors['inventory_updated_at']).toBeUndefined();
   });
 
   it('never silently discards a bedroom range entered in a single-number field', () => {
@@ -81,7 +81,7 @@ describe('project chat form validation', () => {
 
     expect(payload.name).toBe('Four bedrooms');
     expect(payload.currency).toBe('USD');
-    expect(payload.inventory_updated_at).toBe('2026-08-01T12:00:00.000Z');
+    expect(payload).not.toHaveProperty('inventory_updated_at');
     expect(payload.features).toEqual(['Patio']);
     expect(payload.review_status).toBe('confirmed');
     expect(payload).not.toHaveProperty('id');

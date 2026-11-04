@@ -401,6 +401,19 @@ def _state_payload(db: Session, project: Project) -> dict[str, Any]:
     if not processing and not pending_review:
         latest_ai = next((item for item in reversed(messages) if item.sender == SenderType.AI), None)
         desired_question = _guided_next_question(db, project, profile)
+        if latest_ai and not latest_ai.response_payload and (latest_ai.ui_payload or {}).get("field") == "inventory_updated_at":
+            # Retire this question without rewriting what the user originally
+            # saw, or fabricating an answer/date for historical inventory.
+            services.record_message_response(
+                db, project.session.id, latest_ai.id,
+                "This step was retired. Quantity confirmations are now recorded automatically on save.",
+                status="superseded", commit=False,
+            )
+            latest_ai = services.save_message(
+                db, project.session.id, SenderType.AI, desired_question["prompt"],
+                ui_payload=desired_question, in_reply_to_message_id=latest_ai.id,
+            )
+            messages.append(latest_ai)
         if latest_ai and (latest_ai.response_payload or {}).get("status") in {"deferred", "resumed"}:
             services.supersede_unanswered_questions(db, project.session.id)
             question = services.save_message(db, project.session.id, SenderType.AI, desired_question["prompt"], ui_payload=desired_question)

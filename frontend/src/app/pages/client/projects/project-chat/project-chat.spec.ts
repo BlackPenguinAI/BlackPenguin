@@ -410,7 +410,7 @@ describe('ProjectChatComponent', () => {
     expect(request.request.body).not.toHaveProperty('id');
     expect(request.request.body).not.toHaveProperty('project_id');
     expect(request.request.body).not.toHaveProperty('media');
-    expect(request.request.body.inventory_updated_at).toBe('2026-08-01T12:00:00.000Z');
+    expect(request.request.body).not.toHaveProperty('inventory_updated_at');
     request.flush({
       detail: {
         code: 'incomplete_property_type', message: 'Review the highlighted fields.',

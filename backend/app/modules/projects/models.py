@@ -221,6 +221,7 @@ class ProjectPropertyType(Base):
     currency = Column(String(10), nullable=True)
     features = Column(JSON, default=list, nullable=False)
     inventory_updated_at = Column(DateTime, nullable=True)
+    inventory_confirmed_by_user_id = Column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     images_status = Column(String(30), default="pending", nullable=False)
     review_status = Column(String(30), default="confirmed", nullable=False)
     source_reference = Column(Text, nullable=True)
