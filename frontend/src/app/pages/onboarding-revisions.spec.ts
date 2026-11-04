@@ -49,6 +49,7 @@ describe('Published and draft onboarding UI', () => {
           getState: () => of({ profile, messages: [], sources: [], next_question: null, stage: 'approval', version: 1 }),
           getPropertyTypes: () => of({ items: [], confirmed_count: 0, candidate_count: 0, limit: 20, remaining: 20, catalog_complete: false }),
           getMetaSetupConfiguration: () => of({ configured: false, oauth_enabled: false, blockers: [] }),
+          getMetaSetupState: () => of({ project_id: 'project-1', account_status: 'not_connected', routing_status: 'not_linked', authorizations: [], missing_permissions: [], mappings: [] }),
           getSalesAssets: empty, getCampaigns: empty, getMetaConnections: empty,
           getProjectTeam: empty, getSalesCandidates: empty,
         } },

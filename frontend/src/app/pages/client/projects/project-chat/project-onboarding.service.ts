@@ -5,7 +5,7 @@ import { Observable } from 'rxjs';
 import { API_V1_URL } from '../../../../core/config/api.config';
 
 import {
-  Campaign, ChatMessage, ChatTurn, MetaAssetDiscovery, MetaAuthorization, MetaConnection, MetaSetupConfiguration, MetaSetupResult,
+  Campaign, ChatMessage, ChatTurn, MetaAssetDiscovery, MetaAuthorization, MetaConnection, MetaSetupConfiguration, MetaSetupResult, MetaSetupState,
   OnboardingState, ProjectAssignment, ProjectOnboardingActionPayload, ProjectProfile,
   ProjectSalesCandidate, ProjectSource, SourceProposal, ProjectPropertyType, ProjectPropertyTypePayload, PropertyTypeCatalog,
   ProjectFileIntent, ProjectSalesAsset, SalesAssetType,
@@ -113,7 +113,7 @@ export class ProjectOnboardingService {
   assignSalesUser(id: string, userId: string): Observable<ProjectAssignment> {
     return this.http.put<ProjectAssignment>(`${this.baseUrl}/${id}/team/${userId}`, {
       user_id: userId, responsibility: 'sales', is_primary: false,
-      routing_weight: 100, accepts_new_leads: true, is_active: true,
+      routing_weight: 100, accepts_new_leads: true, sales_enabled: true, is_active: true,
     });
   }
   inviteAndAssignSalesUser(id: string, payload: { first_name: string; last_name: string; email: string }): Observable<ProjectAssignment> {
@@ -122,8 +122,11 @@ export class ProjectOnboardingService {
   getMetaSetupConfiguration(id: string): Observable<MetaSetupConfiguration> {
     return this.http.get<MetaSetupConfiguration>(`${this.baseUrl}/${id}/meta-setup/config`);
   }
-  startMetaOAuth(id: string): Observable<{ authorization_url: string; expires_at: string }> {
-    return this.http.get<{ authorization_url: string; expires_at: string }>(`${this.baseUrl}/${id}/meta/oauth/start`);
+  startMetaOAuth(id: string): Observable<{ authorization_url: string; expires_at: string; state: string }> {
+    return this.http.get<{ authorization_url: string; expires_at: string; state: string }>(`${this.baseUrl}/${id}/meta/oauth/start`);
+  }
+  getMetaSetupState(id: string): Observable<MetaSetupState> {
+    return this.http.get<MetaSetupState>(`${this.baseUrl}/${id}/meta/setup-state`);
   }
   getMetaAuthorizations(id: string): Observable<MetaAuthorization[]> {
     return this.http.get<MetaAuthorization[]>(`${this.baseUrl}/${id}/meta/oauth/authorizations`);

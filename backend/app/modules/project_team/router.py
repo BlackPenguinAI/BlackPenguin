@@ -2,11 +2,12 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import or_
 
 from app.db.postgres import get_db
 from app.modules.auth.deps import RoleChecker
 from app.modules.projects.models import Project
-from app.modules.users.models import SALES_ACTOR_ROLES, TENANT_MANAGER_ROLES, User, UserRole
+from app.modules.users.models import SALES_ACTOR_ROLES, TENANT_MANAGER_ROLES, User, UserRole, UserProjectAccess
 from app.modules.users import services as user_services
 from app.modules.users.schemas import TenantUserResponse
 from app.modules.users.project_access import require_project_access
@@ -71,6 +72,8 @@ def list_sales_candidates(
         User.company_id == current_user.company_id,
         User.role.in_(SALES_ACTOR_ROLES),
         User.is_active.is_(True),
+        or_(User.project_access_scope != "selected", User.id.in_(db.query(UserProjectAccess.user_id).filter(
+            UserProjectAccess.project_id == project_id, UserProjectAccess.is_active.is_(True)))),
     ).order_by(User.role.asc(), User.email.asc()).all()
 
 
@@ -86,22 +89,34 @@ def upsert_assignment(
     if payload.user_id != user_id:
         raise HTTPException(status_code=422, detail="Path and payload user IDs differ.")
     user = db.query(User).filter(User.id == user_id, User.company_id == current_user.company_id).first()
-    allowed_roles = [UserRole.MKT] if payload.responsibility == "marketing" else SALES_ACTOR_ROLES
+    allowed_roles = [UserRole.ADMIN, UserRole.MKT] if payload.responsibility == "marketing" else SALES_ACTOR_ROLES
     if not user or user.role not in allowed_roles or not user.is_active:
         raise HTTPException(status_code=422, detail=f"A {payload.responsibility} assignment requires a matching active Company user.")
+    if user.project_access_scope == "selected" and not db.query(UserProjectAccess.id).filter_by(
+        user_id=user.id, project_id=project_id, is_active=True,
+    ).first():
+        raise HTTPException(status_code=422, detail="This user is limited to other Projects. Update their Selected Projects in Team / Users first, then refresh this list.")
+    if ((payload.sales_enabled is True and user.role not in SALES_ACTOR_ROLES)
+            or (payload.marketing_enabled is True and user.role not in (UserRole.ADMIN, UserRole.MKT))):
+        raise HTTPException(status_code=422, detail="The requested capability is not available to this user's role.")
     item = db.query(ProjectUserAssignment).filter(
         ProjectUserAssignment.project_id == project_id,
         ProjectUserAssignment.user_id == user_id,
-    ).first() or ProjectUserAssignment(project_id=project_id, user_id=user_id)
+    ).first()
+    existing = item is not None
+    if item is None:
+        item = ProjectUserAssignment(project_id=project_id, user_id=user_id)
     for key, value in payload.model_dump(exclude={"user_id"}).items():
         if value is not None:
             setattr(item, key, value)
     if payload.sales_enabled is None:
-        item.sales_enabled = payload.responsibility == "sales"
+        item.sales_enabled = (bool(item.sales_enabled) if existing and user.role == UserRole.ADMIN
+                              else user.role in SALES_ACTOR_ROLES)
     if payload.marketing_enabled is None:
-        item.marketing_enabled = payload.responsibility == "marketing"
+        item.marketing_enabled = (bool(item.marketing_enabled) if existing and user.role == UserRole.ADMIN
+                                  else user.role in (UserRole.ADMIN, UserRole.MKT))
     if payload.accepts_appointments is None:
-        item.accepts_appointments = item.sales_enabled
+        item.accepts_appointments = bool(item.accepts_appointments) if existing else item.sales_enabled
     if payload.is_primary:
         db.query(ProjectUserAssignment).filter(
             ProjectUserAssignment.project_id == project_id,

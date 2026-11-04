@@ -591,6 +591,7 @@ class MetaSetupConfigurationResponse(BaseModel):
 class MetaOAuthStartResponse(BaseModel):
     authorization_url: str
     expires_at: datetime
+    state: str
 
 
 class MetaAuthorizationResponse(BaseModel):
@@ -602,6 +603,24 @@ class MetaAuthorizationResponse(BaseModel):
     status: str
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
+
+
+class MetaProjectMappingResponse(BaseModel):
+    id: str
+    name: str
+    page_id: str | None = None
+    lead_form_id: str | None = None
+    ready: bool
+    verification_mode: str | None = None
+
+
+class MetaSetupStateResponse(BaseModel):
+    project_id: str
+    account_status: Literal["connected", "permissions_required", "reconnect_required", "not_connected"]
+    authorizations: list[MetaAuthorizationResponse]
+    missing_permissions: list[str]
+    routing_status: Literal["connected", "review_required", "not_linked"]
+    mappings: list[MetaProjectMappingResponse]
 
 
 class MetaAssetOption(BaseModel):

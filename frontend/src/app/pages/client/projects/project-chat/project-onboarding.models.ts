@@ -200,6 +200,7 @@ export interface ProjectAssignment {
   is_primary: boolean; routing_weight: number; accepts_new_leads: boolean; is_active: boolean;
   email: string; first_name: string | null; last_name: string | null;
   invitation_id?: string | null; invitation_status?: string | null;
+  sales_enabled?: boolean; marketing_enabled?: boolean; accepts_appointments?: boolean;
   delivery_status?: 'accepted' | 'failed' | 'not_requested' | null; invitation_message?: string | null;
 }
 
@@ -217,6 +218,15 @@ export interface MetaSetupConfiguration {
   oauth_blocker_message: string | null;
   can_connect: boolean;
   manual_fallback_enabled: boolean;
+}
+
+export interface MetaSetupState {
+  project_id: string;
+  account_status: 'connected' | 'permissions_required' | 'reconnect_required' | 'not_connected';
+  authorizations: MetaAuthorization[];
+  missing_permissions: string[];
+  routing_status: 'connected' | 'review_required' | 'not_linked';
+  mappings: Array<{id:string; name:string; page_id:string|null; lead_form_id:string|null; ready:boolean; verification_mode:string|null}>;
 }
 
 export interface MetaAuthorization {

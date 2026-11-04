@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import hashlib
 import logging
 import secrets
@@ -8,13 +8,13 @@ from urllib.parse import urlencode
 
 import httpx
 from fastapi import HTTPException
-from sqlalchemy import or_
+from sqlalchemy import or_, text
 from sqlalchemy.orm import Session
 
 from app.core.secret_store import decrypt_secret, encrypt_secret
 from app.modules.system_settings import services as system_settings
 from app.modules.system_settings.models import MetaOAuthAttempt
-from app.modules.users.models import User
+from app.modules.users.models import User, UserRole, TENANT_MANAGER_ROLES
 
 from .models import MetaAuthorization, MetaConnection, Project, ProjectCampaign
 
@@ -95,11 +95,13 @@ def start_oauth(db: Session, *, project: Project, user: User) -> dict:
     }
     return {
         "authorization_url": f"https://www.facebook.com/{config.graph_api_version}/dialog/oauth?{urlencode(params)}",
-        "expires_at": expires_at,
+        "expires_at": expires_at.replace(tzinfo=timezone.utc),
+        "state": state,
     }
 
 
-async def complete_oauth(db: Session, *, state: str, code: str) -> tuple[MetaAuthorization, str]:
+def consume_oauth_attempt(db: Session, state: str) -> MetaOAuthAttempt:
+    """Claim once atomically, including denial callbacks. Never trust a project in the URL."""
     digest = hashlib.sha256(state.encode("utf-8")).hexdigest()
     attempt = db.query(MetaOAuthAttempt).filter(
         MetaOAuthAttempt.nonce_hash == digest,
@@ -108,8 +110,26 @@ async def complete_oauth(db: Session, *, state: str, code: str) -> tuple[MetaAut
     ).first()
     if not attempt:
         raise HTTPException(status_code=400, detail="This Meta connection attempt is invalid or expired.")
-    attempt.consumed_at = datetime.utcnow()
-    db.add(attempt); db.commit()
+    claimed = db.query(MetaOAuthAttempt).filter(
+        MetaOAuthAttempt.id == attempt.id, MetaOAuthAttempt.consumed_at.is_(None),
+        MetaOAuthAttempt.expires_at > datetime.utcnow(),
+    ).update({MetaOAuthAttempt.consumed_at: datetime.utcnow()}, synchronize_session=False)
+    db.commit()
+    if claimed != 1:
+        raise HTTPException(status_code=400, detail="This Meta connection attempt was already used.")
+    actor = db.get(User, attempt.user_id)
+    project = db.get(Project, attempt.project_id)
+    if (not actor or not actor.is_active or actor.company_id != attempt.company_id
+            or actor.role not in [*TENANT_MANAGER_ROLES, UserRole.MKT]
+            or not project or project.company_id != attempt.company_id or not project.is_active):
+        raise HTTPException(status_code=403, detail="This Meta connection is no longer authorized. Return to your Company and try again.")
+    from app.modules.users.project_access import require_project_access
+    require_project_access(db, actor, project.id)
+    return attempt
+
+
+async def complete_oauth(db: Session, *, state: str, code: str) -> tuple[MetaAuthorization, str]:
+    attempt = consume_oauth_attempt(db, state)
     config, secret = system_settings.meta_platform_credentials(db)
     async with httpx.AsyncClient(timeout=20.0) as client:
         response = await client.get(
@@ -165,7 +185,20 @@ async def complete_oauth(db: Session, *, state: str, code: str) -> tuple[MetaAut
     authorization.expires_at = datetime.utcnow() + timedelta(seconds=expires_in) if expires_in else None
     authorization.status = "active"
     authorization.verification_results = {"identity_check": "passed", "connected_at": datetime.utcnow().isoformat()}
-    db.add(authorization); db.commit(); db.refresh(authorization)
+    db.add(authorization); db.flush()
+    from app.modules.governance.services import record_platform_event
+    from . import services
+    from .models import SenderType
+    actor = db.get(User, attempt.user_id)
+    project = db.get(Project, attempt.project_id)
+    record_platform_event(db, actor=actor, company_id=attempt.company_id,
+        event_type="meta.account_authorized", entity_type="meta_authorization", entity_id=authorization.id,
+        payload={"project_id": attempt.project_id, "scopes": granted_scopes})
+    if project.session:
+        services.save_message(db, project.session.id, SenderType.AI,
+            "Meta account authorization saved for this Company. This does not create or change any Project lead route. "
+            "Select and verify this Project's Page and Lead Form in step 2, or configure that step later.", commit=False)
+    db.commit(); db.refresh(authorization)
     return authorization, attempt.project_id
 
 
@@ -321,6 +354,18 @@ def configure_project_setup(
     if not authorization:
         raise HTTPException(status_code=404, detail="Meta authorization not found for this Company.")
     _ensure_required_scopes(authorization)
+    # A Page + Form route cannot silently steal traffic from another Project.
+    # Distinct Ads may share a Form, but broad and exact routes must not overlap.
+    if db.get_bind().dialect.name == "postgresql":
+        lock_key = int.from_bytes(hashlib.sha256(f"meta-route:{page_id}:{lead_form_id}".encode()).digest()[:8], "big", signed=True)
+        db.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": lock_key})
+    conflicts = db.query(ProjectCampaign).join(MetaConnection, MetaConnection.id == ProjectCampaign.meta_connection_id).join(
+        Project, Project.id == ProjectCampaign.project_id,
+    ).filter(ProjectCampaign.project_id != project.id, ProjectCampaign.platform == "meta",
+        ProjectCampaign.status == "active", Project.is_active.is_(True),
+        MetaConnection.page_id == page_id, ProjectCampaign.lead_form_id == lead_form_id).all()
+    if any(not external_ad_id or not c.external_ad_id or c.external_ad_id == external_ad_id for c in conflicts):
+        raise HTTPException(status_code=409, detail="This Page and Lead Form route is already assigned to another Project. Choose a distinct Ad or review the existing mapping before changing it.")
     config, _ = system_settings.meta_platform_credentials(db)
     token = _token(authorization)
     base = f"https://graph.facebook.com/{config.graph_api_version}"
@@ -358,6 +403,33 @@ def configure_project_setup(
         form = next((item for item in forms_response.json().get("data", []) if str(item.get("id")) == lead_form_id), None)
         if not form:
             raise HTTPException(status_code=422, detail="The selected Lead Form is no longer available.")
+        if str(form.get("status") or "ACTIVE").upper() not in {"ACTIVE", "PUBLISHED"}:
+            raise HTTPException(status_code=422, detail="Select a published, active Lead Form.")
+        if instagram_account_id and str((page.get("instagram_business_account") or {}).get("id") or "") != instagram_account_id:
+            raise HTTPException(status_code=422, detail="The Instagram account does not belong to the selected Page.")
+        # Validate submitted hierarchy server-side, not only the dropdowns.
+        for asset_id, fields, kind in [
+            (external_campaign_id, "id,account_id", "Campaign"),
+            (external_adset_id, "id,account_id,campaign_id", "Ad Set"),
+            (external_ad_id, "id,account_id,campaign_id,adset_id,creative{object_story_spec,asset_feed_spec}", "Ad"),
+        ]:
+            if not asset_id:
+                continue
+            checked = client.get(f"{base}/{asset_id}", params={"access_token": token, "fields": fields})
+            try:
+                checked.raise_for_status()
+            except httpx.HTTPError as exc:
+                raise HTTPException(status_code=422, detail=f"Meta could not validate the selected {kind}.") from exc
+            value = checked.json()
+            if str(value.get("id") or "") != asset_id or str(value.get("account_id") or "").removeprefix("act_") != normalized_ad_account:
+                raise HTTPException(status_code=422, detail=f"The selected {kind} does not belong to this Ad Account.")
+            if external_campaign_id and kind != "Campaign" and str(value.get("campaign_id") or "") != external_campaign_id:
+                raise HTTPException(status_code=422, detail=f"The selected {kind} does not belong to this Campaign.")
+            if external_adset_id and kind == "Ad" and str(value.get("adset_id") or "") != external_adset_id:
+                raise HTTPException(status_code=422, detail="The selected Ad does not belong to this Ad Set.")
+            linked_form = _nested_lead_form_id(value) if kind == "Ad" else None
+            if linked_form and linked_form != lead_form_id:
+                raise HTTPException(status_code=422, detail="The selected Ad uses a different Lead Form.")
         subscription = client.post(f"{base}/{page_id}/subscribed_apps", data={
             "access_token": page_token, "subscribed_fields": "leadgen",
         })

@@ -6,7 +6,7 @@ export function availableProjectSalesCandidates(
 ): ProjectSalesCandidate[] {
   const assigned = new Set(
     assignments
-      .filter((item) => item.responsibility === 'sales' && item.is_active)
+      .filter((item) => (item.sales_enabled ?? item.responsibility === 'sales') && item.is_active && item.accepts_new_leads)
       .map((item) => item.user_id),
   );
   return users.filter(

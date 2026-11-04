@@ -41,7 +41,7 @@ from .schemas import (
     CampaignCreate, CampaignResponse, ChatBootstrapRequest, ChatMessagePayload, ChatMessageResponse, ChatTurnResponse,
     MetaConnectionCreate, MetaConnectionResponse, MetaProjectSetupRequest, MetaProjectSetupResponse,
     MetaAssetDiscoveryResponse, MetaAuthorizationResponse, MetaOAuthStartResponse,
-    MetaSetupConfigurationResponse, ProjectCreate, ProjectProfilePatch, ProjectTimezoneUpdate,
+    MetaSetupConfigurationResponse, MetaSetupStateResponse, ProjectCreate, ProjectProfilePatch, ProjectTimezoneUpdate,
     ProjectOnboardingActionRequest,
     ProjectCompleteResponse, ProjectDeleteRequest, ProjectDeletionImpact, ProjectDraftResponse,
     ProjectOverviewResponse, ProjectProfileResponse, ProjectResponse,
@@ -1131,7 +1131,7 @@ def apply_onboarding_action(
                 .join(User, User.id == ProjectUserAssignment.user_id)
                 .filter(
                     ProjectUserAssignment.project_id == project.id,
-                    ProjectUserAssignment.responsibility == "sales",
+                    ProjectUserAssignment.sales_enabled.is_(True),
                     ProjectUserAssignment.is_active.is_(True),
                     ProjectUserAssignment.accepts_new_leads.is_(True),
                     User.is_active.is_(True),
@@ -1962,9 +1962,12 @@ def get_meta_setup_configuration(
 @router.get("/{project_id}/meta/oauth/start", response_model=MetaOAuthStartResponse)
 def start_meta_oauth(
     project_id: str,
+    response: Response,
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker(EDITOR_ROLES)),
 ):
+    require_project_access(db, current_user, project_id)
+    response.headers["Cache-Control"] = "no-store"
     project = services.get_project(db, project_id, current_user.company_id)
     return meta_oauth_service.start_oauth(db, project=project, user=current_user)
 
@@ -1974,21 +1977,27 @@ async def meta_oauth_callback(
     state: str = Query(default=""), code: str = Query(default=""), error: str = Query(default=""),
     db: Session = Depends(get_db),
 ):
-    from urllib.parse import urlencode
-
-    if error or not state or not code:
-        query = urlencode({"meta_oauth": "error", "reason": error or "authorization_cancelled"})
-        return RedirectResponse(f"{settings.PUBLIC_APP_URL.rstrip('/')}/app/projects?{query}", status_code=303)
+    from .meta_oauth_return import oauth_return
+    project_id = None
     try:
+        if error or not code:
+            attempt = meta_oauth_service.consume_oauth_attempt(db, state)
+            project_id = attempt.project_id
+            reason = "Meta authorization was cancelled or permissions were not granted. Your onboarding is unchanged; you can retry."
+            return oauth_return(settings.PUBLIC_APP_URL, state=state, project_id=project_id, connected=False, reason=reason)
         _, project_id = await meta_oauth_service.complete_oauth(db, state=state, code=code)
     except (HTTPException, httpx.HTTPError) as exc:
         reason = exc.detail if isinstance(exc, HTTPException) else "meta_exchange_failed"
-        query = urlencode({"meta_oauth": "error", "reason": str(reason)[:180]})
-        return RedirectResponse(f"{settings.PUBLIC_APP_URL.rstrip('/')}/app/projects?{query}", status_code=303)
-    query = urlencode({"meta_oauth": "connected"})
-    return RedirectResponse(
-        f"{settings.PUBLIC_APP_URL.rstrip('/')}/app/projects/{project_id}/onboarding?{query}", status_code=303,
-    )
+        return oauth_return(settings.PUBLIC_APP_URL, state=state, project_id=project_id, connected=False, reason=str(reason)[:180])
+    return oauth_return(settings.PUBLIC_APP_URL, state=state, project_id=project_id, connected=True)
+
+
+@router.get("/{project_id}/meta/setup-state", response_model=MetaSetupStateResponse)
+def meta_setup_state(project_id: str, db: Session = Depends(get_db), current_user: User = Depends(RoleChecker(EDITOR_ROLES))):
+    from .meta_setup_state import setup_state
+    require_project_access(db, current_user, project_id)
+    project = services.get_project(db, project_id, current_user.company_id)
+    return setup_state(db, project)
 
 
 @router.get("/{project_id}/meta/oauth/authorizations", response_model=list[MetaAuthorizationResponse])
@@ -1997,6 +2006,7 @@ def list_meta_authorizations(
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker(EDITOR_ROLES)),
 ):
+    require_project_access(db, current_user, project_id)
     services.get_project(db, project_id, current_user.company_id)
     return [meta_oauth_service.serialize_authorization(item) for item in meta_oauth_service.authorizations(db, current_user.company_id)]
 
@@ -2010,6 +2020,7 @@ async def discover_meta_assets(
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker(EDITOR_ROLES)),
 ):
+    require_project_access(db, current_user, project_id)
     services.get_project(db, project_id, current_user.company_id)
     try:
         return await meta_oauth_service.discover_assets(

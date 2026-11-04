@@ -226,7 +226,8 @@
         <section class="w-full rounded-2xl rounded-tl-sm border border-white/10 bg-white/5 p-4 md:p-5">
           <p class="mb-2 text-[9px] font-semibold uppercase tracking-wider text-secondary">Step 2 of 4 · Team</p>
           <h2 class="text-sm font-semibold text-white">Set up company users</h2>
-          <p class="mt-1 text-xs leading-relaxed text-gray-400">Optionally add Assistant, Marketing, or Sales users now. You can also continue and manage them later from Team. User login emails are separate from the company's public contact information.</p>
+          <p class="mt-1 text-xs leading-relaxed text-gray-400">Create Company users here or later in Team / Users. Project onboarding assigns existing users; it does not create them. User login emails are separate from the company's public contact information.</p>
+          <p class="mt-2 text-xs leading-relaxed text-gray-400">By default, users have access to all current and future Projects; Sales and Marketing participation follows their role. The Administrator has both capabilities. Choose Selected Projects for exceptions or edit them later in Team / Users.</p>
           <div *ngIf="team.administrator" class="mt-4 rounded-xl border border-green-500/20 bg-green-500/5 p-3 text-xs">
             <span class="font-semibold text-green-300">Company administrator</span>
             <span class="mt-1 block text-gray-300">{{ team.administrator.first_name }} {{ team.administrator.last_name }}</span>
