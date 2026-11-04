@@ -29,6 +29,7 @@ export interface FinalizationBlocker {
 }
 
 export interface ProjectProfile {
+  ui_deferrals?: Record<string, any>;
   id: string;
   project_id: string;
   project_name: string;

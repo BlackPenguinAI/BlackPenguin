@@ -44,6 +44,7 @@ export interface CompanyCompletion {
 }
 
 export interface CompanyProfileResponse {
+  ui_deferrals?: Record<string, any>;
   id: string;
   company_id: string;
   data: Record<string, unknown>;

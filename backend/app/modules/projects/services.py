@@ -12,6 +12,7 @@ from sqlalchemy.orm.attributes import flag_modified
 
 from app.modules.companies.models import Company
 from app.modules import onboarding_versions as versions
+from app.modules.onboarding_deferrals import records as ui_deferrals, resolve_in_sources
 from app.modules.onboarding_questions import validate_onboarding_value
 from app.modules.project_team.models import ProjectUserAssignment
 from app.modules.users.models import SALES_ACTOR_ROLES, User, UserRole
@@ -624,6 +625,9 @@ def apply_field_updates(
             states[field] = restored
     if accepted and profile.project.onboarding_status == "draft":
         profile.project.onboarding_status = "in_progress"
+    for item in accepted:
+        if item["status"] in {"confirmed", "corrected_by_user"}:
+            resolve_in_sources(sources, "field:" + item["field"])
     profile.profile_data, profile.field_states, profile.field_sources = data, states, sources
     for name in ("profile_data", "field_states", "field_sources"):
         flag_modified(profile, name)
@@ -694,6 +698,7 @@ def serialize_profile(profile: ProjectProfile) -> dict[str, Any]:
         "project_name": str((profile.profile_data or {}).get("project_name") or profile.project.name),
         "data": profile.profile_data or {},
         "published_data": (versions.published_snapshot(profile) or {}).get("data"),
+        "ui_deferrals": ui_deferrals(profile),
         "fields": field_progress(profile.field_states), "completion": completion,
         "updated_at": profile.updated_at,
     }
@@ -845,6 +850,8 @@ def complete_onboarding(db: Session, project: Project, user_id: str) -> ProjectP
         locations = normalized_project_locations(data["exact_address"])
         project.address = locations[0]["address"][:255] if locations else project.address
     profile.final_approved = True
+    from app.modules.onboarding_deferrals import resolve_draft
+    resolve_draft(profile, "final_approval")
     versions.publish(db, profile, actor_user_id=user_id)
     profile.approved_for_sales_at = now
     project.onboarding_status = "completed"

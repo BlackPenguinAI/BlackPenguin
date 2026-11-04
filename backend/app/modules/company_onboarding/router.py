@@ -17,6 +17,7 @@ from app.modules.ai_core.usage import LLMUsageContext
 from app.modules.auth.deps import RoleChecker
 from app.modules.companies.models import Company
 from app.modules.onboarding_questions import build_next_question
+from app.modules.onboarding_deferrals import deferred, question_blockers, deferred_question
 from app.modules.onboarding_jobs import service as job_service
 from app.modules.onboarding_jobs.continuation import finalize_source_group
 from app.modules.onboarding_jobs.models import OnboardingSourceJob
@@ -264,6 +265,8 @@ def _next_prompt(profile) -> str:
 
 def _next_question(profile) -> dict[str, Any]:
     completion = services.serialize_profile(profile)["completion"]
+    if not completion["can_complete"] and not completion["blockers"] and deferred(profile, "final_approval"):
+        return deferred_question()
     if completion["can_complete"]:
         return {
             "field": None,
@@ -278,8 +281,11 @@ def _next_question(profile) -> dict[str, Any]:
             "help_text": None,
             "answer_actions": {},
         }
+    blockers = question_blockers(profile, completion["blockers"])
+    if completion["blockers"] and not blockers:
+        return deferred_question()
     return build_next_question(
-        completion["blockers"],
+        blockers,
         final_prompt="Review the Company Profile and choose whether to approve it or make changes.",
         profile_data=profile.profile_data or {},
         profile_sources=profile.field_sources or {},
@@ -370,6 +376,13 @@ def _workflow_stage(
 ) -> str:
     """Return the single server-owned step the Company UI may render."""
     completion = serialized_profile["completion"]
+    resumed = {key for key,value in serialized_profile.get("ui_deferrals", {}).items() if value.get("resumed")}
+    if "team" in resumed:
+        return "team"
+    if "enrichment" in resumed:
+        return "enrichment"
+    if "field:company_logo" in resumed:
+        return "logo_review"
     if completion["can_complete"]:
         return "complete"
     if processing:
@@ -382,11 +395,12 @@ def _workflow_stage(
         (field for field in serialized_profile["fields"] if field["key"] == "company_logo"),
         {"status": "missing"},
     )
-    if logo["status"] not in {"confirmed", "corrected_by_user", "deferred"}:
+    deferred_cards = serialized_profile.get("ui_deferrals", {})
+    if logo["status"] not in {"confirmed", "corrected_by_user", "deferred"} and not deferred_cards.get("field:company_logo", {}).get("deferred"):
         return "logo_review"
     if completion["required"]["remaining"]:
         return "required"
-    if any(role["status"] == "missing" for role in team["roles"]):
+    if any(role["status"] == "missing" for role in team["roles"]) and not deferred_cards.get("team", {}).get("deferred"):
         return "team"
     if completion["blockers"]:
         return "conditional"
@@ -396,7 +410,7 @@ def _workflow_stage(
     presence_fields = [
         field for field in serialized_profile["fields"] if field["key"] in presence_keys
     ]
-    if any(field["status"] == "missing" for field in presence_fields):
+    if any(field["status"] == "missing" for field in presence_fields) and not deferred_cards.get("enrichment", {}).get("deferred"):
         return "enrichment"
     return "approval"
 
@@ -457,12 +471,13 @@ def _runtime_workflow_stage(
     pending_review = any(
         proposal.status.value == "pending"
         for source in sources
+        if not deferred(profile, "source:" + source.id)
         for proposal in source.proposals
     )
     return _workflow_stage(
         services.serialize_profile(profile),
         services.serialize_team(db, company_id, profile),
-        processing=processing or any(source.status.value == "processing" for source in sources),
+        processing=processing or any(source.status.value == "processing" and not deferred(profile, "source:" + source.id) for source in sources),
         pending_review=pending_review,
         pristine=False,
     )
@@ -485,14 +500,16 @@ def _state_payload(db: Session, company_id: str) -> dict[str, Any]:
         .all()
     )
     serialized_profile = services.serialize_profile(profile)
-    processing = any(source.status.value == "processing" for source in sources) or db.query(OnboardingSourceJob).filter(
+    processing = any(source.status.value == "processing" and not deferred(profile, "source:" + source.id) for source in sources) or db.query(OnboardingSourceJob).filter(
         OnboardingSourceJob.scope == "company",
+        OnboardingSourceJob.source_id.notin_([s.id for s in sources if deferred(profile, "source:" + s.id)]),
         OnboardingSourceJob.company_id == company_id,
         OnboardingSourceJob.status.in_(["queued", "processing"]),
     ).first() is not None
     pending_review = any(
         proposal.status.value == "pending"
         for source in sources
+        if not deferred(profile, "source:" + source.id)
         for proposal in source.proposals
     )
     team = services.serialize_team(db, company_id, profile)
@@ -623,7 +640,10 @@ def continue_company_onboarding_after_team(
 ):
     """Finish the optional Team step and return the next workflow state."""
     profile = services.get_or_create_profile(db, current_user.company_id)
+    from app.modules.onboarding_deferrals import resolve_draft
+    resolve_draft(profile, "team")
     services.defer_missing_team_roles(db, current_user.company_id, profile)
+    db.commit()
     return _state_payload(db, current_user.company_id)
 
 

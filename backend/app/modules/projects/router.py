@@ -20,6 +20,7 @@ from app.modules.ai_core.usage import LLMUsageContext
 from app.modules.auth.deps import RoleChecker
 from app.modules.company_onboarding.models import CompanyProfile
 from app.modules.onboarding_questions import build_next_question
+from app.modules.onboarding_deferrals import deferred, question_blockers, deferred_question
 from app.modules.onboarding_jobs import service as job_service
 from app.modules.onboarding_jobs.continuation import finalize_source_group
 from app.modules.onboarding_jobs.models import OnboardingSourceJob
@@ -298,9 +299,19 @@ def _cover_confirmation_message(source_name: str, next_prompt: str) -> str:
 
 def _next_question(profile) -> dict[str, Any]:
     blockers = services.serialize_profile(profile)["completion"]["blockers"]
+    if not blockers and deferred(profile, "final_approval"):
+        return deferred_question()
+    original = blockers
+    blockers = question_blockers(profile, blockers)
+    if original and not blockers:
+        return deferred_question()
     catalog_managed_fields = {
         "typologies", "available_inventory", "starting_price", "currency", "inventory_updated_at",
     }
+    if deferred(profile, "field:property_type_catalog"):
+        blockers = [item for item in blockers if item["field"] not in catalog_managed_fields and item["field"] != "property_type_catalog"]
+        if original and not blockers:
+            return deferred_question()
     if blockers and blockers[0]["field"] in catalog_managed_fields:
         blockers = [{
             "field": "property_type_catalog",
@@ -374,8 +385,9 @@ def _state_payload(db: Session, project: Project) -> dict[str, Any]:
         db, project, services.serialize_profile(profile),
     )
     ready_for_confirmation = serialized_profile["completion"]["can_finalize"]
-    processing = any(source.status.value == "processing" for source in sources) or db.query(OnboardingSourceJob).filter(
+    processing = any(source.status.value == "processing" and not deferred(profile, "source:" + source.id) for source in sources) or db.query(OnboardingSourceJob).filter(
         OnboardingSourceJob.scope == "project",
+        OnboardingSourceJob.source_id.notin_([s.id for s in sources if deferred(profile, "source:" + s.id)]),
         OnboardingSourceJob.project_id == project.id,
         OnboardingSourceJob.company_id == project.company_id,
         OnboardingSourceJob.status.in_(["queued", "processing"]),
@@ -383,11 +395,16 @@ def _state_payload(db: Session, project: Project) -> dict[str, Any]:
     pending_review = any(
         proposal.status.value == "pending"
         for source in sources
+        if not deferred(profile, "source:" + source.id)
         for proposal in source.proposals
     )
     if not processing and not pending_review:
         latest_ai = next((item for item in reversed(messages) if item.sender == SenderType.AI), None)
         desired_question = _guided_next_question(db, project, profile)
+        if latest_ai and (latest_ai.response_payload or {}).get("status") in {"deferred", "resumed"}:
+            services.supersede_unanswered_questions(db, project.session.id)
+            question = services.save_message(db, project.session.id, SenderType.AI, desired_question["prompt"], ui_payload=desired_question)
+            messages.append(question)
         if latest_ai and not latest_ai.response_payload and (
             not latest_ai.ui_payload
             or (latest_ai.ui_payload or {}).get("field") != desired_question.get("field")
@@ -887,6 +904,8 @@ def create_sales_asset(
 ):
     project = services.get_project(db, project_id, current_user.company_id)
     require_project_access(db, current_user, project_id)
+    from app.modules.onboarding_deferrals import resolve_draft
+    resolve_draft(project.profile, "materials")
     item = sales_asset_service.create(db, project, payload.model_dump(), user_id=current_user.id)
     return sales_asset_service.serialize(item)
 

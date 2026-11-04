@@ -53,16 +53,23 @@ import {
   TeamProjectOption,
 } from './company-onboarding.models';
 import { CompanyOnboardingService } from './company-onboarding.service';
+import { ConfigureLaterComponent, DeferredCards, restoreDraft } from '../../shared/ui/configure-later/configure-later';
 
 
 @Component({
   selector: 'app-chat',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, TranslateModule, OnboardingAiMessageComponent, OnboardingWelcomeComponent, TimezoneSelectComponent],
+  imports: [CommonModule, FormsModule, RouterModule, TranslateModule, OnboardingAiMessageComponent, OnboardingWelcomeComponent, TimezoneSelectComponent, ConfigureLaterComponent],
   templateUrl: './chat.html',
   styleUrl: './chat.scss',
 })
 export class ChatComponent implements OnInit, OnDestroy {
+  get deferredCards() { return Object.entries(this.profile.ui_deferrals || {}).filter(([,v]) => v.deferred).map(([key])=>key); }
+  cardDeferred(card:string) { return !!this.profile.ui_deferrals?.[card]?.deferred; }
+  deferredLabel(card:string) { return this.sources.find(s=>'source:'+s.id===card)?.name || this.profile.fields.find(f=>'field:'+f.key===card)?.label || ({team:'Team users',enrichment:'Public contact information',final_approval:'Final approval'} as Record<string,string>)[card] || card.replace(/_/g,' '); }
+  sourceDraft(source:OnboardingSource) { return Object.fromEntries(source.proposals.map(p=>[p.id,p.draftValue ?? this.formatProposalValue(p)])); }
+  publicPresenceDraft() { return {publicEmails:this.publicEmails,publicPhones:this.publicPhones,socialProfiles:this.socialProfiles,editing:[...this.publicPresenceEditing],dirty:[...this.publicPresenceDirty]}; }
+  deferralsSaved(records:DeferredCards) { this.profile={...this.profile,ui_deferrals:records};this.syncState('bottom'); }
   @ViewChild('chatScroll') chatScroll!: ElementRef<HTMLElement>;
 
   prompt = '';
@@ -305,7 +312,7 @@ export class ChatComponent implements OnInit, OnDestroy {
   }
 
   get hasPendingReview(): boolean {
-    return this.sources.some((source) => this.hasPendingProposals(source));
+    return this.sources.some((source) => !this.cardDeferred('source:'+source.id) && this.hasPendingProposals(source));
   }
 
   get visibleMessages(): ChatMessage[] {
@@ -363,11 +370,11 @@ export class ChatComponent implements OnInit, OnDestroy {
   }
 
   get hasExclusiveStep(): boolean {
-    return this.currentStage === 'logo_review' || this.currentStage === 'team' || this.currentStage === 'enrichment';
+    return (this.currentStage === 'logo_review' && !this.cardDeferred('field:company_logo')) || (this.currentStage === 'team' && !this.cardDeferred('team')) || (this.currentStage === 'enrichment' && !this.cardDeferred('enrichment'));
   }
 
   get hasProcessingSources(): boolean {
-    return this.currentStage === 'processing' || this.sources.some(source => source.status === 'processing');
+    return this.currentStage === 'processing' || this.sources.some(source => source.status === 'processing' && !this.cardDeferred('source:'+source.id));
   }
 
   get teamInviteErrors(): Record<string, string> {
@@ -945,7 +952,7 @@ export class ChatComponent implements OnInit, OnDestroy {
           && previous.draftValue !== undefined;
         return {
           ...proposal,
-          draftValue: preserveDraft ? previous.draftValue : this.formatProposalValue(proposal),
+          draftValue: preserveDraft ? previous.draftValue : ((proposal.status === 'pending' ? this.profile.ui_deferrals?.['source:'+source.id]?.draft?.[proposal.id] : undefined) ?? this.formatProposalValue(proposal)),
         };
       }),
     }));
@@ -997,6 +1004,9 @@ export class ChatComponent implements OnInit, OnDestroy {
     this.lastStateVersion = state.version;
     this.messages = [...state.messages];
     this.profile = state.profile;
+    restoreDraft(this.teamInvite, this.profile.ui_deferrals?.['team']?.draft);
+    const logoDraft = this.profile.ui_deferrals?.['field:company_logo']?.draft;
+    if (typeof logoDraft?.selectedLogoId === 'string') this.selectedLogoId=logoDraft.selectedLogoId;
     this.sources = this.prepareSources(state.sources);
     this.loadCompanyMedia();
     for (const source of this.sources) {
@@ -1004,6 +1014,7 @@ export class ChatComponent implements OnInit, OnDestroy {
     }
     const previousStage = this.currentStage;
     this.nextQuestion = state.next_question;
+    if (!this.prompt && this.nextQuestion?.field) this.prompt=this.profile.ui_deferrals?.['field:'+this.nextQuestion.field]?.draft?.answer || '';
     this.currentStage = state.stage;
     this.team = state.team || EMPTY_TEAM_ONBOARDING;
     this.teamProjects = this.team.projects || [];
@@ -1011,7 +1022,19 @@ export class ChatComponent implements OnInit, OnDestroy {
       this.teamInvite.timezone = this.companyTimezone;
     }
     this.initializePublicPresence(state.profile.data);
-    this.isCompleted = state.profile.completion.can_complete;
+    const presenceDraft = this.profile.ui_deferrals?.['enrichment']?.draft;
+    if (presenceDraft) {
+      if (Array.isArray(presenceDraft.editing)) presenceDraft.editing.forEach((key:string)=>this.publicPresenceEditing.add(key));
+      if (Array.isArray(presenceDraft.dirty)) presenceDraft.dirty.forEach((key:string)=>this.publicPresenceDirty.add(key));
+      for (const [key, field] of [['publicEmails','public_contact_emails'],['publicPhones','public_contact_phones'],['socialProfiles','corporate_social_profiles']]) {
+        if ((!this.isPublicPresenceResolved(field) || this.publicPresenceEditing.has(field)) && typeof presenceDraft[key] === 'string') {
+          if (key === 'publicEmails') this.publicEmails=presenceDraft[key];
+          if (key === 'publicPhones') this.publicPhones=presenceDraft[key];
+          if (key === 'socialProfiles') this.socialProfiles=presenceDraft[key];
+        }
+      }
+    }
+    this.isCompleted = state.profile.completion.can_complete && state.stage === 'complete';
     this.showWelcome = state.stage === 'website';
     if (this.pollingTimer) clearTimeout(this.pollingTimer);
     if (state.stage === 'processing') this.schedulePolling();

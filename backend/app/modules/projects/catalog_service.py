@@ -5,6 +5,7 @@ from decimal import Decimal
 import re
 from typing import Any
 from app.modules import onboarding_versions as versions
+from app.modules.onboarding_deferrals import resolve_draft
 
 from fastapi import HTTPException
 from sqlalchemy import func
@@ -302,6 +303,7 @@ def confirm_catalog(db: Session, project: Project) -> dict[str, Any]:
 
     states = dict(profile.field_states or {})
     states["property_type_catalog"] = {"status": "confirmed", "applicable": True}
+    resolve_draft(profile, "field:property_type_catalog")
     profile.field_states = states
     flag_modified(profile, "field_states")
     services.refresh_completion(profile)
@@ -330,6 +332,7 @@ def create(db: Session, project: Project, payload: dict[str, Any], *, user_id: s
     db.add(item)
     db.flush()
     _sync_profile(db, project)
+    resolve_draft(project.profile, "property:new")
     versions.record_edit(db, project.profile, before, actor_user_id=user_id)
     db.commit()
     db.refresh(item)
@@ -360,6 +363,7 @@ def update(db: Session, project: Project, item: ProjectPropertyType, payload: di
     db.add(item)
     db.flush()
     _sync_profile(db, project)
+    resolve_draft(project.profile, "property:" + item.id)
     versions.record_edit(db, project.profile, before, actor_user_id=user_id)
     db.commit()
     db.refresh(item)

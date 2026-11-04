@@ -11,6 +11,7 @@ from sqlalchemy.orm.attributes import flag_modified
 
 from app.modules.onboarding_questions import validate_onboarding_value
 from app.modules import onboarding_versions as versions
+from app.modules.onboarding_deferrals import records as ui_deferrals, resolve_in_sources, resolve_draft
 from app.modules.users import services as user_services
 from app.modules.users.models import User, UserAuthStatus, UserRole
 from app.modules.projects.models import Project
@@ -598,6 +599,11 @@ def apply_field_updates(
             }
         )
 
+    for item in accepted:
+        if item["status"] in {"confirmed", "corrected_by_user"}:
+            resolve_in_sources(sources, "field:" + item["field"])
+            if item["field"] in {"public_contact_emails", "public_contact_phones", "corporate_social_profiles"}:
+                resolve_in_sources(sources, "enrichment")
     profile.profile_data = data
     profile.field_states = states
     profile.field_sources = sources
@@ -722,6 +728,7 @@ def approve_profile(
         raise ValueError("profile_has_blockers")
 
     profile.final_approved = True
+    resolve_draft(profile, "final_approval")
     versions.publish(db, profile, actor_user_id=actor_user_id)
     completion = refresh_completion(profile)
     db.add(profile)
@@ -740,6 +747,7 @@ def serialize_profile(profile: CompanyProfile) -> dict[str, Any]:
         "company_id": profile.company_id,
         "data": profile.profile_data or {},
         "published_data": (versions.published_snapshot(profile) or {}).get("data"),
+        "ui_deferrals": ui_deferrals(profile),
         "fields": field_progress(profile.field_states),
         "completion": completion,
         "updated_at": profile.updated_at,
@@ -866,6 +874,7 @@ def defer_missing_team_roles(
 
 
 def clear_team_role_decision(db: Session, profile: CompanyProfile, role: UserRole) -> None:
+    resolve_draft(profile, "team")
     state_key = TEAM_ROLE_STATE_KEYS.get(role)
     states = dict(profile.field_states or {})
     if state_key and state_key in states:

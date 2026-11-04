@@ -1,4 +1,5 @@
 import { ChangeDetectorRef, Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
+import { ConfigureLaterComponent, DeferredCards, restoreDraft } from '../../../../shared/ui/configure-later/configure-later';
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
@@ -43,10 +44,23 @@ import {
 
 @Component({
   selector: 'app-project-chat', standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, OnboardingAiMessageComponent, OnboardingWelcomeComponent],
+  imports: [CommonModule, FormsModule, RouterModule, OnboardingAiMessageComponent, OnboardingWelcomeComponent, ConfigureLaterComponent],
   templateUrl: './project-chat.html', styleUrls: ['./project-chat.scss'],
 })
 export class ProjectChatComponent implements OnInit, OnDestroy {
+  get deferredCards() { return Object.entries(this.profile.ui_deferrals || {}).filter(([,v])=>v.deferred).map(([key])=>key); }
+  cardDeferred(card:string) { return !!this.profile.ui_deferrals?.[card]?.deferred; }
+  deferredLabel(card:string) { return this.sources.find(s=>'source:'+s.id===card)?.name || this.propertyCatalog.items.find(p=>'property:'+p.id===card)?.name || this.profile.fields.find(f=>'field:'+f.key===card)?.label || ({'property:new':'New property type',materials:'Lead-safe materials',catalog:'Property catalog',final_approval:'Final approval'} as Record<string,string>)[card] || card.replace(/_/g,' '); }
+  sourceDraft(source:ProjectSource) { return Object.fromEntries(source.proposals.map(p=>[p.id,p.draftValue ?? this.formatProposalValue(p)])); }
+  deferralsSaved(records:DeferredCards) { this.profile={...this.profile,ui_deferrals:records};this.syncState('bottom'); }
+  propertyDraft(item:ProjectPropertyType) { return {...item,selected_images:[...(this.propertyTypeImageSelection.get(item.id) || [])]}; }
+  newPropertyDraft() { return {...this.propertyTypeDraft,selected_images:[...this.propertyTypeDraftImageSelection]}; }
+  cardDraft(field:string|null) {
+    if (field === 'campaigns_defined' || field === 'meta_connection_verified') return {manual:this.metaSetup,oauth:this.metaOAuth};
+    if (field === 'sales_contacts') return {invite:this.salesInvite};
+    if (field === 'property_type_catalog') return {items:this.propertyCatalog.items,newType:this.propertyTypeDraft};
+    return {answer:this.prompt};
+  }
   @ViewChild('chatScroll') chatScroll!: ElementRef<HTMLElement>;
   projectId = '';
   prompt = '';
@@ -217,7 +231,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     const registered = new Set(this.salesAssets.map(item => item.source_id));
     return this.sources.filter(source => source.status === 'ready' && !!source.download_url && !registered.has(source.id));
   }
-  get hasProcessingSources(): boolean { return this.sources.some((source) => source.status === 'processing'); }
+  get hasProcessingSources(): boolean { return this.sources.some((source) => source.status === 'processing' && !this.cardDeferred('source:'+source.id)); }
   get nextBlocker(): string { return this.profile.completion.blockers[0]?.label || 'Final profile approval'; }
   reviewFinalizationBlocker(action: string): void {
     const selector = action === 'review_sales_materials' ? '[data-testid="sales-materials"]' : '[data-active-question="true"]';
@@ -676,7 +690,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
 
   get readyProjectImages(): ProjectSource[] { return this.sources.filter(source => source.kind === 'image' && source.status === 'ready' && !!source.download_url); }
   get showCoverPicker(): boolean { return this.nextQuestion?.input_type === 'project_cover'; }
-  get showPropertyCatalog(): boolean { return this.nextQuestion?.input_type === 'property_type_catalog' || this.showPropertyTypeForm; }
+  get showPropertyCatalog(): boolean { return !this.cardDeferred('field:property_type_catalog') && (this.nextQuestion?.input_type === 'property_type_catalog' || this.showPropertyTypeForm || Object.entries(this.profile.ui_deferrals || {}).some(([key,value])=>key.startsWith('property:') && value.resumed)); }
 
   private emptyPropertyType(): Partial<ProjectPropertyType> {
     return { name: '', code: null, description: null, bedrooms: null, bathrooms: null, area_min: null, area_max: null,
@@ -697,7 +711,14 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   }
 
   private normalizePropertyType(item: ProjectPropertyType): ProjectPropertyType {
-    return { ...item, inventory_updated_at: item.inventory_updated_at?.slice(0, 10) || null };
+    const result = { ...item, inventory_updated_at: item.inventory_updated_at?.slice(0, 10) || null };
+    const catalogRecord = this.profile.ui_deferrals?.['field:property_type_catalog'];
+    const catalogDraft = catalogRecord?.draft?.items?.find((row: any) => row.id === item.id);
+    if (!item.updated_at || !catalogRecord?.updated_at || Date.parse(item.updated_at) <= Date.parse(catalogRecord.updated_at)) restoreDraft(result, catalogDraft);
+    restoreDraft(result, this.profile.ui_deferrals?.['property:'+item.id]?.draft);
+    const selected = this.profile.ui_deferrals?.['property:'+item.id]?.draft?.selected_images;
+    if (Array.isArray(selected) && !this.propertyTypeImageSelection.has(item.id)) this.propertyTypeImageSelection.set(item.id,new Set(selected));
+    return result;
   }
 
   private handlePropertyTypeError(itemId: string | null, error: Error | HttpErrorResponse, fallback: string): void {
@@ -930,7 +951,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   }
 
   get hasPendingReview(): boolean {
-    return this.sources.some((source) => this.isReviewableSource(source) && this.hasPendingProposals(source));
+    return this.sources.some((source) => !this.cardDeferred('source:'+source.id) && this.isReviewableSource(source) && this.hasPendingProposals(source));
   }
   get hasExclusiveSourceFlow(): boolean { return this.hasProcessingSources || this.hasPendingReview; }
   get visibleMessages(): ChatMessage[] {
@@ -1434,7 +1455,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
           && previous.draftValue !== undefined;
         return {
           ...proposal,
-          draftValue: preserveDraft ? previous.draftValue : this.formatProposalValue(proposal),
+          draftValue: preserveDraft ? previous.draftValue : ((proposal.status === 'pending' ? this.profile.ui_deferrals?.['source:'+source.id]?.draft?.[proposal.id] : undefined) ?? this.formatProposalValue(proposal)),
           inlineError: preserveDraft ? previous.inlineError : undefined,
         };
       }),
@@ -1473,8 +1494,19 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     if (state.version < this.lastStateVersion) return;
     this.lastStateVersion = state.version;
     this.messages = [...state.messages]; this.profile = state.profile;
+    restoreDraft(this.propertyTypeDraft, this.profile.ui_deferrals?.['property:new']?.draft);
+    const newImages=this.profile.ui_deferrals?.['property:new']?.draft?.selected_images;
+    if (Array.isArray(newImages) && !this.propertyTypeDraftImageSelection.size) newImages.forEach(id=>this.propertyTypeDraftImageSelection.add(id));
+    if (this.profile.ui_deferrals?.['property:new']?.resumed) this.showPropertyTypeForm=true;
+    restoreDraft(this.propertyTypeDraft, this.profile.ui_deferrals?.['field:property_type_catalog']?.draft?.newType);
+    restoreDraft(this.salesInvite, this.profile.ui_deferrals?.['field:sales_contacts']?.draft?.invite);
+    const metaDraft = [this.profile.ui_deferrals?.['field:meta_connection_verified']?.draft,this.profile.ui_deferrals?.['field:campaigns_defined']?.draft].find(draft=>draft?.manual || draft?.oauth);
+    restoreDraft(this.metaOAuth, metaDraft?.oauth);
+    restoreDraft(this.metaSetup, metaDraft?.manual);
+    restoreDraft(this.salesAssetDraft, this.profile.ui_deferrals?.['materials']?.draft);
     this.onboardingStage = state.stage;
     this.sources = this.prepareSources(state.sources); this.nextQuestion = state.next_question;
+    if (!this.prompt && this.nextQuestion?.field) this.prompt=this.profile.ui_deferrals?.['field:'+this.nextQuestion.field]?.draft?.answer || '';
     this.loadSourceImagePreviews();
     this.loadPropertyTypes();
     this.loadSalesAssets();

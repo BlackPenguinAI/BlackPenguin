@@ -20,7 +20,7 @@ def snapshot(profile, db=None) -> dict:
         "profile_id": getattr(profile, "id", None),
         "data": deepcopy(getattr(profile, "profile_data", None) or {}),
         "states": deepcopy(profile.field_states or {}),
-        "sources": deepcopy(getattr(profile, "field_sources", None) or {}),
+        "sources": deepcopy({k:v for k,v in (getattr(profile, "field_sources", None) or {}).items() if k != "__ui_deferrals__"}),
     }
     project = getattr(profile, "project", None)
     value["company_id"] = getattr(project, "company_id", None) if project else getattr(profile, "company_id", None)

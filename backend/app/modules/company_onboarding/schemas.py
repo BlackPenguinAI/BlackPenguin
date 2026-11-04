@@ -66,6 +66,7 @@ class CompletionSummary(BaseModel):
 
 
 class CompanyProfileResponse(BaseModel):
+    ui_deferrals: dict[str, Any] = Field(default_factory=dict)
     published_data: dict[str, Any] | None = None
     id: str
     company_id: str

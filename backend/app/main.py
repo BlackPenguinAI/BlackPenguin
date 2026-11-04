@@ -74,6 +74,8 @@ app.include_router(ai_core_router, prefix=f"{settings.API_V1_STR}/ai", tags=["7.
 
 # 4. Onboarding y Core Inmobiliario
 app.include_router(company_onboarding_router, prefix=f"{settings.API_V1_STR}/company-onboarding", tags=["8. Onboarding Empresa"])
+from app.modules.onboarding_deferrals import router as deferrals_router
+app.include_router(deferrals_router, prefix=f"{settings.API_V1_STR}/onboarding-deferrals", tags=["Onboarding deferrals"])
 app.include_router(projects_router, prefix=f"{settings.API_V1_STR}/projects", tags=["9. Proyectos Inmobiliarios"])
 app.include_router(brokers_router, prefix=f"{settings.API_V1_STR}/brokers", tags=["10. Brokers"])
 

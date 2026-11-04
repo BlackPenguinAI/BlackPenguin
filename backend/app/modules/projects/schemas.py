@@ -63,6 +63,7 @@ class ProjectCompletion(BaseModel):
 
 
 class ProjectProfileResponse(BaseModel):
+    ui_deferrals: dict[str, Any] = Field(default_factory=dict)
     published_data: dict[str, Any] | None = None
     id: str
     project_id: str

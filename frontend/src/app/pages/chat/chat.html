@@ -40,6 +40,7 @@
     </header>
 
     <div #chatScroll class="z-10 flex flex-1 flex-col gap-6 overflow-y-auto p-4 scroll-smooth md:p-8">
+<section *ngIf="deferredCards.length" class="rounded-xl border border-amber-400/30 p-4"><h2>Configurations saved for later</h2><p class="text-xs text-gray-400">Saved drafts are not approvals. Resume required items before final approval.</p><ng-container *ngFor="let key of deferredCards"><app-configure-later  scope="company" [entityId]="profile.company_id" [card]="key" [label]="deferredLabel(key)" [draft]="{}" [records]="profile.ui_deferrals || {}" (saved)="deferralsSaved($event)"></app-configure-later></ng-container></section>
       <ng-container *ngFor="let msg of visibleMessages">
         <div
           class="flex w-full"
@@ -57,6 +58,7 @@
               (selected)="chooseAnswer($event, msg)"
               (custom)="writeCustomAnswer(msg)"
             ></app-onboarding-ai-message>
+<app-configure-later *ngIf="isActiveQuestion(msg) && msg.ui_payload?.input_type !== 'complete' && msg.ui_payload?.input_type !== 'deferred_review'" scope="company" [entityId]="profile.company_id" [card]="msg.ui_payload!.field ? 'field:'+msg.ui_payload!.field : 'final_approval'" [label]="msg.ui_payload!.label" [draft]="{answer: prompt}" [records]="profile.ui_deferrals || {}" (saved)="deferralsSaved($event)"></app-configure-later>
             <div *ngIf="msg.media_evidence as media" class="ml-11 mt-2 max-w-sm rounded-xl border border-green-500/20 bg-green-500/[0.06] p-3">
               <div class="flex items-center gap-3">
                 <img *ngIf="companyMediaUrls.get(media.asset_id) as preview" [src]="preview" [alt]="media.name" class="h-16 w-20 rounded-lg border border-white/10 bg-black/30 object-contain p-1" />
@@ -95,6 +97,8 @@
       </ng-container>
 
       <ng-template #sourceReview let-source>
+<app-configure-later  scope="company" [entityId]="profile.company_id" [card]="'source:'+source.id" [label]="source.name" [draft]="sourceDraft(source)" [records]="profile.ui_deferrals || {}" (saved)="deferralsSaved($event)"></app-configure-later>
+<ng-container *ngIf="!cardDeferred('source:'+source.id)">
       <section *ngIf="source.status === 'processing'" class="processing-source ml-11 max-w-3xl" role="status" aria-live="polite">
         <span class="processing-source__spinner" aria-hidden="true"></span>
         <div class="min-w-0">
@@ -185,9 +189,11 @@
           </div>
         </div>
       </details>
+</ng-container>
       </ng-template>
 
       <div *ngIf="currentStage === 'enrichment'" class="flex max-w-3xl gap-4" data-active-onboarding-step="true">
+<app-configure-later  scope="company" [entityId]="profile.company_id" [card]="'enrichment'" [label]="'enrichment'" [draft]="publicPresenceDraft()" [records]="profile.ui_deferrals || {}" (saved)="deferralsSaved($event)"></app-configure-later>
         <div class="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-secondary/50 bg-secondary/20">
           <span class="material-symbols-outlined text-[18px] text-secondary">contact_phone</span>
         </div>
@@ -205,7 +211,7 @@
             <div class="flex items-center gap-3 pt-1">
               <button [disabled]="!canSavePublicPresence" [title]="canSavePublicPresence ? '' : 'Enter at least one valid public channel.'" class="rounded-lg bg-secondary px-3 py-2 text-[10px] font-semibold text-black disabled:cursor-not-allowed disabled:opacity-40">{{ publicPresenceSaving ? 'Saving...' : (publicPresenceErrorCount ? 'Complete valid information' : 'Save public information') }}</button>
               <span *ngIf="publicPresenceSaved" class="text-[10px] text-green-400">Saved</span>
-              <button type="button" (click)="deferPublicPresence()" [disabled]="publicPresenceSaving" class="rounded-lg border border-white/10 px-3 py-2 text-[10px] text-gray-400 disabled:opacity-50">Continue for now</button>
+
             </div>
           </form>
           <p *ngIf="publicPresenceError" class="mt-3 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-[10px] text-red-200">{{ publicPresenceError }}</p>
@@ -213,6 +219,7 @@
       </div>
 
       <div *ngIf="currentStage === 'team'" class="flex max-w-3xl gap-4" data-active-onboarding-step="true">
+<app-configure-later  scope="company" [entityId]="profile.company_id" [card]="'team'" [label]="'team'" [draft]="teamInvite" [records]="profile.ui_deferrals || {}" (saved)="deferralsSaved($event)"></app-configure-later>
         <div class="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-secondary/50 bg-secondary/20">
           <span class="material-symbols-outlined text-[18px] text-secondary">group_add</span>
         </div>
@@ -283,6 +290,7 @@
       </div>
 
       <div *ngIf="currentStage === 'logo_review'" class="flex max-w-3xl gap-4" data-testid="company-logo-step" data-active-onboarding-step="true">
+<app-configure-later  scope="company" [entityId]="profile.company_id" [card]="'field:company_logo'" [label]="'logo review'" [draft]="{selectedLogoId: selectedLogoId}" [records]="profile.ui_deferrals || {}" (saved)="deferralsSaved($event)"></app-configure-later>
         <div class="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-secondary/50 bg-secondary/20"><span class="material-symbols-outlined text-[18px] text-secondary">image</span></div>
         <section class="w-full rounded-2xl rounded-tl-sm border border-white/10 bg-white/5 p-4 md:p-5">
           <h2 class="text-sm font-semibold">Company logo</h2><p class="mt-1 text-xs leading-relaxed text-gray-400">Choose a candidate extracted from the website, upload the official logo, or provide it later.</p>
@@ -293,7 +301,7 @@
             </button>
           </div>
           <p *ngIf="selectedLogoId" class="mt-3 flex items-center gap-2 text-[10px] text-green-400"><span class="material-symbols-outlined text-base">check_circle</span>Logo selected. Confirm to continue.</p>
-          <div class="mt-4 flex flex-wrap gap-2"><button type="button" (click)="confirmCompanyLogo()" [disabled]="logoBusy || !selectedLogoId" class="rounded-lg bg-secondary px-4 py-2 text-[10px] font-semibold text-black disabled:opacity-40">{{ logoBusy ? 'Confirming...' : 'Confirm Company Logo' }}</button><label class="cursor-pointer rounded-lg border border-secondary/30 px-4 py-2 text-[10px] font-semibold text-secondary"><input type="file" accept="image/jpeg,image/png,image/webp" class="hidden" (change)="uploadCompanyLogo($event)" [disabled]="logoBusy" />Upload logo</label><button type="button" (click)="deferCompanyLogo()" [disabled]="logoBusy" class="rounded-lg border border-white/10 px-4 py-2 text-[10px] text-gray-400">Provide later</button></div>
+          <div class="mt-4 flex flex-wrap gap-2"><button type="button" (click)="confirmCompanyLogo()" [disabled]="logoBusy || !selectedLogoId" class="rounded-lg bg-secondary px-4 py-2 text-[10px] font-semibold text-black disabled:opacity-40">{{ logoBusy ? 'Confirming...' : 'Confirm Company Logo' }}</button><label class="cursor-pointer rounded-lg border border-secondary/30 px-4 py-2 text-[10px] font-semibold text-secondary"><input type="file" accept="image/jpeg,image/png,image/webp" class="hidden" (change)="uploadCompanyLogo($event)" [disabled]="logoBusy" />Upload logo</label></div>
         </section>
       </div>
 
