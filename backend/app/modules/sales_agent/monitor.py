@@ -104,20 +104,54 @@ def scoped_messages(db, conv, lead_id):
     return messages, physical_count
 
 
+def explicit_run_leads(snapshot):
+    """Explicit ownership wins over legacy fallback, including retry history."""
+    if not isinstance(snapshot, dict):
+        return set()
+    owners = {value for value in (snapshot.get("lead_id"), (snapshot.get("turn_trace") or {}).get("lead_id")) if isinstance(value, str) and value}
+    for key in ("input_snapshot", "historical_input"):
+        owners.update(explicit_run_leads(snapshot.get(key)))
+    for attempt in snapshot.get("trace_attempts") or []:
+        owners.update(explicit_run_leads(attempt))
+    return owners
+
+
 def diagnostic(db, conv, company_id, project_id, lead_id):
     messages, physical_count = scoped_messages(db, conv, lead_id)
     ids = {m.id for m in messages}
     deliveries = db.query(OutboundMessage).filter(OutboundMessage.conversation_id == conv.id).all()
     linked_run_ids = {(m.metadata_json or {}).get("agent_run_id") for m in messages}
+    attribution = db.query(SalesMessage.id, SalesMessage.metadata_json).filter(SalesMessage.conversation_id == conv.id).all()
+    message_owners = {item.id: (item.metadata_json or {}).get("lead_id") for item in attribution}
+    linked_owners = {}
+    for item in attribution:
+        metadata = item.metadata_json or {}
+        if metadata.get("agent_run_id") and metadata.get("lead_id"):
+            linked_owners.setdefault(metadata["agent_run_id"], set()).add(metadata["lead_id"])
     all_runs = db.query(AgentRun).filter(AgentRun.conversation_id == conv.id).order_by(AgentRun.started_at, AgentRun.id).all()
     no_contexts = not db.query(SalesConversationLeadContext.id).filter(SalesConversationLeadContext.conversation_id == conv.id).first()
-    runs = [r for r in all_runs if r.id in linked_run_ids or (r.input_snapshot or {}).get("message_id") in ids or
-            ((r.input_snapshot or {}).get("turn_trace") or {}).get("lead_id") == lead_id or (no_contexts and conv.lead_id == lead_id)]
+    runs = []
+    ownership_exclusions = []
+    for run in all_runs:
+        snapshot = run.input_snapshot or {}
+        owners = explicit_run_leads(snapshot) | linked_owners.get(run.id, set())
+        inbound_owner = message_owners.get(snapshot.get("message_id"))
+        if inbound_owner:
+            owners.add(inbound_owner)
+        if owners:
+            if owners == {lead_id}:
+                runs.append(run)
+            else:
+                ownership_exclusions.append(run.id)
+        elif run.id in linked_run_ids or snapshot.get("message_id") in ids or (no_contexts and conv.lead_id == lead_id):
+            runs.append(run)
     run_ids = {r.id for r in runs}
     provider_ids = {m.provider_message_id for m in messages if m.provider_message_id}
     outbound_ids = {(m.metadata_json or {}).get("outbound_message_id") for m in messages}
     scoped_deliveries = [d for d in deliveries if d.id in outbound_ids or d.agent_run_id in run_ids or d.provider_message_id in provider_ids]
     missing = []
+    if ownership_exclusions:
+        missing.append("Executions with other-opportunity or conflicting explicit attribution excluded; legacy ownership fallback was not applied to them.")
     if physical_count != len(messages):
         missing.append("Other-opportunity or unattributed messages excluded; physical thread is not the selected opportunity.")
     if any(not (m.metadata_json or {}).get("lead_id") for m in messages):

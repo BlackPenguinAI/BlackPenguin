@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+from copy import deepcopy
 import re
 import uuid
 
@@ -898,13 +899,16 @@ def _prepare_run(
     existing = db.query(AgentRun).filter(AgentRun.event_id == event_id).first()
     if existing and existing.status in {"completed", "blocked"}:
         return None
-    prior_attempts = list((existing.input_snapshot or {}).get("trace_attempts", [])) if existing else []
+    prior_attempts = deepcopy((existing.input_snapshot or {}).get("trace_attempts", [])) if existing else []
     if existing and not prior_attempts:
         prior_attempts = [{"historical_input": existing.input_snapshot or {},
                            "missing": ["historical code/context trace unavailable"]}]
     if existing and prior_attempts:
         prior_attempts[-1] = {**prior_attempts[-1], "status": existing.status,
                               "error_code": existing.error_code, "model": existing.model,
+                              # History is already kept in the flat attempts list.
+                              # Do not recursively embed it in every new snapshot.
+                              "input_snapshot": deepcopy({key: value for key, value in (existing.input_snapshot or {}).items() if key != "trace_attempts"}),
                               "prompt_snapshot": existing.prompt_snapshot,
                               "output_snapshot": existing.output_snapshot}
     run = existing or AgentRun(
