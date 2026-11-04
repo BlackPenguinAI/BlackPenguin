@@ -38,6 +38,7 @@ describe('Uniform Configure later',()=>{
   it('does not restore an older catalog draft over a newly saved property',()=>{
     const page:any=Object.create(ProjectChatComponent.prototype);
     page.propertyTypeImageSelection=new Map();
+    page.propertyTypeBases=new Map();page.consumedPropertyDrafts=new Map();page.dirtyPropertyTypeIds=new Set();
     page.profile={ui_deferrals:{'field:property_type_catalog':{updated_at:'2026-11-04T10:00:00',draft:{items:[{id:'a',name:'Old draft'}]}}}};
     const result=page.normalizePropertyType({id:'a',name:'Latest saved name',updated_at:'2026-11-04T11:00:00',inventory_updated_at:null});
     expect(result.name).toBe('Latest saved name');

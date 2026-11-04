@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+from copy import deepcopy
 import re
 from typing import Any
 from app.modules import onboarding_versions as versions
@@ -387,6 +388,16 @@ def update(db: Session, project: Project, item: ProjectPropertyType, payload: di
     db.flush()
     _sync_profile(db, project)
     resolve_draft(project.profile, "property:" + item.id)
+    # A full-catalog Configure later draft may also contain this row. Resolve
+    # only the saved row, preserving every other pending row and chat/audit.
+    sources = dict(project.profile.field_sources or {})
+    bag = deepcopy(sources.get("__ui_deferrals__", {}))
+    record = bag.get("field:property_type_catalog", {})
+    draft = record.get("draft", {})
+    if isinstance(draft.get("items"), list):
+        draft["items"] = [row for row in draft["items"] if not isinstance(row, dict) or row.get("id") != item.id]
+        project.profile.field_sources = {**sources, "__ui_deferrals__": bag}
+        flag_modified(project.profile, "field_sources")
     versions.record_edit(db, project.profile, before, actor_user_id=user_id)
     db.commit()
     db.refresh(item)

@@ -31,7 +31,7 @@ import {
   ProjectFileIntent, ProjectPropertyType, ProjectSalesAsset, PropertyTypeCatalog, SalesAssetType,
 } from './project-onboarding.models';
 import { ProjectOnboardingService } from './project-onboarding.service';
-import { PROPERTY_TYPE_FIELDS, mergePropertyTypeDraft, propertyTypeSnapshot } from './property-type-form';
+import { PROPERTY_TYPE_FIELDS, mergePropertyTypeDraft, propertyTypeSnapshot, propertyTypeDetails, restorePropertyTypeDraft } from './property-type-form';
 import { availableProjectSalesCandidates, companyAdministratorSalesCandidate } from './project-sales-capabilities';
 import {
   errorCount,
@@ -54,12 +54,12 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   deferredLabel(card:string) { return this.sources.find(s=>'source:'+s.id===card)?.name || this.propertyCatalog.items.find(p=>'property:'+p.id===card)?.name || this.profile.fields.find(f=>'field:'+f.key===card)?.label || ({'property:new':'New property type',materials:'Lead-safe materials',catalog:'Property catalog',final_approval:'Final approval'} as Record<string,string>)[card] || card.replace(/_/g,' '); }
   sourceDraft(source:ProjectSource) { return Object.fromEntries(source.proposals.map(p=>[p.id,p.draftValue ?? this.formatProposalValue(p)])); }
   deferralsSaved(records:DeferredCards) { this.profile={...this.profile,ui_deferrals:records};this.syncState('bottom'); }
-  propertyDraft(item:ProjectPropertyType) { return {...item,selected_images:[...(this.propertyTypeImageSelection.get(item.id) || [])]}; }
+  propertyDraft(item:ProjectPropertyType) { return {...item,details_base:this.propertyTypeBases.get(item.id) || propertyTypeDetails(item),selected_images:[...(this.propertyTypeImageSelection.get(item.id) || [])]}; }
   newPropertyDraft() { return {...this.propertyTypeDraft,selected_images:[...this.propertyTypeDraftImageSelection]}; }
   cardDraft(field:string|null) {
     if (field === 'campaigns_defined' || field === 'meta_connection_verified') return {manual:this.metaSetup,oauth:this.metaOAuth};
     if (field === 'sales_contacts') return {invite:this.salesInvite};
-    if (field === 'property_type_catalog') return {items:this.propertyCatalog.items,newType:this.propertyTypeDraft};
+    if (field === 'property_type_catalog') return {items:this.propertyCatalog.items.map(item=>this.propertyDraft(item)),newType:this.propertyTypeDraft};
     return {answer:this.prompt};
   }
   @ViewChild('chatScroll') chatScroll!: ElementRef<HTMLElement>;
@@ -135,6 +135,8 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   readonly removingPropertyTypeIds = new Set<string>();
   readonly propertyTypeServerErrors = new Map<string, FormErrors>();
   readonly dirtyPropertyTypeIds = new Set<string>();
+  private readonly propertyTypeBases = new Map<string, Record<string, unknown>>();
+  private readonly consumedPropertyDrafts = new Map<string, string>();
   readonly propertyTypeFields = PROPERTY_TYPE_FIELDS;
   readonly mediaUpdatingPropertyTypeIds = new Set<string>();
   creatingPropertyType = false;
@@ -567,6 +569,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
         this.propertyCatalog = {
           ...catalog,
           items: catalog.items.map(item => {
+            if (!this.propertyTypeBases.has(item.id) || (!this.dirtyPropertyTypeIds.has(item.id) && !this.isPropertyTypeSaving(item))) this.propertyTypeBases.set(item.id, propertyTypeDetails(item));
             const local = localItems.get(item.id);
             if (local && this.mediaUpdatingPropertyTypeIds.has(item.id)) return local;
             if (local && (this.dirtyPropertyTypeIds.has(item.id) || this.savingPropertyTypeIds.has(item.id))) return mergePropertyTypeDraft(item, local);
@@ -591,6 +594,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
       switchMap(updated => {
         if (!selectedImageIds.length) return of(updated);
         return this.onboarding.attachPropertyTypeMedia(this.projectId, updated.id, selectedImageIds).pipe(
+          timeout(20_000),
           catchError(() => {
             this.propertyTypeImageSelection.set(updated.id, new Set(selectedImageIds));
             this.errorMessage = 'The property type was saved, but its images could not be attached. The selection is ready to retry.';
@@ -636,6 +640,8 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
         changedWhileSaving ? this.dirtyPropertyTypeIds.add(item.id) : this.dirtyPropertyTypeIds.delete(item.id);
         this.propertyTypeServerErrors.delete(item.id);
         ++this.propertyCatalogRequestVersion;
+        this.propertyTypeBases.set(item.id, propertyTypeDetails(updated));
+        for (const key of ['property:'+item.id, 'field:property_type_catalog']) this.consumedPropertyDrafts.set(item.id+':'+key, JSON.stringify(this.profile.ui_deferrals?.[key] || {}));
         this.replacePropertyType(merged);
         this.syncState('none');
       },
@@ -766,11 +772,13 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
 
   private normalizePropertyType(item: ProjectPropertyType): ProjectPropertyType {
     let result = { ...item };
+    if (!this.propertyTypeBases.has(item.id)) this.propertyTypeBases.set(item.id, propertyTypeDetails(item));
+    const canRestore = (key: string, draft: any, record: any) => this.consumedPropertyDrafts.get(item.id+':'+key) !== JSON.stringify(record || {}) && restorePropertyTypeDraft(item, draft, record);
     const catalogRecord = this.profile.ui_deferrals?.['field:property_type_catalog'];
     const catalogDraft = catalogRecord?.draft?.items?.find((row: any) => row.id === item.id);
-    if (!item.updated_at || !catalogRecord?.updated_at || Date.parse(item.updated_at) <= Date.parse(catalogRecord.updated_at)) result = mergePropertyTypeDraft(result, catalogDraft || {});
+    if (canRestore('field:property_type_catalog', catalogDraft, catalogRecord)) result = mergePropertyTypeDraft(result, catalogDraft || {});
     const record = this.profile.ui_deferrals?.['property:'+item.id];
-    if (!item.updated_at || !record?.updated_at || Date.parse(item.updated_at) <= Date.parse(record.updated_at)) result = mergePropertyTypeDraft(result, record?.draft || {});
+    if (canRestore('property:'+item.id, record?.draft, record)) result = mergePropertyTypeDraft(result, record?.draft || {});
     if (JSON.stringify(toPropertyTypePayload(result)) !== JSON.stringify(toPropertyTypePayload(item))) this.dirtyPropertyTypeIds.add(item.id);
     const selected = this.profile.ui_deferrals?.['property:'+item.id]?.draft?.selected_images;
     if (Array.isArray(selected) && !this.propertyTypeImageSelection.has(item.id)) this.propertyTypeImageSelection.set(item.id,new Set(selected));

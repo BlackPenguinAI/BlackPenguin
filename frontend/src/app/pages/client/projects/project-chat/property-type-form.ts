@@ -28,6 +28,25 @@ export const PROPERTY_TYPE_FIELDS: readonly PropertyTypeField[] = [
 
 const EDITABLE_KEYS = [...PROPERTY_TYPE_FIELDS.map(field => field.key), 'source_reference', 'sort_order'] as const;
 
+export function propertyTypeDetails(value: Partial<ProjectPropertyType>): Record<string, unknown> {
+  return JSON.parse(JSON.stringify(Object.fromEntries(EDITABLE_KEYS.map(key => [key, value[key] ?? null]))));
+}
+
+export function restorePropertyTypeDraft(server: ProjectPropertyType, draft: any, record: any): boolean {
+  if (!draft || record?.completed_at) return false;
+  if (draft.details_base && typeof draft.details_base === 'object') {
+    // Image changes do not alter this scalar baseline. A real scalar change
+    // must not be silently overwritten by an old saved draft.
+    const current = propertyTypeDetails(server);
+    return Object.keys(current).every(key => JSON.stringify(current[key]) === JSON.stringify(draft.details_base[key] ?? null));
+  }
+  // Legacy active drafts predate scalar baselines: keep their explicit pending
+  // review rather than treating an image-only timestamp as a scalar save.
+  return !!(record?.resumed || record?.deferred)
+    || !server.updated_at || !record?.updated_at
+    || Date.parse(server.updated_at) <= Date.parse(record.updated_at);
+}
+
 /** Keep pending scalar edits; media and server-owned metadata stay authoritative. */
 export function mergePropertyTypeDraft(
   server: ProjectPropertyType, local: Partial<ProjectPropertyType>, submitted?: Partial<ProjectPropertyType>,
