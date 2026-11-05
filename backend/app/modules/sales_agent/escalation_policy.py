@@ -28,9 +28,12 @@ def apply_escalation_policy(result, *, inbound, routing=None, event_kind="lead_m
     requested_review = requested_review or prior.get("disposition") == "notify_sales"
     confidence = result.get("intent_confidence")
     trusted = isinstance(confidence, (float, int)) and not isinstance(confidence, bool) and float(routing.get("minimum_confidence", .8)) <= confidence <= 1
+    uncertain_opt_out = event_kind == "lead_message" and "opt_out" in intents and (not trusted or bool(result.get("requires_clarification")))
     reason = escalation_reason(inbound) if event_kind == "lead_message" else None
     disposition = "pause" if reason else "continue"
-    if event_kind == "lead_message" and (inbound.strip().upper() in {"STOP", "UNSUBSCRIBE", "CANCEL", "END", "QUIT"} or trusted and "opt_out" in intents):
+    applicable_conditions = []
+    matched_pause_rules = []
+    if event_kind == "lead_message" and (inbound.strip().upper() in {"STOP", "UNSUBSCRIBE", "CANCEL", "END", "QUIT"} or trusted and "opt_out" in intents and not uncertain_opt_out):
         disposition, reason = "opt_out", "LEAD_OPTED_OUT"
     elif violations:
         disposition, reason = "pause", "POLICY_VIOLATION"
@@ -41,19 +44,31 @@ def apply_escalation_policy(result, *, inbound, routing=None, event_kind="lead_m
     elif not reason:
         missing_material = "assets" in topics_for_turn(inbound, intents) and not commercial.get("available_assets")
         low_confidence = bool(result.get("requires_clarification")) or not trusted
-        gap = "MISSING_MATERIAL" if missing_material else "LOW_CONFIDENCE" if low_confidence else "MISSING_INFORMATION"
-        flag = {"MISSING_MATERIAL": "pause_on_missing_material", "LOW_CONFIDENCE": "pause_on_low_confidence", "MISSING_INFORMATION": "pause_on_missing_information"}[gap]
-        if (missing_material or low_confidence or requested_review) and routing.get(flag) is True:
-            disposition, reason = "pause", gap
+        # Confidence is independent of collateral availability. Check every
+        # applicable rule, then use this explicit precedence for the reason.
+        rules = [("LOW_CONFIDENCE", "pause_on_low_confidence", low_confidence),
+                 ("MISSING_MATERIAL", "pause_on_missing_material", missing_material),
+                 ("MISSING_INFORMATION", "pause_on_missing_information", requested_review and not missing_material and not low_confidence)]
+        applicable_conditions = [label for label, _, applies in rules if applies]
+        matched_pause_rules = [label for label, flag, applies in rules if applies and routing.get(flag) is True]
+        if matched_pause_rules:
+            disposition, reason = "pause", matched_pause_rules[0]
         elif requested_review:
-            disposition, reason = "notify_sales", gap
+            disposition, reason = "notify_sales", next(iter(applicable_conditions), "MISSING_INFORMATION")
     actions = [a for a in actions if a.get("type") not in {"request_human_review", "request_callback"}]
     if disposition == "pause":
         actions = [{"type": "request_callback" if reason == "HUMAN_REQUESTED" else "request_human_review"}]
     if disposition == "opt_out":
         actions = []
+    elif uncertain_opt_out:
+        result["requires_clarification"] = True
+        # No commercial action is consent to continue contact. Ask only about
+        # scope; do not book, share files or promise an unsubscribe here.
+        actions = actions if disposition == "pause" else [{"type": "ask_qualification_question"}]
     decision = {"version": "sales-escalation-v1", "disposition": disposition, "reason": reason,
                 "conversation_paused": disposition in {"pause", "opt_out"},
+                "consent_clarification_required": uncertain_opt_out and disposition != "opt_out",
+                "applicable_conditions": applicable_conditions, "matched_pause_rules": matched_pause_rules,
                 "applied_pause_policy": {key: routing.get(key) is True for key in ("pause_on_missing_information", "pause_on_missing_material", "pause_on_low_confidence")}}
     result.update(proposed_actions=actions, policy_violations=violations,
                   requires_human=disposition == "pause", escalation_decision=decision)
@@ -63,6 +78,13 @@ def apply_escalation_policy(result, *, inbound, routing=None, event_kind="lead_m
             return "" if re.search(r"\b(?:human review|hold on|(?:chat|conversation|AI) (?:is |has been )?paused|transferr?ing you|cannot continue)\b", match.group(), re.I) else match.group()
         cleaned = re.sub(r"[^.!?\n]+(?:[.!?]|$)", keep_safe_sentence, reply).strip()
         result["proposed_reply"] = cleaned or "Some information needs verification, but I can continue helping with the approved Project information."
+    if uncertain_opt_out and disposition not in {"pause", "opt_out"}:
+        result["proposed_reply"] = "Do you want to stop all messages from us, or only these offers? Reply STOP to unsubscribe from all messages."
+    elif disposition != "opt_out" and re.search(r"\b(?:you (?:have been|are|were) (?:successfully )?(?:unsubscribed|opted out)|I(?:['’]ve| have) unsubscribed you|you will (?:not|no longer) receive (?:any |further |more )?messages)\b", result.get("proposed_reply") or "", re.I):
+        # Confirmation belongs to the persisted opt-out operation, not to a
+        # model sentence (including hallucinated scheduled follow-ups).
+        result["proposed_reply"] = (escalation_reply(decision) if disposition == "pause" else
+            "You can reply STOP to unsubscribe from all messages. How would you like to proceed?")
     result["response_policy_trace"] = {**result.get("response_policy_trace", {}), "escalation": decision, "requires_human": result["requires_human"]}
     return result
 
@@ -77,6 +99,16 @@ def notify_sales(db, *, conversation, lead, decision, event_id, evidence):
                  "evidence": evidence[:500], "recipient_roles": ["admin", "sales"],
                  "action_url": f"/app/agent?conversation={conversation.id}"},
         dedupe_key=f"sales-review:{conversation.id}:{event_id}")
+
+
+def cancel_followups_for_consent_clarification(db, *, conversation, lead):
+    """Do not proactively chase a lead while asking what contact to stop."""
+    from .models import SalesFollowUpJob
+    lead.next_action_at = None
+    db.query(SalesFollowUpJob).filter(
+        SalesFollowUpJob.conversation_id == conversation.id,
+        SalesFollowUpJob.status.in_(["pending", "processing"]),
+    ).update({SalesFollowUpJob.status: "cancelled"}, synchronize_session=False)
 
 
 def escalation_reply(decision):

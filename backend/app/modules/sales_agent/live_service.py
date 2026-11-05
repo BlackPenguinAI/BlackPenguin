@@ -40,7 +40,7 @@ from app.modules.governance.services import (
     create_intervention_case, escalation_reason, next_allowed_proactive_time,
     operating_policy_for,
 )
-from .escalation_policy import apply_escalation_policy, notify_sales, escalation_reply
+from .escalation_policy import apply_escalation_policy, notify_sales, escalation_reply, cancel_followups_for_consent_clarification
 from app.core.config import settings
 from app.integrations.whatsapp_templates import (
     initial_template_parameters,
@@ -1317,6 +1317,8 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
                 "project_timezone": project.timezone or "UTC",
             } if not action_types(appointment_actions) & {"request_visit_location", "appointment_confirmed"} else None
         decision = result["escalation_decision"]
+        if decision.get("consent_clarification_required"):
+            cancel_followups_for_consent_clarification(db, conversation=conversation, lead=lead)
         if decision["disposition"] == "notify_sales":
             notice = notify_sales(db, conversation=conversation, lead=lead, decision=decision, event_id=inbound.id, evidence=inbound.content)
             decision.update(notification_id=notice.id, notification_persisted=True)
@@ -1415,7 +1417,8 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
                     **({"appointment_offer": appointment_offer} if appointment_offer is not None else {}),
                 },
             )
-        _schedule_next_action(db, conversation, lead, event_id)
+        if not decision.get("consent_clarification_required"):
+            _schedule_next_action(db, conversation, lead, event_id)
         db.commit()
     except Exception as exc:
         db.rollback()

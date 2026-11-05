@@ -311,15 +311,41 @@ def escalation_reason(text: str) -> str | None:
     # This pre-model route is reserved for an affirmative request, not a
     # mention of an advisor or a refusal to speak with one. The LLM still
     # handles other paraphrases through the canonical intent contract.
-    for clause in re.split(r"[.!?;]|\b(?:but|however|pero)\b", text, flags=re.I):
+    clauses = re.split(r"[.!?;]|\b(?:but|however|pero)\b", text, flags=re.I)
+    for clause in clauses:
         if HUMAN_REQUEST.search(clause) and HUMAN_VERB.search(clause):
             negated = re.search(r"\b(?:don['’]t|do not|never|no longer|no quiero|no necesito)\b[^.!?;]{0,65}\b(?:talk|speak|call|contact|transfer|hablar|llamar|comunicar)\b", clause, re.I)
             if not negated:
                 return "HUMAN_REQUESTED"
-    if LEGAL_REQUEST.search(text):
-        return "LEGAL_QUESTION"
-    if NEGOTIATION_REQUEST.search(text):
-        return "COMPLEX_NEGOTIATION"
+    # Bind a negation to the matched request, not to unrelated words earlier
+    # in the message. Positive requests in another clause remain protected.
+    negated_prefix = re.compile(
+        r"\b(?:don['’]t|do not|does not)\s+(?:need|want|require|request|ask)|"
+        r"\b(?:am not|I'm not|I’m not|not)\s+(?:asking|requesting|seeking)|"
+        r"\bno\s+(?:quiero|necesito|solicito|estoy pidiendo)|\bno need|\bno", re.I)
+    filler = r"(?:for|to|a|an|any|the|your|more|further|un|una|el|la|los|las|de|por|ninguna|ningún|ningun|más|mas)"
+    particles = re.compile(r"\s*(?:" + filler + r"\s+)*$", re.I)
+    def negation_applies(prefix, negation):
+        tail = prefix[negation.end():].lstrip()
+        # A negated verb may govern a following exception noun, e.g.
+        # "No quiero negociar un descuento especial". Only remove the
+        # leading verb, never a fresh affirmative imperative after a comma.
+        tail = re.sub(r"^(?:negotiate|negociar)\s+", "", tail, flags=re.I)
+        while True:
+            tail = re.sub(r"^\s*(?:" + filler + r"\s+)*", "", tail, flags=re.I)
+            noun = LEGAL_REQUEST.match(tail) or NEGOTIATION_REQUEST.match(tail)
+            conjunction = re.match(r"\s*,?\s*(?:and|or|ni|o|y)\s+", tail[noun.end():], re.I) if noun else None
+            if not conjunction:
+                return bool(particles.fullmatch(tail))
+            tail = tail[noun.end() + conjunction.end():]
+    for pattern, reason in ((LEGAL_REQUEST, "LEGAL_QUESTION"), (NEGOTIATION_REQUEST, "COMPLEX_NEGOTIATION")):
+        for clause in clauses:
+            for match in pattern.finditer(clause):
+                prefix = clause[:match.start()]
+                explicitly_negated = any(negation_applies(prefix, n) for n in negated_prefix.finditer(prefix))
+                suffix_negated = re.match(r"\s+(?:(?:is|are)\s+)?(?:not (?:needed|required|requested)|no (?:es|son) necesari[oa]s?)\b", clause[match.end():], re.I)
+                if not explicitly_negated and not suffix_negated:
+                    return reason
     return None
 
 

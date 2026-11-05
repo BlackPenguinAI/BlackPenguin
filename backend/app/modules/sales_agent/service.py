@@ -18,7 +18,7 @@ from app.modules.sales_crm.scheduling import available_slots, create_agent_appoi
 from app.modules.users.models import User
 
 from .graph import GRAPH_VERSION, TOOLSET_VERSION, build_sales_graph
-from .escalation_policy import apply_escalation_policy, notify_sales, escalation_reply
+from .escalation_policy import apply_escalation_policy, notify_sales, escalation_reply, cancel_followups_for_consent_clarification
 from .conversation_scope import scoped_messages_query
 from .turn_context import latest_outbound, choice_index, appointment_execution_allowed, location_continuation
 from .models import AgentRun, OutboundMessage, SalesAgentSimulation, SalesConversation, SalesFollowUpJob, SalesInboundJob, SalesMessage
@@ -805,7 +805,7 @@ async def simulate_turn(
             inbound_text=inbound_text,
             project=project,
             now=now,
-        ) if record_inbound and event_kind == "lead_message" and result["escalation_decision"]["disposition"] in {"continue", "notify_sales"} else None
+        ) if record_inbound and event_kind == "lead_message" and result["escalation_decision"]["disposition"] in {"continue", "notify_sales"} and not result["escalation_decision"].get("consent_clarification_required") else None
         if selected_slot is None and record_inbound and event_kind == "lead_message":
             selected_slot = _classified_slot_selection(db,conversation=conversation,project=project,inbound_text=inbound_text,result=result,now=now)
         appointment_context = _recent_appointment_context(db, conversation.id)
@@ -816,7 +816,7 @@ async def simulate_turn(
             selected_slot is not None
             or scheduling_request
         )
-        awaiting_location = location_continuation(db, conversation, lead, inbound_text)
+        awaiting_location = location_continuation(db, conversation, lead, inbound_text) if result["escalation_decision"]["disposition"] in {"continue", "notify_sales"} and not result["escalation_decision"].get("consent_clarification_required") else False
         location_ready, location_question, location_resume = (
             _confirm_or_request_location(project, lead, inbound_text)
             if location_needed or awaiting_location else (True, None, None)
@@ -912,6 +912,8 @@ async def simulate_turn(
                 proposed_actions.append({"type": "request_available_slots"})
         run.prompt_configuration_id = result.get("prompt_configuration_id")
         decision = result["escalation_decision"]
+        if decision.get("consent_clarification_required"):
+            cancel_followups_for_consent_clarification(db, conversation=conversation, lead=lead)
         if decision["disposition"] == "notify_sales":
             notice = notify_sales(db, conversation=conversation, lead=lead, decision=decision, event_id=event_id, evidence=inbound_text)
             decision.update(notification_id=notice.id, notification_persisted=True)
@@ -988,12 +990,13 @@ async def simulate_turn(
                 created_at=message_now + timedelta(microseconds=1) if record_inbound else message_now,
             ))
             conversation.updated_at = message_now
-            lead.agent_status = "appointment_confirmed" if appointment_confirmed else "simulation"
+            if not conversation.is_paused:
+                lead.agent_status = "simulation"
             pending_count = db.query(SalesFollowUpJob).filter(
                 SalesFollowUpJob.conversation_id == conversation.id,
                 SalesFollowUpJob.status == "pending",
             ).count()
-            if pending_count == 0 and not lead.is_opt_out and not appointment_confirmed:
+            if pending_count == 0 and not lead.is_opt_out and not conversation.is_paused and not decision.get("consent_clarification_required"):
                 attempt = 1 if event_kind != "follow_up" else min(3, 1 + db.query(SalesFollowUpJob).filter(
                     SalesFollowUpJob.conversation_id == conversation.id,
                     SalesFollowUpJob.status == "processed",
