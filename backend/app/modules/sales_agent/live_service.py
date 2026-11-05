@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.db.postgres import SessionLocal
 from app.integrations.messaging_gateway import channel_sender, company_live_channel, default_provider, live_provider, send_message, send_sms
-from app.modules.projects import asset_share_service
+from app.modules.projects import asset_share_service, sales_asset_service
 from app.modules.projects.models import Project, ProjectCampaign, ProjectSalesAsset, SalesAssetShare
 from app.modules.sales_crm.intelligence import merge_extracted_facts, update_lead_intelligence
 from app.modules.sales_crm.models import FunnelStage, Lead, LeadContact
@@ -23,7 +23,8 @@ from .commercial_context import build_commercial_context
 from .monetary_policy import validate_monetary_reply
 from app.modules.onboarding_versions import require_capability
 from .conversation_scope import scoped_messages_query
-from .response_policy import AFFIRMATIVE, action_types, requested_topics
+from .response_policy import AFFIRMATIVE, action_types, requested_topics, topics_for_turn, render_channel_text, split_channel_text
+from .turn_context import latest_outbound, location_continuation, appointment_execution_allowed, turn_context
 from .models import (
     AgentRun, ExternalWebhookEvent, OutboundMessage, SalesConversation, SalesConversationLeadContext, SalesInboundJob,
     SalesFollowUpJob, SalesMessage,
@@ -31,7 +32,7 @@ from .models import (
 from .service import (
     _appointment_confirmation, _availability_reply,
     _confirm_or_request_location, _is_availability_request, _offered_slot_selection, _project_zone,
-    _recent_appointment_context, get_or_create_conversation,
+    _recent_appointment_context, get_or_create_conversation, _affirmative_slot_reply, _classified_slot_selection,
 )
 from app.modules.sales_crm.scheduling import create_agent_appointment, next_cadence_time
 from app.modules.ai_core.services import get_ai_config
@@ -50,7 +51,7 @@ from app.integrations.whatsapp_templates import (
 EXPLICIT_ASSET_SHARE = re.compile(
     r"\b(?:send|share|give|download|can i get|could i get|can i see|could i see|show me|"
     r"let me see|email me|env[ií]a|comparte|m[aá]ndame|mu[eé]strame|"
-    r"puedo (?:tener|recibir|descargar|ver))\b",
+    r"puedo (?:tener|recibir|descargar|ver)|i (?:want|need|would like)|i'd like)\b",
     re.IGNORECASE,
 )
 
@@ -59,10 +60,9 @@ def _no_slot_alternative_selection(
     db: Session, *, conversation_id: str, inbound_text: str,
 ) -> str | None:
     """Resolve the two alternatives from the latest no-slots response only."""
-    latest = db.query(SalesMessage).filter(
-        SalesMessage.conversation_id == conversation_id,
-        SalesMessage.direction == "outbound",
-    ).order_by(SalesMessage.created_at.desc()).first()
+    latest = latest_outbound(db, conversation_id)
+    if latest and any(isinstance((latest.metadata_json or {}).get(kind), dict) for kind in ("property_catalog_offer", "location_offer", "material_offer")):
+        return None
     offer = (latest.metadata_json or {}).get("appointment_offer") if latest else None
     if not isinstance(offer, dict) or offer.get("slots"):
         return None
@@ -278,27 +278,72 @@ def _whatsapp_customer_window_open(db: Session, conversation: SalesConversation)
 async def _dispatch(
     db: Session, *, conversation: SalesConversation, lead: Lead, content: str,
     role: str, agent_run_id: str | None, author_user_id: str | None = None,
+    metadata: dict | None = None, idempotency_key: str | None = None,
+) -> SalesMessage:
+    """Validate once, format losslessly, then deliver stable ordered blocks."""
+    details = dict(metadata or {})
+    details.setdefault("proposed_reply_before_format", content)
+    template = details.get("event_kind") in {"meta_lead_first_contact", "manual_lead_first_contact"}
+    automatic = role == "assistant" and not author_user_id and not template
+    run = db.get(AgentRun, agent_run_id) if agent_run_id else None
+    if run and run.conversation_id != conversation.id:
+        raise HTTPException(409, "The agent run does not belong to this conversation.")
+    if automatic:
+        content = render_channel_text(content, conversation.channel)
+        if agent_run_id:
+            project = db.query(Project).filter_by(id=conversation.project_id, company_id=conversation.company_id).one()
+            if project.profile: require_capability(project.profile)
+            commercial = build_commercial_context(db, project=project, company_id=conversation.company_id, lead_id=lead.id, channel=conversation.channel)
+            before = content
+            content, evidence = validate_monetary_reply(content, commercial, lead_profile=lead.lead_profile_data)
+            if evidence.get("replaced"):
+                # Monetary repair must not silently swallow already issued links.
+                resources = [line for line in before.splitlines() if "/projects/a/" in line and "http" in line]
+                if resources: content += "\n\n" + "\n".join(resources)
+            details["monetary_validation"] = evidence
+            if run:
+                run.output_snapshot = {**(run.output_snapshot or {}), "reply_before_dispatch":before,
+                                       "reply":content, "dispatch_monetary_validation":evidence}
+        parts = split_channel_text(content, conversation.channel)
+    else:
+        parts = [content]
+    if not parts:
+        raise HTTPException(422, "There is no message content to send.")
+    group_key = idempotency_key or (f"agent-reply:{agent_run_id}" if agent_run_id else f"reply:{uuid.uuid4()}")
+    if run:
+        run.output_snapshot = {**(run.output_snapshot or {}), "delivery_group":{"key":group_key,"total":len(parts)}}
+    deliveries = []
+    last = None
+    share_ids = details.get("sales_asset_share_ids") or []
+    shares = db.query(SalesAssetShare).filter(SalesAssetShare.id.in_(share_ids), SalesAssetShare.company_id == conversation.company_id, SalesAssetShare.lead_id == lead.id).all() if share_ids else []
+    import hashlib
+    for index, part in enumerate(parts):
+        hashes = {hashlib.sha256(token.rstrip(".,;)").encode()).hexdigest() for token in re.findall(r"/projects/a/([^\s]+)", part)}
+        part_metadata = {**details, "delivery_group":{"key":group_key, "part":index+1, "total":len(parts)},
+                         "sales_asset_share_ids":[share.id for share in shares if share.token_hash in hashes]}
+        last = await _dispatch_part(db, conversation=conversation, lead=lead, content=part, role=role,
+                                    agent_run_id=agent_run_id, author_user_id=author_user_id,
+                                    metadata=part_metadata,
+                                    idempotency_key=group_key if len(parts)==1 else f"{group_key}:part:{index+1}")
+        deliveries.append({"message_id":last.id, "part":index+1, "status":last.status})
+        if run:
+            run.output_snapshot = {**(run.output_snapshot or {}), "delivery_parts":list(deliveries)}
+            db.add(run); db.commit()
+    return last
+
+
+async def _dispatch_part(
+    db: Session, *, conversation: SalesConversation, lead: Lead, content: str,
+    role: str, agent_run_id: str | None, author_user_id: str | None = None,
     metadata: dict | None = None,
     idempotency_key: str | None = None,
 ) -> SalesMessage:
-    proposed_content = content
     message_metadata = dict(metadata or {})
+    proposed_content = message_metadata.get("proposed_reply_before_format", content)
     message_metadata.setdefault("lead_id", lead.id)
     message_metadata.setdefault("project_id", conversation.project_id)
     event_kind = message_metadata.get("event_kind")
     uses_whatsapp_template = event_kind in {"meta_lead_first_contact", "manual_lead_first_contact"}
-    if role == "assistant" and agent_run_id and not author_user_id and not uses_whatsapp_template:
-        project = db.query(Project).filter(Project.id == conversation.project_id, Project.company_id == conversation.company_id).one()
-        if project.profile:
-            require_capability(project.profile)
-        commercial = build_commercial_context(db, project=project, company_id=conversation.company_id, lead_id=lead.id, channel=conversation.channel)
-        content, evidence = validate_monetary_reply(content, commercial, lead_profile=lead.lead_profile_data)
-        message_metadata["monetary_validation"] = evidence
-        run = db.query(AgentRun).filter(AgentRun.id == agent_run_id, AgentRun.conversation_id == conversation.id).first()
-        if run:
-            previous = run.output_snapshot or {}
-            run.output_snapshot = {**previous, "reply_before_dispatch": previous.get("reply"), "reply": content, "dispatch_monetary_validation": evidence}
-            db.add(run)
     persisted_content = content
     template_parameters = None
     if conversation.channel == "whatsapp" and uses_whatsapp_template:
@@ -354,11 +399,13 @@ async def _dispatch(
             OutboundMessage.idempotency_key == idempotency_key,
         ).first()
         if existing_outbound:
-            existing_message = db.query(SalesMessage).filter(
+            message_query = db.query(SalesMessage).filter(
                 SalesMessage.conversation_id == conversation.id,
                 SalesMessage.direction == "outbound",
-                SalesMessage.content == existing_outbound.content,
-            ).order_by(SalesMessage.created_at.desc()).first()
+            )
+            existing_message = message_query.filter(SalesMessage.metadata_json["outbound_message_id"].as_string() == existing_outbound.id).first()
+            if not existing_message:
+                existing_message = message_query.filter(SalesMessage.content == existing_outbound.content).order_by(SalesMessage.created_at.desc()).first()
             if existing_outbound.status != "failed" and existing_message:
                 return existing_message
             if existing_outbound.status == "failed" and existing_message:
@@ -462,6 +509,8 @@ def _requested_asset_tags(inbound_text: str) -> set[str]:
         tags.add("brochure")
     if re.search(r"\b(?:pictures?|photos?|images?|gallery|renderings?|fotos?|im[aá]genes?|galer[ií]a|renders?)\b", text):
         tags.add("gallery_image")
+    if re.search(r"\b(?:unit sheets?|inventory lists?|fichas? de (?:unidad|unidades))\b", text):
+        tags.add("unit_sheet")
     return tags
 
 
@@ -480,7 +529,7 @@ def _asset_tags(asset: dict) -> set[str]:
     return tags
 
 
-def _select_assets_for_request(assets: list[dict], inbound_text: str, *, limit: int = 5) -> list[dict]:
+def _select_assets_for_request(assets: list[dict], inbound_text: str, *, limit: int | None = None) -> list[dict]:
     """Return every useful approved resource, ranked by partial topic coverage.
 
     A resource does not need to satisfy the whole request. If one approved file
@@ -498,7 +547,7 @@ def _select_assets_for_request(assets: list[dict], inbound_text: str, *, limit: 
         # even when the administrator used only a broad content label.
         ranked = [(0, -position, asset) for position, asset in enumerate(assets)]
     ranked.sort(key=lambda item: (item[0], item[1]), reverse=True)
-    return [item[2] for item in ranked[:max(1, limit)]]
+    return [item[2] for item in (ranked if limit is None else ranked[:max(1, limit)])]
 
 
 def _denies_available_asset(reply: str | None) -> bool:
@@ -520,7 +569,6 @@ def _reconcile_shared_asset_reply(reply: str | None) -> str:
     text = (reply or "").strip()
     if not text:
         return "Here is the approved information you requested."
-    sentence_pattern = re.compile(r"(?is)([^.!?]*(?:[.!?]|$))")
     removed = False
     kept_lines: list[str] = []
     for line in text.splitlines():
@@ -528,23 +576,23 @@ def _reconcile_shared_asset_reply(reply: str | None) -> str:
             kept_lines.append("")
             continue
         kept_sentences: list[str] = []
-        for match in sentence_pattern.finditer(line):
-            sentence = match.group(1).strip()
+        for value in re.split(r"(?<=[.!?])[ \t]+(?=[A-Z])", line):
+            sentence = value.strip()
             if not sentence:
                 continue
             lowered = sentence.casefold()
             contradicts_share = bool(
-                re.search(r"\b(?:cannot|can't|can not|unable to|not able to|do not|don't)\b", lowered)
+                re.search(r"\b(?:cannot|can't|can not|unable to|not able to|do not|don't|no approved)\b", lowered)
                 and re.search(r"\b(?:share|send|provide|attach|access|have)\b", lowered)
-                and re.search(r"\b(?:document|brochure|blueprint|floor plan|pdf|file|material|link|email)\w*\b", lowered)
+                and re.search(r"\b(?:document|brochure|blueprint|floor plan|pdf|file|material|link|email|picture|photo|image)\w*\b", lowered)
             )
             unsupported_email = bool(
                 re.search(r"\b(?:email|e-mail)\b", lowered)
                 and re.search(r"\b(?:send|share|provide|address|via)\b", lowered)
             )
             deferred_delivery = bool(
-                re.search(r"\b(?:sales team|someone|representative)\b", lowered)
-                and re.search(r"\b(?:follow up|send|share|review)\b", lowered)
+                re.search(r"\b(?:sales team|team|someone|representative)\b", lowered)
+                and re.search(r"\b(?:follow up|send|share|review|forwarded|sent|asked)\b", lowered)
                 and re.search(r"\b(?:document|brochure|file|material|request)\w*\b", lowered)
             )
             if contradicts_share or unsupported_email or deferred_delivery:
@@ -596,29 +644,40 @@ def _normalize_asset_request_result(
 def _execute_share_actions(
     db: Session, *, conversation: SalesConversation, lead: Lead, run: AgentRun,
     reply: str | None, actions: list[dict], commercial: dict, inbound_text: str,
+    intent_result: dict | None = None,
+    offer_metadata: dict | None = None,
 ) -> tuple[str | None, list[dict], list[str]]:
     """Validate model proposals and mint links only at the dispatch boundary."""
-    approved = {item["asset_id"]: item for item in commercial.get("available_assets", [])}
-    requested_asset_tags = _requested_asset_tags(inbound_text)
-    requested = "assets" in requested_topics(inbound_text)
+    current_approved_ids = {item.id for item in sales_asset_service.approved_for_turn(db, project_id=conversation.project_id, company_id=conversation.company_id, channel=conversation.channel)}
+    approved = {item["asset_id"]: item for item in commercial.get("available_assets", []) if item["asset_id"] in current_approved_ids}
+    selected = next((item for item in commercial.get("property_types", []) if item.get("id") == commercial.get("selected_property_type_id")), None)
+    if selected:
+        approved = {key:item for key,item in approved.items() if not item.get("property_type") or item["property_type"] == selected["property_type"]}
+    offer_details = offer_metadata if offer_metadata is not None else {}
+    resolution = intent_result or {}
+    intents = [resolution.get("primary_intent") or resolution.get("intent"), *(resolution.get("secondary_intents") or [])]
+    request_text = material_request_text(inbound_text, resolution)
+    requested_asset_tags = _requested_asset_tags(request_text)
+    requested = "assets" in topics_for_turn(inbound_text, intents)
     pending = approved.get(conversation.pending_asset_id or "")
-    consented = bool(pending and AFFIRMATIVE.match(inbound_text or ""))
+    latest = latest_outbound(db, conversation.id)
+    offer = (latest.metadata_json or {}).get("material_offer") if latest else None
+    consented = bool(pending and (_affirmative_slot_reply(inbound_text) or re.fullmatch(r"\s*(?:sure|please|claro|send it|send them)[.!\s]*", inbound_text or "", re.I))
+                     and (not latest or isinstance(offer, dict) and pending["asset_id"] in offer.get("asset_ids", [])))
     explicit_request = bool(requested and EXPLICIT_ASSET_SHARE.search(inbound_text or ""))
     if consented:
         actions = [
             action for action in actions
             if not isinstance(action, dict) or action.get("type") != "share_asset"
         ]
-        actions.append({
-            "type": "share_asset", "asset_id": pending["asset_id"],
-            "reason": "lead_confirmed_material_offer",
-        })
+        actions.extend({"type":"share_asset", "asset_id":asset_id, "reason":"lead_confirmed_material_offer"}
+                       for asset_id in ((offer or {}).get("asset_ids") or [pending["asset_id"]]) if asset_id in approved)
         conversation.pending_asset_id = None
         conversation.pending_asset_offered_at = None
         db.add(conversation)
         db.flush()
     elif requested and approved:
-        selected_assets = _select_assets_for_request(list(approved.values()), inbound_text)
+        selected_assets = _select_assets_for_request(list(approved.values()), request_text)
         selected = selected_assets[0] if selected_assets else None
         if selected:
             if explicit_request:
@@ -651,8 +710,9 @@ def _execute_share_actions(
                 if "virtual_tour" in capabilities:
                     details.append("a virtual tour")
                 detail = f" It includes {' and '.join(details)}." if details else ""
+                offer_details["asset_ids"] = [asset["asset_id"] for asset in selected_assets]
                 return (
-                    f"I have an approved file called {selected.get('name') or 'Project material'}.{detail} "
+                    f"{_reconcile_shared_asset_reply(reply)}\n\nI have an approved file called {selected.get('name') or 'Project material'}.{detail} "
                     "Would you like me to send the secure link here?",
                     actions,
                     [],
@@ -669,15 +729,12 @@ def _execute_share_actions(
     seen: set[str] = set()
     covered_tags: set[str] = set()
     for action in actions:
-        if len(links) >= 5:
-            break
         if not isinstance(action, dict) or action.get("type") != "share_asset":
             continue
         asset_id = str(action.get("asset_id") or "")
         metadata = approved.get(asset_id)
         if not metadata or asset_id in seen:
             continue
-        covered_tags.update(requested_asset_tags.intersection(_asset_tags(metadata)))
         asset = db.query(ProjectSalesAsset).filter(
             ProjectSalesAsset.id == asset_id,
             ProjectSalesAsset.company_id == conversation.company_id,
@@ -686,6 +743,9 @@ def _execute_share_actions(
         ).first()
         if not asset:
             continue
+        if asset.id not in current_approved_ids:
+            continue
+        delivered = False
         if metadata.get("has_file", True):
             url, share = asset_share_service.issue(
                 db,
@@ -699,9 +759,8 @@ def _execute_share_actions(
             )
             links.append(f"{asset.display_name}: {url}")
             share_ids.append(share.id)
+            delivered = True
         for embedded in metadata.get("links") or []:
-            if len(links) >= 5:
-                break
             if embedded.get("kind") not in {"virtual_tour", "location_map", "external_reference"}:
                 continue
             # The approved file may contain several useful resources, but a
@@ -723,9 +782,10 @@ def _execute_share_actions(
             )
             links.append(f"{embedded.get('label') or 'Related resource'}: {external_url}")
             share_ids.append(external_share.id)
+            delivered = True
+        if delivered:
+            covered_tags.update(requested_asset_tags.intersection(_asset_tags(metadata)))
         seen.add(asset_id)
-        if len(links) >= 5:
-            break
     if links:
         cleaned = _reconcile_shared_asset_reply(reply)
         missing_tags = requested_asset_tags - covered_tags
@@ -734,14 +794,38 @@ def _execute_share_actions(
                 "brochure": "brochure", "floor_plan": "floor plans",
                 "price_list": "price list", "amenities": "amenities document",
                 "virtual_tour": "360° virtual tour", "location_map": "location map",
+                "gallery_image": "photos or images",
             }
             missing_values = [labels[tag] for tag in sorted(missing_tags) if tag in labels]
             if len(missing_values) == 1:
                 cleaned = f"{cleaned}\n\nI don't currently have an approved {missing_values[0]} to share."
             elif missing_values:
                 cleaned = f"{cleaned}\n\nI don't currently have approved materials for: {', '.join(missing_values)}."
-        reply = f"{cleaned}\n\n" + "\n".join(links)
+        shared = [item for item in approved.values() if item["asset_id"] in seen]
+        coverage = "; ".join(f"{item.get('name') or 'Approved material'} includes {', '.join(sorted(_asset_tags(item))).replace('_', ' ')}" for item in shared)
+        reply = f"{cleaned}\n\n{coverage}.\n\n" + "\n".join(links)
+    elif requested and not offer_details:
+        alternatives = [item for item in approved.values() if item.get("has_file") and item.get("asset_type") in {"brochure", "unit_sheet"}]
+        if alternatives:
+            item = alternatives[0]
+            conversation.pending_asset_id = item["asset_id"]; conversation.pending_asset_offered_at = datetime.utcnow()
+            offer_details["asset_ids"] = [item["asset_id"]]
+            reply = f"{_reconcile_shared_asset_reply(reply)}\n\nI don't have a separately approved resource matching all requested content. I can offer {item.get('name') or 'the approved Project file'}, containing {', '.join(sorted(_asset_tags(item))).replace('_', ' ')}. Would you like that link?"
+        else:
+            reply = f"{_reconcile_shared_asset_reply(reply)}\n\nI don't currently have an approved file matching that request. I can still answer using confirmed Project information."
+    if re.search(r"\b(?:email|e-mail|correo)\b", inbound_text, re.I):
+        reply = f"{_reconcile_shared_asset_reply(reply)}\n\nI can share approved links here; no email has been sent from this chat."
     return reply, actions, share_ids
+
+
+def material_request_text(inbound, result):
+    intents = {result.get("primary_intent") or result.get("intent"), *(result.get("secondary_intents") or [])}
+    materials = (result.get("intent_entities") or {}).get("requested_materials") or []
+    hints = [str(value).replace("_", " ") for value in materials]
+    if "request_visual_material" in intents and not _requested_asset_tags(inbound): hints.append("pictures")
+    if "request_virtual_tour" in intents: hints.append("virtual tour")
+    if "request_document" in intents and not hints: hints.append("document")
+    return " ".join([inbound, *hints])
 
 
 def _schedule_next_action(db: Session, conversation: SalesConversation, lead: Lead, event_id: str) -> None:
@@ -949,7 +1033,7 @@ async def _process_deterministic_appointment_turn(
         db, conversation_id=conversation.id, inbound_text=inbound.content,
         project=project, now=now,
     )
-    awaiting_location = bool((lead.meta_form_data or {}).get("pending_location_request"))
+    awaiting_location = location_continuation(db, conversation, lead, inbound.content)
     scheduling_request = allow_new_request and _is_availability_request(
         inbound.content, now=now, zone=_project_zone(project),
         appointment_context=_recent_appointment_context(db, conversation.id),
@@ -973,19 +1057,7 @@ async def _process_deterministic_appointment_turn(
         actions = [{"type": "request_visit_location"}]
     elif selected:
         try:
-            meeting, user = create_agent_appointment(
-                db, lead=lead, starts_at=selected, duration_minutes=45, modality="showroom",
-            )
-            reply = _appointment_confirmation(
-                project=project, lead=lead, user=user, starts_at=meeting.meeting_time,
-            )
-            conversation.stage = "appointment_confirmed"
-            conversation.is_paused = True
-            conversation.pause_reason = "Appointment confirmed"
-            lead.pipeline_stage = "S09_HANDOFF"
-            lead.agent_status = "appointment_confirmed"
-            lead.next_action_at = None
-            actions = [{"type": "appointment_confirmed", "meeting_id": meeting.id}]
+            reply, actions = _book_live_slot(db,conversation=conversation,lead=lead,project=project,selected=selected)
         except HTTPException as exc:
             if exc.status_code != 409:
                 raise
@@ -1017,6 +1089,7 @@ async def _process_deterministic_appointment_turn(
     run.output_snapshot = {
         "reply": reply, "proposed_actions": actions,
         "requires_human": False, "policy_violations": [], "error_code": None,
+        "response_policy_trace":{"route":"verified_offer_continuation", "active_offer":turn_context(db, conversation, lead)},
     }
     run.status = "completed"
     run.completed_at = datetime.utcnow()
@@ -1029,11 +1102,13 @@ async def _process_deterministic_appointment_turn(
         metadata={
             "event_kind": "deterministic_appointment_routing",
             "inbound_message_id": inbound.id,
-            "appointment_offer": {
+            "proposed_actions": actions,
+            **({"location_offer": {"pending":True}} if not location_ready else {}),
+            **({"appointment_offer": {
                 "slots": [slot.isoformat() for slot in offered_slots],
                 "duration_minutes": 45,
                 "project_timezone": project.timezone or "UTC",
-            },
+            }} if location_ready and lead.agent_status != "appointment_confirmed" else {}),
         },
         idempotency_key=f"appointment-turn:{event_id}",
     )
@@ -1043,9 +1118,17 @@ async def _process_deterministic_appointment_turn(
     return True
 
 
+def _book_live_slot(db, *, conversation, lead, project, selected):
+    meeting, user = create_agent_appointment(db, lead=lead, starts_at=selected, duration_minutes=45, modality="showroom")
+    conversation.stage="appointment_confirmed";conversation.is_paused=True;conversation.pause_reason="Appointment confirmed"
+    lead.pipeline_stage="S09_HANDOFF";lead.agent_status="appointment_confirmed";lead.next_action_at=None
+    return _appointment_confirmation(project=project,lead=lead,user=user,starts_at=meeting.meeting_time), [{"type":"appointment_confirmed","meeting_id":meeting.id}]
+
+
 def _execute_classified_appointment_request(
     db: Session, *, conversation: SalesConversation, lead: Lead,
     project: Project, inbound: SalesMessage,
+    result: dict | None = None,
 ) -> tuple[str, list[dict], list[datetime]]:
     """Execute a model-classified appointment request with trusted CRM tools."""
     location_ready, location_question, location_resume = _confirm_or_request_location(
@@ -1053,6 +1136,13 @@ def _execute_classified_appointment_request(
     )
     if not location_ready:
         return location_question, [{"type": "request_visit_location"}], []
+    selected = _classified_slot_selection(db,conversation=conversation,project=project,inbound_text=inbound.content,result=result or {},now=datetime.utcnow())
+    if selected:
+        try:
+            reply, actions = _book_live_slot(db,conversation=conversation,lead=lead,project=project,selected=selected)
+            return reply,actions,[]
+        except HTTPException as exc:
+            if exc.status_code!=409:raise
     reply, offered_slots = _availability_reply(
         db,
         project=project,
@@ -1192,25 +1282,31 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
         appointment_offer: dict | None = None
         if (
             not result.get("policy_violations")
-            and (result.get("primary_intent") or result.get("intent")) == "request_appointment"
+            and appointment_execution_allowed(result, ((get_ai_config(db, None).agent_ventas or {}).get("intent_routing_config") or {}))
         ):
-            reply, actions, offered_slots = _execute_classified_appointment_request(
-                db, conversation=conversation, lead=lead, project=project, inbound=inbound,
+            commercial_reply = reply
+            appointment_reply, appointment_actions, offered_slots = _execute_classified_appointment_request(
+                db, conversation=conversation, lead=lead, project=project, inbound=inbound, result=result,
             )
+            intents = [result.get("primary_intent") or result.get("intent"), *(result.get("secondary_intents") or [])]
+            mixed = topics_for_turn(inbound.content, intents) - {"appointment", "assets"}
+            reply = f"{commercial_reply}\n\n{appointment_reply}" if mixed else appointment_reply
+            actions = [a for a in actions if isinstance(a, dict) and a.get("type") not in {"request_available_slots", "offer_appointment", "request_visit_location"}] + appointment_actions
             result["requires_human"] = False
             appointment_offer = {
                 "slots": [slot.isoformat() for slot in offered_slots],
                 "duration_minutes": 45,
                 "project_timezone": project.timezone or "UTC",
-            }
-        if "assets" in requested_topics(inbound.content):
+            } if not action_types(appointment_actions) & {"request_visit_location", "appointment_confirmed"} else None
+        turn_intents = [result.get("primary_intent") or result.get("intent"), *(result.get("secondary_intents") or [])]
+        if "assets" in topics_for_turn(inbound.content, turn_intents) and not result.get("requires_clarification") and not set(turn_intents).intersection({"security_or_abuse", "human_requested", "opt_out"}):
             if available_assets:
                 # The runtime, not the model, owns disclosure. Invalid model
                 # asset IDs are discarded and deterministically replaced from
                 # the approved, tenant-scoped library below. They must not
                 # create a false POLICY_VIOLATION or pause the conversation.
                 result, actions = _normalize_asset_request_result(result, actions, available_assets)
-            elif not available_assets:
+            elif not available_assets and not result.get("policy_violations"):
                 # Missing collateral is a normal commercial limitation. Keep
                 # the conversation active and explain it without a hard handoff.
                 result["requires_human"] = False
@@ -1219,10 +1315,6 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
                     if not isinstance(action, dict)
                     or action.get("type") not in {"share_asset", "request_human_review"}
                 ]
-                reply = (
-                    "I don't currently have an approved file matching that request. "
-                    "I can still answer questions using the confirmed Project information available here."
-                )
         intervention_case = None
         if result.get("requires_human"):
             conversation, lead, intervention_case = _persist_intervention_before_confirmation(
@@ -1232,12 +1324,16 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
             )
             reply = _confirmed_handoff_reply(inbound.content, actions)
         share_ids: list[str] = []
-        if not result.get("requires_human"):
+        material_offer = {}
+        if not result.get("requires_human") and not result.get("requires_clarification"):
             reply, actions, share_ids = _execute_share_actions(
                 db, conversation=conversation, lead=lead, run=run,
                 reply=reply, actions=actions, commercial=commercial,
                 inbound_text=inbound.content,
+                intent_result=result,
+                offer_metadata=material_offer,
             )
+        reply = render_channel_text(reply, conversation.channel)
         if not result.get("requires_human"):
             lead_history, lead_message_count = _lead_intelligence_input(history)
             update_lead_intelligence(
@@ -1295,6 +1391,9 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
                     "event_kind": "agent_reply", "proposed_actions": actions,
                     "inbound_message_id": inbound.id,
                     "sales_asset_share_ids": share_ids,
+                    **({"property_catalog_offer":result["property_catalog_offer"]} if result.get("property_catalog_offer") else {}),
+                    **({"material_offer":material_offer} if material_offer else {}),
+                    **({"location_offer":{"pending":True}} if "request_visit_location" in action_types(actions) else {}),
                     **({"appointment_offer": appointment_offer} if appointment_offer is not None else {}),
                 },
             )

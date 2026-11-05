@@ -23,24 +23,33 @@ from .response_policy import (
     appointment_intent_present,
     complete_requested_commercial_topics,
     grounded_catalog_reply,
-    concise_channel_text, plain_channel_text,
+    render_channel_text, plain_channel_text,
+    topics_for_turn,
     remove_unsolicited_appointment_offer,
     repeats_introduction_after_greeting,
     repeats_recent_assistant_reply,
 )
 from .state import SalesAgentState
 from .intent_contract import normalize_intent, CONTRACT_INSTRUCTION, CONTRACT_VERSION
+from .turn_context import turn_context, choice_index, appointment_execution_allowed
 from app.modules.governance.services import guidance_context
 
 
-GRAPH_VERSION = "sales-v2"
-TOOLSET_VERSION = "sales-tools-v2"
+GRAPH_VERSION = "sales-turns-v3"
+TOOLSET_VERSION = "sales-tools-v3"
 PLATFORM_GUARDRAILS = (
     "Never cross Company boundaries. Never invent prices, inventory or appointment slots. "
     "Respect consent and opt-out. Demo data may be used only in simulation and can never be dispatched. "
     "Answer the lead's current Project or inventory question before proposing a visit. "
     "Never treat property availability as appointment availability, and never repeat an appointment offer after the lead rejects it. "
     "Communicate with leads in English only until Black Penguin explicitly enables localization. "
+    "A pending task never overrides the current request. Use active_offer_kind to interpret a numeric selection; "
+    "if the reference is ambiguous, clarify before acting. Allow topic interruptions and explicit resumption. "
+    "Catalog coverage is not exhaustive: absence of a type is unknown, not evidence that it does not exist. "
+    "Use per-field approved facts and provenance, and quote quantities only when verified. "
+    "Resolve every intent of a mixed request: textual answers first, approved useful resources last. "
+    "A file covering only some requested topics is useful; describe its coverage without claiming missing content. "
+    "Never claim an email was or will be sent without a successful delivery action. "
     "Return only JSON matching the requested contract."
 )
 
@@ -89,6 +98,13 @@ def build_sales_graph(db: Session):
             SalesConversation.id == state["conversation_id"],
             SalesConversation.company_id == state["company_id"],
         ).one()
+        active = turn_context(db, conversation, lead)
+        commercial["selection_context_required"] = True
+        if active["active_offer_kind"] == "property_catalog_offer":
+            index = choice_index(state.get("inbound_text", ""))
+            ids = active["offers"]["property_catalog_offer"].get("property_type_ids", [])
+            if index is not None and 0 <= index < len(ids) and ids[index] in {item["id"] for item in commercial["property_types"]}:
+                commercial["selected_property_type_id"] = ids[index]
         history = scoped_messages_query(
             db, conversation, lead_id=lead.id,
         ).order_by(SalesMessage.created_at.asc()).all()
@@ -99,6 +115,7 @@ def build_sales_graph(db: Session):
                 "profile": commercial["confirmed_project_facts"],
             },
             "commercial_context": commercial,
+            "turn_context": active,
             "inventory_context": commercial["inventory"],
             "lead_context": {
                 "id": lead.id, "name": lead.full_name, "stage": lead.funnel_stage.value,
@@ -200,6 +217,7 @@ def build_sales_graph(db: Session):
             {"role": "system", "content": "RUNTIME CONTEXT:\n" + json.dumps({
                 "company": state["company_context"], "project": state["project_context"],
                 "commercial": state["commercial_context"], "lead": state["lead_context"],
+                "turn_context": state.get("turn_context", {}),
                 "event_kind": state.get("event_kind", "lead_message"),
                 "allowed_actions": ["answer_question", "ask_qualification_question", "search_inventory", "share_asset", "request_callback", "request_visit_location", "request_available_slots", "offer_appointment", "schedule_follow_up", "request_human_review"],
                 "contract": contract,
@@ -258,6 +276,24 @@ def build_sales_graph(db: Session):
         requires_clarification = bool(state.get("requires_clarification")) or (
             primary_intent == "unclear" or confidence < minimum_confidence
         )
+        active = state.get("turn_context") or {}
+        numeric_choice = choice_index(state.get("inbound_text", ""))
+        if numeric_choice is not None and active.get("active_offer_kind") not in {"property_catalog_offer", "appointment_offer", "location_offer", "material_offer"}:
+            requires_clarification = True
+        intents = [primary_intent, *secondary_intents]
+        commercial = dict(state.get("commercial_context") or {})
+        if not requires_clarification and active.get("active_offer_kind") == "property_catalog_offer" and set(intents) & {"request_property_details", "request_pricing", "request_inventory", "request_document", "request_visual_material"}:
+            import re
+            reference = (state.get("intent_entities") or {}).get("property_reference") or state.get("inbound_text", "")
+            match = re.search(r"\b(?:option|type|number|opción|opcion)\s+(\d{1,4})\b", reference, re.I)
+            index = int(match.group(1))-1 if match else choice_index(reference)
+            if index is None: index = numeric_choice
+            ids = active["offers"]["property_catalog_offer"].get("property_type_ids", [])
+            if index is not None:
+                if 0 <= index < len(ids) and ids[index] in {item["id"] for item in commercial.get("property_types", [])}:
+                    commercial["selected_property_type_id"] = ids[index]
+                else:
+                    requires_clarification = True
         allowed = {"answer_question", "ask_qualification_question", "search_inventory", "share_asset", "request_callback", "request_visit_location", "request_available_slots", "offer_appointment", "schedule_follow_up", "request_human_review"}
         actions = list(state.get("proposed_actions", []))
         for action in actions:
@@ -270,11 +306,11 @@ def build_sales_graph(db: Session):
             }:
                 violations.append("share_asset_not_approved")
         appointment_actions = {"request_visit_location", "request_available_slots", "offer_appointment"}
-        appointment_intent = appointment_intent_present(
+        appointment_intent = appointment_execution_allowed({**state, "primary_intent":primary_intent, "secondary_intents":secondary_intents, "requires_clarification":requires_clarification}, routing) and appointment_intent_present(
             state.get("inbound_text", ""), state.get("conversation_history", []),
-            classified_intent=primary_intent,
+            classified_intent="request_appointment" if "request_appointment" in intents else primary_intent,
         )
-        if not appointment_intent:
+        if not appointment_intent or requires_clarification:
             actions = [
                 action for action in actions
                 if not isinstance(action, dict) or action.get("type") not in appointment_actions
@@ -286,6 +322,8 @@ def build_sales_graph(db: Session):
                 "or would you like to schedule an in-person visit?"
             )
             actions = [{"type": "ask_qualification_question"}]
+            if numeric_choice is not None:
+                reply = "Does that number refer to a property type, a visit location, or an appointment time? Please specify before I take any action."
         if not appointment_intent:
             reply = remove_unsolicited_appointment_offer(reply)
         if repeats_recent_assistant_reply(reply, state.get("conversation_history", [])) or repeats_introduction_after_greeting(
@@ -296,9 +334,11 @@ def build_sales_graph(db: Session):
                 "financing, delivery timing, or project features?"
             )
             actions = [{"type": "ask_qualification_question"}]
+        topics = topics_for_turn(state.get("inbound_text"), intents)
+        catalog_requested = bool(set(intents) & {"request_property_catalog", "request_property_details", "request_inventory", "request_pricing"}) or (primary_intent == "general_question" and bool(topics & {"property_types", "inventory", "pricing"}))
         catalog_reply = (
-            grounded_catalog_reply(state.get("inbound_text"), state.get("commercial_context") or {})
-            if state.get("event_kind", "lead_message") == "lead_message"
+            grounded_catalog_reply(state.get("inbound_text"), commercial, intents=intents)
+            if not requires_clarification and catalog_requested and state.get("event_kind", "lead_message") == "lead_message"
             else None
         )
         if catalog_reply:
@@ -312,21 +352,21 @@ def build_sales_graph(db: Session):
                     action for action in actions
                     if not isinstance(action, dict) or action.get("type") != "request_human_review"
                 ]
+        reply, monetary_validation = validate_monetary_reply(reply, commercial, lead_profile=(state.get("lead_context") or {}).get("profile_data"))
+        if not catalog_reply and not requires_clarification and topics & {"financing", "delivery", "amenities", "location"} and not set(intents) & {"security_or_abuse", "human_requested", "opt_out"}:
+            # These fields have a canonical approved value (or an explicit
+            # gap). A fluent but contradictory model sentence is not evidence.
+            reply = ""
         reply, supplemented_topics = complete_requested_commercial_topics(
             reply,
             inbound=state.get("inbound_text"),
             actions=actions,
-            commercial=state.get("commercial_context") or {},
-        )
+            commercial=commercial, intents=intents,
+        ) if not requires_clarification else (reply, [])
         # Never truncate a confirmed property catalog. Telnyx can segment a
         # long SMS, while WhatsApp supports a substantially larger body; the
         # application must not silently hide approved options.
-        reply = (
-            plain_channel_text(reply)
-            if catalog_reply
-            else concise_channel_text(reply, state.get("channel", "sms"))
-        )
-        reply, monetary_validation = validate_monetary_reply(reply, state.get("commercial_context") or {}, lead_profile=(state.get("lead_context") or {}).get("profile_data"))
+        reply = render_channel_text(reply, state.get("channel", "sms"))
         if not reply:
             violations.append("missing_reply")
         model_requires_human = bool(state.get("requires_human", False))
@@ -355,6 +395,8 @@ def build_sales_graph(db: Session):
         return {
             "intent": primary_intent,
             "monetary_validation": monetary_validation,
+            "commercial_context": commercial,
+            "property_catalog_offer": {"property_type_ids": [item["id"] for item in commercial.get("property_types", [])], "approved_revision":commercial.get("approved_revision")} if catalog_reply and not commercial.get("selected_property_type_id") else None,
             "response_policy_trace": {
                 "intent_contract_version": CONTRACT_VERSION,
                 "intent_contract_issues": state.get("intent_contract_issues", []),
@@ -363,6 +405,8 @@ def build_sales_graph(db: Session):
                 "clarification_threshold": clarification_threshold,
                 "appointment_intent": appointment_intent,
                 "catalog_reply_applied": bool(catalog_reply),
+                "active_offer": active,
+                "execution_requires_clarification": requires_clarification,
                 "supplemented_topics": sorted(supplemented_topics),
                 "policy_violations": sorted(set(violations)),
                 "requires_human": requires_human,

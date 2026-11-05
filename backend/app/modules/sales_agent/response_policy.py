@@ -60,6 +60,15 @@ TOPIC_PATTERNS = {
 }
 
 
+def _strip_emphasis_outside_urls(text, pattern, replacement):
+    spans = [(match.start(), match.end()) for match in re.finditer(r"https?://[^\s]+", text)]
+    def replace(match):
+        if any(start <= match.start() < end or start < match.end() < end for start, end in spans):
+            return match.group(0)
+        return replacement(match)
+    return re.sub(pattern, replace, text)
+
+
 def plain_channel_text(value: str | None) -> str | None:
     """Remove presentation Markdown that is rendered literally by SMS/WhatsApp."""
     if value is None:
@@ -71,9 +80,9 @@ def plain_channel_text(value: str | None) -> str | None:
         text,
     )
     text = re.sub(r"(?m)^\s{0,3}#{1,6}\s*", "", text)
-    text = re.sub(r"\*\*(.+?)\*\*|__(.+?)__", lambda m: m.group(1) or m.group(2), text)
-    text = re.sub(r"(?<!\*)\*([^*\n]+)\*(?!\*)", r"\1", text)
-    text = re.sub(r"(?m)^\s*[-*]\s+", "• ", text)
+    text = _strip_emphasis_outside_urls(text, r"\*\*(.+?)\*\*|__(.+?)__", lambda m: m.group(1) or m.group(2))
+    text = _strip_emphasis_outside_urls(text, r"(?<!\*)\*([^*\n]+)\*(?!\*)", lambda m: m.group(1))
+    text = re.sub(r"(?m)^[ \t]*[-*][ \t]+", "• ", text)
     return re.sub(r"[ \t]+", " ", text).strip()
 
 
@@ -143,6 +152,56 @@ def requested_topics(inbound: str | None) -> set[str]:
     return {name for name, pattern in TOPIC_PATTERNS.items() if pattern.search(inbound or "")}
 
 
+INTENT_TOPICS = {
+    "request_property_catalog": "property_types", "request_property_details": "property_types",
+    "request_inventory": "inventory", "request_pricing": "pricing", "request_financing": "financing",
+    "request_delivery": "delivery", "request_amenities": "amenities", "request_location": "location",
+    "request_visual_material": "assets", "request_document": "assets", "request_virtual_tour": "assets",
+    "request_appointment": "appointment", "select_appointment_slot": "appointment",
+}
+
+
+def topics_for_turn(inbound, intents=()):
+    return requested_topics(inbound) | {INTENT_TOPICS[i] for i in intents if i in INTENT_TOPICS}
+
+
+def render_channel_text(value, channel="sms"):
+    """One lossless final format for model, catalog and executor replies."""
+    text = plain_channel_text(value)
+    if not text:
+        return text
+    # Repair inline numbering, without changing decimal prices or URLs.
+    text = re.sub(r"(?<=\S)[ \t]+(?=\d{1,4}[.)][ \t]+)", "\n\n", text)
+    text = re.sub(r"(?<=\S)[ \t]+(?=•[ \t]+)", "\n", text)
+    text = re.sub(r"(?<!\n)\n(?=\d{1,4}[.)][ \t]+)", "\n\n", text)
+    return re.sub(r"\n{3,}", "\n\n", text).strip()
+
+
+def split_channel_text(value, channel="sms"):
+    """Split by paragraphs/lines, never truncate options or split a secure URL."""
+    text = render_channel_text(value, channel) or ""
+    limit = 1400 if channel == "sms" else 3500
+    if len(text) <= limit:
+        return [text] if text else []
+    chunks = []
+    remaining = text
+    while len(remaining) > limit:
+        boundary = remaining.rfind("\n\n", 0, limit + 1)
+        if boundary <= 0:
+            boundary = remaining.rfind("\n", 0, limit + 1)
+        if boundary <= 0:
+            boundary = remaining.rfind(" ", 0, limit + 1)
+        if boundary <= 0:
+            # A single opaque token must stay intact, even if the provider
+            # ultimately rejects it. Never issue a corrupted download URL.
+            boundary = next((i for i, c in enumerate(remaining) if c.isspace()), len(remaining))
+        chunks.append(remaining[:boundary].strip())
+        remaining = remaining[boundary:].lstrip()
+    if remaining:
+        chunks.append(remaining)
+    return chunks
+
+
 def _topic_evidenced(topic: str, reply: str | None, actions: list[Any]) -> bool:
     text = (reply or "").casefold()
     if topic == "inventory":
@@ -158,7 +217,9 @@ def _topic_evidenced(topic: str, reply: str | None, actions: list[Any]) -> bool:
     if topic == "assets":
         return "http" in text or "share_asset" in action_types(actions)
     if topic == "property_types":
-        return bool(re.search(r"\b(?:\d+\s*(?:br|bed)|bedroom|unit type|home type|property type)\w*\b", text))
+        return "confirmed details for" in text or bool(re.search(r"\b(?:\d+\s*(?:br|bed)|bedroom|unit type|home type|property type)\w*\b", text))
+    if topic == "location":
+        return bool(re.search(r"\b(?:address|location|located)\b", text))
     return True
 
 
@@ -182,6 +243,7 @@ def _render_fact_value(value: Any) -> str:
 
 def complete_requested_commercial_topics(
     reply: str | None, *, inbound: str | None, actions: list[Any], commercial: dict[str, Any],
+    intents=(),
 ) -> tuple[str | None, list[str]]:
     """Append only missing, confirmed answers from the canonical context.
 
@@ -189,11 +251,15 @@ def complete_requested_commercial_topics(
     silently lose inventory or price facts merely because the model focused on
     one clause.
     """
-    requested = requested_topics(inbound)
+    requested = topics_for_turn(inbound, intents)
     missing = {topic for topic in requested if not _topic_evidenced(topic, reply, actions)}
     additions: list[str] = []
     property_types = commercial.get("property_types") or []
     inventory = commercial.get("inventory") or []
+    selected = next((item for item in property_types if item.get("id") == commercial.get("selected_property_type_id")), None)
+    if selected:
+        property_types = [selected]
+        inventory = [item for item in inventory if item.get("id") == selected.get("id") or item.get("property_type") == selected.get("property_type")]
     facts = commercial.get("confirmed_project_facts") or {}
     if "property_types" in missing and property_types:
         additions.append("Home types: " + ", ".join(str(item.get("property_type")) for item in property_types if item.get("property_type")) + ".")
@@ -211,16 +277,17 @@ def complete_requested_commercial_topics(
             ]
             count = sum(int(value) for value in values) if values else None
         if count is not None:
-            additions.append(f"Current availability: {count} home{'s' if count != 1 else ''}.")
+            incomplete = len(trusted) < len(inventory) if commercial.get("inventory_source") == "individual_units" else len(values) < len(inventory)
+            additions.append(f"{'Verified subtotal' if incomplete else 'Current availability'}: {count} home{'s' if count != 1 else ''}." + (" Availability for the remaining records is not confirmed." if incomplete else ""))
     if "pricing" in missing:
         candidates = [
             (item.get("starting_price") if item.get("starting_price") is not None else item.get("price"), item.get("currency"))
             for item in inventory
             if item.get("starting_price") is not None or item.get("price") is not None
         ]
-        if candidates:
-            amount, currency = min(candidates, key=lambda item: float(item[0]))
-            additions.append(f"Confirmed starting price: {currency or ''} {format_amount(amount)}.".replace(":  ", ": "))
+        for currency in sorted({currency for _, currency in candidates if currency}):
+            amount = min(amount for amount, code in candidates if code == currency)
+            additions.append(f"Confirmed starting price: {currency} {format_amount(amount)}.")
     if "financing" in missing:
         value = facts.get("payment_methods") or facts.get("financing_options") or facts.get("financing")
         if value:
@@ -228,12 +295,26 @@ def complete_requested_commercial_topics(
     if "delivery" in missing:
         value = facts.get("delivery_dates") or facts.get("delivery_timeline")
         if value:
-            additions.append(f"Delivery: {value}.")
+            additions.append(f"Delivery: {_render_fact_value(value)}.")
     if "amenities" in missing:
         value = facts.get("amenities")
         if value:
             rendered = ", ".join(map(str, value)) if isinstance(value, list) else str(value)
             additions.append(f"Amenities: {rendered}.")
+    if "location" in missing:
+        value = facts.get("exact_address") or facts.get("address")
+        if value:
+            additions.append(f"Location: {_render_fact_value(value)}.")
+        else:
+            additions.append("The Project location has not been confirmed in the available information.")
+    if "inventory" in missing and not any("availability" in item.casefold() or "subtotal" in item.casefold() for item in additions):
+        additions.append("Current unit availability has not been confirmed.")
+    if "pricing" in missing and not any("price" in item.casefold() for item in additions):
+        additions.append("Current pricing has not been confirmed.")
+    for topic, label in (("financing", "Financing terms"), ("delivery", "Delivery timing"), ("amenities", "Amenities")):
+        if topic in missing and not any(label.casefold().split()[0] in item.casefold() for item in additions):
+            if not (topic == "delivery" and "being verified" in (reply or "")):
+                additions.append(f"{label} have not been confirmed in the approved information available here.")
     if not additions:
         return reply, []
     base = (reply or "").strip()
@@ -242,7 +323,7 @@ def complete_requested_commercial_topics(
     return completed, sorted(missing)
 
 
-def grounded_catalog_reply(inbound: str | None, commercial: dict[str, Any]) -> str | None:
+def grounded_catalog_reply(inbound: str | None, commercial: dict[str, Any], *, intents=()) -> str | None:
     """Render catalog facts predictably for mobile channels.
 
     The model may choose what to discuss, but it must not concatenate numbered
@@ -251,20 +332,23 @@ def grounded_catalog_reply(inbound: str | None, commercial: dict[str, Any]) -> s
     items = commercial.get("property_types") or []
     text = (inbound or "").casefold()
     selected_index: int | None = None
+    selected_id = commercial.get("selected_property_type_id")
+    if selected_id:
+        selected_index = next((i for i, item in enumerate(items) if item.get("id") == selected_id), None)
     numbered = re.search(r"\b(?:option|number|unit|type)\s*(\d{1,2})\b", text)
-    if numbered and 1 <= int(numbered.group(1)) <= len(items):
+    if selected_index is None and numbered and 1 <= int(numbered.group(1)) <= len(items) and not commercial.get("selection_context_required"):
         selected_index = int(numbered.group(1)) - 1
-    else:
+    elif selected_index is None:
         for index, item in enumerate(items):
             name = str(item.get("property_type") or "").strip().casefold()
             if name and len(name) >= 4 and name in text:
                 selected_index = index
                 break
-    topics = requested_topics(inbound)
+    topics = topics_for_turn(inbound, intents)
     if selected_index is None and not topics.intersection({"property_types", "inventory", "pricing"}):
         return None
     if not items:
-        return "The property catalog has not been confirmed yet. I can ask the sales team to provide the current options."
+        return "The detailed property catalog has not been confirmed yet. That does not mean other options are unavailable; I can help with the approved Project information."
 
     if selected_index is not None:
         item = items[selected_index]
@@ -287,6 +371,8 @@ def grounded_catalog_reply(inbound: str | None, commercial: dict[str, Any]) -> s
             lines.append(f"• Starting price: {format_amount(item['starting_price'])} {item['currency']}")
         if item.get("available_units") is not None and item.get("inventory_updated_at"):
             lines.append(f"• Confirmed availability: {item['available_units']} unit{'s' if item['available_units'] != 1 else ''}")
+        elif "inventory" in topics:
+            lines.append("• Current availability for this option has not been confirmed.")
         description = str(item.get("description") or "").strip()
         if description:
             lines.extend(["", description])
@@ -333,6 +419,10 @@ def grounded_catalog_reply(inbound: str | None, commercial: dict[str, Any]) -> s
         lines.extend(["", "Current pricing has not been confirmed."])
     if "inventory" in topics and not has_inventory:
         lines.extend(["", "Current unit availability has not been confirmed."])
+    elif "inventory" in topics and any(item.get("available_units") is None or not item.get("inventory_updated_at") for item in items):
+        lines.extend(["", "Availability for the remaining types has not been confirmed."])
+    if commercial.get("catalog_coverage", {}).get("exhaustive") is False:
+        lines.extend(["", "These are the options I have confirmed; other options have not been ruled out."])
     conflicts = {str(item.get("code")) for item in commercial.get("data_conflicts") or []}
     if "delivery" in topics and "ready_status_future_delivery" in conflicts:
         lines.extend(["", "The delivery timeline is currently being verified by the Sales team."])
@@ -369,7 +459,7 @@ def remove_unsolicited_appointment_offer(reply: str | None) -> str | None:
     if reply is None:
         return None
     cleaned = UNSOLICITED_APPOINTMENT_SENTENCE.sub("", reply)
-    return re.sub(r"\s{2,}", " ", cleaned).strip()
+    return re.sub(r"\n{3,}", "\n\n", re.sub(r"[ \t]{2,}", " ", cleaned)).strip()
 
 
 def action_types(actions: list[Any]) -> set[str]:

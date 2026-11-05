@@ -76,7 +76,7 @@ def _safe_asset_links(item: Any) -> list[dict[str, Any]]:
     for link in ((item.source.extracted_links or []) if item.source else []):
         url = str(link.get("url") or "").strip()
         parsed = urlparse(url)
-        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc or parsed.username or parsed.password:
             continue
         hostname = (parsed.hostname or "").casefold().rstrip(".")
         if hostname == "localhost" or hostname.endswith((".localhost", ".local", ".internal")):
@@ -125,7 +125,7 @@ def _property_type_payload(item: ProjectPropertyType) -> dict[str, Any]:
         "area_max": _number(item.area_max),
         "area_unit": item.area_unit,
         "total_units": item.total_units,
-        "available_units": item.available_units,
+        "available_units": item.available_units if _trusted_inventory_date(item.inventory_updated_at) else None,
         "starting_price": _number(item.starting_price),
         "maximum_price": _number(item.maximum_price),
         "currency": item.currency,
@@ -301,10 +301,37 @@ def build_commercial_context(
         [_unit_payload(unit) for unit in units]
         if units else [_property_type_payload(item) for item in property_types]
     )
+    types = [_property_type_payload(item) for item in property_types]
+    if units:
+        for row in types:
+            matched = [unit for unit in inventory if str(unit.get("property_type") or "").casefold() == row["property_type"].casefold()]
+            verified = bool(matched) and all(unit.get("inventory_updated_at") for unit in matched)
+            row["available_units"] = sum(str(unit.get("status") or "").casefold() in AVAILABLE_UNIT_STATUSES for unit in matched) if verified else None
+            row["inventory_updated_at"] = max(unit["inventory_updated_at"] for unit in matched) if verified else None
+    if types:
+        safe_facts["typologies"] = [item["property_type"] for item in types]
+    if inventory:
+        safe_facts.pop("available_inventory", None)
+        if units and all(row.get("inventory_updated_at") for row in inventory):
+            safe_facts["available_inventory"] = sum(str(row.get("status") or "").casefold() in AVAILABLE_UNIT_STATUSES for row in inventory)
+        elif not units and all(row.get("inventory_updated_at") and row.get("available_units") is not None for row in inventory):
+            safe_facts["available_inventory"] = sum(row["available_units"] for row in inventory)
+    snapshot = approved or {}
+    sources = snapshot.get("sources") or getattr(project.profile, "field_sources", None) or {}
+    provenance = {field: {"approved_revision": snapshot.get("revision"), "source": sources.get(field),
+                          "status": (snapshot.get("states") or getattr(project.profile, "field_states", None) or {}).get(field, {}).get("status")}
+                  for field in safe_facts}
+    for field in ("starting_price", "currency", "typologies", "available_inventory"):
+        if field in safe_facts and types:
+            provenance[field] = {"approved_revision":snapshot.get("revision"), "source":"individual_units" if field=="available_inventory" and units else "property_type_catalog",
+                                 "record_ids":[row["id"] for row in (inventory if field=="available_inventory" else types)]}
     return {
         "approved_revision": approved.get("revision") if approved else None,
         "confirmed_project_facts": safe_facts,
-        "property_types": [_property_type_payload(item) for item in property_types],
+        "property_types": types,
+        "fact_provenance": provenance,
+        "catalog_coverage": {"exhaustive": False, "known_type_ids": [item["id"] for item in types],
+                             "rule": "Missing types are unknown, not proof of nonexistence. Only dated inventory quantities establish availability."},
         "inventory": inventory,
         "inventory_source": inventory_source,
         "inventory_updated_at": _iso(latest),

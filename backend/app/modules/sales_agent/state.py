@@ -42,3 +42,5 @@ class SalesAgentState(TypedDict, total=False):
     policy_violations: list[str]
     error_code: str | None
     monetary_validation: dict[str, Any]
+    turn_context: dict[str, Any]
+    property_catalog_offer: dict[str, Any] | None

@@ -19,6 +19,7 @@ from app.modules.users.models import User
 
 from .graph import GRAPH_VERSION, TOOLSET_VERSION, build_sales_graph
 from .conversation_scope import scoped_messages_query
+from .turn_context import latest_outbound, choice_index, appointment_execution_allowed, location_continuation
 from .models import AgentRun, OutboundMessage, SalesAgentSimulation, SalesConversation, SalesFollowUpJob, SalesInboundJob, SalesMessage
 
 
@@ -125,10 +126,7 @@ def _action_types(actions: list[dict] | None) -> set[str]:
 
 def _recent_appointment_context(db: Session, conversation_id: str) -> bool:
     """Return whether the latest agent turn established scheduling context."""
-    recent = db.query(SalesMessage).filter(
-        SalesMessage.conversation_id == conversation_id,
-        SalesMessage.direction == "outbound",
-    ).order_by(SalesMessage.created_at.desc()).first()
+    recent = latest_outbound(db, conversation_id)
     if not recent:
         return False
     metadata = recent.metadata_json or {}
@@ -282,6 +280,8 @@ def _selected_time(text: str) -> time | None:
         if not match:
             return None
         return time(int(match.group(1)), int(match.group(2)))
+    if not 1 <= int(match.group(1)) <= 12:
+        return None
     hour = int(match.group(1)) % 12
     if match.group(3).lower().startswith("p"):
         hour += 12
@@ -318,33 +318,42 @@ def _offered_slot_selection(
     now: datetime,
 ) -> datetime | None:
     """Resolve a choice only against a recent verified offer from this chat."""
+    from .response_policy import requested_topics
+    # A time/ordinal inside a different request is not booking consent.
+    if requested_topics(inbound_text) - {"appointment"} or re.search(r"\b(?:no|not|don't|do not|cancel|cannot|can't)\b", inbound_text, re.I):
+        return None
     selected = _selected_time(inbound_text)
     zone = _project_zone(project)
-    messages = db.query(SalesMessage).filter(
-        SalesMessage.conversation_id == conversation_id,
-        SalesMessage.direction == "outbound",
-    ).order_by(SalesMessage.created_at.desc()).limit(20).all()
+    latest = latest_outbound(db, conversation_id)
+    if latest and any(isinstance((latest.metadata_json or {}).get(kind),dict) for kind in ("property_catalog_offer","material_offer","location_offer")):
+        return None
+    messages = [latest] if latest else []
     for message in messages:
         offer = (message.metadata_json or {}).get("appointment_offer")
         if not isinstance(offer, dict):
             continue
+        if any(isinstance((message.metadata_json or {}).get(kind), dict) for kind in ("property_catalog_offer", "material_offer", "location_offer")):
+            return None
         offered: list[datetime] = []
+        matching_times: list[datetime] = []
         for raw_slot in offer.get("slots", []):
             try:
                 start_utc = datetime.fromisoformat(raw_slot)
             except (TypeError, ValueError):
                 continue
-            offered.append(start_utc)
-            local_start = start_utc.replace(tzinfo=timezone.utc).astimezone(zone)
+            aware = start_utc.replace(tzinfo=timezone.utc) if start_utc.tzinfo is None else start_utc.astimezone(timezone.utc)
+            if aware <= now.replace(tzinfo=timezone.utc):
+                continue
+            offered.append(aware)
+            local_start = aware.astimezone(zone)
             if selected is not None and local_start.time().replace(second=0, microsecond=0) == selected:
-                return start_utc.replace(tzinfo=None)
-        ordinal = re.search(r"\b(first|second|third|primero|primera|segundo|segunda|tercero|tercera)\b", inbound_text.casefold())
-        if ordinal:
-            index = {
-                "first": 0, "primero": 0, "primera": 0,
-                "second": 1, "segundo": 1, "segunda": 1,
-                "third": 2, "tercero": 2, "tercera": 2,
-            }[ordinal.group(1)]
+                requested = _requested_date(inbound_text, now=now, zone=zone)
+                if requested is None or requested == local_start.date():
+                    matching_times.append(aware)
+        if selected is not None:
+            return matching_times[0].replace(tzinfo=None) if len(matching_times)==1 else None
+        index = choice_index(inbound_text)
+        if index is not None:
             if index < len(offered):
                 return offered[index].replace(tzinfo=None)
         if selected is None and len(offered) == 1 and _affirmative_slot_reply(inbound_text):
@@ -375,6 +384,28 @@ def _offered_slot_selection(
     return local_start.astimezone(timezone.utc).replace(tzinfo=None)
 
 
+def _classified_slot_selection(db, *, conversation, project, inbound_text, result, now):
+    """A mixed turn may select a slot, but only after contextual LLM validation."""
+    intents = {result.get("primary_intent") or result.get("intent"), *(result.get("secondary_intents") or [])}
+    if "select_appointment_slot" not in intents or not appointment_execution_allowed(result, result.get("intent_routing_config")):
+        return None
+    if re.search(r"\b(?:no|not|don't|do not|cancel|cannot|can't)\b", inbound_text, re.I):
+        return None
+    from .response_policy import requested_topics
+    if requested_topics(inbound_text) - {"appointment"} and not re.search(r"\b(?:appointment|slot|time|visit|cita|horario|visita|confirm|book)\b|works for me", inbound_text, re.I):
+        return None
+    selected = _selected_time(inbound_text)
+    if selected:
+        date_value = _requested_date(inbound_text, now=now, zone=_project_zone(project))
+        reference = f"{date_value.isoformat()} " if date_value else ""
+        reference += selected.strftime("%H:%M")
+    else:
+        match = re.search(r"\b(first|second|third)\s+(?:appointment|time|slot)\b", inbound_text, re.I)
+        if not match: return None
+        reference = match.group(1)
+    return _offered_slot_selection(db, conversation_id=conversation.id, project=project, inbound_text=reference, now=now)
+
+
 def _timezone_label(value: datetime, zone: ZoneInfo, timezone_name: str) -> str:
     local = value.replace(tzinfo=timezone.utc).astimezone(zone)
     offset = local.strftime("%z")
@@ -399,7 +430,7 @@ def _appointment_confirmation(
         f"Your appointment is confirmed for {local_start.strftime('%A, %B %-d, %Y at %-I:%M %p')} "
         f"({_timezone_label(starts_at, zone, project.timezone or 'UTC')}). "
         f"Your Sales representative is {sales_name}. Location: {location}. "
-        f"A confirmation with these appointment details will also be sent to {email}. "
+        f"Contact email on record: {email}. "
         "We look forward to welcoming you!"
     )
 
@@ -419,15 +450,15 @@ def _confirm_or_request_location(project: Project, lead: Lead, inbound_text: str
         selected = locations[0]
     else:
         normalized = re.sub(r"[^a-z0-9]+", " ", inbound_text.casefold()).strip()
-        ordinals = {"first": 1, "1": 1, "one": 1, "second": 2, "2": 2, "two": 2, "third": 3, "3": 3, "three": 3}
-        ordinal_match = re.search(r"\b(first|second|third|one|two|three|1|2|3)\b", normalized)
-        ordinal_value = ordinals.get(ordinal_match.group(1)) if ordinal_match else None
+        index = choice_index(inbound_text) if form.get("pending_location_request") else None
+        ordinal_value = index + 1 if index is not None else None
         selected = resolve_visit_location(project, str(ordinal_value or normalized))
         if not selected:
-            choices = " ".join(f"{index}. {item['label']} — {item['address']}" for index, item in enumerate(locations, 1))
-            form["pending_location_request"] = inbound_text
+            choices = "\n\n".join(f"{index}. {item['label']} — {item['address']}" for index, item in enumerate(locations, 1))
+            if not form.get("pending_location_request") or _requested_period(inbound_text, now=datetime.utcnow(), zone=_project_zone(project)):
+                form["pending_location_request"] = inbound_text
             lead.meta_form_data = form
-            return False, f"Which property location would you like to visit? {choices} Reply with the number or location name.", None
+            return False, f"Which property location would you like to visit?\n\n{choices}\n\nReply with the number or location name.", None
     resume = form.pop("pending_location_request", None)
     form["selected_visit_location"] = selected
     lead.meta_form_data = form
@@ -767,17 +798,17 @@ async def simulate_turn(
             project=project,
             now=now,
         ) if record_inbound and event_kind == "lead_message" else None
+        if selected_slot is None and record_inbound and event_kind == "lead_message":
+            selected_slot = _classified_slot_selection(db,conversation=conversation,project=project,inbound_text=inbound_text,result=result,now=now)
         appointment_context = _recent_appointment_context(db, conversation.id)
-        scheduling_request = _is_availability_request(
-            inbound_text, now=now, zone=_project_zone(project),
-            appointment_context=appointment_context,
-        )
+        from app.modules.ai_core.services import get_ai_config
+        routing = ((get_ai_config(db, None).agent_ventas or {}).get("intent_routing_config") or {})
+        scheduling_request = appointment_execution_allowed(result, routing)
         location_needed = (
             selected_slot is not None
             or scheduling_request
-            or "request_available_slots" in _action_types(proposed_actions)
         )
-        awaiting_location = bool((lead.meta_form_data or {}).get("pending_location_request"))
+        awaiting_location = location_continuation(db, conversation, lead, inbound_text)
         location_ready, location_question, location_resume = (
             _confirm_or_request_location(project, lead, inbound_text)
             if location_needed or awaiting_location else (True, None, None)
@@ -845,8 +876,7 @@ async def simulate_turn(
                 ).update({SalesFollowUpJob.status: "cancelled"}, synchronize_session=False)
             availability_handled = True
         elif not result.get("policy_violations") and (
-            "request_available_slots" in _action_types(proposed_actions)
-            or scheduling_request
+            scheduling_request
         ):
             proposed_reply, offered_slots = _availability_reply(
                 db, project=project, inbound_text=inbound_text, now=now,
@@ -873,6 +903,8 @@ async def simulate_turn(
             if "request_available_slots" not in _action_types(proposed_actions):
                 proposed_actions.append({"type": "request_available_slots"})
         run.prompt_configuration_id = result.get("prompt_configuration_id")
+        from .response_policy import render_channel_text, split_channel_text
+        proposed_reply = render_channel_text(proposed_reply, "sms")
         run.prompt_snapshot = result.get("prompt_snapshot", {})
         run.model = result.get("model", "unknown")
         run.input_snapshot = {**run.input_snapshot, "graph_commercial_context": result.get("commercial_context") or {}}
@@ -880,6 +912,8 @@ async def simulate_turn(
             "reply": proposed_reply,
             "model_proposed_reply": result.get("model_proposed_reply", result.get("proposed_reply")),
             "response_policy_trace": result.get("response_policy_trace", {}),
+            "primary_intent":result.get("primary_intent"), "secondary_intents":result.get("secondary_intents", []),
+            "intent_confidence":result.get("intent_confidence"), "requires_clarification":result.get("requires_clarification", False),
             "intent": "appointment_confirmed" if appointment_confirmed else result.get("intent"),
             "proposed_actions": proposed_actions,
             "requires_human": False if availability_handled else result.get("requires_human", False),
@@ -912,6 +946,9 @@ async def simulate_turn(
                     "event_kind": event_kind,
                     "follow_up_hours": follow_up_hours,
                     "proposed_actions": proposed_actions,
+                    "channel_parts":split_channel_text(proposed_reply, "sms"),
+                    **({"property_catalog_offer":result["property_catalog_offer"]} if result.get("property_catalog_offer") and not availability_handled else {}),
+                    **({"location_offer":{"pending":True}} if "request_visit_location" in _action_types(proposed_actions) else {}),
                     **({
                         "appointment_offer": {
                             "duration_minutes": 45,
