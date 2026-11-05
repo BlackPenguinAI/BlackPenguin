@@ -18,6 +18,7 @@ from app.modules.sales_crm.scheduling import available_slots, create_agent_appoi
 from app.modules.users.models import User
 
 from .graph import GRAPH_VERSION, TOOLSET_VERSION, build_sales_graph
+from .escalation_policy import apply_escalation_policy, notify_sales, escalation_reply
 from .conversation_scope import scoped_messages_query
 from .turn_context import latest_outbound, choice_index, appointment_execution_allowed, location_continuation
 from .models import AgentRun, OutboundMessage, SalesAgentSimulation, SalesConversation, SalesFollowUpJob, SalesInboundJob, SalesMessage
@@ -685,6 +686,9 @@ async def simulate_turn(
         return _response(existing, output)
 
     conversation = meta_simulation or get_or_create_conversation(db, lead, channel="simulation")
+    stop_command = record_inbound and inbound_text.strip().upper() in {"STOP", "UNSUBSCRIBE", "CANCEL", "END", "QUIT"}
+    if lead.is_opt_out or (conversation.is_paused and conversation.pause_reason not in {"Appointment confirmed", "Simulation/draft mode"} and not stop_command):
+        raise HTTPException(status_code=409, detail="This conversation is paused. Review its reason and explicitly resume it before continuing; opted-out leads cannot be resumed.")
     simulation = db.query(SalesAgentSimulation).filter(
         SalesAgentSimulation.lead_id == lead.id,
         SalesAgentSimulation.conversation_id == conversation.id,
@@ -787,6 +791,9 @@ async def simulate_turn(
             "requires_human": False,
             "policy_violations": [],
         })
+        from app.modules.ai_core.services import get_ai_config
+        routing = ((get_ai_config(db, None).agent_ventas or {}).get("intent_routing_config") or {})
+        result = apply_escalation_policy(result, inbound=inbound_text, routing=routing, event_kind=event_kind)
         proposed_actions = result.get("proposed_actions", [])
         proposed_reply = result.get("proposed_reply")
         availability_handled = False
@@ -798,7 +805,7 @@ async def simulate_turn(
             inbound_text=inbound_text,
             project=project,
             now=now,
-        ) if record_inbound and event_kind == "lead_message" else None
+        ) if record_inbound and event_kind == "lead_message" and result["escalation_decision"]["disposition"] in {"continue", "notify_sales"} else None
         if selected_slot is None and record_inbound and event_kind == "lead_message":
             selected_slot = _classified_slot_selection(db,conversation=conversation,project=project,inbound_text=inbound_text,result=result,now=now)
         appointment_context = _recent_appointment_context(db, conversation.id)
@@ -904,6 +911,20 @@ async def simulate_turn(
             if "request_available_slots" not in _action_types(proposed_actions):
                 proposed_actions.append({"type": "request_available_slots"})
         run.prompt_configuration_id = result.get("prompt_configuration_id")
+        decision = result["escalation_decision"]
+        if decision["disposition"] == "notify_sales":
+            notice = notify_sales(db, conversation=conversation, lead=lead, decision=decision, event_id=event_id, evidence=inbound_text)
+            decision.update(notification_id=notice.id, notification_persisted=True)
+            proposed_reply = f"{proposed_reply or ''}\n\nI've flagged the information gap to Sales for review. You can continue asking me about the approved Project information."
+        elif decision["disposition"] == "pause":
+            from app.modules.governance.services import create_intervention_case
+            create_intervention_case(db, conversation=conversation, lead=lead, reason=decision["reason"], evidence=inbound_text)
+            proposed_reply = escalation_reply(decision)
+        elif decision["disposition"] == "opt_out":
+            lead.is_opt_out = True; lead.consent_status = "opted_out"; lead.agent_status = "paused"; lead.next_action_at = None
+            conversation.is_paused = True; conversation.pause_reason = "Lead opted out"
+            db.query(SalesFollowUpJob).filter(SalesFollowUpJob.conversation_id == conversation.id, SalesFollowUpJob.status.in_(["pending", "processing"])).update({SalesFollowUpJob.status:"cancelled"}, synchronize_session=False)
+            proposed_reply = escalation_reply(decision)
         from .response_policy import render_channel_text, split_channel_text
         proposed_reply = render_channel_text(proposed_reply, "sms")
         run.prompt_snapshot = result.get("prompt_snapshot", {})
@@ -918,6 +939,9 @@ async def simulate_turn(
             "intent": "appointment_confirmed" if appointment_confirmed else result.get("intent"),
             "proposed_actions": proposed_actions,
             "requires_human": False if availability_handled else result.get("requires_human", False),
+            "escalation_decision": decision,
+            "correction_context": result.get("correction_context", {}),
+            "selected_property_type_id": result.get("selected_property_type_id"),
             "policy_violations": result.get("policy_violations", []),
             "error_code": result.get("error_code"),
         }
@@ -947,6 +971,8 @@ async def simulate_turn(
                     "event_kind": event_kind,
                     "follow_up_hours": follow_up_hours,
                     "proposed_actions": proposed_actions,
+                    "escalation_decision": decision,
+                    "selected_property_type_id": result.get("selected_property_type_id"),
                     "channel_parts":split_channel_text(proposed_reply, "sms"),
                     **({"property_catalog_offer":result["property_catalog_offer"]} if result.get("property_catalog_offer") and not availability_handled else {}),
                     **({"location_offer":{"pending":True}} if "request_visit_location" in _action_types(proposed_actions) else {}),

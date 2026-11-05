@@ -22,6 +22,15 @@ def normalize_intent(value):
     if not isinstance(entities, dict):
         entities = {}; issues.append("invalid_entities")
     clean = {}
+    for key in ("correction_requested", "challenged_topic"):
+        item = entities.get(key)
+        if item is None:
+            continue
+        valid = isinstance(item, bool) if key == "correction_requested" else isinstance(item, str) and item in {"pricing", "inventory", "property_types", "financing", "delivery", "amenities", "location", "assets"}
+        if valid:
+            clean[key] = item
+        else:
+            issues.append("invalid_entity:" + key)
     for key in ("requested_materials","property_reference","requested_date"):
         item = entities.get(key)
         if key == "requested_materials":
@@ -45,5 +54,9 @@ CONTRACT_INSTRUCTION = (
     "and requires_clarification as a boolean. Never fabricate maximum confidence. "
     "Photos, PDFs and virtual tours are not in-person appointments. For mixed requests return all applicable intents. "
     "If ambiguous use unclear and ask one specific clarification; do not book anything."
+    " When the lead challenges or corrects an earlier answer, set intent_entities.correction_requested=true "
+    "and challenged_topic (pricing, inventory, property_types, financing, delivery, amenities, location or assets) when known. "
+    "Keep the selected property unless the lead explicitly changes it. Identify what was disputed and use approved evidence, "
+    "not a repeated apology. Do not claim a correction or source change without evidence."
 )
 

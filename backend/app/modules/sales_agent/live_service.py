@@ -40,6 +40,7 @@ from app.modules.governance.services import (
     create_intervention_case, escalation_reason, next_allowed_proactive_time,
     operating_policy_for,
 )
+from .escalation_policy import apply_escalation_policy, notify_sales, escalation_reply
 from app.core.config import settings
 from app.integrations.whatsapp_templates import (
     initial_template_parameters,
@@ -1174,7 +1175,7 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
     try:
         conversation = db.query(SalesConversation).filter(SalesConversation.id == conversation_id).with_for_update().first()
         inbound = db.query(SalesMessage).filter(SalesMessage.id == inbound_message_id).first()
-        if not conversation or not inbound or conversation.is_paused:
+        if not conversation or not inbound:
             return
         lead = db.query(Lead).filter(Lead.id == conversation.lead_id, Lead.company_id == conversation.company_id).one()
         project = db.query(Project).filter(Project.id == conversation.project_id, Project.company_id == conversation.company_id).one()
@@ -1183,9 +1184,12 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
         if inbound.content.strip().upper() in {"STOP", "UNSUBSCRIBE", "CANCEL", "END", "QUIT"}:
             lead.is_opt_out = True; lead.consent_status = "opted_out"; lead.agent_status = "paused"
             conversation.is_paused = True; conversation.pause_reason = "Lead opted out"
-            db.query(SalesFollowUpJob).filter(SalesFollowUpJob.conversation_id == conversation.id, SalesFollowUpJob.status == "pending").update({SalesFollowUpJob.status: "cancelled"}, synchronize_session=False)
+            lead.next_action_at = None
+            db.query(SalesFollowUpJob).filter(SalesFollowUpJob.conversation_id == conversation.id, SalesFollowUpJob.status.in_(["pending", "processing"])).update({SalesFollowUpJob.status: "cancelled"}, synchronize_session=False)
             db.commit()
             await _dispatch(db, conversation=conversation, lead=lead, content="You have been unsubscribed and will not receive further messages.", role="assistant", agent_run_id=None, metadata={"event_kind": "opt_out", "inbound_message_id": inbound.id})
+            return
+        if conversation.is_paused:
             return
         mandatory_reason = escalation_reason(inbound.content)
         if mandatory_reason:
@@ -1198,7 +1202,7 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
             )
             await _dispatch(
                 db, conversation=conversation, lead=lead,
-                content=_confirmed_handoff_reply(inbound.content, intervention_actions),
+                content=escalation_reply({"reason": mandatory_reason, "disposition": "pause"}),
                 role="assistant", agent_run_id=None,
                 metadata={
                     "event_kind": "human_intervention",
@@ -1278,11 +1282,13 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
             "lead_id": lead.id, "channel": conversation.channel, "inbound_text": inbound.content,
             "event_kind": "lead_message", "requires_human": False, "policy_violations": [],
         })
+        routing = ((get_ai_config(db, None).agent_ventas or {}).get("intent_routing_config") or {})
+        result = apply_escalation_policy(result, inbound=inbound.content, routing=routing)
         reply = result.get("proposed_reply")
         actions = result.get("proposed_actions", [])
         if result.get("error_code") == "invalid_model_contract":
             raise RuntimeError("The Sales Agent returned an invalid response contract.")
-        if not result.get("policy_violations"):
+        if not result.get("policy_violations") and not result.get("requires_human") and result["escalation_decision"]["disposition"] != "opt_out":
             merge_extracted_facts(
                 lead, result.get("extracted_facts"), evidence=inbound.content,
             )
@@ -1291,7 +1297,6 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
         ).order_by(SalesMessage.created_at).all()
         commercial = result.get("commercial_context") or {}
         run.input_snapshot = {**run.input_snapshot, "graph_commercial_context": commercial}
-        available_assets = commercial.get("available_assets") or []
         appointment_offer: dict | None = None
         if (
             not result.get("policy_violations")
@@ -1311,34 +1316,28 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
                 "duration_minutes": 45,
                 "project_timezone": project.timezone or "UTC",
             } if not action_types(appointment_actions) & {"request_visit_location", "appointment_confirmed"} else None
-        turn_intents = [result.get("primary_intent") or result.get("intent"), *(result.get("secondary_intents") or [])]
-        if "assets" in topics_for_turn(inbound.content, turn_intents) and not result.get("requires_clarification") and not set(turn_intents).intersection({"security_or_abuse", "human_requested", "opt_out"}):
-            if available_assets:
-                # The runtime, not the model, owns disclosure. Invalid model
-                # asset IDs are discarded and deterministically replaced from
-                # the approved, tenant-scoped library below. They must not
-                # create a false POLICY_VIOLATION or pause the conversation.
-                result, actions = _normalize_asset_request_result(result, actions, available_assets)
-            elif not available_assets and not result.get("policy_violations"):
-                # Missing collateral is a normal commercial limitation. Keep
-                # the conversation active and explain it without a hard handoff.
-                result["requires_human"] = False
-                actions = [
-                    action for action in actions
-                    if not isinstance(action, dict)
-                    or action.get("type") not in {"share_asset", "request_human_review"}
-                ]
+        decision = result["escalation_decision"]
+        if decision["disposition"] == "notify_sales":
+            notice = notify_sales(db, conversation=conversation, lead=lead, decision=decision, event_id=inbound.id, evidence=inbound.content)
+            decision.update(notification_id=notice.id, notification_persisted=True)
+            reply = f"{reply or ''}\n\nI've flagged the information gap to Sales for review. You can continue asking me about the approved Project information."
+        if decision["disposition"] == "opt_out":
+            lead.is_opt_out = True; lead.consent_status = "opted_out"; lead.agent_status = "paused"; lead.next_action_at = None
+            conversation.is_paused = True; conversation.pause_reason = "Lead opted out"
+            db.query(SalesFollowUpJob).filter(SalesFollowUpJob.conversation_id == conversation.id, SalesFollowUpJob.status.in_(["pending", "processing"])).update({SalesFollowUpJob.status: "cancelled"}, synchronize_session=False)
+            reply = escalation_reply(decision)
+            actions = []
         intervention_case = None
         if result.get("requires_human"):
             conversation, lead, intervention_case = _persist_intervention_before_confirmation(
                 db, conversation=conversation, lead=lead,
-                reason="LOW_CONFIDENCE" if not result.get("policy_violations") else "POLICY_VIOLATION",
+                reason=decision["reason"],
                 evidence=inbound.content,
             )
-            reply = _confirmed_handoff_reply(inbound.content, actions)
+            reply = escalation_reply(decision)
         share_ids: list[str] = []
         material_offer = {}
-        if not result.get("requires_human") and not result.get("requires_clarification"):
+        if not result.get("requires_human") and not result.get("requires_clarification") and not lead.is_opt_out:
             reply, actions, share_ids = _execute_share_actions(
                 db, conversation=conversation, lead=lead, run=run,
                 reply=reply, actions=actions, commercial=commercial,
@@ -1347,7 +1346,7 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
                 offer_metadata=material_offer,
             )
         reply = render_channel_text(reply, conversation.channel)
-        if not result.get("requires_human"):
+        if not result.get("requires_human") and not lead.is_opt_out:
             lead_history, lead_message_count = _lead_intelligence_input(history)
             update_lead_intelligence(
                 db, lead, inbound_text=inbound.content,
@@ -1369,6 +1368,9 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
             "requires_clarification": result.get("requires_clarification", False),
             "extracted_facts": result.get("extracted_facts", []),
             "requires_human": result.get("requires_human", False),
+            "escalation_decision": decision,
+            "correction_context": result.get("correction_context", {}),
+            "selected_property_type_id": result.get("selected_property_type_id"),
             "policy_violations": result.get("policy_violations", []),
             "error_code": result.get("error_code"),
             "model_reason": result.get("model_reason"),
@@ -1396,6 +1398,7 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
             not conversation.is_paused
             or conversation.pause_reason == "Appointment confirmed"
             or (conversation.pause_reason or "").startswith("Human intervention")
+            or decision["disposition"] == "opt_out"
         ):
             await _dispatch(
                 db, conversation=conversation, lead=lead, content=reply,
@@ -1404,6 +1407,8 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
                     "event_kind": "agent_reply", "proposed_actions": actions,
                     "inbound_message_id": inbound.id,
                     "sales_asset_share_ids": share_ids,
+                    "escalation_decision": decision,
+                    "selected_property_type_id": result.get("selected_property_type_id"),
                     **({"property_catalog_offer":result["property_catalog_offer"]} if result.get("property_catalog_offer") else {}),
                     **({"material_offer":material_offer} if material_offer else {}),
                     **({"location_offer":{"pending":True}} if "request_visit_location" in action_types(actions) else {}),
@@ -1620,6 +1625,8 @@ async def process_live_followup_job(job_id: str) -> None:
             ),
             "event_kind": "scheduled_follow_up", "requires_human": False, "policy_violations": [],
         })
+        result = apply_escalation_policy(result, inbound="", routing=((get_ai_config(db, None).agent_ventas or {}).get("intent_routing_config") or {}), event_kind="scheduled_follow_up")
+        decision = result["escalation_decision"]
         reply = result.get("proposed_reply")
         run.prompt_configuration_id = result.get("prompt_configuration_id")
         run.prompt_snapshot = result.get("prompt_snapshot", {})
@@ -1630,11 +1637,17 @@ async def process_live_followup_job(job_id: str) -> None:
                                "proposed_actions": result.get("proposed_actions", []),
                                "primary_intent": result.get("primary_intent"),
                                "policy_violations": result.get("policy_violations", []),
-                               "requires_human": result.get("requires_human", False)}
+                               "requires_human": result.get("requires_human", False),
+                               "escalation_decision": decision}
+        if decision["disposition"] == "notify_sales":
+            notice = notify_sales(db, conversation=conversation, lead=lead, decision=decision, event_id=event_id, evidence="Scheduled follow-up generation requested Sales review.")
+            decision = {**decision, "notification_id": notice.id, "notification_persisted": True}
+            run.output_snapshot = {**run.output_snapshot, "escalation_decision": decision,
+                "response_policy_trace": {**result.get("response_policy_trace", {}), "escalation": decision}}
         if result.get("requires_human"):
             create_intervention_case(
                 db, conversation=conversation, lead=lead,
-                reason="LOW_CONFIDENCE" if not result.get("policy_violations") else "POLICY_VIOLATION",
+                reason=decision["reason"],
                 evidence="Scheduled follow-up generation required human review.",
             )
         run.status = "completed" if reply and not result.get("requires_human") else (

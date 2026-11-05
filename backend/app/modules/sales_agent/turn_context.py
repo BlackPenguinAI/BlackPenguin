@@ -41,12 +41,24 @@ def turn_context(db, conversation, lead=None):
     kinds = [key for key in ("appointment_offer", "property_catalog_offer", "material_offer", "location_offer")
              if isinstance(metadata.get(key), dict)]
     # More than one selectable offer requires an explicit reference, not a guess.
+    selection = None
+    catalog = None
+    rows = scoped_messages_query(db, conversation).filter(SalesMessage.direction == "outbound", SalesMessage.status.notin_(["failed", "cancelled"])).order_by(SalesMessage.created_at.desc(), SalesMessage.id.desc()).all()
+    for row in rows:
+        details = row.metadata_json or {}
+        if selection is None and details.get("selected_property_type_id"):
+            selection = details["selected_property_type_id"]
+        if isinstance(details.get("property_catalog_offer"), dict):
+            catalog = details["property_catalog_offer"]
+            break
     return {"latest_offer_message_id": latest.id if latest else None,
             "active_offer_kind": kinds[0] if len(kinds) == 1 else None,
             "ambiguous_offer": len(kinds) > 1,
             "offers": {key: metadata[key] for key in kinds},
             "pending_location": bool(lead and (lead.meta_form_data or {}).get("pending_location_request")),
-            "pending_material_id": conversation.pending_asset_id}
+            "pending_material_id": conversation.pending_asset_id,
+            "selected_property_type_id": selection,
+            "last_property_catalog": catalog}
 
 
 def appointment_execution_allowed(result, routing=None):
@@ -59,7 +71,7 @@ def appointment_execution_allowed(result, routing=None):
     confidence = result.get("intent_confidence")
     threshold = float((routing or {}).get("minimum_confidence", .80))
     return bool(intents & SCHEDULING_INTENTS) and not (
-        result.get("requires_clarification") or result.get("policy_violations")
+        result.get("requires_clarification") or result.get("policy_violations") or (result.get("escalation_decision") or {}).get("disposition") in {"pause", "opt_out"}
         or intents & {"human_requested", "request_callback", "security_or_abuse", "opt_out"}
     ) and isinstance(confidence, (int, float)) and not isinstance(confidence, bool) and math.isfinite(confidence) and threshold <= confidence <= 1
 

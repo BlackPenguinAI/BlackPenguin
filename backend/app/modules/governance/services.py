@@ -37,7 +37,7 @@ HUMAN_REQUEST = re.compile(
 )
 HUMAN_VERB = re.compile(r"\b(talk|speak|call|contact|transfer|quiero|hablar|llam|comunicar|pas[ae])\w*\b", re.IGNORECASE)
 LEGAL_REQUEST = re.compile(
-    r"\b(legal|lawyer|lawsuit|contract clause|tax advice|abogado|demanda|cl[aá]usula|asesor[ií]a legal|impuesto)\b",
+    r"\b(legal advice|legal interpretation|lawyer|lawsuit|contract clause|tax advice|abogado|demanda|cl[aá]usula|asesor[ií]a legal|impuesto)\b",
     re.IGNORECASE,
 )
 NEGOTIATION_REQUEST = re.compile(
@@ -308,8 +308,14 @@ def next_allowed_proactive_time(
 
 
 def escalation_reason(text: str) -> str | None:
-    if HUMAN_REQUEST.search(text) and HUMAN_VERB.search(text):
-        return "HUMAN_REQUESTED"
+    # This pre-model route is reserved for an affirmative request, not a
+    # mention of an advisor or a refusal to speak with one. The LLM still
+    # handles other paraphrases through the canonical intent contract.
+    for clause in re.split(r"[.!?;]|\b(?:but|however|pero)\b", text, flags=re.I):
+        if HUMAN_REQUEST.search(clause) and HUMAN_VERB.search(clause):
+            negated = re.search(r"\b(?:don['’]t|do not|never|no longer|no quiero|no necesito)\b[^.!?;]{0,65}\b(?:talk|speak|call|contact|transfer|hablar|llamar|comunicar)\b", clause, re.I)
+            if not negated:
+                return "HUMAN_REQUESTED"
     if LEGAL_REQUEST.search(text):
         return "LEGAL_QUESTION"
     if NEGOTIATION_REQUEST.search(text):
@@ -515,6 +521,10 @@ def create_intervention_case(
         "LEGAL": "Legal or regulatory review is required",
         "POLICY_VIOLATION": "A protected policy prevented the automated response",
         "LOW_CONFIDENCE": "The request requires human clarification",
+        "MISSING_MATERIAL": "Staff policy requires review of missing approved materials",
+        "MISSING_INFORMATION": "Staff policy requires review of missing verified information",
+        "LEGAL_QUESTION": "Legal review is required",
+        "COMPLEX_NEGOTIATION": "A commercial exception requires approval",
     }
     friendly_reason = reason_labels.get(reason, reason.replace("_", " ").title())
     lead_meta = dict(lead.meta_form_data or {})

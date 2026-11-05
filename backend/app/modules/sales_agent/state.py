@@ -45,3 +45,6 @@ class SalesAgentState(TypedDict, total=False):
     monetary_validation: dict[str, Any]
     turn_context: dict[str, Any]
     property_catalog_offer: dict[str, Any] | None
+    selected_property_type_id: str | None
+    correction_context: dict[str, Any]
+    escalation_decision: dict[str, Any]
