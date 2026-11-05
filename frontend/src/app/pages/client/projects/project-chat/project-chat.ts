@@ -1620,6 +1620,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
         else if (shouldScrollToBottom) this.scrollToBottom();
       },
       error: (error: HttpErrorResponse) => {
+        if (generation !== this.renderGeneration) return;
         if (error.status !== 401) {
           this.initialState = 'error';
           this.errorMessage = 'The Project Onboarding state could not be synchronized.';

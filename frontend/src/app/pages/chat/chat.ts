@@ -998,6 +998,7 @@ export class ChatComponent implements OnInit, OnDestroy {
         else if (shouldScrollToBottom) this.scrollToBottom();
       },
       error: (error: HttpErrorResponse) => {
+        if (generation !== this.renderGeneration) return;
         if (error.status !== 401) {
           this.initialState = 'error';
           this.errorMessage = 'The onboarding state could not be synchronized.';

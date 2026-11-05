@@ -7,6 +7,8 @@ import { of, Subject, throwError } from 'rxjs';
 import { OnboardingLocationComponent } from '../../../../shared/ui/onboarding-location';
 import { ProjectChatComponent } from './project-chat';
 import { EMPTY_PROJECT_PROFILE } from './project-onboarding.models';
+import { ChatComponent } from '../../../chat/chat';
+import { EMPTY_COMPANY_PROFILE } from '../../../chat/company-onboarding.models';
 
 afterEach(()=>{vi.restoreAllMocks();TestBed.resetTestingModule();});
 const cities=[{country:'US',city:'Miami',timezone:'America/New_York'},{country:'US',city:'Chicago',timezone:'America/Chicago'},{country:'PE',city:'Lima',timezone:'America/Lima'}];
@@ -56,5 +58,30 @@ it('opens the same persisted task through the explicit editor endpoint without n
  const api={openEditorTask:vi.fn(()=>of(turn))};const c=project(api);vi.spyOn(c as any,'scrollToBottom').mockImplementation(()=>undefined);
  c.openEditorTask('meta_account');expect(api.openEditorTask).toHaveBeenCalledWith('project-1','meta_account',expect.any(String));
  expect(c.isAnalyzing).toBe(false);expect(c.nextQuestion?.task).toBe('meta_account');
+});
+
+it.each([0,401,500,502,504])('ignores stale Project state errors (%s) after the successful editor turn',(status)=>{
+ const stale=new Subject<any>();const c=project({getState:()=>stale});c.initialState='ready';c.prompt='Keep my draft';
+ (c as any).syncState();(c as any).applyTurn(turn);stale.error({status});
+ expect(c.messages.map(m=>m.id)).toEqual(['new-answer']);expect(c.nextQuestion?.task).toBe('meta_account');
+ expect(c.initialState).toBe('ready');expect(c.errorMessage).toBe('');expect(c.prompt).toBe('Keep my draft');
+});
+it('still shows a current Project synchronization failure',()=>{
+ const request=new Subject<any>();const c=project({getState:()=>request});c.initialState='ready';
+ (c as any).syncState();request.error({status:500});
+ expect(c.initialState).toBe('error');expect(c.errorMessage).toContain('could not be synchronized');
+});
+it.each([0,401,500,502,504])('ignores stale Company state errors (%s) after a successful turn',(status)=>{
+ const old=new Subject<any>(),current=new Subject<any>();let calls=0;
+ const c=new ChatComponent({use:vi.fn()} as any,{getState:()=>++calls===1?old:current} as any,{detectChanges:vi.fn()} as any,{isSupported:false} as any,{} as any);
+ c.initialState='ready';c.prompt='Keep Company draft';(c as any).syncState();
+ (c as any).applyTurn({...turn,profile:EMPTY_COMPANY_PROFILE});old.error({status});
+ expect(c.messages.map(m=>m.id)).toEqual(['new-answer']);expect(c.initialState).toBe('ready');
+ expect(c.errorMessage).toBe('');expect(c.prompt).toBe('Keep Company draft');
+});
+it('still shows a current Company synchronization failure',()=>{
+ const request=new Subject<any>();const c=new ChatComponent({use:vi.fn()} as any,{getState:()=>request} as any,{detectChanges:vi.fn()} as any,{isSupported:false} as any,{} as any);
+ c.initialState='ready';(c as any).syncState();request.error({status:500});
+ expect(c.initialState).toBe('error');expect(c.errorMessage).toContain('could not be synchronized');
 });
 

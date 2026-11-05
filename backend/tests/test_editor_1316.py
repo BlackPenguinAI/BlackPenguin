@@ -147,3 +147,69 @@ def test_generic_profile_edit_cannot_publish_a_city_timezone_mismatch(context):
     with pytest.raises(HTTPException) as error:services.complete_onboarding(db,project,user.id)
     assert error.value.status_code==422 and profile.published_snapshot==published
 
+# Per-field suggestion recovery: never mutate the saved or approved profile.
+@pytest.mark.parametrize("scope", ["project", "company"])
+@pytest.mark.parametrize("source_country,source_city,saved_city,city_status,saved_zone,zone_status,expected_city,expected_zone", [
+    ("US", "Miami", "", "missing", None, "missing", "Miami", "America/New_York"),
+    ("MX", "Mexico City", "", "missing", None, "missing", "", ""),
+    ("US", "Miami", "Chicago", "confirmed", None, "missing", "Chicago", "America/Chicago"),
+    ("US", "Chicago", "", "missing", "America/New_York", "confirmed", "Chicago", "America/New_York"),
+    ("US", "Chicago", "Miami", "extracted", "America/New_York", "extracted", "Chicago", "America/Chicago"),
+    (None, "Miami", "", "missing", None, "missing", "Miami", "America/New_York"),
+])
+def test_suggestions_recover_each_missing_field_without_replacing_approval(
+    api, scope, source_country, source_city, saved_city, city_status,
+    saved_zone, zone_status, expected_city, expected_zone,
+):
+    from app.modules.projects.models import ProjectOnboardingSource,ProjectOnboardingProposal,ProjectSourceKind,ProjectSourceStatus
+    from app.modules.company_onboarding.models import CompanyOnboardingSource,CompanyOnboardingProposal,SourceKind,SourceStatus
+    from app.modules.company_onboarding import services as company_services
+    client,(db,company,user,project,project_profile,item)=api
+    client.app.include_router(location_router,prefix="/editor")
+    company.country_code="US"
+    if scope=="project":
+        profile=project_profile; entity=project.id
+        source=ProjectOnboardingSource(project_id=entity,kind=ProjectSourceKind.URL,status=ProjectSourceStatus.READY,name="Location website",url="https://example.com/project")
+        Proposal=ProjectOnboardingProposal
+    else:
+        entity=company.id;profile=company_services.get_or_create_profile(db,entity)
+        source=CompanyOnboardingSource(company_id=entity,kind=SourceKind.OFFICIAL_WEBSITE,status=SourceStatus.READY,name="Location website",url="https://example.com/company")
+        Proposal=CompanyOnboardingProposal
+    profile.profile_data={**(profile.profile_data or {}),"country":"US","city":saved_city,"timezone":saved_zone}
+    profile.field_states={**(profile.field_states or {}),"country":{"status":"confirmed","applicable":True},"city":{"status":city_status},"timezone":{"status":zone_status}}
+    db.add(source);db.flush()
+    if source_country:db.add(Proposal(source_id=source.id,field_key="country",value=source_country))
+    db.add(Proposal(source_id=source.id,field_key="city",value=source_city));db.commit()
+    before=deepcopy(profile.profile_data);states=deepcopy(profile.field_states)
+    published=deepcopy(profile.published_snapshot)
+    response=client.get(f"/editor/{scope}/{entity}/location")
+    assert response.status_code==200,response.text
+    result=response.json()
+    assert result["country"]=="US"
+    assert result["city"]==expected_city and result["timezone"]==expected_zone
+    if not saved_city and expected_city:assert "Location website" in result["source"]
+    db.refresh(profile)
+    assert profile.profile_data==before and profile.field_states==states and profile.published_snapshot==published
+
+@pytest.mark.parametrize("saved_country,saved_city,city_status,expected_country,expected_city,expected_zone", [
+    ("PE", "Lima", "confirmed", "PE", "Lima", "America/Lima"),
+    ("PE", "Lima", "extracted", "US", "", ""),
+    ("", "Miami", "confirmed", "US", "Miami", "America/New_York"),
+])
+def test_country_only_source_does_not_mix_cities_from_another_country(
+    api, saved_country, saved_city, city_status, expected_country, expected_city, expected_zone,
+):
+    from app.modules.projects.models import ProjectOnboardingSource,ProjectOnboardingProposal,ProjectSourceKind,ProjectSourceStatus
+    client,(db,company,user,project,profile,item)=api
+    client.app.include_router(location_router,prefix="/editor")
+    profile.profile_data={**profile.profile_data,"country":saved_country,"city":saved_city,"timezone":"America/Lima"}
+    profile.field_states={**profile.field_states,"country":{"status":"extracted"},"city":{"status":city_status},"timezone":{"status":"extracted"}}
+    source=ProjectOnboardingSource(project_id=project.id,kind=ProjectSourceKind.URL,status=ProjectSourceStatus.READY,name="Country-only website",url="https://example.com/location")
+    db.add(source);db.flush()
+    db.add(ProjectOnboardingProposal(source_id=source.id,field_key="country",value="US"));db.commit()
+    before=deepcopy(profile.profile_data)
+    response=client.get(f"/editor/project/{project.id}/location")
+    assert response.status_code==200,response.text
+    result=response.json()
+    assert (result["country"],result["city"],result["timezone"])==(expected_country,expected_city,expected_zone)
+    db.refresh(profile);assert profile.profile_data==before

@@ -53,6 +53,14 @@ def suggestions(scope:str,entity:str,db:Session=Depends(get_db),actor:User=Depen
     country=country_code(data.get("country") or getattr(record,"country",None))
     city=data.get("city") or getattr(record,"city",None) or ""
     source="Saved profile (review before confirming)"
+    states=profile.field_states or {}
+    approved={"confirmed","corrected_by_user"}
+    country_locked=states.get("country",{}).get("status") in approved and bool(country_code(data.get("country")))
+    city_locked=states.get("city",{}).get("status") in approved and bool(data.get("city"))
+    country_selected=country_locked or (city_locked and bool(country))
+    city_selected=city_locked
+    country_source=source if data.get("country") else "Company country suggestion (not approved for this Project)"
+    city_source=source if city else ""
     if scope in {"project","company"}:
         if scope=="project":
             from app.modules.projects.models import ProjectOnboardingSource as Source
@@ -60,24 +68,41 @@ def suggestions(scope:str,entity:str,db:Session=Depends(get_db),actor:User=Depen
         else:
             from app.modules.company_onboarding.models import CompanyOnboardingSource as Source
             source_query=db.query(Source).filter_by(company_id=entity)
-        # Do not replace a confirmed location with a new extraction.
-        if (profile.field_states or {}).get("country",{}).get("status") not in {"confirmed","corrected_by_user"}:
-            for item in source_query.order_by(Source.created_at.desc()).all():
-                proposed={p.field_key:p.value for p in item.proposals if p.status.value!="rejected"}
-                if isinstance(proposed.get("headquarters"),dict):
-                    proposed={**proposed["headquarters"],**proposed}
-                candidate=country_code(proposed.get("country"))
-                if candidate:
-                    country=candidate;city=proposed.get("city") or city;source=item.name;break
+        # Approval belongs to each field, not the entire location. A confirmed
+        # country must not prevent a missing city from receiving suggestions.
+        for item in source_query.order_by(Source.created_at.desc()).all():
+            proposed={p.field_key:p.value for p in item.proposals if p.status.value!="rejected"}
+            if isinstance(proposed.get("headquarters"),dict):
+                proposed={**proposed["headquarters"],**proposed}
+            candidate=country_code(proposed.get("country"))
+            if country_selected and candidate and candidate!=country:
+                continue  # Never mix a city from an explicitly different country.
+            if not country_selected and candidate:
+                if candidate!=country and not city_locked:
+                    city="";city_source="";city_selected=False
+                country=candidate;country_selected=True;country_source=item.name
+            proposed_city=proposed.get("city")
+            if not city_selected and isinstance(proposed_city,str) and proposed_city.strip():
+                city=proposed_city.strip();city_selected=True;city_source=item.name
+                # Keep this pending pair coherent if another older source has
+                # a different country. The fallback is still only a suggestion.
+                country_selected=bool(country)
+            if country_selected and city_selected:
+                break
     if not country:
         country=country_code(company.country_code);source="Company country suggestion (not approved for this Project)"
     elif scope == "project" and not data.get("country") and source.startswith("Saved profile"):
         source="Company country suggestion (not approved for this Project)"
+    source="; ".join(dict.fromkeys(value for value in (country_source,city_source) if value)) or source
     matches=[i for i in OPTIONS["cities"] if i["country"]==country and norm(i["city"])==norm(city)]
     zones=sorted({i["timezone"] for i in matches})
+    saved_timezone=data.get("timezone")
+    timezone_locked=states.get("timezone",{}).get("status") in approved and bool(saved_timezone)
+    same_pair=country_code(data.get("country"))==country and norm(data.get("city"))==norm(city)
+    suggested_timezone=saved_timezone if timezone_locked else (zones[0] if len(zones)==1 else saved_timezone if same_pair else "")
     return {"countries":[{"code":k,"name":v} for k,v in sorted(OPTIONS["countries"].items(),key=lambda i:i[1])],
         "cities":OPTIONS["cities"],"country":country or "","city":city,"source":source,
-        "timezone":data.get("timezone") or (zones[0] if len(zones)==1 else ""),
+        "timezone":suggested_timezone or "",
         "timezone_confirmed":(profile.field_states or {}).get("timezone",{}).get("status") in {"confirmed","corrected_by_user"}}
 
 @router.post("/{scope}/{entity}/location")
