@@ -12,6 +12,7 @@ class SalesAgentState(TypedDict, total=False):
     lead_id: str
     inbound_text: str
     event_kind: str
+    evaluation_now: str
     channel: str
     company_context: dict[str, Any]
     project_context: dict[str, Any]

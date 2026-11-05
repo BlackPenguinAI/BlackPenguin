@@ -2,6 +2,7 @@ from __future__ import annotations
 from .monetary_policy import validate_monetary_reply
 
 import json
+from datetime import datetime
 from typing import Any
 
 from langgraph.graph import END, START, StateGraph
@@ -306,10 +307,24 @@ def build_sales_graph(db: Session):
             }:
                 violations.append("share_asset_not_approved")
         appointment_actions = {"request_visit_location", "request_available_slots", "offer_appointment"}
-        appointment_intent = appointment_execution_allowed({**state, "primary_intent":primary_intent, "secondary_intents":secondary_intents, "requires_clarification":requires_clarification}, routing) and appointment_intent_present(
+        decision = {**state, "primary_intent":primary_intent, "secondary_intents":secondary_intents,
+                    "requires_clarification":requires_clarification, "policy_violations":violations}
+        executable = appointment_execution_allowed(decision, routing)
+        verified_selection = None
+        evaluation_now = datetime.fromisoformat(state["evaluation_now"]) if state.get("mode") == "simulation" and state.get("evaluation_now") else datetime.utcnow()
+        if executable and "select_appointment_slot" in intents and active.get("active_offer_kind") == "appointment_offer":
+            # Reuse the executor's bounded selection resolver. A document in
+            # the same turn must not veto a real, current appointment choice;
+            # a picture request or an old/property offer is still not consent.
+            from .service import _classified_slot_selection
+            conversation = db.get(SalesConversation, state["conversation_id"])
+            project = db.query(Project).filter_by(id=state["project_id"], company_id=state["company_id"]).one()
+            verified_selection = _classified_slot_selection(db, conversation=conversation, project=project,
+                inbound_text=state.get("inbound_text", ""), result=decision, now=evaluation_now)
+        appointment_intent = executable and (verified_selection is not None or appointment_intent_present(
             state.get("inbound_text", ""), state.get("conversation_history", []),
             classified_intent="request_appointment" if "request_appointment" in intents else primary_intent,
-        )
+        ))
         if not appointment_intent or requires_clarification:
             actions = [
                 action for action in actions
@@ -404,6 +419,8 @@ def build_sales_graph(db: Session):
                 "primary_intent": primary_intent, "confidence": confidence,
                 "clarification_threshold": clarification_threshold,
                 "appointment_intent": appointment_intent,
+                "verified_slot_selection": verified_selection.isoformat() if verified_selection else None,
+                "selection_checked_at": evaluation_now.isoformat(),
                 "catalog_reply_applied": bool(catalog_reply),
                 "active_offer": active,
                 "execution_requires_clarification": requires_clarification,

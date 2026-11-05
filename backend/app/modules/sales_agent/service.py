@@ -783,6 +783,7 @@ async def simulate_turn(
             "channel": "simulation",
             "inbound_text": inbound_text,
             "event_kind": event_kind,
+            "evaluation_now": now.isoformat(),
             "requires_human": False,
             "policy_violations": [],
         })
