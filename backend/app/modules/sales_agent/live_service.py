@@ -662,8 +662,19 @@ def _execute_share_actions(
     pending = approved.get(conversation.pending_asset_id or "")
     latest = latest_outbound(db, conversation.id)
     offer = (latest.metadata_json or {}).get("material_offer") if latest else None
+    acknowledged = bool(_affirmative_slot_reply(inbound_text) or re.fullmatch(r"\s*(?:sure|please|claro|send it|send them)[.!\s]*", inbound_text or "", re.I))
+    offered_ids = list(dict.fromkeys(offer.get("asset_ids") or [])) if isinstance(offer, dict) else []
+    revoked_offer = acknowledged and bool(offered_ids) and any(asset_id not in approved for asset_id in offered_ids)
+    if revoked_offer and not any(asset_id in approved for asset_id in offered_ids):
+        conversation.pending_asset_id = None
+        conversation.pending_asset_offered_at = None
+        db.add(conversation); db.flush()
+        actions = [action for action in actions if not isinstance(action, dict) or action.get("type") != "share_asset"]
+        return ("The material I previously offered is no longer approved or available to share. "
+                "No link has been sent. I can help with other approved Project information.", actions, [])
     consented = bool(pending and (_affirmative_slot_reply(inbound_text) or re.fullmatch(r"\s*(?:sure|please|claro|send it|send them)[.!\s]*", inbound_text or "", re.I))
                      and (not latest or isinstance(offer, dict) and pending["asset_id"] in offer.get("asset_ids", [])))
+    consented = consented or bool(acknowledged and offered_ids and any(asset_id in approved for asset_id in offered_ids))
     explicit_request = bool(requested and EXPLICIT_ASSET_SHARE.search(inbound_text or ""))
     if consented:
         actions = [
@@ -671,7 +682,7 @@ def _execute_share_actions(
             if not isinstance(action, dict) or action.get("type") != "share_asset"
         ]
         actions.extend({"type":"share_asset", "asset_id":asset_id, "reason":"lead_confirmed_material_offer"}
-                       for asset_id in ((offer or {}).get("asset_ids") or [pending["asset_id"]]) if asset_id in approved)
+                       for asset_id in (offered_ids or [pending["asset_id"]]) if asset_id in approved)
         conversation.pending_asset_id = None
         conversation.pending_asset_offered_at = None
         db.add(conversation)
@@ -788,6 +799,8 @@ def _execute_share_actions(
         seen.add(asset_id)
     if links:
         cleaned = _reconcile_shared_asset_reply(reply)
+        if revoked_offer:
+            cleaned += "\n\nSome previously offered materials are no longer approved or available; only the still-approved resources are shared below."
         missing_tags = requested_asset_tags - covered_tags
         if missing_tags:
             labels = {

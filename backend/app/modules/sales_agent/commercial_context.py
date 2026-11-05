@@ -92,7 +92,7 @@ def _safe_asset_links(item: Any) -> list[dict[str, Any]]:
             "kind": str(link.get("kind") or "external_reference")[:40],
             "page": link.get("page"),
         })
-    return links[:10]
+    return links
 
 
 def confirmed_profile_facts(profile: Any) -> dict[str, Any]:

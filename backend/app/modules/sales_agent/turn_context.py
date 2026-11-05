@@ -51,6 +51,10 @@ def turn_context(db, conversation, lead=None):
 
 def appointment_execution_allowed(result, routing=None):
     import math
+    # A downstream executor must not revive an intention explicitly rejected
+    # by the graph. Missing trace remains compatible with legacy callers.
+    if (result.get("response_policy_trace") or {}).get("appointment_intent") is False:
+        return False
     intents = {result.get("primary_intent") or result.get("intent"), *(result.get("secondary_intents") or [])}
     confidence = result.get("intent_confidence")
     threshold = float((routing or {}).get("minimum_confidence", .80))
