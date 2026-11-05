@@ -727,7 +727,15 @@ def approve_profile(
     if readiness["blockers"]:
         raise ValueError("profile_has_blockers")
 
+    from app.modules.location_editor import validate_published_location
+    validate_published_location(getattr(profile,"profile_data",None) or {})
     profile.final_approved = True
+    from app.modules.companies.models import Company
+    company = db.get(Company, profile.company_id) if (getattr(profile,"profile_data",None) or {}).get("timezone") else None
+    if company and (profile.profile_data or {}).get("timezone"):
+        company.timezone = profile.profile_data["timezone"]
+        if (profile.profile_data or {}).get("country"):
+            company.country_code = profile.profile_data["country"]
     resolve_draft(profile, "final_approval")
     versions.publish(db, profile, actor_user_id=actor_user_id)
     completion = refresh_completion(profile)

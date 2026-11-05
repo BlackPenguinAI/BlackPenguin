@@ -152,6 +152,7 @@ class ChatMessageResponse(BaseModel):
 
 
 class NextQuestionResponse(BaseModel):
+    task: str | None = None
     field: str | None = None
     label: str
     prompt: str

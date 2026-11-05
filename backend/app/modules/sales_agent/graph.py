@@ -29,6 +29,7 @@ from .response_policy import (
     repeats_recent_assistant_reply,
 )
 from .state import SalesAgentState
+from .intent_contract import normalize_intent, CONTRACT_INSTRUCTION, CONTRACT_VERSION
 from app.modules.governance.services import guidance_context
 
 
@@ -142,6 +143,7 @@ def build_sales_graph(db: Session):
         }
         return {
             "prompt_configuration_id": config.id,
+            "intent_routing_config": agent.get("intent_routing_config", {}),
             "prompt_snapshot": {
                 "platform_guardrails": PLATFORM_GUARDRAILS,
                 "system_prompt": agent.get("system_prompt", ""),
@@ -168,7 +170,8 @@ def build_sales_graph(db: Session):
         if not config.openrouter_api_key:
             if state.get("mode") == "simulation":
                 return {
-                    "intent": "demo_follow_up",
+                    "intent": "greeting", "primary_intent":"greeting", "intent_confidence":1.0,
+                    "secondary_intents":[],"intent_entities":{},"requires_clarification":False,
                     "proposed_actions": [{"type": "ask_qualification_question"}],
                     "proposed_reply": (
                         "Thanks for sharing that. What matters most for your next home: "
@@ -193,7 +196,7 @@ def build_sales_graph(db: Session):
             "reason": "string",
         }
         messages = [
-            {"role": "system", "content": "\n\n".join(state["prompt_snapshot"].values())},
+            {"role": "system", "content": "\n\n".join(state["prompt_snapshot"].values()) + "\n" + CONTRACT_INSTRUCTION},
             {"role": "system", "content": "RUNTIME CONTEXT:\n" + json.dumps({
                 "company": state["company_context"], "project": state["project_context"],
                 "commercial": state["commercial_context"], "lead": state["lead_context"],
@@ -225,18 +228,8 @@ def build_sales_graph(db: Session):
             ),
         )
         value = _json_object(raw)
-        primary_intent = value.get("primary_intent") or value.get("intent")
-        try:
-            confidence = max(0.0, min(1.0, float(value.get("intent_confidence", 1.0))))
-        except (TypeError, ValueError):
-            confidence = 0.0
         return {
-            "intent": primary_intent,
-            "primary_intent": primary_intent,
-            "secondary_intents": value.get("secondary_intents") if isinstance(value.get("secondary_intents"), list) else [],
-            "intent_confidence": confidence,
-            "intent_entities": value.get("intent_entities") if isinstance(value.get("intent_entities"), dict) else {},
-            "requires_clarification": bool(value.get("requires_clarification")),
+            **normalize_intent(value),
             "model_reason": value.get("reason") if isinstance(value.get("reason"), str) else None,
             "extracted_facts": value.get("extracted_facts") if isinstance(value.get("extracted_facts"), list) else [],
             "addressed_topics": value.get("addressed_topics") if isinstance(value.get("addressed_topics"), list) else [],
@@ -249,7 +242,7 @@ def build_sales_graph(db: Session):
 
     async def validate_output(state: SalesAgentState) -> dict[str, Any]:
         violations = list(state.get("policy_violations", []))
-        routing = (get_ai_config(db, None).agent_ventas or {}).get("intent_routing_config") or {}
+        routing = state.get("intent_routing_config") or (get_ai_config(db, None).agent_ventas or {}).get("intent_routing_config") or {}
         canonical_intents = set(SALES_INTENT_KEYS)
         primary_intent = str(state.get("primary_intent") or state.get("intent") or "unclear")
         if primary_intent not in canonical_intents:
@@ -259,7 +252,7 @@ def build_sales_graph(db: Session):
             str(value) for value in (state.get("secondary_intents") or [])
             if str(value) in canonical_intents and str(value) != primary_intent
         ][:maximum_intents - 1]
-        confidence = max(0.0, min(1.0, float(state.get("intent_confidence", 1.0))))
+        confidence = normalize_intent(state)["intent_confidence"]
         clarification_threshold = float(routing.get("clarification_threshold", 0.55))
         minimum_confidence = float(routing.get("minimum_confidence", 0.80))
         requires_clarification = bool(state.get("requires_clarification")) or (
@@ -287,7 +280,7 @@ def build_sales_graph(db: Session):
                 if not isinstance(action, dict) or action.get("type") not in appointment_actions
             ]
         reply = plain_channel_text(state.get("proposed_reply"))
-        if confidence < clarification_threshold and primary_intent == "unclear":
+        if requires_clarification and primary_intent not in {"opt_out", "human_requested", "security_or_abuse"}:
             reply = (
                 "Would you like property details or approved materials, such as photos and a brochure, "
                 "or would you like to schedule an in-person visit?"
@@ -363,6 +356,8 @@ def build_sales_graph(db: Session):
             "intent": primary_intent,
             "monetary_validation": monetary_validation,
             "response_policy_trace": {
+                "intent_contract_version": CONTRACT_VERSION,
+                "intent_contract_issues": state.get("intent_contract_issues", []),
                 "applied_routing_config": routing,
                 "primary_intent": primary_intent, "confidence": confidence,
                 "clarification_threshold": clarification_threshold,

@@ -203,7 +203,7 @@ def test_initial_template_contract_rejects_fixed_or_non_english_templates():
             raise AssertionError("The incompatible template should have been rejected.")
 
 
-def test_company_country_change_is_inherited_by_existing_projects():
+def test_company_country_change_does_not_relocate_confirmed_projects():
     db = _db()
     company = Company(name="Regional Realty", country_code="US")
     db.add(company); db.flush()
@@ -219,8 +219,8 @@ def test_company_country_change_is_inherited_by_existing_projects():
     sync_project_country(db, company_id=company.id, country_code="PE")
     db.commit(); db.refresh(project); db.refresh(profile)
 
-    assert project.country == "PE"
-    assert profile.profile_data["country"] == "PE"
+    assert project.country == "US"
+    assert profile.profile_data["country"] == "US"
     assert profile.field_states["country"]["status"] == "confirmed"
 
 

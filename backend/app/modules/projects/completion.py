@@ -35,6 +35,7 @@ FIELDS = (
     FieldDefinition("exact_address", "Exact address", "location"),
     FieldDefinition("city", "City / region", "location"),
     FieldDefinition("country", "Country", "location"),
+    FieldDefinition("timezone", "Confirmed IANA timezone", "location", "optional"),
     FieldDefinition("location_references", "Location references", "location", "recommended"),
     FieldDefinition("phases_and_towers", "Phases and towers", "structure", "conditionally_required"),
     FieldDefinition("property_type_catalog", "Confirmed property type catalog", "product"),

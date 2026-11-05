@@ -44,7 +44,7 @@ def test_langgraph_simulation_creates_a_draft_without_dispatching():
     db.commit()
     lead = db.query(Lead).filter(Lead.project_id == project.id).first()
     llm_json = (
-        '{"reply":"What layout do you prefer?","intent":"qualification",'
+        '{"reply":"What layout do you prefer?","primary_intent":"general_question","intent_confidence":0.95,'
         '"extracted_facts":[],"proposed_actions":[{"type":"ask_qualification_question"}],'
         '"requires_human":false,"reason":"Need preference"}'
     )
@@ -81,7 +81,7 @@ def test_visit_location_action_is_valid_workflow_output_not_a_policy_violation()
     )); db.commit()
     lead = db.query(Lead).filter(Lead.project_id == project.id).first()
     llm_json = (
-        '{"reply":"Which property would you like to visit?","intent":"appointment_request",'
+        '{"reply":"Which property would you like to visit?","primary_intent":"request_appointment","intent_confidence":0.95,'
         '"extracted_facts":[],"proposed_actions":[{"type":"request_visit_location"}],'
         '"requires_human":false,"reason":"Need an explicit location"}'
     )

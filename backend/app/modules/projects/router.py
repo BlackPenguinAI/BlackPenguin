@@ -200,7 +200,7 @@ def _turn_payload(
             for item in rejected
         ],
         "sources": [source_service.serialize_source(source) for source in (sources or [])],
-        "next_question": _next_question(profile),
+        "next_question": ai_message.ui_payload if (ai_message.ui_payload or {}).get("task") else _next_question(profile),
     }
 
 
@@ -400,7 +400,7 @@ def _state_payload(db: Session, project: Project) -> dict[str, Any]:
     )
     if not processing and not pending_review:
         latest_ai = next((item for item in reversed(messages) if item.sender == SenderType.AI), None)
-        desired_question = _guided_next_question(db, project, profile)
+        desired_question = latest_ai.ui_payload if latest_ai and not latest_ai.response_payload and (latest_ai.ui_payload or {}).get("task") else _guided_next_question(db, project, profile)
         if latest_ai and not latest_ai.response_payload and (latest_ai.ui_payload or {}).get("field") == "inventory_updated_at":
             # Retire this question without rewriting what the user originally
             # saw, or fabricating an answer/date for historical inventory.
@@ -427,9 +427,9 @@ def _state_payload(db: Session, project: Project) -> dict[str, Any]:
                 project.session.id,
                 keep_message_id=latest_ai.id,
             )
-            latest_ai.ui_payload = desired_question
-            latest_ai.content = desired_question["prompt"]
-            db.add(latest_ai); db.commit(); db.refresh(latest_ai)
+            services.record_message_response(db, project.session.id, latest_ai.id, "Moved to the current review step.", status="superseded", commit=False)
+            latest_ai = services.save_message(db, project.session.id, SenderType.AI, desired_question["prompt"], ui_payload=desired_question)
+            messages.append(latest_ai)
     if serialized_profile["completion"]["can_complete"]:
         stage = "complete"
     elif processing:
@@ -451,7 +451,7 @@ def _state_payload(db: Session, project: Project) -> dict[str, Any]:
         "messages": [_message(message) for message in messages],
         "profile": serialized_profile,
         "sources": [source_service.serialize_source(source) for source in sources],
-        "next_question": _guided_next_question(db, project, profile),
+        "next_question": desired_question if not processing and not pending_review else _guided_next_question(db, project, profile),
         "stage": stage,
         "version": version,
     }
@@ -1386,6 +1386,11 @@ async def send_chat(
     if existing_turn:
         return existing_turn
 
+    from .editor_tasks import detect_task
+    task = detect_task(payload.message)
+    if task:
+        return _open_editor_task(db, project, current_user, task, payload.client_message_id, payload.message, request_id)
+
     active_question = services.get_active_question(
         db,
         project.session.id,
@@ -1909,6 +1914,32 @@ def create_campaign(project_id: str, payload: CampaignCreate, db: Session = Depe
         actor_user_id=current_user.id,
     )
     return campaign
+
+
+def _open_editor_task(db, project, actor, task, client_id, text, request_id):
+    from .editor_tasks import question
+    require_project_access(db, actor, project.id)
+    if task == "team" and actor.role not in TENANT_MANAGER_ROLES:
+        raise HTTPException(403, "Ask a Company Administrator or Assistant to manage the team.")
+    user_message = services.save_message(db, project.session.id, SenderType.USER, text, message_id=client_id, commit=False)
+    services.supersede_unanswered_questions(db, project.session.id)
+    ui = question(task)
+    if task == "review": ui = _guided_next_question(db, project, services.get_profile(project))
+    ai = services.save_message(db, project.session.id, SenderType.AI, "I understood: " + ui["label"] + ". " + ui["prompt"], ui_payload=ui, in_reply_to_message_id=user_message.id, commit=False)
+    record_platform_event(db, actor=actor, company_id=project.company_id, event_type="onboarding.task_opened", entity_type="project", entity_id=project.id, payload={"task":task})
+    db.commit()
+    return _turn_payload(request_id=request_id, ai_message=ai, user_message=user_message, profile=services.get_profile(project))
+
+
+@router.post("/{project_id}/editor/{task}", response_model=ChatTurnResponse)
+def open_editor_task(project_id: str, task: str, payload: ChatMessagePayload, db: Session = Depends(get_db), current_user: User = Depends(RoleChecker(EDITOR_ROLES))):
+    from .editor_tasks import TASKS
+    if task not in TASKS: raise HTTPException(422, "Unknown onboarding task.")
+    project = services.get_project(db, project_id, current_user.company_id)
+    require_project_access(db, current_user, project_id)
+    db.query(ProjectSession).filter_by(id=project.session.id).with_for_update().one()
+    existing = _existing_turn(db, project=project, client_message_id=payload.client_message_id, request_id="editor")
+    return existing or _open_editor_task(db, project, current_user, task, payload.client_message_id, payload.message, "editor")
 
 
 @router.get("/{project_id}/meta-setup/config", response_model=MetaSetupConfigurationResponse)

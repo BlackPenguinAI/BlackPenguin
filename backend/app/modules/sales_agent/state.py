@@ -28,6 +28,8 @@ class SalesAgentState(TypedDict, total=False):
     primary_intent: str | None
     secondary_intents: list[str]
     intent_confidence: float
+    intent_contract_issues: list[str]
+    intent_routing_config: dict[str, Any]
     intent_entities: dict[str, Any]
     requires_clarification: bool
     extracted_facts: list[dict[str, Any]]

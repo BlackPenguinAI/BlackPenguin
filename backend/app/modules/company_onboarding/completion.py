@@ -85,6 +85,9 @@ OPTIONAL_FIELDS = tuple(
     FieldDefinition(key, label, "optional")
     for key, label in (
         ("legal_entity_type", "Legal entity type"),
+        ("country", "Company country"),
+        ("city", "Company city"),
+        ("timezone", "Company IANA timezone"),
         ("subsidiaries", "Subsidiaries"),
         ("ownership_structure", "Ownership structure"),
         ("assets_under_management", "Assets under management"),

@@ -53,13 +53,14 @@ import {
   TeamProjectOption,
 } from './company-onboarding.models';
 import { CompanyOnboardingService } from './company-onboarding.service';
+import { OnboardingLocationComponent } from '../../shared/ui/onboarding-location';
 import { ConfigureLaterComponent, DeferredCards, restoreDraft } from '../../shared/ui/configure-later/configure-later';
 
 
 @Component({
   selector: 'app-chat',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, TranslateModule, OnboardingAiMessageComponent, OnboardingWelcomeComponent, TimezoneSelectComponent, ConfigureLaterComponent],
+  imports: [CommonModule, FormsModule, RouterModule, TranslateModule, OnboardingAiMessageComponent, OnboardingWelcomeComponent, TimezoneSelectComponent, ConfigureLaterComponent, OnboardingLocationComponent],
   templateUrl: './chat.html',
   styleUrl: './chat.scss',
 })
@@ -84,6 +85,9 @@ export class ChatComponent implements OnInit, OnDestroy {
   messages: ChatMessage[] = [];
   sources: OnboardingSource[] = [];
   profile: CompanyProfileResponse = EMPTY_COMPANY_PROFILE;
+  companyEditorTask = '';
+  openCompanyTask(task:string):void {if(this.isAnalyzing)return;this.prompt=({team:'I want to update Company users',documents:'I want to upload documents',location:'I want to update city and country',review:'I want to review profile'} as Record<string,string>)[task] || '';this.sendMessage();}
+  companyLocationSaved():void {this.syncState('bottom');}
   showWelcome = false;
   initialState: 'loading' | 'ready' | 'error' = 'loading';
   nextQuestion: OnboardingQuestion | null = null;
@@ -118,6 +122,7 @@ export class ChatComponent implements OnInit, OnDestroy {
   private pollingTimer?: ReturnType<typeof setTimeout>;
   private replyToMessageId: string | null = null;
   private lastStateVersion = 0;
+  private renderGeneration = 0;
   private teamInviteRequestKey = '';
   private teamInviteRequestFingerprint = '';
   private pollingStartedAt = 0;
@@ -426,7 +431,7 @@ export class ChatComponent implements OnInit, OnDestroy {
   inviteTeamMember(): void {
     this.teamInviteAttempted = true;
     this.teamSuccess = '';
-    if (this.currentStage !== 'team' || this.hasPendingReview || this.isCompleted || !this.canInviteTeamMember) return;
+    if ((this.currentStage !== 'team' && this.companyEditorTask !== 'team') || this.hasPendingReview || (this.isCompleted && this.companyEditorTask !== 'team') || !this.canInviteTeamMember) return;
     this.teamSaving = true;
     this.teamSavingAction = 'add';
     this.teamError = '';
@@ -540,7 +545,7 @@ export class ChatComponent implements OnInit, OnDestroy {
   }
 
   continueTeamSetup(): void {
-    if (this.currentStage !== 'team' || this.teamSaving || this.hasPendingReview || this.isCompleted) return;
+    if ((this.currentStage !== 'team' && this.companyEditorTask !== 'team') || this.teamSaving || this.hasPendingReview || (this.isCompleted && this.companyEditorTask !== 'team')) return;
     this.teamSaving = true;
     this.teamSavingAction = 'continue';
     this.teamError = '';
@@ -668,6 +673,7 @@ export class ChatComponent implements OnInit, OnDestroy {
 
   sendMessage(): void {
     if (!this.canSend) return;
+    this.renderGeneration++;
     if (this.isRecording) this.speech.stop();
     const content = this.prompt.trim();
     this.prompt = '';
@@ -980,10 +986,12 @@ export class ChatComponent implements OnInit, OnDestroy {
     scrollMode: OnboardingScrollMode = 'none',
     anchor: ReviewScrollAnchor | null = null,
   ): void {
+    const generation = this.renderGeneration;
     const shouldScrollToBottom = scrollMode === 'bottom'
       || (scrollMode === 'auto' && isNearScrollBottom(this.chatScroll?.nativeElement));
     this.onboarding.getState().subscribe({
       next: (state) => {
+        if (generation !== this.renderGeneration) return;
         this.initialState = 'ready';
         this.applyState(state);
         if (scrollMode === 'preserve') this.restoreProposalAnchor(anchor);
@@ -1002,6 +1010,7 @@ export class ChatComponent implements OnInit, OnDestroy {
   private applyState(state: OnboardingState): void {
     if (state.version < this.lastStateVersion) return;
     this.lastStateVersion = state.version;
+    this.companyEditorTask = (state.next_question as any)?.task || '';
     this.messages = [...state.messages];
     this.profile = state.profile;
     restoreDraft(this.teamInvite, this.profile.ui_deferrals?.['team']?.draft);
@@ -1048,6 +1057,8 @@ export class ChatComponent implements OnInit, OnDestroy {
   }
 
   private applyTurn(turn: ChatTurnResponse): void {
+    this.renderGeneration++;
+    this.companyEditorTask = (turn.next_question as any)?.task || '';
     const wasCompleted = this.isCompleted;
     const additions = [turn.user_message, turn.message].filter((message): message is ChatMessage => !!message);
     const merged = new Map(this.messages.filter((message) => message.id).map((message) => [message.id!, message]));

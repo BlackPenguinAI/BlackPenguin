@@ -17,6 +17,7 @@ export class ProjectOnboardingService {
   constructor(private readonly http: HttpClient) {}
 
   getProfile(id: string): Observable<ProjectProfile> { return this.http.get<ProjectProfile>(`${this.baseUrl}/${id}/profile`); }
+  openEditorTask(id:string,task:string,clientId:string):Observable<ChatTurn>{return this.http.post<ChatTurn>(`${this.baseUrl}/${id}/editor/${task}`,{message:'Open review: '+task,client_message_id:clientId});}
   getHistory(id: string): Observable<ChatMessage[]> { return this.http.get<ChatMessage[]>(`${this.baseUrl}/${id}/chat`); }
   startChat(id: string): Observable<ChatTurn> { return this.http.post<ChatTurn>(`${this.baseUrl}/${id}/chat/start`, {}); }
   bootstrap(id: string, initialUrl: string): Observable<ChatTurn> { return this.http.post<ChatTurn>(`${this.baseUrl}/${id}/chat/bootstrap`, { initial_url: initialUrl, skip_website: false }); }

@@ -408,6 +408,8 @@ def _seed_project(
     if result.rejected:
         raise ValueError(f"{project.name} contains invalid seed fields: {result.rejected}")
 
+    if "timezone" not in (profile.field_states or {}):
+        project_services.apply_field_updates(db, profile, [{"field":"timezone","value":None,"status":"not_applicable","applicable":False}],allow_authoritative_statuses=True,commit=False)
     for definition in PROJECT_FIELDS:
         if definition.key not in (profile.field_states or {}):
             raise ValueError(f"{project.name} seed does not evaluate Project field '{definition.key}'.")

@@ -8,6 +8,7 @@ from app.modules.projects.completion import FIELDS
 TEMPLATE_VERSION = "v1"
 
 PROFILE_DATA = {
+    "timezone": None,
     "project_name": "Demo",
     "project_type": "Residential development",
     "project_status": "Under construction",

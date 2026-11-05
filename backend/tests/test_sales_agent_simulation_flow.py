@@ -38,28 +38,28 @@ from app.modules.users.models import User, UserRole
 
 LLM_REPLY = (
     '{"reply":"Hi, this is Black Penguin following up about your home search. '
-    'What is your preferred number of bedrooms?","intent":"qualification",'
+    'What is your preferred number of bedrooms?","primary_intent":"general_question","intent_confidence":0.95,'
     '"extracted_facts":[],"proposed_actions":[{"type":"ask_qualification_question"}],'
     '"requires_human":false,"reason":"Need one preference"}'
 )
 
 SLOTS_REPLY = (
     '{"reply":"I will check the available appointment slots. Please hold on.",'
-    '"intent":"appointment_request","extracted_facts":[],'
+    '"primary_intent":"request_appointment","intent_confidence":0.95,"extracted_facts":[],'
     '"proposed_actions":[{"type":"request_available_slots"}],'
     '"requires_human":false,"reason":"Check verified availability"}'
 )
 
 HUMAN_REVIEW_REPLY = (
     '{"reply":"Please hold on while I request a human review.",'
-    '"intent":"appointment_request","extracted_facts":[],'
+    '"primary_intent":"request_appointment","intent_confidence":0.95,"extracted_facts":[],'
     '"proposed_actions":[{"type":"request_human_review"}],'
     '"requires_human":true,"reason":"Availability was not checked"}'
 )
 
 FALSE_CONFIRMATION_REPLY = (
     '{"reply":"Your appointment is confirmed for Friday at 3:00 PM.",'
-    '"intent":"appointment_confirmed","extracted_facts":[],'
+    '"primary_intent":"select_appointment_slot","intent_confidence":0.95,"extracted_facts":[],'
     '"proposed_actions":[{"type":"appointment_confirmed"}],'
     '"requires_human":false,"reason":"Lead agreed"}'
 )

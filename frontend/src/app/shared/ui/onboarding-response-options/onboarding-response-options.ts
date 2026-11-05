@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 
 export interface OnboardingQuestion {
+  task?: string | null;
   field: string | null;
   label: string;
   prompt: string;

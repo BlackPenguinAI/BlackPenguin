@@ -476,6 +476,11 @@ def is_too_short(field: str, value: Any) -> bool:
 
 
 def validate_onboarding_value(field: str, value: Any) -> dict[str, Any] | None:
+    if field == "timezone" and value is not None:
+        from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+        try: ZoneInfo(value)
+        except (ValueError, TypeError, ZoneInfoNotFoundError):
+            return {"code":"invalid_timezone","message":"Choose a valid IANA timezone.","field":field}
     """Return a stable validation error shared by chat, extraction and review flows."""
     if field == "starting_price" and value is not None:
         from app.modules.money import parse_amount

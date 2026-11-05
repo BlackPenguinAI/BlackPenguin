@@ -131,23 +131,13 @@ def create_project_with_onboarding(db: Session, *, company_id: str, payload: dic
             detail="The Company operating country must be configured before creating Projects.",
         )
     payload = dict(payload)
-    # A Project currently operates in the same market as its Company. Keep the
-    # persisted Project value for compatibility, but never trust a client value.
-    payload["country"] = inherited_country
+    country_provided = bool(payload.get("country"))
+    # Company country is only a fallback suggestion; Projects are independent.
+    payload["country"] = payload.get("country") or inherited_country
     if not payload.get("timezone") or payload.get("timezone") == "UTC":
-        location = " ".join(str(payload.get(key) or "") for key in ("city", "address")).casefold()
-        known_city_timezones = {
-            "ciudad de méxico": "America/Mexico_City",
-            "ciudad de mexico": "America/Mexico_City",
-            "mexico city": "America/Mexico_City",
-            "lima": "America/Lima",
-            "chicago": "America/Chicago",
-            "miami": "America/New_York",
-        }
-        payload["timezone"] = next(
-            (zone for city, zone in known_city_timezones.items() if city in location),
-            payload.get("timezone") or "UTC",
-        )
+        from app.modules.location_editor import OPTIONS, country_code, norm
+        matches = {i["timezone"] for i in OPTIONS["cities"] if i["country"] == country_code(payload["country"]) and norm(i["city"]) == norm(payload.get("city"))}
+        payload["timezone"] = next(iter(matches)) if len(matches)==1 else (payload.get("timezone") or "UTC")
     project = Project(**payload, company_id=company_id, is_active=True)
     db.add(project)
     db.flush()
@@ -161,6 +151,8 @@ def create_project_with_onboarding(db: Session, *, company_id: str, payload: dic
     }
     if draft:
         seed = {}
+    if not country_provided:
+        seed.pop("country", None)
     profile.profile_data = {key: value for key, value in seed.items() if value not in (None, "")}
     profile.field_states = {
         key: {"status": "confirmed", "applicable": True}
@@ -843,7 +835,9 @@ def complete_onboarding(db: Session, project: Project, user_id: str) -> ProjectP
         })
     now = datetime.utcnow()
     data = profile.profile_data or {}
-    for field, attr in (("project_name", "name"), ("short_description", "description"), ("city", "city"), ("country", "country")):
+    from app.modules.location_editor import validate_published_location
+    validate_published_location(data)
+    for field, attr in (("project_name", "name"), ("short_description", "description"), ("city", "city"), ("country", "country"), ("timezone", "timezone")):
         if data.get(field) and (profile.field_states or {}).get(field, {}).get("status") in {"confirmed", "corrected_by_user"}:
             setattr(project, attr, str(data[field]))
     if data.get("exact_address"):

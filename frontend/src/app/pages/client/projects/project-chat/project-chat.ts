@@ -31,6 +31,7 @@ import {
   ProjectFileIntent, ProjectPropertyType, ProjectSalesAsset, PropertyTypeCatalog, SalesAssetType,
 } from './project-onboarding.models';
 import { ProjectOnboardingService } from './project-onboarding.service';
+import { OnboardingLocationComponent } from '../../../../shared/ui/onboarding-location';
 import { API_V1_URL } from '../../../../core/config/api.config';
 import { MetaOAuthWindow } from '../../../../shared/utils/meta-oauth-window';
 import { MetaSetupState } from './project-onboarding.models';
@@ -48,7 +49,7 @@ import {
 
 @Component({
   selector: 'app-project-chat', standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, OnboardingAiMessageComponent, OnboardingWelcomeComponent, ConfigureLaterComponent],
+  imports: [CommonModule, FormsModule, RouterModule, OnboardingAiMessageComponent, OnboardingWelcomeComponent, ConfigureLaterComponent, OnboardingLocationComponent],
   templateUrl: './project-chat.html', styleUrls: ['./project-chat.scss'],
 })
 export class ProjectChatComponent implements OnInit, OnDestroy {
@@ -185,6 +186,14 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   private replyToMessageId: string | null = null;
   private retryClientMessageId: string | null = null;
   private lastStateVersion = 0;
+  private renderGeneration = 0;
+  locationSaved():void {this.syncState('bottom');}
+  readonly editorTasks = [{key:'meta_account',label:'Meta account'},{key:'meta_assets',label:'Campaigns / forms'},{key:'team',label:'Assign team'},{key:'catalog',label:'Property types'},{key:'documents',label:'Add documents'},{key:'location',label:'Location / timezone'}];
+  openEditorTask(task:string):void {
+    if(this.isAnalyzing)return;
+    this.isAnalyzing=true;this.errorMessage='';
+    this.onboarding.openEditorTask(this.projectId,task,this.createClientMessageId()).pipe(timeout(20_000)).subscribe({next:turn=>{this.isAnalyzing=false;this.applyTurn(turn);this.showMetaAssetStep=task==='meta_assets';this.scrollToBottom();},error:e=>{this.isAnalyzing=false;this.errorMessage=this.apiDetail(e,'The review could not be opened. Your data is unchanged; retry.');this.cdr.detectChanges();}});
+  }
   private pollingStartedAt = 0;
   private propertyCatalogRequestVersion = 0;
   private readonly expandedSourceIds = new Set<string>();
@@ -1118,6 +1127,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   handleKeyDown(event: KeyboardEvent): void { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); if (this.canSend) this.sendMessage(); } }
   sendMessage(): void {
     if (!this.canSend) return;
+    this.renderGeneration++;
     if (this.isRecording) this.speech.stop();
     const content = this.prompt.trim();
     const files = [...this.selectedFiles];
@@ -1146,8 +1156,8 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
         this.retryClientMessageId = null;
         this.messages = this.messages.filter((message) => message !== optimistic);
         this.markReply(replyTo, content);
-        this.applyTurn(turn);
-        this.isAnalyzing = false; this.isUploading = false; this.scrollToBottom();
+        this.isAnalyzing = false; this.isUploading = false;
+        this.applyTurn(turn); this.scrollToBottom();
       },
       error: (error: HttpErrorResponse) => {
         this.messages = this.messages.filter((message) => message !== optimistic);
@@ -1598,10 +1608,12 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     scrollMode: OnboardingScrollMode = 'none',
     anchor: ReviewScrollAnchor | null = null,
   ): void {
+    const generation = this.renderGeneration;
     const shouldScrollToBottom = scrollMode === 'bottom'
       || (scrollMode === 'auto' && isNearScrollBottom(this.chatScroll?.nativeElement));
     this.onboarding.getState(this.projectId).subscribe({
       next: (state) => {
+        if (generation !== this.renderGeneration) return;
         this.initialState = 'ready';
         this.applyState(state);
         if (scrollMode === 'preserve') this.restoreProposalAnchor(anchor);
@@ -1659,11 +1671,17 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     this.cdr.detectChanges();
   }
   private applyTurn(turn: ChatTurn): void {
+    this.renderGeneration++;
+    if (turn.next_question?.task === 'meta_account') this.showMetaAssetStep=false;
+    if (turn.next_question?.task === 'meta_assets') {this.showMetaAssetStep=true;if(this.metaOAuth.authorization_id)this.loadMetaAssets();}
     const additions = [turn.user_message, turn.message].filter((message): message is ChatMessage => !!message);
     const withIds = new Map(this.messages.filter((message) => message.id).map((message) => [message.id!, message]));
     for (const message of additions) if (message.id) withIds.set(message.id, message);
     this.messages = [...withIds.values(), ...this.messages.filter((message) => !message.id), ...additions.filter((message) => !message.id)];
-    this.profile = turn.profile; this.nextQuestion = turn.next_question; this.mergeSources(turn.sources); this.cdr.detectChanges();
+    this.profile = turn.profile; this.nextQuestion = turn.next_question; this.mergeSources(turn.sources);
+    this.showWelcome = false;
+    if (turn.message.ui_payload?.['task'] === 'catalog') this.loadPropertyTypes();
+    this.cdr.detectChanges();
     if (turn.sources.some((source) => source.status === 'processing')) this.schedulePolling();
     if (turn.redirect_url) this.router.navigateByUrl(turn.redirect_url);
   }

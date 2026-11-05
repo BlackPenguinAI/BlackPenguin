@@ -149,6 +149,7 @@ export interface OnboardingState {
   version: number;
 }
 export interface NextQuestion {
+  task?: string | null;
   field: string | null; label: string; prompt: string; input_type: string;
   options: string[]; examples: string[]; allow_custom: boolean; minimum_words: number | null;
   minimum_characters?: number | null; help_text?: string | null;

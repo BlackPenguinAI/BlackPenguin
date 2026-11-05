@@ -521,6 +521,9 @@ def _state_payload(db: Session, company_id: str) -> dict[str, Any]:
         pristine=not messages and not sources,
     )
     next_question = _stage_next_question(stage, profile)
+    selected = services.get_active_question(db, session.id)
+    if selected and (selected.ui_payload or {}).get("task"):
+        next_question = selected.ui_payload
     if next_question:
         active_question = services.get_active_question(db, session.id)
         if active_question and active_question.ui_payload == next_question:
@@ -855,6 +858,17 @@ async def send_chat_message(
     session = services.get_or_create_session(db, current_user.company_id)
     profile = services.get_or_create_profile(db, current_user.company_id)
     db.query(OnboardingSession).filter(OnboardingSession.id == session.id).with_for_update().one()
+    from app.modules.projects.editor_tasks import detect_task, question
+    task = detect_task(payload.message)
+    if task in {"team", "documents", "location", "review"}:
+        user_message = services.save_message(db, session.id, SenderType.USER, payload.message, commit=False)
+        services.supersede_unanswered_questions(db, session.id)
+        ui = question(task)
+        if task == "review": ui = _next_question(profile)
+        else: ui["prompt"] = {"team":"Review Company users below. Existing Project scope exceptions remain in force.","documents":"Attach a new Company document below; no extracted data is approved automatically.","location":"Review selectable Company country, city and timezone. Projects keep their own locations."}[task]
+        ai = services.save_message(db, session.id, SenderType.AI, "I understood: " + ui["prompt"],ui_payload=ui,in_reply_to_message_id=user_message.id,commit=False)
+        db.commit()
+        return {"request_id":request_id,"message_saved":True,"profile_changed":False,"field_update_status":"not_applicable","assistant_status":"deterministic","source_actions":[],"message":_message_payload(ai),"user_message":_message_payload(user_message),"profile":services.serialize_profile(profile),"accepted_fields":[],"rejected_updates":[],"sources":[],"next_question":ui}
     active_question = services.get_active_question(
         db, session.id, payload.in_reply_to_message_id,
     )
