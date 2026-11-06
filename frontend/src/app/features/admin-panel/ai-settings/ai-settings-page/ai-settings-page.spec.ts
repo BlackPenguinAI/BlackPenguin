@@ -4,6 +4,15 @@ import { describe, expect, it, vi } from 'vitest';
 import { AiSettingsPageComponent } from './ai-settings-page';
 
 describe('AiSettingsPageComponent', () => {
+  it('preserves the active cohort while normalizing runtime defaults and editing IDs', () => {
+    const component = new AiSettingsPageComponent({} as any, {} as any, {} as any);
+    component.config.agent_ventas.runtime_config = {mode:'active',company_ids:['company-a'],project_ids:['project-a']};
+    (component as any).refreshPromptKeys();
+    expect(component.config.agent_ventas.runtime_config.mode).toBe('active');
+    component.runtimeIds('lead_ids','lead-a, lead-b');
+    expect(component.config.agent_ventas.runtime_config.lead_ids).toEqual(['lead-a','lead-b']);
+    expect(component.config.agent_ventas.runtime_config.company_ids).toEqual(['company-a']);
+  });
   it('exposes a structured sales prompt pack', () => {
     const component = new AiSettingsPageComponent({} as any, {} as any, {} as any);
     component.activeTab = 'ventas';

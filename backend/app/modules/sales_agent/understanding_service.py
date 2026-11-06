@@ -1,4 +1,4 @@
-"""Opt-in preview only. Never imported/called by the live or simulation executor."""
+"""Audited structured interpretation, gated for preview or active coordination."""
 import hashlib
 import json
 from dataclasses import dataclass
@@ -17,8 +17,8 @@ class PreviewOutcome:
     status: str
 
 
-async def preview(db, scope: Scope, *, inbound_message_id: str, expected_revision: int, event_key: str, infer=None):
-    if not settings.SALES_UNDERSTANDING_PREVIEW_ENABLED:
+async def preview(db, scope: Scope, *, inbound_message_id: str, expected_revision: int, event_key: str, infer=None, active=False):
+    if not (settings.SALES_DIALOGUE_RUNTIME_ENABLED if active else settings.SALES_UNDERSTANDING_PREVIEW_ENABLED):
         raise PermissionError('Understanding preview is disabled. The live engine is unchanged.')
     validate_write_request(event_key, expected_revision, 'understanding_preview')
     conversation = check_scope(db, scope)

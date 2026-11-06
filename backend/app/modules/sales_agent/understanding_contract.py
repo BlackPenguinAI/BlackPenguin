@@ -74,6 +74,12 @@ class Preference(StrictModel):
     evidence: str = Field(min_length=1, max_length=2000)
 
 
+class ConstraintRelease(StrictModel):
+    topic: Topic
+    subject: Subject | None = None
+    evidence: str = Field(min_length=1, max_length=2000)
+
+
 class Understanding(StrictModel):
     version: Literal['sales-understanding/1.0']
     requests: list[Request] = Field(max_length=30)
@@ -84,6 +90,7 @@ class Understanding(StrictModel):
     constraints: list[Constraint] = Field(max_length=30)
     references: list[Reference] = Field(max_length=20)
     preferences: list[Preference] = Field(max_length=20)
+    releases: list[ConstraintRelease] = Field(default_factory=list, max_length=20)
     requires_clarification: StrictBool
     clarification_question: str | None = Field(max_length=500)
     confidence: float = Field(ge=0, le=1, strict=True)
@@ -114,6 +121,7 @@ class Understanding(StrictModel):
         evidence = [r.evidence for r in self.requests] + [c.evidence for c in self.constraints]
         evidence += [g.evidence for g in self.alternatives] + [r.evidence for r in self.references]
         evidence += [p.evidence for p in self.preferences]
+        evidence += [r.evidence for r in self.releases]
         if any(not item.strip() or item not in inbound for item in evidence):
             raise ValueError('Evidence must be an exact non-empty substring of the current message.')
         return self
@@ -137,6 +145,7 @@ class Task(StrictModel):
     subject: Subject | None = None
     source_message_id: str | None = Field(default=None, max_length=36)
     alternative_group: str | None = Field(default=None, max_length=100)
+    property_id: str | None = Field(default=None, max_length=36)
 
 
 class Offer(StrictModel):

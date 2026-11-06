@@ -257,7 +257,8 @@ def test_preview_persists_understanding_without_business_effects_or_task_loss(ca
     assert not conversation.is_paused
     event = db.query(SalesDialogueEvent).filter_by(event_key='preview').one()
     meta = event.payload_json['metadata']
-    assert meta['model'] == 'test/offline' and meta['prompt_snapshot']['version'] == 'sales-understanding-prompt/1.0'
+    from app.modules.sales_agent.understanding_prompt import PROMPT_VERSION
+    assert meta['model'] == 'test/offline' and meta['prompt_snapshot']['version'] == PROMPT_VERSION
     assert 'Published sales guidance' in json.dumps(meta['model_request'])
     assert 'openrouter_api_key' not in json.dumps(meta)
     assert meta['model_request_sha256']

@@ -340,6 +340,9 @@ async def _dispatch_part(
     idempotency_key: str | None = None,
 ) -> SalesMessage:
     message_metadata = dict(metadata or {})
+    if message_metadata.get('engine') == 'sales-active/1.0':
+        from .active_service import authorize_part
+        authorize_part(db, conversation, lead, message_metadata)
     proposed_content = message_metadata.get("proposed_reply_before_format", content)
     message_metadata.setdefault("lead_id", lead.id)
     message_metadata.setdefault("project_id", conversation.project_id)
@@ -414,6 +417,15 @@ async def _dispatch_part(
                 message = existing_message
                 outbound.status = "queued"; outbound.last_error = None
                 message.status = "queued"
+                if message.content != persisted_content:
+                    # Retain failed content as evidence when a permission
+                    # change requires a different safe retry response.
+                    history = list((message.metadata_json or {}).get('retry_content_history') or [])
+                    history.append({'content': message.content, 'status': 'failed'})
+                    message_metadata['retry_content_history'] = history
+                    message.content = persisted_content
+                    outbound.content = persisted_content
+                    message.metadata_json = {**message_metadata, 'outbound_message_id': outbound.id}
             else:
                 raise HTTPException(status_code=409, detail="The initial SMS request is already being processed.")
         else:
@@ -537,8 +549,16 @@ def _select_assets_for_request(assets: list[dict], inbound_text: str, *, limit: 
     covers A+C and another covers C, both remain useful and may be shared.
     """
     requested = _requested_asset_tags(inbound_text)
+    from .request_safety import prohibited
+    excluded = {tag for subject,tag in [('photos','gallery_image'),('brochure','brochure')] if prohibited(inbound_text,subject)}
+    originally_specific = bool(requested)
+    requested -= excluded
+    if originally_specific and not requested:
+        return []
     ranked: list[tuple[int, int, dict]] = []
     for position, asset in enumerate(assets):
+        if _asset_tags(asset) <= excluded:
+            continue
         covered = requested.intersection(_asset_tags(asset))
         if requested and not covered:
             continue
@@ -548,6 +568,8 @@ def _select_assets_for_request(assets: list[dict], inbound_text: str, *, limit: 
         # even when the administrator used only a broad content label.
         ranked = [(0, -position, asset) for position, asset in enumerate(assets)]
     ranked.sort(key=lambda item: (item[0], item[1]), reverse=True)
+    if re.search(r'\b(?:or|o)\b',inbound_text,re.I) and len(requested)>1 and limit is None:
+        ranked = ranked[:1]
     return [item[2] for item in (ranked if limit is None else ranked[:max(1, limit)])]
 
 
@@ -1177,6 +1199,11 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
         inbound = db.query(SalesMessage).filter(SalesMessage.id == inbound_message_id).first()
         if not conversation or not inbound:
             return
+        # Active cohorts never fall back to the legacy graph, including retries
+        # of already-persisted booking/control replies.
+        from .active_service import maybe_process_active
+        if await maybe_process_active(db, conversation, inbound):
+            return
         lead = db.query(Lead).filter(Lead.id == conversation.lead_id, Lead.company_id == conversation.company_id).one()
         project = db.query(Project).filter(Project.id == conversation.project_id, Project.company_id == conversation.company_id).one()
         if lead.is_opt_out:
@@ -1623,16 +1650,22 @@ async def process_live_followup_job(job_id: str) -> None:
         from .turn_trace import capture_input
         run.input_snapshot = {**run.input_snapshot, "turn_trace": capture_input(db, conversation)}
         db.add(run); db.commit(); db.refresh(run)
-        result = await build_sales_graph(db).ainvoke({
-            "event_id": event_id, "mode": "live", "conversation_id": conversation.id,
-            "company_id": lead.company_id, "project_id": project.id,
-            "campaign_id": lead.campaign_id, "lead_id": lead.id, "channel": conversation.channel,
-            "inbound_text": (
-                "Write the next concise, helpful SMS follow-up based only on the verified context and chat. "
-                "Do not invent urgency, inventory, price or availability. Include a simple question and opt-out language."
-            ),
-            "event_kind": "scheduled_follow_up", "requires_human": False, "policy_violations": [],
-        })
+        from .active_service import active_followup_result, ENGINE
+        result = active_followup_result(db, conversation)
+        if result is not None:
+            run.graph_version = ENGINE
+            run.toolset_version = 'sales-actions/1.0'
+        else:
+            result = await build_sales_graph(db).ainvoke({
+                "event_id": event_id, "mode": "live", "conversation_id": conversation.id,
+                "company_id": lead.company_id, "project_id": project.id,
+                "campaign_id": lead.campaign_id, "lead_id": lead.id, "channel": conversation.channel,
+                "inbound_text": (
+                    "Write the next concise, helpful SMS follow-up based only on the verified context and chat. "
+                    "Do not invent urgency, inventory, price or availability. Include a simple question and opt-out language."
+                ),
+                "event_kind": "scheduled_follow_up", "requires_human": False, "policy_violations": [],
+            })
         result = apply_escalation_policy(result, inbound="", routing=((get_ai_config(db, None).agent_ventas or {}).get("intent_routing_config") or {}), event_kind="scheduled_follow_up")
         decision = result["escalation_decision"]
         reply = result.get("proposed_reply")
@@ -1673,7 +1706,7 @@ async def process_live_followup_job(job_id: str) -> None:
             job.processed_at = datetime.utcnow(); db.commit(); return
         await _dispatch(
             db, conversation=conversation, lead=lead, content=reply, role="assistant",
-            agent_run_id=run.id, metadata={"event_kind": "scheduled_follow_up", "reason": job.reason},
+            agent_run_id=run.id, metadata={"event_kind": "scheduled_follow_up", "reason": job.reason, "engine":run.graph_version},
             idempotency_key=dispatch_key,
         )
         job.status = "processed"; job.processed_at = datetime.utcnow()

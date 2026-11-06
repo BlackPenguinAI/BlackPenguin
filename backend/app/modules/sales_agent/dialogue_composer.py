@@ -86,7 +86,7 @@ def compose(outcome, *, channel='sms', style='concise'):
         blocks.append(clarification.clarification_question)
     if not blocks and not materials:
         blocks.append('I need clarification or verified information to answer this request.')
-    if any(t.topic.value == 'property_details' and t.status == 'awaiting_user' for t in state.tasks):
+    if any(t.topic.value in {'property_details','materials','pricing','inventory'} and t.status == 'awaiting_user' for t in state.tasks):
         blocks.append('Which property option would you like to explore?')
     # Repair is deterministic composition from facts, not another tool execution.
     text = render_channel_text('\n\n'.join([*blocks,*materials]),channel)

@@ -1,0 +1,97 @@
+{
+  "base_commit": "e96c8189cfd39f351274d9f2add115ffc59eecf1",
+  "files": [
+    {
+      "path": "backend/app/integrations/gcalendar_client.py",
+      "sha256": "b3d51035cdaf37f6490cda221601e7ee7c2a154c96a81607818313f7242c7d40"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/active_service.py",
+      "sha256": "f7a04c20a889c19fe034c545d672586894119d11426371ebc53d676133a9262f"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/dialogue_composer.py",
+      "sha256": "dea192a193bc871891e003d8058d0069bfb233e4ed4a280b1e401506e838a24e"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/dialogue_orchestrator.py",
+      "sha256": "0c4d7a0140bf948fcd1474f4699e002e79d7924e88f2286e229746ce97c9f41d"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/dialogue_shadow.py",
+      "sha256": "643c5db6ec86dddd70cb5dba1450479c129b9acc0810eff8c7c8789965de67e3"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/dialogue_tasks.py",
+      "sha256": "aee5914bcf24cbf3908d7579c32864192d448aad7deb6b91f8721848e245684c"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/live_service.py",
+      "sha256": "cf9ff1c35daf915af038babd0ea6f1aeb8f290d3e16b832f950ac82f69fe032a"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/live_worker.py",
+      "sha256": "d44871b553f8ad581821254cdd9f76df664e3974e62fdc7297ebbe9455070269"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/request_safety.py",
+      "sha256": "c28c67ff569d920081b76e70642fb447d4c85414be3df39de9936cd26f612078"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/runtime_policy.py",
+      "sha256": "15cd81558f5665258744be476a61b99c052d5192f2ede8b4bc7059e6f1b708c5"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/turn_context.py",
+      "sha256": "3dca2ca6a4970770190979541e3fe3679bd69bd7dbe68ef48ff37517cd2322b7"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/understanding_contract.py",
+      "sha256": "2dab4afd644e3d13bbf3d0821695d68fca75306b045cd6003ff44a55b91ce8f2"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/understanding_prompt.py",
+      "sha256": "9628daea92daf5908bdbdcf3ea23fbcbac0d9cc2020308fcc930dd7f0e34ae13"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/understanding_service.py",
+      "sha256": "a59ebbbd62daa1c5472afe853796cb6420a9295b39f7ce1c5c8abaf3da7ac399"
+    },
+    {
+      "path": "backend/app/modules/sales_crm/scheduling.py",
+      "sha256": "719a1a36e4658ff8508ad32e13b2610836cbb03c113914d4a53219c70ba38a07"
+    },
+    {
+      "path": "backend/tests/test_active_audit_regressions.py",
+      "sha256": "42c80ee502115b4c158e0e7a2e46f3bd6e0db503cc294b819a07166a6342c19d"
+    },
+    {
+      "path": "backend/tests/test_sales_active_integration.py",
+      "sha256": "10df8f2da2c2028430efd1140b059e4e93144dc13f6bf5c530a51b444cb9e687"
+    },
+    {
+      "path": "backend/tests/test_sales_dialogue_foundation.py",
+      "sha256": "fa61222e9caad5a76c89f7cbe78af7e2de76b67e8bda32fa819a6561972045a0"
+    },
+    {
+      "path": "docs/sales-agent-active-integration.md",
+      "sha256": "1d3498e72a5317d988acca3bc13ffa65a45b164737f12a5e9bdb050888a1ccf9"
+    },
+    {
+      "path": "docs/sales-agent-active-test-results.md",
+      "sha256": "aa4f50e8f04edbb10544e622f922566b7047fa84cc7a20ba2bee214e00e59cb2"
+    },
+    {
+      "path": "frontend/src/app/features/admin-panel/ai-settings/ai-settings-page/ai-settings-page.html",
+      "sha256": "9c3b883d39dc36ac7c363f066ae4e6cf037eb4d5110add3119e6b762a6fc2a85"
+    },
+    {
+      "path": "frontend/src/app/features/admin-panel/ai-settings/ai-settings-page/ai-settings-page.spec.ts",
+      "sha256": "a022153a7c367013214f5afa590dec110e31bef67fa14641f024e9dc34d8dcfd"
+    },
+    {
+      "path": "frontend/src/app/pages/monitor/monitor.html",
+      "sha256": "d7fe497f20d74d0290fb30e92856bb8b49d102b64fe671f6a5d87ec3d2ce87ab"
+    }
+  ]
+}

@@ -63,6 +63,9 @@ def turn_context(db, conversation, lead=None):
 
 def appointment_execution_allowed(result, routing=None):
     import math
+    from .request_safety import prohibited
+    if prohibited(result.get('inbound_text',''),'appointment'):
+        return False
     # A downstream executor must not revive an intention explicitly rejected
     # by the graph. Missing trace remains compatible with legacy callers.
     if (result.get("response_policy_trace") or {}).get("appointment_intent") is False:

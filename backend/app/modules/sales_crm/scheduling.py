@@ -388,6 +388,7 @@ def create_agent_appointment(
     duration_minutes: int,
     modality: str,
     visit_location: object | None = None,
+    defer_calendar: bool = False,
 ) -> tuple[Meeting, User]:
     starts_at = starts_at.replace(tzinfo=None) if starts_at.tzinfo else starts_at
     # Lock every candidate Sales user in a stable order before rechecking
@@ -465,7 +466,7 @@ def create_agent_appointment(
             "recipient_roles": ["admin", "assistant", "sales"],
         }, dedupe_key=f"appointment-confirmed:{meeting.id}",
     )
-    if google_connection and not lead.is_demo:
+    if google_connection and not lead.is_demo and not defer_calendar:
         location = ", ".join(value for value in (project.name, meeting.visit_address) if value)
         try:
             event = create_calendar_event_for_connection(

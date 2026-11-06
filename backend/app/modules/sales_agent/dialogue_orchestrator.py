@@ -1,4 +1,4 @@
-"""Group 6: bounded, persisted internal runtime; never attached to live dispatch."""
+"""Bounded persisted task/read loop shared by preview and active coordination."""
 from dataclasses import dataclass
 import hashlib
 import json
@@ -45,6 +45,8 @@ def run_turn(db, scope, *, message_id, understanding, expected_revision, event_k
     revision, state = load(db, scope)
     if revision != expected_revision:
         raise DialogueConflict('Dialogue revision changed.')
+    from .request_safety import apply_vetoes
+    understanding=apply_vetoes(understanding,message.content)
     state = prepare_tasks(state, understanding, message.id)
     results, references = [], []
     reference_pending = False
@@ -67,10 +69,12 @@ def run_turn(db, scope, *, message_id, understanding, expected_revision, event_k
         if not eligible:
             break
         task = eligible[0]; attempts.add(task.id)
-        if task.topic.value == 'property_details' and reference_pending:
+        if task.topic.value in {'property_details','materials','pricing','inventory','appointment'} and reference_pending:
             task.status = 'awaiting_user'; continue
         call = ToolCall(operation_id=task.id, task_id=task.id, topic=task.topic, subject=task.subject,
-            property_id=state.selected_property_type_id if task.topic.value in {'property_details','materials'} else None)
+            property_id=(task.property_id or state.selected_property_type_id) if task.topic.value in {'property_details','materials'} else None)
+        if task.source_message_id == message.id and task.topic.value in {'property_details','materials'}:
+            task.property_id = call.property_id
         if restricted(state, task):
             result = ToolResult(operation_id=task.id, status='denied', safe_message='An explicit restriction blocks this task.')
         else:

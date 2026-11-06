@@ -1,0 +1,1 @@
+Apply changed backend/frontend/docs files at repository root. delivery/ contains evidence only. See docs/sales-agent-active-integration.md before manual E2E. No production activation or real network messaging was performed.

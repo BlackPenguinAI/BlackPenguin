@@ -38,6 +38,19 @@ def recorded_offers(db,conversation):
     if slots and len(slots)<=200 and all(isinstance(s,str) for s in slots):
         at = latest.created_at.replace(tzinfo=timezone.utc) if latest.created_at.tzinfo is None else latest.created_at
         offers.append(Offer(kind='appointment',message_id=latest.id,option_ids=slots,expires_at=at+timedelta(minutes=30)))
+    addresses=(meta.get('location_offer') or {}).get('option_ids') or []
+    if addresses:
+        from .service import locations_for_project
+        from app.modules.projects.models import Project
+        current={item['address'] for item in locations_for_project(db.get(Project,conversation.project_id))}
+        if len(addresses)<=200 and set(addresses)<=current:
+            offers.append(Offer(kind='location',message_id=latest.id,option_ids=addresses))
+    material_ids=(meta.get('material_offer') or {}).get('asset_ids') or []
+    if material_ids:
+        from app.modules.projects.sales_asset_service import approved_for_turn
+        approved={a.id for a in approved_for_turn(db,project_id=conversation.project_id,company_id=conversation.company_id,channel=conversation.channel)}
+        if len(material_ids)<=200 and set(material_ids)<=approved:
+            offers.append(Offer(kind='material',message_id=latest.id,option_ids=material_ids))
     return offers
 
 logger = logging.getLogger(__name__)
@@ -50,7 +63,7 @@ async def observe_shadow(db, conversation, inbound):
         config = db.query(AIConfiguration).filter_by(company_id=None).first()
         policy = RuntimePolicy.model_validate((config.agent_ventas or {}).get('runtime_config') or {}) if config else RuntimePolicy()
         scope = Scope(conversation.company_id,conversation.project_id,conversation.id,conversation.lead_id)
-        if not policy.selects(scope):
+        if policy.mode != 'shadow' or not policy.selects(scope):
             return 'not_selected'
         key = 'shadow-draft:'+inbound.id
         if scope.query(db,SalesDialogueEvent).filter_by(event_key=key).first():

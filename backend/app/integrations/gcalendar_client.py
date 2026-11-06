@@ -89,11 +89,14 @@ def is_calendar_free(db: Session, connection, *, starts_at: datetime, ends_at: d
     return not calendar_busy_ranges(db, connection, starts_at=starts_at, ends_at=ends_at)
 
 
-def create_calendar_event_for_connection(db: Session, connection, *, title: str, description: str, location: str, start_time: datetime, end_time: datetime, timezone_name: str, attendee_email: str | None, send_updates: str = "all") -> dict:
+def create_calendar_event_for_connection(db: Session, connection, *, title: str, description: str, location: str, start_time: datetime, end_time: datetime, timezone_name: str, attendee_email: str | None, send_updates: str = "all", event_id: str | None = None) -> dict:
     token = _access_token(db, connection)
     body = {"summary": title, "description": description, "location": location, "start": {"dateTime": start_time.replace(tzinfo=timezone.utc).isoformat(), "timeZone": timezone_name}, "end": {"dateTime": end_time.replace(tzinfo=timezone.utc).isoformat(), "timeZone": timezone_name}, "reminders": {"useDefault": False, "overrides": [{"method": "email", "minutes": 1440}, {"method": "popup", "minutes": 60}]}}
     if attendee_email: body["attendees"] = [{"email": attendee_email}]
+    if event_id: body["id"]=event_id
     response = httpx.post(f"{CALENDAR_API}/calendars/{connection.calendar_id or 'primary'}/events", params={"sendUpdates": send_updates}, headers={"Authorization": f"Bearer {token}"}, json=body, timeout=20.0)
+    if event_id and response.status_code==409:
+        response=httpx.get(f"{CALENDAR_API}/calendars/{connection.calendar_id or 'primary'}/events/{event_id}",headers={"Authorization":f"Bearer {token}"},timeout=20.0)
     response.raise_for_status(); return response.json()
 
 

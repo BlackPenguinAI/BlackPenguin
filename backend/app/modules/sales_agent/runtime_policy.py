@@ -1,4 +1,4 @@
-"""Published staff policy; no global or effectful activation in this release."""
+"""Published staff policy for scoped disabled, shadow and active execution."""
 from typing import Literal
 from pydantic import Field, model_validator
 from uuid import UUID
@@ -6,7 +6,7 @@ from .understanding_contract import StrictModel
 
 
 class RuntimePolicy(StrictModel):
-    mode: Literal['disabled','shadow'] = 'disabled'
+    mode: Literal['disabled','shadow','active'] = 'disabled'
     company_ids: list[str] = Field(default_factory=list, max_length=100)
     project_ids: list[str] = Field(default_factory=list, max_length=100)
     lead_ids: list[str] = Field(default_factory=list, max_length=100)
@@ -17,8 +17,8 @@ class RuntimePolicy(StrictModel):
 
     @model_validator(mode='after')
     def scoped_activation(self):
-        if self.mode == 'shadow' and (not self.company_ids or not self.project_ids):
-            raise ValueError('Shadow mode requires company and project allowlists.')
+        if self.mode in {'shadow','active'} and (not self.company_ids or not self.project_ids):
+            raise ValueError('Shadow/active mode requires company and project allowlists.')
         for values in (self.company_ids,self.project_ids,self.lead_ids):
             if len(values) != len(set(values)):
                 raise ValueError('Duplicate scope IDs.')
@@ -28,6 +28,6 @@ class RuntimePolicy(StrictModel):
         return self
 
     def selects(self, scope):
-        return (self.mode == 'shadow' and bool(self.company_ids) and bool(self.project_ids)
+        return (self.mode in {'shadow','active'} and bool(self.company_ids) and bool(self.project_ids)
                 and scope.company_id in self.company_ids and scope.project_id in self.project_ids
                 and (not self.lead_ids or scope.lead_id in self.lead_ids))

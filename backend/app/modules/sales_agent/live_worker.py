@@ -111,7 +111,14 @@ def _claim_inbound_jobs(limit: int = 10) -> list[str]:
 
 
 async def run_live_followup_worker(stop_event: asyncio.Event) -> None:
+    next_calendar_retry = datetime.min
     while not stop_event.is_set():
+        if datetime.utcnow() >= next_calendar_retry:
+            next_calendar_retry = datetime.utcnow() + timedelta(minutes=1)
+            try:
+                await asyncio.to_thread(_retry_active_calendars)
+            except Exception:
+                logger.exception("Active appointment calendar retry failed")
         try:
             await asyncio.to_thread(_process_operational_outboxes)
         except Exception:
@@ -136,3 +143,12 @@ async def run_live_followup_worker(stop_event: asyncio.Event) -> None:
             await asyncio.wait_for(stop_event.wait(), timeout=2)
         except asyncio.TimeoutError:
             pass
+
+
+def _retry_active_calendars():
+    from .active_service import retry_active_calendars
+    db=SessionLocal()
+    try:
+        retry_active_calendars(db)
+    finally:
+        db.close()

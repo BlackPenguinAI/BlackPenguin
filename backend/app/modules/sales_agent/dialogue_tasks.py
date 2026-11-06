@@ -57,6 +57,10 @@ def prepare_tasks(state, understanding, message_id):
     state = DialogueState.model_validate(state.model_dump())
     # Turn-only restrictions expire, persistent restrictions are never silently removed.
     restrictions = [c for c in state.constraints if c.scope == 'until_explicit_change']
+    from .request_safety import explicit_reversal
+    for release in understanding.releases:
+        if explicit_reversal(release.evidence) and understanding.permits(release.topic,release.subject):
+            restrictions = [c for c in restrictions if not (c.topic == release.topic and c.subject == release.subject)]
     for constraint in understanding.constraints:
         if constraint not in restrictions:
             restrictions.append(constraint)
@@ -79,6 +83,13 @@ def prepare_tasks(state, understanding, message_id):
             state.tasks.append(Task(id=identifier, topic=request.topic, subject=request.subject,
                 status='awaiting_user' if understanding.requires_clarification else 'pending',
                 request_ids=[request.id], source_message_id=message_id, alternative_group=groups.get(request.id)))
+    # A fresh explicit request supersedes a previous unresolved copy, not an
+    # unrelated task. Its historical state remains in append-only events.
+    current = [t for t in state.tasks if t.source_message_id == message_id]
+    for task in state.tasks:
+        if task.source_message_id != message_id and task.status in {'blocked','awaiting_user','suspended'}:
+            if any(n.topic == task.topic and n.subject == task.subject for n in current):
+                task.status = 'cancelled'
     state.last_understanding = understanding
     return DialogueState.model_validate(state.model_dump())
 
@@ -93,6 +104,9 @@ def record_result(state, task, result):
                 'denied':'blocked', 'revoked':'blocked', 'conflict':'blocked',
                 'error':'suspended', 'uncertain':'awaiting_user'}
     task.status = statuses[result.status]
+    if task.topic.value == 'pricing' and result.status == 'partial' and any(
+        p.get('starting_price') is None or not p.get('currency') for p in result.data.get('property_types',[])):
+        task.status = 'blocked'
     possible_fallback = task.topic.value == 'materials' and result.status == 'partial' and not result.data.get('coverage_confirmed', False)
     if possible_fallback:
         task.status = 'awaiting_user'
