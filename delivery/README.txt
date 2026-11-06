@@ -1,1 +1,1 @@
-Apply changed backend/frontend/docs files at repository root. delivery/ contains evidence only. See docs/sales-agent-active-integration.md before manual E2E. No production activation or real network messaging was performed.
+Apply .github/, backend/ and docs/ at repository root; do not omit the .github directory. delivery/ contains test evidence only. No deployment, production restart or database mutation was performed. Docker is unavailable in the validation host; tests replicate its filesystem layout without claiming an actual image run.

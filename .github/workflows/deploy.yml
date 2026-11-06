@@ -295,7 +295,10 @@ jobs:
               -e PROJECT_UPLOAD_ROOT=/tmp/blackpenguin-test-uploads \
               -e SEED_MINTO_DEMO=false \
               -e PYTHONPATH=/app \
+              -e SALES_ACCEPTANCE_ROOT=/preflight \
               -v "$REPOSITORY_DIR/backend/tests:/app/tests:ro" \
+              -v "$REPOSITORY_DIR/docs:/preflight/docs:ro" \
+              -v "$REPOSITORY_DIR/backend/tests:/preflight/backend/tests:ro" \
               "$API_IMAGE" \
               python -m pytest -q /app/tests
 
