@@ -28,6 +28,8 @@ class Settings(BaseSettings):
 
     OPENROUTER_API_KEY: str
     DEFAULT_AI_MODEL: str = "deepseek/deepseek-chat"
+    # Development/evaluation only. No live caller is wired in groups 1–3.
+    SALES_UNDERSTANDING_PREVIEW_ENABLED: bool = False
 
     PROJECT_UPLOAD_ROOT: str = "./var/uploads"
     PUBLIC_APP_URL: str = "https://blackpenguin.ai"

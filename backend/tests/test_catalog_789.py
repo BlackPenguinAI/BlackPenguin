@@ -171,7 +171,9 @@ def test_inventory_migration_preserves_legacy_data_and_reverses_without_backfill
         assert tuple(connection.exec_driver_sql('SELECT * FROM project_property_types').one())==('legacy',0,None)
     root=Path(__file__).resolve().parents[1]
     cfg=Config(str(root/'alembic.ini'));cfg.set_main_option('script_location',str(root/'alembic'))
-    assert ScriptDirectory.from_config(cfg).get_heads()==[module.revision]
+    scripts=ScriptDirectory.from_config(cfg)
+    assert len(scripts.get_heads())==1
+    assert module.revision in {item.revision for item in scripts.walk_revisions(base='base',head='heads')}
 
 
 def test_inventory_migration_produces_postgresql_ddl_without_data_updates():

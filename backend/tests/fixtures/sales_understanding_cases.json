@@ -1,0 +1,1100 @@
+{
+  "version": "sales-understanding-fixtures/1.0",
+  "mode": "scripted-contract-not-model-quality",
+  "cases": [
+    {
+      "id": "and",
+      "inbound": "Send the brochure and explain financing.",
+      "model_output": {
+        "version": "sales-understanding/1.0",
+        "requests": [
+          {
+            "id": "a",
+            "topic": "materials",
+            "subject": "brochure",
+            "polarity": "request",
+            "evidence": "Send the brochure"
+          },
+          {
+            "id": "b",
+            "topic": "financing",
+            "subject": null,
+            "polarity": "request",
+            "evidence": "explain financing"
+          }
+        ],
+        "all_of": [
+          "a",
+          "b"
+        ],
+        "alternatives": [],
+        "constraints": [],
+        "references": [],
+        "preferences": [],
+        "requires_clarification": false,
+        "clarification_question": null,
+        "confidence": 0.91
+      },
+      "expected": {
+        "allowed": [
+          [
+            "materials",
+            "brochure"
+          ],
+          [
+            "financing",
+            null
+          ]
+        ],
+        "blocked": [],
+        "alternative_count": 0,
+        "clarification": false
+      }
+    },
+    {
+      "id": "or",
+      "inbound": "Photos or a brochure please.",
+      "model_output": {
+        "version": "sales-understanding/1.0",
+        "requests": [
+          {
+            "id": "a",
+            "topic": "materials",
+            "subject": "photos",
+            "polarity": "request",
+            "evidence": "Photos"
+          },
+          {
+            "id": "b",
+            "topic": "materials",
+            "subject": "brochure",
+            "polarity": "request",
+            "evidence": "a brochure"
+          }
+        ],
+        "all_of": [],
+        "alternatives": [
+          {
+            "id": "choice",
+            "request_ids": [
+              "a",
+              "b"
+            ],
+            "evidence": "Photos or a brochure"
+          }
+        ],
+        "constraints": [],
+        "references": [],
+        "preferences": [],
+        "requires_clarification": false,
+        "clarification_question": null,
+        "confidence": 0.91
+      },
+      "expected": {
+        "allowed": [
+          [
+            "materials",
+            "photos"
+          ],
+          [
+            "materials",
+            "brochure"
+          ]
+        ],
+        "blocked": [],
+        "alternative_count": 1,
+        "clarification": false
+      }
+    },
+    {
+      "id": "mixed_negative",
+      "inbound": "I like the loft. Photos or a brochure please. Explain financing. No in-person visit yet.",
+      "model_output": {
+        "version": "sales-understanding/1.0",
+        "requests": [
+          {
+            "id": "a",
+            "topic": "materials",
+            "subject": "photos",
+            "polarity": "request",
+            "evidence": "Photos"
+          },
+          {
+            "id": "b",
+            "topic": "materials",
+            "subject": "brochure",
+            "polarity": "request",
+            "evidence": "a brochure"
+          },
+          {
+            "id": "c",
+            "topic": "financing",
+            "subject": null,
+            "polarity": "request",
+            "evidence": "Explain financing"
+          },
+          {
+            "id": "d",
+            "topic": "appointment",
+            "subject": null,
+            "polarity": "exclude",
+            "evidence": "No in-person visit yet"
+          }
+        ],
+        "all_of": [
+          "c"
+        ],
+        "alternatives": [
+          {
+            "id": "media",
+            "request_ids": [
+              "a",
+              "b"
+            ],
+            "evidence": "Photos or a brochure"
+          }
+        ],
+        "constraints": [
+          {
+            "topic": "appointment",
+            "subject": null,
+            "effect": "prohibit",
+            "scope": "until_explicit_change",
+            "evidence": "No in-person visit yet."
+          }
+        ],
+        "references": [],
+        "preferences": [],
+        "requires_clarification": false,
+        "clarification_question": null,
+        "confidence": 0.91
+      },
+      "expected": {
+        "allowed": [
+          [
+            "financing",
+            null
+          ],
+          [
+            "materials",
+            "brochure"
+          ]
+        ],
+        "blocked": [
+          [
+            "appointment",
+            null
+          ]
+        ],
+        "alternative_count": 1,
+        "clarification": false
+      }
+    },
+    {
+      "id": "brochure_not_photos",
+      "inbound": "Send the brochure but do not send photos.",
+      "model_output": {
+        "version": "sales-understanding/1.0",
+        "requests": [
+          {
+            "id": "a",
+            "topic": "materials",
+            "subject": "brochure",
+            "polarity": "request",
+            "evidence": "Send the brochure"
+          },
+          {
+            "id": "b",
+            "topic": "materials",
+            "subject": "photos",
+            "polarity": "exclude",
+            "evidence": "do not send photos"
+          }
+        ],
+        "all_of": [
+          "a"
+        ],
+        "alternatives": [],
+        "constraints": [
+          {
+            "topic": "materials",
+            "subject": "photos",
+            "effect": "prohibit",
+            "scope": "until_explicit_change",
+            "evidence": "do not send photos"
+          }
+        ],
+        "references": [],
+        "preferences": [],
+        "requires_clarification": false,
+        "clarification_question": null,
+        "confidence": 0.91
+      },
+      "expected": {
+        "allowed": [
+          [
+            "materials",
+            "brochure"
+          ]
+        ],
+        "blocked": [
+          [
+            "materials",
+            "photos"
+          ]
+        ],
+        "alternative_count": 0,
+        "clarification": false
+      }
+    },
+    {
+      "id": "no_visit",
+      "inbound": "Show the catalog. Do not arrange an in-person visit.",
+      "model_output": {
+        "version": "sales-understanding/1.0",
+        "requests": [
+          {
+            "id": "a",
+            "topic": "catalog",
+            "subject": null,
+            "polarity": "request",
+            "evidence": "Show the catalog"
+          },
+          {
+            "id": "b",
+            "topic": "appointment",
+            "subject": null,
+            "polarity": "exclude",
+            "evidence": "Do not arrange an in-person visit"
+          }
+        ],
+        "all_of": [
+          "a"
+        ],
+        "alternatives": [],
+        "constraints": [
+          {
+            "topic": "appointment",
+            "subject": null,
+            "effect": "prohibit",
+            "scope": "until_explicit_change",
+            "evidence": "Do not arrange an in-person visit"
+          }
+        ],
+        "references": [],
+        "preferences": [],
+        "requires_clarification": false,
+        "clarification_question": null,
+        "confidence": 0.91
+      },
+      "expected": {
+        "allowed": [
+          [
+            "catalog",
+            null
+          ]
+        ],
+        "blocked": [
+          [
+            "appointment",
+            null
+          ]
+        ],
+        "alternative_count": 0,
+        "clarification": false
+      }
+    },
+    {
+      "id": "wrong_affirmative_label",
+      "inbound": "I do not want a visit yet.",
+      "model_output": {
+        "version": "sales-understanding/1.0",
+        "requests": [
+          {
+            "id": "a",
+            "topic": "appointment",
+            "subject": null,
+            "polarity": "request",
+            "evidence": "I do not want a visit yet."
+          }
+        ],
+        "all_of": [
+          "a"
+        ],
+        "alternatives": [],
+        "constraints": [
+          {
+            "topic": "appointment",
+            "subject": null,
+            "effect": "prohibit",
+            "scope": "until_explicit_change",
+            "evidence": "I do not want a visit yet."
+          }
+        ],
+        "references": [],
+        "preferences": [],
+        "requires_clarification": false,
+        "clarification_question": null,
+        "confidence": 0.91
+      },
+      "expected": {
+        "allowed": [],
+        "blocked": [
+          [
+            "appointment",
+            null
+          ]
+        ],
+        "alternative_count": 0,
+        "clarification": false
+      }
+    },
+    {
+      "id": "visit_and_file",
+      "inbound": "Book an in-person visit and send the brochure.",
+      "model_output": {
+        "version": "sales-understanding/1.0",
+        "requests": [
+          {
+            "id": "a",
+            "topic": "appointment",
+            "subject": null,
+            "polarity": "request",
+            "evidence": "Book an in-person visit"
+          },
+          {
+            "id": "b",
+            "topic": "materials",
+            "subject": "brochure",
+            "polarity": "request",
+            "evidence": "send the brochure"
+          }
+        ],
+        "all_of": [
+          "a",
+          "b"
+        ],
+        "alternatives": [],
+        "constraints": [],
+        "references": [],
+        "preferences": [],
+        "requires_clarification": false,
+        "clarification_question": null,
+        "confidence": 0.91
+      },
+      "expected": {
+        "allowed": [
+          [
+            "appointment",
+            null
+          ],
+          [
+            "materials",
+            "brochure"
+          ]
+        ],
+        "blocked": [],
+        "alternative_count": 0,
+        "clarification": false
+      }
+    },
+    {
+      "id": "ambiguous",
+      "inbound": "The second one.",
+      "model_output": {
+        "version": "sales-understanding/1.0",
+        "requests": [],
+        "all_of": [],
+        "alternatives": [],
+        "constraints": [],
+        "references": [
+          {
+            "kind": "ambiguous",
+            "expression": "second",
+            "evidence": "second"
+          }
+        ],
+        "preferences": [],
+        "requires_clarification": true,
+        "clarification_question": "Do you mean a property, location or appointment time?",
+        "confidence": 0.91
+      },
+      "expected": {
+        "allowed": [],
+        "blocked": [
+          [
+            "appointment",
+            null
+          ]
+        ],
+        "alternative_count": 0,
+        "clarification": true
+      }
+    },
+    {
+      "id": "property_reference",
+      "inbound": "Tell me about the second property.",
+      "model_output": {
+        "version": "sales-understanding/1.0",
+        "requests": [
+          {
+            "id": "a",
+            "topic": "property_details",
+            "subject": null,
+            "polarity": "request",
+            "evidence": "Tell me about the second property"
+          }
+        ],
+        "all_of": [
+          "a"
+        ],
+        "alternatives": [],
+        "constraints": [],
+        "references": [
+          {
+            "kind": "property",
+            "expression": "second property",
+            "evidence": "second property"
+          }
+        ],
+        "preferences": [],
+        "requires_clarification": false,
+        "clarification_question": null,
+        "confidence": 0.91
+      },
+      "expected": {
+        "allowed": [
+          [
+            "property_details",
+            null
+          ]
+        ],
+        "blocked": [
+          [
+            "appointment",
+            null
+          ]
+        ],
+        "alternative_count": 0,
+        "clarification": false
+      }
+    },
+    {
+      "id": "reported",
+      "inbound": "You said I wanted a visit, but I only want the brochure.",
+      "model_output": {
+        "version": "sales-understanding/1.0",
+        "requests": [
+          {
+            "id": "a",
+            "topic": "materials",
+            "subject": "brochure",
+            "polarity": "request",
+            "evidence": "I only want the brochure"
+          }
+        ],
+        "all_of": [
+          "a"
+        ],
+        "alternatives": [],
+        "constraints": [],
+        "references": [],
+        "preferences": [],
+        "requires_clarification": false,
+        "clarification_question": null,
+        "confidence": 0.91
+      },
+      "expected": {
+        "allowed": [
+          [
+            "materials",
+            "brochure"
+          ]
+        ],
+        "blocked": [
+          [
+            "appointment",
+            null
+          ]
+        ],
+        "alternative_count": 0,
+        "clarification": false
+      }
+    },
+    {
+      "id": "reversal",
+      "inbound": "Not photos. Actually, book an in-person visit.",
+      "model_output": {
+        "version": "sales-understanding/1.0",
+        "requests": [
+          {
+            "id": "a",
+            "topic": "materials",
+            "subject": "photos",
+            "polarity": "exclude",
+            "evidence": "Not photos"
+          },
+          {
+            "id": "b",
+            "topic": "appointment",
+            "subject": null,
+            "polarity": "request",
+            "evidence": "book an in-person visit"
+          }
+        ],
+        "all_of": [
+          "b"
+        ],
+        "alternatives": [],
+        "constraints": [
+          {
+            "topic": "materials",
+            "subject": "photos",
+            "effect": "prohibit",
+            "scope": "until_explicit_change",
+            "evidence": "Not photos"
+          }
+        ],
+        "references": [],
+        "preferences": [],
+        "requires_clarification": false,
+        "clarification_question": null,
+        "confidence": 0.91
+      },
+      "expected": {
+        "allowed": [
+          [
+            "appointment",
+            null
+          ]
+        ],
+        "blocked": [
+          [
+            "materials",
+            "photos"
+          ]
+        ],
+        "alternative_count": 0,
+        "clarification": false
+      }
+    },
+    {
+      "id": "es_exclusion",
+      "inbound": "Envíame el folleto, pero no me envíes fotos.",
+      "model_output": {
+        "version": "sales-understanding/1.0",
+        "requests": [
+          {
+            "id": "a",
+            "topic": "materials",
+            "subject": "brochure",
+            "polarity": "request",
+            "evidence": "Envíame el folleto"
+          },
+          {
+            "id": "b",
+            "topic": "materials",
+            "subject": "photos",
+            "polarity": "exclude",
+            "evidence": "no me envíes fotos"
+          }
+        ],
+        "all_of": [
+          "a"
+        ],
+        "alternatives": [],
+        "constraints": [
+          {
+            "topic": "materials",
+            "subject": "photos",
+            "effect": "prohibit",
+            "scope": "until_explicit_change",
+            "evidence": "no me envíes fotos"
+          }
+        ],
+        "references": [],
+        "preferences": [],
+        "requires_clarification": false,
+        "clarification_question": null,
+        "confidence": 0.91
+      },
+      "expected": {
+        "allowed": [
+          [
+            "materials",
+            "brochure"
+          ]
+        ],
+        "blocked": [
+          [
+            "materials",
+            "photos"
+          ]
+        ],
+        "alternative_count": 0,
+        "clarification": false
+      }
+    },
+    {
+      "id": "es_or",
+      "inbound": "Quiero fotos o planos y saber el precio.",
+      "model_output": {
+        "version": "sales-understanding/1.0",
+        "requests": [
+          {
+            "id": "a",
+            "topic": "materials",
+            "subject": "photos",
+            "polarity": "request",
+            "evidence": "fotos"
+          },
+          {
+            "id": "b",
+            "topic": "materials",
+            "subject": "floor_plan",
+            "polarity": "request",
+            "evidence": "planos"
+          },
+          {
+            "id": "c",
+            "topic": "pricing",
+            "subject": null,
+            "polarity": "request",
+            "evidence": "saber el precio"
+          }
+        ],
+        "all_of": [
+          "c"
+        ],
+        "alternatives": [
+          {
+            "id": "choice",
+            "request_ids": [
+              "a",
+              "b"
+            ],
+            "evidence": "fotos o planos"
+          }
+        ],
+        "constraints": [],
+        "references": [],
+        "preferences": [],
+        "requires_clarification": false,
+        "clarification_question": null,
+        "confidence": 0.91
+      },
+      "expected": {
+        "allowed": [
+          [
+            "pricing",
+            null
+          ]
+        ],
+        "blocked": [],
+        "alternative_count": 1,
+        "clarification": false
+      }
+    },
+    {
+      "id": "partial_file",
+      "inbound": "Send plans and a price list.",
+      "model_output": {
+        "version": "sales-understanding/1.0",
+        "requests": [
+          {
+            "id": "a",
+            "topic": "materials",
+            "subject": "floor_plan",
+            "polarity": "request",
+            "evidence": "plans"
+          },
+          {
+            "id": "b",
+            "topic": "materials",
+            "subject": "price_list",
+            "polarity": "request",
+            "evidence": "a price list"
+          }
+        ],
+        "all_of": [
+          "a",
+          "b"
+        ],
+        "alternatives": [],
+        "constraints": [],
+        "references": [],
+        "preferences": [],
+        "requires_clarification": false,
+        "clarification_question": null,
+        "confidence": 0.91
+      },
+      "expected": {
+        "allowed": [
+          [
+            "materials",
+            "floor_plan"
+          ],
+          [
+            "materials",
+            "price_list"
+          ]
+        ],
+        "blocked": [],
+        "alternative_count": 0,
+        "clarification": false
+      }
+    },
+    {
+      "id": "tour_not_visit",
+      "inbound": "Send the 360 tour, not an in-person visit.",
+      "model_output": {
+        "version": "sales-understanding/1.0",
+        "requests": [
+          {
+            "id": "a",
+            "topic": "materials",
+            "subject": "virtual_tour",
+            "polarity": "request",
+            "evidence": "Send the 360 tour"
+          },
+          {
+            "id": "b",
+            "topic": "appointment",
+            "subject": null,
+            "polarity": "exclude",
+            "evidence": "not an in-person visit"
+          }
+        ],
+        "all_of": [
+          "a"
+        ],
+        "alternatives": [],
+        "constraints": [
+          {
+            "topic": "appointment",
+            "subject": null,
+            "effect": "prohibit",
+            "scope": "until_explicit_change",
+            "evidence": "not an in-person visit"
+          }
+        ],
+        "references": [],
+        "preferences": [],
+        "requires_clarification": false,
+        "clarification_question": null,
+        "confidence": 0.91
+      },
+      "expected": {
+        "allowed": [
+          [
+            "materials",
+            "virtual_tour"
+          ]
+        ],
+        "blocked": [
+          [
+            "appointment",
+            null
+          ]
+        ],
+        "alternative_count": 0,
+        "clarification": false
+      }
+    },
+    {
+      "id": "human",
+      "inbound": "Please let me speak to a person.",
+      "model_output": {
+        "version": "sales-understanding/1.0",
+        "requests": [
+          {
+            "id": "a",
+            "topic": "human",
+            "subject": null,
+            "polarity": "request",
+            "evidence": "Please let me speak to a person."
+          }
+        ],
+        "all_of": [
+          "a"
+        ],
+        "alternatives": [],
+        "constraints": [],
+        "references": [],
+        "preferences": [],
+        "requires_clarification": false,
+        "clarification_question": null,
+        "confidence": 0.91
+      },
+      "expected": {
+        "allowed": [
+          [
+            "human",
+            null
+          ]
+        ],
+        "blocked": [],
+        "alternative_count": 0,
+        "clarification": false
+      }
+    },
+    {
+      "id": "stop",
+      "inbound": "Do not contact me again.",
+      "model_output": {
+        "version": "sales-understanding/1.0",
+        "requests": [
+          {
+            "id": "a",
+            "topic": "opt_out",
+            "subject": null,
+            "polarity": "request",
+            "evidence": "Do not contact me again."
+          }
+        ],
+        "all_of": [
+          "a"
+        ],
+        "alternatives": [],
+        "constraints": [],
+        "references": [],
+        "preferences": [],
+        "requires_clarification": false,
+        "clarification_question": null,
+        "confidence": 0.91
+      },
+      "expected": {
+        "allowed": [
+          [
+            "opt_out",
+            null
+          ]
+        ],
+        "blocked": [],
+        "alternative_count": 0,
+        "clarification": false
+      }
+    },
+    {
+      "id": "gap",
+      "inbound": "If there are no photos, a brochure is fine.",
+      "model_output": {
+        "version": "sales-understanding/1.0",
+        "requests": [
+          {
+            "id": "a",
+            "topic": "materials",
+            "subject": "photos",
+            "polarity": "request",
+            "evidence": "photos"
+          },
+          {
+            "id": "b",
+            "topic": "materials",
+            "subject": "brochure",
+            "polarity": "request",
+            "evidence": "a brochure"
+          }
+        ],
+        "all_of": [],
+        "alternatives": [
+          {
+            "id": "fallback",
+            "request_ids": [
+              "a",
+              "b"
+            ],
+            "evidence": "If there are no photos, a brochure is fine"
+          }
+        ],
+        "constraints": [],
+        "references": [],
+        "preferences": [],
+        "requires_clarification": false,
+        "clarification_question": null,
+        "confidence": 0.91
+      },
+      "expected": {
+        "allowed": [
+          [
+            "materials",
+            "photos"
+          ],
+          [
+            "materials",
+            "brochure"
+          ]
+        ],
+        "blocked": [],
+        "alternative_count": 1,
+        "clarification": false
+      }
+    },
+    {
+      "id": "inventory",
+      "inbound": "What units are available and when is delivery?",
+      "model_output": {
+        "version": "sales-understanding/1.0",
+        "requests": [
+          {
+            "id": "a",
+            "topic": "inventory",
+            "subject": null,
+            "polarity": "request",
+            "evidence": "What units are available"
+          },
+          {
+            "id": "b",
+            "topic": "delivery",
+            "subject": null,
+            "polarity": "request",
+            "evidence": "when is delivery"
+          }
+        ],
+        "all_of": [
+          "a",
+          "b"
+        ],
+        "alternatives": [],
+        "constraints": [],
+        "references": [],
+        "preferences": [],
+        "requires_clarification": false,
+        "clarification_question": null,
+        "confidence": 0.91
+      },
+      "expected": {
+        "allowed": [
+          [
+            "inventory",
+            null
+          ],
+          [
+            "delivery",
+            null
+          ]
+        ],
+        "blocked": [],
+        "alternative_count": 0,
+        "clarification": false
+      }
+    },
+    {
+      "id": "no_handoff",
+      "inbound": "I do not want an advisor; explain financing.",
+      "model_output": {
+        "version": "sales-understanding/1.0",
+        "requests": [
+          {
+            "id": "a",
+            "topic": "human",
+            "subject": null,
+            "polarity": "exclude",
+            "evidence": "I do not want an advisor"
+          },
+          {
+            "id": "b",
+            "topic": "financing",
+            "subject": null,
+            "polarity": "request",
+            "evidence": "explain financing"
+          }
+        ],
+        "all_of": [
+          "b"
+        ],
+        "alternatives": [],
+        "constraints": [
+          {
+            "topic": "human",
+            "subject": null,
+            "effect": "prohibit",
+            "scope": "until_explicit_change",
+            "evidence": "I do not want an advisor"
+          }
+        ],
+        "references": [],
+        "preferences": [],
+        "requires_clarification": false,
+        "clarification_question": null,
+        "confidence": 0.91
+      },
+      "expected": {
+        "allowed": [
+          [
+            "financing",
+            null
+          ]
+        ],
+        "blocked": [
+          [
+            "human",
+            null
+          ]
+        ],
+        "alternative_count": 0,
+        "clarification": false
+      }
+    },
+    {
+      "id": "preferences",
+      "inbound": "I prefer the loft with two bedrooms.",
+      "model_output": {
+        "version": "sales-understanding/1.0",
+        "requests": [],
+        "all_of": [],
+        "alternatives": [],
+        "constraints": [],
+        "references": [],
+        "preferences": [
+          {
+            "key": "property",
+            "value": "loft",
+            "evidence": "loft"
+          },
+          {
+            "key": "bedrooms",
+            "value": "two",
+            "evidence": "two bedrooms"
+          }
+        ],
+        "requires_clarification": false,
+        "clarification_question": null,
+        "confidence": 0.91
+      },
+      "expected": {
+        "allowed": [],
+        "blocked": [],
+        "alternative_count": 0,
+        "clarification": false
+      }
+    },
+    {
+      "id": "unknown",
+      "inbound": "Can I do that?",
+      "model_output": {
+        "version": "sales-understanding/1.0",
+        "requests": [],
+        "all_of": [],
+        "alternatives": [],
+        "constraints": [],
+        "references": [],
+        "preferences": [],
+        "requires_clarification": true,
+        "clarification_question": "What would you like to do?",
+        "confidence": 0.91
+      },
+      "expected": {
+        "allowed": [],
+        "blocked": [
+          [
+            "appointment",
+            null
+          ]
+        ],
+        "alternative_count": 0,
+        "clarification": true
+      }
+    }
+  ]
+}

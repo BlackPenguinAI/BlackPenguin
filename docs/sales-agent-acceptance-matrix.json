@@ -1,0 +1,317 @@
+{
+  "version": "sales-acceptance-matrix/1.0",
+  "base_commit": "83706ec2382627a86b9c331ff781df6649577b66",
+  "source_document": "Issues priorizados de Black Penguin con Monitor.pdf",
+  "scope": "Traceability and regression inventory, not a claim that all 27 issues are newly closed.",
+  "baseline": {
+    "graph": "sales-turns-v5",
+    "toolset": "sales-tools-v3",
+    "published_production_model": "not_read_or_changed",
+    "published_production_prompt": "not_read_or_changed"
+  },
+  "pending_decisions": [
+    "Stakeholder approval of additional single/multiple-choice questions (issue 27).",
+    "Live model benchmark and provider schema compatibility before enabling the future executor.",
+    "PostgreSQL parallel-worker concurrency test on a disposable database.",
+    "Reference resolution, tool execution, task transitions, bounded loops and composition in later groups."
+  ],
+  "issues": [
+    {
+      "id": 1,
+      "priority": "P0",
+      "area": "Money provenance",
+      "acceptance": "Every amount retains its approved currency/source; drafts and model guesses cannot replace published amounts.",
+      "existing_test_files": [
+        "backend/tests/test_monetary_range_context.py"
+      ],
+      "scope": "Existing regression; new understanding is not a source of monetary facts.",
+      "live_model_e2e": "not_evaluated_in_groups_1_3"
+    },
+    {
+      "id": 2,
+      "priority": "P0",
+      "area": "Deferral and readiness",
+      "acceptance": "Configure later never equals approval; readiness states distinguish profile completion from sales readiness.",
+      "existing_test_files": [
+        "backend/tests/test_price_ranges_and_deferrals.py"
+      ],
+      "scope": "Existing onboarding regression; no readiness changes in groups 1–3.",
+      "live_model_e2e": "not_evaluated_in_groups_1_3"
+    },
+    {
+      "id": 3,
+      "priority": "P0",
+      "area": "Published and draft versions",
+      "acceptance": "Last approved version governs sales; editing preserves immutable receipts and previous approvals.",
+      "existing_test_files": [
+        "backend/tests/test_onboarding_revisions_and_money.py"
+      ],
+      "scope": "Existing version regression; preview only reads the published Sales pack.",
+      "live_model_e2e": "not_evaluated_in_groups_1_3"
+    },
+    {
+      "id": 4,
+      "priority": "P0",
+      "area": "Traceability",
+      "acceptance": "Record prompt/model/input/result and policy evidence without secrets or hidden reasoning.",
+      "existing_test_files": [
+        "backend/tests/test_staff_monitor.py"
+      ],
+      "scope": "Preview adds scoped snapshots and redacted interpretation events; monitor integration is later.",
+      "live_model_e2e": "not_evaluated_in_groups_1_3"
+    },
+    {
+      "id": 5,
+      "priority": "P0",
+      "area": "Staff monitor scope",
+      "acceptance": "Hidden /monitor requires staff authorization and company/project/lead isolation.",
+      "existing_test_files": [
+        "backend/tests/test_monitor_retry_and_scope.py"
+      ],
+      "scope": "Existing monitor regression; new tables are not exposed by a new route.",
+      "live_model_e2e": "not_evaluated_in_groups_1_3"
+    },
+    {
+      "id": 6,
+      "priority": "P0",
+      "area": "Diagnostic export",
+      "acceptance": "JSON exports are scoped, auditable and redact tokens/credentials.",
+      "existing_test_files": [
+        "backend/tests/test_immutable_audit_references.py"
+      ],
+      "scope": "Existing export regression; new dialogue export integration remains later.",
+      "live_model_e2e": "not_evaluated_in_groups_1_3"
+    },
+    {
+      "id": 7,
+      "priority": "P1",
+      "area": "Inventory freshness",
+      "acceptance": "Quantity confirmation is system-stamped, not a manually entered availability date.",
+      "existing_test_files": [
+        "backend/tests/test_catalog_789.py"
+      ],
+      "scope": "Existing catalog regression.",
+      "live_model_e2e": "not_evaluated_in_groups_1_3"
+    },
+    {
+      "id": 8,
+      "priority": "P1",
+      "area": "Uniform property form",
+      "acceptance": "All property types expose the same supported fields and money validation.",
+      "existing_test_files": [
+        "backend/tests/test_catalog_789.py"
+      ],
+      "scope": "Existing catalog regression.",
+      "live_model_e2e": "not_evaluated_in_groups_1_3"
+    },
+    {
+      "id": 9,
+      "priority": "P1",
+      "area": "Property draft preservation",
+      "acceptance": "Add image later and related events preserve entered property values.",
+      "existing_test_files": [
+        "backend/tests/test_catalog_draft_recovery.py"
+      ],
+      "scope": "Existing draft-recovery regression.",
+      "live_model_e2e": "not_evaluated_in_groups_1_3"
+    },
+    {
+      "id": 10,
+      "priority": "P1",
+      "area": "Team assignment",
+      "acceptance": "Project assigns existing users; company/user workflows create them and explain default project access.",
+      "existing_test_files": [
+        "backend/tests/test_team_meta_101112.py"
+      ],
+      "scope": "Existing team regression.",
+      "live_model_e2e": "not_evaluated_in_groups_1_3"
+    },
+    {
+      "id": 11,
+      "priority": "P1",
+      "area": "Meta stages",
+      "acceptance": "Account authorization and project campaign/form mapping are distinct resumable steps.",
+      "existing_test_files": [
+        "backend/tests/test_team_meta_101112.py"
+      ],
+      "scope": "Existing Meta regression; no external OAuth test in this package.",
+      "live_model_e2e": "not_evaluated_in_groups_1_3"
+    },
+    {
+      "id": 12,
+      "priority": "P1",
+      "area": "OAuth return",
+      "acceptance": "Validate popup origin/state and return to the existing onboarding draft.",
+      "existing_test_files": [
+        "backend/tests/test_team_meta_101112.py"
+      ],
+      "scope": "Existing server/UI regressions; live Meta permissions not re-exercised.",
+      "live_model_e2e": "not_evaluated_in_groups_1_3"
+    },
+    {
+      "id": 13,
+      "priority": "P1",
+      "area": "Reopen onboarding tasks",
+      "acceptance": "Sidebar and natural language reopen the intended editable card after completion.",
+      "existing_test_files": [
+        "backend/tests/test_editor_1316.py"
+      ],
+      "scope": "Existing onboarding editor regression.",
+      "live_model_e2e": "not_evaluated_in_groups_1_3"
+    },
+    {
+      "id": 14,
+      "priority": "P1",
+      "area": "Immediate chat rendering",
+      "acceptance": "Replies appear immediately; retries/navigation cannot race or erase local drafts.",
+      "existing_test_files": [
+        "backend/tests/test_onboarding_lossless_answers.py"
+      ],
+      "scope": "Existing request/render regression.",
+      "live_model_e2e": "not_evaluated_in_groups_1_3"
+    },
+    {
+      "id": 15,
+      "priority": "P1",
+      "area": "Project location",
+      "acceptance": "Selectable country/city suggestions determine an IANA zone; project country can differ from company.",
+      "existing_test_files": [
+        "backend/tests/test_editor_1316.py"
+      ],
+      "scope": "Existing location regression; neither country code nor telephone prefix determines intent.",
+      "live_model_e2e": "not_evaluated_in_groups_1_3"
+    },
+    {
+      "id": 16,
+      "priority": "P0",
+      "area": "Structured interpretation",
+      "acceptance": "Represent independent requests, OR alternatives, exclusions, references and uncertainty explicitly.",
+      "existing_test_files": [
+        "backend/tests/test_sales_dialogue_foundation.py"
+      ],
+      "scope": "Groups 1–3 validate contracts and scripted outputs; live LLM quality and executor integration remain pending.",
+      "live_model_e2e": "not_evaluated_in_groups_1_3"
+    },
+    {
+      "id": 17,
+      "priority": "P0",
+      "area": "Dialogue continuity",
+      "acceptance": "Resolve IDs against the current offer; interrupt and resume tasks without booking the wrong option.",
+      "existing_test_files": [
+        "backend/tests/test_sales_continuity_gaps.py"
+      ],
+      "scope": "Group 2 stores tasks/offers; actual reference resolution and task transitions remain later.",
+      "live_model_e2e": "not_evaluated_in_groups_1_3"
+    },
+    {
+      "id": 18,
+      "priority": "P0",
+      "area": "Approved catalog",
+      "acceptance": "Separate verified quantities from unknown/partial coverage; never turn missing data into nonexistent inventory.",
+      "existing_test_files": [
+        "backend/tests/test_sales_agent_commercial_context.py"
+      ],
+      "scope": "Existing grounding regression; future tools must preserve these semantics.",
+      "live_model_e2e": "not_evaluated_in_groups_1_3"
+    },
+    {
+      "id": 19,
+      "priority": "P0",
+      "area": "Mixed replies and materials",
+      "acceptance": "Answer textual needs and share approved full/partial matches and verified 360 links without unnecessary repetition.",
+      "existing_test_files": [
+        "backend/tests/test_sales_turn_1720.py"
+      ],
+      "scope": "New AND/OR and exclusion contract only; material selection/composition integration remains later.",
+      "live_model_e2e": "not_evaluated_in_groups_1_3"
+    },
+    {
+      "id": 20,
+      "priority": "P1",
+      "area": "Readable complete delivery",
+      "acceptance": "Present all types briefly; separate list blocks, preserve URLs and deliver long replies idempotently.",
+      "existing_test_files": [
+        "backend/tests/test_sales_turn_1720.py"
+      ],
+      "scope": "Existing rendering/delivery regression; no new live sender call.",
+      "live_model_e2e": "not_evaluated_in_groups_1_3"
+    },
+    {
+      "id": 21,
+      "priority": "P1",
+      "area": "Corrections and objections",
+      "acceptance": "Apply explicit corrections using approved facts; retain active needs instead of repeating apologies.",
+      "existing_test_files": [
+        "backend/tests/test_sales_corrections_continuity_2122.py"
+      ],
+      "scope": "New interpretation retains evidence; future state transition logic applies corrections.",
+      "live_model_e2e": "not_evaluated_in_groups_1_3"
+    },
+    {
+      "id": 22,
+      "priority": "P0",
+      "area": "Escalation and opt-out",
+      "acceptance": "Distinguish informational notice, human handoff, actual pause and opt-out; record the true reason.",
+      "existing_test_files": [
+        "backend/tests/test_sales_corrections_continuity_2122.py"
+      ],
+      "scope": "Preview recognizes topics but cannot pause, hand off or resume a real lead.",
+      "live_model_e2e": "not_evaluated_in_groups_1_3"
+    },
+    {
+      "id": 23,
+      "priority": "P1",
+      "area": "Configure later",
+      "acceptance": "All optional setup cards support deferral and resumption without silent approval.",
+      "existing_test_files": [
+        "backend/tests/test_onboarding_ux_2325.py"
+      ],
+      "scope": "Existing onboarding regression.",
+      "live_model_e2e": "not_evaluated_in_groups_1_3"
+    },
+    {
+      "id": 24,
+      "priority": "P1",
+      "area": "Collapsed history",
+      "acceptance": "Completed cards collapse into expandable receipts rather than disappearing from chat history.",
+      "existing_test_files": [
+        "backend/tests/test_onboarding_ux_2325.py"
+      ],
+      "scope": "Existing receipt regression; dialogue evidence is append-only through the new service/ORM.",
+      "live_model_e2e": "not_evaluated_in_groups_1_3"
+    },
+    {
+      "id": 25,
+      "priority": "P1",
+      "area": "Material preview and permission",
+      "acceptance": "Upload/preview/select images and classify multiple contents separately from lead-sharing approval.",
+      "existing_test_files": [
+        "backend/tests/test_onboarding_ux_2325.py"
+      ],
+      "scope": "Existing material regression; preview never grants sharing permission.",
+      "live_model_e2e": "not_evaluated_in_groups_1_3"
+    },
+    {
+      "id": 26,
+      "priority": "P1",
+      "area": "Marketing connection status",
+      "acceptance": "Distinguish connected account, permissions/expiry and project campaign/form mappings.",
+      "existing_test_files": [
+        "backend/tests/test_marketing_questions_2627.py"
+      ],
+      "scope": "Existing Marketing regression; no live Meta call.",
+      "live_model_e2e": "not_evaluated_in_groups_1_3"
+    },
+    {
+      "id": 27,
+      "priority": "P1",
+      "area": "Question cardinality",
+      "acceptance": "Keep a canonical question inventory; explicit single/multiple choices preserve multi-value edits.",
+      "existing_test_files": [
+        "backend/tests/test_marketing_questions_2627.py"
+      ],
+      "scope": "Existing inventory regression; stakeholder decisions on additional multi-select questions remain pending.",
+      "live_model_e2e": "not_evaluated_in_groups_1_3"
+    }
+  ]
+}

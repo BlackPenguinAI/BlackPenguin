@@ -54,3 +54,4 @@ from app.modules.governance.models import (
     SalesAssetAccessEvent, UserLegalAcceptance,
 )
 from app.db.schema import SchemaVersion
+from app.modules.sales_agent.dialogue_models import SalesDialogueState, SalesDialogueEvent
