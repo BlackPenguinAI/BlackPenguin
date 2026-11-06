@@ -79,7 +79,7 @@ describe('OnboardingResponseOptionsComponent', () => {
       field: 'project_status', label: 'Status', prompt: 'Choose', input_type: 'choice',
       options: ['Pre-sales'], examples: [], allow_custom: true, minimum_words: null,
     };
-    const emitted: string[] = [];
+    const emitted: Array<string | string[]> = [];
     component.selected.subscribe(value => emitted.push(value));
 
     component.choose('Pre-sales');
@@ -94,7 +94,7 @@ describe('OnboardingResponseOptionsComponent', () => {
       options: ['Advertising disclaimer', 'Financing disclaimer'], examples: [],
       allow_custom: true, minimum_words: null,
     };
-    const emitted: string[] = [];
+    const emitted: Array<string | string[]> = [];
     component.selected.subscribe(value => emitted.push(value));
 
     component.choose('Advertising disclaimer');
@@ -104,6 +104,6 @@ describe('OnboardingResponseOptionsComponent', () => {
     expect(component.isSelected('Financing disclaimer')).toBe(true);
 
     component.submitSelection();
-    expect(emitted).toEqual(['Advertising disclaimer; Financing disclaimer']);
+    expect(emitted).toEqual([['Advertising disclaimer', 'Financing disclaimer']]);
   });
 });

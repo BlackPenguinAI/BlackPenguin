@@ -2,6 +2,7 @@ from datetime import datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, HttpUrl, field_validator
+from app.modules.onboarding_answers import StructuredChatMessagePayload
 
 
 ValidationStatus = Literal[
@@ -123,9 +124,8 @@ class CompanyProfilePatch(BaseModel):
     final_approved: bool | None = None
 
 
-class ChatMessagePayload(BaseModel):
-    message: str = Field(min_length=1, max_length=20000)
-    in_reply_to_message_id: str | None = None
+class ChatMessagePayload(StructuredChatMessagePayload):
+    pass
 
 
 class ChatAttachmentResponse(BaseModel):

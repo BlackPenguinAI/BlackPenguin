@@ -858,8 +858,16 @@ async def send_chat_message(
     session = services.get_or_create_session(db, current_user.company_id)
     profile = services.get_or_create_profile(db, current_user.company_id)
     db.query(OnboardingSession).filter(OnboardingSession.id == session.id).with_for_update().one()
+    if payload.selected_values is not None:
+        bound = db.query(OnboardingMessage).filter(
+            OnboardingMessage.id == payload.in_reply_to_message_id,
+            OnboardingMessage.session_id == session.id,
+            OnboardingMessage.sender == SenderType.AI,
+        ).first()
+        if not bound:
+            raise HTTPException(422, 'This selection does not reference a question in this Company onboarding.')
     from app.modules.projects.editor_tasks import detect_task, question
-    task = detect_task(payload.message)
+    task = detect_task(payload.message) if payload.selected_values is None else None
     if task in {"team", "documents", "location", "review"}:
         user_message = services.save_message(db, session.id, SenderType.USER, payload.message, commit=False)
         services.supersede_unanswered_questions(db, session.id)
@@ -872,7 +880,8 @@ async def send_chat_message(
     active_question = services.get_active_question(
         db, session.id, payload.in_reply_to_message_id,
     )
-    resolved_question_id = active_question.id if active_question else payload.in_reply_to_message_id
+    resolved_question_id = (payload.in_reply_to_message_id if payload.selected_values is not None
+                            else active_question.id if active_question else payload.in_reply_to_message_id)
     user_message = services.save_message(
         db, session.id, SenderType.USER, payload.message,
         in_reply_to_message_id=resolved_question_id,
@@ -885,6 +894,7 @@ async def send_chat_message(
         message_id=resolved_question_id,
         answer=payload.message,
         profile=profile,
+        selected_values=payload.selected_values,
     )
     if not resolution.handled:
         fallback_updates = services.deterministic_context_update(payload.message, profile)
@@ -917,6 +927,7 @@ async def send_chat_message(
                 resolved_question_id,
                 payload.message,
                 status="accepted",
+                selected_values=payload.selected_values,
                 commit=False,
             )
             ai_message = services.save_message(
@@ -965,12 +976,16 @@ async def send_chat_message(
             services.record_message_response(
                 db, session.id, resolved_question_id, payload.message,
                 status="accepted",
+                selected_values=payload.selected_values,
                 commit=False,
             )
         elif deterministic_result.rejected:
             resolution.status = "rejected"
             resolution.reason = deterministic_result.rejected[0].get("reason")
 
+    if payload.selected_values is not None and resolution.status == 'rejected':
+        services.record_message_response(db, session.id, resolved_question_id, payload.message,
+            status='rejected', selected_values=payload.selected_values, commit=False)
     db.commit()
     db.refresh(user_message)
     if deterministic_result and deterministic_result.accepted:
@@ -981,7 +996,9 @@ async def send_chat_message(
 
     source_results = []
     source_actions: list[dict[str, Any]] = []
-    for url in services.extract_urls(payload.message):
+    social_answer = (resolution.handled and resolution.question is not None
+                     and (resolution.question.ui_payload or {}).get('field') == 'corporate_social_profiles')
+    for url in ([] if payload.selected_values is not None or social_answer else services.extract_urls(payload.message)):
         try:
             existing_job = job_service.get_existing_job(
                 db, scope="company", company_id=current_user.company_id,

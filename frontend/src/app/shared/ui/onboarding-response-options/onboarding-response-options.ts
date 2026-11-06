@@ -33,7 +33,7 @@ export class OnboardingResponseOptionsComponent implements OnChanges {
   @Input() selectedChoice: string | null = null;
   @Input() answered = false;
   @Input() showPrompt = true;
-  @Output() selected = new EventEmitter<string>();
+  @Output() selected = new EventEmitter<string | string[]>();
   @Output() custom = new EventEmitter<void>();
   readonly selectedValues = new Set<string>();
   private selectionKey='';
@@ -85,7 +85,7 @@ export class OnboardingResponseOptionsComponent implements OnChanges {
   submitSelection(): void {
     this.prepareSelection();
     if (!this.selectedValues.size || this.disabled || this.answered || this.selectionConflict) return;
-    this.selected.emit([...this.selectedValues].join('; '));
+    this.selected.emit([...this.selectedValues]);
   }
   get selectionConflict():boolean {return this.selectedValues.size>1 && (this.question?.exclusive_options || []).some(value=>this.selectedValues.has(value));}
 

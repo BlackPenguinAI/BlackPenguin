@@ -283,6 +283,7 @@ def record_message_response(
     answer: str,
     *,
     status: str = "accepted",
+    selected_values: list[str] | None = None,
     commit: bool = True,
 ) -> None:
     if not message_id:
@@ -300,6 +301,8 @@ def record_message_response(
         "status": status, "answer": answer.strip(),
         "selected_option": selected, "custom": selected is None,
     }
+    if selected_values is not None:
+        message.response_payload['selected_values'] = list(selected_values)
     db.add(message)
     if commit:
         db.commit()
@@ -330,13 +333,13 @@ def normalize_user_url(value: str) -> str | None:
     return urlunsplit(("https", host + port, path, query, ""))
 
 
-def extract_urls(message: str) -> list[str]:
+def extract_urls(message: str, *, limit: int | None = 3) -> list[str]:
     urls: list[str] = []
     for match in DOMAIN_PATTERN.finditer(message):
         normalized = normalize_user_url(match.group(0))
         if normalized and normalized not in urls:
             urls.append(normalized)
-    return urls[:3]
+    return urls if limit is None else urls[:limit]
 
 
 def resolve_answer_to_question(
@@ -346,6 +349,7 @@ def resolve_answer_to_question(
     message_id: str | None,
     answer: str,
     profile: CompanyProfile,
+    selected_values: list[str] | None = None,
 ) -> QuestionResolution:
     """Resolve a structured reply using the persisted question, never model inference."""
     if not message_id:
@@ -367,6 +371,20 @@ def resolve_answer_to_question(
         if isinstance(item.ui_payload, dict) and not item.response_payload]
     if unanswered and unanswered[0].id != question.id:
         return QuestionResolution(True, "rejected", [], "stale_question", question)
+
+    if selected_values is not None:
+        from app.modules.onboarding_answers import question_selection
+        field = normalize_field_key(question.ui_payload.get('field'))
+        try:
+            value = question_selection(field, question.ui_payload, selected_values)
+        except ValueError:
+            return QuestionResolution(True, 'rejected', [], 'invalid_multi_selection', question)
+        error = validate_onboarding_value(field, value)
+        if error:
+            return QuestionResolution(True, 'rejected', [], error['code'], question)
+        existing = (profile.profile_data or {}).get(field)
+        status = 'corrected_by_user' if existing not in (None, '', []) and existing != value else 'confirmed'
+        return QuestionResolution(True, 'accepted', [_user_update(field, value, status=status)], question=question)
 
     text = normalize_structured_answer(answer)
     if not text:
@@ -428,7 +446,7 @@ def resolve_answer_to_question(
                 True, "accepted", [_user_update(field, copied_value)], question=question,
             )
 
-    urls = extract_urls(text)
+    urls = extract_urls(text, limit=None if field == 'corporate_social_profiles' else 3)
     lowered = text.casefold()
     no_website = lowered in {
         "none", "no", "no website", "none exists", "non exists", "no existe",
@@ -457,7 +475,7 @@ def resolve_answer_to_question(
     elif urls:
         return QuestionResolution(True, "rejected", [], "url_not_valid_for_field", question)
     elif input_type == "multi_select":
-        try:value=normalize_selection(field,text,question.ui_payload.get('options',[]))
+        try:value=normalize_selection(field,text,(question.ui_payload.get('options') or []) + (question.ui_payload.get('selected_values') or []))
         except ValueError:return QuestionResolution(True,"rejected",[],"invalid_multi_selection",question)
         if not value:
             return QuestionResolution(True, "rejected", [], "empty_answer", question)

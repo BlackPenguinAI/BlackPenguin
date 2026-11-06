@@ -112,8 +112,9 @@ export class CompanyOnboardingService {
     return this.http.delete<{ detail: string }>(`${API_V1_URL}/users/company/${userId}/invitation`);
   }
 
-  sendMessage(message: string, inReplyToMessageId?: string | null): Observable<ChatTurnResponse> {
-    return this.http.post<ChatTurnResponse>(`${this.baseUrl}/chat`, { message, in_reply_to_message_id: inReplyToMessageId || null });
+  sendMessage(message: string, inReplyToMessageId?: string | null, selectedValues?: string[]): Observable<ChatTurnResponse> {
+    return this.http.post<ChatTurnResponse>(`${this.baseUrl}/chat`, { message, in_reply_to_message_id: inReplyToMessageId || null,
+      ...(selectedValues !== undefined ? {selected_values: selectedValues} : {}) });
   }
 
   getSources(): Observable<OnboardingSource[]> {

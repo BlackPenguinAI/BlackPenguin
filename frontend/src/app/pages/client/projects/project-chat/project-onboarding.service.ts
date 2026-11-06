@@ -25,9 +25,10 @@ export class ProjectOnboardingService {
   complete(id: string): Observable<{ completed: boolean; redirect_url: string; profile: ProjectProfile }> {
     return this.http.post<{ completed: boolean; redirect_url: string; profile: ProjectProfile }>(`${this.baseUrl}/${id}/onboarding/complete`, {});
   }
-  sendMessage(id: string, message: string, inReplyToMessageId: string | null, clientMessageId: string): Observable<ChatTurn> {
+  sendMessage(id: string, message: string, inReplyToMessageId: string | null, clientMessageId: string, selectedValues?: string[]): Observable<ChatTurn> {
     return this.http.post<ChatTurn>(`${this.baseUrl}/${id}/chat`, {
       message, in_reply_to_message_id: inReplyToMessageId || null, client_message_id: clientMessageId,
+      ...(selectedValues !== undefined ? {selected_values: selectedValues} : {}),
     });
   }
   sendMessageWithFiles(id: string, message: string, files: File[], intents: ProjectFileIntent[], inReplyToMessageId: string | null, clientMessageId: string): Observable<ChatTurn> {

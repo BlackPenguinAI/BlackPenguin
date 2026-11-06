@@ -25,7 +25,7 @@ export class OnboardingAiMessageComponent implements OnInit, OnDestroy {
   @Input({ required: true }) message!: StructuredAiMessage;
   @Input() active = false;
   @Input() disabled = false;
-  @Output() selected = new EventEmitter<string>();
+  @Output() selected = new EventEmitter<string | string[]>();
   @Output() custom = new EventEmitter<void>();
   speechState: SpeechSynthesisState = 'idle';
   activeMessageId: string | null = null;

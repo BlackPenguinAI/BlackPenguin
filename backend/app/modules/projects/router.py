@@ -1430,8 +1430,17 @@ async def send_chat(
     if existing_turn:
         return existing_turn
 
+    if payload.selected_values is not None:
+        bound = db.query(ProjectMessage).filter(
+            ProjectMessage.id == payload.in_reply_to_message_id,
+            ProjectMessage.session_id == project.session.id,
+            ProjectMessage.sender == SenderType.AI,
+        ).first()
+        if not bound:
+            raise HTTPException(422, 'This selection does not reference a question in this Project onboarding.')
+
     from .editor_tasks import detect_task
-    task = detect_task(payload.message)
+    task = detect_task(payload.message) if payload.selected_values is None else None
     if task:
         return _open_editor_task(db, project, current_user, task, payload.client_message_id, payload.message, request_id)
 
@@ -1440,7 +1449,7 @@ async def send_chat(
         project.session.id,
         payload.in_reply_to_message_id,
     )
-    rename_target = _project_name_command(payload.message)
+    rename_target = _project_name_command(payload.message) if payload.selected_values is None else None
     if rename_target:
         user_message = services.save_message(
             db, project.session.id, SenderType.USER, payload.message,
@@ -1495,8 +1504,9 @@ async def send_chat(
         message_id=resolved_question_id,
         answer=payload.message,
         profile=services.get_profile(project),
+        selected_values=payload.selected_values,
     )
-    if resolution.handled and not URL_PATTERN.search(payload.message):
+    if resolution.handled and (payload.selected_values is not None or not URL_PATTERN.search(payload.message)):
         profile = services.get_profile(project)
         if resolution.action == "approve_profile":
             services.record_message_response(
@@ -1543,6 +1553,7 @@ async def send_chat(
             resolved_question_id,
             payload.message,
             status="accepted" if accepted_resolution else "rejected",
+            selected_values=payload.selected_values,
             commit=False,
         )
         if accepted:

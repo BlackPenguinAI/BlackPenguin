@@ -68,10 +68,10 @@ describe('Existing multi-select safety',()=>{
   const c=options();c.choose('A');c.choose('B');c.choose('Standard');expect([...c.selectedValues]).toEqual(['Standard']);c.choose('A');expect([...c.selectedValues]).toEqual(['A']);
  });
  it.each(['Not applicable','Provide later'])('emits %s alone as a typed action',(choice)=>{
-  const c=options();const emitted:string[]=[];c.selected.subscribe(v=>emitted.push(v));c.choose('A');c.choose(choice);expect(emitted).toEqual([choice]);expect(c.selectedValues.size).toBe(0);
+  const c=options();const emitted:Array<string|string[]>=[];c.selected.subscribe(v=>emitted.push(v));c.choose('A');c.choose(choice);expect(emitted).toEqual([choice]);expect(c.selectedValues.size).toBe(0);
  });
  it('restores saved and custom values for editing, requiring explicit submit',()=>{
-  const c=options({selected_values:['A','Custom saved value']});const emitted:string[]=[];c.selected.subscribe(v=>emitted.push(v));c.ngOnChanges();expect(c.choices).toContain('Custom saved value');expect(emitted).toEqual([]);c.submitSelection();expect(emitted).toEqual(['A; Custom saved value']);
+  const c=options({selected_values:['A','Custom saved value']});const emitted:Array<string|string[]>=[];c.selected.subscribe(v=>emitted.push(v));c.ngOnChanges();expect(c.choices).toContain('Custom saved value');expect(emitted).toEqual([]);c.submitSelection();expect(emitted).toEqual([['A','Custom saved value']]);
  });
  it('does not leak selections to another field',()=>{
   const c=options();c.choose('A');c.question={...c.question,field:'payment_methods',selected_values:['B']};c.ngOnChanges();expect([...c.selectedValues]).toEqual(['B']);
@@ -89,6 +89,6 @@ describe('Existing multi-select safety',()=>{
   const c=options({field:'project_type',input_type:'single_select',options:['Mixed-use']});const emit=vi.spyOn(c.selected,'emit');c.choose('Mixed-use');expect(emit).toHaveBeenCalledWith('Mixed-use');expect(c.isMultiSelect).toBe(false);
  });
  it('keeps example-only multi fields multiple and restores custom values',()=>{
-  const c=options({field:'public_contact_emails',options:[],examples:['info@example.test','sales@example.test'],selected_values:['saved@example.test']});const emit=vi.spyOn(c.selected,'emit');c.ngOnChanges();expect(c.choices).toContain('saved@example.test');c.choose('info@example.test');c.choose('sales@example.test');expect(emit).not.toHaveBeenCalled();c.submitSelection();expect(emit).toHaveBeenCalledWith('saved@example.test; info@example.test; sales@example.test');
+  const c=options({field:'public_contact_emails',options:[],examples:['info@example.test','sales@example.test'],selected_values:['saved@example.test']});const emit=vi.spyOn(c.selected,'emit');c.ngOnChanges();expect(c.choices).toContain('saved@example.test');c.choose('info@example.test');c.choose('sales@example.test');expect(emit).not.toHaveBeenCalled();c.submitSelection();expect(emit).toHaveBeenCalledWith(['saved@example.test','info@example.test','sales@example.test']);
  });
 });

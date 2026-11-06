@@ -132,6 +132,7 @@ export class ChatComponent implements OnInit, OnDestroy {
   private speechBase = '';
   private pollingTimer?: ReturnType<typeof setTimeout>;
   private replyToMessageId: string | null = null;
+  private pendingSelection: {text:string; questionId:string|null; values:string[]} | null = null;
   private lastStateVersion = 0;
   private renderGeneration = 0;
   private teamInviteRequestKey = '';
@@ -316,12 +317,13 @@ export class ChatComponent implements OnInit, OnDestroy {
     this.syncState();
   }
 
-  chooseAnswer(value: string, message?: ChatMessage): void {
-    this.prompt = value;
+  chooseAnswer(value: string | string[], message?: ChatMessage): void {
+    this.prompt = Array.isArray(value) ? value.join('; ') : value;
     this.replyToMessageId = message?.id || null;
+    this.pendingSelection=Array.isArray(value) ? {text:this.prompt, questionId:this.replyToMessageId, values:[...value]} : null;
     this.sendMessage();
   }
-  writeCustomAnswer(message?: ChatMessage): void { this.prompt = ''; this.replyToMessageId = message?.id || null; }
+  writeCustomAnswer(message?: ChatMessage): void { this.pendingSelection=null; this.prompt = ''; this.replyToMessageId = message?.id || null; }
   isActiveQuestion(message: ChatMessage): boolean {
     return !this.hasPendingReview && !this.hasExclusiveStep && message.sender === 'ai' && this.hasQuestionPayload(message) && !message.response_payload
       && this.visibleMessages.filter((item) => item.sender === 'ai' && this.hasQuestionPayload(item) && !item.response_payload).at(-1) === message;
@@ -695,18 +697,22 @@ export class ChatComponent implements OnInit, OnDestroy {
 
     this.errorMessage = '';
     const replyTo = this.replyToMessageId || this.activeQuestionMessageId();
+    const selection=this.pendingSelection?.text.trim()===content && this.pendingSelection.questionId===replyTo ? this.pendingSelection : null;
     this.replyToMessageId = null;
-    this.onboarding.sendMessage(content, replyTo).pipe(finalize(() => {
+    const request=selection ? this.onboarding.sendMessage(content, replyTo, selection.values) : this.onboarding.sendMessage(content, replyTo);
+    request.pipe(finalize(() => {
       this.isAnalyzing = false;
       this.cdr.detectChanges();
     })).subscribe({
         next: (turn) => {
+          this.pendingSelection=null;
           this.messages = this.messages.filter((message) => message !== optimistic);
           if (turn.field_update_status === 'accepted') this.markReply(replyTo, content);
           this.applyTurn(turn);
           this.scrollToBottom();
         },
         error: (error: HttpErrorResponse) => {
+          this.pendingSelection=selection;
           this.messages = this.messages.filter((message) => message !== optimistic);
           this.prompt = content;
           this.replyToMessageId = replyTo;

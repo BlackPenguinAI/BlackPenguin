@@ -252,6 +252,7 @@ def record_message_response(
     answer: str,
     *,
     status: str = "accepted",
+    selected_values: list[str] | None = None,
     commit: bool = True,
 ) -> None:
     if not message_id:
@@ -269,6 +270,8 @@ def record_message_response(
         "status": status, "answer": answer.strip(),
         "selected_option": selected, "custom": selected is None,
     }
+    if selected_values is not None:
+        message.response_payload['selected_values'] = list(selected_values)
     db.add(message)
     if commit:
         db.commit()
@@ -301,6 +304,7 @@ def resolve_answer_to_question(
     message_id: str | None,
     answer: str,
     profile: ProjectProfile,
+    selected_values: list[str] | None = None,
 ) -> QuestionResolution:
     """Resolve a persisted structured question without depending on a model call."""
     if not message_id:
@@ -318,6 +322,20 @@ def resolve_answer_to_question(
     active = get_active_question(db, session_id, message_id)
     if active and active.id != question.id:
         return QuestionResolution(True, "rejected", [], "stale_question", question)
+
+    if selected_values is not None:
+        from app.modules.onboarding_answers import question_selection
+        field = normalize_field_key(question.ui_payload.get('field'))
+        try:
+            value = question_selection(field, question.ui_payload, selected_values)
+        except ValueError:
+            return QuestionResolution(True, 'rejected', [], 'invalid_multi_selection', question)
+        error = validate_onboarding_value(field, value)
+        if error:
+            return QuestionResolution(True, 'rejected', [], error['code'], question)
+        existing = (profile.profile_data or {}).get(field)
+        status = 'corrected_by_user' if existing not in (None, '', []) and existing != value else 'confirmed'
+        return QuestionResolution(True, 'accepted', [user_field_update(field, value, status=status)], question=question)
 
     text = re.sub(r"\s+", " ", answer).strip()
     if not text:
@@ -472,7 +490,7 @@ def resolve_answer_to_question(
         )
     value: Any
     if input_type == "multi_select":
-        try:value=normalize_selection(field,text,question.ui_payload.get('options',[]))
+        try:value=normalize_selection(field,text,(question.ui_payload.get('options') or []) + (question.ui_payload.get('selected_values') or []))
         except ValueError:return QuestionResolution(True,"rejected",[],"invalid_multi_selection",question)
         if not value:
             return QuestionResolution(True, "rejected", [], "empty_answer", question)

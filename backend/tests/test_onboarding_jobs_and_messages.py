@@ -189,7 +189,7 @@ def test_company_chat_initializes_accepted_updates_before_processing_urls():
     source = inspect.getsource(company_router.send_chat_message)
 
     assert source.index("accepted = deterministic_result.accepted") < source.index(
-        "for url in services.extract_urls"
+        "services.extract_urls(payload.message)"
     )
 
 

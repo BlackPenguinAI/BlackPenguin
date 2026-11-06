@@ -197,6 +197,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   private speechBase = '';
   private pollingTimer?: ReturnType<typeof setTimeout>;
   private replyToMessageId: string | null = null;
+  private pendingSelection: {text:string; questionId:string|null; values:string[]} | null = null;
   private retryClientMessageId: string | null = null;
   private lastStateVersion = 0;
   requestedEditorTask='';
@@ -1144,12 +1145,13 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     this.errorMessage = '';
     this.syncState();
   }
-  chooseAnswer(value: string, message?: ChatMessage): void {
-    this.prompt = value;
+  chooseAnswer(value: string | string[], message?: ChatMessage): void {
+    this.prompt = Array.isArray(value) ? value.join('; ') : value;
     this.replyToMessageId = message?.id || null;
+    this.pendingSelection = Array.isArray(value) ? {text:this.prompt, questionId:this.replyToMessageId, values:[...value]} : null;
     this.sendMessage();
   }
-  writeCustomAnswer(message?: ChatMessage): void { this.prompt = ''; this.replyToMessageId = message?.id || null; }
+  writeCustomAnswer(message?: ChatMessage): void { this.pendingSelection=null; this.prompt = ''; this.replyToMessageId = message?.id || null; }
   isActiveQuestion(message: ChatMessage): boolean {
     return !this.hasExclusiveSourceFlow && message.sender === 'ai' && !!message.ui_payload && !message.response_payload
       && this.visibleMessages.filter((item) => item.sender === 'ai' && !!item.ui_payload && !item.response_payload).at(-1) === message;
@@ -1198,6 +1200,11 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   handleKeyDown(event: KeyboardEvent): void { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); if (this.canSend) this.sendMessage(); } }
   sendMessage(): void {
     if (!this.canSend) return;
+    const selection = this.pendingSelection?.text.trim() === this.prompt.trim()
+      && this.pendingSelection.questionId === this.replyToMessageId ? this.pendingSelection : null;
+    if (selection && this.selectedFiles.length) {
+      this.errorMessage='Send or remove the attached files before confirming these selections. Your choices are preserved.'; return;
+    }
     this.renderGeneration++;
     if (this.isRecording) this.speech.stop();
     const content = this.prompt.trim();
@@ -1219,11 +1226,13 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     this.messages = [...this.messages, optimistic]; this.isAnalyzing = true; this.isUploading = !!files.length; this.scrollToBottom();
     const request = files.length
       ? this.onboarding.sendMessageWithFiles(this.projectId, content, files, fileIntents, this.replyToMessageId, clientMessageId)
+      : selection ? this.onboarding.sendMessage(this.projectId, content, this.replyToMessageId, clientMessageId, selection.values)
       : this.onboarding.sendMessage(this.projectId, content, this.replyToMessageId, clientMessageId);
     const replyTo = this.replyToMessageId;
     this.replyToMessageId = null;
     request.subscribe({
       next: (turn) => {
+        this.pendingSelection=null;
         this.retryClientMessageId = null;
         this.messages = this.messages.filter((message) => message !== optimistic);
         this.markReply(replyTo, content);
@@ -1231,6 +1240,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
         this.applyTurn(turn); this.scrollToBottom();
       },
       error: (error: HttpErrorResponse) => {
+        this.pendingSelection=selection;
         this.messages = this.messages.filter((message) => message !== optimistic);
         this.recoverFailedSend(error, content, files, fileIntents, replyTo, clientMessageId);
       },
@@ -1628,6 +1638,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
         }
         this.retryClientMessageId = null;
         this.applyState(state);
+        this.pendingSelection=null;
         this.isAnalyzing = false; this.isUploading = false;
         this.errorMessage = 'Your answer was saved. The current onboarding state has been restored.';
         this.cdr.detectChanges();
