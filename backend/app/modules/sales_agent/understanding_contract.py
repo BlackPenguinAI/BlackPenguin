@@ -134,6 +134,9 @@ class Task(StrictModel):
     status: Literal['pending', 'suspended', 'blocked', 'awaiting_user', 'completed', 'cancelled']
     request_ids: list[str] = Field(default_factory=list, max_length=30)
     depends_on: list[str] = Field(default_factory=list, max_length=30)
+    subject: Subject | None = None
+    source_message_id: str | None = Field(default=None, max_length=36)
+    alternative_group: str | None = Field(default=None, max_length=100)
 
 
 class Offer(StrictModel):
