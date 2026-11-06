@@ -773,12 +773,9 @@ def _validate_signature(content: bytes, mime_type: str) -> None:
                     raise UnreadableFileError()
         except BadZipFile as exc:
             raise UnreadableFileError() from exc
-    if mime_type == "image/jpeg" and not content.startswith(b"\xff\xd8\xff"):
-        raise ValueError("The image is not a valid JPEG.")
-    if mime_type == "image/png" and not content.startswith(b"\x89PNG\r\n\x1a\n"):
-        raise ValueError("The image is not a valid PNG.")
-    if mime_type == "image/webp" and not (content.startswith(b"RIFF") and content[8:12] == b"WEBP"):
-        raise ValueError("The image is not a valid WEBP image.")
+    if mime_type in {"image/jpeg", "image/png", "image/webp"}:
+        from .image_validation import validate_image
+        validate_image(content, mime_type)
 
 
 def _fail_source(db: Session, source: ProjectOnboardingSource, message: str) -> None:

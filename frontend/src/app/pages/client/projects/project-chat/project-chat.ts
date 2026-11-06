@@ -36,7 +36,7 @@ import { OnboardingLocationComponent } from '../../../../shared/ui/onboarding-lo
 import { API_V1_URL } from '../../../../core/config/api.config';
 import { MetaOAuthWindow } from '../../../../shared/utils/meta-oauth-window';
 import { MetaSetupState } from './project-onboarding.models';
-import { PROPERTY_TYPE_FIELDS, mergePropertyTypeDraft, propertyTypeSnapshot, propertyTypeDetails, restorePropertyTypeDraft } from './property-type-form';
+import { PROPERTY_TYPE_FIELDS, mergePropertyTypeDraft, propertyTypeSnapshot, propertyTypeDetails, restorePropertyTypeDraft, propertyDraftTimestamp } from './property-type-form';
 import { availableProjectSalesCandidates, companyAdministratorSalesCandidate } from './project-sales-capabilities';
 import {
   errorCount,
@@ -901,12 +901,25 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     const canRestore = (key: string, draft: any, record: any) => this.consumedPropertyDrafts.get(item.id+':'+key) !== JSON.stringify(record || {}) && restorePropertyTypeDraft(item, draft, record);
     const catalogRecord = this.profile.ui_deferrals?.['field:property_type_catalog'];
     const catalogDraft = catalogRecord?.draft?.items?.find((row: any) => row.id === item.id);
-    if (canRestore('field:property_type_catalog', catalogDraft, catalogRecord)) result = mergePropertyTypeDraft(result, catalogDraft || {});
     const record = this.profile.ui_deferrals?.['property:'+item.id];
-    if (canRestore('property:'+item.id, record?.draft, record)) result = mergePropertyTypeDraft(result, record?.draft || {});
+    const drafts = [
+      {key:'field:property_type_catalog',draft:catalogDraft,record:catalogRecord},
+      {key:'property:'+item.id,draft:record?.draft,record},
+    ].filter(entry=>canRestore(entry.key,entry.draft,entry.record))
+      .sort((a,b)=>propertyDraftTimestamp(a.record?.updated_at)-propertyDraftTimestamp(b.record?.updated_at));
+    let selected:string[]|undefined;
+    for(const entry of drafts) {
+      result=mergePropertyTypeDraft(result,entry.draft);
+      if(Array.isArray(entry.draft.selected_images)) {
+        selected=entry.draft.selected_images.filter((id:unknown):id is string=>typeof id==='string' && !!id);
+      }
+    }
     if (JSON.stringify(toPropertyTypePayload(result)) !== JSON.stringify(toPropertyTypePayload(item))) this.dirtyPropertyTypeIds.add(item.id);
-    const selected = this.profile.ui_deferrals?.['property:'+item.id]?.draft?.selected_images;
-    if (Array.isArray(selected) && !this.propertyTypeImageSelection.has(item.id)) this.propertyTypeImageSelection.set(item.id,new Set(selected));
+    // An explicit local empty selection is also an edit: do not resurrect it.
+    if(selected!==undefined && !this.propertyTypeImageSelection.has(item.id)) {
+      const attached=new Set(item.media.map(media=>media.source_id));
+      this.propertyTypeImageSelection.set(item.id,new Set(selected.filter(id=>!attached.has(id))));
+    }
     return result;
   }
 
@@ -1692,7 +1705,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
       const drafts = [
         {value: records['field:property_type_catalog']?.draft?.newType, at: records['field:property_type_catalog']?.updated_at},
         {value: records['property:new']?.draft, at: records['property:new']?.updated_at},
-      ].sort((a,b)=>(Date.parse(a.at || '') || 0)-(Date.parse(b.at || '') || 0));
+      ].sort((a,b)=>propertyDraftTimestamp(a.at)-propertyDraftTimestamp(b.at));
       for (const draft of drafts) {
         restoreDraft(this.propertyTypeDraft, draft.value);
         if (Array.isArray(draft.value?.selected_images)) {
@@ -1713,7 +1726,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
       const records = this.profile.ui_deferrals || {};
       const drafts = [records['field:meta_connection_verified'],records['field:campaigns_defined']]
         .filter(record=>record?.draft?.manual || record?.draft?.oauth)
-        .sort((a,b)=>(Date.parse(a?.updated_at || '') || 0)-(Date.parse(b?.updated_at || '') || 0));
+        .sort((a,b)=>propertyDraftTimestamp(a?.updated_at)-propertyDraftTimestamp(b?.updated_at));
       for (const record of drafts) { restoreDraft(this.metaOAuth, record!.draft.oauth); restoreDraft(this.metaSetup, record!.draft.manual); }
       this.metaDraftRestored = true;
     }

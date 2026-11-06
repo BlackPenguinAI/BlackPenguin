@@ -32,6 +32,15 @@ export function propertyTypeDetails(value: Partial<ProjectPropertyType>): Record
   return JSON.parse(JSON.stringify(Object.fromEntries(EDITABLE_KEYS.map(key => [key, value[key] ?? null]))));
 }
 
+/** Deferral timestamps are server UTC, including legacy naive ISO strings. */
+export function propertyDraftTimestamp(value: unknown): number {
+  if(typeof value!=='string') return 0;
+  const utc=/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?$/.test(value) ? value+'Z' : value;
+  const parsed=Date.parse(utc);
+  const fraction=value.match(/\.(\d+)(?:Z|[+-]\d{2}:?\d{2})?$/)?.[1] || '';
+  return Number.isFinite(parsed) ? parsed+(Number('0.'+fraction)*1000)%1 : 0;
+}
+
 export function restorePropertyTypeDraft(server: ProjectPropertyType, draft: any, record: any): boolean {
   if (!draft || record?.completed_at) return false;
   if (draft.details_base && typeof draft.details_base === 'object') {

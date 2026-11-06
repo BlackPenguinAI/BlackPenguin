@@ -6,7 +6,7 @@ from typing import Any
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from .models import Project, ProjectOnboardingSource, ProjectSalesAsset, ProjectSourceStatus
+from .models import Project, ProjectOnboardingSource, ProjectSalesAsset, ProjectSourceStatus, ProjectSourceKind
 
 
 ASSET_TYPES = {
@@ -197,6 +197,18 @@ def approve(db: Session, item: ProjectSalesAsset, *, user_id: str) -> ProjectSal
     now = datetime.utcnow()
     if item.valid_until and item.valid_until <= now:
         raise HTTPException(status_code=409, detail="Expired material cannot be approved.")
+    # Recheck legacy ready images too. Do not silently archive or rewrite an
+    # existing file/history; reject this approval with a recoverable message.
+    if source.kind == ProjectSourceKind.IMAGE or source.mime_type in {"image/jpeg", "image/png", "image/webp"}:
+        from . import storage_service
+        from .image_validation import validate_image
+        try:
+            content = storage_service.read_project_file(source.storage_path, encrypted=bool(source.is_encrypted))
+            if len(content) > 15 * 1024 * 1024:
+                raise ValueError("The image exceeds the 15 MB limit.")
+            validate_image(content, source.mime_type)
+        except (ValueError, OSError) as exc:
+            raise HTTPException(status_code=422, detail="This image cannot be approved because its content could not be validated. Upload a valid JPG, PNG, or WEBP image (up to 15 MB and 40 megapixels) and review it again.") from exc
     item.approval_status = "approved"
     item.approved_by_user_id = user_id
     item.approved_at = now
