@@ -22,6 +22,13 @@ def normalize_intent(value):
     if not isinstance(entities, dict):
         entities = {}; issues.append("invalid_entities")
     clean = {}
+    protected = entities.get("protected_request")
+    if protected is not None:
+        if (isinstance(protected, dict) and isinstance(protected.get("kind"), str) and protected["kind"] in {"legal_review", "commercial_exception"}
+            and isinstance(protected.get("evidence"), str) and 0 < len(protected["evidence"].strip()) <= 500):
+            clean["protected_request"] = {"kind":protected["kind"], "evidence":protected["evidence"].strip()}
+        else:
+            issues.append("invalid_entity:protected_request")
     for key in ("correction_requested", "challenged_topic"):
         item = entities.get(key)
         if item is None:
@@ -58,5 +65,12 @@ CONTRACT_INSTRUCTION = (
     "and challenged_topic (pricing, inventory, property_types, financing, delivery, amenities, location or assets) when known. "
     "Keep the selected property unless the lead explicitly changes it. Identify what was disputed and use approved evidence, "
     "not a repeated apology. Do not claim a correction or source change without evidence."
+    " Distinguish reported prior statements from the lead's current request: 'you said I need legal advice, "
+    "but I only want a brochure' is a correction/material request, not a new request for legal advice. "
+    "For a genuine current legal-review or commercial-exception request (including an explicit renewal such as "
+    "'please arrange that advice'), return intent_entities.protected_request as "
+    "{kind: legal_review|commercial_exception, evidence: exact current-request substring from the inbound message}. "
+    "Use null/omit it for a mere quote, reference or negation. Evidence must identify the current affirmative "
+    "request, not the quoted/reported claim. Ask clarification if attribution or renewal is ambiguous."
 )
 

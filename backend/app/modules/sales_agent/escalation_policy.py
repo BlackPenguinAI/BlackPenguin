@@ -5,7 +5,7 @@ staff routing policy controls ordinary gaps; protected violations remain hard.
 """
 import re
 from .response_policy import topics_for_turn
-from app.modules.governance.services import escalation_reason, enqueue_notification
+from app.modules.governance.services import escalation_reason, enqueue_notification, request_attribution
 
 
 def apply_escalation_policy(result, *, inbound, routing=None, event_kind="lead_message"):
@@ -29,18 +29,32 @@ def apply_escalation_policy(result, *, inbound, routing=None, event_kind="lead_m
     confidence = result.get("intent_confidence")
     trusted = isinstance(confidence, (float, int)) and not isinstance(confidence, bool) and float(routing.get("minimum_confidence", .8)) <= confidence <= 1
     uncertain_opt_out = event_kind == "lead_message" and "opt_out" in intents and (not trusted or bool(result.get("requires_clarification")))
+    attribution = request_attribution(inbound)
     reason = escalation_reason(inbound) if event_kind == "lead_message" else None
+    reason_source = "deterministic_current_request" if reason else None
+    protected = (result.get("intent_entities") or {}).get("protected_request")
+    protected_accepted = False
+    if event_kind == "lead_message" and not reason and trusted and not result.get("requires_clarification") and isinstance(protected, dict):
+        kind, evidence = protected.get("kind"), protected.get("evidence")
+        if isinstance(kind, str) and kind in {"legal_review", "commercial_exception"} and isinstance(evidence, str) and 0 < len(evidence.strip()) <= 500 and evidence.casefold() in attribution["current_text"].casefold():
+            reason = {"legal_review":"LEGAL_QUESTION", "commercial_exception":"COMPLEX_NEGOTIATION"}[kind]
+            reason_source = "llm_current_request"
+            protected_accepted = True
     disposition = "pause" if reason else "continue"
     applicable_conditions = []
     matched_pause_rules = []
     if event_kind == "lead_message" and (inbound.strip().upper() in {"STOP", "UNSUBSCRIBE", "CANCEL", "END", "QUIT"} or trusted and "opt_out" in intents and not uncertain_opt_out):
         disposition, reason = "opt_out", "LEAD_OPTED_OUT"
+        reason_source = "literal_opt_out" if inbound.strip().upper() in {"STOP", "UNSUBSCRIBE", "CANCEL", "END", "QUIT"} else "llm_opt_out"
     elif violations:
         disposition, reason = "pause", "POLICY_VIOLATION"
+        reason_source = "protected_policy_validation"
     elif event_kind == "lead_message" and trusted and "security_or_abuse" in intents:
         disposition, reason = "pause", "SECURITY"
+        reason_source = "llm_security"
     elif event_kind == "lead_message" and trusted and "human_requested" in intents:
         disposition, reason = "pause", "HUMAN_REQUESTED"
+        reason_source = "llm_human_request"
     elif not reason:
         missing_material = "assets" in topics_for_turn(inbound, intents) and not commercial.get("available_assets")
         low_confidence = bool(result.get("requires_clarification")) or not trusted
@@ -53,8 +67,10 @@ def apply_escalation_policy(result, *, inbound, routing=None, event_kind="lead_m
         matched_pause_rules = [label for label, flag, applies in rules if applies and routing.get(flag) is True]
         if matched_pause_rules:
             disposition, reason = "pause", matched_pause_rules[0]
+            reason_source = "staff_pause_policy"
         elif requested_review:
             disposition, reason = "notify_sales", next(iter(applicable_conditions), "MISSING_INFORMATION")
+            reason_source = "sales_notice"
     actions = [a for a in actions if a.get("type") not in {"request_human_review", "request_callback"}]
     if disposition == "pause":
         actions = [{"type": "request_callback" if reason == "HUMAN_REQUESTED" else "request_human_review"}]
@@ -69,6 +85,8 @@ def apply_escalation_policy(result, *, inbound, routing=None, event_kind="lead_m
                 "conversation_paused": disposition in {"pause", "opt_out"},
                 "consent_clarification_required": uncertain_opt_out and disposition != "opt_out",
                 "applicable_conditions": applicable_conditions, "matched_pause_rules": matched_pause_rules,
+                "request_attribution": attribution, "reason_source": reason_source,
+                "protected_request_accepted": protected_accepted,
                 "applied_pause_policy": {key: routing.get(key) is True for key in ("pause_on_missing_information", "pause_on_missing_material", "pause_on_low_confidence")}}
     result.update(proposed_actions=actions, policy_violations=violations,
                   requires_human=disposition == "pause", escalation_decision=decision)

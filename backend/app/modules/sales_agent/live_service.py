@@ -37,7 +37,7 @@ from .service import (
 from app.modules.sales_crm.scheduling import create_agent_appointment, next_cadence_time
 from app.modules.ai_core.services import get_ai_config
 from app.modules.governance.services import (
-    create_intervention_case, escalation_reason, next_allowed_proactive_time,
+    create_intervention_case, escalation_reason, next_allowed_proactive_time, request_attribution,
     operating_policy_for,
 )
 from .escalation_policy import apply_escalation_policy, notify_sales, escalation_reply, cancel_followups_for_consent_clarification
@@ -1208,6 +1208,8 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
                     "event_kind": "human_intervention",
                     "inbound_message_id": inbound.id,
                     "reason": mandatory_reason,
+                    "reason_source": "deterministic_current_request",
+                    "request_attribution": request_attribution(inbound.content),
                     "human_intervention_case_id": intervention_case.id,
                     "proposed_actions": intervention_actions,
                 },

@@ -307,11 +307,68 @@ def next_allowed_proactive_time(
     })
 
 
+def request_attribution(text: str) -> dict:
+    """Bound explicit reported speech; do not exempt an entire lead message.
+
+    This is a conservative scope helper, not the commercial intent classifier.
+    Direct requests before/after the reported span and quoted direct requests
+    without an attribution cue remain visible to the protected guards.
+    """
+    cue = re.compile(
+        r"\b(?:you\s+(?:said|mentioned|suggested|recommended|told me)|"
+        r"(?:the|your)\s+(?:agent|assistant|advisor)\s+(?:said|mentioned|suggested|recommended)|"
+        r"(?:(?:t[uú]|me)\s+)?(?:dijiste|mencionaste|sugeriste|recomendaste)|"
+        r"(?:el|tu)\s+(?:agente|asistente|asesor)\s+(?:dijo|mencion[oó]|sugiri[oó]|recomend[oó]))\b", re.I)
+    boundary = re.compile(
+        r"[.!?;\n]|\b(?:but|however|pero|sin embargo|and now|y ahora)\b|"
+        r"(?:,\s*|\b(?:and|y)\s+)(?=(?:(?:now|ahora)\s+)?(?:please\s+)?"
+        r"(?:(?:can|could|would)\s+you|I\s+(?:want|need|request)|"
+        r"(?:yo\s+)?(?:quiero|necesito|solicito)|por favor)\b)", re.I)
+    quotes = list(re.finditer(r'"[^"\n]*"|“[^”\n]*”|«[^»\n]*»|(?<!\w)\x27[^\x27\n]*\x27(?!\w)', text))
+    spans = []
+    for match in cue.finditer(text):
+        if any(start <= match.start() < end for start, end in spans):
+            continue
+        # A quote starting with reported speech is itself a reference, while
+        # a direct request such as "I need legal advice, as you said" is not.
+        containing = next((q for q in quotes if q.start() <= match.start() < q.end()), None)
+        if containing:
+            prefix = text[containing.start()+1:match.start()].strip()
+            if not prefix or re.fullmatch(r"(?:earlier|previously|antes|previamente)", prefix, re.I):
+                spans.append((containing.start(), containing.end()))
+            continue
+        opening = re.match(r"\s*(?:(?:that|que)\s*)?:?\s*", text[match.end():])
+        quoted = next((q for q in quotes if q.start() == match.end() + opening.end()), None)
+        if quoted:
+            end = quoted.end()
+        else:
+            stop = next((b for b in boundary.finditer(text, match.end())
+                if not any(q.start() <= b.start() < q.end() for q in quotes)), None)
+            end = stop.start() if stop else len(text)
+        introductory = re.search(r"\b(?:as|como)\s*$", text[:match.start()], re.I)
+        spans.append((introductory.start() if introductory else match.start(), end))
+    current = list(text)
+    for start, end in spans:
+        current[start:end] = ["\n" if ch == "\n" else " " for ch in text[start:end]]
+    return {"current_text": "".join(current),
+            "reported_spans": [{"start":start,"end":end,"text":text[start:end]} for start,end in spans]}
+
+
 def escalation_reason(text: str) -> str | None:
     # This pre-model route is reserved for an affirmative request, not a
     # mention of an advisor or a refusal to speak with one. The LLM still
     # handles other paraphrases through the canonical intent contract.
-    clauses = re.split(r"[.!?;]|\b(?:but|however|pero)\b", text, flags=re.I)
+    current = request_attribution(text)["current_text"]
+    clauses = re.split(r"[.!?;]|\b(?:but|however|pero)\b", current, flags=re.I)
+    scoped_clauses = []
+    for clause in clauses:
+        # A lead's own negation must not swallow a following independent
+        # affirmative imperative. Do not split a third-party report this way.
+        if re.match(r"^\s*(?:I (?:don['’]t|do not|am not)|I['’]m not|not only|no (?:quiero|necesito|estoy))\b", clause, re.I):
+            scoped_clauses.extend(re.split(r",\s*(?=(?:I\s+(?:also\s+)?(?:need|want|request)|negotiate|transfer|please|quiero|necesito|negociar)\b)", clause, flags=re.I))
+        else:
+            scoped_clauses.append(clause)
+    clauses = scoped_clauses
     for clause in clauses:
         if HUMAN_REQUEST.search(clause) and HUMAN_VERB.search(clause):
             negated = re.search(r"\b(?:don['’]t|do not|never|no longer|no quiero|no necesito)\b[^.!?;]{0,65}\b(?:talk|speak|call|contact|transfer|hablar|llamar|comunicar)\b", clause, re.I)
@@ -325,6 +382,11 @@ def escalation_reason(text: str) -> str | None:
         r"\bno\s+(?:quiero|necesito|solicito|estoy pidiendo)|\bno need|\bno", re.I)
     filler = r"(?:for|to|a|an|any|the|your|more|further|un|una|el|la|los|las|de|por|ninguna|ningún|ningun|más|mas)"
     particles = re.compile(r"\s*(?:" + filler + r"\s+)*$", re.I)
+    direct_request = re.compile(
+        r"^[\s,:'\"“«]*(?:(?:now|actually|yes|well|and|ahora|s[ií]|y)\b[\s,:]*)*"
+        r"(?:I\s+(?:also\s+)?(?:need|want|request|require|would like|am asking)|I['’]d like|"
+        r"(?:can|could|would|may|will|do)\s+(?:you|I)|please|help me|explain|review|interpret|negotiate|"
+        r"quiero|necesito|solicito|quisiera|puedes|podr[ií]as|por favor|ay[uú]dame|negociar)\b", re.I)
     def negation_applies(prefix, negation):
         tail = prefix[negation.end():].lstrip()
         # A negated verb may govern a following exception noun, e.g.
@@ -342,6 +404,14 @@ def escalation_reason(text: str) -> str | None:
         for clause in clauses:
             for match in pattern.finditer(clause):
                 prefix = clause[:match.start()]
+                segment_prefix = re.split(r",|\b(?:and|y)\b", prefix, flags=re.I)[-1]
+                segment = segment_prefix + clause[match.start():]
+                # Keywords alone are not a current affirmative request. Other
+                # wordings (including implicit renewals) go through the typed
+                # LLM request contract, rather than forcing a pre-model pause.
+                stated_need = (LEGAL_REQUEST.match(segment.lstrip()) or NEGOTIATION_REQUEST.match(segment.lstrip())) and re.search(r"\b(?:is|are)\s+(?:needed|required|requested)\b", segment, re.I)
+                if (not direct_request.search(segment) and not stated_need) or re.search(r"\b(?:not(?!\s+only)|don['’]t|do not)\b", segment_prefix, re.I):
+                    continue
                 explicitly_negated = any(negation_applies(prefix, n) for n in negated_prefix.finditer(prefix))
                 suffix_negated = re.match(r"\s+(?:(?:is|are)\s+)?(?:not (?:needed|required|requested)|no (?:es|son) necesari[oa]s?)\b", clause[match.end():], re.I)
                 if not explicitly_negated and not suffix_negated:

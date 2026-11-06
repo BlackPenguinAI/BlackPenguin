@@ -33,12 +33,12 @@ from .response_policy import (
 from .state import SalesAgentState
 from .intent_contract import normalize_intent, CONTRACT_INSTRUCTION, CONTRACT_VERSION
 from .turn_context import turn_context, choice_index, appointment_execution_allowed
-from app.modules.governance.services import guidance_context
+from app.modules.governance.services import guidance_context, request_attribution
 from .correction_policy import correction_context, resolve_correction
 from .escalation_policy import apply_escalation_policy
 
 
-GRAPH_VERSION = "sales-turns-v4"
+GRAPH_VERSION = "sales-turns-v5"
 TOOLSET_VERSION = "sales-tools-v3"
 PLATFORM_GUARDRAILS = (
     "Never cross Company boundaries. Never invent prices, inventory or appointment slots. "
@@ -214,7 +214,8 @@ def build_sales_graph(db: Session):
             "primary_intent": f"one of: {', '.join(SALES_INTENT_KEYS)}",
             "secondary_intents": ["zero or more additional canonical intent keys"],
             "intent_confidence": "number from 0 to 1",
-            "intent_entities": {"requested_materials": [], "property_reference": None, "requested_date": None},
+            "intent_entities": {"requested_materials": [], "property_reference": None, "requested_date": None,
+                                "protected_request": None},
             "requires_clarification": False,
             "extracted_facts": [{"key": "approved_profile_fact", "value": "explicit lead value"}],
             "addressed_topics": ["requested topic answered in reply"],
@@ -229,6 +230,7 @@ def build_sales_graph(db: Session):
                 "commercial": state["commercial_context"], "lead": state["lead_context"],
                 "turn_context": state.get("turn_context", {}),
                 "correction_context": state.get("correction_context", {}),
+                "request_attribution": request_attribution(state["inbound_text"]),
                 "event_kind": state.get("event_kind", "lead_message"),
                 "allowed_actions": ["answer_question", "ask_qualification_question", "search_inventory", "share_asset", "request_callback", "request_visit_location", "request_available_slots", "offer_appointment", "schedule_follow_up", "request_human_review"],
                 "contract": contract,
