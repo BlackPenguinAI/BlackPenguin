@@ -458,6 +458,7 @@ def _state_payload(db: Session, project: Project) -> dict[str, Any]:
 
 
 def _system_instruction(config: dict[str, Any]) -> str:
+    from app.modules.onboarding_selection import selection_instruction
     catalog = [{"key": key, "label": field.label, "section": field.section} for key, field in FIELD_BY_KEY.items()]
     return (
         f"{config.get('system_prompt', '')}\n\nFLOW PROTOCOL:\n{config.get('protocol_prompt', '')}"
@@ -466,7 +467,8 @@ def _system_instruction(config: dict[str, Any]) -> str:
         "Always set final_approved to false; only the application's explicit confirmation action can finish onboarding. "
         "verified_updates items use field, value, status, applicable, source_type, source_reference, confidence. "
         "Use only canonical keys from this catalog. Do not say data was saved; the application validates writes. "
-        f"FIELD CATALOG: {json.dumps(catalog)}"
+        + selection_instruction()
+        + f"FIELD CATALOG: {json.dumps(catalog)}"
     )
 
 
@@ -1559,6 +1561,7 @@ async def send_chat(
                 "stale_question": "That question is no longer the active step.",
                 "empty_answer": "Please enter a value before continuing.",
                 "minimum_words": "Please provide a more complete answer.",
+                "invalid_multi_selection": "Select incompatible choices separately. Not applicable, Configure later, and standard Company compliance must not be combined with other options.",
                 "minimum_characters": "Please provide a more complete answer.",
                 "explicit_consent_required": "Use the authorization button so your consent is recorded explicitly.",
                 "sales_team_required": "Assign at least one active Sales user, or choose to configure the team later.",
@@ -1877,7 +1880,9 @@ def project_marketing_summary(
     current_user: User = Depends(RoleChecker(VIEWER_ROLES)),
 ):
     from app.modules.sales_crm.models import FunnelStage, Lead, Meeting
+    from .meta_setup_state import setup_state
 
+    require_project_access(db, current_user, project_id)
     project = services.get_project(db, project_id, current_user.company_id)
     campaigns = db.query(ProjectCampaign).filter(ProjectCampaign.project_id == project.id).order_by(ProjectCampaign.created_at).all()
     leads = db.query(Lead).filter(Lead.project_id == project.id, Lead.company_id == current_user.company_id).all()
@@ -1899,6 +1904,8 @@ def project_marketing_summary(
     return {
         "project_id": project.id,
         "project_name": project.name,
+        "meta_setup": setup_state(db, project),
+        "can_configure_meta": current_user.role in TENANT_MANAGER_ROLES,
         "totals": {
             "campaigns": len(campaigns), "active_campaigns": sum(item.status == "active" for item in campaigns),
             "leads": len(leads), "qualified": qualified_total, "appointments": appointments_total,

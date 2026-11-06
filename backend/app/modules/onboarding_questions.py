@@ -282,6 +282,7 @@ def build_next_question(
     blocker = blockers[0]
     field = blocker["field"]
     config = QUESTION_CATALOG.get(field, {})
+    from .onboarding_selection import EXCLUSIVE_OPTIONS, normalize_selection
     options = list(config.get("options", []))
     examples = list(config.get("examples", []))
     answer_actions: dict[str, dict[str, Any]] = {}
@@ -340,16 +341,24 @@ def build_next_question(
     if config.get("prompt"):
         prompt = str(config["prompt"])
     elif options:
-        prompt = f"Choose the best option for **{blocker['label']}**, or suggest a different answer."
+        prompt = (f"Choose one or more options for **{blocker['label']}**, or suggest a different answer."
+                  if config.get('input_type') == 'multi_select'
+                  else f"Choose the best option for **{blocker['label']}**, or suggest a different answer.")
     elif examples:
         prompt = f"Choose, edit, or write a complete answer for **{blocker['label']}**."
     else:
         prompt = f"What should I record for **{blocker['label']}**?"
+    selected=[]
+    if config.get('input_type')=='multi_select':
+        try:selected=normalize_selection(field,(profile_data or {}).get(field),config.get('options',[]),validate_exclusivity=False) or []
+        except ValueError:pass  # Non-text legacy structures cannot be converted into invented selections.
     return {
         "field": field,
         "label": blocker["label"],
         "prompt": prompt,
         "input_type": config.get("input_type", "text"),
+        "exclusive_options": EXCLUSIVE_OPTIONS.get(field,[]),
+        "selected_values": selected,
         "options": options,
         "examples": examples,
         "allow_custom": bool(config.get("allow_custom", True)),
@@ -476,6 +485,9 @@ def is_too_short(field: str, value: Any) -> bool:
 
 
 def validate_onboarding_value(field: str, value: Any) -> dict[str, Any] | None:
+    from .onboarding_selection import normalize_field_selection
+    try:normalize_field_selection(field,value)
+    except ValueError as exc:return {"code":"invalid_multi_selection","field":field,"message":str(exc)}
     if field == "timezone" and value is not None:
         from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
         try: ZoneInfo(value)

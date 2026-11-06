@@ -32,11 +32,12 @@
     *ngIf="isMultiSelect && !answered"
     type="button"
     class="submit-selection"
-    [disabled]="disabled || !selectedValues.size"
+    [disabled]="disabled || !selectedValues.size || selectionConflict"
     (click)="submitSelection()"
   >
     Continue with {{ selectedValues.size }} selected
   </button>
+  <p *ngIf="selectionConflict && !answered" class="hint" role="alert">The standard Company compliance option must be selected on its own. Review the selection before continuing.</p>
   <p *ngIf="answered" class="hint"><span class="material-symbols-outlined">check_circle</span> Answer recorded.</p>
   <p *ngIf="question.minimum_words && !answered" class="hint">Use at least {{ question.minimum_words }} words for a complete answer.</p>
   <p *ngIf="question.minimum_characters && !answered" class="hint">Use at least {{ question.minimum_characters }} characters for a complete answer.</p>

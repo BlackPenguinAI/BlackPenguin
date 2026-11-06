@@ -199,6 +199,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   private replyToMessageId: string | null = null;
   private retryClientMessageId: string | null = null;
   private lastStateVersion = 0;
+  requestedEditorTask='';
   private renderGeneration = 0;
   locationSaved():void {this.syncState('bottom');}
   readonly editorTasks = [{key:'meta_account',label:'Meta account'},{key:'meta_assets',label:'Campaigns / forms'},{key:'team',label:'Assign team'},{key:'catalog',label:'Property types'},{key:'documents',label:'Add documents'},{key:'location',label:'Location / timezone'}];
@@ -227,6 +228,8 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     this.projectId = this.route.snapshot.paramMap.get('id') || '';
     this.userName = localStorage.getItem('bp_name') || 'User';
     const oauthStatus = this.route.snapshot.queryParamMap?.get('meta_oauth');
+    const task=this.route.snapshot.queryParamMap?.get('task');
+    this.requestedEditorTask=['meta_account','meta_assets'].includes(task || '') ? task || '' : '';
     if (oauthStatus === 'connected') this.metaSetupMessage = 'Meta connected. Select the assets that belong to this Project.';
     if (oauthStatus === 'error') this.errorMessage = this.route.snapshot.queryParamMap?.get('reason') || 'Meta connection could not be completed.';
     this.syncState(oauthStatus ? 'bottom' : 'none');

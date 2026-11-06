@@ -14,6 +14,7 @@ from app.modules.companies.models import Company
 from app.modules import onboarding_versions as versions
 from app.modules.onboarding_deferrals import records as ui_deferrals, resolve_in_sources
 from app.modules.onboarding_questions import validate_onboarding_value
+from app.modules.onboarding_selection import normalize_field_selection, normalize_selection
 from app.modules.project_team.models import ProjectUserAssignment
 from app.modules.users.models import SALES_ACTOR_ROLES, User, UserRole
 from app.modules.sales_crm.models import CalendarConnection
@@ -471,7 +472,8 @@ def resolve_answer_to_question(
         )
     value: Any
     if input_type == "multi_select":
-        value = [item.strip() for item in re.split(r"[,;]", text) if item.strip()]
+        try:value=normalize_selection(field,text,question.ui_payload.get('options',[]))
+        except ValueError:return QuestionResolution(True,"rejected",[],"invalid_multi_selection",question)
         if not value:
             return QuestionResolution(True, "rejected", [], "empty_answer", question)
     else:
@@ -534,6 +536,9 @@ def apply_field_updates(
         if status in {"confirmed", "corrected_by_user", "not_applicable", "deferred"} and not allow_authoritative_statuses:
             status = "pending_confirmation"
         value = update.get("value")
+        try:value=normalize_field_selection(key,value)
+        except ValueError as exc:
+            rejected.append({"update":raw,"reason":"invalid_multi_selection","validation":{"code":"invalid_multi_selection","field":key,"message":str(exc)}});continue
         if (not allow_authoritative_statuses
                 and states.get(key, {}).get("status") in {"confirmed", "corrected_by_user"}):
             rejected.append({"update": raw, "reason": "confirmed_value_requires_explicit_review"}); continue

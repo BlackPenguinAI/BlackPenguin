@@ -228,6 +228,7 @@ export interface MetaSetupState {
   missing_permissions: string[];
   routing_status: 'connected' | 'review_required' | 'not_linked';
   mappings: Array<{id:string; name:string; page_id:string|null; lead_form_id:string|null; ready:boolean; verification_mode:string|null}>;
+  last_authorization?: MetaAuthorization | null;
 }
 
 export interface MetaAuthorization {

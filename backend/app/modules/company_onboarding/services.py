@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
 from app.modules.onboarding_questions import validate_onboarding_value
+from app.modules.onboarding_selection import normalize_field_selection, normalize_selection
 from app.modules import onboarding_versions as versions
 from app.modules.onboarding_deferrals import records as ui_deferrals, resolve_in_sources, resolve_draft
 from app.modules.users import services as user_services
@@ -456,7 +457,8 @@ def resolve_answer_to_question(
     elif urls:
         return QuestionResolution(True, "rejected", [], "url_not_valid_for_field", question)
     elif input_type == "multi_select":
-        value = [item.strip() for item in re.split(r"[,;]", text) if item.strip()]
+        try:value=normalize_selection(field,text,question.ui_payload.get('options',[]))
+        except ValueError:return QuestionResolution(True,"rejected",[],"invalid_multi_selection",question)
         if not value:
             return QuestionResolution(True, "rejected", [], "empty_answer", question)
     else:
@@ -537,6 +539,9 @@ def apply_field_updates(
         current_state = states.get(field_key, {}).get("status")
         current_value = data.get(field_key)
         incoming_value = update.get("value")
+        try:incoming_value=normalize_field_selection(field_key,incoming_value)
+        except ValueError as exc:
+            rejected.append({"update":raw_update,"reason":"invalid_multi_selection","validation":{"code":"invalid_multi_selection","field":field_key,"message":str(exc)}});continue
         if (
             not allow_authoritative_statuses
             and current_state in {"confirmed", "corrected_by_user"}
@@ -563,7 +568,7 @@ def apply_field_updates(
         ):
             status = "corrected_by_user" if incoming_value != current_value else current_state
 
-        value = update.get("value")
+        value = incoming_value
         if status not in {"missing", "not_applicable", "deferred"} and value in (None, "", []):
             rejected.append({"update": raw_update, "reason": "missing_value"})
             continue

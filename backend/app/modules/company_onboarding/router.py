@@ -1051,6 +1051,7 @@ async def send_chat_message(
                 "invalid_url": "Please enter a valid public website URL or choose No website.",
                 "url_not_valid_for_field": "A URL cannot be saved as the value for this field.",
                 "minimum_words": "Please provide a more complete answer.",
+                "invalid_multi_selection": "Select incompatible choices separately. Not applicable and Configure later must not be combined with other options.",
                 "minimum_characters": "Please provide a more complete answer.",
                 "missing_reference_value": "The referenced profile value is not available. Please enter the value directly.",
                 "profile_has_blockers": "The profile changed before approval and still has required information pending.",
@@ -1441,6 +1442,7 @@ async def trigger_scrape(
 
 
 def _system_instruction(agent_config: dict[str, Any]) -> str:
+    from app.modules.onboarding_selection import selection_instruction
     field_catalog = [{"key": key, "label": value.label} for key, value in FIELD_BY_KEY.items()]
     return (
         f"{agent_config.get('system_prompt', '')}\n\n"
@@ -1452,5 +1454,6 @@ def _system_instruction(agent_config: dict[str, Any]) -> str:
         "Never expose JSON, canonical keys, statuses, confidence, or source metadata in assistant_message. "
         "Do not say information was saved; acknowledge it neutrally because the application validates writes "
         "after your response. Ask one focused question based on the first unresolved blocker.\n"
-        f"FIELD CATALOG: {json.dumps(field_catalog)}"
+        + selection_instruction()
+        + f"FIELD CATALOG: {json.dumps(field_catalog)}"
     )

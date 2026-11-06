@@ -164,6 +164,8 @@ class NextQuestionResponse(BaseModel):
     minimum_characters: int | None = None
     help_text: str | None = None
     answer_actions: dict[str, dict[str, Any]] = Field(default_factory=dict)
+    exclusive_options: list[str] = Field(default_factory=list)
+    selected_values: list[str] = Field(default_factory=list)
     suggestion_origin: Literal["website", "confirmed_context", "generic_fallback"] | None = None
     suggestion_sources: list[str] = Field(default_factory=list)
 

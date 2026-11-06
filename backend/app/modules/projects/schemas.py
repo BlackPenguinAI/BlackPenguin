@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import datetime, timedelta, timezone
 from typing import Any, Literal
 
@@ -187,6 +189,8 @@ class NextQuestionResponse(BaseModel):
     minimum_characters: int | None = None
     help_text: str | None = None
     answer_actions: dict[str, dict[str, Any]] = Field(default_factory=dict)
+    exclusive_options: list[str] = Field(default_factory=list)
+    selected_values: list[str] = Field(default_factory=list)
 
 
 class SourceProposalResponse(BaseModel):
@@ -502,6 +506,8 @@ class ProjectMarketingSummary(BaseModel):
     intent_distribution: dict[str, int] = Field(default_factory=dict)
     segment_distribution: dict[str, int] = Field(default_factory=dict)
     leads: list[dict[str, Any]]
+    meta_setup: MetaSetupStateResponse | None = None
+    can_configure_meta: bool = False
 
 
 class CampaignCreate(BaseModel):
@@ -613,6 +619,8 @@ class MetaProjectMappingResponse(BaseModel):
     lead_form_id: str | None = None
     ready: bool
     verification_mode: str | None = None
+    campaign_status: str = "active"
+    reason: str | None = None
 
 
 class MetaSetupStateResponse(BaseModel):
@@ -622,6 +630,7 @@ class MetaSetupStateResponse(BaseModel):
     missing_permissions: list[str]
     routing_status: Literal["connected", "review_required", "not_linked"]
     mappings: list[MetaProjectMappingResponse]
+    last_authorization: MetaAuthorizationResponse | None = None
 
 
 class MetaAssetOption(BaseModel):

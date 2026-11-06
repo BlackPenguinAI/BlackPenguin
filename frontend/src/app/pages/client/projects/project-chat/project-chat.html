@@ -52,6 +52,7 @@
 
     <div #chatScroll class="flex flex-1 flex-col gap-6 overflow-y-auto p-4 md:p-8">
       <nav aria-label="Edit Project onboarding" class="flex flex-wrap gap-2"><button *ngFor="let task of editorTasks" type="button" class="structured-secondary" (click)="openEditorTask(task.key)" [disabled]="isAnalyzing">{{task.label}}</button><button type="button" (click)="openEditorTask('review')" [disabled]="isAnalyzing">Review / approve profile</button></nav>
+      <section *ngIf="requestedEditorTask" class="rounded-xl border border-secondary/30 p-4" data-testid="requested-editor-task"><p>Marketing setup review requested. Your saved settings remain unchanged until you explicitly save an update.</p><button type="button" class="structured-primary mt-2" (click)="openEditorTask(requestedEditorTask); requestedEditorTask=''" [disabled]="isAnalyzing">{{requestedEditorTask === 'meta_account' ? 'Review Meta account and permissions' : 'Review Project campaigns and forms'}}</button></section>
       <section *ngIf="metaAccountState" class="rounded-xl border border-white/15 p-4 text-xs" data-testid="meta-saved-summary">
         <h2 class="font-semibold">Saved Meta setup · {{ projectName }}</h2>
         <p class="mt-2">Step 1 · {{ metaAccountLabel }}</p><p class="mt-1">Step 2 · {{ metaRoutingLabel }}</p>
