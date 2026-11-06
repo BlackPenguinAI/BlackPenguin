@@ -45,14 +45,20 @@ Deploy this differential on its base (or reconcile newer changes first). No new
 migration is introduced; existing dialogue tables from the preceding groups
 must already be migrated.
 
-1. Set `SALES_DIALOGUE_RUNTIME_ENABLED=true` in the environment actually used
-   by API and worker, then recreate/restart both with the same image/config.
+1. Set repository **Actions variable** `SALES_DIALOGUE_RUNTIME_ENABLED=true`
+   in GitHub Settings → Secrets and variables → Actions → Variables.
+   The deployment workflow validates and persists it to the common API/worker
+   environment on every deployment. If absent, the safe default is false.
+   Run a new successful deployment so both containers receive the setting.
    `SALES_UNDERSTANDING_PREVIEW_ENABLED` may remain false for active execution.
 2. Open `/admin/ai-settings`, Sales Agent. Select the configured model and ensure
    the Company has its normal configured model credential.
-3. Set runtime Mode to **Active · structured engine**, enter Company and Project
-   UUIDs, optionally restrict Lead UUIDs to your test lead, save and **publish**.
-   A draft alone is not activation. IDs must be canonical UUIDs, not names or `*`.
+3. Set runtime Mode to **Active · structured engine** and Scope to
+   **Global · all Companies and Projects**, save and **publish**. Global includes
+   future Companies/Projects and requires no IDs. It does not bypass consent,
+   sales authorization, paused conversations, approved assets or tenant isolation.
+   A draft alone is not activation. For a restricted test instead, choose Cohort
+   and supply canonical Company/Project UUIDs and optional Lead UUIDs, never `*`.
 4. Use a consenting test lead on the normal live messaging path. The historical
    simulator still has its separate legacy simulation executor; do not use it
    as proof of the new inbound engine.

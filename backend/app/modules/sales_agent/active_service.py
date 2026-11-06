@@ -40,7 +40,7 @@ def authorize_part(db,conversation,lead,metadata):
     if lead.consent_status!='granted' and metadata.get('control_outcome')!='opt_out':
         raise PermissionError('Messaging consent was withdrawn.')
     project=db.get(Project,scope.project_id)
-    if project.profile:
+    if project.profile and metadata.get('control_outcome') != 'opt_out':
         db.refresh(project.profile);require_capability(project.profile)
     ids=metadata.get('sales_asset_share_ids') or []
     if ids:
@@ -59,17 +59,17 @@ def selected_policy(db,scope):
     return policy if policy.mode=='active' and policy.selects(scope) else None
 
 
-def _current(db,scope):
+def _current(db,scope,control=False):
     conversation=db.query(SalesConversation).filter_by(id=scope.conversation_id).populate_existing().with_for_update().one()
     check_scope(db,scope)
     lead=db.query(Lead).filter_by(id=scope.lead_id).populate_existing().one()
-    if lead.deleted_at or lead.is_opt_out or conversation.is_paused:
+    if lead.deleted_at or lead.is_opt_out or (conversation.is_paused and not control):
         raise PermissionError('Manual control, opt-out or a changed opportunity interrupted this turn.')
     project=db.query(Project).filter_by(id=scope.project_id,company_id=scope.company_id).populate_existing().one()
-    if project.profile:
+    if project.profile and not control:
         db.refresh(project.profile)
         require_capability(project.profile)
-    if lead.consent_status!='granted':
+    if lead.consent_status!='granted' and not control:
         raise PermissionError('Messaging consent is not granted.')
     return conversation,lead,project
 
@@ -112,9 +112,7 @@ def _confirmed_offer_understanding(u,meta,text):
 
 def _materials(db,scope,conversation,lead,run,outcome,previous_meta):
     """Rehydrate approved IDs; diagnostic URLs are never sent to the lead."""
-    u=outcome.state.last_understanding
     tasks={t.id:t for t in outcome.state.tasks}
-    current_ids={t.id for t in tasks.values() if t.source_message_id==run.input_snapshot['message_id']}
     approved={a.id:a for a in sales_asset_service.approved_for_turn(db,project_id=scope.project_id,
         company_id=scope.company_id,channel=conversation.channel)}
     fresh=build_commercial_context(db,project=db.get(Project,scope.project_id),company_id=scope.company_id,
@@ -127,7 +125,7 @@ def _materials(db,scope,conversation,lead,run,outcome,previous_meta):
     pending=[]
     for result in outcome.results:
         task=tasks.get(result.operation_id)
-        if not task or task.id not in current_ids or task.topic.value!='materials' or task.status=='cancelled' or restricted(outcome.state,task):
+        if not task or task.topic.value!='materials' or task.status in {'cancelled','completed'} or restricted(outcome.state,task):
             continue
         if task.status=='awaiting_user' and not result.data.get('materials'):
             continue
@@ -280,12 +278,13 @@ async def maybe_process_active(db,conversation,inbound):
     if existing and existing.status in {'completed','blocked'}:return True
     lead=db.get(Lead,scope.lead_id)
     if not lead or (lead.is_opt_out and not (sticky and (existing.output_snapshot or {}).get('reply_ready'))):return True
-    if conversation.is_paused and not (sticky and (existing.output_snapshot or {}).get('reply_ready')):
+    exact_stop=inbound.content.strip().upper() in {'STOP','UNSUBSCRIBE','CANCEL','END','QUIT'}
+    if conversation.is_paused and not exact_stop and not (sticky and (existing.output_snapshot or {}).get('reply_ready')):
         return True
     run=existing if sticky else None
     if not (run and (run.output_snapshot or {}).get('reply_ready')):
         try:
-            conversation,lead,project=_current(db,scope)
+            conversation,lead,project=_current(db,scope,control=exact_stop)
         except PermissionError:
             return True
         run=live._prepare_run(db,conversation=conversation,event_id=event_id,message_id=inbound.id)
@@ -324,7 +323,7 @@ async def maybe_process_active(db,conversation,inbound):
                 u=u.model_copy(update={'requires_clarification':True,'clarification_question':'Could you clarify whether you want property details, materials, financing, or a visit?'})
             outcome=run_turn(db,scope,message_id=inbound.id,understanding=u,expected_revision=interpreted_revision,
                 event_key='active-runtime:'+inbound.id,max_steps=policy.max_steps,max_seconds=policy.max_seconds)
-            conversation,lead,project=_current(db,scope)  # Manual takeover/consent/permissions win after inference.
+            conversation,lead,project=_current(db,scope,control=exact_stop)  # Manual takeover/consent/permissions win after inference.
             draft=compose(outcome,channel=conversation.channel,style=policy.composition_style)
             # Material discovery blocks are replaced by verified live links or
             # a specific fallback question; never send "not sent yet" diagnostics.
@@ -413,7 +412,7 @@ async def maybe_process_active(db,conversation,inbound):
     if lead.consent_status!='granted' and metadata.get('control_outcome')!='opt_out':return True
     if not selected_policy(db,scope):return True
     project=db.query(Project).filter_by(id=scope.project_id,company_id=scope.company_id).populate_existing().one()
-    if project.profile:
+    if project.profile and metadata.get('control_outcome') != 'opt_out':
         db.refresh(project.profile)
         require_capability(project.profile)
     approved_ids={a.id for a in sales_asset_service.approved_for_turn(db,project_id=scope.project_id,company_id=scope.company_id,channel=conversation.channel)}

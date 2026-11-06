@@ -1,21 +1,53 @@
 {
-  "base_commit": "a461e769374111e8b12d946ae22d1d40c9be0c02",
+  "base_commit": "f5da5489c843aebe4f449fde6f3913884c92e4c3",
   "files": [
     {
       "path": ".github/workflows/deploy.yml",
-      "sha256": "2c73be4168dc899aae3f1ac1cf574c48869509f165c8cb4ae270c87ce85b7673"
+      "sha256": "1c71746745e56754e5d1109323d54ae363d7e0cbfb896fe9a63e006f586ea826"
     },
     {
-      "path": "backend/tests/test_preflight_acceptance_layout.py",
-      "sha256": "eaa689500261d36d802dcee1b573a07c68b9b46cec0d07bbbcbb957d7c72c524"
+      "path": "backend/app/modules/sales_agent/active_service.py",
+      "sha256": "f9fe5a9aaabbc484b770de62f358ad39fd14c6880247c2bb5187b01f831e5591"
     },
     {
-      "path": "backend/tests/test_sales_acceptance_matrix.py",
-      "sha256": "85fe0276246184196e96646d7d2f56a191621d31c59b556ba072610e3d240eca"
+      "path": "backend/app/modules/sales_agent/dialogue_tasks.py",
+      "sha256": "5ffe14d4928cc28d130ece3d17321e647e400c2263188b9bb3b5e4c53dc22f53"
     },
     {
-      "path": "docs/preflight-acceptance-layout-fix.md",
-      "sha256": "4f760766871cbcfceebad3e41ffd5382c8045d2f4b40d744cbe5caf9e4b1768c"
+      "path": "backend/app/modules/sales_agent/live_service.py",
+      "sha256": "f13cdf85dd8b24b8ef9c2900d5800cd0a7e648824cc3a4cb86d37ffea0a1c820"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/runtime_policy.py",
+      "sha256": "bb03cf798b23dfd7a1724aa8d27e89f9e856fe26e1552c20c9f814a937c06a6e"
+    },
+    {
+      "path": "backend/tests/test_sales_active_integration.py",
+      "sha256": "4830e0c77b6133ccdf8befea034c22468010e7cafdb02ad54b5def0c5cb9dd92"
+    },
+    {
+      "path": "backend/tests/test_sales_global_rollout.py",
+      "sha256": "902ef6d31bd74209ad2477f73de021faabbe0ca54f7b0d5097c98fb130ce308c"
+    },
+    {
+      "path": "docs/sales-agent-active-integration.md",
+      "sha256": "448e046d6e22469fe613e5a943997c7e3b8ad4ec76eaf8acbe029ab170ef9cec"
+    },
+    {
+      "path": "docs/sales-global-rollout-patch.md",
+      "sha256": "4760877dc08ce5232249b1ca802f8035c08ea177b5055d92d410f70a51a30280"
+    },
+    {
+      "path": "frontend/src/app/features/admin-panel/ai-settings/ai-settings-page/ai-settings-page.html",
+      "sha256": "71febb27c6fcc4d5706022f7f55d66dc184b2af588bbceb8017d2c72fbbd49d3"
+    },
+    {
+      "path": "frontend/src/app/features/admin-panel/ai-settings/ai-settings-page/ai-settings-page.spec.ts",
+      "sha256": "c5c570a49258b0a6c1acb80bef32c95ffb303fb05539a04c9afb5d8c782fffd6"
+    },
+    {
+      "path": "frontend/src/app/features/admin-panel/ai-settings/ai-settings-page/ai-settings-page.ts",
+      "sha256": "3037572e8b062cc5abc761589e24fe57ba6f15f9c15c66d1f8b08ef2e9fcac24"
     }
   ]
 }

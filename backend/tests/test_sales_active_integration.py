@@ -201,7 +201,8 @@ def test_protected_controls_need_no_model_and_persist_before_reply(agent,text):
     agent.infer.assert_not_awaited()
 
 
-def test_verified_slot_booking_is_durable_and_retry_does_not_duplicate(agent):
+@pytest.mark.parametrize('selection',['1','3:00 PM'])
+def test_verified_slot_booking_is_durable_and_retry_does_not_duplicate(agent,selection):
     from app.modules.users.models import User,UserRole
     from app.modules.project_team.models import ProjectUserAssignment
     from app.modules.sales_crm.models import SalesAvailabilityBlock
@@ -213,7 +214,7 @@ def test_verified_slot_booking_is_durable_and_retry_does_not_duplicate(agent):
     agent.db.add(SalesAvailabilityBlock(user_id=sales.id,starts_at=starts,ends_at=starts+timedelta(hours=2),timezone='UTC'));agent.db.commit()
     agent.turn('I want to arrange a visit',understanding('I want to arrange a visit','appointment'))
     assert not agent.db.query(Meeting).count()
-    message,run=agent.turn('1',understanding('1','appointment',references=[dict(kind='appointment',expression='1',evidence='1')]))
+    message,run=agent.turn(selection,understanding(selection,'appointment',references=[dict(kind='appointment',expression=selection,evidence=selection)]))
     assert agent.db.query(Meeting).count()==1,run.output_snapshot
     meeting=agent.db.query(Meeting).one()
     assert meeting.meeting_time==starts and meeting.visit_address=='100 Main St'

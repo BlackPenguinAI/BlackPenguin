@@ -218,7 +218,7 @@ export class AiSettingsPageComponent implements OnInit {
   private refreshPromptKeys(): void {
     this.config.agent_ventas ||= {};
     this.config.agent_ventas.runtime_config = {
-      mode: 'disabled', company_ids: [], project_ids: [], lead_ids: [],
+      mode: 'disabled', scope: 'cohort', company_ids: [], project_ids: [], lead_ids: [],
       max_steps: 8, max_seconds: 5, understanding_guidance: '', composition_style: 'concise',
       ...(this.config.agent_ventas.runtime_config || {})
     };
@@ -234,5 +234,12 @@ export class AiSettingsPageComponent implements OnInit {
     const runtime = this.config.agent_ventas.runtime_config;
     if (value !== undefined) runtime[key] = value.split(',').map(v => v.trim()).filter(Boolean);
     return (runtime[key] || []).join(', ');
+  }
+
+  runtimeScopeChanged(): void {
+    const runtime = this.config.agent_ventas.runtime_config;
+    if (runtime.scope === 'global') {
+      runtime.company_ids = []; runtime.project_ids = []; runtime.lead_ids = [];
+    }
   }
 }

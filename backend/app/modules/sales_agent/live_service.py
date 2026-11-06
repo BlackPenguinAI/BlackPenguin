@@ -293,7 +293,7 @@ async def _dispatch(
         content = render_channel_text(content, conversation.channel)
         if agent_run_id:
             project = db.query(Project).filter_by(id=conversation.project_id, company_id=conversation.company_id).one()
-            if project.profile: require_capability(project.profile)
+            if project.profile and details.get('control_outcome') != 'opt_out': require_capability(project.profile)
             commercial = build_commercial_context(db, project=project, company_id=conversation.company_id, lead_id=lead.id, channel=conversation.channel)
             before = content
             content, evidence = validate_monetary_reply(content, commercial, lead_profile=lead.lead_profile_data)

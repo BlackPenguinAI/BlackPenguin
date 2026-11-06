@@ -4,6 +4,14 @@ import { describe, expect, it, vi } from 'vitest';
 import { AiSettingsPageComponent } from './ai-settings-page';
 
 describe('AiSettingsPageComponent', () => {
+  it('clears hidden cohort filters when switching to global scope', () => {
+    const component = new AiSettingsPageComponent({} as any, {} as any, {} as any);
+    component.config.agent_ventas.runtime_config = {mode:'active',scope:'global',company_ids:['a'],project_ids:['b'],lead_ids:['c']};
+    component.runtimeScopeChanged();
+    expect(component.config.agent_ventas.runtime_config).toMatchObject({mode:'active',scope:'global',company_ids:[],project_ids:[],lead_ids:[]});
+    (component as any).refreshPromptKeys();
+    expect(component.config.agent_ventas.runtime_config.scope).toBe('global');
+  });
   it('preserves the active cohort while normalizing runtime defaults and editing IDs', () => {
     const component = new AiSettingsPageComponent({} as any, {} as any, {} as any);
     component.config.agent_ventas.runtime_config = {mode:'active',company_ids:['company-a'],project_ids:['project-a']};

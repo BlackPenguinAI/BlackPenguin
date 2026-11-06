@@ -24,6 +24,7 @@ jobs:
         uses: appleboy/ssh-action@v1.0.3
         env:
           DEPLOY_SHA: ${{ github.sha }}
+          SALES_DIALOGUE_RUNTIME_ENABLED: ${{ vars.SALES_DIALOGUE_RUNTIME_ENABLED || 'false' }}
           DB_URL: ${{ secrets.DATABASE_URL }}
           META_TOKEN: ${{ secrets.META_ACCESS_TOKEN }}
           META_BUSINESS_MANAGER_ID: ${{ secrets.META_BUSINESS_MANAGER_ID }}
@@ -40,10 +41,14 @@ jobs:
           host: ${{ secrets.DO_HOST }}
           username: ${{ secrets.DO_USER }}
           key: ${{ secrets.DO_SSH_KEY }}
-          envs: DEPLOY_SHA,DB_URL,META_TOKEN,META_BUSINESS_MANAGER_ID,OPENROUTER_KEY,JWT_SECRET,SA_EMAIL,SA_PASS,MAILCHIMP_KEY,MAILCHIMP_LIST,MAILCHIMP_SERVER,FIREBASE_ADMIN_BRIDGE_URL,FIREBASE_ADMIN_BRIDGE_SECRET
+          envs: DEPLOY_SHA,SALES_DIALOGUE_RUNTIME_ENABLED,DB_URL,META_TOKEN,META_BUSINESS_MANAGER_ID,OPENROUTER_KEY,JWT_SECRET,SA_EMAIL,SA_PASS,MAILCHIMP_KEY,MAILCHIMP_LIST,MAILCHIMP_SERVER,FIREBASE_ADMIN_BRIDGE_URL,FIREBASE_ADMIN_BRIDGE_SECRET
           command_timeout: 30m
           script: |
             set -Eeuo pipefail
+            case "${SALES_DIALOGUE_RUNTIME_ENABLED:-false}" in
+              true|false) ;;
+              *) echo "SALES_DIALOGUE_RUNTIME_ENABLED must be true or false."; exit 1 ;;
+            esac
 
             REPOSITORY_DIR=/home/jorge/BlackPenguin
             DEPLOY_STATE_FILE=/home/jorge/.blackpenguin-production-sha
@@ -255,6 +260,7 @@ jobs:
             {
               echo "ENVIRONMENT=production"
               echo "APP_COMMIT_SHA=$DEPLOY_SHA"
+              echo "SALES_DIALOGUE_RUNTIME_ENABLED=${SALES_DIALOGUE_RUNTIME_ENABLED:-false}"
               echo "ALGORITHM=HS256"
               echo "ACCESS_TOKEN_EXPIRE_MINUTES=10080"
               echo "SECRET_KEY=$JWT_SECRET"

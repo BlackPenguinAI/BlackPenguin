@@ -50,6 +50,35 @@ def resolve_reference(db, scope, state, reference, *, now=None):
                    if p['property_type'].casefold() == reference.expression.strip().casefold()]
         if len(matches) == 1:
             return {'kind':'property', 'id':matches[0]['id'], 'message_id':None}
+    if reference.kind == 'appointment' and offers:
+        import re
+        from zoneinfo import ZoneInfo
+        from app.modules.projects.models import Project
+        expression=reference.expression.strip().upper()
+        if not re.fullmatch(r'\d{1,2}(?::\d{2})?(?:\s*[AP]M)?',expression):
+            return None
+        parsed=None
+        for fmt in ('%I:%M %p','%I %p','%I:%M%p','%I%p','%H:%M'):
+            try:
+                parsed=datetime.strptime(expression,fmt).time();break
+            except ValueError:
+                continue
+        if parsed is None:return None
+        newest=max((date,identifier) for date,identifier,_ in offers)
+        matches=[]
+        zone=ZoneInfo(db.get(Project,scope.project_id).timezone or 'UTC')
+        for date,identifier,offer in offers:
+            if (date,identifier)!=newest or (offer.expires_at and offer.expires_at<=now):continue
+            for value in offer.option_ids:
+                try:
+                    instant=datetime.fromisoformat(value)
+                    instant=instant.replace(tzinfo=timezone.utc) if instant.tzinfo is None else instant
+                    local=instant.astimezone(zone)
+                except ValueError:
+                    continue
+                if instant>now and local.time().replace(tzinfo=None)==parsed:
+                    matches.append({'kind':'appointment','id':value,'message_id':identifier})
+        if len(matches)==1:return matches[0]
     return None
 
 
