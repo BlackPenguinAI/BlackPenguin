@@ -126,6 +126,13 @@ def create_prompt_draft(db: Session, *, company_id: str | None, agent_key: str, 
 
 
 def validate_sales_configuration(configuration: dict) -> None:
+    from app.modules.sales_agent.runtime_policy import RuntimePolicy
+    from pydantic import ValidationError
+    try:
+        RuntimePolicy.model_validate(configuration.get('runtime_config') or {})
+    except ValidationError as exc:
+        errors = ['.'.join(str(p) for p in e['loc'])+': '+e['msg'] for e in exc.errors()[:3]]
+        raise HTTPException(status_code=422, detail='Invalid staged runtime configuration: '+'; '.join(errors))
     scoring = configuration.get("scoring_config") or {}
     hot = int(scoring.get("hot_threshold", 70)); warm = int(scoring.get("warm_threshold", 40))
     if not 0 <= warm < hot <= 100:

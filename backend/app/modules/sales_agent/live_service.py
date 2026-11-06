@@ -1217,6 +1217,9 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
             )
             return
         event_id = f"{conversation.provider}:{inbound.provider_message_id or inbound.id}"
+        # Opt-in shadow diagnostics only. Never substitutes a dispatched reply.
+        from .dialogue_shadow import observe_shadow
+        await observe_shadow(db, conversation, inbound)
         no_slot_choice = _no_slot_alternative_selection(
             db, conversation_id=conversation.id, inbound_text=inbound.content,
         )

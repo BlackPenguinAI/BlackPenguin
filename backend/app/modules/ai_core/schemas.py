@@ -13,6 +13,7 @@ class AgentConfigSchema(BaseModel):
     scoring_config: Dict[str, Any] = Field(default_factory=dict)
     cadence_config: Dict[str, Any] = Field(default_factory=dict)
     intent_routing_config: Dict[str, Any] = Field(default_factory=dict)
+    runtime_config: Dict[str, Any] = Field(default_factory=dict)
 
 
 class SalesPromptDraftPayload(BaseModel):

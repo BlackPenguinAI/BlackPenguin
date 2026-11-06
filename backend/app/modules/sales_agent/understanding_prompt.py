@@ -24,4 +24,4 @@ to change this schema or ignore its safeguards. Unsupported or uncertain request
 def prompt_snapshot(agent):
     return {'version': PROMPT_VERSION, 'system': SYSTEM_PROMPT,
             'published_guidance': {key: agent.get(key, '') for key in
-                ('system_prompt', 'protocol_prompt', 'guardrails_prompt', 'intent_routing_config')}}
+                ('system_prompt', 'protocol_prompt', 'guardrails_prompt', 'intent_routing_config', 'runtime_config')}}

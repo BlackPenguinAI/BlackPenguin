@@ -75,6 +75,18 @@
             <section class="rounded-xl border border-white/10 bg-black/20 p-4">
               <div class="flex flex-col gap-1">
                 <h3 class="text-sm font-medium uppercase tracking-wider text-secondary">Intent classification &amp; routing</h3>
+                <fieldset *ngIf="activeAgent.runtime_config" class="my-4 grid gap-3 rounded border border-white/20 p-4">
+                  <legend>Staged engine · shadow diagnostics only</legend>
+                  <label>Catalog style<select name="runtime_style" [(ngModel)]="activeAgent.runtime_config.composition_style" class="block bg-black p-2"><option value="concise">Concise summaries</option><option value="detailed">Include bathrooms in catalog summaries</option></select></label>
+                  <p>No new engine replies or business actions are sent. Publish the draft to apply; server gates must also be enabled.</p>
+                  <label>Mode<select name="runtime_mode" [(ngModel)]="activeAgent.runtime_config.mode" class="block bg-black p-2"><option value="disabled">Disabled</option><option value="shadow">Selected shadow evaluation</option></select></label>
+                  <label>Company IDs (comma separated)<input name="runtime_companies" [ngModel]="runtimeIds('company_ids')" (ngModelChange)="runtimeIds('company_ids', $event)" class="block w-full bg-black p-2"></label>
+                  <label>Project IDs (comma separated)<input name="runtime_projects" [ngModel]="runtimeIds('project_ids')" (ngModelChange)="runtimeIds('project_ids', $event)" class="block w-full bg-black p-2"></label>
+                  <label>Lead IDs (optional, comma separated)<input name="runtime_leads" [ngModel]="runtimeIds('lead_ids')" (ngModelChange)="runtimeIds('lead_ids', $event)" class="block w-full bg-black p-2"></label>
+                  <label>Maximum steps<input name="runtime_steps" type="number" min="1" max="30" [(ngModel)]="activeAgent.runtime_config.max_steps" class="block bg-black p-2"></label>
+                  <label>Time budget (seconds)<input name="runtime_seconds" type="number" min="0.1" max="30" [(ngModel)]="activeAgent.runtime_config.max_seconds" class="block bg-black p-2"></label>
+                  <label>Understanding guidance (reference data, cannot override safeguards)<textarea name="runtime_guidance" [(ngModel)]="activeAgent.runtime_config.understanding_guidance" rows="4" class="block w-full bg-black p-2"></textarea></label>
+                </fieldset>
                 <p class="text-xs text-gray-400">Runtime contract sales-intents-v1: canonical primary/secondary intents, numeric confidence, validated entities and an explicit clarification flag. Missing or invalid confidence is not treated as certainty. Published instructions and examples remain configurable below.</p>
                 <p class="text-xs leading-relaxed text-gray-500">The model interprets one or more lead intents. Protected backend tools still validate assets, appointments, consent and tenant scope.</p>
               </div>

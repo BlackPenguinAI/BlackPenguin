@@ -216,11 +216,23 @@ export class AiSettingsPageComponent implements OnInit {
   }
 
   private refreshPromptKeys(): void {
+    this.config.agent_ventas ||= {};
+    this.config.agent_ventas.runtime_config = {
+      mode: 'disabled', company_ids: [], project_ids: [], lead_ids: [],
+      max_steps: 8, max_seconds: 5, understanding_guidance: '', composition_style: 'concise',
+      ...(this.config.agent_ventas.runtime_config || {})
+    };
     const sales = this.config.agent_ventas ||= {};
     sales.intent_routing_config ||= { intent_definitions: {} };
     sales.intent_routing_config.intent_definitions ||= {};
     this.stagePromptKeys = Object.keys(this.config.agent_ventas?.stage_prompts || {});
     this.segmentPromptKeys = Object.keys(this.config.agent_ventas?.segment_prompts || {});
     this.intentRoutingKeys = Object.keys(sales.intent_routing_config.intent_definitions);
+  }
+
+  runtimeIds(key: string, value?: string): string {
+    const runtime = this.config.agent_ventas.runtime_config;
+    if (value !== undefined) runtime[key] = value.split(',').map(v => v.trim()).filter(Boolean);
+    return (runtime[key] || []).join(', ');
   }
 }

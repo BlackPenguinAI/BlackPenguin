@@ -68,6 +68,8 @@ class ChatExport(BaseModel):
     materials: list[dict]
     opportunity_contexts: list[dict]
     missing_evidence: list[str] = Field(default_factory=list)
+    dialogue_states: list[dict] = Field(default_factory=list)
+    dialogue_events: list[dict] = Field(default_factory=list)
 
 
 def audit(db, actor, request, company_id, action, entity_id=None, payload=None):
@@ -117,6 +119,8 @@ def explicit_run_leads(snapshot):
 
 
 def diagnostic(db, conv, company_id, project_id, lead_id):
+    from .dialogue_models import SalesDialogueState, SalesDialogueEvent
+    dialogue_scope = dict(company_id=company_id, project_id=project_id, lead_id=lead_id, conversation_id=conv.id)
     messages, physical_count = scoped_messages(db, conv, lead_id)
     ids = {m.id for m in messages}
     deliveries = db.query(OutboundMessage).filter(OutboundMessage.conversation_id == conv.id).all()
@@ -194,7 +198,9 @@ def diagnostic(db, conv, company_id, project_id, lead_id):
         outbound_deliveries=[row(d, ("recipient",)) for d in scoped_deliveries],
         follow_up_jobs=[row(j) for j in followups], pauses=[row(p) for p in pauses],
         materials=[row(m, ("token_hash", "target_url")) for m in materials if m.id in referenced_shares or m.agent_run_id in run_ids or m.outbound_message_id in {d.id for d in scoped_deliveries}],
-        opportunity_contexts=[row(c) for c in contexts], missing_evidence=missing)
+        opportunity_contexts=[row(c) for c in contexts], missing_evidence=missing,
+        dialogue_states=[row(s) for s in db.query(SalesDialogueState).filter_by(**dialogue_scope).all()],
+        dialogue_events=[row(e) for e in db.query(SalesDialogueEvent).filter_by(**dialogue_scope).order_by(SalesDialogueEvent.revision).all()])
     return ChatExport.model_validate(redact(result.model_dump(mode="json")))
 
 
@@ -235,6 +241,7 @@ def conversations(company_id: str, project_id: str, lead_id: str, request: Reque
 
 @router.get("/conversations/{conversation_id}")
 def detail(conversation_id: str, company_id: str, project_id: str, lead_id: str, request: Request, db: Session = Depends(get_db), actor: User = Depends(staff), after: str | None = None, limit: int = Query(100, ge=1, le=200)):
+    from .dialogue_models import SalesDialogueEvent
     conv = selected(db, company_id, project_id, lead_id, conversation_id)
     query = message_query(db, conv, lead_id)
     if after:
@@ -246,6 +253,8 @@ def detail(conversation_id: str, company_id: str, project_id: str, lead_id: str,
     batch = messages[:limit]
     audit(db, actor, request, company_id, "read", conversation_id, {"project_id":project_id, "lead_id":lead_id, "after":after})
     return redact({"messages":[row(m) for m in batch], "next_cursor":batch[-1].id if batch else after,
+        "dialogue_events":[row(e) for e in db.query(SalesDialogueEvent).filter_by(company_id=company_id,
+            project_id=project_id,lead_id=lead_id,conversation_id=conv.id).order_by(SalesDialogueEvent.revision.desc()).limit(20).all()],
         "has_more":len(messages)>limit, "is_paused":conv.is_paused, "pause_reason":conv.pause_reason,
         "delivery_statuses":[{"message_id":m.id,"status":m.status} for m in message_query(db, conv, lead_id).with_entities(SalesMessage.id, SalesMessage.status).filter(SalesMessage.direction == "outbound").order_by(SalesMessage.created_at, SalesMessage.id).all()]})
 
