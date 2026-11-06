@@ -93,7 +93,7 @@ export interface PropertyCatalogSnapshotItem {
   media: Array<{ source_id: string; caption: string | null; image_url: string }>;
 }
 export interface ProjectChatArtifact {
-  kind: 'property_catalog_snapshot'; confirmed_at: string; items: PropertyCatalogSnapshotItem[];
+  kind: 'property_catalog_snapshot'; confirmed_at: string; items: PropertyCatalogSnapshotItem[]; title?: string; action?: string;
 }
 export interface SourceProposal {
   id: string; field: string; label: string; value: unknown; evidence: string | null;

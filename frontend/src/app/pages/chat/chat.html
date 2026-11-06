@@ -41,7 +41,7 @@
 
     <div #chatScroll class="z-10 flex flex-1 flex-col gap-6 overflow-y-auto p-4 scroll-smooth md:p-8">
       <nav aria-label="Edit Company onboarding"><button type="button" (click)="openCompanyTask('team')">Company users</button><button type="button" (click)="openCompanyTask('documents')">Add documents</button><button type="button" (click)="openCompanyTask('location')">Country / city / timezone</button><button type="button" (click)="openCompanyTask('review')">Review / approve profile</button></nav>
-      <app-onboarding-location *ngIf="companyEditorTask==='location'" scope="company" [entityId]="profile.company_id" (saved)="companyLocationSaved()"></app-onboarding-location>
+      <app-onboarding-location *ngIf="companyEditorTask==='location' && !cardDeferred('field:country')" scope="company" [entityId]="profile.company_id" [records]="profile.ui_deferrals || {}" (deferred)="deferralsSaved($event)" (saved)="companyLocationSaved()"></app-onboarding-location>
 <section *ngIf="deferredCards.length" class="rounded-xl border border-amber-400/30 p-4"><h2>Configurations saved for later</h2><p class="text-xs text-gray-400">Saved drafts are not approvals. Resume required items before final approval.</p><ng-container *ngFor="let key of deferredCards"><app-configure-later  scope="company" [entityId]="profile.company_id" [card]="key" [label]="deferredLabel(key)" [draft]="{}" [records]="profile.ui_deferrals || {}" (saved)="deferralsSaved($event)"></app-configure-later></ng-container></section>
       <ng-container *ngFor="let msg of visibleMessages">
         <div
@@ -60,7 +60,7 @@
               (selected)="chooseAnswer($event, msg)"
               (custom)="writeCustomAnswer(msg)"
             ></app-onboarding-ai-message>
-<app-configure-later *ngIf="isActiveQuestion(msg) && msg.ui_payload?.input_type !== 'complete' && msg.ui_payload?.input_type !== 'deferred_review'" scope="company" [entityId]="profile.company_id" [card]="msg.ui_payload!.field ? 'field:'+msg.ui_payload!.field : 'final_approval'" [label]="msg.ui_payload!.label" [draft]="{answer: prompt}" [records]="profile.ui_deferrals || {}" (saved)="deferralsSaved($event)"></app-configure-later>
+<app-configure-later *ngIf="isActiveQuestion(msg) && msg.ui_payload?.input_type !== 'complete' && msg.ui_payload?.input_type !== 'deferred_review' && companyEditorTask !== 'location'" scope="company" [entityId]="profile.company_id" [card]="questionCard(msg.ui_payload!)" [label]="msg.ui_payload!.label" [draft]="{answer: prompt}" [records]="profile.ui_deferrals || {}" (saved)="deferralsSaved($event)"></app-configure-later>
             <div *ngIf="msg.media_evidence as media" class="ml-11 mt-2 max-w-sm rounded-xl border border-green-500/20 bg-green-500/[0.06] p-3">
               <div class="flex items-center gap-3">
                 <img *ngIf="companyMediaUrls.get(media.asset_id) as preview" [src]="preview" [alt]="media.name" class="h-16 w-20 rounded-lg border border-white/10 bg-black/30 object-contain p-1" />
@@ -194,7 +194,8 @@
 </ng-container>
       </ng-template>
 
-      <div *ngIf="currentStage === 'enrichment'" class="flex max-w-3xl gap-4" data-active-onboarding-step="true">
+      <app-review-card *ngIf="currentStage === 'enrichment' && !cardDeferred('enrichment')" title="Public contact information" status="Pending review" summary="Confirm public email, phone and social profiles; user login information is separate.">
+      <div class="flex max-w-3xl gap-4" data-active-onboarding-step="true">
 <app-configure-later  scope="company" [entityId]="profile.company_id" [card]="'enrichment'" [label]="'enrichment'" [draft]="publicPresenceDraft()" [records]="profile.ui_deferrals || {}" (saved)="deferralsSaved($event)"></app-configure-later>
         <div class="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-secondary/50 bg-secondary/20">
           <span class="material-symbols-outlined text-[18px] text-secondary">contact_phone</span>
@@ -220,7 +221,9 @@
         </section>
       </div>
 
-      <div *ngIf="currentStage === 'team' || companyEditorTask === 'team'" class="flex max-w-3xl gap-4" data-active-onboarding-step="true">
+      </app-review-card>
+      <app-review-card *ngIf="(currentStage === 'team' || companyEditorTask === 'team') && !cardDeferred('team')" title="Company users" status="Team setup" [summary]="team.members.length + ' saved user(s). Default access: all current and future Projects, unless selected exceptions apply.'">
+      <div class="flex max-w-3xl gap-4" data-active-onboarding-step="true">
 <app-configure-later  scope="company" [entityId]="profile.company_id" [card]="'team'" [label]="'team'" [draft]="teamInvite" [records]="profile.ui_deferrals || {}" (saved)="deferralsSaved($event)"></app-configure-later>
         <div class="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-secondary/50 bg-secondary/20">
           <span class="material-symbols-outlined text-[18px] text-secondary">group_add</span>
@@ -292,7 +295,9 @@
         </section>
       </div>
 
-      <div *ngIf="currentStage === 'logo_review'" class="flex max-w-3xl gap-4" data-testid="company-logo-step" data-active-onboarding-step="true">
+      </app-review-card>
+      <app-review-card *ngIf="currentStage === 'logo_review' && !cardDeferred('field:company_logo')" title="Company logo" status="Pending confirmation" summary="Choose, upload or configure the official image later.">
+      <div class="flex max-w-3xl gap-4" data-testid="company-logo-step" data-active-onboarding-step="true">
 <app-configure-later  scope="company" [entityId]="profile.company_id" [card]="'field:company_logo'" [label]="'logo review'" [draft]="{selectedLogoId: selectedLogoId}" [records]="profile.ui_deferrals || {}" (saved)="deferralsSaved($event)"></app-configure-later>
         <div class="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-secondary/50 bg-secondary/20"><span class="material-symbols-outlined text-[18px] text-secondary">image</span></div>
         <section class="w-full rounded-2xl rounded-tl-sm border border-white/10 bg-white/5 p-4 md:p-5">
@@ -308,6 +313,11 @@
         </section>
       </div>
 
+      </app-review-card>
+      <app-review-card *ngIf="team.members.length && currentStage !== 'team' && companyEditorTask !== 'team'" title="Saved Company team" status="Saved · invitations may still be pending" [summary]="team.members.length + ' user(s) saved. Expand to review names, roles and invitation status.'" [complete]="true">
+        <p *ngFor="let member of team.members" class="text-xs">{{member.first_name}} {{member.last_name}} · {{member.email}} · {{member.role}} · {{teamMemberStatusLabel(member)}}</p>
+        <button type="button" class="structured-secondary" (click)="openCompanyTask('team')">Review team setup</button>
+      </app-review-card>
       <div *ngIf="isCompleted" class="flex max-w-3xl gap-4" data-testid="company-onboarding-complete" data-active-onboarding-step="true">
         <div class="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-green-500/40 bg-green-500/10">
           <span class="material-symbols-outlined text-[18px] text-green-400">verified</span>

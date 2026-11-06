@@ -4,7 +4,7 @@ import json
 import re
 import uuid
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 from urllib.parse import quote, urlparse
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, Response, UploadFile, status
@@ -772,6 +772,40 @@ async def upload_project_cover_candidate(
     return source_service.serialize_source(source)
 
 
+@router.post("/{project_id}/sources/image-upload", response_model=SourceResponse, status_code=201)
+async def upload_property_image(
+    project_id: str, file: UploadFile = File(...),
+    sharing_intent: Literal["internal", "sales_candidate"] = Form("internal"),
+    content_tags: str = Form('["gallery_image"]'),
+    db: Session = Depends(get_db), current_user: User = Depends(RoleChecker(EDITOR_ROLES)),
+):
+    """Store a ready image for selection, without selecting a cover or approving sales."""
+    project = services.get_project(db, project_id, current_user.company_id)
+    require_project_access(db, current_user, project_id)
+    try:
+        tags = json.loads(content_tags)
+    except (ValueError, TypeError):
+        raise HTTPException(422, "Choose the content types for this image.")
+    if not isinstance(tags, list) or not tags or any(not isinstance(tag, str) or tag not in sales_asset_service.ASSET_TYPES for tag in tags):
+        raise HTTPException(422, "Choose at least one valid image content type.")
+    if file.content_type not in {"image/jpeg", "image/png", "image/webp"}:
+        raise HTTPException(422, "Use a JPG, PNG, or WEBP image, up to 15 MB.")
+    source = await source_service.create_file_source(
+        db, project_id=project.id, company_id=current_user.company_id, user_id=current_user.id,
+        upload=file, sharing_intent=sharing_intent, intended_asset_type=tags[0], intended_content_tags=tags,
+    )
+    if source.status == ProjectSourceStatus.FAILED or not source.storage_path:
+        raise HTTPException(422, source.error_message or "The image could not be validated.")
+    source.status = ProjectSourceStatus.READY
+    source.extracted_text = "[User-uploaded property image; content classified by user]"
+    sales_asset_service.materialize_source_candidate(db, source)
+    record_platform_event(db, actor=current_user, company_id=project.company_id,
+                          event_type="onboarding.property_image_uploaded", entity_type="project_source",
+                          entity_id=source.id, payload={"sharing_intent": sharing_intent, "content_tags": tags})
+    db.commit(); db.refresh(source)
+    return source_service.serialize_source(source)
+
+
 def _property_type(db: Session, project_id: str, property_type_id: str) -> ProjectPropertyType:
     item = db.query(ProjectPropertyType).filter(
         ProjectPropertyType.id == property_type_id,
@@ -873,7 +907,7 @@ def attach_property_type_media(
 ):
     project = services.get_project(db, project_id, current_user.company_id)
     item = _property_type(db, project.id, property_type_id)
-    return catalog_service.serialize(catalog_service.attach_media(db, project, item, payload.source_ids))
+    return catalog_service.serialize(catalog_service.attach_media(db, project, item, payload.source_ids, user_id=current_user.id))
 
 
 @router.post("/{project_id}/property-types/{property_type_id}/defer-images", response_model=PropertyTypeResponse)
@@ -883,7 +917,11 @@ def defer_property_type_images(
 ):
     project = services.get_project(db, project_id, current_user.company_id)
     item = _property_type(db, project.id, property_type_id)
-    item.images_status = "deferred"; db.add(item); db.commit(); db.refresh(item)
+    if item.images_status != "deferred":
+        item.images_status = "deferred"; db.add(item)
+        from .review_receipts import property_receipt
+        property_receipt(db, project, item, "images configured for later", current_user.id)
+    db.commit(); db.refresh(item)
     return catalog_service.serialize(item)
 
 
@@ -942,6 +980,8 @@ def approve_sales_asset(
     project = services.get_project(db, project_id, current_user.company_id)
     require_project_access(db, current_user, project_id)
     item = _sales_asset(db, project.id, asset_id)
+    from app.modules.onboarding_deferrals import resolve_draft
+    resolve_draft(project.profile, "material:" + item.id)
     item = sales_asset_service.approve(db, item, user_id=current_user.id)
     services.save_message(
         db, project.session.id, SenderType.AI,
@@ -959,6 +999,8 @@ def archive_sales_asset(
     require_project_access(db, current_user, project_id)
     item = _sales_asset(db, project.id, asset_id)
     display_name = item.display_name
+    from app.modules.onboarding_deferrals import resolve_draft
+    resolve_draft(project.profile, "material:" + item.id)
     sales_asset_service.archive(db, item)
     services.save_message(
         db, project.session.id, SenderType.AI,

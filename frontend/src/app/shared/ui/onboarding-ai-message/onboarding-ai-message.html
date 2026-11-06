@@ -2,6 +2,11 @@
   <div class="avatar"><span class="material-symbols-outlined">smart_toy</span></div>
   <div class="message-column">
     <article class="bubble">
+      <app-review-card *ngIf="message.ui_payload; else plainMessage" [title]="message.ui_payload.label || 'Onboarding review'" [status]="message.response_payload?.status || (active ? 'Active review' : 'Pending')" [summary]="message.response_payload?.answer || 'Expand to review this step.'" [complete]="!!message.response_payload">
+        <ng-container *ngTemplateOutlet="messageBody"></ng-container>
+      </app-review-card>
+      <ng-template #plainMessage><ng-container *ngTemplateOutlet="messageBody"></ng-container></ng-template>
+      <ng-template #messageBody>
       <div class="assistant-markdown" [innerHTML]="renderMarkdown(message.content)"></div>
       <app-onboarding-response-options
         *ngIf="message.ui_payload"
@@ -17,6 +22,12 @@
         <span class="material-symbols-outlined">check_circle</span>
         Custom answer: {{ message.response_payload?.answer }}
       </div>
+      <app-review-card *ngIf="draftReceipt" title="Saved draft at this decision" [status]="message.response_payload?.status || 'Pending'" summary="Expand to review the values preserved at this decision." [complete]="true">
+        <pre class="whitespace-pre-wrap break-words">{{draftReceipt}}</pre>
+        <p>This is historical evidence, not approved data. Resume the pending configuration to continue editing.</p>
+        <p>{{message.response_payload?.decided_at | date:'medium'}}</p>
+      </app-review-card>
+      </ng-template>
     </article>
     <div class="meta-row">
       <span>{{ message.created_at | date: 'dd/MM/yyyy HH:mm' }}</span>

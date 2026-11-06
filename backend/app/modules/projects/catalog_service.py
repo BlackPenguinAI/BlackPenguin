@@ -353,7 +353,15 @@ def create(db: Session, project: Project, payload: dict[str, Any], *, user_id: s
     db.flush()
     _sync_profile(db, project)
     resolve_draft(project.profile, "property:new")
+    sources = deepcopy(project.profile.field_sources or {})
+    catalog_draft = sources.get("__ui_deferrals__", {}).get("field:property_type_catalog", {}).get("draft", {})
+    if "newType" in catalog_draft:
+        catalog_draft.pop("newType")
+        project.profile.field_sources = sources
+        flag_modified(project.profile, "field_sources")
     versions.record_edit(db, project.profile, before, actor_user_id=user_id)
+    from .review_receipts import property_receipt
+    property_receipt(db, project, item, "saved", user_id)
     db.commit()
     db.refresh(item)
     return item
@@ -361,6 +369,8 @@ def create(db: Session, project: Project, payload: dict[str, Any], *, user_id: s
 
 def remove(db: Session, project: Project, item: ProjectPropertyType, *, user_id: str | None = None) -> None:
     before = versions.begin_edit(db, services.get_profile(project))
+    from .review_receipts import property_receipt
+    property_receipt(db, project, item, "removed", user_id)
     if item.review_status == "candidate":
         item.review_status = "rejected"
         db.add(item)
@@ -399,12 +409,14 @@ def update(db: Session, project: Project, item: ProjectPropertyType, payload: di
         project.profile.field_sources = {**sources, "__ui_deferrals__": bag}
         flag_modified(project.profile, "field_sources")
     versions.record_edit(db, project.profile, before, actor_user_id=user_id)
+    from .review_receipts import property_receipt
+    property_receipt(db, project, item, "saved", user_id)
     db.commit()
     db.refresh(item)
     return item
 
 
-def attach_media(db: Session, project: Project, item: ProjectPropertyType, source_ids: list[str]) -> ProjectPropertyType:
+def attach_media(db: Session, project: Project, item: ProjectPropertyType, source_ids: list[str], *, user_id: str | None = None) -> ProjectPropertyType:
     sources = db.query(ProjectOnboardingSource).filter(
         ProjectOnboardingSource.project_id == project.id,
         ProjectOnboardingSource.id.in_(source_ids),
@@ -415,11 +427,16 @@ def attach_media(db: Session, project: Project, item: ProjectPropertyType, sourc
     if len({source.id for source in sources}) != len(set(source_ids)):
         raise HTTPException(status_code=422, detail="Every selected image must be a ready image from this Project.")
     existing = {media.source_id for media in item.media}
+    changed = item.images_status != "provided" or bool(set(source_ids) - existing)
     for index, source_id in enumerate(source_ids):
         if source_id not in existing:
             db.add(ProjectPropertyTypeMedia(property_type_id=item.id, source_id=source_id, sort_order=len(existing) + index))
     item.images_status = "provided"
     db.add(item)
+    if changed:
+        db.flush(); db.refresh(item, ["media"])
+        from .review_receipts import property_receipt
+        property_receipt(db, project, item, "images attached", user_id)
     db.commit()
     db.refresh(item)
     return item

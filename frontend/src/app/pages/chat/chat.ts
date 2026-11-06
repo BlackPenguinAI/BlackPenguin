@@ -54,23 +54,31 @@ import {
 } from './company-onboarding.models';
 import { CompanyOnboardingService } from './company-onboarding.service';
 import { OnboardingLocationComponent } from '../../shared/ui/onboarding-location';
-import { ConfigureLaterComponent, DeferredCards, restoreDraft } from '../../shared/ui/configure-later/configure-later';
+import { ConfigureLaterComponent, DeferredCards, restoreDraft, questionCard } from '../../shared/ui/configure-later/configure-later';
+import { ReviewCardComponent } from '../../shared/ui/review-card';
 
 
 @Component({
   selector: 'app-chat',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, TranslateModule, OnboardingAiMessageComponent, OnboardingWelcomeComponent, TimezoneSelectComponent, ConfigureLaterComponent, OnboardingLocationComponent],
+  imports: [CommonModule, FormsModule, RouterModule, TranslateModule, OnboardingAiMessageComponent, OnboardingWelcomeComponent, TimezoneSelectComponent, ConfigureLaterComponent, OnboardingLocationComponent, ReviewCardComponent],
   templateUrl: './chat.html',
   styleUrl: './chat.scss',
 })
 export class ChatComponent implements OnInit, OnDestroy {
+  readonly questionCard=questionCard;
   get deferredCards() { return Object.entries(this.profile.ui_deferrals || {}).filter(([,v]) => v.deferred).map(([key])=>key); }
   cardDeferred(card:string) { return !!this.profile.ui_deferrals?.[card]?.deferred; }
   deferredLabel(card:string) { return this.sources.find(s=>'source:'+s.id===card)?.name || this.profile.fields.find(f=>'field:'+f.key===card)?.label || ({team:'Team users',enrichment:'Public contact information',final_approval:'Final approval'} as Record<string,string>)[card] || card.replace(/_/g,' '); }
   sourceDraft(source:OnboardingSource) { return Object.fromEntries(source.proposals.map(p=>[p.id,p.draftValue ?? this.formatProposalValue(p)])); }
   publicPresenceDraft() { return {publicEmails:this.publicEmails,publicPhones:this.publicPhones,socialProfiles:this.socialProfiles,editing:[...this.publicPresenceEditing],dirty:[...this.publicPresenceDirty]}; }
-  deferralsSaved(records:DeferredCards) { this.profile={...this.profile,ui_deferrals:records};this.syncState('bottom'); }
+  deferralsSaved(records:DeferredCards) {
+    const resumed=Object.keys(records).find(key=>this.cardDeferred(key) && records[key].resumed);
+    this.profile={...this.profile,ui_deferrals:records};
+    if(this.cardDeferred('team')) this.companyEditorTask='';
+    if(resumed==='documents' || resumed==='field:country') this.openCompanyTask(resumed==='documents' ? 'documents' : 'location');
+    else this.syncState('bottom');
+  }
   @ViewChild('chatScroll') chatScroll!: ElementRef<HTMLElement>;
 
   prompt = '';
@@ -86,6 +94,9 @@ export class ChatComponent implements OnInit, OnDestroy {
   sources: OnboardingSource[] = [];
   profile: CompanyProfileResponse = EMPTY_COMPANY_PROFILE;
   companyEditorTask = '';
+  private restoredTeamDraft=false;
+  private restoredPresenceDraft=false;
+  private restoredLogoDraft=false;
   openCompanyTask(task:string):void {if(this.isAnalyzing)return;this.prompt=({team:'I want to update Company users',documents:'I want to upload documents',location:'I want to update city and country',review:'I want to review profile'} as Record<string,string>)[task] || '';this.sendMessage();}
   companyLocationSaved():void {this.syncState('bottom');}
   showWelcome = false;
@@ -977,9 +988,6 @@ export class ChatComponent implements OnInit, OnDestroy {
     const merged = new Map(this.sources.map((source) => [source.id, source]));
     for (const source of this.prepareSources(sources)) merged.set(source.id, source);
     this.sources = Array.from(merged.values());
-    for (const source of this.sources) {
-      if (this.hasPendingProposals(source)) this.expandedSourceIds.add(source.id);
-    }
   }
 
   private syncState(
@@ -1014,14 +1022,15 @@ export class ChatComponent implements OnInit, OnDestroy {
     this.companyEditorTask = (state.next_question as any)?.task || '';
     this.messages = [...state.messages];
     this.profile = state.profile;
-    restoreDraft(this.teamInvite, this.profile.ui_deferrals?.['team']?.draft);
+    if(!this.restoredTeamDraft) {
+      restoreDraft(this.teamInvite, this.profile.ui_deferrals?.['team']?.draft);
+      this.restoredTeamDraft=true;
+    }
     const logoDraft = this.profile.ui_deferrals?.['field:company_logo']?.draft;
-    if (typeof logoDraft?.selectedLogoId === 'string') this.selectedLogoId=logoDraft.selectedLogoId;
+    if (!this.restoredLogoDraft && typeof logoDraft?.selectedLogoId === 'string') this.selectedLogoId=logoDraft.selectedLogoId;
+    this.restoredLogoDraft=true;
     this.sources = this.prepareSources(state.sources);
     this.loadCompanyMedia();
-    for (const source of this.sources) {
-      if (this.hasPendingProposals(source)) this.expandedSourceIds.add(source.id);
-    }
     const previousStage = this.currentStage;
     this.nextQuestion = state.next_question;
     if (!this.prompt && this.nextQuestion?.field) this.prompt=this.profile.ui_deferrals?.['field:'+this.nextQuestion.field]?.draft?.answer || '';
@@ -1033,7 +1042,7 @@ export class ChatComponent implements OnInit, OnDestroy {
     }
     this.initializePublicPresence(state.profile.data);
     const presenceDraft = this.profile.ui_deferrals?.['enrichment']?.draft;
-    if (presenceDraft) {
+    if (presenceDraft && !this.restoredPresenceDraft) {
       if (Array.isArray(presenceDraft.editing)) presenceDraft.editing.forEach((key:string)=>this.publicPresenceEditing.add(key));
       if (Array.isArray(presenceDraft.dirty)) presenceDraft.dirty.forEach((key:string)=>this.publicPresenceDirty.add(key));
       for (const [key, field] of [['publicEmails','public_contact_emails'],['publicPhones','public_contact_phones'],['socialProfiles','corporate_social_profiles']]) {
@@ -1044,6 +1053,7 @@ export class ChatComponent implements OnInit, OnDestroy {
         }
       }
     }
+    this.restoredPresenceDraft=true;
     this.isCompleted = state.profile.completion.can_complete && state.stage === 'complete';
     this.showWelcome = state.stage === 'website';
     if (this.pollingTimer) clearTimeout(this.pollingTimer);

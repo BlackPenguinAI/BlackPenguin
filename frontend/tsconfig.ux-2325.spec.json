@@ -1,0 +1,19 @@
+{
+  "extends": "./tsconfig.editor-1316.spec.json",
+  "include": [
+    "src/**/*.d.ts",
+    "src/app/pages/monitor/monitor.spec.ts",
+    "src/app/shared/ui/configure-later/configure-later.spec.ts",
+    "src/app/shared/ui/onboarding-ai-message/onboarding-ai-message.spec.ts",
+    "src/app/core/guards/company-completion.guard.spec.ts",
+    "src/app/pages/onboarding-revisions.spec.ts",
+    "src/app/pages/client/projects/project-chat/project-form-validation.spec.ts",
+    "src/app/pages/client/projects/project-chat/project-sales-capabilities.spec.ts",
+    "src/app/pages/client/projects/project-chat/project-chat-p2.spec.ts",
+    "src/app/pages/client/projects/project-chat/project-catalog-789.spec.ts",
+    "src/app/pages/client/projects/project-chat/project-catalog-recovery.spec.ts",
+    "src/app/pages/client/projects/project-chat/project-team-meta.spec.ts",
+    "src/app/pages/client/projects/project-chat/project-editor-1316.spec.ts",
+    "src/app/pages/client/projects/project-chat/project-ux-2325.spec.ts"
+  ]
+}

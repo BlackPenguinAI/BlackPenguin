@@ -27,7 +27,11 @@ def deferred(profile, card):
 
 
 def question_blockers(profile, blockers):
-    return [item for item in blockers if not deferred(profile, "field:" + item["field"])]
+    visible = [item for item in blockers if not deferred(profile, "field:" + item["field"])]
+    # A direct Resume action should take the user back to that review, not
+    # silently show the first unrelated missing field again.
+    resumed = {key: value.get("updated_at", "") for key, value in records(profile).items() if value.get("resumed")}
+    return sorted(visible, key=lambda item: resumed.get("field:" + item["field"], ""), reverse=True)
 
 
 def deferred_question():
@@ -76,7 +80,10 @@ def save(db, profile, scope, entity_id, payload, actor):
     elif prefix == "property" and scope == "project":
         if identifier != "new" and not db.query(pm.ProjectPropertyType.id).filter(pm.ProjectPropertyType.id == identifier, pm.ProjectPropertyType.project_id == entity_id).first():
             raise HTTPException(404, "Property type not found.")
-    elif payload.card not in {"team", "enrichment", "catalog", "materials", "final_approval"}:
+    elif prefix == "material" and scope == "project":
+        if not db.query(pm.ProjectSalesAsset.id).filter(pm.ProjectSalesAsset.id == identifier, pm.ProjectSalesAsset.project_id == entity_id).first():
+            raise HTTPException(404, "Sales material not found in this onboarding.")
+    elif payload.card not in {"team", "enrichment", "catalog", "materials", "documents", "meta_setup", "final_approval"}:
         raise HTTPException(422, "Unknown onboarding card.")
     if len(json.dumps(payload.draft).encode()) > 200000:
         raise HTTPException(413, "This draft is too large. Upload the document before configuring it later.")
@@ -91,6 +98,8 @@ def save(db, profile, scope, entity_id, payload, actor):
     db.refresh(profile)
     state = deepcopy(records(profile))
     previous = state.get(payload.card, {})
+    if payload.resume and not previous:
+        raise HTTPException(409, "This card has no saved draft. Open the review before resuming it.")
     value = {"deferred": not payload.resume, "resumed": payload.resume, "draft": payload.draft if not payload.resume else previous.get("draft", {}), "actor_user_id": actor.id, "updated_at": datetime.utcnow().isoformat()}
     if previous.get("deferred") == value["deferred"] and previous.get("draft") == value["draft"]:
         return state
@@ -113,7 +122,7 @@ def save(db, profile, scope, entity_id, payload, actor):
     message_model = cm.OnboardingMessage if scope == "company" else pm.ProjectMessage
     sender = cm.SenderType.AI if scope == "company" else pm.SenderType.AI
     label = fields[identifier].label if prefix == "field" else {"source":"Document review", "property":"Property type draft"}.get(prefix, payload.card.replace("_", " "))
-    db.add(message_model(session_id=session.id, sender=sender, content=("Resumed " if payload.resume else "Configured for later: ") + label + ". Saved values were preserved. This does not approve data, files or sales permissions.", response_payload={"status":"resumed" if payload.resume else "deferred", "answer":payload.card}))
+    db.add(message_model(session_id=session.id, sender=sender, content=("Resumed " if payload.resume else "Configured for later: ") + label + ". Saved values were preserved. This does not approve data, files or sales permissions.", response_payload={"status":"resumed" if payload.resume else "deferred", "answer":payload.card, "draft_snapshot":deepcopy(value["draft"]), "actor_user_id":actor.id, "decided_at":value["updated_at"]}))
     record_platform_event(db, actor=actor, company_id=company_id, event_type="onboarding.card_resumed" if payload.resume else "onboarding.card_deferred", entity_type=scope + "_profile", entity_id=profile.id, payload={"card":payload.card,"before":previous,"after":value})
     db.commit()
     return records(profile)
@@ -129,5 +138,7 @@ def decide(scope: Literal["company", "project"], entity_id: str, payload: Decisi
         profile = services.get_or_create_profile(db, entity_id)
     else:
         from app.modules.projects import services
+        from app.modules.users.project_access import require_project_access
+        require_project_access(db, actor, entity_id)
         profile = services.get_profile(services.get_project(db, entity_id, actor.company_id))
     return {"deferrals": save(db, profile, scope, entity_id, payload, actor)}

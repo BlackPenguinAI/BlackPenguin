@@ -1,5 +1,6 @@
 import { ChangeDetectorRef, Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
-import { ConfigureLaterComponent, DeferredCards, restoreDraft } from '../../../../shared/ui/configure-later/configure-later';
+import { ConfigureLaterComponent, DeferredCards, restoreDraft, questionCard } from '../../../../shared/ui/configure-later/configure-later';
+import { ReviewCardComponent } from '../../../../shared/ui/review-card';
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
@@ -28,7 +29,7 @@ import {
   Campaign, ChatAttachment, ChatMessage, ChatTurn, EMPTY_PROJECT_PROFILE, MetaAssetDiscovery, MetaAssetOption, MetaAuthorization, MetaConnection,
   MetaSetupConfiguration, OnboardingState, ProjectAssignment, ProjectFieldProgress, ProjectProfile,
   ProjectSalesCandidate, ProjectSource, SectionProgress, SourceProposal, ValidationStatus,
-  ProjectFileIntent, ProjectPropertyType, ProjectSalesAsset, PropertyTypeCatalog, SalesAssetType,
+  ProjectFileIntent, ProjectPropertyType, ProjectSalesAsset, PropertyTypeCatalog, SalesAssetType, ProjectChatArtifact,
 } from './project-onboarding.models';
 import { ProjectOnboardingService } from './project-onboarding.service';
 import { OnboardingLocationComponent } from '../../../../shared/ui/onboarding-location';
@@ -49,21 +50,30 @@ import {
 
 @Component({
   selector: 'app-project-chat', standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, OnboardingAiMessageComponent, OnboardingWelcomeComponent, ConfigureLaterComponent, OnboardingLocationComponent],
+  imports: [CommonModule, FormsModule, RouterModule, OnboardingAiMessageComponent, OnboardingWelcomeComponent, ConfigureLaterComponent, OnboardingLocationComponent, ReviewCardComponent],
   templateUrl: './project-chat.html', styleUrls: ['./project-chat.scss'],
 })
 export class ProjectChatComponent implements OnInit, OnDestroy {
+  readonly questionCard=questionCard;
   get deferredCards() { return Object.entries(this.profile.ui_deferrals || {}).filter(([,v])=>v.deferred).map(([key])=>key); }
   cardDeferred(card:string) { return !!this.profile.ui_deferrals?.[card]?.deferred; }
-  deferredLabel(card:string) { return this.sources.find(s=>'source:'+s.id===card)?.name || this.propertyCatalog.items.find(p=>'property:'+p.id===card)?.name || this.profile.fields.find(f=>'field:'+f.key===card)?.label || ({'property:new':'New property type',materials:'Lead-safe materials',catalog:'Property catalog',final_approval:'Final approval'} as Record<string,string>)[card] || card.replace(/_/g,' '); }
+  deferredLabel(card:string) { return this.sources.find(s=>'source:'+s.id===card)?.name || this.salesAssets.find(a=>'material:'+a.id===card)?.display_name || this.propertyCatalog.items.find(p=>'property:'+p.id===card)?.name || this.profile.fields.find(f=>'field:'+f.key===card)?.label || ({'property:new':'New property type',materials:'Lead-safe materials',catalog:'Property catalog',final_approval:'Final approval'} as Record<string,string>)[card] || card.replace(/_/g,' '); }
   sourceDraft(source:ProjectSource) { return Object.fromEntries(source.proposals.map(p=>[p.id,p.draftValue ?? this.formatProposalValue(p)])); }
-  deferralsSaved(records:DeferredCards) { this.profile={...this.profile,ui_deferrals:records};this.syncState('bottom'); }
+  deferralsSaved(records:DeferredCards) {
+    const resumed=Object.keys(records).find(key=>this.cardDeferred(key) && records[key].resumed);
+    this.profile={...this.profile,ui_deferrals:records};
+    if(this.cardDeferred('property:new')) this.showPropertyTypeForm=false;
+    if(resumed==='property:new') this.showPropertyTypeForm=true;
+    const task=resumed && ({'field:meta_connection_verified':'meta_account','field:campaigns_defined':'meta_assets','field:sales_contacts':'team','field:property_type_catalog':'catalog',catalog:'catalog',final_approval:'review',documents:'documents',meta_setup:'meta','field:country':'location'} as Record<string,string>)[resumed];
+    if(task) this.openEditorTask(task); else this.syncState('bottom');
+  }
   propertyDraft(item:ProjectPropertyType) { return {...item,details_base:this.propertyTypeBases.get(item.id) || propertyTypeDetails(item),selected_images:[...(this.propertyTypeImageSelection.get(item.id) || [])]}; }
   newPropertyDraft() { return {...this.propertyTypeDraft,selected_images:[...this.propertyTypeDraftImageSelection]}; }
   cardDraft(field:string|null) {
     if (field === 'campaigns_defined' || field === 'meta_connection_verified') return {manual:this.metaSetup,oauth:this.metaOAuth};
     if (field === 'sales_contacts') return {selected_user_id:this.selectedSalesUserId};
-    if (field === 'property_type_catalog') return {items:this.propertyCatalog.items.map(item=>this.propertyDraft(item)),newType:this.propertyTypeDraft};
+    if (field === 'project_cover') return {selected_source_id:this.selectedCoverSourceId};
+    if (field === 'property_type_catalog') return {items:this.propertyCatalog.items.map(item=>this.propertyDraft(item)),newType:this.newPropertyDraft()};
     return {answer:this.prompt};
   }
   @ViewChild('chatScroll') chatScroll!: ElementRef<HTMLElement>;
@@ -152,6 +162,9 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   private readonly consumedPropertyDrafts = new Map<string, string>();
   readonly propertyTypeFields = PROPERTY_TYPE_FIELDS;
   readonly mediaUpdatingPropertyTypeIds = new Set<string>();
+  readonly propertyImageUploads = new Set<string>();
+  readonly propertyImageSharing:Record<string,string>={};
+  readonly propertyImageTags:Record<string,SalesAssetType[]>={};
   creatingPropertyType = false;
   confirmingPropertyCatalog = false;
   coverBusy = false;
@@ -321,19 +334,28 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
       && this.propertyTypeErrorCount(item) === 0;
   }
   isPropertyTypeSaving(item: Partial<ProjectPropertyType>): boolean {
-    return item.id ? this.savingPropertyTypeIds.has(item.id) || this.mediaUpdatingPropertyTypeIds.has(item.id) : this.creatingPropertyType;
+    return this.propertyImageUploads.has(item.id || 'new') || (item.id ? this.savingPropertyTypeIds.has(item.id) || this.mediaUpdatingPropertyTypeIds.has(item.id) : this.creatingPropertyType);
   }
   get catalogReady(): boolean {
     return !this.creatingPropertyType
+      && !this.hasUnattachedImages
       && this.dirtyPropertyTypeIds.size === 0
       && this.mediaUpdatingPropertyTypeIds.size === 0
       && this.savingPropertyTypeIds.size === 0
+      && this.propertyImageUploads.size === 0
       && !this.confirmingPropertyCatalog
       && this.propertyCatalog.confirmed_count > 0
       && this.propertyCatalog.candidate_count === 0
       && this.propertyCatalog.items
         .filter(item => item.review_status === 'confirmed')
         .every(item => this.propertyTypeErrorCount(item) === 0);
+  }
+  get hasUnattachedImages():boolean {
+    return [...this.propertyTypeImageSelection].some(([id,selection])=>selection.size>0 && !this.cardDeferred('property:'+id))
+      || this.showPropertyTypeForm && !this.cardDeferred('property:new') && this.propertyTypeDraftImageSelection.size>0;
+  }
+  get catalogMutationBusy():boolean {
+    return this.propertyImageUploads.size>0 || this.savingPropertyTypeIds.size>0 || this.mediaUpdatingPropertyTypeIds.size>0 || this.creatingPropertyType || this.confirmingPropertyCatalog;
   }
   get salesInviteErrors(): FormErrors { return validateSalesInvite(this.salesInvite); }
   get salesInviteErrorCount(): number { return errorCount(this.salesInviteErrors); }
@@ -730,6 +752,38 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     this.errorMessage = '';
   }
 
+  propertySummary(item:ProjectPropertyType):string {
+    return `${item.bedrooms ?? '—'} beds · ${item.bathrooms ?? '—'} baths · ${this.formatCatalogArea(item.area_min,item.area_max,item.area_unit)}\n${this.formatCatalogMoney(item.starting_price,item.currency)} · Available: ${item.available_units ?? 'not confirmed'} · Images: ${item.media.length} (${item.images_status})`;
+  }
+  artifactSummary(artifact:ProjectChatArtifact):string {
+    return artifact.items.map(item=>`${item.name} · ${this.formatCatalogArea(item.area_min,item.area_max,item.area_unit)} · ${this.formatCatalogMoney(item.starting_price,item.currency)} · Images: ${item.media.length} (${item.images_status})`).join('\n');
+  }
+  propertyReviewComplete(item:ProjectPropertyType):boolean {
+    return item.review_status==='confirmed' && !this.dirtyPropertyTypeIds.has(item.id) && !this.propertyTypeImageSelection.get(item.id)?.size && !this.profile.ui_deferrals?.['property:'+item.id]?.resumed;
+  }
+  toggleUploadTag(item:Partial<ProjectPropertyType>,tag:SalesAssetType):void {
+    const key=item.id || 'new';const tags=this.propertyImageTags[key] || ['gallery_image'];
+    this.propertyImageTags[key]=tags.includes(tag) ? tags.filter(value=>value!==tag) : [...tags,tag];
+  }
+  uploadPropertyImage(item:Partial<ProjectPropertyType>,event:Event):void {
+    const input=event.target as HTMLInputElement;const file=input.files?.[0];input.value='';
+    const key=item.id || 'new';
+    if(!file || this.propertyImageUploads.has(key) || this.isPropertyTypeSaving(item)) return;
+    const tags=this.propertyImageTags[key] || ['gallery_image'];
+    if(!['image/jpeg','image/png','image/webp'].includes(file.type) || !file.size || file.size>15*1024*1024 || !tags.length) {
+      this.errorMessage='Choose a JPG, PNG, or WEBP image up to 15 MB and at least one content type. Your form is unchanged.';return;
+    }
+    this.propertyImageUploads.add(key);this.errorMessage='';
+    this.onboarding.uploadPropertyImage(this.projectId,file,this.propertyImageSharing[key] || 'internal',tags).pipe(
+      timeout(30_000),finalize(()=>{this.propertyImageUploads.delete(key);this.cdr.detectChanges();}),
+    ).subscribe({next:source=>{
+      this.mergeSources([source]);
+      if(item.id) { const selected=this.propertyTypeImageSelection.get(item.id) || new Set<string>();selected.add(source.id);this.propertyTypeImageSelection.set(item.id,selected); }
+      else {this.propertyTypeDraftInitialized=true;this.propertyTypeDraftImageSelection.add(source.id);}
+      this.loadSalesAssets();
+    },error:error=>{this.errorMessage=this.apiDetail(error,'The image could not be uploaded. Your fields and image selections are preserved; retry.');}});
+  }
+
   rejectPropertyType(item: ProjectPropertyType): void {
     if (this.removingPropertyTypeIds.has(item.id) || this.isPropertyTypeSaving(item)) return;
     this.removingPropertyTypeIds.add(item.id);
@@ -821,7 +875,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   }
 
   get readyProjectImages(): ProjectSource[] { return this.sources.filter(source => source.kind === 'image' && source.status === 'ready' && !!source.download_url); }
-  get showCoverPicker(): boolean { return this.nextQuestion?.input_type === 'project_cover'; }
+  get showCoverPicker(): boolean { return !this.cardDeferred('field:project_cover') && this.nextQuestion?.input_type === 'project_cover'; }
   get showPropertyCatalog(): boolean { return !this.cardDeferred('field:property_type_catalog') && (this.nextQuestion?.input_type === 'property_type_catalog' || this.showPropertyTypeForm || Object.entries(this.profile.ui_deferrals || {}).some(([key,value])=>key.startsWith('property:') && value.resumed)); }
 
   private emptyPropertyType(): Partial<ProjectPropertyType> {
@@ -1106,6 +1160,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   }
   isReviewableSource(source: ProjectSource): boolean {
     return source.kind !== 'image'
+      || this.salesAssetsForSource(source.id).length > 0
       || source.status === 'processing'
       || source.status === 'failed'
       || source.proposals.length > 0;
@@ -1601,7 +1656,6 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     const merged = new Map(this.sources.map((source) => [source.id, source]));
     for (const source of this.prepareSources(items)) merged.set(source.id, source);
     this.sources = Array.from(merged.values());
-    for (const source of this.sources) if (this.hasPendingProposals(source)) this.expandedSourceIds.add(source.id);
     this.loadSourceImagePreviews();
   }
   private syncState(
@@ -1639,12 +1693,18 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
         {value: records['field:property_type_catalog']?.draft?.newType, at: records['field:property_type_catalog']?.updated_at},
         {value: records['property:new']?.draft, at: records['property:new']?.updated_at},
       ].sort((a,b)=>(Date.parse(a.at || '') || 0)-(Date.parse(b.at || '') || 0));
-      for (const draft of drafts) restoreDraft(this.propertyTypeDraft, draft.value);
-      const newImages = records['property:new']?.draft?.selected_images;
-      if (Array.isArray(newImages)) newImages.forEach(id=>this.propertyTypeDraftImageSelection.add(id));
+      for (const draft of drafts) {
+        restoreDraft(this.propertyTypeDraft, draft.value);
+        if (Array.isArray(draft.value?.selected_images)) {
+          this.propertyTypeDraftImageSelection.clear();
+          draft.value.selected_images.forEach((id:string)=>this.propertyTypeDraftImageSelection.add(id));
+        }
+      }
       this.propertyTypeDraftInitialized = true;
     }
     if (this.profile.ui_deferrals?.['property:new']?.resumed) this.showPropertyTypeForm=true;
+    if (this.cardDeferred('property:new')) this.showPropertyTypeForm=false;
+    if (!this.selectedCoverSourceId) this.selectedCoverSourceId=this.profile.ui_deferrals?.['field:project_cover']?.draft?.selected_source_id || null;
     if (!this.teamDraftRestored) {
       this.selectedSalesUserId = this.profile.ui_deferrals?.['field:sales_contacts']?.draft?.selected_user_id || this.selectedSalesUserId;
       this.teamDraftRestored = true;
@@ -1664,7 +1724,6 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     this.loadSourceImagePreviews();
     this.loadPropertyTypes();
     this.loadSalesAssets();
-    for (const source of this.sources) if (this.hasPendingProposals(source)) this.expandedSourceIds.add(source.id);
     this.showWelcome = state.stage === 'website';
     if (this.pollingTimer) clearTimeout(this.pollingTimer);
     if (state.stage === 'processing') this.schedulePolling();

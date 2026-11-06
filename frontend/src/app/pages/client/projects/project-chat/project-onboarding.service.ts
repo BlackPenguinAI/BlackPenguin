@@ -66,6 +66,10 @@ export class ProjectOnboardingService {
     const body = new FormData(); body.append('file', file, file.name);
     return this.http.post<ProjectSource>(`${this.baseUrl}/${id}/sources/cover-upload`, body);
   }
+  uploadPropertyImage(id:string,file:File,sharingIntent:string,tags:SalesAssetType[]):Observable<ProjectSource> {
+    const body=new FormData();body.append('file',file,file.name);body.append('sharing_intent',sharingIntent);body.append('content_tags',JSON.stringify(tags));
+    return this.http.post<ProjectSource>(`${this.baseUrl}/${id}/sources/image-upload`,body);
+  }
   getPropertyTypes(id: string): Observable<PropertyTypeCatalog> {
     return this.http.get<PropertyTypeCatalog>(`${this.baseUrl}/${id}/property-types`);
   }

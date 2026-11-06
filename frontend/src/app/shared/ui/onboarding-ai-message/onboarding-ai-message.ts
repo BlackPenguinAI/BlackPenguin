@@ -5,18 +5,20 @@ import { Subscription } from 'rxjs';
 
 import { SpeechSynthesisService, SpeechSynthesisState } from '../../../core/services/speech-synthesis.service';
 import { OnboardingQuestion, OnboardingResponseOptionsComponent } from '../onboarding-response-options/onboarding-response-options';
+import { formatDraftSummary } from '../configure-later/configure-later';
+import { ReviewCardComponent } from '../review-card';
 
 export interface StructuredAiMessage {
   id?: string;
   content: string;
   created_at: string | Date;
   ui_payload?: OnboardingQuestion | null;
-  response_payload?: { status: string; answer: string; selected_option?: string | null; custom?: boolean } | null;
+  response_payload?: { status: string; answer: string; selected_option?: string | null; custom?: boolean; draft_snapshot?:Record<string,any>; decided_at?:string } | null;
 }
 
 @Component({
   selector: 'app-onboarding-ai-message', standalone: true,
-  imports: [CommonModule, OnboardingResponseOptionsComponent],
+  imports: [CommonModule, OnboardingResponseOptionsComponent,ReviewCardComponent],
   templateUrl: './onboarding-ai-message.html', styleUrl: './onboarding-ai-message.scss',
 })
 export class OnboardingAiMessageComponent implements OnInit, OnDestroy {
@@ -36,6 +38,7 @@ export class OnboardingAiMessageComponent implements OnInit, OnDestroy {
   }
   ngOnDestroy(): void { this.subscriptions.unsubscribe(); }
   get messageId(): string { return this.message.id || `transient-${String(this.message.created_at)}`; }
+  get draftReceipt():string {return formatDraftSummary(this.message.response_payload?.draft_snapshot);}
   get isSpeaking(): boolean { return this.activeMessageId === this.messageId; }
   get choicesText(): string {
     const question = this.message.ui_payload;
