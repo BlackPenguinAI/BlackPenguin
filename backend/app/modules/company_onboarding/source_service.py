@@ -591,7 +591,9 @@ async def _extract_proposals(
                 "an explicit headquarters, registered office, corporate address, or statement that the "
                 "company is based in a specific city and country. Keep Project locations and operating "
                 "markets separate from headquarters. Also prioritize asset classes, business model, official "
-                "company descriptions, value propositions, and differentiators when the source supports them."
+                "company descriptions, value propositions, and differentiators when the source supports them. "
+                "A brand does not prove a registered legal name or DBA. Do not designate one of several offices "
+                "as headquarters without explicit evidence. Social profile URLs must identify the organization, not posts or reels."
             ),
         },
         {
@@ -666,6 +668,13 @@ SOCIAL_HOSTS = {
 }
 
 
+def _corporate_social_profile(url: str) -> bool:
+    """Posts, reels and individual videos are evidence, not Company profiles."""
+    parsed = urlparse(url)
+    segments = [part.casefold() for part in parsed.path.split("/") if part]
+    return not any(part in {"p", "reel", "reels", "posts", "videos", "watch", "shorts", "stories", "status"} for part in segments)
+
+
 def _social_host(url: str) -> bool:
     host = (urlparse(url).hostname or "").casefold().removeprefix("www.")
     return any(host == domain or host.endswith(f".{domain}") for domain in SOCIAL_HOSTS)
@@ -709,7 +718,7 @@ def _embedded_link_values(text: str) -> dict[str, Any]:
             number = link[4:].split("?", 1)[0].strip()
             if number:
                 phones.append(number)
-        elif lowered.startswith(("http://", "https://")) and _social_host(link):
+        elif lowered.startswith(("http://", "https://")) and _social_host(link) and _corporate_social_profile(link):
             if link not in social_profiles:
                 social_profiles.append(link)
 

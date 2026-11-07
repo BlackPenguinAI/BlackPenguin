@@ -35,7 +35,10 @@ QUESTION_CATALOG: dict[str, dict[str, Any]] = {
     },
     "additional_corporate_languages": {
         "input_type": "multi_select",
-        "options": ["English", "Spanish", "Portuguese", "French"],
+        "options": ["English"],
+        "prompt": "Confirm the communication language supported by Black Penguin.",
+        "help_text": "English is currently supported. Additional languages will be available in a future release.",
+        "allow_custom": False,
     },
     "corporate_compliance_information": {
         "input_type": "multi_select",
@@ -158,6 +161,11 @@ QUESTION_CATALOG: dict[str, dict[str, Any]] = {
     "currency": {
         "input_type": "single_select",
         "options": ["USD", "PEN", "EUR", "MXN", "COP", "BRL"],
+    },
+    "parking_and_storage": {
+        "input_type": "long_text",
+        "prompt": "Describe parking and storage: garage or assigned spaces, visitor parking, storage, quantities, and whether each is included or optional.",
+        "help_text": "Only include confirmed details. Use Provide later if unknown; Not applicable means it does not apply.",
     },
     "payment_methods": {
         "input_type": "multi_select",

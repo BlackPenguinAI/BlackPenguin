@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.spec.json",
+  "include": [
+    "src/**/*.d.ts",
+    "src/app/shared/ui/configure-later/*.spec.ts",
+    "src/app/shared/ui/onboarding-ai-message/*.spec.ts",
+    "src/app/shared/ui/onboarding-response-options/*.spec.ts",
+    "src/app/shared/ui/onboarding-welcome/*.spec.ts",
+    "src/app/pages/onboarding-*.spec.ts",
+    "src/app/pages/client/projects/project-chat/*-*.spec.ts",
+    "src/app/pages/client/marketing/*.spec.ts",
+    "src/app/core/timezones.spec.ts"
+  ]
+}

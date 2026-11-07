@@ -229,11 +229,13 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     this.projectId = this.route.snapshot.paramMap.get('id') || '';
     this.userName = localStorage.getItem('bp_name') || 'User';
     const oauthStatus = this.route.snapshot.queryParamMap?.get('meta_oauth');
+    if(oauthStatus)this.restoreOAuthDraft();
     const task=this.route.snapshot.queryParamMap?.get('task');
     this.requestedEditorTask=['meta_account','meta_assets'].includes(task || '') ? task || '' : '';
+    if (oauthStatus === 'connected') this.showMetaAssetStep=true;
     if (oauthStatus === 'connected') this.metaSetupMessage = 'Meta connected. Select the assets that belong to this Project.';
     if (oauthStatus === 'error') this.errorMessage = this.route.snapshot.queryParamMap?.get('reason') || 'Meta connection could not be completed.';
-    this.syncState(oauthStatus ? 'bottom' : 'none');
+    this.syncState('bottom');
     this.loadCampaigns(); this.loadMetaConnections(); this.loadSalesTeam(); this.loadMetaSetupConfiguration(); this.loadMetaSetupState();
     if (oauthStatus) {
       void this.router.navigate([], {
@@ -334,14 +336,17 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   }
   canSavePropertyType(item: Partial<ProjectPropertyType>): boolean {
     return !this.isPropertyTypeSaving(item)
+      && !(item.id && this.propertyTypeImageSelection.get(item.id)?.size)
       && !this.propertyTypeFormError(item)
       && this.propertyTypeErrorCount(item) === 0;
   }
   isPropertyTypeSaving(item: Partial<ProjectPropertyType>): boolean {
     return this.propertyImageUploads.has(item.id || 'new') || (item.id ? this.savingPropertyTypeIds.has(item.id) || this.mediaUpdatingPropertyTypeIds.has(item.id) : this.creatingPropertyType);
   }
+  get reviewingAvailability(): boolean { return this.nextQuestion?.label === 'Confirm current availability'; }
   get catalogReady(): boolean {
-    return !this.creatingPropertyType
+    return (!this.reviewingAvailability || this.propertyCatalog.items.filter(item => item.review_status === 'confirmed').every(item => item.available_units != null))
+      && !this.creatingPropertyType
       && !this.hasUnattachedImages
       && this.dirtyPropertyTypeIds.size === 0
       && this.mediaUpdatingPropertyTypeIds.size === 0
@@ -520,36 +525,38 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
       },
     });
   }
+  navigateToMeta(url:string):void { window.location.assign(url); }
+  private oauthDraftKey():string { return 'bp-meta-draft:'+this.projectId; }
+  private restoredOAuthItems:Record<string,any> = {};
+  private restoreOAuthDraft():void {
+    try {
+      const raw=sessionStorage.getItem(this.oauthDraftKey()); if(!raw)return;
+      const draft=JSON.parse(raw); sessionStorage.removeItem(this.oauthDraftKey());
+      this.prompt=typeof draft.prompt==='string'?draft.prompt:'';
+      restoreDraft(this.propertyTypeDraft,draft.newType);
+      this.propertyTypeDraftImageSelection.clear();
+      for(const id of draft.newType?.selected_images || [])this.propertyTypeDraftImageSelection.add(id);
+      this.restoredOAuthItems=Object.fromEntries((draft.items || []).map((item:any)=>[item.id,item]));
+    } catch { this.errorMessage='A local draft could not be restored. Saved server data is unchanged.'; }
+  }
   connectMeta(): void {
     if (this.metaOAuthBusy || this.metaLoginBusy) return;
     this.metaLoginBusy = true;
     this.metaOAuthBusy = true; this.errorMessage = '';
     this.metaOAuthFallbackUrl = '';
-    this.metaWindow?.dispose();
-    this.metaWindow = new MetaOAuthWindow(new URL(API_V1_URL, window.location.href).origin, this.projectId, result => {
-      this.metaLoginBusy = false;
-      this.metaOAuthBusy = false;
-      if (result.status === 'connected') this.metaSetupMessage = 'Step 1 saved: Meta account authorized for the Company. Select Project assets in step 2, or configure that step later.';
-      else this.errorMessage = result.reason || 'Meta authorization did not complete. You can retry without losing your draft.';
-      this.refreshMetaAccount(); this.syncState('none'); this.cdr.detectChanges();
-    });
-    const opened = this.metaWindow.open(); // Must happen synchronously in the user click.
     this.speechSubscriptions.add(this.onboarding.startMetaOAuth(this.projectId).pipe(timeout(20_000)).subscribe({
       next: value => {
         try {
-          this.metaWindow!.authorize(value);
-          if (!opened) {
-            this.metaOAuthFallbackUrl = value.authorization_url; this.metaOAuthBusy = false; this.metaLoginBusy = false;
-            this.errorMessage = 'Your browser blocked the Meta window. Open the authorization link below in a new tab, then return here and refresh the saved status.';
-          }
-        } catch {
-          this.metaWindow?.dispose(); this.metaOAuthBusy = false; this.metaLoginBusy = false; this.errorMessage = 'Meta authorization could not be opened safely. Please try again.';
-        }
-        this.cdr.detectChanges();
+          const target = new URL(value.authorization_url);
+          if (target.searchParams.get('state') !== value.state || target.protocol !== 'https:' || !['facebook.com','www.facebook.com'].includes(target.hostname)) throw new Error('Invalid authorization URL');
+          sessionStorage.setItem(this.oauthDraftKey(),JSON.stringify({prompt:this.prompt,newType:this.newPropertyDraft(),items:this.propertyCatalog.items.filter(item=>this.dirtyPropertyTypeIds.has(item.id)).map(item=>this.propertyDraft(item))}));
+          this.navigateToMeta(target.href);
+        } catch { this.metaOAuthBusy=false; this.metaLoginBusy=false; this.errorMessage='Meta authorization could not be opened safely. Your saved draft is unchanged.'; this.cdr.detectChanges(); }
       },
-      error: (error: HttpErrorResponse) => { this.metaWindow?.dispose(); this.metaOAuthBusy = false; this.metaLoginBusy = false; this.errorMessage = this.apiDetail(error, 'Meta connection could not be started. Your draft is unchanged.'); this.cdr.detectChanges(); },
+      error: (error: HttpErrorResponse) => { this.metaOAuthBusy=false; this.metaLoginBusy=false; this.errorMessage=this.apiDetail(error,'Meta authorization is unavailable. Your saved draft is unchanged.'); this.cdr.detectChanges(); },
     }));
   }
+
   loadMetaSetupState(): void {
     this.onboarding.getMetaSetupState(this.projectId).subscribe({
       next: state => { this.metaAccountState = state; this.metaStateError = ''; this.cdr.detectChanges(); },
@@ -763,7 +770,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     return artifact.items.map(item=>`${item.name} · ${this.formatCatalogArea(item.area_min,item.area_max,item.area_unit)} · ${this.formatCatalogMoney(item.starting_price,item.currency)} · Images: ${item.media.length} (${item.images_status})`).join('\n');
   }
   propertyReviewComplete(item:ProjectPropertyType):boolean {
-    return item.review_status==='confirmed' && !this.dirtyPropertyTypeIds.has(item.id) && !this.propertyTypeImageSelection.get(item.id)?.size && !this.profile.ui_deferrals?.['property:'+item.id]?.resumed;
+    return !(this.reviewingAvailability && item.available_units == null) && item.review_status==='confirmed' && !this.dirtyPropertyTypeIds.has(item.id) && !this.propertyTypeImageSelection.get(item.id)?.size && !this.profile.ui_deferrals?.['property:'+item.id]?.resumed;
   }
   toggleUploadTag(item:Partial<ProjectPropertyType>,tag:SalesAssetType):void {
     const key=item.id || 'new';const tags=this.propertyImageTags[key] || ['gallery_image'];
@@ -855,7 +862,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
       timeout(20_000),
       finalize(() => { this.mediaUpdatingPropertyTypeIds.delete(item.id); this.cdr.detectChanges(); }),
     ).subscribe({
-      next: updated => this.mergePropertyTypeMedia(updated),
+      next: updated => { this.propertyTypeImageSelection.get(item.id)?.clear(); this.mergePropertyTypeMedia(updated); },
       error: () => { this.errorMessage = 'Images could not be postponed. Your changes remain in the form; please retry.'; },
     });
   }
@@ -880,7 +887,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
 
   get readyProjectImages(): ProjectSource[] { return this.sources.filter(source => source.kind === 'image' && source.status === 'ready' && !!source.download_url); }
   get showCoverPicker(): boolean { return !this.cardDeferred('field:project_cover') && this.nextQuestion?.input_type === 'project_cover'; }
-  get showPropertyCatalog(): boolean { return !this.cardDeferred('field:property_type_catalog') && (this.nextQuestion?.input_type === 'property_type_catalog' || this.showPropertyTypeForm || Object.entries(this.profile.ui_deferrals || {}).some(([key,value])=>key.startsWith('property:') && value.resumed)); }
+  get showPropertyCatalog(): boolean { return (this.nextQuestion?.input_type === 'property_type_catalog' || !this.cardDeferred('field:property_type_catalog')) && (this.nextQuestion?.input_type === 'property_type_catalog' || this.showPropertyTypeForm || Object.entries(this.profile.ui_deferrals || {}).some(([key,value])=>key.startsWith('property:') && value.resumed)); }
 
   private emptyPropertyType(): Partial<ProjectPropertyType> {
     return { name: '', code: null, description: null, bedrooms: null, bathrooms: null, area_min: null, area_max: null,
@@ -901,6 +908,8 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
 
   private normalizePropertyType(item: ProjectPropertyType): ProjectPropertyType {
     let result = { ...item };
+    const local=this.restoredOAuthItems?.[item.id];
+    if(local) { result=mergePropertyTypeDraft(result,local); this.dirtyPropertyTypeIds.add(item.id); this.propertyTypeImageSelection.set(item.id,new Set(local.selected_images || [])); delete this.restoredOAuthItems[item.id]; }
     if (!this.propertyTypeBases.has(item.id)) this.propertyTypeBases.set(item.id, propertyTypeDetails(item));
     const canRestore = (key: string, draft: any, record: any) => this.consumedPropertyDrafts.get(item.id+':'+key) !== JSON.stringify(record || {}) && restorePropertyTypeDraft(item, draft, record);
     const catalogRecord = this.profile.ui_deferrals?.['field:property_type_catalog'];
@@ -997,7 +1006,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     return this.isActiveQuestion(message) && message.ui_payload?.input_type === inputType;
   }
   isGlobalStructuredQuestion(message: ChatMessage): boolean {
-    return ['project_cover', 'property_type_catalog'].includes(message.ui_payload?.input_type || '');
+    return ['project_cover', 'property_type_catalog'].includes(message.ui_payload?.input_type || '') || (this.isActiveQuestion(message) && ['location_editor','ai_sales_authorization','project_sales_team','meta_lead_setup'].includes(message.ui_payload?.input_type || ''));
   }
   hasPersistedStructuredTransition(message: ChatMessage): boolean {
     return message.sender === 'ai' && /^I saved\b/i.test(message.content.trim());
@@ -1349,6 +1358,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   }
   decideProposal(source: ProjectSource, proposal: SourceProposal, action: 'confirm' | 'correct' | 'reject'): void {
     if (proposal.submitting || proposal.status !== 'pending') return;
+    if (action === 'confirm' && (proposal.draftValue ?? this.formatProposalValue(proposal)).trim() !== this.formatProposalValue(proposal).trim()) action = 'correct';
     if (action === 'confirm' && !this.proposalCanConfirm(proposal)) return;
     if (action === 'correct' && !this.proposalCanSave(proposal)) return;
     const anchor = captureReviewScrollAnchor(this.chatScroll?.nativeElement, proposal.id);
@@ -1697,6 +1707,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
         if (generation !== this.renderGeneration) return;
         this.initialState = 'ready';
         this.applyState(state);
+        if(this.requestedEditorTask) {const task=this.requestedEditorTask;this.requestedEditorTask='';this.openEditorTask(task);}
         if (scrollMode === 'preserve') this.restoreProposalAnchor(anchor);
         else if (shouldScrollToBottom) this.scrollToBottom();
       },

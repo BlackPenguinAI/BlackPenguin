@@ -8,7 +8,7 @@
       <h2>Meta Lead Ads · {{summary.project_name}}</h2>
       <ng-container *ngIf="summary.meta_setup as meta; else unavailableMeta">
         <div class="meta-grid">
-          <article data-testid="marketing-meta-account"><h3>1 · Account and permissions</h3><strong>{{accountLabel}}</strong>
+          <article data-testid="marketing-meta-account"><h3>1 · Account and permissions <span class="setup-flag" [class.ready]="meta.account_status === 'connected'" [class.failed]="meta.account_status === 'reconnect_required' || meta.account_status === 'permissions_required'">{{meta.account_status === 'connected' ? '✓ Complete' : (meta.account_status === 'not_connected' ? '○ Pending' : '! Review required')}}</span></h3><strong>{{accountLabel}}</strong>
             <p *ngIf="meta.last_authorization">{{meta.last_authorization.meta_user_name || 'Saved Meta account'}} · {{meta.last_authorization.status}}</p>
             <p *ngIf="meta.last_authorization?.expires_at">Authorization expires: {{asUtc(meta.last_authorization.expires_at) | date:'medium':'UTC'}} (UTC)</p>
             <p *ngIf="meta.last_authorization && !meta.last_authorization.expires_at">The provider did not supply an expiration date.</p>
@@ -16,7 +16,7 @@
             <p *ngIf="meta.account_status === 'reconnect_required'">Reconnect the account and confirm permissions. This does not remove saved campaigns.</p>
             <a *ngIf="summary.can_configure_meta" [routerLink]="['/app/projects',projectId,'onboarding']" [queryParams]="{task:'meta_account'}">Review account / permissions</a>
           </article>
-          <article data-testid="marketing-meta-routing"><h3>2 · Project campaigns and forms</h3><strong>{{routingLabel}}</strong>
+          <article data-testid="marketing-meta-routing"><h3>2 · Project campaigns and forms <span class="setup-flag" [class.ready]="meta.routing_status === 'connected'" [class.failed]="meta.routing_status === 'review_required'">{{meta.routing_status === 'connected' ? '✓ Complete' : (meta.routing_status === 'review_required' ? '! Review required' : '○ Pending')}}</span></h3><strong>{{routingLabel}}</strong>
             <p *ngIf="!meta.mappings?.length">No Meta campaign/form association is saved for this Project. A connected account alone does not route leads here.</p>
             <p *ngIf="meta.mappings?.length">{{meta.mappings.length}} saved association(s). Only active, verified routes can receive live leads.</p>
             <a *ngIf="summary.can_configure_meta" [routerLink]="['/app/projects',projectId,'onboarding']" [queryParams]="{task:'meta_assets'}">Review campaigns / forms</a>

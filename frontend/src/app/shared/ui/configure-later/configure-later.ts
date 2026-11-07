@@ -10,11 +10,11 @@ export function questionCard(question:{field?:string|null;input_type?:string}):s
 }
 
 @Component({selector:'app-configure-later', standalone:true, imports:[CommonModule], template:`
-  <div class="my-3 rounded-lg border border-amber-400/25 bg-amber-400/5 p-3 text-xs">
+  <div class="my-3 flex flex-wrap items-center gap-2 text-xs">
     <p *ngIf="records[card]?.deferred" class="mb-2 text-amber-200">Saved for later: {{label}}. This grants no new approval. Required reviews still block final approval; operational setup still blocks its own capability.</p>
     <p *ngIf="records[card]?.updated_at" class="mb-2">{{label}} · {{records[card].deferred ? 'Pending' : (records[card].resumed ? 'Review resumed' : 'Review saved')}} · {{records[card].updated_at | date:'medium'}}</p>
     <details *ngIf="records[card]?.draft && draftSummary" class="mb-2"><summary>Saved draft (not approved)</summary><pre class="whitespace-pre-wrap break-words">{{draftSummary}}</pre></details>
-    <button type="button" (click)="save()" [disabled]="busy || blocked || !entityId" class="rounded border border-amber-300/40 px-3 py-2 text-amber-200 disabled:opacity-50">{{busy ? 'Saving…' : (records[card]?.deferred ? 'Resume configuration' : 'Configure later')}}</button>
+    <button type="button" (click)="save()" [disabled]="busy || blocked || !entityId" class="rounded border border-amber-300/40 px-3 py-2 text-amber-200 disabled:opacity-50">{{busy ? 'Saving…' : (records[card]?.deferred ? 'Resume configuration' : (card === 'final_approval' ? 'Continue review later' : 'Complete later'))}}</button>
     <a *ngIf="records[card]?.deferred && !busy" [href]="scope === 'project' ? '/app/projects' : '/app/dashboard'" class="ml-3 underline">Draft saved · Exit onboarding</a>
     <p *ngIf="error" role="alert" class="mt-2 text-red-300">{{error}}</p>
   </div>`})

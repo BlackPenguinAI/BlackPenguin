@@ -53,10 +53,10 @@
     <div #chatScroll class="flex flex-1 flex-col gap-6 overflow-y-auto p-4 md:p-8">
       <nav aria-label="Edit Project onboarding" class="flex flex-wrap gap-2"><button *ngFor="let task of editorTasks" type="button" class="structured-secondary" (click)="openEditorTask(task.key)" [disabled]="isAnalyzing">{{task.label}}</button><button type="button" (click)="openEditorTask('review')" [disabled]="isAnalyzing">Review / approve profile</button></nav>
       <section *ngIf="requestedEditorTask" class="rounded-xl border border-secondary/30 p-4" data-testid="requested-editor-task"><p>Marketing setup review requested. Your saved settings remain unchanged until you explicitly save an update.</p><button type="button" class="structured-primary mt-2" (click)="openEditorTask(requestedEditorTask); requestedEditorTask=''" [disabled]="isAnalyzing">{{requestedEditorTask === 'meta_account' ? 'Review Meta account and permissions' : 'Review Project campaigns and forms'}}</button></section>
-      <section *ngIf="metaAccountState" class="rounded-xl border border-white/15 p-4 text-xs" data-testid="meta-saved-summary">
+      <section *ngIf="metaAccountState?.account_status === 'connected' && !isAnalyzing" class="rounded-xl border border-white/15 p-4 text-xs" data-testid="meta-saved-summary">
         <h2 class="font-semibold">Saved Meta setup · {{ projectName }}</h2>
         <p class="mt-2">Step 1 · {{ metaAccountLabel }}</p><p class="mt-1">Step 2 · {{ metaRoutingLabel }}</p>
-        <p *ngFor="let mapping of metaAccountState.mappings" class="mt-2 text-gray-400">{{ mapping.name }} · Page {{ mapping.page_id || 'pending' }} · Form {{ mapping.lead_form_id || 'pending' }} · {{ mapping.ready ? 'Verified' : 'Review required' }}</p>
+        <p *ngFor="let mapping of metaAccountState?.mappings" class="mt-2 text-gray-400">{{ mapping.name }} · Page {{ mapping.page_id || 'pending' }} · Form {{ mapping.lead_form_id || 'pending' }} · {{ mapping.ready ? 'Verified' : 'Review required' }}</p>
       </section>
 <section *ngIf="deferredCards.length" class="rounded-xl border border-amber-400/30 p-4"><h2>Configurations saved for later</h2><p class="text-xs text-gray-400">Required reviews remain pending. No files or permissions were approved.</p><ng-container *ngFor="let key of deferredCards"><app-configure-later  scope="project" [entityId]="projectId" [card]="key" [label]="deferredLabel(key)" [draft]="{}" [records]="profile.ui_deferrals || {}" (saved)="deferralsSaved($event)"></app-configure-later></ng-container></section>
       <ng-container *ngFor="let msg of visibleMessages">
@@ -69,8 +69,8 @@
               [disabled]="isAnalyzing || profile.completion.can_complete || hasExclusiveSourceFlow"
               (selected)="chooseAnswer($event, msg)"
               (custom)="writeCustomAnswer(msg)"
-            ></app-onboarding-ai-message>
-<app-configure-later *ngIf="isActiveQuestion(msg) && !isGlobalStructuredQuestion(msg) && msg.ui_payload?.input_type !== 'complete' && msg.ui_payload?.input_type !== 'deferred_review' && msg.ui_payload?.input_type !== 'meta_lead_setup' && msg.ui_payload?.input_type !== 'location_editor' && msg.ui_payload?.field !== 'country' && msg.ui_payload?.field !== 'city'" scope="project" [entityId]="projectId" [card]="questionCard(msg.ui_payload!)" [label]="msg.ui_payload!.label" [draft]="cardDraft(msg.ui_payload!.field)" [records]="profile.ui_deferrals || {}" (saved)="deferralsSaved($event)"></app-configure-later>
+            ><app-configure-later *ngIf="msg.ui_payload?.field != null && msg.ui_payload?.input_type !== 'final_approval' && !msg.ui_payload?.options?.includes('Provide later') && isActiveQuestion(msg) && !isGlobalStructuredQuestion(msg) && msg.ui_payload?.input_type !== 'complete' && msg.ui_payload?.input_type !== 'deferred_review' && msg.ui_payload?.input_type !== 'meta_lead_setup' && msg.ui_payload?.input_type !== 'location_editor' && msg.ui_payload?.field !== 'country' && msg.ui_payload?.field !== 'city'" scope="project" [entityId]="projectId" [card]="questionCard(msg.ui_payload!)" [label]="msg.ui_payload!.label" [draft]="cardDraft(msg.ui_payload!.field)" [records]="profile.ui_deferrals || {}" (saved)="deferralsSaved($event)"></app-configure-later></app-onboarding-ai-message>
+
             <div *ngIf="msg.media_evidence as media" class="order-first ml-11 mb-2 max-w-sm rounded-xl border border-green-500/20 bg-green-500/[0.06] p-3">
               <div class="flex items-center gap-3">
                 <img *ngIf="sourceImageUrls.get(media.asset_id) as preview" [src]="preview" [alt]="media.name" class="h-20 w-28 rounded-lg border border-white/10 bg-black/30 object-cover" />
@@ -104,7 +104,7 @@
               </div>
               <div class="mt-4 flex flex-wrap gap-2">
                 <button (click)="authorizeAiSales(msg)" [disabled]="authorizationBusy" class="structured-primary">{{ authorizationBusy ? 'Saving authorization...' : 'Authorize AI-assisted sales and continue' }}</button>
-                <a routerLink="/app/projects" class="structured-secondary">Save and exit</a>
+                <app-configure-later scope="project" [entityId]="projectId" card="field:sales_authorization" label="AI-assisted sales authorization" [draft]="{}" [blocked]="authorizationBusy" [records]="profile.ui_deferrals || {}" (saved)="deferralsSaved($event)"></app-configure-later>
               </div>
             </section>
 
@@ -138,7 +138,7 @@
                 <button (click)="assignSelectedSalesUser(msg)" [disabled]="!canManageProjectTeam || !selectedSalesUserId || teamBusy" class="structured-primary">Assign</button>
               </div>
               <div class="mt-3 flex flex-wrap gap-2">
-                <button *ngIf="assignedSalesUsers.length" (click)="completeSalesTeam(msg)" [disabled]="teamBusy" class="structured-primary">Continue with assigned team</button>
+                <button *ngIf="assignedSalesUsers.length" (click)="completeSalesTeam(msg)" [disabled]="teamBusy" class="structured-primary">Continue with assigned team</button><app-configure-later scope="project" [entityId]="projectId" card="field:sales_contacts" label="Project Sales team" [draft]="cardDraft('sales_contacts')" [blocked]="teamBusy" [records]="profile.ui_deferrals || {}" (saved)="deferralsSaved($event)"></app-configure-later>
               </div>
               </app-review-card>
             </section>
@@ -155,7 +155,7 @@
               <div class="mt-4 rounded-lg border border-white/15 p-3" data-testid="meta-account-step">
               <app-review-card title="Step 1 · Account and permissions" [status]="metaAccountState?.account_status || 'Pending'" [summary]="metaAccountLabel" [complete]="metaAccountState?.account_status === 'connected'">
               <h3 class="text-sm font-semibold">Step 1 · Account and permissions</h3>
-              <app-configure-later scope="project" [entityId]="projectId" card="field:meta_connection_verified" label="Meta account and permissions" [draft]="cardDraft('meta_connection_verified')" [blocked]="metaLoginBusy || metaOAuthBusy || metaSetupBusy" [records]="profile.ui_deferrals || {}" (saved)="deferralsSaved($event)"></app-configure-later>
+
               <p class="mt-2 text-xs" data-testid="meta-account-status">{{ metaAccountLabel }}</p>
               <p *ngIf="metaAccountState?.missing_permissions?.length" class="mt-2 text-xs text-amber-200">Missing permissions: {{ metaAccountState!.missing_permissions.join(', ') }}. Reconnect and grant access before linking assets.</p>
               <div *ngIf="metaSetupConfig.oauth_enabled" class="mt-4 rounded-lg border border-secondary/20 bg-secondary/[0.06] p-3">
@@ -163,7 +163,7 @@
               </div>
               <a *ngIf="metaOAuthFallbackUrl" [href]="metaOAuthFallbackUrl" target="_blank" rel="noopener noreferrer" class="structured-secondary mt-3" data-testid="meta-popup-fallback">Open Meta authorization in a new tab</a>
               <button type="button" (click)="refreshMetaAccount()" class="structured-secondary mt-3">I finished authorization · refresh saved status</button>
-              <p class="mt-2 text-xs text-gray-400">Your chat and unsaved fields stay in this tab. You may close the Meta window after granting permissions.</p>
+              <p class="mt-2 text-xs text-gray-400">You will return to this Project after Meta authorization. Saved settings and local text drafts are preserved.</p><app-configure-later scope="project" [entityId]="projectId" card="field:meta_connection_verified" label="Meta account and permissions" [draft]="cardDraft('meta_connection_verified')" [blocked]="metaLoginBusy || metaOAuthBusy || metaSetupBusy" [records]="profile.ui_deferrals || {}" (saved)="deferralsSaved($event)"></app-configure-later>
               </app-review-card>
               </div>
               <div *ngIf="!metaSetupConfig.oauth_enabled" class="mt-4 rounded-lg border border-amber-500/25 bg-amber-500/[0.08] p-3" data-testid="meta-oauth-blocker">
@@ -173,7 +173,7 @@
               </div>
               <div class="mt-4 rounded-lg border border-white/15 p-3" data-testid="meta-project-step">
               <app-review-card title="Step 2 · Project campaign and form" [status]="metaAccountState?.routing_status || 'Pending'" [summary]="metaRoutingLabel" [complete]="metaAccountState?.routing_status === 'connected'">
-              <h3 class="text-sm font-semibold">Step 2 · Project campaign and form</h3>
+              <h3 class="text-sm font-semibold">Step 2 · Project campaign and form</h3><p *ngIf="metaAccountState?.account_status !== 'connected'" class="mt-2 text-xs text-gray-400">Connect the account in step 1 to select this Project’s assets.</p>
               <p class="mt-2 text-xs" data-testid="meta-routing-status">{{ metaRoutingLabel }}</p>
               <p class="mt-2 text-xs text-gray-400">Target Project: {{ projectName }}. No selection is linked until you explicitly save and verify it.</p>
               <p *ngFor="let mapping of metaAccountState?.mappings" class="mt-2 text-xs text-gray-300">{{ mapping.name }} · Page {{ mapping.page_id || 'pending' }} · Form {{ mapping.lead_form_id || 'pending' }} · {{ mapping.ready ? 'Verified' : 'Review required (not live)' }}</p>
@@ -192,7 +192,7 @@
                 </div>
                 <button type="button" (click)="completeMetaOAuth(msg)" [disabled]="metaOAuthBusy || metaLoginBusy || !metaOAuth.page_id || !metaOAuth.ad_account_id || !metaOAuth.lead_form_id || !metaOAuth.campaign_name.trim()" class="structured-primary sm:col-span-2">{{ metaOAuthBusy ? 'Loading Meta assets…' : 'Save and verify selected assets for this Project' }}</button>
               </div>
-              <app-configure-later scope="project" [entityId]="projectId" [card]="'field:campaigns_defined'" [label]="'Project campaign and form (step 2); the saved account authorization is kept'" [draft]="cardDraft('campaigns_defined')" [records]="profile.ui_deferrals || {}" (saved)="deferralsSaved($event)"></app-configure-later>
+              <app-configure-later *ngIf="metaAccountState?.account_status === 'connected'" scope="project" [entityId]="projectId" [card]="'field:campaigns_defined'" [label]="'Project campaign and form (step 2); the saved account authorization is kept'" [draft]="cardDraft('campaigns_defined')" [records]="profile.ui_deferrals || {}" (saved)="deferralsSaved($event)"></app-configure-later>
               </app-review-card>
               </div>
               <button *ngIf="metaSetupConfig.manual_fallback_enabled" type="button" (click)="showManualMetaSetup = !showManualMetaSetup" class="structured-secondary mt-4">{{ showManualMetaSetup ? 'Hide manual setup' : 'Use asset IDs manually' }}</button>
@@ -304,8 +304,8 @@
             <p *ngIf="proposal.evidence" class="mt-2 text-[11px] text-gray-500">{{ proposal.evidence }}</p>
             <p *ngIf="proposalDraftError(proposal) as proposalError" [id]="'proposal-error-' + proposal.id" class="mt-2 rounded-lg border border-secondary/20 bg-secondary/[0.06] px-3 py-2 text-[11px] text-secondary" role="status">{{ proposalError }}</p>
             <div *ngIf="proposal.status === 'pending'" class="mt-3 flex flex-wrap gap-2">
-              <button (click)="decideProposal(source, proposal, 'confirm')" [disabled]="!proposalCanConfirm(proposal)" [title]="proposal.validation ? 'Edit the value so it meets the requirement before saving.' : ''" class="proposal-action primary disabled:cursor-not-allowed disabled:opacity-40">Confirm</button>
-              <button (click)="decideProposal(source, proposal, 'correct')" [disabled]="!proposalCanSave(proposal)" [title]="proposalCanSave(proposal) ? '' : 'Change the value and complete the requirement to save it.'" class="proposal-action disabled:cursor-not-allowed disabled:opacity-40">Save edit</button>
+              <button (click)="decideProposal(source, proposal, 'confirm')" [disabled]="!proposalCanConfirm(proposal)" [title]="proposal.validation ? 'Edit the value so it meets the requirement before saving.' : ''" class="proposal-action primary disabled:cursor-not-allowed disabled:opacity-40">Save and confirm</button>
+
               <button (click)="decideProposal(source, proposal, 'reject')" [disabled]="proposal.submitting === true" class="proposal-action danger disabled:opacity-50">Reject</button>
             </div>
             <div *ngIf="proposal.status === 'corrected' && !proposal.editing" class="mt-3 flex flex-wrap items-center gap-2">
@@ -323,7 +323,7 @@
       </ng-template>
 
       <section *ngIf="showCoverPicker && !hasExclusiveSourceFlow" class="cover-picker ml-0 max-w-3xl rounded-2xl border border-white/10 bg-white/[0.025] p-5 md:ml-11" data-testid="project-cover-picker">
-        <app-configure-later scope="project" [entityId]="projectId" card="field:project_cover" label="Project cover image" [draft]="cardDraft('project_cover')" [blocked]="coverBusy || coverUploadBusy" [records]="profile.ui_deferrals || {}" (saved)="deferralsSaved($event)"></app-configure-later>
+
         <p class="text-[10px] font-bold uppercase tracking-[.18em] text-secondary">Project media</p>
         <h2 class="mt-1 text-lg font-medium">Choose the Project cover image</h2>
         <p class="mt-2 text-xs leading-5 text-gray-500">Select the image that will represent this Project in its Overview, then confirm to continue.</p>
@@ -346,11 +346,13 @@
           <span class="material-symbols-outlined text-sm">{{ selectedCoverSourceId ? 'check_circle' : 'info' }}</span>
           {{ selectedCoverSourceId ? 'Image selected. Confirm to continue.' : 'Choose one image above or upload a new image to enable confirmation.' }}
         </p>
-      </section>
+
+<app-configure-later scope="project" [entityId]="projectId" card="field:project_cover" label="Project cover image" [draft]="cardDraft('project_cover')" [blocked]="coverBusy || coverUploadBusy" [records]="profile.ui_deferrals || {}" (saved)="deferralsSaved($event)"></app-configure-later>
+</section>
 
       <section *ngIf="showPropertyCatalog && !hasExclusiveSourceFlow" class="ml-0 max-w-3xl rounded-2xl border border-white/10 bg-white/[0.025] p-5 md:ml-11" data-testid="property-type-catalog">
-<app-configure-later scope="project" [entityId]="projectId" [card]="'field:property_type_catalog'" [label]="'Property catalog'" [draft]="cardDraft('property_type_catalog')" [blocked]="catalogMutationBusy" [records]="profile.ui_deferrals || {}" (saved)="deferralsSaved($event)"></app-configure-later>
-        <div class="flex flex-wrap items-start justify-between gap-3"><div><p class="text-[10px] font-bold uppercase tracking-[.18em] text-secondary">Property catalog</p><h2 class="mt-1 text-lg font-medium">Property types and availability</h2><p class="mt-2 text-xs leading-5 text-gray-500">Extracted types are candidates. Commercial fields are optional: leave price or availability blank unless the source confirms them.</p></div><div class="text-right"><p class="text-sm font-semibold">{{ propertyCatalog.confirmed_count }} / {{ propertyCatalog.limit }}</p><p class="text-[10px] text-gray-500">confirmed types</p></div></div>
+
+        <div class="flex flex-wrap items-start justify-between gap-3"><div><p class="text-[10px] font-bold uppercase tracking-[.18em] text-secondary">Property catalog</p><h2 class="mt-1 text-lg font-medium">{{ reviewingAvailability ? 'Confirm current availability' : 'Property types and availability' }}</h2><p *ngIf="reviewingAvailability" class="mt-2 text-sm text-amber-200">Enter available units in each type and save. Unknown is not zero; confirming the catalog alone does not confirm inventory.</p><p class="mt-2 text-xs leading-5 text-gray-500">Extracted types are candidates. Commercial fields are optional: leave price or availability blank unless the source confirms them.</p></div><div class="text-right"><p class="text-sm font-semibold">{{ propertyCatalog.confirmed_count }} / {{ propertyCatalog.limit }}</p><p class="text-[10px] text-gray-500">confirmed types</p></div></div>
         <div *ngIf="propertyCatalog.candidate_count" class="mt-4 rounded-xl border border-secondary/20 bg-secondary/5 px-4 py-3 text-xs text-secondary">I found {{ propertyCatalog.candidate_count }} possible property type{{ propertyCatalog.candidate_count === 1 ? '' : 's' }}. This is not assumed to be the complete catalog.</div>
         <div *ngIf="!propertyCatalog.items.length && !showPropertyTypeForm" class="mt-4 rounded-xl border border-dashed border-white/15 bg-black/20 px-4 py-6 text-center" data-testid="empty-property-catalog">
           <span class="material-symbols-outlined text-2xl text-gray-500">domain_add</span>
@@ -360,14 +362,15 @@
         <div class="mt-4 space-y-4">
           <article *ngFor="let item of propertyCatalog.items" class="rounded-xl border p-4" [class.border-secondary/25]="item.review_status === 'candidate'" [class.border-white/10]="item.review_status !== 'candidate'">
 <app-review-card [title]="item.name || 'Unnamed property type'" [status]="cardDeferred('property:'+item.id) ? 'Pending · saved for later' : (dirtyPropertyTypeIds.has(item.id) ? 'Unsaved changes' : item.review_status)" [summary]="propertySummary(item)" [complete]="propertyReviewComplete(item)" [revision]="item.updated_at">
-<app-configure-later scope="project" [entityId]="projectId" [card]="'property:'+item.id" [label]="item.name" [draft]="propertyDraft(item)" [blocked]="isPropertyTypeSaving(item)" [records]="profile.ui_deferrals || {}" (saved)="deferralsSaved($event)"></app-configure-later>
+
 <ng-container *ngIf="!cardDeferred('property:'+item.id)">
             <div class="flex flex-wrap items-center justify-between gap-2"><div><span class="text-[9px] font-bold uppercase tracking-wider" [class.text-secondary]="item.review_status === 'candidate'" [class.text-green-400]="item.review_status === 'confirmed'">{{ item.review_status }}</span><h3 class="mt-1 font-medium">{{ item.name || 'Unnamed property type' }}</h3></div><button type="button" (click)="rejectPropertyType(item)" [disabled]="removingPropertyTypeIds.has(item.id)" class="rounded-lg border border-red-500/20 px-3 py-1.5 text-[10px] text-red-300 hover:bg-red-500/10 disabled:cursor-wait disabled:opacity-50">{{ removingPropertyTypeIds.has(item.id) ? 'Removing...' : 'Remove' }}</button></div>
             <p *ngIf="propertyTypeErrorCount(item)" class="form-help mt-3" role="status"><span class="material-symbols-outlined text-sm">info</span>Complete or correct {{ propertyTypeErrorCount(item) }} field{{ propertyTypeErrorCount(item) === 1 ? '' : 's' }} before saving this property type.</p>
             <p *ngIf="propertyTypeFormError(item)" class="mt-3 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-200" role="alert">{{ propertyTypeFormError(item) }}</p>
             <ng-container *ngTemplateOutlet="propertyTypeForm; context: {$implicit: item}"></ng-container>
             <p *ngIf="dirtyPropertyTypeIds.has(item.id)" class="mt-3 text-xs text-amber-200" role="status">Unsaved changes. Save this type before confirming the catalog.</p>
-            <div class="mt-4 flex flex-wrap gap-2"><button (click)="confirmPropertyType(item)" [disabled]="!canSavePropertyType(item)" [title]="canSavePropertyType(item) ? '' : 'Complete all required fields and correct invalid ranges.'" class="rounded-lg bg-secondary px-4 py-2 text-xs font-semibold text-black disabled:cursor-not-allowed disabled:opacity-40">{{ isPropertyTypeSaving(item) ? 'Saving...' : (propertyTypeErrorCount(item) || propertyTypeFormError(item) ? 'Review required fields' : (item.review_status === 'candidate' ? 'Confirm this type' : 'Save updates')) }}</button><button *ngIf="propertyTypeImageSelection.get(item.id)?.size" (click)="attachSelectedImages(item)" [disabled]="isPropertyTypeSaving(item)" class="rounded-lg border border-secondary/30 px-4 py-2 text-xs text-secondary">Attach selected images</button><button *ngIf="item.images_status !== 'provided'" (click)="deferPropertyTypeImages(item)" [disabled]="isPropertyTypeSaving(item)" class="rounded-lg border border-white/10 px-4 py-2 text-xs text-gray-400">Add images later</button></div>
+            <div class="mt-4 flex flex-wrap gap-2"><button *ngIf="propertyTypeImageSelection.get(item.id)?.size" (click)="attachSelectedImages(item)" [disabled]="isPropertyTypeSaving(item)" class="rounded-lg border border-secondary/30 px-4 py-2 text-xs text-secondary">Attach selected images</button><button *ngIf="item.images_status !== 'provided'" (click)="deferPropertyTypeImages(item)" [disabled]="isPropertyTypeSaving(item)" class="rounded-lg border border-white/10 px-4 py-2 text-xs text-gray-400">Add images later</button></div><p *ngIf="propertyTypeImageSelection.get(item.id)?.size" class="mt-2 text-xs text-amber-200">Attach or deselect pending images before confirming this type.</p><div class="mt-4 border-t border-white/10 pt-4"><button (click)="confirmPropertyType(item)" [disabled]="!canSavePropertyType(item)" [title]="canSavePropertyType(item) ? '' : 'Complete all required fields and correct invalid ranges.'" class="rounded-lg bg-secondary px-4 py-2 text-xs font-semibold text-black disabled:cursor-not-allowed disabled:opacity-40">{{ isPropertyTypeSaving(item) ? 'Saving...' : (propertyTypeErrorCount(item) || propertyTypeFormError(item) ? 'Review required fields' : (item.review_status === 'candidate' ? 'Confirm this type' : 'Save updates')) }}</button></div>
+<app-configure-later scope="project" [entityId]="projectId" [card]="'property:'+item.id" [label]="item.name" [draft]="propertyDraft(item)" [blocked]="isPropertyTypeSaving(item)" [records]="profile.ui_deferrals || {}" (saved)="deferralsSaved($event)"></app-configure-later>
 </ng-container>
           </app-review-card>
           </article>
@@ -382,12 +385,14 @@
         </div>
         <p *ngIf="hasUnattachedImages" class="mt-3 text-xs text-amber-200" role="status">You have selected images that are not attached yet. Attach them, deselect them, or use Configure later on that type to preserve the selection before confirming the catalog.</p>
         <div *ngIf="propertyCatalog.confirmed_count && propertyCatalog.candidate_count === 0" class="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-5"><p class="text-xs text-gray-400">{{ catalogReady ? 'Confirm that the reviewed types represent the current Project catalog.' : 'Save pending changes, resolve selected images and complete any invalid fields before confirming the catalog.' }}</p><button (click)="confirmPropertyCatalog()" [disabled]="confirmingPropertyCatalog || !catalogReady" [title]="catalogReady ? '' : 'Review pending property changes and selected images.'" class="rounded-xl bg-secondary px-5 py-2.5 text-xs font-semibold text-black disabled:cursor-not-allowed disabled:opacity-40">{{ confirmingPropertyCatalog ? 'Confirming...' : (catalogReady ? 'Confirm catalog and continue' : 'Review pending catalog changes') }}</button></div>
-      </section>
+
+<app-configure-later scope="project" [entityId]="projectId" [card]="'field:property_type_catalog'" [label]="'Property catalog'" [draft]="cardDraft('property_type_catalog')" [blocked]="catalogMutationBusy" [records]="profile.ui_deferrals || {}" (saved)="deferralsSaved($event)"></app-configure-later>
+</section>
 
       <ng-template #propertyTypeForm let-item>
         <p class="mt-3 text-xs leading-5 text-gray-400">Only the name is required. Leave unknown data blank; zero available units means none are available. Area unit is required with an area, and currency with a price. Quantities are dated automatically when you save or confirm this type.</p>
-        <fieldset [disabled]="isPropertyTypeSaving(item)" class="mt-4 grid min-w-0 gap-3 sm:grid-cols-2" data-testid="property-type-shared-fields">
-          <label *ngFor="let field of propertyTypeFields" class="field-label" [attr.data-property-field]="field.key" [class.sm:col-span-2]="field.kind === 'textarea'">
+        <fieldset [disabled]="isPropertyTypeSaving(item)" class="property-fields mt-4 grid min-w-0 gap-3 sm:grid-cols-6" data-testid="property-type-shared-fields">
+          <label *ngFor="let field of propertyTypeFields" class="field-label" [attr.data-property-field]="field.key" [class.sm:col-span-6]="field.kind === 'textarea'" [class.sm:col-span-2]="['area_min','area_max','area_unit','starting_price','maximum_price','currency'].includes(field.key)" [class.sm:col-span-3]="field.kind !== 'textarea' && !['area_min','area_max','area_unit','starting_price','maximum_price','currency'].includes(field.key)">
             {{ field.label }}{{ field.required ? ' *' : (field.conditional ? ' (when specified)' : ' (optional)') }}
             <ng-container [ngSwitch]="field.kind">
               <ng-container *ngSwitchCase="'textarea'">
@@ -404,20 +409,21 @@
             </ng-container>
             <span *ngIf="propertyTypeError(item, field.key)" class="field-error">{{propertyTypeError(item, field.key)}}</span>
           </label>
-          <div class="sm:col-span-2" [attr.data-testid]="item.id ? 'existing-property-images' : 'draft-property-images'">
+          <div class="sm:col-span-6" data-testid="property-image-upload" [attr.data-testid-images]="item.id ? 'existing-property-images' : 'draft-property-images'">
             <p class="field-label">Images (optional)</p><p class="mt-1 text-[10px] text-gray-500">{{ item.id ? 'Attach selected images separately; unsaved details will stay in this form.' : 'Selected images will be attached when you save this type.' }}</p>
-            <div class="mt-3 space-y-2" data-testid="property-image-upload">
-              <label class="field-label">New image visibility<select class="catalog-input" [ngModel]="propertyImageSharing[item.id || 'new'] || 'internal'" (ngModelChange)="propertyImageSharing[item.id || 'new']=$event"><option value="internal">Internal only (default)</option><option value="sales_candidate">Candidate for lead sharing — requires separate approval</option></select></label>
-              <p class="text-xs text-gray-400">What does this image contain? Select one or more. Uploading or attaching never approves it for leads.</p>
-              <div class="flex flex-wrap gap-2"><label *ngFor="let tag of salesAssetTypes" class="text-xs"><input type="checkbox" [checked]="(propertyImageTags[item.id || 'new'] || ['gallery_image']).includes(tag.value)" (change)="toggleUploadTag(item,tag.value)"> {{tag.label}}</label></div>
               <label class="inline-block cursor-pointer rounded-lg border border-secondary/30 px-3 py-2 text-xs text-secondary"><input type="file" accept="image/jpeg,image/png,image/webp" class="hidden" [disabled]="isPropertyTypeSaving(item)" (change)="uploadPropertyImage(item,$event)">{{propertyImageUploads.has(item.id || 'new') ? 'Uploading…' : 'Upload your own image (up to 15 MB)'}}</label>
-            </div>
             <div class="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-5">
               <button *ngFor="let image of readyProjectImages" type="button" (click)="item.id ? togglePropertyTypeImage(item, image.id) : toggleDraftPropertyTypeImage(image.id)" class="relative overflow-hidden rounded-lg border border-white/10" [class.border-secondary]="item.id ? isPropertyTypeImageSelected(item, image.id) : propertyTypeDraftImageSelection.has(image.id)">
                 <img *ngIf="sourceImageUrls.get(image.id) as preview" [src]="preview" [alt]="image.name" class="h-16 w-full object-cover" />
                 <span class="block truncate px-1 text-[10px]">{{image.name}}</span>
                 <span *ngIf="item.id ? isPropertyTypeImageSelected(item, image.id) : propertyTypeDraftImageSelection.has(image.id)" class="absolute right-1 top-1 rounded-full bg-secondary p-0.5 text-black material-symbols-outlined text-sm">check</span>
               </button>
+            </div>
+            <div class="mt-3 space-y-2">
+              <label class="field-label">New image visibility<select class="catalog-input" [ngModel]="propertyImageSharing[item.id || 'new'] || 'internal'" (ngModelChange)="propertyImageSharing[item.id || 'new']=$event"><option value="internal">Internal only (default)</option><option value="sales_candidate">Candidate for lead sharing — requires separate approval</option></select></label>
+              <p class="text-xs text-gray-400">What does this image contain? Select one or more. Uploading or attaching never approves it for leads.</p>
+              <div class="flex flex-wrap gap-2"><label *ngFor="let tag of salesAssetTypes" class="text-xs"><input type="checkbox" [checked]="(propertyImageTags[item.id || 'new'] || ['gallery_image']).includes(tag.value)" (change)="toggleUploadTag(item,tag.value)"> {{tag.label}}</label></div>
+
             </div>
           </div>
         </fieldset>
@@ -545,12 +551,12 @@
       <div class="rounded-xl border p-4" [ngClass]="profile.completion.sales_activation_status === 'ready' ? 'border-green-500/30 bg-green-500/10 text-green-300' : 'border-secondary/20 bg-secondary/10 text-secondary'">
         <p class="text-[10px] font-bold uppercase tracking-wider">Sales activation: {{ profile.completion.sales_activation_status.replace('_', ' ') }}</p>
         <p class="mt-1 text-[11px]">{{ profile.completion.sales_activation_status === 'ready' ? 'Project approved and operationally ready.' : 'Check each capability below. A deferred setup step is not an approval or permission.' }}</p>
-        <div *ngIf="profile.completion.capabilities as capabilities" class="mt-3 space-y-2 text-[11px]">
+        <details *ngIf="profile.completion.capabilities as capabilities" class="mt-3 space-y-2 text-[11px]"><summary class="cursor-pointer">Review operational requirements</summary>
           <div *ngFor="let capability of capabilities | keyvalue">
             <p>{{ capability.key.replaceAll('_', ' ') }}: {{ capability.value.ready ? 'Ready' : 'Pending' }}</p>
             <p *ngFor="let blocker of capability.value.blockers" class="mt-1 text-[10px]">{{ blocker.label }}: {{ blocker.status.replaceAll('_', ' ') }}</p>
           </div>
-        </div>
+        </details>
       </div>
     </footer>
   </aside>

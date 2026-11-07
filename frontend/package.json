@@ -6,7 +6,8 @@
     "start": "ng serve",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test"
+    "test": "ng test",
+    "test:onboarding": "ng test --watch=false --ts-config=tsconfig.onboarding-regression.json --include='src/app/pages/client/projects/project-chat/*-*.spec.ts' --exclude='**/project-chat.spec.ts' --include='src/app/pages/onboarding-*.spec.ts' --include='src/app/shared/ui/onboarding-*/*.spec.ts' --include='src/app/shared/ui/configure-later/*.spec.ts' --include='src/app/pages/client/marketing/*.spec.ts' --include='src/app/core/timezones.spec.ts'"
   },
   "private": true,
   "packageManager": "npm@11.11.0",

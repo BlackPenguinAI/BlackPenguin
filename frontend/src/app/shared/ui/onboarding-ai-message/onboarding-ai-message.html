@@ -22,11 +22,12 @@
         <span class="material-symbols-outlined">check_circle</span>
         Custom answer: {{ message.response_payload?.answer }}
       </div>
-      <app-review-card *ngIf="draftReceipt" title="Saved draft at this decision" [status]="message.response_payload?.status || 'Pending'" summary="Expand to review the values preserved at this decision." [complete]="true">
+      <app-review-card class="draft-receipt" *ngIf="draftReceipt" title="Saved draft at this decision" [status]="message.response_payload?.status || 'Pending'" summary="Expand to review the values preserved at this decision." [complete]="true">
         <pre class="whitespace-pre-wrap break-words">{{draftReceipt}}</pre>
         <p>This is historical evidence, not approved data. Resume the pending configuration to continue editing.</p>
         <p>{{message.response_payload?.decided_at | date:'medium'}}</p>
       </app-review-card>
+      <ng-content></ng-content>
       </ng-template>
     </article>
     <div class="meta-row">

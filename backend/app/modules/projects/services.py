@@ -951,7 +951,7 @@ def overview_address(primary: str | None, *context: Any) -> str | None:
         "ar": ("argentina",),
     }
     parts: list[str] = []
-    for candidate in (primary, *context):
+    for candidate in (primary, *(part for value in context for part in str(value or "").split(","))):
         value = str(candidate or "").strip(" ,")
         if not value:
             continue
@@ -1002,7 +1002,7 @@ def serialize_overview(db: Session, project: Project, viewer_user: User | None =
                 "id": item.id,
                 "typology": item.name,
                 "total": item.total_units,
-                "sold": max(0, item.total_units - item.available_units) if item.total_units is not None and item.available_units is not None else None,
+                "sold": None,  # Non-available does not imply sold (reserved/blocked/unreleased).
                 "available": None if item.id in future_inventory_ids else item.available_units,
                 "starting_price": float(item.starting_price) if item.starting_price is not None else None,
                 "currency": item.currency,

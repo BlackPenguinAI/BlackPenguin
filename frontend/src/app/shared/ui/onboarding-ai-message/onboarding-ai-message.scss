@@ -16,3 +16,5 @@
 .custom-answer { display: flex; gap: .4rem; align-items: center; margin-top: .75rem; padding-top: .65rem; border-top: 1px solid rgba(255,255,255,.08); color: #f3b43b; font-size: .72rem; }
 .custom-answer .material-symbols-outlined { font-size: 16px; }
 @media (min-width: 768px) { :host { max-width: 80%; } }
+
+.draft-receipt { display: block; margin-top: 1rem; }

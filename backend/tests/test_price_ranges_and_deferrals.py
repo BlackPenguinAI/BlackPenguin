@@ -115,7 +115,7 @@ def test_required_questions_are_deferred_not_approved(api):
     services.apply_field_updates(db,profile,[services.user_field_update('project_name',None,status='missing')],allow_authoritative_statuses=True)
     response=client.post('/deferrals/project/'+project.id,json={'card':'field:project_name','draft':{'answer':'Unconfirmed answer'}})
     assert response.status_code==200
-    assert _next_question(profile)['label']=='Saved for later'
+    assert _next_question(profile)['field']=='project_name'  # Required deferred facts are revisited, never approved.
     assert not services.serialize_profile(profile)['completion']['can_complete']
 
 

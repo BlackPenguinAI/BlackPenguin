@@ -20,6 +20,6 @@ def oauth_return(app_url: str, *, state: str, project_id: str | None, connected:
 <p>{html.escape(reason) if reason else 'Your authorization was saved. Return to onboarding to select this Project’s campaigns and forms.'}</p>
 <p>You can close this window and continue in the original onboarding tab. If it is no longer open:</p>
 <a href="{html.escape(fallback, quote=True)}" rel="noreferrer">Return to Project onboarding</a>
-<script nonce="{nonce}">if(window.opener){{window.opener.postMessage({payload},{json.dumps(origin)});window.close();}}</script></body></html>'''
+<script nonce="{nonce}">if(window.opener){{window.opener.postMessage({payload},{json.dumps(origin)});window.close();}}else{{window.location.replace({json.dumps(fallback)});}}</script></body></html>'''
     return HTMLResponse(body, headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer",
         "Content-Security-Policy": f"default-src 'none'; script-src 'nonce-{nonce}'; base-uri 'none'; frame-ancestors 'none'"})

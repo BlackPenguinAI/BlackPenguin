@@ -54,6 +54,13 @@ ALLOWED_FILE_TYPES = {
 }
 
 
+def _catalog_area_unit(value: Any) -> str | None:
+    text = str(value or "").strip().casefold()
+    aliases = {"sqft": "ft²", "sq ft": "ft²", "sq. ft.": "ft²", "square feet": "ft²",
+               "ft2": "ft²", "sqm": "m²", "sq m": "m²", "m2": "m²", "square meters": "m²"}
+    return aliases.get(text, str(value).strip()[:20] if text else None)
+
+
 def _catalog_number(value: Any, *, integer: bool = False, maximum: float | None = None):
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return None
@@ -355,7 +362,12 @@ async def _extract_proposals(
         "a proposals array containing field, value, evidence, and confidence, plus an optional property_types array. "
         "Each property type is only a candidate and may contain name, code, description, bedrooms, bathrooms, area_min, "
         "area_max, area_unit, total_units, available_units, starting_price, maximum_price, currency, features, "
-        "and evidence. Omit unsupported values and never treat the extracted count as definitive. "
+        "and evidence. Extract all explicit fields, not only bedrooms and bathrooms. Preserve area numbers with their "
+        "original units: square feet/sq ft/ft² becomes ft²; square metres/m² becomes m²; never relabel or convert numbers. "
+        "A starting-from price is starting_price, not maximum_price. Extract its currency only when supported. "
+        "Community amenities belong in the Project amenities proposal, not individual type features unless explicitly attributed. "
+        "A model address must retain its model/visit-address meaning in evidence. "
+        "Omit unsupported values and never treat the extracted count as definitive. "
         "Do not generate inventory verification dates; those are recorded when a user confirms the quantity. "
         "Use a stable English property-type name based on bedroom count, layout, or code. Never create separate types "
         "only because the same generic word appears translated (for example Apartment and Departamento). "
@@ -402,7 +414,7 @@ async def _extract_proposals(
             bathrooms=_catalog_number(item.get("bathrooms"), maximum=50),
             area_min=_catalog_number(item.get("area_min"), maximum=9999999999.99),
             area_max=_catalog_number(item.get("area_max"), maximum=9999999999.99),
-            area_unit=str(item.get("area_unit") or "")[:20] or None,
+            area_unit=_catalog_area_unit(item.get("area_unit")),
             total_units=_catalog_number(item.get("total_units"), integer=True, maximum=2147483647),
             available_units=_catalog_number(item.get("available_units"), integer=True, maximum=2147483647),
             starting_price=_catalog_number(item.get("starting_price"), maximum=99999999999999.99),

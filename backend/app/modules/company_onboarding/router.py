@@ -283,7 +283,9 @@ def _next_question(profile) -> dict[str, Any]:
         }
     blockers = question_blockers(profile, completion["blockers"])
     if completion["blockers"] and not blockers:
-        return deferred_question()
+        blockers = [item for item in completion["blockers"] if item.get("requirement") == "required"]
+        if not blockers:
+            return deferred_question()
     return build_next_question(
         blockers,
         final_prompt="Review the Company Profile and choose whether to approve it or make changes.",
@@ -646,6 +648,8 @@ def continue_company_onboarding_after_team(
     from app.modules.onboarding_deferrals import resolve_draft
     resolve_draft(profile, "team")
     services.defer_missing_team_roles(db, current_user.company_id, profile)
+    session = services.get_or_create_session(db, current_user.company_id)
+    services.supersede_unanswered_questions(db, session.id)
     db.commit()
     return _state_payload(db, current_user.company_id)
 

@@ -12,7 +12,8 @@ TASKS = {
 }
 def detect_task(text):
     value = text.casefold().strip()
-    if re.search(r"\b(review profile|review the profile|revisar perfil|revisar el perfil)\b",value): return "review"
+    if value == "open review: catalog" or re.search(r"\b(available inventory|current inventory|disponibilidad|inventario)\b", value): return "catalog"
+    if re.search(r"\b(review profile|review the profile|approve the company profile|approve company profile|approve profile|aprobar perfil|revisar perfil|revisar el perfil)\b",value): return "review"
     if not re.search(r"\b(update|edit|change|connect|reconnect|assign|add|upload|actualizar|editar|cambiar|conectar|reconectar|asignar|agregar|subir|quiero|want)\b",value):
         return None
     if re.search(r"\b(meta|facebook|campaña|campana|campaign|formulario)\b",value):

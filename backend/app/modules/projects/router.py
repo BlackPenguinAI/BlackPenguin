@@ -304,11 +304,14 @@ def _next_question(profile) -> dict[str, Any]:
     original = blockers
     blockers = question_blockers(profile, blockers)
     if original and not blockers:
-        return deferred_question()
+        # Revisit required deferred facts once the initial pass is exhausted.
+        blockers = [item for item in original if item.get("requirement") == "required"]
+        if not blockers:
+            return deferred_question()
     catalog_managed_fields = {
         "typologies", "available_inventory", "starting_price", "currency", "inventory_updated_at",
     }
-    if deferred(profile, "field:property_type_catalog"):
+    if deferred(profile, "field:property_type_catalog") and any(item["field"] not in catalog_managed_fields and item["field"] != "property_type_catalog" for item in blockers):
         blockers = [item for item in blockers if item["field"] not in catalog_managed_fields and item["field"] != "property_type_catalog"]
         if original and not blockers:
             return deferred_question()
@@ -320,11 +323,16 @@ def _next_question(profile) -> dict[str, Any]:
             "status": "missing",
             "requirement": "required",
         }, *blockers[1:]]
-    return build_next_question(
+    question = build_next_question(
         blockers,
         final_prompt="Review the Project Profile and choose whether to approve it or make changes.",
         profile_data=profile.profile_data or {},
     )
+    if question.get("input_type") == "property_type_catalog" and any(item["field"] == "available_inventory" for item in original):
+        question["label"] = "Confirm current availability"
+        question["prompt"] = "Your property types are saved. Expand each type and enter its current available units, then save. Unknown is not zero. You may attach a current inventory file as evidence."
+        question["help_text"] = "Catalog confirmation alone does not confirm availability. Complete the available units for each confirmed type."
+    return question
 
 
 def _guided_next_question(db: Session, project: Project, profile) -> dict[str, Any]:
@@ -834,6 +842,10 @@ def confirm_property_type_catalog(
 ):
     project = services.get_project(db, project_id, current_user.company_id)
     active_question = services.get_active_question(db, project.session.id)
+    if active_question and (active_question.ui_payload or {}).get("label") == "Confirm current availability":
+        pending = db.query(ProjectPropertyType).filter_by(project_id=project.id, review_status="confirmed").all()
+        if any(item.available_units is None for item in pending):
+            raise HTTPException(422, "Enter current available units for each confirmed type and save it first. Unknown is not zero.")
     result = catalog_service.confirm_catalog(db, project)
     profile = services.get_profile(project)
     if active_question and (active_question.ui_payload or {}).get("input_type") == "property_type_catalog":
@@ -1985,6 +1997,16 @@ def _open_editor_task(db, project, actor, task, client_id, text, request_id):
     services.supersede_unanswered_questions(db, project.session.id)
     ui = question(task)
     if task == "review": ui = _guided_next_question(db, project, services.get_profile(project))
+    if task == "catalog":
+        from copy import deepcopy
+        from sqlalchemy.orm.attributes import flag_modified
+        profile = services.get_profile(project)
+        sources = deepcopy(profile.field_sources or {})
+        record = sources.get("__ui_deferrals__", {}).get("field:property_type_catalog")
+        if record:
+            record.update(deferred=False, resumed=True)
+            profile.field_sources = sources
+            flag_modified(profile, "field_sources")
     ai = services.save_message(db, project.session.id, SenderType.AI, "I understood: " + ui["label"] + ". " + ui["prompt"], ui_payload=ui, in_reply_to_message_id=user_message.id, commit=False)
     record_platform_event(db, actor=actor, company_id=project.company_id, event_type="onboarding.task_opened", entity_type="project", entity_id=project.id, payload={"task":task})
     db.commit()

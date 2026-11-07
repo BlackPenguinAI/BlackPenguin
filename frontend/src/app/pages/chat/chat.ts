@@ -157,7 +157,7 @@ export class ChatComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.userName = localStorage.getItem('bp_name') || 'User';
-    this.syncState();
+    this.syncState('bottom');
     this.loadCompanyMedia();
     this.speechSubscriptions.add(this.speech.state$.subscribe((state) => {
       this.isRecording = state === 'listening';
@@ -460,7 +460,7 @@ export class ChatComponent implements OnInit, OnDestroy {
           const code = member.invitation_error_code ? ` (${member.invitation_error_code})` : '';
           this.teamError = member.invitation_error_message
             ? `The user ${submittedEmail} was saved. ${member.invitation_error_message}`
-            : `The user ${submittedEmail} was saved, but Firebase did not accept the invitation${code}. Use Resend invitation or revoke the failed user below.`;
+            : `The user ${submittedEmail} was saved, but the invitation service did not accept the request${code}. Use Resend invitation or revoke the failed user below.`;
           this.teamSuccess = '';
         } else {
           this.teamSuccess = member.request_replayed
@@ -585,7 +585,7 @@ export class ChatComponent implements OnInit, OnDestroy {
       this.cdr.detectChanges();
     })).subscribe({
       next: () => {
-        this.teamSuccess = 'Firebase accepted the new activation request.';
+        this.teamSuccess = 'The activation invitation was requested.';
         this.refreshTeam(true);
       },
       error: (error: HttpErrorResponse) => {
@@ -755,6 +755,7 @@ export class ChatComponent implements OnInit, OnDestroy {
     action: 'confirm' | 'correct' | 'reject',
   ): void {
     if (proposal.submitting || proposal.status !== 'pending') return;
+    if (action === 'confirm' && (proposal.draftValue ?? this.formatProposalValue(proposal)).trim() !== this.formatProposalValue(proposal).trim()) action = 'correct';
     const anchor = captureReviewScrollAnchor(this.chatScroll?.nativeElement, proposal.id);
     const nextProposalId = source.proposals.find(item => item.status === 'pending' && item.id !== proposal.id)?.id || null;
     this.errorMessage = '';

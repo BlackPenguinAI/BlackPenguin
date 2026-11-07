@@ -78,28 +78,27 @@ describe('Auxiliary Meta OAuth window',()=>{
 });
 
 describe('Project team and independent Meta steps',()=>{
-  it('opens OAuth synchronously before requesting a URL; preserves chat and every local draft',()=>{
-    const child=popup(),api=service();const pending=new Subject<typeof start>();api.startMetaOAuth.mockReturnValue(pending as any);
-    const c=component(api);c.prompt='Unsaved chat';c.propertyTypeDraft.name='Unsaved unit';c.metaOAuth.campaign_name='Unsaved campaign';
-    c.connectMeta();c.connectMeta();
-    expect(window.open).toHaveBeenCalledOnce();expect(api.startMetaOAuth).toHaveBeenCalledOnce();
-    expect(child.location.replace).not.toHaveBeenCalled();
-    pending.next(start);result(child);
-    expect(c.prompt).toBe('Unsaved chat');expect(c.propertyTypeDraft.name).toBe('Unsaved unit');expect(c.metaOAuth.campaign_name).toBe('Unsaved campaign');
-    expect(c.metaLoginBusy).toBe(false);expect(c.metaSetupMessage).toContain('Step 1 saved');
-    expect(api.discoverMetaAssets).not.toHaveBeenCalled();
+  it('uses same-tab OAuth, persists drafts, and ignores duplicate connection clicks',()=>{
+    const api=service(),pending=new Subject<typeof start>();api.startMetaOAuth.mockReturnValue(pending as any);
+    const c=component(api);const navigate=vi.spyOn(c,'navigateToMeta').mockImplementation(()=>undefined);
+    c.prompt='Unsaved chat';c.propertyTypeDraft.name='Unsaved unit';
+    c.connectMeta();c.connectMeta();expect(api.startMetaOAuth).toHaveBeenCalledOnce();
+    expect(navigate).not.toHaveBeenCalled();pending.next(start);
+    expect(navigate).toHaveBeenCalledWith(start.authorization_url);
+    expect(JSON.parse(sessionStorage.getItem('bp-meta-draft:project-1')!).prompt).toBe('Unsaved chat');
+    sessionStorage.removeItem('bp-meta-draft:project-1');
   });
-  it('provides an explicit new-tab fallback if blocked and recovers from start errors',()=>{
-    vi.spyOn(window,'open').mockReturnValue(null);const api=service(),c=component(api);
-    c.connectMeta();expect(c.metaOAuthFallbackUrl).toBe(start.authorization_url);expect(c.metaOAuthBusy).toBe(false);
+  it('rejects unsafe destinations and recovers from start errors',()=>{
+    const api=service(),c=component(api),navigate=vi.spyOn(c,'navigateToMeta').mockImplementation(()=>undefined);
+    api.startMetaOAuth.mockReturnValue(of({...start,authorization_url:'https://attacker.test'}) as any);
+    c.connectMeta();expect(navigate).not.toHaveBeenCalled();expect(c.metaOAuthBusy).toBe(false);
     api.startMetaOAuth.mockReturnValue(throwError(()=>new Error('offline')) as any);
-    c.connectMeta();expect(c.metaOAuthFallbackUrl).toBe('');expect(c.metaLoginBusy).toBe(false);expect(c.errorMessage).toContain('unchanged');
+    c.connectMeta();expect(c.metaLoginBusy).toBe(false);expect(c.errorMessage).toContain('unchanged');
   });
-  it('bounds an unresponsive OAuth start request without losing the unit draft',()=>{
-    vi.useFakeTimers();const child=popup(),api=service();api.startMetaOAuth.mockReturnValue(new Subject() as any);
+  it('bounds an unresponsive OAuth start without losing the draft',()=>{
+    vi.useFakeTimers();const api=service();api.startMetaOAuth.mockReturnValue(new Subject() as any);
     const c=component(api);c.propertyTypeDraft.name='Keep';c.connectMeta();vi.advanceTimersByTime(20001);
-    expect(c.metaOAuthBusy).toBe(false);expect(c.metaLoginBusy).toBe(false);expect(child.close).toHaveBeenCalled();
-    expect(c.propertyTypeDraft.name).toBe('Keep');
+    expect(c.metaOAuthBusy).toBe(false);expect(c.metaLoginBusy).toBe(false);expect(c.propertyTypeDraft.name).toBe('Keep');
   });
   it('does not discover or associate assets merely by loading the saved account',()=>{
     const api=service(),c=component(api);c.loadMetaAuthorizations();c.loadMetaSetupState();

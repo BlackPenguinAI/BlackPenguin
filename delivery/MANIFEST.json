@@ -1,53 +1,156 @@
 {
-  "base_commit": "f5da5489c843aebe4f449fde6f3913884c92e4c3",
+  "base_commit": "bf6623fc3c13ff7793a3840ef30501d8022de0cd",
   "files": [
     {
-      "path": ".github/workflows/deploy.yml",
-      "sha256": "1c71746745e56754e5d1109323d54ae363d7e0cbfb896fe9a63e006f586ea826"
+      "path": "backend/app/modules/company_onboarding/router.py",
+      "action": "modified",
+      "base_sha256": "bcfee76ea96dd12cc0e61e5192cdfd3d39ae4aab60662f19304515603e864961",
+      "sha256": "1deaccc6dc3e270157bb7c8b23d732c9a3c40b16af6c50b0df5a74c84112d894"
     },
     {
-      "path": "backend/app/modules/sales_agent/active_service.py",
-      "sha256": "f9fe5a9aaabbc484b770de62f358ad39fd14c6880247c2bb5187b01f831e5591"
+      "path": "backend/app/modules/company_onboarding/source_service.py",
+      "action": "modified",
+      "base_sha256": "80ba3592b4b09e226f43ca3ebcc1e51093e21a818719ef382b312a038ca21710",
+      "sha256": "0910bc0097f721a0d39a69e59e5fba5b1536e0a66c0cdca40f78f9319dbb628c"
     },
     {
-      "path": "backend/app/modules/sales_agent/dialogue_tasks.py",
-      "sha256": "5ffe14d4928cc28d130ece3d17321e647e400c2263188b9bb3b5e4c53dc22f53"
+      "path": "backend/app/modules/onboarding_questions.py",
+      "action": "modified",
+      "base_sha256": "ab45817fc8a31b97c543d674f3982b7dd1456746e4318f20b3263f02d4f55f2a",
+      "sha256": "1e72dc5cd847e17f70496e9e19be32170ec49727140d0a27462484df8fb85452"
     },
     {
-      "path": "backend/app/modules/sales_agent/live_service.py",
-      "sha256": "f13cdf85dd8b24b8ef9c2900d5800cd0a7e648824cc3a4cb86d37ffea0a1c820"
+      "path": "backend/app/modules/projects/editor_tasks.py",
+      "action": "modified",
+      "base_sha256": "b7248e3515b03f569a6935b5a4e24583d6302a746dffe81f55bb58f066282b3e",
+      "sha256": "b6326663ade1019f8a1e4dbb2ae6516004c311e4f08070e3578590f52e0c3834"
     },
     {
-      "path": "backend/app/modules/sales_agent/runtime_policy.py",
-      "sha256": "bb03cf798b23dfd7a1724aa8d27e89f9e856fe26e1552c20c9f814a937c06a6e"
+      "path": "backend/app/modules/projects/meta_oauth_return.py",
+      "action": "modified",
+      "base_sha256": "056a53345db90e0cd0b35e25f77e5e092e50ad27fadf5b0e71c866ab2a7c5866",
+      "sha256": "6385c9c9b04a0f4f15a87a9a641da5dd6bbe3974f3e8242f4435ed982b48b004"
     },
     {
-      "path": "backend/tests/test_sales_active_integration.py",
-      "sha256": "4830e0c77b6133ccdf8befea034c22468010e7cafdb02ad54b5def0c5cb9dd92"
+      "path": "backend/app/modules/projects/router.py",
+      "action": "modified",
+      "base_sha256": "8022a47bf3e1532d38389168ea2cc433ff16909249cc056f517ca5d04d726140",
+      "sha256": "b363c17f5f2992bab85451867e36ffed77d35ac3f655d6e2976745865420757b"
     },
     {
-      "path": "backend/tests/test_sales_global_rollout.py",
-      "sha256": "902ef6d31bd74209ad2477f73de021faabbe0ca54f7b0d5097c98fb130ce308c"
+      "path": "backend/app/modules/projects/services.py",
+      "action": "modified",
+      "base_sha256": "c1fb67bd703c21e622b0ad2e6855bc018e8fcea71c295228d1205273714c5718",
+      "sha256": "c03028d14d8b1e0183599609341edc3aa82746dc8fe65751292b35ac0d2ae2d4"
     },
     {
-      "path": "docs/sales-agent-active-integration.md",
-      "sha256": "448e046d6e22469fe613e5a943997c7e3b8ad4ec76eaf8acbe029ab170ef9cec"
+      "path": "backend/app/modules/projects/source_service.py",
+      "action": "modified",
+      "base_sha256": "12801f6ab9786cb17a5e394c4930b0a0b49f178182e7bd83a6c384ae3fbe4316",
+      "sha256": "ee06183664ba1b931d4a5e6f2b9980642783f36d6a670cff17cdda59a2201c39"
     },
     {
-      "path": "docs/sales-global-rollout-patch.md",
-      "sha256": "4760877dc08ce5232249b1ca802f8035c08ea177b5055d92d410f70a51a30280"
+      "path": "backend/tests/test_onboarding_journey_regressions.py",
+      "action": "new",
+      "base_sha256": null,
+      "sha256": "22765b65d3157d398f513f739ffecd4a6377a83dd4dc44030f309745a23b8a89"
     },
     {
-      "path": "frontend/src/app/features/admin-panel/ai-settings/ai-settings-page/ai-settings-page.html",
-      "sha256": "71febb27c6fcc4d5706022f7f55d66dc184b2af588bbceb8017d2c72fbbd49d3"
+      "path": "backend/tests/test_price_ranges_and_deferrals.py",
+      "action": "modified",
+      "base_sha256": "6575edc3749c5d791a02b127bf03d3756d8b699fb2c66d7febb9b2a76f98a294",
+      "sha256": "a795e1304be62f4c1bfaf93c75e14a9011d4f928cdc8b32c3b70f0dcf5c90544"
     },
     {
-      "path": "frontend/src/app/features/admin-panel/ai-settings/ai-settings-page/ai-settings-page.spec.ts",
-      "sha256": "c5c570a49258b0a6c1acb80bef32c95ffb303fb05539a04c9afb5d8c782fffd6"
+      "path": "docs/onboarding-journey-differential.md",
+      "action": "new",
+      "base_sha256": null,
+      "sha256": "6890dbcab5c72233e8ce89c7dd31ec082f518fb043c2966775e050e4271ce5bf"
     },
     {
-      "path": "frontend/src/app/features/admin-panel/ai-settings/ai-settings-page/ai-settings-page.ts",
-      "sha256": "3037572e8b062cc5abc761589e24fe57ba6f15f9c15c66d1f8b08ef2e9fcac24"
+      "path": "frontend/package.json",
+      "action": "modified",
+      "base_sha256": "82e7f4fc392ecfacf3130ee166c41765165d2d991a70e9f41352bd92cd0c6bb1",
+      "sha256": "bd47a3a87f86583977173dee3633d71843634567c57ab7abe17bf1610cca35dd"
+    },
+    {
+      "path": "frontend/src/app/pages/chat/chat.html",
+      "action": "modified",
+      "base_sha256": "b2443242985c3c8c583fc8ef64345a40f6f976397c7249bb132a66bd0a825323",
+      "sha256": "fddc4baec13e0867c4bb6a38a71b868fee78302971dfe4d3d366a0a245c4f958"
+    },
+    {
+      "path": "frontend/src/app/pages/chat/chat.ts",
+      "action": "modified",
+      "base_sha256": "3f0966191e9346afe0054e68aba5e1ee21fd805ec12f27010e382908faaff8cd",
+      "sha256": "d2c93e5615f6b5c602318e89909b494ad4db8b9488b719e2afe2c176a5d7fed6"
+    },
+    {
+      "path": "frontend/src/app/pages/client/marketing/marketing.html",
+      "action": "modified",
+      "base_sha256": "3860ffdd3da0fced722a35648224cdfaca9cc22791b586e28f79fb2a119469e5",
+      "sha256": "19a1532f086bcc0d580583d2ea46e0a8b4b9166a8bd795a47a701ee2bbe697f0"
+    },
+    {
+      "path": "frontend/src/app/pages/client/marketing/marketing.scss",
+      "action": "modified",
+      "base_sha256": "c0abf9fbade68706786e2f7a1728f0ad454818ed9ec50fb80e759d3c8d7b0ad4",
+      "sha256": "2b60aa16a430420fd3189c15f67d8b90fe7cd56cf1419a5e3095500f81959657"
+    },
+    {
+      "path": "frontend/src/app/pages/client/projects/project-chat/project-chat.html",
+      "action": "modified",
+      "base_sha256": "d123c532fa09f0b4de67980b3c31c6177a94fbdf880411d14d3df543aca2fc54",
+      "sha256": "df2373efa6639bb2772226154fc703e00838441ba4ec25fe111390d78584017d"
+    },
+    {
+      "path": "frontend/src/app/pages/client/projects/project-chat/project-chat.ts",
+      "action": "modified",
+      "base_sha256": "562cf5d9078115d9d4121056b7e965377c64efcc52c3c7e7e0cd852a45aa5a6e",
+      "sha256": "893d477958fdef673575aedcd0f11c41ed8cf89392e9fb301762b5896975299c"
+    },
+    {
+      "path": "frontend/src/app/pages/client/projects/project-chat/project-journey-regressions.spec.ts",
+      "action": "new",
+      "base_sha256": null,
+      "sha256": "807994a45d043a1c48c74e02e57b556411074bce379c79a844df711df0758ec8"
+    },
+    {
+      "path": "frontend/src/app/pages/client/projects/project-chat/project-team-meta.spec.ts",
+      "action": "modified",
+      "base_sha256": "4cf1ee334f2e2d86480acbf41b632393e20b372031b6420feaccc501e384d918",
+      "sha256": "f113bca0e3bc0a16ea132e1217f683c32e7f98302fe73e8b703a2536c9ef4706"
+    },
+    {
+      "path": "frontend/src/app/shared/ui/configure-later/configure-later.ts",
+      "action": "modified",
+      "base_sha256": "a841ee8bee77e88d6b5f965270c8b2e7db453f9ece91e8a222d87542710b52c3",
+      "sha256": "632df26dfaa940232d5144d9dfb1f335592a0c7de32494b79bf2b067b98f89fe"
+    },
+    {
+      "path": "frontend/src/app/shared/ui/onboarding-ai-message/onboarding-ai-message.html",
+      "action": "modified",
+      "base_sha256": "217d521d42ed2eaf27156805fe0008011017f51919257cbb75777300d418d5e4",
+      "sha256": "741d32543a09ebb346bb26ec3008b3080cb076b775e5f045805dd87f8c0fcb38"
+    },
+    {
+      "path": "frontend/src/app/shared/ui/onboarding-ai-message/onboarding-ai-message.scss",
+      "action": "modified",
+      "base_sha256": "9253d91e3ba932f8595e7feb37fc70cfe3328d28e5d59521a98d64e877d982e0",
+      "sha256": "e54e4ed854f82c7fbe2cfe4bf9ba3570cf5168f5c53af0cfbbbfce16b8af80fd"
+    },
+    {
+      "path": "frontend/src/app/shared/ui/onboarding-location.ts",
+      "action": "modified",
+      "base_sha256": "e9e234a972d81f48fc8158c39a7c1829b853278330a040afc7814393a2cba736",
+      "sha256": "26c9fe334a6ca5e4138bb97d2d7ce4ef4d723b17bfefe81346c0d98b4062a7d5"
+    },
+    {
+      "path": "frontend/tsconfig.onboarding-regression.json",
+      "action": "new",
+      "base_sha256": null,
+      "sha256": "05a3391a44c3fe3b3f8f371d11b87b41896abd53cdbdd63ce49fbc950bf82ad0"
     }
-  ]
+  ],
+  "deletions": []
 }
