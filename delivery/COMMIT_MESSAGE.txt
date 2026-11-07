@@ -1,8 +1,8 @@
-fix: preserve onboarding selections and add scoped detail reviews
+fix: recover invalid interpretations in the active sales flow
 
-- Persist deferred selections without approving draft values.
-- Restore resumed reviews and collect specific compliance instructions.
-- Add scoped delivery dates and structured parking and storage forms.
-- Continue Company onboarding with existing confirmed public channels.
-- Distinguish legal names from brands and avoid ambiguous headquarters.
-- Preserve published profiles and expand onboarding regression coverage.
+- Clarify inventory requests and material-only subjects in the interpretation prompt.
+- Reject contradictory request and exclusion evidence.
+- Retry invalid interpretations once with bounded validation feedback.
+- Preserve contract checks, consent, manual takeover and delivery idempotency.
+- Record interpretation attempts and retain the actual model on failures.
+- Replace misleading safety fallbacks and add sales recovery regression tests.

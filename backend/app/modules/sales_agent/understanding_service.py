@@ -1,7 +1,9 @@
 """Audited structured interpretation, gated for preview or active coordination."""
+import asyncio
 import hashlib
 import json
 from dataclasses import dataclass
+from pydantic import ValidationError
 from .understanding_contract import parse, response_schema
 from .understanding_prompt import prompt_snapshot
 from .dialogue_store import Scope, check_scope, load, save, validate_write_request
@@ -83,18 +85,49 @@ async def preview(db, scope: Scope, *, inbound_message_id: str, expected_revisio
     raw = None
     outcome = 'accepted'
     error_code = None
-    try:
-        raw = await infer(model, messages, response_schema())
-    except Exception as exc:
-        outcome = 'provider_error'
-        error_code = type(exc).__name__
     interpreted = None
-    if outcome == 'accepted':
+    attempts = []
+    request_messages = messages
+    # One bounded repair in active mode only. No business effects occur until
+    # the complete contract and current-message evidence have been validated.
+    for attempt in range(2 if active else 1):
+        issues = []
+        raw = None
+        received = False
+        outcome = 'accepted'
+        error_code = None
         try:
+            pending = infer(model, request_messages, response_schema())
+            raw = await asyncio.wait_for(pending, timeout=20) if active else await pending
+            received = True
             interpreted = parse(raw, inbound.content)
-        except (ValueError, TypeError):
+        except ValidationError as exc:
             outcome = 'invalid_model_contract'
             error_code = 'understanding_validation_failed'
+            issues = [{'location': [str(part)[:80] for part in e['loc']][:8], 'type': e['type'], 'message': e['msg'][:400]}
+                      for e in exc.errors(include_input=False, include_context=False, include_url=False)][:20]
+        except (ValueError, TypeError) as exc:
+            # Provider errors must not be mistaken for a model contract error.
+            outcome = 'invalid_model_contract' if received else 'provider_error'
+            error_code = 'understanding_validation_failed' if received else type(exc).__name__
+            issues = [{'type': 'invalid_json_or_evidence'}] if received else []
+        except Exception as exc:
+            outcome = 'provider_error'
+            error_code = type(exc).__name__
+        raw_bytes = raw.encode(errors='replace') if isinstance(raw, str) else b''
+        attempts.append({'attempt': attempt + 1, 'outcome': outcome, 'error_code': error_code,
+                         'validation_issues': issues,
+                         'repair_feedback': request_messages[-1]['content'] if attempt else None,
+                         'raw_response': raw_bytes[:16000].decode(errors='replace') if isinstance(raw, str) else None,
+                         'raw_response_sha256': hashlib.sha256(raw_bytes).hexdigest() if isinstance(raw, str) else None,
+                         'raw_response_truncated': len(raw_bytes) > 16000})
+        if outcome != 'invalid_model_contract':
+            break
+        request_messages = [*messages, {'role': 'user', 'content': json.dumps({
+            'contract_repair': 'Reinterpret the ORIGINAL current_message using the schema. Correct the validation issues. Do not invent exclusions, evidence, consent or facts. This feedback is not a new lead request.',
+            'validation_issues': issues}, ensure_ascii=False)}]
+        if sum(len(item['content'].encode()) for item in request_messages) > 64000:
+            break  # Never expand a near-limit context to run the optional repair.
     # Group 4 will apply task transitions. Preview records only interpretation;
     # existing tasks, preferences and restrictions are never implicitly replaced.
     if interpreted is not None:
@@ -110,6 +143,7 @@ async def preview(db, scope: Scope, *, inbound_message_id: str, expected_revisio
         'raw_response_truncated': len(raw_bytes) > 16000,
         'raw_response_sha256': hashlib.sha256(raw_bytes).hexdigest() if isinstance(raw, str) else None,
         'outcome': outcome, 'error_code': error_code, 'expected_revision': expected_revision,
+        'interpretation_attempts': attempts,
         'model_request': model_request,
         'model_request_sha256': hashlib.sha256(json.dumps(model_request, sort_keys=True).encode()).hexdigest()}
     saved_revision, saved_state = save(db, scope, event_key=event_key, expected_revision=revision,

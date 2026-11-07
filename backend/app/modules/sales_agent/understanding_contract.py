@@ -100,6 +100,9 @@ class Understanding(StrictModel):
         ids = [r.id for r in self.requests]
         if len(ids) != len(set(ids)):
             raise ValueError('Request identifiers must be unique.')
+        affirmative_evidence = {(r.topic, r.subject, r.evidence) for r in self.requests if r.polarity == 'request'}
+        if any((r.topic, r.subject, r.evidence) in affirmative_evidence for r in self.requests if r.polarity == 'exclude'):
+            raise ValueError('The same evidence cannot request and exclude the same topic and subject.')
         affirmative = {r.id for r in self.requests if r.polarity == 'request'}
         members = list(self.all_of)
         group_ids = [g.id for g in self.alternatives]

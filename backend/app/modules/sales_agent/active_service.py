@@ -388,8 +388,16 @@ async def maybe_process_active(db,conversation,inbound):
         except Exception as exc:
             db.rollback()
             run=db.query(AgentRun).filter_by(event_id=event_id).one()
-            run.output_snapshot={'engine':ENGINE,'reply_ready':True,'reply':"I couldn't verify that request safely. Could you clarify what you need?",
+            interpretation=scope.query(db,SalesDialogueEvent).filter_by(event_key='active-understanding:'+inbound.id).first()
+            trace=(interpretation.payload_json.get('metadata') or {}) if interpretation else {}
+            if trace:
+                run.model=trace.get('model') or run.model
+                run.prompt_snapshot=trace.get('prompt_snapshot') or run.prompt_snapshot
+                run.prompt_configuration_id=trace.get('prompt_configuration_id')
+            run.error_code=trace.get('error_code') or type(exc).__name__
+            run.output_snapshot={'engine':ENGINE,'reply_ready':True,'reply':"I'm having trouble processing your message right now. You can ask about available properties, prices, or a visit, or request help from the Sales team.",
                 'metadata':{'engine':ENGINE,'inbound_message_id':inbound.id},'error_code':type(exc).__name__,
+                'interpretation_outcome':trace.get('outcome'),'interpretation_attempt_count':len(trace.get('interpretation_attempts') or []),
                 'sales_asset_share_ids':[],'delivered_task_ids':[],'policy_violations':[]}
             run.status='prepared';db.commit()
     # Durable effect receipts precede provider sends. Retry dispatch does not

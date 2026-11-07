@@ -1,186 +1,47 @@
 {
-  "base_commit": "856a36b6b817775e0cdc7a0955bfaa1a62ce0124",
+  "base_commit": "0e042f5602790c9e80a7072d8be5a3014bca57b6",
   "files": [
     {
-      "path": "backend/app/modules/company_onboarding/router.py",
+      "path": "backend/app/modules/sales_agent/active_service.py",
       "action": "modified",
-      "base_sha256": "1deaccc6dc3e270157bb7c8b23d732c9a3c40b16af6c50b0df5a74c84112d894",
-      "sha256": "9ce49036a4757f85ce0b57913eeb7b18eb99666063266585b6ddfafa9ca398ea"
+      "base_sha256": "f9fe5a9aaabbc484b770de62f358ad39fd14c6880247c2bb5187b01f831e5591",
+      "sha256": "9d88d6b04b0fbeef6a360956fc32502dc06ca0d525ae2b7fd3d6cd29442607d6"
     },
     {
-      "path": "backend/app/modules/company_onboarding/schemas.py",
+      "path": "backend/app/modules/sales_agent/understanding_contract.py",
       "action": "modified",
-      "base_sha256": "3cd1486cf039ed7a3c4f0eb2382608f18e040114a2e50aa108be3ae46ccd1ca4",
-      "sha256": "27068f78716f5f159e09dca22816c3ef99248ef2ca6642898266f9a82b28c996"
+      "base_sha256": "2dab4afd644e3d13bbf3d0821695d68fca75306b045cd6003ff44a55b91ce8f2",
+      "sha256": "821613d42737012bc32cf4a32184f03aa4fbe13725493a110a0146f2c208d3f0"
     },
     {
-      "path": "backend/app/modules/company_onboarding/services.py",
+      "path": "backend/app/modules/sales_agent/understanding_prompt.py",
       "action": "modified",
-      "base_sha256": "13939ceaf7b5b7216319c5fc413a3ae5b2fc811c612c74bf9e384b0243282459",
-      "sha256": "1d8fcc98c45b7fe56d21d55b98ca16aaba6d71f404ccd041d9c1f7340c1a8026"
+      "base_sha256": "9628daea92daf5908bdbdcf3ea23fbcbac0d9cc2020308fcc930dd7f0e34ae13",
+      "sha256": "5323edd29786a643f69a6a90885957a5d840b95aa0dae9f00bbfc3400a3f45ea"
     },
     {
-      "path": "backend/app/modules/company_onboarding/source_service.py",
+      "path": "backend/app/modules/sales_agent/understanding_service.py",
       "action": "modified",
-      "base_sha256": "0910bc0097f721a0d39a69e59e5fba5b1536e0a66c0cdca40f78f9319dbb628c",
-      "sha256": "e534250532beda07fbdebbc51f1824d10b7352285cd46a128a3782cf43a54117"
+      "base_sha256": "a59ebbbd62daa1c5472afe853796cb6420a9295b39f7ce1c5c8abaf3da7ac399",
+      "sha256": "d1832bc7b5922fb2a48d12ac02d425c49bc43a556104fbfabd55ee6fa8cb3db3"
     },
     {
-      "path": "backend/app/modules/onboarding_answers.py",
-      "action": "modified",
-      "base_sha256": "36fb001cd47d94f5bcd854284183cdbb080c836ad85481d8c8878ddd4581e67c",
-      "sha256": "24075fc74e8f6b6100abc2d74c438de1b9b8da1e701000c43bf02dc63029198c"
-    },
-    {
-      "path": "backend/app/modules/onboarding_deferrals.py",
-      "action": "modified",
-      "base_sha256": "fe49dc9a4bf61a65c62a43069d14af25f9d9ddb60aaaffc80a3ea66f21488ce8",
-      "sha256": "d87b14a4d54590fec3847657c8e2b6655b5564bb600e759be6facfc50623bbf7"
-    },
-    {
-      "path": "backend/app/modules/onboarding_questions.py",
-      "action": "modified",
-      "base_sha256": "1e72dc5cd847e17f70496e9e19be32170ec49727140d0a27462484df8fb85452",
-      "sha256": "6bd0f1ad5ba05b15d3f9ab6f6c456b2491b77019dd8e5e5b3b83f731dec8116c"
-    },
-    {
-      "path": "backend/app/modules/projects/detail_forms.py",
+      "path": "backend/tests/test_sales_understanding_recovery.py",
       "action": "new",
       "base_sha256": null,
-      "sha256": "1e7b41c87ae5869a90c204cdea232aff20632b7ca996e152abd45913ca819729"
+      "sha256": "1bbcf6a552978e0ec563d4a09ca887f30b352c08c0ec41769b12fabe16499003"
     },
     {
-      "path": "backend/app/modules/projects/editor_tasks.py",
-      "action": "modified",
-      "base_sha256": "b6326663ade1019f8a1e4dbb2ae6516004c311e4f08070e3578590f52e0c3834",
-      "sha256": "c019833f5065f07f7b1285270e6fb535105ca6ef686d0a283382a7c37a40dca1"
-    },
-    {
-      "path": "backend/app/modules/projects/router.py",
-      "action": "modified",
-      "base_sha256": "b363c17f5f2992bab85451867e36ffed77d35ac3f655d6e2976745865420757b",
-      "sha256": "9b49c7219006591d2dd0457fdfafa6be87562b6f968382daadd1921b9c83c34f"
-    },
-    {
-      "path": "backend/app/modules/projects/schemas.py",
-      "action": "modified",
-      "base_sha256": "ced7c58e8dbef3bd77d86e2a49cc57402a86c3261627862679ad513433a06855",
-      "sha256": "9529704563e2b0e73aefe52ececabe19e74a959f190ee2134655637a418828bf"
-    },
-    {
-      "path": "backend/tests/company_onboarding/test_completion_and_contract.py",
-      "action": "modified",
-      "base_sha256": "45a383aaf2ae28da09e3168cbe578c49c3103b5b2a4bb3f8bfac6a434ff5215b",
-      "sha256": "51b180ed4e83c3f140fc3099d9c1cbcbd1c659ee03b6863d55c3f6412751c654"
-    },
-    {
-      "path": "backend/tests/test_onboarding_followup_drafts.py",
+      "path": "docs/sales-understanding-recovery.md",
       "action": "new",
       "base_sha256": null,
-      "sha256": "8a21279bc593737862cb426c3941f5e7238181a6e794eff8cc61ee312017f75e"
-    },
-    {
-      "path": "backend/tests/test_project_detail_forms.py",
-      "action": "new",
-      "base_sha256": null,
-      "sha256": "b5ec2eaf3809883ecc8484d14a6bdd24823860ee1ad15fc7990b64ea0df20aeb"
-    },
-    {
-      "path": "docs/onboarding-followup-differential.md",
-      "action": "new",
-      "base_sha256": null,
-      "sha256": "e8c1d9acea32459cdf232e24b32c154023fcd1ad135f4e7974f2f09739cfbbf2"
-    },
-    {
-      "path": "frontend/src/app/pages/chat/chat.html",
-      "action": "modified",
-      "base_sha256": "fddc4baec13e0867c4bb6a38a71b868fee78302971dfe4d3d366a0a245c4f958",
-      "sha256": "4442aecc4c2aa556947edb2e4a51d00081276ed683b6ce197e48df588265767c"
-    },
-    {
-      "path": "frontend/src/app/pages/chat/chat.ts",
-      "action": "modified",
-      "base_sha256": "d2c93e5615f6b5c602318e89909b494ad4db8b9488b719e2afe2c176a5d7fed6",
-      "sha256": "c9f8773200a6d50cba702db2d7cc4c0fc5231575fced3e255e4411cacdaddeb4"
-    },
-    {
-      "path": "frontend/src/app/pages/chat/company-onboarding.service.ts",
-      "action": "modified",
-      "base_sha256": "def19d40df8cc88a7ee54987eb86615a042a3f1037906351d336bb2be4357469",
-      "sha256": "4a457fced31e61fdd6f5a8ebe0b888f8cbac2acd07b65164ca90ba9535e0bcc9"
-    },
-    {
-      "path": "frontend/src/app/pages/client/marketing/marketing-questions-2627.spec.ts",
-      "action": "modified",
-      "base_sha256": "94a68f7b059d172e7112fac39781577ed237df9e82960ee7e44fa345e5a38f88",
-      "sha256": "4f05b5e02c3ca29099f1b061cafaaa7c53a3f0b634da0f565a56c1d3cd77f9ba"
-    },
-    {
-      "path": "frontend/src/app/pages/client/projects/project-chat/project-chat.html",
-      "action": "modified",
-      "base_sha256": "df2373efa6639bb2772226154fc703e00838441ba4ec25fe111390d78584017d",
-      "sha256": "e8c6c4aa96fa32ac677b2b07ea093d35882a1502c902606bb3d4f1bbe3e4b7a3"
-    },
-    {
-      "path": "frontend/src/app/pages/client/projects/project-chat/project-chat.ts",
-      "action": "modified",
-      "base_sha256": "893d477958fdef673575aedcd0f11c41ed8cf89392e9fb301762b5896975299c",
-      "sha256": "5d9c62f01b0f62b03dde41daf5caa35360b917fadd13d3373914f6a2cc08039e"
-    },
-    {
-      "path": "frontend/src/app/pages/client/projects/project-chat/project-onboarding.service.ts",
-      "action": "modified",
-      "base_sha256": "a78cc8efc9610c52dacb689020b90b33b8c5213811d002bec563b306b8b0eb3c",
-      "sha256": "586163c0933d8d7a3244424a7ae1b15bcbda66247fe23a4bad0dc87b5bd4cf84"
-    },
-    {
-      "path": "frontend/src/app/pages/onboarding-detail-forms.spec.ts",
-      "action": "new",
-      "base_sha256": null,
-      "sha256": "4efdac9f9ed1fcaa9ae5c95cca3558a77c41c5954815a08608e51a87ee6d8fa3"
-    },
-    {
-      "path": "frontend/src/app/pages/onboarding-followup.spec.ts",
-      "action": "new",
-      "base_sha256": null,
-      "sha256": "6b4aa36f0f2859b58061e4b25f1315a321fcd62706bf987b4fe76d9bd46cb1ef"
-    },
-    {
-      "path": "frontend/src/app/shared/ui/onboarding-ai-message/onboarding-ai-message.html",
-      "action": "modified",
-      "base_sha256": "741d32543a09ebb346bb26ec3008b3080cb076b775e5f045805dd87f8c0fcb38",
-      "sha256": "90d2391f234f798a467cb1642814794b9b759977dc370b37c8f7ae147cfbe6c9"
-    },
-    {
-      "path": "frontend/src/app/shared/ui/onboarding-ai-message/onboarding-ai-message.ts",
-      "action": "modified",
-      "base_sha256": "f8e7adc26c261caeb8c4a0bf4f43073e2e7af28bc6c8503c8ab39701cf47a0be",
-      "sha256": "4c8ed1e0a06fa297bad0e0cac22ede21ca5c5eae3d49adca47ef413989a8af40"
-    },
-    {
-      "path": "frontend/src/app/shared/ui/onboarding-detail-editor.ts",
-      "action": "new",
-      "base_sha256": null,
-      "sha256": "d53460469e9689ba1169cc3e69ea743318d2b544f89c52726b11219fd87d984b"
-    },
-    {
-      "path": "frontend/src/app/shared/ui/onboarding-response-options/onboarding-response-options.html",
-      "action": "modified",
-      "base_sha256": "659913f28624e067dac8c857d9c8bd72d5c8f814ba2f33afbc20321b4d5a8f55",
-      "sha256": "80e9840ff73569d1977bbe5c3d974ec08a5be9685de882aea6b350c1104eea1e"
-    },
-    {
-      "path": "frontend/src/app/shared/ui/onboarding-response-options/onboarding-response-options.scss",
-      "action": "modified",
-      "base_sha256": "b0f11dee2fb759fc0ba222e952bc0e33c3cd60e1b618e49d6eb31d84d7f2e69e",
-      "sha256": "09cc64b81b63eb95a2b90c2fba747fb3edc45b8968d02b6d576e666add033a61"
-    },
-    {
-      "path": "frontend/src/app/shared/ui/onboarding-response-options/onboarding-response-options.ts",
-      "action": "modified",
-      "base_sha256": "70bde7de7a48b57113cb985b7ba14f358e1c7b300dcab015eaaf565400f99404",
-      "sha256": "eaa9066b91f57bcb4aa026d3b5d61386bd1d015b9d39ea1cdd5ed2f46a09f2b3"
+      "sha256": "b140c1f7cc937703efc57c909f6ecbab6a1fa2b380bf9c290f56b65a208b8754"
     }
   ],
-  "deletions": []
+  "deletions": [],
+  "verification": {
+    "backend": "1445 passed, 2 skipped",
+    "live_providers": "not called",
+    "frontend": "unchanged; not rerun"
+  }
 }
