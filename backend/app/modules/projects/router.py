@@ -32,6 +32,7 @@ from app.modules.users.project_access import project_ids_for_user, require_proje
 from app.modules.governance.services import record_platform_event, request_fingerprint
 
 from . import asset_share_service, catalog_service, meta_oauth_service, meta_service, sales_asset_service, services, source_service, storage_service
+from .detail_forms import DetailDecision
 from .completion import FIELD_BY_KEY
 from .models import (
     MetaConnection, Project, ProjectCampaign, ProjectMessage, ProjectOnboardingProposal,
@@ -299,7 +300,8 @@ def _cover_confirmation_message(source_name: str, next_prompt: str) -> str:
 
 def _next_question(profile) -> dict[str, Any]:
     blockers = services.serialize_profile(profile)["completion"]["blockers"]
-    if not blockers and deferred(profile, "final_approval"):
+    resumed_fields = any(key.startswith("field:") and value.get("resumed") for key,value in (getattr(profile,"field_sources",None) or {}).get("__ui_deferrals__",{}).items())
+    if not resumed_fields and not blockers and deferred(profile, "final_approval"):
         return deferred_question()
     original = blockers
     blockers = question_blockers(profile, blockers)
@@ -327,6 +329,7 @@ def _next_question(profile) -> dict[str, Any]:
         blockers,
         final_prompt="Review the Project Profile and choose whether to approve it or make changes.",
         profile_data=profile.profile_data or {},
+        profile_sources=profile.field_sources or {},
     )
     if question.get("input_type") == "property_type_catalog" and any(item["field"] == "available_inventory" for item in original):
         question["label"] = "Confirm current availability"
@@ -2022,6 +2025,37 @@ def open_editor_task(project_id: str, task: str, payload: ChatMessagePayload, db
     db.query(ProjectSession).filter_by(id=project.session.id).with_for_update().one()
     existing = _existing_turn(db, project=project, client_message_id=payload.client_message_id, request_id="editor")
     return existing or _open_editor_task(db, project, current_user, task, payload.client_message_id, payload.message, "editor")
+
+
+@router.post("/{project_id}/details", response_model=ChatTurnResponse)
+def save_project_details(project_id: str, payload: DetailDecision, db: Session = Depends(get_db),
+                         current_user: User = Depends(RoleChecker(EDITOR_ROLES))):
+    project = services.get_project(db, project_id, current_user.company_id)
+    require_project_access(db, current_user, project_id)
+    db.query(ProjectSession).filter_by(id=project.session.id).with_for_update().one()
+    existing = _existing_turn(db, project=project, client_message_id=payload.client_message_id, request_id="details")
+    if existing: return existing
+    question = services.get_active_question(db, project.session.id, payload.question_message_id)
+    if not question or question.id != payload.question_message_id or question.response_payload or (question.ui_payload or {}).get("field") != payload.field:
+        raise HTTPException(409, "This detail review is no longer active. Reopen it before saving.")
+    try: value = payload.formatted_value()
+    except ValueError as exc: raise HTTPException(422, str(exc)) from exc
+    profile = services.get_profile(project)
+    result = services.apply_field_updates(db, profile, [services.user_field_update(payload.field, value)],
+        allow_authoritative_statuses=True, actor_user_id=current_user.id, commit=False)
+    if result.rejected:
+        db.rollback()
+        raise HTTPException(422, "Review the detail fields before saving.")
+    user_message = services.save_message(db, project.session.id, SenderType.USER, value,
+        message_id=payload.client_message_id, in_reply_to_message_id=question.id, commit=False)
+    services.record_message_response(db, project.session.id, question.id, value, commit=False)
+    next_question = _guided_next_question(db, project, profile)
+    ai = services.save_message(db, project.session.id, SenderType.AI,
+        "Saved " + FIELD_BY_KEY[payload.field].label + ". " + next_question["prompt"],
+        ui_payload=next_question, in_reply_to_message_id=user_message.id, commit=False)
+    db.commit()
+    return _turn_payload(request_id="details", ai_message=ai, user_message=user_message, profile=profile,
+                         accepted=result.accepted, assistant_status="deterministic")
 
 
 @router.get("/{project_id}/meta-setup/config", response_model=MetaSetupConfigurationResponse)

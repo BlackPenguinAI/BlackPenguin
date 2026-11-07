@@ -24,7 +24,7 @@ class StructuredChatMessagePayload(BaseModel):
         return self
 
 
-def question_selection(field, question, values):
+def question_selection(field, question, values, *, allow_incomplete=False):
     from .onboarding_questions import QUESTION_CATALOG
     if (question.get('input_type') != 'multi_select'
             or QUESTION_CATALOG.get(field, {}).get('input_type') != 'multi_select'):
@@ -33,6 +33,10 @@ def question_selection(field, question, values):
     result = normalize_selection(field, values, choices)
     if not result:
         raise ValueError('Select at least one value.')
+    if not allow_incomplete:
+        for label in question.get('detail_options') or []:
+            if label in result or any(value.startswith(label + ':') and len(value.partition(':')[2].strip()) < 10 for value in result):
+                raise ValueError('Provide the exact text or requirements for each selected compliance category (at least 10 characters).')
     if not question.get('allow_custom', True) and any(value not in choices for value in result):
         raise ValueError('Choose one of the available options.')
     return result

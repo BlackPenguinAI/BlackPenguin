@@ -1,6 +1,7 @@
 import { ChangeDetectorRef, Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { ConfigureLaterComponent, DeferredCards, restoreDraft, questionCard } from '../../../../shared/ui/configure-later/configure-later';
 import { ReviewCardComponent } from '../../../../shared/ui/review-card';
+import { OnboardingDetailEditor } from '../../../../shared/ui/onboarding-detail-editor';
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
@@ -50,7 +51,7 @@ import {
 
 @Component({
   selector: 'app-project-chat', standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, OnboardingAiMessageComponent, OnboardingWelcomeComponent, ConfigureLaterComponent, OnboardingLocationComponent, ReviewCardComponent],
+  imports: [CommonModule, FormsModule, RouterModule, OnboardingAiMessageComponent, OnboardingWelcomeComponent, ConfigureLaterComponent, OnboardingLocationComponent, ReviewCardComponent, OnboardingDetailEditor],
   templateUrl: './project-chat.html', styleUrls: ['./project-chat.scss'],
 })
 export class ProjectChatComponent implements OnInit, OnDestroy {
@@ -202,8 +203,18 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   private lastStateVersion = 0;
   requestedEditorTask='';
   private renderGeneration = 0;
+  private detailAttempt:{fingerprint:string;id:string}|null=null;
+  saveProjectDetails(value:Record<string,unknown>,message:ChatMessage):void {
+    if(this.isAnalyzing || !message.id)return;this.isAnalyzing=true;this.errorMessage='';
+    const fingerprint=JSON.stringify([this.projectId,message.id,value]);
+    if(this.detailAttempt?.fingerprint!==fingerprint)this.detailAttempt={fingerprint,id:this.createClientMessageId()};
+    this.onboarding.saveDetails(this.projectId,{...value,question_message_id:message.id,client_message_id:this.detailAttempt!.id}).pipe(timeout(20_000)).subscribe({
+      next:turn=>{this.detailAttempt=null;this.isAnalyzing=false;this.applyTurn(turn);this.scrollToBottom();},
+      error:e=>{this.isAnalyzing=false;this.errorMessage=this.apiDetail(e,'Details were not saved. Your entries remain in the form.');this.cdr.detectChanges();}
+    });
+  }
   locationSaved():void {this.syncState('bottom');}
-  readonly editorTasks = [{key:'meta_account',label:'Meta account'},{key:'meta_assets',label:'Campaigns / forms'},{key:'team',label:'Assign team'},{key:'catalog',label:'Property types'},{key:'documents',label:'Add documents'},{key:'location',label:'Location / timezone'}];
+  readonly editorTasks = [{key:'meta_account',label:'Meta account'},{key:'meta_assets',label:'Campaigns / forms'},{key:'team',label:'Assign team'},{key:'catalog',label:'Property types'},{key:'delivery',label:'Delivery dates'},{key:'parking',label:'Parking / storage'},{key:'documents',label:'Add documents'},{key:'location',label:'Location / timezone'}];
   openEditorTask(task:string):void {
     if(this.isAnalyzing)return;
     this.isAnalyzing=true;this.errorMessage='';
@@ -1006,6 +1017,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     return this.isActiveQuestion(message) && message.ui_payload?.input_type === inputType;
   }
   isGlobalStructuredQuestion(message: ChatMessage): boolean {
+    if(this.isActiveQuestion(message) && ['delivery_dates','parking_and_storage'].includes(message.ui_payload?.field || ''))return true;
     return ['project_cover', 'property_type_catalog'].includes(message.ui_payload?.input_type || '') || (this.isActiveQuestion(message) && ['location_editor','ai_sales_authorization','project_sales_team','meta_lead_setup'].includes(message.ui_payload?.input_type || ''));
   }
   hasPersistedStructuredTransition(message: ChatMessage): boolean {
@@ -1153,6 +1165,14 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     this.initialState = 'loading';
     this.errorMessage = '';
     this.syncState();
+  }
+  deferSelection(values:string[],message:ChatMessage):void {
+    if(this.isAnalyzing || !message.id || !message.ui_payload?.field)return;
+    this.isAnalyzing=true;this.errorMessage='';
+    this.onboarding.deferSelection(this.projectId,message.ui_payload.field,message.id,values).pipe(timeout(20_000)).subscribe({
+      next:r=>{this.isAnalyzing=false;this.deferralsSaved(r.deferrals);},
+      error:()=>{this.isAnalyzing=false;this.errorMessage='The selections could not be saved for later. Your choices remain in this card; retry.';this.cdr.detectChanges();}
+    });
   }
   chooseAnswer(value: string | string[], message?: ChatMessage): void {
     this.prompt = Array.isArray(value) ? value.join('; ') : value;

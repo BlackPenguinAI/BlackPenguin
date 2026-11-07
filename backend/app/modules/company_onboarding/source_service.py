@@ -130,6 +130,8 @@ def _semantic_headquarters(soup: BeautifulSoup) -> str | None:
         *soup.select('[itemprop="address"]'),
         *soup.find_all("address"),
     ]
+    addresses = []
+    explicit = []
     for candidate in candidates:
         text = re.sub(r"\s+", " ", candidate.get_text(" ", strip=True)).strip(" ,")
         if (
@@ -137,8 +139,11 @@ def _semantic_headquarters(soup: BeautifulSoup) -> str | None:
             and re.search(r"[A-Za-z]", text)
             and not re.fullmatch(r"[^@\s]+@[^@\s]+", text)
         ):
-            return text
-    return None
+            if text not in addresses: addresses.append(text)
+            heading = candidate.find_previous(["h1","h2","h3","h4","h5"])
+            if heading and re.search(r"headquarters|head office|corporate office|sede principal", heading.get_text(" ",strip=True), re.I):
+                if text not in explicit: explicit.append(text)
+    return explicit[0] if len(explicit)==1 else addresses[0] if len(addresses)==1 else None
 
 
 def _phone_key(value: str) -> str:
@@ -164,12 +169,15 @@ def _canonical_phones(values: list[Any]) -> list[str]:
 
 def _structured_company_facts(soup: BeautifulSoup) -> dict[str, Any]:
     names: list[str] = []
+    brands: list[str] = []
     addresses: list[str] = []
     phones: list[Any] = []
     for record in _json_ld_records(soup):
         if not (_schema_types(record) & STRUCTURED_ORGANIZATION_TYPES):
             continue
-        name = record.get("legalName") or record.get("name")
+        brand = record.get("name")
+        if isinstance(brand, str) and brand.strip() and brand.strip() not in brands: brands.append(brand.strip())
+        name = record.get("legalName")
         if isinstance(name, str) and name.strip() and name.strip() not in names:
             names.append(name.strip())
         address = _structured_address(record.get("address"))
@@ -178,9 +186,11 @@ def _structured_company_facts(soup: BeautifulSoup) -> dict[str, Any]:
         telephone = record.get("telephone")
         phones.extend(telephone if isinstance(telephone, list) else [telephone])
     facts: dict[str, Any] = {}
-    if names:
+    if len(names)==1:
         facts["official_company_name"] = names[0]
-    headquarters = addresses[0] if addresses else _semantic_headquarters(soup)
+    if len(brands)==1:
+        facts["preferred_display_name"] = brands[0]
+    headquarters = addresses[0] if len(addresses)==1 else _semantic_headquarters(soup)
     if headquarters:
         facts["headquarters"] = headquarters
     canonical_phones = _canonical_phones(phones)
@@ -734,7 +744,7 @@ def _embedded_link_values(text: str) -> dict[str, Any]:
             continue
         if not isinstance(payload, dict):
             continue
-        for field in ("official_company_name", "headquarters"):
+        for field in ("official_company_name", "preferred_display_name", "headquarters"):
             if payload.get(field) and not values.get(field):
                 values[field] = payload[field]
         structured_phones = payload.get("public_contact_phones")

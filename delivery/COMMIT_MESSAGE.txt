@@ -1,8 +1,8 @@
-fix: improve onboarding recovery and Meta setup navigation
+fix: preserve onboarding selections and add scoped detail reviews
 
-- Resume required reviews and guide current inventory confirmation.
-- Keep secondary actions inside onboarding cards and prevent unattached image confirmation.
-- Prioritize city timezones and normalize extracted area-unit labels.
-- Return Meta authorization to the same Project and show setup status badges.
-- Preserve edited proposals and stop inferring sold units from availability.
-- Add onboarding regression coverage and document remaining acceptance work.
+- Persist deferred selections without approving draft values.
+- Restore resumed reviews and collect specific compliance instructions.
+- Add scoped delivery dates and structured parking and storage forms.
+- Continue Company onboarding with existing confirmed public channels.
+- Distinguish legal names from brands and avoid ambiguous headquarters.
+- Preserve published profiles and expand onboarding regression coverage.

@@ -24,6 +24,10 @@ export class CompanyOnboardingService {
     : '/api/v1/company-onboarding';
 
   constructor(private readonly http: HttpClient) {}
+  deferSelection(entityId:string, field:string, questionId:string, values:string[]):Observable<{deferrals:Record<string,any>}> {
+    return this.http.post<{deferrals:Record<string,any>}>(`${API_V1_URL}/onboarding-deferrals/company/${entityId}`,
+      {card:'field:'+field,question_message_id:questionId,draft:{selected_values:values}});
+  }
 
   getProfile(): Observable<CompanyProfileResponse> {
     return this.http.get<CompanyProfileResponse>(`${this.baseUrl}/profile`);
@@ -49,6 +53,8 @@ export class CompanyOnboardingService {
     }));
     return this.http.patch<CompanyProfileResponse>(`${this.baseUrl}/profile`, { updates });
   }
+
+  continuePublicPresence():Observable<OnboardingState> {return this.http.post<OnboardingState>(`${this.baseUrl}/public-presence/continue`,{});}
 
   deferPublicPresence(fields: string[] = ['public_contact_emails', 'public_contact_phones', 'corporate_social_profiles']): Observable<CompanyProfileResponse> {
     const updates = fields.map(field => ({

@@ -31,6 +31,17 @@ def question_blockers(profile, blockers):
     # A direct Resume action should take the user back to that review, not
     # silently show the first unrelated missing field again.
     resumed = {key: value.get("updated_at", "") for key, value in records(profile).items() if value.get("resumed")}
+    if getattr(profile, "project_id", None):
+        from app.modules.projects.completion import FIELD_BY_KEY
+    else:
+        from app.modules.company_onboarding.completion import FIELD_BY_KEY
+    present = {item["field"] for item in visible}
+    for key in resumed:
+        field = key.removeprefix("field:")
+        definition = FIELD_BY_KEY.get(field) if key.startswith("field:") else None
+        if definition and field not in present:
+            visible.append({"field":field,"label":definition.label,"requirement":definition.requirement,
+                            "status":"pending_confirmation","section":getattr(definition,"section","profile")})
     return sorted(visible, key=lambda item: resumed.get("field:" + item["field"], ""), reverse=True)
 
 
@@ -58,6 +69,7 @@ def resolve_draft(profile, card):
 class Decision(BaseModel):
     card: str = Field(min_length=1, max_length=160)
     resume: bool = False
+    question_message_id: str | None = None
     draft: dict = Field(default_factory=dict)
 
 
@@ -93,9 +105,36 @@ def save(db, profile, scope, entity_id, payload, actor):
         return isinstance(value, list) and any(has_credentials(v) for v in value)
     if has_credentials(payload.draft):
         raise HTTPException(422, "Do not include passwords, API keys or access tokens in onboarding drafts.")
-    # Values in this bag are never fed to the agent or promoted to profile_data.
+    # Serialize against profile updates before checking the question binding.
     db.query(type(profile)).filter(type(profile).id == profile.id).with_for_update().one()
     db.refresh(profile)
+    # Selection drafts must be bound to this tenant's still-active question.
+    if payload.question_message_id:
+        model = cm.OnboardingMessage if scope == "company" else pm.ProjectMessage
+        session = (db.query(cm.OnboardingSession).filter_by(company_id=entity_id).one()
+                   if scope == "company" else profile.project.session)
+        question = db.query(model).filter_by(id=payload.question_message_id, session_id=session.id).first()
+        if question: db.refresh(question)
+        if scope == "project":
+            from app.modules.projects import services as scope_services
+        else:
+            from app.modules.company_onboarding import services as scope_services
+        active = scope_services.get_active_question(db, session.id, payload.question_message_id)
+        if not active or not question or active.id != question.id:
+            raise HTTPException(409, "This review is no longer active. Refresh before postponing it.")
+        ui = (question.ui_payload or {}) if question else {}
+        if not question or question.sender.value != "ai" or question.response_payload or ui.get("field") != identifier or prefix != "field":
+            raise HTTPException(409, "This review is no longer active. Refresh before postponing it.")
+        from app.modules.onboarding_answers import question_selection
+        selected = payload.draft.get("selected_values", [])
+        if not isinstance(selected, list) or any(not isinstance(item, str) for item in selected):
+            raise HTTPException(422, "Draft selections must be a list of text options.")
+        try:
+            values = question_selection(identifier, ui, selected, allow_incomplete=True) if selected else []
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
+        payload.draft = {"selected_values": values}
+    # Values in this bag are never fed to the agent or promoted to profile_data.
     state = deepcopy(records(profile))
     previous = state.get(payload.card, {})
     if payload.resume and not previous:

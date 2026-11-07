@@ -190,6 +190,7 @@ class NextQuestionResponse(BaseModel):
     answer_actions: dict[str, dict[str, Any]] = Field(default_factory=dict)
     exclusive_options: list[str] = Field(default_factory=list)
     selected_values: list[str] = Field(default_factory=list)
+    detail_options: list[str] = Field(default_factory=list)
 
 
 class SourceProposalResponse(BaseModel):

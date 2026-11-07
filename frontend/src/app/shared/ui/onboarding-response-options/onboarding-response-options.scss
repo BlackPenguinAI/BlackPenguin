@@ -26,3 +26,5 @@
 .suggestion-origin small { width: 100%; overflow: hidden; color: #6b7280; text-overflow: ellipsis; white-space: nowrap; }
 .suggestion-origin--fallback { color: #d1d5db; }
 @media (max-width: 640px) { .question-options { margin-left: 0; } .choice { width: 100%; border-radius: .7rem; } }
+
+.option-details label{display:block;margin:1rem 0;font-size:.8rem;color:#d1d5db}.option-details textarea{display:block;box-sizing:border-box;width:100%;margin-top:.5rem;padding:.75rem;border:1px solid #ffffff26;border-radius:.6rem;background:#080808;color:#fff;resize:vertical}

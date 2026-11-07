@@ -298,7 +298,8 @@ def build_next_question(
     suggestion_sources: list[str] = []
     if field == "dba":
         preferred_name = str((profile_data or {}).get("preferred_display_name") or "").strip()
-        if preferred_name:
+        legal_name = str((profile_data or {}).get("official_company_name") or "").strip()
+        if preferred_name and preferred_name.casefold() != legal_name.casefold():
             copy_label = f"Yes — use {preferred_name}"
             options.append(copy_label)
             answer_actions[copy_label] = {
@@ -360,6 +361,13 @@ def build_next_question(
     if config.get('input_type')=='multi_select':
         try:selected=normalize_selection(field,(profile_data or {}).get(field),config.get('options',[]),validate_exclusivity=False) or []
         except ValueError:pass  # Non-text legacy structures cannot be converted into invented selections.
+        saved = (profile_sources or {}).get("__ui_deferrals__", {}).get("field:" + field, {})
+        if (saved.get("deferred") or saved.get("resumed")) and "selected_values" in saved.get("draft", {}):
+            try:
+                draft_values = saved["draft"]["selected_values"]
+                selected = normalize_selection(field, draft_values, options) if draft_values else []
+            except ValueError:
+                pass  # A malformed legacy draft never overwrites a confirmed value.
     return {
         "field": field,
         "label": blocker["label"],
@@ -367,6 +375,7 @@ def build_next_question(
         "input_type": config.get("input_type", "text"),
         "exclusive_options": EXCLUSIVE_OPTIONS.get(field,[]),
         "selected_values": selected,
+        "detail_options": [value for value in options if value not in EXCLUSIVE_OPTIONS.get(field, []) and value not in answer_actions] if field in {"compliance_notes", "corporate_compliance_information"} else [],
         "options": options,
         "examples": examples,
         "allow_custom": bool(config.get("allow_custom", True)),

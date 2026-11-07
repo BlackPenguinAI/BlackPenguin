@@ -15,7 +15,12 @@ import {
 export class ProjectOnboardingService {
   private readonly baseUrl = `${API_V1_URL}/projects`;
   constructor(private readonly http: HttpClient) {}
+  deferSelection(entityId:string, field:string, questionId:string, values:string[]):Observable<{deferrals:Record<string,any>}> {
+    return this.http.post<{deferrals:Record<string,any>}>(`${API_V1_URL}/onboarding-deferrals/project/${entityId}`,
+      {card:'field:'+field,question_message_id:questionId,draft:{selected_values:values}});
+  }
 
+  saveDetails(id:string,payload:Record<string,unknown>):Observable<ChatTurn>{return this.http.post<ChatTurn>(`${this.baseUrl}/${id}/details`,payload);}
   getProfile(id: string): Observable<ProjectProfile> { return this.http.get<ProjectProfile>(`${this.baseUrl}/${id}/profile`); }
   openEditorTask(id:string,task:string,clientId:string):Observable<ChatTurn>{return this.http.post<ChatTurn>(`${this.baseUrl}/${id}/editor/${task}`,{message:'Open review: '+task,client_message_id:clientId});}
   getHistory(id: string): Observable<ChatMessage[]> { return this.http.get<ChatMessage[]>(`${this.baseUrl}/${id}/chat`); }

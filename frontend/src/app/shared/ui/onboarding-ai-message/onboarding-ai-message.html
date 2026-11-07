@@ -16,6 +16,7 @@
         [answered]="!!message.response_payload"
         [showPrompt]="false"
         (selected)="selected.emit($event)"
+        (deferred)="deferred.emit($event)"
         (custom)="custom.emit()"
       ></app-onboarding-response-options>
       <div *ngIf="message.response_payload?.custom" class="custom-answer">

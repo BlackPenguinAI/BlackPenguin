@@ -56,8 +56,9 @@
             <app-onboarding-ai-message
               [message]="msg"
               [active]="isActiveQuestion(msg)"
-              [disabled]="isAnalyzing || isCompleted || hasPendingReview"
+              [disabled]="isAnalyzing || (isCompleted && !(msg.ui_payload?.field && profile.ui_deferrals?.['field:'+msg.ui_payload!.field]?.resumed)) || hasPendingReview"
               (selected)="chooseAnswer($event, msg)"
+              (deferred)="deferSelection($event,msg)"
               (custom)="writeCustomAnswer(msg)"
             ><app-configure-later *ngIf="msg.ui_payload?.field != null && msg.ui_payload?.input_type !== 'final_approval' && !msg.ui_payload?.options?.includes('Provide later') && isActiveQuestion(msg) && msg.ui_payload?.input_type !== 'complete' && msg.ui_payload?.input_type !== 'deferred_review' && companyEditorTask !== 'location'" scope="company" [entityId]="profile.company_id" [card]="questionCard(msg.ui_payload!)" [label]="msg.ui_payload!.label" [draft]="{answer: prompt}" [records]="profile.ui_deferrals || {}" (saved)="deferralsSaved($event)"></app-configure-later></app-onboarding-ai-message>
 
@@ -163,6 +164,7 @@
               [rows]="isStructuredProposal(proposal) ? 4 : 2"
               class="mt-2 w-full resize-y rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs leading-5 text-white outline-none focus:border-secondary/60 disabled:opacity-60"
             ></textarea>
+            <p class="mt-2 text-[11px] text-gray-400">Source: {{source.name}} · {{proposal.status === 'pending' ? 'Extracted suggestion — review required' : 'Reviewed value'}}</p>
             <p *ngIf="proposal.evidence" class="mt-2 text-[11px] leading-relaxed text-gray-500">
               {{ proposal.evidence }}
             </p>
@@ -208,9 +210,10 @@
             <div *ngIf="shouldEditPublicPresence('public_contact_phones')"><input name="public_phones" [(ngModel)]="publicPhones" (ngModelChange)="markPublicPresenceDirty('public_contact_phones')" type="text" placeholder="Public phone numbers" class="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-xs outline-none focus:border-secondary/50" [class.border-red-400/60]="!!publicPresenceFieldError('public_contact_phones')"><p *ngIf="publicPresenceFieldError('public_contact_phones')" class="field-error">{{ publicPresenceFieldError('public_contact_phones') }}</p></div>
             <div *ngIf="isPublicPresenceResolved('corporate_social_profiles') && !shouldEditPublicPresence('corporate_social_profiles')" class="flex items-start gap-3 rounded-lg border border-green-500/20 bg-green-500/[0.06] px-3 py-2"><span class="material-symbols-outlined text-base text-green-400">share</span><div class="min-w-0 flex-1"><p class="text-[9px] font-bold uppercase tracking-wider text-green-400">Confirmed social profiles</p><p class="mt-1 break-words text-xs text-gray-200">{{ socialProfiles }}</p></div><button type="button" (click)="editPublicPresence('corporate_social_profiles')" class="text-[10px] text-secondary">Edit</button></div>
             <div *ngIf="shouldEditPublicPresence('corporate_social_profiles')"><textarea name="social_profiles" [(ngModel)]="socialProfiles" (ngModelChange)="markPublicPresenceDirty('corporate_social_profiles')" rows="2" placeholder="Official LinkedIn, Instagram, Facebook, X, YouTube, or TikTok URLs" class="w-full resize-y rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-xs outline-none focus:border-secondary/50" [class.border-red-400/60]="!!publicPresenceFieldError('corporate_social_profiles')"></textarea><p *ngIf="publicPresenceFieldError('corporate_social_profiles')" class="field-error">{{ publicPresenceFieldError('corporate_social_profiles') }}</p></div>
-            <p *ngIf="publicPresenceErrorCount" class="form-help" role="status"><span class="material-symbols-outlined text-sm">info</span>Enter at least one valid channel and correct any highlighted value before saving.</p>
+            <p *ngIf="publicPresenceErrorCount" class="form-help" role="status"><span class="material-symbols-outlined text-sm">info</span>{{ publicPresenceResolvedCount ? 'Other channels are optional. Add a valid value or keep the channels already confirmed.' : 'Enter at least one valid public channel and correct the highlighted fields.' }}</p>
             <div class="flex items-center gap-3 pt-1">
               <button [disabled]="!canSavePublicPresence" [title]="canSavePublicPresence ? '' : 'Enter at least one valid public channel.'" class="rounded-lg bg-secondary px-3 py-2 text-[10px] font-semibold text-black disabled:cursor-not-allowed disabled:opacity-40">{{ publicPresenceSaving ? 'Saving...' : (publicPresenceErrorCount ? 'Complete valid information' : 'Save public information') }}</button>
+              <button *ngIf="canKeepConfirmedChannels" type="button" (click)="keepConfirmedChannels()" class="rounded-lg border border-secondary/30 px-3 py-2 text-xs text-secondary">Keep confirmed channels and continue</button>
               <span *ngIf="publicPresenceSaved" class="text-[10px] text-green-400">Saved</span>
 
             </div>

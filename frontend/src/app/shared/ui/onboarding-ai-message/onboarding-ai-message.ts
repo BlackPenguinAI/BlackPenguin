@@ -26,6 +26,7 @@ export class OnboardingAiMessageComponent implements OnInit, OnDestroy {
   @Input() active = false;
   @Input() disabled = false;
   @Output() selected = new EventEmitter<string | string[]>();
+  @Output() deferred = new EventEmitter<string[]>();
   @Output() custom = new EventEmitter<void>();
   speechState: SpeechSynthesisState = 'idle';
   activeMessageId: string | null = null;

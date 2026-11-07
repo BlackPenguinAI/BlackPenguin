@@ -12,7 +12,7 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { marked } from 'marked';
-import { catchError, concatMap, finalize, from, of, Subscription, tap, toArray } from 'rxjs';
+import { catchError, concatMap, finalize, from, of, Subscription, tap, toArray, timeout } from 'rxjs';
 
 import { SpeechRecognitionService } from '../../core/services/speech-recognition.service';
 import { deviceTimezone } from '../../core/timezones';
@@ -317,6 +317,14 @@ export class ChatComponent implements OnInit, OnDestroy {
     this.syncState();
   }
 
+  deferSelection(values:string[],message:ChatMessage):void {
+    if(this.isAnalyzing || !message.id || !message.ui_payload?.field)return;
+    this.isAnalyzing=true;this.errorMessage='';
+    this.onboarding.deferSelection(this.profile.company_id,message.ui_payload.field,message.id,values).pipe(timeout(20_000)).subscribe({
+      next:r=>{this.isAnalyzing=false;this.deferralsSaved(r.deferrals);},
+      error:()=>{this.isAnalyzing=false;this.errorMessage='The selections could not be saved for later. Your choices remain in this card; retry.';this.cdr.detectChanges();}
+    });
+  }
   chooseAnswer(value: string | string[], message?: ChatMessage): void {
     this.prompt = Array.isArray(value) ? value.join('; ') : value;
     this.replyToMessageId = message?.id || null;
@@ -437,6 +445,21 @@ export class ChatComponent implements OnInit, OnDestroy {
     return invalid + (hasValue ? 0 : 1);
   }
 
+  get canKeepConfirmedChannels(): boolean {
+    return !this.publicPresenceSaving && this.publicPresenceResolvedCount>0 && this.publicPresenceDirty.size===0
+      && this.editablePublicPresenceFields.every(field=>!this.publicPresenceValues(field).length);
+  }
+  private publicPresenceValues(field:string):string[] {
+    return this.splitList(field==='public_contact_emails'?this.publicEmails:field==='public_contact_phones'?this.publicPhones:this.socialProfiles);
+  }
+  keepConfirmedChannels():void {
+    if(!this.canKeepConfirmedChannels || this.currentStage!=='enrichment')return;
+    this.publicPresenceSaving=true;this.publicPresenceError='';
+    this.onboarding.continuePublicPresence().pipe(timeout(20_000),finalize(()=>{this.publicPresenceSaving=false;this.cdr.detectChanges();})).subscribe({
+      next:state=>{this.applyState(state);this.scrollToBottom();},
+      error:()=>{this.publicPresenceError='Could not continue. Your confirmed channels are unchanged; retry.';}
+    });
+  }
   get canSavePublicPresence(): boolean {
     return !this.publicPresenceSaving && this.editablePublicPresenceFields.length > 0 && this.publicPresenceErrorCount === 0;
   }

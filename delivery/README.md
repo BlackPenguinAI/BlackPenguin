@@ -1,84 +1,90 @@
-# Onboarding journey differential — implementation and limitations
+# Onboarding: segundo diferencial
 
-Base: `bf6623fc3c13ff7793a3840ef30501d8022de0cd` (origin/main, verified again before packaging).
-No push, deploy, live messages, OAuth authorization, migrations or production data corrections were performed.
+## Base y aplicación
 
-## Implemented
+Base exacta: `856a36b6b817775e0cdc7a0955bfaa1a62ce0124` (main; incluye el primer diferencial que subiste).
+Este ZIP es incremental: NO sustituye la primera entrega ni corresponde a bf6623f.
+Copiar backend/, frontend/ y docs/ sobre la raíz del repositorio, sin borrar otros archivos.
+delivery/ contiene instrucciones, commit, manifiesto SHA-256 y logs locales.
+No requiere migraciones ni nuevas dependencias. No se hicieron commits, push, despliegues ni cambios en producción.
 
-- Shared plain-question deferral actions are projected inside the AI review bubble. Duplicate Provide later / Configure later actions are suppressed. Final approval no longer shows the generic defer action.
-- Deferral UI uses a compact secondary action rather than the detached yellow strip; historical draft receipts have spacing.
-- Project cover, catalog and existing-type deferral actions follow the main task.
-- Active dedicated Project authorization/team/Meta/location editors no longer also render the redundant generic active AI card.
-- Required deferred facts are revisited at the end of the initial Company/Project pass, without approving the saved draft.
-- Inventory requests and the legacy catalog shortcut are recognized as editor actions. Explicitly reopening a deferred catalog resumes it without discarding its draft.
-- Inventory review explains unknown vs zero, expands types with unknown quantities, and blocks catalog continuation while quantities remain unknown in that review.
-- Company team continuation supersedes the previous active question, without sending another invitation.
-- Edited extraction proposals use the correction API even when the user clicks the primary Save and confirm action. Separate redundant Save edit buttons were removed.
-- Location component owns its styling. City matching prioritizes its IANA zone, supports explicit country-zone alternatives and displays a current date-aware offset. Existing appointments are unchanged.
-- Project forms group area min/max/unit, total/available units and prices/currency on desktop.
-- Image picking precedes visibility controls. Attachment/later actions precede separate type confirmation; selected unattached images block confirmation.
-- Meta uses same-tab authorization; callback redirects back to the Project, retaining popup compatibility. Destination scheme/host/state are checked.
-- Composer/new-type/dirty existing-type text drafts are saved locally before Meta navigation and restored on return. Server profile settings remain unchanged until explicit save.
-- Meta step 2 deferral is unavailable before account connection. Marketing displays icon/text/colour status badges.
-- Marketing deep links open their requested editor after state loads. Reloads return the conversation to its current bottom.
-- Operational capability details are collapsed rather than occupying the full sidebar.
-- Source extraction prompts request explicit fields and preserve model-address meaning and community-vs-unit scope. Area aliases such as sqft normalize to the selector's ft² without changing the number.
-- Embedded Company social links exclude post/reel/video URLs. Company extraction instructions distinguish brands, legal names, DBA and headquarters evidence.
-- Communication language suggestions list English only.
-- Parking/storage asks for substantive details. An approval/navigation request is recognized before it can be interpreted as a country answer.
-- Project overview does not infer sold units from total minus available; address context is deduplicated component by component.
+## Implementado en este bloque
 
-## Automated results
+### Selecciones aplazadas
 
-- Backend full suite: **1415 passed, 2 skipped**.
-- Focused onboarding/frontend regression: **188 passed**, 18 files.
-- Angular production build: passed; existing style-budget warnings in agent.scss and sales.scss remain.
-- git diff --check: passed.
-- No production E2E or browser screenshot validation was performed.
-- The default npm test command is NOT green: old scaffold specs contain invalid imports.
-- The old project-chat.spec.ts also has pre-existing failures: reproduced separately on an unchanged bf6623f worktree (**33 failed, 1 passed**). The focused command excludes that file explicitly; this is not a claim that all frontend tests pass.
+- Provide later guarda las selecciones y detalles incompletos en ui_deferrals, nunca en datos aprobados.
+- El servidor verifica Company/Project, pregunta activa, campo y formato de la selección.
+- Retomar restaura exactamente los valores, incluidos textos con puntuación, sin enviarlos como una respuesta automáticamente.
+- La recarga por API se prueba en Project, además de persistencia de Company.
+- Se puede retomar un campo ya confirmado sin degradar el perfil publicado. La aprobación de la revisión permanece separada.
+- Un fallo de guardado deja las selecciones visibles para reintentar. Las peticiones nuevas tienen un tiempo límite para evitar bloqueos indefinidos.
 
-Run:
-```bash
-cd frontend
-npm ci
-npm run test:onboarding
-npm run build
-```
-Backend: run `python -m pytest -q` in backend using the repository's test environment, never production credentials.
-The logs included under delivery are from local runs with synthetic credentials and mocked provider interactions.
+### Compliance específico
 
-## Still open — do not treat the entire original plan as completed
+- Las nuevas preguntas incluyen un contrato detail_options. Cada categoría seleccionada requiere instrucciones concretas antes de confirmar.
+- El usuario puede guardar un borrador incompleto y completarlo después.
+- Usar las reglas estándar de Company no requiere inventar instrucciones adicionales y sigue siendo una opción exclusiva.
+- Los mensajes históricos sin detail_options conservan su contrato anterior. No se reescriben respuestas antiguas.
+- Las instrucciones se almacenan como valores de texto explícitos dentro de la lista existente; no se generan políticas legales automáticamente.
+- No se ha auditado ni cambiado todavía cómo el agente de ventas consume estas instrucciones.
 
-1. Full date/scope modeling for Project, phase, property type and individual-unit delivery dates is not implemented.
-2. Cross-role Project Sales eligibility has NOT been expanded. Existing explicit Sales capabilities and access controls remain in force. Do not automatically grant Marketing users Sales permissions.
-3. Complete server-persisted multi-selection drafts across Provide later/resume remain to be implemented; the existing typed answer contract is unchanged.
-4. Dedicated detail collection for each compliance category, a full structured parking/storage editor, comprehensive Company contact validation improvements, legal-name/DBA/HQ extraction heuristics, and a complete source-by-source provenance UI are not closed by this patch.
-5. Extraction coverage improvements are prompt/normalization changes, not proof that a live website or every PDF will produce all fields. Existing saved quantities, prices and areas are not retroactively rewritten.
-6. Complete visual standardization across every source/logo/material card and real laptop/mobile browser QA remain pending.
-7. Same-tab Meta success, cancel, provider error and permission revocation need a real authenticated acceptance run. Local text drafts are restored, not browser-selected upload File objects.
-8. No Sales AI conversation/runtime changes or proof of how it consumes qualification/compliance settings are included.
+### Fechas de entrega con alcance explícito
 
-## Manual acceptance before considering the full onboarding closed
+- Nuevo formulario para Project completo, fase/edificio, tipo de propiedad o unidad individual.
+- El usuario indica la referencia y elige mes/año o día exacto. Un mes no inventa un día.
+- Validación de fechas imposibles, referencias vacías, duplicados de alcance y pregunta obsoleta.
+- Nuevos accesos directos Delivery dates y Parking / storage.
+- Se conserva almacenamiento textual legible en el campo delivery_dates existente y su versión aprobada, sin migraciones.
+- Las referencias son nombres/códigos declarados, NO claves foráneas a fases/unidades. No constituyen un calendario relacional ni actualizan otros registros automáticamente.
+- Fechas antiguas como Dec 2026 permanecen visibles y no reciben un alcance inventado. Al editarlas se exige escoger el alcance.
 
-- Start a new Company; review extracted edited fields, contact channels, location and an existing team without another invitation.
-- Confirm country requests cannot capture approval/navigation text.
-- Create a Project; verify explicit sqft area renders ft² and correct its current source evidence.
-- Confirm catalog with unknown availability, finish other questions, then verify availability editor returns without a loop.
-- Test 0 available separately from unknown, save every type and reach final review.
-- Pick images, choose visibility, attach or defer, then confirm the type; verify no lead-sharing permission is granted.
-- Authorize Meta in the same tab, return to the correct Project at the bottom, discover assets, and either save/verify or defer step 2.
-- Check Marketing badges, approved profile vs operational readiness, and edit/reapprove the profile.
-- Validate laptop and mobile manually.
+### Parking y almacenamiento
 
-Ashville Park data requiring human review: saved 3734 m² vs source 3734 sq ft; concatenated street/city input; whether 114 is a Project total or this type's total; and source/date of availability 1. These were not modified in production.
+- Formulario con aplicación, garaje, plazas asignadas, visitantes, almacenamiento y condiciones de inclusión/precio.
+- Campos desconocidos quedan en blanco: blanco no significa cero, ausencia ni no aplicable.
+- Not applicable y Complete later son decisiones separadas.
+- Guardado determinista con historial, comprobación de permisos, idempotencia y borrador publicado preservado. Un reintento del mismo formulario tras timeout reutiliza la identidad de la petición.
 
-## Applying
+### Contactos e identidad de Company
 
-Pull the base first and ensure your local tree is clean. If origin/main differs, rebase/review instead of overwriting blindly.
-Copy backend/, frontend/ and docs/ from this archive to the repository root. delivery/ contains evidence/instructions, not runtime files.
-No dependency versions or DB schema were changed. Keep frontend/package-lock.json as-is.
-Use delivery/manifest.json to check paths and original/new SHA-256 values.
+- Permite continuar usando canales ya confirmados, sin exigir un nuevo correo comercial.
+- No omite valores nuevos que aún requieren revisión ni borra canales existentes.
+- Corrige la validación de valores nulos cuando la decisión es missing/deferred/not_applicable; confirmar un correo o teléfono sigue requiriendo un valor válido.
+- Desactiva el estado de reanudación de enriquecimiento al continuar, evitando otro bucle.
+- JSON-LD name se propone como preferred_display_name; legalName respalda official_company_name.
+- Varias oficinas sin identificación de sede no se convierten arbitrariamente en headquarters.
+- No ofrece copiar el nombre comercial como DBA cuando es idéntico al nombre legal.
+- Las propuestas muestran su fuente y distinguen sugerencia de valor revisado.
 
-Rollback: restore only this manifest's paths from the base commit after backing up any later edits. No destructive reset command is required.
+## Pruebas
+
+Resultados locales: backend **1438 passed, 2 skipped**; frontend **196 passed** (20 archivos); build de producción correcto.
+
+Las corridas locales están en delivery/backend-tests.log, frontend-tests.log y frontend-build.log.
+Backend: suite completa de pytest, incluyendo las nuevas pruebas de guardado, recuperación, permisos y precisión de fechas.
+Frontend: `npm run test:onboarding`, con la configuración de regresión incorporada en el primer bloque.
+Build: `npm run build`.
+No se afirma que el comando genérico npm test esté verde: los tests scaffold/legacy excluidos en la primera entrega siguen pendientes.
+Persisten las advertencias de tamaño de estilos de agent.scss y sales.scss.
+No hubo pruebas con proveedores reales ni validación visual mediante navegador.
+
+## Pendientes del plan general
+
+1. Participación Sales de usuarios con otros roles: no se ampliaron permisos. Requiere revisar elegibilidad, routing, agenda y autorización por Project de extremo a extremo; habilitar solo el selector sería inconsistente e inseguro.
+2. Vinculación relacional de fechas a entidades reales, si se desea automatización sobre fases/tipos/unidades. Esta entrega captura alcance explícito y precisión en el perfil existente.
+3. Validación manual de Meta real: éxito, cancelación, error, expiración y regreso al Project correcto.
+4. QA visual de todas las tarjetas de fuentes, logos y materiales en laptop/móvil.
+5. Verificación de cobertura de extracción con páginas/PDF reales; no se promete extracción completa por cambiar instrucciones.
+6. Diálogo del Sales AI y consumo efectivo de target/qualification/compliance, expresamente fuera de este bloque.
+7. Corrección humana de los datos de prueba de Ashville Park: 3734 m² frente a 3734 sq ft, dirección concatenada y alcance/origen de cantidades. No se reescribió producción.
+
+## Aceptación manual sugerida
+
+- Seleccionar dos opciones de compliance, escribir parcialmente una regla, aplazar, recargar, retomar y comprobar ambas opciones/texto.
+- Completar las instrucciones, guardar y revisar que se pide aprobación separada antes de publicar.
+- Registrar una entrega mensual de fase y otra exacta de unidad; reabrir y comprobar precisión y referencias.
+- Probar un duplicado de alcance y una fecha imposible: deben rechazarse sin perder el formulario.
+- Confirmar parking, aplazarlo con datos y retomar; comprobar Not applicable por separado.
+- Company con teléfono confirmado y correo vacío: continuar sin inventar correo; Company sin canales: no debe saltar esa comprobación.
+- Reabrir una revisión ya aprobada: conservar versión publicada y exigir confirmación explícita de cambios.
 

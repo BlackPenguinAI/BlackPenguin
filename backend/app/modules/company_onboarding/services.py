@@ -590,7 +590,7 @@ def apply_field_updates(
         if status not in {"missing", "not_applicable", "deferred"} and value in (None, "", []):
             rejected.append({"update": raw_update, "reason": "missing_value"})
             continue
-        validation_error = validate_onboarding_value(field_key, value)
+        validation_error = None if value is None and status in {"missing", "not_applicable", "deferred"} else validate_onboarding_value(field_key, value)
         if validation_error:
             rejected.append({"update": raw_update, "reason": validation_error["code"], "validation": validation_error})
             continue

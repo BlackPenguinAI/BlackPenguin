@@ -413,7 +413,8 @@ def test_html_deduplicates_phone_formats_and_extracts_schema_org_company_facts()
 
     values = _embedded_link_values(_extract_bytes(html, "text/html", "https://example.com"))
 
-    assert values["official_company_name"] == "Fouquet's Miami"
+    assert values["preferred_display_name"] == "Fouquet's Miami"
+    assert "official_company_name" not in values
     assert values["headquarters"] == "5000 Biscayne Blvd, Miami, FL, 33137, US"
     assert values["public_contact_phones"] == ["3052304300"]
 

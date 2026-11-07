@@ -265,9 +265,10 @@ def _next_prompt(profile) -> str:
 
 def _next_question(profile) -> dict[str, Any]:
     completion = services.serialize_profile(profile)["completion"]
-    if not completion["can_complete"] and not completion["blockers"] and deferred(profile, "final_approval"):
+    resumed_fields = any(key.startswith("field:") and value.get("resumed") for key,value in (getattr(profile,"field_sources",None) or {}).get("__ui_deferrals__",{}).items())
+    if not resumed_fields and not completion["can_complete"] and not completion["blockers"] and deferred(profile, "final_approval"):
         return deferred_question()
-    if completion["can_complete"]:
+    if completion["can_complete"] and not resumed_fields:
         return {
             "field": None,
             "label": "Company Profile complete",
@@ -385,12 +386,14 @@ def _workflow_stage(
         return "enrichment"
     if "field:company_logo" in resumed:
         return "logo_review"
-    if completion["can_complete"]:
+    if completion["can_complete"] and not any(key.startswith("field:") for key in resumed):
         return "complete"
     if processing:
         return "processing"
     if pending_review:
         return "website_review"
+    if any(key.startswith("field:") for key in resumed):
+        return "required"
     if pristine:
         return "website"
     logo = next(
@@ -650,6 +653,28 @@ def continue_company_onboarding_after_team(
     services.defer_missing_team_roles(db, current_user.company_id, profile)
     session = services.get_or_create_session(db, current_user.company_id)
     services.supersede_unanswered_questions(db, session.id)
+    db.commit()
+    return _state_payload(db, current_user.company_id)
+
+
+@router.post("/public-presence/continue", response_model=OnboardingStateResponse)
+def continue_with_confirmed_public_channels(db: Session = Depends(get_db),
+        current_user: User = Depends(RoleChecker(TENANT_MANAGER_ROLES))):
+    from app.modules.onboarding_contract import field_approved
+    from app.modules.onboarding_deferrals import resolve_draft
+    profile = services.get_or_create_profile(db, current_user.company_id)
+    db.query(type(profile)).filter_by(id=profile.id).with_for_update().one()
+    keys = ("public_contact_emails","public_contact_phones","corporate_social_profiles")
+    data = profile.profile_data or {}; states = profile.field_states or {}
+    if not any(field_approved(states.get(key)) and data.get(key) for key in keys):
+        raise HTTPException(422, "Confirm at least one public channel before continuing.")
+    if any(not field_approved(states.get(key)) and data.get(key) for key in keys):
+        raise HTTPException(409, "Review the unconfirmed public channel values before continuing.")
+    updates = [{"field":key,"value":None,"status":"deferred","applicable":True} for key in keys
+               if not field_approved(states.get(key)) and states.get(key,{}).get("status") != "not_applicable"]
+    if updates: services.apply_field_updates(db, profile, updates, allow_authoritative_statuses=True,
+                                             actor_user_id=current_user.id, commit=False)
+    resolve_draft(profile, "enrichment")
     db.commit()
     return _state_payload(db, current_user.company_id)
 

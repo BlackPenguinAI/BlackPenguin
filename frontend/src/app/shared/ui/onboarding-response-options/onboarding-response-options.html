@@ -28,11 +28,12 @@
       Other / write my own
     </button>
   </div>
+  <div *ngIf="!answered" class="option-details"><label *ngFor="let choice of detailChoices">{{choice}}<textarea [(ngModel)]="optionDetails[choice]" [disabled]="disabled" rows="3" placeholder="Enter the exact disclaimer, registration number, conditions or required review. Do not enter secrets or personal data."></textarea></label><p *ngIf="missingDetails" class="hint">Provide at least 10 characters of specific instructions per selected category, or complete this review later.</p></div>
   <button
     *ngIf="isMultiSelect && !answered"
     type="button"
     class="submit-selection"
-    [disabled]="disabled || !selectedValues.size || selectionConflict"
+    [disabled]="disabled || !selectedValues.size || selectionConflict || missingDetails"
     (click)="submitSelection()"
   >
     Continue with {{ selectedValues.size }} selected

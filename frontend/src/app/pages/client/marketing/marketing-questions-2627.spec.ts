@@ -67,9 +67,10 @@ describe('Existing multi-select safety',()=>{
  it('treats default compliance as exclusive in both click orders',()=>{
   const c=options();c.choose('A');c.choose('B');c.choose('Standard');expect([...c.selectedValues]).toEqual(['Standard']);c.choose('A');expect([...c.selectedValues]).toEqual(['A']);
  });
- it.each(['Not applicable','Provide later'])('emits %s alone as a typed action',(choice)=>{
+ it.each(['Not applicable'])('emits %s alone as a typed action',(choice)=>{
   const c=options();const emitted:Array<string|string[]>=[];c.selected.subscribe(v=>emitted.push(v));c.choose('A');c.choose(choice);expect(emitted).toEqual([choice]);expect(c.selectedValues.size).toBe(0);
  });
+ it('preserves selected values when postponing instead of submitting an answer',()=>{const c=options();const draft=vi.fn();const selected=vi.fn();c.deferred.subscribe(draft);c.selected.subscribe(selected);c.choose('A');c.choose('Provide later');expect(draft).toHaveBeenCalledWith(['A']);expect(selected).not.toHaveBeenCalled();expect(c.selectedValues.has('A')).toBe(true);});
  it('restores saved and custom values for editing, requiring explicit submit',()=>{
   const c=options({selected_values:['A','Custom saved value']});const emitted:Array<string|string[]>=[];c.selected.subscribe(v=>emitted.push(v));c.ngOnChanges();expect(c.choices).toContain('Custom saved value');expect(emitted).toEqual([]);c.submitSelection();expect(emitted).toEqual([['A','Custom saved value']]);
  });

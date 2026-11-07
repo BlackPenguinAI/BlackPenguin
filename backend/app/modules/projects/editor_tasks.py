@@ -1,6 +1,8 @@
 """Non-destructive, explicit onboarding task selection."""
 import re
 TASKS = {
+ "delivery": ("delivery_dates","detail_editor","Delivery dates","Confirm the scope and precision of each delivery date."),
+ "parking": ("parking_and_storage","detail_editor","Parking and storage","Record confirmed details and what they apply to."),
  "review": (None,"complete","Profile review","Review the profile and explicitly approve pending changes when ready."),
  "meta_account": ("campaigns_defined","meta_lead_setup","Meta account","Review the saved Company authorization in step 1. Connecting an account does not link a campaign. Use step 2 to associate campaigns/forms."),
  "meta_assets": ("campaigns_defined","meta_lead_setup","Meta campaigns and forms","Review step 2 for this Project. Existing Company account permissions are reused; no route changes until explicit verification."),
@@ -26,6 +28,11 @@ def detect_task(text):
 
 def question(task):
     field,kind,label,prompt = TASKS[task]
+    if task=="parking":
+        from app.modules.onboarding_questions import build_next_question
+        result=build_next_question([{"field":field,"label":label,"requirement":"conditionally_required"}],final_prompt="Review")
+        result.update(input_type=kind,task=task)
+        return result
     return {"field":field,"input_type":kind,"label":label,"prompt":prompt,"options":[],"examples":[],
         "allow_custom":False,"task":task}
 
