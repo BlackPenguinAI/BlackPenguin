@@ -130,6 +130,7 @@ def build(db,scope,*,inbound_message_id,now=None):
             'pending_tasks':pending[-20:],'pending_tasks_truncated':len(pending)>20,
             'constraints':[{**c.model_dump(mode='json'),'evidence':c.evidence[:200],
                             'context_truncated':len(c.evidence)>200} for c in state.constraints],
+            'property_constraints':[{**c.model_dump(mode='json'),'evidence':c.evidence[:200]} for c in state.property_constraints],
             'change_proposals':proposal_context(db,scope,state,now=now),
             'qualification_offer':(previous.metadata_json or {}).get('qualification_offer') if previous else None,
             'rule':'Current interest is independent from booked visits. Appointment reads, summaries and proposals never authorize booking, cancellation or rescheduling.'}

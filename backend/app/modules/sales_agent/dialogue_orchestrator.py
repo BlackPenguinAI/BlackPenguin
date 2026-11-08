@@ -22,12 +22,19 @@ class TurnOutcome:
 
 
 def run_turn(db, scope, *, message_id, understanding, expected_revision, event_key,
-             max_steps=8, max_seconds=5.0, clock=time.monotonic):
+             max_steps=8, max_seconds=5.0, max_rounds=3,max_read_units=12,clock=time.monotonic):
     if not settings.SALES_DIALOGUE_RUNTIME_ENABLED:
         raise PermissionError('Staged dialogue runtime is disabled.')
     validate_write_request(event_key, expected_revision, 'state_update')
     if type(max_steps) is not int or not 1 <= max_steps <= 30 or type(max_seconds) not in {int,float} or not 0 < max_seconds <= 30:
         raise ValueError('Invalid runtime limits.')
+    from .next_flow import selected
+    if selected(scope):
+        if type(max_rounds) is not int or not 1<=max_rounds<=6 or type(max_read_units) is not int or not 1<=max_read_units<=60:
+            raise ValueError('Invalid planning limits.')
+        from .turn_planner import run
+        return run(db,scope,message_id=message_id,understanding=understanding,expected_revision=expected_revision,
+            event_key=event_key,max_steps=max_steps,max_seconds=max_seconds,max_rounds=max_rounds,max_read_units=max_read_units,clock=clock)
     conversation = check_scope(db, scope)
     message = scoped_messages_query(db, conversation).filter_by(id=message_id, direction='inbound', role='user').first()
     if not message or (message.metadata_json or {}).get('lead_id', scope.lead_id) != scope.lead_id:

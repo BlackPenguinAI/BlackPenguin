@@ -136,7 +136,7 @@ def for_context(profile):
     return result
 
 
-def capture(db,scope,understanding,message_id,*,selected_property=None):
+def capture(db,scope,understanding,message_id,*,selected_property=None,selected_unit=None):
     from .dialogue_store import check_scope
     from .conversation_scope import scoped_messages_query
     from .models import SalesMessage
@@ -164,9 +164,13 @@ def capture(db,scope,understanding,message_id,*,selected_property=None):
     for pref in understanding.preferences:
         # Exact evidence is authoritative; model-normalized values never replace it.
         put(PREFERENCE_KEYS[pref.key],pref.evidence,pref.evidence)
-    if selected_property and any(r.kind=='property' for r in understanding.references):
-        reference=next(r for r in understanding.references if r.kind=='property')
-        put('property_interest',selected_property['property_type'],reference.evidence,'approved_catalog_selection',{'property_type_id':selected_property['id']})
+    if selected_unit and any(r.kind=='unit' for r in understanding.references):
+        reference=next(r for r in understanding.references if r.kind=='unit')
+        put('property_interest',selected_unit['unit_code'],reference.evidence,'approved_catalog_selection',{'unit_id':selected_unit['id']})
+    elif selected_property and any(r.kind in {'property','unit'} for r in understanding.references):
+        reference=next(r for r in understanding.references if r.kind in {'property','unit'})
+        put('property_interest',selected_property['property_type'],reference.evidence,'approved_catalog_selection',
+            {'property_type_id':selected_property['id'],'unit_id':selected_property.get('unit_id')})
     profile=deepcopy(lead.lead_profile_data or {})
     explicit={field:item for field,item in current.items() if item['source'] in {'active_conversation','approved_catalog_selection','staff_verified'}}
     profile['sales_profile']={'version':VERSION,'current':explicit,'history':history[-100:]}

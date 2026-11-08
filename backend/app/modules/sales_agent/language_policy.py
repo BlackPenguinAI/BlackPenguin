@@ -37,6 +37,7 @@ everything whenever wherever currently verified approved recorded new old previo
 open closed sent delivered read received unavailable unconfirmed until into around
 howdy goodbye bye bye-bye stop unsubscribe end quit yes absolutely fine details don'''.split())
 ENGLISH.update('active past cancelled canceled recorded specialist specialists showroom status duration progress'.split())
+ENGLISH.update('contains content contents coverage file files'.split())
 
 
 @dataclass(frozen=True)

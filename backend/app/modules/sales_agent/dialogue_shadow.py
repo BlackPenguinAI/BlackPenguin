@@ -16,11 +16,15 @@ from .models import SalesMessage
 from datetime import datetime, timezone, timedelta
 
 
-def recorded_offers(db,conversation):
+def recorded_offers(db,conversation,*,extended=True):
     """Only the latest outbound can expose an unqualified ordinal selection."""
     from .next_flow import selected
     from .turn_context import latest_outbound
     scope=Scope(conversation.company_id,conversation.project_id,conversation.id,conversation.lead_id)
+    if extended and selected(scope):
+        from .dialogue_store import load
+        from .reference_resolution import offers_for_turn
+        return offers_for_turn(db,conversation,load(db,scope)[1])
     latest=latest_outbound(db,conversation.id,skip_language_holds=selected(scope))
     if not latest:
         return []

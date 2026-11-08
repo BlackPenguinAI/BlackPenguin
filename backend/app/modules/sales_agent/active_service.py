@@ -134,12 +134,14 @@ def _materials(db,scope,conversation,lead,run,outcome,previous_meta):
         scoped_messages_query(db,conversation).filter_by(id=run.input_snapshot['message_id']).one().content) else set()
     selection={}
     pending=[]
+    unit_fallback=False
     for result in outcome.results:
         task=tasks.get(result.operation_id)
         if not task or task.topic.value!='materials' or task.status in {'cancelled','completed'} or restricted(outcome.state,task):
             continue
         if task.status=='awaiting_user' and not result.data.get('materials'):
             continue
+        unit_fallback|=bool(result.data.get('requested_unit_id'))
         for material in result.data.get('materials',[]):
             aid=material['asset_id']
             if aid not in approved:
@@ -171,6 +173,7 @@ def _materials(db,scope,conversation,lead,run,outcome,previous_meta):
     if offer:
         names=', '.join(approved[aid].display_name for aid in offer['asset_ids'])
         question=f"I have {names}. It may contain useful related information, but the requested photo coverage is not confirmed. Would you like that file?"
+        if unit_fallback:question=f"I have {names} for the property type. Coverage for the specific unit is not confirmed. Would you like those materials?"
     else:
         question=''
     # Pending files not selected by the user must not be silently completed.
@@ -191,11 +194,17 @@ def _appointment(db,scope,conversation,lead,project,outcome,inbound):
         if 'appointment' in compliance_action_holds(policy_context(db,scope,confirmed_profile_facts(project.profile))):
             return 'The Sales team needs to verify this appointment information.',{},[]
         from .appointment_context import AppointmentReadTool,render
-        result=AppointmentReadTool(db,scope).execute({'category':u.appointment_query})
+        plan=getattr(outcome,'plan',None)
+        read=next((r.data['appointment_query'] for r in outcome.results if 'appointment_query' in r.data),None)
+        if plan and read is None:return 'I could not verify that appointment information in this turn. Please tell me which date you want to review.',{},[]
+        result=read if read is not None else AppointmentReadTool(db,scope).execute({'category':u.appointment_query})
         for task in outcome.state.tasks:
             if task.topic.value=='appointment' and task.source_message_id==inbound.id:task.status='completed'
         return render(result),{'appointment_query':result},[]
     if not u.permits('appointment'):
+        return '',{},[]
+    plan=getattr(outcome,'plan',None)
+    if plan and not any(t.id in plan['write_candidates_require_backend_authorization'] for t in outcome.state.tasks if t.topic.value=='appointment' and t.source_message_id==inbound.id):
         return '',{},[]
     if any(t.topic.value=='appointment' and (restricted(outcome.state,t) or t.status=='awaiting_user') for t in outcome.state.tasks if t.source_message_id==inbound.id):
         return '',{},[]
@@ -407,7 +416,8 @@ async def maybe_process_active(db,conversation,inbound):
             if not protected and not exact_stop and advisory in {'LEGAL_QUESTION','COMPLEX_NEGOTIATION'}:
                 u=u.model_copy(update={'requires_clarification':True,'clarification_question':'The Sales team needs to review that legal or commercial exception. I can continue helping with approved property information.'})
             outcome=run_turn(db,scope,message_id=inbound.id,understanding=u,expected_revision=interpreted_revision,
-                event_key='active-runtime:'+inbound.id,max_steps=policy.max_steps,max_seconds=policy.max_seconds)
+                event_key='active-runtime:'+inbound.id,max_steps=policy.max_steps,max_seconds=policy.max_seconds,
+                **({'max_rounds':policy.max_rounds,'max_read_units':policy.max_read_units} if next_enabled else {}))
             conversation,lead,project=_current(db,scope,control=exact_stop)  # Manual takeover/consent/permissions win after inference.
             draft=compose(outcome,channel=conversation.channel,style=policy.composition_style)
             # Material discovery blocks are replaced by verified live links or
@@ -419,6 +429,7 @@ async def maybe_process_active(db,conversation,inbound):
             metadata['requested_topics']=sorted({r.topic.value for r in u.requests if r.polarity=='request'})
             metadata['policy_holds_at_prepare']=sorted(action_holds)
             if next_enabled:metadata['action_policy']=approved_policy.get('action_policy')
+            if next_enabled:metadata['planning']=getattr(outcome,'plan',None)
             if u.requires_clarification and any(r.topic.value=='human' and r.polarity=='request' for r in u.requests):
                 metadata['control_confirmation']='human'
             actions=[];share_ids=[];delivered=set();extra=[];links=[]
@@ -465,6 +476,11 @@ async def maybe_process_active(db,conversation,inbound):
                 text='How can I help: property options, materials, pricing, financing, or delivery timing?'
             if (extra or links) and text=='I need clarification or verified information to answer this request.':
                 text=''
+            if next_enabled:
+                from .planning_reply import continuation
+                question,offer_metadata=continuation(outcome,action_holds)
+                if question:extra.append(question)
+                metadata.update(offer_metadata)
             text='\n\n'.join(v for v in [text,*extra,*links] if v)
             if not text:text='Which property or approved material would you like to review?'
             if not conversation.is_paused and not lead.is_opt_out and not safe_u.requires_clarification:
@@ -473,7 +489,14 @@ async def maybe_process_active(db,conversation,inbound):
                 chosen=next((p for p in commercial['property_types'] if p['id']==outcome.state.selected_property_type_id),None)
                 if next_enabled:
                     from .lead_profile import capture as capture_profile
-                    capture_profile(db,scope,safe_u,inbound.id,selected_property=chosen)
+                    plan=getattr(outcome,'plan',None) or {}
+                    interest=plan.get('interest_reference')
+                    refs=[r for i,r in enumerate(safe_u.references) if (r.id or 'legacy-'+str(i))==interest]
+                    capture_u=safe_u.model_copy(update={'references':refs})
+                    chosen_unit=next((v for v in commercial['inventory'] if v['id']==outcome.state.selected_unit_id and v.get('unit_code')),None)
+                    capture_profile(db,scope,capture_u,inbound.id,
+                        selected_property={**chosen,'unit_id':outcome.state.selected_unit_id} if interest and chosen else None,
+                        selected_unit=chosen_unit if interest else None)
                 else:capture(lead,safe_u,inbound.id,selected_property=chosen)
                 history=scoped_messages_query(db,conversation).filter(SalesMessage.created_at<=inbound.created_at).order_by(SalesMessage.created_at,SalesMessage.id).all()
                 lead_text,count=live._lead_intelligence_input(history)
@@ -491,7 +514,8 @@ async def maybe_process_active(db,conversation,inbound):
                     metadata['qualification_missing']=missing_fields(lead,commercial['confirmed_project_facts'])
                 if not safe_u.requests and safe_u.preferences:
                     text='Thanks, I have recorded that information. What would you like to explore next?'
-                if safe_u.confidence>=.8 and not safe_u.permits('appointment') and not previous_meta.get('material_offer') and not links:
+                if safe_u.confidence>=.8 and not safe_u.permits('appointment') and not previous_meta.get('material_offer') and not links and not (
+                    next_enabled and (getattr(outcome,'plan',{}).get('questions') or outcome.stop_reason in {'step_limit','time_limit','round_limit','read_cost_limit','capacity_limit'})):
                     if next_enabled:
                         _,field,question=qualification(lead,commercial['confirmed_project_facts'],record_asked=True)
                     else:field,question=next_question(lead,commercial['confirmed_project_facts'],record=True)

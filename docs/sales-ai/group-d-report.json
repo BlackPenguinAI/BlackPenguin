@@ -1,0 +1,126 @@
+{
+  "version": "sales-ai-group-d-report/1.0",
+  "date": "2026-11-08",
+  "base_commit": "2c6814951188afb75637295f161941260b99f72f",
+  "main_reverified_at_close": "2c6814951188afb75637295f161941260b99f72f",
+  "branch": "sales-ai/group-d-reference-planning",
+  "steps": [
+    7,
+    8
+  ],
+  "status": "implemented_and_verified",
+  "checks": [
+    {
+      "name": "group_d_focused",
+      "passed": 51,
+      "skipped": 0,
+      "warnings": 1856,
+      "seconds": 8.79,
+      "failed": 0,
+      "exit_code": 0
+    },
+    {
+      "name": "full_backend_checkout",
+      "passed": 1713,
+      "skipped": 2,
+      "warnings": 20602,
+      "seconds": 110.94,
+      "failed": 0,
+      "exit_code": 0
+    },
+    {
+      "name": "isolated_actions_layout",
+      "passed": 1713,
+      "skipped": 2,
+      "warnings": 20602,
+      "seconds": 111.74,
+      "failed": 0,
+      "exit_code": 0,
+      "physical_copies": true,
+      "checkout_imports": false,
+      "unchanged_reference_files": 215,
+      "matching_application_tools_migration_files": 263
+    },
+    {
+      "name": "group_a_safety_replay",
+      "passed": 20,
+      "total": 20,
+      "external_actions": 0,
+      "model_quality_evaluated": false,
+      "exit_code": 0
+    },
+    {
+      "name": "dependency_consistency",
+      "command": "python -m pip check",
+      "exit_code": 0
+    },
+    {
+      "name": "whitespace",
+      "command": "git diff --check",
+      "exit_code": 0
+    }
+  ],
+  "environment": {
+    "python": "3.12.14",
+    "pytest": "9.1.1",
+    "SQLAlchemy": "2.0.50",
+    "fastapi": "0.136.3",
+    "pydantic": "2.13.4",
+    "langdetect": "1.0.9"
+  },
+  "coverage": {
+    "new_tests": 51,
+    "group_b_and_c_regressions_in_full_suite": 146,
+    "exported_projects": 6,
+    "channels": [
+      "sms",
+      "whatsapp"
+    ],
+    "real_catalog_mixed_need_turns": 12,
+    "reference_binding": "APPROVED_PROJECT_CATALOG_AND_ACCEPTED_OFFERS",
+    "agenda_interruption_and_resumption": "REAL_COORDINATOR_MOCKED_PROVIDER",
+    "model": "INJECTED_SCRIPTED",
+    "providers": "MOCKED",
+    "physical_file_content_acceptance": false
+  },
+  "planning_defaults": {
+    "max_steps": 8,
+    "max_rounds": 3,
+    "max_seconds": 5,
+    "max_read_units": 12
+  },
+  "planning_cost": "Internal read-work units, not USD/tokens; deterministic replanning adds zero LLM calls.",
+  "new_migrations": [],
+  "inherited_required_migrations": [
+    "20261108_sales_visit_context"
+  ],
+  "production_changes": false,
+  "deployment_performed": false,
+  "published_prompts_changed": false,
+  "product_model_changed": false,
+  "new_flow_activation": "disabled_by_default_explicit_project_allowlist_required",
+  "skipped": [
+    "Two PostgreSQL concurrency tests require DIALOGUE_POSTGRES_TEST_URL for a disposable database."
+  ],
+  "not_run": [
+    "Actual Docker image build (Docker unavailable locally)",
+    "Remote GitHub Actions execution",
+    "Real PostgreSQL concurrency",
+    "Real OpenRouter sales quality",
+    "Live messaging/Calendar",
+    "Physical file/content validation assigned to E",
+    "Frontend tests/build (no frontend source changes)",
+    "T01-T26 complete end-to-end acceptance"
+  ],
+  "limits": [
+    "Entity selection remains within the approved Project/opportunity scope; no implicit cross-tenant/project transfer.",
+    "Unknown unit/type relationships remain unknown; approved unit facts may still answer the query.",
+    "Capacity-deferred requests are persisted in the event and require a later prioritized turn; no hidden mutation queue.",
+    "Natural sales composition and final material validation remain E; appointment lifecycle and reactivation retain their later groups."
+  ],
+  "next_group": "E",
+  "next_steps": [
+    9,
+    10
+  ]
+}

@@ -45,6 +45,14 @@ def compose(outcome, *, channel='sms', style='concise'):
             pending.append(task.id)  # Discovery is not fulfillment.
         elif 'property_types' in data:
             rows = data['property_types']
+            for unit in data.get('units',[]):
+                details=[f"Unit {unit['unit_code']}"]
+                for key,label in [('bedrooms','bedrooms'),('bathrooms','bathrooms'),('area','area')]:
+                    if unit.get(key) is not None:details.append(f"{label}: {unit[key]}")
+                if unit.get('price') is not None and unit.get('currency'):details.append(f"recorded price: {unit['price']:,.2f} {unit['currency']}")
+                elif task.topic.value=='pricing':details.append('the price for this unit is not confirmed');pending.append(task.id)
+                if unit.get('status'):details.append('last recorded status: '+unit['status'])
+                blocks.append('; '.join(details)+'.')
             summaries = []
             for index, item in enumerate(rows,1):
                 facts = []

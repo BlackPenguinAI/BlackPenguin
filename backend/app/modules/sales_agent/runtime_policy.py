@@ -13,6 +13,8 @@ class RuntimePolicy(StrictModel):
     lead_ids: list[str] = Field(default_factory=list, max_length=100)
     max_steps: int = Field(default=8, ge=1, le=30, strict=True)
     max_seconds: float = Field(default=5, gt=0, le=30, strict=True)
+    max_rounds: int = Field(default=3,ge=1,le=6,strict=True)
+    max_read_units: int = Field(default=12,ge=1,le=60,strict=True)
     understanding_guidance: str = Field(default='', max_length=16000)
     composition_style: Literal['concise','detailed'] = 'concise'
 

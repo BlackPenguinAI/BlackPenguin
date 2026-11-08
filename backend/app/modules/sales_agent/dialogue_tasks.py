@@ -12,7 +12,7 @@ def task_id(message_id, request_id):
     return hashlib.sha256(f'{message_id}:{request_id}'.encode()).hexdigest()[:40]
 
 
-def resolve_reference(db, scope, state, reference, *, now=None):
+def _resolve_legacy(db, scope, state, reference, *, now=None):
     """Resolve a reference against actual outbound messages, not array order."""
     now = now or datetime.now(timezone.utc)
     conversation = check_scope(db, scope)
@@ -82,6 +82,15 @@ def resolve_reference(db, scope, state, reference, *, now=None):
     return None
 
 
+def resolve_reference(db,scope,state,reference,*,now=None):
+    from .next_flow import selected
+    if selected(scope):
+        from .reference_resolution import Resolver
+        result=Resolver(db,scope,state,now=now).resolve(reference)
+        return result.get('value') if result['status']=='resolved' else None
+    return _resolve_legacy(db,scope,state,reference,now=now)
+
+
 def prepare_tasks(state, understanding, message_id):
     state = DialogueState.model_validate(state.model_dump())
     # Turn-only restrictions expire, persistent restrictions are never silently removed.
@@ -124,8 +133,13 @@ def prepare_tasks(state, understanding, message_id):
 
 
 def restricted(state, task):
-    return any(c.topic == task.topic and (c.subject is None or task.subject is None or c.subject == task.subject)
-               for c in state.constraints)
+    global_hold=any(c.topic == task.topic and (c.subject is None or task.subject is None or c.subject == task.subject)
+                   for c in state.constraints)
+    scoped_hold=any(c.topic==task.topic and (c.subject is None or task.subject is None or c.subject==task.subject)
+        and (c.binding_status=='unresolved' or c.unit_id==task.unit_id and c.unit_id is not None
+             or c.unit_id is None and c.property_id==task.property_id and c.property_id is not None)
+        for c in state.property_constraints)
+    return global_hold or scoped_hold
 
 
 def record_result(state, task, result):

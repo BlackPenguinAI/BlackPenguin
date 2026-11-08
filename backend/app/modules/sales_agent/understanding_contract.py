@@ -34,6 +34,7 @@ class Request(StrictModel):
     subject: Subject | None = None
     polarity: Literal['request', 'exclude']
     evidence: str = Field(min_length=1, max_length=2000)
+    reference_id: str | None = Field(default=None,max_length=60)
 
     @model_validator(mode='after')
     def subject_scope(self):
@@ -54,6 +55,7 @@ class Constraint(StrictModel):
     effect: Literal['prohibit'] = 'prohibit'
     scope: Literal['turn', 'until_explicit_change']
     evidence: str = Field(min_length=1, max_length=2000)
+    reference_id: str | None = Field(default=None,max_length=60)
 
     @model_validator(mode='after')
     def subject_scope(self):
@@ -63,7 +65,8 @@ class Constraint(StrictModel):
 
 
 class Reference(StrictModel):
-    kind: Literal['property', 'appointment', 'location', 'material', 'ambiguous']
+    kind: Literal['property', 'unit', 'appointment', 'location', 'material', 'ambiguous']
+    id: str | None = Field(default=None,min_length=1,max_length=60)
     expression: str = Field(min_length=1, max_length=300)
     evidence: str = Field(min_length=1, max_length=2000)
 
@@ -92,12 +95,19 @@ class Understanding(StrictModel):
     preferences: list[Preference] = Field(max_length=20)
     releases: list[ConstraintRelease] = Field(default_factory=list, max_length=20)
     appointment_query: Literal['active','past','cancelled','all'] | None = None
+    selected_reference_id: str | None = Field(default=None,max_length=60)
     requires_clarification: StrictBool
     clarification_question: str | None = Field(max_length=500)
     confidence: float = Field(ge=0, le=1, strict=True)
 
     @model_validator(mode='after')
     def relations(self):
+        refs=[r.id for r in self.references if r.id is not None]
+        if len(refs)!=len(set(refs)):raise ValueError('Reference IDs must be unique.')
+        linked=[r.reference_id for r in self.requests]+[c.reference_id for c in self.constraints]+[self.selected_reference_id]
+        if any(value is not None and value not in refs for value in linked):raise ValueError('Unknown reference link.')
+        if self.selected_reference_id and next(r for r in self.references if r.id==self.selected_reference_id).kind not in {'property','unit'}:
+            raise ValueError('Only a property or unit reference can select commercial interest.')
         ids = [r.id for r in self.requests]
         if len(ids) != len(set(ids)):
             raise ValueError('Request identifiers must be unique.')
@@ -150,13 +160,28 @@ class Task(StrictModel):
     source_message_id: str | None = Field(default=None, max_length=36)
     alternative_group: str | None = Field(default=None, max_length=100)
     property_id: str | None = Field(default=None, max_length=36)
+    unit_id: str | None = Field(default=None,max_length=36)
+    binding_status: Literal['unspecified','resolved','unresolved']='unspecified'
+    blocked_reason: str | None = Field(default=None,max_length=300)
+    last_read_signature: str | None = Field(default=None,max_length=64)
 
 
 class Offer(StrictModel):
-    kind: Literal['property', 'appointment', 'location', 'material']
+    kind: Literal['property', 'unit', 'appointment', 'location', 'material']
     message_id: str = Field(min_length=1, max_length=36)
     option_ids: list[str] = Field(max_length=200)
     expires_at: AwareDatetime | None = None
+    status: Literal['current','suspended']='current'
+
+
+class PropertyConstraint(StrictModel):
+    topic: Topic
+    subject: Subject | None = None
+    scope: Literal['turn','until_explicit_change']
+    evidence: str = Field(min_length=1,max_length=2000)
+    property_id: str | None = Field(default=None,max_length=36)
+    unit_id: str | None = Field(default=None,max_length=36)
+    binding_status: Literal['resolved','unresolved']='resolved'
 
 
 class ToolResult(StrictModel):
@@ -194,6 +219,7 @@ class DialogueState(StrictModel):
     selected_unit_id: str | None = Field(default=None,min_length=1,max_length=36)
     tasks: list[Task] = Field(default_factory=list, max_length=100)
     constraints: list[Constraint] = Field(default_factory=list, max_length=100)
+    property_constraints: list[PropertyConstraint] = Field(default_factory=list,max_length=100)
     offers: list[Offer] = Field(default_factory=list, max_length=50)
     preferences: list[Preference] = Field(default_factory=list, max_length=100)
     last_understanding: Understanding | None = None

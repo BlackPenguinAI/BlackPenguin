@@ -67,6 +67,11 @@ def validate_references(db, scope, state):
     if state.change_proposals:
         from .turn_memory import validate_proposal_scope
         for proposal in state.change_proposals:validate_proposal_scope(db,scope,proposal,check_target=False)
+    for restriction in state.property_constraints:
+        from app.modules.projects.models import ProjectUnit
+        for model,identifier in ((ProjectPropertyType,restriction.property_id),(ProjectUnit,restriction.unit_id)):
+            entity=db.get(model,identifier) if identifier else None
+            if entity and entity.project_id!=scope.project_id:raise PermissionError('Restriction refers to another Project.')
     for offer in state.offers:
         message = scoped_messages_query(db, conversation).filter_by(id=offer.message_id,
             direction='outbound').first()
@@ -80,6 +85,10 @@ def validate_references(db, scope, state):
             count = db.query(ProjectSalesAsset.id).filter(ProjectSalesAsset.id.in_(set(offer.option_ids)), ProjectSalesAsset.company_id == scope.company_id, ProjectSalesAsset.project_id == scope.project_id).count()
             if count != len(set(offer.option_ids)):
                 raise PermissionError('Offer has foreign material identifiers.')
+        if offer.kind=='unit':
+            from app.modules.projects.models import ProjectUnit
+            count=db.query(ProjectUnit.id).filter(ProjectUnit.project_id==scope.project_id,ProjectUnit.id.in_(set(offer.option_ids))).count()
+            if count!=len(set(offer.option_ids)):raise PermissionError('Offer has foreign unit identifiers.')
 
 
 def validate_write_request(event_key, expected_revision, kind):
