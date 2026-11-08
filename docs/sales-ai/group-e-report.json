@@ -1,0 +1,152 @@
+{
+  "version": "sales-ai-group-e-report/1.0",
+  "date": "2026-11-08",
+  "base_commit": "da712a341e5e351f0f5d0c475d732e31101ea607",
+  "main_reverified_at_close": "da712a341e5e351f0f5d0c475d732e31101ea607",
+  "branch": "sales-ai/group-e-response-materials",
+  "steps": [
+    9,
+    10
+  ],
+  "status": "implemented_and_verified",
+  "checks": [
+    {
+      "name": "group_e_focused",
+      "passed": 82,
+      "skipped": 0,
+      "warnings": 4331,
+      "seconds": 18.86,
+      "failed": 0,
+      "exit_code": 0
+    },
+    {
+      "name": "full_backend_checkout",
+      "passed": 1795,
+      "skipped": 2,
+      "warnings": 25042,
+      "seconds": 124.86,
+      "failed": 0,
+      "exit_code": 0
+    },
+    {
+      "name": "isolated_actions_layout",
+      "passed": 1795,
+      "skipped": 2,
+      "warnings": 25042,
+      "seconds": 126.29,
+      "failed": 0,
+      "exit_code": 0,
+      "physical_copies": true,
+      "checkout_imports": false,
+      "unchanged_reference_files": 219,
+      "matching_application_tools_migration_files": 273
+    },
+    {
+      "name": "group_a_safety_replay",
+      "passed": 20,
+      "total": 20,
+      "external_actions": 0,
+      "model_quality_evaluated": false,
+      "exit_code": 0
+    },
+    {
+      "name": "dependency_consistency",
+      "command": "python -m pip check",
+      "exit_code": 0
+    },
+    {
+      "name": "whitespace",
+      "command": "git diff --check",
+      "exit_code": 0
+    }
+  ],
+  "coverage": {
+    "new_tests": 82,
+    "exported_projects": 6,
+    "channels": [
+      "sms",
+      "whatsapp"
+    ],
+    "real_catalog_composition_turns": 12,
+    "model": "INJECTED_SCRIPTED",
+    "providers": "MOCKED",
+    "synthetic_local_material_bytes": true,
+    "exported_commercial_file_contents_verified": false,
+    "groups_e_acceptance_cases": [
+      "T01",
+      "T02",
+      "T06",
+      "T07",
+      "T08",
+      "T09",
+      "T10"
+    ],
+    "complete_T01_T26_acceptance": false
+  },
+  "composition": {
+    "version": "sales-commercial-composer/1.0",
+    "mode": "evidence-bound wording selection; no free-text factual assertions",
+    "model_source": "published Sales configuration, unchanged",
+    "primary_calls": 1,
+    "max_contract_repairs": 1,
+    "total_inference_seconds": 10,
+    "max_call_seconds": 8,
+    "max_completion_tokens_per_call": 2048,
+    "max_context_bytes": 64000,
+    "max_response_bytes": 16000,
+    "max_contract_blocks": 120,
+    "on_failure": "verified deterministic wording with one authorized continuation",
+    "real_commercial_quality_evaluated": false
+  },
+  "materials": {
+    "proposal_version": "sales-material-proposal/1.0",
+    "expires_minutes": 30,
+    "max_local_file_bytes": 52428800,
+    "content_validation": "existence, size, decryption, registered integrity hash and pinned plaintext SHA256; coverage from approved tags",
+    "exact_proposal_acceptance": true,
+    "dispatch_and_public_access_revalidation": true,
+    "external_url_reachability_checked": false,
+    "receipt_semantics": "provider accepted; not proof of phone delivery or human access"
+  },
+  "environment": {
+    "python": "3.12.14",
+    "pytest": "9.1.1",
+    "SQLAlchemy": "2.0.50",
+    "fastapi": "0.136.3",
+    "pydantic": "2.13.4"
+  },
+  "new_migrations": [],
+  "inherited_required_migrations": [
+    "20261108_sales_visit_context"
+  ],
+  "production_changes": false,
+  "deployment_performed": false,
+  "published_prompts_changed": false,
+  "product_model_changed": false,
+  "new_flow_activation": "disabled_by_default_explicit_project_allowlist_required",
+  "skipped": [
+    "Two PostgreSQL concurrency tests require DIALOGUE_POSTGRES_TEST_URL for a disposable database."
+  ],
+  "not_run": [
+    "Actual Docker image build (Docker unavailable locally)",
+    "Remote GitHub Actions execution",
+    "Real PostgreSQL concurrency",
+    "Real OpenRouter sales quality",
+    "Live messaging/Calendar",
+    "Actual exported commercial file content acceptance",
+    "Frontend tests/build (no frontend source changes)",
+    "T01-T26 complete end-to-end acceptance"
+  ],
+  "limits": [
+    "Composition uses constrained evidence wordings rather than unrestricted paraphrasing; natural commercial quality remains for K.",
+    "Asset tags and coverage are administrative evidence; reading bytes does not prove photographs or unit-specific content.",
+    "External resources are checked against approved URLs, without network reachability or content verification.",
+    "Exact binding checks apply to new-provenance shares, preserving legacy link compatibility.",
+    "First appointment lifecycle and conversation after booking remain F."
+  ],
+  "next_group": "F",
+  "next_steps": [
+    11,
+    12
+  ]
+}

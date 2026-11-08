@@ -114,6 +114,17 @@ def resolve(db: Session, token: str) -> tuple[ProjectOnboardingSource, SalesAsse
     ).first()
     if not source or (not share.target_url and not source.storage_path):
         raise HTTPException(status_code=404, detail="Shared sales material not found.")
+    if share.agent_run_id:
+        from app.modules.sales_agent.models import AgentRun
+        run = db.get(AgentRun, share.agent_run_id)
+        metadata = ((run.output_snapshot or {}).get('metadata') or {}) if run else {}
+        if metadata.get('material_delivery_version'):
+            from app.modules.sales_agent.material_delivery import validate_shares
+            from app.modules.sales_agent.dialogue_store import Scope
+            binding = [row for row in metadata.get('material_bindings', []) if row.get('share_id') == share.id]
+            if not validate_shares(db, Scope(share.company_id, share.project_id,
+                    run.conversation_id, share.lead_id), [share], {**metadata, 'material_bindings': binding}):
+                raise HTTPException(status_code=404, detail='This shared sales material changed or is unavailable.')
     return source, share
 
 

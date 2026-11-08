@@ -58,6 +58,10 @@ def authorize_part(db,conversation,lead,metadata):
             SalesAssetShare.project_id==scope.project_id,SalesAssetShare.lead_id==scope.lead_id).all()
         if len(shares)!=len(ids) or any(s.sales_asset_id not in approved or s.revoked or s.expires_at<=datetime.utcnow() for s in shares):
             raise PermissionError('Material approval changed before dispatch.')
+        if metadata.get('material_delivery_version'):
+            from .material_delivery import validate_shares
+            if not validate_shares(db,scope,shares,metadata,subset=True):
+                raise PermissionError('The exact approved material changed before dispatch.')
 
 
 def selected_policy(db,scope):
@@ -420,6 +424,10 @@ async def maybe_process_active(db,conversation,inbound):
                 **({'max_rounds':policy.max_rounds,'max_read_units':policy.max_read_units} if next_enabled else {}))
             conversation,lead,project=_current(db,scope,control=exact_stop)  # Manual takeover/consent/permissions win after inference.
             draft=compose(outcome,channel=conversation.channel,style=policy.composition_style)
+            material_question=''
+            reference_question=''
+            reference_metadata={}
+            appointment=''
             # Material discovery blocks are replaced by verified live links or
             # a specific fallback question; never send "not sent yet" diagnostics.
             text=draft.text
@@ -453,7 +461,14 @@ async def maybe_process_active(db,conversation,inbound):
                 appointment,appointment_meta,actions=(None,{},[]) if 'appointment' in action_holds else _appointment(db,scope,conversation,lead,project,outcome,inbound)
                 metadata.update(appointment_meta)
                 if appointment:extra.append(appointment)
-                links,share_ids,offer,question,delivered=([],[],{},None,set()) if 'materials' in action_holds else _materials(db,scope,conversation,lead,run,outcome,previous_meta)
+                if next_enabled and 'materials' not in action_holds:
+                    from .material_delivery import deliver,VERSION as MATERIAL_VERSION
+                    links,share_ids,offer,question,delivered,material_bindings=deliver(db,scope,conversation,lead,run,outcome,previous_meta)
+                    metadata['material_delivery_version']=MATERIAL_VERSION
+                    metadata['material_bindings']=material_bindings
+                else:
+                    links,share_ids,offer,question,delivered=([],[],{},None,set()) if 'materials' in action_holds else _materials(db,scope,conversation,lead,run,outcome,previous_meta)
+                material_question=question or ''
                 if offer:metadata['material_offer']=offer
                 if question:extra.append(question)
                 if any(t.topic.value in {'catalog','inventory','pricing'} and t.source_message_id==inbound.id and t.status=='completed' for t in outcome.state.tasks):
@@ -480,6 +495,8 @@ async def maybe_process_active(db,conversation,inbound):
                 from .planning_reply import continuation
                 question,offer_metadata=continuation(outcome,action_holds)
                 if question:extra.append(question)
+                reference_question=question
+                reference_metadata=offer_metadata
                 metadata.update(offer_metadata)
             text='\n\n'.join(v for v in [text,*extra,*links] if v)
             if not text:text='Which property or approved material would you like to review?'
@@ -514,7 +531,7 @@ async def maybe_process_active(db,conversation,inbound):
                     metadata['qualification_missing']=missing_fields(lead,commercial['confirmed_project_facts'])
                 if not safe_u.requests and safe_u.preferences:
                     text='Thanks, I have recorded that information. What would you like to explore next?'
-                if safe_u.confidence>=.8 and not safe_u.permits('appointment') and not previous_meta.get('material_offer') and not links and not (
+                if not next_enabled and safe_u.confidence>=.8 and not safe_u.permits('appointment') and not previous_meta.get('material_offer') and not links and not (
                     next_enabled and (getattr(outcome,'plan',{}).get('questions') or outcome.stop_reason in {'step_limit','time_limit','round_limit','read_cost_limit','capacity_limit'})):
                     if next_enabled:
                         _,field,question=qualification(lead,commercial['confirmed_project_facts'],record_asked=True)
@@ -524,6 +541,51 @@ async def maybe_process_active(db,conversation,inbound):
                             text='Thanks, I have recorded that information.'
                         text+='\n\n'+question
                         metadata['qualification_offer']={'field':field,'question':question}
+            if next_enabled and not exact_stop and not protected:
+                from .commercial_composer import compose as compose_commercial
+                # Replace stacked catalog/material/qualification questions with
+                # one continuation authorized against the current results.
+                priority=reference_question or material_question
+                priority_meta=reference_metadata if reference_question else {}
+                if reference_question and metadata.get('material_offer'):
+                    metadata.pop('material_offer',None)
+                release=next((v for v in extra if v.startswith('You previously asked')),None)
+                if release and not priority:priority=release
+                if safe_u.requires_clarification:
+                    from dataclasses import replace
+                    draft=replace(draft,text=draft.text.replace(safe_u.clarification_question or '', '').strip())
+                details=[]
+                if priority and appointment and '?' in appointment:
+                    # Keep a mixed request pending without putting two competing
+                    # acceptance questions/offers into the same outbound message.
+                    metadata.pop('appointment_offer',None)
+                    metadata.pop('location_offer',None)
+                    details.append('Your visit request remains pending while we review the information request.')
+                elif appointment:details.append(appointment)
+                if metadata.get('review_notice'):
+                    details.append('The Sales team needs to verify the restricted part of your request. I can continue helping with other approved information.')
+                details.extend(links)
+                commercial_draft=await compose_commercial(db,scope,inbound=inbound,outcome=outcome,draft=draft,
+                    commercial=commercial,lead=lead,metadata=metadata,previous_meta=previous_meta,
+                    holds=action_holds,channel=conversation.channel,extra=details,
+                    priority=priority,priority_meta=priority_meta)
+                if conversation.is_paused and not (metadata.get('meeting_id') and conversation.pause_reason=='Appointment confirmed'):
+                    raise PermissionError('Manual control interrupted composition.')
+                conversation,lead,project=_current(db,scope,control=bool(metadata.get('meeting_id')))
+                from .turn_configuration import digest
+                from app.modules.projects.models import ProjectPropertyType,ProjectUnit
+                for record_type in (ProjectPropertyType,ProjectUnit):
+                    db.query(record_type).filter_by(project_id=scope.project_id).populate_existing().all()
+                refreshed=build_commercial_context(db,project=project,company_id=scope.company_id,
+                    lead_id=scope.lead_id,channel=conversation.channel)
+                if digest(refreshed)!=digest(commercial):
+                    raise ValueError('Approved commercial information changed during composition.')
+                text=commercial_draft.text
+                metadata['composition']=commercial_draft.trace
+                metadata.update(commercial_draft.trace['closing_metadata'])
+                if metadata.get('qualification_offer'):
+                    from .lead_profile import qualification
+                    qualification(lead,commercial['confirmed_project_facts'],record_asked=True)
             if draft.violations:
                 text+='\n\nSome information could not be verified; no unsupported facts have been added.'
             if next_enabled:
@@ -617,8 +679,16 @@ async def maybe_process_active(db,conversation,inbound):
     shares=db.query(SalesAssetShare).filter(SalesAssetShare.id.in_(data.get('sales_asset_share_ids') or []),
         SalesAssetShare.company_id==scope.company_id,SalesAssetShare.project_id==scope.project_id,
         SalesAssetShare.lead_id==scope.lead_id,SalesAssetShare.agent_run_id==run.id).all()
-    if len(shares)!=len(data.get('sales_asset_share_ids') or []) or any(s.sales_asset_id not in approved_ids or s.revoked or s.expires_at<=datetime.utcnow() for s in shares):
-        data['reply']="Some requested materials are no longer approved to share. No new file link has been sent."
+    exact_valid=True
+    if metadata.get('material_delivery_version'):
+        from .material_delivery import validate_shares
+        exact_valid=validate_shares(db,scope,shares,metadata)
+    if not exact_valid or len(shares)!=len(data.get('sales_asset_share_ids') or []) or any(s.sales_asset_id not in approved_ids or s.revoked or s.expires_at<=datetime.utcnow() for s in shares):
+        if metadata.get('material_delivery_version'):
+            data['reply']='\n\n'.join(v for v in data['reply'].split('\n\n') if '/projects/a/' not in v)
+            data['reply']+='\n\nSome requested materials changed or are unavailable. No new file link has been sent.'
+        else:
+            data['reply']="Some requested materials are no longer approved to share. No new file link has been sent."
         data['sales_asset_share_ids']=[]
         data['delivered_task_ids']=[]
     metadata['sales_asset_share_ids']=data.get('sales_asset_share_ids') or []
@@ -633,7 +703,10 @@ async def maybe_process_active(db,conversation,inbound):
     if dispatched.status in {'queued','sending','scheduled','accepted'} and not dispatched.provider_message_id:
         raise RuntimeError('Provider acceptance is unknown; keep the durable turn pending.')
     revision,state=load(db,scope)
+    replaced={tid for row in metadata.get('material_bindings',[]) if row['share_id'] in metadata.get('sales_asset_share_ids',[]) for tid in row.get('replaces_task_ids',[])}
     for task in state.tasks:
+        if task.id in replaced:
+            task.status='cancelled';task.blocked_reason='accepted_related_alternative'
         if task.id in data.get('delivered_task_ids',[]):task.status='completed'
         if task.source_message_id==inbound.id and task.topic.value in {'human','opt_out'} and own_control:task.status='completed'
         if task.source_message_id==inbound.id and task.topic.value=='appointment' and metadata.get('meeting_id'):task.status='completed'

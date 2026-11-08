@@ -123,6 +123,11 @@ class Resolver:
             matches=[r for r in locations_for_project(self.db.get(Project,self.scope.project_id)) if expression in {normalized(r['label']),normalized(r['address'])}]
             if len(matches)==1:return {'status':'resolved','value':self.bound('location',matches[0]['address'])}
         if kind=='material':
+            if expression in {'it','this file','that file','this pdf','that pdf','that brochure','these materials','those materials'}:
+                offer=next((o for o in self.state.offers if o.kind=='material' and o.status=='current'),None)
+                if offer and len(offer.option_ids)==1:
+                    return {'status':'resolved','value':self.bound('material',offer.option_ids[0],offer.message_id)}
+                return question('ambiguous_material_offer',[])
             matches=[a for a in self.context['available_assets'] if normalized(a.get('name') or '')==expression]
             if len(matches)==1:return {'status':'resolved','value':self.bound('material',matches[0]['asset_id'])}
         # Existing exact location/material resolution remains bounded by offers.

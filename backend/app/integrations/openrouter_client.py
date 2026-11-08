@@ -20,6 +20,7 @@ async def generate_llm_response(
     temperature: float = 0.3,
     raise_on_error: bool = False,
     timeout_seconds: float = 45.0,
+    max_tokens: int | None = None,
     usage_context: LLMUsageContext | None = None,
 ) -> str:
     """Envía la solicitud asíncrona al LLM para generar texto."""
@@ -37,6 +38,10 @@ async def generate_llm_response(
     }
     if response_format is not None:
         payload["response_format"] = response_format
+    if max_tokens is not None:
+        if isinstance(max_tokens, bool) or not isinstance(max_tokens, int) or not 1 <= max_tokens <= 4096:
+            raise ValueError('max_tokens must be an integer between 1 and 4096.')
+        payload['max_tokens'] = max_tokens
     
     try:
         async with httpx.AsyncClient() as client:

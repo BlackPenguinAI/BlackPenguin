@@ -121,6 +121,12 @@ def run(db,scope,*,message_id,understanding,expected_revision,event_key,max_step
             unit_id=value.get('unit_id',state.selected_unit_id) if r.topic.value in BOUND_TOPICS else None,
             binding_status='unresolved' if unresolved else 'resolved' if value or state.selected_property_type_id or state.selected_unit_id else 'unspecified',
             blocked_reason='reference_clarification' if unresolved else None)
+        if (not unresolved and not task.property_id and not task.unit_id and
+            task.topic.value in {'property_details','materials'} and len(resolver.types)==1):
+            # A single approved option is an unambiguous query target, not
+            # evidence of purchase interest or appointment consent.
+            task.property_id=next(iter(resolver.types))
+            task.binding_status='resolved'
         if scoped and prohibited(r.evidence,'appointment' if r.topic.value=='appointment' else r.subject or r.topic.value):
             task.status='blocked';task.blocked_reason='negative_current_evidence'
         if unresolved:

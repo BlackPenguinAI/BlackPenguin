@@ -5,6 +5,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from app.core.config import settings
 from test_live_sales_agent import _db
 from app.modules.companies.models import Company
 from app.modules.projects.models import Project, ProjectProfile, ProjectPropertyType, ProjectUnit
@@ -18,7 +19,8 @@ from app.modules.sales_agent.response_policy import render_channel_text, split_c
 
 
 @pytest.fixture
-def case():
+def case(tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, 'PROJECT_UPLOAD_ROOT', str(tmp_path))
     db = _db()
     company = Company(name="Messaging Company"); db.add(company); db.flush()
     project = Project(company_id=company.id, name="Generic development", address="100 Main St", timezone="UTC")
@@ -229,6 +231,11 @@ def approved_asset(case, tags, *, name="Generic sales file", links=None, asset_t
     db,company,project,lead,conversation=case
     source=ProjectOnboardingSource(project_id=project.id,kind=ProjectSourceKind.UPLOADED_FILE,status=ProjectSourceStatus.READY,name=name+".pdf",mime_type="application/pdf",storage_path="test/never-read.pdf",extracted_links=links or [])
     db.add(source);db.flush()
+    from app.modules.projects.storage_service import resolve_project_file
+    source.storage_path = 'test/' + source.id + '.pdf'
+    path = resolve_project_file(source.storage_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(b'%PDF-1.4\n% Synthetic offline material; coverage comes from reviewed tags.\n%%EOF')
     asset=ProjectSalesAsset(company_id=company.id,project_id=project.id,source_id=source.id,asset_type=asset_type,content_tags=tags,display_name=name,approval_status="approved",approved_at=datetime.utcnow(),allowed_channels=["sms","whatsapp"])
     db.add(asset);db.commit()
     return asset

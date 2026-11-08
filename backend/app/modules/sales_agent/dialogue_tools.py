@@ -67,8 +67,26 @@ class ReadTools:
             matches = []
             for asset in context['available_assets']:
                 selected = next((p['property_type'] for p in types if p['id'] == call.property_id), None)
+                if next_enabled:
+                    from app.modules.projects.models import ProjectSalesAsset
+                    row=self.db.get(ProjectSalesAsset,asset['asset_id'])
+                    if row.property_type_id and row.property_type_id != call.property_id:continue
                 if selected and asset.get('property_type') and asset['property_type'] != selected:
                     continue
+                if next_enabled:
+                    from .material_delivery import snapshot
+                    from app.modules.projects.models import ProjectSalesAsset
+                    row=self.db.get(ProjectSalesAsset,asset['asset_id'])
+                    file_ok=False
+                    if asset.get('has_file'):
+                        try:snapshot(row,channel=conversation.channel);file_ok=True
+                        except (ValueError,OSError):pass
+                    links=[]
+                    for link in asset['links']:
+                        try:snapshot(row,channel=conversation.channel,target_url=link['url']);links.append(link)
+                        except (ValueError,OSError):pass
+                    asset={**asset,'has_file':file_ok,'links':links}
+                    if not file_ok and not links:continue
                 tags = set(asset['content_tags'])
                 direct = call.subject is None or call.subject in tags or call.subject in asset.get('capabilities', [])
                 direct |= call.subject == 'photos' and 'gallery_image' in tags
