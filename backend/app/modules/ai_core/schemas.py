@@ -1,5 +1,6 @@
 from pydantic import BaseModel, ConfigDict, Field
 from typing import Any, Dict, List, Optional
+from app.modules.sales_agent.turn_configuration import SalesPlaybook
 
 class AgentConfigSchema(BaseModel):
     model: str
@@ -14,6 +15,7 @@ class AgentConfigSchema(BaseModel):
     cadence_config: Dict[str, Any] = Field(default_factory=dict)
     intent_routing_config: Dict[str, Any] = Field(default_factory=dict)
     runtime_config: Dict[str, Any] = Field(default_factory=dict)
+    sales_playbook: SalesPlaybook | None = None
 
 
 class SalesPromptDraftPayload(BaseModel):

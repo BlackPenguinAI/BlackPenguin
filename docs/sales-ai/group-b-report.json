@@ -1,0 +1,120 @@
+{
+  "version": "sales-ai-group-b-report/1.0",
+  "date": "2026-11-08",
+  "base_commit": "f1b16f1fd3f1c77c5dc5283b88879c433fb90411",
+  "main_reverified_at_close": "f1b16f1fd3f1c77c5dc5283b88879c433fb90411",
+  "branch": "sales-ai/group-b-configuration-english",
+  "steps": [
+    3,
+    4
+  ],
+  "status": "implemented_and_verified",
+  "production_changes": false,
+  "deployment_performed": false,
+  "published_prompts_changed": false,
+  "model_configuration_changed": false,
+  "migrations": [],
+  "platform_defaults": {
+    "SALES_NEXT_FLOW_ENABLED": false,
+    "SALES_NEXT_FLOW_PROJECT_IDS": ""
+  },
+  "environment": {
+    "python": "3.12.14",
+    "pytest": "9.1.1",
+    "SQLAlchemy": "2.0.50",
+    "fastapi": "0.136.3",
+    "pydantic": "2.13.4",
+    "langdetect": "1.0.9"
+  },
+  "checks": [
+    {
+      "name": "group_b_focused",
+      "passed": 75,
+      "failed": 0,
+      "seconds": 6.3,
+      "exit_code": 0
+    },
+    {
+      "name": "full_backend_checkout",
+      "passed": 1591,
+      "failed": 0,
+      "skipped": 2,
+      "seconds": 86.41,
+      "exit_code": 0
+    },
+    {
+      "name": "isolated_preflight_full_backend",
+      "passed": 1591,
+      "failed": 0,
+      "skipped": 2,
+      "seconds": 89.08,
+      "exit_code": 0,
+      "existing_runtime_enabled": true,
+      "new_cohort_selected_per_test": true,
+      "physical_copy_layout": true,
+      "checkout_imports": false,
+      "reference_files_unchanged": 205
+    },
+    {
+      "name": "group_a_current_safety_replay",
+      "passed": 20,
+      "total": 20,
+      "external_actions": 0,
+      "model_quality_evaluated": false,
+      "exit_code": 0
+    },
+    {
+      "name": "dependency_consistency",
+      "command": "python -m pip check",
+      "exit_code": 0
+    },
+    {
+      "name": "patch_whitespace",
+      "command": "git diff --check",
+      "exit_code": 0
+    }
+  ],
+  "coverage": {
+    "new_tests": 75,
+    "exported_projects": 6,
+    "channels": [
+      "sms",
+      "whatsapp"
+    ],
+    "real_catalog_turns": 24,
+    "catalog_data_unchanged": true,
+    "policy_review_records": "SYNTHETIC_TEST_ONLY",
+    "model_inference": "INJECTED_SCRIPTED",
+    "messaging": "MOCKED",
+    "calendar": "FAKE_OR_FORBIDDEN_NETWORK"
+  },
+  "skips": [
+    "PostgreSQL disposable-database tests: DIALOGUE_POSTGRES_TEST_URL not configured"
+  ],
+  "not_run": [
+    "Actual Docker image build (Docker unavailable locally)",
+    "Remote GitHub Actions run",
+    "Frontend tests/build (no frontend source changes)",
+    "Real OpenRouter model quality",
+    "Live SMS/WhatsApp and Calendar",
+    "T01-T26 complete new-flow acceptance"
+  ],
+  "limitations": [
+    "Language detection can produce false positives; uncertainty asks for English and never pauses.",
+    "Published free-text compliance notes need explicit staff-reviewed scoped policies; no automatic conversion/approval.",
+    "Existing legacy simulator does not represent the new active-runtime cohort.",
+    "Natural final sales composition, profile normalization and appointment lifecycle remain assigned to later groups.",
+    "First WhatsApp contact still requires an approved English template; invalid content raises a configuration error before sending."
+  ],
+  "fixture_sha256": {
+    "acceptance_matrix.json": "ac31e3d2ccd2015715b3e3c75cfa9b4902266c24de4b49577d5a5d9bd00804a1",
+    "synthetic_catalog.json": "5b791214f4599a1d2a6af220a416be33f7a1f69bd96fccd994fc031b5af2e0a0",
+    "real_catalog_20261108.json": "13d0dade18cc417d48a37408b031091bd0c6920a41baca027069a169889ec0cc",
+    "historical_cases_20261108.json": "81d2257f1e58bbecafa555a684406e7286228a63a219483f19a9d2540a48cecc"
+  },
+  "next_group": "C",
+  "next_steps": [
+    5,
+    6
+  ]
+}

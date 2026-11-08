@@ -306,6 +306,22 @@ async def _dispatch(
             if run:
                 run.output_snapshot = {**(run.output_snapshot or {}), "reply_before_dispatch":before,
                                        "reply":content, "dispatch_monetary_validation":evidence}
+        # Final automatic-message boundary also covers cadence replies. Active
+        # turns validate before committing effects; this is a delivery backstop.
+        from .next_flow import selected as next_selected
+        scope = conversation
+        if next_selected(scope):
+            from .language_policy import detect, scoped_names, OUTPUT_FALLBACK
+            language_project = db.query(Project).filter_by(id=scope.project_id, company_id=scope.company_id).one()
+            language_context = build_commercial_context(db, project=language_project, company_id=scope.company_id,
+                                                       lead_id=lead.id, channel=conversation.channel)
+            decision = detect(content, names=scoped_names(language_project, lead, language_context), output=True)
+            details['dispatch_language_policy'] = decision.metadata()
+            if decision.needs_reentry:
+                content = OUTPUT_FALLBACK
+            if run:
+                run.output_snapshot = {**(run.output_snapshot or {}), 'reply':content,
+                                       'dispatch_language_policy':decision.metadata()}
         parts = split_channel_text(content, conversation.channel)
     else:
         parts = [content]
@@ -384,6 +400,20 @@ async def _dispatch_part(
             "rendered_content": persisted_content,
             "generated_draft": content,
         })
+    if role == 'assistant' and not author_user_id and uses_whatsapp_template:
+        from .next_flow import selected as next_selected
+        scope = conversation
+        if next_selected(scope):
+            from .language_policy import detect, REENTRY
+            project = db.query(Project).filter_by(id=scope.project_id, company_id=scope.company_id).one()
+            # Never rewrite an approved WhatsApp template into an unapproved
+            # free-form message. Report a configuration error before delivery.
+            decision = detect(persisted_content, names=(lead.full_name, *(lead.full_name or '').split(), project.name), output=True)
+            if decision.needs_reentry:
+                if conversation.channel == 'whatsapp':
+                    raise HTTPException(422, 'The approved initial WhatsApp template must contain English text.')
+                content = persisted_content = REENTRY
+            message_metadata['dispatch_language_policy'] = decision.metadata()
     from .turn_trace import capture_input, dispatch_trace
     message_metadata["agent_run_id"] = agent_run_id
     message_metadata["turn_trace"] = dispatch_trace(conversation, lead, agent_run_id, event_kind, proposed_content, persisted_content)

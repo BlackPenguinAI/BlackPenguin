@@ -128,6 +128,11 @@ def create_prompt_draft(db: Session, *, company_id: str | None, agent_key: str, 
 def validate_sales_configuration(configuration: dict) -> None:
     from app.modules.sales_agent.runtime_policy import RuntimePolicy
     from pydantic import ValidationError
+    from app.modules.sales_agent.turn_configuration import SalesPlaybook
+    if configuration.get('sales_playbook') is not None:
+        try:SalesPlaybook.model_validate(configuration['sales_playbook'])
+        except ValidationError:
+            raise HTTPException(status_code=422,detail='Invalid Sales playbook; technical permissions and languages are platform-owned.')
     try:
         RuntimePolicy.model_validate(configuration.get('runtime_config') or {})
     except ValidationError as exc:

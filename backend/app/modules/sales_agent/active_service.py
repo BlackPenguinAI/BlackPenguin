@@ -24,6 +24,7 @@ from .commercial_context import build_commercial_context
 from .conversation_scope import scoped_messages_query
 from .turn_context import choice_index, latest_outbound
 from .continuity_policy import explicit_opt_out, evidenced_pause_reason, dismissed_trigger, confirmed_controls
+from .language_policy import LanguageHold
 
 ENGINE='sales-active/1.0'
 
@@ -84,7 +85,9 @@ def _current(db,scope,control=False):
 
 def _references(db,conversation,state,message):
     offers=recorded_offers(db,conversation)
-    last=latest_outbound(db,conversation.id)
+    from .next_flow import selected
+    scope=Scope(conversation.company_id,conversation.project_id,conversation.id,conversation.lead_id)
+    last=latest_outbound(db,conversation.id,skip_language_holds=selected(scope))
     meta=(last.metadata_json or {}) if last else {}
     # A plain answer supersedes old ordinals; explicit names can still resolve.
     state.offers=offers
@@ -264,6 +267,11 @@ def retry_active_calendars(db,limit=10):
 def active_followup_requires_review(db,conversation):
     scope=Scope(conversation.company_id,conversation.project_id,conversation.id,conversation.lead_id)
     if not selected_policy(db,scope):return False
+    from .next_flow import selected as next_selected
+    if next_selected(scope):
+        previous=latest_outbound(db,conversation.id)
+        if previous and (previous.metadata_json or {}).get('language_hold'):
+            return True  # Wait for the requested English input; do not resume a stale task.
     from .sales_policy import policy_context, custom_compliance
     from .commercial_context import confirmed_profile_facts
     project=db.get(Project,scope.project_id)
@@ -315,6 +323,17 @@ async def maybe_process_active(db,conversation,inbound):
         run.graph_version=ENGINE;run.toolset_version='sales-actions/1.0'
         db.commit()
         try:
+            from .next_flow import selected as next_selected
+            next_enabled=next_selected(scope)
+            if next_enabled and not exact_stop and not evidenced_pause_reason(inbound.content):
+                from .language_policy import detect,scoped_names,credential_request
+                if not credential_request(inbound.content):
+                    language_context=build_commercial_context(db,project=project,company_id=scope.company_id,lead_id=scope.lead_id,channel=conversation.channel)
+                    previous=latest_outbound(db,conversation.id,skip_language_holds=True)
+                    previous_data=(previous.metadata_json or {}) if previous else {}
+                    contextual=any(previous_data.get(k) for k in ('qualification_offer','material_offer','appointment_offer','control_confirmation','release_offer','property_catalog_offer'))
+                    decision=detect(inbound.content,names=scoped_names(project,lead,language_context),contextual_answer=contextual)
+                    if decision.needs_reentry:raise LanguageHold(decision)
             revision,state=load(db,scope)
             state,previous_meta=_references(db,conversation,state,inbound)
             # A bounded explicit assent can release a prohibition only when the
@@ -325,6 +344,9 @@ async def maybe_process_active(db,conversation,inbound):
             revision,state=save(db,scope,event_key='active-context:'+inbound.id,expected_revision=revision,state=state,
                 metadata={'engine':ENGINE,'message_id':inbound.id})
             protected=evidenced_pause_reason(inbound.content)
+            if next_enabled and not protected:
+                from .language_policy import credential_request
+                if credential_request(inbound.content):protected='SECURITY'
             if previous_meta.get('control_confirmation')=='human' and live._affirmative_slot_reply(inbound.content):
                 protected='HUMAN_REQUESTED'
             if protected and dismissed_trigger(lead,conversation.id,protected,inbound.content):
@@ -367,6 +389,7 @@ async def maybe_process_active(db,conversation,inbound):
             metadata={'engine':ENGINE,'inbound_message_id':inbound.id,'selected_property_type_id':outcome.state.selected_property_type_id}
             metadata['requested_topics']=sorted({r.topic.value for r in u.requests if r.polarity=='request'})
             metadata['policy_holds_at_prepare']=sorted(action_holds)
+            if next_enabled:metadata['action_policy']=approved_policy.get('action_policy')
             if u.requires_clarification and any(r.topic.value=='human' and r.polarity=='request' for r in u.requests):
                 metadata['control_confirmation']='human'
             actions=[];share_ids=[];delivered=set();extra=[];links=[]
@@ -379,6 +402,8 @@ async def maybe_process_active(db,conversation,inbound):
             elif protected:
                 case=create_intervention_case(db,conversation=conversation,lead=lead,reason=protected,evidence=inbound.content)
                 text="Your request and this conversation have been recorded for the Sales team to review."
+                if next_enabled and protected=='SECURITY':
+                    text="I cannot share private credentials or access another company's data. Your request has been recorded for the Sales team to review."
                 metadata.update(human_intervention_case_id=case.id,control_outcome='handoff',reason=protected,reason_source='verified_current_request')
             elif not safe_u.requires_clarification:
                 for task in outcome.state.tasks:
@@ -435,6 +460,11 @@ async def maybe_process_active(db,conversation,inbound):
                         metadata['qualification_offer']={'field':field,'question':question}
             if draft.violations:
                 text+='\n\nSome information could not be verified; no unsupported facts have been added.'
+            if next_enabled:
+                from .language_policy import detect,scoped_names
+                decision=detect(text,names=scoped_names(project,lead,commercial),output=True)
+                if decision.needs_reentry:raise LanguageHold(decision,output=True)
+                metadata['language_policy']={'version':decision.version,'output_language':'en'}
             final_revision,state=save(db,scope,event_key='active-prepared:'+inbound.id,expected_revision=outcome.revision,state=outcome.state,
                 metadata={'engine':ENGINE,'message_id':inbound.id,'draft':asdict(draft),'actions':actions,
                     'share_ids':share_ids,'delivery_state':'prepared_not_delivered'})
@@ -442,12 +472,37 @@ async def maybe_process_active(db,conversation,inbound):
             trace=interpretation.payload_json['metadata'] if interpretation else {
                 'model':'deterministic-control','prompt_snapshot':{},'prompt_configuration_id':None}
             run.model=trace['model'];run.prompt_snapshot=trace['prompt_snapshot'];run.prompt_configuration_id=trace['prompt_configuration_id']
+            if next_enabled:
+                metadata['configuration_ref']=trace.get('configuration_ref')
+                metadata['playbook_selection']=trace.get('playbook_selection')
             run.input_snapshot={**run.input_snapshot,'understanding':safe_u.model_dump(mode='json'),'runtime_policy':policy.model_dump()}
             run.output_snapshot={'engine':ENGINE,'reply_ready':True,'reply':text,'metadata':metadata,'proposed_actions':actions,
                 'sales_asset_share_ids':share_ids,'delivered_task_ids':list(delivered),'state_revision':final_revision,
                 'requires_human':metadata.get('control_outcome')=='handoff','policy_violations':[]}
             run.status='prepared';conversation.updated_at=datetime.utcnow();lead.last_interaction_at=datetime.utcnow()
             db.add_all([run,conversation,lead]);db.commit()
+        except LanguageHold as hold:
+            # Input holds occur before reference/task changes. Output rejection
+            # rolls back all proposed effects before any external dispatch.
+            rejected_trace={}
+            if hold.output:
+                with db.no_autoflush:
+                    event=scope.query(db,SalesDialogueEvent).filter_by(event_key='active-understanding:'+inbound.id).first()
+                    trace=(event.payload_json.get('metadata') or {}) if event else {}
+                    rejected_trace={key:trace.get(key) for key in ('model','configuration_ref','playbook_selection','model_request_sha256')}
+            db.rollback()
+            from .language_policy import REENTRY,OUTPUT_FALLBACK,VERSION
+            run=db.query(AgentRun).filter_by(event_id=event_id).one()
+            run.model='deterministic-language-policy';run.prompt_configuration_id=None
+            run.prompt_snapshot={'version':VERSION,'decision':hold.decision.metadata()}
+            run.error_code='reply_language_rejected' if hold.output else None
+            run.output_snapshot={'engine':ENGINE,'reply_ready':True,'reply':OUTPUT_FALLBACK if hold.output else REENTRY,
+                'metadata':{'engine':ENGINE,'inbound_message_id':inbound.id,'language_hold':True,
+                            'output_rejected':hold.output,'language_policy':hold.decision.metadata(),
+                            'rejected_turn':rejected_trace},
+                'sales_asset_share_ids':[],'delivered_task_ids':[],'proposed_actions':[],
+                'requires_human':False,'policy_violations':[]}
+            run.status='prepared';db.commit()
         except DialogueConflict:
             raise
         except PermissionError:
@@ -518,7 +573,7 @@ async def maybe_process_active(db,conversation,inbound):
         save(db,scope,event_key='active-receipt:'+inbound.id,expected_revision=revision,state=state,
             metadata={'engine':ENGINE,'message_id':inbound.id,'run_id':run.id,'delivery_state':'provider_accepted_not_delivery_confirmed','share_ids':metadata['sales_asset_share_ids']})
     run.status='completed';run.completed_at=datetime.utcnow();db.commit()
-    if not conversation.is_paused and not lead.is_opt_out and not run.error_code:
+    if not conversation.is_paused and not lead.is_opt_out and not run.error_code and not metadata.get('language_hold'):
         live._schedule_next_action(db,conversation,lead,event_id,refresh_pending=True);db.commit()
     elif run.error_code:
         jobs=db.query(SalesFollowUpJob).filter_by(conversation_id=conversation.id,status='pending').all()

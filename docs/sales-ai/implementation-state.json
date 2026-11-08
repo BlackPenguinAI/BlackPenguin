@@ -1,20 +1,22 @@
 {
   "version": "sales-ai-implementation-state/1.0",
-  "base_commit": "f7e7f055fd0499f2224b43bad8f9128db2eaf434",
-  "branch": "sales-ai/group-a-foundation",
-  "current_group": "A",
+  "base_commit": "f1b16f1fd3f1c77c5dc5283b88879c433fb90411",
+  "branch": "sales-ai/group-b-configuration-english",
+  "current_group": "B",
   "completed_steps": [
     1,
-    2
-  ],
-  "next_group": "B",
-  "next_steps": [
+    2,
     3,
     4
   ],
+  "next_group": "C",
+  "next_steps": [
+    5,
+    6
+  ],
   "groups": {
     "A": "implemented_and_verified",
-    "B": "pending",
+    "B": "implemented_and_verified",
     "C": "pending",
     "D": "pending",
     "E": "pending",
@@ -32,8 +34,8 @@
   "model_quality_evaluated": false,
   "live_channel_acceptance": "not_run",
   "acceptance_matrix": "backend/tests/fixtures/sales_ai/acceptance_matrix.json",
-  "verification_report": "docs/sales-ai/group-a-report.json",
-  "replay_report": "docs/sales-ai/group-a-replay.json",
+  "verification_report": "docs/sales-ai/group-b-report.json",
+  "replay_report": "docs/sales-ai/group-b-baseline-replay.json",
   "continuity": "Continue from this accumulated delivery, reconcile a newer main, and implement only the next explicitly requested group.",
   "maintenance": [
     {
@@ -44,5 +46,10 @@
       "runtime_behavior_changed": false,
       "report": "docs/sales-ai/group-a-preflight-fix-report.json"
     }
+  ],
+  "new_flow_activation": "disabled_by_default_explicit_project_allowlist_required",
+  "prior_verification_reports": [
+    "docs/sales-ai/group-a-report.json",
+    "docs/sales-ai/group-a-preflight-fix-report.json"
   ]
 }

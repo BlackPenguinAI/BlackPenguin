@@ -18,8 +18,10 @@ from datetime import datetime, timezone, timedelta
 
 def recorded_offers(db,conversation):
     """Only the latest outbound can expose an unqualified ordinal selection."""
-    latest = scoped_messages_query(db,conversation).filter_by(direction='outbound').filter(
-        SalesMessage.status.notin_(['failed','cancelled'])).order_by(SalesMessage.created_at.desc(),SalesMessage.id.desc()).first()
+    from .next_flow import selected
+    from .turn_context import latest_outbound
+    scope=Scope(conversation.company_id,conversation.project_id,conversation.id,conversation.lead_id)
+    latest=latest_outbound(db,conversation.id,skip_language_holds=selected(scope))
     if not latest:
         return []
     meta = latest.metadata_json or {}

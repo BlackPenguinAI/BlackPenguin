@@ -701,6 +701,7 @@ def guidance_context(db: Session, *, company_id: str, project_id: str | None, li
     query = db.query(KnowledgeGuidanceItem).filter(
         KnowledgeGuidanceItem.company_id == company_id,
         KnowledgeGuidanceItem.status == "approved",
+        KnowledgeGuidanceItem.kind.in_(["faq", "script"]),
     )
     if project_id:
         query = query.filter(

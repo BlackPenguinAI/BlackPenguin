@@ -25,14 +25,18 @@ def choice_index(text):
     return int(value) - 1 if value.isdigit() and int(value) > 0 else ORDINALS.get(value)
 
 
-def latest_outbound(db, conversation_id):
+def latest_outbound(db, conversation_id, *, skip_language_holds=False):
     conversation = db.get(SalesConversation, conversation_id)
     if not conversation:
         return None
-    return scoped_messages_query(db, conversation).filter(
+    query = scoped_messages_query(db, conversation).filter(
         SalesMessage.direction == "outbound",
         SalesMessage.status.notin_(["failed", "cancelled"]),
-    ).order_by(SalesMessage.created_at.desc(), SalesMessage.id.desc()).first()
+    )
+    if skip_language_holds:
+        from sqlalchemy import and_
+        query=query.filter(~and_(SalesMessage.role=='assistant',SalesMessage.metadata_json['language_hold'].as_boolean().is_(True)))
+    return query.order_by(SalesMessage.created_at.desc(), SalesMessage.id.desc()).first()
 
 
 def turn_context(db, conversation, lead=None):

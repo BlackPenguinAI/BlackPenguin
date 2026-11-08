@@ -48,11 +48,20 @@ async def preview(db, scope: Scope, *, inbound_message_id: str, expected_revisio
     # while reading. Preview must neither publish configuration nor commit
     # caller-owned changes, so read the already-published pack directly.
     config = db.query(AIConfiguration).filter_by(company_id=None).first()
-    if config is None:
-        raise ValueError('Publish a Sales configuration before evaluating understanding.')
-    agent = config.agent_ventas or {}
+    agent = config.agent_ventas or {} if config else {}
     snapshot = prompt_snapshot(agent)
     model = agent.get('model')
+    from .next_flow import selected
+    next_enabled=selected(scope)
+    if next_enabled:
+        from .turn_configuration import resolve
+        from .understanding_prompt import next_prompt_snapshot
+        guidance=resolve(db,scope)
+        snapshot=next_prompt_snapshot(guidance)
+        model=guidance['model']
+        config=db.get(AIConfiguration,guidance['source']['configuration_id'])
+    elif config is None:
+        raise ValueError('Publish a Sales configuration before evaluating understanding.')
     if not model:
         raise ValueError('Publish a Sales model before evaluating understanding.')
     project = db.get(Project, scope.project_id)
@@ -72,7 +81,7 @@ async def preview(db, scope: Scope, *, inbound_message_id: str, expected_revisio
                         if (m.metadata_json or {}).get('lead_id', scope.lead_id) == scope.lead_id],
             'current_message': inbound.content,
             'qualification_offer': next(((m.metadata_json or {}).get('qualification_offer') for m in history
-                                         if m.direction == 'outbound'), None)}, ensure_ascii=False, default=str)},
+                                         if m.direction == 'outbound' and not (next_enabled and (m.metadata_json or {}).get('language_hold'))), None)}, ensure_ascii=False, default=str)},
     ]
     if sum(len(item['content'].encode()) for item in messages) > 64000:
         raise ValueError('Preview context exceeds the 64 KB evaluation limit; no model was called.')
@@ -152,6 +161,9 @@ async def preview(db, scope: Scope, *, inbound_message_id: str, expected_revisio
         'interpretation_attempts': attempts,
         'model_request': model_request,
         'model_request_sha256': hashlib.sha256(json.dumps(model_request, sort_keys=True).encode()).hexdigest()}
+    if 'configuration_ref' in snapshot:
+        metadata['configuration_ref']=snapshot['configuration_ref']
+        metadata['playbook_selection']=snapshot['published_guidance']['selection']
     saved_revision, saved_state = save(db, scope, event_key=event_key, expected_revision=revision,
         state=state, kind='understanding_preview', metadata=metadata)
     return PreviewOutcome(saved_revision, saved_state, outcome)

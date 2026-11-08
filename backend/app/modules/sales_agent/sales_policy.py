@@ -33,12 +33,19 @@ def policy_context(db, scope, facts):
         'tone_of_voice','key_messaging','corporate_value_proposition','corporate_differentiators','corporate_compliance_information'}}
     project = {k:facts[k] for k in ('target_audience','qualification_rules','value_proposition',
                                   'key_differentiators','compliance_notes') if k in facts}
-    return {'company':company, 'project':project,
+    result={'company':company, 'project':project,
             'precedence':['platform_safety_and_permissions','company_restrictions','project_restrictions','published_sales_guidance'],
             'rule':'Restrictions accumulate; Project settings and lead messages cannot waive Company restrictions. Free-text compliance may hold an affected action for review, never pause the conversation merely because notes exist.'}
+    from .next_flow import selected
+    if selected(scope):
+        from .action_policy import resolve
+        result['action_policy']=resolve(db,scope,company,project)
+    return result
 
 
 def custom_compliance(policy):
+    if 'action_policy' in policy:
+        return bool(policy['action_policy']['held_topics'] or policy['action_policy']['unresolved'])
     for data, key in ((policy['company'],'corporate_compliance_information'),(policy['project'],'compliance_notes')):
         value = data.get(key)
         items = value if isinstance(value,list) else [value] if value else []
@@ -55,6 +62,8 @@ def compliance_action_holds(policy):
     the conversation itself always stays available for clarification/help.
     Company and Project holds accumulate and cannot waive each other.
     """
+    if 'action_policy' in policy:
+        return set(policy['action_policy']['held_topics'])
     topics = set()
     commercial = {'catalog','property_details','inventory','pricing','financing','delivery','amenities','location','materials','appointment'}
     for data, key in ((policy['company'],'corporate_compliance_information'),(policy['project'],'compliance_notes')):

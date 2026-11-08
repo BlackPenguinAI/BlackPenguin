@@ -34,11 +34,18 @@ class OperatingPolicyResponse(OperatingPolicyPayload):
 
 class GuidanceItemPayload(BaseModel):
     project_id: str | None = None
-    kind: Literal["faq", "script"]
+    kind: Literal["faq", "script", "sales_action_policy"]
     title: str = Field(min_length=2, max_length=220)
     content: str = Field(min_length=2, max_length=10000)
     tags: list[str] = Field(default_factory=list, max_length=30)
     status: Literal["draft", "approved", "archived"] = "draft"
+
+    @model_validator(mode='after')
+    def action_policy_contract(self):
+        if self.kind=='sales_action_policy':
+            from app.modules.sales_agent.action_policy import ActionPolicy
+            ActionPolicy.model_validate_json(self.content)
+        return self
 
 
 class GuidanceItemResponse(GuidanceItemPayload):

@@ -31,6 +31,10 @@ class Settings(BaseSettings):
     # Development/evaluation only. No live caller is wired in groups 1–3.
     SALES_UNDERSTANDING_PREVIEW_ENABLED: bool = False
     SALES_DIALOGUE_RUNTIME_ENABLED: bool = False
+    # Staged next-flow policy: both the switch AND an explicit project allowlist
+    # are required. Existing global runtime activation never enables this work.
+    SALES_NEXT_FLOW_ENABLED: bool = False
+    SALES_NEXT_FLOW_PROJECT_IDS: str = ""
 
     PROJECT_UPLOAD_ROOT: str = "./var/uploads"
     PUBLIC_APP_URL: str = "https://blackpenguin.ai"

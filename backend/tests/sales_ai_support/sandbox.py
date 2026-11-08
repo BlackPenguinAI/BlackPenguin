@@ -157,6 +157,7 @@ class InboundHarness:
         self.monkeypatch=monkeypatch
         monkeypatch.setattr(settings,'SALES_DIALOGUE_RUNTIME_ENABLED',True)
         monkeypatch.setattr(settings,'SALES_UNDERSTANDING_PREVIEW_ENABLED',False)
+        monkeypatch.setattr(settings,'SALES_NEXT_FLOW_ENABLED',False)
         self.clock.install(monkeypatch,live_service,active_service,commercial_context,sales_asset_service,scheduling)
         self.db.add(AIConfiguration(company_id=None,agent_ventas={'model':'test/offline-scripted',
             'runtime_config':{'mode':'active','scope':'global','max_steps':8,'max_seconds':5}}))
