@@ -577,7 +577,9 @@ def process_notification_outbox(db: Session, *, company_id: str | None = None) -
             role_value = user.role.value if hasattr(user.role, "value") else str(user.role)
             if recipient_roles and role_value not in recipient_roles:
                 continue
-            target_sales_id = payload.get("assigned_sales_user_id") if event.event_type == "appointment_confirmed" else None
+            if payload.get("recipient_user_ids") and user.id not in payload["recipient_user_ids"]:
+                continue
+            target_sales_id = payload.get("assigned_sales_user_id") if event.event_type in {"appointment_confirmed", "appointment_rescheduled"} else None
             target_sales_id = target_sales_id or (lead.assigned_sales_user_id if lead else None)
             if user.role == UserRole.SALES and target_sales_id != user.id:
                 continue

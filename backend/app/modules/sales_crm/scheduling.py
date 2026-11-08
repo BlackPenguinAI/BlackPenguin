@@ -272,6 +272,7 @@ def _is_free(
     starts_at: datetime,
     ends_at: datetime,
     external_busy: list[tuple[datetime, datetime]] | None = None,
+    excluded_meeting: Meeting | None = None,
 ) -> bool:
     meetings = db.query(Meeting).filter(
         Meeting.assigned_sales_user_id == user_id,
@@ -279,7 +280,7 @@ def _is_free(
         Meeting.meeting_time < ends_at,
     ).all()
     database_free = not any(
-        meeting.meeting_time + timedelta(minutes=meeting.duration_minutes) > starts_at
+        meeting.id != (excluded_meeting.id if excluded_meeting else None) and meeting.meeting_time + timedelta(minutes=meeting.duration_minutes) > starts_at
         for meeting in meetings
     )
     if not database_free:
@@ -291,6 +292,9 @@ def _is_free(
         CalendarConnection.provider == "google",
         CalendarConnection.status == "connected",
     ).first()
+    if connection and excluded_meeting and excluded_meeting.assigned_sales_user_id==user_id and excluded_meeting.gcal_event_id:
+        from app.integrations.gcalendar_client import calendar_busy_ranges_excluding_event
+        return not calendar_busy_ranges_excluding_event(db,connection,starts_at=starts_at,ends_at=ends_at,event_id=excluded_meeting.gcal_event_id)
     return not connection or is_calendar_free(db, connection, starts_at=starts_at, ends_at=ends_at)
 
 
@@ -301,11 +305,15 @@ def eligible_users_for_slot(
     starts_at: datetime,
     duration_minutes: int,
     external_busy_by_user: dict[str, list[tuple[datetime, datetime]]] | None = None,
+    excluded_meeting: Meeting | None = None,
+    allowed_sales_user_ids: set[str] | None = None,
 ) -> list[str]:
     starts_at = starts_at.replace(tzinfo=None) if starts_at.tzinfo else starts_at
     ends_at = starts_at + timedelta(minutes=duration_minutes)
     eligible = []
     for assignment in eligible_appointment_assignments(db, project_id):
+        if allowed_sales_user_ids is not None and assignment.user_id not in allowed_sales_user_ids:
+            continue
         date_blocks = availability_blocks_for_user(
             db, user_id=assignment.user_id, starts_at=starts_at, ends_at=ends_at,
         )
@@ -313,6 +321,7 @@ def eligible_users_for_slot(
             if _is_free(
                 db, user_id=assignment.user_id, starts_at=starts_at, ends_at=ends_at,
                 external_busy=(external_busy_by_user or {}).get(assignment.user_id) if external_busy_by_user is not None else None,
+                excluded_meeting=excluded_meeting,
             ):
                 eligible.append(assignment.user_id)
             continue
@@ -329,6 +338,7 @@ def eligible_users_for_slot(
                 if _is_free(
                     db, user_id=assignment.user_id, starts_at=starts_at, ends_at=ends_at,
                     external_busy=(external_busy_by_user or {}).get(assignment.user_id) if external_busy_by_user is not None else None,
+                    excluded_meeting=excluded_meeting,
                 ):
                     eligible.append(assignment.user_id)
                 break
@@ -345,6 +355,8 @@ def available_slots(
     limit: int = 12,
     slot_predicate=None,
     include_sales_user_ids: bool = False,
+    allowed_sales_user_ids: set[str] | None = None,
+    excluded_meeting: Meeting | None = None,
 ) -> list[dict]:
     after = after.replace(tzinfo=None) if after.tzinfo else after
     minute = 0 if after.minute < 30 else 30
@@ -354,11 +366,16 @@ def available_slots(
     end = after + timedelta(days=days)
     external_busy_by_user: dict[str, list[tuple[datetime, datetime]]] = {}
     for assignment in eligible_appointment_assignments(db, project_id):
+        if allowed_sales_user_ids is not None and assignment.user_id not in allowed_sales_user_ids:continue
         connection = db.query(CalendarConnection).filter(
             CalendarConnection.user_id == assignment.user_id,
             CalendarConnection.provider == "google",
             CalendarConnection.status == "connected",
         ).first()
+        if connection and excluded_meeting and excluded_meeting.assigned_sales_user_id==assignment.user_id and excluded_meeting.gcal_event_id:
+            from app.integrations.gcalendar_client import calendar_busy_ranges_excluding_event
+            external_busy_by_user[assignment.user_id]=calendar_busy_ranges_excluding_event(db,connection,starts_at=after,ends_at=end,event_id=excluded_meeting.gcal_event_id)
+            continue
         external_busy_by_user[assignment.user_id] = (
             calendar_busy_ranges(db, connection, starts_at=after, ends_at=end)
             if connection else []
@@ -374,7 +391,10 @@ def available_slots(
             starts_at=cursor,
             duration_minutes=duration_minutes,
             external_busy_by_user=external_busy_by_user,
+            excluded_meeting=excluded_meeting,
+            allowed_sales_user_ids=allowed_sales_user_ids,
         )
+        if allowed_sales_user_ids is not None:user_ids=[uid for uid in user_ids if uid in allowed_sales_user_ids]
         if user_ids:
             result.append({
                 "start_at": cursor,
@@ -399,21 +419,28 @@ def create_agent_appointment(
     visit_unit_id: str | None = None,
     capture_visit_context: bool = False,
     required_sales_user_id: str | None = None,
+    excluded_meeting: Meeting | None = None,
+    booking_project_id: str | None = None,
+    emit_notification: bool = True,
 ) -> tuple[Meeting, User]:
+    booking_project_id=booking_project_id or lead.project_id
+    if not db.query(Project).filter_by(id=booking_project_id,company_id=lead.company_id).first():
+        raise PermissionError('Booking Project is outside the lead Company.')
     starts_at = starts_at.replace(tzinfo=None) if starts_at.tzinfo else starts_at
     # Lock every candidate Sales user in a stable order before rechecking
     # availability. This serializes overlapping bookings even when the same
     # person is assigned to multiple Projects.
     candidate_ids = sorted({
-        assignment.user_id for assignment in eligible_appointment_assignments(db, lead.project_id)
+        assignment.user_id for assignment in eligible_appointment_assignments(db, booking_project_id)
     })
     if candidate_ids:
         db.query(User).filter(User.id.in_(candidate_ids)).order_by(User.id).with_for_update().all()
     eligible_user_ids = eligible_users_for_slot(
         db,
-        project_id=lead.project_id,
+        project_id=booking_project_id,
         starts_at=starts_at,
         duration_minutes=duration_minutes,
+        excluded_meeting=excluded_meeting,
     )
     if required_sales_user_id:
         eligible_user_ids=[uid for uid in eligible_user_ids if uid==required_sales_user_id]
@@ -421,7 +448,7 @@ def create_agent_appointment(
         raise HTTPException(status_code=409, detail="That appointment time is no longer available.")
     assigned_user_id = select_next_sales_user(
         db,
-        lead.project_id,
+        booking_project_id,
         eligible_user_ids=set(eligible_user_ids),
         for_appointments=True,
     )
@@ -430,7 +457,7 @@ def create_agent_appointment(
     user = db.query(User).filter(User.id == assigned_user_id, User.company_id == lead.company_id).one()
     connections = calendar_connections_for_user(db, user.id)
     google_connection = next((item for item in connections if item.provider == "google" and item.status == "connected"), None)
-    project = db.query(Project).filter(Project.id == lead.project_id).one()
+    project = db.query(Project).filter(Project.id == booking_project_id).one()
     selected_location = resolve_visit_location(
         project, visit_location or (lead.meta_form_data or {}).get("selected_visit_location"),
     )
@@ -444,7 +471,7 @@ def create_agent_appointment(
     form["selected_visit_location"] = selected_location
     lead.meta_form_data = form
     meeting = Meeting(
-        project_id=lead.project_id,
+        project_id=booking_project_id,
         lead_id=lead.id,
         broker_id=None,
         assigned_sales_user_id=user.id,
@@ -471,8 +498,8 @@ def create_agent_appointment(
     lead.stage_changed_at = datetime.utcnow()
     db.add_all([meeting, lead])
     db.flush()
-    enqueue_notification(
-        db, company_id=lead.company_id, project_id=lead.project_id,
+    if emit_notification:enqueue_notification(
+        db, company_id=lead.company_id, project_id=booking_project_id,
         event_type="appointment_confirmed", entity_type="lead", entity_id=lead.id,
         payload={
             "meeting_id": meeting.id,

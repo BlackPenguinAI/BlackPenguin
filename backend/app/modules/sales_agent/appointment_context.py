@@ -102,7 +102,8 @@ def render(result):
     blocks=[]
     for row in rows:
         when=datetime.fromisoformat(row['starts_at_local']).strftime('%Y-%m-%d at %H:%M')
-        parts=[f"{row['project_name']}: {when} ({row['timezone']}); status: {row['status']}."]
+        status='rescheduled (replaced)' if row.get('confirmation_status')=='rescheduled' else row['status']
+        parts=[f"{row['project_name']}: {when} ({row['timezone']}); status: {status}."]
         if row['property_type_name']:parts.append('Property: '+row['property_type_name']+'.')
         if row['unit_code']:parts.append('Unit: '+row['unit_code']+'.')
         if row['address']:parts.append('Visit address: '+row['address']+'.')

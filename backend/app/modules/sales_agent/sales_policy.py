@@ -24,7 +24,7 @@ FACT_KEYS = {'property':'property_interest', 'budget':'budget', 'bedrooms':'bedr
              'visit_readiness':'visit_readiness'}
 
 
-def policy_context(db, scope, facts):
+def policy_context(db, scope, facts, *, target_project_id=None):
     profile = db.query(CompanyProfile).filter_by(company_id=scope.company_id).first()
     company = confirmed_profile_facts(profile) if active_approved(profile) else {}
     # Only public, approved guidance, never login data or unapproved onboarding sources.
@@ -39,7 +39,7 @@ def policy_context(db, scope, facts):
     from .next_flow import selected
     if selected(scope):
         from .action_policy import resolve
-        result['action_policy']=resolve(db,scope,company,project)
+        result['action_policy']=resolve(db,scope,company,project,target_project_id=target_project_id)
     return result
 
 

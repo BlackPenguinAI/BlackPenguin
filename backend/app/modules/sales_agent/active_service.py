@@ -191,6 +191,11 @@ def _appointment(db,scope,conversation,lead,project,outcome,inbound):
     from .service import _confirm_or_request_location
     u=outcome.state.last_understanding
     from .next_flow import selected as next_selected
+    if next_selected(scope) and not u.appointment_query:
+        from .reschedule_service import should_handle,handle as reschedule
+        previous=latest_outbound(db,conversation.id,skip_language_holds=True)
+        previous_meta=(previous.metadata_json or {}) if previous else {}
+        if should_handle(u,outcome.state,previous_meta,outcome):return reschedule(db,scope,conversation,lead,project,outcome,inbound,previous_meta)
     if next_selected(scope) and u.appointment_query and u.permits('appointment'):
         if u.requires_clarification or u.confidence<.8:return 'Which appointment would you like to review?',{},[]
         from .sales_policy import policy_context,compliance_action_holds
@@ -270,8 +275,16 @@ def _calendar_after_commit(db,meeting_id,scope):
     from .booking_models import SalesBookingOperation
     operation=db.query(SalesBookingOperation).filter_by(meeting_id=meeting_id,company_id=scope.company_id,lead_id=scope.lead_id).first()
     if operation:
+        from .reschedule_models import SalesRescheduleOperation
+        replacement=db.query(SalesRescheduleOperation).filter_by(replacement_meeting_id=meeting_id,company_id=scope.company_id,lead_id=scope.lead_id).first()
+        if replacement:
+            from .reschedule_service import advance_effect
+            advance_effect(db,replacement.id)
+            return
         from .first_booking import sync_calendar
         sync_calendar(db,operation.id)
+        from .reschedule_service import advance_for_meeting
+        advance_for_meeting(db,scope,meeting_id)
         return
     meeting=db.query(Meeting).filter_by(id=meeting_id,project_id=scope.project_id,lead_id=scope.lead_id).with_for_update().one()
     from app.modules.sales_crm.models import MeetingStatus
@@ -301,6 +314,8 @@ def retry_active_calendars(db,limit=10):
     if not settings.SALES_DIALOGUE_RUNTIME_ENABLED:return
     from .first_booking import retry_calendars
     retry_calendars(db,limit)
+    from .reschedule_service import retry_effects
+    retry_effects(db,limit)
     from app.modules.sales_crm.models import MeetingStatus
     rows=db.query(Meeting).filter(Meeting.source=='agent_sms_active',Meeting.status==MeetingStatus.CONFIRMED,
         Meeting.calendar_sync_status.in_(['pending','failed']),Meeting.meeting_time>datetime.utcnow()).order_by(
@@ -428,6 +443,8 @@ async def maybe_process_active(db,conversation,inbound):
                 if next_enabled:
                     from .first_booking import enrich_understanding
                     u=enrich_understanding(u,previous_meta,inbound.content)
+                    from .reschedule_service import enrich as enrich_reschedule
+                    u=enrich_reschedule(u,previous_meta,inbound.content)
                 u=confirmed_controls(u,inbound.content,pause_reason=protected)
                 interpreted_revision=interpreted.revision
             if u.confidence < .8 and not u.requires_clarification:
@@ -579,12 +596,16 @@ async def maybe_process_active(db,conversation,inbound):
                     # Keep a mixed request pending without putting two competing
                     # acceptance questions/offers into the same outbound message.
                     if metadata.get('booking_operation_id'):
-                        details.append(appointment.removesuffix(' What else would you like to know before your visit?'))
+                        closing=' What else would you like to know?' if metadata.get('reschedule_operation_id') else ' What else would you like to know before your visit?'
+                        details.append(appointment.removesuffix(closing))
                         metadata.pop('post_booking_question',None)
                     else:
                         metadata.pop('appointment_offer',None)
                         metadata.pop('location_offer',None)
                         metadata.pop('booking_confirmation',None)
+                        metadata.pop('reschedule_confirmation',None)
+                        metadata.pop('reschedule_offer',None)
+                        metadata.pop('reschedule_meeting_offer',None)
                         if metadata.pop('booking_property_question',None):metadata.pop('property_catalog_offer',None)
                         details.append('Your visit request remains pending while we review the information request.')
                 elif appointment:details.append(appointment)
@@ -606,6 +627,8 @@ async def maybe_process_active(db,conversation,inbound):
                     lead_id=scope.lead_id,channel=conversation.channel)
                 if digest(refreshed)!=digest(commercial):
                     raise ValueError('Approved commercial information changed during composition.')
+                from .reschedule_service import validate_prepared
+                validate_prepared(db,scope,metadata)
                 text=commercial_draft.text
                 metadata['composition']=commercial_draft.trace
                 metadata.update(commercial_draft.trace['closing_metadata'])

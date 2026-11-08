@@ -104,6 +104,18 @@ class Courtesy(StrictModel):
     evidence: str = Field(min_length=1,max_length=2000)
 
 
+class RescheduleDirective(StrictModel):
+    action: Literal['request','select','confirm','decline']
+    evidence: str = Field(min_length=1,max_length=2000)
+    meeting_reference: str | None = Field(default=None,max_length=200)
+    target_project: str | None = Field(default=None,max_length=200)
+    target_property: str | None = Field(default=None,max_length=200)
+    target_unit: str | None = Field(default=None,max_length=200)
+    target_location: str | None = Field(default=None,max_length=500)
+    target_specialist: str | None = Field(default=None,max_length=200)
+    timing: VisitTiming | None = None
+
+
 class Understanding(StrictModel):
     version: Literal['sales-understanding/1.0']
     requests: list[Request] = Field(max_length=30)
@@ -117,6 +129,7 @@ class Understanding(StrictModel):
     releases: list[ConstraintRelease] = Field(default_factory=list, max_length=20)
     visit: VisitDirective | None = None
     courtesy: Courtesy | None = None
+    reschedule: RescheduleDirective | None = None
     appointment_query: Literal['active','past','cancelled','all'] | None = None
     selected_reference_id: str | None = Field(default=None,max_length=60)
     requires_clarification: StrictBool
@@ -163,6 +176,10 @@ class Understanding(StrictModel):
             evidence.append(self.visit.evidence)
             if self.visit.timing:
                 evidence.extend(v for k,v in self.visit.timing.model_dump().items() if k!='time_relation' and v is not None)
+        if self.reschedule:
+            evidence.append(self.reschedule.evidence)
+            evidence.extend(v for k,v in self.reschedule.model_dump().items() if k not in {'action','evidence','timing'} and v)
+            if self.reschedule.timing:evidence.extend(v for k,v in self.reschedule.timing.model_dump().items() if k!='time_relation' and v is not None)
         if self.courtesy:evidence.append(self.courtesy.evidence)
         if any(not item.strip() or item not in inbound for item in evidence):
             raise ValueError('Evidence must be an exact non-empty substring of the current message.')
@@ -252,6 +269,8 @@ class DialogueState(StrictModel):
     preferences: list[Preference] = Field(default_factory=list, max_length=100)
     last_understanding: Understanding | None = None
     memory: 'TurnMemory' = Field(default_factory=lambda: TurnMemory())
+    reschedule_search: dict = Field(default_factory=dict)
+    reschedule_proposal: dict | None = None
     booking_search: dict = Field(default_factory=dict)
     booking_proposal: dict | None = None
     cadence_status: Literal['active','stopped'] = 'active'

@@ -1,0 +1,138 @@
+{
+  "version": "sales-ai-group-g-report/1.0",
+  "date": "2026-11-08",
+  "base_commit": "c2355a71362169f25e1f01471888e5a8c9259b75",
+  "main_reverified_at_close": "c2355a71362169f25e1f01471888e5a8c9259b75",
+  "branch": "sales-ai/group-g-reschedule",
+  "steps": [
+    13
+  ],
+  "status": "implemented_and_verified",
+  "checks": [
+    {
+      "name": "group_g_focused",
+      "passed": 39,
+      "skipped": 0,
+      "warnings": 5203,
+      "seconds": 26.13,
+      "failed": 0,
+      "exit_code": 0
+    },
+    {
+      "name": "checkout_regression_before_final_worker_fix",
+      "passed": 1900,
+      "skipped": 4,
+      "warnings": 35113,
+      "seconds": 183.05,
+      "failed": 0,
+      "exit_code": 0
+    },
+    {
+      "name": "isolated_actions_layout_final_tree",
+      "passed": 1902,
+      "skipped": 4,
+      "warnings": 35475,
+      "seconds": 186.26,
+      "failed": 0,
+      "exit_code": 0,
+      "unchanged_reference_files": 229,
+      "matching_application_tools_migration_files": 279,
+      "physical_copies": true,
+      "checkout_imports": false
+    },
+    {
+      "name": "existing_safety_replay",
+      "passed": 20,
+      "total": 20,
+      "external_actions": 0,
+      "model_quality_evaluated": false
+    },
+    {
+      "name": "migration_heads",
+      "head": "20261108_sales_reschedule_ops"
+    },
+    {
+      "name": "sqlite_roundtrip_and_postgres_ddl",
+      "included_in_focused_tests": true
+    },
+    {
+      "name": "dependency_consistency",
+      "exit_code": 0
+    },
+    {
+      "name": "whitespace",
+      "exit_code": 0
+    }
+  ],
+  "coverage": {
+    "channels": [
+      "sms",
+      "whatsapp"
+    ],
+    "model": "INJECTED_SCRIPTED",
+    "providers": "MOCKED",
+    "real_postgres_concurrency_proven": false,
+    "inherited_postgres_cases_skipped": 4,
+    "partial_acceptance_cases": [
+      "T17",
+      "T18",
+      "T19",
+      "T21",
+      "T25",
+      "T26"
+    ],
+    "complete_T01_T26_acceptance": false
+  },
+  "reschedule": {
+    "version": "sales-reschedule/1.0",
+    "proposal_expiry_minutes": 30,
+    "protocol": "verified options -> selection -> full old/new comparison -> exact assent -> atomic replacement",
+    "old_reservation_released_before_confirmation": false,
+    "cross_project_requires_explicit_approved_same_company_target": true,
+    "lead_or_conversation_project_transferred": false,
+    "unique_receipts": [
+      "proposal_id",
+      "original_meeting_id",
+      "replacement_meeting_id"
+    ],
+    "concurrency_guards": [
+      "lead lock",
+      "original receipt and meeting locks",
+      "ordered specialist locks",
+      "availability recheck",
+      "savepoint rollback"
+    ]
+  },
+  "effects": {
+    "new_calendar_created_before_old_calendar_removed": true,
+    "old_calendar_removal": "exact saved event/connection/calendar binding only",
+    "old_calendar_removal_attempt_cap": 5,
+    "notification_outbox": "explicit old/new Sales recipients with deduplication",
+    "separate_confirmation_email_sent": false,
+    "successive_replacement_chain_limit": 10,
+    "activation_checked_for_source_and_target": true
+  },
+  "internal_prompt_version": "sales-understanding-prompt/2.4",
+  "new_migrations": [
+    "20261108_sales_reschedule_ops"
+  ],
+  "production_migration_applied": false,
+  "production_changes": false,
+  "deployment_performed": false,
+  "published_prompts_changed": false,
+  "product_model_changed": false,
+  "model_quality_evaluated": false,
+  "live_channel_acceptance": "not_run",
+  "new_flow_activation": "disabled_by_default_explicit_project_allowlist_required",
+  "limits": [
+    "No live model, Calendar or messaging acceptance.",
+    "Real PostgreSQL parallel contention remains unproven.",
+    "Docker unavailable: physical isolated Actions layout validated, not a built image or remote workflow.",
+    "Cancellation requested by the lead and durable wait remain H and I.",
+    "Operational rollback must retain meetings, receipts and snapshots and use compatible JSON readers."
+  ],
+  "next_group": "H",
+  "next_steps": [
+    14
+  ]
+}

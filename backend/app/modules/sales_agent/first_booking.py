@@ -142,7 +142,7 @@ def choose_user(db,project_id,ids):
     return values[(values.index(last)+1)%len(values)] if last in values else values[0] if values else None
 
 
-def search_slots(db,scope,prefs,now):
+def search_slots(db,scope,prefs,now,*,excluded_meeting=None,allowed_user_ids=None):
     from datetime import date
     from app.modules.sales_crm.scheduling import available_slots,eligible_users_for_slot
     if not eligible_appointment_assignments(db,scope.project_id):return []
@@ -166,16 +166,19 @@ def search_slots(db,scope,prefs,now):
     # One availability scan and one FreeBusy range per connected specialist.
     # One extra UTC day covers local daylight-saving offsets; the predicate clips the range.
     slots=available_slots(db,project_id=scope.project_id,after=after,duration_minutes=prefs['duration_minutes'],
-        days=(last-first).days+2,limit=3,slot_predicate=matches,include_sales_user_ids=True)
+        days=(last-first).days+2,limit=3,slot_predicate=matches,include_sales_user_ids=True,
+        **({'allowed_sales_user_ids':allowed_user_ids} if allowed_user_ids is not None else {}),
+        **({'excluded_meeting':excluded_meeting} if excluded_meeting else {}))
     for slot in slots:
         starts=slot['start_at']
         ids=slot.get('eligible_sales_user_ids')
         if ids is None:ids=eligible_users_for_slot(db,project_id=scope.project_id,starts_at=starts,duration_minutes=prefs['duration_minutes'])
+        if allowed_user_ids is not None:ids=[uid for uid in ids if uid in allowed_user_ids]
         user_id=choose_user(db,scope.project_id,ids)
         user=db.query(User).filter_by(id=user_id,company_id=scope.company_id,deleted_at=None).first() if user_id else None
         if user:result.append({'starts_at':utc(starts).isoformat(),'sales_user_id':user.id,
             'specialist_name':' '.join(v for v in [user.first_name,user.last_name] if v) or 'Sales specialist'})
-    return result
+    return result[:3]
 
 
 def label(option,prefs):
@@ -380,7 +383,11 @@ def retry_calendars(db,limit=10):
     config=db.query(AIConfiguration).filter_by(company_id=None).first()
     policy=RuntimePolicy.model_validate((config.agent_ventas or {}).get('runtime_config') or {}) if config else RuntimePolicy()
     if policy.mode!='active':return
-    query=db.query(SalesBookingOperation).filter(SalesBookingOperation.calendar_status.in_(['pending','retry','waiting_connection']),
+    from .reschedule_models import SalesRescheduleOperation
+    replacement=db.query(SalesRescheduleOperation.id).filter(
+        SalesRescheduleOperation.replacement_booking_operation_id==SalesBookingOperation.id).exists()
+    # G owns both activation scopes and the ordered replacement/cleanup effect.
+    query=db.query(SalesBookingOperation).filter(~replacement,SalesBookingOperation.calendar_status.in_(['pending','retry','waiting_connection']),
         SalesBookingOperation.next_attempt_at<=datetime.utcnow(),SalesBookingOperation.project_id.in_(ids))
     if policy.scope=='cohort':
         query=query.filter(SalesBookingOperation.company_id.in_(policy.company_ids),SalesBookingOperation.project_id.in_(policy.project_ids))

@@ -95,7 +95,7 @@ def select_continuations(*, outcome, commercial, metadata, previous_meta, lead, 
     if metadata.get('material_offer'):
         # The caller supplies this as priority; never make an offer invisible.
         raise ValueError('Material proposal needs an explicit continuation.')
-    if metadata.get('appointment_offer') or metadata.get('location_offer') or metadata.get('meeting_id') or metadata.get('appointment_query') or metadata.get('booking_confirmation') or metadata.get('booking_property_question'):
+    if metadata.get('appointment_offer') or metadata.get('location_offer') or metadata.get('meeting_id') or metadata.get('appointment_query') or metadata.get('booking_confirmation') or metadata.get('booking_property_question') or metadata.get('reschedule_confirmation') or metadata.get('reschedule_meeting_offer') or metadata.get('reschedule_context_question'):
         add('none', '')  # Backend operation details include their own continuation, if any.
         return choices
     types = commercial['property_types']

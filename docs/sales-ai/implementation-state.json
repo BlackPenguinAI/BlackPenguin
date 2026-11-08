@@ -1,8 +1,8 @@
 {
   "version": "sales-ai-implementation-state/1.0",
-  "base_commit": "f92e8046cf09c253da78b9636c311c7dfed62988",
-  "branch": "sales-ai/group-f-booking-continuity",
-  "current_group": "F",
+  "base_commit": "c2355a71362169f25e1f01471888e5a8c9259b75",
+  "branch": "sales-ai/group-g-reschedule",
+  "current_group": "G",
   "completed_steps": [
     1,
     2,
@@ -15,11 +15,12 @@
     9,
     10,
     11,
-    12
-  ],
-  "next_group": "G",
-  "next_steps": [
+    12,
     13
+  ],
+  "next_group": "H",
+  "next_steps": [
+    14
   ],
   "groups": {
     "A": "implemented_and_verified",
@@ -28,7 +29,7 @@
     "D": "implemented_and_verified",
     "E": "implemented_and_verified",
     "F": "implemented_and_verified",
-    "G": "pending",
+    "G": "implemented_and_verified",
     "H": "pending",
     "I": "pending",
     "J": "pending",
@@ -39,12 +40,13 @@
   "deployment_performed": false,
   "migrations": [
     "20261108_sales_visit_context",
-    "20261108_sales_booking_ops"
+    "20261108_sales_booking_ops",
+    "20261108_sales_reschedule_ops"
   ],
   "model_quality_evaluated": false,
   "live_channel_acceptance": "not_run",
   "acceptance_matrix": "backend/tests/fixtures/sales_ai/acceptance_matrix.json",
-  "verification_report": "docs/sales-ai/group-f-report.json",
+  "verification_report": "docs/sales-ai/group-g-report.json",
   "replay_report": "docs/sales-ai/group-b-baseline-replay.json",
   "continuity": "Continue from this accumulated delivery, reconcile a newer main, and implement only the next explicitly requested group.",
   "maintenance": [
@@ -64,9 +66,11 @@
     "docs/sales-ai/group-b-report.json",
     "docs/sales-ai/group-c-report.json",
     "docs/sales-ai/group-d-report.json",
-    "docs/sales-ai/group-e-report.json"
+    "docs/sales-ai/group-e-report.json",
+    "docs/sales-ai/group-f-report.json"
   ],
   "production_migration_applied": false,
   "commercial_composition": "evidence_bound_llm_selection_with_backend_wordings",
-  "booking_engine": "sales-first-booking/1.0"
+  "booking_engine": "sales-first-booking/1.0",
+  "reschedule_engine": "sales-reschedule/1.0"
 }

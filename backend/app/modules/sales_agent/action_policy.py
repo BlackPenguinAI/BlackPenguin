@@ -21,20 +21,25 @@ class ActionPolicy(BaseModel):
     rules:list[ActionRule]=Field(default_factory=list,max_length=30)
 
 
-def resolve(db,scope,company,project):
+def resolve(db,scope,company,project,*,target_project_id=None):
     from app.modules.governance.models import KnowledgeGuidanceItem
     from app.modules.users.models import User,UserRole
     holds,unresolved,evidence=set(),[],[]
     with db.no_autoflush:
         from .dialogue_store import check_scope
         check_scope(db,scope)
+        project_id=target_project_id or scope.project_id
+        if target_project_id:
+            from app.modules.projects.models import Project
+            if not db.query(Project).filter_by(id=project_id,company_id=scope.company_id).first():
+                raise PermissionError('Target policy is outside this Company.')
         records=db.query(KnowledgeGuidanceItem).filter(
             KnowledgeGuidanceItem.company_id==scope.company_id,
             KnowledgeGuidanceItem.kind=='sales_action_policy',KnowledgeGuidanceItem.status=='approved',
             KnowledgeGuidanceItem.approved_at.isnot(None),
-            ((KnowledgeGuidanceItem.project_id==scope.project_id)|(KnowledgeGuidanceItem.project_id.is_(None)))).all()
+            ((KnowledgeGuidanceItem.project_id==project_id)|(KnowledgeGuidanceItem.project_id.is_(None)))).all()
         for source,owner,notes in [('company',None,company.get('corporate_compliance_information')),
-                                  ('project',scope.project_id,project.get('compliance_notes'))]:
+                                  ('project',project_id,project.get('compliance_notes'))]:
             matched=False
             note_hash=digest(notes) if notes not in (None,'',[],{}) else None
             invalid=[]

@@ -115,3 +115,43 @@ def delete_calendar_event_for_connection(db: Session, connection, event_id: str)
 def create_calendar_event(calendar_id: str, title: str, start_time: datetime, attendee_email: str) -> str:
     """Compatibility adapter for legacy Broker records."""
     return f"legacy_calendar_pending_{uuid.uuid4().hex[:12]}"
+
+
+def calendar_busy_ranges_excluding_event(db: Session, connection, *, starts_at: datetime, ends_at: datetime, event_id: str) -> list[tuple[datetime, datetime]]:
+    """List event instances to omit one owned booking, without subtracting merged FreeBusy.
+
+    https://developers.google.com/workspace/calendar/api/v3/reference/events/list
+    Pagination, malformed data and provider errors fail closed.
+    """
+    from zoneinfo import ZoneInfo
+    try:
+        token=_access_token(db,connection)
+        params={'timeMin':starts_at.replace(tzinfo=timezone.utc).isoformat(),
+            'timeMax':ends_at.replace(tzinfo=timezone.utc).isoformat(),
+            'singleEvents':'true','showDeleted':'false','maxResults':250}
+        busy=[]
+        for _ in range(5):
+            response=httpx.get(f"{CALENDAR_API}/calendars/{connection.calendar_id or 'primary'}/events",params=params,
+                headers={'Authorization':f'Bearer {token}'},timeout=15.0)
+            response.raise_for_status();payload=response.json()
+            if not isinstance(payload,dict) or 'items' not in payload and payload.get('kind')!='calendar#events':raise ValueError('Invalid calendar event response.')
+            zone=ZoneInfo(payload['timeZone']) if payload.get('timeZone') else None
+            def instant(value):
+                raw=value.get('dateTime') or value.get('date')
+                parsed=datetime.fromisoformat(raw.replace('Z','+00:00'))
+                if parsed.tzinfo is None:
+                    local_zone=ZoneInfo(value['timeZone']) if value.get('timeZone') else zone
+                    if local_zone is None:raise ValueError('Calendar timezone is required for local/all-day events.')
+                    parsed=parsed.replace(tzinfo=local_zone)
+                return parsed.astimezone(timezone.utc).replace(tzinfo=None)
+            for event in payload.get('items',[]):
+                if event.get('id')==event_id or event.get('status')=='cancelled' or event.get('transparency')=='transparent':continue
+                start,end=instant(event['start']),instant(event['end'])
+                if end<=start:raise ValueError('Invalid calendar interval.')
+                if start<ends_at and end>starts_at:busy.append((start,end))
+            if not payload.get('nextPageToken'):return busy
+            params['pageToken']=payload['nextPageToken']
+        raise ValueError('Calendar event pagination limit reached.')
+    except Exception as exc:
+        connection.last_error=type(exc).__name__;db.flush()
+        return [(starts_at,ends_at)]

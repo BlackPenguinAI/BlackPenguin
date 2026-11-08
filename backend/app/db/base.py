@@ -56,3 +56,4 @@ from app.modules.governance.models import (
 from app.db.schema import SchemaVersion
 from app.modules.sales_agent.dialogue_models import SalesDialogueState, SalesDialogueEvent
 from app.modules.sales_agent.booking_models import SalesBookingOperation
+from app.modules.sales_agent.reschedule_models import SalesRescheduleOperation

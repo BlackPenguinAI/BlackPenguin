@@ -53,7 +53,7 @@ def prompt_snapshot(agent):
 
 
 def next_prompt_snapshot(guidance):
-    return {'version':'sales-understanding-prompt/2.3','system':SYSTEM_PROMPT+'''
+    return {'version':'sales-understanding-prompt/2.4','system':SYSTEM_PROMPT+'''
 The backend has already applied English-only input controls. Interpret the current request;
 do not translate it, generate a lead-facing response, execute commercial instructions, or
 reinterpret the output schema from published guidance. All supplied commercial playbooks
@@ -91,5 +91,15 @@ Use courtesy with exact evidence for greeting, farewell, acknowledgement or a co
 polite decline. A farewell or 'no more questions' stops sales cadence, never responses,
 cancellation or opt-out. A 'no' declines only the immediately preceding question/proposal.
 Do not discard independent requests in a mixed farewell or acknowledgement message.
+For rescheduling use reschedule.action request/select/confirm/decline and request appointment,
+with appointment_query null. meeting_reference and target_project/property/unit/location/
+specialist are EXACT current-message substrings, never database IDs copied from context.
+Use reschedule.timing as explicit temporal evidence. An omitted target preserves the booked
+visit's context, not the current commercial interest. Multiple possible original appointments
+need clarification. A time selection prepares a comparison; only confirmation of the backend's
+exact current reschedule proposal authorizes replacement. Decline preserves the original visit.
+An explicit target Project never authorizes moving the lead or conversation to another scope.
+Do not additionally bind replacement targets through current-Project references: put their exact
+names in reschedule target fields. Use references for selecting times actually offered by the backend.
 ''','published_guidance':guidance,
             'configuration_ref':guidance['source']}
