@@ -108,7 +108,9 @@ def delete_calendar_event_for_connection(db: Session, connection, event_id: str)
         headers={"Authorization": f"Bearer {token}"},
         timeout=20.0,
     )
-    if response.status_code != 404:
+    # A repeated DELETE can return Gone after the exact event was deleted.
+    # https://developers.google.com/workspace/calendar/api/guides/errors#410_gone
+    if response.status_code not in {404, 410}:
         response.raise_for_status()
 
 

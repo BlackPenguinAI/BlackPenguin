@@ -1,8 +1,8 @@
 {
   "version": "sales-ai-implementation-state/1.0",
-  "base_commit": "c2355a71362169f25e1f01471888e5a8c9259b75",
-  "branch": "sales-ai/group-g-reschedule",
-  "current_group": "G",
+  "base_commit": "95c062dea640033300f559544c2649417bce5851",
+  "branch": "sales-ai/group-h-cancellation",
+  "current_group": "H",
   "completed_steps": [
     1,
     2,
@@ -16,11 +16,12 @@
     10,
     11,
     12,
-    13
-  ],
-  "next_group": "H",
-  "next_steps": [
+    13,
     14
+  ],
+  "next_group": "I",
+  "next_steps": [
+    15
   ],
   "groups": {
     "A": "implemented_and_verified",
@@ -30,7 +31,7 @@
     "E": "implemented_and_verified",
     "F": "implemented_and_verified",
     "G": "implemented_and_verified",
-    "H": "pending",
+    "H": "implemented_and_verified",
     "I": "pending",
     "J": "pending",
     "K": "pending",
@@ -41,12 +42,13 @@
   "migrations": [
     "20261108_sales_visit_context",
     "20261108_sales_booking_ops",
-    "20261108_sales_reschedule_ops"
+    "20261108_sales_reschedule_ops",
+    "20261108_sales_cancel_ops"
   ],
   "model_quality_evaluated": false,
   "live_channel_acceptance": "not_run",
   "acceptance_matrix": "backend/tests/fixtures/sales_ai/acceptance_matrix.json",
-  "verification_report": "docs/sales-ai/group-g-report.json",
+  "verification_report": "docs/sales-ai/group-h-report.json",
   "replay_report": "docs/sales-ai/group-b-baseline-replay.json",
   "continuity": "Continue from this accumulated delivery, reconcile a newer main, and implement only the next explicitly requested group.",
   "maintenance": [
@@ -67,10 +69,12 @@
     "docs/sales-ai/group-c-report.json",
     "docs/sales-ai/group-d-report.json",
     "docs/sales-ai/group-e-report.json",
-    "docs/sales-ai/group-f-report.json"
+    "docs/sales-ai/group-f-report.json",
+    "docs/sales-ai/group-g-report.json"
   ],
   "production_migration_applied": false,
   "commercial_composition": "evidence_bound_llm_selection_with_backend_wordings",
   "booking_engine": "sales-first-booking/1.0",
-  "reschedule_engine": "sales-reschedule/1.0"
+  "reschedule_engine": "sales-reschedule/1.0",
+  "cancellation_engine": "sales-cancellation/1.0"
 }

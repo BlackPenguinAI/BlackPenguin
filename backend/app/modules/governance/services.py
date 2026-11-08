@@ -557,55 +557,73 @@ def process_appointment_email_outbox(db: Session, *, limit: int = 10) -> int:
     return sent
 
 
+def _process_notification_event(db: Session, event: NotificationOutbox) -> int:
+    created = 0
+    users = db.query(User).filter(
+        User.company_id == event.company_id,
+        User.is_active.is_(True), User.deleted_at.is_(None),
+        User.role.in_([UserRole.ADMIN, UserRole.ASSISTANT, UserRole.MKT, UserRole.SALES]),
+    ).all()
+    lead = db.query(Lead).filter(Lead.id == event.entity_id).first() if event.entity_type == "lead" else None
+    payload = event.payload_json or {}
+    recipient_roles = {str(role) for role in payload.get("recipient_roles", []) if role}
+    for user in users:
+        role_value = user.role.value if hasattr(user.role, "value") else str(user.role)
+        if recipient_roles and role_value not in recipient_roles:
+            continue
+        if payload.get("recipient_user_ids") and user.id not in payload["recipient_user_ids"]:
+            continue
+        target_sales_id = payload.get("assigned_sales_user_id") if event.event_type in {"appointment_confirmed", "appointment_rescheduled", "appointment_cancelled"} else None
+        target_sales_id = target_sales_id or (lead.assigned_sales_user_id if lead else None)
+        if user.role == UserRole.SALES and target_sales_id != user.id:
+            continue
+        if event.project_id and user.role in {UserRole.MKT, UserRole.SALES}:
+            allowed = project_ids_for_user(db, user)
+            if (user.project_access_scope or "all") == "selected" and event.project_id not in allowed:
+                continue
+        if event.event_type == "human_intervention" and user.role == UserRole.MKT:
+            continue
+        dedupe = f"{event.dedupe_key}:{user.id}"
+        if db.query(Notification).filter(
+            Notification.recipient_user_id == user.id, Notification.dedupe_key == dedupe,
+        ).first():
+            continue
+        db.add(Notification(
+            company_id=event.company_id, project_id=event.project_id,
+            recipient_user_id=user.id, notification_type=event.event_type,
+            severity="warning" if event.event_type == "human_intervention" else "info",
+            title=str(payload.get("title") or event.event_type.replace("_", " ").title()),
+            body=str(payload.get("body") or "A new event requires your attention."),
+            entity_type=event.entity_type, entity_id=event.entity_id,
+            action_url=payload.get("action_url") or (f"/app/leads?lead={event.entity_id}" if event.entity_type == "lead" else None),
+            dedupe_key=dedupe,
+        ))
+        created += 1
+    event.status = "processed"; event.processed_at = datetime.utcnow(); event.attempts += 1
+    db.flush()
+    return created
+
+
 def process_notification_outbox(db: Session, *, company_id: str | None = None) -> int:
-    query = db.query(NotificationOutbox).filter(NotificationOutbox.status == "pending")
+    from app.modules.sales_agent.cancellation_models import SalesCancellationOperation
+    from sqlalchemy import or_
+    linked = db.query(SalesCancellationOperation.id).filter(SalesCancellationOperation.notification_outbox_id == NotificationOutbox.id).exists()
+    due = db.query(SalesCancellationOperation.id).filter(
+        SalesCancellationOperation.notification_outbox_id == NotificationOutbox.id,
+        SalesCancellationOperation.notification_status.in_(['pending','retry']),
+        SalesCancellationOperation.notification_next_attempt_at <= datetime.utcnow()).exists()
+    query = db.query(NotificationOutbox).filter(NotificationOutbox.status == "pending",or_(~linked,due))
     if company_id:
         query = query.filter(NotificationOutbox.company_id == company_id)
     created = 0
     if db.get_bind().dialect.name == "postgresql":
         query = query.with_for_update(skip_locked=True)
     for event in query.order_by(NotificationOutbox.created_at).limit(100).all():
-        users = db.query(User).filter(
-            User.company_id == event.company_id,
-            User.is_active.is_(True), User.deleted_at.is_(None),
-            User.role.in_([UserRole.ADMIN, UserRole.ASSISTANT, UserRole.MKT, UserRole.SALES]),
-        ).all()
-        lead = db.query(Lead).filter(Lead.id == event.entity_id).first() if event.entity_type == "lead" else None
-        payload = event.payload_json or {}
-        recipient_roles = {str(role) for role in payload.get("recipient_roles", []) if role}
-        for user in users:
-            role_value = user.role.value if hasattr(user.role, "value") else str(user.role)
-            if recipient_roles and role_value not in recipient_roles:
-                continue
-            if payload.get("recipient_user_ids") and user.id not in payload["recipient_user_ids"]:
-                continue
-            target_sales_id = payload.get("assigned_sales_user_id") if event.event_type in {"appointment_confirmed", "appointment_rescheduled"} else None
-            target_sales_id = target_sales_id or (lead.assigned_sales_user_id if lead else None)
-            if user.role == UserRole.SALES and target_sales_id != user.id:
-                continue
-            if event.project_id and user.role in {UserRole.MKT, UserRole.SALES}:
-                allowed = project_ids_for_user(db, user)
-                if (user.project_access_scope or "all") == "selected" and event.project_id not in allowed:
-                    continue
-            if event.event_type == "human_intervention" and user.role == UserRole.MKT:
-                continue
-            dedupe = f"{event.dedupe_key}:{user.id}"
-            if db.query(Notification).filter(
-                Notification.recipient_user_id == user.id, Notification.dedupe_key == dedupe,
-            ).first():
-                continue
-            db.add(Notification(
-                company_id=event.company_id, project_id=event.project_id,
-                recipient_user_id=user.id, notification_type=event.event_type,
-                severity="warning" if event.event_type == "human_intervention" else "info",
-                title=str(payload.get("title") or event.event_type.replace("_", " ").title()),
-                body=str(payload.get("body") or "A new event requires your attention."),
-                entity_type=event.entity_type, entity_id=event.entity_id,
-                action_url=payload.get("action_url") or (f"/app/leads?lead={event.entity_id}" if event.entity_type == "lead" else None),
-                dedupe_key=dedupe,
-            ))
-            created += 1
-        event.status = "processed"; event.processed_at = datetime.utcnow(); event.attempts += 1
+        if event.event_type == 'appointment_cancelled':
+            from app.modules.sales_agent.cancellation_service import process_notification
+            created += process_notification(db,event)
+        else:
+            created += _process_notification_event(db,event)
     db.commit()
     return created
 

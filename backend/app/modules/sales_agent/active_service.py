@@ -195,6 +195,8 @@ def _appointment(db,scope,conversation,lead,project,outcome,inbound):
         from .reschedule_service import should_handle,handle as reschedule
         previous=latest_outbound(db,conversation.id,skip_language_holds=True)
         previous_meta=(previous.metadata_json or {}) if previous else {}
+        from .cancellation_service import should_handle as should_cancel,handle as cancel
+        if should_cancel(u,previous_meta):return cancel(db,scope,conversation,lead,outcome,inbound,previous_meta)
         if should_handle(u,outcome.state,previous_meta,outcome):return reschedule(db,scope,conversation,lead,project,outcome,inbound,previous_meta)
     if next_selected(scope) and u.appointment_query and u.permits('appointment'):
         if u.requires_clarification or u.confidence<.8:return 'Which appointment would you like to review?',{},[]
@@ -316,6 +318,8 @@ def retry_active_calendars(db,limit=10):
     retry_calendars(db,limit)
     from .reschedule_service import retry_effects
     retry_effects(db,limit)
+    from .cancellation_service import retry_effects as retry_cancellations
+    retry_cancellations(db,limit)
     from app.modules.sales_crm.models import MeetingStatus
     rows=db.query(Meeting).filter(Meeting.source=='agent_sms_active',Meeting.status==MeetingStatus.CONFIRMED,
         Meeting.calendar_sync_status.in_(['pending','failed']),Meeting.meeting_time>datetime.utcnow()).order_by(
@@ -445,6 +449,8 @@ async def maybe_process_active(db,conversation,inbound):
                     u=enrich_understanding(u,previous_meta,inbound.content)
                     from .reschedule_service import enrich as enrich_reschedule
                     u=enrich_reschedule(u,previous_meta,inbound.content)
+                    from .cancellation_service import enrich as enrich_cancellation
+                    u=enrich_cancellation(u,previous_meta,inbound.content)
                 u=confirmed_controls(u,inbound.content,pause_reason=protected)
                 interpreted_revision=interpreted.revision
             if u.confidence < .8 and not u.requires_clarification:
@@ -595,7 +601,11 @@ async def maybe_process_active(db,conversation,inbound):
                 if priority and appointment and '?' in appointment:
                     # Keep a mixed request pending without putting two competing
                     # acceptance questions/offers into the same outbound message.
-                    if metadata.get('booking_operation_id'):
+                    if metadata.get('cancellation_operation_id'):
+                        from .cancellation_service import OPTIONAL_REASON
+                        details.append(appointment.removesuffix(OPTIONAL_REASON))
+                        metadata.pop('cancellation_followup',None)
+                    elif metadata.get('booking_operation_id'):
                         closing=' What else would you like to know?' if metadata.get('reschedule_operation_id') else ' What else would you like to know before your visit?'
                         details.append(appointment.removesuffix(closing))
                         metadata.pop('post_booking_question',None)
@@ -606,6 +616,8 @@ async def maybe_process_active(db,conversation,inbound):
                         metadata.pop('reschedule_confirmation',None)
                         metadata.pop('reschedule_offer',None)
                         metadata.pop('reschedule_meeting_offer',None)
+                        metadata.pop('cancellation_confirmation',None)
+                        metadata.pop('cancellation_meeting_offer',None)
                         if metadata.pop('booking_property_question',None):metadata.pop('property_catalog_offer',None)
                         details.append('Your visit request remains pending while we review the information request.')
                 elif appointment:details.append(appointment)
@@ -629,6 +641,8 @@ async def maybe_process_active(db,conversation,inbound):
                     raise ValueError('Approved commercial information changed during composition.')
                 from .reschedule_service import validate_prepared
                 validate_prepared(db,scope,metadata)
+                from .cancellation_service import validate_prepared as validate_cancellation
+                validate_cancellation(db,scope,metadata)
                 text=commercial_draft.text
                 metadata['composition']=commercial_draft.trace
                 metadata.update(commercial_draft.trace['closing_metadata'])
@@ -742,6 +756,9 @@ async def maybe_process_active(db,conversation,inbound):
         data['delivered_task_ids']=[]
     metadata['sales_asset_share_ids']=data.get('sales_asset_share_ids') or []
     _calendar_after_commit(db,metadata.get('meeting_id'),scope)
+    if metadata.get('cancellation_operation_id'):
+        from .cancellation_service import advance_effect
+        advance_effect(db,metadata['cancellation_operation_id'])
     # Retain the original intent result even if dispatch-time approval changed.
     run.output_snapshot={**run.output_snapshot,'reply':data['reply']}
     dispatched=await live._dispatch(db,conversation=conversation,lead=lead,content=data['reply'],role='assistant',agent_run_id=run.id,

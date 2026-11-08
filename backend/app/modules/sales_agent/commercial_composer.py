@@ -95,6 +95,9 @@ def select_continuations(*, outcome, commercial, metadata, previous_meta, lead, 
     if metadata.get('material_offer'):
         # The caller supplies this as priority; never make an offer invisible.
         raise ValueError('Material proposal needs an explicit continuation.')
+    if any(metadata.get(k) for k in ['cancellation_confirmation','cancellation_meeting_offer','cancellation_context_question','cancellation_operation_id','cancellation_followup_closed']):
+        add('none','')
+        return choices
     if metadata.get('appointment_offer') or metadata.get('location_offer') or metadata.get('meeting_id') or metadata.get('appointment_query') or metadata.get('booking_confirmation') or metadata.get('booking_property_question') or metadata.get('reschedule_confirmation') or metadata.get('reschedule_meeting_offer') or metadata.get('reschedule_context_question'):
         add('none', '')  # Backend operation details include their own continuation, if any.
         return choices
@@ -109,6 +112,9 @@ def select_continuations(*, outcome, commercial, metadata, previous_meta, lead, 
             'farewell':"You're welcome. Feel free to message again whenever you have another question.",
             'acknowledgement':'You can message here if another question comes up.',
             'decline':'No problem. You can continue asking about the property whenever you like.'}[u.courtesy.kind],'metadata':{}}]
+    if outcome.state.cadence_stop_reason=='cancelled':
+        add('details','What would you like to know next about the property?' if topics-{'other'} else '')
+        return choices
     missing, field, question = qualification(lead, commercial['confirmed_project_facts'])
     if field == 'visit_readiness' and ('appointment' in holds or any(c.topic.value == 'appointment' for c in [*outcome.state.constraints,*outcome.state.property_constraints])):
         question = ''

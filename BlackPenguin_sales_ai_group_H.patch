@@ -1,0 +1,1725 @@
+diff --git a/backend/alembic/versions/20261108_sales_cancellation_operations.py b/backend/alembic/versions/20261108_sales_cancellation_operations.py
+new file mode 100644
+index 0000000..fce969a
+--- /dev/null
++++ b/backend/alembic/versions/20261108_sales_cancellation_operations.py
+@@ -0,0 +1,38 @@
++"""Add cancellation receipts; preserve all historical reservations and existing outboxes."""
++from alembic import op
++import sqlalchemy as sa
++revision='20261108_sales_cancel_ops'
++down_revision='20261108_sales_reschedule_ops'
++branch_labels=None
++depends_on=None
++
++
++def upgrade():
++    op.create_table('sales_cancellation_operations',
++        sa.Column('id',sa.String(36),primary_key=True),
++        sa.Column('company_id',sa.String(36),sa.ForeignKey('companies.id',ondelete='CASCADE'),nullable=False),
++        sa.Column('project_id',sa.String(36),sa.ForeignKey('projects.id',ondelete='CASCADE'),nullable=False),
++        sa.Column('booking_project_id',sa.String(36),sa.ForeignKey('projects.id',ondelete='CASCADE'),nullable=False),
++        sa.Column('conversation_id',sa.String(36),sa.ForeignKey('sales_conversations.id',ondelete='CASCADE'),nullable=False),
++        sa.Column('lead_id',sa.String(36),sa.ForeignKey('leads.id',ondelete='CASCADE'),nullable=False),
++        sa.Column('proposal_id',sa.String(64),nullable=False,unique=True),
++        sa.Column('meeting_id',sa.String(36),sa.ForeignKey('meetings.id',ondelete='CASCADE'),nullable=False,unique=True),
++        sa.Column('snapshot_json',sa.JSON(),nullable=False),
++        sa.Column('calendar_status',sa.String(40),nullable=False),
++        sa.Column('attempts',sa.Integer(),nullable=False),
++        sa.Column('next_attempt_at',sa.DateTime(),nullable=False),
++        sa.Column('last_error',sa.String(100)),
++        sa.Column('notification_outbox_id',sa.String(36),sa.ForeignKey('notification_outbox.id',ondelete='SET NULL')),
++        sa.Column('notification_status',sa.String(30),nullable=False),
++        sa.Column('notification_attempts',sa.Integer(),nullable=False),
++        sa.Column('notification_next_attempt_at',sa.DateTime(),nullable=False),
++        sa.Column('notification_last_error',sa.String(100)),
++        sa.Column('reason',sa.Text()),
++        sa.Column('reason_message_id',sa.String(36),sa.ForeignKey('sales_messages.id',ondelete='SET NULL')),
++        sa.Column('created_at',sa.DateTime(),nullable=False))
++    op.create_index('ix_sales_cancellation_operations_calendar_status','sales_cancellation_operations',['calendar_status'])
++
++
++def downgrade():
++    op.drop_index('ix_sales_cancellation_operations_calendar_status',table_name='sales_cancellation_operations')
++    op.drop_table('sales_cancellation_operations')
+diff --git a/backend/app/db/base.py b/backend/app/db/base.py
+index 66d8fd2..0a50a46 100644
+--- a/backend/app/db/base.py
++++ b/backend/app/db/base.py
+@@ -57,3 +57,4 @@ from app.db.schema import SchemaVersion
+ from app.modules.sales_agent.dialogue_models import SalesDialogueState, SalesDialogueEvent
+ from app.modules.sales_agent.booking_models import SalesBookingOperation
+ from app.modules.sales_agent.reschedule_models import SalesRescheduleOperation
++from app.modules.sales_agent.cancellation_models import SalesCancellationOperation
+diff --git a/backend/app/integrations/gcalendar_client.py b/backend/app/integrations/gcalendar_client.py
+index ae9ab89..4e61f76 100644
+--- a/backend/app/integrations/gcalendar_client.py
++++ b/backend/app/integrations/gcalendar_client.py
+@@ -108,7 +108,9 @@ def delete_calendar_event_for_connection(db: Session, connection, event_id: str)
+         headers={"Authorization": f"Bearer {token}"},
+         timeout=20.0,
+     )
+-    if response.status_code != 404:
++    # A repeated DELETE can return Gone after the exact event was deleted.
++    # https://developers.google.com/workspace/calendar/api/guides/errors#410_gone
++    if response.status_code not in {404, 410}:
+         response.raise_for_status()
+ 
+ 
+diff --git a/backend/app/modules/governance/router.py b/backend/app/modules/governance/router.py
+index 3992953..44c2158 100644
+--- a/backend/app/modules/governance/router.py
++++ b/backend/app/modules/governance/router.py
+@@ -223,3 +223,23 @@ def mark_notification_read(
+     if not item: raise HTTPException(status_code=404, detail="Notification not found.")
+     item.read_at = item.read_at or datetime.utcnow(); db.commit(); db.refresh(item)
+     return item
++
++
++def _cancellation_effect(db, user, operation_id):
++    from app.modules.sales_agent.cancellation_models import SalesCancellationOperation
++    item=db.query(SalesCancellationOperation).filter_by(id=operation_id,company_id=user.company_id).first()
++    if not item:raise HTTPException(status_code=404,detail='Cancellation not found.')
++    for pid in {item.project_id,item.booking_project_id,*[t['project_id'] for t in item.snapshot_json['cleanup']]}:_scope(db,user,pid)
++    return item
++
++
++@router.get('/appointment-cancellations/{operation_id}/effects')
++def cancellation_effects(operation_id: str,db: Session = Depends(get_db),current_user: User = Depends(RoleChecker(TENANT_MANAGER_ROLES))):
++    from app.modules.sales_agent.cancellation_service import effect_status
++    return effect_status(_cancellation_effect(db,current_user,operation_id))
++
++
++@router.post('/appointment-cancellations/{operation_id}/effects/retry')
++def retry_cancellation_effects(operation_id: str,db: Session = Depends(get_db),current_user: User = Depends(RoleChecker(TENANT_MANAGER_ROLES))):
++    from app.modules.sales_agent.cancellation_service import reset_effects
++    return reset_effects(db,_cancellation_effect(db,current_user,operation_id))
+diff --git a/backend/app/modules/governance/services.py b/backend/app/modules/governance/services.py
+index c41673d..5922390 100644
+--- a/backend/app/modules/governance/services.py
++++ b/backend/app/modules/governance/services.py
+@@ -557,55 +557,73 @@ def process_appointment_email_outbox(db: Session, *, limit: int = 10) -> int:
+     return sent
+ 
+ 
++def _process_notification_event(db: Session, event: NotificationOutbox) -> int:
++    created = 0
++    users = db.query(User).filter(
++        User.company_id == event.company_id,
++        User.is_active.is_(True), User.deleted_at.is_(None),
++        User.role.in_([UserRole.ADMIN, UserRole.ASSISTANT, UserRole.MKT, UserRole.SALES]),
++    ).all()
++    lead = db.query(Lead).filter(Lead.id == event.entity_id).first() if event.entity_type == "lead" else None
++    payload = event.payload_json or {}
++    recipient_roles = {str(role) for role in payload.get("recipient_roles", []) if role}
++    for user in users:
++        role_value = user.role.value if hasattr(user.role, "value") else str(user.role)
++        if recipient_roles and role_value not in recipient_roles:
++            continue
++        if payload.get("recipient_user_ids") and user.id not in payload["recipient_user_ids"]:
++            continue
++        target_sales_id = payload.get("assigned_sales_user_id") if event.event_type in {"appointment_confirmed", "appointment_rescheduled", "appointment_cancelled"} else None
++        target_sales_id = target_sales_id or (lead.assigned_sales_user_id if lead else None)
++        if user.role == UserRole.SALES and target_sales_id != user.id:
++            continue
++        if event.project_id and user.role in {UserRole.MKT, UserRole.SALES}:
++            allowed = project_ids_for_user(db, user)
++            if (user.project_access_scope or "all") == "selected" and event.project_id not in allowed:
++                continue
++        if event.event_type == "human_intervention" and user.role == UserRole.MKT:
++            continue
++        dedupe = f"{event.dedupe_key}:{user.id}"
++        if db.query(Notification).filter(
++            Notification.recipient_user_id == user.id, Notification.dedupe_key == dedupe,
++        ).first():
++            continue
++        db.add(Notification(
++            company_id=event.company_id, project_id=event.project_id,
++            recipient_user_id=user.id, notification_type=event.event_type,
++            severity="warning" if event.event_type == "human_intervention" else "info",
++            title=str(payload.get("title") or event.event_type.replace("_", " ").title()),
++            body=str(payload.get("body") or "A new event requires your attention."),
++            entity_type=event.entity_type, entity_id=event.entity_id,
++            action_url=payload.get("action_url") or (f"/app/leads?lead={event.entity_id}" if event.entity_type == "lead" else None),
++            dedupe_key=dedupe,
++        ))
++        created += 1
++    event.status = "processed"; event.processed_at = datetime.utcnow(); event.attempts += 1
++    db.flush()
++    return created
++
++
+ def process_notification_outbox(db: Session, *, company_id: str | None = None) -> int:
+-    query = db.query(NotificationOutbox).filter(NotificationOutbox.status == "pending")
++    from app.modules.sales_agent.cancellation_models import SalesCancellationOperation
++    from sqlalchemy import or_
++    linked = db.query(SalesCancellationOperation.id).filter(SalesCancellationOperation.notification_outbox_id == NotificationOutbox.id).exists()
++    due = db.query(SalesCancellationOperation.id).filter(
++        SalesCancellationOperation.notification_outbox_id == NotificationOutbox.id,
++        SalesCancellationOperation.notification_status.in_(['pending','retry']),
++        SalesCancellationOperation.notification_next_attempt_at <= datetime.utcnow()).exists()
++    query = db.query(NotificationOutbox).filter(NotificationOutbox.status == "pending",or_(~linked,due))
+     if company_id:
+         query = query.filter(NotificationOutbox.company_id == company_id)
+     created = 0
+     if db.get_bind().dialect.name == "postgresql":
+         query = query.with_for_update(skip_locked=True)
+     for event in query.order_by(NotificationOutbox.created_at).limit(100).all():
+-        users = db.query(User).filter(
+-            User.company_id == event.company_id,
+-            User.is_active.is_(True), User.deleted_at.is_(None),
+-            User.role.in_([UserRole.ADMIN, UserRole.ASSISTANT, UserRole.MKT, UserRole.SALES]),
+-        ).all()
+-        lead = db.query(Lead).filter(Lead.id == event.entity_id).first() if event.entity_type == "lead" else None
+-        payload = event.payload_json or {}
+-        recipient_roles = {str(role) for role in payload.get("recipient_roles", []) if role}
+-        for user in users:
+-            role_value = user.role.value if hasattr(user.role, "value") else str(user.role)
+-            if recipient_roles and role_value not in recipient_roles:
+-                continue
+-            if payload.get("recipient_user_ids") and user.id not in payload["recipient_user_ids"]:
+-                continue
+-            target_sales_id = payload.get("assigned_sales_user_id") if event.event_type in {"appointment_confirmed", "appointment_rescheduled"} else None
+-            target_sales_id = target_sales_id or (lead.assigned_sales_user_id if lead else None)
+-            if user.role == UserRole.SALES and target_sales_id != user.id:
+-                continue
+-            if event.project_id and user.role in {UserRole.MKT, UserRole.SALES}:
+-                allowed = project_ids_for_user(db, user)
+-                if (user.project_access_scope or "all") == "selected" and event.project_id not in allowed:
+-                    continue
+-            if event.event_type == "human_intervention" and user.role == UserRole.MKT:
+-                continue
+-            dedupe = f"{event.dedupe_key}:{user.id}"
+-            if db.query(Notification).filter(
+-                Notification.recipient_user_id == user.id, Notification.dedupe_key == dedupe,
+-            ).first():
+-                continue
+-            db.add(Notification(
+-                company_id=event.company_id, project_id=event.project_id,
+-                recipient_user_id=user.id, notification_type=event.event_type,
+-                severity="warning" if event.event_type == "human_intervention" else "info",
+-                title=str(payload.get("title") or event.event_type.replace("_", " ").title()),
+-                body=str(payload.get("body") or "A new event requires your attention."),
+-                entity_type=event.entity_type, entity_id=event.entity_id,
+-                action_url=payload.get("action_url") or (f"/app/leads?lead={event.entity_id}" if event.entity_type == "lead" else None),
+-                dedupe_key=dedupe,
+-            ))
+-            created += 1
+-        event.status = "processed"; event.processed_at = datetime.utcnow(); event.attempts += 1
++        if event.event_type == 'appointment_cancelled':
++            from app.modules.sales_agent.cancellation_service import process_notification
++            created += process_notification(db,event)
++        else:
++            created += _process_notification_event(db,event)
+     db.commit()
+     return created
+ 
+diff --git a/backend/app/modules/sales_agent/active_service.py b/backend/app/modules/sales_agent/active_service.py
+index 1aacd3f..f9dc1cc 100644
+--- a/backend/app/modules/sales_agent/active_service.py
++++ b/backend/app/modules/sales_agent/active_service.py
+@@ -195,6 +195,8 @@ def _appointment(db,scope,conversation,lead,project,outcome,inbound):
+         from .reschedule_service import should_handle,handle as reschedule
+         previous=latest_outbound(db,conversation.id,skip_language_holds=True)
+         previous_meta=(previous.metadata_json or {}) if previous else {}
++        from .cancellation_service import should_handle as should_cancel,handle as cancel
++        if should_cancel(u,previous_meta):return cancel(db,scope,conversation,lead,outcome,inbound,previous_meta)
+         if should_handle(u,outcome.state,previous_meta,outcome):return reschedule(db,scope,conversation,lead,project,outcome,inbound,previous_meta)
+     if next_selected(scope) and u.appointment_query and u.permits('appointment'):
+         if u.requires_clarification or u.confidence<.8:return 'Which appointment would you like to review?',{},[]
+@@ -316,6 +318,8 @@ def retry_active_calendars(db,limit=10):
+     retry_calendars(db,limit)
+     from .reschedule_service import retry_effects
+     retry_effects(db,limit)
++    from .cancellation_service import retry_effects as retry_cancellations
++    retry_cancellations(db,limit)
+     from app.modules.sales_crm.models import MeetingStatus
+     rows=db.query(Meeting).filter(Meeting.source=='agent_sms_active',Meeting.status==MeetingStatus.CONFIRMED,
+         Meeting.calendar_sync_status.in_(['pending','failed']),Meeting.meeting_time>datetime.utcnow()).order_by(
+@@ -445,6 +449,8 @@ async def maybe_process_active(db,conversation,inbound):
+                     u=enrich_understanding(u,previous_meta,inbound.content)
+                     from .reschedule_service import enrich as enrich_reschedule
+                     u=enrich_reschedule(u,previous_meta,inbound.content)
++                    from .cancellation_service import enrich as enrich_cancellation
++                    u=enrich_cancellation(u,previous_meta,inbound.content)
+                 u=confirmed_controls(u,inbound.content,pause_reason=protected)
+                 interpreted_revision=interpreted.revision
+             if u.confidence < .8 and not u.requires_clarification:
+@@ -595,7 +601,11 @@ async def maybe_process_active(db,conversation,inbound):
+                 if priority and appointment and '?' in appointment:
+                     # Keep a mixed request pending without putting two competing
+                     # acceptance questions/offers into the same outbound message.
+-                    if metadata.get('booking_operation_id'):
++                    if metadata.get('cancellation_operation_id'):
++                        from .cancellation_service import OPTIONAL_REASON
++                        details.append(appointment.removesuffix(OPTIONAL_REASON))
++                        metadata.pop('cancellation_followup',None)
++                    elif metadata.get('booking_operation_id'):
+                         closing=' What else would you like to know?' if metadata.get('reschedule_operation_id') else ' What else would you like to know before your visit?'
+                         details.append(appointment.removesuffix(closing))
+                         metadata.pop('post_booking_question',None)
+@@ -606,6 +616,8 @@ async def maybe_process_active(db,conversation,inbound):
+                         metadata.pop('reschedule_confirmation',None)
+                         metadata.pop('reschedule_offer',None)
+                         metadata.pop('reschedule_meeting_offer',None)
++                        metadata.pop('cancellation_confirmation',None)
++                        metadata.pop('cancellation_meeting_offer',None)
+                         if metadata.pop('booking_property_question',None):metadata.pop('property_catalog_offer',None)
+                         details.append('Your visit request remains pending while we review the information request.')
+                 elif appointment:details.append(appointment)
+@@ -629,6 +641,8 @@ async def maybe_process_active(db,conversation,inbound):
+                     raise ValueError('Approved commercial information changed during composition.')
+                 from .reschedule_service import validate_prepared
+                 validate_prepared(db,scope,metadata)
++                from .cancellation_service import validate_prepared as validate_cancellation
++                validate_cancellation(db,scope,metadata)
+                 text=commercial_draft.text
+                 metadata['composition']=commercial_draft.trace
+                 metadata.update(commercial_draft.trace['closing_metadata'])
+@@ -742,6 +756,9 @@ async def maybe_process_active(db,conversation,inbound):
+         data['delivered_task_ids']=[]
+     metadata['sales_asset_share_ids']=data.get('sales_asset_share_ids') or []
+     _calendar_after_commit(db,metadata.get('meeting_id'),scope)
++    if metadata.get('cancellation_operation_id'):
++        from .cancellation_service import advance_effect
++        advance_effect(db,metadata['cancellation_operation_id'])
+     # Retain the original intent result even if dispatch-time approval changed.
+     run.output_snapshot={**run.output_snapshot,'reply':data['reply']}
+     dispatched=await live._dispatch(db,conversation=conversation,lead=lead,content=data['reply'],role='assistant',agent_run_id=run.id,
+diff --git a/backend/app/modules/sales_agent/cancellation_models.py b/backend/app/modules/sales_agent/cancellation_models.py
+new file mode 100644
+index 0000000..7445d16
+--- /dev/null
++++ b/backend/app/modules/sales_agent/cancellation_models.py
+@@ -0,0 +1,30 @@
++"""Durable cancellation, exact Calendar cleanup and observable notification recovery."""
++from datetime import datetime
++import uuid
++from sqlalchemy import Column,String,Integer,DateTime,JSON,ForeignKey,Text
++from app.db.postgres import Base
++
++
++class SalesCancellationOperation(Base):
++    __tablename__='sales_cancellation_operations'
++    id=Column(String(36),primary_key=True,default=lambda:str(uuid.uuid4()))
++    company_id=Column(String(36),ForeignKey('companies.id',ondelete='CASCADE'),nullable=False)
++    project_id=Column(String(36),ForeignKey('projects.id',ondelete='CASCADE'),nullable=False)
++    booking_project_id=Column(String(36),ForeignKey('projects.id',ondelete='CASCADE'),nullable=False)
++    conversation_id=Column(String(36),ForeignKey('sales_conversations.id',ondelete='CASCADE'),nullable=False)
++    lead_id=Column(String(36),ForeignKey('leads.id',ondelete='CASCADE'),nullable=False)
++    proposal_id=Column(String(64),nullable=False,unique=True)
++    meeting_id=Column(String(36),ForeignKey('meetings.id',ondelete='CASCADE'),nullable=False,unique=True)
++    snapshot_json=Column(JSON,nullable=False)
++    calendar_status=Column(String(40),nullable=False,default='pending',index=True)
++    attempts=Column(Integer,nullable=False,default=0)
++    next_attempt_at=Column(DateTime(),nullable=False,default=datetime.utcnow)
++    last_error=Column(String(100))
++    notification_outbox_id=Column(String(36),ForeignKey('notification_outbox.id',ondelete='SET NULL'))
++    notification_status=Column(String(30),nullable=False,default='pending')
++    notification_attempts=Column(Integer,nullable=False,default=0)
++    notification_next_attempt_at=Column(DateTime(),nullable=False,default=datetime.utcnow)
++    notification_last_error=Column(String(100))
++    reason=Column(Text())
++    reason_message_id=Column(String(36),ForeignKey('sales_messages.id',ondelete='SET NULL'))
++    created_at=Column(DateTime(),nullable=False,default=datetime.utcnow)
+diff --git a/backend/app/modules/sales_agent/cancellation_service.py b/backend/app/modules/sales_agent/cancellation_service.py
+new file mode 100644
+index 0000000..ac5fd4f
+--- /dev/null
++++ b/backend/app/modules/sales_agent/cancellation_service.py
+@@ -0,0 +1,299 @@
++"""Exact, scoped cancellation. Reservation writes commit before retryable external effects."""
++from dataclasses import replace
++from datetime import datetime,timedelta
++from types import SimpleNamespace
++import re
++from app.modules.projects.models import Project
++from app.modules.sales_crm.models import Lead,Meeting,MeetingStatus,CalendarConnection,FunnelStage
++from app.modules.users.models import User
++from .dialogue_store import Scope,check_scope
++from .understanding_contract import Understanding,CancellationDirective
++from .turn_configuration import digest
++from .first_booking import accepted_outbound,stop_cadence,active_meetings
++from .reschedule_service import resolve_original,meeting_snapshot,current_description,reservation_version
++from .booking_models import SalesBookingOperation
++from .reschedule_models import SalesRescheduleOperation
++from .cancellation_models import SalesCancellationOperation
++from .appointment_context import utc
++
++VERSION='sales-cancellation/1.0'
++OPTIONAL_REASON=' If you wish, what is your reason for cancelling?'
++TERMINAL={'completed','review','simulation'}
++
++
++def enabled(db,scope,project_ids):
++    from .next_flow import selected
++    from .active_service import selected_policy
++    return all(selected(replace(scope,project_id=pid)) and selected_policy(db,replace(scope,project_id=pid)) for pid in {scope.project_id,*project_ids})
++
++
++def authorize(db,scope,project_id):
++    check_scope(db,scope)
++    project=db.query(Project).filter_by(id=project_id,company_id=scope.company_id).populate_existing().one_or_none()
++    if not project or not enabled(db,scope,[project_id]):raise PermissionError('Cancellation scope is not enabled.')
++    from .sales_policy import policy_context,compliance_action_holds
++    from .commercial_context import confirmed_profile_facts
++    if 'appointment' in compliance_action_holds(policy_context(db,scope,confirmed_profile_facts(project.profile),target_project_id=project_id)):
++        raise PermissionError('Cancellation requires policy review.')
++    # Cancelling an existing reservation never requires current catalog availability.
++    return project
++
++
++def directive_for(u):
++    return u.cancellation or (CancellationDirective(action='request',evidence=u.visit.evidence) if u.visit and u.visit.action=='cancel' else None)
++
++
++def should_handle(u,previous):
++    if directive_for(u):return True
++    if u.visit or u.reschedule or u.appointment_query:return False
++    return bool(previous.get('cancellation_confirmation') and u.permits('appointment') or
++        previous.get('cancellation_followup') and (u.courtesy or all(r.topic.value=='other' for r in u.requests)))
++
++
++def enrich(u,previous,text):
++    from .service import _affirmative_slot_reply
++    from .turn_context import choice_index
++    key=next((k for k in ['cancellation_confirmation','cancellation_meeting_offer','cancellation_followup'] if previous.get(k)),None)
++    if not key:return u
++    short=' '.join(re.sub('[^a-z ]',' ',text.lower()).split())
++    decline=short in {'no','no thanks','no thank you','not now','no more questions','no no more questions','no that s all'}
++    if key=='cancellation_meeting_offer' and choice_index(text) is not None:
++        data=u.model_dump(mode='json');data.update(requests=[{'id':'choose_cancel_visit','topic':'appointment','polarity':'request','subject':None,'evidence':text}],
++            all_of=['choose_cancel_visit'],alternatives=[],references=[],selected_reference_id=None,requires_clarification=False,clarification_question=None,
++            cancellation={'action':'request','evidence':text,'meeting_reference':text},reschedule=None,visit=None,appointment_query=None,courtesy=None)
++        return Understanding.model_validate(data)
++    if previous.get('material_offer') or previous.get('release_offer'):return u
++    if not decline and not (key=='cancellation_confirmation' and _affirmative_slot_reply(text)):return u
++    data=u.model_dump(mode='json')
++    data.update(requests=[{'id':'cancel_reply','topic':'other' if key=='cancellation_followup' else 'appointment','polarity':'request','subject':None,'evidence':text}],
++        all_of=['cancel_reply'],alternatives=[],references=[],selected_reference_id=None,requires_clarification=False,clarification_question=None,
++        visit=None,reschedule=None,appointment_query=None,courtesy={'kind':'farewell','evidence':text} if key=='cancellation_followup' else None,
++        cancellation=None if key=='cancellation_followup' else {'action':'decline' if decline else 'confirm','evidence':text})
++    return Understanding.model_validate(data)
++
++
++def cleanup_target(db,row):
++    receipt=db.query(SalesBookingOperation).filter_by(meeting_id=row.id).first()
++    event_id=row.gcal_event_id
++    if not event_id and receipt and receipt.calendar_attempts:event_id='bp'+row.id.replace('-','')
++    connection=db.query(CalendarConnection).filter_by(user_id=row.assigned_sales_user_id,provider='google').first()
++    return {'meeting_id':row.id,'project_id':row.project_id,'event_id':event_id,'expected_meeting_event_id':row.gcal_event_id,
++        'user_id':row.assigned_sales_user_id,'connection_id':connection.id if connection else None,
++        'calendar_id':connection.calendar_id if connection else None,'completed':not bool(event_id)}
++
++
++def collect_cleanup(db,row):
++    targets=[cleanup_target(db,row)];operations=[];seen={row.id};current=row.id
++    for _ in range(10):
++        op=db.query(SalesRescheduleOperation).filter_by(replacement_meeting_id=current).first()
++        if not op:return targets,operations,False
++        if op.original_meeting_id in seen:return targets,operations,True
++        seen.add(op.original_meeting_id);operations.append(op);current=op.original_meeting_id
++        old=db.get(Meeting,current)
++        if not old or old.lead_id!=row.lead_id:return targets,operations,True
++        saved=op.snapshot_json['cleanup']
++        targets.append({'meeting_id':old.id,'project_id':old.project_id,**saved,
++            'expected_meeting_event_id':saved.get('event_id'),'completed':op.calendar_status in {'completed','simulation'} or not bool(saved.get('event_id'))})
++    return targets,operations,bool(db.query(SalesRescheduleOperation).filter_by(replacement_meeting_id=current).first())
++
++
++def cancel(db,scope,conversation,lead,outcome,inbound,proposal):
++    db.query(Lead).filter_by(id=scope.lead_id,company_id=scope.company_id,project_id=scope.project_id).populate_existing().with_for_update().one()
++    db.query(SalesBookingOperation).filter_by(meeting_id=proposal['appointment']['id']).with_for_update().all()
++    row=db.query(Meeting).filter_by(id=proposal['appointment']['id'],lead_id=scope.lead_id).populate_existing().with_for_update().one_or_none()
++    state=outcome.state
++    if not row or row.status not in {MeetingStatus.CONFIRMED,MeetingStatus.SCHEDULED} or row.meeting_time<=datetime.utcnow() or reservation_version(row)!=proposal['appointment']['booking_sha256']:
++        state.cancellation_proposal=None
++        return 'That visit changed or is no longer eligible for this cancellation. No other reservation has been changed. Please review the current visit.',{'cancellation_context_question':True},[]
++    authorize(db,scope,row.project_id)
++    if lead.deleted_at or lead.is_opt_out or lead.consent_status!='granted' or lead.agent_status=='human_control':raise PermissionError('Lead permissions changed.')
++    if row.assigned_sales_user_id:db.query(User).filter_by(id=row.assigned_sales_user_id).with_for_update().all()
++    targets,previous,chain_limit=collect_cleanup(db,row)
++    snapshot=meeting_snapshot(db,row);now=datetime.utcnow()
++    from app.modules.governance.services import enqueue_notification
++    with db.begin_nested():
++        op=SalesCancellationOperation(company_id=scope.company_id,project_id=scope.project_id,booking_project_id=row.project_id,
++            conversation_id=scope.conversation_id,lead_id=scope.lead_id,meeting_id=row.id,proposal_id=proposal['id'],
++            snapshot_json={'version':VERSION,'appointment':snapshot,'cleanup':targets},
++            calendar_status='review' if chain_limit else 'simulation' if row.is_demo else 'pending',
++            last_error='ReplacementChainLimit' if chain_limit else None,next_attempt_at=now,notification_next_attempt_at=now,
++            reason=proposal.get('reason'),reason_message_id=proposal.get('reason_message_id'))
++        db.add(op);db.flush()
++        row.status=MeetingStatus.CANCELLED;row.confirmation_status='cancelled_by_lead'
++        booking=db.query(SalesBookingOperation).filter_by(meeting_id=row.id).first()
++        if booking:booking.calendar_status='cancelled'
++        for old_op in previous:old_op.calendar_status='cancelled'
++        payload={'title':'Appointment cancelled','body':'Cancelled visit: '+current_description(snapshot)+'.',
++            'action_url':'/app/schedule','assigned_sales_user_id':row.assigned_sales_user_id}
++        if row.assigned_sales_user_id:payload['recipient_user_ids']=[row.assigned_sales_user_id]
++        else:payload['recipient_roles']=['admin','assistant']
++        notice=enqueue_notification(db,company_id=scope.company_id,project_id=row.project_id,event_type='appointment_cancelled',entity_type='lead',entity_id=lead.id,
++            payload=payload,dedupe_key='cancellation:'+op.id)
++        op.notification_outbox_id=notice.id
++        db.flush()
++    state.cancellation_proposal=None;state.cancellation_search={};state.cancellation_followup_id=None if op.reason else op.id
++    state.booking_proposal=None;state.booking_search={};state.reschedule_proposal=None;state.reschedule_search={}
++    stop_cadence(db,conversation,lead,state,'cancelled')
++    if not active_meetings(db,scope):
++        conversation.stage='appointment_cancelled';lead.agent_status='active'
++        if lead.pipeline_stage=='S09_HANDOFF':lead.pipeline_stage='S06_NURTURE'
++        if lead.funnel_stage==FunnelStage.APPOINTMENT_SET:lead.funnel_stage=FunnelStage.CONTACTED
++    metadata={'cancellation_operation_id':op.id,'cancelled_meeting_id':row.id}
++    if not op.reason:metadata['cancellation_followup']={'id':op.id}
++    return 'Your visit has been cancelled: '+current_description(snapshot)+'. You can continue asking about other properties.'+(OPTIONAL_REASON if not op.reason else ' Your reason has been recorded.'),metadata,[
++            {'type':'appointment_cancelled','meeting_id':row.id,'operation_id':op.id}]
++
++
++def handle(db,scope,conversation,lead,outcome,inbound,previous):
++    state=outcome.state;u=state.last_understanding;directive=directive_for(u)
++    if u.cancellation and (u.reschedule or u.visit):return 'Please clarify whether you want to cancel the current visit or request a different visit. Nothing has been changed.',{'cancellation_context_question':True},[]
++    if previous.get('cancellation_followup') and not (directive and directive.action=='request'):
++        accepted=accepted_outbound(db,conversation,'cancellation_followup')
++        op=db.query(SalesCancellationOperation).filter_by(id=state.cancellation_followup_id,company_id=scope.company_id,lead_id=scope.lead_id).first()
++        if directive and directive.action=='reason' and accepted and op and previous['cancellation_followup'].get('id')==op.id and directive.reason:
++            op.reason=directive.reason;op.reason_message_id=inbound.id
++            state.cancellation_followup_id=None
++            return 'Thank you. Your reason has been recorded. You can message whenever you have another property question.',{'cancellation_followup_closed':True},[]
++        if not directive or directive.action=='decline':
++            state.cancellation_followup_id=None
++            return 'No reason is required. You can message whenever you have another property question.',{'cancellation_followup_closed':True},[]
++    if directive and directive.action=='reason':return 'A reason is optional. No reservation has been changed by this message.',{'cancellation_followup_closed':True},[]
++    if directive and directive.action=='decline':
++        proposal=state.cancellation_proposal
++        row=db.query(Meeting).filter_by(id=proposal['appointment']['id'],lead_id=scope.lead_id).first() if proposal else None
++        kept=bool(row and row.status in {MeetingStatus.CONFIRMED,MeetingStatus.SCHEDULED})
++        state.cancellation_search={};state.cancellation_proposal=None
++        return ('I have kept your original reservation. You can continue asking questions.' if kept else 'No new cancellation has been made. You can continue asking questions.'),{'cancellation_followup_closed':True},[]
++    if not u.permits('appointment') or u.requires_clarification or u.confidence<.8:return '',{},[]
++    if not any(t.source_message_id==inbound.id and t.topic.value=='appointment' and t.id in outcome.plan.get('write_candidates_require_backend_authorization',[]) for t in state.tasks):return '',{},[]
++    from .service import _affirmative_slot_reply
++    from app.modules.governance.services import request_attribution
++    assent=_affirmative_slot_reply(inbound.content)
++    if directive and directive.action=='confirm':assent|=_affirmative_slot_reply(directive.evidence) and request_attribution(inbound.content)['current_text'].lstrip().startswith(directive.evidence)
++    proposal=state.cancellation_proposal;prompt=accepted_outbound(db,conversation,'cancellation_confirmation')
++    if assent:
++        if not proposal or not prompt or prompt.metadata_json['cancellation_confirmation'].get('id')!=proposal['id']:
++            return 'Please review a current cancellation summary before confirming. No reservation has been changed.',{'cancellation_context_question':True},[]
++        if proposal['scope']!=scope.__dict__ or proposal['id']!=digest({k:v for k,v in proposal.items() if k!='id'}) or datetime.fromisoformat(proposal['expires_at'])<=utc(datetime.utcnow()):
++            state.cancellation_proposal=None
++            return 'That cancellation proposal expired or changed. Your reservation is unchanged. Please request a current summary.',{'cancellation_context_question':True},[]
++        try:return cancel(db,scope,conversation,lead,outcome,inbound,proposal)
++        except PermissionError:
++            state.cancellation_proposal=None
++            return 'The cancellation needs access or approval review. Your reservation is unchanged.',{'cancellation_context_question':True},[]
++    old,rows=resolve_original(db,scope,conversation,directive,SimpleNamespace(reschedule_search=state.cancellation_search),offer_key='cancellation_meeting_offer')
++    if not old:
++        if not rows:return 'I could not find a future active visit eligible for cancellation. No reservation has been changed.',{'cancellation_context_question':True},[]
++        return 'Which current visit would you like to cancel?\n\n'+'\n\n'.join(f'{i}. {current_description(meeting_snapshot(db,r))}' for i,r in enumerate(rows,1)),{'cancellation_meeting_offer':{'meeting_ids':[r.id for r in rows]}},[]
++    try:authorize(db,scope,old.project_id)
++    except PermissionError:return 'The cancellation needs access or approval review. Your reservation is unchanged.',{'cancellation_context_question':True},[]
++    proposal={'version':VERSION,'scope':scope.__dict__,'appointment':meeting_snapshot(db,old),
++        'reason':directive.reason if directive else None,'reason_message_id':inbound.id if directive and directive.reason else None,'expires_at':(utc(datetime.utcnow())+timedelta(minutes=30)).isoformat()}
++    proposal['id']=digest(proposal);state.cancellation_proposal=proposal;state.cancellation_search={'original_meeting_id':old.id}
++    state.booking_proposal=None;state.reschedule_proposal=None
++    return 'Current visit: '+current_description(proposal['appointment'])+'. Your reservation will remain in place unless you confirm. Shall I cancel this exact visit?',{
++        'cancellation_confirmation':{'id':proposal['id'],'expires_at':proposal['expires_at']}},[]
++
++
++def validate_prepared(db,scope,metadata):
++    if not metadata.get('cancellation_operation_id'):return
++    op=db.query(SalesCancellationOperation).filter_by(id=metadata['cancellation_operation_id'],company_id=scope.company_id,lead_id=scope.lead_id).one()
++    try:authorize(db,scope,op.booking_project_id)
++    except PermissionError as exc:raise ValueError('Cancellation access changed before commit.') from exc
++    row=db.get(Meeting,op.meeting_id)
++    if row.status!=MeetingStatus.CANCELLED or row.confirmation_status!='cancelled_by_lead':raise ValueError('Cancellation state changed before commit.')
++
++
++def advance_effect(db,operation_id):
++    op=db.query(SalesCancellationOperation).filter_by(id=operation_id).populate_existing().with_for_update(skip_locked=True).first()
++    if not op or op.calendar_status in TERMINAL or op.next_attempt_at>datetime.utcnow():return
++    scope=Scope(op.company_id,op.project_id,op.conversation_id,op.lead_id)
++    pending=[t for t in op.snapshot_json['cleanup'] if not t['completed']]
++    if not enabled(db,scope,[op.booking_project_id,*[t['project_id'] for t in pending]]):return
++    # Effects use saved, authenticated reservation ownership; they do not contact the lead.
++    if not pending:op.calendar_status='completed';op.last_error=None;db.commit();return
++    snapshot={**op.snapshot_json,'cleanup':[dict(t) for t in op.snapshot_json['cleanup']]}
++    op.attempts+=1
++    from app.integrations.gcalendar_client import delete_calendar_event_for_connection
++    try:
++        for target in snapshot['cleanup']:
++            if target['completed']:continue
++            row=db.query(Meeting).filter_by(id=target['meeting_id'],lead_id=op.lead_id).populate_existing().with_for_update().first()
++            project=db.get(Project,target['project_id']);owner=db.query(User).filter_by(id=target['user_id'],company_id=op.company_id,deleted_at=None).first()
++            connection=db.query(CalendarConnection).filter_by(id=target['connection_id'],user_id=target['user_id'],provider='google').first()
++            if not row or not project or project.company_id!=op.company_id or row.project_id!=project.id or row.assigned_sales_user_id!=target['user_id'] or row.status!=MeetingStatus.CANCELLED or row.confirmation_status not in {'rescheduled','cancelled_by_lead'} or row.gcal_event_id!=target['expected_meeting_event_id'] or not owner or not connection or connection.calendar_id!=target['calendar_id']:
++                op.calendar_status='review';op.last_error='CalendarBindingChanged';break
++            if connection.status!='connected':
++                op.attempts-=1;op.calendar_status='waiting_connection';op.next_attempt_at=datetime.utcnow()+timedelta(minutes=10);break
++            delete_calendar_event_for_connection(db,connection,target['event_id'])
++            row.calendar_sync_status='cancelled_removed';target['completed']=True
++        else:op.calendar_status='completed';op.last_error=None
++    except Exception as exc:
++        op.calendar_status='review' if op.attempts>=5 else 'retry';op.last_error=type(exc).__name__
++        op.next_attempt_at=datetime.utcnow()+timedelta(minutes=min(60,2**op.attempts))
++    op.snapshot_json=snapshot;db.commit()
++
++
++def retry_effects(db,limit=10):
++    from app.core.config import settings
++    from app.modules.ai_core.models import AIConfiguration
++    from .runtime_policy import RuntimePolicy
++    from uuid import UUID
++    if not settings.SALES_DIALOGUE_RUNTIME_ENABLED or not settings.SALES_NEXT_FLOW_ENABLED:return
++    ids=[v.strip() for v in settings.SALES_NEXT_FLOW_PROJECT_IDS.split(',') if v.strip()]
++    try:
++        if not ids or any(str(UUID(v))!=v for v in ids):return
++    except ValueError:return
++    config=db.query(AIConfiguration).filter_by(company_id=None).first();policy=RuntimePolicy.model_validate((config.agent_ventas or {}).get('runtime_config') or {}) if config else RuntimePolicy()
++    if policy.mode!='active':return
++    query=db.query(SalesCancellationOperation).filter(SalesCancellationOperation.calendar_status.in_(['pending','retry','waiting_connection']),SalesCancellationOperation.next_attempt_at<=datetime.utcnow(),SalesCancellationOperation.project_id.in_(ids),SalesCancellationOperation.booking_project_id.in_(ids))
++    if policy.scope=='cohort':
++        query=query.filter(SalesCancellationOperation.company_id.in_(policy.company_ids),SalesCancellationOperation.project_id.in_(policy.project_ids),SalesCancellationOperation.booking_project_id.in_(policy.project_ids))
++        if policy.lead_ids:query=query.filter(SalesCancellationOperation.lead_id.in_(policy.lead_ids))
++    for row in query.order_by(SalesCancellationOperation.next_attempt_at).limit(limit).all():advance_effect(db,row.id)
++
++
++def process_notification(db,event):
++    """A failed panel notice is observable and due for retry; the cancellation stays committed."""
++    op=db.query(SalesCancellationOperation).filter_by(notification_outbox_id=event.id,company_id=event.company_id).with_for_update().first()
++    if not op:
++        from app.modules.governance.services import _process_notification_event
++        return _process_notification_event(db,event)
++    if op.notification_status in {'processed','review'} or op.notification_next_attempt_at>datetime.utcnow():return 0
++    from app.modules.governance.services import _process_notification_event
++    try:
++        with db.begin_nested():
++            created=_process_notification_event(db,event)
++            if created==0:
++                from app.modules.governance.models import Notification
++                if not db.query(Notification).filter(Notification.dedupe_key.like(event.dedupe_key+':%')).first():raise ValueError('NoEligibleRecipient')
++        op.notification_status='processed';op.notification_last_error=None;op.notification_attempts+=1
++        return created
++    except Exception as exc:
++        op.notification_attempts+=1;op.notification_status='review' if op.notification_attempts>=5 else 'retry'
++        op.notification_last_error=type(exc).__name__;op.notification_next_attempt_at=datetime.utcnow()+timedelta(minutes=min(60,2**op.notification_attempts))
++        return 0
++
++
++def effect_status(op):
++    return {'id':op.id,'meeting_id':op.meeting_id,'cancelled':True,
++        'calendar':{'status':op.calendar_status,'attempts':op.attempts,'last_error':op.last_error,'next_attempt_at':op.next_attempt_at},
++        'notification':{'status':op.notification_status,'attempts':op.notification_attempts,'last_error':op.notification_last_error,'next_attempt_at':op.notification_next_attempt_at}}
++
++
++def reset_effects(db,op):
++    """Explicit manager recovery resets only effect budgets; it never cancels or books again."""
++    from app.modules.governance.models import NotificationOutbox
++    event=db.query(NotificationOutbox).filter_by(id=op.notification_outbox_id).with_for_update().first()
++    op=db.query(SalesCancellationOperation).filter_by(id=op.id).populate_existing().with_for_update().one()
++    if op.last_error=='ReplacementChainLimit':
++        from fastapi import HTTPException
++        raise HTTPException(status_code=409,detail='The replacement chain requires manual Calendar reconciliation.')
++    if op.calendar_status not in {'completed','simulation'}:
++        op.calendar_status='pending';op.attempts=0;op.last_error=None;op.next_attempt_at=datetime.utcnow()
++    if op.notification_status!='processed':
++        op.notification_status='pending';op.notification_attempts=0;op.notification_last_error=None;op.notification_next_attempt_at=datetime.utcnow()
++        event=db.get(NotificationOutbox,op.notification_outbox_id)
++        if event:event.status='pending'
++    db.commit()
++    return effect_status(op)
+diff --git a/backend/app/modules/sales_agent/commercial_composer.py b/backend/app/modules/sales_agent/commercial_composer.py
+index 44ab625..cbe17d0 100644
+--- a/backend/app/modules/sales_agent/commercial_composer.py
++++ b/backend/app/modules/sales_agent/commercial_composer.py
+@@ -95,6 +95,9 @@ def select_continuations(*, outcome, commercial, metadata, previous_meta, lead,
+     if metadata.get('material_offer'):
+         # The caller supplies this as priority; never make an offer invisible.
+         raise ValueError('Material proposal needs an explicit continuation.')
++    if any(metadata.get(k) for k in ['cancellation_confirmation','cancellation_meeting_offer','cancellation_context_question','cancellation_operation_id','cancellation_followup_closed']):
++        add('none','')
++        return choices
+     if metadata.get('appointment_offer') or metadata.get('location_offer') or metadata.get('meeting_id') or metadata.get('appointment_query') or metadata.get('booking_confirmation') or metadata.get('booking_property_question') or metadata.get('reschedule_confirmation') or metadata.get('reschedule_meeting_offer') or metadata.get('reschedule_context_question'):
+         add('none', '')  # Backend operation details include their own continuation, if any.
+         return choices
+@@ -109,6 +112,9 @@ def select_continuations(*, outcome, commercial, metadata, previous_meta, lead,
+             'farewell':"You're welcome. Feel free to message again whenever you have another question.",
+             'acknowledgement':'You can message here if another question comes up.',
+             'decline':'No problem. You can continue asking about the property whenever you like.'}[u.courtesy.kind],'metadata':{}}]
++    if outcome.state.cadence_stop_reason=='cancelled':
++        add('details','What would you like to know next about the property?' if topics-{'other'} else '')
++        return choices
+     missing, field, question = qualification(lead, commercial['confirmed_project_facts'])
+     if field == 'visit_readiness' and ('appointment' in holds or any(c.topic.value == 'appointment' for c in [*outcome.state.constraints,*outcome.state.property_constraints])):
+         question = ''
+diff --git a/backend/app/modules/sales_agent/first_booking.py b/backend/app/modules/sales_agent/first_booking.py
+index ff4f5ce..4a9b238 100644
+--- a/backend/app/modules/sales_agent/first_booking.py
++++ b/backend/app/modules/sales_agent/first_booking.py
+@@ -200,7 +200,7 @@ def handle(db,scope,conversation,lead,project,outcome,inbound):
+     state=outcome.state;u=state.last_understanding;now=datetime.utcnow()
+     if u.appointment_query:return None  # Existing scoped reader remains authoritative.
+     if u.visit and u.visit.action=='decline' and not u.requires_clarification and u.confidence>=.8:
+-        state.booking_proposal=None;stop_cadence(db,conversation,lead,state,'declined')
++        state.booking_proposal=None;stop_cadence(db,conversation,lead,state,'cancelled' if state.cadence_stop_reason=='cancelled' else 'declined')
+         message='Your existing visit is unchanged. You can continue asking about the property.' if active_meetings(db,scope,now) else 'No visit has been booked. You can continue asking about the property.'
+         return message,{'booking_declined':True},[]
+     if not u.permits('appointment') or u.confidence<.8:return '',{},[]
+@@ -215,7 +215,7 @@ def handle(db,scope,conversation,lead,project,outcome,inbound):
+     if u.visit and u.visit.action in {'reschedule','cancel'}:
+         return 'I have not changed any appointment. Please specify the appointment you want to review.',{},[]
+     if u.visit and u.visit.action=='decline':
+-        state.booking_proposal=None;stop_cadence(db,conversation,lead,state,'declined')
++        state.booking_proposal=None;stop_cadence(db,conversation,lead,state,'cancelled' if state.cadence_stop_reason=='cancelled' else 'declined')
+         return 'No visit has been booked. You can continue asking about the property.',{'booking_declined':True},[]
+     proposal=state.booking_proposal
+     prompt=accepted_outbound(db,conversation,'booking_confirmation')
+@@ -430,7 +430,7 @@ def apply_courtesy(db,conversation,lead,state):
+     from app.modules.governance.services import request_attribution
+     if u.courtesy.evidence not in request_attribution(u.courtesy.evidence)['current_text']:return
+     substantive=any(r.polarity=='request' and r.topic.value!='other' for r in u.requests)
+-    if u.courtesy.kind=='farewell':stop_cadence(db,conversation,lead,state,'farewell')
++    if u.courtesy.kind=='farewell':stop_cadence(db,conversation,lead,state,'cancelled' if state.cadence_stop_reason=='cancelled' else 'farewell')
+     elif u.courtesy.kind=='decline' and not substantive:
+         state.booking_proposal=None
+-        stop_cadence(db,conversation,lead,state,'declined')
++        stop_cadence(db,conversation,lead,state,'cancelled' if state.cadence_stop_reason=='cancelled' else 'declined')
+diff --git a/backend/app/modules/sales_agent/reschedule_service.py b/backend/app/modules/sales_agent/reschedule_service.py
+index 25f597e..457a879 100644
+--- a/backend/app/modules/sales_agent/reschedule_service.py
++++ b/backend/app/modules/sales_agent/reschedule_service.py
+@@ -81,14 +81,14 @@ def originals(db,scope):
+         Meeting.status.in_([MeetingStatus.SCHEDULED,MeetingStatus.CONFIRMED]),Meeting.meeting_time>datetime.utcnow()).order_by(Meeting.meeting_time,Meeting.id).all()
+ 
+ 
+-def resolve_original(db,scope,conversation,directive,state):
++def resolve_original(db,scope,conversation,directive,state,*,offer_key='reschedule_meeting_offer'):
+     rows=originals(db,scope);reference=directive.meeting_reference if directive else None
+     if reference:
+         from .turn_context import choice_index
+         cleaned=re.sub(r'\b(?:appointment|visit|booking)\b','',normalized(reference)).strip()
+         index=choice_index(cleaned)
+-        offered=accepted_outbound(db,conversation,'reschedule_meeting_offer')
+-        ids=(offered.metadata_json or {})['reschedule_meeting_offer']['meeting_ids'] if offered else []
++        offered=accepted_outbound(db,conversation,offer_key)
++        ids=(offered.metadata_json or {})[offer_key]['meeting_ids'] if offered else []
+         if index is not None:
+             if not 0<=index<len(ids):return None,rows
+             return next((r for r in rows if r.id==ids[index]),None),rows
+@@ -346,7 +346,7 @@ def handle(db,scope,conversation,lead,project,outcome,inbound,previous_meta):
+ def advance_effect(db,operation_id):
+     """Create the new event first. Retire only the exact former event after success."""
+     op=db.get(SalesRescheduleOperation,operation_id)
+-    if not op or op.calendar_status in {'completed','review','simulation'}:return
++    if not op or op.calendar_status in {'completed','review','simulation','cancelled'}:return
+     if op.calendar_status!='pending' and op.next_attempt_at>datetime.utcnow():return
+     new_receipt=db.get(SalesBookingOperation,op.replacement_booking_operation_id)
+     seen=set()
+@@ -367,7 +367,7 @@ def advance_effect(db,operation_id):
+         from .first_booking import sync_calendar
+         sync_calendar(db,new_receipt.id)
+     op=db.query(SalesRescheduleOperation).filter_by(id=operation_id).populate_existing().with_for_update(skip_locked=True).first()
+-    if not op or op.calendar_status in {'completed','review','simulation'}:return
++    if not op or op.calendar_status in {'completed','review','simulation','cancelled'}:return
+     new_receipt=db.query(SalesBookingOperation).filter_by(id=effective_receipt_id).populate_existing().one()
+     cleanup=op.snapshot_json['cleanup']
+     if new_receipt.calendar_status not in {'synced','simulation'}:
+diff --git a/backend/app/modules/sales_agent/turn_memory.py b/backend/app/modules/sales_agent/turn_memory.py
+index dd222a0..d6f5a0a 100644
+--- a/backend/app/modules/sales_agent/turn_memory.py
++++ b/backend/app/modules/sales_agent/turn_memory.py
+@@ -127,6 +127,8 @@ def build(db,scope,*,inbound_message_id,now=None):
+             'appointments':{category:tool.execute({'category':category,'limit':5},now=now) for category in ('active','past','cancelled')},
+             'memory':state.memory.model_dump(mode='json'),'history':list(reversed(pertinent)),
+             'history_coverage':{'messages':len(pertinent),'bounded':True,'older_messages_omitted':len(history)==20 or remaining<=0},
++            'cancellation_search':state.cancellation_search,'cancellation_proposal':state.cancellation_proposal,
++            'cancellation_followup_id':state.cancellation_followup_id,
+             'reschedule_search':state.reschedule_search,'reschedule_proposal':state.reschedule_proposal,
+             'booking_search':state.booking_search,'booking_proposal':state.booking_proposal,
+             'cadence':{'status':state.cadence_status,'reason':state.cadence_stop_reason},
+diff --git a/backend/app/modules/sales_agent/understanding_contract.py b/backend/app/modules/sales_agent/understanding_contract.py
+index feb95e1..e8f7407 100644
+--- a/backend/app/modules/sales_agent/understanding_contract.py
++++ b/backend/app/modules/sales_agent/understanding_contract.py
+@@ -104,6 +104,13 @@ class Courtesy(StrictModel):
+     evidence: str = Field(min_length=1,max_length=2000)
+ 
+ 
++class CancellationDirective(StrictModel):
++    action: Literal['request','confirm','decline','reason']
++    evidence: str = Field(min_length=1,max_length=2000)
++    meeting_reference: str | None = Field(default=None,max_length=200)
++    reason: str | None = Field(default=None,max_length=1000)
++
++
+ class RescheduleDirective(StrictModel):
+     action: Literal['request','select','confirm','decline']
+     evidence: str = Field(min_length=1,max_length=2000)
+@@ -130,6 +137,7 @@ class Understanding(StrictModel):
+     visit: VisitDirective | None = None
+     courtesy: Courtesy | None = None
+     reschedule: RescheduleDirective | None = None
++    cancellation: CancellationDirective | None = None
+     appointment_query: Literal['active','past','cancelled','all'] | None = None
+     selected_reference_id: str | None = Field(default=None,max_length=60)
+     requires_clarification: StrictBool
+@@ -180,6 +188,8 @@ class Understanding(StrictModel):
+             evidence.append(self.reschedule.evidence)
+             evidence.extend(v for k,v in self.reschedule.model_dump().items() if k not in {'action','evidence','timing'} and v)
+             if self.reschedule.timing:evidence.extend(v for k,v in self.reschedule.timing.model_dump().items() if k!='time_relation' and v is not None)
++        if self.cancellation:
++            evidence.extend(v for k,v in self.cancellation.model_dump().items() if k!='action' and v)
+         if self.courtesy:evidence.append(self.courtesy.evidence)
+         if any(not item.strip() or item not in inbound for item in evidence):
+             raise ValueError('Evidence must be an exact non-empty substring of the current message.')
+@@ -269,12 +279,15 @@ class DialogueState(StrictModel):
+     preferences: list[Preference] = Field(default_factory=list, max_length=100)
+     last_understanding: Understanding | None = None
+     memory: 'TurnMemory' = Field(default_factory=lambda: TurnMemory())
++    cancellation_search: dict = Field(default_factory=dict)
++    cancellation_proposal: dict | None = None
++    cancellation_followup_id: str | None = None
+     reschedule_search: dict = Field(default_factory=dict)
+     reschedule_proposal: dict | None = None
+     booking_search: dict = Field(default_factory=dict)
+     booking_proposal: dict | None = None
+     cadence_status: Literal['active','stopped'] = 'active'
+-    cadence_stop_reason: Literal['booked','farewell','declined'] | None = None
++    cadence_stop_reason: Literal['booked','farewell','declined','cancelled'] | None = None
+     change_proposals: list['ChangeProposal'] = Field(default_factory=list,max_length=10)
+ 
+     @model_validator(mode='after')
+diff --git a/backend/app/modules/sales_agent/understanding_prompt.py b/backend/app/modules/sales_agent/understanding_prompt.py
+index 7c6bad5..b0331ce 100644
+--- a/backend/app/modules/sales_agent/understanding_prompt.py
++++ b/backend/app/modules/sales_agent/understanding_prompt.py
+@@ -53,7 +53,7 @@ def prompt_snapshot(agent):
+ 
+ 
+ def next_prompt_snapshot(guidance):
+-    return {'version':'sales-understanding-prompt/2.4','system':SYSTEM_PROMPT+'''
++    return {'version':'sales-understanding-prompt/2.5','system':SYSTEM_PROMPT+'''
+ The backend has already applied English-only input controls. Interpret the current request;
+ do not translate it, generate a lead-facing response, execute commercial instructions, or
+ reinterpret the output schema from published guidance. All supplied commercial playbooks
+@@ -101,5 +101,16 @@ exact current reschedule proposal authorizes replacement. Decline preserves the
+ An explicit target Project never authorizes moving the lead or conversation to another scope.
+ Do not additionally bind replacement targets through current-Project references: put their exact
+ names in reschedule target fields. Use references for selecting times actually offered by the backend.
++For cancellation use cancellation.action request/confirm/decline and request appointment,
++with appointment_query null. meeting_reference is exact current-message evidence, not a DB ID.
++A cancellation request prepares an exact current-visit summary; only a confirmation answering
++that summary authorizes cancellation. It is independent from reschedule and first booking.
++Never emit both cancellation and reschedule/visit for the same mutation. A bare yes can confirm
++only the immediately preceding backend cancellation proposal, never an older or manual message.
++After cancellation a reason is OPTIONAL: use cancellation.action reason and exact reason text
++only for a current voluntary answer to the backend optional-reason question. A negative reply,
++farewell or 'no more questions' never cancels any visit, opts out or requests a new booking.
++Do not interpret a reason, yes to an optional-reason question, property inquiry, or farewell as
++permission to schedule a new visit. A fresh visit requires its own explicit request.
+ ''','published_guidance':guidance,
+             'configuration_ref':guidance['source']}
+diff --git a/backend/tests/test_sales_ai_group_b.py b/backend/tests/test_sales_ai_group_b.py
+index 52e5be3..54974ee 100644
+--- a/backend/tests/test_sales_ai_group_b.py
++++ b/backend/tests/test_sales_ai_group_b.py
+@@ -131,7 +131,7 @@ def test_new_interpreter_has_internal_contract_and_configuration_provenance(agen
+     version=publish(agent,pack)
+     _,run=agent.turn('Give me information',understanding('Give me information','catalog'))
+     assert run.status=='completed',run.output_snapshot
+-    assert run.prompt_snapshot['version']=='sales-understanding-prompt/2.4'
++    assert run.prompt_snapshot['version']=='sales-understanding-prompt/2.5'
+     assert run.output_snapshot['metadata']['configuration_ref']['version_id']==version.id
+     request=json.dumps(agent.infer.call_args.args)
+     assert 'LEGACY_SCHEMA_SENTINEL' not in request and 'Sales identity' in request
+@@ -397,7 +397,7 @@ def test_exported_real_catalog_through_new_gate_and_versioned_interpreter(index,
+         assert held.output_snapshot['metadata']['language_hold'] and not h.model.requests
+         _,run=h.turn('Give me information')
+         assert run.status=='completed',run.output_snapshot
+-        assert run.prompt_snapshot['version']=='sales-understanding-prompt/2.4'
++        assert run.prompt_snapshot['version']=='sales-understanding-prompt/2.5'
+         assert len(h.model.requests)==1 and not h.conversation.is_paused
+         assert not h.db.query(Meeting).count() and not h.db.query(SalesAssetShare).count()
+         assert not h.calendar.calls
+diff --git a/backend/tests/test_sales_ai_group_h.py b/backend/tests/test_sales_ai_group_h.py
+new file mode 100644
+index 0000000..6eec43a
+--- /dev/null
++++ b/backend/tests/test_sales_ai_group_h.py
+@@ -0,0 +1,475 @@
++"""Confirmed cancellation through real coordinator/state/dispatcher; providers are simulated."""
++from datetime import datetime,timedelta
++from unittest.mock import patch,Mock
++import uuid
++import pytest
++from test_sales_ai_group_b import agent
++from test_sales_ai_group_f import book,latest,visit,courtesy
++from test_sales_ai_group_g import setup_old_calendar,request_and_choose
++from test_sales_ai_group_c import product,meeting
++from test_sales_ai_group_d import typed,req,ref
++from test_sales_active_integration import understanding
++from test_sales_turn_1720 import case,outbound,approved_asset
++from app.modules.sales_agent.understanding_contract import Understanding
++from app.modules.sales_agent.dialogue_store import load,save
++from app.modules.sales_agent.models import SalesMessage,AgentRun
++from app.modules.sales_agent.cancellation_models import SalesCancellationOperation
++from app.modules.sales_agent.booking_models import SalesBookingOperation
++from app.modules.sales_agent.reschedule_models import SalesRescheduleOperation
++from app.modules.sales_crm.models import Meeting,MeetingStatus,CalendarConnection
++from app.modules.governance.models import NotificationOutbox,Notification
++from app.modules.governance.services import process_notification_outbox
++
++
++def cancellation(text,action='request',**values):
++    return Understanding.model_validate({**understanding(text,'appointment' if action!='reason' else 'other').model_dump(),
++        'cancellation':{'action':action,'evidence':text,**values}})
++
++
++def prepare(agent):
++    _,_,row,_=book(agent)
++    agent.turn('Cancel my visit',cancellation('Cancel my visit'))
++    assert latest(agent).metadata_json.get('cancellation_confirmation'),agent.db.query(AgentRun).all()[-1].output_snapshot
++    return row
++
++
++def cancelled(agent):
++    row=prepare(agent);agent.turn('Yes',understanding('Yes','other'))
++    assert agent.db.query(SalesCancellationOperation).count()==1,agent.db.query(AgentRun).all()[-1].output_snapshot
++    return row,agent.db.query(SalesCancellationOperation).one()
++
++
++@pytest.mark.parametrize('channel',['sms','whatsapp'])
++def test_request_then_exact_confirmation_cancels_once_and_keeps_chat_open(agent,channel):
++    agent.conversation.channel=channel;row=prepare(agent);snapshot=latest(agent).content
++    assert row.status==MeetingStatus.CONFIRMED and agent.db.query(Meeting).count()==1
++    for value in ['Generic development','Studio','100 Main St','UTC','45 minutes']:assert value in snapshot
++    assert snapshot.count('?')==1
++    agent.turn('Yes',understanding('Yes','other'));op=agent.db.query(SalesCancellationOperation).one();agent.db.refresh(row)
++    assert row.status==MeetingStatus.CANCELLED and row.confirmation_status=='cancelled_by_lead'
++    assert latest(agent).content.startswith('Your visit has been cancelled:') and latest(agent).content.count('?')==1
++    assert 'reason' in latest(agent).content and 'notified' not in latest(agent).content
++    assert op.calendar_status=='completed' and not agent.conversation.is_paused and not agent.lead.is_opt_out
++    assert agent.db.query(SalesBookingOperation).one().calendar_status=='cancelled'
++    state=load(agent.db,agent.scope)[1]
++    assert state.cadence_status=='stopped' and state.cadence_stop_reason=='cancelled'
++    agent.turn('Yes',understanding('Yes','appointment'))
++    assert agent.db.query(Meeting).count()==agent.db.query(SalesCancellationOperation).count()==1
++
++
++@pytest.mark.parametrize('text',['No','No thanks','No more questions'])
++def test_no_declines_only_cancellation_proposal(agent,text):
++    row=prepare(agent);agent.turn(text,understanding(text,'opt_out'))
++    assert row.status==MeetingStatus.CONFIRMED and not agent.lead.is_opt_out
++    assert not agent.db.query(SalesCancellationOperation).count() and 'kept your original reservation' in latest(agent).content
++
++
++@pytest.mark.parametrize('kind,text',[('farewell','Goodbye'),('acknowledgement','Thank you'),('farewell','I have no more questions')])
++def test_farewell_and_acknowledgement_never_cancel(agent,kind,text):
++    _,_,row,_=book(agent);agent.turn(text,courtesy(text,kind))
++    assert row.status==MeetingStatus.CONFIRMED and not agent.db.query(SalesCancellationOperation).count()
++
++
++def test_expired_proposal_keeps_reservation(agent):
++    row=prepare(agent);rev,state=load(agent.db,agent.scope)
++    from app.modules.sales_agent.turn_configuration import digest
++    proposal=state.cancellation_proposal;proposal['expires_at']=(datetime.now().astimezone()-timedelta(minutes=1)).isoformat();proposal['id']=digest({k:v for k,v in proposal.items() if k!='id'})
++    save(agent.db,agent.scope,event_key='expire',expected_revision=rev,state=state);agent.db.commit()
++    msg=latest(agent);msg.metadata_json={**msg.metadata_json,'cancellation_confirmation':{'id':proposal['id']}};agent.db.commit()
++    agent.turn('Yes',understanding('Yes','other'))
++    assert row.status==MeetingStatus.CONFIRMED and not agent.db.query(SalesCancellationOperation).count() and 'expired' in latest(agent).content
++
++
++@pytest.mark.parametrize('change',['time','specialist','status'])
++def test_changed_reservation_is_not_cancelled_from_old_summary(agent,change):
++    row=prepare(agent)
++    if change=='time':row.meeting_time+=timedelta(hours=1)
++    if change=='specialist':row.assigned_sales_user_id=None
++    if change=='status':row.status=MeetingStatus.IN_PROGRESS
++    agent.db.commit();agent.turn('Yes',understanding('Yes','other'))
++    assert row.status!=MeetingStatus.CANCELLED and not agent.db.query(SalesCancellationOperation).count()
++
++
++@pytest.mark.parametrize('interruption',['human','incomplete','other'])
++def test_only_immediate_complete_backend_summary_can_be_accepted(agent,interruption):
++    row=prepare(agent)
++    if interruption=='human':
++        msg=outbound(agent.db,agent.conversation,'Can I help with something else?',{});msg.role='human';agent.db.commit()
++    elif interruption=='incomplete':
++        msg=latest(agent);msg.metadata_json={**msg.metadata_json,'delivery_group':{'key':'missing-parts','total':2,'part':1}};agent.db.commit()
++    else:
++        approved_asset((agent.db,agent.company,agent.project,agent.lead,agent.conversation),['floor_plan'])
++        agent.turn('Send floor plans',understanding('Send floor plans','materials',subjects={0:'floor_plan'}))
++    agent.turn('Yes',understanding('Yes','appointment'))
++    assert row.status==MeetingStatus.CONFIRMED and not agent.db.query(SalesCancellationOperation).count()
++
++
++def test_multiple_current_visits_require_choice_before_summary(agent):
++    _,_,row,_=book(agent)
++    other=meeting(agent,product_id=product(agent,'Loft').id,starts=row.meeting_time+timedelta(days=2));agent.db.commit()
++    agent.turn('Cancel my visit',cancellation('Cancel my visit'))
++    assert latest(agent).metadata_json.get('cancellation_meeting_offer')
++    agent.turn('2',understanding('2','other'))
++    assert latest(agent).metadata_json.get('cancellation_confirmation') and 'Loft' in latest(agent).content
++    agent.turn('Yes',understanding('Yes','other'))
++    assert agent.db.get(Meeting,other.id).status==MeetingStatus.CANCELLED and row.status==MeetingStatus.CONFIRMED
++
++
++def test_optional_reason_is_recorded_after_cancellation_and_never_required(agent):
++    row,op=cancelled(agent);text='My travel plans changed'
++    agent.turn(text,cancellation(text,'reason',reason=text))
++    agent.db.refresh(op)
++    assert op.reason==text and op.reason_message_id and row.status==MeetingStatus.CANCELLED
++    assert 'reason has been recorded' in latest(agent).content and latest(agent).content.count('?')==0
++
++
++def test_no_to_optional_reason_does_not_opt_out_or_request_another_visit(agent):
++    row,op=cancelled(agent);agent.turn('No',understanding('No','opt_out'))
++    assert not agent.lead.is_opt_out and not agent.conversation.is_paused and agent.db.query(Meeting).count()==1
++    assert 'No reason is required' in latest(agent).content and latest(agent).content.count('?')==0
++    assert load(agent.db,agent.scope)[1].cadence_stop_reason=='cancelled'
++    agent.turn('Tell me about the property',understanding('Tell me about the property','property_details'))
++    assert not latest(agent).metadata_json.get('visit_invitation') and not latest(agent).metadata_json.get('appointment_offer')
++    assert agent.db.query(Meeting).count()==1
++
++
++def test_failure_after_cancel_flush_rolls_back_all_reservation_changes(agent):
++    row=prepare(agent)
++    with patch('app.modules.governance.services.enqueue_notification',side_effect=RuntimeError('outbox insert failed')):agent.turn('Yes',understanding('Yes','other'))
++    agent.db.expire_all()
++    assert agent.db.get(Meeting,row.id).status==MeetingStatus.CONFIRMED and not agent.db.query(SalesCancellationOperation).count()
++    assert agent.db.query(SalesBookingOperation).one().calendar_status!='cancelled'
++
++
++def test_calendar_delete_failure_keeps_cancellation_and_retries_exact_event(agent):
++    row,connection=setup_old_calendar(agent)
++    agent.turn('Cancel my visit',cancellation('Cancel my visit'))
++    with patch('app.integrations.gcalendar_client.delete_calendar_event_for_connection',side_effect=RuntimeError('offline')):agent.turn('Yes',understanding('Yes','other'))
++    op=agent.db.query(SalesCancellationOperation).one()
++    assert row.status==MeetingStatus.CANCELLED and op.calendar_status=='retry' and op.attempts==1 and op.last_error=='RuntimeError'
++    from app.modules.sales_agent.cancellation_service import retry_effects
++    op.next_attempt_at=datetime.utcnow()-timedelta(seconds=1);agent.db.commit()
++    with patch('app.integrations.gcalendar_client.delete_calendar_event_for_connection') as delete:
++        retry_effects(agent.db);retry_effects(agent.db)
++        assert delete.call_count==1 and delete.call_args.args[-1]=='old-owned-event'
++    assert op.calendar_status=='completed' and agent.db.query(Meeting).count()==1
++
++
++def test_notification_failure_visible_retryable_and_recipient_bound_to_cancelled_visit(agent):
++    row,op=cancelled(agent);sales_id=row.assigned_sales_user_id;agent.lead.assigned_sales_user_id=None;agent.db.commit()
++    from app.modules.governance import services
++    original=services._process_notification_event
++    def fail_cancel(db,event):
++        if event.id==op.notification_outbox_id:raise RuntimeError('notice failure')
++        return original(db,event)
++    with patch.object(services,'_process_notification_event',side_effect=fail_cancel):process_notification_outbox(agent.db)
++    assert op.notification_status=='retry' and op.notification_last_error=='RuntimeError' and row.status==MeetingStatus.CANCELLED
++    event=agent.db.get(NotificationOutbox,op.notification_outbox_id);assert event.status=='pending'
++    op.notification_next_attempt_at=datetime.utcnow()-timedelta(seconds=1);agent.db.commit()
++    process_notification_outbox(agent.db);process_notification_outbox(agent.db)
++    notices=agent.db.query(Notification).filter_by(notification_type='appointment_cancelled').all()
++    assert len(notices)==1 and notices[0].recipient_user_id==sales_id and op.notification_status=='processed'
++
++
++def test_legacy_cancel_directive_uses_exact_confirmation_not_first_booking(agent):
++    _,_,row,_=book(agent);agent.turn('Cancel my visit',visit('Cancel my visit',action='cancel'))
++    assert latest(agent).metadata_json.get('cancellation_confirmation') and row.status==MeetingStatus.CONFIRMED
++    agent.turn('Yes',understanding('Yes','other'));assert row.status==MeetingStatus.CANCELLED
++
++
++def test_no_future_or_in_progress_booking_is_never_invented_or_cancelled(agent):
++    _,_,row,_=book(agent);row.status=MeetingStatus.IN_PROGRESS;agent.db.commit()
++    agent.turn('Cancel my visit',cancellation('Cancel my visit'))
++    assert not latest(agent).metadata_json.get('cancellation_confirmation') and row.status==MeetingStatus.IN_PROGRESS
++    assert not agent.db.query(SalesCancellationOperation).count()
++
++
++def test_cross_scope_forged_proposal_never_cancels_other_lead(agent):
++    row=prepare(agent)
++    from app.modules.sales_crm.models import Lead
++    from app.modules.sales_agent.turn_configuration import digest
++    lead=Lead(company_id=agent.company.id,project_id=agent.project.id,full_name='Other lead',phone='+15550109999',source='manual',consent_status='granted')
++    agent.db.add(lead);agent.db.flush();other=meeting(agent,lead=lead);agent.db.commit()
++    rev,state=load(agent.db,agent.scope);p=state.cancellation_proposal;p['appointment']['id']=other.id;p['id']=digest({k:v for k,v in p.items() if k!='id'})
++    save(agent.db,agent.scope,event_key='forged',expected_revision=rev,state=state);agent.db.commit()
++    msg=latest(agent);msg.metadata_json={**msg.metadata_json,'cancellation_confirmation':{'id':p['id']}};agent.db.commit()
++    agent.turn('Yes',understanding('Yes','other'))
++    assert row.status==other.status==MeetingStatus.CONFIRMED and not agent.db.query(SalesCancellationOperation).count()
++
++
++def test_reason_is_not_a_new_booking_and_needs_current_reason_question(agent):
++    row,op=cancelled(agent)
++    agent.turn('Tell me about the property',understanding('Tell me about the property','property_details'))
++    text='Travel plans changed';agent.turn(text,cancellation(text,'reason',reason=text))
++    assert op.reason is None and row.status==MeetingStatus.CANCELLED and agent.db.query(Meeting).count()==1
++
++
++def test_cancel_after_reschedule_owns_pending_ancestor_calendar_cleanup(agent):
++    row,connection=setup_old_calendar(agent)
++    with patch('app.integrations.gcalendar_client.calendar_busy_ranges_excluding_event',return_value=[]),\
++         patch('app.integrations.gcalendar_client.create_calendar_event_for_connection',return_value={'id':'new-owned-event'}),\
++         patch('app.integrations.gcalendar_client.delete_calendar_event_for_connection',side_effect=RuntimeError('offline')):
++        request_and_choose(agent);agent.turn('Yes',understanding('Yes','other'))
++    previous=agent.db.query(SalesRescheduleOperation).one();assert previous.calendar_status=='retry'
++    agent.turn('Cancel my visit',cancellation('Cancel my visit'))
++    with patch('app.integrations.gcalendar_client.delete_calendar_event_for_connection') as delete:
++        agent.turn('Yes',understanding('Yes','other'))
++        assert {c.args[-1] for c in delete.call_args_list}=={'old-owned-event','new-owned-event'}
++        from app.modules.sales_agent.reschedule_service import advance_effect
++        advance_effect(agent.db,previous.id)
++        assert delete.call_count==2
++    op=agent.db.query(SalesCancellationOperation).one()
++    assert op.calendar_status=='completed' and previous.calendar_status=='cancelled'
++    assert not agent.db.query(Meeting).filter_by(status=MeetingStatus.CONFIRMED).count()
++
++
++def test_cancel_recovers_deterministic_event_after_creation_timeout(agent):
++    row,connection=setup_old_calendar(agent);row.gcal_event_id=None
++    receipt=agent.db.query(SalesBookingOperation).one();receipt.calendar_attempts=1;receipt.calendar_status='retry';agent.db.commit()
++    agent.turn('Cancel my visit',cancellation('Cancel my visit'))
++    with patch('app.integrations.gcalendar_client.delete_calendar_event_for_connection') as delete,patch('app.integrations.gcalendar_client.create_calendar_event_for_connection') as create:
++        agent.turn('Yes',understanding('Yes','other'))
++        from app.modules.sales_agent.first_booking import retry_calendars
++        retry_calendars(agent.db);create.assert_not_called()
++        assert delete.call_count==1 and delete.call_args.args[-1]=='bp'+row.id.replace('-','')
++
++
++def test_mixed_material_confirmation_has_true_cancellation_and_only_one_question(agent):
++    row=prepare(agent);approved_asset((agent.db,agent.company,agent.project,agent.lead,agent.conversation),['brochure'])
++    text='Yes, and send photos'
++    u=Understanding.model_validate({**understanding(text,'appointment','materials',subjects={1:'photos'}).model_dump(),
++        'cancellation':{'action':'confirm','evidence':'Yes'}})
++    agent.turn(text,u)
++    assert row.status==MeetingStatus.CANCELLED and 'Your visit has been cancelled:' in latest(agent).content
++    assert latest(agent).content.count('?')==1 and latest(agent).metadata_json.get('material_offer')
++    assert 'reason for cancelling' not in latest(agent).content
++
++
++def test_cancel_summary_hidden_by_material_offer_cannot_be_confirmed(agent):
++    _,_,row,_=book(agent);approved_asset((agent.db,agent.company,agent.project,agent.lead,agent.conversation),['brochure'])
++    text='Cancel my visit and send photos'
++    u=Understanding.model_validate({**understanding(text,'appointment','materials',subjects={1:'photos'}).model_dump(),
++        'cancellation':{'action':'request','evidence':'Cancel my visit'}})
++    agent.turn(text,u);assert latest(agent).metadata_json.get('material_offer') and not latest(agent).metadata_json.get('cancellation_confirmation')
++    agent.turn('Yes',understanding('Yes','other'))
++    assert row.status==MeetingStatus.CONFIRMED and not agent.db.query(SalesCancellationOperation).count()
++
++
++def test_cancellation_frees_local_slot_without_changing_specialist_routing(agent):
++    row=prepare(agent);user=row.assigned_sales_user_id;cursor=agent.project.next_sales_user_id if hasattr(agent.project,'next_sales_user_id') else None
++    from app.modules.sales_crm.scheduling import _is_free
++    args=dict(user_id=user,starts_at=row.meeting_time,ends_at=row.meeting_time+timedelta(minutes=45),external_busy=[])
++    assert not _is_free(agent.db,**args)
++    agent.turn('Yes',understanding('Yes','other'))
++    assert _is_free(agent.db,**args) and agent.lead.assigned_sales_user_id==user
++    if hasattr(agent.project,'next_sales_user_id'):assert agent.project.next_sales_user_id==cursor
++
++
++def test_post_composition_permission_change_rolls_back_cancellation(agent):
++    row=prepare(agent)
++    from app.modules.sales_agent import commercial_composer,cancellation_service
++    compose=commercial_composer.compose;authorize=cancellation_service.authorize;after={'value':False}
++    async def composed(*a,**kw):
++        result=await compose(*a,**kw);after['value']=True;return result
++    def guarded(*a,**kw):
++        if after['value']:raise PermissionError('Permission changed during composition')
++        return authorize(*a,**kw)
++    with patch.object(commercial_composer,'compose',side_effect=composed),patch.object(cancellation_service,'authorize',side_effect=guarded):agent.turn('Yes',understanding('Yes','other'))
++    agent.db.expire_all()
++    assert agent.db.get(Meeting,row.id).status==MeetingStatus.CONFIRMED and not agent.db.query(SalesCancellationOperation).count()
++
++
++def test_notification_budget_and_manager_retry_are_visible_and_idempotent(agent):
++    row,op=cancelled(agent)
++    from app.modules.sales_agent.cancellation_service import reset_effects
++    from app.modules.governance import services,router
++    original=services._process_notification_event
++    def fail(db,event):
++        if event.id==op.notification_outbox_id:raise RuntimeError('offline')
++        return original(db,event)
++    for _ in range(5):
++        op.notification_next_attempt_at=datetime.utcnow()-timedelta(seconds=1);agent.db.commit()
++        with patch.object(services,'_process_notification_event',side_effect=fail):process_notification_outbox(agent.db)
++    assert op.notification_status=='review' and op.notification_attempts==5
++    assert router.cancellation_effects(op.id,db=agent.db,current_user=manager(agent))['notification']['last_error']=='RuntimeError'
++    reset_effects(agent.db,op);process_notification_outbox(agent.db);process_notification_outbox(agent.db)
++    assert op.notification_status=='processed' and agent.db.query(Notification).filter_by(notification_type='appointment_cancelled').count()==1
++    assert agent.db.query(Meeting).count()==1 and row.status==MeetingStatus.CANCELLED
++
++
++def manager(agent):
++    from app.modules.users.models import User,UserRole
++    user=User(company_id=agent.company.id,email='manager-'+uuid.uuid4().hex+'@example.invalid',role=UserRole.ADMIN,first_name='Manager',hashed_password='OFFLINE',is_active=True)
++    agent.db.add(user);agent.db.commit();return user
++
++
++def test_effect_endpoints_check_role_company_and_project_access(agent):
++    from app.modules.governance import router
++    from app.modules.users.models import UserRole
++    from app.modules.auth.deps import RoleChecker
++    from fastapi import HTTPException
++    row,op=cancelled(agent);user=manager(agent)
++    assert router.cancellation_effects(op.id,db=agent.db,current_user=user)['cancelled']
++    user.role=UserRole.SALES
++    with pytest.raises(HTTPException) as caught:RoleChecker([UserRole.ADMIN,UserRole.ASSISTANT])(user)
++    assert caught.value.status_code==403
++    user.role=UserRole.ADMIN;user.company_id=str(uuid.uuid4())
++    with pytest.raises(HTTPException) as caught:router.cancellation_effects(op.id,db=agent.db,current_user=user)
++    assert caught.value.status_code==404
++    agent.db.rollback()
++
++
++def test_legacy_cancelled_notice_without_h_receipt_still_processes(agent):
++    _,_,row,_=book(agent)
++    from app.modules.governance.services import enqueue_notification
++    enqueue_notification(agent.db,company_id=agent.company.id,project_id=agent.project.id,event_type='appointment_cancelled',entity_type='lead',entity_id=agent.lead.id,payload={},dedupe_key='legacy-cancel');agent.db.commit()
++    process_notification_outbox(agent.db)
++    assert agent.db.query(NotificationOutbox).filter_by(dedupe_key='legacy-cancel').one().status=='processed'
++
++
++def test_explicit_new_visit_after_cancellation_still_needs_selection_and_confirmation(agent):
++    old,op=cancelled(agent)
++    agent.turn('I want to arrange a new visit',visit('I want to arrange a new visit'))
++    assert latest(agent).metadata_json.get('appointment_offer') and agent.db.query(Meeting).count()==1
++    agent.turn('1',typed('1',[req('time','appointment','1',ref='t')],[ref('t','appointment','1')]))
++    assert latest(agent).metadata_json.get('booking_confirmation') and agent.db.query(Meeting).count()==1
++    agent.turn('Yes',understanding('Yes','other'))
++    assert agent.db.query(Meeting).count()==2 and old.status==MeetingStatus.CANCELLED
++    assert agent.db.query(Meeting).filter_by(status=MeetingStatus.CONFIRMED).count()==1
++
++
++def test_calendar_retry_budget_and_reset_do_not_repeat_cancellation(agent):
++    row,connection=setup_old_calendar(agent);agent.turn('Cancel my visit',cancellation('Cancel my visit'))
++    from app.modules.sales_agent.cancellation_service import advance_effect,reset_effects
++    with patch('app.integrations.gcalendar_client.delete_calendar_event_for_connection',side_effect=RuntimeError('offline')) as delete:
++        agent.turn('Yes',understanding('Yes','other'));op=agent.db.query(SalesCancellationOperation).one()
++        for _ in range(4):
++            op.next_attempt_at=datetime.utcnow()-timedelta(seconds=1);agent.db.commit();advance_effect(agent.db,op.id)
++        advance_effect(agent.db,op.id)
++        assert delete.call_count==5 and op.calendar_status=='review' and op.last_error=='RuntimeError'
++    reset_effects(agent.db,op)
++    with patch('app.integrations.gcalendar_client.delete_calendar_event_for_connection') as delete:advance_effect(agent.db,op.id);advance_effect(agent.db,op.id);assert delete.call_count==1
++    assert op.calendar_status=='completed' and agent.db.query(SalesCancellationOperation).count()==agent.db.query(Meeting).count()==1
++
++
++@pytest.mark.parametrize('changed',['event','calendar','connection','meeting'])
++def test_cleanup_never_deletes_a_changed_calendar_binding(agent,changed):
++    row,connection=setup_old_calendar(agent);agent.turn('Cancel my visit',cancellation('Cancel my visit'))
++    with patch('app.integrations.gcalendar_client.delete_calendar_event_for_connection',side_effect=RuntimeError('offline')):agent.turn('Yes',understanding('Yes','other'))
++    op=agent.db.query(SalesCancellationOperation).one()
++    if changed=='event':row.gcal_event_id='different-event'
++    if changed=='calendar':connection.calendar_id='other-calendar'
++    if changed=='connection':connection.provider='changed-provider'
++    if changed=='meeting':row.status=MeetingStatus.CONFIRMED
++    op.next_attempt_at=datetime.utcnow()-timedelta(seconds=1);agent.db.commit()
++    from app.modules.sales_agent.cancellation_service import advance_effect
++    with patch('app.integrations.gcalendar_client.delete_calendar_event_for_connection') as delete:advance_effect(agent.db,op.id);delete.assert_not_called()
++    assert op.calendar_status=='review' and op.last_error=='CalendarBindingChanged'
++
++
++def test_disconnected_calendar_waits_for_same_connection_recovery(agent):
++    row,connection=setup_old_calendar(agent);connection.status='disconnected';agent.db.commit()
++    agent.turn('Cancel my visit',cancellation('Cancel my visit'));agent.turn('Yes',understanding('Yes','other'))
++    op=agent.db.query(SalesCancellationOperation).one();assert op.calendar_status=='waiting_connection'
++    connection.status='connected';op.next_attempt_at=datetime.utcnow()-timedelta(seconds=1);agent.db.commit()
++    from app.modules.sales_agent.cancellation_service import advance_effect
++    with patch('app.integrations.gcalendar_client.delete_calendar_event_for_connection') as delete:advance_effect(agent.db,op.id);assert delete.call_count==1
++    assert op.calendar_status=='completed'
++
++
++def test_disabled_scope_does_not_run_calendar_cleanup(agent,monkeypatch):
++    from app.core.config import settings
++    row,connection=setup_old_calendar(agent);agent.turn('Cancel my visit',cancellation('Cancel my visit'))
++    with patch('app.integrations.gcalendar_client.delete_calendar_event_for_connection',side_effect=RuntimeError('offline')):agent.turn('Yes',understanding('Yes','other'))
++    op=agent.db.query(SalesCancellationOperation).one();op.next_attempt_at=datetime.utcnow()-timedelta(seconds=1);agent.db.commit()
++    monkeypatch.setattr(settings,'SALES_NEXT_FLOW_PROJECT_IDS','')
++    from app.modules.sales_agent.cancellation_service import retry_effects,advance_effect
++    with patch('app.integrations.gcalendar_client.delete_calendar_event_for_connection') as delete:retry_effects(agent.db);advance_effect(agent.db,op.id);delete.assert_not_called()
++    assert op.calendar_status=='retry' and row.status==MeetingStatus.CANCELLED
++
++
++def test_cancellation_does_not_require_property_to_still_be_sellable(agent):
++    row=prepare(agent)
++    from app.modules.projects.models import ProjectPropertyType
++    agent.db.get(ProjectPropertyType,row.visit_property_type_id).review_status='draft';agent.db.commit()
++    agent.turn('Yes',understanding('Yes','other'))
++    assert row.status==MeetingStatus.CANCELLED and agent.db.query(SalesCancellationOperation).count()==1
++
++
++def test_late_target_policy_denial_keeps_reservation(agent):
++    row=prepare(agent)
++    with patch('app.modules.sales_agent.cancellation_service.authorize',side_effect=PermissionError('Access revoked')):agent.turn('Yes',understanding('Yes','other'))
++    assert row.status==MeetingStatus.CONFIRMED and not agent.db.query(SalesCancellationOperation).count()
++
++
++def test_delivery_failure_retry_reuses_one_cancellation_and_no_extra_effect(agent):
++    row=prepare(agent);agent.send.side_effect=RuntimeError('SMS offline')
++    with pytest.raises(RuntimeError):agent.turn('Yes',understanding('Yes','other'))
++    inbound=agent.db.query(SalesMessage).filter_by(direction='inbound').order_by(SalesMessage.created_at.desc(),SalesMessage.id.desc()).first()
++    assert row.status==MeetingStatus.CANCELLED and agent.db.query(SalesCancellationOperation).count()==1
++    agent.send.side_effect=lambda *a,**kw:{'sid':str(uuid.uuid4()),'status':'sent'}
++    agent.retry(inbound)
++    assert agent.db.query(SalesCancellationOperation).count()==agent.db.query(Meeting).count()==1
++    assert agent.db.query(NotificationOutbox).filter_by(event_type='appointment_cancelled').count()==1
++
++
++def test_cancellation_migration_roundtrip_preserves_meetings_and_existing_outbox():
++    import importlib.util
++    from pathlib import Path
++    from sqlalchemy import create_engine,text,inspect
++    from alembic.migration import MigrationContext
++    from alembic.operations import Operations
++    path=Path(__file__).resolve().parents[1]/'alembic/versions/20261108_sales_cancellation_operations.py'
++    spec=importlib.util.spec_from_file_location('cancel_migration',path);module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
++    engine=create_engine('sqlite://')
++    with engine.begin() as connection:
++        for table in ['companies','projects','sales_conversations','leads','sales_messages']:connection.execute(text(f'CREATE TABLE {table} (id VARCHAR(36) PRIMARY KEY)'))
++        for table in ['meetings','notification_outbox']:
++            connection.execute(text(f'CREATE TABLE {table} (id VARCHAR(36) PRIMARY KEY, value TEXT)'))
++            connection.execute(text(f"INSERT INTO {table} VALUES ('old','unchanged')"))
++        with Operations.context(MigrationContext.configure(connection)):
++            module.upgrade();assert 'sales_cancellation_operations' in inspect(connection).get_table_names()
++            module.downgrade();assert 'sales_cancellation_operations' not in inspect(connection).get_table_names()
++            for table in ['meetings','notification_outbox']:assert connection.execute(text(f'SELECT value FROM {table}')).scalar()=='unchanged'
++    engine.dispose()
++
++
++def test_cancellation_migration_postgres_ddl_is_additive():
++    import importlib.util,io
++    from pathlib import Path
++    from alembic.migration import MigrationContext
++    from alembic.operations import Operations
++    path=Path(__file__).resolve().parents[1]/'alembic/versions/20261108_sales_cancellation_operations.py'
++    spec=importlib.util.spec_from_file_location('cancel_sql',path);module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
++    output=io.StringIO()
++    with Operations.context(MigrationContext.configure(dialect_name='postgresql',opts={'as_sql':True,'output_buffer':output})):module.upgrade()
++    sql=output.getvalue();assert 'UNIQUE (proposal_id)' in sql and 'UNIQUE (meeting_id)' in sql
++    assert 'UPDATE meetings' not in sql and 'DELETE' not in sql.replace('ON DELETE CASCADE','').replace('ON DELETE SET NULL','')
++
++
++def test_voluntary_reason_in_request_is_saved_without_asking_again(agent):
++    _,_,row,_=book(agent);text='Cancel my visit because my travel plans changed'
++    request,_=agent.turn(text,cancellation(text,reason='my travel plans changed'))
++    agent.turn('Yes',understanding('Yes','other'));op=agent.db.query(SalesCancellationOperation).one()
++    assert op.reason=='my travel plans changed' and op.reason_message_id==request.id
++    assert 'reason has been recorded' in latest(agent).content and 'reason for cancelling' not in latest(agent).content
++    assert not latest(agent).metadata_json.get('cancellation_followup')
++
++
++def test_decline_does_not_claim_an_already_cancelled_reservation_was_kept(agent):
++    row=prepare(agent);row.status=MeetingStatus.CANCELLED;agent.db.commit()
++    agent.turn('No',understanding('No','other'))
++    assert 'kept your original reservation' not in latest(agent).content and not agent.db.query(SalesCancellationOperation).count()
++
++
++@pytest.mark.parametrize('status',[204,404,410,403,500])
++def test_calendar_delete_recognizes_already_deleted_event_but_not_permission_or_server_errors(status):
++    import httpx
++    from types import SimpleNamespace
++    from app.integrations.gcalendar_client import delete_calendar_event_for_connection
++    response=httpx.Response(status,request=httpx.Request('DELETE','https://calendar.example.invalid/event'))
++    with patch('app.integrations.gcalendar_client._access_token',return_value='offline'),patch('app.integrations.gcalendar_client.httpx.delete',return_value=response) as delete:
++        if status in {403,500}:
++            with pytest.raises(httpx.HTTPStatusError):delete_calendar_event_for_connection(Mock(),SimpleNamespace(calendar_id='owned-calendar'),'owned-event')
++        else:delete_calendar_event_for_connection(Mock(),SimpleNamespace(calendar_id='owned-calendar'),'owned-event')
++        assert delete.call_args.args[0].endswith('/calendars/owned-calendar/events/owned-event')
+diff --git a/backend/tools/sales_ai/offline.sh b/backend/tools/sales_ai/offline.sh
+index ac3877d..cf8d972 100644
+--- a/backend/tools/sales_ai/offline.sh
++++ b/backend/tools/sales_ai/offline.sh
+@@ -13,9 +13,10 @@ case "$BP_MODE" in
+     group-e) BP_ARGS=(-m pytest tests/test_sales_ai_group_e.py -q --disable-warnings) ;;
+     group-f) BP_ARGS=(-m pytest tests/test_sales_ai_group_f.py tests/test_sales_booking_postgres.py -q --disable-warnings) ;;
+     group-g) BP_ARGS=(-m pytest tests/test_sales_ai_group_g.py -q --disable-warnings) ;;
++    group-h) BP_ARGS=(-m pytest tests/test_sales_ai_group_h.py -q --disable-warnings) ;;
+     baseline) BP_ARGS=(-m pytest tests -q --disable-warnings) ;;
+     replay) BP_ARGS=(-m tools.sales_ai.replay --output "${2:?Provide the report output path}") ;;
+-    *) printf 'Usage: bash tools/sales_ai/offline.sh test|group-b|group-c|group-d|group-e|group-f|group-g|baseline|replay OUTPUT\n' >&2; exit 2 ;;
++    *) printf 'Usage: bash tools/sales_ai/offline.sh test|group-b|group-c|group-d|group-e|group-f|group-g|group-h|baseline|replay OUTPUT\n' >&2; exit 2 ;;
+ esac
+ exec env SECRET_KEY=group-a-offline-test ACCESS_TOKEN_EXPIRE_MINUTES=60 \
+     DATABASE_URL=sqlite:// ENVIRONMENT=test \
+diff --git a/docs/sales-ai/group-h-report.json b/docs/sales-ai/group-h-report.json
+new file mode 100644
+index 0000000..f72b910
+--- /dev/null
++++ b/docs/sales-ai/group-h-report.json
+@@ -0,0 +1,164 @@
++{
++  "version": "sales-ai-group-h-report/1.0",
++  "date": "2026-11-08",
++  "base_commit": "95c062dea640033300f559544c2649417bce5851",
++  "main_reverified_at_close": "95c062dea640033300f559544c2649417bce5851",
++  "branch": "sales-ai/group-h-cancellation",
++  "steps": [
++    14
++  ],
++  "status": "implemented_and_verified",
++  "checks": [
++    {
++      "name": "group_h_focused",
++      "passed": 54,
++      "skipped": 0,
++      "warnings": 6767,
++      "seconds": 36.31,
++      "failed": 0,
++      "exit_code": 0
++    },
++    {
++      "name": "full_backend_checkout_before_delete_recovery",
++      "passed": 1951,
++      "skipped": 4,
++      "warnings": 42253,
++      "seconds": 226.25,
++      "failed": 0,
++      "exit_code": 0
++    },
++    {
++      "name": "full_backend_final_tree_isolated_actions_layout",
++      "passed": 1956,
++      "skipped": 4,
++      "warnings": 42253,
++      "seconds": 224.33,
++      "failed": 0,
++      "exit_code": 0,
++      "unchanged_reference_files": 233,
++      "matching_application_tools_migration_files": 282,
++      "physical_copies": true,
++      "checkout_imports": false
++    },
++    {
++      "name": "existing_safety_replay",
++      "passed": 20,
++      "total": 20,
++      "external_actions": 0,
++      "model_quality_evaluated": false
++    },
++    {
++      "name": "migration_heads",
++      "head": "20261108_sales_cancel_ops"
++    },
++    {
++      "name": "sqlite_migration_roundtrip_and_postgres_ddl",
++      "included_in_focused_tests": true,
++      "existing_meetings_and_outbox_preserved": true
++    },
++    {
++      "name": "dependency_consistency",
++      "exit_code": 0
++    },
++    {
++      "name": "whitespace",
++      "exit_code": 0
++    }
++  ],
++  "coverage": {
++    "channels": [
++      "sms",
++      "whatsapp"
++    ],
++    "model": "INJECTED_SCRIPTED",
++    "providers": "MOCKED",
++    "real_postgres_concurrency_proven": false,
++    "inherited_postgres_cases_skipped": 4,
++    "partial_acceptance_cases": [
++      "T14",
++      "T19",
++      "T20",
++      "T21",
++      "T25",
++      "T26"
++    ],
++    "complete_T01_T26_acceptance": false,
++    "effects_route_authorization": "unit checks of handler scoping and existing RoleChecker; not live HTTP acceptance"
++  },
++  "cancellation": {
++    "version": "sales-cancellation/1.0",
++    "proposal_expiry_minutes": 30,
++    "protocol": "request -> exact current-visit summary -> contextual assent -> atomic cancellation",
++    "eligible_statuses": [
++      "scheduled",
++      "confirmed"
++    ],
++    "future_only": true,
++    "farewell_cancels_booking": false,
++    "reason_required": false,
++    "reason_capture": "voluntary request evidence or voluntary answer to current optional-reason question",
++    "unique_receipts": [
++      "proposal_id",
++      "meeting_id"
++    ],
++    "concurrency_guards": [
++      "lead lock",
++      "original booking receipt and Meeting locks",
++      "specialist lock for release",
++      "reservation version recheck",
++      "savepoint and outer transaction rollback"
++    ],
++    "local_slot_released_at_commit": true,
++    "external_slot_released_before_cleanup_success": false,
++    "original_booking_deleted": false,
++    "lead_or_conversation_project_transferred": false,
++    "catalog_sellability_required_for_cancellation": false,
++    "commercial_cadence": "stopped; postcancel invitations suppressed until explicit new-visit request"
++  },
++  "effects": {
++    "calendar": "delete exact saved event/owner/connection/calendar; deterministic F event ID after attempted creation timeout",
++    "calendar_attempt_cap": 5,
++    "calendar_cap_semantics": "passes; progress saved per cleanup target",
++    "previous_reschedule_cleanup_owned_by_h": true,
++    "maximum_reschedule_ancestors": 10,
++    "longer_chain": "manual reconciliation; generic retry reset rejected",
++    "notification": "existing panel outbox with explicit booked Sales recipient and deduplication; Company managers when no specialist",
++    "notification_retry_attempt_cap": 5,
++    "notification_errors_observable_in_receipt": true,
++    "notification_errors_rollback_cancellation": false,
++    "manager_effect_get": "/appointment-cancellations/{operation_id}/effects under existing governance prefix",
++    "manager_effect_retry": "/appointment-cancellations/{operation_id}/effects/retry under existing governance prefix",
++    "manager_permissions": "Administrator/Assistant, same Company and access to every referenced Project",
++    "separate_confirmation_email_sent": false,
++    "provider_acceptance_is_handset_delivery": false
++  },
++  "internal_prompt_version": "sales-understanding-prompt/2.5",
++  "new_migrations": [
++    "20261108_sales_cancel_ops"
++  ],
++  "inherited_required_migrations": [
++    "20261108_sales_visit_context",
++    "20261108_sales_booking_ops",
++    "20261108_sales_reschedule_ops"
++  ],
++  "production_migration_applied": false,
++  "production_changes": false,
++  "deployment_performed": false,
++  "published_prompts_changed": false,
++  "product_model_changed": false,
++  "model_quality_evaluated": false,
++  "live_channel_acceptance": "not_run",
++  "new_flow_activation": "disabled_by_default_explicit_project_allowlist_required",
++  "limits": [
++    "Real model, Calendar and messaging acceptance not run.",
++    "SQLite and generated PostgreSQL DDL do not prove parallel PostgreSQL contention.",
++    "Docker unavailable: physical isolated Actions layout validated, not image build or remote workflow.",
++    "No new frontend: general agent visibility remains J.",
++    "Wait requests and nearby alternatives remain I.",
++    "Operational rollback must retain receipts, meetings and compatible JSON readers."
++  ],
++  "next_group": "I",
++  "next_steps": [
++    15
++  ]
++}
+diff --git a/docs/sales-ai/group-h.md b/docs/sales-ai/group-h.md
+new file mode 100644
+index 0000000..561ca4c
+--- /dev/null
++++ b/docs/sales-ai/group-h.md
+@@ -0,0 +1,138 @@
++# Sales AI — Grupo H: paso 14
++
++Fecha: 8 de noviembre de 2026. Base de main con G: `95c062dea640033300f559544c2649417bce5851`.
++Rama: `sales-ai/group-h-cancellation`. Continúa A–G. Siguiente: **I, paso 15**, pendiente.
++Resultados reproducibles y límites: `group-h-report.json`.
++
++## Cancelación confirmada
++
++El motor `sales-cancellation/1.0` consulta las visitas futuras activas del mismo lead y Company.
++Si existe más de una, pide elegir la cita mediante una lista del backend. No la identifica por
++el interés comercial actual. Las visitas en curso, pasadas, completadas o ya canceladas no se
++cancelan por este recorrido; requieren el tratamiento operativo correspondiente.
++
++Una solicitud explícita muestra proyecto, propiedad/unidad registrada, especialista, fecha,
++hora/zona/offset, duración y dirección de la visita y pregunta si debe cancelar **esa cita exacta**.
++El horario sigue reservado. Sólo la aceptación contextual del resumen actual, enviado completo
++y aceptado por el proveedor, puede cancelar. La propuesta vincula ámbito, contenido, versión de
++la cita y vencimiento de 30 minutos mediante un identificador derivado del contenido completo.
++Un resumen antiguo, alterado, vencido, interrumpido por otra oferta o seguido de una respuesta
++manual no autoriza cancelar. Tampoco lo hacen elegir otra propiedad, despedirse o decir que no
++hay más dudas. Una negativa al resumen conserva la reserva; no se convierte en baja del canal.
++
++La aceptación bloquea el lead, el recibo de reserva y la cita; comprueba propietario, Company,
++estado, hora futura, versión y políticas actuales de origen y proyecto reservado. También
++bloquea el especialista al liberar el horario. Guarda la cancelación, su recibo y el aviso del
++panel en la misma transacción. Un fallo de persistencia revierte todos esos cambios, sin liberar
++la cita a medias. Una validación adicional de permisos tras componer la respuesta protege el
++commit. Las claves únicas por propuesta y Meeting y la respuesta preparada evitan repetir la
++cancelación o sus efectos al reintentar el mismo envío.
++
++La cita queda `cancelled` con `confirmation_status=cancelled_by_lead`; no se borra. El horario
++local deja de bloquear nuevas reservas al commit. Un evento externo aún pendiente de eliminar
++puede seguir bloqueando el Calendar hasta su recuperación: no se afirma liberación externa antes
++de completarla. No se modifica el cursor de reparto ni se cambia el especialista del lead.
++Si no quedan otras visitas activas, se retira el estado operativo de cita confirmada sin cambiar
++un resultado de venta cerrado. La conversación sigue abierta y la cadencia comercial detenida.
++
++Cancelar una cita existente no exige que su propiedad siga vendible o aprobada en el catálogo.
++La operación sí respeta el ámbito, las restricciones aprobadas y los interruptores/allowlists del
++proyecto de origen y del reservado. No mueve la conversación ni la oportunidad a otro Project.
++Las reservas históricas sin tipología/unidad conservan esa asociación desconocida.
++
++## Motivo opcional y continuidad
++
++La confirmación pregunta una sola vez por el motivo, de manera explícitamente opcional y después
++de guardar la cancelación. Si el lead ya indicó voluntariamente un motivo al solicitarla, lo
++conserva con el mensaje de origen y no vuelve a preguntarlo. Una respuesta voluntaria al mensaje
++actual se guarda en el recibo; una negativa no impide cancelar, no produce baja ni otra cita.
++Una respuesta posterior sin esa pregunta actual no se agrega como motivo por una referencia vieja.
++
++El lead puede seguir preguntando por otra propiedad. La cadencia detenida por cancelación evita
++invitaciones comerciales de agenda no solicitadas. Para una nueva visita debe existir una nueva
++solicitud explícita; sigue siendo necesario elegir un horario y aceptar su resumen completo de F.
++Un “yes” a la pregunta sobre el motivo no reserva. Una confirmación mezclada con una petición de
++material conserva el hecho de la cancelación y una sola pregunta. Si el resumen de cancelación
++no se muestra porque se priorizó otra oferta, aceptar esa oferta no cancela la visita.
++
++Contrato interno: `sales-understanding-prompt/2.5`, con `cancellation` y evidencia exacta.
++Los registros anteriores siguen cargando por defecto. No se publica un prompt administrativo
++ni se cambia el modelo configurado. El simulador anterior no representa esta ruta de producción.
++
++## Efectos durables y recuperación
++
++Nueva revisión **`20261108_sales_cancel_ops`**, posterior a `20261108_sales_reschedule_ops`.
++Crea solamente `sales_cancellation_operations`, con snapshots, estado/intentos/errores y fechas
++para Calendar y avisos, además del motivo opcional y su mensaje. No reescribe Meetings ni altera
++el esquema de los outboxes existentes. Debe aplicarse antes de iniciar API/worker con este código.
++
++Después del commit se retira únicamente el evento conocido de la cita cancelada. Para una
++creación F que se intentó pero pudo agotar el tiempo antes de guardar su ID, se usa el ID
++determinista de esa misma reserva. La eliminación comprueba Meeting, Company, lead, especialista,
++conexión y calendario guardados; una vinculación distinta queda en revisión, sin borrar otro
++objeto. El cliente reconoce 404/410 como evento ya inexistente al repetir DELETE; los errores de
++permisos y de servidor siguen siendo fallos recuperables. Referencia del proveedor:
++https://developers.google.com/workspace/calendar/api/guides/errors#410_gone.
++Una conexión desconectada espera que se recupere la misma conexión.
++
++Cuando la cita procede de una reprogramación G con retiro antiguo pendiente, el recibo H toma
++la limpieza de esos ancestros y detiene los recibos G correspondientes. Sigue como máximo diez
++reprogramaciones; una cadena mayor queda en revisión y exige reconciliación manual. Los objetivos
++ya completados no se repiten. Esto evita dejar un evento antiguo porque el último reemplazo ya
++se canceló. Los workers F/G no vuelven a crear la reserva cancelada.
++
++Los errores externos quedan con su tipo, presupuesto y siguiente intento. Calendar reintenta
++con backoff, hasta cinco pasadas con intentos antes de revisión; una pasada puede revisar varios
++objetivos de una cadena, conservando el progreso. El worker existente recupera operaciones
++pendientes en lotes acotados y comprueba los ámbitos habilitados antes de eliminar eventos.
++No crea Meetings ni se envía un mensaje al lead desde ese worker.
++
++El aviso del panel se dirige al Sales de la visita, con deduplicación y destinatario explícito,
++aunque el lead se reasigne. Sin especialista registrado se dirige a responsables de la Company.
++Su procesamiento usa un savepoint independiente: un fallo no deshace la cancelación ya guardada,
++queda visible en el recibo y se reintenta con backoff hasta cinco intentos, luego revisión.
++Los avisos antiguos sin recibo H conservan su recorrido anterior. Los avisos procesados no se
++repiten. No se afirma envío de correo separado, entrega al teléfono o éxito externo sin recibo.
++
++Los responsables con rol Administrator/Assistant pueden consultar y reponer el presupuesto de
++un efecto fallido con los endpoints del router de governance:
++
++- `GET /appointment-cancellations/{operation_id}/effects`
++- `POST /appointment-cancellations/{operation_id}/effects/retry`
++
++Ambos se montan bajo el prefijo de governance existente y validan Company y acceso a todos los
++Projects del recibo. Devuelven estado, intentos, tipo del error y próxima fecha de recuperación.
++El POST sólo restablece efectos pendientes, nunca cancela ni reserva otra vez; no cambia una
++vinculación Calendar. Una cadena por encima del límite requiere revisión manual y no se reinicia
++por ese endpoint. No se añade una pantalla nueva: la visibilidad general del agente sigue en J.
++Los avisos del panel ya autorizados usan su outbox existente; los interruptores de Calendar no
++se presentan como cancelación de esos avisos persistidos.
++
++## Verificación y aplicación
++
++```bash
++cd backend
++alembic upgrade head
++BP_PYTHON=python bash tools/sales_ai/offline.sh group-h
++BP_PYTHON=python bash tools/sales_ai/offline.sh baseline
++BP_PYTHON=python bash tools/sales_ai/offline.sh replay /tmp/group-h-replay.json
++```
++
++Las 54 pruebas enfocadas usan coordinador, persistencia y despachador reales con interpretación
++y proveedores simulados. Cubren confirmación en SMS/WhatsApp, negativas, despedidas, vencimiento,
++cambios de cita, aislamiento, varias visitas, material mixto, motivo opcional, fallo de envío,
++rollback, liberación local de horario, reprogramaciones previas, Calendar, avisos, recuperación
++operativa y migración SQLite/DDL PostgreSQL. El informe distingue esta evidencia de la aceptación
++real con el modelo/canales y de las pruebas paralelas en PostgreSQL.
++
++No se ejecutaron modelo, mensajería o Calendar reales ni concurrencia real en PostgreSQL.
++Los cuatro tests PostgreSQL heredados se omiten sin una URL de base desechable. No se ejecutó
++Docker, un workflow remoto, despliegue ni migración productiva. Las copias físicas aisladas del
++layout de Actions no equivalen a construir una imagen. La aceptación integral T01–T26 permanece
++pendiente en K/L. El grupo I (espera y alternativas) no está implementado en esta entrega.
++
++Los interruptores del nuevo flujo siguen desactivados por defecto. Para rollback operativo,
++detener la cohorte, conservar citas, recibos y eventos, y reconciliar los efectos pendientes.
++No usar un downgrade destructivo como reversión de código ni reactivar una imagen con lector
++JSON estricto incompatible con los campos nuevos. Desactivar el flujo no deshace cancelaciones
++ya confirmadas. No se han cambiado frontend, modelo o configuración productiva.
+diff --git a/docs/sales-ai/implementation-state.json b/docs/sales-ai/implementation-state.json
+index 49b2023..1a710b3 100644
+--- a/docs/sales-ai/implementation-state.json
++++ b/docs/sales-ai/implementation-state.json
+@@ -1,8 +1,8 @@
+ {
+   "version": "sales-ai-implementation-state/1.0",
+-  "base_commit": "c2355a71362169f25e1f01471888e5a8c9259b75",
+-  "branch": "sales-ai/group-g-reschedule",
+-  "current_group": "G",
++  "base_commit": "95c062dea640033300f559544c2649417bce5851",
++  "branch": "sales-ai/group-h-cancellation",
++  "current_group": "H",
+   "completed_steps": [
+     1,
+     2,
+@@ -16,11 +16,12 @@
+     10,
+     11,
+     12,
+-    13
++    13,
++    14
+   ],
+-  "next_group": "H",
++  "next_group": "I",
+   "next_steps": [
+-    14
++    15
+   ],
+   "groups": {
+     "A": "implemented_and_verified",
+@@ -30,7 +31,7 @@
+     "E": "implemented_and_verified",
+     "F": "implemented_and_verified",
+     "G": "implemented_and_verified",
+-    "H": "pending",
++    "H": "implemented_and_verified",
+     "I": "pending",
+     "J": "pending",
+     "K": "pending",
+@@ -41,12 +42,13 @@
+   "migrations": [
+     "20261108_sales_visit_context",
+     "20261108_sales_booking_ops",
+-    "20261108_sales_reschedule_ops"
++    "20261108_sales_reschedule_ops",
++    "20261108_sales_cancel_ops"
+   ],
+   "model_quality_evaluated": false,
+   "live_channel_acceptance": "not_run",
+   "acceptance_matrix": "backend/tests/fixtures/sales_ai/acceptance_matrix.json",
+-  "verification_report": "docs/sales-ai/group-g-report.json",
++  "verification_report": "docs/sales-ai/group-h-report.json",
+   "replay_report": "docs/sales-ai/group-b-baseline-replay.json",
+   "continuity": "Continue from this accumulated delivery, reconcile a newer main, and implement only the next explicitly requested group.",
+   "maintenance": [
+@@ -67,10 +69,12 @@
+     "docs/sales-ai/group-c-report.json",
+     "docs/sales-ai/group-d-report.json",
+     "docs/sales-ai/group-e-report.json",
+-    "docs/sales-ai/group-f-report.json"
++    "docs/sales-ai/group-f-report.json",
++    "docs/sales-ai/group-g-report.json"
+   ],
+   "production_migration_applied": false,
+   "commercial_composition": "evidence_bound_llm_selection_with_backend_wordings",
+   "booking_engine": "sales-first-booking/1.0",
+-  "reschedule_engine": "sales-reschedule/1.0"
++  "reschedule_engine": "sales-reschedule/1.0",
++  "cancellation_engine": "sales-cancellation/1.0"
+ }

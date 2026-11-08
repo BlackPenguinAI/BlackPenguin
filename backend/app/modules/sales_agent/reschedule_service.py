@@ -81,14 +81,14 @@ def originals(db,scope):
         Meeting.status.in_([MeetingStatus.SCHEDULED,MeetingStatus.CONFIRMED]),Meeting.meeting_time>datetime.utcnow()).order_by(Meeting.meeting_time,Meeting.id).all()
 
 
-def resolve_original(db,scope,conversation,directive,state):
+def resolve_original(db,scope,conversation,directive,state,*,offer_key='reschedule_meeting_offer'):
     rows=originals(db,scope);reference=directive.meeting_reference if directive else None
     if reference:
         from .turn_context import choice_index
         cleaned=re.sub(r'\b(?:appointment|visit|booking)\b','',normalized(reference)).strip()
         index=choice_index(cleaned)
-        offered=accepted_outbound(db,conversation,'reschedule_meeting_offer')
-        ids=(offered.metadata_json or {})['reschedule_meeting_offer']['meeting_ids'] if offered else []
+        offered=accepted_outbound(db,conversation,offer_key)
+        ids=(offered.metadata_json or {})[offer_key]['meeting_ids'] if offered else []
         if index is not None:
             if not 0<=index<len(ids):return None,rows
             return next((r for r in rows if r.id==ids[index]),None),rows
@@ -346,7 +346,7 @@ def handle(db,scope,conversation,lead,project,outcome,inbound,previous_meta):
 def advance_effect(db,operation_id):
     """Create the new event first. Retire only the exact former event after success."""
     op=db.get(SalesRescheduleOperation,operation_id)
-    if not op or op.calendar_status in {'completed','review','simulation'}:return
+    if not op or op.calendar_status in {'completed','review','simulation','cancelled'}:return
     if op.calendar_status!='pending' and op.next_attempt_at>datetime.utcnow():return
     new_receipt=db.get(SalesBookingOperation,op.replacement_booking_operation_id)
     seen=set()
@@ -367,7 +367,7 @@ def advance_effect(db,operation_id):
         from .first_booking import sync_calendar
         sync_calendar(db,new_receipt.id)
     op=db.query(SalesRescheduleOperation).filter_by(id=operation_id).populate_existing().with_for_update(skip_locked=True).first()
-    if not op or op.calendar_status in {'completed','review','simulation'}:return
+    if not op or op.calendar_status in {'completed','review','simulation','cancelled'}:return
     new_receipt=db.query(SalesBookingOperation).filter_by(id=effective_receipt_id).populate_existing().one()
     cleanup=op.snapshot_json['cleanup']
     if new_receipt.calendar_status not in {'synced','simulation'}:

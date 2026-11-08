@@ -1,0 +1,164 @@
+{
+  "version": "sales-ai-group-h-report/1.0",
+  "date": "2026-11-08",
+  "base_commit": "95c062dea640033300f559544c2649417bce5851",
+  "main_reverified_at_close": "95c062dea640033300f559544c2649417bce5851",
+  "branch": "sales-ai/group-h-cancellation",
+  "steps": [
+    14
+  ],
+  "status": "implemented_and_verified",
+  "checks": [
+    {
+      "name": "group_h_focused",
+      "passed": 54,
+      "skipped": 0,
+      "warnings": 6767,
+      "seconds": 36.31,
+      "failed": 0,
+      "exit_code": 0
+    },
+    {
+      "name": "full_backend_checkout_before_delete_recovery",
+      "passed": 1951,
+      "skipped": 4,
+      "warnings": 42253,
+      "seconds": 226.25,
+      "failed": 0,
+      "exit_code": 0
+    },
+    {
+      "name": "full_backend_final_tree_isolated_actions_layout",
+      "passed": 1956,
+      "skipped": 4,
+      "warnings": 42253,
+      "seconds": 224.33,
+      "failed": 0,
+      "exit_code": 0,
+      "unchanged_reference_files": 233,
+      "matching_application_tools_migration_files": 282,
+      "physical_copies": true,
+      "checkout_imports": false
+    },
+    {
+      "name": "existing_safety_replay",
+      "passed": 20,
+      "total": 20,
+      "external_actions": 0,
+      "model_quality_evaluated": false
+    },
+    {
+      "name": "migration_heads",
+      "head": "20261108_sales_cancel_ops"
+    },
+    {
+      "name": "sqlite_migration_roundtrip_and_postgres_ddl",
+      "included_in_focused_tests": true,
+      "existing_meetings_and_outbox_preserved": true
+    },
+    {
+      "name": "dependency_consistency",
+      "exit_code": 0
+    },
+    {
+      "name": "whitespace",
+      "exit_code": 0
+    }
+  ],
+  "coverage": {
+    "channels": [
+      "sms",
+      "whatsapp"
+    ],
+    "model": "INJECTED_SCRIPTED",
+    "providers": "MOCKED",
+    "real_postgres_concurrency_proven": false,
+    "inherited_postgres_cases_skipped": 4,
+    "partial_acceptance_cases": [
+      "T14",
+      "T19",
+      "T20",
+      "T21",
+      "T25",
+      "T26"
+    ],
+    "complete_T01_T26_acceptance": false,
+    "effects_route_authorization": "unit checks of handler scoping and existing RoleChecker; not live HTTP acceptance"
+  },
+  "cancellation": {
+    "version": "sales-cancellation/1.0",
+    "proposal_expiry_minutes": 30,
+    "protocol": "request -> exact current-visit summary -> contextual assent -> atomic cancellation",
+    "eligible_statuses": [
+      "scheduled",
+      "confirmed"
+    ],
+    "future_only": true,
+    "farewell_cancels_booking": false,
+    "reason_required": false,
+    "reason_capture": "voluntary request evidence or voluntary answer to current optional-reason question",
+    "unique_receipts": [
+      "proposal_id",
+      "meeting_id"
+    ],
+    "concurrency_guards": [
+      "lead lock",
+      "original booking receipt and Meeting locks",
+      "specialist lock for release",
+      "reservation version recheck",
+      "savepoint and outer transaction rollback"
+    ],
+    "local_slot_released_at_commit": true,
+    "external_slot_released_before_cleanup_success": false,
+    "original_booking_deleted": false,
+    "lead_or_conversation_project_transferred": false,
+    "catalog_sellability_required_for_cancellation": false,
+    "commercial_cadence": "stopped; postcancel invitations suppressed until explicit new-visit request"
+  },
+  "effects": {
+    "calendar": "delete exact saved event/owner/connection/calendar; deterministic F event ID after attempted creation timeout",
+    "calendar_attempt_cap": 5,
+    "calendar_cap_semantics": "passes; progress saved per cleanup target",
+    "previous_reschedule_cleanup_owned_by_h": true,
+    "maximum_reschedule_ancestors": 10,
+    "longer_chain": "manual reconciliation; generic retry reset rejected",
+    "notification": "existing panel outbox with explicit booked Sales recipient and deduplication; Company managers when no specialist",
+    "notification_retry_attempt_cap": 5,
+    "notification_errors_observable_in_receipt": true,
+    "notification_errors_rollback_cancellation": false,
+    "manager_effect_get": "/appointment-cancellations/{operation_id}/effects under existing governance prefix",
+    "manager_effect_retry": "/appointment-cancellations/{operation_id}/effects/retry under existing governance prefix",
+    "manager_permissions": "Administrator/Assistant, same Company and access to every referenced Project",
+    "separate_confirmation_email_sent": false,
+    "provider_acceptance_is_handset_delivery": false
+  },
+  "internal_prompt_version": "sales-understanding-prompt/2.5",
+  "new_migrations": [
+    "20261108_sales_cancel_ops"
+  ],
+  "inherited_required_migrations": [
+    "20261108_sales_visit_context",
+    "20261108_sales_booking_ops",
+    "20261108_sales_reschedule_ops"
+  ],
+  "production_migration_applied": false,
+  "production_changes": false,
+  "deployment_performed": false,
+  "published_prompts_changed": false,
+  "product_model_changed": false,
+  "model_quality_evaluated": false,
+  "live_channel_acceptance": "not_run",
+  "new_flow_activation": "disabled_by_default_explicit_project_allowlist_required",
+  "limits": [
+    "Real model, Calendar and messaging acceptance not run.",
+    "SQLite and generated PostgreSQL DDL do not prove parallel PostgreSQL contention.",
+    "Docker unavailable: physical isolated Actions layout validated, not image build or remote workflow.",
+    "No new frontend: general agent visibility remains J.",
+    "Wait requests and nearby alternatives remain I.",
+    "Operational rollback must retain receipts, meetings and compatible JSON readers."
+  ],
+  "next_group": "I",
+  "next_steps": [
+    15
+  ]
+}

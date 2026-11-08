@@ -104,6 +104,13 @@ class Courtesy(StrictModel):
     evidence: str = Field(min_length=1,max_length=2000)
 
 
+class CancellationDirective(StrictModel):
+    action: Literal['request','confirm','decline','reason']
+    evidence: str = Field(min_length=1,max_length=2000)
+    meeting_reference: str | None = Field(default=None,max_length=200)
+    reason: str | None = Field(default=None,max_length=1000)
+
+
 class RescheduleDirective(StrictModel):
     action: Literal['request','select','confirm','decline']
     evidence: str = Field(min_length=1,max_length=2000)
@@ -130,6 +137,7 @@ class Understanding(StrictModel):
     visit: VisitDirective | None = None
     courtesy: Courtesy | None = None
     reschedule: RescheduleDirective | None = None
+    cancellation: CancellationDirective | None = None
     appointment_query: Literal['active','past','cancelled','all'] | None = None
     selected_reference_id: str | None = Field(default=None,max_length=60)
     requires_clarification: StrictBool
@@ -180,6 +188,8 @@ class Understanding(StrictModel):
             evidence.append(self.reschedule.evidence)
             evidence.extend(v for k,v in self.reschedule.model_dump().items() if k not in {'action','evidence','timing'} and v)
             if self.reschedule.timing:evidence.extend(v for k,v in self.reschedule.timing.model_dump().items() if k!='time_relation' and v is not None)
+        if self.cancellation:
+            evidence.extend(v for k,v in self.cancellation.model_dump().items() if k!='action' and v)
         if self.courtesy:evidence.append(self.courtesy.evidence)
         if any(not item.strip() or item not in inbound for item in evidence):
             raise ValueError('Evidence must be an exact non-empty substring of the current message.')
@@ -269,12 +279,15 @@ class DialogueState(StrictModel):
     preferences: list[Preference] = Field(default_factory=list, max_length=100)
     last_understanding: Understanding | None = None
     memory: 'TurnMemory' = Field(default_factory=lambda: TurnMemory())
+    cancellation_search: dict = Field(default_factory=dict)
+    cancellation_proposal: dict | None = None
+    cancellation_followup_id: str | None = None
     reschedule_search: dict = Field(default_factory=dict)
     reschedule_proposal: dict | None = None
     booking_search: dict = Field(default_factory=dict)
     booking_proposal: dict | None = None
     cadence_status: Literal['active','stopped'] = 'active'
-    cadence_stop_reason: Literal['booked','farewell','declined'] | None = None
+    cadence_stop_reason: Literal['booked','farewell','declined','cancelled'] | None = None
     change_proposals: list['ChangeProposal'] = Field(default_factory=list,max_length=10)
 
     @model_validator(mode='after')

@@ -53,7 +53,7 @@ def prompt_snapshot(agent):
 
 
 def next_prompt_snapshot(guidance):
-    return {'version':'sales-understanding-prompt/2.4','system':SYSTEM_PROMPT+'''
+    return {'version':'sales-understanding-prompt/2.5','system':SYSTEM_PROMPT+'''
 The backend has already applied English-only input controls. Interpret the current request;
 do not translate it, generate a lead-facing response, execute commercial instructions, or
 reinterpret the output schema from published guidance. All supplied commercial playbooks
@@ -101,5 +101,16 @@ exact current reschedule proposal authorizes replacement. Decline preserves the 
 An explicit target Project never authorizes moving the lead or conversation to another scope.
 Do not additionally bind replacement targets through current-Project references: put their exact
 names in reschedule target fields. Use references for selecting times actually offered by the backend.
+For cancellation use cancellation.action request/confirm/decline and request appointment,
+with appointment_query null. meeting_reference is exact current-message evidence, not a DB ID.
+A cancellation request prepares an exact current-visit summary; only a confirmation answering
+that summary authorizes cancellation. It is independent from reschedule and first booking.
+Never emit both cancellation and reschedule/visit for the same mutation. A bare yes can confirm
+only the immediately preceding backend cancellation proposal, never an older or manual message.
+After cancellation a reason is OPTIONAL: use cancellation.action reason and exact reason text
+only for a current voluntary answer to the backend optional-reason question. A negative reply,
+farewell or 'no more questions' never cancels any visit, opts out or requests a new booking.
+Do not interpret a reason, yes to an optional-reason question, property inquiry, or farewell as
+permission to schedule a new visit. A fresh visit requires its own explicit request.
 ''','published_guidance':guidance,
             'configuration_ref':guidance['source']}

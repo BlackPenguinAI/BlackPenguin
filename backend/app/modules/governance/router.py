@@ -223,3 +223,23 @@ def mark_notification_read(
     if not item: raise HTTPException(status_code=404, detail="Notification not found.")
     item.read_at = item.read_at or datetime.utcnow(); db.commit(); db.refresh(item)
     return item
+
+
+def _cancellation_effect(db, user, operation_id):
+    from app.modules.sales_agent.cancellation_models import SalesCancellationOperation
+    item=db.query(SalesCancellationOperation).filter_by(id=operation_id,company_id=user.company_id).first()
+    if not item:raise HTTPException(status_code=404,detail='Cancellation not found.')
+    for pid in {item.project_id,item.booking_project_id,*[t['project_id'] for t in item.snapshot_json['cleanup']]}:_scope(db,user,pid)
+    return item
+
+
+@router.get('/appointment-cancellations/{operation_id}/effects')
+def cancellation_effects(operation_id: str,db: Session = Depends(get_db),current_user: User = Depends(RoleChecker(TENANT_MANAGER_ROLES))):
+    from app.modules.sales_agent.cancellation_service import effect_status
+    return effect_status(_cancellation_effect(db,current_user,operation_id))
+
+
+@router.post('/appointment-cancellations/{operation_id}/effects/retry')
+def retry_cancellation_effects(operation_id: str,db: Session = Depends(get_db),current_user: User = Depends(RoleChecker(TENANT_MANAGER_ROLES))):
+    from app.modules.sales_agent.cancellation_service import reset_effects
+    return reset_effects(db,_cancellation_effect(db,current_user,operation_id))

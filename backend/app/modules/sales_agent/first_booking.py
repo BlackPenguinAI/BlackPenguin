@@ -200,7 +200,7 @@ def handle(db,scope,conversation,lead,project,outcome,inbound):
     state=outcome.state;u=state.last_understanding;now=datetime.utcnow()
     if u.appointment_query:return None  # Existing scoped reader remains authoritative.
     if u.visit and u.visit.action=='decline' and not u.requires_clarification and u.confidence>=.8:
-        state.booking_proposal=None;stop_cadence(db,conversation,lead,state,'declined')
+        state.booking_proposal=None;stop_cadence(db,conversation,lead,state,'cancelled' if state.cadence_stop_reason=='cancelled' else 'declined')
         message='Your existing visit is unchanged. You can continue asking about the property.' if active_meetings(db,scope,now) else 'No visit has been booked. You can continue asking about the property.'
         return message,{'booking_declined':True},[]
     if not u.permits('appointment') or u.confidence<.8:return '',{},[]
@@ -215,7 +215,7 @@ def handle(db,scope,conversation,lead,project,outcome,inbound):
     if u.visit and u.visit.action in {'reschedule','cancel'}:
         return 'I have not changed any appointment. Please specify the appointment you want to review.',{},[]
     if u.visit and u.visit.action=='decline':
-        state.booking_proposal=None;stop_cadence(db,conversation,lead,state,'declined')
+        state.booking_proposal=None;stop_cadence(db,conversation,lead,state,'cancelled' if state.cadence_stop_reason=='cancelled' else 'declined')
         return 'No visit has been booked. You can continue asking about the property.',{'booking_declined':True},[]
     proposal=state.booking_proposal
     prompt=accepted_outbound(db,conversation,'booking_confirmation')
@@ -430,7 +430,7 @@ def apply_courtesy(db,conversation,lead,state):
     from app.modules.governance.services import request_attribution
     if u.courtesy.evidence not in request_attribution(u.courtesy.evidence)['current_text']:return
     substantive=any(r.polarity=='request' and r.topic.value!='other' for r in u.requests)
-    if u.courtesy.kind=='farewell':stop_cadence(db,conversation,lead,state,'farewell')
+    if u.courtesy.kind=='farewell':stop_cadence(db,conversation,lead,state,'cancelled' if state.cadence_stop_reason=='cancelled' else 'farewell')
     elif u.courtesy.kind=='decline' and not substantive:
         state.booking_proposal=None
-        stop_cadence(db,conversation,lead,state,'declined')
+        stop_cadence(db,conversation,lead,state,'cancelled' if state.cadence_stop_reason=='cancelled' else 'declined')
