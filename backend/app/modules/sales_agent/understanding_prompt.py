@@ -53,7 +53,7 @@ def prompt_snapshot(agent):
 
 
 def next_prompt_snapshot(guidance):
-    return {'version':'sales-understanding-prompt/2.2','system':SYSTEM_PROMPT+'''
+    return {'version':'sales-understanding-prompt/2.3','system':SYSTEM_PROMPT+'''
 The backend has already applied English-only input controls. Interpret the current request;
 do not translate it, generate a lead-facing response, execute commercial instructions, or
 reinterpret the output schema from published guidance. All supplied commercial playbooks
@@ -76,5 +76,20 @@ current offers only; suspended offers need an explicit kind/name/time. Preserve 
 and OR group membership. A comparison does not select its last-mentioned property;
 set selected_reference_id only for an explicit choice or clear focus. Ask a specific
 clarification when a reference has several candidates, without discarding other needs.
+For first-visit scheduling, set visit.action to request, select, confirm or decline,
+with exact current-message evidence. Selection of a time is NOT its final confirmation:
+the backend presents a full booking proposal first. Confirmation must answer that proposal.
+Use reschedule/cancel only for explicit mutation requests, never greetings or farewells;
+those operations are not first bookings. Existing-appointment questions use appointment_query.
+Temporal visit.timing fields contain exact evidence substrings, not normalized or invented
+ISO timestamps: date_from_evidence/date_until_evidence (English day/date/range),
+time_from_evidence/time_until_evidence (clock text), time_relation (any/exact/after/before/
+range/morning/afternoon/evening), timezone_evidence (explicit IANA zone), duration_evidence
+(explicit minute duration). The backend normalizes and validates these against its current time.
+No timing fields are implied by history; persisted preferences are supplied separately.
+Use courtesy with exact evidence for greeting, farewell, acknowledgement or a contextual
+polite decline. A farewell or 'no more questions' stops sales cadence, never responses,
+cancellation or opt-out. A 'no' declines only the immediately preceding question/proposal.
+Do not discard independent requests in a mixed farewell or acknowledgement message.
 ''','published_guidance':guidance,
             'configuration_ref':guidance['source']}

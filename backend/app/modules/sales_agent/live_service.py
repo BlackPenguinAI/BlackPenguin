@@ -898,6 +898,8 @@ def material_request_text(inbound, result):
 def _schedule_next_action(db: Session, conversation: SalesConversation, lead: Lead, event_id: str, *, refresh_pending=False) -> None:
     if lead.is_opt_out or conversation.is_paused:
         return
+    from .first_booking import cadence_stopped
+    if cadence_stopped(db,conversation):return
     if refresh_pending:
         from app.modules.ai_core.models import AIConfiguration
         published=db.query(AIConfiguration).filter_by(company_id=None).first()
@@ -1675,7 +1677,8 @@ async def process_live_followup_job(job_id: str) -> None:
             Lead.id == conversation.lead_id,
             Lead.company_id == conversation.company_id,
         ).one()
-        if conversation.channel not in {"sms", "whatsapp"} or conversation.is_paused or lead.is_opt_out:
+        from .first_booking import cadence_stopped
+        if conversation.channel not in {"sms", "whatsapp"} or conversation.is_paused or lead.is_opt_out or cadence_stopped(db,conversation):
             job.status = "cancelled"; job.processed_at = datetime.utcnow(); db.commit(); return
         if conversation.channel == "whatsapp" and not _whatsapp_customer_window_open(db, conversation):
             # Re-engagement outside the customer-service window requires a

@@ -205,6 +205,9 @@ def _appointment(db,scope,conversation,lead,project,outcome,inbound):
         for task in outcome.state.tasks:
             if task.topic.value=='appointment' and task.source_message_id==inbound.id:task.status='completed'
         return render(result),{'appointment_query':result},[]
+    if next_selected(scope):
+        from .first_booking import handle
+        return handle(db,scope,conversation,lead,project,outcome,inbound)
     if not u.permits('appointment'):
         return '',{},[]
     plan=getattr(outcome,'plan',None)
@@ -264,6 +267,12 @@ def _appointment(db,scope,conversation,lead,project,outcome,inbound):
 def _calendar_after_commit(db,meeting_id,scope):
     """DB booking is already durable; deterministic event ID prevents duplicates."""
     if not meeting_id:return
+    from .booking_models import SalesBookingOperation
+    operation=db.query(SalesBookingOperation).filter_by(meeting_id=meeting_id,company_id=scope.company_id,lead_id=scope.lead_id).first()
+    if operation:
+        from .first_booking import sync_calendar
+        sync_calendar(db,operation.id)
+        return
     meeting=db.query(Meeting).filter_by(id=meeting_id,project_id=scope.project_id,lead_id=scope.lead_id).with_for_update().one()
     from app.modules.sales_crm.models import MeetingStatus
     if (meeting.calendar_sync_status not in {'pending','failed'} or meeting.is_demo
@@ -290,6 +299,8 @@ def _calendar_after_commit(db,meeting_id,scope):
 def retry_active_calendars(db,limit=10):
     """Bounded worker retry; no legacy bookings or disabled cohorts touched."""
     if not settings.SALES_DIALOGUE_RUNTIME_ENABLED:return
+    from .first_booking import retry_calendars
+    retry_calendars(db,limit)
     from app.modules.sales_crm.models import MeetingStatus
     rows=db.query(Meeting).filter(Meeting.source=='agent_sms_active',Meeting.status==MeetingStatus.CONFIRMED,
         Meeting.calendar_sync_status.in_(['pending','failed']),Meeting.meeting_time>datetime.utcnow()).order_by(
@@ -344,6 +355,9 @@ async def maybe_process_active(db,conversation,inbound):
     existing=db.query(AgentRun).filter_by(event_id=event_id).first()
     sticky=bool(existing and existing.graph_version==ENGINE)
     policy=selected_policy(db,scope)
+    if policy:
+        from .first_booking import recover_booking_pause
+        recover_booking_pause(db,conversation)
     if not policy:return sticky  # Never replay an unfinished new-engine turn through legacy.
     if not scoped_messages_query(db,conversation).filter_by(id=inbound.id,direction='inbound',role='user').first():
         raise PermissionError('Inbound message belongs to another opportunity.')
@@ -411,6 +425,9 @@ async def maybe_process_active(db,conversation,inbound):
                     db.commit()
                     raise ValueError('Understanding could not be validated.')
                 u=_confirmed_offer_understanding(interpreted.state.last_understanding,previous_meta,inbound.content)
+                if next_enabled:
+                    from .first_booking import enrich_understanding
+                    u=enrich_understanding(u,previous_meta,inbound.content)
                 u=confirmed_controls(u,inbound.content,pause_reason=protected)
                 interpreted_revision=interpreted.revision
             if u.confidence < .8 and not u.requires_clarification:
@@ -422,6 +439,9 @@ async def maybe_process_active(db,conversation,inbound):
             outcome=run_turn(db,scope,message_id=inbound.id,understanding=u,expected_revision=interpreted_revision,
                 event_key='active-runtime:'+inbound.id,max_steps=policy.max_steps,max_seconds=policy.max_seconds,
                 **({'max_rounds':policy.max_rounds,'max_read_units':policy.max_read_units} if next_enabled else {}))
+            if next_enabled:
+                from .first_booking import apply_courtesy
+                apply_courtesy(db,conversation,lead,outcome.state)
             conversation,lead,project=_current(db,scope,control=exact_stop)  # Manual takeover/consent/permissions win after inference.
             draft=compose(outcome,channel=conversation.channel,style=policy.composition_style)
             material_question=''
@@ -558,9 +578,15 @@ async def maybe_process_active(db,conversation,inbound):
                 if priority and appointment and '?' in appointment:
                     # Keep a mixed request pending without putting two competing
                     # acceptance questions/offers into the same outbound message.
-                    metadata.pop('appointment_offer',None)
-                    metadata.pop('location_offer',None)
-                    details.append('Your visit request remains pending while we review the information request.')
+                    if metadata.get('booking_operation_id'):
+                        details.append(appointment.removesuffix(' What else would you like to know before your visit?'))
+                        metadata.pop('post_booking_question',None)
+                    else:
+                        metadata.pop('appointment_offer',None)
+                        metadata.pop('location_offer',None)
+                        metadata.pop('booking_confirmation',None)
+                        if metadata.pop('booking_property_question',None):metadata.pop('property_catalog_offer',None)
+                        details.append('Your visit request remains pending while we review the information request.')
                 elif appointment:details.append(appointment)
                 if metadata.get('review_notice'):
                     details.append('The Sales team needs to verify the restricted part of your request. I can continue helping with other approved information.')
@@ -660,7 +686,7 @@ async def maybe_process_active(db,conversation,inbound):
     lead=db.query(Lead).filter_by(id=scope.lead_id).populate_existing().one()
     metadata=dict(data.get('metadata') or {})
     expected_pause=metadata.get('expected_pause_reason')
-    if metadata.get('meeting_id'):expected_pause='Appointment confirmed'
+    if metadata.get('meeting_id') and not metadata.get('booking_operation_id'):expected_pause='Appointment confirmed'
     own_control=bool(metadata.get('control_outcome') or metadata.get('meeting_id'))
     if metadata.get('control_outcome')=='handoff':
         from app.modules.governance.models import HumanInterventionCase
@@ -721,7 +747,8 @@ async def maybe_process_active(db,conversation,inbound):
         save(db,scope,event_key='active-receipt:'+inbound.id,expected_revision=revision,state=state,
             metadata={'engine':ENGINE,'message_id':inbound.id,'run_id':run.id,'delivery_state':'provider_accepted_not_delivery_confirmed','share_ids':metadata['sales_asset_share_ids']})
     run.status='completed';run.completed_at=datetime.utcnow();db.commit()
-    if not conversation.is_paused and not lead.is_opt_out and not run.error_code and not metadata.get('language_hold'):
+    from .first_booking import cadence_stopped
+    if not conversation.is_paused and not lead.is_opt_out and not run.error_code and not metadata.get('language_hold') and not cadence_stopped(db,conversation):
         live._schedule_next_action(db,conversation,lead,event_id,refresh_pending=True);db.commit()
     elif run.error_code:
         jobs=db.query(SalesFollowUpJob).filter_by(conversation_id=conversation.id,status='pending').all()

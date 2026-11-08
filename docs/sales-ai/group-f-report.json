@@ -1,0 +1,194 @@
+{
+  "version": "sales-ai-group-f-report/1.0",
+  "date": "2026-11-08",
+  "base_commit": "f92e8046cf09c253da78b9636c311c7dfed62988",
+  "main_reverified_at_close": "f92e8046cf09c253da78b9636c311c7dfed62988",
+  "branch": "sales-ai/group-f-booking-continuity",
+  "steps": [
+    11,
+    12
+  ],
+  "status": "implemented_and_verified",
+  "checks": [
+    {
+      "name": "group_f_focused_final",
+      "passed": 68,
+      "skipped": 2,
+      "warnings": 4901,
+      "seconds": 24.44,
+      "failed": 0,
+      "exit_code": 0
+    },
+    {
+      "name": "checkout_regression_before_final_worker_scope_filter",
+      "passed": 1862,
+      "skipped": 4,
+      "warnings": 30140,
+      "seconds": 153.35,
+      "failed": 0,
+      "exit_code": 0,
+      "phase": "before_final_worker_scope_filter_and_its_regression_case"
+    },
+    {
+      "name": "full_backend_final_tree_isolated_actions_layout",
+      "passed": 1863,
+      "skipped": 4,
+      "warnings": 30272,
+      "seconds": 156.97,
+      "failed": 0,
+      "exit_code": 0,
+      "physical_copies": true,
+      "checkout_imports": false,
+      "unchanged_reference_files": 225,
+      "matching_application_tools_migration_files": 276
+    },
+    {
+      "name": "existing_safety_replay",
+      "passed": 20,
+      "total": 20,
+      "external_actions": 0,
+      "model_quality_evaluated": false,
+      "exit_code": 0
+    },
+    {
+      "name": "migration_heads",
+      "head": "20261108_sales_booking_ops",
+      "exit_code": 0
+    },
+    {
+      "name": "migration_sqlite_roundtrip_and_postgres_ddl",
+      "included_in_focused_tests": true,
+      "production_database_touched": false
+    },
+    {
+      "name": "dependency_consistency",
+      "command": "python -m pip check",
+      "exit_code": 0
+    },
+    {
+      "name": "whitespace",
+      "command": "git diff --check",
+      "exit_code": 0
+    }
+  ],
+  "coverage": {
+    "focused_tests_passed": 68,
+    "new_parallel_postgres_cases_defined": 2,
+    "new_parallel_postgres_cases_executed": 0,
+    "exported_projects": 6,
+    "channels": [
+      "sms",
+      "whatsapp"
+    ],
+    "real_catalog_initial_visit_requests": 12,
+    "model": "INJECTED_SCRIPTED",
+    "providers": "MOCKED",
+    "real_postgres_concurrency_proven": false,
+    "covered_cases": [
+      "T11",
+      "T12",
+      "T14",
+      "T15",
+      "T16",
+      "T21",
+      "T25",
+      "T26"
+    ],
+    "partial_cases": [
+      "T13 no-matching-time response; durable wait remains I",
+      "T19 ordered contention and opt-in PostgreSQL tests; real parallel execution pending"
+    ],
+    "complete_T01_T26_acceptance": false,
+    "prior_regressions_updated": "C and D now require the full-summary confirmation; original property binding and interruption assertions preserved."
+  },
+  "booking": {
+    "version": "sales-first-booking/1.0",
+    "protocol": "verified time offer -> selection -> full summary -> exact assent -> transaction",
+    "proposal_expiry_minutes": 30,
+    "default_duration_minutes": 45,
+    "explicit_duration_minutes_range": [
+      15,
+      180
+    ],
+    "maximum_search_days_per_request": 14,
+    "maximum_requested_range_days": 31,
+    "future_request_horizon_days": 90,
+    "maximum_offered_slots": 3,
+    "timezone": "Project default or explicitly evidenced IANA timezone; UTC storage",
+    "idempotency": "unique proposal/meeting receipt; prepared outbound and deterministic Calendar event ID",
+    "concurrency_guards": [
+      "lead row lock across channels",
+      "stable specialist row locks before conflict recheck",
+      "active/in-progress meeting conflicts"
+    ],
+    "first_time_selection_creates_reservation": false,
+    "confirmation_uses_persisted_values": true
+  },
+  "effects": {
+    "notification_outbox": "deduplicated panel notices addressed to booked specialist, not later lead assignment",
+    "separate_confirmation_email_sent": false,
+    "calendar_operation_table": "sales_booking_operations",
+    "calendar_provider_id": "bp + Meeting UUID without hyphens",
+    "calendar_failure_attempt_cap": 5,
+    "calendar_backoff_minutes": "2**attempt, bounded at 60; review after attempt 5",
+    "calendar_without_connection": "waiting_connection; due again in 10 minutes",
+    "calendar_retry_batch_default": 10,
+    "disabled_scopes_filtered_before_batch_limit": true,
+    "delivery_receipt_semantics": "provider accepted, not proof of handset delivery"
+  },
+  "continuity": {
+    "chat_after_booking": "open",
+    "commercial_cadence_after_booking_or_farewell": "stopped",
+    "legacy_booking_pause_recovery": [
+      "authenticated provider ingress",
+      "active coordinator"
+    ],
+    "manual_and_human_pauses_preserved": true,
+    "farewell_cancels_booking": false,
+    "change_of_interest_changes_booking": false
+  },
+  "internal_prompt_version": "sales-understanding-prompt/2.3",
+  "new_migrations": [
+    "20261108_sales_booking_ops"
+  ],
+  "inherited_required_migrations": [
+    "20261108_sales_visit_context"
+  ],
+  "migration_applied_in_production": false,
+  "production_changes": false,
+  "deployment_performed": false,
+  "published_prompts_changed": false,
+  "product_model_changed": false,
+  "new_flow_activation": "disabled_by_default_explicit_project_allowlist_required",
+  "environment": {
+    "python": "3.12.14",
+    "pytest": "9.1.1",
+    "SQLAlchemy": "2.0.50",
+    "fastapi": "0.136.3",
+    "pydantic": "2.13.4"
+  },
+  "skipped": [
+    "Two existing PostgreSQL dialogue concurrency cases and two new booking contention cases require an explicit disposable PostgreSQL URL."
+  ],
+  "not_run": [
+    "Actual PostgreSQL migration/concurrency",
+    "Real OpenRouter conversation quality",
+    "Live SMS/WhatsApp or Calendar",
+    "Actual Docker image build (Docker unavailable)",
+    "Remote GitHub Actions",
+    "Frontend tests/build (no frontend changes)",
+    "Complete T01-T26 acceptance"
+  ],
+  "limits": [
+    "Real model language/commercial acceptance remains K; providers are simulated.",
+    "A 14-day availability scan is bounded work, not proof of exhaustive availability or a measured end-to-end latency.",
+    "Exported-project cases cover initial visit requests and isolation, not completed live reservations for every Project.",
+    "Notification notices are from the existing panel; no separate confirmation-email delivery is asserted.",
+    "Rescheduling, cancellation and durable wait remain G, H and I.",
+    "Keep booking receipts, meetings and JSON snapshots on operational rollback; older strict readers need compatibility handling."
+  ],
+  "next_group": "G",
+  "next_steps": [
+    13
+  ]
+}

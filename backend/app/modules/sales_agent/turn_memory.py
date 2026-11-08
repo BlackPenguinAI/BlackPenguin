@@ -127,6 +127,8 @@ def build(db,scope,*,inbound_message_id,now=None):
             'appointments':{category:tool.execute({'category':category,'limit':5},now=now) for category in ('active','past','cancelled')},
             'memory':state.memory.model_dump(mode='json'),'history':list(reversed(pertinent)),
             'history_coverage':{'messages':len(pertinent),'bounded':True,'older_messages_omitted':len(history)==20 or remaining<=0},
+            'booking_search':state.booking_search,'booking_proposal':state.booking_proposal,
+            'cadence':{'status':state.cadence_status,'reason':state.cadence_stop_reason},
             'pending_tasks':pending[-20:],'pending_tasks_truncated':len(pending)>20,
             'constraints':[{**c.model_dump(mode='json'),'evidence':c.evidence[:200],
                             'context_truncated':len(c.evidence)>200} for c in state.constraints],

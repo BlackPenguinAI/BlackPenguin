@@ -83,6 +83,27 @@ class ConstraintRelease(StrictModel):
     evidence: str = Field(min_length=1, max_length=2000)
 
 
+class VisitTiming(StrictModel):
+    date_from_evidence: str | None = Field(default=None,max_length=200)
+    date_until_evidence: str | None = Field(default=None,max_length=200)
+    time_from_evidence: str | None = Field(default=None,max_length=100)
+    time_until_evidence: str | None = Field(default=None,max_length=100)
+    time_relation: Literal['any','exact','after','before','range','morning','afternoon','evening']='any'
+    timezone_evidence: str | None = Field(default=None,max_length=100)
+    duration_evidence: str | None = Field(default=None,max_length=100)
+
+
+class VisitDirective(StrictModel):
+    action: Literal['request','select','confirm','decline','reschedule','cancel']
+    evidence: str = Field(min_length=1,max_length=2000)
+    timing: VisitTiming | None = None
+
+
+class Courtesy(StrictModel):
+    kind: Literal['greeting','farewell','acknowledgement','decline']
+    evidence: str = Field(min_length=1,max_length=2000)
+
+
 class Understanding(StrictModel):
     version: Literal['sales-understanding/1.0']
     requests: list[Request] = Field(max_length=30)
@@ -94,6 +115,8 @@ class Understanding(StrictModel):
     references: list[Reference] = Field(max_length=20)
     preferences: list[Preference] = Field(max_length=20)
     releases: list[ConstraintRelease] = Field(default_factory=list, max_length=20)
+    visit: VisitDirective | None = None
+    courtesy: Courtesy | None = None
     appointment_query: Literal['active','past','cancelled','all'] | None = None
     selected_reference_id: str | None = Field(default=None,max_length=60)
     requires_clarification: StrictBool
@@ -136,6 +159,11 @@ class Understanding(StrictModel):
         evidence += [g.evidence for g in self.alternatives] + [r.evidence for r in self.references]
         evidence += [p.evidence for p in self.preferences]
         evidence += [r.evidence for r in self.releases]
+        if self.visit:
+            evidence.append(self.visit.evidence)
+            if self.visit.timing:
+                evidence.extend(v for k,v in self.visit.timing.model_dump().items() if k!='time_relation' and v is not None)
+        if self.courtesy:evidence.append(self.courtesy.evidence)
         if any(not item.strip() or item not in inbound for item in evidence):
             raise ValueError('Evidence must be an exact non-empty substring of the current message.')
         return self
@@ -224,6 +252,10 @@ class DialogueState(StrictModel):
     preferences: list[Preference] = Field(default_factory=list, max_length=100)
     last_understanding: Understanding | None = None
     memory: 'TurnMemory' = Field(default_factory=lambda: TurnMemory())
+    booking_search: dict = Field(default_factory=dict)
+    booking_proposal: dict | None = None
+    cadence_status: Literal['active','stopped'] = 'active'
+    cadence_stop_reason: Literal['booked','farewell','declined'] | None = None
     change_proposals: list['ChangeProposal'] = Field(default_factory=list,max_length=10)
 
     @model_validator(mode='after')

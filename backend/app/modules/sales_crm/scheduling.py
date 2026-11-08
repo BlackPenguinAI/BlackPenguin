@@ -23,7 +23,7 @@ from .models import (
 )
 
 
-ACTIVE_MEETING_STATUSES = {MeetingStatus.SCHEDULED, MeetingStatus.CONFIRMED}
+ACTIVE_MEETING_STATUSES = {MeetingStatus.SCHEDULED, MeetingStatus.CONFIRMED, MeetingStatus.IN_PROGRESS}
 
 
 def next_cadence_time(*, now: datetime, timezone_name: str, delay_hours: int) -> datetime:
@@ -343,6 +343,8 @@ def available_slots(
     duration_minutes: int = 45,
     days: int = 14,
     limit: int = 12,
+    slot_predicate=None,
+    include_sales_user_ids: bool = False,
 ) -> list[dict]:
     after = after.replace(tzinfo=None) if after.tzinfo else after
     minute = 0 if after.minute < 30 else 30
@@ -363,6 +365,9 @@ def available_slots(
         )
     result = []
     while cursor < end and len(result) < limit:
+        if slot_predicate is not None and not slot_predicate(cursor, cursor + timedelta(minutes=duration_minutes)):
+            cursor += timedelta(minutes=30)
+            continue
         user_ids = eligible_users_for_slot(
             db,
             project_id=project_id,
@@ -375,6 +380,7 @@ def available_slots(
                 "start_at": cursor,
                 "end_at": cursor + timedelta(minutes=duration_minutes),
                 "eligible_sales_users": len(user_ids),
+                **({"eligible_sales_user_ids": user_ids} if include_sales_user_ids else {}),
             })
         cursor += timedelta(minutes=30)
     return result
@@ -392,6 +398,7 @@ def create_agent_appointment(
     visit_property_type_id: str | None = None,
     visit_unit_id: str | None = None,
     capture_visit_context: bool = False,
+    required_sales_user_id: str | None = None,
 ) -> tuple[Meeting, User]:
     starts_at = starts_at.replace(tzinfo=None) if starts_at.tzinfo else starts_at
     # Lock every candidate Sales user in a stable order before rechecking
@@ -408,6 +415,8 @@ def create_agent_appointment(
         starts_at=starts_at,
         duration_minutes=duration_minutes,
     )
+    if required_sales_user_id:
+        eligible_user_ids=[uid for uid in eligible_user_ids if uid==required_sales_user_id]
     if not eligible_user_ids:
         raise HTTPException(status_code=409, detail="That appointment time is no longer available.")
     assigned_user_id = select_next_sales_user(
@@ -466,6 +475,8 @@ def create_agent_appointment(
         db, company_id=lead.company_id, project_id=lead.project_id,
         event_type="appointment_confirmed", entity_type="lead", entity_id=lead.id,
         payload={
+            "meeting_id": meeting.id,
+            "assigned_sales_user_id": user.id,
             "title": "Appointment confirmed",
             "body": f"{lead.full_name} confirmed an appointment for {starts_at.isoformat()}.",
             "action_url": "/app/schedule",

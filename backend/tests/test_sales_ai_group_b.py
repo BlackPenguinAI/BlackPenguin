@@ -131,7 +131,7 @@ def test_new_interpreter_has_internal_contract_and_configuration_provenance(agen
     version=publish(agent,pack)
     _,run=agent.turn('Give me information',understanding('Give me information','catalog'))
     assert run.status=='completed',run.output_snapshot
-    assert run.prompt_snapshot['version']=='sales-understanding-prompt/2.2'
+    assert run.prompt_snapshot['version']=='sales-understanding-prompt/2.3'
     assert run.output_snapshot['metadata']['configuration_ref']['version_id']==version.id
     request=json.dumps(agent.infer.call_args.args)
     assert 'LEGACY_SCHEMA_SENTINEL' not in request and 'Sales identity' in request
@@ -397,7 +397,7 @@ def test_exported_real_catalog_through_new_gate_and_versioned_interpreter(index,
         assert held.output_snapshot['metadata']['language_hold'] and not h.model.requests
         _,run=h.turn('Give me information')
         assert run.status=='completed',run.output_snapshot
-        assert run.prompt_snapshot['version']=='sales-understanding-prompt/2.2'
+        assert run.prompt_snapshot['version']=='sales-understanding-prompt/2.3'
         assert len(h.model.requests)==1 and not h.conversation.is_paused
         assert not h.db.query(Meeting).count() and not h.db.query(SalesAssetShare).count()
         assert not h.calendar.calls

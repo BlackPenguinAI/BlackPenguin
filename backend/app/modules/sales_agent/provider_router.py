@@ -61,6 +61,8 @@ def _record_inbound(
     )
     db.add(message)
     db.flush()
+    from .first_booking import recover_booking_pause
+    recover_booking_pause(db, conversation)
     should_queue = content_supported and not conversation.is_paused
     if should_queue:
         db.add(SalesInboundJob(

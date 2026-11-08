@@ -1,0 +1,2034 @@
+diff --git a/backend/alembic/versions/20261108_sales_booking_operations.py b/backend/alembic/versions/20261108_sales_booking_operations.py
+new file mode 100644
+index 0000000..6374f68
+--- /dev/null
++++ b/backend/alembic/versions/20261108_sales_booking_operations.py
+@@ -0,0 +1,30 @@
++"""Add durable first-booking receipts; leave historical meetings unchanged."""
++from alembic import op
++import sqlalchemy as sa
++revision='20261108_sales_booking_ops'
++down_revision='20261108_sales_visit_context'
++branch_labels=None
++depends_on=None
++
++
++def upgrade():
++    op.create_table('sales_booking_operations',
++        sa.Column('id',sa.String(36),primary_key=True),
++        sa.Column('company_id',sa.String(36),sa.ForeignKey('companies.id',ondelete='CASCADE'),nullable=False),
++        sa.Column('project_id',sa.String(36),sa.ForeignKey('projects.id',ondelete='CASCADE'),nullable=False),
++        sa.Column('conversation_id',sa.String(36),sa.ForeignKey('sales_conversations.id',ondelete='CASCADE'),nullable=False),
++        sa.Column('lead_id',sa.String(36),sa.ForeignKey('leads.id',ondelete='CASCADE'),nullable=False),
++        sa.Column('proposal_id',sa.String(64),nullable=False,unique=True),
++        sa.Column('meeting_id',sa.String(36),sa.ForeignKey('meetings.id',ondelete='CASCADE'),nullable=False,unique=True),
++        sa.Column('snapshot_json',sa.JSON(),nullable=False),
++        sa.Column('calendar_status',sa.String(30),nullable=False),
++        sa.Column('calendar_attempts',sa.Integer(),nullable=False),
++        sa.Column('next_attempt_at',sa.DateTime(),nullable=False),
++        sa.Column('last_error',sa.String(100),nullable=True),
++        sa.Column('created_at',sa.DateTime(),nullable=False))
++    op.create_index('ix_sales_booking_operations_calendar_status','sales_booking_operations',['calendar_status'])
++
++
++def downgrade():
++    op.drop_index('ix_sales_booking_operations_calendar_status',table_name='sales_booking_operations')
++    op.drop_table('sales_booking_operations')
+diff --git a/backend/app/db/base.py b/backend/app/db/base.py
+index 1ee5b49..4c0d21e 100644
+--- a/backend/app/db/base.py
++++ b/backend/app/db/base.py
+@@ -55,3 +55,4 @@ from app.modules.governance.models import (
+ )
+ from app.db.schema import SchemaVersion
+ from app.modules.sales_agent.dialogue_models import SalesDialogueState, SalesDialogueEvent
++from app.modules.sales_agent.booking_models import SalesBookingOperation
+diff --git a/backend/app/modules/governance/services.py b/backend/app/modules/governance/services.py
+index 715f30f..2beefac 100644
+--- a/backend/app/modules/governance/services.py
++++ b/backend/app/modules/governance/services.py
+@@ -577,7 +577,9 @@ def process_notification_outbox(db: Session, *, company_id: str | None = None) -
+             role_value = user.role.value if hasattr(user.role, "value") else str(user.role)
+             if recipient_roles and role_value not in recipient_roles:
+                 continue
+-            if user.role == UserRole.SALES and (not lead or lead.assigned_sales_user_id != user.id):
++            target_sales_id = payload.get("assigned_sales_user_id") if event.event_type == "appointment_confirmed" else None
++            target_sales_id = target_sales_id or (lead.assigned_sales_user_id if lead else None)
++            if user.role == UserRole.SALES and target_sales_id != user.id:
+                 continue
+             if event.project_id and user.role in {UserRole.MKT, UserRole.SALES}:
+                 allowed = project_ids_for_user(db, user)
+diff --git a/backend/app/modules/sales_agent/active_service.py b/backend/app/modules/sales_agent/active_service.py
+index 90977e5..727c3b0 100644
+--- a/backend/app/modules/sales_agent/active_service.py
++++ b/backend/app/modules/sales_agent/active_service.py
+@@ -205,6 +205,9 @@ def _appointment(db,scope,conversation,lead,project,outcome,inbound):
+         for task in outcome.state.tasks:
+             if task.topic.value=='appointment' and task.source_message_id==inbound.id:task.status='completed'
+         return render(result),{'appointment_query':result},[]
++    if next_selected(scope):
++        from .first_booking import handle
++        return handle(db,scope,conversation,lead,project,outcome,inbound)
+     if not u.permits('appointment'):
+         return '',{},[]
+     plan=getattr(outcome,'plan',None)
+@@ -264,6 +267,12 @@ def _appointment(db,scope,conversation,lead,project,outcome,inbound):
+ def _calendar_after_commit(db,meeting_id,scope):
+     """DB booking is already durable; deterministic event ID prevents duplicates."""
+     if not meeting_id:return
++    from .booking_models import SalesBookingOperation
++    operation=db.query(SalesBookingOperation).filter_by(meeting_id=meeting_id,company_id=scope.company_id,lead_id=scope.lead_id).first()
++    if operation:
++        from .first_booking import sync_calendar
++        sync_calendar(db,operation.id)
++        return
+     meeting=db.query(Meeting).filter_by(id=meeting_id,project_id=scope.project_id,lead_id=scope.lead_id).with_for_update().one()
+     from app.modules.sales_crm.models import MeetingStatus
+     if (meeting.calendar_sync_status not in {'pending','failed'} or meeting.is_demo
+@@ -290,6 +299,8 @@ def _calendar_after_commit(db,meeting_id,scope):
+ def retry_active_calendars(db,limit=10):
+     """Bounded worker retry; no legacy bookings or disabled cohorts touched."""
+     if not settings.SALES_DIALOGUE_RUNTIME_ENABLED:return
++    from .first_booking import retry_calendars
++    retry_calendars(db,limit)
+     from app.modules.sales_crm.models import MeetingStatus
+     rows=db.query(Meeting).filter(Meeting.source=='agent_sms_active',Meeting.status==MeetingStatus.CONFIRMED,
+         Meeting.calendar_sync_status.in_(['pending','failed']),Meeting.meeting_time>datetime.utcnow()).order_by(
+@@ -344,6 +355,9 @@ async def maybe_process_active(db,conversation,inbound):
+     existing=db.query(AgentRun).filter_by(event_id=event_id).first()
+     sticky=bool(existing and existing.graph_version==ENGINE)
+     policy=selected_policy(db,scope)
++    if policy:
++        from .first_booking import recover_booking_pause
++        recover_booking_pause(db,conversation)
+     if not policy:return sticky  # Never replay an unfinished new-engine turn through legacy.
+     if not scoped_messages_query(db,conversation).filter_by(id=inbound.id,direction='inbound',role='user').first():
+         raise PermissionError('Inbound message belongs to another opportunity.')
+@@ -411,6 +425,9 @@ async def maybe_process_active(db,conversation,inbound):
+                     db.commit()
+                     raise ValueError('Understanding could not be validated.')
+                 u=_confirmed_offer_understanding(interpreted.state.last_understanding,previous_meta,inbound.content)
++                if next_enabled:
++                    from .first_booking import enrich_understanding
++                    u=enrich_understanding(u,previous_meta,inbound.content)
+                 u=confirmed_controls(u,inbound.content,pause_reason=protected)
+                 interpreted_revision=interpreted.revision
+             if u.confidence < .8 and not u.requires_clarification:
+@@ -422,6 +439,9 @@ async def maybe_process_active(db,conversation,inbound):
+             outcome=run_turn(db,scope,message_id=inbound.id,understanding=u,expected_revision=interpreted_revision,
+                 event_key='active-runtime:'+inbound.id,max_steps=policy.max_steps,max_seconds=policy.max_seconds,
+                 **({'max_rounds':policy.max_rounds,'max_read_units':policy.max_read_units} if next_enabled else {}))
++            if next_enabled:
++                from .first_booking import apply_courtesy
++                apply_courtesy(db,conversation,lead,outcome.state)
+             conversation,lead,project=_current(db,scope,control=exact_stop)  # Manual takeover/consent/permissions win after inference.
+             draft=compose(outcome,channel=conversation.channel,style=policy.composition_style)
+             material_question=''
+@@ -558,9 +578,15 @@ async def maybe_process_active(db,conversation,inbound):
+                 if priority and appointment and '?' in appointment:
+                     # Keep a mixed request pending without putting two competing
+                     # acceptance questions/offers into the same outbound message.
+-                    metadata.pop('appointment_offer',None)
+-                    metadata.pop('location_offer',None)
+-                    details.append('Your visit request remains pending while we review the information request.')
++                    if metadata.get('booking_operation_id'):
++                        details.append(appointment.removesuffix(' What else would you like to know before your visit?'))
++                        metadata.pop('post_booking_question',None)
++                    else:
++                        metadata.pop('appointment_offer',None)
++                        metadata.pop('location_offer',None)
++                        metadata.pop('booking_confirmation',None)
++                        if metadata.pop('booking_property_question',None):metadata.pop('property_catalog_offer',None)
++                        details.append('Your visit request remains pending while we review the information request.')
+                 elif appointment:details.append(appointment)
+                 if metadata.get('review_notice'):
+                     details.append('The Sales team needs to verify the restricted part of your request. I can continue helping with other approved information.')
+@@ -660,7 +686,7 @@ async def maybe_process_active(db,conversation,inbound):
+     lead=db.query(Lead).filter_by(id=scope.lead_id).populate_existing().one()
+     metadata=dict(data.get('metadata') or {})
+     expected_pause=metadata.get('expected_pause_reason')
+-    if metadata.get('meeting_id'):expected_pause='Appointment confirmed'
++    if metadata.get('meeting_id') and not metadata.get('booking_operation_id'):expected_pause='Appointment confirmed'
+     own_control=bool(metadata.get('control_outcome') or metadata.get('meeting_id'))
+     if metadata.get('control_outcome')=='handoff':
+         from app.modules.governance.models import HumanInterventionCase
+@@ -721,7 +747,8 @@ async def maybe_process_active(db,conversation,inbound):
+         save(db,scope,event_key='active-receipt:'+inbound.id,expected_revision=revision,state=state,
+             metadata={'engine':ENGINE,'message_id':inbound.id,'run_id':run.id,'delivery_state':'provider_accepted_not_delivery_confirmed','share_ids':metadata['sales_asset_share_ids']})
+     run.status='completed';run.completed_at=datetime.utcnow();db.commit()
+-    if not conversation.is_paused and not lead.is_opt_out and not run.error_code and not metadata.get('language_hold'):
++    from .first_booking import cadence_stopped
++    if not conversation.is_paused and not lead.is_opt_out and not run.error_code and not metadata.get('language_hold') and not cadence_stopped(db,conversation):
+         live._schedule_next_action(db,conversation,lead,event_id,refresh_pending=True);db.commit()
+     elif run.error_code:
+         jobs=db.query(SalesFollowUpJob).filter_by(conversation_id=conversation.id,status='pending').all()
+diff --git a/backend/app/modules/sales_agent/booking_models.py b/backend/app/modules/sales_agent/booking_models.py
+new file mode 100644
+index 0000000..4d7c90e
+--- /dev/null
++++ b/backend/app/modules/sales_agent/booking_models.py
+@@ -0,0 +1,22 @@
++"""Durable booking receipt and retryable Calendar operation, committed with the reservation."""
++from datetime import datetime
++import uuid
++from sqlalchemy import Column, String, Integer, DateTime, JSON, ForeignKey
++from app.db.postgres import Base
++
++
++class SalesBookingOperation(Base):
++    __tablename__ = 'sales_booking_operations'
++    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
++    company_id = Column(String(36), ForeignKey('companies.id', ondelete='CASCADE'), nullable=False)
++    project_id = Column(String(36), ForeignKey('projects.id', ondelete='CASCADE'), nullable=False)
++    conversation_id = Column(String(36), ForeignKey('sales_conversations.id', ondelete='CASCADE'), nullable=False)
++    lead_id = Column(String(36), ForeignKey('leads.id', ondelete='CASCADE'), nullable=False)
++    proposal_id = Column(String(64), nullable=False, unique=True)
++    meeting_id = Column(String(36), ForeignKey('meetings.id', ondelete='CASCADE'), nullable=False, unique=True)
++    snapshot_json = Column(JSON, nullable=False)
++    calendar_status = Column(String(30), nullable=False, default='pending', index=True)
++    calendar_attempts = Column(Integer, nullable=False, default=0)
++    next_attempt_at = Column(DateTime, nullable=False, default=datetime.utcnow)
++    last_error = Column(String(100), nullable=True)
++    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+diff --git a/backend/app/modules/sales_agent/commercial_composer.py b/backend/app/modules/sales_agent/commercial_composer.py
+index 11e0da4..cff00ed 100644
+--- a/backend/app/modules/sales_agent/commercial_composer.py
++++ b/backend/app/modules/sales_agent/commercial_composer.py
+@@ -95,7 +95,7 @@ def select_continuations(*, outcome, commercial, metadata, previous_meta, lead,
+     if metadata.get('material_offer'):
+         # The caller supplies this as priority; never make an offer invisible.
+         raise ValueError('Material proposal needs an explicit continuation.')
+-    if metadata.get('appointment_offer') or metadata.get('location_offer') or metadata.get('meeting_id') or metadata.get('appointment_query'):
++    if metadata.get('appointment_offer') or metadata.get('location_offer') or metadata.get('meeting_id') or metadata.get('appointment_query') or metadata.get('booking_confirmation') or metadata.get('booking_property_question'):
+         add('none', '')  # Backend operation details include their own continuation, if any.
+         return choices
+     types = commercial['property_types']
+@@ -104,6 +104,11 @@ def select_continuations(*, outcome, commercial, metadata, previous_meta, lead,
+     if metadata.get('property_catalog_offer') and len(types) > 1 and selected is None:
+         add('choose_property', 'Which property option would you like to explore in more detail?')
+         return choices
++    if u.courtesy and not (topics-{'other'}):
++        return [{'id':'courtesy','text':{'greeting':'Welcome back. What would you like to know?',
++            'farewell':"You're welcome. Feel free to message again whenever you have another question.",
++            'acknowledgement':'You can message here if another question comes up.',
++            'decline':'No problem. You can continue asking about the property whenever you like.'}[u.courtesy.kind],'metadata':{}}]
+     missing, field, question = qualification(lead, commercial['confirmed_project_facts'])
+     if field == 'visit_readiness' and ('appointment' in holds or any(c.topic.value == 'appointment' for c in [*outcome.state.constraints,*outcome.state.property_constraints])):
+         question = ''
+diff --git a/backend/app/modules/sales_agent/first_booking.py b/backend/app/modules/sales_agent/first_booking.py
+new file mode 100644
+index 0000000..ec3302a
+--- /dev/null
++++ b/backend/app/modules/sales_agent/first_booking.py
+@@ -0,0 +1,429 @@
++"""First visit: evidence-based preferences, exact confirmation, durable effect receipt."""
++from datetime import datetime, timedelta, timezone, time
++from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
++import re
++from fastapi import HTTPException
++from app.modules.projects.models import Project, ProjectPropertyType
++from app.modules.projects.locations import locations_for_project, resolve_visit_location
++from app.modules.sales_crm.models import Lead, Meeting, MeetingStatus, CalendarConnection
++from app.modules.users.models import User
++from app.modules.project_team.models import ProjectRoutingState
++from app.modules.project_team.service import eligible_appointment_assignments
++from .booking_models import SalesBookingOperation
++from .dialogue_store import check_scope
++from .dialogue_tasks import restricted
++from .turn_configuration import digest
++from .appointment_context import ACTIVE, utc, bind_visit
++
++VERSION='sales-first-booking/1.0'
++ACCEPTED={'sent','delivered','read','accepted'}
++
++
++def active_meetings(db,scope,now=None):
++    now=now or datetime.utcnow()
++    rows=db.query(Meeting).join(Project,Project.id==Meeting.project_id).filter(
++        Meeting.lead_id==scope.lead_id,Project.company_id==scope.company_id,Meeting.status.in_(list(ACTIVE))).all()
++    return [r for r in rows if r.meeting_time+timedelta(minutes=r.duration_minutes)>now]
++
++
++def stop_cadence(db,conversation,lead,state,reason):
++    from .models import SalesFollowUpJob
++    state.cadence_status='stopped';state.cadence_stop_reason=reason
++    lead.next_action_at=None
++    jobs=db.query(SalesFollowUpJob).filter_by(conversation_id=conversation.id).filter(SalesFollowUpJob.status.in_(['pending','processing'])).all()
++    for job in jobs:
++        if job.reason.endswith('_cadence'):job.status='cancelled'
++
++
++def recover_booking_pause(db,conversation):
++    """Only the legacy system booking pause is recoverable, never human control or opt-out."""
++    if not conversation.is_paused or conversation.pause_reason!='Appointment confirmed':return False
++    from .next_flow import selected
++    from .active_service import selected_policy
++    from .dialogue_store import Scope,load,save
++    from app.modules.governance.models import HumanInterventionCase
++    scope=Scope(conversation.company_id,conversation.project_id,conversation.id,conversation.lead_id)
++    if not selected(scope) or not selected_policy(db,scope):return False
++    check_scope(db,scope)
++    lead=db.get(Lead,scope.lead_id)
++    if not lead or lead.deleted_at or lead.is_opt_out or lead.consent_status!='granted' or lead.agent_status=='human_control':return False
++    if db.query(HumanInterventionCase).filter_by(conversation_id=conversation.id,status='open').first():return False
++    if not db.query(Meeting).filter_by(project_id=scope.project_id,lead_id=scope.lead_id).first():return False
++    revision,state=load(db,scope)
++    stop_cadence(db,conversation,lead,state,'booked')
++    conversation.is_paused=False;conversation.pause_reason=None
++    save(db,scope,event_key='booking-continuity:'+str(revision+1),expected_revision=revision,state=state,
++        metadata={'reason':'legacy_system_booking_pause','human_control_lifted':False,'reservation_changed':False})
++    return True
++
++
++def cadence_stopped(db,conversation):
++    from .next_flow import selected
++    if not selected(conversation):return False
++    from .dialogue_store import Scope,load
++    scope=Scope(conversation.company_id,conversation.project_id,conversation.id,conversation.lead_id)
++    return load(db,scope)[1].cadence_status=='stopped' or bool(active_meetings(db,scope))
++
++
++def accepted_outbound(db,conversation,key,*,message=None):
++    from .turn_context import latest_outbound
++    from .reference_resolution import accepted
++    from .conversation_scope import scoped_messages_query
++    row=message or latest_outbound(db,conversation.id,skip_language_holds=True)
++    if not row or not accepted(row) or not (row.metadata_json or {}).get(key):return None
++    group=(row.metadata_json or {}).get('delivery_group') or {}
++    if group.get('total',1)>1:
++        parts=scoped_messages_query(db,conversation).filter_by(direction='outbound').all()
++        indexes={((p.metadata_json or {}).get('delivery_group') or {}).get('part') for p in parts
++            if ((p.metadata_json or {}).get('delivery_group') or {}).get('key')==group.get('key') and accepted(p)}
++        if indexes!=set(range(1,group['total']+1)):return None
++    return row
++
++
++def normalize_timing(u,text,project,now,previous):
++    """Normalize only temporal evidence after semantic appointment interpretation."""
++    from .service import _requested_period,_selected_time
++    timing=u.visit.timing if u.visit else None
++    supplied=timing.model_dump() if timing else {}
++    zone_name=supplied.get('timezone_evidence') or previous.get('timezone') or project.timezone or 'UTC'
++    try:zone=ZoneInfo(zone_name)
++    except (ZoneInfoNotFoundError,ValueError):raise ValueError('Please specify a valid IANA timezone, such as America/Chicago.')
++    def period(evidence):
++        if not evidence:return None
++        result=_requested_period(evidence,now=now,zone=zone)
++        if not result:raise ValueError('Please specify the preferred visit date or date range.')
++        return result
++    date_evidence=supplied.get('date_from_evidence')
++    date_end_evidence=supplied.get('date_until_evidence')
++    dates=period(date_evidence) if date_evidence else _requested_period(text,now=now,zone=zone)
++    end_dates=period(date_end_evidence)
++    start=dates[0].isoformat() if dates else previous.get('date_from')
++    end=(end_dates or dates)[1].isoformat() if end_dates or dates else previous.get('date_until')
++    if start and end and end<start:raise ValueError('The last date must be on or after the first date.')
++    def clock(value):
++        if not value:return None
++        result=_selected_time(value)
++        if result is None:
++            try:result=time.fromisoformat(value)
++            except ValueError:raise ValueError('Please specify the preferred local time, including AM or PM.')
++        return result.strftime('%H:%M')
++    relation=supplied.get('time_relation') or previous.get('time_relation','any')
++    if timing and relation in {'after','before','morning','afternoon','evening'} and not re.search(r'\b'+relation+r'\b',text,re.I):
++        raise ValueError('Please clarify your preferred time of day or time range.')
++    lower=clock(supplied.get('time_from_evidence')) or previous.get('time_from')
++    upper=clock(supplied.get('time_until_evidence')) or previous.get('time_until')
++    if not timing and _selected_time(text):lower=_selected_time(text).strftime('%H:%M');relation='exact'
++    if relation=='morning':lower,upper='06:00','12:00'
++    elif relation=='afternoon':lower,upper='12:00','18:00'
++    elif relation=='evening':lower,upper='18:00','22:00'
++    if relation in {'exact','after','before','range'} and not lower:raise ValueError('Please specify the preferred local time, including AM or PM.')
++    if relation=='range' and (not upper or upper<=lower):raise ValueError('Please specify a local time range whose end is after its start.')
++    duration=previous.get('duration_minutes',45)
++    if supplied.get('duration_evidence'):
++        match=re.fullmatch(r'\s*(\d{1,3})\s*(?:minutes?|mins?)\s*',supplied['duration_evidence'],re.I)
++        if not match or not 15<=int(match[1])<=180:raise ValueError('Please request a visit duration between 15 and 180 minutes.')
++        duration=int(match[1])
++    return {'timezone':zone_name,'date_from':start,'date_until':end,'time_relation':relation,
++        'time_from':lower,'time_until':upper,'duration_minutes':duration,
++        'source_evidence':{k:v for k,v in supplied.items() if k!='time_relation' and v},'source':'current_message_or_saved_explicit_preferences'}
++
++
++def context_snapshot(db,scope,project,state,location):
++    temp=Meeting(project_id=project.id,lead_id=scope.lead_id)
++    bind_visit(db,temp,company_id=scope.company_id,property_type_id=state.booking_search.get('property_type_id'),unit_id=state.booking_search.get('unit_id'))
++    return {**temp.visit_context,'location':location,'duration_minutes':state.booking_search['duration_minutes']}
++
++
++def choose_user(db,project_id,ids):
++    assignments=eligible_appointment_assignments(db,project_id)
++    values=[r.user_id for r in assignments if r.user_id in ids]
++    cursor=db.query(ProjectRoutingState).filter_by(project_id=project_id).first()
++    last=cursor.last_assigned_user_id if cursor else None
++    return values[(values.index(last)+1)%len(values)] if last in values else values[0] if values else None
++
++
++def search_slots(db,scope,prefs,now):
++    from datetime import date
++    from app.modules.sales_crm.scheduling import available_slots,eligible_users_for_slot
++    if not eligible_appointment_assignments(db,scope.project_id):return []
++    zone=ZoneInfo(prefs['timezone']);today=utc(now).astimezone(zone).date()
++    first=date.fromisoformat(prefs['date_from']) if prefs.get('date_from') else today
++    last=date.fromisoformat(prefs['date_until']) if prefs.get('date_until') else first+timedelta(days=13)
++    if last<today:return []
++    if first>today+timedelta(days=90) or (last-first).days>30:raise ValueError('Please choose a visit range within 90 days and no longer than 31 days.')
++    first=max(first,today);result=[]
++    last=min(last,first+timedelta(days=13))
++    def matches(starts,ends):
++        local_start=utc(starts).astimezone(zone);local_end=utc(ends).astimezone(zone)
++        if starts<=now or not first<=local_start.date()<=last:return False
++        value=local_start.strftime('%H:%M');endvalue=local_end.strftime('%H:%M');kind=prefs['time_relation']
++        lower,upper=prefs.get('time_from'),prefs.get('time_until')
++        if kind=='exact' and value!=lower or kind=='after' and value<lower or kind=='before' and value>=lower:return False
++        if kind in {'range','morning','afternoon','evening'} and (value<lower or local_end.date()!=local_start.date() or endvalue>upper):return False
++        return True
++    local=datetime.combine(first,time.min,tzinfo=zone)
++    after=max(now,local.astimezone(timezone.utc).replace(tzinfo=None)-timedelta(microseconds=1))
++    # One availability scan and one FreeBusy range per connected specialist.
++    # One extra UTC day covers local daylight-saving offsets; the predicate clips the range.
++    slots=available_slots(db,project_id=scope.project_id,after=after,duration_minutes=prefs['duration_minutes'],
++        days=(last-first).days+2,limit=3,slot_predicate=matches,include_sales_user_ids=True)
++    for slot in slots:
++        starts=slot['start_at']
++        ids=slot.get('eligible_sales_user_ids')
++        if ids is None:ids=eligible_users_for_slot(db,project_id=scope.project_id,starts_at=starts,duration_minutes=prefs['duration_minutes'])
++        user_id=choose_user(db,scope.project_id,ids)
++        user=db.query(User).filter_by(id=user_id,company_id=scope.company_id,deleted_at=None).first() if user_id else None
++        if user:result.append({'starts_at':utc(starts).isoformat(),'sales_user_id':user.id,
++            'specialist_name':' '.join(v for v in [user.first_name,user.last_name] if v) or 'Sales specialist'})
++    return result
++
++
++def label(option,prefs):
++    value=datetime.fromisoformat(option['starts_at']).astimezone(ZoneInfo(prefs['timezone']))
++    return value.strftime('%Y-%m-%d at %I:%M %p')+f" ({prefs['timezone']}, UTC{value.strftime('%z')}); {option['specialist_name']}"
++
++
++def confirmation(snapshot,option,prefs,*,booked=False):
++    property_name=snapshot.get('property_type_name') or snapshot.get('project_name')
++    if snapshot.get('unit_code'):property_name+=' / unit '+snapshot['unit_code']
++    prefix='Your visit is confirmed' if booked else 'Please confirm your visit'
++    text=f"{prefix}: {property_name}; {label(option,prefs)}; {prefs['duration_minutes']} minutes; {snapshot['location']['label']}: {snapshot['location']['address']}."
++    return text+(' What else would you like to know before your visit?' if booked else ' Shall I book this exact visit?')
++
++
++def handle(db,scope,conversation,lead,project,outcome,inbound):
++    from .service import _affirmative_slot_reply
++    from .turn_context import choice_index,latest_outbound
++    state=outcome.state;u=state.last_understanding;now=datetime.utcnow()
++    if u.appointment_query:return None  # Existing scoped reader remains authoritative.
++    if u.visit and u.visit.action=='decline' and not u.requires_clarification and u.confidence>=.8:
++        state.booking_proposal=None;stop_cadence(db,conversation,lead,state,'declined')
++        message='Your existing visit is unchanged. You can continue asking about the property.' if active_meetings(db,scope,now) else 'No visit has been booked. You can continue asking about the property.'
++        return message,{'booking_declined':True},[]
++    if not u.permits('appointment') or u.confidence<.8:return '',{},[]
++    candidates={t.id for t in state.tasks if t.source_message_id==inbound.id and t.topic.value=='appointment' and not restricted(state,t)}
++    if not candidates & set(outcome.plan.get('write_candidates_require_backend_authorization',[])):return '',{},[]
++    from app.modules.onboarding_versions import require_capability
++    if project.profile:require_capability(project.profile,'appointments')
++    existing=active_meetings(db,scope,now)
++    if existing:
++        stop_cadence(db,conversation,lead,state,'booked')
++        return 'You already have an active visit. I can help review its details. A change requires a separate confirmed request.',{'existing_meeting_ids':[r.id for r in existing]},[]
++    if u.visit and u.visit.action in {'reschedule','cancel'}:
++        return 'I have not changed any appointment. Please specify the appointment you want to review.',{},[]
++    if u.visit and u.visit.action=='decline':
++        state.booking_proposal=None;stop_cadence(db,conversation,lead,state,'declined')
++        return 'No visit has been booked. You can continue asking about the property.',{'booking_declined':True},[]
++    proposal=state.booking_proposal
++    prompt=accepted_outbound(db,conversation,'booking_confirmation')
++    assent=_affirmative_slot_reply(inbound.content)
++    if not assent and u.visit and u.visit.action=='confirm':
++        from app.modules.governance.services import request_attribution
++        own=request_attribution(inbound.content)['current_text'].lstrip()
++        assent=_affirmative_slot_reply(u.visit.evidence) and own.startswith(u.visit.evidence)
++    if assent and proposal and prompt and (prompt.metadata_json or {}).get('booking_confirmation',{}).get('id')==proposal['id']:
++        if proposal.get('id')!=digest({k:v for k,v in proposal.items() if k!='id'}):
++            state.booking_proposal=None
++            return 'The visit proposal changed. Please request current visit options before confirming.',{},[]
++        if datetime.fromisoformat(proposal['expires_at'])<=utc(now):
++            state.booking_proposal=None
++            return 'That visit proposal expired. Please request current visit times.',{},[]
++        if proposal['scope']!=scope.__dict__:raise PermissionError('Booking proposal belongs to another opportunity.')
++        # Serialize separate conversations/channels for this lead before checking active visits.
++        locked_lead=db.query(Lead).filter_by(id=scope.lead_id,company_id=scope.company_id).populate_existing().with_for_update().one()
++        if locked_lead.deleted_at or locked_lead.is_opt_out or locked_lead.consent_status!='granted' or locked_lead.agent_status=='human_control':
++            raise PermissionError('Lead permissions changed before booking.')
++        prior=db.query(SalesBookingOperation).filter_by(proposal_id=proposal['id']).first()
++        if prior:
++            return confirmation(prior.snapshot_json['context'],prior.snapshot_json['option'],prior.snapshot_json['preferences'],booked=True),{'meeting_id':prior.meeting_id,'booking_operation_id':prior.id},[]
++        if active_meetings(db,scope,now):return 'You already have an active visit. Would you like to review its details?',{},[]
++        try:fresh=context_snapshot(db,scope,project,state,resolve_visit_location(project,proposal['context']['location']))
++        except (PermissionError,ValueError):
++            state.booking_proposal=None
++            return 'The approved property details changed. Please request current visit options before confirming.',{},[]
++        if fresh!=proposal['context'] or not fresh['location']:
++            state.booking_proposal=None
++            return 'The visit details changed. Please request current visit options before confirming.',{},[]
++        from app.modules.sales_crm.scheduling import create_agent_appointment
++        option=proposal['option'];starts=datetime.fromisoformat(option['starts_at']).astimezone(timezone.utc).replace(tzinfo=None)
++        if starts<=now:return 'That visit time has passed. Please request current visit options.',{},[]
++        user=db.query(User).filter_by(id=option['sales_user_id'],company_id=scope.company_id,deleted_at=None,is_active=True).one_or_none()
++        if not user or ' '.join(v for v in [user.first_name,user.last_name] if v)!=option['specialist_name']:
++            state.booking_proposal=None
++            return 'The specialist details changed. Please request current visit options.',{},[]
++        try:
++            meeting,user=create_agent_appointment(db,lead=lead,starts_at=starts,duration_minutes=proposal['preferences']['duration_minutes'],
++                modality='showroom',visit_location=fresh['location'],defer_calendar=True,
++                visit_property_type_id=fresh['property_type_id'],visit_unit_id=fresh['unit_id'],capture_visit_context=True,
++                required_sales_user_id=option['sales_user_id'])
++        except HTTPException as exc:
++            if exc.status_code!=409:raise
++            state.booking_proposal=None
++            return 'That visit is no longer available. Nothing was booked. Would you like me to check current times?',{},[]
++        meeting.source='agent_next_first_booking'
++        saved={'context':{**meeting.visit_context,'location':{'label':meeting.visit_location_label,'address':meeting.visit_address},'duration_minutes':meeting.duration_minutes},
++               'option':{**option,'starts_at':utc(meeting.meeting_time).isoformat()},'preferences':proposal['preferences']}
++        op=SalesBookingOperation(company_id=scope.company_id,project_id=scope.project_id,conversation_id=scope.conversation_id,
++            lead_id=scope.lead_id,proposal_id=proposal['id'],meeting_id=meeting.id,snapshot_json=saved,
++            calendar_status='simulation' if meeting.is_demo else 'pending',next_attempt_at=now)
++        db.add(op);db.flush()
++        conversation.stage='appointment_confirmed';conversation.is_paused=False;conversation.pause_reason=None
++        lead.pipeline_stage='S09_HANDOFF';lead.agent_status='appointment_confirmed'
++        stop_cadence(db,conversation,lead,state,'booked');state.booking_proposal=None
++        return confirmation(saved['context'],saved['option'],saved['preferences'],booked=True),{'meeting_id':meeting.id,'booking_operation_id':op.id,'post_booking_question':True},[{'type':'appointment_confirmed','meeting_id':meeting.id,'operation_id':op.id}]
++    # A time selection only prepares a full immutable proposal; never books directly.
++    refs=[r['value'] for r in outcome.plan.get('references',{}).values() if r.get('status')=='resolved' and r.get('value',{}).get('kind')=='appointment']
++    offered=accepted_outbound(db,conversation,'appointment_offer')
++    offer=(offered.metadata_json or {}).get('appointment_offer') if offered else None
++    chosen=next((r for r in refs if offer and any(o['starts_at']==r['id'] for o in offer.get('options',[]))),None)
++    if not chosen:
++        from .conversation_scope import scoped_messages_query
++        from .models import SalesMessage
++        # Explicit temporal references may resume a still-valid suspended offer.
++        # The resolver has already rejected bare property ordinals as slot consent.
++        for value in refs:
++            if not value.get('message_id'):continue
++            row=scoped_messages_query(db,conversation).filter_by(id=value['message_id']).first()
++            row=accepted_outbound(db,conversation,'appointment_offer',message=row) if row else None
++            previous_offer=(row.metadata_json or {}).get('appointment_offer') if row else None
++            if previous_offer and any(o['starts_at']==value['id'] for o in previous_offer.get('options',[])):
++                offered,offer,chosen=row,previous_offer,value;break
++    if chosen and offer.get('version')==VERSION:
++        if datetime.fromisoformat(offer['expires_at'])<=utc(now):return 'Those visit times expired. Please request current options.',{},[]
++        option=next(o for o in offer['options'] if o['starts_at']==chosen['id'])
++        state.booking_search={**offer['preferences'],'property_type_id':offer['context']['property_type_id'],'unit_id':offer['context']['unit_id'],'location':offer['context']['location']}
++        proposal={'scope':scope.__dict__,'context':offer['context'],'option':option,'preferences':offer['preferences'],
++            'offer_message_id':offered.id,'expires_at':offer['expires_at']}
++        proposal['id']=digest(proposal);state.booking_proposal=proposal
++        return confirmation(proposal['context'],option,proposal['preferences']),{'booking_confirmation':{'id':proposal['id'],'expires_at':proposal['expires_at']}},[]
++    if assent:
++        return 'Please choose a current visit time before confirming a booking.',{},[]
++    previous=state.booking_search
++    try:prefs=normalize_timing(u,inbound.content,project,now,previous)
++    except ValueError as exc:return str(exc),{},[]
++    property_id=state.selected_property_type_id or previous.get('property_type_id')
++    unit_id=state.selected_unit_id if state.selected_unit_id else previous.get('unit_id') if property_id==previous.get('property_type_id') else None
++    from .commercial_context import build_commercial_context
++    catalog=build_commercial_context(db,project=project,company_id=scope.company_id,lead_id=scope.lead_id,channel=conversation.channel)
++    if not property_id and not unit_id:
++        types=catalog['property_types']
++        if len(types)==1:property_id=types[0]['id']
++        elif len(types)>1:
++            state.booking_search={**previous,**prefs}
++            return 'Which property would you like to visit?\n\n'+'\n'.join(f"{i}. {r['property_type']}" for i,r in enumerate(types,1)),{'booking_property_question':True,'property_catalog_offer':{'property_type_ids':[r['id'] for r in types]}},[]
++    location=resolve_visit_location(project,previous.get('location'))
++    refs_locations=[r['value']['id'] for r in outcome.plan.get('references',{}).values() if r.get('status')=='resolved' and r.get('value',{}).get('kind')=='location']
++    if refs_locations:location=resolve_visit_location(project,refs_locations[0])
++    state.booking_search={**prefs,'property_type_id':property_id,'unit_id':unit_id,'location':location}
++    state.booking_proposal=None
++    if not location:
++        locations=locations_for_project(project)
++        if not locations:return 'A visit location needs to be approved before I can offer times. What property information would help meanwhile?',{},[]
++        return 'Which location would you like to visit?\n\n'+'\n'.join(f"{i}. {r['label']}: {r['address']}" for i,r in enumerate(locations,1)),{'location_offer':{'option_ids':[r['address'] for r in locations],'pending':True}},[]
++    try:options=search_slots(db,scope,prefs,now)
++    except ValueError as exc:return str(exc),{},[]
++    if not options:return 'I checked up to 14 calendar days within your requested range and could not find a verified time matching those preferences. Would you like to try another date or time range?',{'booking_search_status':'no_matching_time','booking_preferences':prefs},[]
++    try:context=context_snapshot(db,scope,project,state,location)
++    except (PermissionError,ValueError):
++        state.booking_search={**prefs,'property_type_id':None,'unit_id':None,'location':location}
++        return 'The property details need to be verified before I can offer that visit. Which property would you like to review?',{},[]
++    offer={'version':VERSION,'slots':[o['starts_at'] for o in options],'options':options,'preferences':prefs,'context':context,
++        'property_type_id':property_id,'unit_id':unit_id,'visit_location':location,'duration_minutes':prefs['duration_minutes'],
++        'project_timezone':project.timezone or 'UTC','expires_at':(utc(now)+timedelta(minutes=30)).isoformat()}
++    return 'Verified visit options:\n\n'+'\n\n'.join(f"{i}. {label(o,prefs)}" for i,o in enumerate(options,1))+'\n\nWhich time would you like me to prepare for confirmation?',{'appointment_offer':offer},[{'type':'request_available_slots'}]
++
++
++def sync_calendar(db,operation_id):
++    """A durable, locked operation with deterministic provider ID; never creates a reservation."""
++    op=db.query(SalesBookingOperation).filter_by(id=operation_id).with_for_update(skip_locked=True).first()
++    if not op or op.calendar_status in {'synced','simulation','review','cancelled'}:return
++    meeting=db.query(Meeting).filter_by(id=op.meeting_id).populate_existing().with_for_update().first();project=db.get(Project,op.project_id)
++    if not meeting or not project or project.company_id!=op.company_id or meeting.lead_id!=op.lead_id or meeting.project_id!=op.project_id:raise PermissionError('Calendar operation scope changed.')
++    if meeting.status not in {MeetingStatus.CONFIRMED,MeetingStatus.SCHEDULED} or meeting.meeting_time<=datetime.utcnow():
++        op.calendar_status='cancelled';db.commit();return
++    saved=op.snapshot_json
++    if (utc(meeting.meeting_time).isoformat()!=saved['option']['starts_at'] or meeting.assigned_sales_user_id!=saved['option']['sales_user_id'] or
++        meeting.duration_minutes!=saved['context']['duration_minutes'] or meeting.visit_address!=saved['context']['location']['address']):
++        op.calendar_status='review';op.last_error='BookingChanged';db.commit();return
++    user=db.query(User).filter_by(id=meeting.assigned_sales_user_id,company_id=op.company_id,deleted_at=None).first()
++    connection=db.query(CalendarConnection).filter_by(user_id=meeting.assigned_sales_user_id,provider='google',status='connected').first() if user else None
++    if not connection:
++        op.calendar_status='waiting_connection';op.next_attempt_at=datetime.utcnow()+timedelta(minutes=10);meeting.calendar_sync_status='not_connected';db.commit();return
++    from app.integrations.gcalendar_client import create_calendar_event_for_connection
++    op.calendar_attempts+=1
++    try:
++        lead=db.get(Lead,op.lead_id)
++        event=create_calendar_event_for_connection(db,connection,title=f"{op.snapshot_json['context']['project_name']} visit with {lead.full_name}",
++            description='Confirmed property visit.',location=meeting.visit_address or '',start_time=meeting.meeting_time,
++            end_time=meeting.meeting_time+timedelta(minutes=meeting.duration_minutes),timezone_name=meeting.visit_context['timezone'],
++            attendee_email=lead.email if not lead.is_opt_out else None,event_id='bp'+meeting.id.replace('-',''))
++        meeting.gcal_event_id=event['id'];meeting.meeting_url=event.get('htmlLink');meeting.calendar_sync_status='synced';op.calendar_status='synced';op.last_error=None
++    except Exception as exc:
++        meeting.calendar_sync_status='failed';op.calendar_status='review' if op.calendar_attempts>=5 else 'retry'
++        op.last_error=type(exc).__name__;op.next_attempt_at=datetime.utcnow()+timedelta(minutes=min(60,2**op.calendar_attempts))
++    db.commit()
++
++
++def retry_calendars(db,limit=10):
++    from .active_service import selected_policy
++    from .next_flow import selected
++    from .dialogue_store import Scope
++    from app.core.config import settings
++    from app.modules.ai_core.models import AIConfiguration
++    from .runtime_policy import RuntimePolicy
++    from uuid import UUID
++    if not settings.SALES_DIALOGUE_RUNTIME_ENABLED or not settings.SALES_NEXT_FLOW_ENABLED:return
++    ids=[value.strip() for value in settings.SALES_NEXT_FLOW_PROJECT_IDS.split(',') if value.strip()]
++    try:
++        if not ids or any(str(UUID(value))!=value for value in ids):return
++    except ValueError:return
++    config=db.query(AIConfiguration).filter_by(company_id=None).first()
++    policy=RuntimePolicy.model_validate((config.agent_ventas or {}).get('runtime_config') or {}) if config else RuntimePolicy()
++    if policy.mode!='active':return
++    query=db.query(SalesBookingOperation).filter(SalesBookingOperation.calendar_status.in_(['pending','retry','waiting_connection']),
++        SalesBookingOperation.next_attempt_at<=datetime.utcnow(),SalesBookingOperation.project_id.in_(ids))
++    if policy.scope=='cohort':
++        query=query.filter(SalesBookingOperation.company_id.in_(policy.company_ids),SalesBookingOperation.project_id.in_(policy.project_ids))
++        if policy.lead_ids:query=query.filter(SalesBookingOperation.lead_id.in_(policy.lead_ids))
++    # Filter disabled scopes before the batch limit so they cannot starve live work.
++    rows=query.order_by(SalesBookingOperation.next_attempt_at).limit(limit).all()
++    for row in rows:
++        scope=Scope(row.company_id,row.project_id,row.conversation_id,row.lead_id)
++        if selected(scope) and selected_policy(db,scope):sync_calendar(db,row.id)
++
++
++def enrich_understanding(u,previous_meta,text):
++    """Only the immediately preceding backend question can turn a short answer into continuation."""
++    from .service import _affirmative_slot_reply
++    normalized=' '.join(re.sub(r"[^a-z ]",' ',text.casefold()).split())
++    if normalized in {'no','no thanks','no thank you','not now','no more questions','no no more questions','no that s all'} and (
++        previous_meta.get('booking_confirmation') or previous_meta.get('post_booking_question')):
++        payload=u.model_dump(mode='json')
++        payload.update(requests=[{'id':'backend_contextual_decline','topic':'other','subject':None,'polarity':'request','evidence':text}],
++            all_of=['backend_contextual_decline'],alternatives=[],requires_clarification=False,clarification_question=None,
++            visit=None,appointment_query=None,courtesy={'kind':'decline' if previous_meta.get('booking_confirmation') else 'farewell','evidence':text})
++        from .understanding_contract import Understanding
++        return Understanding.model_validate(payload)
++    if u.requires_clarification or u.permits('appointment'):return u
++    resume=(previous_meta.get('booking_confirmation') and _affirmative_slot_reply(text)) or (
++        previous_meta.get('booking_property_question') and any(r.kind in {'property','unit'} for r in u.references) and
++        all(r.topic.value in {'other','property_details','catalog'} for r in u.requests if r.polarity=='request'))
++    if not resume:return u
++    if previous_meta.get('material_offer') or previous_meta.get('release_offer'):return u
++    payload=u.model_dump(mode='json')
++    payload['requests'].append({'id':'backend_visit_continuation','topic':'appointment','subject':None,'polarity':'request','evidence':text})
++    payload['all_of'].append('backend_visit_continuation')
++    from .understanding_contract import Understanding
++    return Understanding.model_validate(payload)
++
++
++def apply_courtesy(db,conversation,lead,state):
++    u=state.last_understanding
++    if not u.courtesy:return
++    from app.modules.governance.services import request_attribution
++    if u.courtesy.evidence not in request_attribution(u.courtesy.evidence)['current_text']:return
++    substantive=any(r.polarity=='request' and r.topic.value!='other' for r in u.requests)
++    if u.courtesy.kind=='farewell':stop_cadence(db,conversation,lead,state,'farewell')
++    elif u.courtesy.kind=='decline' and not substantive:
++        state.booking_proposal=None
++        stop_cadence(db,conversation,lead,state,'declined')
+diff --git a/backend/app/modules/sales_agent/language_policy.py b/backend/app/modules/sales_agent/language_policy.py
+index 7932346..1678ad5 100644
+--- a/backend/app/modules/sales_agent/language_policy.py
++++ b/backend/app/modules/sales_agent/language_policy.py
+@@ -37,7 +37,7 @@ everything whenever wherever currently verified approved recorded new old previo
+ open closed sent delivered read received unavailable unconfirmed until into around
+ howdy goodbye bye bye-bye stop unsubscribe end quit yes absolutely fine details don'''.split())
+ ENGLISH.update('active past cancelled canceled recorded specialist specialists showroom status duration progress'.split())
+-ENGLISH.update('contains content contents coverage file files'.split())
++ENGLISH.update('contains content contents coverage file files arrange arranging prepared prepare expired expires preferences matching'.split())
+ 
+ 
+ @dataclass(frozen=True)
+diff --git a/backend/app/modules/sales_agent/live_service.py b/backend/app/modules/sales_agent/live_service.py
+index 23fb728..8f65347 100644
+--- a/backend/app/modules/sales_agent/live_service.py
++++ b/backend/app/modules/sales_agent/live_service.py
+@@ -898,6 +898,8 @@ def material_request_text(inbound, result):
+ def _schedule_next_action(db: Session, conversation: SalesConversation, lead: Lead, event_id: str, *, refresh_pending=False) -> None:
+     if lead.is_opt_out or conversation.is_paused:
+         return
++    from .first_booking import cadence_stopped
++    if cadence_stopped(db,conversation):return
+     if refresh_pending:
+         from app.modules.ai_core.models import AIConfiguration
+         published=db.query(AIConfiguration).filter_by(company_id=None).first()
+@@ -1675,7 +1677,8 @@ async def process_live_followup_job(job_id: str) -> None:
+             Lead.id == conversation.lead_id,
+             Lead.company_id == conversation.company_id,
+         ).one()
+-        if conversation.channel not in {"sms", "whatsapp"} or conversation.is_paused or lead.is_opt_out:
++        from .first_booking import cadence_stopped
++        if conversation.channel not in {"sms", "whatsapp"} or conversation.is_paused or lead.is_opt_out or cadence_stopped(db,conversation):
+             job.status = "cancelled"; job.processed_at = datetime.utcnow(); db.commit(); return
+         if conversation.channel == "whatsapp" and not _whatsapp_customer_window_open(db, conversation):
+             # Re-engagement outside the customer-service window requires a
+diff --git a/backend/app/modules/sales_agent/provider_router.py b/backend/app/modules/sales_agent/provider_router.py
+index 65aaa21..b017e74 100644
+--- a/backend/app/modules/sales_agent/provider_router.py
++++ b/backend/app/modules/sales_agent/provider_router.py
+@@ -61,6 +61,8 @@ def _record_inbound(
+     )
+     db.add(message)
+     db.flush()
++    from .first_booking import recover_booking_pause
++    recover_booking_pause(db, conversation)
+     should_queue = content_supported and not conversation.is_paused
+     if should_queue:
+         db.add(SalesInboundJob(
+diff --git a/backend/app/modules/sales_agent/turn_memory.py b/backend/app/modules/sales_agent/turn_memory.py
+index c5a49d4..109dbda 100644
+--- a/backend/app/modules/sales_agent/turn_memory.py
++++ b/backend/app/modules/sales_agent/turn_memory.py
+@@ -127,6 +127,8 @@ def build(db,scope,*,inbound_message_id,now=None):
+             'appointments':{category:tool.execute({'category':category,'limit':5},now=now) for category in ('active','past','cancelled')},
+             'memory':state.memory.model_dump(mode='json'),'history':list(reversed(pertinent)),
+             'history_coverage':{'messages':len(pertinent),'bounded':True,'older_messages_omitted':len(history)==20 or remaining<=0},
++            'booking_search':state.booking_search,'booking_proposal':state.booking_proposal,
++            'cadence':{'status':state.cadence_status,'reason':state.cadence_stop_reason},
+             'pending_tasks':pending[-20:],'pending_tasks_truncated':len(pending)>20,
+             'constraints':[{**c.model_dump(mode='json'),'evidence':c.evidence[:200],
+                             'context_truncated':len(c.evidence)>200} for c in state.constraints],
+diff --git a/backend/app/modules/sales_agent/understanding_contract.py b/backend/app/modules/sales_agent/understanding_contract.py
+index 2e5f748..f29b19d 100644
+--- a/backend/app/modules/sales_agent/understanding_contract.py
++++ b/backend/app/modules/sales_agent/understanding_contract.py
+@@ -83,6 +83,27 @@ class ConstraintRelease(StrictModel):
+     evidence: str = Field(min_length=1, max_length=2000)
+ 
+ 
++class VisitTiming(StrictModel):
++    date_from_evidence: str | None = Field(default=None,max_length=200)
++    date_until_evidence: str | None = Field(default=None,max_length=200)
++    time_from_evidence: str | None = Field(default=None,max_length=100)
++    time_until_evidence: str | None = Field(default=None,max_length=100)
++    time_relation: Literal['any','exact','after','before','range','morning','afternoon','evening']='any'
++    timezone_evidence: str | None = Field(default=None,max_length=100)
++    duration_evidence: str | None = Field(default=None,max_length=100)
++
++
++class VisitDirective(StrictModel):
++    action: Literal['request','select','confirm','decline','reschedule','cancel']
++    evidence: str = Field(min_length=1,max_length=2000)
++    timing: VisitTiming | None = None
++
++
++class Courtesy(StrictModel):
++    kind: Literal['greeting','farewell','acknowledgement','decline']
++    evidence: str = Field(min_length=1,max_length=2000)
++
++
+ class Understanding(StrictModel):
+     version: Literal['sales-understanding/1.0']
+     requests: list[Request] = Field(max_length=30)
+@@ -94,6 +115,8 @@ class Understanding(StrictModel):
+     references: list[Reference] = Field(max_length=20)
+     preferences: list[Preference] = Field(max_length=20)
+     releases: list[ConstraintRelease] = Field(default_factory=list, max_length=20)
++    visit: VisitDirective | None = None
++    courtesy: Courtesy | None = None
+     appointment_query: Literal['active','past','cancelled','all'] | None = None
+     selected_reference_id: str | None = Field(default=None,max_length=60)
+     requires_clarification: StrictBool
+@@ -136,6 +159,11 @@ class Understanding(StrictModel):
+         evidence += [g.evidence for g in self.alternatives] + [r.evidence for r in self.references]
+         evidence += [p.evidence for p in self.preferences]
+         evidence += [r.evidence for r in self.releases]
++        if self.visit:
++            evidence.append(self.visit.evidence)
++            if self.visit.timing:
++                evidence.extend(v for k,v in self.visit.timing.model_dump().items() if k!='time_relation' and v is not None)
++        if self.courtesy:evidence.append(self.courtesy.evidence)
+         if any(not item.strip() or item not in inbound for item in evidence):
+             raise ValueError('Evidence must be an exact non-empty substring of the current message.')
+         return self
+@@ -224,6 +252,10 @@ class DialogueState(StrictModel):
+     preferences: list[Preference] = Field(default_factory=list, max_length=100)
+     last_understanding: Understanding | None = None
+     memory: 'TurnMemory' = Field(default_factory=lambda: TurnMemory())
++    booking_search: dict = Field(default_factory=dict)
++    booking_proposal: dict | None = None
++    cadence_status: Literal['active','stopped'] = 'active'
++    cadence_stop_reason: Literal['booked','farewell','declined'] | None = None
+     change_proposals: list['ChangeProposal'] = Field(default_factory=list,max_length=10)
+ 
+     @model_validator(mode='after')
+diff --git a/backend/app/modules/sales_agent/understanding_prompt.py b/backend/app/modules/sales_agent/understanding_prompt.py
+index 3997fea..6ac5e70 100644
+--- a/backend/app/modules/sales_agent/understanding_prompt.py
++++ b/backend/app/modules/sales_agent/understanding_prompt.py
+@@ -53,7 +53,7 @@ def prompt_snapshot(agent):
+ 
+ 
+ def next_prompt_snapshot(guidance):
+-    return {'version':'sales-understanding-prompt/2.2','system':SYSTEM_PROMPT+'''
++    return {'version':'sales-understanding-prompt/2.3','system':SYSTEM_PROMPT+'''
+ The backend has already applied English-only input controls. Interpret the current request;
+ do not translate it, generate a lead-facing response, execute commercial instructions, or
+ reinterpret the output schema from published guidance. All supplied commercial playbooks
+@@ -76,5 +76,20 @@ current offers only; suspended offers need an explicit kind/name/time. Preserve
+ and OR group membership. A comparison does not select its last-mentioned property;
+ set selected_reference_id only for an explicit choice or clear focus. Ask a specific
+ clarification when a reference has several candidates, without discarding other needs.
++For first-visit scheduling, set visit.action to request, select, confirm or decline,
++with exact current-message evidence. Selection of a time is NOT its final confirmation:
++the backend presents a full booking proposal first. Confirmation must answer that proposal.
++Use reschedule/cancel only for explicit mutation requests, never greetings or farewells;
++those operations are not first bookings. Existing-appointment questions use appointment_query.
++Temporal visit.timing fields contain exact evidence substrings, not normalized or invented
++ISO timestamps: date_from_evidence/date_until_evidence (English day/date/range),
++time_from_evidence/time_until_evidence (clock text), time_relation (any/exact/after/before/
++range/morning/afternoon/evening), timezone_evidence (explicit IANA zone), duration_evidence
++(explicit minute duration). The backend normalizes and validates these against its current time.
++No timing fields are implied by history; persisted preferences are supplied separately.
++Use courtesy with exact evidence for greeting, farewell, acknowledgement or a contextual
++polite decline. A farewell or 'no more questions' stops sales cadence, never responses,
++cancellation or opt-out. A 'no' declines only the immediately preceding question/proposal.
++Do not discard independent requests in a mixed farewell or acknowledgement message.
+ ''','published_guidance':guidance,
+             'configuration_ref':guidance['source']}
+diff --git a/backend/app/modules/sales_crm/scheduling.py b/backend/app/modules/sales_crm/scheduling.py
+index aba20f4..c5a3959 100644
+--- a/backend/app/modules/sales_crm/scheduling.py
++++ b/backend/app/modules/sales_crm/scheduling.py
+@@ -23,7 +23,7 @@ from .models import (
+ )
+ 
+ 
+-ACTIVE_MEETING_STATUSES = {MeetingStatus.SCHEDULED, MeetingStatus.CONFIRMED}
++ACTIVE_MEETING_STATUSES = {MeetingStatus.SCHEDULED, MeetingStatus.CONFIRMED, MeetingStatus.IN_PROGRESS}
+ 
+ 
+ def next_cadence_time(*, now: datetime, timezone_name: str, delay_hours: int) -> datetime:
+@@ -343,6 +343,8 @@ def available_slots(
+     duration_minutes: int = 45,
+     days: int = 14,
+     limit: int = 12,
++    slot_predicate=None,
++    include_sales_user_ids: bool = False,
+ ) -> list[dict]:
+     after = after.replace(tzinfo=None) if after.tzinfo else after
+     minute = 0 if after.minute < 30 else 30
+@@ -363,6 +365,9 @@ def available_slots(
+         )
+     result = []
+     while cursor < end and len(result) < limit:
++        if slot_predicate is not None and not slot_predicate(cursor, cursor + timedelta(minutes=duration_minutes)):
++            cursor += timedelta(minutes=30)
++            continue
+         user_ids = eligible_users_for_slot(
+             db,
+             project_id=project_id,
+@@ -375,6 +380,7 @@ def available_slots(
+                 "start_at": cursor,
+                 "end_at": cursor + timedelta(minutes=duration_minutes),
+                 "eligible_sales_users": len(user_ids),
++                **({"eligible_sales_user_ids": user_ids} if include_sales_user_ids else {}),
+             })
+         cursor += timedelta(minutes=30)
+     return result
+@@ -392,6 +398,7 @@ def create_agent_appointment(
+     visit_property_type_id: str | None = None,
+     visit_unit_id: str | None = None,
+     capture_visit_context: bool = False,
++    required_sales_user_id: str | None = None,
+ ) -> tuple[Meeting, User]:
+     starts_at = starts_at.replace(tzinfo=None) if starts_at.tzinfo else starts_at
+     # Lock every candidate Sales user in a stable order before rechecking
+@@ -408,6 +415,8 @@ def create_agent_appointment(
+         starts_at=starts_at,
+         duration_minutes=duration_minutes,
+     )
++    if required_sales_user_id:
++        eligible_user_ids=[uid for uid in eligible_user_ids if uid==required_sales_user_id]
+     if not eligible_user_ids:
+         raise HTTPException(status_code=409, detail="That appointment time is no longer available.")
+     assigned_user_id = select_next_sales_user(
+@@ -466,6 +475,8 @@ def create_agent_appointment(
+         db, company_id=lead.company_id, project_id=lead.project_id,
+         event_type="appointment_confirmed", entity_type="lead", entity_id=lead.id,
+         payload={
++            "meeting_id": meeting.id,
++            "assigned_sales_user_id": user.id,
+             "title": "Appointment confirmed",
+             "body": f"{lead.full_name} confirmed an appointment for {starts_at.isoformat()}.",
+             "action_url": "/app/schedule",
+diff --git a/backend/tests/test_sales_ai_group_b.py b/backend/tests/test_sales_ai_group_b.py
+index 7f486c1..4167535 100644
+--- a/backend/tests/test_sales_ai_group_b.py
++++ b/backend/tests/test_sales_ai_group_b.py
+@@ -131,7 +131,7 @@ def test_new_interpreter_has_internal_contract_and_configuration_provenance(agen
+     version=publish(agent,pack)
+     _,run=agent.turn('Give me information',understanding('Give me information','catalog'))
+     assert run.status=='completed',run.output_snapshot
+-    assert run.prompt_snapshot['version']=='sales-understanding-prompt/2.2'
++    assert run.prompt_snapshot['version']=='sales-understanding-prompt/2.3'
+     assert run.output_snapshot['metadata']['configuration_ref']['version_id']==version.id
+     request=json.dumps(agent.infer.call_args.args)
+     assert 'LEGACY_SCHEMA_SENTINEL' not in request and 'Sales identity' in request
+@@ -397,7 +397,7 @@ def test_exported_real_catalog_through_new_gate_and_versioned_interpreter(index,
+         assert held.output_snapshot['metadata']['language_hold'] and not h.model.requests
+         _,run=h.turn('Give me information')
+         assert run.status=='completed',run.output_snapshot
+-        assert run.prompt_snapshot['version']=='sales-understanding-prompt/2.2'
++        assert run.prompt_snapshot['version']=='sales-understanding-prompt/2.3'
+         assert len(h.model.requests)==1 and not h.conversation.is_paused
+         assert not h.db.query(Meeting).count() and not h.db.query(SalesAssetShare).count()
+         assert not h.calendar.calls
+diff --git a/backend/tests/test_sales_ai_group_c.py b/backend/tests/test_sales_ai_group_c.py
+index c43fd32..8b2e9ac 100644
+--- a/backend/tests/test_sales_ai_group_c.py
++++ b/backend/tests/test_sales_ai_group_c.py
+@@ -377,6 +377,8 @@ def test_actual_booking_binds_original_offer_not_later_interest(agent):
+     save(agent.db,agent.scope,event_key='later-interest',expected_revision=revision,state=state);agent.db.commit()
+     text='3:00 PM'
+     _,run=agent.turn(text,understanding(text,'appointment',references=[dict(kind='appointment',expression=text,evidence=text)]))
++    assert not agent.db.query(Meeting).count()
++    agent.turn('Yes',understanding('Yes','other'))
+     booked=agent.db.query(Meeting).one()
+     assert booked.visit_property_type_id==a.id and booked.visit_context['property_type_name']=='Studio',run.output_snapshot
+     assert booked.visit_address=='100 Main St' and booked.meeting_time==starts
+diff --git a/backend/tests/test_sales_ai_group_d.py b/backend/tests/test_sales_ai_group_d.py
+index 6cebf4a..019f2c3 100644
+--- a/backend/tests/test_sales_ai_group_d.py
++++ b/backend/tests/test_sales_ai_group_d.py
+@@ -280,6 +280,8 @@ def test_agenda_can_be_interrupted_by_plans_and_resumed_before_explicit_slot_con
+     assert not agent.db.query(Meeting).count()
+     text='3:00 PM'
+     agent.turn(text,typed(text,[req('slot','appointment',text,ref='slot')],[ref('slot','appointment',text)]))
++    assert not agent.db.query(Meeting).count()
++    agent.turn('Yes',understanding('Yes','other'))
+     assert agent.db.query(Meeting).one().meeting_time==starts
+ 
+ 
+diff --git a/backend/tests/test_sales_ai_group_f.py b/backend/tests/test_sales_ai_group_f.py
+new file mode 100644
+index 0000000..84f44da
+--- /dev/null
++++ b/backend/tests/test_sales_ai_group_f.py
+@@ -0,0 +1,562 @@
++"""First booking and post-booking continuity through the production coordinator."""
++from datetime import datetime,timedelta,timezone
++import asyncio,json
++from unittest.mock import patch,AsyncMock
++import pytest
++from fastapi import HTTPException
++from test_sales_turn_1720 import case,outbound
++from test_sales_ai_group_b import agent
++from test_sales_ai_group_c import product,inbound
++from test_sales_ai_group_d import availability,typed,req,ref
++from test_sales_active_integration import understanding
++from app.core.config import settings
++from app.modules.sales_agent.understanding_contract import Understanding,VisitTiming,VisitDirective
++from app.modules.sales_agent.dialogue_store import load,save
++from app.modules.sales_agent.models import SalesMessage,SalesFollowUpJob,AgentRun
++from app.modules.sales_agent.booking_models import SalesBookingOperation
++from app.modules.sales_agent.first_booking import normalize_timing,retry_calendars,sync_calendar
++from app.modules.sales_crm.models import Meeting,CalendarConnection,MeetingStatus
++from app.modules.governance.models import NotificationOutbox,Notification
++from app.modules.governance.services import process_notification_outbox
++
++
++def latest(agent):return agent.db.query(SalesMessage).filter_by(direction='outbound').order_by(SalesMessage.created_at.desc(),SalesMessage.id.desc()).first()
++
++
++def visit(text,*,action='request',timing=None):
++    u=understanding(text,'appointment')
++    return Understanding.model_validate({**u.model_dump(),'visit':{'action':action,'evidence':text,'timing':timing}})
++
++
++def courtesy(text,kind):
++    return Understanding.model_validate({**understanding(text,'other').model_dump(),'courtesy':{'kind':kind,'evidence':text}})
++
++
++def options(agent):
++    starts=availability(agent);product(agent,'Studio')
++    agent.turn('I want to arrange a visit',visit('I want to arrange a visit'))
++    msg=latest(agent)
++    assert msg.metadata_json.get('appointment_offer'),agent.db.query(AgentRun).all()[-1].output_snapshot
++    return starts,msg.metadata_json['appointment_offer']
++
++
++def select(agent):
++    starts,offer=options(agent)
++    text='1'
++    _,run=agent.turn(text,typed(text,[req('slot','appointment',text,ref='s')],[ref('s','appointment',text)]))
++    assert not agent.db.query(Meeting).count(),run.output_snapshot
++    assert latest(agent).metadata_json.get('booking_confirmation'),run.output_snapshot
++    return starts,offer
++
++
++def book(agent):
++    starts,offer=select(agent)
++    message,run=agent.turn('Yes',understanding('Yes','other'))
++    assert agent.db.query(Meeting).count()==1,run.output_snapshot
++    return message,run,agent.db.query(Meeting).one(),starts
++
++
++@pytest.mark.parametrize('channel',['sms','whatsapp'])
++def test_first_booking_is_two_step_complete_scoped_and_open(agent,channel):
++    agent.conversation.channel=channel
++    _,run,row,starts=book(agent)
++    assert row.meeting_time==starts and row.visit_property_type_id and row.assigned_sales_user_id
++    assert row.visit_address=='100 Main St' and row.visit_context['property_type_name']=='Studio'
++    assert not agent.conversation.is_paused and agent.conversation.pause_reason is None
++    text=latest(agent).content
++    assert 'confirmed' in text and 'Studio' in text and 'Test Specialist' in text and '45 minutes' in text and 'UTC' in text and '100 Main St' in text
++    assert latest(agent).channel==channel and text.count('?')==1
++    assert agent.db.query(SalesBookingOperation).one().meeting_id==row.id
++    assert agent.db.query(NotificationOutbox).filter_by(event_type='appointment_confirmed').count()==1
++    assert load(agent.db,agent.scope)[1].cadence_stop_reason=='booked'
++
++
++def test_booking_delivery_retry_reuses_receipt_and_does_not_book_again(agent):
++    select(agent);agent.send.side_effect=RuntimeError('offline')
++    with pytest.raises(RuntimeError):agent.turn('Yes',understanding('Yes','other'))
++    row=agent.db.query(Meeting).one();op=agent.db.query(SalesBookingOperation).one()
++    message=agent.db.query(SalesMessage).filter_by(direction='inbound',content='Yes').one();count=agent.infer.await_count
++    agent.send.side_effect=lambda *a,**kw:{'sid':str(__import__('uuid').uuid4()),'status':'sent'}
++    agent.retry(message)
++    assert agent.db.query(Meeting).one().id==row.id and agent.db.query(SalesBookingOperation).one().id==op.id
++    assert agent.infer.await_count==count
++    agent.turn('Yes',understanding('Yes','appointment'))
++    assert agent.db.query(Meeting).count()==1 and not agent.conversation.is_paused
++
++
++def test_after_booking_queries_other_property_and_farewell_preserve_visit(agent):
++    _,_,row,_=book(agent);before=(row.meeting_time,row.visit_property_type_id,row.visit_address)
++    text='When is my appointment?'
++    u=understanding(text,'appointment').model_copy(update={'appointment_query':'active'})
++    agent.turn(text,u)
++    assert 'Studio' in latest(agent).content and '100 Main St' in latest(agent).content
++    product(agent,'Loft');text='Tell me about Loft'
++    agent.turn(text,typed(text,[req('d','property_details',text,ref='p')],[ref('p','property','Loft')]))
++    assert 'Loft' in latest(agent).content and agent.db.query(Meeting).count()==1
++    agent.turn('Thanks, goodbye',courtesy('Thanks, goodbye','farewell'))
++    assert 'budget' not in latest(agent).content and not agent.conversation.is_paused and not agent.lead.is_opt_out
++    agent.turn('Hello again',courtesy('Hello again','greeting'))
++    assert 'Welcome back' in latest(agent).content
++    agent.db.refresh(row);assert (row.meeting_time,row.visit_property_type_id,row.visit_address)==before
++
++
++def test_no_after_confirmation_question_is_farewell_not_cancel_or_opt_out(agent):
++    book(agent)
++    agent.turn('No, no more questions',courtesy('No, no more questions','farewell'))
++    assert agent.db.query(Meeting).one().status==MeetingStatus.CONFIRMED
++    assert not agent.lead.is_opt_out and not agent.conversation.is_paused
++
++
++def test_declining_proposal_does_not_book_or_pause(agent):
++    select(agent)
++    agent.turn('No thanks',courtesy('No thanks','decline'))
++    assert not agent.db.query(Meeting).count() and not load(agent.db,agent.scope)[1].booking_proposal
++    assert not agent.conversation.is_paused and not agent.lead.is_opt_out
++
++
++def test_farewell_stops_cadence_but_later_question_is_answered(agent):
++    product(agent)
++    job=SalesFollowUpJob(conversation_id=agent.conversation.id,status='pending',reason='warm_cadence',idempotency_key='test-farewell-cadence',scheduled_at=datetime.utcnow())
++    agent.db.add(job);agent.db.commit()
++    agent.turn('Goodbye',courtesy('Goodbye','farewell'))
++    agent.db.refresh(job);assert job.status=='cancelled' and not agent.conversation.is_paused
++    agent.turn('Give me information',understanding('Give me information','catalog'))
++    assert 'Studio' in latest(agent).content and not agent.conversation.is_paused
++    from app.modules.sales_agent.live_service import _schedule_next_action
++    _schedule_next_action(agent.db,agent.conversation,agent.lead,'test',refresh_pending=True)
++    assert not agent.db.query(SalesFollowUpJob).filter_by(status='pending').count()
++
++
++@pytest.mark.parametrize('kind',['property','manual','incomplete','expired'])
++def test_confirmation_cannot_use_an_unrelated_or_incomplete_offer(agent,kind):
++    select(agent)
++    if kind=='property':outbound(agent.db,agent.conversation,'Review the property',{'property_catalog_offer':{'property_type_ids':[load(agent.db,agent.scope)[1].selected_property_type_id]}})
++    elif kind=='manual':
++        row=outbound(agent.db,agent.conversation,'Human message');row.role='human';agent.db.commit()
++    elif kind=='incomplete':
++        row=latest(agent);row.metadata_json={**row.metadata_json,'delivery_group':{'key':'partial','part':1,'total':2}};agent.db.commit()
++    elif kind=='expired':
++        revision,state=load(agent.db,agent.scope);state.booking_proposal={**state.booking_proposal,'expires_at':(datetime.now(timezone.utc)-timedelta(seconds=1)).isoformat()}
++        save(agent.db,agent.scope,event_key='expire',expected_revision=revision,state=state);agent.db.commit()
++    agent.turn('Yes',understanding('Yes','appointment'))
++    assert not agent.db.query(Meeting).count() and not agent.conversation.is_paused
++
++
++@pytest.mark.parametrize('change',['specialist','location','duration_conflict','property'])
++def test_proposal_details_are_revalidated_before_booking(agent,change):
++    starts,offer=select(agent)
++    if change=='specialist':
++        from app.modules.users.models import User
++        user=agent.db.get(User,offer['options'][0]['sales_user_id']);user.is_active=False
++    elif change=='location':agent.project.address='Changed location'
++    elif change=='property':
++        p=agent.db.query(__import__('app.modules.projects.models',fromlist=['ProjectPropertyType']).ProjectPropertyType).one();p.review_status='pending'
++    else:
++        from test_sales_ai_group_c import meeting
++        meeting(agent,starts=starts);other=agent.db.query(Meeting).one();other.assigned_sales_user_id=offer['options'][0]['sales_user_id'];other.lead_id=__import__('uuid').uuid4().hex
++    agent.db.commit()
++    agent.turn('Yes',understanding('Yes','other'))
++    assert not agent.db.query(SalesBookingOperation).count() and not agent.conversation.is_paused
++
++
++def test_structured_temporal_preferences_are_normalized_and_applied(agent):
++    starts=availability(agent);product(agent)
++    day=starts.strftime('%Y-%m-%d');text=f'Book a visit on {day} after 3:30 PM for 30 minutes in UTC'
++    timing={'date_from_evidence':day,'time_from_evidence':'3:30 PM','time_relation':'after','duration_evidence':'30 minutes','timezone_evidence':'UTC'}
++    agent.turn(text,visit(text,timing=timing))
++    offer=latest(agent).metadata_json['appointment_offer']
++    assert offer['duration_minutes']==30 and offer['preferences']['time_from']=='15:30'
++    assert all(datetime.fromisoformat(o['starts_at']).hour>=15 and datetime.fromisoformat(o['starts_at']).minute>=0 for o in offer['options'])
++    assert min(datetime.fromisoformat(o['starts_at']) for o in offer['options']).replace(tzinfo=None)>=starts+timedelta(minutes=30)
++
++
++def test_multiple_properties_are_resolved_before_offering_a_visit(agent):
++    availability(agent);product(agent,'Studio');loft=product(agent,'Loft')
++    agent.turn('I want a visit',visit('I want a visit'))
++    assert latest(agent).metadata_json.get('booking_property_question')
++    text='Loft';agent.turn(text,typed(text,[req('p','property_details',text,ref='p')],[ref('p','property',text)]))
++    assert latest(agent).metadata_json.get('appointment_offer')
++    assert latest(agent).metadata_json['appointment_offer']['property_type_id']==loft.id
++
++
++def test_calendar_failure_is_durable_and_does_not_rollback_or_duplicate_booking(agent):
++    select(agent)
++    offer=load(agent.db,agent.scope)[1].booking_proposal
++    connection=CalendarConnection(user_id=offer['option']['sales_user_id'],provider='google',status='connected',calendar_id='offline')
++    agent.db.add(connection);agent.db.commit()
++    with patch('app.modules.sales_crm.scheduling.is_calendar_free',return_value=True),patch('app.integrations.gcalendar_client.create_calendar_event_for_connection',side_effect=RuntimeError('offline')):
++        agent.turn('Yes',understanding('Yes','other'))
++    row=agent.db.query(Meeting).one();op=agent.db.query(SalesBookingOperation).one()
++    assert row.calendar_sync_status=='failed' and op.calendar_status=='retry' and op.calendar_attempts==1
++    op.next_attempt_at=datetime.utcnow()-timedelta(seconds=1);agent.db.commit()
++    with patch('app.integrations.gcalendar_client.create_calendar_event_for_connection',return_value={'id':'deterministic-calendar'}) as create:
++        retry_calendars(agent.db)
++        assert create.call_args.kwargs['event_id']=='bp'+row.id.replace('-','')
++        retry_calendars(agent.db)
++        assert create.call_count==1
++    assert agent.db.query(Meeting).count()==1 and agent.db.query(SalesBookingOperation).one().calendar_status=='synced'
++
++
++def test_notifications_are_durable_and_idempotent(agent):
++    book(agent)
++    process_notification_outbox(agent.db);before=agent.db.query(Notification).count()
++    process_notification_outbox(agent.db)
++    assert before>0 and agent.db.query(Notification).count()==before
++
++
++@pytest.mark.parametrize('channel',['sms','whatsapp'])
++def test_real_provider_ingress_recovers_only_system_booking_pause_and_deduplicates(agent,channel):
++    from fastapi import BackgroundTasks
++    from app.modules.sales_agent.provider_router import _record_inbound
++    from app.modules.sales_agent.models import SalesInboundJob
++    from test_sales_ai_group_c import meeting
++    row=meeting(agent);row.source='agent_sms_active'
++    agent.conversation.channel=channel;agent.conversation.is_paused=True;agent.conversation.pause_reason='Appointment confirmed'
++    agent.lead.agent_status='appointment_confirmed';agent.db.commit()
++    kwargs=dict(provider='telnyx',event_id='f-ingress-'+channel,to_number='+15550100002',from_number=agent.lead.phone,
++        body='When is my appointment?',payload={},background_tasks=BackgroundTasks(),expected_company_id=agent.company.id,channel=channel)
++    with patch('app.modules.sales_agent.provider_router.resolve_inbound_conversation',return_value=agent.conversation):
++        _record_inbound(agent.db,**kwargs);_record_inbound(agent.db,**kwargs)
++    assert not agent.conversation.is_paused and agent.db.query(SalesInboundJob).count()==1
++    msg=agent.db.query(SalesMessage).filter_by(direction='inbound').one()
++    u=understanding(msg.content,'appointment').model_copy(update={'appointment_query':'active'})
++    agent.infer.return_value=u.model_dump_json()
++    with agent.patched():
++        from app.modules.sales_agent.live_service import process_live_inbound
++        asyncio.run(process_live_inbound(agent.conversation.id,msg.id))
++    assert '100 Main Street' in latest(agent).content and agent.db.query(Meeting).one().id==row.id
++
++
++@pytest.mark.parametrize('reason',['Manual pause','Human intervention: review','Lead opted out'])
++def test_ingress_does_not_lift_manual_security_or_opt_out_pauses(agent,reason):
++    from fastapi import BackgroundTasks
++    from app.modules.sales_agent.provider_router import _record_inbound
++    from app.modules.sales_agent.models import SalesInboundJob
++    from test_sales_ai_group_c import meeting
++    meeting(agent);agent.conversation.is_paused=True;agent.conversation.pause_reason=reason;agent.db.commit()
++    with patch('app.modules.sales_agent.provider_router.resolve_inbound_conversation',return_value=agent.conversation):
++        _record_inbound(agent.db,provider='telnyx',event_id='held',to_number='+15550100002',from_number=agent.lead.phone,
++            body='Hello',payload={},background_tasks=BackgroundTasks(),expected_company_id=agent.company.id)
++    assert agent.conversation.is_paused and not agent.db.query(SalesInboundJob).count()
++
++
++def test_coordinator_recovers_legacy_booking_pause_without_webhook(agent):
++    from test_sales_ai_group_c import meeting
++    row=meeting(agent);row.source='agent_sms_active'
++    agent.conversation.is_paused=True;agent.conversation.pause_reason='Appointment confirmed';agent.lead.agent_status='appointment_confirmed';agent.db.commit()
++    agent.turn('Hello again',courtesy('Hello again','greeting'))
++    assert not agent.conversation.is_paused and 'Welcome back' in latest(agent).content
++    assert load(agent.db,agent.scope)[1].cadence_stop_reason=='booked'
++
++
++@pytest.mark.parametrize('channel',['sms','whatsapp'])
++def test_booking_cadence_is_cancelled_and_claimed_old_job_never_sends(agent,channel):
++    from app.modules.sales_agent import live_service as live
++    agent.conversation.channel=channel
++    book(agent)
++    job=SalesFollowUpJob(conversation_id=agent.conversation.id,status='processing',reason='warm_cadence',
++        idempotency_key='old-cadence',scheduled_at=datetime.utcnow())
++    agent.db.add(job);agent.db.commit();before=agent.send.await_count
++    with agent.patched():asyncio.run(live.process_live_followup_job(job.id))
++    agent.db.refresh(job)
++    assert job.status=='cancelled' and agent.send.await_count==before
++
++
++def test_no_qualified_sales_or_no_matching_time_never_creates_wait_promise(agent):
++    product(agent)
++    agent.turn('Arrange a visit',visit('Arrange a visit'))
++    assert not agent.db.query(Meeting).count() and 'could not find a verified time' in latest(agent).content
++    assert 'notify you' not in latest(agent).content and not agent.conversation.is_paused
++    assert load(agent.db,agent.scope)[1].booking_search
++
++
++def test_timing_evidence_validation_rejects_invented_substrings():
++    with pytest.raises(ValueError):
++        visit('Book tomorrow',timing={'date_from_evidence':'next Friday'}) .check_evidence('Book tomorrow')
++
++
++@pytest.mark.parametrize('timing,text',[
++    ({'timezone_evidence':'Mars/Olympus'},'Book in Mars/Olympus'),
++    ({'duration_evidence':'999 minutes'},'Book for 999 minutes'),
++    ({'time_relation':'afternoon'},'Book a visit'),
++    ({'date_from_evidence':'not a date'},'Book on not a date'),
++    ({'time_relation':'range','time_from_evidence':'5:00 PM','time_until_evidence':'3:00 PM'},'Book between 5:00 PM and 3:00 PM'),
++])
++def test_invalid_temporal_preferences_ask_without_booking(agent,timing,text):
++    availability(agent);product(agent)
++    agent.turn(text,visit(text,timing=timing))
++    assert not agent.db.query(Meeting).count() and not latest(agent).metadata_json.get('appointment_offer')
++    assert not agent.conversation.is_paused
++
++
++def test_explicit_timezone_converts_time_correctly(agent):
++    starts=availability(agent);product(agent)
++    local=starts.replace(tzinfo=timezone.utc).astimezone(__import__('zoneinfo').ZoneInfo('America/Lima'))
++    day=local.strftime('%Y-%m-%d');clock=local.strftime('%I:%M %p')
++    text=f'Book {day} at {clock} in America/Lima'
++    agent.turn(text,visit(text,timing={'date_from_evidence':day,'time_from_evidence':clock,'time_relation':'exact','timezone_evidence':'America/Lima'}))
++    offer=latest(agent).metadata_json['appointment_offer']
++    assert datetime.fromisoformat(offer['options'][0]['starts_at']).replace(tzinfo=None)==starts
++    agent.turn('1',typed('1',[req('a','appointment','1',ref='s')],[ref('s','appointment','1')]))
++    agent.turn('Yes',understanding('Yes','other'))
++    assert 'America/Lima' in latest(agent).content and agent.db.query(Meeting).one().meeting_time==starts
++
++
++def test_unit_and_location_details_are_pinned_in_first_booking(agent):
++    from app.modules.projects.models import ProjectUnit
++    availability(agent);p=product(agent,'Studio')
++    unit=ProjectUnit(project=agent.project,unit_code='S-101',typology='Studio',status='available',inventory_updated_at=datetime.utcnow())
++    agent.db.add(unit);agent.db.commit()
++    text='Arrange a visit to S-101'
++    agent.turn(text,typed(text,[req('a','appointment',text,ref='u')],[ref('u','unit','S-101')]))
++    agent.turn('1',typed('1',[req('a','appointment','1',ref='s')],[ref('s','appointment','1')]))
++    agent.turn('Yes',understanding('Yes','other'))
++    row=agent.db.query(Meeting).one()
++    assert row.visit_unit_id==unit.id and row.visit_property_type_id==p.id and 'S-101' in latest(agent).content
++
++
++def test_multiple_locations_require_current_location_choice(agent):
++    availability(agent);product(agent)
++    agent.project.profile.profile_data={'exact_address':[{'label':'Office','address':'100 Office St'},{'label':'Showroom','address':'200 Showroom St'}]}
++    agent.project.profile.field_states={'exact_address':{'status':'confirmed','applicable':True}};agent.db.commit()
++    agent.turn('Arrange a visit',visit('Arrange a visit'))
++    assert latest(agent).metadata_json.get('location_offer')
++    text='Showroom';agent.turn(text,typed(text,[req('a','appointment',text,ref='l')],[ref('l','location','Showroom')]))
++    assert latest(agent).metadata_json['appointment_offer']['context']['location']['address']=='200 Showroom St'
++    agent.turn('1',typed('1',[req('a','appointment','1',ref='s')],[ref('s','appointment','1')]))
++    agent.turn('Yes',understanding('Yes','other'))
++    assert agent.db.query(Meeting).one().visit_address=='200 Showroom St'
++
++
++def test_new_migration_roundtrip_preserves_existing_meetings():
++    import importlib.util
++    from pathlib import Path
++    from sqlalchemy import create_engine,text,inspect
++    from alembic.migration import MigrationContext
++    from alembic.operations import Operations
++    file=Path(__file__).resolve().parents[1]/'alembic/versions/20261108_sales_booking_operations.py'
++    spec=importlib.util.spec_from_file_location('booking_migration',file);module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
++    engine=create_engine('sqlite://')
++    with engine.begin() as conn:
++        for table in ['companies','projects','sales_conversations','leads']:conn.execute(text(f'CREATE TABLE {table} (id VARCHAR(36) PRIMARY KEY)'))
++        conn.execute(text('CREATE TABLE meetings (id VARCHAR(36) PRIMARY KEY, visit_address TEXT)'))
++        conn.execute(text("INSERT INTO meetings VALUES ('old', 'Original address')"))
++        with Operations.context(MigrationContext.configure(conn)):
++            module.upgrade();assert 'sales_booking_operations' in inspect(conn).get_table_names()
++            assert conn.execute(text('SELECT count(*) FROM sales_booking_operations')).scalar()==0
++            module.downgrade();assert 'sales_booking_operations' not in inspect(conn).get_table_names()
++            assert conn.execute(text('SELECT visit_address FROM meetings')).scalar()=='Original address'
++            module.upgrade()
++    engine.dispose()
++
++
++@pytest.mark.parametrize('reply',['No','No thanks','No, no more questions'])
++def test_bare_contextual_no_after_booking_cannot_become_opt_out_or_cancel(agent,reply):
++    book(agent)
++    agent.turn(reply,understanding(reply,'opt_out'))
++    assert agent.db.query(Meeting).one().status==MeetingStatus.CONFIRMED
++    assert not agent.conversation.is_paused and not agent.lead.is_opt_out
++    assert 'stop all messages' not in latest(agent).content
++
++
++def test_bare_no_declines_the_exact_booking_question_despite_bad_model_label(agent):
++    select(agent)
++    agent.turn('No',understanding('No','appointment'))
++    assert not agent.db.query(Meeting).count() and not load(agent.db,agent.scope)[1].booking_proposal
++    assert not agent.conversation.is_paused
++
++
++def test_confirmation_with_independent_photos_keeps_true_booking_and_one_question(agent):
++    from test_sales_turn_1720 import approved_asset
++    select(agent)
++    approved_asset((agent.db,agent.company,agent.project,agent.lead,agent.conversation),['brochure'])
++    text='Yes, and send photos'
++    u=understanding(text,'appointment','materials',subjects={1:'photos'})
++    u=Understanding.model_validate({**u.model_dump(),'visit':{'action':'confirm','evidence':'Yes','timing':None}})
++    agent.turn(text,u)
++    assert agent.db.query(Meeting).count()==1 and 'Your visit is confirmed' in latest(agent).content
++    assert 'remains pending' not in latest(agent).content and latest(agent).content.count('?')==1
++    assert latest(agent).metadata_json.get('material_offer')
++
++
++def test_calendar_retries_stop_at_review_without_new_meetings(agent):
++    select(agent);proposal=load(agent.db,agent.scope)[1].booking_proposal
++    agent.db.add(CalendarConnection(user_id=proposal['option']['sales_user_id'],provider='google',status='connected'));agent.db.commit()
++    with patch('app.modules.sales_crm.scheduling.is_calendar_free',return_value=True),patch('app.integrations.gcalendar_client.create_calendar_event_for_connection',side_effect=RuntimeError('offline')) as create:
++        agent.turn('Yes',understanding('Yes','other'))
++        op=agent.db.query(SalesBookingOperation).one()
++        for _ in range(8):
++            op.next_attempt_at=datetime.utcnow()-timedelta(seconds=1);agent.db.commit();retry_calendars(agent.db)
++        assert create.call_count==5 and op.calendar_status=='review'
++    assert agent.db.query(Meeting).count()==1
++
++
++def test_notification_failure_after_booking_can_be_retried(agent):
++    book(agent)
++    event=agent.db.query(NotificationOutbox).filter_by(event_type='appointment_confirmed').one()
++    with patch.object(agent.db,'commit',side_effect=RuntimeError('offline')):
++        with pytest.raises(RuntimeError):process_notification_outbox(agent.db)
++    agent.db.rollback()
++    assert agent.db.get(NotificationOutbox,event.id).status=='pending'
++    process_notification_outbox(agent.db)
++    assert agent.db.get(NotificationOutbox,event.id).status=='processed' and agent.db.query(Meeting).count()==1
++
++
++def test_open_human_case_prevents_legacy_pause_recovery(agent):
++    from test_sales_ai_group_c import meeting
++    from app.modules.governance.services import create_intervention_case
++    from app.modules.sales_agent.first_booking import recover_booking_pause
++    meeting(agent)
++    create_intervention_case(agent.db,conversation=agent.conversation,lead=agent.lead,reason='HUMAN_REQUESTED',evidence='Speak to Sales')
++    agent.conversation.is_paused=True;agent.conversation.pause_reason='Appointment confirmed';agent.db.commit()
++    assert not recover_booking_pause(agent.db,agent.conversation) and agent.conversation.is_paused
++
++
++def test_courtesy_state_survives_restart_and_does_not_start_new_appointment(agent):
++    agent.turn('Goodbye',courtesy('Goodbye','farewell'))
++    agent.db.expire_all()
++    assert load(agent.db,agent.scope)[1].cadence_status=='stopped'
++    agent.turn('Hello',courtesy('Hello','greeting'))
++    assert 'Welcome back' in latest(agent).content and not agent.db.query(Meeting).count()
++
++
++def test_sales_notice_targets_booked_specialist_even_if_lead_is_reassigned(agent):
++    from app.modules.users.models import User,UserRole
++    from app.modules.project_team.models import ProjectUserAssignment
++    book(agent);old=agent.db.query(Meeting).one().assigned_sales_user_id
++    other=User(company_id=agent.company.id,email='other-sales@example.invalid',first_name='Other',last_name='Sales',hashed_password='OFFLINE',role=UserRole.SALES,is_active=True)
++    agent.db.add(other);agent.db.flush()
++    agent.db.add(ProjectUserAssignment(project_id=agent.project.id,user_id=other.id,responsibility='sales',sales_enabled=True,is_active=True))
++    agent.lead.assigned_sales_user_id=other.id;agent.db.commit()
++    process_notification_outbox(agent.db)
++    assert agent.db.query(Notification).filter_by(recipient_user_id=old,notification_type='appointment_confirmed').count()==1
++    assert not agent.db.query(Notification).filter_by(recipient_user_id=other.id,notification_type='appointment_confirmed').count()
++
++
++def test_changed_booking_is_not_silently_synced_as_the_old_operation(agent):
++    _,_,row,_=book(agent);op=agent.db.query(SalesBookingOperation).one()
++    row.meeting_time+=timedelta(days=1);agent.db.commit()
++    with patch('app.integrations.gcalendar_client.create_calendar_event_for_connection') as create:
++        sync_calendar(agent.db,op.id)
++        create.assert_not_called()
++    assert op.calendar_status=='review' and op.last_error=='BookingChanged'
++
++
++def test_running_visit_blocks_overlapping_specialist_slot(agent):
++    from app.modules.sales_crm.scheduling import eligible_users_for_slot
++    starts,offer=options(agent);uid=offer['options'][0]['sales_user_id']
++    from test_sales_ai_group_c import meeting
++    row=meeting(agent,starts=starts-timedelta(minutes=15),status=MeetingStatus.IN_PROGRESS)
++    row.assigned_sales_user_id=uid;row.duration_minutes=90;agent.db.commit()
++    assert not eligible_users_for_slot(agent.db,project_id=agent.project.id,starts_at=starts,duration_minutes=45)
++
++
++@pytest.mark.parametrize('channel',['sms','whatsapp'])
++@pytest.mark.parametrize('index',range(6))
++def test_six_exported_projects_keep_first_visit_requests_scoped_and_no_unconfirmed_booking(index,channel,monkeypatch):
++    from sales_ai_support.sandbox import Sandbox,InboundHarness,load_catalog
++    catalog=load_catalog();sandbox=Sandbox(catalog)
++    try:
++        pid=catalog['projects'][index]['project']['id'];text='I would like to arrange a visit'
++        h=InboundHarness(sandbox,pid,channel,monkeypatch,visit(text))
++        monkeypatch.setattr(settings,'SALES_NEXT_FLOW_ENABLED',True);monkeypatch.setattr(settings,'SALES_NEXT_FLOW_PROJECT_IDS',pid)
++        _,run=h.turn(text)
++        assert run.status=='completed' and not h.conversation.is_paused,run.output_snapshot
++        assert not h.db.query(Meeting).count() and not h.calendar.calls
++        offer=run.output_snapshot['metadata'].get('appointment_offer')
++        if offer:
++            assert offer['version']=='sales-first-booking/1.0' and offer['context']['project_id']==pid
++            assert all(o['sales_user_id'] for o in offer['options'])
++        assert not run.output_snapshot['metadata'].get('language_hold')
++    finally:sandbox.close()
++
++
++def test_two_leads_with_same_offered_time_cannot_both_confirm(agent):
++    from app.modules.sales_crm.models import Lead
++    from app.modules.sales_agent.models import SalesConversation
++    from app.modules.sales_agent.dialogue_store import Scope
++    from app.modules.sales_agent.first_booking import handle
++    from types import SimpleNamespace
++    starts,offer=select(agent)
++    original=load(agent.db,agent.scope)[1].booking_proposal
++    other=Lead(company_id=agent.company.id,project_id=agent.project.id,full_name='Other lead',phone='+15550100002',source='manual',consent_status='granted')
++    agent.db.add(other);agent.db.flush()
++    conv=SalesConversation(company_id=agent.company.id,project_id=agent.project.id,lead_id=other.id,channel='sms',provider='telnyx',is_paused=False)
++    agent.db.add(conv);agent.db.flush();scope=Scope(agent.company.id,agent.project.id,conv.id,other.id)
++    from app.modules.sales_agent.turn_configuration import digest
++    from app.modules.sales_agent.understanding_contract import DialogueState,Task
++    proposal={**original,'scope':scope.__dict__};proposal.pop('id');proposal['id']=digest(proposal)
++    outbound(agent.db,conv,'Confirm the visit?',{'booking_confirmation':{'id':proposal['id']}})
++    other_inbound=SalesMessage(conversation_id=conv.id,channel='sms',direction='inbound',role='user',content='Yes',status='received');agent.db.add(other_inbound);agent.db.commit()
++    agent.turn('Yes',understanding('Yes','other'))
++    state=DialogueState(booking_proposal=proposal,booking_search={'property_type_id':proposal['context']['property_type_id'],'unit_id':None,'duration_minutes':45},last_understanding=understanding('Yes','appointment'),tasks=[Task(id='booking',topic='appointment',status='pending',source_message_id=other_inbound.id)])
++    result=handle(agent.db,scope,conv,other,agent.project,SimpleNamespace(state=state,plan={'write_candidates_require_backend_authorization':['booking'],'references':{}}),other_inbound)
++    assert not result[1].get('meeting_id') and 'no longer available' in result[0]
++    agent.db.commit();assert agent.db.query(Meeting).count()==1
++
++
++def test_explicit_suspended_time_reference_prepares_summary_without_renewing_expiry(agent):
++    from test_sales_turn_1720 import approved_asset
++    starts,offer=options(agent)
++    approved_asset((agent.db,agent.company,agent.project,agent.lead,agent.conversation),['floor_plan'])
++    agent.turn('Send floor plans first',understanding('Send floor plans first','materials',subjects={0:'floor_plan'}))
++    text='3:00 PM'
++    agent.turn(text,typed(text,[req('a','appointment',text,ref='s')],[ref('s','appointment',text)]))
++    assert latest(agent).metadata_json.get('booking_confirmation')
++    assert load(agent.db,agent.scope)[1].booking_proposal['expires_at']==offer['expires_at']
++    assert not agent.db.query(Meeting).count()
++
++
++def test_booking_migration_generates_postgres_sql_without_touching_data():
++    import importlib.util,io
++    from pathlib import Path
++    from alembic.migration import MigrationContext
++    from alembic.operations import Operations
++    path=Path(__file__).resolve().parents[1]/'alembic/versions/20261108_sales_booking_operations.py'
++    spec=importlib.util.spec_from_file_location('booking_sql',path);module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
++    output=io.StringIO()
++    with Operations.context(MigrationContext.configure(dialect_name='postgresql',opts={'as_sql':True,'output_buffer':output})):
++        module.upgrade()
++    sql=output.getvalue()
++    assert 'CREATE TABLE sales_booking_operations' in sql and 'UNIQUE (proposal_id)' in sql and 'UNIQUE (meeting_id)' in sql
++    assert 'UPDATE meetings' not in sql and 'DELETE' not in sql.replace('ON DELETE CASCADE','')
++
++
++def test_property_question_interrupted_by_photos_does_not_start_scheduling(agent):
++    from test_sales_turn_1720 import approved_asset
++    availability(agent);product(agent,'Studio');loft=product(agent,'Loft')
++    asset=approved_asset((agent.db,agent.company,agent.project,agent.lead,agent.conversation),['gallery_image']);asset.property_type_id=loft.id;agent.db.commit()
++    agent.turn('I want a visit',visit('I want a visit'))
++    text='Send Loft photos first'
++    agent.turn(text,typed(text,[req('m','materials',text,ref='p',subject='photos')],[ref('p','property','Loft')]))
++    assert not latest(agent).metadata_json.get('appointment_offer') and not agent.db.query(Meeting).count()
++    assert '/projects/a/' in latest(agent).content
++
++
++def test_explicit_decline_of_pending_proposal_never_cancels_an_existing_visit(agent):
++    select(agent)
++    text="I don't want this visit"
++    agent.turn(text,visit(text,action='decline'))
++    assert not agent.db.query(Meeting).count() and not load(agent.db,agent.scope)[1].booking_proposal
++    assert 'No visit has been booked' in latest(agent).content
++
++
++def test_disabled_project_effects_cannot_starve_enabled_calendar_queue(agent):
++    from app.modules.projects.models import Project
++    from app.modules.sales_crm.models import Lead
++    from app.modules.sales_agent.models import SalesConversation
++    _,_,row,_=book(agent);op=agent.db.query(SalesBookingOperation).one()
++    agent.db.add(CalendarConnection(user_id=row.assigned_sales_user_id,provider='google',status='connected'))
++    op.calendar_status='pending';op.next_attempt_at=datetime.utcnow()-timedelta(minutes=1)
++    disabled=Project(company_id=agent.company.id,name='Disabled scope',address='200 Test St',timezone='UTC');agent.db.add(disabled);agent.db.flush()
++    lead=Lead(company_id=agent.company.id,project_id=disabled.id,full_name='Other lead',phone='+15550100003',source='manual',consent_status='granted');agent.db.add(lead);agent.db.flush()
++    conv=SalesConversation(company_id=agent.company.id,project_id=disabled.id,lead_id=lead.id,channel='sms',provider='telnyx',is_paused=False);agent.db.add(conv);agent.db.flush()
++    for index in range(11):
++        meeting=Meeting(project_id=disabled.id,lead_id=lead.id,meeting_time=row.meeting_time,status=MeetingStatus.CONFIRMED);agent.db.add(meeting);agent.db.flush()
++        agent.db.add(SalesBookingOperation(company_id=agent.company.id,project_id=disabled.id,lead_id=lead.id,conversation_id=conv.id,
++            proposal_id='disabled-'+str(index),meeting_id=meeting.id,snapshot_json={},calendar_status='pending',next_attempt_at=datetime.utcnow()-timedelta(minutes=2)))
++    agent.db.commit()
++    with patch('app.integrations.gcalendar_client.create_calendar_event_for_connection',return_value={'id':'enabled-calendar'}) as create:
++        retry_calendars(agent.db,limit=10)
++        assert create.call_count==1
++    assert op.calendar_status=='synced'
+diff --git a/backend/tests/test_sales_booking_postgres.py b/backend/tests/test_sales_booking_postgres.py
+new file mode 100644
+index 0000000..d6d8946
+--- /dev/null
++++ b/backend/tests/test_sales_booking_postgres.py
+@@ -0,0 +1,89 @@
++"""Optional actual PostgreSQL contention. Never run against a non-test database."""
++from concurrent.futures import ThreadPoolExecutor
++from datetime import datetime,timedelta,timezone
++from threading import Barrier
++from types import SimpleNamespace
++import os,uuid
++import pytest
++from sqlalchemy import create_engine,text
++from sqlalchemy.orm import Session
++import app.db.base
++from app.db.postgres import Base
++from app.modules.companies.models import Company
++from app.modules.projects.models import Project,ProjectProfile,ProjectPropertyType
++from app.modules.users.models import User,UserRole
++from app.modules.project_team.models import ProjectUserAssignment
++from app.modules.sales_crm.models import Lead,Meeting,SalesAvailabilityBlock
++from app.modules.governance.models import NotificationOutbox
++from app.modules.sales_agent.models import SalesConversation,SalesMessage
++from app.modules.sales_agent.booking_models import SalesBookingOperation
++from app.modules.sales_agent.dialogue_store import Scope
++from app.modules.sales_agent.understanding_contract import DialogueState,Task
++from app.modules.sales_agent.first_booking import handle,context_snapshot,normalize_timing
++from app.modules.sales_agent.turn_configuration import digest
++from test_sales_active_integration import understanding
++
++
++@pytest.mark.parametrize('same_lead',[False,True],ids=['two-leads-one-specialist','one-lead-two-channels'])
++def test_postgres_first_booking_contention_has_one_reservation_and_one_effect(same_lead):
++    url=os.environ.get('DIALOGUE_POSTGRES_TEST_URL')
++    if not url:pytest.skip('Disposable PostgreSQL URL not supplied; SQLite is not a parallel-worker proof.')
++    engine=create_engine(url)
++    assert engine.dialect.name=='postgresql'
++    with engine.connect() as connection:
++        assert connection.execute(text('SELECT current_database()')).scalar_one().endswith('_test')
++    schema='bp_booking_test_'+uuid.uuid4().hex
++    with engine.begin() as connection:connection.exec_driver_sql(f'CREATE SCHEMA {schema}')
++    isolated=create_engine(url,connect_args={'options':f'-csearch_path={schema} -cstatement_timeout=15000'})
++    try:
++        Base.metadata.create_all(isolated)
++        entries=[];starts=(datetime.utcnow()+timedelta(days=2)).replace(hour=15,minute=0,second=0,microsecond=0)
++        with Session(isolated) as db:
++            company=Company(name='Disposable booking fixture');db.add(company);db.flush()
++            project=Project(company_id=company.id,name='Test property',address='100 Test St',timezone='UTC')
++            project.profile=ProjectProfile(profile_data={},field_states={});db.add(project);db.flush()
++            product=ProjectPropertyType(project=project,name='Studio',review_status='confirmed')
++            sales=User(company_id=company.id,email='parallel@example.invalid',first_name='Parallel',last_name='Sales',hashed_password='OFFLINE',role=UserRole.SALES,is_active=True)
++            db.add_all([product,sales]);db.flush()
++            db.add(ProjectUserAssignment(project_id=project.id,user_id=sales.id,responsibility='sales',sales_enabled=True,is_active=True,accepts_appointments=True))
++            db.add(SalesAvailabilityBlock(user_id=sales.id,starts_at=starts,ends_at=starts+timedelta(hours=1),timezone='UTC'))
++            first_lead=None
++            for index in range(2):
++                lead=first_lead if same_lead and first_lead else Lead(company_id=company.id,project_id=project.id,full_name='Fictional lead '+str(index),phone='+1555010000'+str(index),source='manual',consent_status='granted')
++                if lead is not first_lead:db.add(lead);db.flush()
++                first_lead=first_lead or lead
++                conversation=SalesConversation(company_id=company.id,project_id=project.id,lead_id=lead.id,channel='sms' if index==0 or not same_lead else 'whatsapp',provider='telnyx',is_paused=False)
++                db.add(conversation);db.flush()
++                scope=Scope(company.id,project.id,conversation.id,lead.id)
++                state=DialogueState(selected_property_type_id=product.id,booking_search={'property_type_id':product.id,'unit_id':None,'duration_minutes':45})
++                context=context_snapshot(db,scope,project,state,{'label':'Primary location','address':project.address})
++                prefs=normalize_timing(understanding('Yes','appointment'),'Yes',project,datetime.utcnow(),{})
++                option={'starts_at':starts.replace(tzinfo=timezone.utc).isoformat(),'sales_user_id':sales.id,'specialist_name':'Parallel Sales'}
++                proposal={'scope':scope.__dict__,'context':context,'preferences':prefs,'option':option,'offer_message_id':str(uuid.uuid4()),'expires_at':(datetime.now(timezone.utc)+timedelta(minutes=20)).isoformat()}
++                proposal['id']=digest(proposal);state.booking_proposal=proposal
++                message=SalesMessage(conversation_id=conversation.id,channel=conversation.channel,direction='outbound',role='assistant',status='delivered',content='Confirm this exact visit?',metadata_json={'booking_confirmation':{'id':proposal['id']}})
++                db.add(message);db.flush()
++                inbound=SalesMessage(conversation_id=conversation.id,channel=conversation.channel,direction='inbound',role='user',status='received',content='Yes')
++                db.add(inbound);db.flush()
++                state.last_understanding=understanding('Yes','appointment')
++                state.tasks=[Task(id='booking',topic='appointment',status='pending',source_message_id=inbound.id,request_ids=['r0'])]
++                entries.append((scope,inbound.id,state.model_dump(mode='json')))
++            db.commit()
++        barrier=Barrier(2)
++        def reserve(entry):
++            scope,message_id,state=entry
++            with Session(isolated) as db:
++                conversation=db.get(SalesConversation,scope.conversation_id);lead=db.get(Lead,scope.lead_id);project=db.get(Project,scope.project_id);inbound=db.get(SalesMessage,message_id)
++                outcome=SimpleNamespace(state=DialogueState.model_validate(state),plan={'write_candidates_require_backend_authorization':['booking'],'references':{}})
++                barrier.wait(timeout=10)
++                result=handle(db,scope,conversation,lead,project,outcome,inbound)
++                db.commit();return bool(result[1].get('meeting_id'))
++        with ThreadPoolExecutor(max_workers=2) as pool:results=list(pool.map(reserve,entries))
++        assert sorted(results)==[False,True]
++        with Session(isolated) as db:
++            assert db.query(Meeting).count()==db.query(SalesBookingOperation).count()==1
++            assert db.query(NotificationOutbox).filter_by(event_type='appointment_confirmed').count()==1
++    finally:
++        isolated.dispose()
++        with engine.begin() as connection:connection.exec_driver_sql(f'DROP SCHEMA {schema} CASCADE')
++        engine.dispose()
+diff --git a/backend/tools/sales_ai/offline.sh b/backend/tools/sales_ai/offline.sh
+index f4b7f1e..23f90e6 100644
+--- a/backend/tools/sales_ai/offline.sh
++++ b/backend/tools/sales_ai/offline.sh
+@@ -11,9 +11,10 @@ case "$BP_MODE" in
+     group-c) BP_ARGS=(-m pytest tests/test_sales_ai_group_c.py -q --disable-warnings) ;;
+     group-d) BP_ARGS=(-m pytest tests/test_sales_ai_group_d.py -q --disable-warnings) ;;
+     group-e) BP_ARGS=(-m pytest tests/test_sales_ai_group_e.py -q --disable-warnings) ;;
++    group-f) BP_ARGS=(-m pytest tests/test_sales_ai_group_f.py tests/test_sales_booking_postgres.py -q --disable-warnings) ;;
+     baseline) BP_ARGS=(-m pytest tests -q --disable-warnings) ;;
+     replay) BP_ARGS=(-m tools.sales_ai.replay --output "${2:?Provide the report output path}") ;;
+-    *) printf 'Usage: bash tools/sales_ai/offline.sh test|group-b|group-c|group-d|group-e|baseline|replay OUTPUT\n' >&2; exit 2 ;;
++    *) printf 'Usage: bash tools/sales_ai/offline.sh test|group-b|group-c|group-d|group-e|group-f|baseline|replay OUTPUT\n' >&2; exit 2 ;;
+ esac
+ exec env SECRET_KEY=group-a-offline-test ACCESS_TOKEN_EXPIRE_MINUTES=60 \
+     DATABASE_URL=sqlite:// ENVIRONMENT=test \
+diff --git a/docs/sales-ai/group-f-report.json b/docs/sales-ai/group-f-report.json
+new file mode 100644
+index 0000000..d045e68
+--- /dev/null
++++ b/docs/sales-ai/group-f-report.json
+@@ -0,0 +1,194 @@
++{
++  "version": "sales-ai-group-f-report/1.0",
++  "date": "2026-11-08",
++  "base_commit": "f92e8046cf09c253da78b9636c311c7dfed62988",
++  "main_reverified_at_close": "f92e8046cf09c253da78b9636c311c7dfed62988",
++  "branch": "sales-ai/group-f-booking-continuity",
++  "steps": [
++    11,
++    12
++  ],
++  "status": "implemented_and_verified",
++  "checks": [
++    {
++      "name": "group_f_focused_final",
++      "passed": 68,
++      "skipped": 2,
++      "warnings": 4901,
++      "seconds": 24.44,
++      "failed": 0,
++      "exit_code": 0
++    },
++    {
++      "name": "checkout_regression_before_final_worker_scope_filter",
++      "passed": 1862,
++      "skipped": 4,
++      "warnings": 30140,
++      "seconds": 153.35,
++      "failed": 0,
++      "exit_code": 0,
++      "phase": "before_final_worker_scope_filter_and_its_regression_case"
++    },
++    {
++      "name": "full_backend_final_tree_isolated_actions_layout",
++      "passed": 1863,
++      "skipped": 4,
++      "warnings": 30272,
++      "seconds": 156.97,
++      "failed": 0,
++      "exit_code": 0,
++      "physical_copies": true,
++      "checkout_imports": false,
++      "unchanged_reference_files": 225,
++      "matching_application_tools_migration_files": 276
++    },
++    {
++      "name": "existing_safety_replay",
++      "passed": 20,
++      "total": 20,
++      "external_actions": 0,
++      "model_quality_evaluated": false,
++      "exit_code": 0
++    },
++    {
++      "name": "migration_heads",
++      "head": "20261108_sales_booking_ops",
++      "exit_code": 0
++    },
++    {
++      "name": "migration_sqlite_roundtrip_and_postgres_ddl",
++      "included_in_focused_tests": true,
++      "production_database_touched": false
++    },
++    {
++      "name": "dependency_consistency",
++      "command": "python -m pip check",
++      "exit_code": 0
++    },
++    {
++      "name": "whitespace",
++      "command": "git diff --check",
++      "exit_code": 0
++    }
++  ],
++  "coverage": {
++    "focused_tests_passed": 68,
++    "new_parallel_postgres_cases_defined": 2,
++    "new_parallel_postgres_cases_executed": 0,
++    "exported_projects": 6,
++    "channels": [
++      "sms",
++      "whatsapp"
++    ],
++    "real_catalog_initial_visit_requests": 12,
++    "model": "INJECTED_SCRIPTED",
++    "providers": "MOCKED",
++    "real_postgres_concurrency_proven": false,
++    "covered_cases": [
++      "T11",
++      "T12",
++      "T14",
++      "T15",
++      "T16",
++      "T21",
++      "T25",
++      "T26"
++    ],
++    "partial_cases": [
++      "T13 no-matching-time response; durable wait remains I",
++      "T19 ordered contention and opt-in PostgreSQL tests; real parallel execution pending"
++    ],
++    "complete_T01_T26_acceptance": false,
++    "prior_regressions_updated": "C and D now require the full-summary confirmation; original property binding and interruption assertions preserved."
++  },
++  "booking": {
++    "version": "sales-first-booking/1.0",
++    "protocol": "verified time offer -> selection -> full summary -> exact assent -> transaction",
++    "proposal_expiry_minutes": 30,
++    "default_duration_minutes": 45,
++    "explicit_duration_minutes_range": [
++      15,
++      180
++    ],
++    "maximum_search_days_per_request": 14,
++    "maximum_requested_range_days": 31,
++    "future_request_horizon_days": 90,
++    "maximum_offered_slots": 3,
++    "timezone": "Project default or explicitly evidenced IANA timezone; UTC storage",
++    "idempotency": "unique proposal/meeting receipt; prepared outbound and deterministic Calendar event ID",
++    "concurrency_guards": [
++      "lead row lock across channels",
++      "stable specialist row locks before conflict recheck",
++      "active/in-progress meeting conflicts"
++    ],
++    "first_time_selection_creates_reservation": false,
++    "confirmation_uses_persisted_values": true
++  },
++  "effects": {
++    "notification_outbox": "deduplicated panel notices addressed to booked specialist, not later lead assignment",
++    "separate_confirmation_email_sent": false,
++    "calendar_operation_table": "sales_booking_operations",
++    "calendar_provider_id": "bp + Meeting UUID without hyphens",
++    "calendar_failure_attempt_cap": 5,
++    "calendar_backoff_minutes": "2**attempt, bounded at 60; review after attempt 5",
++    "calendar_without_connection": "waiting_connection; due again in 10 minutes",
++    "calendar_retry_batch_default": 10,
++    "disabled_scopes_filtered_before_batch_limit": true,
++    "delivery_receipt_semantics": "provider accepted, not proof of handset delivery"
++  },
++  "continuity": {
++    "chat_after_booking": "open",
++    "commercial_cadence_after_booking_or_farewell": "stopped",
++    "legacy_booking_pause_recovery": [
++      "authenticated provider ingress",
++      "active coordinator"
++    ],
++    "manual_and_human_pauses_preserved": true,
++    "farewell_cancels_booking": false,
++    "change_of_interest_changes_booking": false
++  },
++  "internal_prompt_version": "sales-understanding-prompt/2.3",
++  "new_migrations": [
++    "20261108_sales_booking_ops"
++  ],
++  "inherited_required_migrations": [
++    "20261108_sales_visit_context"
++  ],
++  "migration_applied_in_production": false,
++  "production_changes": false,
++  "deployment_performed": false,
++  "published_prompts_changed": false,
++  "product_model_changed": false,
++  "new_flow_activation": "disabled_by_default_explicit_project_allowlist_required",
++  "environment": {
++    "python": "3.12.14",
++    "pytest": "9.1.1",
++    "SQLAlchemy": "2.0.50",
++    "fastapi": "0.136.3",
++    "pydantic": "2.13.4"
++  },
++  "skipped": [
++    "Two existing PostgreSQL dialogue concurrency cases and two new booking contention cases require an explicit disposable PostgreSQL URL."
++  ],
++  "not_run": [
++    "Actual PostgreSQL migration/concurrency",
++    "Real OpenRouter conversation quality",
++    "Live SMS/WhatsApp or Calendar",
++    "Actual Docker image build (Docker unavailable)",
++    "Remote GitHub Actions",
++    "Frontend tests/build (no frontend changes)",
++    "Complete T01-T26 acceptance"
++  ],
++  "limits": [
++    "Real model language/commercial acceptance remains K; providers are simulated.",
++    "A 14-day availability scan is bounded work, not proof of exhaustive availability or a measured end-to-end latency.",
++    "Exported-project cases cover initial visit requests and isolation, not completed live reservations for every Project.",
++    "Notification notices are from the existing panel; no separate confirmation-email delivery is asserted.",
++    "Rescheduling, cancellation and durable wait remain G, H and I.",
++    "Keep booking receipts, meetings and JSON snapshots on operational rollback; older strict readers need compatibility handling."
++  ],
++  "next_group": "G",
++  "next_steps": [
++    13
++  ]
++}
+diff --git a/docs/sales-ai/group-f.md b/docs/sales-ai/group-f.md
+new file mode 100644
+index 0000000..684983e
+--- /dev/null
++++ b/docs/sales-ai/group-f.md
+@@ -0,0 +1,151 @@
++# Sales AI — Grupo F: pasos 11 y 12
++
++Fecha: 8 de noviembre de 2026. Base de main con E: `f92e8046cf09c253da78b9636c311c7dfed62988`.
++Rama: `sales-ai/group-f-booking-continuity`. Continúa A–E. Siguiente: **G, paso 13**, pendiente.
++Resultados reproducibles: `group-f-report.json`.
++
++## Paso 11 — Primera reserva y confirmación
++
++La cohorte nueva usa `sales-first-booking/1.0`. Conserva consultas de citas de C y el flujo
++anterior fuera de la allowlist. El recorrido tiene tres mensajes del backend:
++
++1. Ofrece hasta tres horarios verificados para una propiedad/unidad y ubicación concretas,
++   duración y especialista elegible. Si hay varias propiedades o ubicaciones, pide la elección
++   pertinente sin exigir presupuesto ni completar todas las etapas comerciales.
++2. Al elegir un horario, prepara un resumen completo y pregunta si debe reservar **esa visita
++   exacta**. Elegir un número o una hora no crea una reserva. La propuesta conserva el mensaje
++   de origen, su ámbito, datos y vencimiento original; tiene un identificador derivado del
++   contenido completo. Una interrupción no prolonga los 30 minutos originales.
++3. La aceptación contextual de ese resumen revalida permisos, referencia, fecha futura,
++   propiedad, ubicación, especialista y disponibilidad. Guarda cita, asignación, recibo de
++   operación y aviso en la misma transacción. La confirmación usa los valores guardados e
++   incluye propiedad/unidad, especialista, fecha, hora/zona/offset, duración, dirección y un
++   cierre útil. Se envía por el canal activo SMS/WhatsApp, sin afirmar entrega al teléfono.
++
++Las referencias a un horario suspendido pueden preparar el resumen si son explícitas, la oferta
++original fue aceptada por el proveedor y sigue vigente. Las ofertas multipartes deben estar
++completas. Una pregunta o respuesta manual posterior no autoriza aceptar un resumen antiguo.
++Las selecciones de propiedad siguen siendo independientes del consentimiento de reserva.
++Una pregunta sobre fotos o precios interrumpe la agenda sin convertirse en solicitud de horarios.
++
++### Preferencias y disponibilidad
++
++El contrato de interpretación interno pasa a `sales-understanding-prompt/2.3`. Añade `visit`
++(acción y fragmentos temporales exactos) y `courtesy` (saludo, agradecimiento, despedida o negativa).
++Los registros históricos omiten estos campos y siguen cargando mediante valores predeterminados.
++No se publica un prompt administrativo ni se cambia el modelo configurado.
++
++El backend normaliza evidencia temporal explícita en fechas/rangos, hora local exacta o límites,
++franjas del día, zona IANA y duración. Conserva los valores y su evidencia en `booking_search`.
++No acepta fechas, zonas ni duraciones inventadas en lugar de fragmentos del mensaje. La duración
++predeterminada es 45 minutos; una duración explícita debe estar entre 15 y 180 minutos.
++La zona del Project es el valor predeterminado; una zona explícita válida se convierte a UTC para
++reservar y se muestra en el resumen. Un valor ambiguo o inválido produce una aclaración inglesa.
++
++La búsqueda usa una sola exploración de disponibilidad y un rango FreeBusy por especialista
++conectado, sin repetirlo por cada día. Comprueba hasta 14 días dentro del rango solicitado,
++retorna hasta tres opciones y comunica ese límite si no encuentra un horario. Acepta solicitudes
++hasta 90 días en el futuro y rangos de hasta 31 días; no presenta la revisión de 14 días como
++cobertura de un rango mayor. No registra espera ni promete avisos futuros: corresponden a I.
++El tiempo real de búsqueda con proveedores externos sigue sujeto a sus timeouts y se evaluará en K;
++no se atribuye a esta búsqueda el presupuesto separado de lecturas del plan de D.
++
++La propuesta conserva el especialista mostrado. La confirmación no lo sustituye silenciosamente
++por otro si cambió el cursor round robin. La asignación definitiva actualiza el cursor existente.
++Una cita en curso también bloquea horarios solapados. No se confunde una consulta de inventario,
++una imagen o una despedida con una autorización de agenda.
++
++### Transacción y efectos durables
++
++Nueva migración: **`20261108_sales_booking_ops`**, archivo
++`backend/alembic/versions/20261108_sales_booking_operations.py`, posterior a
++`20261108_sales_visit_context`. Crea solamente `sales_booking_operations`; no reescribe ni
++reconstruye reservas históricas. El recibo tiene claves únicas por propuesta y Meeting, ámbito,
++snapshot de confirmación y estado/intentos del efecto Calendar.
++
++Se bloquea el lead antes de comprobar otra reserva activa y se conservan los bloqueos de Sales
++ordenados antes de comprobar conflictos. Esto coordina dos canales del mismo lead y dos leads
++que compiten por un especialista. Los tests secuenciales verifican conflictos, y se añaden tests
++paralelos reales optativos para PostgreSQL. **SQLite no acredita concurrencia PostgreSQL**; las
++pruebas omitidas y el nivel de evidencia se declaran en el informe.
++
++La respuesta preparada y sus operaciones persisten antes del envío. Reintentar un envío fallido
++reutiliza esa respuesta y esa reserva; un nuevo “yes” posterior tampoco crea otra cita si existe
++una activa. Cambiar el interés no modifica la propiedad reservada. Reprogramar y cancelar no se
++ejecutan mediante esta ruta de primera reserva: conservan G y H.
++
++Los avisos usan `NotificationOutbox`, con deduplicación por Meeting y destinatario. El Sales de
++ese aviso es el de la reserva, aunque el lead se reasigne antes de procesar el outbox. Son avisos
++del panel existente; esta entrega no afirma haber enviado un correo separado de confirmación.
++
++Calendar se ejecuta después del commit y tiene ID de evento determinista por Meeting. El worker
++existente revisa los recibos pendientes; un fallo no borra la reserva. Los intentos fallidos se
++reintentan con backoff, hasta cinco llamadas por operación antes de dejar `review`. Sin conexión,
++queda `waiting_connection` con revisión a los diez minutos. Un cambio de fecha/hora, especialista, duración o dirección de la reserva deja
++la operación en revisión en lugar de sincronizar datos distintos a los confirmados. No se crea
++un nuevo Meeting al recuperar un fallo externo. Los eventos simulados no llaman al proveedor.
++La política de cohortes/interruptores sigue limitando los reintentos automáticos.
++
++## Paso 12 — Conversación abierta y cadencia separada
++
++Reservar deja `conversation.is_paused=False`; `cadence_status=stopped` con motivo `booked`
++detiene los seguimientos comerciales. Una despedida detiene la cadencia con motivo `farewell`,
++sin dar de baja al lead, cancelar visitas ni impedir consultas nuevas. Un saludo al regresar
++puede recibir una bienvenida. Las consultas posteriores usan el lector de citas existente y
++sus snapshots, sin reinterpretar el interés actual como una reserva distinta.
++
++El control se aplica al ingreso de webhooks, al coordinador y a los trabajos de seguimiento.
++La pausa histórica exacta `Appointment confirmed` se puede recuperar en la cohorte autorizada
++cuando hay una reserva del ámbito y no hay baja ni intervención humana abierta. Las pausas
++manuales, de seguridad, legales o de intervención no se levantan por este mecanismo. La
++recuperación registra un evento; no cambia la cita ni completa asociaciones históricas desconocidas.
++
++Una negativa breve al resumen declina la propuesta; una negativa breve a la pregunta posterior
++a la confirmación responde a esa pregunta. Se protege esa interpretación incluso ante una
++etiqueta errónea del modelo que intente convertir “No” en baja o reserva. Los controles explícitos
++de consentimiento y las palabras de opt-out del canal conservan su prioridad. Una despedida no
++los sustituye ni elimina restricciones previas.
++
++Una confirmación combinada con una solicitud de material conserva los datos de la reserva y
++una sola pregunta útil. Si el material relacionado necesita aceptación, se retira la pregunta
++opcional de cierre de la cita, no la confirmación verdadera. No se afirma que una reserva ya
++guardada siga pendiente.
++
++## Verificación, aplicación y límites
++
++```bash
++cd backend
++BP_PYTHON=python bash tools/sales_ai/offline.sh group-f
++BP_PYTHON=python bash tools/sales_ai/offline.sh baseline
++BP_PYTHON=python bash tools/sales_ai/offline.sh replay /tmp/group-f-replay.json
++```
++
++El wrapper offline deja vacía la URL PostgreSQL intencionalmente. Los tests
++`tests/test_sales_booking_postgres.py` se pueden ejecutar directamente en un entorno de pruebas
++con `DIALOGUE_POSTGRES_TEST_URL` explícita. Rechazan bases cuyo nombre no termine en `_test` y
++crean/eliminan solo un esquema aleatorio propio. No se ejecutaron contra producción.
++
++Se prueban coordinador, persistencia, ingreso y despachador reales, con modelo/proveedores
++simulados: reserva en dos pasos, reintento, postreserva, cambio de interés, despedida/regreso,
++“No” contextual, negativas, referencias, preferencias, zonas, duración, varias ubicaciones,
++materiales mixtos, conflictos, notificaciones, fallos/recuperación de Calendar y migración SQLite.
++Se genera también el DDL de la migración para PostgreSQL. Los seis proyectos exportados se usan
++para solicitudes de visita y aislamiento en ambos canales, sin inventar disponibilidad faltante;
++esto no equivale a completar una reserva real en cada proyecto.
++
++Antes de arrancar API/worker con este código se requiere `alembic upgrade head`. Aplicar archivos
++sin migrar no acredita un despliegue válido. Se mantienen apagados por defecto los interruptores
++de la cohorte nueva; no se cambia configuración de producción, frontend ni modelo. El simulador
++anterior no representa esta ruta.
++
++Para revertir código tras haber activado F, detener primero la automatización de la cohorte y
++revisar turnos preparados/efectos pendientes. Conservar la tabla, los Meetings, eventos y snapshots;
++no ejecutar un downgrade que borre recibos pendientes como procedimiento de rollback operativo.
++El esquema JSON nuevo necesita un lector compatible; no exponer esos estados a una imagen antigua
++con contrato estricto sin una estrategia de compatibilidad. Reconciliar Calendar y avisos antes
++de reactivar otra versión. Desactivar automatización no cancela las citas guardadas.
++
++No se ejecutaron modelo real, Calendar/mensajería real ni aceptación completa T01–T26. La calidad
++comercial, las carreras reales de PostgreSQL y las pruebas con canales autorizados mantienen sus
++niveles pendientes. Docker no está instalado: la disposición de Actions se verifica por copias
++físicas aisladas, sin afirmar una construcción de imagen, workflow remoto o despliegue.
+diff --git a/docs/sales-ai/implementation-state.json b/docs/sales-ai/implementation-state.json
+index ca5ba92..7d47bf5 100644
+--- a/docs/sales-ai/implementation-state.json
++++ b/docs/sales-ai/implementation-state.json
+@@ -1,8 +1,8 @@
+ {
+   "version": "sales-ai-implementation-state/1.0",
+-  "base_commit": "da712a341e5e351f0f5d0c475d732e31101ea607",
+-  "branch": "sales-ai/group-e-response-materials",
+-  "current_group": "E",
++  "base_commit": "f92e8046cf09c253da78b9636c311c7dfed62988",
++  "branch": "sales-ai/group-f-booking-continuity",
++  "current_group": "F",
+   "completed_steps": [
+     1,
+     2,
+@@ -13,20 +13,21 @@
+     7,
+     8,
+     9,
+-    10
+-  ],
+-  "next_group": "F",
+-  "next_steps": [
++    10,
+     11,
+     12
+   ],
++  "next_group": "G",
++  "next_steps": [
++    13
++  ],
+   "groups": {
+     "A": "implemented_and_verified",
+     "B": "implemented_and_verified",
+     "C": "implemented_and_verified",
+     "D": "implemented_and_verified",
+     "E": "implemented_and_verified",
+-    "F": "pending",
++    "F": "implemented_and_verified",
+     "G": "pending",
+     "H": "pending",
+     "I": "pending",
+@@ -37,12 +38,13 @@
+   "production_changes": false,
+   "deployment_performed": false,
+   "migrations": [
+-    "20261108_sales_visit_context"
++    "20261108_sales_visit_context",
++    "20261108_sales_booking_ops"
+   ],
+   "model_quality_evaluated": false,
+   "live_channel_acceptance": "not_run",
+   "acceptance_matrix": "backend/tests/fixtures/sales_ai/acceptance_matrix.json",
+-  "verification_report": "docs/sales-ai/group-e-report.json",
++  "verification_report": "docs/sales-ai/group-f-report.json",
+   "replay_report": "docs/sales-ai/group-b-baseline-replay.json",
+   "continuity": "Continue from this accumulated delivery, reconcile a newer main, and implement only the next explicitly requested group.",
+   "maintenance": [
+@@ -61,8 +63,10 @@
+     "docs/sales-ai/group-a-preflight-fix-report.json",
+     "docs/sales-ai/group-b-report.json",
+     "docs/sales-ai/group-c-report.json",
+-    "docs/sales-ai/group-d-report.json"
++    "docs/sales-ai/group-d-report.json",
++    "docs/sales-ai/group-e-report.json"
+   ],
+   "production_migration_applied": false,
+-  "commercial_composition": "evidence_bound_llm_selection_with_backend_wordings"
++  "commercial_composition": "evidence_bound_llm_selection_with_backend_wordings",
++  "booking_engine": "sales-first-booking/1.0"
+ }

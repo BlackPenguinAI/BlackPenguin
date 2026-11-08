@@ -280,6 +280,8 @@ def test_agenda_can_be_interrupted_by_plans_and_resumed_before_explicit_slot_con
     assert not agent.db.query(Meeting).count()
     text='3:00 PM'
     agent.turn(text,typed(text,[req('slot','appointment',text,ref='slot')],[ref('slot','appointment',text)]))
+    assert not agent.db.query(Meeting).count()
+    agent.turn('Yes',understanding('Yes','other'))
     assert agent.db.query(Meeting).one().meeting_time==starts
 
 

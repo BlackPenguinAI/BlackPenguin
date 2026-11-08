@@ -377,6 +377,8 @@ def test_actual_booking_binds_original_offer_not_later_interest(agent):
     save(agent.db,agent.scope,event_key='later-interest',expected_revision=revision,state=state);agent.db.commit()
     text='3:00 PM'
     _,run=agent.turn(text,understanding(text,'appointment',references=[dict(kind='appointment',expression=text,evidence=text)]))
+    assert not agent.db.query(Meeting).count()
+    agent.turn('Yes',understanding('Yes','other'))
     booked=agent.db.query(Meeting).one()
     assert booked.visit_property_type_id==a.id and booked.visit_context['property_type_name']=='Studio',run.output_snapshot
     assert booked.visit_address=='100 Main St' and booked.meeting_time==starts
