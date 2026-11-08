@@ -1,0 +1,110 @@
+{
+  "version": "sales-ai-group-a-report/1.0",
+  "date": "2026-11-08",
+  "base_commit": "f7e7f055fd0499f2224b43bad8f9128db2eaf434",
+  "main_reverified_at_close": "f7e7f055fd0499f2224b43bad8f9128db2eaf434",
+  "steps": [
+    1,
+    2
+  ],
+  "status": "implemented_and_verified",
+  "environment": {
+    "python": "3.12.14",
+    "pytest": "9.1.1",
+    "SQLAlchemy": "2.0.50",
+    "fastapi": "0.136.3",
+    "pydantic": "2.13.4",
+    "langgraph": "1.2.11",
+    "node": "24.22.1",
+    "vitest": "4.1.9"
+  },
+  "checks": [
+    {
+      "name": "backend_before_group_a",
+      "command": "python -m pytest tests -q",
+      "passed": 1479,
+      "failed": 0,
+      "skipped": 2,
+      "seconds": 78.61,
+      "exit_code": 0
+    },
+    {
+      "name": "backend_with_group_a",
+      "command": "BP_PYTHON=/path/to/venv/bin/python bash tools/sales_ai/offline.sh baseline",
+      "passed": 1516,
+      "failed": 0,
+      "skipped": 2,
+      "seconds": 79.74,
+      "exit_code": 0
+    },
+    {
+      "name": "group_a_focused",
+      "command": "BP_PYTHON=/path/to/venv/bin/python bash tools/sales_ai/offline.sh test",
+      "passed": 37,
+      "failed": 0,
+      "seconds": 3.25,
+      "exit_code": 0
+    },
+    {
+      "name": "frontend_agent_settings_and_review",
+      "command": "node node_modules/vitest/vitest.mjs run --environment jsdom src/app/pages/client/agent/agent.spec.ts src/app/pages/client/agent-settings/agent-settings.spec.ts src/app/pages/client/agent/agent-review-render.spec.ts",
+      "passed": 34,
+      "failed": 0,
+      "files": 3,
+      "seconds": 0.819,
+      "exit_code": 0
+    },
+    {
+      "name": "offline_coordinator_replay",
+      "command": "BP_PYTHON=/path/to/venv/bin/python bash tools/sales_ai/offline.sh replay /tmp/sales-ai-replay.json",
+      "passed_current_safety": 20,
+      "total": 20,
+      "external_actions": 0,
+      "model_quality_evaluated": false,
+      "exit_code": 0
+    },
+    {
+      "name": "alembic_heads",
+      "command": "python -m alembic heads",
+      "head": "20261106_sales_dialogue",
+      "exit_code": 0
+    }
+  ],
+  "baseline_failures": [],
+  "skips": [
+    "Two PostgreSQL dialogue tests require a disposable _test database and DIALOGUE_POSTGRES_TEST_URL."
+  ],
+  "not_executed": [
+    "Real LLM/OpenRouter quality, latency or cost evaluation",
+    "Real SMS/WhatsApp delivery",
+    "Real Google Calendar operations/free-busy",
+    "PostgreSQL concurrency",
+    "Production deployment or migrations",
+    "Frontend production build (no frontend changes)"
+  ],
+  "source_export": {
+    "total_rows": 1268,
+    "tables": 65,
+    "companies": 4,
+    "projects": 6,
+    "leads": 5,
+    "sales_conversations": 4,
+    "sales_messages": 30,
+    "agent_runs": 13,
+    "raw_property_types": 14,
+    "approved_fixture_types": 12,
+    "individual_units": 0,
+    "meetings": 0,
+    "reviewed_historical_cases": 6
+  },
+  "fixture_sha256": {
+    "acceptance_matrix.json": "ac31e3d2ccd2015715b3e3c75cfa9b4902266c24de4b49577d5a5d9bd00804a1",
+    "historical_cases_20261108.json": "81d2257f1e58bbecafa555a684406e7286228a63a219483f19a9d2540a48cecc",
+    "real_catalog_20261108.json": "13d0dade18cc417d48a37408b031091bd0c6920a41baca027069a169889ec0cc",
+    "synthetic_catalog.json": "5b791214f4599a1d2a6af220a416be33f7a1f69bd96fccd994fc031b5af2e0a0"
+  },
+  "target_acceptance": "All T01-T26 remain PENDING_NEW_FLOW. Deterministic safety checks do not measure a real model or commercial persuasion.",
+  "production_code_changed": false,
+  "migrations": [],
+  "next_group": "B: steps 3 and 4"
+}

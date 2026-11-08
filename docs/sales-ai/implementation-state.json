@@ -1,0 +1,38 @@
+{
+  "version": "sales-ai-implementation-state/1.0",
+  "base_commit": "f7e7f055fd0499f2224b43bad8f9128db2eaf434",
+  "branch": "sales-ai/group-a-foundation",
+  "current_group": "A",
+  "completed_steps": [
+    1,
+    2
+  ],
+  "next_group": "B",
+  "next_steps": [
+    3,
+    4
+  ],
+  "groups": {
+    "A": "implemented_and_verified",
+    "B": "pending",
+    "C": "pending",
+    "D": "pending",
+    "E": "pending",
+    "F": "pending",
+    "G": "pending",
+    "H": "pending",
+    "I": "pending",
+    "J": "pending",
+    "K": "pending",
+    "L": "pending"
+  },
+  "production_changes": false,
+  "deployment_performed": false,
+  "migrations": [],
+  "model_quality_evaluated": false,
+  "live_channel_acceptance": "not_run",
+  "acceptance_matrix": "backend/tests/fixtures/sales_ai/acceptance_matrix.json",
+  "verification_report": "docs/sales-ai/group-a-report.json",
+  "replay_report": "docs/sales-ai/group-a-replay.json",
+  "continuity": "Continue from this accumulated delivery, reconcile a newer main, and implement only the next explicitly requested group."
+}

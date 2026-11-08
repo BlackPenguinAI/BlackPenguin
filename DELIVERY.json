@@ -1,0 +1,100 @@
+{
+  "group": "A",
+  "steps": [
+    1,
+    2
+  ],
+  "base_commit": "f7e7f055fd0499f2224b43bad8f9128db2eaf434",
+  "local_delivery_commit": "545cacb75a1959327c65989827541d286d3dcfd2",
+  "branch": "sales-ai/group-a-foundation",
+  "files": [
+    {
+      "path": "backend/tests/fixtures/sales_ai/acceptance_matrix.json",
+      "sha256": "ac31e3d2ccd2015715b3e3c75cfa9b4902266c24de4b49577d5a5d9bd00804a1"
+    },
+    {
+      "path": "backend/tests/fixtures/sales_ai/historical_cases_20261108.json",
+      "sha256": "81d2257f1e58bbecafa555a684406e7286228a63a219483f19a9d2540a48cecc"
+    },
+    {
+      "path": "backend/tests/fixtures/sales_ai/real_catalog_20261108.json",
+      "sha256": "13d0dade18cc417d48a37408b031091bd0c6920a41baca027069a169889ec0cc"
+    },
+    {
+      "path": "backend/tests/fixtures/sales_ai/synthetic_catalog.json",
+      "sha256": "5b791214f4599a1d2a6af220a416be33f7a1f69bd96fccd994fc031b5af2e0a0"
+    },
+    {
+      "path": "backend/tests/sales_ai_support/__init__.py",
+      "sha256": "12e64740ef0c52562b82359efa8d48360d4cf6056e52441c28ed03018d7e29e2"
+    },
+    {
+      "path": "backend/tests/sales_ai_support/adapters.py",
+      "sha256": "6dc331f4eea6c860c5a10475a2cb8b6f56a6788f3682de118474834a3e1c265c"
+    },
+    {
+      "path": "backend/tests/sales_ai_support/clock.py",
+      "sha256": "5033de8cdacb28d7cef0462d872ce33897b04325bf631f56e0971498b05e30dd"
+    },
+    {
+      "path": "backend/tests/sales_ai_support/sandbox.py",
+      "sha256": "de153840bb676c0bc0a28e459a0217340c60c0ebe00d4c67c2800094ce9f1a68"
+    },
+    {
+      "path": "backend/tests/sales_ai_support/trace.py",
+      "sha256": "fcc67c23c13d66bfd0fa306fe9ddfff37dec04e2c8c2b1a772d3d46b69abdf93"
+    },
+    {
+      "path": "backend/tests/test_sales_ai_group_a.py",
+      "sha256": "c0768b3751eafddc6394d2325cc049101c12c311d5866596ae91d9f4f0a7bf1e"
+    },
+    {
+      "path": "backend/tools/__init__.py",
+      "sha256": "3e03ef6ae91debf6376b64df08e7ae54c5f3e53910c726f9ca7411b707be563f"
+    },
+    {
+      "path": "backend/tools/sales_ai/__init__.py",
+      "sha256": "225edbf908b4fd9d163c3ada19eff41f9427cbd50a9913da4aed65e3fd2299cc"
+    },
+    {
+      "path": "backend/tools/sales_ai/build_fixtures.py",
+      "sha256": "6f0e72efa08212b77fa7ff89a8a4c7b77268f7c046ce744745d1fef386982d0c"
+    },
+    {
+      "path": "backend/tools/sales_ai/export_context.py",
+      "sha256": "0eb524ff446729ec4039ca3262e21378a5fc0ff23a65240fe86658a39269f9db"
+    },
+    {
+      "path": "backend/tools/sales_ai/offline.sh",
+      "sha256": "cfd2a30d55ab90a50918fe665dbbe5020c78057c7969ed0c6f9ec5ddfffdf9ec"
+    },
+    {
+      "path": "backend/tools/sales_ai/replay.py",
+      "sha256": "3b388f71486c24391ae1dd21c56b44f699eb1ffd55a0150d7e735a02fe58478f"
+    },
+    {
+      "path": "backend/tools/sales_ai/snapshot.py",
+      "sha256": "fccc95c3198212197470ac55f9a45041d7d021c13a49a8f220fa4a4d6a0d2914"
+    },
+    {
+      "path": "docs/sales-ai/group-a-replay.json",
+      "sha256": "4b4b8d4b0258cb4ee2b6cf741b8c67aa62f187655bb42504f5529ef55c034b38"
+    },
+    {
+      "path": "docs/sales-ai/group-a-report.json",
+      "sha256": "cb30dd6e35616232c5ff7996fec0f8396943ea91f374f5506799638a69c40b7b"
+    },
+    {
+      "path": "docs/sales-ai/group-a.md",
+      "sha256": "4f48dbf564e61646d92d191d8b9b36251b92f01b75f6d85d27962238490174fe"
+    },
+    {
+      "path": "docs/sales-ai/implementation-state.json",
+      "sha256": "a9b0b577cdbf6dc6881836e96fed68855f3dd63e5fc7be99e6518887c6d75426"
+    }
+  ],
+  "migrations": [],
+  "production_code_changed": false,
+  "deployment_performed": false,
+  "next_group": "B: steps 3 and 4"
+}

@@ -1,0 +1,606 @@
+{
+  "version": "sales-ai-catalog/1.0",
+  "mode": "OFFLINE_FIXTURE_ONLY",
+  "origin": "SYNTHETIC",
+  "captured_at": "2026-11-08T13:23:42+00:00",
+  "source_commit": null,
+  "source_snapshot_sha256": null,
+  "projects": [
+    {
+      "origin": "SYNTHETIC",
+      "fixture_key": "SYN_SINGLE",
+      "project": {
+        "id": "cb9b071e-09b6-5eea-8405-acff1cff4936",
+        "company_id": "c0b86ce0-1ebb-5cc9-ac12-7e3f1139eb89",
+        "name": "SYN_SINGLE Development",
+        "address": "100 Example Avenue",
+        "city": "Example City",
+        "country": "US",
+        "timezone": "America/New_York",
+        "is_active": true,
+        "is_demo": false,
+        "onboarding_status": "completed"
+      },
+      "approval": {
+        "profile_id": "3e24d721-dfc3-56c6-8c0a-2d6f5ea95dc7",
+        "source": "published_snapshot",
+        "revision": 1,
+        "profile_updated_at": "2026-11-08T13:23:42+00:00",
+        "draft_revision": 1,
+        "approved_for_sales_at": "2026-11-08T13:23:42+00:00",
+        "sales_authorization_withdrawn": false
+      },
+      "facts": {
+        "project_name": "SYN_SINGLE Development",
+        "short_description": "SYNTHETIC test development.",
+        "exact_address": [
+          {
+            "label": "SYNTHETIC showroom",
+            "address": "100 Example Avenue"
+          },
+          {
+            "label": "SYNTHETIC model home",
+            "address": "200 Example Avenue"
+          }
+        ],
+        "city": "Example City",
+        "country": "US",
+        "timezone": "America/New_York",
+        "amenities": [
+          "SYNTHETIC walking paths",
+          "SYNTHETIC pool"
+        ],
+        "payment_methods": [
+          "SYNTHETIC bank financing"
+        ],
+        "sales_authorization": true,
+        "qualification_rules": "Confirm budget and purchase timeline.",
+        "sales_contacts": [
+          "d49ad028-c755-562b-8b65-ed69da8f4cc0",
+          "3f580fe7-440d-5eaf-b915-e84268935349"
+        ],
+        "appointment_routing": "round_robin"
+      },
+      "field_states": {
+        "project_name": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "short_description": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "exact_address": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "city": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "country": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "timezone": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "amenities": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "payment_methods": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "sales_authorization": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "qualification_rules": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "sales_contacts": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "appointment_routing": {
+          "status": "confirmed",
+          "applicable": true
+        }
+      },
+      "property_types": [
+        {
+          "id": "19dc084a-3e2b-5912-8d90-f4ea64b53377",
+          "project_id": "cb9b071e-09b6-5eea-8405-acff1cff4936",
+          "name": "Maple Studio",
+          "code": "SYN_SINGLE0",
+          "description": "SYNTHETIC property for isolated tests.",
+          "bedrooms": 0,
+          "bathrooms": 1,
+          "area_min": 45,
+          "area_max": 50,
+          "area_unit": "m²",
+          "total_units": 3,
+          "available_units": 2,
+          "starting_price": 100000,
+          "maximum_price": 120000,
+          "currency": "USD",
+          "features": [
+            "SYNTHETIC open layout",
+            "SYNTHETIC covered balcony"
+          ],
+          "inventory_updated_at": "2026-11-07T12:00:00+00:00",
+          "images_status": "pending",
+          "review_status": "confirmed",
+          "sort_order": 0,
+          "created_at": "2026-11-08T13:23:42+00:00",
+          "updated_at": "2026-11-08T13:23:42+00:00"
+        }
+      ],
+      "units": [],
+      "materials": []
+    },
+    {
+      "origin": "SYNTHETIC",
+      "fixture_key": "SYN_MULTI",
+      "project": {
+        "id": "6ad0ef0b-bf27-571a-a423-cb79a44e8f01",
+        "company_id": "c0b86ce0-1ebb-5cc9-ac12-7e3f1139eb89",
+        "name": "SYN_MULTI Development",
+        "address": "100 Example Avenue",
+        "city": "Example City",
+        "country": "US",
+        "timezone": "America/New_York",
+        "is_active": true,
+        "is_demo": false,
+        "onboarding_status": "completed"
+      },
+      "approval": {
+        "profile_id": "6d24f25c-39f9-5983-9e40-23cba405eff3",
+        "source": "published_snapshot",
+        "revision": 1,
+        "profile_updated_at": "2026-11-08T13:23:42+00:00",
+        "draft_revision": 1,
+        "approved_for_sales_at": "2026-11-08T13:23:42+00:00",
+        "sales_authorization_withdrawn": false
+      },
+      "facts": {
+        "project_name": "SYN_MULTI Development",
+        "short_description": "SYNTHETIC test development.",
+        "exact_address": [
+          {
+            "label": "SYNTHETIC showroom",
+            "address": "100 Example Avenue"
+          },
+          {
+            "label": "SYNTHETIC model home",
+            "address": "200 Example Avenue"
+          }
+        ],
+        "city": "Example City",
+        "country": "US",
+        "timezone": "America/New_York",
+        "amenities": [
+          "SYNTHETIC walking paths",
+          "SYNTHETIC pool"
+        ],
+        "payment_methods": [
+          "SYNTHETIC bank financing"
+        ],
+        "sales_authorization": true,
+        "qualification_rules": "Confirm budget and purchase timeline.",
+        "sales_contacts": [
+          "d49ad028-c755-562b-8b65-ed69da8f4cc0",
+          "3f580fe7-440d-5eaf-b915-e84268935349"
+        ],
+        "appointment_routing": "round_robin"
+      },
+      "field_states": {
+        "project_name": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "short_description": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "exact_address": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "city": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "country": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "timezone": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "amenities": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "payment_methods": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "sales_authorization": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "qualification_rules": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "sales_contacts": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "appointment_routing": {
+          "status": "confirmed",
+          "applicable": true
+        }
+      },
+      "property_types": [
+        {
+          "id": "86a32cde-82fb-55e3-a455-17da8a528fc5",
+          "project_id": "6ad0ef0b-bf27-571a-a423-cb79a44e8f01",
+          "name": "Oak Two Bedroom",
+          "code": "SYN_MULTI0",
+          "description": "SYNTHETIC property for isolated tests.",
+          "bedrooms": 2,
+          "bathrooms": 2,
+          "area_min": 90,
+          "area_max": 110,
+          "area_unit": "m²",
+          "total_units": 3,
+          "available_units": 2,
+          "starting_price": 200000,
+          "maximum_price": 250000,
+          "currency": "USD",
+          "features": [
+            "SYNTHETIC open layout",
+            "SYNTHETIC covered balcony"
+          ],
+          "inventory_updated_at": "2026-11-07T12:00:00+00:00",
+          "images_status": "pending",
+          "review_status": "confirmed",
+          "sort_order": 0,
+          "created_at": "2026-11-08T13:23:42+00:00",
+          "updated_at": "2026-11-08T13:23:42+00:00"
+        },
+        {
+          "id": "eb9ab688-1e84-55d4-bef2-4e71442a4084",
+          "project_id": "6ad0ef0b-bf27-571a-a423-cb79a44e8f01",
+          "name": "Pine Three Bedroom",
+          "code": "SYN_MULTI1",
+          "description": "SYNTHETIC property for isolated tests.",
+          "bedrooms": 3,
+          "bathrooms": 3,
+          "area_min": 120,
+          "area_max": 140,
+          "area_unit": "m²",
+          "total_units": 3,
+          "available_units": 2,
+          "starting_price": 300000,
+          "maximum_price": 350000,
+          "currency": "USD",
+          "features": [
+            "SYNTHETIC open layout",
+            "SYNTHETIC covered balcony"
+          ],
+          "inventory_updated_at": "2026-11-07T12:00:00+00:00",
+          "images_status": "pending",
+          "review_status": "confirmed",
+          "sort_order": 1,
+          "created_at": "2026-11-08T13:23:42+00:00",
+          "updated_at": "2026-11-08T13:23:42+00:00"
+        },
+        {
+          "id": "2013c7fc-297e-5575-b6a0-a8e92a2d8cdc",
+          "project_id": "6ad0ef0b-bf27-571a-a423-cb79a44e8f01",
+          "name": "Cedar Four Bedroom",
+          "code": "SYN_MULTI2",
+          "description": "SYNTHETIC property for isolated tests.",
+          "bedrooms": 4,
+          "bathrooms": 4,
+          "area_min": 150,
+          "area_max": 170,
+          "area_unit": "m²",
+          "total_units": 3,
+          "available_units": 2,
+          "starting_price": 400000,
+          "maximum_price": 450000,
+          "currency": "USD",
+          "features": [
+            "SYNTHETIC open layout",
+            "SYNTHETIC covered balcony"
+          ],
+          "inventory_updated_at": "2026-11-07T12:00:00+00:00",
+          "images_status": "pending",
+          "review_status": "confirmed",
+          "sort_order": 2,
+          "created_at": "2026-11-08T13:23:42+00:00",
+          "updated_at": "2026-11-08T13:23:42+00:00"
+        }
+      ],
+      "units": [],
+      "materials": [
+        {
+          "id": "64dc6b37-b88a-5ed8-a291-f7119ed25dbf",
+          "company_id": "c0b86ce0-1ebb-5cc9-ac12-7e3f1139eb89",
+          "project_id": "6ad0ef0b-bf27-571a-a423-cb79a44e8f01",
+          "property_type_id": "86a32cde-82fb-55e3-a455-17da8a528fc5",
+          "source_id": "a1e9215d-671a-50cd-a862-9aad847fce44",
+          "asset_type": "brochure",
+          "content_tags": [
+            "brochure"
+          ],
+          "display_name": "SYNTHETIC brochure",
+          "description": "SYNTHETIC placeholder; not a real approved document.",
+          "approval_status": "approved",
+          "version": 1,
+          "valid_from": null,
+          "valid_until": null,
+          "allowed_channels": [
+            "sms",
+            "whatsapp"
+          ],
+          "approved_at": "2026-11-01T00:00:00+00:00",
+          "created_at": "2026-11-08T13:23:42+00:00",
+          "updated_at": "2026-11-08T13:23:42+00:00",
+          "content_verified": false,
+          "resource_in_sandbox": "SYNTHETIC_PLACEHOLDER_ONLY",
+          "source": {
+            "id": "a1e9215d-671a-50cd-a862-9aad847fce44",
+            "project_id": "6ad0ef0b-bf27-571a-a423-cb79a44e8f01",
+            "kind": "UPLOADED_FILE",
+            "status": "READY",
+            "mime_type": "application/pdf",
+            "size_bytes": null,
+            "is_encrypted": false,
+            "has_stored_file": false,
+            "sharing_intent": "sales"
+          }
+        },
+        {
+          "id": "51bf6434-b018-5dd7-ac1f-ae31695386b3",
+          "company_id": "c0b86ce0-1ebb-5cc9-ac12-7e3f1139eb89",
+          "project_id": "6ad0ef0b-bf27-571a-a423-cb79a44e8f01",
+          "property_type_id": "eb9ab688-1e84-55d4-bef2-4e71442a4084",
+          "source_id": "e0d579c7-130d-557b-bc25-cabb6b25971d",
+          "asset_type": "gallery_image",
+          "content_tags": [
+            "gallery_image"
+          ],
+          "display_name": "SYNTHETIC gallery_image",
+          "description": "SYNTHETIC placeholder; not a real approved document.",
+          "approval_status": "approved",
+          "version": 1,
+          "valid_from": null,
+          "valid_until": null,
+          "allowed_channels": [
+            "sms",
+            "whatsapp"
+          ],
+          "approved_at": "2026-11-01T00:00:00+00:00",
+          "created_at": "2026-11-08T13:23:42+00:00",
+          "updated_at": "2026-11-08T13:23:42+00:00",
+          "content_verified": false,
+          "resource_in_sandbox": "SYNTHETIC_PLACEHOLDER_ONLY",
+          "source": {
+            "id": "e0d579c7-130d-557b-bc25-cabb6b25971d",
+            "project_id": "6ad0ef0b-bf27-571a-a423-cb79a44e8f01",
+            "kind": "UPLOADED_FILE",
+            "status": "READY",
+            "mime_type": "image/jpeg",
+            "size_bytes": null,
+            "is_encrypted": false,
+            "has_stored_file": false,
+            "sharing_intent": "sales"
+          }
+        },
+        {
+          "id": "15d96824-d493-5a61-800b-0050d0bd6ba9",
+          "company_id": "c0b86ce0-1ebb-5cc9-ac12-7e3f1139eb89",
+          "project_id": "6ad0ef0b-bf27-571a-a423-cb79a44e8f01",
+          "property_type_id": "86a32cde-82fb-55e3-a455-17da8a528fc5",
+          "source_id": "09d0c123-0c9a-513b-a8af-90572ef776cf",
+          "asset_type": "floor_plan",
+          "content_tags": [
+            "floor_plan"
+          ],
+          "display_name": "SYNTHETIC floor_plan",
+          "description": "SYNTHETIC placeholder; not a real approved document.",
+          "approval_status": "approved",
+          "version": 1,
+          "valid_from": null,
+          "valid_until": "2026-11-01T00:00:00+00:00",
+          "allowed_channels": [
+            "sms",
+            "whatsapp"
+          ],
+          "approved_at": "2026-11-01T00:00:00+00:00",
+          "created_at": "2026-11-08T13:23:42+00:00",
+          "updated_at": "2026-11-08T13:23:42+00:00",
+          "content_verified": false,
+          "resource_in_sandbox": "SYNTHETIC_PLACEHOLDER_ONLY",
+          "source": {
+            "id": "09d0c123-0c9a-513b-a8af-90572ef776cf",
+            "project_id": "6ad0ef0b-bf27-571a-a423-cb79a44e8f01",
+            "kind": "UPLOADED_FILE",
+            "status": "READY",
+            "mime_type": "application/pdf",
+            "size_bytes": null,
+            "is_encrypted": false,
+            "has_stored_file": false,
+            "sharing_intent": "sales"
+          }
+        }
+      ]
+    }
+  ],
+  "specialists": [
+    {
+      "id": "d49ad028-c755-562b-8b65-ed69da8f4cc0",
+      "company_id": "c0b86ce0-1ebb-5cc9-ac12-7e3f1139eb89",
+      "role": "SALES",
+      "auth_status": "ACTIVE",
+      "is_active": true,
+      "timezone": "America/New_York",
+      "deleted_at": null
+    },
+    {
+      "id": "3f580fe7-440d-5eaf-b915-e84268935349",
+      "company_id": "c0b86ce0-1ebb-5cc9-ac12-7e3f1139eb89",
+      "role": "SALES",
+      "auth_status": "ACTIVE",
+      "is_active": true,
+      "timezone": "America/Los_Angeles",
+      "deleted_at": null
+    }
+  ],
+  "assignments": [
+    {
+      "id": "c9108c4a-edff-588c-bdea-cd424ba1cc38",
+      "project_id": "cb9b071e-09b6-5eea-8405-acff1cff4936",
+      "user_id": "d49ad028-c755-562b-8b65-ed69da8f4cc0",
+      "responsibility": "sales",
+      "sales_enabled": true,
+      "marketing_enabled": false,
+      "accepts_appointments": true,
+      "is_primary": false,
+      "routing_weight": 100,
+      "accepts_new_leads": true,
+      "is_active": true,
+      "created_at": "2026-11-08T13:23:42+00:00",
+      "updated_at": "2026-11-08T13:23:42+00:00"
+    },
+    {
+      "id": "c5625100-dc33-5bf8-b874-511463bf2bdd",
+      "project_id": "cb9b071e-09b6-5eea-8405-acff1cff4936",
+      "user_id": "3f580fe7-440d-5eaf-b915-e84268935349",
+      "responsibility": "sales",
+      "sales_enabled": true,
+      "marketing_enabled": false,
+      "accepts_appointments": true,
+      "is_primary": false,
+      "routing_weight": 100,
+      "accepts_new_leads": true,
+      "is_active": true,
+      "created_at": "2026-11-08T13:23:42+00:00",
+      "updated_at": "2026-11-08T13:23:42+00:00"
+    },
+    {
+      "id": "039e4e38-175c-5494-8e69-df642c0e0d31",
+      "project_id": "6ad0ef0b-bf27-571a-a423-cb79a44e8f01",
+      "user_id": "d49ad028-c755-562b-8b65-ed69da8f4cc0",
+      "responsibility": "sales",
+      "sales_enabled": true,
+      "marketing_enabled": false,
+      "accepts_appointments": true,
+      "is_primary": false,
+      "routing_weight": 100,
+      "accepts_new_leads": true,
+      "is_active": true,
+      "created_at": "2026-11-08T13:23:42+00:00",
+      "updated_at": "2026-11-08T13:23:42+00:00"
+    },
+    {
+      "id": "0bac3e13-8f68-5425-9a80-91a9408931a1",
+      "project_id": "6ad0ef0b-bf27-571a-a423-cb79a44e8f01",
+      "user_id": "3f580fe7-440d-5eaf-b915-e84268935349",
+      "responsibility": "sales",
+      "sales_enabled": true,
+      "marketing_enabled": false,
+      "accepts_appointments": true,
+      "is_primary": false,
+      "routing_weight": 100,
+      "accepts_new_leads": true,
+      "is_active": true,
+      "created_at": "2026-11-08T13:23:42+00:00",
+      "updated_at": "2026-11-08T13:23:42+00:00"
+    }
+  ],
+  "weekly_availability": [],
+  "dated_availability": [
+    {
+      "id": "f4fc6408-dace-5bc8-814a-8b6579626e37",
+      "user_id": "d49ad028-c755-562b-8b65-ed69da8f4cc0",
+      "starts_at": "2026-11-09T14:00:00+00:00",
+      "ends_at": "2026-11-09T19:00:00+00:00",
+      "timezone": "America/New_York"
+    },
+    {
+      "id": "211e5592-76d2-5e95-b988-7906ad53eb34",
+      "user_id": "3f580fe7-440d-5eaf-b915-e84268935349",
+      "starts_at": "2026-11-09T14:00:00+00:00",
+      "ends_at": "2026-11-09T19:00:00+00:00",
+      "timezone": "America/Los_Angeles"
+    }
+  ],
+  "missing": [],
+  "synthetic_meta_answers": {
+    "questions": [
+      {
+        "key": "budget",
+        "label": "What is your budget?",
+        "answer": "USD 200000-300000"
+      },
+      {
+        "key": "purchase_timeline",
+        "label": "When would you like to buy?",
+        "answer": "Within three months"
+      },
+      {
+        "key": "buyer_type",
+        "label": "How will you use the home?",
+        "answer": "Primary residence"
+      }
+    ],
+    "profile_facts": {
+      "budget": {
+        "value": "USD 200000-300000",
+        "source": "SYNTHETIC_META"
+      },
+      "purchase_timeline": {
+        "value": "Within three months",
+        "source": "SYNTHETIC_META"
+      }
+    }
+  },
+  "synthetic_appointment_variants": [
+    {
+      "origin": "SYNTHETIC",
+      "key": "active",
+      "status": "scheduled",
+      "time": "2026-11-09T15:00:00+00:00"
+    },
+    {
+      "origin": "SYNTHETIC",
+      "key": "past",
+      "status": "completed",
+      "time": "2026-11-01T15:00:00+00:00"
+    },
+    {
+      "origin": "SYNTHETIC",
+      "key": "cancelled",
+      "status": "cancelled",
+      "time": "2026-11-09T15:00:00+00:00"
+    }
+  ],
+  "synthetic_external_busy": [
+    {
+      "user_id": "d49ad028-c755-562b-8b65-ed69da8f4cc0",
+      "start": "2026-11-09T15:00:00+00:00",
+      "end": "2026-11-09T15:45:00+00:00"
+    }
+  ]
+}

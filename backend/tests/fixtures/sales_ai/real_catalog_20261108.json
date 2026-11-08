@@ -1,0 +1,3823 @@
+{
+  "version": "sales-ai-catalog/1.0",
+  "mode": "OFFLINE_FIXTURE_ONLY",
+  "captured_at": "2026-11-08T13:23:41.237176+00:00",
+  "source_commit": "f7e7f055fd0499f2224b43bad8f9128db2eaf434",
+  "source_snapshot_sha256": "beb433237eb32e042dfb3e0330464bca31c1b3b08f773a8e087c487d1fdd3f9b",
+  "projects": [
+    {
+      "origin": "REAL_APPROVED",
+      "project": {
+        "id": "49c3922c-2536-45e9-b3f6-064d817fde67",
+        "company_id": "a73df3b4-95fa-4ed4-bb2c-bfe3543dfa4b",
+        "name": "Ashville Park",
+        "address": "2968 Weston LoopVirginia Beach, VA 23456",
+        "city": "Virginia Beach, Virginia",
+        "country": "US",
+        "timezone": "America/New_York",
+        "is_active": true,
+        "is_demo": false,
+        "onboarding_status": "completed"
+      },
+      "approval": {
+        "profile_id": "bca8fb2c-1a5b-4f84-83eb-3d676dc5d1f6",
+        "source": "published_snapshot",
+        "revision": 27,
+        "profile_updated_at": "2026-11-07T09:14:12.190951+00:00",
+        "draft_revision": 27,
+        "approved_for_sales_at": "2026-11-07T09:14:12.177092+00:00",
+        "sales_authorization_withdrawn": false
+      },
+      "facts": {
+        "project_name": "Ashville Park",
+        "project_type": "Master-planned residential community",
+        "project_status": "New home community",
+        "city": "Virginia Beach, Virginia",
+        "short_description": "A Virginia Beach residential community with a natural landscape, lakes, preserved forest, and resident amenities.",
+        "location_references": "Close to sandy beaches, the Virginia Beach boardwalk, shopping, and 30 acres of preserved forests.",
+        "amenities": [
+          "The Lake House clubhouse",
+          "Fitness center",
+          "Entertainment lounge and event space with a kitchen",
+          "Saltwater pool with cabanas",
+          "Walking paths",
+          "Community lakes",
+          "Playgrounds",
+          "Dog park",
+          "Basketball court",
+          "Adventure park"
+        ],
+        "key_differentiators": "30 acres of preserved forests, a network of 15 lakes, and resident-exclusive access to the Lake House clubhouse.",
+        "value_proposition": "Upscale living in a natural setting with community amenities and opportunities to personalize a new-construction home.",
+        "exact_address": "2968 Weston LoopVirginia Beach, VA 23456",
+        "country": "US",
+        "timezone": "America/New_York",
+        "typologies": [
+          "4-bedroom single-family home"
+        ],
+        "available_inventory": 1,
+        "starting_price": 1394900.0,
+        "currency": "USD",
+        "areas": [
+          {
+            "type": "4-bedroom single-family home",
+            "min": 3734.0,
+            "max": 3734.0,
+            "unit": "m²"
+          }
+        ],
+        "bedrooms_and_bathrooms": [
+          {
+            "type": "4-bedroom single-family home",
+            "bedrooms": 4,
+            "bathrooms": 3.5
+          }
+        ],
+        "payment_methods": [
+          "Cash",
+          "Developer financing",
+          "Reservation deposit"
+        ],
+        "delivery_dates": "Dec 2026",
+        "sales_authorization": true,
+        "target_audience": "Buyers seeking a master-planned residential community in Virginia Beach, Virginia, with practical layouts, a defined purchase timeline, and readiness to evaluate available inventory.",
+        "qualification_rules": "Confirm budget range, purchase timeline, financing status, preferred unit type, and readiness to schedule a visit.",
+        "sales_contacts": [
+          "81034205-3bab-4b7c-ad08-d3b18787dc8a"
+        ],
+        "appointment_routing": "round_robin",
+        "phases_and_towers": "Multiple phases",
+        "compliance_notes": [
+          "Use standard Company compliance; no Project-specific notes"
+        ]
+      },
+      "field_states": {
+        "project_name": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "project_type": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "project_status": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "city": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "short_description": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "location_references": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "amenities": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "key_differentiators": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "value_proposition": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "exact_address": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "country": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "timezone": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "typologies": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "available_inventory": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "starting_price": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "currency": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "areas": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "bedrooms_and_bathrooms": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "payment_methods": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "delivery_dates": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "sales_authorization": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "target_audience": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "qualification_rules": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "sales_contacts": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "appointment_routing": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "phases_and_towers": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "compliance_notes": {
+          "status": "confirmed",
+          "applicable": true
+        }
+      },
+      "fact_provenance": {
+        "project_name": {
+          "approved_revision": 27,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "project_type": {
+          "approved_revision": 27,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "project_status": {
+          "approved_revision": 27,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "city": {
+          "approved_revision": 27,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "short_description": {
+          "approved_revision": 27,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "location_references": {
+          "approved_revision": 27,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "amenities": {
+          "approved_revision": 27,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "key_differentiators": {
+          "approved_revision": 27,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "value_proposition": {
+          "approved_revision": 27,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "exact_address": {
+          "approved_revision": 27,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "country": {
+          "approved_revision": 27,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "timezone": {
+          "approved_revision": 27,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "typologies": {
+          "approved_revision": 27,
+          "source": null
+        },
+        "available_inventory": {
+          "approved_revision": 27,
+          "source": null
+        },
+        "starting_price": {
+          "approved_revision": 27,
+          "source": null
+        },
+        "currency": {
+          "approved_revision": 27,
+          "source": null
+        },
+        "areas": {
+          "approved_revision": 27,
+          "source": null
+        },
+        "bedrooms_and_bathrooms": {
+          "approved_revision": 27,
+          "source": null
+        },
+        "payment_methods": {
+          "approved_revision": 27,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "delivery_dates": {
+          "approved_revision": 27,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "sales_authorization": {
+          "approved_revision": 27,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "target_audience": {
+          "approved_revision": 27,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "qualification_rules": {
+          "approved_revision": 27,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "sales_contacts": {
+          "approved_revision": 27,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "appointment_routing": {
+          "approved_revision": 27,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "phases_and_towers": {
+          "approved_revision": 27,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "compliance_notes": {
+          "approved_revision": 27,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        }
+      },
+      "property_types": [
+        {
+          "id": "65b11a02-739f-42d6-8bbe-473c9b64c8a1",
+          "project_id": "49c3922c-2536-45e9-b3f6-064d817fde67",
+          "name": "4-bedroom single-family home",
+          "code": "U001",
+          "description": "Serene landscapes and upscale amenities create an idyllic setting within Virginia Beach that establishes upscale living designed for your dynamic lifestyle. Get ready to experience the grandeur that is life at Ashville Park!",
+          "bedrooms": 4,
+          "bathrooms": 3.5,
+          "area_min": 3734.0,
+          "area_max": 3734.0,
+          "area_unit": "m²",
+          "total_units": 114,
+          "available_units": 1,
+          "starting_price": 1394900.0,
+          "maximum_price": null,
+          "currency": "USD",
+          "features": [
+            "The Lake House, Ashville's stunning Clubhouse, features a fitness center and a bustling entertainment lounge perfect for gatherings and social events.",
+            "A spacious saltwater pool is complete with cabanas that offer a relaxing escape just steps from home.",
+            "Treelined walking paths accompanied by a network of fifteen lakes make for an ideal, peaceful stroll or morning jog.",
+            "Playgrounds are thoughtfully designed for children of all ages to play and enjoy an outdoor adventure.",
+            "Ample open spaces and dog parks allow you to bring your furry friend to accompany you on your outdoor adventures."
+          ],
+          "inventory_updated_at": "2026-11-07T09:12:20.210644",
+          "images_status": "provided",
+          "review_status": "confirmed",
+          "sort_order": 0,
+          "created_at": "2026-11-07T07:30:36.547724",
+          "updated_at": "2026-11-07T09:12:20.215062"
+        }
+      ],
+      "units": [],
+      "materials": []
+    },
+    {
+      "origin": "REAL_APPROVED",
+      "project": {
+        "id": "68fbcef9-89e3-4a0a-bbf0-72bdab4a5e32",
+        "company_id": "c9099547-17be-43b1-a554-5acc5e82ed5c",
+        "name": "Coahuila 34",
+        "address": "Coahuila #34, Col. Roma Norte, Alc. Cuauhtémoc",
+        "city": "Colonia Roma Norte, Cuauhtémoc, Ciudad de México",
+        "country": "US",
+        "timezone": "UTC",
+        "is_active": true,
+        "is_demo": false,
+        "onboarding_status": "completed"
+      },
+      "approval": {
+        "profile_id": "481b8da1-19b4-4147-add6-5258537f831d",
+        "source": "legacy_final_approved",
+        "revision": null,
+        "profile_updated_at": "2026-10-20T00:30:01.091431+00:00",
+        "draft_revision": 0,
+        "approved_for_sales_at": "2026-10-19T23:47:13.003989+00:00",
+        "sales_authorization_withdrawn": false
+      },
+      "facts": {
+        "project_name": "Coahuila 34",
+        "project_type": "Residential apartment development",
+        "exact_address": "Coahuila #34, Col. Roma Norte, Alc. Cuauhtémoc",
+        "city": "Colonia Roma Norte, Cuauhtémoc, Ciudad de México",
+        "country": "US",
+        "location_references": "Near restaurants, exclusive shops, cultural centers, shopping centers, schools, recreational parks, and offices.",
+        "amenities": [
+          "Elevator",
+          "24/7 security",
+          "Package area",
+          "Bike parking",
+          "Pet-friendly",
+          "Common roof garden",
+          "Heated swimming pool",
+          "Gym"
+        ],
+        "parking_and_storage": "Parking applies to some apartments.",
+        "project_status": "Ready for occupancy",
+        "short_description": "Apartment development in Colonia Roma Norte with multiple apartment designs and sizes, near restaurants, shopping, cultural centers, parks, schools, offices, and other city amenities.",
+        "typologies": [
+          "Garden House 107"
+        ],
+        "available_inventory": 6,
+        "starting_price": 1250000.0,
+        "currency": "MXN",
+        "areas": [
+          {
+            "type": "Garden House 107",
+            "min": 93.65,
+            "max": 93.65,
+            "unit": "m²"
+          }
+        ],
+        "bedrooms_and_bathrooms": [
+          {
+            "type": "Garden House 107",
+            "bedrooms": 2,
+            "bathrooms": 2.0
+          }
+        ],
+        "payment_methods": [
+          "Bank financing"
+        ],
+        "delivery_dates": "2026",
+        "sales_authorization": true,
+        "target_audience": "Buyers seeking a residential apartment development in Colonia Roma Norte, Cuauhtémoc, Ciudad de México, with practical layouts, a defined purchase timeline, and readiness to evaluate available inventory.",
+        "value_proposition": "A residential apartment development in Colonia Roma Norte, Cuauhtémoc, Ciudad de México that combines thoughtful design, Elevator, 24/7 security, and dependable long-term value.",
+        "key_differentiators": "Strategic positioning in Colonia Roma Norte, Cuauhtémoc, Ciudad de México, Elevator, 24/7 security, efficient spaces, and a customer-focused purchase experience.",
+        "qualification_rules": "Confirm budget range, purchase timeline, financing status, preferred unit type, and readiness to schedule a visit.",
+        "sales_contacts": [
+          "32255a36-d58e-4e32-9941-82c652d5aaa3"
+        ],
+        "appointment_routing": "round_robin",
+        "phases_and_towers": "Single phase — no towers",
+        "compliance_notes": [
+          "Use standard Company compliance",
+          "no Project-specific notes"
+        ]
+      },
+      "field_states": {
+        "project_name": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "project_type": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "exact_address": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "city": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "country": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "location_references": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "amenities": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "parking_and_storage": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "project_status": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "short_description": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "typologies": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "available_inventory": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "starting_price": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "currency": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "areas": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "bedrooms_and_bathrooms": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "payment_methods": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "delivery_dates": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "sales_authorization": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "target_audience": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "value_proposition": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "key_differentiators": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "qualification_rules": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "sales_contacts": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "appointment_routing": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "phases_and_towers": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "compliance_notes": {
+          "status": "confirmed",
+          "applicable": true
+        }
+      },
+      "fact_provenance": {
+        "project_name": {
+          "approved_revision": null,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "project_type": {
+          "approved_revision": null,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "exact_address": {
+          "approved_revision": null,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "city": {
+          "approved_revision": null,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "country": {
+          "approved_revision": null,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "location_references": {
+          "approved_revision": null,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "amenities": {
+          "approved_revision": null,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "parking_and_storage": {
+          "approved_revision": null,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "project_status": {
+          "approved_revision": null,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "short_description": {
+          "approved_revision": null,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "typologies": {
+          "approved_revision": null,
+          "source": null
+        },
+        "available_inventory": {
+          "approved_revision": null,
+          "source": null
+        },
+        "starting_price": {
+          "approved_revision": null,
+          "source": null
+        },
+        "currency": {
+          "approved_revision": null,
+          "source": null
+        },
+        "areas": {
+          "approved_revision": null,
+          "source": null
+        },
+        "bedrooms_and_bathrooms": {
+          "approved_revision": null,
+          "source": null
+        },
+        "payment_methods": {
+          "approved_revision": null,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "delivery_dates": {
+          "approved_revision": null,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "sales_authorization": {
+          "approved_revision": null,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "target_audience": {
+          "approved_revision": null,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "value_proposition": {
+          "approved_revision": null,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "key_differentiators": {
+          "approved_revision": null,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "qualification_rules": {
+          "approved_revision": null,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "sales_contacts": {
+          "approved_revision": null,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "appointment_routing": {
+          "approved_revision": null,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "phases_and_towers": {
+          "approved_revision": null,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "compliance_notes": {
+          "approved_revision": null,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        }
+      },
+      "property_types": [
+        {
+          "id": "450869b6-470e-441b-873a-52eab9f0f8d0",
+          "project_id": "68fbcef9-89e3-4a0a-bbf0-72bdab4a5e32",
+          "name": "Garden House 107",
+          "code": "GH01",
+          "description": null,
+          "bedrooms": 2,
+          "bathrooms": 2.0,
+          "area_min": "93.65",
+          "area_max": "93.65",
+          "area_unit": "m²",
+          "total_units": 50,
+          "available_units": 6,
+          "starting_price": "1250000.00",
+          "maximum_price": "1250000.00",
+          "currency": "MXN",
+          "features": [
+            "70.75 m² interior area",
+            "23.90 m² terrace",
+            "Level 1"
+          ],
+          "inventory_updated_at": "2026-10-01T12:00:00+00:00",
+          "images_status": "pending",
+          "review_status": "confirmed",
+          "sort_order": 0,
+          "created_at": "2026-10-19T23:43:35.362107+00:00",
+          "updated_at": "2026-10-19T23:44:29.999858+00:00"
+        }
+      ],
+      "units": [],
+      "materials": []
+    },
+    {
+      "origin": "REAL_APPROVED",
+      "project": {
+        "id": "984c4c66-8910-438e-8c71-11706b4195e9",
+        "company_id": "4fa8155a-cdc1-4fca-bdea-8f78af688c11",
+        "name": "Fouquet's Hotel & Residences",
+        "address": "39 NE 39th Street, Miami, FL 33137",
+        "city": "Miami, Florida",
+        "country": "United States",
+        "timezone": "UTC",
+        "is_active": true,
+        "is_demo": false,
+        "onboarding_status": "completed"
+      },
+      "approval": {
+        "profile_id": "393ac8b2-3b8c-494c-b04d-d017311eb770",
+        "source": "legacy_final_approved",
+        "revision": null,
+        "profile_updated_at": "2026-10-30T17:19:18.414132+00:00",
+        "draft_revision": 0,
+        "approved_for_sales_at": "2026-10-30T17:19:18.412278+00:00",
+        "sales_authorization_withdrawn": false
+      },
+      "facts": {
+        "project_name": "Fouquet's Hotel & Residences",
+        "project_type": "Hotel and residences",
+        "short_description": "A residential offering in Miami Design District with one-to-four-bedroom residences and curated amenities and services.",
+        "exact_address": "39 NE 39th Street, Miami, FL 33137",
+        "city": "Miami, Florida",
+        "location_references": [
+          "Miami Design District"
+        ],
+        "construction_details": {
+          "architecture": "David Chipperfield Architects",
+          "interiors": "RDAI",
+          "hospitality": "Fouquet's",
+          "landscape_architecture": "Perry Guillot Inc."
+        },
+        "amenities": [
+          "Rooftop pool",
+          "Fitness center",
+          "Executive lounge",
+          "Curated amenities and services"
+        ],
+        "project_status": "Pre-construction",
+        "country": "United States",
+        "typologies": [
+          "1-bedroom residence",
+          "2-bedroom residence"
+        ],
+        "available_inventory": 6,
+        "starting_price": 30.0,
+        "currency": "USD",
+        "areas": [
+          {
+            "type": "1-bedroom residence",
+            "min": 100.0,
+            "max": 130.0,
+            "unit": "m²"
+          },
+          {
+            "type": "2-bedroom residence",
+            "min": 130.0,
+            "max": 150.0,
+            "unit": "m²"
+          }
+        ],
+        "bedrooms_and_bathrooms": [
+          {
+            "type": "1-bedroom residence",
+            "bedrooms": 1,
+            "bathrooms": 1.0
+          },
+          {
+            "type": "2-bedroom residence",
+            "bedrooms": 2,
+            "bathrooms": 2.0
+          }
+        ],
+        "payment_methods": [
+          "Bank financing"
+        ],
+        "delivery_dates": "Dec. 2027",
+        "sales_authorization": true,
+        "target_audience": "Buyers seeking a hotel and residences in Miami, Florida, with practical layouts, a defined purchase timeline, and readiness to evaluate available inventory.",
+        "value_proposition": "A well-located project that combines thoughtful design, useful amenities, and dependable long-term value.",
+        "key_differentiators": "Strategic location, efficient layouts, and amenities designed around residents' everyday needs.",
+        "qualification_rules": "Qualify the desired property type, available down payment, decision timeline, financing needs, and preferred contact channel.",
+        "phases_and_towers": "Multiple phases",
+        "compliance_notes": [
+          "Contact consent or privacy requirements"
+        ]
+      },
+      "field_states": {
+        "project_name": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "project_type": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "short_description": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "exact_address": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "city": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "location_references": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "construction_details": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "amenities": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "project_status": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "country": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "typologies": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "available_inventory": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "starting_price": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "currency": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "areas": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "bedrooms_and_bathrooms": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "payment_methods": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "delivery_dates": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "sales_authorization": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "target_audience": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "value_proposition": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "key_differentiators": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "qualification_rules": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "phases_and_towers": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "compliance_notes": {
+          "status": "confirmed",
+          "applicable": true
+        }
+      },
+      "fact_provenance": {
+        "project_name": {
+          "approved_revision": null,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "project_type": {
+          "approved_revision": null,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "short_description": {
+          "approved_revision": null,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "exact_address": {
+          "approved_revision": null,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "city": {
+          "approved_revision": null,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "location_references": {
+          "approved_revision": null,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "construction_details": {
+          "approved_revision": null,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "amenities": {
+          "approved_revision": null,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "project_status": {
+          "approved_revision": null,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "country": {
+          "approved_revision": null,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "typologies": {
+          "approved_revision": null,
+          "source": null
+        },
+        "available_inventory": {
+          "approved_revision": null,
+          "source": null
+        },
+        "starting_price": {
+          "approved_revision": null,
+          "source": null
+        },
+        "currency": {
+          "approved_revision": null,
+          "source": null
+        },
+        "areas": {
+          "approved_revision": null,
+          "source": null
+        },
+        "bedrooms_and_bathrooms": {
+          "approved_revision": null,
+          "source": null
+        },
+        "payment_methods": {
+          "approved_revision": null,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "delivery_dates": {
+          "approved_revision": null,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "sales_authorization": {
+          "approved_revision": null,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "target_audience": {
+          "approved_revision": null,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "value_proposition": {
+          "approved_revision": null,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "key_differentiators": {
+          "approved_revision": null,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "qualification_rules": {
+          "approved_revision": null,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "phases_and_towers": {
+          "approved_revision": null,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "compliance_notes": {
+          "approved_revision": null,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        }
+      },
+      "property_types": [
+        {
+          "id": "633bd1b9-9d27-4988-8a51-220562d5212f",
+          "project_id": "984c4c66-8910-438e-8c71-11706b4195e9",
+          "name": "1-bedroom residence",
+          "code": "1",
+          "description": "1bed",
+          "bedrooms": 1,
+          "bathrooms": 1.0,
+          "area_min": "100.00",
+          "area_max": "130.00",
+          "area_unit": "m²",
+          "total_units": 10,
+          "available_units": 3,
+          "starting_price": "30.00",
+          "maximum_price": "40.00",
+          "currency": "USD",
+          "features": [],
+          "inventory_updated_at": "2026-10-26T12:00:00+00:00",
+          "images_status": "pending",
+          "review_status": "confirmed",
+          "sort_order": 0,
+          "created_at": "2026-10-30T16:57:04.418734+00:00",
+          "updated_at": "2026-10-30T16:58:11.063665+00:00"
+        },
+        {
+          "id": "7dbca5b7-3b88-4a48-86b5-e54a931b9125",
+          "project_id": "984c4c66-8910-438e-8c71-11706b4195e9",
+          "name": "2-bedroom residence",
+          "code": "2",
+          "description": "2bed",
+          "bedrooms": 2,
+          "bathrooms": 2.0,
+          "area_min": "130.00",
+          "area_max": "150.00",
+          "area_unit": "m²",
+          "total_units": 3,
+          "available_units": 3,
+          "starting_price": "30.00",
+          "maximum_price": "50.00",
+          "currency": "USD",
+          "features": [],
+          "inventory_updated_at": "2026-10-30T12:00:00+00:00",
+          "images_status": "pending",
+          "review_status": "confirmed",
+          "sort_order": 1,
+          "created_at": "2026-10-30T16:57:04.418747+00:00",
+          "updated_at": "2026-10-30T16:58:42.096432+00:00"
+        }
+      ],
+      "units": [],
+      "materials": [
+        {
+          "id": "a0a3bb2b-035b-4797-ad5c-85830cee1047",
+          "company_id": "4fa8155a-cdc1-4fca-bdea-8f78af688c11",
+          "project_id": "984c4c66-8910-438e-8c71-11706b4195e9",
+          "property_type_id": null,
+          "source_id": "27adad90-0745-4678-a016-354b52c791f9",
+          "asset_type": "location_map",
+          "content_tags": [
+            "location_map"
+          ],
+          "display_name": "Resources from fouquetsmiami.com",
+          "description": "External Project resources detected during onboarding. Review every contained link before approval.",
+          "approval_status": "approved",
+          "version": 1,
+          "valid_from": null,
+          "valid_until": null,
+          "allowed_channels": [
+            "sms",
+            "whatsapp"
+          ],
+          "approved_at": "2026-10-30T17:19:10.495357+00:00",
+          "created_at": "2026-10-30T16:57:04.424927+00:00",
+          "updated_at": "2026-10-30T17:19:10.495855+00:00",
+          "source": {
+            "id": "27adad90-0745-4678-a016-354b52c791f9",
+            "project_id": "984c4c66-8910-438e-8c71-11706b4195e9",
+            "kind": "URL",
+            "status": "READY",
+            "mime_type": "text/html",
+            "size_bytes": 82117,
+            "is_encrypted": false,
+            "has_stored_file": false,
+            "sharing_intent": "internal"
+          },
+          "content_verified": false,
+          "resource_in_sandbox": "SYNTHETIC_PLACEHOLDER_ONLY"
+        }
+      ]
+    },
+    {
+      "origin": "EXPORTED_DEMO",
+      "project": {
+        "id": "a412c99e-3b68-4597-b057-8609996b8a3f",
+        "company_id": "40a3fdb2-6e58-464d-ae8a-1789ff518d04",
+        "name": "East Hills Crossing",
+        "address": "Stoney Trail and 17 Avenue SE, Calgary, Alberta",
+        "city": "Calgary, Alberta",
+        "country": "Canada",
+        "timezone": "UTC",
+        "is_active": true,
+        "is_demo": true,
+        "onboarding_status": "completed"
+      },
+      "approval": {
+        "profile_id": "da41e022-13e9-4ec6-93ce-fd5ef66e683c",
+        "source": "published_snapshot",
+        "revision": 0,
+        "profile_updated_at": "2026-11-08T06:09:11.494219+00:00",
+        "draft_revision": 2,
+        "approved_for_sales_at": "2026-11-08T06:09:10.862184+00:00",
+        "sales_authorization_withdrawn": false
+      },
+      "facts": {
+        "project_name": "East Hills Crossing",
+        "project_type": "Mixed residential community",
+        "project_status": "Pre-sales",
+        "short_description": "Contemporary townhomes and condominiums in Belvedere with convenient access to shopping, transit, parks, and major roads.",
+        "exact_address": "Stoney Trail and 17 Avenue SE, Calgary, Alberta",
+        "city": "Calgary, Alberta",
+        "country": "Canada",
+        "location_references": [
+          "Belvedere",
+          "East Hills Shopping Centre",
+          "Stoney Trail",
+          "Highway 1",
+          "Bus Rapid Transit"
+        ],
+        "phases_and_towers": "Multiple low-rise residential buildings and townhome phases; no tower structure is advertised.",
+        "typologies": [
+          "1 bedroom condo",
+          "2 bedroom condo",
+          "2 bedroom townhome",
+          "3 bedroom townhome",
+          "4 bedroom townhome"
+        ],
+        "areas": "Floorplan-specific areas are available from [User-464df05834] Sales; demo ranges are recorded in the property catalog.",
+        "bedrooms_and_bathrooms": [
+          "Condos: 1-2 bedrooms",
+          "Townhomes: 2-4 bedrooms"
+        ],
+        "construction_details": "Contemporary low-rise condominiums and townhomes with rear-lane or front-drive attached-garage configurations.",
+        "amenities": [
+          "Parks",
+          "Pathways",
+          "Nearby shopping and dining",
+          "Nearby fitness facilities",
+          "Rapid transit access"
+        ],
+        "parking_and_storage": "Townhomes offer rear-lane or front-drive garage configurations; condominium details vary by floorplan.",
+        "currency": "CAD",
+        "starting_price": 329900,
+        "payment_methods": "Demo assumption: reservation deposit and buyer-arranged financing; confirm current terms with [User-464df05834] Sales.",
+        "promotions": "A design-credit or basement-development offer appeared on the official page; eligibility and current terms require Sales confirmation.",
+        "delivery_dates": "Quick-possession condominiums and townhomes may be available; confirm exact dates with [User-464df05834] Sales.",
+        "available_inventory": "Demo inventory is represented by the confirmed property-type catalog below.",
+        "sales_authorization": "Simulation only. Do not send external messages or represent demo inventory as a binding offer.",
+        "target_audience": "Homebuyers seeking contemporary condominiums or townhomes in southeast Calgary with access to shopping, transit, and major road connections.",
+        "value_proposition": "Modern home choices in a walkable community close to East Hills Shopping Centre, rapid transit, parks, and regional road connections.",
+        "key_differentiators": "Freehold townhomes without condo fees, condominium choices, quick possessions, and direct access to southeast Calgary amenities.",
+        "qualification_rules": "Confirm condo or townhome preference, bedroom count, budget range, purchase timeline, financing readiness, and appointment availability.",
+        "sales_contacts": [
+          {
+            "name": "East Hills Crossing Sales Centre",
+            "phone": "[redacted]"
+          }
+        ],
+        "appointment_routing": "Round robin among active Sales users assigned to East Hills Crossing; simulation does not contact external calendars.",
+        "compliance_notes": "Prices, plans, specifications, dimensions, promotions, and availability must be confirmed by [User-464df05834] Sales and may change without notice."
+      },
+      "field_states": {
+        "project_name": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "project_type": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "project_status": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "short_description": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "exact_address": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "city": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "country": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "location_references": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "phases_and_towers": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "typologies": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "areas": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "bedrooms_and_bathrooms": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "construction_details": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "amenities": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "parking_and_storage": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "currency": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "starting_price": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "payment_methods": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "promotions": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "delivery_dates": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "available_inventory": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "sales_authorization": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "target_audience": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "value_proposition": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "key_differentiators": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "qualification_rules": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "sales_contacts": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "appointment_routing": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "compliance_notes": {
+          "status": "confirmed",
+          "applicable": true
+        }
+      },
+      "fact_provenance": {
+        "project_name": {
+          "approved_revision": 0,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "project_type": {
+          "approved_revision": 0,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "project_status": {
+          "approved_revision": 0,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "short_description": {
+          "approved_revision": 0,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "exact_address": {
+          "approved_revision": 0,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "city": {
+          "approved_revision": 0,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "country": {
+          "approved_revision": 0,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "location_references": {
+          "approved_revision": 0,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "phases_and_towers": {
+          "approved_revision": 0,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "typologies": {
+          "approved_revision": 0,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "areas": {
+          "approved_revision": 0,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "bedrooms_and_bathrooms": {
+          "approved_revision": 0,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "construction_details": {
+          "approved_revision": 0,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "amenities": {
+          "approved_revision": 0,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "parking_and_storage": {
+          "approved_revision": 0,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "currency": {
+          "approved_revision": 0,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "starting_price": {
+          "approved_revision": 0,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "payment_methods": {
+          "approved_revision": 0,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "promotions": {
+          "approved_revision": 0,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "delivery_dates": {
+          "approved_revision": 0,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "available_inventory": {
+          "approved_revision": 0,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "sales_authorization": {
+          "approved_revision": 0,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "target_audience": {
+          "approved_revision": 0,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "value_proposition": {
+          "approved_revision": 0,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "key_differentiators": {
+          "approved_revision": 0,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "qualification_rules": {
+          "approved_revision": 0,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "sales_contacts": {
+          "approved_revision": 0,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "appointment_routing": {
+          "approved_revision": 0,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "compliance_notes": {
+          "approved_revision": 0,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        }
+      },
+      "property_types": [
+        {
+          "id": "2e661e51-4bb2-44ee-a356-03babe8ab2cc",
+          "project_id": "a412c99e-3b68-4597-b057-8609996b8a3f",
+          "name": "Condominiums",
+          "code": "EHC-CO",
+          "description": "Contemporary one- and two-bedroom condominiums.",
+          "bedrooms": 1,
+          "bathrooms": 1.0,
+          "area_min": 550.0,
+          "area_max": 1050.0,
+          "area_unit": "ft²",
+          "total_units": 12,
+          "available_units": 5,
+          "starting_price": 329900.0,
+          "maximum_price": 489900.0,
+          "currency": "CAD",
+          "features": [],
+          "inventory_updated_at": "2026-10-28T00:13:30.996923",
+          "images_status": "confirmed",
+          "review_status": "confirmed",
+          "sort_order": 0,
+          "created_at": "2026-10-21T16:28:47.955217",
+          "updated_at": "2026-10-28T00:13:31.612485"
+        },
+        {
+          "id": "e0d32456-7265-4eb5-80e7-5d6c0341ffa9",
+          "project_id": "a412c99e-3b68-4597-b057-8609996b8a3f",
+          "name": "Rear Lane Townhomes",
+          "code": "EHC-RL",
+          "description": "Townhomes with rear-lane garage access and a pedestrian-focused streetscape.",
+          "bedrooms": 3,
+          "bathrooms": 2.5,
+          "area_min": 1350.0,
+          "area_max": 1800.0,
+          "area_unit": "ft²",
+          "total_units": 8,
+          "available_units": 3,
+          "starting_price": 529900.0,
+          "maximum_price": 669900.0,
+          "currency": "CAD",
+          "features": [],
+          "inventory_updated_at": "2026-10-28T00:13:30.996923",
+          "images_status": "confirmed",
+          "review_status": "confirmed",
+          "sort_order": 1,
+          "created_at": "2026-10-21T16:28:47.958659",
+          "updated_at": "2026-10-28T00:13:31.612490"
+        },
+        {
+          "id": "823978cc-ca1d-4567-a484-05bf004b911e",
+          "project_id": "a412c99e-3b68-4597-b057-8609996b8a3f",
+          "name": "Front Drive Townhomes",
+          "code": "EHC-FD",
+          "description": "Townhomes with attached garages accessed from the main street and flexible layouts.",
+          "bedrooms": 3,
+          "bathrooms": 2.5,
+          "area_min": 1500.0,
+          "area_max": 2100.0,
+          "area_unit": "ft²",
+          "total_units": 8,
+          "available_units": 2,
+          "starting_price": 589900.0,
+          "maximum_price": 749900.0,
+          "currency": "CAD",
+          "features": [],
+          "inventory_updated_at": "2026-10-28T00:13:30.996923",
+          "images_status": "confirmed",
+          "review_status": "confirmed",
+          "sort_order": 2,
+          "created_at": "2026-10-21T16:28:47.962388",
+          "updated_at": "2026-10-28T00:13:31.612489"
+        }
+      ],
+      "units": [],
+      "materials": []
+    },
+    {
+      "origin": "EXPORTED_DEMO",
+      "project": {
+        "id": "b68d13fd-532a-4a3c-a722-fc07584cc087",
+        "company_id": "40a3fdb2-6e58-464d-ae8a-1789ff518d04",
+        "name": "Wildflower",
+        "address": "1215 Fowler Road SW, Airdrie, Alberta",
+        "city": "Airdrie, Alberta",
+        "country": "Canada",
+        "timezone": "UTC",
+        "is_active": true,
+        "is_demo": true,
+        "onboarding_status": "completed"
+      },
+      "approval": {
+        "profile_id": "8c120308-585c-4d81-a4a5-b48f5194a728",
+        "source": "published_snapshot",
+        "revision": 0,
+        "profile_updated_at": "2026-11-08T06:09:11.438978+00:00",
+        "draft_revision": 2,
+        "approved_for_sales_at": "2026-11-08T06:09:10.862184+00:00",
+        "sales_authorization_withdrawn": false
+      },
+      "facts": {
+        "project_name": "Wildflower",
+        "project_type": "Mixed residential community",
+        "project_status": "Pre-sales",
+        "short_description": "A master-planned Airdrie community with single-family homes, duplexes, townhomes, and resort-style amenities.",
+        "exact_address": "1215 Fowler Road SW, Airdrie, Alberta",
+        "city": "Airdrie, Alberta",
+        "country": "Canada",
+        "location_references": [
+          "Upper west side of Airdrie",
+          "Wildflower Sales Centre",
+          "Hillside Hub"
+        ],
+        "phases_and_towers": "Multiple low-rise residential phases; no towers.",
+        "typologies": [
+          "Single-family",
+          "Duplex",
+          "Townhouse"
+        ],
+        "areas": {
+          "Single Family Homes": "1,445-2,586 ft²",
+          "Duplex Homes": "approximately 2,000 ft²",
+          "Townhomes": "approximately 1,397 ft²"
+        },
+        "bedrooms_and_bathrooms": [
+          "Duplex: 3 bed / 2.5 bath",
+          "Townhome: 3-4 bedrooms"
+        ],
+        "construction_details": "Low-rise homes in a variety of architectural designs, sizes, and product types.",
+        "amenities": [
+          "Outdoor pool",
+          "Hot tub",
+          "Open-air sports court",
+          "Hillside Hub amenity building"
+        ],
+        "parking_and_storage": "Attached garages for duplex homes and rear-drive garages for townhomes; details vary by floorplan.",
+        "currency": "CAD",
+        "starting_price": 429900,
+        "payment_methods": "Demo assumption: reservation deposit and buyer-arranged financing; confirm current terms with [User-464df05834] Sales.",
+        "promotions": "No promotion is asserted in this demo dataset; confirm current incentives with [User-464df05834] Sales.",
+        "delivery_dates": "Quick-possession homes may be available; exact completion dates must be confirmed with [User-464df05834] Sales.",
+        "available_inventory": "Demo inventory is represented by the confirmed property-type catalog below.",
+        "sales_authorization": "Simulation only. Do not send external messages or represent demo inventory as a binding offer.",
+        "target_audience": "Homebuyers seeking single-family, duplex, or townhome living in Airdrie with community amenities and practical access to Calgary.",
+        "value_proposition": "A variety of new-home formats paired with exclusive resort-style amenities and a connected master-planned community setting.",
+        "key_differentiators": "Three home formats, Hillside Hub access, Airdrie's first outdoor pool, and quick-possession opportunities.",
+        "qualification_rules": "Confirm preferred home type, bedrooms, budget range, purchase timeline, financing readiness, and interest in a presentation-centre appointment.",
+        "sales_contacts": [
+          {
+            "name": "Wildflower Sales Centre",
+            "phone": "[redacted]"
+          }
+        ],
+        "appointment_routing": "Round robin among active Sales users assigned to Wildflower; simulation does not contact external calendars.",
+        "compliance_notes": "Prices, plans, specifications, dimensions, and availability must be confirmed by [User-464df05834] Sales and may change without notice."
+      },
+      "field_states": {
+        "project_name": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "project_type": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "project_status": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "short_description": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "exact_address": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "city": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "country": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "location_references": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "phases_and_towers": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "typologies": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "areas": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "bedrooms_and_bathrooms": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "construction_details": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "amenities": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "parking_and_storage": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "currency": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "starting_price": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "payment_methods": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "promotions": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "delivery_dates": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "available_inventory": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "sales_authorization": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "target_audience": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "value_proposition": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "key_differentiators": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "qualification_rules": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "sales_contacts": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "appointment_routing": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "compliance_notes": {
+          "status": "confirmed",
+          "applicable": true
+        }
+      },
+      "fact_provenance": {
+        "project_name": {
+          "approved_revision": 0,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "project_type": {
+          "approved_revision": 0,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "project_status": {
+          "approved_revision": 0,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "short_description": {
+          "approved_revision": 0,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "exact_address": {
+          "approved_revision": 0,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "city": {
+          "approved_revision": 0,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "country": {
+          "approved_revision": 0,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "location_references": {
+          "approved_revision": 0,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "phases_and_towers": {
+          "approved_revision": 0,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "typologies": {
+          "approved_revision": 0,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "areas": {
+          "approved_revision": 0,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "bedrooms_and_bathrooms": {
+          "approved_revision": 0,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "construction_details": {
+          "approved_revision": 0,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "amenities": {
+          "approved_revision": 0,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "parking_and_storage": {
+          "approved_revision": 0,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "currency": {
+          "approved_revision": 0,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "starting_price": {
+          "approved_revision": 0,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "payment_methods": {
+          "approved_revision": 0,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "promotions": {
+          "approved_revision": 0,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "delivery_dates": {
+          "approved_revision": 0,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "available_inventory": {
+          "approved_revision": 0,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "sales_authorization": {
+          "approved_revision": 0,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "target_audience": {
+          "approved_revision": 0,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "value_proposition": {
+          "approved_revision": 0,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "key_differentiators": {
+          "approved_revision": 0,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "qualification_rules": {
+          "approved_revision": 0,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "sales_contacts": {
+          "approved_revision": 0,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "appointment_routing": {
+          "approved_revision": 0,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "compliance_notes": {
+          "approved_revision": 0,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        }
+      },
+      "property_types": [
+        {
+          "id": "41c838fe-bc8b-4d29-937c-6581de7d4684",
+          "project_id": "b68d13fd-532a-4a3c-a722-fc07584cc087",
+          "name": "Single Family Homes",
+          "code": "WF-SF",
+          "description": "Detached homes on 32- to 38-foot lots.",
+          "bedrooms": 3,
+          "bathrooms": 2.5,
+          "area_min": 1445.0,
+          "area_max": 2586.0,
+          "area_unit": "ft²",
+          "total_units": 8,
+          "available_units": 3,
+          "starting_price": 649900.0,
+          "maximum_price": 899900.0,
+          "currency": "CAD",
+          "features": [],
+          "inventory_updated_at": "2026-10-28T00:13:30.996923",
+          "images_status": "confirmed",
+          "review_status": "confirmed",
+          "sort_order": 0,
+          "created_at": "2026-10-21T16:28:47.880544",
+          "updated_at": "2026-10-28T00:13:31.568061"
+        },
+        {
+          "id": "ce63a107-5a1e-4c5c-84e0-1b86244e8450",
+          "project_id": "b68d13fd-532a-4a3c-a722-fc07584cc087",
+          "name": "Duplex Homes",
+          "code": "WF-DX",
+          "description": "Semi-detached homes with flexible layouts and attached garages.",
+          "bedrooms": 3,
+          "bathrooms": 2.5,
+          "area_min": 1900.0,
+          "area_max": 2100.0,
+          "area_unit": "ft²",
+          "total_units": 6,
+          "available_units": 2,
+          "starting_price": 559900.0,
+          "maximum_price": 689900.0,
+          "currency": "CAD",
+          "features": [],
+          "inventory_updated_at": "2026-10-28T00:13:30.996923",
+          "images_status": "confirmed",
+          "review_status": "confirmed",
+          "sort_order": 1,
+          "created_at": "2026-10-21T16:28:47.886242",
+          "updated_at": "2026-10-28T00:13:31.568063"
+        },
+        {
+          "id": "1b732e82-93be-4bcb-8f54-ffafc831b680",
+          "project_id": "b68d13fd-532a-4a3c-a722-fc07584cc087",
+          "name": "Townhomes",
+          "code": "WF-TH",
+          "description": "Three- to four-bedroom townhomes with rear-drive garages.",
+          "bedrooms": 3,
+          "bathrooms": 2.5,
+          "area_min": 1397.0,
+          "area_max": 1397.0,
+          "area_unit": "ft²",
+          "total_units": 10,
+          "available_units": 4,
+          "starting_price": 429900.0,
+          "maximum_price": 519900.0,
+          "currency": "CAD",
+          "features": [],
+          "inventory_updated_at": "2026-10-28T00:13:30.996923",
+          "images_status": "confirmed",
+          "review_status": "confirmed",
+          "sort_order": 2,
+          "created_at": "2026-10-21T16:28:47.891336",
+          "updated_at": "2026-10-28T00:13:31.568057"
+        }
+      ],
+      "units": [],
+      "materials": []
+    },
+    {
+      "origin": "REAL_APPROVED",
+      "project": {
+        "id": "cf50fe57-7db6-425e-9cc2-d042feb14ea8",
+        "company_id": "4fa8155a-cdc1-4fca-bdea-8f78af688c11",
+        "name": "The Trails",
+        "address": "28827 Cross Pines Drive, New Caney, TX 77357",
+        "city": "New Caney, Texas; Harris County",
+        "country": "US",
+        "timezone": "America/Los_Angeles",
+        "is_active": true,
+        "is_demo": false,
+        "onboarding_status": "completed"
+      },
+      "approval": {
+        "profile_id": "32fac773-9425-4709-9894-5995f4ffaa0e",
+        "source": "published_snapshot",
+        "revision": 31,
+        "profile_updated_at": "2026-11-06T22:27:18.607715+00:00",
+        "draft_revision": 31,
+        "approved_for_sales_at": "2026-11-06T22:27:18.595032+00:00",
+        "sales_authorization_withdrawn": false
+      },
+      "facts": {
+        "project_name": "The Trails",
+        "project_type": "Master-planned residential community",
+        "project_status": "Homes are selling; Phase 2 is underway.",
+        "exact_address": "28827 Cross Pines Drive, New Caney, TX 77357",
+        "city": "New Caney, Texas; Harris County",
+        "location_references": "Harris County; along the Grand Parkway",
+        "phases_and_towers": "Phase 2 is underway.",
+        "construction_details": "The source describes the resort-style pool, lap pool, splash pad, and The Landing Amenity Center as under construction or taking shape. It also describes a future on-site school as proposed.",
+        "amenities": [
+          "Miles of trails",
+          "Amenity center",
+          "Resort-style pool",
+          "Splash pad",
+          "Event lawn"
+        ],
+        "target_audience": "The source describes the community as suited to young families and empty nesters, and also mentions first-time buyers and move-up buyers.",
+        "key_differentiators": "The source emphasizes outdoor access, miles of trails, extensive green space, and access to multiple home builders.",
+        "short_description": "Luxury residences combining contemporary design, premium amenities, and a central urban location.",
+        "country": "US",
+        "timezone": "America/Los_Angeles",
+        "typologies": [
+          "LENNAR HOMES",
+          "COVENTRY HOMES"
+        ],
+        "available_inventory": 25,
+        "starting_price": 198490.0,
+        "currency": "USD",
+        "areas": [
+          {
+            "type": "LENNAR HOMES",
+            "min": 1527.0,
+            "max": null,
+            "unit": "ft²"
+          },
+          {
+            "type": "COVENTRY HOMES",
+            "min": 2399.0,
+            "max": null,
+            "unit": "ft²"
+          }
+        ],
+        "bedrooms_and_bathrooms": [
+          {
+            "type": "LENNAR HOMES",
+            "bedrooms": 3,
+            "bathrooms": 2.0
+          },
+          {
+            "type": "COVENTRY HOMES",
+            "bedrooms": 4,
+            "bathrooms": 3.0
+          }
+        ],
+        "payment_methods": [
+          "Developer financing"
+        ],
+        "delivery_dates": "Febuary 2027",
+        "sales_authorization": true,
+        "value_proposition": "A well-located project that combines thoughtful design, useful amenities, and dependable long-term value.",
+        "qualification_rules": "Prioritize leads whose budget matches available inventory and who are ready to speak with Sales or arrange a viewing.",
+        "sales_contacts": [
+          "de714ed7-756b-4b8c-9c70-465dc5767646",
+          "454db474-ed6a-499f-98d5-3b9e527db1af"
+        ],
+        "appointment_routing": "round_robin",
+        "promotions": "10% off in 2026",
+        "compliance_notes": [
+          "Use standard Company compliance; no Project-specific notes"
+        ]
+      },
+      "field_states": {
+        "project_name": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "project_type": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "project_status": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "exact_address": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "city": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "location_references": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "phases_and_towers": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "construction_details": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "amenities": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "target_audience": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "key_differentiators": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "short_description": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "country": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "timezone": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "typologies": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "available_inventory": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "starting_price": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "currency": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "areas": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "bedrooms_and_bathrooms": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "payment_methods": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "delivery_dates": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "sales_authorization": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "value_proposition": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "qualification_rules": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "sales_contacts": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "appointment_routing": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "promotions": {
+          "status": "confirmed",
+          "applicable": true
+        },
+        "compliance_notes": {
+          "status": "confirmed",
+          "applicable": true
+        }
+      },
+      "fact_provenance": {
+        "project_name": {
+          "approved_revision": 31,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "project_type": {
+          "approved_revision": 31,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "project_status": {
+          "approved_revision": 31,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "exact_address": {
+          "approved_revision": 31,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "city": {
+          "approved_revision": 31,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "location_references": {
+          "approved_revision": 31,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "phases_and_towers": {
+          "approved_revision": 31,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "construction_details": {
+          "approved_revision": 31,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "amenities": {
+          "approved_revision": 31,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "target_audience": {
+          "approved_revision": 31,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "key_differentiators": {
+          "approved_revision": 31,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "short_description": {
+          "approved_revision": 31,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "country": {
+          "approved_revision": 31,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "timezone": {
+          "approved_revision": 31,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "typologies": {
+          "approved_revision": 31,
+          "source": null
+        },
+        "available_inventory": {
+          "approved_revision": 31,
+          "source": null
+        },
+        "starting_price": {
+          "approved_revision": 31,
+          "source": null
+        },
+        "currency": {
+          "approved_revision": 31,
+          "source": null
+        },
+        "areas": {
+          "approved_revision": 31,
+          "source": null
+        },
+        "bedrooms_and_bathrooms": {
+          "approved_revision": 31,
+          "source": null
+        },
+        "payment_methods": {
+          "approved_revision": 31,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "delivery_dates": {
+          "approved_revision": 31,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "sales_authorization": {
+          "approved_revision": 31,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "value_proposition": {
+          "approved_revision": 31,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "qualification_rules": {
+          "approved_revision": 31,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "sales_contacts": {
+          "approved_revision": 31,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "appointment_routing": {
+          "approved_revision": 31,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "promotions": {
+          "approved_revision": 31,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        },
+        "compliance_notes": {
+          "approved_revision": 31,
+          "source": {
+            "source_id": null,
+            "source_ids": null,
+            "kind": null,
+            "source_kind": null,
+            "page": null
+          }
+        }
+      },
+      "property_types": [
+        {
+          "id": "82a960fb-94dc-41bb-9bfb-2853041325f5",
+          "project_id": "cf50fe57-7db6-425e-9cc2-d042feb14ea8",
+          "name": "LENNAR HOMES",
+          "code": null,
+          "description": "Beds: 3\nBaths: 2\nSquare Footage: 1,572\nGarage: 2\nStories: 1",
+          "bedrooms": 3,
+          "bathrooms": 2.0,
+          "area_min": 1527.0,
+          "area_max": null,
+          "area_unit": "ft²",
+          "total_units": 10,
+          "available_units": 10,
+          "starting_price": 198490.0,
+          "maximum_price": 198490.0,
+          "currency": "USD",
+          "features": [
+            "Pool"
+          ],
+          "inventory_updated_at": "2026-11-06T22:15:21.479274",
+          "images_status": "provided",
+          "review_status": "confirmed",
+          "sort_order": 0,
+          "created_at": "2026-11-06T22:15:21.486409",
+          "updated_at": "2026-11-06T22:15:21.695217"
+        },
+        {
+          "id": "566c1a6f-a588-4f2b-944c-06381acf8da0",
+          "project_id": "cf50fe57-7db6-425e-9cc2-d042feb14ea8",
+          "name": "COVENTRY HOMES",
+          "code": null,
+          "description": "COVENTRY HOMES",
+          "bedrooms": 4,
+          "bathrooms": 3.0,
+          "area_min": 2399.0,
+          "area_max": null,
+          "area_unit": "ft²",
+          "total_units": 15,
+          "available_units": 15,
+          "starting_price": 334990.0,
+          "maximum_price": null,
+          "currency": "USD",
+          "features": [
+            "terrace"
+          ],
+          "inventory_updated_at": "2026-11-06T22:16:54.899239",
+          "images_status": "provided",
+          "review_status": "confirmed",
+          "sort_order": 0,
+          "created_at": "2026-11-06T22:16:54.902248",
+          "updated_at": "2026-11-06T22:16:55.113124"
+        }
+      ],
+      "units": [],
+      "materials": [
+        {
+          "id": "4b02474e-2c4c-460b-b2b2-774cb8055aa2",
+          "company_id": "4fa8155a-cdc1-4fca-bdea-8f78af688c11",
+          "project_id": "cf50fe57-7db6-425e-9cc2-d042feb14ea8",
+          "property_type_id": null,
+          "source_id": "18e5ae0a-194b-4e8c-89b7-eb4b068fb9ee",
+          "asset_type": "location_map",
+          "content_tags": [
+            "location_map"
+          ],
+          "display_name": "Resources from www.thetrailshouston.com",
+          "description": "External Project resources detected during onboarding. Review every contained link before approval.",
+          "approval_status": "approved",
+          "version": 1,
+          "valid_from": null,
+          "valid_until": null,
+          "allowed_channels": [
+            "sms",
+            "whatsapp"
+          ],
+          "approved_at": "2026-11-06T22:11:07.557089+00:00",
+          "created_at": "2026-11-06T22:10:02.514789+00:00",
+          "updated_at": "2026-11-06T22:11:07.558011+00:00",
+          "source": {
+            "id": "18e5ae0a-194b-4e8c-89b7-eb4b068fb9ee",
+            "project_id": "cf50fe57-7db6-425e-9cc2-d042feb14ea8",
+            "kind": "URL",
+            "status": "READY",
+            "mime_type": "text/html",
+            "size_bytes": 792324,
+            "is_encrypted": false,
+            "has_stored_file": false,
+            "sharing_intent": "internal"
+          },
+          "content_verified": false,
+          "resource_in_sandbox": "SYNTHETIC_PLACEHOLDER_ONLY"
+        },
+        {
+          "id": "251c4475-427b-47f3-97d6-f7750ff68cb7",
+          "company_id": "4fa8155a-cdc1-4fca-bdea-8f78af688c11",
+          "project_id": "cf50fe57-7db6-425e-9cc2-d042feb14ea8",
+          "property_type_id": null,
+          "source_id": "df496284-9045-4589-80db-f4acc09c7dd9",
+          "asset_type": "location_map",
+          "content_tags": [
+            "location_map"
+          ],
+          "display_name": "Resources from www.thetrailsliving.com",
+          "description": "External Project resources detected during onboarding. Review every contained link before approval.",
+          "approval_status": "approved",
+          "version": 1,
+          "valid_from": null,
+          "valid_until": null,
+          "allowed_channels": [
+            "sms",
+            "whatsapp"
+          ],
+          "approved_at": "2026-11-06T22:27:14.018497+00:00",
+          "created_at": "2026-11-06T22:24:06.898483+00:00",
+          "updated_at": "2026-11-06T22:27:14.018998+00:00",
+          "source": {
+            "id": "df496284-9045-4589-80db-f4acc09c7dd9",
+            "project_id": "cf50fe57-7db6-425e-9cc2-d042feb14ea8",
+            "kind": "URL",
+            "status": "READY",
+            "mime_type": "text/html",
+            "size_bytes": 19455,
+            "is_encrypted": false,
+            "has_stored_file": false,
+            "sharing_intent": "internal"
+          },
+          "content_verified": false,
+          "resource_in_sandbox": "SYNTHETIC_PLACEHOLDER_ONLY"
+        }
+      ]
+    }
+  ],
+  "specialists": [
+    {
+      "id": "0de80dc3-5f31-41cd-ab26-23dfbc996b06",
+      "company_id": "a73df3b4-95fa-4ed4-bb2c-bfe3543dfa4b",
+      "role": "MKT",
+      "auth_status": "INVITED",
+      "is_active": true,
+      "timezone": "UTC",
+      "deleted_at": null
+    },
+    {
+      "id": "32255a36-d58e-4e32-9941-82c652d5aaa3",
+      "company_id": "c9099547-17be-43b1-a554-5acc5e82ed5c",
+      "role": "ADMIN",
+      "auth_status": "ACTIVE",
+      "is_active": true,
+      "timezone": "UTC",
+      "deleted_at": null
+    },
+    {
+      "id": "454db474-ed6a-499f-98d5-3b9e527db1af",
+      "company_id": "4fa8155a-cdc1-4fca-bdea-8f78af688c11",
+      "role": "ADMIN",
+      "auth_status": "ACTIVE",
+      "is_active": true,
+      "timezone": "UTC",
+      "deleted_at": null
+    },
+    {
+      "id": "81034205-3bab-4b7c-ad08-d3b18787dc8a",
+      "company_id": "a73df3b4-95fa-4ed4-bb2c-bfe3543dfa4b",
+      "role": "ADMIN",
+      "auth_status": "ACTIVE",
+      "is_active": true,
+      "timezone": "UTC",
+      "deleted_at": null
+    },
+    {
+      "id": "d8800844-bde7-42bf-8db4-2bb2e8bb4ca2",
+      "company_id": "40a3fdb2-6e58-464d-ae8a-1789ff518d04",
+      "role": "ADMIN",
+      "auth_status": "ACTIVE",
+      "is_active": true,
+      "timezone": "UTC",
+      "deleted_at": null
+    },
+    {
+      "id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "company_id": "4fa8155a-cdc1-4fca-bdea-8f78af688c11",
+      "role": "SALES",
+      "auth_status": "ACTIVE",
+      "is_active": true,
+      "timezone": "UTC",
+      "deleted_at": null
+    }
+  ],
+  "assignments": [
+    {
+      "id": "8afa343e-79f4-4cf3-a961-6418b0cfe40a",
+      "project_id": "68fbcef9-89e3-4a0a-bbf0-72bdab4a5e32",
+      "user_id": "32255a36-d58e-4e32-9941-82c652d5aaa3",
+      "responsibility": "sales",
+      "sales_enabled": true,
+      "marketing_enabled": true,
+      "accepts_appointments": true,
+      "is_primary": false,
+      "routing_weight": 100,
+      "accepts_new_leads": true,
+      "is_active": true,
+      "created_at": "2026-10-19T23:46:52.981172+00:00",
+      "updated_at": "2026-10-19T23:46:52.981176+00:00"
+    },
+    {
+      "id": "71afa5ff-fcce-4baf-9ef2-e02eb571969e",
+      "project_id": "a412c99e-3b68-4597-b057-8609996b8a3f",
+      "user_id": "d8800844-bde7-42bf-8db4-2bb2e8bb4ca2",
+      "responsibility": "sales",
+      "sales_enabled": true,
+      "marketing_enabled": true,
+      "accepts_appointments": true,
+      "is_primary": false,
+      "routing_weight": 100,
+      "accepts_new_leads": true,
+      "is_active": true,
+      "created_at": "2026-10-24T18:55:52.246158+00:00",
+      "updated_at": "2026-10-24T18:55:52.246158+00:00"
+    },
+    {
+      "id": "a7c760eb-33fa-46b9-88f2-712b91bd8ef8",
+      "project_id": "b68d13fd-532a-4a3c-a722-fc07584cc087",
+      "user_id": "d8800844-bde7-42bf-8db4-2bb2e8bb4ca2",
+      "responsibility": "sales",
+      "sales_enabled": true,
+      "marketing_enabled": true,
+      "accepts_appointments": true,
+      "is_primary": false,
+      "routing_weight": 100,
+      "accepts_new_leads": true,
+      "is_active": true,
+      "created_at": "2026-10-24T18:55:52.246158+00:00",
+      "updated_at": "2026-10-24T18:55:52.246158+00:00"
+    },
+    {
+      "id": "dea8e1bd-aad6-46bc-9a5d-b090f9238680",
+      "project_id": "984c4c66-8910-438e-8c71-11706b4195e9",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "responsibility": "sales",
+      "sales_enabled": true,
+      "marketing_enabled": false,
+      "accepts_appointments": true,
+      "is_primary": false,
+      "routing_weight": 100,
+      "accepts_new_leads": true,
+      "is_active": true,
+      "created_at": "2026-10-30T16:56:11.854779+00:00",
+      "updated_at": "2026-10-30T16:56:11.854784+00:00"
+    },
+    {
+      "id": "844f82af-8a6c-4693-a83e-4615f773742a",
+      "project_id": "984c4c66-8910-438e-8c71-11706b4195e9",
+      "user_id": "454db474-ed6a-499f-98d5-3b9e527db1af",
+      "responsibility": "sales",
+      "sales_enabled": true,
+      "marketing_enabled": true,
+      "accepts_appointments": true,
+      "is_primary": false,
+      "routing_weight": 100,
+      "accepts_new_leads": true,
+      "is_active": true,
+      "created_at": "2026-10-30T16:56:11.854794+00:00",
+      "updated_at": "2026-10-30T16:56:11.854796+00:00"
+    },
+    {
+      "id": "7cd22cfd-1447-4b6f-b193-47de4b50716d",
+      "project_id": "cf50fe57-7db6-425e-9cc2-d042feb14ea8",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "responsibility": "sales",
+      "sales_enabled": true,
+      "marketing_enabled": false,
+      "accepts_appointments": true,
+      "is_primary": false,
+      "routing_weight": 100,
+      "accepts_new_leads": true,
+      "is_active": true,
+      "created_at": "2026-11-06T22:09:33.109759+00:00",
+      "updated_at": "2026-11-06T22:09:33.109763+00:00"
+    },
+    {
+      "id": "561c8ec2-78d4-472f-9ad8-683a10867a99",
+      "project_id": "cf50fe57-7db6-425e-9cc2-d042feb14ea8",
+      "user_id": "454db474-ed6a-499f-98d5-3b9e527db1af",
+      "responsibility": "sales",
+      "sales_enabled": true,
+      "marketing_enabled": true,
+      "accepts_appointments": true,
+      "is_primary": false,
+      "routing_weight": 100,
+      "accepts_new_leads": true,
+      "is_active": true,
+      "created_at": "2026-11-06T22:09:33.109773+00:00",
+      "updated_at": "2026-11-06T22:09:33.109774+00:00"
+    },
+    {
+      "id": "0dc94f52-1a7d-4184-befd-d59cd920b98a",
+      "project_id": "49c3922c-2536-45e9-b3f6-064d817fde67",
+      "user_id": "0de80dc3-5f31-41cd-ab26-23dfbc996b06",
+      "responsibility": "marketing",
+      "sales_enabled": false,
+      "marketing_enabled": true,
+      "accepts_appointments": false,
+      "is_primary": false,
+      "routing_weight": 100,
+      "accepts_new_leads": false,
+      "is_active": true,
+      "created_at": "2026-11-07T07:29:55.465101+00:00",
+      "updated_at": "2026-11-07T08:37:32.927916+00:00"
+    },
+    {
+      "id": "77988bf1-31cf-4b15-b2a7-aaa0ccb70aa2",
+      "project_id": "49c3922c-2536-45e9-b3f6-064d817fde67",
+      "user_id": "81034205-3bab-4b7c-ad08-d3b18787dc8a",
+      "responsibility": "sales",
+      "sales_enabled": true,
+      "marketing_enabled": true,
+      "accepts_appointments": true,
+      "is_primary": false,
+      "routing_weight": 100,
+      "accepts_new_leads": true,
+      "is_active": true,
+      "created_at": "2026-11-07T07:29:55.465113+00:00",
+      "updated_at": "2026-11-07T07:29:55.465114+00:00"
+    }
+  ],
+  "source_configuration": {
+    "id": "cbc8abfa-23d3-417c-97dd-fd12e3406ed4",
+    "model": "openai/gpt-4o-mini",
+    "updated_at": "2026-11-06T23:03:38.861154+00:00",
+    "published_version": 8,
+    "published_at": "2026-11-06T23:03:38.860406+00:00"
+  },
+  "weekly_availability": [],
+  "dated_availability": [
+    {
+      "id": "944102ef-16f8-49c8-854b-c86d7b0ce21e",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "starts_at": "2026-10-06T09:00:00+00:00",
+      "ends_at": "2026-10-06T17:00:00+00:00",
+      "timezone": "UTC"
+    },
+    {
+      "id": "a65d520f-9990-448e-b1c9-6e9d5476c7c8",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "starts_at": "2026-10-07T09:00:00+00:00",
+      "ends_at": "2026-10-07T17:00:00+00:00",
+      "timezone": "UTC"
+    },
+    {
+      "id": "7ae432a1-a670-47f4-bc8b-472fa3ac4e3e",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "starts_at": "2026-10-08T09:00:00+00:00",
+      "ends_at": "2026-10-08T17:00:00+00:00",
+      "timezone": "UTC"
+    },
+    {
+      "id": "5b30f75f-3c6b-47d5-ba96-f3d7d09907a5",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "starts_at": "2026-10-09T09:00:00+00:00",
+      "ends_at": "2026-10-09T17:00:00+00:00",
+      "timezone": "UTC"
+    },
+    {
+      "id": "262881d3-55a0-4eed-8553-8afc49a6de86",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "starts_at": "2026-10-12T09:00:00+00:00",
+      "ends_at": "2026-10-12T17:00:00+00:00",
+      "timezone": "UTC"
+    },
+    {
+      "id": "b29370e5-77e5-4d16-a905-5f3c282f22cb",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "starts_at": "2026-10-13T09:00:00+00:00",
+      "ends_at": "2026-10-13T17:00:00+00:00",
+      "timezone": "UTC"
+    },
+    {
+      "id": "47c20122-974c-4270-85d5-4a88ec94b74e",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "starts_at": "2026-10-14T09:00:00+00:00",
+      "ends_at": "2026-10-14T17:00:00+00:00",
+      "timezone": "UTC"
+    },
+    {
+      "id": "f1cfa797-b882-403f-9b84-19e2367f17a1",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "starts_at": "2026-10-15T09:00:00+00:00",
+      "ends_at": "2026-10-15T17:00:00+00:00",
+      "timezone": "UTC"
+    },
+    {
+      "id": "827623df-12bd-461c-8cd4-34a4bcbfe423",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "starts_at": "2026-10-16T09:00:00+00:00",
+      "ends_at": "2026-10-16T17:00:00+00:00",
+      "timezone": "UTC"
+    },
+    {
+      "id": "b26ccb05-e756-4359-b03f-88b019952899",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "starts_at": "2026-10-19T09:00:00+00:00",
+      "ends_at": "2026-10-19T17:00:00+00:00",
+      "timezone": "UTC"
+    },
+    {
+      "id": "60929111-2a27-40c1-9696-6da9fcfc02ec",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "starts_at": "2026-10-20T09:00:00+00:00",
+      "ends_at": "2026-10-20T17:00:00+00:00",
+      "timezone": "UTC"
+    },
+    {
+      "id": "993fa087-cc80-49da-ba73-a889bbd8ee95",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "starts_at": "2026-10-21T09:00:00+00:00",
+      "ends_at": "2026-10-21T17:00:00+00:00",
+      "timezone": "UTC"
+    },
+    {
+      "id": "17801033-a5b5-4dbe-b2ae-b7f37b3ac569",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "starts_at": "2026-10-22T09:00:00+00:00",
+      "ends_at": "2026-10-22T17:00:00+00:00",
+      "timezone": "UTC"
+    },
+    {
+      "id": "41791af5-e805-4bb5-a651-fb08bc7a6950",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "starts_at": "2026-10-23T09:00:00+00:00",
+      "ends_at": "2026-10-23T17:00:00+00:00",
+      "timezone": "UTC"
+    },
+    {
+      "id": "4f87c116-9b3a-476c-bda9-209a306b0589",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "starts_at": "2026-10-26T09:00:00+00:00",
+      "ends_at": "2026-10-26T17:00:00+00:00",
+      "timezone": "UTC"
+    },
+    {
+      "id": "d1e70bf7-ccd3-4c09-a29e-662b8e617017",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "starts_at": "2026-10-27T09:00:00+00:00",
+      "ends_at": "2026-10-27T17:00:00+00:00",
+      "timezone": "UTC"
+    },
+    {
+      "id": "5672bf1d-8c5a-4e8a-98c4-f0f0464f759e",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "starts_at": "2026-10-28T09:00:00+00:00",
+      "ends_at": "2026-10-28T17:00:00+00:00",
+      "timezone": "UTC"
+    },
+    {
+      "id": "a1b77f04-8224-499b-a9d2-03eef14a865f",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "starts_at": "2026-10-29T09:00:00+00:00",
+      "ends_at": "2026-10-29T17:00:00+00:00",
+      "timezone": "UTC"
+    },
+    {
+      "id": "2679b7a5-0e32-4acd-bcf3-9d1d8b8d759b",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "starts_at": "2026-10-30T09:00:00+00:00",
+      "ends_at": "2026-10-30T17:00:00+00:00",
+      "timezone": "UTC"
+    },
+    {
+      "id": "0801c1f6-9fe9-4648-9324-72030929f922",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "starts_at": "2026-11-02T09:00:00+00:00",
+      "ends_at": "2026-11-02T17:00:00+00:00",
+      "timezone": "UTC"
+    },
+    {
+      "id": "a46b677d-3357-42fa-a7b0-9b5815ed77c6",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "starts_at": "2026-11-03T09:00:00+00:00",
+      "ends_at": "2026-11-03T17:00:00+00:00",
+      "timezone": "UTC"
+    },
+    {
+      "id": "b23a6794-3bc1-4006-9e41-d54b7f08b7f5",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "starts_at": "2026-11-04T09:00:00+00:00",
+      "ends_at": "2026-11-04T17:00:00+00:00",
+      "timezone": "UTC"
+    },
+    {
+      "id": "777adde8-384a-40b8-96a7-7b1cb3a97639",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "starts_at": "2026-11-05T09:00:00+00:00",
+      "ends_at": "2026-11-05T17:00:00+00:00",
+      "timezone": "UTC"
+    },
+    {
+      "id": "2a42e094-6b47-4e29-9d03-83b163c93cf1",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "starts_at": "2026-11-06T09:00:00+00:00",
+      "ends_at": "2026-11-06T17:00:00+00:00",
+      "timezone": "UTC"
+    },
+    {
+      "id": "35910e7c-9964-4c0e-b587-38d64317c2c3",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "starts_at": "2026-11-09T09:00:00+00:00",
+      "ends_at": "2026-11-09T17:00:00+00:00",
+      "timezone": "UTC"
+    },
+    {
+      "id": "033d0d30-a02d-4f96-aa04-9727c7c40205",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "starts_at": "2026-11-10T09:00:00+00:00",
+      "ends_at": "2026-11-10T17:00:00+00:00",
+      "timezone": "UTC"
+    },
+    {
+      "id": "37b28eb8-7492-4107-b821-a744ce6f0286",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "starts_at": "2026-11-11T09:00:00+00:00",
+      "ends_at": "2026-11-11T17:00:00+00:00",
+      "timezone": "UTC"
+    },
+    {
+      "id": "4bc214f7-78f4-4707-ac81-e366f3759911",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "starts_at": "2026-11-12T09:00:00+00:00",
+      "ends_at": "2026-11-12T17:00:00+00:00",
+      "timezone": "UTC"
+    },
+    {
+      "id": "65551188-b560-4150-9a71-1472935c799f",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "starts_at": "2026-11-13T09:00:00+00:00",
+      "ends_at": "2026-11-13T17:00:00+00:00",
+      "timezone": "UTC"
+    },
+    {
+      "id": "b5d532fd-2ca4-4d31-a093-cac91e67265e",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "starts_at": "2026-11-16T09:00:00+00:00",
+      "ends_at": "2026-11-16T17:00:00+00:00",
+      "timezone": "UTC"
+    },
+    {
+      "id": "1186a1c7-8b3d-4fe7-bf61-2432ff6e82d5",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "starts_at": "2026-11-17T09:00:00+00:00",
+      "ends_at": "2026-11-17T17:00:00+00:00",
+      "timezone": "UTC"
+    },
+    {
+      "id": "5ae0f902-c777-4794-882c-97dd05f085af",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "starts_at": "2026-11-18T09:00:00+00:00",
+      "ends_at": "2026-11-18T17:00:00+00:00",
+      "timezone": "UTC"
+    },
+    {
+      "id": "9597f368-8635-4017-b502-f80a031c4a42",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "starts_at": "2026-11-19T09:00:00+00:00",
+      "ends_at": "2026-11-19T17:00:00+00:00",
+      "timezone": "UTC"
+    },
+    {
+      "id": "6cbf8a57-ab83-4abb-a32a-109fdae6ea78",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "starts_at": "2026-11-20T09:00:00+00:00",
+      "ends_at": "2026-11-20T17:00:00+00:00",
+      "timezone": "UTC"
+    },
+    {
+      "id": "075f57c8-1e7d-49a3-9f4b-ed519f2a9269",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "starts_at": "2026-11-23T09:00:00+00:00",
+      "ends_at": "2026-11-23T17:00:00+00:00",
+      "timezone": "UTC"
+    },
+    {
+      "id": "85786d3e-2738-481b-be00-4835c23a9a12",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "starts_at": "2026-11-24T09:00:00+00:00",
+      "ends_at": "2026-11-24T17:00:00+00:00",
+      "timezone": "UTC"
+    },
+    {
+      "id": "affac981-031a-4b7b-bc2f-ccc192587483",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "starts_at": "2026-11-25T09:00:00+00:00",
+      "ends_at": "2026-11-25T17:00:00+00:00",
+      "timezone": "UTC"
+    },
+    {
+      "id": "d62751a4-2a28-48cd-a6b2-a24d944ffb3f",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "starts_at": "2026-11-26T09:00:00+00:00",
+      "ends_at": "2026-11-26T17:00:00+00:00",
+      "timezone": "UTC"
+    },
+    {
+      "id": "5fe4b104-83ed-4609-ba02-cf24da1c7849",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "starts_at": "2026-11-27T09:00:00+00:00",
+      "ends_at": "2026-11-27T17:00:00+00:00",
+      "timezone": "UTC"
+    },
+    {
+      "id": "408f719c-011a-4cc2-a5a8-4efba76315a6",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "starts_at": "2026-11-30T09:00:00+00:00",
+      "ends_at": "2026-11-30T17:00:00+00:00",
+      "timezone": "UTC"
+    },
+    {
+      "id": "b0d29b6a-6cff-4e21-87d8-24a112ff5da5",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "starts_at": "2026-12-01T09:00:00+00:00",
+      "ends_at": "2026-12-01T17:00:00+00:00",
+      "timezone": "UTC"
+    },
+    {
+      "id": "acd4f52d-e63e-4c7b-966d-4c243b6a3d92",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "starts_at": "2026-12-02T09:00:00+00:00",
+      "ends_at": "2026-12-02T17:00:00+00:00",
+      "timezone": "UTC"
+    },
+    {
+      "id": "0b765de8-bae8-464e-8cb8-4b767fd82ea4",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "starts_at": "2026-12-03T09:00:00+00:00",
+      "ends_at": "2026-12-03T17:00:00+00:00",
+      "timezone": "UTC"
+    },
+    {
+      "id": "617b27b9-2b6c-4eea-b8c0-142af7c98760",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "starts_at": "2026-12-04T09:00:00+00:00",
+      "ends_at": "2026-12-04T17:00:00+00:00",
+      "timezone": "UTC"
+    },
+    {
+      "id": "94c85295-2f10-4b5b-8bbb-57c4133c41de",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "starts_at": "2026-12-07T09:00:00+00:00",
+      "ends_at": "2026-12-07T17:00:00+00:00",
+      "timezone": "UTC"
+    },
+    {
+      "id": "30730c6c-8272-4355-afc2-786bebdd3ada",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "starts_at": "2026-12-08T09:00:00+00:00",
+      "ends_at": "2026-12-08T17:00:00+00:00",
+      "timezone": "UTC"
+    },
+    {
+      "id": "fd7e097b-5a01-4666-900e-8286c69b63f1",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "starts_at": "2026-12-09T09:00:00+00:00",
+      "ends_at": "2026-12-09T17:00:00+00:00",
+      "timezone": "UTC"
+    },
+    {
+      "id": "38c8cbb9-f79d-4069-9768-550fe13ab423",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "starts_at": "2026-12-10T09:00:00+00:00",
+      "ends_at": "2026-12-10T17:00:00+00:00",
+      "timezone": "UTC"
+    },
+    {
+      "id": "b895f34d-6ccc-4902-bb98-6d2259c82b78",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "starts_at": "2026-12-11T09:00:00+00:00",
+      "ends_at": "2026-12-11T17:00:00+00:00",
+      "timezone": "UTC"
+    },
+    {
+      "id": "4e16904d-5652-4e2c-9b3a-a5d2154fe615",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "starts_at": "2026-12-14T09:00:00+00:00",
+      "ends_at": "2026-12-14T17:00:00+00:00",
+      "timezone": "UTC"
+    },
+    {
+      "id": "44ae5a2b-2683-4423-a63d-851043abdbc6",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "starts_at": "2026-12-15T09:00:00+00:00",
+      "ends_at": "2026-12-15T17:00:00+00:00",
+      "timezone": "UTC"
+    },
+    {
+      "id": "088af2cd-a688-4046-ad8c-6b83e2df03d5",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "starts_at": "2026-12-16T09:00:00+00:00",
+      "ends_at": "2026-12-16T17:00:00+00:00",
+      "timezone": "UTC"
+    },
+    {
+      "id": "26d87e65-4753-4e46-bdc5-3960b99e8684",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "starts_at": "2026-12-17T09:00:00+00:00",
+      "ends_at": "2026-12-17T17:00:00+00:00",
+      "timezone": "UTC"
+    },
+    {
+      "id": "2c43014a-09af-4289-b240-6bfc4a2c1f07",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "starts_at": "2026-12-18T09:00:00+00:00",
+      "ends_at": "2026-12-18T17:00:00+00:00",
+      "timezone": "UTC"
+    },
+    {
+      "id": "1f04587d-9c6e-4944-be20-7b9b1750c907",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "starts_at": "2026-12-21T09:00:00+00:00",
+      "ends_at": "2026-12-21T17:00:00+00:00",
+      "timezone": "UTC"
+    },
+    {
+      "id": "d4b6ba3d-c26b-4d62-91f4-b0f52751aea8",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "starts_at": "2026-12-22T09:00:00+00:00",
+      "ends_at": "2026-12-22T17:00:00+00:00",
+      "timezone": "UTC"
+    },
+    {
+      "id": "d4e7b118-a849-49b7-a897-d04f9d620b7b",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "starts_at": "2026-12-23T09:00:00+00:00",
+      "ends_at": "2026-12-23T17:00:00+00:00",
+      "timezone": "UTC"
+    },
+    {
+      "id": "c16ed10d-90bb-4ade-b198-920c2100186b",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "starts_at": "2026-12-24T09:00:00+00:00",
+      "ends_at": "2026-12-24T17:00:00+00:00",
+      "timezone": "UTC"
+    },
+    {
+      "id": "8d42674f-6756-46d1-a8d1-ad8e9afcfd50",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "starts_at": "2026-12-25T09:00:00+00:00",
+      "ends_at": "2026-12-25T17:00:00+00:00",
+      "timezone": "UTC"
+    },
+    {
+      "id": "4e7751d6-24f9-446e-9772-6470a6d02739",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "starts_at": "2026-12-28T09:00:00+00:00",
+      "ends_at": "2026-12-28T17:00:00+00:00",
+      "timezone": "UTC"
+    },
+    {
+      "id": "b109e8ce-ec19-49c8-8ccf-ad174d9967b3",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "starts_at": "2026-12-29T09:00:00+00:00",
+      "ends_at": "2026-12-29T17:00:00+00:00",
+      "timezone": "UTC"
+    },
+    {
+      "id": "c1781a48-a23c-4e5c-bdd0-265d339d838b",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "starts_at": "2026-12-30T09:00:00+00:00",
+      "ends_at": "2026-12-30T17:00:00+00:00",
+      "timezone": "UTC"
+    },
+    {
+      "id": "a3116ae7-e5fd-47d2-ac58-7535dfed5efb",
+      "user_id": "de714ed7-756b-4b8c-9c70-465dc5767646",
+      "starts_at": "2026-12-31T09:00:00+00:00",
+      "ends_at": "2026-12-31T17:00:00+00:00",
+      "timezone": "UTC"
+    }
+  ],
+  "missing": [
+    "Real document contents",
+    "Meta form commercial answers",
+    "Existing appointments",
+    "External Calendar free/busy"
+  ]
+}
