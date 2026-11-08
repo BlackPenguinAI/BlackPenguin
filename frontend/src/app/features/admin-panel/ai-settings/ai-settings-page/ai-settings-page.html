@@ -101,7 +101,7 @@
                 <label class="flex items-center gap-2"><input type="checkbox" name="intent_enabled" [(ngModel)]="activeAgent.intent_routing_config.enabled"> Enable LLM intent routing</label>
                 <label class="flex items-center gap-2"><input type="checkbox" name="intent_multilingual" [(ngModel)]="activeAgent.intent_routing_config.multilingual_input"> Interpret multilingual input</label>
                 <label class="flex items-center gap-2"><input type="checkbox" name="intent_explicit_appointment" [(ngModel)]="activeAgent.intent_routing_config.appointment_requires_explicit_request"> Require an explicit appointment request</label>
-                <label class="flex items-center gap-2"><input type="checkbox" name="intent_no_missing_material_pause" [checked]="!activeAgent.intent_routing_config.pause_on_missing_material" (change)="activeAgent.intent_routing_config.pause_on_missing_material = !$any($event.target).checked"> Keep AI active when material is missing</label>
+                <p class="text-gray-400">Ambiguous intent, missing information and missing materials keep the conversation active. Only verified intervention cases pause the AI.</p>
               </div>
               <label class="mt-4 grid gap-1 text-xs text-gray-400">Classifier instructions<textarea rows="4" name="intent_classifier_instructions" [(ngModel)]="activeAgent.intent_routing_config.classifier_instructions" class="rounded-lg border border-white/10 bg-black/50 p-3 text-xs text-white"></textarea></label>
               <details class="mt-4 rounded-lg border border-white/10 bg-black/30 p-3">

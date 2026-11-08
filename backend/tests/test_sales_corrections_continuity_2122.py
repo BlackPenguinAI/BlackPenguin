@@ -100,9 +100,12 @@ def test_ordinary_gap_is_notice_not_handoff(intent, inbound):
     ("pause_on_missing_material",{},"MISSING_MATERIAL"),
     ("pause_on_missing_information",{"primary_intent":"request_delivery","inbound":"When is delivery?"},"MISSING_INFORMATION"),
     ("pause_on_low_confidence",{"primary_intent":"unclear","inbound":"The other thing","intent_confidence":.2,"requires_clarification":True},"LOW_CONFIDENCE")])
-def test_staff_policy_can_require_pause_without_mutating_published_flags(flag, overrides, reason):
+def test_legacy_staff_flags_are_advisory_without_mutating_published_config(flag, overrides, reason):
     result = decision(routing={flag:True}, **overrides)
-    assert result["requires_human"] and result["escalation_decision"]["reason"] == reason
+    assert not result["requires_human"] and result["escalation_decision"]["reason"] == reason
+    assert result['escalation_decision']['disposition']=='notify_sales'
+    assert result['escalation_decision']['applied_pause_policy'][flag] is True
+    assert flag in result['escalation_decision']['ignored_ordinary_pause_flags']
 
 
 @pytest.mark.parametrize("intent,inbound,mode,reason",[
@@ -156,11 +159,11 @@ def test_live_pause_reason_matches_case_notification_message_and_trace(case,inte
     assert event.payload_json["reason"] == reason and event.payload_json["conversation_id"] == conv.id
     assert event.payload_json["reason_label"] in conv.pause_reason
     assert "paused" in dispatch.await_args.kwargs["content"]
-    assert db.query(AgentRun).one().output_snapshot["escalation_decision"]["reason"] == reason
+    assert dispatch.await_args.kwargs['metadata']['reason'] == reason
+    graph.ainvoke.assert_not_awaited()  # evidenced control no longer needs model interpretation
     from app.modules.sales_agent.monitor import diagnostic
     report=diagnostic(db,conv,conv.company_id,conv.project_id,conv.lead_id).model_dump()
     assert report["conversation"]["pause_reason"] == conv.pause_reason
-    assert report["runs"][0]["output_snapshot"]["escalation_decision"]["reason"] == reason
     assert report["pauses"][0]["reason"] == reason
 
 
@@ -229,16 +232,16 @@ def test_new_correction_contract_rejects_malformed_fields():
     assert "correction_requested" not in value["intent_entities"]
 
 
-def test_security_and_human_request_secondary_intents_cannot_be_softened():
+def test_secondary_control_labels_need_current_message_evidence():
     for intent in ("security_or_abuse","human_requested"):
         result=decision(primary_intent="request_document",secondary_intents=[intent])
-        assert result["requires_human"]
-        assert result["escalation_decision"]["reason"] in {"SECURITY","HUMAN_REQUESTED"}
+        assert not result["requires_human"] and result['requires_clarification']
+        assert result['escalation_decision']['unverified_control_request']
 
 
 def test_low_confidence_security_label_clarifies_instead_of_fabricating_incident():
     result=decision(primary_intent="security_or_abuse",intent_confidence=.2,requires_clarification=True,requires_human=False,proposed_actions=[],inbound="Could I see it?")
-    assert not result["requires_human"] and result["escalation_decision"]["disposition"] == "continue"
+    assert not result["requires_human"] and result["escalation_decision"]["disposition"] in {"continue","notify_sales"}
 
 
 def test_selected_property_is_in_live_message_metadata_and_survives_next_turn(case):

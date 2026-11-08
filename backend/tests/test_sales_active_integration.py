@@ -46,12 +46,13 @@ class Harness:
         async def injected(*args,**kwargs):return await real(*args,**kwargs,infer=self.infer)
         with patch.object(live,'SessionLocal',return_value=self.db),patch.object(self.db,'close'),\
              patch.object(active,'preview',side_effect=injected),patch.object(live,'send_sms',new=self.send),\
+             patch.object(live,'send_message',new=self.send),\
              patch.object(live,'build_sales_graph',new=self.legacy),patch.object(live,'_schedule_next_action'):
             yield
 
     def turn(self,text,u):
         self.infer.return_value=u.model_dump_json() if isinstance(u,Understanding) else u
-        inbound=SalesMessage(conversation_id=self.conversation.id,channel='sms',direction='inbound',role='user',content=text,status='received')
+        inbound=SalesMessage(conversation_id=self.conversation.id,channel=self.conversation.channel,direction='inbound',role='user',content=text,status='received')
         self.db.add(inbound);self.db.commit()
         with self.patched():asyncio.run(live.process_live_inbound(self.conversation.id,inbound.id))
         return inbound,self.db.query(AgentRun).filter_by(event_id='telnyx:'+inbound.id).one()

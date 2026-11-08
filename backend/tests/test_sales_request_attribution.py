@@ -57,13 +57,14 @@ def test_cancelled_followup_cannot_dispatch_after_consent_clarification(case):
     graph.ainvoke.assert_not_awaited();dispatch.assert_not_awaited()
 
 
-def test_both_matching_staff_rules_remain_visible_in_trace():
+def test_ordinary_staff_flags_remain_visible_but_cannot_pause():
     result=apply_escalation_policy({"primary_intent":"request_document","intent_confidence":.2,"requires_clarification":True,
         "proposed_reply":"Please clarify which file.","proposed_actions":[],"commercial_context":{}},
         inbound="Those documents, maybe?",routing={"pause_on_low_confidence":True,"pause_on_missing_material":True})
     decision=result["escalation_decision"]
-    assert decision["matched_pause_rules"]==["LOW_CONFIDENCE","MISSING_MATERIAL"]
-    assert decision["disposition"]=="pause" and decision["reason"]=="LOW_CONFIDENCE"
+    assert decision["matched_pause_rules"]==[]
+    assert decision['ignored_ordinary_pause_flags']==['pause_on_missing_material','pause_on_low_confidence']
+    assert decision["disposition"]=="notify_sales" and decision["reason"]=="LOW_CONFIDENCE"
     assert result["response_policy_trace"]["escalation"]==decision
 
 
@@ -165,8 +166,9 @@ def test_llm_can_identify_an_actual_renewed_request_after_a_reference(kind,reaso
     result=apply_escalation_policy({"primary_intent":"general_question","intent_confidence":.95,
         "intent_entities":{"protected_request":{"kind":kind,"evidence":"please arrange that review for me"}},
         "proposed_reply":"The request needs review.","proposed_actions":[],"requires_human":False},inbound=text)
-    assert result["requires_human"] and result["escalation_decision"]["reason"]==reason
-    assert result["escalation_decision"]["reason_source"]=="llm_current_request"
+    assert not result["requires_human"] and result["escalation_decision"]["reason"]==reason
+    assert result["escalation_decision"]["reason_source"]=="sales_notice"
+    assert result['proposed_actions']==[]
     assert result["escalation_decision"]["protected_request_accepted"]
 
 
@@ -202,7 +204,7 @@ def test_malformed_optional_contract_is_rejected_without_crashing(entity):
 def test_graph_applies_typed_current_request_without_replacing_published_prompts(case):
     result,model=model_turn(case,'You said "a legal review may help"; please arrange that review.',primary="general_question",
         entities={"protected_request":{"kind":"legal_review","evidence":"please arrange that review"}},reply="I can refer that for review.")
-    assert result["requires_human"] and result["escalation_decision"]["reason"]=="LEGAL_QUESTION"
+    assert not result["requires_human"] and result["escalation_decision"]["reason"]=="LEGAL_QUESTION"
     messages=model.await_args.args[2]
     assert any("request_attribution" in m["content"] for m in messages)
     assert any("protected_request" in m["content"] for m in messages)
@@ -215,9 +217,9 @@ def test_live_renewed_request_has_consistent_case_notification_reply_and_trace(c
     result,_=model_turn(case,'You said "a review may help"; please arrange that review.',primary="general_question",
         entities={"protected_request":{"kind":"legal_review","evidence":"please arrange that review"}},reply="I can refer that.")
     dispatch,slots,graph,ids=run_live(case,'You said "a review may help"; please arrange that review.',result)
-    assert db.get(SalesConversation,ids[0]).is_paused
-    assert db.query(HumanInterventionCase).one().reason=="LEGAL_QUESTION"
+    assert not db.get(SalesConversation,ids[0]).is_paused
+    assert db.query(HumanInterventionCase).count()==0
     assert db.query(NotificationOutbox).one().payload_json["reason"]=="LEGAL_QUESTION"
-    assert "legal review" in dispatch.await_args.kwargs["content"]
-    assert db.query(AgentRun).one().output_snapshot["escalation_decision"]["reason_source"]=="llm_current_request"
+    assert "review" in dispatch.await_args.kwargs["content"]
+    assert db.query(AgentRun).one().output_snapshot["escalation_decision"]["reason_source"]=="sales_notice"
 

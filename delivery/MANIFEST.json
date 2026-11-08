@@ -1,47 +1,197 @@
 {
-  "base_commit": "0e042f5602790c9e80a7072d8be5a3014bca57b6",
+  "base_commit": "d905c635d594c18c5e3dae830594a02fc0bb4dfb",
+  "includes_previous_zip": "BlackPenguin_sales_active_e2e_differentials.zip",
   "files": [
+    {
+      "path": "backend/app/modules/governance/services.py",
+      "action": "modified",
+      "base_sha256": "da36bf5735f97f95013ea85f6b4867949ad81da33b21d3199a117c5e90c280db",
+      "sha256": "5a4502d5368f9d221e235333054f38cd0891513e4f6081213b9fdf8d997b1238"
+    },
     {
       "path": "backend/app/modules/sales_agent/active_service.py",
       "action": "modified",
-      "base_sha256": "f9fe5a9aaabbc484b770de62f358ad39fd14c6880247c2bb5187b01f831e5591",
-      "sha256": "9d88d6b04b0fbeef6a360956fc32502dc06ca0d525ae2b7fd3d6cd29442607d6"
+      "base_sha256": "9d88d6b04b0fbeef6a360956fc32502dc06ca0d525ae2b7fd3d6cd29442607d6",
+      "sha256": "b5f2c482e789ba670c78fee8bca8a9b73d596e2b216fbadb5dc03bd14750442b"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/continuity_policy.py",
+      "action": "new",
+      "base_sha256": null,
+      "sha256": "b24dfaba47eba8e9bbd66489209126644b9a72991dbcd9b9931c844bbbc9f1dc"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/conversation_review.py",
+      "action": "new",
+      "base_sha256": null,
+      "sha256": "13f3b1dc07ffa046707e70b3d9c6ebd973610863fb4b3186023b57b756d8cd40"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/dialogue_orchestrator.py",
+      "action": "modified",
+      "base_sha256": "0c4d7a0140bf948fcd1474f4699e002e79d7924e88f2286e229746ce97c9f41d",
+      "sha256": "46c842d91429bb877f79eb0c7bfe47515db0eb2ad50057b2e614e8de9deae4f6"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/dialogue_tools.py",
+      "action": "modified",
+      "base_sha256": "56b77860840f2dcc457cbd48f369626edc753ae2848e00048b537671849e164a",
+      "sha256": "167ec3d8d05ba33d1307db3f46accb575d93243d34e1f92d3681373c5011d63b"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/escalation_policy.py",
+      "action": "modified",
+      "base_sha256": "45311386d829745bfa4518d32b6c7abad978fa7768398b7143dd8cd8fdd7406b",
+      "sha256": "4b1333d28e693f0ba2af7dea6c49e40434923a7ce90a6a2da9bdfd97e8f566af"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/live_service.py",
+      "action": "modified",
+      "base_sha256": "f13cdf85dd8b24b8ef9c2900d5800cd0a7e648824cc3a4cb86d37ffea0a1c820",
+      "sha256": "a526fe83450f3f93813698d3b26f1686e87edcfb9828ecfa7065d0375449631b"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/router.py",
+      "action": "modified",
+      "base_sha256": "2dda4529ef4b1e58786fcd98cc82000c2eeb1c0b8ca34ecca7b8805cd18ad01a",
+      "sha256": "f24d8209e8e11c08c93c08b68723dc28d45fae2b25a3ceadcd9a1a1d514189ab"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/sales_policy.py",
+      "action": "new",
+      "base_sha256": null,
+      "sha256": "c430f1062b02fd38826c82662585dca587c0db1c82a65033216184541d0918ad"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/schemas.py",
+      "action": "modified",
+      "base_sha256": "6f0ae8056dd3040217c5110118238d37aa8250419545a1d02b7d2b9fcc9d2be2",
+      "sha256": "24f87f73239cfeb9f494f2525efe87f445e58ac0e198673fe5c91bec6fccd79b"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/service.py",
+      "action": "modified",
+      "base_sha256": "b6c47b297d7b481ec0573749f8e0a69e9b51047d7a34b99c16efc197baef4960",
+      "sha256": "82e52d4218ba15c0dedb61cf1a480cd1981990a4ea5790c5d64af2eb6e97483f"
     },
     {
       "path": "backend/app/modules/sales_agent/understanding_contract.py",
       "action": "modified",
-      "base_sha256": "2dab4afd644e3d13bbf3d0821695d68fca75306b045cd6003ff44a55b91ce8f2",
-      "sha256": "821613d42737012bc32cf4a32184f03aa4fbe13725493a110a0146f2c208d3f0"
+      "base_sha256": "821613d42737012bc32cf4a32184f03aa4fbe13725493a110a0146f2c208d3f0",
+      "sha256": "18bd244140d0416e55945a91a9a9b9bb3ff84f1422bc1c742f00e7a25e175a53"
     },
     {
       "path": "backend/app/modules/sales_agent/understanding_prompt.py",
       "action": "modified",
-      "base_sha256": "9628daea92daf5908bdbdcf3ea23fbcbac0d9cc2020308fcc930dd7f0e34ae13",
-      "sha256": "5323edd29786a643f69a6a90885957a5d840b95aa0dae9f00bbfc3400a3f45ea"
+      "base_sha256": "5323edd29786a643f69a6a90885957a5d840b95aa0dae9f00bbfc3400a3f45ea",
+      "sha256": "0bd17bd059e11a6043b98754693ba38736d2c7c34cc49bb4a8d94f46c9d1350e"
     },
     {
       "path": "backend/app/modules/sales_agent/understanding_service.py",
       "action": "modified",
-      "base_sha256": "a59ebbbd62daa1c5472afe853796cb6420a9295b39f7ce1c5c8abaf3da7ac399",
-      "sha256": "d1832bc7b5922fb2a48d12ac02d425c49bc43a556104fbfabd55ee6fa8cb3db3"
+      "base_sha256": "d1832bc7b5922fb2a48d12ac02d425c49bc43a556104fbfabd55ee6fa8cb3db3",
+      "sha256": "bb71bf4340d685b19a562747470153b7dc067a22fee579d24d786737a70fe3cb"
+    },
+    {
+      "path": "backend/app/modules/sales_crm/intelligence.py",
+      "action": "modified",
+      "base_sha256": "89e62a722da6f1ff57c6728fcdf6acad511ff881d68bd83d6f3662e55410199f",
+      "sha256": "577a292213d812a7cbfc7db8f4a5425f3d96f9a7dab82b9130f9fdee0eea1fcb"
+    },
+    {
+      "path": "backend/tests/test_sales_active_integration.py",
+      "action": "modified",
+      "base_sha256": "4830e0c77b6133ccdf8befea034c22468010e7cafdb02ad54b5def0c5cb9dd92",
+      "sha256": "f2143e8ba9678a2642f09643e4a74456718e6931714f45bf59a9dc3e491ea3e4"
+    },
+    {
+      "path": "backend/tests/test_sales_active_journey.py",
+      "action": "new",
+      "base_sha256": null,
+      "sha256": "b4278d21d9b93d825cf90b0dcd2e3e23c22a3a1c552c0be14d7d80be1ed7c89f"
+    },
+    {
+      "path": "backend/tests/test_sales_continuity_gaps.py",
+      "action": "modified",
+      "base_sha256": "fdf26ae140b4b4fcb5b70345ada163f4df0b6e0bb6fd35549d5fdcc99a8836e4",
+      "sha256": "935c6b92b973194979239c8aa051c39730128a9178a4b8963d1e3f2b701b81a4"
+    },
+    {
+      "path": "backend/tests/test_sales_conversation_review.py",
+      "action": "new",
+      "base_sha256": null,
+      "sha256": "7f1c9206b67ec1667d8abdc6454fc9ebd1d08ddb750fb71f0db9dadc62d2decb"
+    },
+    {
+      "path": "backend/tests/test_sales_corrections_continuity_2122.py",
+      "action": "modified",
+      "base_sha256": "9377f6e0ee49793d1678cf50fe9b92396bcd86fd2a2486d0e2c182d2931306a8",
+      "sha256": "6501f8441acd51530b941101d12113b313ba778acd418169e58e52271005264e"
+    },
+    {
+      "path": "backend/tests/test_sales_request_attribution.py",
+      "action": "modified",
+      "base_sha256": "2ec88de499e9e0472481f4137cd2bb3f63a57947209b4aee93ee09e060eff7dd",
+      "sha256": "8aaed99cc1099540aa09377a5a4b4a2d0de33084a73fc5d679f0d8998abded52"
     },
     {
       "path": "backend/tests/test_sales_understanding_recovery.py",
-      "action": "new",
-      "base_sha256": null,
-      "sha256": "1bbcf6a552978e0ec563d4a09ca887f30b352c08c0ec41769b12fabe16499003"
+      "action": "modified",
+      "base_sha256": "1bbcf6a552978e0ec563d4a09ca887f30b352c08c0ec41769b12fabe16499003",
+      "sha256": "5f39d99a8ff9418ee2d056467b749aaa5d6638b628b454b8bb92d402c040d591"
     },
     {
-      "path": "docs/sales-understanding-recovery.md",
+      "path": "docs/sales-active-end-to-end.md",
       "action": "new",
       "base_sha256": null,
-      "sha256": "b140c1f7cc937703efc57c909f6ecbab6a1fa2b380bf9c290f56b65a208b8754"
+      "sha256": "68c916880b9c1fe77e71529e7c97c20c30219a11bc561ae8d38023d1fc65eb9e"
+    },
+    {
+      "path": "docs/sales-conversation-continuity-review.md",
+      "action": "new",
+      "base_sha256": null,
+      "sha256": "8674e60ac2411da606f84651a305d83108de2b0e758aeeebbf7c78f9096093e4"
+    },
+    {
+      "path": "frontend/src/app/features/admin-panel/ai-settings/ai-settings-page/ai-settings-page.html",
+      "action": "modified",
+      "base_sha256": "71febb27c6fcc4d5706022f7f55d66dc184b2af588bbceb8017d2c72fbbd49d3",
+      "sha256": "86bfde6dcab56baaa57d95fde1ab17eb973e29aca6012e727108cb336c663113"
+    },
+    {
+      "path": "frontend/src/app/pages/client/agent/agent-review-render.spec.ts",
+      "action": "new",
+      "base_sha256": null,
+      "sha256": "c97c336f496b300533392c27640ec13a8b644b7c7aee7f8f3d8b83f63d0c0e53"
+    },
+    {
+      "path": "frontend/src/app/pages/client/agent/agent.html",
+      "action": "modified",
+      "base_sha256": "86b3b349d2ba98f3c84f69129e9bedfb7d84a8fc9d5605e12c95831af6071460",
+      "sha256": "9631b1fa97038f5cca3023b232be19d7da4c183122e83e7a108c064f3766daf2"
+    },
+    {
+      "path": "frontend/src/app/pages/client/agent/agent.spec.ts",
+      "action": "modified",
+      "base_sha256": "cdec13e60cc4e14baa0bb15d12d3432b78757f520649220ab1d53798565c04ce",
+      "sha256": "5be160ef8b0599ecf1541916dd14fd70b83d6dffac0a3b5d12eb8dbb2867738d"
+    },
+    {
+      "path": "frontend/src/app/pages/client/agent/agent.ts",
+      "action": "modified",
+      "base_sha256": "22ec997f83ad7be9d0108056e751c1148a13efce32e079cff477ff9df18a02b9",
+      "sha256": "e4c47c03549d66c2669b9cef6605635685280727662d31637f91386dbe43b973"
     }
   ],
   "deletions": [],
   "verification": {
-    "backend": "1445 passed, 2 skipped",
-    "live_providers": "not called",
-    "frontend": "unchanged; not rerun"
-  }
+    "backend": "1485 passed, 2 skipped",
+    "targeted_review_after_final_display_change": "32 passed",
+    "frontend": "37 passed, including rendered Angular review template",
+    "production_build": "passed, existing stylesheet budget warnings",
+    "git_diff_check": "passed",
+    "real_model_and_providers": "not called",
+    "visual_browser_screenshots": "not completed: browser process unavailable in this environment"
+  },
+  "deployment": "not deployed; runtime flags and cohort unchanged"
 }

@@ -1,14 +1,15 @@
 """Trusted escalation disposition, shared by inbound, simulation and follow-ups.
 
-Model review proposals are not permission to pause a conversation. Published
-staff routing policy controls ordinary gaps; protected violations remain hard.
+Model review proposals are not permission to pause a conversation. Ordinary
+gaps remain advisory even with old pause flags; verified control stays hard.
 """
 import re
 from .response_policy import topics_for_turn
 from app.modules.governance.services import escalation_reason, enqueue_notification, request_attribution
+from .continuity_policy import explicit_opt_out, evidenced_pause_reason, HARD_VIOLATIONS
 
 
-def apply_escalation_policy(result, *, inbound, routing=None, event_kind="lead_message"):
+def apply_escalation_policy(result, *, inbound, routing=None, event_kind="lead_message", dismissed_reason=None):
     result = dict(result)
     routing = routing or {}
     intents = {result.get("primary_intent") or result.get("intent"), *(result.get("secondary_intents") or [])}
@@ -28,33 +29,31 @@ def apply_escalation_policy(result, *, inbound, routing=None, event_kind="lead_m
     requested_review = requested_review or prior.get("disposition") == "notify_sales"
     confidence = result.get("intent_confidence")
     trusted = isinstance(confidence, (float, int)) and not isinstance(confidence, bool) and float(routing.get("minimum_confidence", .8)) <= confidence <= 1
-    uncertain_opt_out = event_kind == "lead_message" and "opt_out" in intents and (not trusted or bool(result.get("requires_clarification")))
+    uncertain_opt_out = event_kind == "lead_message" and "opt_out" in intents and not explicit_opt_out(inbound)
     attribution = request_attribution(inbound)
-    reason = escalation_reason(inbound) if event_kind == "lead_message" else None
+    reason = evidenced_pause_reason(inbound) if event_kind == "lead_message" else None
+    if reason == dismissed_reason:
+        reason = None
     reason_source = "deterministic_current_request" if reason else None
     protected = (result.get("intent_entities") or {}).get("protected_request")
-    protected_accepted = False
+    advisory_reason = escalation_reason(inbound) if event_kind == 'lead_message' else None
+    protected_accepted = advisory_reason in {'LEGAL_QUESTION','COMPLEX_NEGOTIATION'}
     if event_kind == "lead_message" and not reason and trusted and not result.get("requires_clarification") and isinstance(protected, dict):
         kind, evidence = protected.get("kind"), protected.get("evidence")
         if isinstance(kind, str) and kind in {"legal_review", "commercial_exception"} and isinstance(evidence, str) and 0 < len(evidence.strip()) <= 500 and evidence.casefold() in attribution["current_text"].casefold():
-            reason = {"legal_review":"LEGAL_QUESTION", "commercial_exception":"COMPLEX_NEGOTIATION"}[kind]
-            reason_source = "llm_current_request"
+            # A model's commercial/legal label is advisory, never authority
+            # to stop the conversation. Hold actions and notify staff below.
             protected_accepted = True
+            advisory_reason = {'legal_review':'LEGAL_QUESTION','commercial_exception':'COMPLEX_NEGOTIATION'}[kind]
     disposition = "pause" if reason else "continue"
     applicable_conditions = []
     matched_pause_rules = []
-    if event_kind == "lead_message" and (inbound.strip().upper() in {"STOP", "UNSUBSCRIBE", "CANCEL", "END", "QUIT"} or trusted and "opt_out" in intents and not uncertain_opt_out):
+    if event_kind == "lead_message" and explicit_opt_out(inbound):
         disposition, reason = "opt_out", "LEAD_OPTED_OUT"
-        reason_source = "literal_opt_out" if inbound.strip().upper() in {"STOP", "UNSUBSCRIBE", "CANCEL", "END", "QUIT"} else "llm_opt_out"
-    elif violations:
+        reason_source = "literal_opt_out" if inbound.strip().upper() in {"STOP", "UNSUBSCRIBE", "CANCEL", "END", "QUIT"} else "explicit_current_opt_out"
+    elif HARD_VIOLATIONS.intersection(violations):
         disposition, reason = "pause", "POLICY_VIOLATION"
         reason_source = "protected_policy_validation"
-    elif event_kind == "lead_message" and trusted and "security_or_abuse" in intents:
-        disposition, reason = "pause", "SECURITY"
-        reason_source = "llm_security"
-    elif event_kind == "lead_message" and trusted and "human_requested" in intents:
-        disposition, reason = "pause", "HUMAN_REQUESTED"
-        reason_source = "llm_human_request"
     elif not reason:
         missing_material = "assets" in topics_for_turn(inbound, intents) and not commercial.get("available_assets")
         low_confidence = bool(result.get("requires_clarification")) or not trusted
@@ -64,13 +63,25 @@ def apply_escalation_policy(result, *, inbound, routing=None, event_kind="lead_m
                  ("MISSING_MATERIAL", "pause_on_missing_material", missing_material),
                  ("MISSING_INFORMATION", "pause_on_missing_information", requested_review and not missing_material and not low_confidence)]
         applicable_conditions = [label for label, _, applies in rules if applies]
-        matched_pause_rules = [label for label, flag, applies in rules if applies and routing.get(flag) is True]
-        if matched_pause_rules:
-            disposition, reason = "pause", matched_pause_rules[0]
-            reason_source = "staff_pause_policy"
-        elif requested_review:
-            disposition, reason = "notify_sales", next(iter(applicable_conditions), "MISSING_INFORMATION")
+        # Legacy stored pause flags remain readable, but cannot turn an
+        # ordinary gap or a bad interpretation into conversation control.
+        matched_pause_rules = []
+        if requested_review or applicable_conditions or violations or protected_accepted:
+            disposition, reason = "notify_sales", advisory_reason if protected_accepted else next(iter(applicable_conditions), "MISSING_INFORMATION")
             reason_source = "sales_notice"
+    unverified_control = event_kind == 'lead_message' and not reason_source == 'deterministic_current_request' and bool(intents & {'human_requested','security_or_abuse'}) and disposition != 'pause'
+    if unverified_control:
+        result['requires_clarification'] = True
+        result['proposed_reply'] = ('Would you like me to transfer this conversation to the Sales team?' if 'human_requested' in intents
+                                    else 'Could you clarify your request? I can help with approved property information or connect you with the Sales team.')
+        actions = []
+    # A rejected action is not permission to execute any other write from an
+    # invalid turn. Keep a reply/clarification available without pausing.
+    if (violations and disposition != 'pause') or protected_accepted:
+        actions = []
+        result['requires_clarification'] = True
+        if protected_accepted and disposition != 'pause':
+            result['proposed_reply'] = 'The Sales team needs to review that legal or commercial exception. I can continue helping with approved property information.'
     actions = [a for a in actions if a.get("type") not in {"request_human_review", "request_callback"}]
     if disposition == "pause":
         actions = [{"type": "request_callback" if reason == "HUMAN_REQUESTED" else "request_human_review"}]
@@ -81,12 +92,15 @@ def apply_escalation_policy(result, *, inbound, routing=None, event_kind="lead_m
         # No commercial action is consent to continue contact. Ask only about
         # scope; do not book, share files or promise an unsubscribe here.
         actions = actions if disposition == "pause" else [{"type": "ask_qualification_question"}]
-    decision = {"version": "sales-escalation-v1", "disposition": disposition, "reason": reason,
+    decision = {"version": "sales-escalation-v2", "disposition": disposition, "reason": reason,
                 "conversation_paused": disposition in {"pause", "opt_out"},
                 "consent_clarification_required": uncertain_opt_out and disposition != "opt_out",
                 "applicable_conditions": applicable_conditions, "matched_pause_rules": matched_pause_rules,
                 "request_attribution": attribution, "reason_source": reason_source,
                 "protected_request_accepted": protected_accepted,
+                "unverified_control_request": unverified_control,
+                "control_confirmation": 'human' if unverified_control and 'human_requested' in intents else None,
+                "ignored_ordinary_pause_flags": [key for key in ('pause_on_missing_information','pause_on_missing_material','pause_on_low_confidence') if routing.get(key) is True],
                 "applied_pause_policy": {key: routing.get(key) is True for key in ("pause_on_missing_information", "pause_on_missing_material", "pause_on_low_confidence")}}
     result.update(proposed_actions=actions, policy_violations=violations,
                   requires_human=disposition == "pause", escalation_decision=decision)

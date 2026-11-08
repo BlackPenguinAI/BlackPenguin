@@ -22,6 +22,7 @@ from .escalation_policy import apply_escalation_policy, notify_sales, escalation
 from .conversation_scope import scoped_messages_query
 from .turn_context import latest_outbound, choice_index, appointment_execution_allowed, location_continuation
 from .models import AgentRun, OutboundMessage, SalesAgentSimulation, SalesConversation, SalesFollowUpJob, SalesInboundJob, SalesMessage
+from .conversation_review import review_snapshot
 
 
 MONTHS = {
@@ -501,6 +502,8 @@ def conversation_summaries(
             SalesInboundJob.conversation_id == conversation.id,
         ).order_by(SalesInboundJob.created_at.desc()).first()
         result.append({
+            **review_snapshot(db,conversation),
+            'can_resume':not lead.is_opt_out and conversation.pause_reason != 'Appointment confirmed',
             "id": conversation.id, "lead_id": lead.id, "project_id": project.id,
             "campaign_id": conversation.campaign_id, "channel": conversation.channel,
             "platform": lead.platform, "source": lead.source,
@@ -561,6 +564,7 @@ def conversation_messages(
 def set_conversation_action(
     db: Session, *, company_id: str, conversation_id: str, action: str,
     sales_user_id: str | None = None, actor_user_id: str | None = None,
+    review_case_id: str | None = None, false_positive: bool = False, review_note: str | None = None,
 ) -> SalesConversation:
     query = db.query(SalesConversation).join(Lead, Lead.id == SalesConversation.lead_id).filter(
         SalesConversation.id == conversation_id,
@@ -568,15 +572,23 @@ def set_conversation_action(
     )
     if sales_user_id:
         query = query.filter(Lead.assigned_sales_user_id == sales_user_id)
-    conversation = query.first()
+    conversation = query.with_for_update().first()
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found.")
+    if false_positive and action != 'resume':
+        raise HTTPException(status_code=422, detail='False-positive review must resume the conversation.')
     if action == "resume":
         lead = db.query(Lead).filter(Lead.id == conversation.lead_id).first()
         if lead and lead.is_opt_out:
             raise HTTPException(status_code=409, detail="An opted-out lead cannot be resumed.")
         if conversation.pause_reason == "Appointment confirmed":
             raise HTTPException(status_code=409, detail="This conversation is closed because the appointment is confirmed.")
+        if lead and conversation.is_paused:
+            from .conversation_review import resolve_cases
+            resolve_cases(db,conversation,lead,actor_user_id=actor_user_id,case_id=review_case_id,
+                          false_positive=false_positive,note=review_note)
+        elif false_positive:
+            raise HTTPException(status_code=409, detail='This conversation is already active.')
         conversation.is_paused = False
         conversation.pause_reason = None
         if lead:
@@ -586,14 +598,6 @@ def set_conversation_action(
             if lead.pipeline_stage == "S09_HANDOFF":
                 lead.pipeline_stage = previous_stage or "S06_NURTURE"
             lead.meta_form_data = lead_meta
-            db.query(HumanInterventionCase).filter(
-                HumanInterventionCase.conversation_id == conversation.id,
-                HumanInterventionCase.status == "open",
-            ).update({
-                HumanInterventionCase.status: "resolved",
-                HumanInterventionCase.resolved_at: datetime.utcnow(),
-                HumanInterventionCase.resolved_by_user_id: actor_user_id,
-            }, synchronize_session=False)
             if conversation.channel in {"sms", "whatsapp"} and not db.query(SalesFollowUpJob).filter(
                 SalesFollowUpJob.conversation_id == conversation.id,
                 SalesFollowUpJob.status == "pending",
@@ -793,7 +797,10 @@ async def simulate_turn(
         })
         from app.modules.ai_core.services import get_ai_config
         routing = ((get_ai_config(db, None).agent_ventas or {}).get("intent_routing_config") or {})
-        result = apply_escalation_policy(result, inbound=inbound_text, routing=routing, event_kind=event_kind)
+        from .continuity_policy import evidenced_pause_reason, dismissed_trigger
+        candidate = evidenced_pause_reason(inbound_text)
+        dismissed = candidate if candidate and dismissed_trigger(lead,conversation.id,candidate,inbound_text) else None
+        result = apply_escalation_policy(result, inbound=inbound_text, routing=routing, event_kind=event_kind,dismissed_reason=dismissed)
         proposed_actions = result.get("proposed_actions", [])
         proposed_reply = result.get("proposed_reply")
         availability_handled = False

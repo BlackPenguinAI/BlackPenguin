@@ -205,6 +205,10 @@ class ConversationSummary(BaseModel):
     lead_profile_data: dict[str, Any] = Field(default_factory=dict)
     pipeline_stage: str = "S00_CAPTURE"
     pause_reason: str | None = None
+    intervention_cases: list[dict[str, Any]] = Field(default_factory=list)
+    processing_issue: dict[str, Any] | None = None
+    review_notice: dict[str, Any] | None = None
+    can_resume: bool = True
     last_message: str | None = None
     last_message_at: datetime | None = None
     next_action_at: datetime | None = None
@@ -245,6 +249,9 @@ class SalesMessageResponse(BaseModel):
 
 class ConversationAction(BaseModel):
     action: str = Field(pattern="^(pause|resume|human_handoff)$")
+    review_case_id: str | None = Field(default=None, max_length=36)
+    false_positive: bool = False
+    review_note: str | None = Field(default=None, max_length=2000)
 
 
 class ManualMessageCreate(BaseModel):

@@ -72,8 +72,8 @@ def run_turn(db, scope, *, message_id, understanding, expected_revision, event_k
         if task.topic.value in {'property_details','materials','pricing','inventory','appointment'} and reference_pending:
             task.status = 'awaiting_user'; continue
         call = ToolCall(operation_id=task.id, task_id=task.id, topic=task.topic, subject=task.subject,
-            property_id=(task.property_id or state.selected_property_type_id) if task.topic.value in {'property_details','materials'} else None)
-        if task.source_message_id == message.id and task.topic.value in {'property_details','materials'}:
+            property_id=(task.property_id or state.selected_property_type_id) if task.topic.value in {'property_details','materials','pricing','inventory'} else None)
+        if task.source_message_id == message.id and task.topic.value in {'property_details','materials','pricing','inventory'}:
             task.property_id = call.property_id
         if restricted(state, task):
             result = ToolResult(operation_id=task.id, status='denied', safe_message='An explicit restriction blocks this task.')

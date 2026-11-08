@@ -39,12 +39,13 @@ def test_unchanged_approved_price_does_not_claim_a_project_data_change(case):
     assert not result["response_policy_trace"]["correction"]["previous_monetary_validation"]["replaced"]
 
 
-def test_low_confidence_pause_flag_still_applies_when_material_is_missing():
+def test_low_confidence_remains_a_clarification_when_material_is_missing():
     result=apply_escalation_policy({"primary_intent":"request_visual_material","intent_confidence":.2,
         "requires_clarification":True,"requires_human":False,"commercial_context":{},
         "proposed_actions":[],"proposed_reply":"Which images do you mean?"},
         inbound="Could I see those pictures?",routing={"pause_on_missing_material":False,"pause_on_low_confidence":True})
-    assert result["escalation_decision"]["disposition"] == "pause", result["escalation_decision"]
+    assert result["escalation_decision"]["disposition"] == "notify_sales", result["escalation_decision"]
+    assert not result['requires_human']
     assert result["escalation_decision"]["reason"] == "LOW_CONFIDENCE"
 
 
@@ -90,7 +91,7 @@ def test_sales_notice_is_delivered_only_to_authorized_company_sales_staff(case):
 @pytest.mark.parametrize("material_flag",[False,True])
 @pytest.mark.parametrize("confidence",[.2,.99])
 @pytest.mark.parametrize("has_asset",[False,True])
-def test_combined_pause_flags_are_independent(low_flag,material_flag,confidence,has_asset):
+def test_combined_ordinary_pause_flags_are_advisory_and_leave_config_unchanged(low_flag,material_flag,confidence,has_asset):
     routing={"pause_on_low_confidence":low_flag,"pause_on_missing_material":material_flag}
     original=dict(routing)
     result=apply_escalation_policy({"primary_intent":"request_document","intent_confidence":confidence,
@@ -100,9 +101,13 @@ def test_combined_pause_flags_are_independent(low_flag,material_flag,confidence,
     matched=[]
     if low_flag and confidence < .8:matched.append("LOW_CONFIDENCE")
     if material_flag and not has_asset:matched.append("MISSING_MATERIAL")
-    assert result["requires_human"] == bool(matched)
-    assert result["escalation_decision"]["matched_pause_rules"] == matched
-    if matched:assert result["escalation_decision"]["reason"] == matched[0]
+    assert not result["requires_human"]
+    assert result["escalation_decision"]["matched_pause_rules"] == []
+    conditions=[]
+    if confidence < .8:conditions.append('LOW_CONFIDENCE')
+    if not has_asset:conditions.append('MISSING_MATERIAL')
+    assert result['escalation_decision']['applicable_conditions']==conditions
+    if conditions:assert result['escalation_decision']['reason']==conditions[0]
     assert routing == original
 
 
@@ -165,11 +170,12 @@ def test_uncertain_opt_out_cancels_followups_without_claiming_consent_was_change
     assert dispatch.await_args.kwargs["metadata"]["proposed_actions"] == [{"type":"ask_qualification_question"}]
 
 
-def test_uncertain_opt_out_respects_staff_pause_policy_instead_of_confirming_a_bogus_unsubscribe():
+def test_uncertain_opt_out_stays_active_despite_legacy_pause_flag():
     result=apply_escalation_policy({"primary_intent":"opt_out","intent_confidence":.4,
         "proposed_reply":"You have been unsubscribed.","requires_clarification":True},
         inbound="Maybe stop these offers?",routing={"pause_on_low_confidence":True})
-    assert result["requires_human"] and result["escalation_decision"]["reason"] == "LOW_CONFIDENCE"
+    assert not result["requires_human"] and result["escalation_decision"]["reason"] == "LOW_CONFIDENCE"
+    assert result['escalation_decision']['disposition']=='notify_sales'
     assert "unsubscribed" not in result["proposed_reply"]
 
 
@@ -183,7 +189,7 @@ def test_raw_stop_is_unconditional_even_with_invalid_model_confidence_and_staff_
 def test_high_confidence_but_explicitly_unresolved_opt_out_still_needs_confirmation():
     result=apply_escalation_policy({"primary_intent":"opt_out","intent_confidence":.99,"requires_clarification":True,
         "proposed_reply":"You have been unsubscribed.","proposed_actions":[]},inbound="Not those offers, perhaps")
-    assert result["requires_clarification"] and result["escalation_decision"]["disposition"] == "continue"
+    assert result["requires_clarification"] and result["escalation_decision"]["disposition"] in {"continue","notify_sales"}
     assert "stop all messages" in result["proposed_reply"]
 
 

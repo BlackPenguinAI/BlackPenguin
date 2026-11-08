@@ -1,7 +1,60 @@
 import '@angular/compiler';
-import { of, throwError } from 'rxjs';
+import { of, throwError, Subject } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { AgentComponent } from './agent';
+
+describe('Agent conversation review', () => {
+  function component(http: any) {
+    const value = new AgentComponent(http,{markForCheck:()=>undefined} as any,{snapshot:{queryParamMap:{get:()=>null}}} as any);
+    value.role='admin';
+    value.selected={id:'conversation',is_paused:true,can_resume:true,intervention_cases:[{id:'incident',status:'open',reason:'SECURITY',evidence:'Original message'}]};
+    vi.spyOn(value,'loadConversations').mockImplementation(()=>undefined);
+    return value;
+  }
+
+  it('records the incident, explanation and false-positive decision when resuming', () => {
+    const post=vi.fn(()=>of({id:'conversation',is_paused:false,intervention_cases:[{id:'incident',status:'false_positive'}]}));
+    const value=component({post});
+    value.reviewNote='Reviewed with the lead: this request was misunderstood.';
+    value.action('resume',true);
+    expect(post).toHaveBeenCalledWith(expect.stringContaining('/conversations/conversation/action'),{
+      action:'resume',review_case_id:'incident',false_positive:true,review_note:'Reviewed with the lead: this request was misunderstood.',
+    });
+    expect(value.selected.is_paused).toBe(false);
+    expect(value.reviewNote).toBe('');
+    expect(value.reviewingConversation).toBe(false);
+    expect(value.openIncident).toBeUndefined();
+  });
+
+  it('requires a note for false positives and prevents an opted-out conversation from resuming', () => {
+    const post=vi.fn();const value=component({post});
+    value.action('resume',true);
+    expect(post).not.toHaveBeenCalled();
+    value.reviewNote='Reviewed';value.selected.can_resume=false;
+    value.action('resume',true);value.action('resume');
+    expect(post).not.toHaveBeenCalled();
+  });
+
+  it('retains the paused state and note when the incident has changed on the server', () => {
+    const value=component({post:()=>throwError(()=>({error:{detail:'The open incident changed.'}}))});
+    value.reviewNote='Reviewed';value.action('resume',true);
+    expect(value.selected.is_paused).toBe(true);
+    expect(value.reviewNote).toBe('Reviewed');
+    expect(value.error).toBe('The open incident changed.');
+    expect(value.reviewingConversation).toBe(false);
+  });
+
+  it('prevents duplicate reviews and does not replace a different conversation after switching threads', () => {
+    const response=new Subject<any>();const post=vi.fn(()=>response);
+    const value=component({post});value.reviewNote='Reviewed';
+    value.action('resume',true);value.action('resume',true);
+    expect(post).toHaveBeenCalledTimes(1);
+    value.selected={id:'another',is_paused:true};
+    response.next({id:'conversation',is_paused:false});response.complete();
+    expect(value.selected.id).toBe('another');
+    expect(value.reviewingConversation).toBe(false);
+  });
+});
 
 describe('AgentComponent simulation form', () => {
   const component = (http: any = {}) =>

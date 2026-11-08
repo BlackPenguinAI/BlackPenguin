@@ -17,7 +17,7 @@ class ToolCall(StrictModel):
     property_id: str | None = Field(default=None, max_length=36)
 
 
-FACTS = {'financing':'payment_methods', 'delivery':'delivery_dates', 'amenities':'amenities', 'location':'location'}
+FACTS = {'financing':'payment_methods', 'delivery':'delivery_dates', 'amenities':'amenities', 'location':'exact_address'}
 EFFECT_TOPICS = {Topic.appointment, Topic.human, Topic.opt_out}
 
 
@@ -44,6 +44,10 @@ class ReadTools:
             return result('denied', safe_message='External actions are disabled in this staged runtime.')
         context = build_commercial_context(self.db, project=self.db.get(Project, self.scope.project_id),
             company_id=self.scope.company_id, lead_id=self.scope.lead_id, channel=conversation.channel)
+        from .sales_policy import policy_context, compliance_action_holds
+        holds = compliance_action_holds(policy_context(self.db,self.scope,context['confirmed_project_facts']))
+        if call.topic.value in holds:
+            return result('denied', safe_message='This action needs Sales review under approved guidance; the conversation remains active.')
         types = context['property_types']
         if call.property_id and call.property_id not in {p['id'] for p in types}:
             return result('revoked', safe_message='The selected property is no longer in the approved catalog.')
@@ -74,6 +78,12 @@ class ReadTools:
         facts = context['confirmed_project_facts']
         key = FACTS.get(call.topic.value)
         value = facts.get(key) if key else None
+        if call.topic == Topic.location:
+            address=facts.get('exact_address')
+            if isinstance(address,list):
+                address='; '.join(v if isinstance(v,str) else v.get('address','') for v in address if isinstance(v,(str,dict)))
+            parts=[v.strip() for v in (address,facts.get('city'),facts.get('country')) if isinstance(v,str) and v.strip()]
+            value = ', '.join(dict.fromkeys(parts)) or facts.get('location')
         if call.topic == Topic.delivery and any(c.get('code') == 'ready_status_future_delivery'
                                                for c in context['data_conflicts'] if isinstance(c, dict)):
             return result('conflict', safe_message='Approved delivery information needs reconciliation.')

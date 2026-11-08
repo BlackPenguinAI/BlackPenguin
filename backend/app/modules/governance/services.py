@@ -627,10 +627,24 @@ def create_intervention_case(
     if lead.pipeline_stage != "S09_HANDOFF" and not lead_meta.get("pre_handoff_pipeline_stage"):
         lead_meta["pre_handoff_pipeline_stage"] = lead.pipeline_stage
         lead.meta_form_data = lead_meta
-    dedupe_key = f"{reason}:open"
+    dedupe_key = f"{reason}:{lead.id}:open"
+    # Older releases resolved a case without releasing this unique key.
+    # Keep its history while allowing a genuinely new incident of that reason.
+    closed = db.query(HumanInterventionCase).filter(
+        HumanInterventionCase.conversation_id == conversation.id,
+        HumanInterventionCase.dedupe_key.in_([dedupe_key,f'{reason}:open']),
+        HumanInterventionCase.lead_id == lead.id,
+        HumanInterventionCase.status != 'open',
+    ).first()
+    if closed:
+        closed.dedupe_key = f'{reason}:closed:{closed.id}'
+        db.flush()
     existing = db.query(HumanInterventionCase).filter(
         HumanInterventionCase.conversation_id == conversation.id,
-        HumanInterventionCase.dedupe_key == dedupe_key,
+        HumanInterventionCase.reason == reason,
+        HumanInterventionCase.company_id == conversation.company_id,
+        HumanInterventionCase.project_id == conversation.project_id,
+        HumanInterventionCase.lead_id == lead.id,
         HumanInterventionCase.status == "open",
     ).first()
     if existing:

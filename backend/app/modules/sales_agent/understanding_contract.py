@@ -69,7 +69,7 @@ class Reference(StrictModel):
 
 
 class Preference(StrictModel):
-    key: Literal['property', 'budget', 'bedrooms', 'location', 'delivery']
+    key: Literal['property', 'budget', 'bedrooms', 'location', 'delivery', 'purchase_timeline', 'financing', 'buyer_type', 'visit_readiness']
     value: str = Field(min_length=1, max_length=500)
     evidence: str = Field(min_length=1, max_length=2000)
 

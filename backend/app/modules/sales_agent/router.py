@@ -337,6 +337,7 @@ def conversation_action(
     conversation = set_conversation_action(
         db, company_id=current_user.company_id, conversation_id=conversation_id, action=payload.action,
         sales_user_id=None, actor_user_id=current_user.id,
+        review_case_id=payload.review_case_id, false_positive=payload.false_positive, review_note=payload.review_note,
     )
     return next(item for item in conversation_summaries(
         db, company_id=current_user.company_id,

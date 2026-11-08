@@ -194,9 +194,9 @@ def record_objection(db: Session, lead: Lead, inbound_text: str) -> LeadObjectio
     return item
 
 
-def calculate_score(db: Session, lead: Lead, conversation_text: str, message_count: int) -> LeadScoreSnapshot:
+def calculate_score(db: Session, lead: Lead, conversation_text: str, message_count: int, *, scoring_config=None) -> LeadScoreSnapshot:
     text = _text(lead, conversation_text)
-    config = (get_ai_config(db, None).agent_ventas or {}).get("scoring_config", {})
+    config = scoring_config if scoring_config is not None else (get_ai_config(db, None).agent_ventas or {}).get("scoring_config", {})
     weight = lambda key, fallback: int(config.get(key, fallback))
     appointment_signal = bool(re.search(
         r"\b(appointment|schedule|openings?|available\s+times?|visit|tour|showing|"
@@ -228,7 +228,7 @@ def calculate_score(db: Session, lead: Lead, conversation_text: str, message_cou
     return snapshot
 
 
-def update_lead_intelligence(db: Session, lead: Lead, *, inbound_text: str, conversation_text: str, message_count: int) -> None:
+def update_lead_intelligence(db: Session, lead: Lead, *, inbound_text: str, conversation_text: str, message_count: int, scoring_config=None) -> None:
     workflow_locked = bool(
         lead.is_opt_out
         or lead.agent_status in {"human_control", "appointment_confirmed"}
@@ -237,7 +237,7 @@ def update_lead_intelligence(db: Session, lead: Lead, *, inbound_text: str, conv
     objection = record_objection(db, lead, inbound_text)
     complete_context = f"{conversation_text} {inbound_text}"
     assign_segment(db, lead, complete_context)
-    snapshot = calculate_score(db, lead, complete_context, message_count)
+    snapshot = calculate_score(db, lead, complete_context, message_count, scoring_config=scoring_config)
     if objection and (objection.occurrence_count >= 2 or "not ready" in inbound_text.casefold()):
         snapshot.factor_breakdown = {**snapshot.factor_breakdown, "readiness_penalty": -max(0, snapshot.total_score - 39)}
         snapshot.total_score = min(snapshot.total_score, 39)

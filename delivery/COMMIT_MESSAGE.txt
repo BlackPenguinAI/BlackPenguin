@@ -1,8 +1,1 @@
-fix: recover invalid interpretations in the active sales flow
-
-- Clarify inventory requests and material-only subjects in the interpretation prompt.
-- Reject contradictory request and exclusion evidence.
-- Retry invalid interpretations once with bounded validation feedback.
-- Preserve contract checks, consent, manual takeover and delivery idempotency.
-- Record interpretation attempts and retain the actual model on failures.
-- Replace misleading safety fallbacks and add sales recovery regression tests.
+fix(sales): keep ambiguous conversations active and audit pause reviews

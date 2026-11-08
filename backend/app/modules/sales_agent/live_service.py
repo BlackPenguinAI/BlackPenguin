@@ -41,6 +41,7 @@ from app.modules.governance.services import (
     operating_policy_for,
 )
 from .escalation_policy import apply_escalation_policy, notify_sales, escalation_reply, cancel_followups_for_consent_clarification
+from .continuity_policy import explicit_opt_out, evidenced_pause_reason, dismissed_trigger
 from app.core.config import settings
 from app.integrations.whatsapp_templates import (
     initial_template_parameters,
@@ -864,10 +865,15 @@ def material_request_text(inbound, result):
     return " ".join([inbound, *hints])
 
 
-def _schedule_next_action(db: Session, conversation: SalesConversation, lead: Lead, event_id: str) -> None:
+def _schedule_next_action(db: Session, conversation: SalesConversation, lead: Lead, event_id: str, *, refresh_pending=False) -> None:
     if lead.is_opt_out or conversation.is_paused:
         return
-    cadence = (get_ai_config(db, None).agent_ventas or {}).get("cadence_config", {})
+    if refresh_pending:
+        from app.modules.ai_core.models import AIConfiguration
+        published=db.query(AIConfiguration).filter_by(company_id=None).first()
+        cadence=(published.agent_ventas or {}).get('cadence_config',{}) if published else {}
+    else:
+        cadence = (get_ai_config(db, None).agent_ventas or {}).get("cadence_config", {})
     delays = {"hot": int(cadence.get("hot_hours", 24)), "warm": int(cadence.get("warm_hours", 72)), "cold": int(cadence.get("cold_hours", 24 * 14))}
     hours = delays.get(lead.intent_tier, 72)
     project = db.query(Project).filter(Project.id == conversation.project_id).first()
@@ -877,6 +883,13 @@ def _schedule_next_action(db: Session, conversation: SalesConversation, lead: Le
     scheduled_at = max(scheduled_at, next_allowed_proactive_time(
         db, company_id=conversation.company_id, project_id=conversation.project_id, now=scheduled_at,
     ))
+    if refresh_pending:
+        pending=db.query(SalesFollowUpJob).filter(SalesFollowUpJob.conversation_id==conversation.id,SalesFollowUpJob.status=='pending').all()
+        for job in pending:
+            if job.reason.endswith('_cadence'):
+                job.scheduled_at=scheduled_at
+                job.reason=f'{lead.intent_tier}_cadence'
+                lead.next_action_at=scheduled_at
     if not db.query(SalesFollowUpJob).filter(
         SalesFollowUpJob.conversation_id == conversation.id,
         SalesFollowUpJob.status == "pending",
@@ -1208,7 +1221,7 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
         project = db.query(Project).filter(Project.id == conversation.project_id, Project.company_id == conversation.company_id).one()
         if lead.is_opt_out:
             return
-        if inbound.content.strip().upper() in {"STOP", "UNSUBSCRIBE", "CANCEL", "END", "QUIT"}:
+        if explicit_opt_out(inbound.content):
             lead.is_opt_out = True; lead.consent_status = "opted_out"; lead.agent_status = "paused"
             conversation.is_paused = True; conversation.pause_reason = "Lead opted out"
             lead.next_action_at = None
@@ -1218,7 +1231,13 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
             return
         if conversation.is_paused:
             return
-        mandatory_reason = escalation_reason(inbound.content)
+        mandatory_reason = evidenced_pause_reason(inbound.content)
+        previous = latest_outbound(db,conversation.id)
+        if previous and (previous.metadata_json or {}).get('control_confirmation')=='human' and _affirmative_slot_reply(inbound.content):
+            mandatory_reason='HUMAN_REQUESTED'
+        dismissed_reason = mandatory_reason if mandatory_reason and dismissed_trigger(lead,conversation.id,mandatory_reason,inbound.content) else None
+        if dismissed_reason:
+            mandatory_reason = None
         if mandatory_reason:
             intervention_actions = [{
                 "type": "request_callback" if mandatory_reason == "HUMAN_REQUESTED" else "request_human_review",
@@ -1315,7 +1334,7 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
             "event_kind": "lead_message", "requires_human": False, "policy_violations": [],
         })
         routing = ((get_ai_config(db, None).agent_ventas or {}).get("intent_routing_config") or {})
-        result = apply_escalation_policy(result, inbound=inbound.content, routing=routing)
+        result = apply_escalation_policy(result, inbound=inbound.content, routing=routing, dismissed_reason=dismissed_reason)
         reply = result.get("proposed_reply")
         actions = result.get("proposed_actions", [])
         if result.get("error_code") == "invalid_model_contract":
@@ -1442,6 +1461,7 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
                     "inbound_message_id": inbound.id,
                     "sales_asset_share_ids": share_ids,
                     "escalation_decision": decision,
+                    "control_confirmation": decision.get('control_confirmation'),
                     "selected_property_type_id": result.get("selected_property_type_id"),
                     **({"property_catalog_offer":result["property_catalog_offer"]} if result.get("property_catalog_offer") else {}),
                     **({"material_offer":material_offer} if material_offer else {}),
@@ -1604,7 +1624,9 @@ async def send_manual_message(db: Session, *, conversation_id: str, company_id: 
         role="human", agent_run_id=None, author_user_id=user_id,
         metadata={"event_kind": f"manual_{conversation.channel}"},
     )
-    conversation.pause_reason = "Manual control active"
+    # Preserve the incident's original reason while staff reply to the lead.
+    if not (conversation.pause_reason or '').startswith('Human intervention:'):
+        conversation.pause_reason = "Manual control active"
     conversation.updated_at = datetime.utcnow(); db.commit()
     return message
 
@@ -1636,6 +1658,9 @@ async def process_live_followup_job(job_id: str) -> None:
             Project.id == conversation.project_id,
             Project.company_id == conversation.company_id,
         ).one()
+        from .active_service import active_followup_requires_review
+        if active_followup_requires_review(db,conversation):
+            job.status='cancelled'; job.processed_at=datetime.utcnow(); db.commit(); return
         allowed_at = next_allowed_proactive_time(
             db, company_id=conversation.company_id, project_id=conversation.project_id, now=datetime.utcnow(),
         )

@@ -293,13 +293,35 @@
             ><small>{{ selected.phone }} · {{ selected.campaign_name || leadSourceLabel }}</small></span
           >
         </div>
-        <button class="pause" (click)="action(selected.is_paused ? 'resume' : 'pause')">
+        <button class="pause" (click)="action(selected.is_paused ? 'resume' : 'pause')" [disabled]="reviewingConversation || (selected.is_paused && !canResume)">
           <span class="material-symbols-outlined">{{
             selected.is_paused ? 'play_arrow' : 'pause'
           }}</span
           >{{ selected.is_paused ? 'Resume' : 'Pause' }}
         </button>
       </div>
+      <section class="conversation-review m-3 max-h-[38vh] shrink-0 overflow-auto rounded-xl border border-amber-700 bg-amber-950/30 p-3 text-xs text-amber-100" *ngIf="selected.is_paused" aria-label="Conversation pause review">
+        <strong>AI paused · review required</strong>
+        <p>{{ selected.pause_reason || 'Review the conversation before resuming.' }}</p>
+        <ng-container *ngIf="openIncident as incident">
+          <small>Rule: {{ incident.reason }} · {{ asUtcDate(incident.created_at) | date:'short' }}</small>
+          <blockquote class="my-2 whitespace-pre-wrap break-words border-l-2 border-amber-600 pl-3">{{ incident.evidence || 'No message evidence was recorded for this incident.' }}</blockquote>
+          <p>The messages below provide the conversation context. You can reply manually while the AI is paused.</p>
+          <ng-container *ngIf="canResume && canManualControl">
+            <label>Review note<textarea class="my-2 block w-full rounded-lg border border-neutral-600 bg-neutral-950 p-2 text-white" [(ngModel)]="reviewNote" maxlength="2000" rows="2" placeholder="Explain the review or why this was a false positive"></textarea></label>
+            <div class="review-actions mt-2 flex flex-wrap gap-3">
+              <button class="rounded-lg border border-amber-700 px-3 py-2 disabled:opacity-50" (click)="action('resume')" [disabled]="reviewingConversation">Resume AI</button>
+              <button class="rounded-lg border border-amber-700 px-3 py-2 disabled:opacity-50" (click)="action('resume', true)" [disabled]="reviewingConversation || !reviewNote.trim()">False positive · resume AI</button>
+            </div>
+          </ng-container>
+        </ng-container>
+        <p *ngIf="!canResume">This conversation cannot be resumed from this control.</p>
+      </section>
+      <section class="conversation-review advisory m-3 shrink-0 rounded-xl border border-emerald-800 bg-emerald-950/30 p-3 text-xs text-emerald-100" *ngIf="!selected.is_paused && (selected.processing_issue || selected.review_notice)">
+        <strong>AI active · attention requested</strong>
+        <p>{{ selected.processing_issue?.message || 'An action needs verification. The conversation remains active.' }}</p>
+        <small>{{ selected.processing_issue?.reason || selected.review_notice?.reason }}</small>
+      </section>
       <div class="thread" #thread>
         <div *ngIf="loadingMessages && !messages.length" class="loading">Loading messages…</div>
         <div class="generation-state" *ngIf="generatingInitial">
@@ -408,6 +430,15 @@
         <ng-container *ngIf="!isLive"><dt>Protocol review</dt><dd>{{ selected.approval_status || 'pending' }}</dd></ng-container>
         <ng-container *ngIf="selected.pause_reason"><dt>Pause reason</dt><dd>{{ selected.pause_reason }}</dd></ng-container>
       </dl>
+      <details *ngIf="selected.intervention_cases?.length" class="conversation-review m-3 max-h-[38vh] shrink-0 overflow-auto rounded-xl border border-amber-700 bg-amber-950/30 p-3 text-xs text-amber-100">
+        <summary>Intervention history</summary>
+        <article class="mt-3 break-words border-t border-amber-900 pt-2" *ngFor="let incident of selected.intervention_cases">
+          <strong>{{ incident.reason }} · {{ incident.status }}</strong>
+          <small>{{ asUtcDate(incident.created_at) | date:'short' }}</small>
+          <p>{{ incident.evidence }}</p>
+          <p *ngIf="incident.resolution">Review: {{ incident.resolution.note }}<br>By {{ incident.resolution.reviewer_name || 'Administrator' }} · {{ asUtcDate(incident.resolution.at) | date:'short' }}</p>
+        </article>
+      </details>
       <div class="clock" *ngIf="selected.simulation_id && !selected.appointment_id">
         <strong>Test follow-up cadence</strong>
         <div>

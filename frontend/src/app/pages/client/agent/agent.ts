@@ -55,6 +55,8 @@ export class AgentComponent implements OnInit, OnDestroy {
   deletingSimulation = false;
   generatingInitial = false;
   retryingTurn = false;
+  reviewingConversation = false;
+  reviewNote = '';
   setupOpen = true;
   setupMode: 'simulation' | 'live_meta' = 'live_meta';
   leadSourceCode = 'manual';
@@ -518,6 +520,7 @@ export class AgentComponent implements OnInit, OnDestroy {
     this.selected = conversation;
     this.setupOpen = false;
     if (changed) {
+      this.reviewNote = '';
       this.messages = [];
       this.slots = [];
       this.selectedSlot = '';
@@ -895,13 +898,37 @@ export class AgentComponent implements OnInit, OnDestroy {
       });
   }
 
-  action(action: 'pause' | 'resume' | 'human_handoff'): void {
-    if (!this.selected) return;
+  get openIncident(): any {
+    return this.selected?.intervention_cases?.find((item: any) => item.status === 'open');
+  }
+
+  get canResume(): boolean {
+    return ['admin','assistant','mkt'].includes(this.role) && this.selected?.can_resume !== false;
+  }
+
+  action(action: 'pause' | 'resume' | 'human_handoff', falsePositive = false): void {
+    if (!this.selected || this.reviewingConversation) return;
+    if (action === 'resume' && !this.canResume) return;
+    if (falsePositive && (!this.canManualControl || !this.openIncident || !this.reviewNote.trim())) return;
+    this.reviewingConversation = true;
+    this.error = '';
+    const payload: any = { action };
+    const conversationId = this.selected.id;
+    if (action === 'resume') {
+      payload.review_case_id = this.openIncident?.id || null;
+      payload.false_positive = falsePositive;
+      payload.review_note = this.reviewNote.trim() || null;
+    }
     this.http
-      .post<any>(`${API_V1_URL}/sales-agent/conversations/${this.selected.id}/action`, { action })
+      .post<any>(`${API_V1_URL}/sales-agent/conversations/${conversationId}/action`, payload)
+      .pipe(finalize(() => { this.reviewingConversation = false; this.cdr.markForCheck(); }))
       .subscribe({
         next: (row) => {
-          this.selected = row;
+          if (this.selected?.id === conversationId) {
+            this.selected = row;
+            this.reviewNote = '';
+          }
+          this.success = falsePositive ? 'False positive recorded. The AI is active; the same reviewed trigger will not pause this conversation again.' : 'Conversation control updated.';
           this.loadConversations(true);
         },
         error: (err) => {

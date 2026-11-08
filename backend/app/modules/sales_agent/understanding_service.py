@@ -58,6 +58,10 @@ async def preview(db, scope: Scope, *, inbound_message_id: str, expected_revisio
     project = db.get(Project, scope.project_id)
     commercial = build_commercial_context(db, project=project, company_id=scope.company_id,
         lead_id=scope.lead_id, channel=conversation.channel)
+    from .sales_policy import policy_context
+    from app.modules.sales_crm.models import Lead
+    commercial['sales_policy'] = policy_context(db, scope, commercial['confirmed_project_facts'])
+    commercial['lead_qualification'] = db.get(Lead,scope.lead_id).lead_profile_data or {}
     history = scoped_messages_query(db, conversation).filter(SalesMessage.created_at <= inbound.created_at,
         SalesMessage.id != inbound.id).order_by(SalesMessage.created_at.desc(), SalesMessage.id.desc()).limit(20).all()
     messages = [
@@ -66,7 +70,9 @@ async def preview(db, scope: Scope, *, inbound_message_id: str, expected_revisio
             'state': state.model_dump(mode='json'), 'approved_context': commercial,
             'history': [{'role': m.role, 'content': m.content} for m in reversed(history)
                         if (m.metadata_json or {}).get('lead_id', scope.lead_id) == scope.lead_id],
-            'current_message': inbound.content}, ensure_ascii=False, default=str)},
+            'current_message': inbound.content,
+            'qualification_offer': next(((m.metadata_json or {}).get('qualification_offer') for m in history
+                                         if m.direction == 'outbound'), None)}, ensure_ascii=False, default=str)},
     ]
     if sum(len(item['content'].encode()) for item in messages) > 64000:
         raise ValueError('Preview context exceeds the 64 KB evaluation limit; no model was called.')
