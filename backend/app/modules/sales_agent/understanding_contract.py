@@ -91,6 +91,7 @@ class Understanding(StrictModel):
     references: list[Reference] = Field(max_length=20)
     preferences: list[Preference] = Field(max_length=20)
     releases: list[ConstraintRelease] = Field(default_factory=list, max_length=20)
+    appointment_query: Literal['active','past','cancelled','all'] | None = None
     requires_clarification: StrictBool
     clarification_question: str | None = Field(max_length=500)
     confidence: float = Field(ge=0, le=1, strict=True)
@@ -167,14 +168,37 @@ class ToolResult(StrictModel):
     safe_message: str | None = Field(default=None, max_length=1000)
 
 
+class TurnMemory(StrictModel):
+    version: Literal['sales-turn-memory/1.0']='sales-turn-memory/1.0'
+    as_of_message_id: str | None = Field(default=None,max_length=36)
+    recent_turns: list[dict] = Field(default_factory=list,max_length=8)
+    answered_topics: list[Topic] = Field(default_factory=list,max_length=30)
+
+
+class ChangeProposal(StrictModel):
+    id: str = Field(min_length=1,max_length=60)
+    kind: Literal['reschedule','cancel','property_visit_change']
+    meeting_id: str = Field(min_length=1,max_length=36)
+    booking_sha256: str = Field(pattern=r'^[0-9a-f]{64}$')
+    expires_at: AwareDatetime
+    target_project_id: str | None = Field(default=None,max_length=36)
+    target_property_type_id: str | None = Field(default=None,max_length=36)
+    target_unit_id: str | None = Field(default=None,max_length=36)
+    starts_at: AwareDatetime | None = None
+    availability: Literal['not_checked']='not_checked'
+
+
 class DialogueState(StrictModel):
     version: Literal['sales-dialogue/1.0'] = 'sales-dialogue/1.0'
     selected_property_type_id: str | None = Field(default=None, min_length=1, max_length=36)
+    selected_unit_id: str | None = Field(default=None,min_length=1,max_length=36)
     tasks: list[Task] = Field(default_factory=list, max_length=100)
     constraints: list[Constraint] = Field(default_factory=list, max_length=100)
     offers: list[Offer] = Field(default_factory=list, max_length=50)
     preferences: list[Preference] = Field(default_factory=list, max_length=100)
     last_understanding: Understanding | None = None
+    memory: 'TurnMemory' = Field(default_factory=lambda: TurnMemory())
+    change_proposals: list['ChangeProposal'] = Field(default_factory=list,max_length=10)
 
     @model_validator(mode='after')
     def task_dependencies(self):

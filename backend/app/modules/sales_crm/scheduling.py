@@ -389,6 +389,9 @@ def create_agent_appointment(
     modality: str,
     visit_location: object | None = None,
     defer_calendar: bool = False,
+    visit_property_type_id: str | None = None,
+    visit_unit_id: str | None = None,
+    capture_visit_context: bool = False,
 ) -> tuple[Meeting, User]:
     starts_at = starts_at.replace(tzinfo=None) if starts_at.tzinfo else starts_at
     # Lock every candidate Sales user in a stable order before rechecking
@@ -451,6 +454,9 @@ def create_agent_appointment(
         source="agent_simulation" if lead.is_demo else "agent_sms",
         notes="Appointment confirmed by the AI Sales Agent.",
     )
+    if capture_visit_context or visit_property_type_id or visit_unit_id:
+        from app.modules.sales_agent.appointment_context import bind_visit
+        bind_visit(db,meeting,company_id=lead.company_id,property_type_id=visit_property_type_id,unit_id=visit_unit_id)
     lead.assigned_sales_user_id = user.id
     lead.funnel_stage = FunnelStage.APPOINTMENT_SET
     lead.stage_changed_at = datetime.utcnow()

@@ -183,6 +183,18 @@ def _appointment(db,scope,conversation,lead,project,outcome,inbound):
     from . import live_service as live
     from .service import _confirm_or_request_location
     u=outcome.state.last_understanding
+    from .next_flow import selected as next_selected
+    if next_selected(scope) and u.appointment_query and u.permits('appointment'):
+        if u.requires_clarification or u.confidence<.8:return 'Which appointment would you like to review?',{},[]
+        from .sales_policy import policy_context,compliance_action_holds
+        from .commercial_context import confirmed_profile_facts
+        if 'appointment' in compliance_action_holds(policy_context(db,scope,confirmed_profile_facts(project.profile))):
+            return 'The Sales team needs to verify this appointment information.',{},[]
+        from .appointment_context import AppointmentReadTool,render
+        result=AppointmentReadTool(db,scope).execute({'category':u.appointment_query})
+        for task in outcome.state.tasks:
+            if task.topic.value=='appointment' and task.source_message_id==inbound.id:task.status='completed'
+        return render(result),{'appointment_query':result},[]
     if not u.permits('appointment'):
         return '',{},[]
     if any(t.topic.value=='appointment' and (restricted(outcome.state,t) or t.status=='awaiting_user') for t in outcome.state.tasks if t.source_message_id==inbound.id):
@@ -211,7 +223,16 @@ def _appointment(db,scope,conversation,lead,project,outcome,inbound):
         if starts.tzinfo:starts=starts.astimezone(timezone.utc).replace(tzinfo=None)
         from app.modules.sales_crm.scheduling import create_agent_appointment
         try:
-            meeting,user=create_agent_appointment(db,lead=lead,starts_at=starts,duration_minutes=45,modality='showroom',defer_calendar=True)
+            visit_kwargs={}
+            if next_selected(scope):
+                # Bind to the original slot offer, never whichever property the
+                # lead happened to ask about afterwards. Legacy offers stay unknown.
+                offer=next((o for o in outcome.state.offers if o.kind=='appointment' and slot['id'] in o.option_ids),None)
+                row=scoped_messages_query(db,conversation).filter_by(id=offer.message_id).first() if offer else None
+                binding=((row.metadata_json or {}).get('appointment_offer') or {}) if row else {}
+                visit_kwargs={'visit_property_type_id':binding.get('property_type_id'),'visit_unit_id':binding.get('unit_id'),'capture_visit_context':True}
+                if binding.get('visit_location'):visit_kwargs['visit_location']=binding['visit_location']
+            meeting,user=create_agent_appointment(db,lead=lead,starts_at=starts,duration_minutes=45,modality='showroom',defer_calendar=True,**visit_kwargs)
         except HTTPException as exc:
             if exc.status_code!=409:raise
         else:
@@ -221,7 +242,10 @@ def _appointment(db,scope,conversation,lead,project,outcome,inbound):
             return live._appointment_confirmation(project=project,lead=lead,user=user,starts_at=meeting.meeting_time),{'meeting_id':meeting.id},[{'type':'appointment_confirmed','meeting_id':meeting.id}]
     reply,slots=live._availability_reply(db,project=project,inbound_text=resume or inbound.content,now=datetime.utcnow())
     lead.pipeline_stage='S08_APPOINTMENT'
-    return reply,{'appointment_offer':{'slots':[s.isoformat() for s in slots],'duration_minutes':45,'project_timezone':project.timezone or 'UTC'}},[{'type':'request_available_slots'}]
+    offer={'slots':[s.isoformat() for s in slots],'duration_minutes':45,'project_timezone':project.timezone or 'UTC'}
+    if next_selected(scope):offer.update(project_id=scope.project_id,property_type_id=outcome.state.selected_property_type_id,
+        unit_id=outcome.state.selected_unit_id,visit_location=(lead.meta_form_data or {}).get('selected_visit_location'))
+    return reply,{'appointment_offer':offer},[{'type':'request_available_slots'}]
 
 
 def _calendar_after_commit(db,meeting_id,scope):
@@ -286,7 +310,11 @@ def active_followup_result(db,scope):
     conversation,lead,project=_current(db,scope)
     from .sales_policy import next_question
     context=build_commercial_context(db,project=project,company_id=scope.company_id,lead_id=scope.lead_id,channel=conversation.channel)
-    _,question=next_question(lead,context['confirmed_project_facts'])
+    from .next_flow import selected as next_selected
+    if next_selected(scope):
+        from .lead_profile import qualification
+        _,_,question=qualification(lead,context['confirmed_project_facts'])
+    else:_,question=next_question(lead,context['confirmed_project_facts'])
     _,state=load(db,scope)
     chosen=next((p['property_type'] for p in context['property_types'] if p['id']==state.selected_property_type_id),None)
     reply=question or ('Would you like to continue reviewing '+chosen+'?' if chosen else 'Would you like to continue with property details, approved materials, or financing?')
@@ -387,6 +415,7 @@ async def maybe_process_active(db,conversation,inbound):
             text=draft.text
             text='\n\n'.join(b for b in text.split('\n\n') if not b.startswith('Available material:'))
             metadata={'engine':ENGINE,'inbound_message_id':inbound.id,'selected_property_type_id':outcome.state.selected_property_type_id}
+            if next_enabled:metadata['selected_unit_id']=outcome.state.selected_unit_id
             metadata['requested_topics']=sorted({r.topic.value for r in u.requests if r.polarity=='request'})
             metadata['policy_holds_at_prepare']=sorted(action_holds)
             if next_enabled:metadata['action_policy']=approved_policy.get('action_policy')
@@ -442,17 +471,30 @@ async def maybe_process_active(db,conversation,inbound):
                 from .sales_policy import capture, next_question, missing_fields
                 from app.modules.sales_crm.intelligence import update_lead_intelligence
                 chosen=next((p for p in commercial['property_types'] if p['id']==outcome.state.selected_property_type_id),None)
-                capture(lead,safe_u,inbound.id,selected_property=chosen)
+                if next_enabled:
+                    from .lead_profile import capture as capture_profile
+                    capture_profile(db,scope,safe_u,inbound.id,selected_property=chosen)
+                else:capture(lead,safe_u,inbound.id,selected_property=chosen)
                 history=scoped_messages_query(db,conversation).filter(SalesMessage.created_at<=inbound.created_at).order_by(SalesMessage.created_at,SalesMessage.id).all()
                 lead_text,count=live._lead_intelligence_input(history)
                 config=db.query(AIConfiguration).filter_by(company_id=None).first()
-                update_lead_intelligence(db,lead,inbound_text=inbound.content,conversation_text=lead_text,message_count=count,
-                                         scoring_config=(config.agent_ventas or {}).get('scoring_config',{}) if config else {})
-                metadata['qualification_missing']=missing_fields(lead,commercial['confirmed_project_facts'])
+                if next_enabled:
+                    # Reporting scores do not assign a persona or reinterpret
+                    # workflow state from a bag of form/history keywords.
+                    from app.modules.sales_crm.intelligence import calculate_score
+                    from .lead_profile import qualification
+                    calculate_score(db,lead,lead_text,count,scoring_config=(config.agent_ventas or {}).get('scoring_config',{}) if config else {})
+                    metadata['qualification_missing']=qualification(lead,commercial['confirmed_project_facts'])[0]
+                else:
+                    update_lead_intelligence(db,lead,inbound_text=inbound.content,conversation_text=lead_text,message_count=count,
+                        scoring_config=(config.agent_ventas or {}).get('scoring_config',{}) if config else {})
+                    metadata['qualification_missing']=missing_fields(lead,commercial['confirmed_project_facts'])
                 if not safe_u.requests and safe_u.preferences:
                     text='Thanks, I have recorded that information. What would you like to explore next?'
                 if safe_u.confidence>=.8 and not safe_u.permits('appointment') and not previous_meta.get('material_offer') and not links:
-                    field,question=next_question(lead,commercial['confirmed_project_facts'],record=True)
+                    if next_enabled:
+                        _,field,question=qualification(lead,commercial['confirmed_project_facts'],record_asked=True)
+                    else:field,question=next_question(lead,commercial['confirmed_project_facts'],record=True)
                     if question:
                         if not safe_u.requests and safe_u.preferences:
                             text='Thanks, I have recorded that information.'
@@ -475,6 +517,8 @@ async def maybe_process_active(db,conversation,inbound):
             if next_enabled:
                 metadata['configuration_ref']=trace.get('configuration_ref')
                 metadata['playbook_selection']=trace.get('playbook_selection')
+                metadata['turn_context_version']=trace.get('turn_context_version')
+                metadata['turn_context_sha256']=trace.get('turn_context_sha256')
             run.input_snapshot={**run.input_snapshot,'understanding':safe_u.model_dump(mode='json'),'runtime_policy':policy.model_dump()}
             run.output_snapshot={'engine':ENGINE,'reply_ready':True,'reply':text,'metadata':metadata,'proposed_actions':actions,
                 'sales_asset_share_ids':share_ids,'delivered_task_ids':list(delivered),'state_revision':final_revision,
@@ -569,6 +613,13 @@ async def maybe_process_active(db,conversation,inbound):
         if task.id in data.get('delivered_task_ids',[]):task.status='completed'
         if task.source_message_id==inbound.id and task.topic.value in {'human','opt_out'} and own_control:task.status='completed'
         if task.source_message_id==inbound.id and task.topic.value=='appointment' and metadata.get('meeting_id'):task.status='completed'
+    from .next_flow import selected as next_selected
+    if next_selected(scope) and not metadata.get('language_hold') and run.input_snapshot.get('understanding'):
+        from .turn_memory import remember
+        remember(state,message_id=inbound.id,at=inbound.created_at,
+            understanding=Understanding.model_validate(run.input_snapshot['understanding']),
+            answered_topics=[t.topic for t in state.tasks if t.status=='completed' and t.source_message_id==inbound.id],
+            interest={'property_type_id':metadata.get('selected_property_type_id'),'unit_id':metadata.get('selected_unit_id')})
     if not scope.query(db,SalesDialogueEvent).filter_by(event_key='active-receipt:'+inbound.id).first():
         save(db,scope,event_key='active-receipt:'+inbound.id,expected_revision=revision,state=state,
             metadata={'engine':ENGINE,'message_id':inbound.id,'run_id':run.id,'delivery_state':'provider_accepted_not_delivery_confirmed','share_ids':metadata['sales_asset_share_ids']})

@@ -36,6 +36,7 @@ too very much many few less just actually instead sorry nothing something anythi
 everything whenever wherever currently verified approved recorded new old previous
 open closed sent delivered read received unavailable unconfirmed until into around
 howdy goodbye bye bye-bye stop unsubscribe end quit yes absolutely fine details don'''.split())
+ENGLISH.update('active past cancelled canceled recorded specialist specialists showroom status duration progress'.split())
 
 
 @dataclass(frozen=True)

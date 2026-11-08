@@ -315,6 +315,14 @@ def create_meeting(db: Session, payload: MeetingCreate, company_id: str, assigne
     
     if not lead or not project or lead.project_id != project.id or (payload.broker_id and not broker):
         raise HTTPException(status_code=400, detail="Lead o Broker inválido.")
+    # Validate explicit visit references before any external Calendar call.
+    visit_reference=None
+    if payload.visit_property_type_id or payload.visit_unit_id:
+        from app.modules.sales_agent.appointment_context import bind_visit
+        proposal=Meeting(project_id=project.id,lead_id=lead.id)
+        try:visit_reference=bind_visit(db,proposal,company_id=company_id,
+            property_type_id=payload.visit_property_type_id,unit_id=payload.visit_unit_id)
+        except PermissionError as exc:raise HTTPException(422,str(exc)) from exc
     selected_location = resolve_visit_location(project, payload.visit_location)
     if not selected_location:
         raise HTTPException(status_code=409, detail={
@@ -343,6 +351,9 @@ def create_meeting(db: Session, payload: MeetingCreate, company_id: str, assigne
     )
     meeting = Meeting(
         project_id=payload.project_id,
+        visit_property_type_id=payload.visit_property_type_id,
+        visit_unit_id=payload.visit_unit_id,
+        visit_context=visit_reference,
         lead_id=payload.lead_id,
         broker_id=payload.broker_id,
         assigned_sales_user_id=target_sales_user_id,

@@ -8,9 +8,10 @@ BP_MODE="${1:-test}"
 case "$BP_MODE" in
     test) BP_ARGS=(-m pytest tests/test_sales_ai_group_a.py -q --disable-warnings) ;;
     group-b) BP_ARGS=(-m pytest tests/test_sales_ai_group_b.py -q --disable-warnings) ;;
+    group-c) BP_ARGS=(-m pytest tests/test_sales_ai_group_c.py -q --disable-warnings) ;;
     baseline) BP_ARGS=(-m pytest tests -q --disable-warnings) ;;
     replay) BP_ARGS=(-m tools.sales_ai.replay --output "${2:?Provide the report output path}") ;;
-    *) printf 'Usage: bash tools/sales_ai/offline.sh test|group-b|baseline|replay OUTPUT\n' >&2; exit 2 ;;
+    *) printf 'Usage: bash tools/sales_ai/offline.sh test|group-b|group-c|baseline|replay OUTPUT\n' >&2; exit 2 ;;
 esac
 exec env SECRET_KEY=group-a-offline-test ACCESS_TOKEN_EXPIRE_MINUTES=60 \
     DATABASE_URL=sqlite:// ENVIRONMENT=test \

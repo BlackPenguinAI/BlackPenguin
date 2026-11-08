@@ -80,6 +80,8 @@ class MeetingCreate(BaseModel):
     duration_minutes: int = Field(default=45, ge=15, le=480)
     modality: str = "virtual"
     visit_location: Optional[str] = None
+    visit_property_type_id: Optional[str] = Field(default=None,max_length=36)
+    visit_unit_id: Optional[str] = Field(default=None,max_length=36)
     notes: Optional[str] = None
 
 class MeetingUpdate(BaseModel):
@@ -110,6 +112,9 @@ class MeetingAttachmentResponse(BaseModel):
 class MeetingResponse(BaseModel):
     id: str
     project_id: str
+    visit_property_type_id: Optional[str] = None
+    visit_unit_id: Optional[str] = None
+    visit_context: Optional[dict] = None
     lead_id: str
     broker_id: Optional[str] = None
     assigned_sales_user_id: Optional[str] = None

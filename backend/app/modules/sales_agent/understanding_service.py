@@ -71,17 +71,29 @@ async def preview(db, scope: Scope, *, inbound_message_id: str, expected_revisio
     from app.modules.sales_crm.models import Lead
     commercial['sales_policy'] = policy_context(db, scope, commercial['confirmed_project_facts'])
     commercial['lead_qualification'] = db.get(Lead,scope.lead_id).lead_profile_data or {}
+    turn_context=None
+    if next_enabled:
+        from .turn_memory import build
+        turn_context=build(db,scope,inbound_message_id=inbound.id)
+        commercial.pop('lead_qualification',None)
     history = scoped_messages_query(db, conversation).filter(SalesMessage.created_at <= inbound.created_at,
         SalesMessage.id != inbound.id).order_by(SalesMessage.created_at.desc(), SalesMessage.id.desc()).limit(20).all()
+    context_history=turn_context.pop('history') if turn_context else None
+    context_payload={'published_guidance': snapshot['published_guidance'],
+        'state': state.model_dump(mode='json'), 'approved_context': commercial,
+        'history': context_history if context_history is not None else [{'role':m.role,'content':m.content} for m in reversed(history)
+            if (m.metadata_json or {}).get('lead_id',scope.lead_id)==scope.lead_id],
+        'current_message':inbound.content,
+        'qualification_offer':turn_context.get('qualification_offer') if turn_context else next(((m.metadata_json or {}).get('qualification_offer') for m in history if m.direction=='outbound'),None)}
+    if turn_context:context_payload['turn_context']=turn_context
+    if turn_context:
+        # The backend retains the complete state. Avoid copying a growing audit
+        # history into the model twice; this is a reference projection only.
+        context_payload['state']={'version':state.version,'selected_property_type_id':state.selected_property_type_id,
+            'selected_unit_id':state.selected_unit_id,'offers':[o.model_dump(mode='json') for o in state.offers]}
     messages = [
         {'role': 'system', 'content': snapshot['system']},
-        {'role': 'user', 'content': json.dumps({'published_guidance': snapshot['published_guidance'],
-            'state': state.model_dump(mode='json'), 'approved_context': commercial,
-            'history': [{'role': m.role, 'content': m.content} for m in reversed(history)
-                        if (m.metadata_json or {}).get('lead_id', scope.lead_id) == scope.lead_id],
-            'current_message': inbound.content,
-            'qualification_offer': next(((m.metadata_json or {}).get('qualification_offer') for m in history
-                                         if m.direction == 'outbound' and not (next_enabled and (m.metadata_json or {}).get('language_hold'))), None)}, ensure_ascii=False, default=str)},
+        {'role': 'user', 'content': json.dumps(context_payload,ensure_ascii=False,default=str)},
     ]
     if sum(len(item['content'].encode()) for item in messages) > 64000:
         raise ValueError('Preview context exceeds the 64 KB evaluation limit; no model was called.')
@@ -164,6 +176,8 @@ async def preview(db, scope: Scope, *, inbound_message_id: str, expected_revisio
     if 'configuration_ref' in snapshot:
         metadata['configuration_ref']=snapshot['configuration_ref']
         metadata['playbook_selection']=snapshot['published_guidance']['selection']
+        metadata['turn_context_version']=turn_context['version'] if turn_context else None
+        metadata['turn_context_sha256']=hashlib.sha256(json.dumps(turn_context,sort_keys=True,default=str).encode()).hexdigest()
     saved_revision, saved_state = save(db, scope, event_key=event_key, expected_revision=revision,
         state=state, kind='understanding_preview', metadata=metadata)
     return PreviewOutcome(saved_revision, saved_state, outcome)

@@ -1,0 +1,149 @@
+{
+  "version": "sales-ai-group-c-report/1.0",
+  "date": "2026-11-08",
+  "base_commit": "5ec0c2875260b699ba0bdb5364a3b6a3f65dd9dc",
+  "main_reverified_at_close": "5ec0c2875260b699ba0bdb5364a3b6a3f65dd9dc",
+  "branch": "sales-ai/group-c-profile-context",
+  "steps": [
+    5,
+    6
+  ],
+  "status": "implemented_and_verified",
+  "checks": [
+    {
+      "name": "group_c_focused",
+      "passed": 71,
+      "skipped": 0,
+      "warnings": 1734,
+      "seconds": 7.4,
+      "failed": 0,
+      "exit_code": 0
+    },
+    {
+      "name": "full_backend_checkout",
+      "passed": 1662,
+      "skipped": 2,
+      "warnings": 18718,
+      "seconds": 94.63,
+      "failed": 0,
+      "exit_code": 0
+    },
+    {
+      "name": "isolated_actions_layout",
+      "passed": 1662,
+      "skipped": 2,
+      "warnings": 18718,
+      "seconds": 97.52,
+      "failed": 0,
+      "exit_code": 0,
+      "physical_copies": true,
+      "checkout_imports": false,
+      "unchanged_reference_files": 210,
+      "matching_application_tools_migration_files": 260
+    },
+    {
+      "name": "group_a_safety_replay",
+      "passed": 20,
+      "total": 20,
+      "exit_code": 0,
+      "model_quality_evaluated": false,
+      "external_actions": 0
+    },
+    {
+      "name": "sqlite_visit_migration",
+      "checks": [
+        "nullable new references",
+        "no historical backfill",
+        "upgrade/downgrade/upgrade",
+        "attachments preserved with foreign_keys=ON"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "postgres_migration_sql_generation",
+      "from": "20261106_sales_dialogue",
+      "to": "20261108_sales_visit_context",
+      "connected_to_database": false,
+      "exit_code": 0
+    },
+    {
+      "name": "alembic_heads",
+      "heads": [
+        "20261108_sales_visit_context"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "dependency_consistency",
+      "command": "python -m pip check",
+      "exit_code": 0
+    },
+    {
+      "name": "whitespace",
+      "command": "git diff --check",
+      "exit_code": 0
+    }
+  ],
+  "environment": {
+    "python": "3.12.14",
+    "pytest": "9.1.1",
+    "SQLAlchemy": "2.0.50",
+    "fastapi": "0.136.3",
+    "pydantic": "2.13.4",
+    "langdetect": "1.0.9",
+    "alembic": "1.18.4"
+  },
+  "coverage": {
+    "new_tests": 71,
+    "group_b_regressions_in_full_suite": 75,
+    "exported_projects": 6,
+    "channels": [
+      "sms",
+      "whatsapp"
+    ],
+    "real_catalog_context_turns": 12,
+    "meta_business_answers": "SYNTHETIC_TEST_ONLY",
+    "model": "INJECTED_SCRIPTED",
+    "providers": "MOCKED",
+    "profile_corrections_and_refusals": true,
+    "booking_interest_separation": true,
+    "original_offer_booking_references": true,
+    "read_only_appointment_queries": true,
+    "memory_after_provider_acceptance_only": true,
+    "expiring_non_authorizing_proposals": true
+  },
+  "migrations": [
+    "20261108_sales_visit_context"
+  ],
+  "production_changes": false,
+  "production_migration_applied": false,
+  "deployment_performed": false,
+  "published_prompts_changed": false,
+  "product_model_changed": false,
+  "new_flow_activation": "disabled_by_default_explicit_project_allowlist_required",
+  "schema_compatibility": "Nullable visit references; historical rows unchanged; additive dialogue JSON defaults.",
+  "skipped": [
+    "Two PostgreSQL concurrency tests need DIALOGUE_POSTGRES_TEST_URL pointing to a disposable database."
+  ],
+  "not_run": [
+    "Actual Docker image build (Docker unavailable locally)",
+    "Remote GitHub Actions execution",
+    "Real PostgreSQL migration/concurrency",
+    "Real OpenRouter sales quality",
+    "Live messaging/Calendar",
+    "Frontend tests/build (no frontend source changes)",
+    "T01-T26 complete end-to-end acceptance"
+  ],
+  "limits": [
+    "Historical property/unit associations are unknown unless explicitly recorded.",
+    "Unknown Meta custom questions require explicit alias mapping; no guessing.",
+    "Profile/context evidence is bounded with truncation diagnostics; source messages remain authoritative.",
+    "Post-booking reactivation remains group I; rescheduling/cancellation execution remain later groups.",
+    "Legacy simulator is not the new active-runtime cohort."
+  ],
+  "next_group": "D",
+  "next_steps": [
+    7,
+    8
+  ]
+}

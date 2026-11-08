@@ -57,6 +57,16 @@ def validate_references(db, scope, state):
     if state.selected_property_type_id and not db.query(ProjectPropertyType.id).filter_by(
             id=state.selected_property_type_id, project_id=scope.project_id).first():
         raise PermissionError('Selected property is outside this Project.')
+    if state.selected_unit_id:
+        from app.modules.projects.models import ProjectUnit
+        unit=db.query(ProjectUnit).filter_by(id=state.selected_unit_id,project_id=scope.project_id).first()
+        if not unit:raise PermissionError('Selected unit is outside this Project.')
+        if state.selected_property_type_id:
+            product=db.get(ProjectPropertyType,state.selected_property_type_id)
+            if unit.typology!=product.name:raise PermissionError('Selected unit does not match the property type.')
+    if state.change_proposals:
+        from .turn_memory import validate_proposal_scope
+        for proposal in state.change_proposals:validate_proposal_scope(db,scope,proposal,check_target=False)
     for offer in state.offers:
         message = scoped_messages_query(db, conversation).filter_by(id=offer.message_id,
             direction='outbound').first()
