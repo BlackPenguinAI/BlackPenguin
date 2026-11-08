@@ -2,6 +2,10 @@
 
 Estado: **completado**, 8 de noviembre de 2026. Siguiente grupo: **B, pasos 3 y 4**.
 
+Compatibilidad de despliegue corregida después de la entrega inicial:
+ver [group-a-preflight-fix.md](group-a-preflight-fix.md) y su reporte. La imagen
+incluye ahora las herramientas y las pruebas usan la raíz de referencias de Actions.
+
 Esta entrega fija la base y prepara pruebas reproducibles. No modifica `backend/app`,
 el frontend, prompts publicados, variables del despliegue, migraciones ni el comportamiento
 del worker. Los escenarios T01–T26 describen la aceptación de los grupos siguientes;

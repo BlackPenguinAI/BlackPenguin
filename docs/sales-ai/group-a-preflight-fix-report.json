@@ -1,0 +1,69 @@
+{
+  "version": "sales-ai-group-a-preflight-fix/1.0",
+  "date": "2026-11-08",
+  "base_commit": "0a323e0d1130fb913defe30afe33d5c0b047a220",
+  "changes": [
+    "Include backend/tools in the backend image",
+    "Resolve T01-T26 repository references through SALES_ACCEPTANCE_ROOT"
+  ],
+  "reproduced_before": {
+    "error": "ModuleNotFoundError: tools",
+    "exit_code": 2
+  },
+  "checks": [
+    {
+      "name": "isolated_layout_group_a_and_prior_matrix",
+      "passed": 38,
+      "failed": 0,
+      "exit_code": 0
+    },
+    {
+      "name": "isolated_layout_full_backend",
+      "passed": 1516,
+      "failed": 0,
+      "skipped": 2,
+      "seconds": 116.87,
+      "exit_code": 0,
+      "runtime_enabled": true
+    },
+    {
+      "name": "checkout_group_a",
+      "passed": 37,
+      "failed": 0,
+      "exit_code": 0
+    },
+    {
+      "name": "prior_reference_layout_regressions",
+      "passed": 5,
+      "failed": 0,
+      "exit_code": 0
+    },
+    {
+      "name": "isolated_tools_import_and_exporter_help",
+      "exit_code": 0
+    },
+    {
+      "name": "source_content_integrity",
+      "files_checked": 200,
+      "changed_files": 0
+    }
+  ],
+  "verification_scope": {
+    "docker_daemon_available": false,
+    "actual_docker_image_built_locally": false,
+    "layout_from_dockerfile_COPY": true,
+    "tests_and_references_physically_separate": true,
+    "original_file_modes_preserved": true,
+    "directory_writes_blocked": true,
+    "application_imports_from_checkout": false,
+    "all_source_contents_unchanged": true
+  },
+  "limitations": [
+    "Local checks model the file layout and test variables; the next GitHub Actions run must build and verify the actual image.",
+    "PostgreSQL tests were skipped because no disposable test database was configured."
+  ],
+  "production_container_changes_performed": false,
+  "sql_or_migrations_required": false,
+  "provider_calls_performed": false,
+  "next_action": "Upload the differential in a new commit; rerunning the old commit does not include this fix."
+}

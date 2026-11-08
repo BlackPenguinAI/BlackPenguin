@@ -4,6 +4,7 @@ from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 import gzip
 import json
+import os
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -230,7 +231,10 @@ def test_import_scope_validation_cannot_turn_another_company_catalog_into_facts(
 def test_target_matrix_is_complete_but_does_not_claim_future_acceptance():
     matrix=json.loads((FIXTURES/'acceptance_matrix.json').read_text())
     assert [c['id'] for c in matrix['cases']]==[f'T{i:02d}' for i in range(1,27)]
-    root=Path(__file__).resolve().parents[2]
+    configured_root=os.environ.get('SALES_ACCEPTANCE_ROOT')
+    root=Path(configured_root) if configured_root is not None else Path(__file__).resolve().parents[2]
+    assert root.is_absolute(), 'SALES_ACCEPTANCE_ROOT must be an absolute path.'
+    assert root.is_dir(), f'Acceptance reference root is missing: {root}'
     for case in matrix['cases']:
         assert case['required_outcomes'] and case['forbidden_outcomes']
         assert case['acceptance_status']=='PENDING_NEW_FLOW'

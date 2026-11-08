@@ -8,6 +8,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY ./app /app/app
+COPY ./tools /app/tools
 COPY ./alembic.ini /app/alembic.ini
 COPY ./alembic /app/alembic
 COPY ./migrations /app/migrations

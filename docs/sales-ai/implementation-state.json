@@ -34,5 +34,15 @@
   "acceptance_matrix": "backend/tests/fixtures/sales_ai/acceptance_matrix.json",
   "verification_report": "docs/sales-ai/group-a-report.json",
   "replay_report": "docs/sales-ai/group-a-replay.json",
-  "continuity": "Continue from this accumulated delivery, reconcile a newer main, and implement only the next explicitly requested group."
+  "continuity": "Continue from this accumulated delivery, reconcile a newer main, and implement only the next explicitly requested group.",
+  "maintenance": [
+    {
+      "id": "group-a-preflight-layout",
+      "base_commit": "0a323e0d1130fb913defe30afe33d5c0b047a220",
+      "status": "implemented_and_verified",
+      "image_packaging_changed": true,
+      "runtime_behavior_changed": false,
+      "report": "docs/sales-ai/group-a-preflight-fix-report.json"
+    }
+  ]
 }
