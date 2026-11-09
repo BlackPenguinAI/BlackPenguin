@@ -10,6 +10,18 @@ describe('Uniform Configure later',()=>{
   let http:HttpTestingController; let component:ConfigureLaterComponent;
   beforeEach(()=>{ TestBed.configureTestingModule({imports:[ConfigureLaterComponent],providers:[provideHttpClient(),provideHttpClientTesting()]});http=TestBed.inject(HttpTestingController);component=TestBed.createComponent(ConfigureLaterComponent).componentInstance;component.entityId='project-1';component.card='field:campaigns_defined'; });
   afterEach(()=>{http.verify();TestBed.resetTestingModule();});
+  it('keeps the existing shared labels unless contextual text is requested',()=>{
+    expect(component.buttonLabel).toBe('Complete later');
+    component.label='Project campaigns and forms';component.contextual=true;
+    expect(component.buttonLabel).toBe('Review Project campaigns and forms later');
+    component.actionLabel='Set up campaigns later';expect(component.buttonLabel).toBe('Set up campaigns later');
+    component.records={[component.card]:{deferred:true,draft:{}}};
+    expect(component.buttonLabel).toBe('Resume Project campaigns and forms');
+  });
+  it('does not write deferrals while its parent operation is blocked',()=>{
+    component.blocked=true;component.save();http.expectNone(()=>true);
+    expect(component.busy).toBe(false);
+  });
   it('persists the draft without authorizing sales, approving files or applying facts',()=>{
     component.draft={manual:{page_id:'12345'},oauth:{campaign_name:'Draft launch'}};
     component.save();

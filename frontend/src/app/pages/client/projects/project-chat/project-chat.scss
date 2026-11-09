@@ -45,3 +45,12 @@
 .form-input-invalid { border-color: rgba(248,113,113,.62) !important; }
 .cover-picker { overflow-anchor: none; }
 .cover-picker__status { min-height: 2.25rem; }
+
+// One responsive review surface; the conversation owns the mobile viewport.
+.project-review-panel { display:none; min-height:0; width:min(390px, calc(100vw - 1rem)); }
+.project-review-panel--open { display:flex; position:fixed; inset:0 0 0 auto; z-index:50; height:100dvh; overflow-y:auto; }
+.project-review-backdrop { position:fixed; inset:0; z-index:40; background:rgba(0,0,0,.65); }
+@media (min-width:768px) {
+  .project-review-panel, .project-review-panel--open { display:flex; position:static; width:390px; height:100%; z-index:auto; overflow-y:auto; }
+  .project-review-backdrop { display:none; }
+}

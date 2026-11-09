@@ -125,6 +125,8 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   metaAccountState: MetaSetupState | null = null;
   metaStateError = '';
   showMetaAssetStep = false;
+  metaReviewStep: 'account' | 'assets' | null = 'account';
+  private metaReviewRestored = false;
   metaOAuthFallbackUrl = '';
   private metaWindow?: MetaOAuthWindow;
   private teamDraftRestored = false;
@@ -215,6 +217,36 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   }
   locationSaved():void {this.syncState('bottom');}
   readonly editorTasks = [{key:'meta_account',label:'Meta account'},{key:'meta_assets',label:'Campaigns / forms'},{key:'team',label:'Assign team'},{key:'catalog',label:'Property types'},{key:'delivery',label:'Delivery dates'},{key:'parking',label:'Parking / storage'},{key:'documents',label:'Add documents'},{key:'location',label:'Location / timezone'}];
+  reviewPanelOpen = false;
+  private reviewPanelTrigger: HTMLElement | null = null;
+  get projectReviewBusy(): boolean { return this.isAnalyzing || this.hasProcessingSources || this.onboardingStage === 'processing'; }
+  openProjectReviewPanel(): void {
+    this.reviewPanelTrigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    this.reviewPanelOpen = true; this.cdr.detectChanges();
+    document.querySelector<HTMLElement>('#project-review-panel button')?.focus();
+  }
+  closeProjectReviewPanel(): void {
+    if (!this.reviewPanelOpen) return;
+    this.reviewPanelOpen = false;
+    this.reviewPanelTrigger?.focus();
+  }
+  reviewPanelKeydown(event: KeyboardEvent): void {
+    if (!this.reviewPanelOpen || window.innerWidth >= 768) return;
+    if (event.key === 'Escape') { event.preventDefault(); this.closeProjectReviewPanel(); return; }
+    if (event.key !== 'Tab') return;
+    const panel = document.getElementById('project-review-panel');
+    const controls = Array.from(panel?.querySelectorAll<HTMLElement>('button:not([disabled]),a[href],summary,input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex="0"]') || [])
+      .filter(control => !control.closest('[hidden]'));
+    const first=controls[0], last=controls.at(-1);
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+  }
+  setMetaReviewStep(step: 'account' | 'assets', open=true): void {
+    if (!open) { this.metaReviewStep=null; return; }
+    this.metaReviewStep=step;
+    if (step === 'assets') this.openMetaAssetStep();
+    else this.showMetaAssetStep=false;
+  }
   catalogEditorOpen = false;
   selectedPropertyId = '';
   readonly propertyResourceBusy = new Set<string>();
@@ -232,6 +264,8 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   }
   closeCatalogEditor(): void { this.catalogEditorOpen = false; this.selectedPropertyId = ''; }
   openEditorTask(task:string):void {
+    if (this.projectReviewBusy) return;
+    this.closeProjectReviewPanel();
     if (task === 'catalog') {
       this.catalogEditorOpen = true;
       this.loadPropertyTypes(); this.loadSalesAssets();
@@ -241,7 +275,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     }
     if(this.isAnalyzing)return;
     this.isAnalyzing=true;this.errorMessage='';
-    this.onboarding.openEditorTask(this.projectId,task,this.createClientMessageId()).pipe(timeout(20_000)).subscribe({next:turn=>{this.isAnalyzing=false;this.applyTurn(turn);this.showMetaAssetStep=task==='meta_assets';this.scrollToBottom();},error:e=>{this.isAnalyzing=false;this.errorMessage=this.apiDetail(e,'The review could not be opened. Your data is unchanged; retry.');this.cdr.detectChanges();}});
+    this.onboarding.openEditorTask(this.projectId,task,this.createClientMessageId()).pipe(timeout(20_000)).subscribe({next:turn=>{this.isAnalyzing=false;this.applyTurn(turn);this.showMetaAssetStep=task==='meta_assets';if(task==='meta_account' || task==='meta_assets')this.metaReviewStep=task==='meta_assets'?'assets':'account';this.scrollToBottom();},error:e=>{this.isAnalyzing=false;this.errorMessage=this.apiDetail(e,'The review could not be opened. Your data is unchanged; retry.');this.cdr.detectChanges();}});
   }
   private pollingStartedAt = 0;
   private propertyCatalogRequestVersion = 0;
@@ -266,8 +300,8 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     if(oauthStatus)this.restoreOAuthDraft();
     const task=this.route.snapshot.queryParamMap?.get('task');
     this.requestedEditorTask=['meta_account','meta_assets'].includes(task || '') ? task || '' : '';
-    if (oauthStatus === 'connected') this.showMetaAssetStep=true;
-    if (oauthStatus === 'connected') this.metaSetupMessage = 'Meta connected. Select the assets that belong to this Project.';
+    if (oauthStatus === 'connected') { this.metaReviewStep='account'; this.showMetaAssetStep=false; this.metaReviewRestored=true; }
+    if (oauthStatus === 'connected') this.metaSetupMessage = 'Meta connected. Review the saved Company account, then continue to this Project’s campaigns.';
     if (oauthStatus === 'error') this.errorMessage = this.route.snapshot.queryParamMap?.get('reason') || 'Meta connection could not be completed.';
     this.syncState('bottom');
     this.loadCampaigns(); this.loadMetaConnections(); this.loadSalesTeam(); this.loadMetaSetupConfiguration(); this.loadMetaSetupState();
@@ -598,6 +632,12 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
       error: () => { this.metaStateError = 'Saved Meta setup status could not be loaded. Refresh before making changes.'; this.cdr.detectChanges(); },
     });
   }
+  get metaAccountReviewStatus(): string {
+    return this.metaAccountState ? {connected:'Connected',permissions_required:'Review permissions',reconnect_required:'Reconnect required',not_connected:'Not connected'}[this.metaAccountState.account_status] : 'Loading';
+  }
+  get metaRoutingReviewStatus(): string {
+    return this.metaAccountState ? {connected:'Verified',review_required:'Review required',not_linked:'Not configured'}[this.metaAccountState.routing_status] : 'Loading';
+  }
   get metaAccountLabel(): string {
     if (!this.metaAccountState) return 'Saved account status has not been loaded.';
     return {connected:'Account authorized · saved at Company level.', permissions_required:'Account saved · additional permissions required.', reconnect_required:'Account expired or inactive · reconnect required.', not_connected:'No reusable Meta account authorization saved.'}[this.metaAccountState.account_status];
@@ -610,6 +650,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     this.loadMetaSetupState(); this.loadMetaAuthorizations(); this.loadCampaigns(); this.loadMetaConnections();
   }
   openMetaAssetStep(): void {
+    this.metaReviewStep = 'assets';
     this.showMetaAssetStep = true;
     if (this.metaOAuth.authorization_id) this.loadMetaAssets();
   }
@@ -1097,6 +1138,9 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   isGlobalStructuredQuestion(message: ChatMessage): boolean {
     if(this.isActiveQuestion(message) && ['delivery_dates','parking_and_storage'].includes(message.ui_payload?.field || ''))return true;
     return ['project_cover', 'property_type_catalog'].includes(message.ui_payload?.input_type || '') || (this.isActiveQuestion(message) && ['location_editor','ai_sales_authorization','project_sales_team','meta_lead_setup'].includes(message.ui_payload?.input_type || ''));
+  }
+  hasInlineDeferral(message: ChatMessage): boolean {
+    return Object.values(message.ui_payload?.answer_actions || {}).some(action => action.kind === 'defer');
   }
   hasPersistedStructuredTransition(message: ChatMessage): boolean {
     return message.sender === 'ai' && /^I saved\b/i.test(message.content.trim());
@@ -1830,7 +1874,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
         if (generation !== this.renderGeneration) return;
         this.initialState = 'ready';
         this.applyState(state);
-        if(this.requestedEditorTask) {const task=this.requestedEditorTask;this.requestedEditorTask='';this.openEditorTask(task);}
+        if(this.requestedEditorTask && !this.projectReviewBusy) {const task=this.requestedEditorTask;this.requestedEditorTask='';this.openEditorTask(task);}
         if (scrollMode === 'preserve') this.restoreProposalAnchor(anchor);
         else if (shouldScrollToBottom) this.scrollToBottom();
       },
@@ -1881,6 +1925,12 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     restoreDraft(this.salesAssetDraft, this.profile.ui_deferrals?.['materials']?.draft);
     this.onboardingStage = state.stage;
     this.sources = this.prepareSources(state.sources); this.nextQuestion = state.next_question;
+    if (!this.metaReviewRestored && this.nextQuestion?.input_type === 'meta_lead_setup') {
+      this.metaReviewRestored = true;
+      this.metaReviewStep = this.nextQuestion.task === 'meta_assets' ? 'assets' : 'account';
+      this.showMetaAssetStep = this.metaReviewStep === 'assets';
+      if(this.showMetaAssetStep && this.metaOAuth.authorization_id && !this.hasProcessingSources) this.loadMetaAssets();
+    }
     if (!this.prompt && this.nextQuestion?.field) this.prompt=this.profile.ui_deferrals?.['field:'+this.nextQuestion.field]?.draft?.answer || '';
     this.loadSourceImagePreviews();
     this.loadPropertyTypes();
@@ -1893,8 +1943,9 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   }
   private applyTurn(turn: ChatTurn): void {
     this.renderGeneration++;
-    if (turn.next_question?.task === 'meta_account') this.showMetaAssetStep=false;
-    if (turn.next_question?.task === 'meta_assets') {this.showMetaAssetStep=true;if(this.metaOAuth.authorization_id)this.loadMetaAssets();}
+    if (turn.next_question?.input_type === 'meta_lead_setup') this.metaReviewRestored=true;
+    if (turn.next_question?.input_type === 'meta_lead_setup' && turn.next_question?.task !== 'meta_assets') {this.metaReviewStep='account';this.showMetaAssetStep=false;}
+    if (turn.next_question?.task === 'meta_assets') {this.metaReviewStep='assets';this.showMetaAssetStep=true;if(this.metaOAuth.authorization_id)this.loadMetaAssets();}
     const additions = [turn.user_message, turn.message].filter((message): message is ChatMessage => !!message);
     const withIds = new Map(this.messages.filter((message) => message.id).map((message) => [message.id!, message]));
     for (const message of additions) if (message.id) withIds.set(message.id, message);

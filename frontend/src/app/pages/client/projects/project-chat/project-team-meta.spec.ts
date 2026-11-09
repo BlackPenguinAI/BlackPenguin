@@ -149,15 +149,16 @@ it('renders only existing-user assignment with a safe Team link and refresh, nev
   f.destroy();
 });
 
-it('renders separate persisted account and Project states with one Configure later per step',async()=>{
+it('renders saved Meta states with a single campaign deferral after account connection',async()=>{
   const f=await render('meta_lead_setup'),html=f.nativeElement as HTMLElement;
   expect(html.querySelector('[data-testid=meta-account-step]')).not.toBeNull();
   expect(html.querySelector('[data-testid=meta-project-step]')).not.toBeNull();
   expect(html.querySelector('[data-testid=meta-account-status]')?.textContent).toContain('authorized');
   expect(html.querySelector('[data-testid=meta-routing-status]')?.textContent).toContain('No campaign');
-  expect(html.querySelectorAll('app-configure-later')).toHaveLength(2);
-  expect(html.querySelector('[data-testid=meta-account-step]')?.querySelectorAll('app-configure-later')).toHaveLength(1);
-  expect(html.querySelector('[data-testid=meta-project-step]')?.querySelectorAll('app-configure-later')).toHaveLength(1);
+  expect(html.querySelectorAll('app-configure-later')).toHaveLength(1);
+  expect(html.querySelector('[data-testid=meta-account-step]')?.querySelectorAll('app-configure-later')).toHaveLength(0);
+  expect(html.querySelector('[data-testid=meta-campaign-deferral]')?.querySelectorAll('app-configure-later')).toHaveLength(1);
+  expect(html.textContent).toContain('Set up campaigns later');
   expect(html.querySelector('iframe')).toBeNull();expect(html.querySelector('[data-testid=meta-saved-summary]')).not.toBeNull();
   f.destroy();
 });
