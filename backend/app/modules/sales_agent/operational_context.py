@@ -99,9 +99,16 @@ def snapshot(db,conversation,*,allowed_projects=None,scope_limited=False,meeting
     try:
         if project.profile:require_capability(project.profile)
     except Exception:ready=False
-    inbound=scoped_messages_query(db,conversation).filter_by(direction='inbound',role='user').order_by(SalesMessage.created_at.desc(),SalesMessage.id.desc()).first()
+    inbound=scoped_messages_query(db,conversation).filter_by(direction='inbound',role='user').filter(SalesMessage.metadata_json['resume_context'].as_boolean().isnot(True)).order_by(SalesMessage.created_at.desc(),SalesMessage.id.desc()).first()
     job=db.query(SalesInboundJob).filter_by(message_id=inbound.id).order_by(SalesInboundJob.created_at.desc()).first() if inbound else None
     configuration_ready = True
+    from .continuity import snapshot as continuity_snapshot
+    continuity=continuity_snapshot(db,conversation) if not scope_limited else None
+    from app.modules.sales_crm.models import LeadObjection
+    objections=[] if scope_limited else [{'kind':o.objection_type,'evidence':o.evidence[:500],'status':o.status}
+        for o in db.query(LeadObjection).filter_by(lead_id=lead.id,status='open').order_by(LeadObjection.updated_at.desc()).limit(5).all()]
+    response_run=db.get(AgentRun,(latest.metadata_json or {}).get('agent_run_id')) if latest else None
+    if response_run and response_run.conversation_id!=conversation.id:response_run=None
     try:
         if not scope_limited:
             from .turn_configuration import published_configuration
@@ -118,10 +125,18 @@ def snapshot(db,conversation,*,allowed_projects=None,scope_limited=False,meeting
         'current_interest':None if scope_limited else {'project_name':project.name,'property':product.name if product else None,'unit':unit.unit_code if unit else None,'source':'current enquiry; does not change a booked visit'},
         'appointments':visits,'proposals':proposals if not scope_limited else [],'waits':waits if not scope_limited else [],'effects':effects,
         'tasks':[] if scope_limited else [{'id':t.id,'topic':t.topic,'status':t.status,'blocked_reason':t.blocked_reason} for t in state.tasks[-25:]],
-        'interventions':cases,'moderation':moderation,
+        'interventions':cases,'moderation':moderation,'continuity':continuity,
+        'handoff_summary':None if scope_limited else {'stage':lead.pipeline_stage,'intent_tier':lead.intent_tier,
+            'qualification_summary':lead.qualification_summary,'segment':lead.assigned_segment,'objections':objections,
+            'next_step':'Review and answer the pending lead messages' if continuity['pending_message_count'] else 'Wait for the lead to reply',
+            'pending_topics':sorted({t.topic.value for t in state.tasks if t.status in {'pending','awaiting_user','blocked','suspended'}}),
+            'last_lead_message':inbound.content[:500] if inbound and not (inbound.metadata_json or {}).get('resume_context') else None,
+            'pending_messages':continuity['pending_message_count']},
         'trace':{} if scope_limited else {'workflow_version':meta.get('workflow_version'),'prompt_version':(run.prompt_snapshot or {}).get('version') if run else None,'engine':run.graph_version if run else None,'model':run.model if run else None,'run_status':run.status if run else None,'error_code':run.error_code if run else None,
             'configuration':meta.get('configuration_ref'),'language_validation':meta.get('language_policy'),'action_policy':meta.get('action_policy'),
             'last_message_status':latest.status if latest else None,'last_message_at':latest.created_at if latest else None,
+            'last_response_engine':response_run.graph_version if response_run else None,'last_response_model':response_run.model if response_run else None,
+            'last_response_role':latest.role if latest else None,
             'receipt_semantics':'provider accepted is distinct from device delivery'},
         'bounded':{'appointments':30,'operations_per_kind':40,'moderation':20,'tasks':25}})
 

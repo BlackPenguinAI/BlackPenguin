@@ -34,7 +34,9 @@ def review_snapshot(db, conversation):
     issue = None
     if active_run and active_run.error_code:
         issue = {'reason':active_run.error_code,'conversation_paused':conversation.is_paused,
-                 'message':'The last response could not be processed. The AI conversation remains available for a new message.'}
+                 'message':('The last response was interrupted. The conversation remains paused for staff review.' if conversation.is_paused else
+                            'This response was superseded by a control change.' if active_run.error_code=='control_superseded' else
+                            'The last response could not be processed. The AI conversation remains available for a new message.')}
     notice = (output.get('metadata') or {}).get('review_notice')
     from .monitor import redact
     return redact({

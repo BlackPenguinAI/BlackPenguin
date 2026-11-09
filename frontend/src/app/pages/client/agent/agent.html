@@ -351,7 +351,7 @@
           <ng-template #smsBubble>
             <div class="bubble-row" [class.agent]="message.role === 'assistant' || message.role === 'human'" [class.human]="message.role === 'human'">
               <div class="bubble" [class.unsupported]="message.metadata_json?.content_supported === false">
-                <small>{{ message.role === 'assistant' ? 'AI sales agent' : (message.role === 'human' ? 'Company team · manual ' + channelLabel : selected.lead_name) }}</small>
+                <small>{{ message.metadata_json?.resume_context ? 'Resume context · combined pending messages (internal)' : (message.role === 'assistant' ? 'AI sales agent' : (message.role === 'human' ? 'Company team · manual ' + channelLabel : selected.lead_name)) }}</small>
                 <span *ngIf="message.metadata_json?.delivery_kind === 'whatsapp_template'" class="message-kind">WHATSAPP TEMPLATE · {{message.metadata_json?.template_language}}</span>
                 <span *ngIf="message.metadata_json?.content_supported === false" class="message-kind warning">NOT SENT TO AI</span>
                 <p><ng-container *ngFor="let part of messageParts(message.content)"><a *ngIf="part.url; else plainMessagePart" class="break-all text-[#e9ad00] underline underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#e9ad00]" [href]="part.url" target="_blank" rel="noopener noreferrer">{{ part.text }}</a><ng-template #plainMessagePart>{{ part.text }}</ng-template></ng-container></p>

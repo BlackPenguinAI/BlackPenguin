@@ -491,7 +491,7 @@ def conversation_summaries(
     for conversation, lead, project in rows:
         last = scoped_messages_query(
             db, conversation, lead_id=lead.id,
-        ).order_by(SalesMessage.created_at.desc()).first()
+        ).filter(SalesMessage.metadata_json['resume_context'].as_boolean().isnot(True)).order_by(SalesMessage.created_at.desc()).first()
         simulation = db.query(SalesAgentSimulation).filter(
             SalesAgentSimulation.conversation_id == conversation.id,
         ).first()
@@ -575,6 +575,7 @@ def set_conversation_action(
     conversation = query.with_for_update().first()
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found.")
+    was_paused=conversation.is_paused
     if false_positive and action != 'resume':
         raise HTTPException(status_code=422, detail='False-positive review must resume the conversation.')
     if action == "resume":
@@ -600,24 +601,18 @@ def set_conversation_action(
             if lead.pipeline_stage == "S09_HANDOFF":
                 lead.pipeline_stage = previous_stage or "S06_NURTURE"
             lead.meta_form_data = lead_meta
-            if conversation.channel in {"sms", "whatsapp"} and not db.query(SalesFollowUpJob).filter(
-                SalesFollowUpJob.conversation_id == conversation.id,
-                SalesFollowUpJob.status == "pending",
-            ).first():
-                hours = {"hot": 24, "warm": 72, "cold": 24 * 14}.get(lead.intent_tier, 72)
-                project = db.query(Project).filter(Project.id == conversation.project_id).first()
-                scheduled_at = next_cadence_time(
-                    now=datetime.utcnow(), timezone_name=project.timezone if project else "UTC", delay_hours=hours,
-                )
-                db.add(SalesFollowUpJob(
-                    conversation_id=conversation.id,
-                    idempotency_key=f"resume:{conversation.id}:{uuid.uuid4()}",
-                    scheduled_at=scheduled_at, reason=f"{lead.intent_tier}_cadence", attempt_number=1,
-                ))
-                lead.next_action_at = scheduled_at
+            if conversation.channel in {'sms','whatsapp'}:
+                from .continuity import resume
+                # Repeated Resume while already active does not enqueue another turn.
+                if was_paused:
+                    resume(db,conversation)
+                    from .live_service import _schedule_next_action
+                    _schedule_next_action(db,conversation,lead,'resume:'+str(uuid.uuid4()),refresh_pending=True)
     else:
         conversation.is_paused = True
         conversation.pause_reason = "Human handoff requested" if action == "human_handoff" else "Paused by user"
+        from .continuity import pause
+        pause(db,conversation)
         db.query(SalesFollowUpJob).filter(
             SalesFollowUpJob.conversation_id == conversation.id,
             SalesFollowUpJob.status == "pending",

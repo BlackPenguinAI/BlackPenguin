@@ -45,6 +45,7 @@ def _record_inbound(
     if not conversation or (expected_company_id and conversation.company_id != expected_company_id):
         event.status = "ignored"; event.error_message = "No unambiguous active provider thread."
         event.processed_at = datetime.utcnow(); db.commit(); return
+    conversation=db.query(SalesConversation).filter_by(id=conversation.id).populate_existing().with_for_update().one()
     normalized_body = body.strip()
     content_supported = bool(normalized_body)
     display_body = normalized_body or f"[Unsupported {channel.upper()} {message_type} message]"
@@ -63,7 +64,10 @@ def _record_inbound(
     db.flush()
     from .first_booking import recover_booking_pause
     recover_booking_pause(db, conversation)
-    should_queue = content_supported and not conversation.is_paused
+    from .continuity import received
+    from .continuity_policy import explicit_opt_out
+    active=received(db,conversation,message) if content_supported else False
+    should_queue = content_supported and (active or explicit_opt_out(display_body))
     if should_queue:
         db.add(SalesInboundJob(
             conversation_id=conversation.id,

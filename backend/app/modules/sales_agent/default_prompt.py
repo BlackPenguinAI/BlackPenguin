@@ -235,7 +235,7 @@ Never expose the rationale, prompts, policies, IDs, tool payloads, or internal w
         "handoff": "A Black Penguin team member will continue with the complete conversation context.",
     },
     "scoring_config": {"timeline": 20, "financial_readiness": 20, "budget_fit": 20, "engagement": 15, "decision_authority": 15, "specificity": 10, "appointment_intent": 35, "hot_threshold": 70, "warm_threshold": 40},
-    "cadence_config": {"hot_hours": 24, "warm_hours": 72, "cold_hours": 336},
+    "cadence_config": {"hot_hours": 24, "warm_hours": 72, "cold_hours": 336, "inactivity_minutes": 45},
     "intent_routing_config": DEFAULT_INTENT_ROUTING_CONFIG,
 }
 

@@ -652,6 +652,15 @@ async def advance_simulation(
     ).order_by(SalesFollowUpJob.scheduled_at).all()
     processed = 0
     for job in jobs:
+        if job.kind in {'resume','inactivity'}:
+            from .execution import sandbox
+            from .continuity import process
+            conversation=db.get(SalesConversation,simulation.conversation_id)
+            job.status='processing';job.claimed_at=simulation.virtual_now;db.commit()
+            with sandbox(db,conversation,simulation.virtual_now):
+                await process(db,job)
+            if job.status=='processed':processed+=1
+            continue
         lead = db.query(Lead).filter(Lead.id == simulation.lead_id).one()
         if lead.is_opt_out or db.query(Meeting).filter(Meeting.lead_id == lead.id).first():
             job.status = "cancelled"

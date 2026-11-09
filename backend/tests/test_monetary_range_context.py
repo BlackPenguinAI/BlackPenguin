@@ -106,9 +106,9 @@ def test_known_budget_range_still_is_not_a_project_price_claim():
 ])
 def test_actual_dispatch_uses_corrected_price_but_preserves_valid_features(context,text,should_replace):
     db,company,user,project,profile,item=context
-    lead=Lead(company_id=company.id,project_id=project.id,full_name='Range regression',phone='+12025550111')
+    lead=Lead(company_id=company.id,project_id=project.id,full_name='Range regression',phone='+12025550111',consent_status='granted')
     db.add(lead);db.flush()
-    conversation=SalesConversation(company_id=company.id,project_id=project.id,lead_id=lead.id,provider='telnyx',channel='sms')
+    conversation=SalesConversation(company_id=company.id,project_id=project.id,lead_id=lead.id,provider='telnyx',channel='sms',is_paused=False)
     db.add(conversation);db.flush()
     run=AgentRun(conversation_id=conversation.id,event_id='range-regression',mode='live',status='completed',graph_version='test',toolset_version='test',prompt_snapshot={},model='test',input_snapshot={},output_snapshot={'reply':text})
     db.add(run);db.commit()

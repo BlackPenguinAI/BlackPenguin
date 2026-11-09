@@ -34,6 +34,8 @@ ENGINE='sales-active/1.0'
 def authorize_part(db,conversation,lead,metadata):
     """Re-check each multipart send after any earlier provider call committed."""
     db.refresh(conversation);db.refresh(lead)
+    from .continuity import check_epoch
+    check_epoch(conversation,metadata.get('continuity_epoch'))
     scope=Scope(conversation.company_id,conversation.project_id,conversation.id,lead.id)
     check_scope(db,scope)
     if not selected_policy(db,scope):raise PermissionError('Active cohort was disabled.')
@@ -404,10 +406,20 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
     if not scoped_messages_query(db,conversation).filter_by(id=inbound.id,direction='inbound',role='user').first():
         raise PermissionError('Inbound message belongs to another opportunity.')
     if existing and existing.status in {'completed','blocked'}:return True
+    from . import continuity
+    if (inbound.metadata_json or {}).get('resume_context') and (inbound.metadata_json or {}).get('continuity_epoch')!=continuity.epoch(conversation):
+        db.commit();return True
+    if existing and existing.input_snapshot.get('continuity_epoch') is None and continuity.state(conversation).get('offer_barrier'):
+        existing.status='blocked';existing.error_code='control_superseded';db.commit();return True
+    if not (inbound.metadata_json or {}).get('continuity_recorded') and not (inbound.metadata_json or {}).get('resume_context'):
+        continuity.received(db,conversation,inbound)
     lead=db.get(Lead,scope.lead_id)
     if not lead or (lead.is_opt_out and not (sticky and (existing.output_snapshot or {}).get('reply_ready'))):return True
     exact_stop=explicit_opt_out(inbound.content)
+    if (inbound.metadata_json or {}).get('awaiting_resume') and not exact_stop:
+        db.commit();return True
     if conversation.is_paused and not exact_stop and not (sticky and (existing.output_snapshot or {}).get('reply_ready')):
+        db.commit()
         return True
     run=existing if sticky else None
     if not (run and (run.output_snapshot or {}).get('reply_ready')):
@@ -418,6 +430,7 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
         run=live._prepare_run(db,conversation=conversation,event_id=event_id,message_id=inbound.id)
         if run is None:return True
         run.graph_version=ENGINE;run.toolset_version='sales-actions/1.0'
+        run.input_snapshot={**run.input_snapshot,'continuity_epoch':continuity.epoch(conversation)}
         db.commit()
         try:
             from .next_flow import selected as next_selected
@@ -482,6 +495,8 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
                 u=confirmed_controls(u,inbound.content,pause_reason=protected)
                 interpreted_revision=interpreted.revision
             moderation_decision=None
+            db.refresh(conversation)
+            continuity.check_epoch(conversation,run.input_snapshot.get('continuity_epoch'))
             if next_enabled and not exact_stop:
                 from .moderation import assess
                 moderation_decision=assess(db,scope,inbound,u,event_id)
@@ -504,6 +519,7 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
                 from .first_booking import apply_courtesy
                 apply_courtesy(db,conversation,lead,outcome.state)
             conversation,lead,project=_current(db,scope,control=exact_stop)  # Manual takeover/consent/permissions win after inference.
+            continuity.check_epoch(conversation,run.input_snapshot.get('continuity_epoch'))
             draft=compose(outcome,channel=conversation.channel,style=policy.composition_style)
             if next_enabled:
                 from .natural_reply import naturalize
@@ -769,9 +785,15 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
                 'requires_human':False,'policy_violations':[]}
             run.status='prepared';db.commit()
         except DialogueConflict:
+            db.rollback();db.refresh(conversation)
+            if run.input_snapshot.get('continuity_epoch')!=continuity.epoch(conversation):
+                run.status='blocked';run.error_code='control_superseded';db.commit();return True
             raise
         except PermissionError:
-            db.rollback();return True
+            db.rollback();db.refresh(conversation)
+            if run.input_snapshot.get('continuity_epoch')!=continuity.epoch(conversation):
+                run.status='blocked';run.error_code='control_superseded';db.commit()
+            return True
         except Exception as exc:
             db.rollback()
             run=db.query(AgentRun).filter_by(event_id=event_id).one()
@@ -800,6 +822,10 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
         run.status='completed';run.completed_at=workflow_now(datetime);db.commit()
         return True
     metadata=dict(data.get('metadata') or {})
+    metadata['continuity_epoch']=run.input_snapshot.get('continuity_epoch')
+    try:continuity.check_epoch(conversation,metadata['continuity_epoch'])
+    except PermissionError:
+        run.status='blocked';run.error_code='control_superseded';db.commit();return True
     expected_pause=metadata.get('expected_pause_reason')
     if metadata.get('meeting_id') and not metadata.get('booking_operation_id'):expected_pause='Appointment confirmed'
     own_control=bool(metadata.get('control_outcome') or metadata.get('meeting_id'))
@@ -870,6 +896,11 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
         from .moderation import accepted_warning
         accepted_warning(db,conversation,metadata)
     run.status='completed';run.completed_at=workflow_now(datetime);db.commit()
+    inputs=(inbound.metadata_json or {}).get('source_message_ids') if (inbound.metadata_json or {}).get('resume_context') else [inbound.id]
+    if not run.error_code:
+        continuity.mark_handled(db,conversation,dispatched,inputs)
+        continuity.schedule_inactivity(db,conversation,dispatched)
+        db.commit()
     from .first_booking import cadence_stopped
     if not conversation.is_paused and not lead.is_opt_out and not run.error_code and not metadata.get('language_hold') and not cadence_stopped(db,conversation):
         live._schedule_next_action(db,conversation,lead,event_id,refresh_pending=True);db.commit()

@@ -276,9 +276,9 @@ def test_other_company_cannot_obtain_the_approved_snapshot(context):
 
 def test_dispatch_rechecks_price_after_graph_and_persists_exact_sent_content(context):
     db, company, user, project, profile, item = context
-    lead = Lead(company_id=company.id, project_id=project.id, full_name="Test lead", phone="+12025550123")
+    lead = Lead(company_id=company.id, project_id=project.id, full_name="Test lead", phone="+12025550123", consent_status="granted")
     db.add(lead); db.flush()
-    conversation = SalesConversation(company_id=company.id, project_id=project.id, lead_id=lead.id, provider="telnyx", channel="sms", provider_thread_key="test-only")
+    conversation = SalesConversation(company_id=company.id, project_id=project.id, lead_id=lead.id, provider="telnyx", channel="sms", provider_thread_key="test-only", is_paused=False)
     db.add(conversation); db.flush()
     run = AgentRun(conversation_id=conversation.id, event_id="test-event", mode="live", status="completed", graph_version="test", toolset_version="test", model="test", prompt_snapshot={}, input_snapshot={}, output_snapshot={})
     db.add(run); db.commit()

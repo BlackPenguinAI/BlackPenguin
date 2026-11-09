@@ -33,7 +33,7 @@ def test_current_workflow_ignores_old_flags_lists_and_modes(agent, monkeypatch, 
     text = 'Show me property types'
     _, run = agent.turn(text, understanding(text, 'catalog'))
     assert run.status == 'completed' and run.graph_version == ENGINE
-    assert run.prompt_snapshot['version'] == 'sales-understanding-prompt/2.10'
+    assert run.prompt_snapshot['version'] == 'sales-understanding-prompt/2.11'
     assert 'Current approved home' in agent.reply()
     agent.legacy.assert_not_called()
 
@@ -201,14 +201,19 @@ def test_current_simulation_initial_contact_and_virtual_followup_are_idempotent(
     from datetime import timedelta
     from test_sales_agent_simulation_flow import _db, _fixture, _create
     from app.modules.sales_agent.simulation_service import generate_initial_message,advance_simulation
-    from app.modules.sales_agent.models import SalesMessage
+    from app.modules.sales_agent.models import SalesMessage,SalesFollowUpJob,SalesAgentSimulation
     db=_db();company,_,admin,_,_,project,campaign,product=_fixture(db)
     created=_create(db,company,admin,project,campaign,product)
     with patch('app.modules.sales_agent.graph.generate_llm_response',side_effect=AssertionError('legacy graph invoked')):
         first=asyncio.run(generate_initial_message(db,company_id=company.id,simulation_id=created['simulation_id']))
         second=asyncio.run(generate_initial_message(db,company_id=company.id,simulation_id=created['simulation_id']))
         assert first['run_id']==second['run_id'] and first['reply'].startswith('Hi')
-        asyncio.run(advance_simulation(db,company_id=company.id,simulation_id=created['simulation_id'],hours=25))
+        # Current simulation follows the published cadence, not a fixed +24h.
+        simulation=db.get(SalesAgentSimulation,created['simulation_id'])
+        due=db.query(SalesFollowUpJob).filter_by(conversation_id=created['conversation_id'],kind='cadence',status='pending').one()
+        hours=__import__('math').ceil((due.scheduled_at-simulation.virtual_now).total_seconds()/3600)
+        assert hours>=1
+        asyncio.run(advance_simulation(db,company_id=company.id,simulation_id=created['simulation_id'],hours=hours))
     assert db.query(SalesMessage).filter_by(direction='outbound').count()==2
     assert db.query(OutboundMessage).count()==0
 

@@ -380,6 +380,15 @@ async def _dispatch_part(
             authorize_part(db,conversation,lead,metadata or {})
         return _simulation_message(db, conversation, content, role, agent_run_id, metadata, idempotency_key)
     message_metadata = dict(metadata or {})
+    from .continuity import epoch,check_epoch
+    db.refresh(conversation)
+    check_epoch(conversation,message_metadata.get('continuity_epoch'))
+    message_metadata.setdefault('continuity_epoch',epoch(conversation))
+    if message_metadata.get('inactivity_job_id'):
+        closing=db.get(SalesFollowUpJob,message_metadata['inactivity_job_id'])
+        from .continuity import state
+        if not closing or closing.status!='processing' or conversation.is_paused or (closing.payload_json or {}).get('inbound_message_id')!=state(conversation).get('last_inbound_message_id'):
+            raise PermissionError('The inactivity episode changed before dispatch.')
     if message_metadata.get('wait_request_id'):
         from .wait_service import authorize_part as authorize_wait_part
         authorize_wait_part(db,conversation,lead,message_metadata,content)
@@ -524,6 +533,21 @@ async def _dispatch_part(
         try:authorize_wait_part(db,conversation,lead,message_metadata,content,before_provider=True)
         except Exception:
             outbound.status='failed';message.status='failed';db.commit();raise
+    conversation=db.query(SalesConversation).filter_by(id=conversation.id).populate_existing().with_for_update().one()
+    check_epoch(conversation,message_metadata.get('continuity_epoch'))
+    if role=='assistant' and not uses_whatsapp_template:
+        db.refresh(lead)
+        if (lead.is_opt_out and message_metadata.get('control_outcome')!='opt_out') or (conversation.is_paused and not message_metadata.get('control_outcome') and not message_metadata.get('meeting_id')):
+            raise PermissionError('Automatic dispatch was interrupted by manual control or opt-out.')
+        if message_metadata.get('cadence_job_id'):
+            from .continuity import state as continuity_state,pending as pending_messages
+            cadence_job=db.get(SalesFollowUpJob,message_metadata['cadence_job_id'])
+            if cadence_job.status!='processing' or message_metadata.get('cadence_inbound_message_id')!=continuity_state(conversation).get('last_inbound_message_id') or pending_messages(db,conversation):
+                cadence_job.status='cancelled';db.commit();raise PermissionError('New inbound work superseded the cadence message.')
+        if message_metadata.get('inactivity_job_id'):
+            db.refresh(closing)
+            if closing.status!='processing' or (closing.payload_json or {}).get('inbound_message_id')!=state(conversation).get('last_inbound_message_id'):
+                raise PermissionError('The inactivity episode changed before provider dispatch.')
     try:
         if conversation.channel == "sms":
             result = await send_sms(
@@ -926,7 +950,8 @@ def material_request_text(inbound, result):
 
 
 def _schedule_next_action(db: Session, conversation: SalesConversation, lead: Lead, event_id: str, *, refresh_pending=False) -> None:
-    if conversation.channel == 'simulation':return
+    from .execution import simulated
+    if conversation.channel == 'simulation' and not simulated(conversation):return
     if lead.is_opt_out or conversation.is_paused:
         return
     from .first_booking import cadence_stopped
@@ -956,6 +981,7 @@ def _schedule_next_action(db: Session, conversation: SalesConversation, lead: Le
     if not db.query(SalesFollowUpJob).filter(
         SalesFollowUpJob.conversation_id == conversation.id,
         SalesFollowUpJob.status == "pending",
+        SalesFollowUpJob.kind == 'cadence',
     ).first():
         db.add(SalesFollowUpJob(
             conversation_id=conversation.id,
@@ -1129,7 +1155,7 @@ def _lead_intelligence_input(history: list[SalesMessage]) -> tuple[str, int]:
     """Return lead-authored evidence only; agent copy must never inflate intent."""
     lead_messages = [
         item for item in history
-        if item.direction == "inbound" or item.role == "user"
+        if (item.direction == "inbound" or item.role == "user") and not (item.metadata_json or {}).get('resume_context')
     ]
     return " ".join(item.content for item in lead_messages[-20:]), len(lead_messages)
 
@@ -1580,13 +1606,15 @@ async def process_live_inbound_job(job_id: str) -> None:
         db.expire_all()
         job = db.query(SalesInboundJob).filter(SalesInboundJob.id == job_id).one()
         message = db.query(SalesMessage).filter(SalesMessage.id == job.message_id).one()
+        if (message.metadata_json or {}).get('awaiting_resume'):
+            job.status='awaiting_resume';message.metadata_json={**message.metadata_json,'agent_turn_status':'awaiting_resume'};db.commit();return
         job.status = "processed"
         job.processed_at = workflow_now(datetime)
         job.error_code = None
         job.error_message = None
         message.metadata_json = {
             **(message.metadata_json or {}),
-            "agent_turn_status": "processed",
+            "agent_turn_status": "answered" if (message.metadata_json or {}).get('handled_by_message_id') else "processed",
             "agent_turn_error": None,
         }
         webhook_event_id = (message.metadata_json or {}).get("webhook_event_id")
@@ -1694,11 +1722,15 @@ async def send_manual_message(db: Session, *, conversation_id: str, company_id: 
                 "message": "This manual message is outside the configured contact window.",
                 "next_allowed_at": allowed_at.isoformat(),
             })
+    from .continuity import pending,manual_accepted
+    inputs=[m.id for m in pending(db,conversation)]
     message = await _dispatch(
         db, conversation=conversation, lead=lead, content=content,
         role="human", agent_run_id=None, author_user_id=user_id,
         metadata={"event_kind": f"manual_{conversation.channel}"},
     )
+    conversation=db.query(SalesConversation).filter_by(id=conversation.id).populate_existing().with_for_update().one()
+    manual_accepted(db,conversation,message,inputs)
     # Preserve the incident's original reason while staff reply to the lead.
     if not (conversation.pause_reason or '').startswith('Human intervention:'):
         conversation.pause_reason = "Manual control active"
@@ -1713,6 +1745,10 @@ async def process_live_followup_job(job_id: str) -> None:
         job = db.query(SalesFollowUpJob).filter(SalesFollowUpJob.id == job_id).first()
         if not job or job.status != "processing":
             return
+        if job.kind in {'resume','inactivity'}:
+            from .continuity import process
+            await process(db,job)
+            return
         conversation = db.query(SalesConversation).filter(
             SalesConversation.id == job.conversation_id,
         ).with_for_update().one()
@@ -1723,6 +1759,10 @@ async def process_live_followup_job(job_id: str) -> None:
         from .first_booking import cadence_stopped
         if conversation.channel not in {"sms", "whatsapp"} or conversation.is_paused or lead.is_opt_out or cadence_stopped(db,conversation):
             job.status = "cancelled"; job.processed_at = workflow_now(datetime); db.commit(); return
+        from .continuity import state as continuity_state,pending as pending_messages,epoch
+        if pending_messages(db,conversation) or db.query(SalesInboundJob).filter(SalesInboundJob.conversation_id==conversation.id,SalesInboundJob.status.in_(['pending','retry','processing','failed'])).first():
+            job.status='cancelled';job.processed_at=workflow_now(datetime);db.commit();return
+        cadence_epoch=epoch(conversation);cadence_inbound=continuity_state(conversation).get('last_inbound_message_id')
         if conversation.channel == "whatsapp" and not _whatsapp_customer_window_open(db, conversation):
             # Re-engagement outside the customer-service window requires a
             # separately approved template; never attempt an illegal free-form send.
@@ -1796,7 +1836,8 @@ async def process_live_followup_job(job_id: str) -> None:
             job.processed_at = workflow_now(datetime); db.commit(); return
         await _dispatch(
             db, conversation=conversation, lead=lead, content=reply, role="assistant",
-            agent_run_id=run.id, metadata={"event_kind": "scheduled_follow_up", "reason": job.reason, "engine":run.graph_version},
+            agent_run_id=run.id, metadata={"event_kind": "scheduled_follow_up", "reason": job.reason, "engine":run.graph_version,
+                'continuity_epoch':cadence_epoch,'cadence_inbound_message_id':cadence_inbound,'cadence_job_id':job.id},
             idempotency_key=dispatch_key,
         )
         job.status = "processed"; job.processed_at = workflow_now(datetime)
@@ -1808,7 +1849,9 @@ async def process_live_followup_job(job_id: str) -> None:
     except Exception:
         db.rollback()
         job = db.query(SalesFollowUpJob).filter(SalesFollowUpJob.id == job_id).first()
-        if job:
+        if job and job.status not in {'cancelled','processed','review'}:
+            if job.kind in {'resume','inactivity'}:
+                job.status='review';job.reason=job.kind+'_send_requires_review';db.commit();raise
             job.status = "failed" if job.attempt_number >= 3 else "pending"
             job.attempt_number += 1
             job.scheduled_at = workflow_now(datetime) + timedelta(minutes=5)

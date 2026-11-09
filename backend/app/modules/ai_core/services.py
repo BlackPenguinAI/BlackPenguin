@@ -147,6 +147,9 @@ def validate_sales_configuration(configuration: dict) -> None:
         if value < 0 or value > 100:
             raise HTTPException(status_code=422, detail=f"Scoring weight {key} must be between 0 and 100.")
     cadence = configuration.get("cadence_config") or {}
+    inactivity=cadence.get('inactivity_minutes',45)
+    if isinstance(inactivity,bool) or not isinstance(inactivity,int) or not 5<=inactivity<=240:
+        raise HTTPException(422,'Inactivity closing must be between 5 and 240 whole minutes.')
     for key in ("hot_hours", "warm_hours", "cold_hours"):
         value = int(cadence.get(key, SALES_AGENT_DEFAULT_CONFIG["cadence_config"][key]))
         if value < 1 or value > 2160:

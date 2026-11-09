@@ -62,7 +62,14 @@ def prompt_snapshot(agent):
 
 
 def next_prompt_snapshot(guidance):
-    return {'version':'sales-understanding-prompt/2.10','system':SYSTEM_PROMPT+'''
+    return {'version':'sales-understanding-prompt/2.11','system':SYSTEM_PROMPT+'''
+When resume_sources is present, current_message is an internal consolidation of unanswered
+lead messages after human takeover. Answer their pending requests together. Each evidence
+quote must come from one original resume_sources content; never join quotes across messages.
+A standalone yes/ok cannot accept any pre-takeover offer or an offer made by a human.
+The supplied current facts and explicit later corrections supersede older messages.
+Do not claim the internal consolidation was sent by the lead as one provider message.
+
 SA-03: preferences are explicit COMMERCIAL facts only. Also capture bathrooms,
 motivation, decision_structure and needs (such as a quiet office for working from home).
 Do not manufacture a requirement from age, occupation or any protected characteristic.

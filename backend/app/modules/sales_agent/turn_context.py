@@ -38,7 +38,10 @@ def latest_outbound(db, conversation_id, *, skip_language_holds=False):
     if skip_language_holds:
         from sqlalchemy import and_
         query=query.filter(~and_(SalesMessage.role=='assistant',SalesMessage.metadata_json['language_hold'].as_boolean().is_(True)))
-    return query.order_by(SalesMessage.created_at.desc(), SalesMessage.id.desc()).first()
+    row=query.order_by(SalesMessage.created_at.desc(), SalesMessage.id.desc()).first()
+    from .continuity import state,epoch
+    if row and row.role=='assistant' and state(conversation).get('offer_barrier') and (row.metadata_json or {}).get('continuity_epoch')!=epoch(conversation):return None
+    return row
 
 
 def turn_context(db, conversation, lead=None):

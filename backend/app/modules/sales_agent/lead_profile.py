@@ -195,11 +195,16 @@ def capture(db,scope,understanding,message_id,*,selected_property=None,selected_
     lead=db.get(Lead,scope.lead_id)
     resolved=resolve(lead);current=resolved['current'];history=resolved['history']
     own=request_attribution(message.content)['current_text']
+    def source_ref(evidence):
+        identifiers=(message.metadata_json or {}).get('source_message_ids') or []
+        originals={row.id:row for row in scoped_messages_query(db,conversation).filter(SalesMessage.id.in_(identifiers)).all()}
+        matches=[identifier for identifier in identifiers if identifier in originals and evidence and evidence in originals[identifier].content]
+        return {'message_id':matches[-1],'resume_context_id':message.id} if matches else {'message_id':message.id}
     def put(field,value,evidence,source='active_conversation',extra=None,status=None):
         if not own_statement(evidence, own):return
         polarity='negative' if re.search(r"\b(?:no|not|never|don't|do not)\b",evidence,re.I) else 'affirmative'
         item=record(field,value,source=source,at=message.created_at,evidence=evidence,
-                    source_ref={'message_id':message.id,**(extra or {})},polarity=polarity,status=status)
+                    source_ref={**source_ref(evidence),**(extra or {})},polarity=polarity,status=status)
         previous=current[field]
         if item['id']==previous.get('id'):return
         if previous.get('status')!='unknown' and previous.get('id') not in {r.get('id') for r in history}:history.append(previous)
@@ -249,7 +254,7 @@ def capture(db,scope,understanding,message_id,*,selected_property=None,selected_
         # No model-normalized personal value: retain the exact voluntary quote.
         item = record(fact.key, fact.evidence if fact.action == 'set' else None,
                       source='active_conversation', at=message.created_at, evidence=fact.evidence,
-                      source_ref={'message_id':message.id},
+                      source_ref=source_ref(fact.evidence),
                       status={'set':'declared','withdraw':'withdrawn','decline':'declined'}[fact.action])
         if item['id'] == old.get('id'):continue
         if old.get('status') != 'unknown':optional_history.append(old)

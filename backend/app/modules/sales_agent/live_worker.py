@@ -44,6 +44,7 @@ def _claim_due_jobs(limit: int = 10) -> list[str]:
         ids = [job.id for job in jobs]
         for job in jobs:
             job.status = "processing"
+            job.claimed_at = datetime.utcnow()
         db.commit()
         return ids
     finally:
@@ -54,6 +55,8 @@ def _recover_stale_inbound_jobs() -> None:
     db = SessionLocal()
     try:
         cutoff = datetime.utcnow() - timedelta(minutes=10)
+        db.query(SalesFollowUpJob).filter(SalesFollowUpJob.status=='processing',SalesFollowUpJob.kind.in_(['resume','inactivity']),SalesFollowUpJob.claimed_at<cutoff).update({
+            SalesFollowUpJob.status:'pending',SalesFollowUpJob.claimed_at:None},synchronize_session=False)
         db.query(SalesInboundJob).filter(
             SalesInboundJob.status == "processing",
             SalesInboundJob.claimed_at < cutoff,

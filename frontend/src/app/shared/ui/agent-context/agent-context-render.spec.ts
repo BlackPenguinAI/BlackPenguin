@@ -29,6 +29,15 @@ async function mount(inputs:any={},http:any={get:vi.fn(()=>of(saved())),post:vi.
 }
 afterEach(()=>{TestBed.resetTestingModule();vi.restoreAllMocks();});
 describe('Operational context template',()=>{
+  it('distinguishes manual responses, pending resume and inactivity from inbound processing',async()=>{
+    const context={...saved(),trace:{...saved().trace,last_response_role:'human'},
+      continuity:{pending_message_count:2,waiting_for_lead:false,jobs:[{kind:'resume',status:'pending',scheduled_at:'2026-11-10T17:00:00Z'},{kind:'inactivity',status:'review',scheduled_at:'2026-11-10T18:00:00Z'}]},
+      handoff_summary:{stage:'S09_HANDOFF',intent_tier:'warm',pending_topics:['materials'],pending_messages:2,last_lead_message:'Send plans'}};
+    const {element}=await mount({context});
+    expect(element.textContent).toContain('Last responseCompany team');expect(element.textContent).toContain('2 messages');
+    expect(element.textContent).toContain('Resume continuation');expect(element.textContent).toContain('Inactivity closing');
+    expect(element.textContent).toContain('Sales handoff summary');expect(element.textContent).toContain('Send plans');
+  });
   it('keeps the enquiry independent from a recorded visit and labels UTC',async()=>{
     const context=saved(),before=JSON.stringify(context);const {element}=await mount({context});
     const cards=element.querySelectorAll('.property-grid>article');

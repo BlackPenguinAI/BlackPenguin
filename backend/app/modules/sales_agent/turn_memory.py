@@ -111,6 +111,7 @@ def build(db,scope,*,inbound_message_id,now=None):
             SalesMessage.role.in_(['user','assistant','human'])).order_by(SalesMessage.created_at.desc(),SalesMessage.id.desc()).limit(20).all()
         pertinent=[];remaining=12000
         for row in history:
+            if (row.metadata_json or {}).get('resume_context') or row.id in (inbound.metadata_json or {}).get('source_message_ids',[]):continue
             if (row.metadata_json or {}).get('lead_id',scope.lead_id)!=scope.lead_id:continue
             text=row.content[:min(1500,remaining)]
             if not text:break

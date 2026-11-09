@@ -73,12 +73,6 @@ async def turn(db, *, company_id, lead_id, inbound_text, event_id=None,
         from .first_booking import cadence_stopped
         if not conversation.is_paused and not lead.is_opt_out and not cadence_stopped(db,conversation):
             lead.agent_status='simulation'
-            if not db.query(SalesFollowUpJob).filter_by(conversation_id=conversation.id,status='pending').first():
-                attempt = 1 + db.query(SalesFollowUpJob).filter_by(conversation_id=conversation.id,status='processed').count()
-                if attempt <= 3:
-                    scheduled=clock+timedelta(hours=24 if attempt==1 else 48)
-                    db.add(SalesFollowUpJob(conversation_id=conversation.id,idempotency_key='followup:'+event_id,
-                        status='pending',scheduled_at=scheduled,reason='simulation_cadence',attempt_number=attempt))
-                    lead.next_action_at=scheduled
+            live._schedule_next_action(db,conversation,lead,event_id,refresh_pending=True)
         db.commit()
         return _response(run,run.output_snapshot or {})

@@ -87,6 +87,10 @@ async def preview(db, scope: Scope, *, inbound_message_id: str, expected_revisio
         'current_message':inbound.content,
         'qualification_offer':turn_context.get('qualification_offer') if turn_context else next(((m.metadata_json or {}).get('qualification_offer') for m in history if m.direction=='outbound'),None)}
     if turn_context:context_payload['turn_context']=turn_context
+    if (inbound.metadata_json or {}).get('resume_context'):
+        sources=[scoped_messages_query(db,conversation).filter_by(id=identifier,direction='inbound',role='user').one()
+                 for identifier in inbound.metadata_json['source_message_ids']]
+        context_payload['resume_sources']=[{'message_id':m.id,'content':m.content} for m in sources]
     if turn_context:
         # The backend retains the complete state. Avoid copying a growing audit
         # history into the model twice; this is a reference projection only.
@@ -129,6 +133,11 @@ async def preview(db, scope: Scope, *, inbound_message_id: str, expected_revisio
             raw = await asyncio.wait_for(pending, timeout=20) if active else await pending
             received = True
             interpreted = parse(raw, inbound.content)
+            if (inbound.metadata_json or {}).get('resume_context'):
+                from .evidence import quotations
+                issues=[{'location':path,'type':'evidence_mismatch','message':'Quote one original pending message; never join evidence across messages.'}
+                        for item,key,path in quotations(interpreted.model_dump(mode='json')) if not any(item[key] in m.content for m in sources)]
+                if issues:raise EvidenceError(issues)
         except EvidenceError as exc:
             outcome = 'invalid_model_contract'
             error_code = 'understanding_validation_failed'
