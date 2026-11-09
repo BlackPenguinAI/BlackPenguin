@@ -14,7 +14,9 @@ TASKS = {
 }
 def detect_task(text):
     value = text.casefold().strip()
-    if value == "open review: catalog" or re.search(r"\b(available inventory|current inventory|disponibilidad|inventario)\b", value): return "catalog"
+    if value == "open review: catalog": return "catalog"
+    inventory_command = re.match(r"^(?:(?:okay|ok)[, ]+)?(?:(?:i (?:want|need) to|let[’']s|please)\s+)?(?:fill in|review|open|update|edit|change|confirm|revisar|abrir|actualizar|editar|cambiar|confirmar|completar)\b", value)
+    if inventory_command and re.search(r"\b(available inventory|current inventory|disponibilidad|inventario)\b", value): return "catalog"
     if re.search(r"\b(review profile|review the profile|approve the company profile|approve company profile|approve profile|aprobar perfil|revisar perfil|revisar el perfil)\b",value): return "review"
     if not re.search(r"\b(update|edit|change|connect|reconnect|assign|add|upload|actualizar|editar|cambiar|conectar|reconectar|asignar|agregar|subir|quiero|want)\b",value):
         return None

@@ -38,17 +38,11 @@ describe('ProjectListComponent', () => {
     request.flush([]);
   });
 
-  it('creates an onboarding draft and navigates to the returned chat URL', () => {
+  it('opens the welcome screen without creating a project', () => {
     const fixture = TestBed.createComponent(ProjectListComponent);
-    const component = fixture.componentInstance;
-    const navigate=vi.spyOn(TestBed.inject(Router),'navigateByUrl').mockResolvedValue(true);
-
-    component.createProject();
-
-    const request = http.expectOne(`${API_V1_URL}/projects/drafts`);
-    expect(request.request.method).toBe('POST');
-    expect(request.request.body).toEqual({});
-    request.flush({ id: 'project-1', onboarding_url:'/app/projects/project-1/onboarding' });
-    expect(navigate).toHaveBeenCalledWith('/app/projects/project-1/onboarding');
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+    fixture.componentInstance.createProject();
+    http.expectNone(request => request.method === 'POST');
+    expect(navigate).toHaveBeenCalledWith('/app/projects/new');
   });
 });

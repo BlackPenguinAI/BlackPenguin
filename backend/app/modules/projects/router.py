@@ -18,6 +18,7 @@ from app.integrations.openrouter_client import generate_llm_response
 from app.modules.ai_core.services import get_ai_config
 from app.modules.ai_core.usage import LLMUsageContext
 from app.modules.auth.deps import RoleChecker
+from app.modules.companies.models import Company
 from app.modules.company_onboarding.models import CompanyProfile
 from app.modules.onboarding_questions import build_next_question
 from app.modules.onboarding_deferrals import deferred, question_blockers, deferred_question
@@ -44,7 +45,7 @@ from .schemas import (
     MetaAssetDiscoveryResponse, MetaAuthorizationResponse, MetaOAuthStartResponse,
     MetaSetupConfigurationResponse, MetaSetupStateResponse, ProjectCreate, ProjectProfilePatch, ProjectTimezoneUpdate,
     ProjectOnboardingActionRequest,
-    ProjectCompleteResponse, ProjectDeleteRequest, ProjectDeletionImpact, ProjectDraftResponse,
+    ProjectStartRequest, ProjectCompleteResponse, ProjectDeleteRequest, ProjectDeletionImpact, ProjectDraftResponse,
     ProjectOverviewResponse, ProjectProfileResponse, ProjectResponse,
     PropertyTypeCatalogResponse, PropertyTypeCreate, PropertyTypeMediaAttach,
     PropertyTypeResponse, PropertyTypeUpdate, ProjectMarketingSummary,
@@ -239,7 +240,7 @@ def _existing_turn(
     sources = db.query(ProjectOnboardingSource).filter(
         ProjectOnboardingSource.message_id == user_message.id,
     ).all()
-    return _turn_payload(
+    result = _turn_payload(
         request_id=request_id,
         ai_message=ai_message,
         user_message=user_message,
@@ -247,6 +248,16 @@ def _existing_turn(
         assistant_status="fallback" if recovered_interrupted_turn else "deterministic",
         sources=sources,
     )
+    replied_to = db.get(ProjectMessage, user_message.in_reply_to_message_id) if user_message.in_reply_to_message_id else None
+    actions = (replied_to.ui_payload or {}).get("answer_actions", {}) if replied_to else {}
+    replayed_approval = any(
+        str(label).strip().casefold() == user_message.content.strip().casefold()
+        and isinstance(action, dict) and action.get("kind") == "approve_profile"
+        for label, action in actions.items()
+    )
+    if replayed_approval and project.onboarding_status == "completed" and project.profile.final_approved:
+        result["redirect_url"] = f"/app/projects/{project.id}"
+    return result
 
 
 def _next_prompt(profile) -> str:
@@ -634,6 +645,40 @@ def create_project(payload: ProjectCreate, db: Session = Depends(get_db), curren
     return services.serialize_project(project)
 
 
+@router.post("/start", response_model=ProjectDraftResponse, status_code=status.HTTP_201_CREATED)
+async def start_project_onboarding(
+    payload: ProjectStartRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker(EDITOR_ROLES)),
+):
+    # Scope the retry key to its authenticated owner; no new database column is
+    # needed. Serialize creation against Company limits, including concurrent starts.
+    project_id = str(uuid.uuid5(uuid.NAMESPACE_URL, f"project-start:{current_user.company_id}:{current_user.id}:{payload.client_request_id}"))
+    intent = {"initial_url": str(payload.initial_url) if payload.initial_url else None, "skip_website": payload.skip_website}
+    try:
+        company = db.query(Company).filter(Company.id == current_user.company_id).with_for_update().first()
+        if not company:
+            raise HTTPException(404, "Company not found.")
+        project = db.query(Project).filter(Project.id == project_id, Project.company_id == current_user.company_id).first()
+        if project:
+            if (project.profile.field_sources or {}).get("__start_intent__") != intent:
+                raise HTTPException(409, "This start request was already used with a different website choice.")
+        else:
+            services.check_project_limits(db, current_user.company_id)
+            project = services.create_project_with_onboarding(
+                db, company_id=current_user.company_id,
+                payload={"id": project_id, "name": "Untitled Project"}, draft=True, commit=False,
+            )
+            project.onboarding_status = "in_progress"
+            project.profile.field_sources = {"__start_intent__": intent}
+            db.flush()
+        await bootstrap_chat(project.id, payload, db, current_user)
+        return {"id": project.id, "onboarding_url": f"/app/projects/{project.id}/onboarding", "onboarding_status": project.onboarding_status}
+    except Exception:
+        db.rollback()
+        raise
+
+
 @router.post("/drafts", response_model=ProjectDraftResponse, status_code=status.HTTP_201_CREATED)
 def create_project_draft(
     db: Session = Depends(get_db),
@@ -714,8 +759,8 @@ def complete_project_onboarding(
     active_payload = active_question.ui_payload if active_question else {}
     if active_question and active_payload and active_payload.get("field") is None and active_payload.get("label") == "Final approval":
         services.record_message_response(
-            db, active_question, status="accepted", answer="Approve profile",
-            selected_option="Approve profile", commit=True,
+            db, project.session.id, active_question.id, "Approve profile",
+            status="accepted", commit=True,
         )
     return {"completed": True, "redirect_url": f"/app/projects/{project.id}", "profile": services.serialize_profile(profile)}
 
@@ -1331,6 +1376,7 @@ async def bootstrap_chat(
     current_user: User = Depends(RoleChecker(EDITOR_ROLES)),
 ):
     project = services.get_project(db, project_id, current_user.company_id)
+    db.query(ProjectSession).filter(ProjectSession.id == project.session.id).with_for_update().one()
     existing = (
         db.query(ProjectMessage)
         .options(joinedload(ProjectMessage.attachments))
@@ -1455,7 +1501,15 @@ async def send_chat(
             raise HTTPException(422, 'This selection does not reference a question in this Project onboarding.')
 
     from .editor_tasks import detect_task
-    task = detect_task(payload.message) if payload.selected_values is None else None
+    # A response bound to a card must never be reinterpreted as navigation.
+    task = detect_task(payload.message) if payload.selected_values is None and not payload.in_reply_to_message_id else None
+    # Legacy clients send approval as text. Resolve it against the active card
+    # even without an explicit reply id, before considering editor navigation.
+    if task == "review":
+        candidate = services.get_active_question(db, project.session.id)
+        actions = (candidate.ui_payload or {}).get("answer_actions", {}) if candidate else {}
+        if any(str(label).strip().casefold() == payload.message.strip().casefold() for label in actions):
+            task = None
     if task:
         return _open_editor_task(db, project, current_user, task, payload.client_message_id, payload.message, request_id)
 

@@ -1175,6 +1175,26 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     });
   }
   chooseAnswer(value: string | string[], message?: ChatMessage): void {
+    if (typeof value === 'string' && message?.ui_payload?.answer_actions?.[value]?.kind === 'approve_profile') {
+      if (this.isAnalyzing || !this.isActiveQuestion(message)) return;
+      this.isAnalyzing = true;
+      this.errorMessage = '';
+      this.onboarding.complete(this.projectId).pipe(finalize(() => {
+        this.isAnalyzing = false;
+        this.cdr.detectChanges();
+      })).subscribe({
+        next: result => {
+          this.profile = result.profile;
+          this.markReply(message.id || null, value);
+          this.router.navigateByUrl(result.redirect_url);
+        },
+        error: error => {
+          this.errorMessage = this.apiDetail(error, 'The profile could not be approved. Review the remaining items and retry.');
+          this.syncState('preserve');
+        },
+      });
+      return;
+    }
     this.prompt = Array.isArray(value) ? value.join('; ') : value;
     this.replyToMessageId = message?.id || null;
     this.pendingSelection = Array.isArray(value) ? {text:this.prompt, questionId:this.replyToMessageId, values:[...value]} : null;

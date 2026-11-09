@@ -121,7 +121,7 @@ def get_project(db: Session, project_id: str, company_id: str) -> Project:
     return project
 
 
-def create_project_with_onboarding(db: Session, *, company_id: str, payload: dict[str, Any], draft: bool = False) -> Project:
+def create_project_with_onboarding(db: Session, *, company_id: str, payload: dict[str, Any], draft: bool = False, commit: bool = True) -> Project:
     company = db.query(Company).filter(Company.id == company_id).first()
     if not company:
         raise HTTPException(status_code=404, detail="Company not found.")
@@ -161,8 +161,11 @@ def create_project_with_onboarding(db: Session, *, company_id: str, payload: dic
     }
     refresh_completion(profile)
     project.onboarding_status = "draft" if draft else "in_progress"
-    db.commit()
-    db.refresh(project)
+    if commit:
+        db.commit()
+        db.refresh(project)
+    else:
+        db.flush()
     return project
 
 

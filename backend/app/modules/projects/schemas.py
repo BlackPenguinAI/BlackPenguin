@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from typing import Any, Literal
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator, model_validator
 from app.modules.onboarding_answers import StructuredChatMessagePayload
@@ -319,6 +320,16 @@ class ProposalDecisionResponse(BaseModel):
 class ChatBootstrapRequest(BaseModel):
     initial_url: HttpUrl | None = None
     skip_website: bool = False
+
+
+class ProjectStartRequest(ChatBootstrapRequest):
+    client_request_id: UUID
+
+    @model_validator(mode="after")
+    def require_start_choice(self):
+        if bool(self.initial_url) == self.skip_website:
+            raise ValueError("Provide a project URL or choose to continue without a website.")
+        return self
 
 
 class OnboardingStateResponse(BaseModel):

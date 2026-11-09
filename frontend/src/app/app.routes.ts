@@ -268,6 +268,13 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/client/notifications/notifications').then((m) => m.NotificationsComponent),
       },
       {
+        path: 'projects/new',
+        canActivate: [roleGuard],
+        data: { roles: ['admin', 'assistant'] },
+        loadComponent: () =>
+          import('./pages/client/projects/project-new/project-new').then((m) => m.ProjectNewComponent),
+      },
+      {
         path: 'projects/:id/onboarding',
         canActivate: [roleGuard],
         data: { roles: ['admin', 'assistant'] },

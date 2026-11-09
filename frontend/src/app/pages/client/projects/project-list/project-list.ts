@@ -75,21 +75,7 @@ export class ProjectListComponent implements OnInit, OnDestroy {
   }
 
   createProject() {
-    if (this.isCreating) return;
-    this.isCreating = true;
-    this.http.post<{ id: string; onboarding_url: string }>(`${API_V1_URL}/projects/drafts`, {}).pipe(
-      finalize(() => {
-        this.isCreating = false;
-        if (!this.destroyed) this.cdr.detectChanges();
-      }),
-    ).subscribe({
-      next: (created) => {
-        this.router.navigateByUrl(created.onboarding_url);
-      },
-      error: (err) => {
-        this.toastService.showError(err.error?.detail || 'Error creating project');
-      }
-    });
+    this.router.navigateByUrl('/app/projects/new');
   }
 
   openDeleteModal(project: any): void {
