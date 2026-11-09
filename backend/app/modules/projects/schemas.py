@@ -208,6 +208,7 @@ class SourceProposalResponse(BaseModel):
 
 class ProposalRevision(BaseModel):
     value: Any
+    expected_revision: int | None = Field(default=None, ge=1)
 
 
 class SourceResponse(BaseModel):
@@ -279,6 +280,7 @@ class SalesAssetResponse(BaseModel):
     allowed_channels: list[str]
     approved_by_user_id: str | None = None
     approved_at: datetime | None = None
+    resource_url: str | None = None
     source_name: str | None = None
     mime_type: str | None = None
     source_download_url: str | None = None
@@ -483,6 +485,12 @@ class PropertyTypeResponse(PropertyTypeBase):
     media: list[PropertyTypeMediaResponse] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
+
+
+class PropertyGalleryRequest(BaseModel):
+    accessible_to_leads: bool
+    source_ids: list[str] | None = Field(default=None, max_length=20)
+    allowed_channels: list[Literal["sms", "whatsapp"]] = Field(default_factory=lambda: ["sms", "whatsapp"], min_length=1)
 
 
 class PropertyTypeMediaAttach(BaseModel):

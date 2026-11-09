@@ -371,6 +371,8 @@ def remove(db: Session, project: Project, item: ProjectPropertyType, *, user_id:
     before = versions.begin_edit(db, services.get_profile(project))
     from .review_receipts import property_receipt
     property_receipt(db, project, item, "removed", user_id)
+    from .property_resource_service import invalidate_property_resources
+    invalidate_property_resources(db, item, remove_all=True, user_id=user_id)
     if item.review_status == "candidate":
         item.review_status = "rejected"
         db.add(item)
@@ -426,6 +428,8 @@ def attach_media(db: Session, project: Project, item: ProjectPropertyType, sourc
     ).all()
     if len({source.id for source in sources}) != len(set(source_ids)):
         raise HTTPException(status_code=422, detail="Every selected image must be a ready image from this Project.")
+    before = versions.begin_edit(db, services.get_profile(project))
+    db.refresh(item, ["media"])
     existing = {media.source_id for media in item.media}
     changed = item.images_status != "provided" or bool(set(source_ids) - existing)
     for index, source_id in enumerate(source_ids):
@@ -434,9 +438,30 @@ def attach_media(db: Session, project: Project, item: ProjectPropertyType, sourc
     item.images_status = "provided"
     db.add(item)
     if changed:
+        from .property_resource_service import invalidate_property_resources
+        invalidate_property_resources(db, item, user_id=user_id)
         db.flush(); db.refresh(item, ["media"])
+        versions.record_edit(db, project.profile, before, actor_user_id=user_id)
         from .review_receipts import property_receipt
         property_receipt(db, project, item, "images attached", user_id)
     db.commit()
     db.refresh(item)
+    return item
+
+
+def detach_media(db: Session, project: Project, item: ProjectPropertyType, source_id: str, *, user_id: str):
+    before = versions.begin_edit(db, services.get_profile(project))
+    db.refresh(item, ["media"])
+    media = next((row for row in item.media if row.source_id == source_id), None)
+    if media is None:
+        return item  # Retried removal is idempotent.
+    from .property_resource_service import invalidate_property_resources
+    invalidate_property_resources(db, item, removed_source_id=source_id, user_id=user_id)
+    db.delete(media); db.flush(); db.refresh(item, ["media"])
+    item.images_status = "provided" if item.media else "pending"
+    db.add(item); db.flush()
+    versions.record_edit(db, project.profile, before, actor_user_id=user_id)
+    from .review_receipts import property_receipt
+    property_receipt(db, project, item, "image removed", user_id)
+    db.commit(); db.refresh(item)
     return item

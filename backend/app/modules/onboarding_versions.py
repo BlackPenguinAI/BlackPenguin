@@ -25,7 +25,14 @@ def snapshot(profile, db=None) -> dict:
     project = getattr(profile, "project", None)
     value["company_id"] = getattr(project, "company_id", None) if project else getattr(profile, "company_id", None)
     if project is not None and db is not None:
-        from app.modules.projects.models import ProjectPropertyType, ProjectUnit
+        from app.modules.projects.models import ProjectPropertyType, ProjectPropertyTypeMedia, ProjectUnit
+        value["property_media"] = [
+            {col.name: getattr(row, col.name) for col in ProjectPropertyTypeMedia.__table__.columns}
+            for row in db.query(ProjectPropertyTypeMedia).join(ProjectPropertyType).filter(
+                ProjectPropertyType.project_id == project.id,
+                ProjectPropertyType.review_status == "confirmed",
+            ).order_by(ProjectPropertyTypeMedia.property_type_id, ProjectPropertyTypeMedia.sort_order, ProjectPropertyTypeMedia.id).all()
+        ]
         value["project_id"] = project.id
         value["project_name"] = project.name
         with db.no_autoflush:

@@ -62,8 +62,8 @@ export class ProjectOnboardingService {
   decideProposal(id: string, proposalId: string, action: 'confirm' | 'correct' | 'reject', value?: unknown): Observable<{ proposal: SourceProposal; profile: ProjectProfile }> {
     return this.http.post<{ proposal: SourceProposal; profile: ProjectProfile }>(`${this.baseUrl}/${id}/proposals/${proposalId}/decision`, { action, value });
   }
-  reviseProposal(id: string, proposalId: string, value: unknown): Observable<{ proposal: SourceProposal; profile: ProjectProfile }> {
-    return this.http.post<{ proposal: SourceProposal; profile: ProjectProfile }>(`${this.baseUrl}/${id}/proposals/${proposalId}/revision`, { value });
+  reviseProposal(id: string, proposalId: string, value: unknown, expectedRevision?: number): Observable<{ proposal: SourceProposal; profile: ProjectProfile }> {
+    return this.http.post<{ proposal: SourceProposal; profile: ProjectProfile }>(`${this.baseUrl}/${id}/proposals/${proposalId}/revision`, { value, expected_revision: expectedRevision });
   }
   setCover(id: string, sourceId: string): Observable<ProjectSource> {
     return this.http.post<ProjectSource>(`${this.baseUrl}/${id}/sources/${sourceId}/cover`, {});
@@ -75,6 +75,19 @@ export class ProjectOnboardingService {
   uploadPropertyImage(id:string,file:File,sharingIntent:string,tags:SalesAssetType[]):Observable<ProjectSource> {
     const body=new FormData();body.append('file',file,file.name);body.append('sharing_intent',sharingIntent);body.append('content_tags',JSON.stringify(tags));
     return this.http.post<ProjectSource>(`${this.baseUrl}/${id}/sources/image-upload`,body);
+  }
+  removePropertyImage(id: string, propertyId: string, sourceId: string): Observable<ProjectPropertyType> {
+    return this.http.delete<ProjectPropertyType>(`${this.baseUrl}/${id}/property-types/${propertyId}/media/${sourceId}`);
+  }
+  savePropertyGallery(id: string, propertyId: string, accessible: boolean, sourceIds: string[]): Observable<ProjectSalesAsset | null> {
+    return this.http.post<ProjectSalesAsset | null>(`${this.baseUrl}/${id}/property-types/${propertyId}/gallery`, {accessible_to_leads: accessible, source_ids: sourceIds});
+  }
+  uploadPropertyDocument(id: string, propertyId: string, file: File, accessible: boolean, tags: SalesAssetType[]): Observable<ProjectSalesAsset> {
+    const body = new FormData(); body.append('file', file, file.name); body.append('accessible_to_leads', String(accessible)); body.append('content_tags', JSON.stringify(tags));
+    return this.http.post<ProjectSalesAsset>(`${this.baseUrl}/${id}/property-types/${propertyId}/documents`, body);
+  }
+  removePropertyDocument(id: string, propertyId: string, assetId: string): Observable<void> {
+    return this.http.delete<void>(`${this.baseUrl}/${id}/property-types/${propertyId}/documents/${assetId}`);
   }
   getPropertyTypes(id: string): Observable<PropertyTypeCatalog> {
     return this.http.get<PropertyTypeCatalog>(`${this.baseUrl}/${id}/property-types`);

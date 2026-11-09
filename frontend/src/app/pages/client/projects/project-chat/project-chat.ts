@@ -215,7 +215,30 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   }
   locationSaved():void {this.syncState('bottom');}
   readonly editorTasks = [{key:'meta_account',label:'Meta account'},{key:'meta_assets',label:'Campaigns / forms'},{key:'team',label:'Assign team'},{key:'catalog',label:'Property types'},{key:'delivery',label:'Delivery dates'},{key:'parking',label:'Parking / storage'},{key:'documents',label:'Add documents'},{key:'location',label:'Location / timezone'}];
+  catalogEditorOpen = false;
+  selectedPropertyId = '';
+  readonly propertyResourceBusy = new Set<string>();
+  propertyGalleryAccess: Record<string, boolean | undefined> = {};
+  propertyDocumentAccess: Record<string, boolean> = {};
+  propertyDocumentTags: Record<string, SalesAssetType[]> = {};
+  get visiblePropertyTypes(): ProjectPropertyType[] {
+    return this.propertyCatalog.items.filter(item => !this.selectedPropertyId || item.id === this.selectedPropertyId);
+  }
+  propertyDocuments(item: ProjectPropertyType): ProjectSalesAsset[] {
+    return this.salesAssets.filter(asset => asset.property_type_id === item.id && asset.mime_type === 'application/pdf');
+  }
+  propertyGallery(item: ProjectPropertyType): ProjectSalesAsset | undefined {
+    return this.salesAssets.find(asset => asset.property_type_id === item.id && asset.mime_type === 'application/vnd.blackpenguin.property-gallery+html');
+  }
+  closeCatalogEditor(): void { this.catalogEditorOpen = false; this.selectedPropertyId = ''; }
   openEditorTask(task:string):void {
+    if (task === 'catalog') {
+      this.catalogEditorOpen = true;
+      this.loadPropertyTypes(); this.loadSalesAssets();
+      this.cdr.detectChanges();
+      setTimeout(() => this.chatScroll?.nativeElement.querySelector('[data-testid="property-type-catalog"]')?.scrollIntoView({block:'start'}));
+      return;
+    }
     if(this.isAnalyzing)return;
     this.isAnalyzing=true;this.errorMessage='';
     this.onboarding.openEditorTask(this.projectId,task,this.createClientMessageId()).pipe(timeout(20_000)).subscribe({next:turn=>{this.isAnalyzing=false;this.applyTurn(turn);this.showMetaAssetStep=task==='meta_assets';this.scrollToBottom();},error:e=>{this.isAnalyzing=false;this.errorMessage=this.apiDetail(e,'The review could not be opened. Your data is unchanged; retry.');this.cdr.detectChanges();}});
@@ -352,7 +375,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
       && this.propertyTypeErrorCount(item) === 0;
   }
   isPropertyTypeSaving(item: Partial<ProjectPropertyType>): boolean {
-    return this.propertyImageUploads.has(item.id || 'new') || (item.id ? this.savingPropertyTypeIds.has(item.id) || this.mediaUpdatingPropertyTypeIds.has(item.id) : this.creatingPropertyType);
+    return this.propertyImageUploads.has(item.id || 'new') || this.propertyResourceBusy.has(item.id || 'new') || (item.id ? this.savingPropertyTypeIds.has(item.id) || this.mediaUpdatingPropertyTypeIds.has(item.id) : this.creatingPropertyType);
   }
   get reviewingAvailability(): boolean { return this.nextQuestion?.label === 'Confirm current availability'; }
   get catalogReady(): boolean {
@@ -363,6 +386,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
       && this.mediaUpdatingPropertyTypeIds.size === 0
       && this.savingPropertyTypeIds.size === 0
       && this.propertyImageUploads.size === 0
+      && this.propertyResourceBusy.size === 0
       && !this.confirmingPropertyCatalog
       && this.propertyCatalog.confirmed_count > 0
       && this.propertyCatalog.candidate_count === 0
@@ -833,6 +857,53 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     });
   }
 
+  removePropertyImage(item: ProjectPropertyType, sourceId: string): void {
+    if (this.propertyResourceBusy.has(item.id)) return;
+    this.propertyResourceBusy.add(item.id); this.errorMessage = '';
+    this.onboarding.removePropertyImage(this.projectId, item.id, sourceId).pipe(finalize(() => {
+      this.propertyResourceBusy.delete(item.id); this.cdr.detectChanges();
+    })).subscribe({next: updated => {
+      this.mergePropertyTypeMedia(updated); this.loadSalesAssets(); this.syncState('preserve');
+      delete this.propertyGalleryAccess[item.id];
+    }, error: error => this.errorMessage = this.apiDetail(error, 'The image could not be removed. Your other data is unchanged.')});
+  }
+  savePropertyGallery(item: ProjectPropertyType): void {
+    if (this.propertyResourceBusy.has(item.id)) return;
+    const accessible = this.propertyGalleryAccess[item.id] ?? this.propertyGallery(item)?.approval_status === 'approved';
+    this.propertyResourceBusy.add(item.id); this.errorMessage = '';
+    this.onboarding.savePropertyGallery(this.projectId, item.id, accessible, item.media.map(row => row.source_id)).pipe(finalize(() => {
+      this.propertyResourceBusy.delete(item.id); this.cdr.detectChanges();
+    })).subscribe({next: updated => {
+      if (updated) this.salesAssets = [updated, ...this.salesAssets.filter(row => row.id !== updated.id)];
+      delete this.propertyGalleryAccess[item.id];
+    }, error: error => this.errorMessage = this.apiDetail(error, 'The gallery permissions could not be saved. Review the selected images and retry.')});
+  }
+  togglePropertyDocumentTag(item: ProjectPropertyType, tag: SalesAssetType): void {
+    const tags = this.propertyDocumentTags[item.id] || ['brochure'];
+    this.propertyDocumentTags[item.id] = tags.includes(tag) ? tags.filter(value => value !== tag) : [...tags, tag];
+  }
+  uploadPropertyDocument(item: ProjectPropertyType, event: Event): void {
+    const input = event.target as HTMLInputElement; const file = input.files?.[0]; input.value = '';
+    if (!file || this.propertyResourceBusy.has(item.id)) return;
+    const tags = this.propertyDocumentTags[item.id] || ['brochure'];
+    if (file.type !== 'application/pdf' || file.size > 15 * 1024 * 1024 || !tags.length) {
+      this.errorMessage = 'Choose a PDF up to 15 MB and select its contents.'; return;
+    }
+    this.propertyResourceBusy.add(item.id); this.errorMessage = '';
+    this.onboarding.uploadPropertyDocument(this.projectId, item.id, file, this.propertyDocumentAccess[item.id] || false, tags).pipe(finalize(() => {
+      this.propertyResourceBusy.delete(item.id); this.cdr.detectChanges();
+    })).subscribe({next: asset => { this.salesAssets = [asset, ...this.salesAssets.filter(row => row.id !== asset.id)]; },
+      error: error => this.errorMessage = this.apiDetail(error, 'The PDF could not be uploaded. Your property data is unchanged.')});
+  }
+  removePropertyDocument(item: ProjectPropertyType, asset: ProjectSalesAsset): void {
+    if (this.propertyResourceBusy.has(item.id) || !window.confirm('Remove this PDF from this property type and revoke its lead links?')) return;
+    this.propertyResourceBusy.add(item.id); this.errorMessage = '';
+    this.onboarding.removePropertyDocument(this.projectId, item.id, asset.id).pipe(finalize(() => {
+      this.propertyResourceBusy.delete(item.id); this.cdr.detectChanges();
+    })).subscribe({next: () => { this.salesAssets = this.salesAssets.filter(row => row.id !== asset.id); },
+      error: error => this.errorMessage = this.apiDetail(error, 'The PDF could not be removed.')});
+  }
+
   togglePropertyTypeImage(item: ProjectPropertyType, sourceId: string): void {
     const selected = this.propertyTypeImageSelection.get(item.id) || new Set<string>();
     selected.has(sourceId) ? selected.delete(sourceId) : selected.add(sourceId);
@@ -859,7 +930,14 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
         const remaining = new Set(this.propertyTypeImageSelection.get(item.id) || []);
         selected.forEach(id => remaining.delete(id));
         this.propertyTypeImageSelection.set(item.id, remaining);
+        const gallery = this.propertyGallery(item);
+        const changed = updated.media.some(row => !item.media.some(previous => previous.source_id === row.source_id));
         this.mergePropertyTypeMedia(updated);
+        if (gallery && changed) {
+          gallery.approval_status = 'draft'; gallery.resource_url = null; gallery.approved_at = null;
+          delete this.propertyGalleryAccess[item.id];
+        }
+        if (gallery || this.catalogEditorOpen) this.syncState('preserve');
       },
       error: () => this.errorMessage = 'The selected images could not be attached to this property type.',
     });
@@ -898,7 +976,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
 
   get readyProjectImages(): ProjectSource[] { return this.sources.filter(source => source.kind === 'image' && source.status === 'ready' && !!source.download_url); }
   get showCoverPicker(): boolean { return !this.cardDeferred('field:project_cover') && this.nextQuestion?.input_type === 'project_cover'; }
-  get showPropertyCatalog(): boolean { return (this.nextQuestion?.input_type === 'property_type_catalog' || !this.cardDeferred('field:property_type_catalog')) && (this.nextQuestion?.input_type === 'property_type_catalog' || this.showPropertyTypeForm || Object.entries(this.profile.ui_deferrals || {}).some(([key,value])=>key.startsWith('property:') && value.resumed)); }
+  get showPropertyCatalog(): boolean { return this.catalogEditorOpen || (this.nextQuestion?.input_type === 'property_type_catalog' || !this.cardDeferred('field:property_type_catalog')) && (this.nextQuestion?.input_type === 'property_type_catalog' || this.showPropertyTypeForm || Object.entries(this.profile.ui_deferrals || {}).some(([key,value])=>key.startsWith('property:') && value.resumed)); }
 
   private emptyPropertyType(): Partial<ProjectPropertyType> {
     return { name: '', code: null, description: null, bedrooms: null, bathrooms: null, area_min: null, area_max: null,
@@ -1226,6 +1304,9 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     return this.sources.filter((source) => this.isReviewableSource(source) && (!source.message_id || !messageIds.has(source.message_id)));
   }
   isReviewableSource(source: ProjectSource): boolean {
+    if (source.mime_type === 'application/vnd.blackpenguin.property-gallery+html') return false;
+    if (source.status === 'ready' && !source.proposals.length && source.mime_type === 'application/pdf'
+      && this.salesAssets.some(asset => asset.source_id === source.id && !!asset.property_type_id)) return false;
     return source.kind !== 'image'
       || this.salesAssetsForSource(source.id).length > 0
       || source.status === 'processing'
@@ -1336,12 +1417,13 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   }
   previewSalesAsset(item: ProjectSalesAsset): void {
     const source = this.sourceForSalesAsset(item);
-    if (!source?.download_url) {
+    const downloadUrl = source?.download_url || item.source_download_url;
+    if (!downloadUrl) {
       const url = item.extracted_links?.[0]?.url || source?.url;
       if (url) window.open(url, '_blank', 'noopener,noreferrer');
       return;
     }
-    this.onboarding.downloadAttachment(source.download_url).subscribe({
+    this.onboarding.downloadAttachment(downloadUrl).subscribe({
       next: blob => {
         const url = URL.createObjectURL(blob);
         window.open(url, '_blank', 'noopener,noreferrer');
@@ -1495,7 +1577,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   }
 
   editProposalRevision(source: ProjectSource, proposal: SourceProposal): void {
-    if (proposal.status !== 'corrected' || proposal.submitting) return;
+    if (!['confirmed', 'corrected'].includes(proposal.status) || proposal.submitting) return;
     this.updateProposal(source.id, proposal.id, { editing: true, inlineError: undefined });
   }
 
@@ -1506,10 +1588,10 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   }
 
   saveProposalRevision(source: ProjectSource, proposal: SourceProposal): void {
-    if (proposal.status !== 'corrected' || !proposal.editing || proposal.submitting) return;
+    if (!['confirmed', 'corrected'].includes(proposal.status) || !proposal.editing || proposal.submitting) return;
     const value = parseProposalValue(proposal.field, proposal.draftValue || '', proposal.value);
     this.updateProposal(source.id, proposal.id, { submitting: true, inlineError: undefined });
-    this.onboarding.reviseProposal(this.projectId, proposal.id, value).subscribe({
+    this.onboarding.reviseProposal(this.projectId, proposal.id, value, proposal.revision || 1).subscribe({
       next: result => {
         this.updateProposal(source.id, proposal.id, {
           ...result.proposal, draftValue: this.formatProposalValue(result.proposal),
@@ -1718,11 +1800,12 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
       ...source,
       proposals: source.proposals.map((proposal) => {
         const previous = previousProposals.get(proposal.id);
-        const preserveDraft = proposal.status === 'pending'
-          && previous?.status === 'pending'
+        const preserveDraft = !!previous && ((proposal.status === 'pending' && previous.status === 'pending') || previous.editing === true)
           && previous.draftValue !== undefined;
         return {
           ...proposal,
+          editing: preserveDraft ? previous.editing : false,
+          revision: previous?.editing ? previous.revision : proposal.revision,
           draftValue: preserveDraft ? previous.draftValue : ((proposal.status === 'pending' ? this.profile.ui_deferrals?.['source:'+source.id]?.draft?.[proposal.id] : undefined) ?? this.formatProposalValue(proposal)),
           inlineError: preserveDraft ? previous.inlineError : undefined,
         };

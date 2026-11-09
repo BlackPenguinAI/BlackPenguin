@@ -126,6 +126,7 @@ export interface ProjectFileIntent {
   allowed_channels: Array<'sms' | 'whatsapp'>;
 }
 export interface ProjectSalesAsset {
+  resource_url?: string | null;
   id: string; company_id: string; project_id: string; property_type_id: string | null; source_id: string;
   asset_type: SalesAssetType; content_tags: SalesAssetType[]; display_name: string; description: string | null;
   approval_status: 'draft' | 'approved' | 'archived'; version: number;

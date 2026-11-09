@@ -17,6 +17,7 @@ CHANNELS = {"sms", "whatsapp"}
 
 
 def serialize(item: ProjectSalesAsset) -> dict[str, Any]:
+    from .property_resource_service import resource_url
     source = item.source
     return {
         "id": item.id,
@@ -35,6 +36,7 @@ def serialize(item: ProjectSalesAsset) -> dict[str, Any]:
         "allowed_channels": item.allowed_channels or [],
         "approved_by_user_id": item.approved_by_user_id,
         "approved_at": item.approved_at,
+        "resource_url": resource_url(item),
         "source_name": source.original_filename or source.name if source else None,
         "mime_type": source.mime_type if source else None,
         "source_download_url": (
@@ -172,8 +174,10 @@ def materialize_discovered_link_candidate(db: Session, source: ProjectOnboarding
     return item
 
 
-def update(db: Session, item: ProjectSalesAsset, payload: dict[str, Any]) -> ProjectSalesAsset:
+def update(db: Session, item: ProjectSalesAsset, payload: dict[str, Any], *, user_id: str | None = None) -> ProjectSalesAsset:
     values = _validate_payload(payload)
+    from .property_resource_service import revoke_asset_links
+    revoke_asset_links(db, item, user_id=user_id)
     for key, value in values.items():
         if key != "source_id":
             setattr(item, key, value)
@@ -194,6 +198,8 @@ def approve(db: Session, item: ProjectSalesAsset, *, user_id: str) -> ProjectSal
         not source.storage_path and not (source.extracted_links or [])
     ):
         raise HTTPException(status_code=409, detail="The source file is not ready for sharing.")
+    if item.property_type_id and (not item.property_type or item.property_type.project_id != item.project_id or item.property_type.review_status != "confirmed"):
+        raise HTTPException(status_code=409, detail="Confirm the associated property type before allowing lead access.")
     now = datetime.utcnow()
     if item.valid_until and item.valid_until <= now:
         raise HTTPException(status_code=409, detail="Expired material cannot be approved.")
@@ -209,6 +215,8 @@ def approve(db: Session, item: ProjectSalesAsset, *, user_id: str) -> ProjectSal
             validate_image(content, source.mime_type)
         except (ValueError, OSError) as exc:
             raise HTTPException(status_code=422, detail="This image cannot be approved because its content could not be validated. Upload a valid JPG, PNG, or WEBP image (up to 15 MB and 40 megapixels) and review it again.") from exc
+    if item.approval_status == "approved" and item.approved_at:
+        return item
     item.approval_status = "approved"
     item.approved_by_user_id = user_id
     item.approved_at = now
@@ -218,7 +226,9 @@ def approve(db: Session, item: ProjectSalesAsset, *, user_id: str) -> ProjectSal
     return item
 
 
-def archive(db: Session, item: ProjectSalesAsset) -> None:
+def archive(db: Session, item: ProjectSalesAsset, *, user_id: str | None = None) -> None:
+    from .property_resource_service import revoke_asset_links
+    revoke_asset_links(db, item, user_id=user_id)
     item.approval_status = "archived"
     item.approved_by_user_id = None
     item.approved_at = None

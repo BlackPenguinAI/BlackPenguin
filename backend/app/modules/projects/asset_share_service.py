@@ -114,6 +114,16 @@ def resolve(db: Session, token: str) -> tuple[ProjectOnboardingSource, SalesAsse
     ).first()
     if not source or (not share.target_url and not source.storage_path):
         raise HTTPException(status_code=404, detail="Shared sales material not found.")
+    if share.sales_asset_id:
+        asset = db.get(ProjectSalesAsset, share.sales_asset_id)
+        now = datetime.utcnow()
+        if (not asset or asset.approval_status != "approved" or not asset.approved_at
+                or asset.company_id != share.company_id or asset.project_id != share.project_id
+                or asset.source_id != share.source_id
+                or share.channel and share.channel not in (asset.allowed_channels or [])
+                or asset.valid_from and asset.valid_from > now or asset.valid_until and asset.valid_until <= now
+                or asset.property_type_id and (not asset.property_type or asset.property_type.project_id != asset.project_id or asset.property_type.review_status != "confirmed")):
+            raise HTTPException(404, "This shared sales material changed or is unavailable.")
     if share.agent_run_id:
         from app.modules.sales_agent.models import AgentRun
         run = db.get(AgentRun, share.agent_run_id)
@@ -158,7 +168,7 @@ def record_access(
     db.commit()
 
 
-def revoke(db: Session, share: SalesAssetShare, *, user_id: str) -> None:
+def revoke(db: Session, share: SalesAssetShare, *, user_id: str | None) -> None:
     if share.revoked:
         return
     share.revoked = True

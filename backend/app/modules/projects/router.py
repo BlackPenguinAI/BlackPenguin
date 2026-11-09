@@ -48,7 +48,7 @@ from .schemas import (
     ProjectStartRequest, ProjectCompleteResponse, ProjectDeleteRequest, ProjectDeletionImpact, ProjectDraftResponse,
     ProjectOverviewResponse, ProjectProfileResponse, ProjectResponse,
     PropertyTypeCatalogResponse, PropertyTypeCreate, PropertyTypeMediaAttach,
-    PropertyTypeResponse, PropertyTypeUpdate, ProjectMarketingSummary,
+    PropertyTypeResponse, PropertyTypeUpdate, ProjectMarketingSummary, PropertyGalleryRequest,
     OnboardingStateResponse, ProposalDecision, ProposalDecisionResponse, ProposalRevision,
     SalesAssetPayload, SalesAssetResponse, SalesAssetUpdate, SourceResponse, UrlSourceRequest,
 )
@@ -115,6 +115,15 @@ def _file_upload_intents(raw: str, count: int) -> list[dict[str, Any]]:
     return results
 
 
+@router.get("/resources/{asset_id}/{signature}", include_in_schema=False)
+def view_property_resource(asset_id: str, signature: str, db: Session = Depends(get_db)):
+    from .property_resource_service import resolve_resource, read_resource
+    source = resolve_resource(db, asset_id, signature)
+    content, mime, headers = read_resource(source)
+    headers["Content-Disposition"] = f"inline; filename*=UTF-8''{quote(source.original_filename or source.name)}"
+    return Response(content=content, media_type=mime, headers=headers)
+
+
 @router.get("/shared-assets/{token}", include_in_schema=False)
 def download_shared_sales_asset(token: str, request: Request, download: bool = False, db: Session = Depends(get_db)):
     source, share = asset_share_service.resolve(db, token)
@@ -134,19 +143,18 @@ def download_shared_sales_asset(token: str, request: Request, download: bool = F
         raise HTTPException(status_code=404, detail="Shared sales material not found.") from exc
     if not path.is_file():
         raise HTTPException(status_code=404, detail="Shared sales material not found.")
-    try:
-        content = storage_service.read_project_file(source.storage_path, encrypted=bool(source.is_encrypted))
-    except ValueError as exc:
-        raise HTTPException(status_code=404, detail="Shared sales material not found.") from exc
+    from .property_resource_service import read_resource
+    content, resource_mime, resource_headers = read_resource(source)
     ip_hash, user_agent_hash, _ = request_fingerprint(request)
     asset_share_service.record_access(
         db, share=share, event_type="download" if download else "view",
         ip_hash=ip_hash, user_agent_hash=user_agent_hash,
         user_agent=request.headers.get("user-agent"),
     )
-    return Response(content=content, media_type=source.mime_type or "application/octet-stream", headers={
+    return Response(content=content, media_type=resource_mime, headers={
+        **resource_headers,
         "Content-Disposition": f"{'attachment' if download else 'inline'}; filename*=UTF-8''{quote(source.original_filename or source.name)}",
-        "Cache-Control": "private, max-age=300", "X-Content-Type-Options": "nosniff",
+        "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff",
     })
 
 
@@ -422,7 +430,15 @@ def _state_payload(db: Session, project: Project) -> dict[str, Any]:
     )
     if not processing and not pending_review:
         latest_ai = next((item for item in reversed(messages) if item.sender == SenderType.AI), None)
-        desired_question = latest_ai.ui_payload if latest_ai and not latest_ai.response_payload and (latest_ai.ui_payload or {}).get("task") else _guided_next_question(db, project, profile)
+        active_question = services.get_active_question(db, project.session.id)
+        desired_question = active_question.ui_payload if active_question and (active_question.ui_payload or {}).get("task") else _guided_next_question(db, project, profile)
+        # Saving a property/material adds an immutable receipt, not a new answer.
+        # Keep the pending card and its reply ID when that question is still valid.
+        if active_question and latest_ai and not latest_ai.ui_payload and not latest_ai.response_payload and all(
+            (active_question.ui_payload or {}).get(key) == desired_question.get(key)
+            for key in ("field", "input_type", "task")
+        ):
+            latest_ai = active_question
         if latest_ai and not latest_ai.response_payload and (latest_ai.ui_payload or {}).get("field") == "inventory_updated_at":
             # Retire this question without rewriting what the user originally
             # saw, or fabricating an answer/date for historical inventory.
@@ -972,6 +988,95 @@ def attach_property_type_media(
     return catalog_service.serialize(catalog_service.attach_media(db, project, item, payload.source_ids, user_id=current_user.id))
 
 
+@router.delete("/{project_id}/property-types/{property_type_id}/media/{source_id}", response_model=PropertyTypeResponse)
+def detach_property_image(project_id: str, property_type_id: str, source_id: str,
+    db: Session = Depends(get_db), current_user: User = Depends(RoleChecker(EDITOR_ROLES))):
+    project = services.get_project(db, project_id, current_user.company_id)
+    require_project_access(db, current_user, project_id)
+    item = _property_type(db, project.id, property_type_id)
+    return catalog_service.serialize(catalog_service.detach_media(db, project, item, source_id, user_id=current_user.id))
+
+
+@router.post("/{project_id}/property-types/{property_type_id}/gallery", response_model=SalesAssetResponse | None)
+def save_property_gallery(project_id: str, property_type_id: str, payload: PropertyGalleryRequest,
+    db: Session = Depends(get_db), current_user: User = Depends(RoleChecker(EDITOR_ROLES))):
+    project = services.get_project(db, project_id, current_user.company_id)
+    require_project_access(db, current_user, project_id)
+    item = _property_type(db, project.id, property_type_id)
+    from app.modules.onboarding_versions import lock_for_approval
+    lock_for_approval(db, project.profile)
+    db.refresh(item, ["media"])
+    if payload.accessible_to_leads and payload.source_ids is not None and set(payload.source_ids) != {row.source_id for row in item.media}:
+        raise HTTPException(409, 'The selected gallery images changed. Reload this property type and review them again.')
+    from .property_resource_service import save_gallery
+    asset = save_gallery(db, project, item, accessible=payload.accessible_to_leads,
+        channels=list(dict.fromkeys(payload.allowed_channels)), user_id=current_user.id)
+    return sales_asset_service.serialize(asset) if asset else None
+
+
+@router.delete("/{project_id}/property-types/{property_type_id}/documents/{asset_id}", status_code=204)
+def remove_property_document(project_id: str, property_type_id: str, asset_id: str,
+    db: Session = Depends(get_db), current_user: User = Depends(RoleChecker(EDITOR_ROLES))):
+    project = services.get_project(db, project_id, current_user.company_id)
+    require_project_access(db, current_user, project_id)
+    item = _property_type(db, project.id, property_type_id)
+    asset = _sales_asset(db, project.id, asset_id)
+    if asset.property_type_id != item.id or not asset.source or asset.source.mime_type != 'application/pdf':
+        raise HTTPException(404, 'Property PDF not found.')
+    sales_asset_service.archive(db, asset, user_id=current_user.id)
+    asset.property_type_id = None
+    asset.version += 1
+    db.add(asset); db.commit()
+    return Response(status_code=204)
+
+
+@router.post("/{project_id}/property-types/{property_type_id}/documents", response_model=SalesAssetResponse, status_code=201)
+async def upload_property_document(project_id: str, property_type_id: str,
+    file: UploadFile = File(...), accessible_to_leads: bool = Form(False),
+    content_tags: str = Form('["brochure"]'), display_name: str = Form(''),
+    db: Session = Depends(get_db), current_user: User = Depends(RoleChecker(EDITOR_ROLES))):
+    from io import BytesIO
+    from pypdf import PdfReader
+    project = services.get_project(db, project_id, current_user.company_id)
+    require_project_access(db, current_user, project_id)
+    item = _property_type(db, project.id, property_type_id)
+    if accessible_to_leads and item.review_status != 'confirmed':
+        raise HTTPException(422, 'Confirm this property type before sharing its documents.')
+    if file.content_type != 'application/pdf':
+        raise HTTPException(422, 'Choose a PDF document (up to 15 MB).')
+    try:
+        tags = json.loads(content_tags)
+    except ValueError:
+        raise HTTPException(422, 'Select the contents of this PDF.')
+    if not isinstance(tags, list) or not tags or any(not isinstance(tag, str) or tag not in sales_asset_service.ASSET_TYPES for tag in tags):
+        raise HTTPException(422, 'Select the contents of this PDF.')
+    content = await file.read(15 * 1024 * 1024 + 1)
+    if len(content) > 15 * 1024 * 1024:
+        raise HTTPException(422, 'The PDF exceeds the 15 MB limit.')
+    try:
+        reader = PdfReader(BytesIO(content))
+        if reader.is_encrypted or not len(reader.pages):
+            raise ValueError('Protected or empty PDF')
+    except Exception:
+        raise HTTPException(422, 'Choose a readable, unencrypted PDF with at least one page.')
+    await file.seek(0)
+    source = await source_service.create_file_source(db, project_id=project.id, company_id=project.company_id,
+        user_id=current_user.id, upload=file)
+    if source.status == ProjectSourceStatus.FAILED:
+        raise HTTPException(422, source.error_message or 'The PDF could not be stored.')
+    source.status = ProjectSourceStatus.READY
+    source.extracted_text = '[Property document: content classified by user; no automatic profile updates]'
+    db.add(source); db.flush()
+    asset = sales_asset_service.create(db, project, {'source_id':source.id, 'property_type_id':item.id,
+        'asset_type':tags[0], 'content_tags':list(dict.fromkeys(tags)),
+        'display_name':(display_name.strip() or source.name)[:255], 'allowed_channels':['sms','whatsapp']},user_id=current_user.id)
+    if accessible_to_leads:
+        sales_asset_service.approve(db, asset, user_id=current_user.id)
+    else:
+        sales_asset_service.archive(db, asset, user_id=current_user.id)
+    return sales_asset_service.serialize(asset)
+
+
 @router.post("/{project_id}/property-types/{property_type_id}/defer-images", response_model=PropertyTypeResponse)
 def defer_property_type_images(
     project_id: str, property_type_id: str, db: Session = Depends(get_db),
@@ -1031,7 +1136,7 @@ def update_sales_asset(
     project = services.get_project(db, project_id, current_user.company_id)
     require_project_access(db, current_user, project_id)
     item = _sales_asset(db, project.id, asset_id)
-    return sales_asset_service.serialize(sales_asset_service.update(db, item, payload.model_dump()))
+    return sales_asset_service.serialize(sales_asset_service.update(db, item, payload.model_dump(), user_id=current_user.id))
 
 
 @router.post("/{project_id}/sales-assets/{asset_id}/approve", response_model=SalesAssetResponse)
@@ -1063,7 +1168,7 @@ def archive_sales_asset(
     display_name = item.display_name
     from app.modules.onboarding_deferrals import resolve_draft
     resolve_draft(project.profile, "material:" + item.id)
-    sales_asset_service.archive(db, item)
+    sales_asset_service.archive(db, item, user_id=current_user.id)
     services.save_message(
         db, project.session.id, SenderType.AI,
         f"**{display_name}** will remain internal and will not be shared with leads.",
@@ -1943,7 +2048,7 @@ def revise_proposal(project_id: str, proposal_id: str, payload: ProposalRevision
         raise HTTPException(status_code=404, detail="Proposal not found.")
     proposal, profile = source_service.revise_proposal(
         db, proposal=proposal, company_id=current_user.company_id,
-        user_id=current_user.id, corrected_value=payload.value,
+        user_id=current_user.id, corrected_value=payload.value, expected_revision=payload.expected_revision,
     )
     return {"proposal": source_service.serialize_proposal(proposal), "profile": services.serialize_profile(profile)}
 

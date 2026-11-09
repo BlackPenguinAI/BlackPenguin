@@ -517,14 +517,16 @@ def review_proposal(db: Session, *, proposal: ProjectOnboardingProposal, company
     return proposal, profile
 
 
-def revise_proposal(db: Session, *, proposal: ProjectOnboardingProposal, company_id: str, user_id: str, corrected_value: Any):
+def revise_proposal(db: Session, *, proposal: ProjectOnboardingProposal, company_id: str, user_id: str, corrected_value: Any, expected_revision: int | None = None):
     proposal = db.query(ProjectOnboardingProposal).filter(
         ProjectOnboardingProposal.id == proposal.id,
     ).populate_existing().with_for_update().first()
     if not proposal or proposal.source.project.company_id != company_id:
         raise HTTPException(status_code=404, detail="Proposal not found.")
-    if proposal.status != ProjectProposalStatus.CORRECTED:
-        raise HTTPException(status_code=409, detail="Only a corrected proposal can be revised.")
+    if proposal.status not in {ProjectProposalStatus.CONFIRMED, ProjectProposalStatus.CORRECTED}:
+        raise HTTPException(status_code=409, detail="Only a confirmed or corrected proposal can be revised.")
+    if expected_revision is not None and (proposal.revision or 1) != expected_revision:
+        raise HTTPException(status_code=409, detail="This value was revised elsewhere. Reload it before saving.")
     if corrected_value in (None, "", []):
         raise HTTPException(status_code=422, detail="A corrected value is required.")
     profile = services.get_profile(proposal.source.project)
@@ -534,13 +536,14 @@ def revise_proposal(db: Session, *, proposal: ProjectOnboardingProposal, company
         "source_type": proposal.source.kind.value,
         "source_reference": proposal.source.url or proposal.source.name,
         "confidence": proposal.confidence,
-    }], allow_authoritative_statuses=True, actor_user_id=user_id)
+    }], allow_authoritative_statuses=True, actor_user_id=user_id, commit=False)
     if not result.accepted:
         rejected = result.rejected[0] if result.rejected else {}
         raise HTTPException(status_code=422, detail=rejected.get("validation") or {
             "code": rejected.get("reason", "invalid_value"), "field": proposal.field_key,
             "message": "The revised value could not be applied.",
         })
+    proposal.status = ProjectProposalStatus.CORRECTED
     proposal.revision = (proposal.revision or 1) + 1
     proposal.value = corrected_value
     proposal.reviewed_by_user_id, proposal.reviewed_at = user_id, datetime.utcnow()
