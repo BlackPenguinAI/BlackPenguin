@@ -1,3 +1,4 @@
+import { MaterialCoverageEditor } from './material-coverage-editor';
 import { ChangeDetectorRef, Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { ConfigureLaterComponent, DeferredCards, restoreDraft, questionCard } from '../../../../shared/ui/configure-later/configure-later';
 import { ReviewCardComponent } from '../../../../shared/ui/review-card';
@@ -51,7 +52,7 @@ import {
 
 @Component({
   selector: 'app-project-chat', standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, OnboardingAiMessageComponent, OnboardingWelcomeComponent, ConfigureLaterComponent, OnboardingLocationComponent, ReviewCardComponent, OnboardingDetailEditor],
+  imports: [MaterialCoverageEditor, CommonModule, FormsModule, RouterModule, OnboardingAiMessageComponent, OnboardingWelcomeComponent, ConfigureLaterComponent, OnboardingLocationComponent, ReviewCardComponent, OnboardingDetailEditor],
   templateUrl: './project-chat.html', styleUrls: ['./project-chat.scss'],
 })
 export class ProjectChatComponent implements OnInit, OnDestroy {
@@ -143,6 +144,12 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   metaSetupMessage = '';
   propertyCatalog: PropertyTypeCatalog = { items: [], confirmed_count: 0, candidate_count: 0, limit: 0, remaining: 0, catalog_complete: false };
   salesAssets: ProjectSalesAsset[] = [];
+  coverageEditor: {asset:ProjectSalesAsset; origin:'source'|'property'; propertyId?:string} | null = null;
+  editMaterialCoverage(asset:ProjectSalesAsset,origin:'source'|'property',propertyId?:string):void { this.coverageEditor={asset,origin,propertyId}; }
+  materialCoverageSaved(asset:ProjectSalesAsset):void {
+    this.salesAssets=this.salesAssets.map(row=>row.id===asset.id?asset:row);
+    this.coverageEditor=null;this.cdr.detectChanges();
+  }
   salesAssetBusy = false;
   showSalesAssetForm = false;
   salesAssetDraft: {
@@ -257,10 +264,14 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     return this.propertyCatalog.items.filter(item => !this.selectedPropertyId || item.id === this.selectedPropertyId);
   }
   propertyDocuments(item: ProjectPropertyType): ProjectSalesAsset[] {
-    return this.salesAssets.filter(asset => asset.property_type_id === item.id && asset.mime_type === 'application/pdf');
+    return this.salesAssets.filter(asset => (asset.coverage != null ? asset.coverage.some(c=>c.property_type_id===item.id) : asset.property_type_id === item.id) && asset.mime_type === 'application/pdf');
   }
   propertyGallery(item: ProjectPropertyType): ProjectSalesAsset | undefined {
+    // Gallery generation and access controls manage this property's owned gallery.
     return this.salesAssets.find(asset => asset.property_type_id === item.id && asset.mime_type === 'application/vnd.blackpenguin.property-gallery+html');
+  }
+  sharedPropertyMaterials(item: ProjectPropertyType): ProjectSalesAsset[] {
+    return this.salesAssets.filter(asset => asset.property_type_id !== item.id && asset.mime_type !== 'application/pdf' && asset.coverage?.some(c=>c.property_type_id===item.id));
   }
   closeCatalogEditor(): void { this.catalogEditorOpen = false; this.selectedPropertyId = ''; }
   openEditorTask(task:string):void {
@@ -941,7 +952,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     this.propertyResourceBusy.add(item.id); this.errorMessage = '';
     this.onboarding.removePropertyDocument(this.projectId, item.id, asset.id).pipe(finalize(() => {
       this.propertyResourceBusy.delete(item.id); this.cdr.detectChanges();
-    })).subscribe({next: () => { this.salesAssets = this.salesAssets.filter(row => row.id !== asset.id); },
+    })).subscribe({next: () => { this.salesAssets = this.salesAssets.filter(row => row.id !== asset.id); if (asset.coverage != null) this.loadSalesAssets(); },
       error: error => this.errorMessage = this.apiDetail(error, 'The PDF could not be removed.')});
   }
 

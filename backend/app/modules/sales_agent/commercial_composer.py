@@ -27,22 +27,30 @@ qualification questions. Do not pressure the lead or create a booking from an in
 An available file/link is not delivered to the phone. Only the backend issues links or acts.
 Related materials do not prove photo or unit coverage. Keep catalog order intact inside blocks.
 Benefit wording must have a corresponding supplied evidence block. Do not expose internal IDs.
+Synthesize related facts into a flowing answer: use paragraphs to group selected evidence IDs,
+and choose natural wording where supplied. Preserve catalog order. Do not repeat a fact or
+add unreferenced prose. Each clause still comes from verified evidence, never assumptions.
+Answer the request before considering qualification. Use continuation none when another
+question would feel repetitive or the lead only needs an answer. Show mandatory clarification
+or an exact backend proposal; it must not disappear into a generic closing. Empathy is supplied
+only from the current interpreted personal context; do not infer emotions or medical conditions.
 '''
 OPENINGS = {'direct': '', 'helpful': 'Here is the information I could verify.',
     'compare': 'Here are the details to help you compare your options.',
-    'acknowledge': 'Thanks for sharing that.'}
+    'acknowledge': 'Thanks for sharing that.', 'warm':'Happy to help.'}
 
 
 class BlockChoice(StrictModel):
     evidence_id: str = Field(min_length=1, max_length=64)
-    wording: Literal['direct', 'conversational']
+    wording: Literal['direct', 'conversational','natural']
 
 
 class Composition(StrictModel):
     version: Literal['sales-commercial-composer/1.0']
-    opening: Literal['direct', 'helpful', 'compare', 'acknowledge']
+    opening: Literal['direct', 'helpful', 'compare', 'acknowledge','warm']
     blocks: list[BlockChoice] = Field(max_length=120)
     continuation_id: str = Field(min_length=1, max_length=64)
+    paragraphs: list[list[str]] = Field(default_factory=list,max_length=120)
 
 
 @dataclass(frozen=True)
@@ -68,8 +76,14 @@ def evidence_blocks(text):
             conversational = value.replace('Financing:', 'The approved payment information is:', 1)
         elif value.startswith('Amenities:'):
             conversational = value.replace('Amenities:', 'The confirmed amenities are:', 1)
+        natural=conversational
+        for prefix,replacement in [('Financing:','The listed payment options are:'),('Amenities:','Amenities include:'),('Delivery:','The confirmed delivery information is:'),('Location:','The property location is:')]:
+            if value.startswith(prefix):natural=value.replace(prefix,replacement,1)
+        if re.search(r'https?://|\bwww\.',value,re.I):
+            value=conversational=natural='Resources need an approved sharing link before I can send them.'
+        if any(b['wordings']['direct']==value for b in blocks):continue
         blocks.append({'id': 'e' + str(len(blocks)), 'required': True,
-            'wordings': {'direct': value, 'conversational': conversational}, 'source': 'validated_tool_result_renderer'})
+            'wordings': {'direct': value, 'conversational': conversational,'natural':natural}, 'source': 'validated_tool_result_renderer'})
     # Catalog ordinals cannot be reordered independently of their original offer.
     if any(b['wordings']['direct'] == 'Confirmed catalog:' for b in blocks):
         return [{'id': 'e0', 'required': True, 'wordings': {
@@ -123,6 +137,9 @@ def select_continuations(*, outcome, commercial, metadata, previous_meta, lead, 
             'farewell':"You're welcome. Feel free to message again whenever you have another question.",
             'acknowledgement':'You can message here if another question comes up.',
             'decline':'No problem. You can continue asking about the property whenever you like.'}[u.courtesy.kind],'metadata':{}}]
+    if u.empathy and not (topics-{'other'}):
+        add('none','')
+        return choices
     if outcome.state.cadence_stop_reason=='cancelled':
         add('details','What would you like to know next about the property?' if topics-{'other'} else '')
         return choices
@@ -144,6 +161,8 @@ def select_continuations(*, outcome, commercial, metadata, previous_meta, lead, 
             add('visit', 'A visit could help you assess the layout in person. Would you like to review visit options?', {'visit_invitation': True})
     if not choices:
         add('none', '')
+    elif not any(c['id']=='none' for c in choices):
+        add('none','')
     return choices
 
 
@@ -156,17 +175,21 @@ def validate(plan, blocks, choices):
     if plan.continuation_id not in {c['id'] for c in choices}:
         raise ValueError('The continuation is not authorized for this turn.')
     # The only multi-block catalog shape is already rendered in original ordinal order.
-    if [r.evidence_id for r in plan.blocks] != [b['id'] for b in blocks] and any(
-        b['wordings']['direct'][:1].isdigit() for b in blocks):
+    ordered=[b['id'] for b in blocks if b['wordings']['direct'][:1].isdigit()]
+    if [r.evidence_id for r in plan.blocks if r.evidence_id in ordered] != ordered:
         raise ValueError('Catalog references must preserve their offered order.')
+    if plan.paragraphs and [key for paragraph in plan.paragraphs for key in paragraph]!=ids:
+        raise ValueError('Paragraphs must group each selected evidence block exactly once in the selected order.')
     return plan
 
 
 def render(plan, blocks, choices, channel):
     by_id = {row['id']: row for row in blocks}
     closing = next(c for c in choices if c['id'] == plan.continuation_id)
-    text = '\n\n'.join(v for v in [OPENINGS[plan.opening],
-        *(by_id[row.evidence_id]['wordings'][row.wording] for row in plan.blocks), closing['text']] if v)
+    choices_by_id={r.evidence_id:r for r in plan.blocks}
+    paragraphs=plan.paragraphs or [[r.evidence_id] for r in plan.blocks]
+    statements=[' '.join(by_id[key]['wordings'].get(choices_by_id[key].wording,by_id[key]['wordings']['conversational']) for key in paragraph) for paragraph in paragraphs]
+    text = '\n\n'.join(v for v in [OPENINGS[plan.opening],*statements, closing['text']] if v)
     return render_channel_text(text or 'What would you like to know about the property?', channel), closing['metadata']
 
 
@@ -175,6 +198,10 @@ async def compose(db, scope, *, inbound, outcome, draft, commercial, lead, metad
     from .turn_memory import build
     guidance = resolve(db, scope)
     blocks = evidence_blocks(draft.text)
+    from .natural_reply import empathy_text
+    empathy=empathy_text(outcome.state.last_understanding,outcome.state,commercial)
+    if empathy:
+        blocks.insert(0,{'id':'empathy','required':True,'wordings':{'direct':empathy,'conversational':empathy,'natural':empathy},'source':'current_evidenced_personal_context'})
     if not outcome.state.last_understanding.requests:
         u=outcome.state.last_understanding
         if metadata.get('profile_capture'):
@@ -186,7 +213,7 @@ async def compose(db, scope, *, inbound, outcome, draft, commercial, lead, metad
                 row['namespace']=='optional' for row in metadata['profile_capture']) else 'Thanks for sharing that information.'
             blocks.append({'id':'e'+str(len(blocks)), 'required':True,
                 'wordings':{'direct':text,'conversational':text},'source':'scoped_profile_capture'})
-    if any(r.data.get('property_types') and len(r.data['property_types']) == 1 for r in outcome.results):
+    if not draft.text.startswith('Here are the property options') and any(r.data.get('property_types') and len(r.data['property_types']) == 1 for r in outcome.results):
         for result in outcome.results:
             if len(result.data.get('property_types', [])) != 1:
                 continue
@@ -211,7 +238,7 @@ async def compose(db, scope, *, inbound, outcome, draft, commercial, lead, metad
             value=commercial['confirmed_project_facts'].get(field)
             values=[value] if isinstance(value,str) else value if isinstance(value,list) else []
             for item in values[:3]:
-                if not isinstance(item,str) or not item.strip() or len(item)>600:continue
+                if not isinstance(item,str) or not item.strip() or len(item)>600 or re.search(r'https?://|\bwww\.|guarantee|risk.free|\b(?:profit|yield|appreciation|returns?)\b',item,re.I):continue
                 text='The approved project information highlights: '+item.strip()
                 blocks.append({'id':'e'+str(len(blocks)),'required':False,
                     'wordings':{'direct':text,'conversational':text},'source':'confirmed_project_facts.'+field})
@@ -250,8 +277,8 @@ async def compose(db, scope, *, inbound, outcome, draft, commercial, lead, metad
                 response_format={'type': 'json_schema', 'json_schema': {'name': 'sales_commercial_composition', 'strict': True, 'schema': contract}},
                 temperature=.2, timeout_seconds=8, max_tokens=2048, raise_on_error=True,
                 usage_context=LLMUsageContext(company_id=scope.company_id, project_id=scope.project_id, feature='sales_commercial_composition'))
-    fallback = Composition.model_construct(version=VERSION, opening='direct',
-        blocks=[BlockChoice(evidence_id=b['id'], wording='direct') for b in blocks if b['required']], continuation_id=choices[0]['id'])
+    fallback = Composition.model_construct(version=VERSION, opening='direct',paragraphs=[],
+        blocks=[BlockChoice(evidence_id=b['id'], wording='natural') for b in blocks if b['required']], continuation_id=choices[0]['id'])
     chosen = fallback
     started = monotonic()
     # Total wall budget covers primary inference and one contract repair; no tools rerun.

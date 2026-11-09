@@ -454,6 +454,16 @@
             <p class="mt-2 text-xs text-gray-400">Only attached images are included. Save gallery access to approve this selection. Removing or adding images disables the previous gallery until you review it again.</p>
             <button type="button" class="structured-secondary mt-3" [disabled]="propertyResourceBusy.has(item.id) || dirtyPropertyTypeIds.has(item.id) || !!propertyTypeImageSelection.get(item.id)?.size" (click)="savePropertyGallery(item)">{{propertyResourceBusy.has(item.id) ? 'Saving…' : 'Save gallery access'}}</button>
             <a *ngIf="propertyGallery(item)?.approval_status === 'approved' && propertyGallery(item)?.resource_url" [href]="propertyGallery(item)!.resource_url" target="_blank" rel="noopener noreferrer" class="ml-3 text-xs text-secondary underline">Open lead gallery</a>
+            <div *ngIf="propertyGallery(item) as gallery" class="mt-2 text-xs">
+              <button type="button" class="text-secondary" (click)="editMaterialCoverage(gallery,'property',item.id)">Edit gallery coverage</button>
+              <p *ngIf="gallery.coverage != null" class="mt-1 text-gray-400">Lead sharing follows the reviewed targets. Saving gallery access reviews this property's current image selection again.</p>
+            </div>
+            <article *ngFor="let material of sharedPropertyMaterials(item)" class="mt-3 rounded-lg border border-white/10 p-3">
+              <p class="text-sm">Shared material · {{material.display_name}}</p>
+              <p class="mt-1 text-xs text-gray-400">{{material.approval_status === 'approved' ? 'Accessible to leads' : 'Internal only'}} · Sharing is managed by this material's reviewed coverage.</p>
+              <button type="button" class="mt-2 text-xs text-gray-300" (click)="previewSalesAsset(material)">Preview</button>
+              <button type="button" class="ml-3 text-xs text-secondary" (click)="editMaterialCoverage(material,'property',item.id)">Edit coverage</button>
+            </article>
             <h3 class="mt-6 text-sm font-semibold">Property PDFs</h3>
             <p class="mt-2 text-xs text-gray-400">A PDF may contain plans, photos or other information. Select its contents yourself; attaching it does not change Project facts.</p>
             <div class="mt-3 flex flex-wrap gap-3"><label *ngFor="let tag of salesAssetTypes" class="text-xs"><input type="checkbox" [checked]="(propertyDocumentTags[item.id] || ['brochure']).includes(tag.value)" (change)="togglePropertyDocumentTag(item,tag.value)"> {{tag.label}}</label></div>
@@ -465,9 +475,10 @@
                 <button type="button" class="text-xs text-gray-300" (click)="previewSalesAsset(document)">Preview</button>
                 <button type="button" class="text-xs text-secondary" [disabled]="salesAssetBusy" (click)="document.approval_status === 'approved' ? archiveSalesAsset(document) : approveSalesAsset(document)">{{document.approval_status === 'approved' ? 'Keep internal / revoke access' : 'Allow lead access'}}</button>
                 <a *ngIf="document.approval_status === 'approved' && document.resource_url" [href]="document.resource_url" target="_blank" rel="noopener noreferrer" class="text-xs text-secondary underline">Open lead PDF</a>
-                <button type="button" class="text-xs text-red-300" [disabled]="propertyResourceBusy.has(item.id)" (click)="removePropertyDocument(item,document)">Remove PDF</button>
+                <button type="button" class="text-xs text-gray-300" (click)="editMaterialCoverage(document,'property',item.id)">Edit coverage</button><button type="button" class="text-xs text-red-300" [disabled]="propertyResourceBusy.has(item.id)" (click)="removePropertyDocument(item,document)">Remove PDF</button>
               </div>
             </article>
+            <app-material-coverage-editor *ngIf="coverageEditor?.origin === 'property' && coverageEditor?.propertyId === item.id && coverageEditor?.asset as editing" [asset]="editing" [projectId]="projectId" (saved)="materialCoverageSaved($event)" (closed)="coverageEditor=null"></app-material-coverage-editor>
           </section>
         </fieldset>
       </ng-template>
@@ -480,10 +491,11 @@
           <article class="mt-4 rounded-xl border border-white/10 bg-black/20 p-3">
             <div class="flex flex-wrap items-center justify-between gap-3">
               <div class="flex min-w-0 items-center gap-3"><img *ngIf="sourceForSalesAsset(item)?.kind === 'image' && sourceImageUrls.get(item.source_id) as preview" [src]="preview" [alt]="item.display_name" class="h-14 w-14 rounded-lg object-cover" /><div class="min-w-0"><div class="flex flex-wrap items-center gap-2"><p class="truncate text-sm font-medium text-white">{{ item.display_name }}</p><span class="rounded-full border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider" [ngClass]="item.approval_status === 'approved' ? 'border-green-500/30 text-green-300' : (item.approval_status === 'draft' ? 'border-secondary/30 text-secondary' : 'border-white/10 text-gray-500')">{{ item.approval_status === 'archived' ? 'Internal' : item.approval_status }}</span></div><p class="mt-1 text-[10px] text-gray-500">{{ item.content_tags.join(' + ').replaceAll('_', ' ') }} · {{ item.allowed_channels.join(' + ') }} · v{{ item.version }}</p><p *ngIf="item.approved_at" class="mt-1 text-[9px] text-gray-600">Approved {{ item.approved_at | date:'medium' }}</p></div></div>
-              <div class="flex flex-wrap gap-2"><button type="button" (click)="previewSalesAsset(item)" class="rounded-lg border border-white/10 px-3 py-2 text-[10px] text-gray-300">Preview</button><ng-container *ngIf="item.approval_status === 'draft'"><button type="button" (click)="approveSalesAsset(item)" [disabled]="salesAssetBusy" class="rounded-lg border border-green-500/30 px-3 py-2 text-[10px] font-semibold text-green-300">Approve for leads</button><button type="button" (click)="archiveSalesAsset(item)" [disabled]="salesAssetBusy" class="rounded-lg border border-white/10 px-3 py-2 text-[10px] text-gray-400">Keep internal</button></ng-container></div>
+              <div class="flex flex-wrap gap-2"><button type="button" (click)="editMaterialCoverage(item,'source')" class="rounded-lg border border-white/10 px-3 py-2 text-[10px] text-gray-300">Edit coverage</button><button type="button" (click)="previewSalesAsset(item)" class="rounded-lg border border-white/10 px-3 py-2 text-[10px] text-gray-300">Preview</button><ng-container *ngIf="item.approval_status === 'draft'"><button type="button" (click)="approveSalesAsset(item)" [disabled]="salesAssetBusy" class="rounded-lg border border-green-500/30 px-3 py-2 text-[10px] font-semibold text-green-300">Approve for leads</button><button type="button" (click)="archiveSalesAsset(item)" [disabled]="salesAssetBusy" class="rounded-lg border border-white/10 px-3 py-2 text-[10px] text-gray-400">Keep internal</button></ng-container></div>
             </div>
             <div *ngIf="item.extracted_links.length" class="mt-3 border-t border-white/5 pt-3"><p class="text-[9px] font-semibold uppercase tracking-wider text-gray-600">Detected resources covered by this decision</p><div class="mt-2 flex flex-wrap gap-2"><span *ngFor="let link of item.extracted_links" class="rounded-lg border border-white/10 px-2 py-1 text-[10px] text-gray-400">{{ link.kind.replaceAll('_', ' ') }} · {{ link.label }}</span></div></div>
           </article>
+          <app-material-coverage-editor *ngIf="coverageEditor?.origin === 'source' && coverageEditor?.asset?.id === item.id" [asset]="item" [projectId]="projectId" (saved)="materialCoverageSaved($event)" (closed)="coverageEditor=null"></app-material-coverage-editor>
           </app-review-card>
         </section>
       </ng-template>

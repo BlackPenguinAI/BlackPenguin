@@ -24,14 +24,15 @@ MAX_GALLERY_BYTES = 40 * 1024 * 1024
 
 
 def available(asset: ProjectSalesAsset) -> bool:
+    from .asset_coverage import valid,approved
     now = datetime.utcnow()
-    return bool(asset.approval_status == 'approved' and asset.approved_at and asset.allowed_channels
+    return bool(approved(asset) and asset.allowed_channels
         and asset.project and asset.project.is_active and asset.project.company_id == asset.company_id
         and asset.source and asset.source.project_id == asset.project_id
         and asset.source.status == ProjectSourceStatus.READY and asset.source.storage_path
         and (not asset.property_type_id or (asset.property_type and asset.property_type.project_id == asset.project_id and asset.property_type.review_status == 'confirmed'))
         and (not asset.valid_from or asset.valid_from <= now)
-        and (not asset.valid_until or asset.valid_until > now))
+        and (not asset.valid_until or asset.valid_until > now) and valid(asset))
 
 
 def _signature(asset: ProjectSalesAsset) -> str:
@@ -39,6 +40,9 @@ def _signature(asset: ProjectSalesAsset) -> str:
         asset.company_id, asset.project_id, asset.property_type_id, asset.id,
         asset.source_id, asset.version, asset.approved_at, asset.source.content_hash,
     ))
+    if asset.coverage is not None:
+        import json
+        payload+='|'+json.dumps(asset.coverage,sort_keys=True,separators=(',',':'))
     return hmac.new(settings.SECRET_KEY.encode(), payload.encode(), hashlib.sha256).hexdigest()
 
 
@@ -77,7 +81,8 @@ def revoke_asset_links(db: Session, asset: ProjectSalesAsset, *, user_id: str | 
 
 
 def invalidate_property_resources(db: Session, item, *, removed_source_id=None, remove_all=False, user_id=None) -> None:
-    for asset in db.query(ProjectSalesAsset).filter_by(project_id=item.project_id, property_type_id=item.id).all():
+    for asset in db.query(ProjectSalesAsset).filter_by(project_id=item.project_id).all():
+        if asset.property_type_id!=item.id and not any(r.get('property_type_id')==item.id for r in asset.coverage or []):continue
         gallery = asset.source and asset.source.mime_type == GALLERY_MIME
         if not (remove_all or gallery or removed_source_id == asset.source_id):
             continue
@@ -124,8 +129,14 @@ def save_gallery(db: Session, project, item, *, accessible: bool, channels: list
         parts.append(f'<figure><img alt="{escape(media.caption or item.name, quote=True)}" src="data:{mime};base64,{base64.b64encode(content).decode()}"><figcaption>{escape(media.caption or item.name)}</figcaption></figure>')
     content = ''.join(parts).encode()
     digest = hashlib.sha256(content).hexdigest()
-    if asset and asset.source.content_hash == digest and asset.allowed_channels == channels and available(asset):
+    coverage_change=bool(asset and asset.coverage is not None and (asset.source.content_hash!=digest or not any(
+        row.get('property_type_id')==item.id and 'gallery_image' in row.get('content_tags',[]) for row in asset.coverage)))
+    if asset and not coverage_change and asset.source.content_hash == digest and asset.allowed_channels == channels and available(asset):
         return asset
+    if coverage_change:
+        # This save approves this property's selected images, not stale roles or targets.
+        asset.coverage=[{'property_type_id':item.id,'unit_id':None,'content_tags':['gallery_image'],'pages':[],'summary':'Selected property images'}]
+        asset.content_tags=['gallery_image'];asset.asset_type='gallery_image'
     if not asset or asset.source.content_hash != digest:
         source_id = str(uuid4())
         stored = storage_service.store_project_file(company_id=project.company_id, project_id=project.id, source_id=source_id,

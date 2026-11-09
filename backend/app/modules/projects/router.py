@@ -1021,10 +1021,11 @@ def remove_property_document(project_id: str, property_type_id: str, asset_id: s
     require_project_access(db, current_user, project_id)
     item = _property_type(db, project.id, property_type_id)
     asset = _sales_asset(db, project.id, asset_id)
-    if asset.property_type_id != item.id or not asset.source or asset.source.mime_type != 'application/pdf':
+    if (asset.property_type_id != item.id and not any(c.get('property_type_id')==item.id for c in asset.coverage or [])) or not asset.source or asset.source.mime_type != 'application/pdf':
         raise HTTPException(404, 'Property PDF not found.')
     sales_asset_service.archive(db, asset, user_id=current_user.id)
     asset.property_type_id = None
+    if asset.coverage is not None:asset.coverage=[c for c in asset.coverage if c.get('property_type_id')!=item.id]
     asset.version += 1
     db.add(asset); db.commit()
     return Response(status_code=204)
@@ -1128,6 +1129,19 @@ def create_sales_asset(
     return sales_asset_service.serialize(item)
 
 
+@router.get("/{project_id}/material-targets")
+def material_targets(project_id: str, db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker(EDITOR_ROLES))):
+    project=services.get_project(db,project_id,current_user.company_id)
+    require_project_access(db,current_user,project_id)
+    from .models import ProjectUnit
+    return [{'key':'project','label':'Entire Project','property_type_id':None,'unit_id':None}]+[
+        {'key':'property:'+p.id,'label':p.name,'property_type_id':p.id,'unit_id':None}
+        for p in db.query(ProjectPropertyType).filter_by(project_id=project.id).order_by(ProjectPropertyType.sort_order,ProjectPropertyType.id)]+[
+        {'key':'unit:'+u.id,'label':'Unit '+u.unit_code,'property_type_id':None,'unit_id':u.id}
+        for u in db.query(ProjectUnit).filter_by(project_id=project.id).order_by(ProjectUnit.unit_code,ProjectUnit.id)]
+
+
 @router.put("/{project_id}/sales-assets/{asset_id}", response_model=SalesAssetResponse)
 def update_sales_asset(
     project_id: str, asset_id: str, payload: SalesAssetUpdate,
@@ -1136,7 +1150,9 @@ def update_sales_asset(
     project = services.get_project(db, project_id, current_user.company_id)
     require_project_access(db, current_user, project_id)
     item = _sales_asset(db, project.id, asset_id)
-    return sales_asset_service.serialize(sales_asset_service.update(db, item, payload.model_dump(), user_id=current_user.id))
+    values=payload.model_dump()
+    if 'coverage' not in payload.model_fields_set:values.pop('coverage',None)
+    return sales_asset_service.serialize(sales_asset_service.update(db, item, values, user_id=current_user.id))
 
 
 @router.post("/{project_id}/sales-assets/{asset_id}/approve", response_model=SalesAssetResponse)

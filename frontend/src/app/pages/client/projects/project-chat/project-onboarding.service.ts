@@ -1,3 +1,4 @@
+import { MaterialCoverage, MaterialTarget } from './project-onboarding.models';
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
@@ -120,6 +121,12 @@ export class ProjectOnboardingService {
     valid_until: string | null; allowed_channels: Array<'sms' | 'whatsapp'>;
   }): Observable<ProjectSalesAsset> {
     return this.http.post<ProjectSalesAsset>(`${this.baseUrl}/${id}/sales-assets`, payload);
+  }
+  getMaterialTargets(id: string): Observable<MaterialTarget[]> {
+    return this.http.get<MaterialTarget[]>(`${this.baseUrl}/${id}/material-targets`);
+  }
+  updateSalesAsset(id: string, assetId: string, payload: Pick<ProjectSalesAsset, 'property_type_id'|'asset_type'|'content_tags'|'display_name'|'description'|'valid_from'|'valid_until'|'allowed_channels'> & {coverage?: MaterialCoverage[] | null}): Observable<ProjectSalesAsset> {
+    return this.http.put<ProjectSalesAsset>(`${this.baseUrl}/${id}/sales-assets/${assetId}`,payload);
   }
   approveSalesAsset(id: string, assetId: string): Observable<ProjectSalesAsset> {
     return this.http.post<ProjectSalesAsset>(`${this.baseUrl}/${id}/sales-assets/${assetId}/approve`, {});

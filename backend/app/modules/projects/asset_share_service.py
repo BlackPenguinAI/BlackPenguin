@@ -118,8 +118,9 @@ def resolve(db: Session, token: str) -> tuple[ProjectOnboardingSource, SalesAsse
         raise HTTPException(status_code=404, detail="Shared sales material not found.")
     if share.sales_asset_id:
         asset = db.get(ProjectSalesAsset, share.sales_asset_id)
+        from .asset_coverage import valid,approved
         now = datetime.utcnow()
-        if (not asset or asset.approval_status != "approved" or not asset.approved_at
+        if (not asset or not valid(asset) or not approved(asset)
                 or asset.company_id != share.company_id or asset.project_id != share.project_id
                 or asset.source_id != share.source_id
                 or share.channel and share.channel not in (asset.allowed_channels or [])

@@ -77,10 +77,14 @@ class ReadTools:
             for asset in context['available_assets']:
                 selected = next((p['property_type'] for p in types if p['id'] == call.property_id), None)
                 if next_enabled:
+                    from app.modules.projects.asset_coverage import matches as covered, unrestricted
                     from app.modules.projects.models import ProjectSalesAsset
                     row=self.db.get(ProjectSalesAsset,asset['asset_id'])
-                    if row.property_type_id and row.property_type_id != call.property_id:continue
-                if selected and asset.get('property_type') and asset['property_type'] != selected:
+                    if not unrestricted(row,state,subject=call.subject,holds=holds):continue
+                    reviewed=covered(row,property_id=call.property_id,unit_id=call.unit_id,subject=call.subject)
+                    if row.coverage is not None and not reviewed:continue
+                    if row.coverage is None and row.property_type_id and row.property_type_id != call.property_id:continue
+                if selected and asset.get('property_type') and asset['property_type'] != selected and asset.get('coverage') is None:
                     continue
                 if next_enabled:
                     from .material_delivery import snapshot
@@ -100,9 +104,14 @@ class ReadTools:
                 direct = call.subject is None or call.subject in tags or call.subject in asset.get('capabilities', [])
                 direct |= call.subject == 'photos' and 'gallery_image' in tags
                 fallback = call.subject == 'photos' and bool(tags & {'brochure','gallery_image'})
+                if next_enabled and row.coverage is not None:
+                    direct=any(c['coverage']=='requested_tag' for c in reviewed)
+                    fallback=bool(reviewed)
                 if direct or fallback:
                     links = [link for link in asset['links'] if link['kind'] == call.subject]
-                    matches.append({**asset, 'links':links, 'coverage':'type_only_unit_unconfirmed' if unit else 'requested_tag' if direct else 'possible_embedded_photos'})
+                    coverage='requested_tag' if direct else 'type_only_unit_unconfirmed' if unit else 'possible_embedded_photos'
+                    if next_enabled and row.coverage is None and unit:coverage='type_only_unit_unconfirmed'
+                    matches.append({**asset, 'links':links, 'coverage':coverage})
             if next_enabled and not call.property_id and len({a.get('property_type') for a in matches if a.get('property_type')})>1:
                 return result('uncertain',safe_message='Which property should these materials cover?')
             complete = all(a['coverage']=='requested_tag' for a in matches)

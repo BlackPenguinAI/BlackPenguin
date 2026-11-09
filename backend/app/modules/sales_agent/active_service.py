@@ -490,7 +490,7 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
                     u=Understanding.model_validate({**u.model_dump(),'requests':[{'id':'moderation_boundary','topic':'other','subject':None,'polarity':'request','evidence':inbound.content[:2000]}],
                         'all_of':['moderation_boundary'],'alternatives':[],'references':[],'constraints':[],'releases':[],'preferences':[],
                         'visit':None,'reschedule':None,'cancellation':None,'wait':None,'courtesy':None,'comparison':None,
-                        'personal_facts':[],'preference_withdrawals':[],'source_purposes':[],'objections':[],'selected_reference_id':None,'appointment_query':None,'requires_clarification':False,'clarification_question':None,'confidence':1.0})
+                        'personal_facts':[],'preference_withdrawals':[],'source_purposes':[],'objections':[],'empathy':None,'selected_reference_id':None,'appointment_query':None,'requires_clarification':False,'clarification_question':None,'confidence':1.0})
             if u.confidence < .8 and not u.requires_clarification:
                 u=u.model_copy(update={'requires_clarification':True,'clarification_question':'Could you clarify whether you want property details, materials, financing, or a visit?'})
             # Legal/commercial approvals hold the action, not the conversation.
@@ -505,6 +505,9 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
                 apply_courtesy(db,conversation,lead,outcome.state)
             conversation,lead,project=_current(db,scope,control=exact_stop)  # Manual takeover/consent/permissions win after inference.
             draft=compose(outcome,channel=conversation.channel,style=policy.composition_style)
+            if next_enabled:
+                from .natural_reply import naturalize
+                draft=naturalize(outcome,draft,channel=conversation.channel)
             material_question=''
             reference_question=''
             reference_metadata={}
@@ -567,7 +570,11 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
                         ids=comparison['comparison_property_ids']
                         if ids:metadata['property_catalog_offer']={'property_type_ids':ids}
                         if comparison['comparison_unit_ids']:metadata['unit_catalog_offer']={'unit_ids':comparison['comparison_unit_ids']}
-                    else:metadata['property_catalog_offer']={'property_type_ids':[p['id'] for p in context['property_types'] if broad or not selected or p['id']==selected]}
+                    else:
+                        shown=list(dict.fromkeys(p['id'] for result in outcome.results for p in result.data.get('property_types',[])))
+                        unit_ids=list(dict.fromkeys(p['id'] for result in outcome.results for p in result.data.get('units',[])))
+                        if shown:metadata['property_catalog_offer']={'property_type_ids':shown}
+                        if unit_ids:metadata['unit_catalog_offer']={'unit_ids':unit_ids}
                     extra.append('Which property option would you like to explore in more detail?')
             affected=sorted({t.topic.value for t in outcome.state.tasks if t.source_message_id==inbound.id} & action_holds)
             if (affected or advisory in {'LEGAL_QUESTION','COMPLEX_NEGOTIATION'}) and not conversation.is_paused:

@@ -62,7 +62,7 @@ def prompt_snapshot(agent):
 
 
 def next_prompt_snapshot(guidance):
-    return {'version':'sales-understanding-prompt/2.9','system':SYSTEM_PROMPT+'''
+    return {'version':'sales-understanding-prompt/2.10','system':SYSTEM_PROMPT+'''
 SA-03: preferences are explicit COMMERCIAL facts only. Also capture bathrooms,
 motivation, decision_structure and needs (such as a quiet office for working from home).
 Do not manufacture a requirement from age, occupation or any protected characteristic.
@@ -100,6 +100,25 @@ trust/approval, action raise; resolve only when the lead explicitly says it is r
 Capture the exact quotation. A price question or a neutral property comparison is not an
 objection. Never infer an objection, escalation or risk from age or occupation. These
 records select published sales guidance, never pause, penalize or force a workflow stage.
+For a freely expressed personal setback, feeling unwell or frustration, use empathy
+(kind personal_setback/feeling_unwell/frustrated and exact evidence). This is not hostility,
+a medical diagnosis, a sales objection or a profile fact. Do not capture health details.
+Preserve independent property questions in the same message. Quoted/third-party emotions
+are not the lead's self-statement. A simple personal disclosure needs brief empathy and
+a gentle return to the last property topic, not a warning or forced qualification.
+When the lead asks a specific property detail (bedrooms, bathrooms, area, kitchen,
+features or description), request property_details with detail_fields containing only
+those requested fields. For a specific feature also set feature to its short name.
+Leave detail_fields empty for a general overview. Prices/availability retain pricing/
+inventory topics. A missing kitchen detail is unknown, not permission to invent it.
+For materials, inspect reviewed per-target coverage: photos may be in an approved PDF,
+and a floor plan may be an image. MIME/file extension is not coverage. When the property
+is not yet known, request the material and let the backend offer a property selection;
+a selection answers the pending material request, not a new mandatory sales stage.
+Seeing the property digitally means photos unless an in-person visit is explicit.
+A missing resource never authorizes human pause. Exact coverage and audited links are
+verified by the backend. Do not convert a complementary-material offer into consent to
+visit. A contextual yes confirms only the exact latest resource proposal.
 SA-04: comparisons are read-only. Create ONE unbound catalog request and link comparison
 through request_id, listing local property/unit reference_ids in the requested order.
 Set include_current only when the lead compares with the current focus, include_all only

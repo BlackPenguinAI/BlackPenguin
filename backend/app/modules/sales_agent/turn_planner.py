@@ -138,6 +138,10 @@ def run(db,scope,*,message_id,understanding,expected_revision,event_key,max_step
             # evidence of purchase interest or appointment consent.
             task.property_id=next(iter(resolver.types))
             task.binding_status='resolved'
+        if (task.topic.value=='materials' and task.subject in {'photos','floor_plan','unit_sheet'} and
+            not task.property_id and not task.unit_id and not value.get('kind')=='material' and len(resolver.types)>1):
+            task.status='awaiting_user';task.binding_status='unresolved';task.blocked_reason='reference_clarification'
+            plan['questions'].append({'request_id':r.id,'reason':'material_property_selection','options':resolver.options()})
         if scoped and prohibited(r.evidence,'appointment' if r.topic.value=='appointment' else r.subject or r.topic.value):
             task.status='blocked';task.blocked_reason='negative_current_evidence'
         if unresolved:

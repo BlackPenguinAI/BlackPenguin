@@ -274,6 +274,7 @@ def build_commercial_context(
             "asset_id": item.id,
             "asset_type": item.asset_type,
             "content_tags": item.content_tags or [item.asset_type],
+            **({"coverage": item.coverage} if item.coverage is not None else {}),
             "property_type": item.property_type.name if item.property_type else None,
             "name": item.display_name,
             "description": item.description,

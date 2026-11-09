@@ -46,6 +46,8 @@ def assess(db,scope,inbound,u,event_key):
     if not category and interpretation and interpretation.category in {'disagreement','off_topic'} and interpretation.evidence in current:
         category=interpretation.category
     if category in {'disagreement','off_topic'}:
+        if category=='off_topic' and u.empathy and u.empathy.evidence in current:
+            return {'category':'personal_context','disposition':'continue','version':VERSION}
         return {'category':category,'disposition':'boundary' if category=='off_topic' and all(r.topic.value=='other' for r in u.requests) else 'continue','version':VERSION}
     if not category:return None
     prior=None

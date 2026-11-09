@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, StrictInt, field_validator, model_validator
 from app.modules.onboarding_answers import StructuredChatMessagePayload
 
 
@@ -234,8 +234,18 @@ class SourceResponse(BaseModel):
     updated_at: datetime
 
 
+class SalesAssetCoverage(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    property_type_id: str | None = Field(default=None,min_length=1,max_length=36)
+    unit_id: str | None = Field(default=None,min_length=1,max_length=36)
+    content_tags: list[str] = Field(min_length=1,max_length=10)
+    pages: list[StrictInt] = Field(default_factory=list,max_length=100)
+    summary: str = Field(default='',max_length=500)
+
+
 class SalesAssetPayload(BaseModel):
     source_id: str
+    coverage: list[SalesAssetCoverage] | None = Field(default=None,max_length=100)
     property_type_id: str | None = None
     asset_type: Literal[
         "brochure", "floor_plan", "unit_sheet", "price_list", "amenities",
@@ -250,6 +260,7 @@ class SalesAssetPayload(BaseModel):
 
 
 class SalesAssetUpdate(BaseModel):
+    coverage: list[SalesAssetCoverage] | None = Field(default=None,max_length=100)
     property_type_id: str | None = None
     asset_type: Literal[
         "brochure", "floor_plan", "unit_sheet", "price_list", "amenities",
@@ -269,6 +280,7 @@ class SalesAssetResponse(BaseModel):
     project_id: str
     property_type_id: str | None = None
     source_id: str
+    coverage: list[SalesAssetCoverage] | None = None
     asset_type: str
     content_tags: list[str]
     display_name: str

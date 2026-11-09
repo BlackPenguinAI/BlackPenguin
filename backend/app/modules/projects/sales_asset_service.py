@@ -17,6 +17,7 @@ CHANNELS = {"sms", "whatsapp"}
 
 
 def serialize(item: ProjectSalesAsset) -> dict[str, Any]:
+    from .asset_coverage import approved
     from .property_resource_service import resource_url
     source = item.source
     return {
@@ -24,12 +25,13 @@ def serialize(item: ProjectSalesAsset) -> dict[str, Any]:
         "company_id": item.company_id,
         "project_id": item.project_id,
         "property_type_id": item.property_type_id,
+        "coverage": item.coverage,
         "source_id": item.source_id,
         "asset_type": item.asset_type,
         "content_tags": item.content_tags or [item.asset_type],
         "display_name": item.display_name,
         "description": item.description,
-        "approval_status": item.approval_status,
+        "approval_status": ('approved' if approved(item) else 'draft') if item.approval_status in {'approved','approved_targeted'} else item.approval_status,
         "version": item.version,
         "valid_from": item.valid_from,
         "valid_until": item.valid_until,
@@ -97,6 +99,8 @@ def create(db: Session, project: Project, payload: dict[str, Any], *, user_id: s
     property_type_id = values.get("property_type_id")
     if property_type_id and not any(item.id == property_type_id for item in project.property_types):
         raise HTTPException(status_code=404, detail="Property type not found in this Project.")
+    from .asset_coverage import validate
+    values['coverage']=validate(db,project,values.get('coverage'),values['content_tags'],source=source)
     item = ProjectSalesAsset(
         company_id=project.company_id,
         project_id=project.id,
@@ -176,6 +180,14 @@ def materialize_discovered_link_candidate(db: Session, source: ProjectOnboarding
 
 def update(db: Session, item: ProjectSalesAsset, payload: dict[str, Any], *, user_id: str | None = None) -> ProjectSalesAsset:
     values = _validate_payload(payload)
+    # Omitting the additive field in older clients preserves reviewed targeting.
+    from .asset_coverage import validate
+    if 'coverage' in values:
+        if item.coverage is not None and values['coverage'] is None:
+            raise HTTPException(422,'Choose explicit Project-wide coverage or named targets.')
+        values['coverage']=validate(db,item.project,values['coverage'],values['content_tags'],source=item.source)
+    if values.get('property_type_id') and not any(p.id==values['property_type_id'] for p in item.project.property_types):
+        raise HTTPException(404,'Property type not found in this Project.')
     from .property_resource_service import revoke_asset_links
     revoke_asset_links(db, item, user_id=user_id)
     for key, value in values.items():
@@ -201,6 +213,8 @@ def approve(db: Session, item: ProjectSalesAsset, *, user_id: str) -> ProjectSal
     if item.property_type_id and (not item.property_type or item.property_type.project_id != item.project_id or item.property_type.review_status != "confirmed"):
         raise HTTPException(status_code=409, detail="Confirm the associated property type before allowing lead access.")
     now = datetime.utcnow()
+    from .asset_coverage import validate
+    validate(db,item.project,item.coverage,item.content_tags or [item.asset_type],source=source,approved=True)
     if item.valid_until and item.valid_until <= now:
         raise HTTPException(status_code=409, detail="Expired material cannot be approved.")
     # Recheck legacy ready images too. Do not silently archive or rewrite an
@@ -215,9 +229,10 @@ def approve(db: Session, item: ProjectSalesAsset, *, user_id: str) -> ProjectSal
             validate_image(content, source.mime_type)
         except (ValueError, OSError) as exc:
             raise HTTPException(status_code=422, detail="This image cannot be approved because its content could not be validated. Upload a valid JPG, PNG, or WEBP image (up to 15 MB and 40 megapixels) and review it again.") from exc
-    if item.approval_status == "approved" and item.approved_at:
+    from .asset_coverage import approved
+    if approved(item):
         return item
-    item.approval_status = "approved"
+    item.approval_status = 'approved_targeted' if item.coverage is not None else 'approved'
     item.approved_by_user_id = user_id
     item.approved_at = now
     db.add(item)
@@ -247,14 +262,17 @@ def approved_for_turn(
     ).filter(
         ProjectSalesAsset.project_id == project_id,
         ProjectSalesAsset.company_id == company_id,
-        ProjectSalesAsset.approval_status == "approved",
+        ProjectSalesAsset.approval_status.in_(["approved","approved_targeted"]),
         ProjectSalesAsset.approved_at.isnot(None),
         (ProjectSalesAsset.valid_from.is_(None) | (ProjectSalesAsset.valid_from <= now)),
         (ProjectSalesAsset.valid_until.is_(None) | (ProjectSalesAsset.valid_until > now)),
         ProjectOnboardingSource.status == ProjectSourceStatus.READY,
     ).all()
+    from .asset_coverage import valid,approved
     return [
         item for item in rows
         if channel in (item.allowed_channels or [])
         and bool(item.source and (item.source.storage_path or (item.source.extracted_links or [])))
+        and valid(item)
+        and approved(item)
     ]

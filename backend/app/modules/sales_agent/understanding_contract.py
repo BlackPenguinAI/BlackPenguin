@@ -35,11 +35,17 @@ class Request(StrictModel):
     polarity: Literal['request', 'exclude']
     evidence: str = Field(min_length=1, max_length=2000)
     reference_id: str | None = Field(default=None,max_length=60)
+    detail_fields: list[Literal['bedrooms','bathrooms','area','kitchen','features','description']] = Field(default_factory=list,max_length=6)
+    feature: str | None = Field(default=None,min_length=1,max_length=80)
 
     @model_validator(mode='after')
     def subject_scope(self):
         if self.subject is not None and self.topic != Topic.materials:
             raise ValueError('A material subject requires the materials topic.')
+        if (self.detail_fields or self.feature) and self.topic != Topic.property_details:
+            raise ValueError('Focused property fields require a property details request.')
+        if self.feature and not set(self.detail_fields)&{'features','kitchen'}:
+            raise ValueError('A feature name requires a focused feature or kitchen request.')
         return self
 
 
@@ -97,6 +103,11 @@ class SourcePurposeClassification(StrictModel):
 class ObjectionDeclaration(StrictModel):
     kind: Literal['price','timing','comparison','trust','approval']
     action: Literal['raise','resolve']
+    evidence: str = Field(min_length=1,max_length=2000)
+
+
+class Empathy(StrictModel):
+    kind: Literal['feeling_unwell','personal_setback','frustrated']
     evidence: str = Field(min_length=1,max_length=2000)
 
 
@@ -200,6 +211,7 @@ class Understanding(StrictModel):
     comparison: Comparison | None = None
     source_purposes: list[SourcePurposeClassification] = Field(default_factory=list,max_length=2)
     objections: list[ObjectionDeclaration] = Field(default_factory=list,max_length=5)
+    empathy: Empathy | None = None
     releases: list[ConstraintRelease] = Field(default_factory=list, max_length=20)
     visit: VisitDirective | None = None
     courtesy: Courtesy | None = None

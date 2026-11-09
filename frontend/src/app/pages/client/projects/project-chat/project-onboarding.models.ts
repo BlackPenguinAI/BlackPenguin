@@ -125,9 +125,12 @@ export interface ProjectFileIntent {
   display_name: string;
   allowed_channels: Array<'sms' | 'whatsapp'>;
 }
+export interface MaterialCoverage { property_type_id: string | null; unit_id: string | null; content_tags: SalesAssetType[]; pages: number[]; summary: string; }
+export interface MaterialTarget { key:string; label:string; property_type_id:string|null; unit_id:string|null; }
 export interface ProjectSalesAsset {
   resource_url?: string | null;
   id: string; company_id: string; project_id: string; property_type_id: string | null; source_id: string;
+  coverage?: MaterialCoverage[] | null;
   asset_type: SalesAssetType; content_tags: SalesAssetType[]; display_name: string; description: string | null;
   approval_status: 'draft' | 'approved' | 'archived'; version: number;
   valid_from: string | null; valid_until: string | null; allowed_channels: Array<'sms' | 'whatsapp'>;

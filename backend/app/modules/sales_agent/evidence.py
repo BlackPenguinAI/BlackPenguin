@@ -12,7 +12,7 @@ def quotations(payload):
     for key in ('requests', 'constraints', 'alternatives', 'references', 'preferences', 'releases', 'personal_facts', 'preference_withdrawals', 'objections'):
         for index, item in enumerate(payload.get(key) or []):
             yield item, 'evidence', [key, index, 'evidence']
-    for key in ('visit', 'reschedule', 'cancellation', 'wait', 'moderation', 'courtesy', 'comparison'):
+    for key in ('visit', 'reschedule', 'cancellation', 'wait', 'moderation', 'courtesy', 'comparison', 'empathy'):
         item = payload.get(key)
         if not item:
             continue

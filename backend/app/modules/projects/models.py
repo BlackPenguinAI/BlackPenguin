@@ -270,6 +270,7 @@ class ProjectSalesAsset(Base):
     source_id = Column(String(36), ForeignKey("project_onboarding_sources.id", ondelete="RESTRICT"), nullable=False, index=True)
     asset_type = Column(String(40), nullable=False, default="other", index=True)
     content_tags = Column(JSON, default=list, nullable=False)
+    coverage = Column(JSON(none_as_null=True), nullable=True)  # NULL preserves the original single-target approval.
     display_name = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
     approval_status = Column(String(30), nullable=False, default="draft", index=True)
