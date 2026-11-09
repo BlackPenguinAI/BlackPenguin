@@ -1,3 +1,4 @@
+import { AgentContextComponent } from '../../../shared/ui/agent-context/agent-context';
 import { CommonModule } from '@angular/common';
 import { ChangeDetectorRef, Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -29,7 +30,7 @@ interface MetaLeadFormPreview {
 @Component({
   selector: 'app-agent',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [AgentContextComponent, CommonModule, FormsModule],
   templateUrl: './agent.html',
   styleUrls: ['./agent.scss'],
 })
@@ -928,7 +929,7 @@ export class AgentComponent implements OnInit, OnDestroy {
             this.selected = row;
             this.reviewNote = '';
           }
-          this.success = falsePositive ? 'False positive recorded. The AI is active; the same reviewed trigger will not pause this conversation again.' : 'Conversation control updated.';
+          this.success = falsePositive ? 'False positive recorded. The reviewed incident is closed; consent and safety checks remain active.' : 'Conversation control updated.';
           this.loadConversations(true);
         },
         error: (err) => {

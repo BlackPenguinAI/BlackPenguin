@@ -104,6 +104,11 @@ class Courtesy(StrictModel):
     evidence: str = Field(min_length=1,max_length=2000)
 
 
+class ModerationInterpretation(StrictModel):
+    category: Literal['disagreement','off_topic','profanity','harassment','threat','security']
+    evidence: str = Field(min_length=1,max_length=2000)
+
+
 class WaitDirective(StrictModel):
     action: Literal['request','decline','cancel','nearby']
     evidence: str = Field(min_length=1,max_length=2000)
@@ -145,6 +150,7 @@ class Understanding(StrictModel):
     reschedule: RescheduleDirective | None = None
     cancellation: CancellationDirective | None = None
     wait: WaitDirective | None = None
+    moderation: ModerationInterpretation | None = None
     appointment_query: Literal['active','past','cancelled','all'] | None = None
     selected_reference_id: str | None = Field(default=None,max_length=60)
     requires_clarification: StrictBool
@@ -200,6 +206,7 @@ class Understanding(StrictModel):
         if self.wait:
             evidence.append(self.wait.evidence)
             if self.wait.timing:evidence.extend(v for k,v in self.wait.timing.model_dump().items() if k!='time_relation' and v is not None)
+        if self.moderation:evidence.append(self.moderation.evidence)
         if self.courtesy:evidence.append(self.courtesy.evidence)
         if any(not item.strip() or item not in inbound for item in evidence):
             raise ValueError('Evidence must be an exact non-empty substring of the current message.')

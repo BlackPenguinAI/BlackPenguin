@@ -1,0 +1,59 @@
+name: Sales AI group J isolated UI checks
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ui:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: frontend
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - name: Verify component behavior
+        run: >-
+          TZ=UTC npx ng test --watch=false --ts-config=tsconfig.sales-ai-j.spec.json
+          --include='src/app/pages/client/agent/agent.spec.ts'
+          --include='src/app/pages/client/sales/sales.spec.ts'
+          --include='src/app/pages/monitor/monitor*.spec.ts'
+          --include='src/app/shared/ui/agent-context/agent-context.spec.ts'
+      - name: Verify rendered controls and diagnostic states
+        run: >-
+          TZ=UTC npx vitest run --environment jsdom
+          src/app/pages/client/agent/agent-review-render.spec.ts
+          src/app/shared/ui/agent-context/agent-context-render.spec.ts
+      - run: npm run build
+      - name: Install isolated browser tooling
+        run: |
+          npm install --prefix "$RUNNER_TEMP/bp-ui-browser" --no-package-lock --no-save playwright@1.62.1
+          "$RUNNER_TEMP/bp-ui-browser/node_modules/.bin/playwright" install --with-deps chromium
+      - name: Walk Agent, Schedule and Monitor at desktop and mobile widths
+        env:
+          TZ: UTC
+        run: |
+          mkdir -p qa-group-j
+          node tools/sales-ai/group-j-preview.cjs > qa-group-j/server.log 2>&1 &
+          preview_pid=$!
+          trap 'kill "$preview_pid" 2>/dev/null || true' EXIT
+          node -e '(async()=>{for(let i=0;i<30;i++){try{if((await fetch("http://127.0.0.1:4180")).ok)return}catch{}await new Promise(r=>setTimeout(r,100))}process.exit(1)})()'
+          NODE_PATH="$RUNNER_TEMP/bp-ui-browser/node_modules" node tools/sales-ai/group-j-browser.cjs | tee qa-group-j/browser.log
+      - name: Retain synthetic test logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sales-ai-group-j-ui-logs
+          path: frontend/qa-group-j/*.log
+          if-no-files-found: ignore
+          retention-days: 7

@@ -1,8 +1,8 @@
 {
   "version": "sales-ai-implementation-state/1.0",
-  "base_commit": "b1b3ec29c504b3b0fd9c050836dc420c9ebe721d",
-  "branch": "sales-ai/group-i-waitlist",
-  "current_group": "I",
+  "base_commit": "ffe90014abc18f2aa45633ce01fc6f78099c129a",
+  "branch": "sales-ai/group-j-moderation-monitor",
+  "current_group": "J",
   "completed_steps": [
     1,
     2,
@@ -18,12 +18,14 @@
     12,
     13,
     14,
-    15
-  ],
-  "next_group": "J",
-  "next_steps": [
+    15,
     16,
     17
+  ],
+  "next_group": "K",
+  "next_steps": [
+    18,
+    19
   ],
   "groups": {
     "A": "implemented_and_verified",
@@ -35,7 +37,7 @@
     "G": "implemented_and_verified",
     "H": "implemented_and_verified",
     "I": "implemented_and_verified",
-    "J": "pending",
+    "J": "implemented_visual_acceptance_pending",
     "K": "pending",
     "L": "pending"
   },
@@ -46,12 +48,13 @@
     "20261108_sales_booking_ops",
     "20261108_sales_reschedule_ops",
     "20261108_sales_cancel_ops",
-    "20261108_sales_wait_requests"
+    "20261108_sales_wait_requests",
+    "20261108_sales_moderation"
   ],
   "model_quality_evaluated": false,
   "live_channel_acceptance": "not_run",
   "acceptance_matrix": "backend/tests/fixtures/sales_ai/acceptance_matrix.json",
-  "verification_report": "docs/sales-ai/group-i-report.json",
+  "verification_report": "docs/sales-ai/group-j-report.json",
   "replay_report": "docs/sales-ai/group-b-baseline-replay.json",
   "continuity": "Continue from this accumulated delivery, reconcile a newer main, and implement only the next explicitly requested group.",
   "maintenance": [
@@ -74,12 +77,26 @@
     "docs/sales-ai/group-e-report.json",
     "docs/sales-ai/group-f-report.json",
     "docs/sales-ai/group-g-report.json",
-    "docs/sales-ai/group-h-report.json"
+    "docs/sales-ai/group-h-report.json",
+    "docs/sales-ai/group-i-report.json"
   ],
   "production_migration_applied": false,
   "commercial_composition": "evidence_bound_llm_selection_with_backend_wordings",
   "booking_engine": "sales-first-booking/1.0",
   "reschedule_engine": "sales-reschedule/1.0",
   "cancellation_engine": "sales-cancellation/1.0",
-  "wait_engine": "sales-availability-wait/1.0"
+  "wait_engine": "sales-availability-wait/1.0",
+  "moderation_engine": "sales-gradual-moderation/1.0",
+  "operational_context": "sales-operational-context/1.0",
+  "pending_acceptance": [
+    "J: desktop/mobile browser walkthrough still blocked; 66 frontend checks passed (57 component + 9 DOM render). Manual isolated CI workflow supplied, not run.",
+    "K/L: real model, PostgreSQL parallel contention and controlled live channels."
+  ],
+  "group_j_continuation": {
+    "prior_delivery_commit": "41b5e483922d731801b80afb27eb44121bc6ce3f",
+    "production_code_changed": false,
+    "new_dom_tests": 8,
+    "browser_ci_prepared": true,
+    "browser_ci_executed": false
+  }
 }

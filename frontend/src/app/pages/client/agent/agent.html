@@ -430,6 +430,7 @@
         <ng-container *ngIf="!isLive"><dt>Protocol review</dt><dd>{{ selected.approval_status || 'pending' }}</dd></ng-container>
         <ng-container *ngIf="selected.pause_reason"><dt>Pause reason</dt><dd>{{ selected.pause_reason }}</dd></ng-container>
       </dl>
+      <app-agent-context *ngIf="isLive && selected" [conversationId]="selected.id" [canManage]="role==='admin'||role==='assistant'"></app-agent-context>
       <details *ngIf="selected.intervention_cases?.length" class="conversation-review m-3 max-h-[38vh] shrink-0 overflow-auto rounded-xl border border-amber-700 bg-amber-950/30 p-3 text-xs text-amber-100">
         <summary>Intervention history</summary>
         <article class="mt-3 break-words border-t border-amber-900 pt-2" *ngFor="let incident of selected.intervention_cases">

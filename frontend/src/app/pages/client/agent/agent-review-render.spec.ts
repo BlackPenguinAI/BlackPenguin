@@ -8,9 +8,11 @@ import { ActivatedRoute } from '@angular/router';
 import { of } from 'rxjs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AgentComponent } from './agent';
+import { AgentContextComponent } from '../../../shared/ui/agent-context/agent-context';
 
 TestBed.initTestEnvironment(BrowserTestingModule,platformBrowserTesting());
 // Direct Vitest transpilation does not emit Angular constructor metadata.
+(AgentContextComponent as any).ctorParameters=()=>[{type:HttpClient},{type:ChangeDetectorRef}];
 (AgentComponent as any).ctorParameters=()=>[{type:HttpClient},{type:ChangeDetectorRef},{type:ActivatedRoute}];
 
 describe('Agent review template',()=>{
@@ -18,12 +20,12 @@ describe('Agent review template',()=>{
 
   it('renders the incident evidence, requires a note, resumes and displays the review history',async()=>{
     const template=readFileSync('src/app/pages/client/agent/agent.html','utf8');
-    await resolveComponentResources(url=>Promise.resolve(url.endsWith('.html') ? template : ''));
+    await resolveComponentResources(url=>Promise.resolve(url.includes('agent-context')&&url.endsWith('.html')?readFileSync('src/app/shared/ui/agent-context/agent-context.html','utf8'):url.endsWith('.html') ? template : ''));
     const incident={id:'case',reason:'SECURITY',evidence:'Original message for review',status:'open',created_at:'2026-11-07T17:00:00'};
     const post=vi.fn(()=>of({id:'conversation',lead_name:'Test lead',phone:'+15550100001',channel:'sms',is_paused:false,can_resume:true,
       intervention_cases:[{...incident,status:'false_positive',resolution:{note:'Reviewed with lead',actor_user_id:'reviewer',at:'2026-11-07T17:01:00'}}]}));
     await TestBed.configureTestingModule({imports:[AgentComponent],providers:[
-      {provide:HttpClient,useValue:{post}},
+      {provide:HttpClient,useValue:{post,get:()=>of({chat:{status:'paused'},scope_limited:false})}},
       {provide:ActivatedRoute,useValue:{snapshot:{queryParamMap:{get:()=>null}}}},
     ]}).overrideComponent(AgentComponent,{set:{template,
       templateUrl:undefined,styles:[],styleUrls:[]}}).compileComponents();

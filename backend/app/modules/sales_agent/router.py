@@ -295,11 +295,14 @@ def conversations(
 ):
     if project_id:
         require_project_access(db, current_user, project_id)
-    return conversation_summaries(
+    data=conversation_summaries(
         db, company_id=current_user.company_id, project_id=project_id,
         sales_user_id=current_user.id if current_user.role == UserRole.SALES else None,
         allowed_project_ids=project_ids_for_user(db, current_user),
     )
+    from .monitor import redact
+    for row in data:row['last_message']=redact(row.get('last_message'))
+    return data
 
 
 @router.get("/conversations/{conversation_id}/messages", response_model=list[SalesMessageResponse])
@@ -315,10 +318,11 @@ def messages(
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found.")
     require_project_access(db, current_user, conversation.project_id)
-    return conversation_messages(
+    from .operational_context import safe_message
+    return [safe_message(message) for message in conversation_messages(
         db, company_id=current_user.company_id, conversation_id=conversation_id,
         sales_user_id=current_user.id if current_user.role == UserRole.SALES else None,
-    )
+    )]
 
 
 @router.post("/conversations/{conversation_id}/action", response_model=ConversationSummary)
@@ -408,3 +412,31 @@ def decide_draft(
     draft.last_error = payload.reason if payload.action == "reject" else None
     db.commit()
     return {"id": draft.id, "status": draft.status, "dispatch_enabled": False}
+
+
+@router.get('/conversations/{conversation_id}/operational-context')
+def operational_context(conversation_id: str,response: Response,db: Session = Depends(get_db),current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES,UserRole.MKT,UserRole.SALES]))):
+    from .operational_context import scoped_conversation,snapshot
+    response.headers['Cache-Control']='no-store'
+    return snapshot(db,scoped_conversation(db,current_user,conversation_id),allowed_projects=project_ids_for_user(db,current_user))
+
+
+@router.get('/meetings/{meeting_id}/operational-context')
+def visit_operational_context(meeting_id: str,response: Response,db: Session = Depends(get_db),current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES,UserRole.MKT,UserRole.SALES]))):
+    from .operational_context import meeting_context
+    response.headers['Cache-Control']='no-store'
+    return meeting_context(db,current_user,meeting_id)
+
+
+from pydantic import BaseModel,Field
+from typing import Literal
+class EffectRetryRequest(BaseModel):
+    kind: Literal['booking','replacement','cancellation']
+    operation_id: str = Field(min_length=1,max_length=36)
+    note: str = Field(min_length=3,max_length=1000)
+
+
+@router.post('/conversations/{conversation_id}/effects/retry')
+def retry_operational_effect(conversation_id: str,payload: EffectRetryRequest,db: Session = Depends(get_db),current_user: User = Depends(RoleChecker(TENANT_MANAGER_ROLES))):
+    from .operational_context import scoped_conversation,retry_effect
+    return retry_effect(db,current_user,scoped_conversation(db,current_user,conversation_id),payload.kind,payload.operation_id,payload.note)

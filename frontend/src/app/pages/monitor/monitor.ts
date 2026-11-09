@@ -1,3 +1,4 @@
+import { AgentContextComponent } from '../../shared/ui/agent-context/agent-context';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { Component, Inject, PLATFORM_ID, OnDestroy, isDevMode } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -7,13 +8,14 @@ import { Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-staff-monitor', standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [AgentContextComponent, CommonModule, FormsModule, RouterLink],
   templateUrl: './monitor.html',
 })
 export class StaffMonitorComponent implements OnDestroy {
   companies: any[] = []; projects: any[] = []; leads: any[] = []; conversations: any[] = [];
   company = ''; project = ''; lead = ''; conversation = '';
   messages: any[] = []; cursor = ''; paused = false; pauseReason = '';
+  operationalContext:any=null;
   dialogueEvents: any[] = [];
   error = ''; busy = false; exporting = false; companiesMore = false; leadsMore = false;
   lastRefresh = ''; private generation = 0; private timer?: ReturnType<typeof setInterval>;
@@ -35,7 +37,7 @@ export class StaffMonitorComponent implements OnDestroy {
   loadCompanies() {
     this.get('/companies?offset=' + this.companies.length, data => { this.companies.push(...data.items); this.companiesMore = data.has_more; });
   }
-  private reset() { this.generation++; this.messages = []; this.dialogueEvents = []; this.cursor = ''; this.conversation = ''; this.conversations = []; this.error = ''; this.busy = false; this.exporting = false; this.paused = false; this.pauseReason = ''; this.lastRefresh = ''; }
+  private reset() { this.generation++; this.messages = []; this.dialogueEvents = []; this.operationalContext=null; this.cursor = ''; this.conversation = ''; this.conversations = []; this.error = ''; this.busy = false; this.exporting = false; this.paused = false; this.pauseReason = ''; this.lastRefresh = ''; }
   companyChanged() { this.reset(); this.project = ''; this.lead = ''; this.projects = []; this.leads = []; this.leadsMore = false; if (this.company) this.get('/projects?company_id=' + encodeURIComponent(this.company), d => this.projects = d); }
   projectChanged() { this.reset(); this.lead = ''; this.leads = []; this.leadsMore = false; if (this.project) this.loadLeads(); }
   loadLeads() { this.get('/leads?' + this.scope(false) + '&offset=' + this.leads.length, d => { this.leads.push(...d.items); this.leadsMore = d.has_more; }); }
@@ -50,7 +52,7 @@ export class StaffMonitorComponent implements OnDestroy {
       if (version !== this.generation) return;
       const existing = new Set(this.messages.map(m => m.id));
       this.messages.push(...d.messages.filter((m: any) => !existing.has(m.id)));
-      this.dialogueEvents = d.dialogue_events || [];
+      this.dialogueEvents = d.dialogue_events || [];this.operationalContext=d.operational_context||null;
       const statuses = new Map(d.delivery_statuses.map((m: any) => [m.message_id, m.status]));
       this.messages.forEach(m => { if (statuses.has(m.id)) m.status = statuses.get(m.id); });
       this.cursor = d.next_cursor || ''; this.paused = d.is_paused; this.pauseReason = d.pause_reason || '';

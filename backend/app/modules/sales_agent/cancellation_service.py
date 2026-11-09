@@ -281,7 +281,7 @@ def effect_status(op):
         'notification':{'status':op.notification_status,'attempts':op.notification_attempts,'last_error':op.notification_last_error,'next_attempt_at':op.notification_next_attempt_at}}
 
 
-def reset_effects(db,op):
+def reset_effects(db,op,*,commit=True):
     """Explicit manager recovery resets only effect budgets; it never cancels or books again."""
     from app.modules.governance.models import NotificationOutbox
     event=db.query(NotificationOutbox).filter_by(id=op.notification_outbox_id).with_for_update().first()
@@ -295,5 +295,5 @@ def reset_effects(db,op):
         op.notification_status='pending';op.notification_attempts=0;op.notification_last_error=None;op.notification_next_attempt_at=datetime.utcnow()
         event=db.get(NotificationOutbox,op.notification_outbox_id)
         if event:event.status='pending'
-    db.commit()
+    if commit:db.commit()
     return effect_status(op)

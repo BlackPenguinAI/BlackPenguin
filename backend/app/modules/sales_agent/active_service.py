@@ -402,7 +402,9 @@ async def maybe_process_active(db,conversation,inbound):
         try:
             from .next_flow import selected as next_selected
             next_enabled=next_selected(scope)
-            if next_enabled and not exact_stop and not evidenced_pause_reason(inbound.content):
+            from .moderation import precheck as moderation_precheck
+            hard_moderation=moderation_precheck(inbound.content) if next_enabled and not exact_stop else None
+            if next_enabled and not exact_stop and not hard_moderation and not evidenced_pause_reason(inbound.content):
                 from .language_policy import detect,scoped_names,credential_request
                 if not credential_request(inbound.content):
                     language_context=build_commercial_context(db,project=project,company_id=scope.company_id,lead_id=scope.lead_id,channel=conversation.channel)
@@ -426,7 +428,8 @@ async def maybe_process_active(db,conversation,inbound):
                 if credential_request(inbound.content):protected='SECURITY'
             if previous_meta.get('control_confirmation')=='human' and live._affirmative_slot_reply(inbound.content):
                 protected='HUMAN_REQUESTED'
-            if protected and dismissed_trigger(lead,conversation.id,protected,inbound.content):
+            if hard_moderation:protected=hard_moderation['reason']
+            if protected and not next_enabled and dismissed_trigger(lead,conversation.id,protected,inbound.content):
                 protected=None
             from .sales_policy import policy_context, compliance_action_holds
             commercial=build_commercial_context(db,project=project,company_id=scope.company_id,lead_id=scope.lead_id,channel=conversation.channel)
@@ -458,6 +461,15 @@ async def maybe_process_active(db,conversation,inbound):
                     u=enrich_wait(u,previous_meta,inbound.content)
                 u=confirmed_controls(u,inbound.content,pause_reason=protected)
                 interpreted_revision=interpreted.revision
+            moderation_decision=None
+            if next_enabled and not exact_stop:
+                from .moderation import assess
+                moderation_decision=assess(db,scope,inbound,u,event_id)
+                if moderation_decision and moderation_decision['disposition']=='pause':protected=moderation_decision['reason']
+                if moderation_decision and moderation_decision['disposition'] in {'warn','boundary'}:
+                    u=Understanding.model_validate({**u.model_dump(),'requests':[{'id':'moderation_boundary','topic':'other','subject':None,'polarity':'request','evidence':inbound.content[:2000]}],
+                        'all_of':['moderation_boundary'],'alternatives':[],'references':[],'constraints':[],'releases':[],'preferences':[],
+                        'visit':None,'reschedule':None,'cancellation':None,'wait':None,'courtesy':None,'selected_reference_id':None,'appointment_query':None,'requires_clarification':False,'clarification_question':None,'confidence':1.0})
             if u.confidence < .8 and not u.requires_clarification:
                 u=u.model_copy(update={'requires_clarification':True,'clarification_question':'Could you clarify whether you want property details, materials, financing, or a visit?'})
             # Legal/commercial approvals hold the action, not the conversation.
@@ -482,6 +494,7 @@ async def maybe_process_active(db,conversation,inbound):
             text='\n\n'.join(b for b in text.split('\n\n') if not b.startswith('Available material:'))
             metadata={'engine':ENGINE,'inbound_message_id':inbound.id,'selected_property_type_id':outcome.state.selected_property_type_id}
             if next_enabled:metadata['selected_unit_id']=outcome.state.selected_unit_id
+            if moderation_decision:metadata['moderation']=moderation_decision
             metadata['requested_topics']=sorted({r.topic.value for r in u.requests if r.polarity=='request'})
             metadata['policy_holds_at_prepare']=sorted(action_holds)
             if next_enabled:metadata['action_policy']=approved_policy.get('action_policy')
@@ -500,6 +513,11 @@ async def maybe_process_active(db,conversation,inbound):
                 text="Your request and this conversation have been recorded for the Sales team to review."
                 if next_enabled and protected=='SECURITY':
                     text="I cannot share private credentials or access another company's data. Your request has been recorded for the Sales team to review."
+                if protected in {'THREAT','REPEATED_ABUSE'}:
+                    text='This conversation needs the Sales team to review the '+('threatening message.' if protected=='THREAT' else 'continued personal abuse after the warning.')
+                if moderation_decision and moderation_decision.get('id'):
+                    from .moderation_models import SalesModerationIncident
+                    db.get(SalesModerationIncident,moderation_decision['id']).intervention_case_id=case.id
                 metadata.update(human_intervention_case_id=case.id,control_outcome='handoff',reason=protected,reason_source='verified_current_request')
             elif not safe_u.requires_clarification:
                 for task in outcome.state.tasks:
@@ -538,7 +556,7 @@ async def maybe_process_active(db,conversation,inbound):
             if conversation.is_paused:
                 metadata['expected_pause_reason']=conversation.pause_reason
                 db.query(SalesFollowUpJob).filter(SalesFollowUpJob.conversation_id==conversation.id,SalesFollowUpJob.status.in_(['pending','processing'])).update({'status':'cancelled'},synchronize_session=False)
-            if safe_u.requests and all(r.topic.value=='other' for r in safe_u.requests) and not safe_u.requires_clarification:
+            if safe_u.requests and all(r.topic.value=='other' for r in safe_u.requests) and not safe_u.requires_clarification and not protected and not exact_stop:
                 text='How can I help: property options, materials, pricing, financing, or delivery timing?'
             if (extra or links) and text=='I need clarification or verified information to answer this request.':
                 text=''
@@ -592,7 +610,11 @@ async def maybe_process_active(db,conversation,inbound):
                             text='Thanks, I have recorded that information.'
                         text+='\n\n'+question
                         metadata['qualification_offer']={'field':field,'question':question}
-            if next_enabled and not exact_stop and not protected:
+            moderation_boundary=bool(moderation_decision and moderation_decision['disposition'] in {'warn','boundary'})
+            if moderation_boundary:
+                from .moderation import WARNING,BOUNDARY
+                text=WARNING if moderation_decision['disposition']=='warn' else BOUNDARY
+            if next_enabled and not exact_stop and not protected and not moderation_boundary:
                 from .commercial_composer import compose as compose_commercial
                 # Replace stacked catalog/material/qualification questions with
                 # one continuation authorized against the current results.
@@ -797,6 +819,9 @@ async def maybe_process_active(db,conversation,inbound):
     if not scope.query(db,SalesDialogueEvent).filter_by(event_key='active-receipt:'+inbound.id).first():
         save(db,scope,event_key='active-receipt:'+inbound.id,expected_revision=revision,state=state,
             metadata={'engine':ENGINE,'message_id':inbound.id,'run_id':run.id,'delivery_state':'provider_accepted_not_delivery_confirmed','share_ids':metadata['sales_asset_share_ids']})
+    if next_selected(scope):
+        from .moderation import accepted_warning
+        accepted_warning(db,conversation,metadata)
     run.status='completed';run.completed_at=datetime.utcnow();db.commit()
     from .first_booking import cadence_stopped
     if not conversation.is_paused and not lead.is_opt_out and not run.error_code and not metadata.get('language_hold') and not cadence_stopped(db,conversation):

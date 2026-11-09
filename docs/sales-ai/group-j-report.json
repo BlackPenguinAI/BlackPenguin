@@ -1,0 +1,222 @@
+{
+  "version": "sales-ai-group-j-report/1.0",
+  "date": "2026-11-08",
+  "base_commit": "ffe90014abc18f2aa45633ce01fc6f78099c129a",
+  "main_reverified_at_close": "ffe90014abc18f2aa45633ce01fc6f78099c129a",
+  "branch": "sales-ai/group-j-moderation-monitor",
+  "steps": [
+    16,
+    17
+  ],
+  "status": "implemented_visual_acceptance_pending",
+  "checks": [
+    {
+      "name": "group_j_focused",
+      "passed": 28,
+      "skipped": 0,
+      "warnings": 1116,
+      "seconds": 9.82,
+      "failed": 0,
+      "exit_code": 0
+    },
+    {
+      "name": "monitor_and_review_regression",
+      "passed": 144,
+      "skipped": 0,
+      "warnings": 3162,
+      "seconds": 21.61,
+      "failed": 0,
+      "exit_code": 0
+    },
+    {
+      "name": "full_backend_isolated_actions_layout",
+      "passed": 2031,
+      "skipped": 4,
+      "warnings": 47968,
+      "seconds": 356.8,
+      "failed": 0,
+      "exit_code": 0,
+      "matching_application_tools_migration_files": 289,
+      "unchanged_tests_and_prior_reference_files": 138,
+      "physical_copies": true,
+      "checkout_imports": false
+    },
+    {
+      "name": "frontend_component_tests",
+      "passed": 57,
+      "files": 5,
+      "exit_code": 0
+    },
+    {
+      "name": "agent_review_and_context_dom_render",
+      "passed": 9,
+      "files": 2,
+      "exit_code": 0,
+      "new_in_continuation": 8
+    },
+    {
+      "name": "production_frontend_build",
+      "exit_code": 0,
+      "existing_style_budget_warnings": [
+        "Agent: 9.98 kB against 8 kB warning budget",
+        "Schedule: 9.82 kB against 8 kB warning budget"
+      ]
+    },
+    {
+      "name": "existing_safety_replay",
+      "passed": 20,
+      "total": 20,
+      "external_actions": 0,
+      "model_quality_evaluated": false
+    },
+    {
+      "name": "migration_heads",
+      "head": "20261108_sales_moderation"
+    },
+    {
+      "name": "sqlite_migration_roundtrip_and_postgres_ddl",
+      "included_in_focused_tests": true,
+      "prior_messages_preserved": true
+    },
+    {
+      "name": "preview_server_smoke",
+      "status": "passed",
+      "checks": [
+        "SPA route",
+        "compiled JavaScript MIME",
+        "API refuses unmocked requests",
+        "missing asset 404"
+      ]
+    },
+    {
+      "name": "manual_browser_ci",
+      "yaml_parsed": true,
+      "repository_permission": "contents:read",
+      "uses_secrets": false,
+      "automatic_trigger": false,
+      "executed": false
+    },
+    {
+      "name": "dependency_consistency",
+      "exit_code": 0
+    },
+    {
+      "name": "whitespace",
+      "exit_code": 0
+    },
+    {
+      "name": "desktop_mobile_browser_acceptance",
+      "status": "blocked_not_passed",
+      "widths_planned": [
+        1440,
+        390
+      ],
+      "surfaces": [
+        "Agent",
+        "Schedule",
+        "Monitor"
+      ],
+      "local_browser_failure": "Chromium socket(): Operation not permitted before application launch",
+      "alternate_browser_failure": "Cloud browser cannot reach local preview: net::ERR_CONNECTION_REFUSED",
+      "harness": "frontend/tools/sales-ai/group-j-browser.cjs",
+      "harness_executed_successfully": false
+    }
+  ],
+  "moderation": {
+    "version": "sales-gradual-moderation/1.0",
+    "disagreement_and_isolated_profanity": "continue without strikes",
+    "off_topic": "bounded scope reminder",
+    "first_direct_personal_abuse": "warning without commercial writes",
+    "repeated_abuse": "distinct current scoped inbound after accepted warning within 24 hours",
+    "provider_retry_or_duplicate_webhook": "same incident, no second strike",
+    "failed_or_partial_warning": "not accepted for recurrence",
+    "concrete_threat_or_private_extraction": "immediate protected control with specific case reason",
+    "model_labels": "optional exact current evidence; severe labels require high confidence and dangerous current evidence",
+    "human_false_positive": "only reviewed scoped incident and preceding warning dismissed, no future text whitelist",
+    "resume": "requires current granted consent and no opt-out, preserves closed appointment guard",
+    "warning_receipt": "all parts accepted by provider; not proof of handset delivery or reading"
+  },
+  "visibility": {
+    "version": "sales-operational-context/1.0",
+    "surfaces": [
+      "Agent",
+      "Schedule",
+      "Monitor"
+    ],
+    "facts": [
+      "current enquiry",
+      "actual appointments",
+      "expiring proposals",
+      "availability requests",
+      "conversation tasks",
+      "human intervention",
+      "moderation evidence",
+      "runtime selection",
+      "inbound job status",
+      "configuration/model reference",
+      "language and action validations",
+      "synchronization and receipt states"
+    ],
+    "access": [
+      "Company",
+      "Project",
+      "Sales assignment",
+      "limited retained appointment context for previous Sales owner",
+      "historical Monitor selection does not expose current opportunity"
+    ],
+    "client_trace": "allowlisted configuration references and results; prompt snapshots and raw responses hidden",
+    "staff_export": "applied historical configuration and structured JSON results retained with recursive secret/reasoning redaction; unstructured raw response hidden",
+    "refresh": "10 second independent Agent/Schedule poll, Monitor existing audited poll; cancel old selection requests",
+    "effect_retry": "manager-only, note required, audited, scoped and reservation checked; queued recheck not completion"
+  },
+  "compatibility": {
+    "internal_prompt_version": "sales-understanding-prompt/2.7",
+    "moderation_field_optional": true,
+    "published_prompts_changed": false,
+    "product_model_changed": false,
+    "material_links_in_authenticated_scoped_chat_preserved": true
+  },
+  "coverage": {
+    "channels": [
+      "sms",
+      "whatsapp"
+    ],
+    "model": "INJECTED_SCRIPTED",
+    "providers": "MOCKED",
+    "real_postgres_concurrency_proven": false,
+    "inherited_postgres_cases_skipped": 4,
+    "T23_T24": "backend scoped policy regressions passed; real-model acceptance pending",
+    "complete_T01_T26_acceptance": false
+  },
+  "new_migrations": [
+    "20261108_sales_moderation"
+  ],
+  "production_migration_applied": false,
+  "production_changes": false,
+  "deployment_performed": false,
+  "model_quality_evaluated": false,
+  "live_channel_acceptance": "not_run",
+  "new_flow_activation": "disabled_by_default_explicit_project_allowlist_required",
+  "limits": [
+    "Desktop/mobile browser walkthroughs are blocked and not accepted; supplied harness itself remains unexecuted.",
+    "Model, Calendar, SMS/WhatsApp and PostgreSQL contention are mocked or not exercised.",
+    "English abuse matching is deliberately bounded; real-model quality evaluation remains K.",
+    "No claim of handset delivery, read receipt, or exactly-once network delivery.",
+    "Docker unavailable: physical isolated Actions layout tested, not an image build or remote workflow.",
+    "SCSS build warnings for existing Agent and Schedule styles remain.",
+    "Full T01\u2013T26 acceptance remains K/L."
+  ],
+  "continuation": {
+    "previous_delivery_commit": "41b5e483922d731801b80afb27eb44121bc6ce3f",
+    "production_code_changed": false,
+    "previous_backend_and_build_results_reused": true,
+    "frontend_total_passed": 66,
+    "native_browser_failure": "AT-SPI provider unavailable; local preview refused by CDP browser",
+    "browser_workflow_executed": false
+  },
+  "next_group": "K",
+  "next_steps": [
+    18,
+    19
+  ]
+}

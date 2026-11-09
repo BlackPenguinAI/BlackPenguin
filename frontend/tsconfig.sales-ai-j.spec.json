@@ -1,0 +1,1 @@
+{"extends":"./tsconfig.spec.json","include":["src/**/*.d.ts","src/app/pages/client/agent/agent.spec.ts","src/app/pages/client/sales/sales.spec.ts","src/app/pages/monitor/monitor.spec.ts","src/app/pages/monitor/monitor-staged.spec.ts","src/app/shared/ui/agent-context/agent-context.spec.ts"]}

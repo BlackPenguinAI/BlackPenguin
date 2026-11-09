@@ -671,7 +671,7 @@ def test_resuming_live_whatsapp_closes_intervention_without_marking_simulation()
     lead = Lead(
         company_id=company.id, project_id=project.id, full_name="Lead", phone="+51999888777",
         source="Manual registration", platform="manual", agent_status="human_control",
-        pipeline_stage="S09_HANDOFF",
+        pipeline_stage="S09_HANDOFF", consent_status="granted",
         meta_form_data={"pre_handoff_pipeline_stage": "S04_SCORING"},
     )
     db.add_all([user, lead]); db.flush()

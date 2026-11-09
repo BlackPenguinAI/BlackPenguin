@@ -89,6 +89,7 @@
     <aside class="detail empty" *ngIf="selectedDay&&!selected&&section==='appointments'&&role==='sales'">Assigned appointments appear automatically. Select an appointment to review and confirm it.</aside>
 
     <aside class="detail appointment" *ngIf="selected">
+      <app-agent-context [meetingId]="selected.id"></app-agent-context>
       <p>APPOINTMENT</p><div class="avatar"><span class="material-symbols-outlined">person</span></div><h2>{{selected.lead_name}}</h2><strong>{{statusLabel(selected.status)}}</strong><em *ngIf="selected.is_demo">SIMULATION</em>
       <dl><dt>PROJECT</dt><dd>{{selected.project_name}}</dd><dt>PROPERTY</dt><dd>{{selected.project_address||'Address pending'}}</dd><dt>SCHEDULED TIME</dt><dd>{{formatMeetingTime(selected)}}</dd><dt>TIMEZONE</dt><dd>{{timezoneLabel(selected.project_timezone||timezone)}}</dd><ng-container *ngIf="selected.sales_user_name"><dt>ASSIGNED SALES</dt><dd>{{selected.sales_user_name}}</dd></ng-container><dt>MODALITY</dt><dd>{{selected.modality}}</dd><dt>CONFIRMATION</dt><dd>{{selected.confirmation_status}}</dd></dl>
       <div *ngIf="leadLoading" class="lead-loading">Loading lead context…</div>

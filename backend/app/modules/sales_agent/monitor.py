@@ -25,12 +25,21 @@ def no_store(response: Response):
 
 router = APIRouter(dependencies=[Depends(RoleChecker([UserRole.SUPERADMIN])), Depends(no_store)])
 staff = RoleChecker([UserRole.SUPERADMIN])
-SECRET = re.compile(r"password|secret|^authorization$|authorization_header|api.?key|access.?token|refresh.?token|credential|private.?key|token_hash|storage_path|^token$|cookie", re.I)
+SECRET = re.compile(r"password|secret|^authorization$|authorization_header|api.?key|access.?token|refresh.?token|credential|private.?key|token_hash|storage_path|^token$|cookie|^reasoning(?:_content|_text)?$|chain.?of.?thought|^analysis$|^thinking$|^thoughts$|^raw_(?:completion|model_output)$|thought_process|scratchpad|internal_monologue|(?:^|_)(?:reasoning|thinking|analysis)(?:_|$)", re.I)
 
 
 def redact(value):
     if isinstance(value, dict):
-        return {k: "[REDACTED]" if SECRET.search(k) else redact(v) for k, v in value.items()}
+        result={}
+        for k,v in value.items():
+            if k=='raw_response' and isinstance(v,str):
+                import json
+                try:
+                    parsed=json.loads(v);clean=redact(parsed)
+                    result[k]=v if clean==parsed else json.dumps(clean,ensure_ascii=False)
+                except (ValueError,TypeError):result[k]='[REDACTED]'
+            else:result[k]='[REDACTED]' if SECRET.search(k) else redact(v)
+        return result
     if isinstance(value, list):
         return [redact(v) for v in value]
     if isinstance(value, str):
@@ -57,6 +66,7 @@ class ChatExport(BaseModel):
     schema_version: Literal["blackpenguin.chat-diagnostic/1.0"]
     exported_at: str
     timezone: Literal["UTC"]
+    operational_context: dict = Field(default_factory=dict)
     scope: dict
     conversation: dict
     messages: list[dict]
@@ -192,7 +202,9 @@ def diagnostic(db, conv, company_id, project_id, lead_id):
     # state is labelled as current physical-thread state, never historical fact.
     conversation = row(conv, ("provider_thread_key", "lead_id", "project_id", "campaign_id", "pending_asset_id"))
     conversation["state_scope"] = "current_physical_thread_not_historical"
-    result = ChatExport(schema_version="blackpenguin.chat-diagnostic/1.0", exported_at=datetime.now(timezone.utc).isoformat(), timezone="UTC",
+    from .operational_context import snapshot
+    operational=snapshot(db,conv) if (conv.company_id,conv.project_id,conv.lead_id)==(company_id,project_id,lead_id) else {'scope_limited':True,'historical':True}
+    result = ChatExport(operational_context=operational,schema_version="blackpenguin.chat-diagnostic/1.0", exported_at=datetime.now(timezone.utc).isoformat(), timezone="UTC",
         scope={"company_id":company_id, "project_id":project_id, "lead_id":lead_id, "conversation_id":conv.id}, conversation=conversation,
         messages=[row(m) for m in messages], runs=run_values, inbound_jobs=[row(j) for j in jobs],
         outbound_deliveries=[row(d, ("recipient",)) for d in scoped_deliveries],
@@ -252,7 +264,8 @@ def detail(conversation_id: str, company_id: str, project_id: str, lead_id: str,
     messages = query.order_by(SalesMessage.created_at, SalesMessage.id).limit(limit + 1).all()
     batch = messages[:limit]
     audit(db, actor, request, company_id, "read", conversation_id, {"project_id":project_id, "lead_id":lead_id, "after":after})
-    return redact({"messages":[row(m) for m in batch], "next_cursor":batch[-1].id if batch else after,
+    from .operational_context import snapshot
+    return redact({"operational_context":snapshot(db,conv) if (conv.company_id,conv.project_id,conv.lead_id)==(company_id,project_id,lead_id) else {"scope_limited":True,"historical":True},"messages":[row(m) for m in batch], "next_cursor":batch[-1].id if batch else after,
         "dialogue_events":[row(e) for e in db.query(SalesDialogueEvent).filter_by(company_id=company_id,
             project_id=project_id,lead_id=lead_id,conversation_id=conv.id).order_by(SalesDialogueEvent.revision.desc()).limit(20).all()],
         "has_more":len(messages)>limit, "is_paused":conv.is_paused, "pause_reason":conv.pause_reason,

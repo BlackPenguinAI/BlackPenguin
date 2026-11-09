@@ -15,9 +15,10 @@ describe('SalesComponent scheduling view', () => {
   it('keeps simulated appointments in the same calendar collection', () => {
     vi.stubGlobal('localStorage', { getItem: () => 'sales' });
     const component = new SalesComponent({} as any, { markForCheck: () => undefined } as any);
-    const now = new Date();
-    component.meetings = [{ meeting_time: now.toISOString(), is_demo: true, status: 'confirmed' }];
-    expect(component.meetingsFor(now)).toHaveLength(1);
+    component.timezone='America/Lima';
+    const instant = new Date('2026-11-08T15:00:00Z'), day = new Date(2026,10,8);
+    component.meetings = [{ meeting_time: instant.toISOString(), is_demo: true, status: 'confirmed' }];
+    expect(component.meetingsFor(day)).toHaveLength(1);
     expect(component.count('confirmed')).toBe(1);
   });
 

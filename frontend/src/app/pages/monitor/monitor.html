@@ -17,6 +17,7 @@
       <header class="mb-2 text-xs text-gray-400">{{m.direction}} · {{m.role}} · {{m.channel}} · {{m.created_at}} UTC · {{m.status}}<span *ngIf="m.metadata_json?.engine"> · Engine: {{m.metadata_json.engine}}</span></header>
       <p class="whitespace-pre-wrap break-words">{{m.content}}</p><footer class="mt-3 break-all text-xs text-gray-500">Message {{m.id}}</footer>
     </article>
+    <app-agent-context *ngIf="operationalContext" [context]="operationalContext"></app-agent-context>
     <section class="mt-8" aria-label="Staged dialogue diagnostics">
       <h2 class="text-xl">Dialogue engine diagnostics</h2>
       <p class="text-sm text-gray-400">Latest 20 events. Shadow drafts are not sent. Active events distinguish preparation from provider acceptance; acceptance is not confirmed delivery. Full history is included in the audited JSON export.</p>

@@ -503,7 +503,7 @@ def conversation_summaries(
         ).order_by(SalesInboundJob.created_at.desc()).first()
         result.append({
             **review_snapshot(db,conversation),
-            'can_resume':not lead.is_opt_out and conversation.pause_reason != 'Appointment confirmed',
+            'can_resume':not lead.is_opt_out and lead.consent_status=='granted' and conversation.pause_reason != 'Appointment confirmed',
             "id": conversation.id, "lead_id": lead.id, "project_id": project.id,
             "campaign_id": conversation.campaign_id, "channel": conversation.channel,
             "platform": lead.platform, "source": lead.source,
@@ -579,10 +579,12 @@ def set_conversation_action(
         raise HTTPException(status_code=422, detail='False-positive review must resume the conversation.')
     if action == "resume":
         lead = db.query(Lead).filter(Lead.id == conversation.lead_id).first()
-        if lead and lead.is_opt_out:
-            raise HTTPException(status_code=409, detail="An opted-out lead cannot be resumed.")
         if conversation.pause_reason == "Appointment confirmed":
             raise HTTPException(status_code=409, detail="This conversation is closed because the appointment is confirmed.")
+        if lead and lead.is_opt_out:
+            raise HTTPException(status_code=409, detail="An opted-out lead cannot be resumed.")
+        if lead and lead.consent_status != "granted":
+            raise HTTPException(status_code=409, detail="A lead without current contact consent cannot be resumed.")
         if lead and conversation.is_paused:
             from .conversation_review import resolve_cases
             resolve_cases(db,conversation,lead,actor_user_id=actor_user_id,case_id=review_case_id,

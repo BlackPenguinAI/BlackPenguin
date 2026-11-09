@@ -1,3 +1,4 @@
+import { AgentContextComponent } from '../../../shared/ui/agent-context/agent-context';
 import { CommonModule } from '@angular/common';
 import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -12,7 +13,7 @@ type ScheduleSection = 'availability' | 'appointments';
 type CalendarView = 'month' | 'week' | 'day';
 
 @Component({
-  selector: 'app-sales', standalone: true, imports: [CommonModule, FormsModule, TimezoneSelectComponent],
+  selector: 'app-sales', standalone: true, imports: [AgentContextComponent, CommonModule, FormsModule, TimezoneSelectComponent],
   templateUrl: './sales.html', styleUrls: ['./sales.scss', './sales-visit.scss'],
 })
 export class SalesComponent implements OnInit {

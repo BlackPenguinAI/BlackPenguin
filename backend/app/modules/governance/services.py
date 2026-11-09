@@ -636,6 +636,8 @@ def create_intervention_case(
         "HUMAN_REQUESTED": "The lead asked to speak with a person",
         "SECURITY": "Potential security or unauthorized-access request",
         "ABUSE": "Abusive behavior requires human review",
+        "THREAT": "A concrete threat requires human review",
+        "REPEATED_ABUSE": "Personal abuse continued after an accepted warning",
         "LEGAL": "Legal or regulatory review is required",
         "POLICY_VIOLATION": "A protected policy prevented the automated response",
         "LOW_CONFIDENCE": "The request requires human clarification",

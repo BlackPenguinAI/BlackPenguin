@@ -36,12 +36,13 @@ def review_snapshot(db, conversation):
         issue = {'reason':active_run.error_code,'conversation_paused':conversation.is_paused,
                  'message':'The last response could not be processed. The AI conversation remains available for a new message.'}
     notice = (output.get('metadata') or {}).get('review_notice')
-    return {
+    from .monitor import redact
+    return redact({
         'intervention_cases':[{'id':c.id,'reason':c.reason,'evidence':c.evidence,'confidence':c.confidence,
             'status':c.status,'created_at':c.created_at,'resolved_at':c.resolved_at,
             'resolved_by_user_id':c.resolved_by_user_id,'resolution':resolutions.get(c.id)} for c in cases],
         'processing_issue':issue,'review_notice':notice,
-    }
+    })
 
 
 def resolve_cases(db, conversation, lead, *, actor_user_id=None, case_id=None, false_positive=False, note=None):
@@ -56,7 +57,12 @@ def resolve_cases(db, conversation, lead, *, actor_user_id=None, case_id=None, f
     ).all()
     if case_id and (len(cases) != 1 or cases[0].id != case_id):
         raise HTTPException(status_code=409,detail='The open incident changed. Refresh and review its current reason.')
-    if false_positive:
+    from .next_flow import selected
+    bounded=selected(conversation)
+    if false_positive and bounded:
+        from .moderation import dismiss_cases
+        dismiss_cases(db,conversation,cases)
+    if false_positive and not bounded:
         meta = dict(lead.meta_form_data or {})
         dismissed = list(meta.get('dismissed_pause_triggers') or [])
         fingerprint = trigger_fingerprint(conversation.id,cases[0].reason,cases[0].evidence)
