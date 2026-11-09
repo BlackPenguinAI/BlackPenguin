@@ -138,6 +138,7 @@ export class AiSettingsPageComponent implements OnInit {
   }
 
   setTab(tab: string) {
+    if (!['empresa', 'proyectos', 'ventas'].includes(tab)) return;
     this.activeTab = tab;
     if (tab === 'ventas' && !this.promptVersionsLoaded && !this.promptVersionsLoading) {
       this.loadPromptVersions();
@@ -149,7 +150,6 @@ export class AiSettingsPageComponent implements OnInit {
       case 'empresa': return this.config.agent_onboarding_empresa;
       case 'proyectos': return this.config.agent_onboarding_proyectos;
       case 'ventas': return this.config.agent_ventas;
-      case 'reporteria': return this.config.agent_reporteria;
       default: return this.config.agent_onboarding_empresa;
     }
   }
@@ -162,7 +162,7 @@ export class AiSettingsPageComponent implements OnInit {
     this.isSaving = true;
     this.cdr.detectChanges();
 
-    const key = ({ empresa: 'agent_onboarding_empresa', proyectos: 'agent_onboarding_proyectos', reporteria: 'agent_reporteria' } as Record<string, string>)[this.activeTab];
+    const key = ({ empresa: 'agent_onboarding_empresa', proyectos: 'agent_onboarding_proyectos' } as Record<string, string>)[this.activeTab];
     const payload = { available_models: this.config.available_models, [key]: this.activeAgent };
     this.aiService.updateConfig(payload).subscribe({
       next: () => {
