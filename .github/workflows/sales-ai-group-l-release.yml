@@ -1,0 +1,43 @@
+name: Sales AI group L release packaging checks
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  frontend-package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install locked dependencies and test release metadata
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run test:release
+      - name: Build local immutable frontend image without production credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build --build-arg APP_COMMIT_SHA="${GITHUB_SHA}" --build-arg BP_BUILD_CONFIGURATION=production,offline-ci -t bp-l-frontend:"${GITHUB_SHA}" frontend
+          observed="$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' bp-l-frontend:"${GITHUB_SHA}")"
+          test "$observed" = "$GITHUB_SHA"
+          docker run --rm --network none bp-l-frontend:"${GITHUB_SHA}" nginx -t
+          mkdir -p qa-group-l
+          docker run --rm --network none --entrypoint cat bp-l-frontend:"${GITHUB_SHA}" /usr/share/nginx/html/release.json > qa-group-l/frontend-release.json
+          node -e 'const fs=require("fs");const x=JSON.parse(fs.readFileSync("qa-group-l/frontend-release.json"));if(x.commit!==process.env.GITHUB_SHA||!x.commit_known||!/^[0-9a-f]{64}$/.test(x.assets_sha256))process.exit(1)'
+      - name: Retain build identity, not a deployment approval
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sales-ai-group-l-frontend-identity
+          path: qa-group-l/frontend-release.json
+          if-no-files-found: ignore
+          retention-days: 7

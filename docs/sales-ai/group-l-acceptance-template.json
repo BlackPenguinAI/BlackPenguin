@@ -1,0 +1,121 @@
+{
+  "version": "sales-release-checklist/1.0",
+  "candidate_commit": null,
+  "authorization": {
+    "approved": false,
+    "operator": null,
+    "environment": null,
+    "company_id": null,
+    "project_id": null,
+    "test_contact_reference": null,
+    "channels": [],
+    "expires_at": null
+  },
+  "components": {
+    "api_commit": null,
+    "worker_commit": null,
+    "frontend_commit": null,
+    "alembic_head": null,
+    "configuration_sha256": null
+  },
+  "checks": {
+    "real_model_evaluation": {
+      "status": "pending",
+      "candidate_commit": null,
+      "reviewed_by": null,
+      "reviewed_at": null,
+      "evidence": []
+    },
+    "postgres_parallel": {
+      "status": "pending",
+      "candidate_commit": null,
+      "reviewed_by": null,
+      "reviewed_at": null,
+      "evidence": []
+    },
+    "desktop_mobile": {
+      "status": "pending",
+      "candidate_commit": null,
+      "reviewed_by": null,
+      "reviewed_at": null,
+      "evidence": []
+    },
+    "configuration_review": {
+      "status": "pending",
+      "candidate_commit": null,
+      "reviewed_by": null,
+      "reviewed_at": null,
+      "evidence": []
+    },
+    "backup_restore_check": {
+      "status": "pending",
+      "candidate_commit": null,
+      "reviewed_by": null,
+      "reviewed_at": null,
+      "evidence": []
+    },
+    "rollback_plan_review": {
+      "status": "pending",
+      "candidate_commit": null,
+      "reviewed_by": null,
+      "reviewed_at": null,
+      "evidence": []
+    },
+    "live_sms": {
+      "status": "pending",
+      "candidate_commit": null,
+      "reviewed_by": null,
+      "reviewed_at": null,
+      "evidence": []
+    },
+    "live_whatsapp": {
+      "status": "pending",
+      "candidate_commit": null,
+      "reviewed_by": null,
+      "reviewed_at": null,
+      "evidence": []
+    },
+    "lead_delivery_receipts": {
+      "status": "pending",
+      "candidate_commit": null,
+      "reviewed_by": null,
+      "reviewed_at": null,
+      "evidence": []
+    },
+    "calendar_booking": {
+      "status": "pending",
+      "candidate_commit": null,
+      "reviewed_by": null,
+      "reviewed_at": null,
+      "evidence": []
+    },
+    "calendar_replacement": {
+      "status": "pending",
+      "candidate_commit": null,
+      "reviewed_by": null,
+      "reviewed_at": null,
+      "evidence": []
+    },
+    "calendar_cancellation": {
+      "status": "pending",
+      "candidate_commit": null,
+      "reviewed_by": null,
+      "reviewed_at": null,
+      "evidence": []
+    },
+    "sales_notification": {
+      "status": "pending",
+      "candidate_commit": null,
+      "reviewed_by": null,
+      "reviewed_at": null,
+      "evidence": []
+    },
+    "manual_control_and_resume": {
+      "status": "pending",
+      "candidate_commit": null,
+      "reviewed_by": null,
+      "reviewed_at": null,
+      "evidence": []
+    }
+  }
+}

@@ -1,0 +1,7 @@
+const {test}=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs');const os=require('node:os');const path=require('node:path');const {stamp}=require('./release-stamp.cjs');
+function fixture(t){const dir=fs.mkdtempSync(path.join(os.tmpdir(),'bp-release-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));fs.writeFileSync(path.join(dir,'index.html'),'<app-root></app-root>');fs.writeFileSync(path.join(dir,'main.js'),'console.log("synthetic")');return dir;}
+test('stamps the exact commit and stable public asset digest',t=>{const dir=fixture(t);const result=stamp(dir,'a'.repeat(40));assert.equal(result.commit_known,true);assert.equal(result.asset_count,2);assert.deepEqual(stamp(dir,'a'.repeat(40)),result);fs.appendFileSync(path.join(dir,'main.js'),' ');assert.notEqual(stamp(dir,'a'.repeat(40)).assets_sha256,result.assets_sha256);});
+test('unknown local builds never claim a verified commit',t=>{assert.equal(stamp(fixture(t)).commit_known,false);});
+test('rejects malformed commit values before writing a release file',t=>{const dir=fixture(t);assert.throws(()=>stamp(dir,'not a Git revision'));assert.equal(fs.existsSync(path.join(dir,'release.json')),false);});
+test('requires a completed build',t=>{const dir=fixture(t);fs.unlinkSync(path.join(dir,'index.html'));assert.throws(()=>stamp(dir,'a'.repeat(40)));});
+test('refuses symlinked files instead of hashing outside the build',t=>{const dir=fixture(t);fs.symlinkSync(__filename,path.join(dir,'linked.js'));assert.throws(()=>stamp(dir,'a'.repeat(40)));});

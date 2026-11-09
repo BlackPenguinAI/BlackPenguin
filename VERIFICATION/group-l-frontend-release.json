@@ -1,0 +1,8 @@
+{
+  "version": "blackpenguin.frontend-release/1.0",
+  "service": "frontend",
+  "commit": "9b141ac0f0cf749317863811762f918f66cb3c29",
+  "commit_known": true,
+  "assets_sha256": "3bc98acbe16cf03b50061d9ec71fc5da5c1fa61414f0a84aa6d2b53f8ea5b03b",
+  "asset_count": 65
+}

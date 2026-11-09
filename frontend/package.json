@@ -8,7 +8,9 @@
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "test:onboarding": "ng test --watch=false --ts-config=tsconfig.onboarding-regression.json --include='src/app/pages/client/projects/project-chat/*-*.spec.ts' --exclude='**/project-chat.spec.ts' --include='src/app/pages/onboarding-*.spec.ts' --include='src/app/shared/ui/onboarding-*/*.spec.ts' --include='src/app/shared/ui/configure-later/*.spec.ts' --include='src/app/pages/client/marketing/*.spec.ts' --include='src/app/core/timezones.spec.ts'",
-    "test:sales-ai-k": "ng test --watch=false --ts-config=tsconfig.sales-ai-k.spec.json --exclude='**/agent-review-render.spec.ts' --exclude='**/agent-context-render.spec.ts' --setup-files=testing/sales-ai-k-setup.ts --providers-file=testing/sales-ai-k-providers.ts && vitest run src/app/pages/client/agent/agent-review-render.spec.ts src/app/shared/ui/agent-context/agent-context-render.spec.ts --environment jsdom"
+    "test:sales-ai-k": "ng test --watch=false --ts-config=tsconfig.sales-ai-k.spec.json --exclude='**/agent-review-render.spec.ts' --exclude='**/agent-context-render.spec.ts' --setup-files=testing/sales-ai-k-setup.ts --providers-file=testing/sales-ai-k-providers.ts && vitest run src/app/pages/client/agent/agent-review-render.spec.ts src/app/shared/ui/agent-context/agent-context-render.spec.ts --environment jsdom",
+    "stamp:release": "node tools/release-stamp.cjs",
+    "test:release": "node --test tools/release-stamp.test.cjs"
   },
   "private": true,
   "packageManager": "npm@11.11.0",

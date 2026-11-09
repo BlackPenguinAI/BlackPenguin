@@ -1,8 +1,8 @@
 {
   "version": "sales-ai-implementation-state/1.0",
-  "base_commit": "306dd648b0e8749973e4ce5a78a1ee2cccd82576",
-  "branch": "sales-ai/group-k-evaluation-integration",
-  "current_group": "K",
+  "base_commit": "41c4abee4e47e02d2c77d57ca8a6961844a6ebb8",
+  "branch": "sales-ai/group-l-acceptance-release",
+  "current_group": "L",
   "completed_steps": [
     1,
     2,
@@ -22,10 +22,10 @@
     16,
     17
   ],
-  "next_group": "K",
+  "next_group": "L",
   "next_steps": [
-    18,
-    19
+    20,
+    21
   ],
   "groups": {
     "A": "implemented_and_verified",
@@ -39,7 +39,7 @@
     "I": "implemented_and_verified",
     "J": "implemented_visual_acceptance_pending",
     "K": "partially_executed_external_acceptance_pending",
-    "L": "pending"
+    "L": "delivery_prepared_live_acceptance_not_run"
   },
   "production_changes": false,
   "deployment_performed": false,
@@ -54,7 +54,7 @@
   "model_quality_evaluated": false,
   "live_channel_acceptance": "not_run",
   "acceptance_matrix": "backend/tests/fixtures/sales_ai/acceptance_matrix.json",
-  "verification_report": "docs/sales-ai/group-k-report.json",
+  "verification_report": "docs/sales-ai/group-l-report.json",
   "replay_report": "docs/sales-ai/group-b-baseline-replay.json",
   "continuity": "Continue from this accumulated delivery, reconcile a newer main, and implement only the next explicitly requested group.",
   "maintenance": [
@@ -79,7 +79,8 @@
     "docs/sales-ai/group-g-report.json",
     "docs/sales-ai/group-h-report.json",
     "docs/sales-ai/group-i-report.json",
-    "docs/sales-ai/group-j-report.json"
+    "docs/sales-ai/group-j-report.json",
+    "docs/sales-ai/group-k-report.json"
   ],
   "production_migration_applied": false,
   "commercial_composition": "evidence_bound_llm_selection_with_backend_wordings",
@@ -93,7 +94,9 @@
     "K18: real OpenRouter model evaluation blocked: no OPENROUTER_API_KEY; prepared representative repeated cases, no model-quality approval.",
     "K19: actual PostgreSQL contention not executed: no disposable database/binaries/Docker; isolated manual CI supplied.",
     "J/K19: desktop/mobile browser acceptance still blocked by environment; CI supplied, not run.",
-    "K: human review of real commercial answers pending; complete T01\u2013T26 acceptance not asserted."
+    "K: human review of real commercial answers pending; complete T01\u2013T26 acceptance not asserted.",
+    "L20: no expressly identified test environment/contact or live-service credentials; SMS/WhatsApp/Calendar/Sales acceptance NOT_RUN.",
+    "L21: delivery prepared, no deployment; operator approval and compatible immutable images/evidence required."
   ],
   "group_j_continuation": {
     "prior_delivery_commit": "41b5e483922d731801b80afb27eb44121bc6ce3f",
@@ -108,5 +111,13 @@
       20,
       21
     ]
+  },
+  "blocking_prior_group": "K",
+  "release_preparation": {
+    "read_only_audit": true,
+    "frontend_build_identity": true,
+    "new_migrations": [],
+    "real_acceptance_executed": false,
+    "deployment_executed": false
   }
 }

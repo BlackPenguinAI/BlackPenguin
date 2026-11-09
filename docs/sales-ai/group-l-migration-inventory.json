@@ -1,0 +1,290 @@
+{
+  "version": "sales-release-migration-inventory/1.0",
+  "expected_head": "20261108_sales_moderation",
+  "new_migrations_in_L": [],
+  "production_applied": false,
+  "chain": [
+    {
+      "revision": "20260805_jobs_v2",
+      "down_revision": null,
+      "file": "backend/alembic/versions/20260805_onboarding_jobs_v2.py",
+      "sha256": "a647001057f142196462df4dd55130b5717ef8de163ebf6cee82baa7cd184b46"
+    },
+    {
+      "revision": "20260814_project_sales_meta",
+      "down_revision": "20260805_jobs_v2",
+      "file": "backend/alembic/versions/20260814_project_sales_meta_setup.py",
+      "sha256": "0e5116ab5112b8bb6a84d465deb9b339123ec7c32b761b22b871bcc21d5b8f50"
+    },
+    {
+      "revision": "20260814_project_onboarding_ux",
+      "down_revision": "20260814_project_sales_meta",
+      "file": "backend/alembic/versions/20260814_project_onboarding_ux.py",
+      "sha256": "cff249d97b6732e919712bc444f7f289e2912dd6bccfeaeceb71db47c1739c19"
+    },
+    {
+      "revision": "20260814_company_catalog_media",
+      "down_revision": "20260814_project_onboarding_ux",
+      "file": "backend/alembic/versions/20260814_company_catalog_media.py",
+      "sha256": "8a67d693bb6b384030cbc30da2ac5ddc67f1ae764a36a30c2e830e1c5db6fea1"
+    },
+    {
+      "revision": "20260814_sales_agent_demo",
+      "down_revision": "20260814_company_catalog_media",
+      "file": "backend/alembic/versions/20260814_sales_agent_demo.py",
+      "sha256": "9e6fd7a51b7bec21ad240ff99587b8ca75004c8dfef002f39510354eb3c24860"
+    },
+    {
+      "revision": "20260817_agent_simulation",
+      "down_revision": "20260814_sales_agent_demo",
+      "file": "backend/alembic/versions/20260817_sales_agent_simulation.py",
+      "sha256": "6a3798996ab6614341930f3cb5231ad49144f1e1ede940a6d5a6c0afc234a4e5"
+    },
+    {
+      "revision": "20260818_multi_demo",
+      "down_revision": "20260817_agent_simulation",
+      "file": "backend/alembic/versions/20260818_multiple_demo_projects.py",
+      "sha256": "6729a779be125834a235b3e9e3139eeca29fdea770db31847f5ba7c198f2db7f"
+    },
+    {
+      "revision": "20260825_sales_workspace",
+      "down_revision": "20260818_multi_demo",
+      "file": "backend/alembic/versions/20260825_sales_workspace.py",
+      "sha256": "8785a130a3fe7345174a47bc39c45e13a446a7dc4772ab0d984ce3b3f33b285a"
+    },
+    {
+      "revision": "20260825_sales_visit",
+      "down_revision": "20260825_sales_workspace",
+      "file": "backend/alembic/versions/20260825_sales_visit_reporting.py",
+      "sha256": "b5127b8a3b4dd6e9b8006bcecdde5dc4d9e2c076bb453b901805d018e2e39295"
+    },
+    {
+      "revision": "20260825_schedule_tz",
+      "down_revision": "20260825_sales_visit",
+      "file": "backend/alembic/versions/20260825_schedule_timezones.py",
+      "sha256": "e70925f4aad617ed7744b17ceab9ba4f60a7a26b3b61bb3dcdad6b7a4834681c"
+    },
+    {
+      "revision": "20260826_user_project_access",
+      "down_revision": "20260825_schedule_tz",
+      "file": "backend/alembic/versions/20260826_user_project_access.py",
+      "sha256": "f5030fbf73e608f8ce19e8b5303d208dfe22bcf9e54be174700e953fd7caea19"
+    },
+    {
+      "revision": "20260830_live_sales_agent",
+      "down_revision": "20260826_user_project_access",
+      "file": "backend/alembic/versions/20260830_live_sales_agent.py",
+      "sha256": "5f3910582a71f5cadc06c13eec740cf2a1cdea8b6420b168092c0043ad3c6904"
+    },
+    {
+      "revision": "20260831_platform_experience",
+      "down_revision": "20260830_live_sales_agent",
+      "file": "backend/alembic/versions/20260831_platform_experience.py",
+      "sha256": "991f3f3c0c6ccf1197b5aca115a042a54ad232e30d2c2aab926a933f2ca1d2d1"
+    },
+    {
+      "revision": "20260901_firebase_identity",
+      "down_revision": "20260831_platform_experience",
+      "file": "backend/alembic/versions/20260901_firebase_identity_invitations.py",
+      "sha256": "43942f28f768ca44a99b54ed85057a3fc8590ac1de866f6048e17c86865c202b"
+    },
+    {
+      "revision": "20260902_firebase_rest",
+      "down_revision": "20260901_firebase_identity",
+      "file": "backend/alembic/versions/20260902_firebase_rest_invitations.py",
+      "sha256": "e0ea0018d9c437035de7cafbf9892052aee5f399b9c3ada8668d1fbf448c4f49"
+    },
+    {
+      "revision": "20260903_source_progress",
+      "down_revision": "20260902_firebase_rest",
+      "file": "backend/alembic/versions/20260903_company_source_progress.py",
+      "sha256": "e03e217d42d5a90050e65c7c67b4c0b9adceb6b862e1019ec7566b0d53640afe"
+    },
+    {
+      "revision": "20260904_invite_reliability",
+      "down_revision": "20260903_source_progress",
+      "file": "backend/alembic/versions/20260904_team_invitation_reliability.py",
+      "sha256": "dcbc285387e12da357c5cc4862dd35a201f6cfa80df912a9ae0dda48532a7dd1"
+    },
+    {
+      "revision": "20260905_meta_live_sms",
+      "down_revision": "20260904_invite_reliability",
+      "file": "backend/alembic/versions/20260905_meta_live_sms_testing.py",
+      "sha256": "4bbc39f6a927ecf262b4745c038b9078c6ed00c813eba4ff3a7ca368e170e05f"
+    },
+    {
+      "revision": "20260907_meta_oauth_media",
+      "down_revision": "20260905_meta_live_sms",
+      "file": "backend/alembic/versions/20260907_meta_oauth_media_evidence.py",
+      "sha256": "7662d0c0f24deae779111191c3424834bc30fdd2a03fb2f1b71ba8c1743c2d4c"
+    },
+    {
+      "revision": "20260907_project_receipts",
+      "down_revision": "20260907_meta_oauth_media",
+      "file": "backend/alembic/versions/20260907_project_chat_artifacts.py",
+      "sha256": "88a7f6acaacbed9650d65ba5ef788e61771908e7427f538e1bb3f452b43959a0"
+    },
+    {
+      "revision": "20260915_compliance_ops",
+      "down_revision": "20260907_project_receipts",
+      "file": "backend/alembic/versions/20260915_compliance_operations.py",
+      "sha256": "ddd6afcb6a43e8bd8d130020b44b155b41576b70cdcd9c67992a6449edf45bca"
+    },
+    {
+      "revision": "20260917_calendar_email",
+      "down_revision": "20260915_compliance_ops",
+      "file": "backend/alembic/versions/20260917_calendar_email_readiness.py",
+      "sha256": "9becd7f1bfd505af5b71d09cd262ec5df0ab669061a61d63fbb0a1d08a9e3ac6"
+    },
+    {
+      "revision": "20260917_visit_firestore",
+      "down_revision": "20260917_calendar_email",
+      "file": "backend/alembic/versions/20260917_appointment_locations_firestore_mail.py",
+      "sha256": "fc6b341162d6a56515881cf163ba760bfd70fa16738767695feb7fd4e6b5b2bb"
+    },
+    {
+      "revision": "20260925_telnyx_routing",
+      "down_revision": "20260917_visit_firestore",
+      "file": "backend/alembic/versions/20260925_telnyx_messaging_routing.py",
+      "sha256": "28f32de6b3fdc51a88195bf8315369a3c49a582817badf0ca66761a0d78cbf6c"
+    },
+    {
+      "revision": "20260925_telnyx_tenants",
+      "down_revision": "20260925_telnyx_routing",
+      "file": "backend/alembic/versions/20260925_telnyx_company_senders.py",
+      "sha256": "86472031835481f8656a19ce323393ab66e856055bff6abe5dcd7534fb0b49d0"
+    },
+    {
+      "revision": "20260928_telnyx_caps",
+      "down_revision": "20260925_telnyx_tenants",
+      "file": "backend/alembic/versions/20260928_telnyx_sender_capabilities.py",
+      "sha256": "f19da19d74ed737d5effa0c98337c9362afdf8a5cfe63e0f8de56013059ba12d"
+    },
+    {
+      "revision": "20260929_company_whatsapp",
+      "down_revision": "20260928_telnyx_caps",
+      "file": "backend/alembic/versions/20260929_company_whatsapp.py",
+      "sha256": "212ea0cc6ced1452b529dc6bc08a74178ac678b7d57f97c241b4d075f8ed2bc3"
+    },
+    {
+      "revision": "20261001_wa_template_snapshot",
+      "down_revision": "20260929_company_whatsapp",
+      "file": "backend/alembic/versions/20261001_whatsapp_template_snapshot.py",
+      "sha256": "ca94042cf8b95cacb0ad4f15c695f1527a161614e37f5e1e526e2b15191d498d"
+    },
+    {
+      "revision": "20261001_lead_profile",
+      "down_revision": "20261001_wa_template_snapshot",
+      "file": "backend/alembic/versions/20261001_lead_profile_data.py",
+      "sha256": "9e8637e0a249a84362a6e2cc528685b959e792074a0e2789222328933cd74b82"
+    },
+    {
+      "revision": "20261001_inbound_jobs",
+      "down_revision": "20261001_lead_profile",
+      "file": "backend/alembic/versions/20261001_sales_inbound_jobs.py",
+      "sha256": "9d9d0f5d2e68429e59ec23f525c37efbd669e46f6afd3e4c358d60b1c7e4a19c"
+    },
+    {
+      "revision": "20261014_company_timezone",
+      "down_revision": "20261001_inbound_jobs",
+      "file": "backend/alembic/versions/20261014_company_timezone.py",
+      "sha256": "d234116f73176deedc2a9a9cdad2b2d94d2964edce28c8f0ccdd4f09abda718b"
+    },
+    {
+      "revision": "20261015_audit_refs",
+      "down_revision": "20261014_company_timezone",
+      "file": "backend/alembic/versions/20261015_immutable_audit_references.py",
+      "sha256": "de81564c744ef9beaa4bfd3333098beff5e7157725683ad96a0db745dbdcf17e"
+    },
+    {
+      "revision": "20261021_shared_profiles",
+      "down_revision": "20261015_audit_refs",
+      "file": "backend/alembic/versions/20261021_shared_telnyx_profiles.py",
+      "sha256": "c5764d5b2433116350c22cf5418852e45bcb4a60b2dc73795b604e5f403efef2"
+    },
+    {
+      "revision": "20261022_sales_assets",
+      "down_revision": "20261021_shared_profiles",
+      "file": "backend/alembic/versions/20261022_project_sales_assets.py",
+      "sha256": "1e97d8602e6cb2e59175dd0e707dcc9ee69cf05708d6332b0518287c8cdcaf3d"
+    },
+    {
+      "revision": "20261023_source_intent",
+      "down_revision": "20261022_sales_assets",
+      "file": "backend/alembic/versions/20261023_project_source_intent.py",
+      "sha256": "e78bf08831982664679af82c1312840544b826169a8188625ebf18e155c3ac97"
+    },
+    {
+      "revision": "20261023_asset_consent",
+      "down_revision": "20261023_source_intent",
+      "file": "backend/alembic/versions/20261023_sales_asset_consent.py",
+      "sha256": "478f008201113742b36ea37d18009968f20ea51f2939b994830e7777a09fd0dd"
+    },
+    {
+      "revision": "20261023_grounded_links",
+      "down_revision": "20261023_asset_consent",
+      "file": "backend/alembic/versions/20261023_grounded_asset_links.py",
+      "sha256": "47528af4e90eade0c6f53624aeb94f8252c609f943cb1cb45082a8cbf1f70dc7"
+    },
+    {
+      "revision": "20261024_user_capabilities",
+      "down_revision": "20261023_grounded_links",
+      "file": "backend/alembic/versions/20261024_project_user_capabilities.py",
+      "sha256": "9e971dd2ca1894310c7cc4e2198f421301ac4e793bff464d69e6ad6079700201"
+    },
+    {
+      "revision": "20261103_onboarding_versions",
+      "down_revision": "20261024_user_capabilities",
+      "file": "backend/alembic/versions/20261103_onboarding_versions.py",
+      "sha256": "e5d4b1327abe03658113d5aa989b38f82ac35cb3080d0afe0812fb1e31153565"
+    },
+    {
+      "revision": "20261104_inventory_confirmation",
+      "down_revision": "20261103_onboarding_versions",
+      "file": "backend/alembic/versions/20261104_inventory_confirmation.py",
+      "sha256": "6dc5b50d12b4b0eac0d66b3b9af3b22d5fe09d76f093282b2e9787f500228a99"
+    },
+    {
+      "revision": "20261106_sales_dialogue",
+      "down_revision": "20261104_inventory_confirmation",
+      "file": "backend/alembic/versions/20261106_sales_dialogue.py",
+      "sha256": "1a5fe256a8e8aa11c0cd7790739f2aa0e4039fa3852f4a2e1e1baa7ea83a8986"
+    },
+    {
+      "revision": "20261108_sales_visit_context",
+      "down_revision": "20261106_sales_dialogue",
+      "file": "backend/alembic/versions/20261108_sales_visit_context.py",
+      "sha256": "3a017e4fbf9325caed372af324bb7899eab94488d31f07899925787da15cac4b"
+    },
+    {
+      "revision": "20261108_sales_booking_ops",
+      "down_revision": "20261108_sales_visit_context",
+      "file": "backend/alembic/versions/20261108_sales_booking_operations.py",
+      "sha256": "77c74ef796eae9a960a1d1ba5fffead0f82ab433cbd347157e0c74a211bf2b71"
+    },
+    {
+      "revision": "20261108_sales_reschedule_ops",
+      "down_revision": "20261108_sales_booking_ops",
+      "file": "backend/alembic/versions/20261108_sales_reschedule_operations.py",
+      "sha256": "6a211014fdf2d2c0343e0554da5a165acfc087ada144a531cb4008f7e13615f8"
+    },
+    {
+      "revision": "20261108_sales_cancel_ops",
+      "down_revision": "20261108_sales_reschedule_ops",
+      "file": "backend/alembic/versions/20261108_sales_cancellation_operations.py",
+      "sha256": "c62963b8f75be6e682400feec469264265a1a3975e3703647ea0b97120b28b51"
+    },
+    {
+      "revision": "20261108_sales_wait_requests",
+      "down_revision": "20261108_sales_cancel_ops",
+      "file": "backend/alembic/versions/20261108_sales_wait_requests.py",
+      "sha256": "a7a2c5ce424b7770821493dec620bbb4ebc5b38ab674a1c6d24b5609e7039e4b"
+    },
+    {
+      "revision": "20261108_sales_moderation",
+      "down_revision": "20261108_sales_wait_requests",
+      "file": "backend/alembic/versions/20261108_sales_moderation_incidents.py",
+      "sha256": "77114583884e196e0386460c7b29dd346abf75c13785d125a538a021f38d8aec"
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "version": "sales-release-audit/1.0",
+  "status": "BLOCKED",
+  "reason": "DATABASE_URL_MISSING",
+  "database_writes": 0,
+  "provider_calls": 0,
+  "acceptance_proven": false
+}
