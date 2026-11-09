@@ -1,0 +1,154 @@
+{
+  "delivery": 2,
+  "scope": [
+    "SA-03",
+    "SA-04"
+  ],
+  "base_commit": "77e3a1d7937cbff712ad7493650b30af0008d1cd",
+  "understanding_prompt_version": "sales-understanding-prompt/2.9",
+  "backend": {
+    "full_suite": {
+      "passed": 2237,
+      "skipped": 4,
+      "failed": 0,
+      "seconds": 421.5
+    },
+    "delivery_2_regressions": {
+      "passed": 81,
+      "failed": 0,
+      "seconds": 8.37
+    },
+    "command": "python -m pytest -q --disable-warnings --tb=short",
+    "environment": "Isolated test environment; SQLite; fake test credentials.",
+    "skipped_requirement": "Four PostgreSQL concurrency tests require a disposable DIALOGUE_POSTGRES_TEST_URL."
+  },
+  "frontend": {
+    "angular_tests_passed": 476,
+    "dom_tests_passed": 9,
+    "failed": 0,
+    "build": "passed",
+    "test_command": "npm run test:sales-ai-k",
+    "build_command": "npm run build -- --configuration=production,offline-ci",
+    "existing_build_warnings": [
+      "Agent stylesheet budget",
+      "Sales stylesheet budget"
+    ]
+  },
+  "static": {
+    "git_diff_check": "passed",
+    "python_ast_files": 18,
+    "duplicate_literal_dict_keys": [],
+    "closed_schema_objects": 19,
+    "strict_schema_issues": [],
+    "schema_bytes": 14571
+  },
+  "migration_required": false,
+  "new_dependencies": false,
+  "new_environment_flags": false,
+  "limitations": [
+    "Sales inference and messaging/calendar providers were scripted or mocked; no live model/channel acceptance.",
+    "SQLite does not validate PostgreSQL concurrency.",
+    "This delivery covers SA-03/SA-04, not all 64 business scenarios.",
+    "API and worker must share the resulting revision; older strict readers are not guaranteed to accept the new JSON fields."
+  ],
+  "differential_files": [
+    {
+      "path": "backend/app/modules/sales_agent/active_service.py",
+      "bytes": 65281,
+      "sha256": "2f6a2d9dd6383fadbbe851754981da1daca03c27efd7fb977f5f297cc765b8fd"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/commercial_composer.py",
+      "bytes": 19004,
+      "sha256": "3656d85d8acfb9c4587d4754cc8b639559f9c3066d9ffac9767ae5520eec6c49"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/dialogue_composer.py",
+      "bytes": 6425,
+      "sha256": "cf6346a7f35e8f1a74652cbb7e8d0608f03e36ad8ec4391013787b87389774ba"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/dialogue_tools.py",
+      "bytes": 9696,
+      "sha256": "6089857f936815d82f8f40713407187c25c2d15c319d8b9d4cf673b91cb8e0fb"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/evidence.py",
+      "bytes": 3032,
+      "sha256": "d919673d46b179528730486a013c9d8fb017e1b5e896996ee09f1e03aedd2a06"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/lead_profile.py",
+      "bytes": 20546,
+      "sha256": "90a4893895b1e51b2d0c2f164c8e20361da028b2e57380b1eff2b6e4fc279b6c"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/profile_intelligence.py",
+      "bytes": 7601,
+      "sha256": "e5fea5c633893b6983b78f624265a9bfd22645f4616653e44a8ab0e4b371cc2b"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/property_comparison.py",
+      "bytes": 7281,
+      "sha256": "ef34399ced71357bf85fbce5512dbf5d591eb6ea8e67945066df2b1a9b507ab8"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/turn_configuration.py",
+      "bytes": 7263,
+      "sha256": "2902bc502bef6685d69db0a0bad050a3c2839610e69ad45d2a24bb318738ef23"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/turn_memory.py",
+      "bytes": 10591,
+      "sha256": "03514f457f78f8eef901f4b0228dd9cec1724a734fadeb67d1e45fbff6edcda9"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/turn_planner.py",
+      "bytes": 19436,
+      "sha256": "8307721c411434ebfb15c4ec66affe3dc21639ec4a65e6a38ca358fd5a374801"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/understanding_contract.py",
+      "bytes": 20704,
+      "sha256": "73e572b11f415168856ddace860c87e1a262df89e130611528e92be532f24433"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/understanding_prompt.py",
+      "bytes": 17194,
+      "sha256": "5959e21eaea800889d07d8b090150277f9782c3193918cf783ebfc30718f77a5"
+    },
+    {
+      "path": "backend/tests/test_sales_ai_group_b.py",
+      "bytes": 23739,
+      "sha256": "61b3fec02519baf2e16707c1511ee3e8c263eb796a887444a0bf0230322362b4"
+    },
+    {
+      "path": "backend/tests/test_sales_ai_group_e.py",
+      "bytes": 32031,
+      "sha256": "6712531dc8f79ab3c239601e0c2ef65301758747f730e70872ad8f6e2dd5d8ea"
+    },
+    {
+      "path": "backend/tests/test_sales_delivery1.py",
+      "bytes": 13546,
+      "sha256": "d0dbe15687ce4078f0b812f0b57cd8e28f205267e7445fec0f1491374a15071c"
+    },
+    {
+      "path": "backend/tests/test_sales_delivery2.py",
+      "bytes": 29157,
+      "sha256": "e7e6a150660acf66a605ac97f9f77b53e6a48a64ab30a8994fd240151df28258"
+    },
+    {
+      "path": "backend/tests/test_sales_dialogue_foundation.py",
+      "bytes": 24925,
+      "sha256": "812399604f422b5d4e003e9f9d8f797739ba00a7d8ae92e98563edd18eec104c"
+    },
+    {
+      "path": "docs/sales-ai/delivery-2.md",
+      "bytes": 8427,
+      "sha256": "fb38d2845d63238003ad38a5a1ace7135e2842f40931d22e04a8a006b5f1370c"
+    }
+  ],
+  "verification_file": "docs/sales-ai/delivery-2-verification.json",
+  "zip_entries": 20,
+  "commit_command": "git pull && git add . && git commit -m \"Add evidence-backed lead profiles and property comparisons\" && git push"
+}

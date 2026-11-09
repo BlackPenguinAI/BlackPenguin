@@ -4,11 +4,12 @@ from datetime import datetime, timezone
 import hashlib
 import json
 import re
+from .understanding_contract import BUYER_SEGMENTS
 
 VERSION='sales-lead-profile/2.0'
 FIELDS=('budget','budget_minimum','budget_maximum','budget_currency','property_interest','bedrooms',
         'bathrooms','location_preference','purchase_timeline','financing','buyer_type','motivation',
-        'decision_structure','move_in_timing','visit_readiness')
+        'decision_structure','move_in_timing','visit_readiness','needs')
 ALIASES={key:key for key in FIELDS}
 ALIASES.update(budget_min='budget_minimum',minimum_budget='budget_minimum',budget_max='budget_maximum',
     maximum_budget='budget_maximum',currency='budget_currency',property_type='property_interest',
@@ -16,7 +17,8 @@ ALIASES.update(budget_min='budget_minimum',minimum_budget='budget_minimum',budge
     location='location_preference',what_is_your_budget='budget',number_of_bedrooms='bedrooms')
 PREFERENCE_KEYS={'property':'property_interest','budget':'budget','bedrooms':'bedrooms','location':'location_preference',
     'delivery':'move_in_timing','purchase_timeline':'purchase_timeline','financing':'financing',
-    'buyer_type':'buyer_type','visit_readiness':'visit_readiness'}
+    'buyer_type':'buyer_type','visit_readiness':'visit_readiness','bathrooms':'bathrooms',
+    'motivation':'motivation','decision_structure':'decision_structure','needs':'needs'}
 DECLINED={'skip','prefer not to say','i prefer not to say','prefer not to answer','i prefer not to answer'}
 UNKNOWN={'unknown','not provided','not specified','n/a','none','null','not sure','i do not know'}
 
@@ -106,9 +108,52 @@ def resolve(lead):
             current[field]=record(field,None,source='conflicting_sources')
             conflicts.append({'field':field,'candidates':options})
         else:current[field]=options[-1] if options else record(field,None,source='unknown')
+    for field in ('buyer_type','motivation'):
+        annotation=(profile.get('purpose_classifications') or {}).get(field) or {}
+        if annotation.get('record_id')==current[field].get('id') and annotation.get('segment') in BUYER_SEGMENTS:
+            current[field]['normalized_segment']=annotation['segment']
     return {'version':VERSION,'current':current,'conflicts':conflicts,
             'history':deepcopy(stored.get('history') or [])[-100:],
             'rule':'Declared is customer/source information, never verified financing, suitability or consent. Unknown stays unknown.'}
+
+
+def optional_profile(lead):
+    """Volunteered source answers only. Never commercial scoring inputs."""
+    raw = lead.lead_profile_data or {}
+    saved = raw.get('optional_profile') or {}
+    current = {}
+    form = lead.meta_form_data or {}
+    for field in ('age', 'occupation'):
+        rows = []
+        if field in form:
+            rows.append(record(field, form[field], source='meta_form', at=lead.created_at,
+                               evidence=str(form[field]), source_ref={'field': field}))
+        for row in form.get('field_data', []) if isinstance(form.get('field_data'), list) else []:
+            if isinstance(row, dict) and row.get('name') == field:
+                values = row.get('values')
+                value = values[0] if isinstance(values, list) and len(values) == 1 else values
+                rows.append(record(field, value, source='meta_form', at=lead.created_at,
+                                   evidence=str(value), source_ref={'field': field}))
+        for row in raw.get('source_answers', []) if isinstance(raw.get('source_answers'), list) else []:
+            if isinstance(row, dict) and row.get('key') == field:
+                rows.append(record(field, row.get('value'), source='source_answer', at=lead.created_at,
+                                   evidence=str(row.get('value')), source_ref={'field': field}))
+        stored = (saved.get('current') or {}).get(field)
+        if isinstance(stored, dict) and stored.get('field') == field and stored.get('source') in {'active_conversation','staff_verified'}:
+            current[field] = deepcopy(stored)
+        elif len({json.dumps(r['value'], sort_keys=True) for r in rows}) == 1:
+            current[field] = rows[-1]
+        else:
+            current[field] = record(field, None, source='conflicting_sources' if rows else 'unknown')
+    return {'version': 'sales-optional-profile/1.0', 'current': current,
+            'rule': 'Volunteered only. Never solicit age/occupation or use them for eligibility, score, segment, wealth or protected-trait inference.'}
+
+
+def own_statement(evidence, own):
+    # The interpreter must preserve current self-declarations, never quoted,
+    # conditional, negated or third-party attributes as facts about this lead.
+    return evidence in own and not re.search(
+        r'\b(?:my friend|my colleague|my agent|the agent said|the brochure says|suppose|imagine|if I were)\b', evidence, re.I)
 
 
 def known(profile,field):
@@ -150,12 +195,11 @@ def capture(db,scope,understanding,message_id,*,selected_property=None,selected_
     lead=db.get(Lead,scope.lead_id)
     resolved=resolve(lead);current=resolved['current'];history=resolved['history']
     own=request_attribution(message.content)['current_text']
-    def put(field,value,evidence,source='active_conversation',extra=None):
-        if evidence not in own:return
-        if re.search(r'\b(?:my friend|my colleague|the agent said|the brochure says)\b',evidence,re.I):return
+    def put(field,value,evidence,source='active_conversation',extra=None,status=None):
+        if not own_statement(evidence, own):return
         polarity='negative' if re.search(r"\b(?:no|not|never|don't|do not)\b",evidence,re.I) else 'affirmative'
         item=record(field,value,source=source,at=message.created_at,evidence=evidence,
-                    source_ref={'message_id':message.id,**(extra or {})},polarity=polarity)
+                    source_ref={'message_id':message.id,**(extra or {})},polarity=polarity,status=status)
         previous=current[field]
         if item['id']==previous.get('id'):return
         if previous.get('status')!='unknown' and previous.get('id') not in {r.get('id') for r in history}:history.append(previous)
@@ -163,7 +207,22 @@ def capture(db,scope,understanding,message_id,*,selected_property=None,selected_
         current[field]=item
     for pref in understanding.preferences:
         # Exact evidence is authoritative; model-normalized values never replace it.
-        put(PREFERENCE_KEYS[pref.key],pref.evidence,pref.evidence)
+        put(PREFERENCE_KEYS[pref.key],pref.evidence,pref.evidence,status=pref.status)
+        if pref.key in {'buyer_type','motivation'} and pref.value in BUYER_SEGMENTS and pref.status=='declared' and own_statement(pref.evidence,own):
+            # Semantic interpretation is finite and evidenced; it never uses a
+            # demographic field, history keyword search or a score as its source.
+            if not any(p.evidence==pref.evidence for p in understanding.personal_facts):
+                current[PREFERENCE_KEYS[pref.key]]['normalized_segment']=pref.value
+            else:current[PREFERENCE_KEYS[pref.key]]['classification_blocked']='personal_evidence'
+    for withdrawal in understanding.preference_withdrawals:
+        fields = ('budget','budget_minimum','budget_maximum','budget_currency') if withdrawal.key=='budget' else (PREFERENCE_KEYS[withdrawal.key],)
+        for field in fields:
+            put(field, None, withdrawal.evidence)
+            if own_statement(withdrawal.evidence, own):
+                current[field]['status'] = 'withdrawn'
+    if understanding.visit and understanding.visit.action in {'request','select','confirm'} and understanding.permits('appointment'):
+        put('visit_readiness',understanding.visit.evidence,understanding.visit.evidence,
+            extra={'intent':'explicit_visit'})
     if selected_unit and any(r.kind=='unit' for r in understanding.references):
         reference=next(r for r in understanding.references if r.kind=='unit')
         put('property_interest',selected_unit['unit_code'],reference.evidence,'approved_catalog_selection',{'unit_id':selected_unit['id']})
@@ -172,17 +231,60 @@ def capture(db,scope,understanding,message_id,*,selected_property=None,selected_
         put('property_interest',selected_property['property_type'],reference.evidence,'approved_catalog_selection',
             {'property_type_id':selected_property['id'],'unit_id':selected_property.get('unit_id')})
     profile=deepcopy(lead.lead_profile_data or {})
+    annotations=profile.setdefault('purpose_classifications',{})
+    for proposal in understanding.source_purposes:
+        row=current[proposal.field]
+        if row.get('id')!=proposal.record_id or row.get('status') not in {'declared','confirmed'}:continue
+        if row.get('polarity')=='negative' or row.get('classification_blocked'):continue
+        if row.get('source') not in {'meta_form','source_answer','manual_registration','active_conversation','staff_verified'}:continue
+        if not row.get('evidence') and row.get('source')!='staff_verified':continue
+        annotations[proposal.field]={'record_id':row['id'],'segment':proposal.segment,
+            'source':'evidenced_source_interpretation','classified_at':stamp(message.created_at),'message_id':message.id}
+    optional = optional_profile(lead)
+    optional_history = deepcopy((profile.get('optional_profile') or {}).get('history') or [])
+    for fact in understanding.personal_facts:
+        if not own_statement(fact.evidence, own):continue
+        if re.search(r'\b(?:my spouse|my partner|my wife|my husband|my child|my mother|my father)\b',fact.evidence,re.I):continue
+        old = optional['current'][fact.key]
+        # No model-normalized personal value: retain the exact voluntary quote.
+        item = record(fact.key, fact.evidence if fact.action == 'set' else None,
+                      source='active_conversation', at=message.created_at, evidence=fact.evidence,
+                      source_ref={'message_id':message.id},
+                      status={'set':'declared','withdraw':'withdrawn','decline':'declined'}[fact.action])
+        if item['id'] == old.get('id'):continue
+        if old.get('status') != 'unknown':optional_history.append(old)
+        item['supersedes'] = old.get('id')
+        optional['current'][fact.key] = item
+    profile['optional_profile'] = {**optional, 'current':{
+        field:item for field,item in optional['current'].items() if item.get('source') in {'active_conversation','staff_verified'}},
+        'history': optional_history[-100:]}
     explicit={field:item for field,item in current.items() if item['source'] in {'active_conversation','approved_catalog_selection','staff_verified'}}
     profile['sales_profile']={'version':VERSION,'current':explicit,'history':history[-100:]}
     # Compatibility facts stay evidence-backed, with declared/confirmed separated.
     facts=profile.setdefault('facts',{})
     for field,item in explicit.items():
-        if item['status']!='unknown':facts[field]={'value':item['value'],'source':item['source'],
+        if item['status']=='withdrawn':facts.pop(field,None)
+        elif item['status']!='unknown':facts[field]={'value':item['value'],'source':item['source'],
             'status':item['status'],'confirmed':item['status']=='confirmed','captured_at':item['captured_at'],
             'evidence':item['evidence'],'message_id':(item.get('source_ref') or {}).get('message_id')}
+    from app.modules.sales_crm.models import LeadObjection
+    events=profile.setdefault('objection_events',[])
+    for objection in understanding.objections:
+        event_id=message.id+':'+objection.kind
+        if not own_statement(objection.evidence,own) or any(e['event_id']==event_id for e in events):continue
+        rows=db.query(LeadObjection).filter_by(lead_id=scope.lead_id,objection_type=objection.kind,status='open').all()
+        if objection.action=='resolve':
+            for row in rows:row.status='resolved';row.updated_at=message.created_at
+        else:
+            row=rows[0] if rows else LeadObjection(lead_id=scope.lead_id,objection_type=objection.kind,occurrence_count=0)
+            row.occurrence_count+=1;row.evidence=objection.evidence;row.updated_at=message.created_at
+            db.add(row)
+        events.append({'event_id':event_id,'kind':objection.kind,'action':objection.action,
+                       'evidence':objection.evidence,'message_id':message.id,'at':stamp(message.created_at)})
+    profile['objection_events']=events[-100:]
     lead.lead_profile_data=profile
     from app.modules.sales_crm.intelligence import lead_profile_summary
-    lead.qualification_summary=lead_profile_summary({'facts':{f:{'value':r['value']} for f,r in current.items() if r['status']!='unknown'}})
+    lead.qualification_summary=lead_profile_summary({'facts':{f:{'value':r['value']} for f,r in current.items() if r['status'] in {'declared','confirmed'}}})
     return resolve(lead)
 
 
@@ -193,6 +295,7 @@ def qualification(lead,facts,*,record_asked=False):
         aliases={'property_interest':['property_interest','bedrooms'],'budget':['budget','budget_minimum','budget_maximum']}.get(field,[field])
         for k in aliases:
             item=profile['current'][k]
+            if item.get('status')=='withdrawn':return True
             if not known(profile,k):continue
             if k=='budget' and isinstance(item['value'],dict) and item['status']!='declined':
                 if not any(meaningful(v) for name,v in item['value'].items() if name in {'minimum','maximum','min','max','amount'}):continue

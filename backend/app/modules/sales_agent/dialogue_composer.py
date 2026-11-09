@@ -27,6 +27,10 @@ def compose(outcome, *, channel='sms', style='concise'):
             continue
         if restricted(state,task):
             pending.append(task.id); continue
+        if result and result.data.get('comparison_text'):
+            blocks.append(result.data['comparison_text'])
+            (answered if result.status=='success' else pending).append(task.id)
+            continue
         if not result or result.status not in {'success','partial'}:
             if task.status != 'completed':
                 pending.append(task.id)

@@ -96,10 +96,11 @@ def test_t09_known_meta_fields_not_reasked_and_context_reaches_composer(agent,mo
 def test_published_stage_segment_objection_and_original_model_reach_composer(agent,model):
     from app.modules.sales_crm.models import LeadObjection
     product(agent)
-    agent.lead.pipeline_stage='S04';agent.lead.assigned_segment='investor'
+    agent.lead.pipeline_stage='S04';agent.lead.assigned_segment='stale-inferred-segment'
+    agent.lead.meta_form_data={'buyer_type':'rental_yield_investor'}
     agent.db.add(LeadObjection(lead_id=agent.lead.id,objection_type='price',evidence='too expensive'))
     publish(agent,{**agent.config.agent_ventas,'model':'test/offline','stage_prompts':{'S04':'Explain value first'},
-        'segment_prompts':{'investor':'Do not promise returns'},'objection_prompts':{'price':'Explain approved payment options'}})
+        'segment_prompts':{'rental_yield_investor':'Do not promise returns'},'objection_prompts':{'price':'Explain approved payment options'}})
     _,run=agent.turn('Give me information',understanding('Give me information','catalog'))
     data=context(model.call_args)['published_guidance']
     assert data['guidance']['stage']=='Explain value first' and data['guidance']['segment']=='Do not promise returns'

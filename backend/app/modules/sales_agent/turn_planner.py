@@ -45,7 +45,8 @@ def run(db,scope,*,message_id,understanding,expected_revision,event_key,max_step
     references={r.id or 'legacy-'+str(i):resolver.resolve(r) for i,r in enumerate(u.references)}
     values=[r['value'] for r in references.values() if r['status']=='resolved' and r['value']['kind'] in {'property','unit'}]
     subjects={(v.get('property_id'),v.get('unit_id')) for v in values}
-    selection=references.get(u.selected_reference_id,{}).get('value') if u.selected_reference_id else values[0] if len(subjects)==1 else None
+    original_interest=(state.selected_property_type_id,state.selected_unit_id)
+    selection=references.get(u.selected_reference_id,{}).get('value') if u.selected_reference_id else values[0] if len(subjects)==1 and not u.comparison else None
     if selection:
         state.selected_property_type_id=selection.get('property_id')
         state.selected_unit_id=selection.get('unit_id')
@@ -96,7 +97,15 @@ def run(db,scope,*,message_id,understanding,expected_revision,event_key,max_step
     for r in u.requests:
         if r.polarity=='exclude':restriction(r.topic,r.subject,'turn',r.evidence,r.reference_id)
     for p in u.preferences:state.preferences=[v for v in state.preferences if v.key!=p.key]+[p]
+    withdrawn={p.key for p in u.preference_withdrawals}
+    state.preferences=[p for p in state.preferences if p.key not in withdrawn]
+    if 'property' in withdrawn:
+        state.selected_property_type_id=None
+        state.selected_unit_id=None
     state.last_understanding=u
+    if u.comparison:
+        state.pending_comparison=u.comparison
+        state.pending_comparison_references=[r for r in u.references if r.id in u.comparison.reference_ids]
     plan={'version':VERSION,'references':references,'request_coverage':[], 'rounds':[], 'questions':[],
           'read_units':0,'tool_calls':0,'additional_model_calls':0,'external_actions':0,
           'limits':{'steps':max_steps,'rounds':max_rounds,'seconds':max_seconds,'read_units':max_read_units},
@@ -121,6 +130,8 @@ def run(db,scope,*,message_id,understanding,expected_revision,event_key,max_step
             unit_id=value.get('unit_id',state.selected_unit_id) if r.topic.value in BOUND_TOPICS else None,
             binding_status='unresolved' if unresolved else 'resolved' if value or state.selected_property_type_id or state.selected_unit_id else 'unspecified',
             blocked_reason='reference_clarification' if unresolved else None)
+        if u.comparison and u.comparison.request_id==r.id:
+            task.blocked_reason='comparison_requires_current_request'
         if (not unresolved and not task.property_id and not task.unit_id and
             task.topic.value in {'property_details','materials'} and len(resolver.types)==1):
             # A single approved option is an unambiguous query target, not
@@ -164,6 +175,7 @@ def run(db,scope,*,message_id,understanding,expected_revision,event_key,max_step
         if u.requires_clarification:stop='clarification';break
         eligible=[]
         for task in sorted(state.tasks,key=lambda t:t.source_message_id!=message.id):
+            if task.source_message_id!=message.id and task.blocked_reason=='comparison_requires_current_request':continue
             retry=task.status=='blocked' and task.last_read_signature and task.last_read_signature!=context_signature
             if task.id in attempted or task.status not in {'pending','suspended'} and not retry:continue
             if task.source_message_id!=message.id and (task.topic.value in WRITE_TOPICS|{'materials'} or not current_commercial):
@@ -191,6 +203,21 @@ def run(db,scope,*,message_id,understanding,expected_revision,event_key,max_step
             call=ToolCall(operation_id=task.id,task_id=task.id,topic=task.topic,subject=task.subject,
                 property_id=task.property_id,unit_id=task.unit_id,
                 appointment_query=u.appointment_query if task.topic.value=='appointment' else None)
+            if u.comparison and task.source_message_id==message.id and u.comparison.request_id in task.request_ids:
+                from .property_comparison import ComparisonRead,Target
+                targets=[];unresolved=False
+                for rid in u.comparison.reference_ids:
+                    resolved=references[rid]
+                    if resolved['status']!='resolved':unresolved=True;continue
+                    value=resolved['value']
+                    targets.append(Target(kind=value['kind'],property_id=value.get('property_id'),unit_id=value.get('unit_id')))
+                if u.comparison.include_current:
+                    property_id,unit_id=original_interest
+                    if property_id or unit_id:
+                        targets.append(Target(kind='unit' if unit_id else 'property',
+                            property_id=property_id,unit_id=unit_id))
+                    else:unresolved=True
+                call.comparison=ComparisonRead(directive=u.comparison,targets=targets,unresolved=unresolved)
             task.status='pending'
             if restricted(state,task) and not call.appointment_query:result=ToolResult(operation_id=task.id,status='denied',safe_message='An explicit restriction blocks this request.')
             else:
@@ -201,6 +228,11 @@ def run(db,scope,*,message_id,understanding,expected_revision,event_key,max_step
             results.append(result)
             group=task.alternative_group;task.alternative_group=None
             record_result(state,task,result);task.alternative_group=group
+            if call.comparison:
+                task.blocked_reason='comparison_requires_current_request'
+                if result.status=='success':
+                    state.pending_comparison=None
+                    state.pending_comparison_references=[]
             if task.topic.value=='pricing' and any(u.get('price') is None or not u.get('currency') for u in result.data.get('units',[])):
                 task.status='blocked'
             # A distributable direct match wins OR; discovery is not delivery.

@@ -489,7 +489,8 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
                 if moderation_decision and moderation_decision['disposition'] in {'warn','boundary'}:
                     u=Understanding.model_validate({**u.model_dump(),'requests':[{'id':'moderation_boundary','topic':'other','subject':None,'polarity':'request','evidence':inbound.content[:2000]}],
                         'all_of':['moderation_boundary'],'alternatives':[],'references':[],'constraints':[],'releases':[],'preferences':[],
-                        'visit':None,'reschedule':None,'cancellation':None,'wait':None,'courtesy':None,'selected_reference_id':None,'appointment_query':None,'requires_clarification':False,'clarification_question':None,'confidence':1.0})
+                        'visit':None,'reschedule':None,'cancellation':None,'wait':None,'courtesy':None,'comparison':None,
+                        'personal_facts':[],'preference_withdrawals':[],'source_purposes':[],'objections':[],'selected_reference_id':None,'appointment_query':None,'requires_clarification':False,'clarification_question':None,'confidence':1.0})
             if u.confidence < .8 and not u.requires_clarification:
                 u=u.model_copy(update={'requires_clarification':True,'clarification_question':'Could you clarify whether you want property details, materials, financing, or a visit?'})
             # Legal/commercial approvals hold the action, not the conversation.
@@ -561,7 +562,12 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
                     context=build_commercial_context(db,project=project,company_id=scope.company_id,lead_id=scope.lead_id,channel=conversation.channel)
                     selected=outcome.state.selected_property_type_id
                     broad=safe_u.permits('catalog')
-                    metadata['property_catalog_offer']={'property_type_ids':[p['id'] for p in context['property_types'] if broad or not selected or p['id']==selected]}
+                    comparison=next((r.data for r in outcome.results if r.data.get('comparison_text')),None)
+                    if comparison is not None:
+                        ids=comparison['comparison_property_ids']
+                        if ids:metadata['property_catalog_offer']={'property_type_ids':ids}
+                        if comparison['comparison_unit_ids']:metadata['unit_catalog_offer']={'unit_ids':comparison['comparison_unit_ids']}
+                    else:metadata['property_catalog_offer']={'property_type_ids':[p['id'] for p in context['property_types'] if broad or not selected or p['id']==selected]}
                     extra.append('Which property option would you like to explore in more detail?')
             affected=sorted({t.topic.value for t in outcome.state.tasks if t.source_message_id==inbound.id} & action_holds)
             if (affected or advisory in {'LEGAL_QUESTION','COMPLEX_NEGOTIATION'}) and not conversation.is_paused:
@@ -600,9 +606,13 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
                     refs=[r for i,r in enumerate(safe_u.references) if (r.id or 'legacy-'+str(i))==interest]
                     capture_u=safe_u.model_copy(update={'references':refs})
                     chosen_unit=next((v for v in commercial['inventory'] if v['id']==outcome.state.selected_unit_id and v.get('unit_code')),None)
-                    capture_profile(db,scope,capture_u,inbound.id,
+                    captured=capture_profile(db,scope,capture_u,inbound.id,
                         selected_property={**chosen,'unit_id':outcome.state.selected_unit_id} if interest and chosen else None,
                         selected_unit=chosen_unit if interest else None)
+                    from .lead_profile import optional_profile
+                    metadata['profile_capture']=[{'namespace':namespace,'field':field,'status':row['status']}
+                        for namespace,values in (('commercial',captured['current']),('optional',optional_profile(lead)['current']))
+                        for field,row in values.items() if (row.get('source_ref') or {}).get('message_id')==inbound.id]
                 else:capture(lead,safe_u,inbound.id,selected_property=chosen)
                 history=scoped_messages_query(db,conversation).filter(SalesMessage.created_at<=inbound.created_at).order_by(SalesMessage.created_at,SalesMessage.id).all()
                 lead_text,count=live._lead_intelligence_input(history)
@@ -610,9 +620,11 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
                 if next_enabled:
                     # Reporting scores do not assign a persona or reinterpret
                     # workflow state from a bag of form/history keywords.
-                    from app.modules.sales_crm.intelligence import calculate_score
+                    from .profile_intelligence import update as update_declared_intelligence
                     from .lead_profile import qualification
-                    calculate_score(db,lead,lead_text,count,scoring_config=(config.agent_ventas or {}).get('scoring_config',{}) if config else {})
+                    from .turn_configuration import published_configuration
+                    scoring_pack,_=published_configuration(db,scope.company_id)
+                    update_declared_intelligence(db,lead,commercial=commercial,message_count=count,scoring_config=scoring_pack.get('scoring_config',{}))
                     metadata['qualification_missing']=qualification(lead,commercial['confirmed_project_facts'])[0]
                 else:
                     update_lead_intelligence(db,lead,inbound_text=inbound.content,conversation_text=lead_text,message_count=count,

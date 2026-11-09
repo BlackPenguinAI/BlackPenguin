@@ -99,7 +99,7 @@ def build(db,scope,*,inbound_message_id,now=None):
     from .dialogue_store import check_scope,load
     from .conversation_scope import scoped_messages_query
     from .models import SalesMessage
-    from .lead_profile import resolve,for_context
+    from .lead_profile import resolve,for_context,optional_profile
     from .turn_context import latest_outbound
     from app.modules.sales_crm.models import Lead
     now=utc(now or workflow_now(datetime).replace(tzinfo=timezone.utc))
@@ -124,6 +124,7 @@ def build(db,scope,*,inbound_message_id,now=None):
         return {'version':'sales-turn-context/1.0','scope':scope.__dict__,'state_revision':revision,
             'lead_identity':{'first_name':(lead.full_name or '').strip().split()[0] if (lead.full_name or '').strip() else None,'source':'lead_record'},
             'lead_profile':for_context(resolve(lead)),
+            'optional_profile':optional_profile(lead),
             'current_interest':{'project_id':scope.project_id,'property_type_id':state.selected_property_type_id,'unit_id':state.selected_unit_id,
                                 'source':'dialogue_state','changes_existing_visit':False},
             'appointments':{category:tool.execute({'category':category,'limit':5},now=now) for category in ('active','past','cancelled')},
@@ -136,6 +137,8 @@ def build(db,scope,*,inbound_message_id,now=None):
             'booking_search':state.booking_search,'booking_proposal':state.booking_proposal,
             'cadence':{'status':state.cadence_status,'reason':state.cadence_stop_reason},
             'pending_tasks':pending[-20:],'pending_tasks_truncated':len(pending)>20,
+            'pending_comparison':state.pending_comparison.model_dump(mode='json') if state.pending_comparison else None,
+            'pending_comparison_references':[r.model_dump(mode='json') for r in state.pending_comparison_references],
             'constraints':[{**c.model_dump(mode='json'),'evidence':c.evidence[:200],
                             'context_truncated':len(c.evidence)>200} for c in state.constraints],
             'property_constraints':[{**c.model_dump(mode='json'),'evidence':c.evidence[:200]} for c in state.property_constraints],

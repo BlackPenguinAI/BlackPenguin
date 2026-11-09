@@ -1,6 +1,6 @@
 """Versioned understanding contracts. These describe intent, never authorize writes."""
 from enum import Enum
-from typing import Literal
+from typing import Literal, get_args
 import json
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, StrictBool, model_validator
 
@@ -71,10 +71,61 @@ class Reference(StrictModel):
     evidence: str = Field(min_length=1, max_length=2000)
 
 
+PreferenceKey = Literal['property', 'budget', 'bedrooms', 'bathrooms', 'location', 'delivery', 'purchase_timeline', 'financing', 'buyer_type', 'visit_readiness', 'motivation', 'decision_structure', 'needs']
+BuyerSegment = Literal['first_time_buyer','move_up_buyer','relocation','downsizing','rental_yield_investor','appreciation_resale_investor','portfolio_diversification']
+BUYER_SEGMENTS = frozenset(get_args(BuyerSegment))
+
+
 class Preference(StrictModel):
-    key: Literal['property', 'budget', 'bedrooms', 'location', 'delivery', 'purchase_timeline', 'financing', 'buyer_type', 'visit_readiness']
+    key: PreferenceKey
     value: str = Field(min_length=1, max_length=500)
     evidence: str = Field(min_length=1, max_length=2000)
+    status: Literal['declared','declined'] = 'declared'
+
+
+class PreferenceWithdrawal(StrictModel):
+    key: PreferenceKey
+    evidence: str = Field(min_length=1, max_length=2000)
+
+
+class SourcePurposeClassification(StrictModel):
+    field: Literal['buyer_type','motivation']
+    record_id: str = Field(pattern=r'^[0-9a-f]{32}$')
+    segment: BuyerSegment
+
+
+class ObjectionDeclaration(StrictModel):
+    kind: Literal['price','timing','comparison','trust','approval']
+    action: Literal['raise','resolve']
+    evidence: str = Field(min_length=1,max_length=2000)
+
+
+class PersonalFact(StrictModel):
+    key: Literal['age', 'occupation']
+    action: Literal['set', 'withdraw', 'decline']
+    evidence: str = Field(min_length=1, max_length=2000)
+
+
+class Comparison(StrictModel):
+    request_id: str = Field(min_length=1, max_length=60)
+    reference_ids: list[str] = Field(default_factory=list, max_length=20)
+    include_current: StrictBool = False
+    include_all: StrictBool = False
+    all_kind: Literal['property','unit'] = 'property'
+    criteria: list[Literal['general', 'bedrooms', 'bathrooms', 'area', 'price', 'availability', 'kitchen', 'features']] = Field(min_length=1, max_length=8)
+    feature: str | None = Field(default=None,min_length=1,max_length=80)
+    operation: Literal['compare', 'maximum', 'minimum'] = 'compare'
+    evidence: str = Field(min_length=1, max_length=2000)
+
+    @model_validator(mode='after')
+    def numeric_extreme(self):
+        if self.operation != 'compare' and (len(self.criteria) != 1 or self.criteria[0] in {'general', 'kitchen', 'features'}):
+            raise ValueError('An extremum needs one numeric criterion.')
+        if len(set(self.reference_ids)) != len(self.reference_ids) or len(set(self.criteria)) != len(self.criteria):
+            raise ValueError('Comparison members must be unique.')
+        if self.feature is not None and not set(self.criteria)&{'general','features','kitchen'}:
+            raise ValueError('A requested feature needs a feature comparison.')
+        return self
 
 
 class ConstraintRelease(StrictModel):
@@ -144,6 +195,11 @@ class Understanding(StrictModel):
     constraints: list[Constraint] = Field(max_length=30)
     references: list[Reference] = Field(max_length=20)
     preferences: list[Preference] = Field(max_length=20)
+    personal_facts: list[PersonalFact] = Field(default_factory=list, max_length=4)
+    preference_withdrawals: list[PreferenceWithdrawal] = Field(default_factory=list, max_length=13)
+    comparison: Comparison | None = None
+    source_purposes: list[SourcePurposeClassification] = Field(default_factory=list,max_length=2)
+    objections: list[ObjectionDeclaration] = Field(default_factory=list,max_length=5)
     releases: list[ConstraintRelease] = Field(default_factory=list, max_length=20)
     visit: VisitDirective | None = None
     courtesy: Courtesy | None = None
@@ -163,6 +219,25 @@ class Understanding(StrictModel):
         if len(refs)!=len(set(refs)):raise ValueError('Reference IDs must be unique.')
         linked=[r.reference_id for r in self.requests]+[c.reference_id for c in self.constraints]+[self.selected_reference_id]
         if any(value is not None and value not in refs for value in linked):raise ValueError('Unknown reference link.')
+        if len({p.key for p in self.personal_facts}) != len(self.personal_facts):
+            raise ValueError('A personal field may change only once per turn.')
+        if len({p.field for p in self.source_purposes}) != len(self.source_purposes):
+            raise ValueError('A source purpose may be classified only once per turn.')
+        if len({o.kind for o in self.objections}) != len(self.objections):
+            raise ValueError('An objection may change only once per turn.')
+        if {p.key for p in self.preferences} & {p.key for p in self.preference_withdrawals}:
+            raise ValueError('A preference cannot be set and withdrawn together.')
+        if len({p.key for p in self.preference_withdrawals}) != len(self.preference_withdrawals):
+            raise ValueError('A preference may be withdrawn only once per turn.')
+        if self.selected_reference_id and any(p.key=='property' for p in self.preference_withdrawals):
+            raise ValueError('An interest cannot be selected and withdrawn together.')
+        if self.comparison:
+            c = self.comparison
+            request = next((r for r in self.requests if r.id == c.request_id), None)
+            if not request or request.polarity != 'request' or request.topic != Topic.catalog or request.reference_id:
+                raise ValueError('A comparison must link an unbound affirmative catalog request.')
+            if any(rid not in refs or next(r for r in self.references if r.id == rid).kind not in {'property','unit'} for rid in c.reference_ids):
+                raise ValueError('Comparison references must identify properties or units.')
         if self.selected_reference_id and next(r for r in self.references if r.id==self.selected_reference_id).kind not in {'property','unit'}:
             raise ValueError('Only a property or unit reference can select commercial interest.')
         ids = [r.id for r in self.requests]
@@ -276,6 +351,8 @@ class DialogueState(StrictModel):
     offers: list[Offer] = Field(default_factory=list, max_length=50)
     preferences: list[Preference] = Field(default_factory=list, max_length=100)
     last_understanding: Understanding | None = None
+    pending_comparison: Comparison | None = None
+    pending_comparison_references: list[Reference] = Field(default_factory=list,max_length=20)
     memory: 'TurnMemory' = Field(default_factory=lambda: TurnMemory())
     wait_context: dict = Field(default_factory=dict)
     cancellation_search: dict = Field(default_factory=dict)

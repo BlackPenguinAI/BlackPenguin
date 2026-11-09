@@ -73,10 +73,11 @@ def test_current_flow_ignores_retired_platform_switch_and_lists(agent,monkeypatc
 def test_resolver_selects_published_stage_segment_and_open_objections_read_only(agent):
     pack={**agent.config.agent_ventas,'system_prompt':'Published identity','protocol_prompt':'LEGACY JSON SECRET CONTRACT',
           'guardrails_prompt':'Use verified benefits','stage_prompts':{'S04':'Stage guidance','other':'wrong'},
-          'segment_prompts':{'investor':'Investor guidance'},'objection_prompts':{'price':'Explain value','closed':'wrong'}}
+          'segment_prompts':{'rental_yield_investor':'Investor guidance'},'objection_prompts':{'price':'Explain value','closed':'wrong'}}
     version=publish(agent,pack)
     agent.config.agent_ventas={**pack,'system_prompt':'Unpublished edit'}
-    agent.lead.pipeline_stage='S04';agent.lead.assigned_segment='investor'
+    agent.lead.pipeline_stage='S04';agent.lead.assigned_segment='stale-inferred-segment'
+    agent.lead.meta_form_data={'buyer_type':'rental_yield_investor'}
     agent.db.add_all([LeadObjection(lead_id=agent.lead.id,objection_type='price',evidence='too expensive'),
                      LeadObjection(lead_id=agent.lead.id,objection_type='closed',evidence='old',status='closed')])
     agent.db.commit()
@@ -132,7 +133,7 @@ def test_new_interpreter_has_internal_contract_and_configuration_provenance(agen
     version=publish(agent,pack)
     _,run=agent.turn('Give me information',understanding('Give me information','catalog'))
     assert run.status=='completed',run.output_snapshot
-    assert run.prompt_snapshot['version']=='sales-understanding-prompt/2.8'
+    assert run.prompt_snapshot['version']=='sales-understanding-prompt/2.9'
     assert run.output_snapshot['metadata']['configuration_ref']['version_id']==version.id
     request=json.dumps(agent.infer.call_args.args)
     assert 'LEGACY_SCHEMA_SENTINEL' not in request and 'Sales identity' in request
@@ -398,7 +399,7 @@ def test_exported_real_catalog_through_new_gate_and_versioned_interpreter(index,
         assert held.output_snapshot['metadata']['language_hold'] and not h.model.requests
         _,run=h.turn('Give me information')
         assert run.status=='completed',run.output_snapshot
-        assert run.prompt_snapshot['version']=='sales-understanding-prompt/2.8'
+        assert run.prompt_snapshot['version']=='sales-understanding-prompt/2.9'
         assert len(h.model.requests)==1 and not h.conversation.is_paused
         assert not h.db.query(Meeting).count() and not h.db.query(SalesAssetShare).count()
         assert not h.calendar.calls

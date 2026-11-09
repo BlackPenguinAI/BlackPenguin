@@ -62,9 +62,11 @@ def resolve(db,scope):
         agent,source=published_configuration(db,scope.company_id)
         explicit=agent.get('sales_playbook')
         pack=SalesPlaybook.model_validate(explicit) if explicit else SalesPlaybook()
+        from .profile_intelligence import segment_for
+        segment=segment_for(lead)
         objections=db.query(LeadObjection).filter_by(lead_id=lead.id,status='open').order_by(LeadObjection.created_at.desc(),LeadObjection.id.desc()).limit(3).all()
         selection={'stage':{'key':lead.pipeline_stage,'source':'lead.pipeline_stage'},
-                   'segment':{'key':lead.assigned_segment,'source':'lead.assigned_segment'},
+                   'segment':{'key':segment,'source':'sales_profile.current'},
                    'objections':[{'key':o.objection_type,'source':'lead_objections','record_id':o.id} for o in objections]}
         truncated=[]
         def bounded(label,text):
@@ -85,7 +87,7 @@ def resolve(db,scope):
                   'conversation_protocol':bounded('conversation_protocol',pack.conversation_protocol),
                   'guardrails':bounded('guardrails',agent.get('guardrails_prompt','')),
                   'stage':bounded('stage',(agent.get('stage_prompts') or {}).get(lead.pipeline_stage,'')),
-                  'segment':bounded('segment',(agent.get('segment_prompts') or {}).get(lead.assigned_segment,'')),
+                  'segment':bounded('segment',(agent.get('segment_prompts') or {}).get(segment,'')),
                   'objections':[bounded('objection:'+o.objection_type,(agent.get('objection_prompts') or {})[o.objection_type])
                                 for o in objections if o.objection_type in (agent.get('objection_prompts') or {})],
                   'interpretation_guidance':bounded('interpretation_guidance',(agent.get('runtime_config') or {}).get('understanding_guidance',''))}

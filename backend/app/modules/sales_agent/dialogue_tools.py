@@ -7,6 +7,7 @@ from .dialogue_store import check_scope, DialogueConflict
 from .commercial_context import build_commercial_context
 from app.modules.projects.models import Project
 from pydantic import Field
+from .property_comparison import ComparisonRead
 
 
 class ToolCall(StrictModel):
@@ -17,6 +18,7 @@ class ToolCall(StrictModel):
     property_id: str | None = Field(default=None, max_length=36)
     unit_id: str | None = Field(default=None,max_length=36)
     appointment_query: str | None = Field(default=None,max_length=20)
+    comparison: ComparisonRead | None = None
 
 
 FACTS = {'financing':'payment_methods', 'delivery':'delivery_dates', 'amenities':'amenities', 'location':'exact_address'}
@@ -55,6 +57,13 @@ class ReadTools:
         holds = compliance_action_holds(policy_context(self.db,self.scope,context['confirmed_project_facts']))
         if call.topic.value in holds:
             return result('denied', safe_message='This action needs Sales review under approved guidance; the conversation remains active.')
+        if call.comparison:
+            if call.topic != Topic.catalog or not state.last_understanding or call.comparison.directive != state.last_understanding.comparison:
+                return result('denied',safe_message='Comparison does not match the current request.')
+            from .property_comparison import render
+            text, properties, units = render(call.comparison, context, state, holds)
+            return result('success' if properties or units else 'uncertain', evidence_ids=properties+units,
+                data={'comparison_text':text, 'comparison_property_ids':properties, 'comparison_unit_ids':units})
         if appointment_read:
             from .appointment_context import AppointmentReadTool
             return result('success',data={'appointment_query':AppointmentReadTool(self.db,self.scope).execute({'category':call.appointment_query})})

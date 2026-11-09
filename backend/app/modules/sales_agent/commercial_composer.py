@@ -107,6 +107,14 @@ def select_continuations(*, outcome, commercial, metadata, previous_meta, lead, 
     types = commercial['property_types']
     selected = outcome.state.selected_property_type_id
     topics = {r.topic.value for r in u.requests if r.polarity == 'request'}
+    if u.comparison and topics <= {'catalog'}:
+        add('compare_property', 'Which property options would you like to compare?' if not any(
+            r.data.get('comparison_property_ids') or r.data.get('comparison_unit_ids') for r in outcome.results)
+            else 'Which option would you like to explore further?')
+        return choices
+    if not u.requests and (u.personal_facts or u.preference_withdrawals):
+        add('profile_update', 'What would you like to know about the property?')
+        return choices
     if metadata.get('property_catalog_offer') and len(types) > 1 and selected is None:
         add('choose_property', 'Which property option would you like to explore in more detail?')
         return choices
@@ -167,6 +175,17 @@ async def compose(db, scope, *, inbound, outcome, draft, commercial, lead, metad
     from .turn_memory import build
     guidance = resolve(db, scope)
     blocks = evidence_blocks(draft.text)
+    if not outcome.state.last_understanding.requests:
+        u=outcome.state.last_understanding
+        if metadata.get('profile_capture'):
+            # The scoped capture has completed; no claim that erased audit records
+            # disappeared. Withdrawal suppresses future profile use, not the trace.
+            text='I will leave that information out of your current profile.' if any(
+                row['status']=='withdrawn' for row in metadata['profile_capture']) else 'No problem. You can keep that information private.' if any(
+                row['status']=='declined' for row in metadata['profile_capture']) else 'Thanks for sharing. Personal details are optional.' if any(
+                row['namespace']=='optional' for row in metadata['profile_capture']) else 'Thanks for sharing that information.'
+            blocks.append({'id':'e'+str(len(blocks)), 'required':True,
+                'wordings':{'direct':text,'conversational':text},'source':'scoped_profile_capture'})
     if any(r.data.get('property_types') and len(r.data['property_types']) == 1 for r in outcome.results):
         for result in outcome.results:
             if len(result.data.get('property_types', [])) != 1:

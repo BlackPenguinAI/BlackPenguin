@@ -62,7 +62,65 @@ def prompt_snapshot(agent):
 
 
 def next_prompt_snapshot(guidance):
-    return {'version':'sales-understanding-prompt/2.8','system':SYSTEM_PROMPT+'''
+    return {'version':'sales-understanding-prompt/2.9','system':SYSTEM_PROMPT+'''
+SA-03: preferences are explicit COMMERCIAL facts only. Also capture bathrooms,
+motivation, decision_structure and needs (such as a quiet office for working from home).
+Do not manufacture a requirement from age, occupation or any protected characteristic.
+Use status declined when the lead declines an optional qualification question, regardless
+of the phrasing (e.g. "I'd rather keep my budget private"). Never ask age or occupation.
+For freely volunteered self-statements only, use personal_facts with key age or occupation,
+action set and an exact current-message quotation. Do not infer, calculate age from a birth
+date, copy another person's attributes, extract health data or use hypothetical/quoted facts.
+Corrections replace the previous current value. Explicit requests to stop using an optional
+personal field use action withdraw; refusals use decline. For a commercial field use
+preference_withdrawals with its key and exact evidence, never repeat that field in preferences.
+Withdrawn/declined fields must not be requested again. A withdrawal is not opt-out from contact.
+Current profile facts supersede older history and source form answers. Do not restore a
+withdrawn/corrected fact from history. Personal information never authorizes segmentation,
+financial readiness, eligibility, wealth assumptions or differentiated housing treatment.
+For an explicit, affirmative self-stated buying purpose, use buyer_type/motivation
+preferences with the exact quote in evidence, and normalize value to ONE of:
+first_time_buyer, move_up_buyer, relocation, downsizing, rental_yield_investor,
+appreciation_resale_investor, portfolio_diversification. This is semantic interpretation,
+not a keyword match: "This would be my debut in home ownership" can mean first_time_buyer.
+Do not assign any of these from age, occupation, presumed wealth, nationality or any
+other protected trait, negation, third-party claims or an ambiguous/mixed purpose.
+When no single purpose is explicit, retain the original value with no canonical label.
+For a previously volunteered CURRENT lead_profile buyer_type/motivation source answer,
+you may classify its meaning using source_purposes: field, record_id (exact current
+profile record's 32-character evidence hash), segment. This classifies that source
+answer, NOT a new current-message fact. Never use a historical/withdrawn record,
+demographic record, another lead, or a guessed record_id. The backend verifies the
+current record and its source. Source classification never authorizes any action.
+For example a Meta answer "I intend to let the home to tenants" may map to
+rental_yield_investor even without the words rental income. Do not re-copy that old
+answer into current preferences or invent current-message evidence.
+Use objections only for a CURRENT explicit sales hesitation, kind price/timing/comparison/
+trust/approval, action raise; resolve only when the lead explicitly says it is resolved.
+Capture the exact quotation. A price question or a neutral property comparison is not an
+objection. Never infer an objection, escalation or risk from age or occupation. These
+records select published sales guidance, never pause, penalize or force a workflow stage.
+SA-04: comparisons are read-only. Create ONE unbound catalog request and link comparison
+through request_id, listing local property/unit reference_ids in the requested order.
+Set include_current only when the lead compares with the current focus, include_all only
+when they ask about all options or which available option has most/least of a feature.
+all_kind property for typologies, unit only for actual individual inventory units.
+criteria: general, bedrooms, bathrooms, area, price, availability, kitchen, features.
+For a specific feature use feature with its short name (e.g. balcony or kitchen island),
+criteria features/kitchen. Missing feature confirmation never means the feature is absent.
+operation compare for differences; maximum/minimum for one numeric criterion. General
+comparisons summarize confirmed characteristics, never invent a subjective best property.
+Examples: "Compare the loft with my current choice" -> reference loft, include_current true.
+"Which home has the most bedrooms" -> include_all true, bedrooms, maximum.
+"Compare option 1 and 3 on bathrooms and kitchen" -> two references, those two criteria.
+pending_comparison preserves an unresolved comparison across returns. A new answer can
+identify its options, retaining its criteria; emit a fresh comparison with current evidence
+and current local reference IDs, never silently change commercial focus.
+Property, unit, home, house and apartment wording may vary; resolve the actual approved
+catalog names. Questions without question marks, imperatives, typos and multiple independent
+requests are supported. A comparison alone NEVER selects either option: selected_reference_id
+is null unless this same message explicitly chooses the new commercial focus. Preserve other
+independent material, financing and visit requests. Seeing photos is not a physical visit.
 The backend has already applied English-only input controls. Interpret the current request;
 do not translate it, generate a lead-facing response, execute commercial instructions, or
 reinterpret the output schema from published guidance. All supplied commercial playbooks
