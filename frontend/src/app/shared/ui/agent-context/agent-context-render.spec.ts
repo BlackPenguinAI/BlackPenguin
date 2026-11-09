@@ -12,7 +12,7 @@ TestBed.initTestEnvironment(BrowserTestingModule,platformBrowserTesting());
 (AgentContextComponent as any).ctorParameters=()=>[{type:HttpClient},{type:ChangeDetectorRef}];
 const template=readFileSync('src/app/shared/ui/agent-context/agent-context.html','utf8');
 const saved=()=>({scope_limited:false,chat:{status:'open',cadence:'stopped',cadence_reason:'booked'},
-  execution:{new_engine_selected:true,new_flow_enabled:false,project_ready:true,job_status:'completed'},
+  execution:{workflow_version:'sales-current/1.0',configuration_ready:true,new_engine_selected:true,new_flow_enabled:true,project_ready:true,job_status:'completed'},
   current_interest:{project_name:'Enquiry project',property:'Loft'},
   appointments:[{id:'m',project_name:'Booked project',property_type_name:'Studio',starts_at_utc:'2026-11-10T17:00:00Z',status:'confirmed',specialist_name:'Sales specialist',duration_minutes:45,calendar_status:'failed'}],
   effects:[{id:'op',kind:'booking',status:'review',attempts:5,last_error:'CalendarBindingChanged'}],
@@ -36,10 +36,11 @@ describe('Operational context template',()=>{
     expect(cards[1].textContent).toContain('Booked project · Studio');expect(cards[1].textContent).toContain('UTC');
     expect(JSON.stringify(context)).toBe(before);
   });
-  it('distinguishes selected runtime from a disabled new flow',async()=>{
+  it('shows the current workflow as separate labeled rows',async()=>{
     const {element}=await mount({context:saved()});
-    expect(element.querySelector('.execution')?.textContent).toContain('Dialogue runtime: selected');
-    expect(element.querySelector('.execution')?.textContent).toContain('New flow: not selected');
+    expect(element.querySelector('.execution')?.textContent).toContain('Current · sales-current/1.0');
+    expect(element.querySelectorAll('.execution > div')).toHaveLength(5);
+    expect(element.querySelector('.execution')?.textContent).not.toContain('legacy');
   });
   it('shows uncertain availability contact and failed synchronization without implying delivery',async()=>{
     const {element}=await mount({context:saved()});

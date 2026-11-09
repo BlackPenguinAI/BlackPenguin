@@ -50,7 +50,7 @@ def test_mixed_selection_does_not_bypass_booking_preconditions(case,condition):
 
 
 def test_live_mixed_selection_books_once_and_includes_requested_file(case):
-    from app.modules.sales_agent.live_service import process_live_inbound
+    from app.modules.sales_agent.live_service import _legacy_process_live_inbound as process_live_inbound
     from app.modules.sales_agent.models import SalesMessage
     db,company,project,lead,conversation=case
     approved_asset(case,["brochure"])

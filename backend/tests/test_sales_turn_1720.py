@@ -159,7 +159,7 @@ def test_unbound_number_requires_clarification_instead_of_catalog_or_booking(cas
 
 
 def run_live(case,text,result):
-    from app.modules.sales_agent.live_service import process_live_inbound
+    from app.modules.sales_agent.live_service import _legacy_process_live_inbound as process_live_inbound
     db,company,project,lead,conversation=case
     ids=(conversation.id,lead.id,project.id)
     message=SalesMessage(conversation_id=conversation.id,channel="sms",direction="inbound",role="user",content=text,status="received")

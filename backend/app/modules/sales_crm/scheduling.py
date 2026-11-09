@@ -423,6 +423,10 @@ def create_agent_appointment(
     booking_project_id: str | None = None,
     emit_notification: bool = True,
 ) -> tuple[Meeting, User]:
+    from app.modules.sales_agent.execution import simulation
+    context = simulation()
+    in_simulation = bool(context and context.lead_id == lead.id and context.company_id == lead.company_id)
+    demo = bool(lead.is_demo or in_simulation)
     booking_project_id=booking_project_id or lead.project_id
     if not db.query(Project).filter_by(id=booking_project_id,company_id=lead.company_id).first():
         raise PermissionError('Booking Project is outside the lead Company.')
@@ -446,11 +450,8 @@ def create_agent_appointment(
         eligible_user_ids=[uid for uid in eligible_user_ids if uid==required_sales_user_id]
     if not eligible_user_ids:
         raise HTTPException(status_code=409, detail="That appointment time is no longer available.")
-    assigned_user_id = select_next_sales_user(
-        db,
-        booking_project_id,
-        eligible_user_ids=set(eligible_user_ids),
-        for_appointments=True,
+    assigned_user_id = eligible_user_ids[0] if in_simulation else select_next_sales_user(
+        db, booking_project_id, eligible_user_ids=set(eligible_user_ids), for_appointments=True,
     )
     if not assigned_user_id:
         raise HTTPException(status_code=409, detail="No eligible Sales user is available for this time.")
@@ -479,15 +480,15 @@ def create_agent_appointment(
         duration_minutes=duration_minutes,
         modality=modality,
         confirmation_status="confirmed",
-        calendar_sync_status="simulation_ready" if lead.is_demo and connections else ("pending" if google_connection else "not_connected"),
+        calendar_sync_status="simulation_ready" if demo and connections else ("pending" if google_connection else "not_connected"),
         visit_location_label=selected_location["label"],
         visit_address=selected_location["address"],
         location_confirmation_status="confirmed",
         location_confirmed_at=datetime.utcnow(),
         location_confirmed_by="lead",
         status=MeetingStatus.CONFIRMED,
-        is_demo=bool(lead.is_demo),
-        source="agent_simulation" if lead.is_demo else "agent_sms",
+        is_demo=bool(demo),
+        source="agent_simulation" if demo else "agent_sms",
         notes="Appointment confirmed by the AI Sales Agent.",
     )
     if capture_visit_context or visit_property_type_id or visit_unit_id:
@@ -498,7 +499,7 @@ def create_agent_appointment(
     lead.stage_changed_at = datetime.utcnow()
     db.add_all([meeting, lead])
     db.flush()
-    if emit_notification:enqueue_notification(
+    if emit_notification and not in_simulation:enqueue_notification(
         db, company_id=lead.company_id, project_id=booking_project_id,
         event_type="appointment_confirmed", entity_type="lead", entity_id=lead.id,
         payload={
@@ -510,7 +511,7 @@ def create_agent_appointment(
             "recipient_roles": ["admin", "assistant", "sales"],
         }, dedupe_key=f"appointment-confirmed:{meeting.id}",
     )
-    if google_connection and not lead.is_demo and not defer_calendar:
+    if google_connection and not demo and not defer_calendar:
         location = ", ".join(value for value in (project.name, meeting.visit_address) if value)
         try:
             event = create_calendar_event_for_connection(

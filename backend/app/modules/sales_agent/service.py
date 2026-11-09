@@ -653,7 +653,12 @@ def get_or_create_conversation(db: Session, lead: Lead, *, channel: str) -> Sale
     return conversation
 
 
-async def simulate_turn(
+async def simulate_turn(db, **kwargs):
+    from .current_simulation import turn
+    return await turn(db, **kwargs)
+
+
+async def _legacy_simulate_turn(
     db: Session,
     *,
     company_id: str,
@@ -1046,7 +1051,7 @@ def _response(run: AgentRun, output: dict) -> dict:
         "conversation_id": run.conversation_id,
         "status": run.status,
         "mode": run.mode,
-        "reply": output.get("reply"),
+        "reply": None if output.get("suppress_duplicate_error_reply") else output.get("reply"),
         "intent": output.get("intent"),
         "proposed_actions": output.get("proposed_actions", []),
         "requires_human": bool(output.get("requires_human")),

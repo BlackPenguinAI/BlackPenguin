@@ -91,8 +91,9 @@ def test_false_positive_review_is_visible_audited_and_does_not_repause_same_evid
     assert summary['intervention_cases'][0]['reason']=='HUMAN_REQUESTED'
     assert summary['can_resume']
     before=agent.db.query(SalesMessage).count()
-    set_conversation_action(agent.db,company_id=agent.company.id,conversation_id=agent.conversation.id,action='resume',
-        actor_user_id=actor.id,review_case_id=incident.id,false_positive=True,review_note='Reviewed with the lead: continue with AI.')
+    with patch('app.modules.sales_agent.next_flow.selected',return_value=agent.current_flow):
+        set_conversation_action(agent.db,company_id=agent.company.id,conversation_id=agent.conversation.id,action='resume',
+            actor_user_id=actor.id,review_case_id=incident.id,false_positive=True,review_note='Reviewed with the lead: continue with AI.')
     assert not agent.conversation.is_paused and incident.status=='false_positive'
     assert incident.resolved_by_user_id==actor.id and incident.resolved_at
     assert agent.db.query(SalesMessage).count()==before  # no replay or unsolicited resend

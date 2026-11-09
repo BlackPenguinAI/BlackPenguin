@@ -189,27 +189,8 @@ class Understanding(StrictModel):
         return self
 
     def check_evidence(self, inbound: str):
-        evidence = [r.evidence for r in self.requests] + [c.evidence for c in self.constraints]
-        evidence += [g.evidence for g in self.alternatives] + [r.evidence for r in self.references]
-        evidence += [p.evidence for p in self.preferences]
-        evidence += [r.evidence for r in self.releases]
-        if self.visit:
-            evidence.append(self.visit.evidence)
-            if self.visit.timing:
-                evidence.extend(v for k,v in self.visit.timing.model_dump().items() if k!='time_relation' and v is not None)
-        if self.reschedule:
-            evidence.append(self.reschedule.evidence)
-            evidence.extend(v for k,v in self.reschedule.model_dump().items() if k not in {'action','evidence','timing'} and v)
-            if self.reschedule.timing:evidence.extend(v for k,v in self.reschedule.timing.model_dump().items() if k!='time_relation' and v is not None)
-        if self.cancellation:
-            evidence.extend(v for k,v in self.cancellation.model_dump().items() if k!='action' and v)
-        if self.wait:
-            evidence.append(self.wait.evidence)
-            if self.wait.timing:evidence.extend(v for k,v in self.wait.timing.model_dump().items() if k!='time_relation' and v is not None)
-        if self.moderation:evidence.append(self.moderation.evidence)
-        if self.courtesy:evidence.append(self.courtesy.evidence)
-        if any(not item.strip() or item not in inbound for item in evidence):
-            raise ValueError('Evidence must be an exact non-empty substring of the current message.')
+        from .evidence import anchor
+        anchor(self.model_dump(mode='json'), inbound)
         return self
 
     def permits(self, topic: Topic | str, subject: str | None = None) -> bool:
@@ -362,4 +343,7 @@ def parse(raw, inbound):
         payload = json.loads(raw, object_pairs_hook=pairs)
     except RecursionError as exc:
         raise ValueError('Understanding JSON is nested too deeply.') from exc
-    return Understanding.model_validate(payload).check_evidence(inbound)
+    from .evidence import anchor
+    validated = Understanding.model_validate(payload)
+    anchored = anchor(validated.model_dump(mode='json'), inbound, repair_format=True)
+    return Understanding.model_validate(anchored).check_evidence(inbound)

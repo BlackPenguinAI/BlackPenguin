@@ -1,6 +1,7 @@
 """Production SMS workflow sharing the same LangGraph and CRM services as simulation."""
 
 from __future__ import annotations
+from .execution import now as workflow_now
 
 from datetime import datetime, timedelta
 from copy import deepcopy
@@ -224,7 +225,7 @@ def get_or_create_live_conversation(db: Session, lead: Lead, *, provider: str | 
             if not context:
                 context = SalesConversationLeadContext(conversation_id=existing.id, lead_id=lead.id)
             context.is_active = True
-            context.activated_at = datetime.utcnow()
+            context.activated_at = workflow_now(datetime)
             db.add(context)
             existing.lead_id = lead.id
             existing.project_id = lead.project_id
@@ -232,7 +233,7 @@ def get_or_create_live_conversation(db: Session, lead: Lead, *, provider: str | 
             existing.stage = "new"
             existing.is_paused = False
             existing.pause_reason = None
-            existing.updated_at = datetime.utcnow()
+            existing.updated_at = workflow_now(datetime)
             db.add(existing); db.flush()
             return existing, True
         return existing, False
@@ -268,7 +269,7 @@ def _initial_message(lead: Lead, project: Project, campaign: ProjectCampaign | N
 
 def _whatsapp_customer_window_open(db: Session, conversation: SalesConversation) -> bool:
     """WhatsApp free-form replies are allowed for 24 hours after an inbound message."""
-    cutoff = datetime.utcnow() - timedelta(hours=24)
+    cutoff = workflow_now(datetime) - timedelta(hours=24)
     return db.query(SalesMessage.id).filter(
         SalesMessage.conversation_id == conversation.id,
         SalesMessage.channel == "whatsapp",
@@ -294,7 +295,8 @@ async def _dispatch(
         content = render_channel_text(content, conversation.channel)
         if agent_run_id:
             project = db.query(Project).filter_by(id=conversation.project_id, company_id=conversation.company_id).one()
-            if project.profile and details.get('control_outcome') != 'opt_out': require_capability(project.profile)
+            from .execution import simulated
+            if project.profile and details.get('control_outcome') != 'opt_out' and not (simulated(conversation) and project.is_demo): require_capability(project.profile)
             commercial = build_commercial_context(db, project=project, company_id=conversation.company_id, lead_id=lead.id, channel=conversation.channel)
             before = content
             content, evidence = validate_monetary_reply(content, commercial, lead_profile=lead.lead_profile_data)
@@ -350,12 +352,33 @@ async def _dispatch(
     return last
 
 
+def _simulation_message(db, conversation, content, role, run_id, metadata, key):
+    # Durable in-app receipt only: no provider, sender, webhook or outbox writer.
+    existing=db.query(SalesMessage).filter_by(conversation_id=conversation.id,provider_message_id=key).first() if key else None
+    if existing:return existing
+    latest=db.query(SalesMessage).filter_by(conversation_id=conversation.id).order_by(SalesMessage.created_at.desc()).first()
+    timestamp=max(workflow_now(datetime), latest.created_at+timedelta(microseconds=1)) if latest else workflow_now(datetime)
+    row=SalesMessage(conversation_id=conversation.id,channel='simulation',direction='outbound',role=role,
+        content=content,status='sent',provider_message_id=key,
+        metadata_json={**(metadata or {}),'simulation':True,'delivery_kind':'in_app_only','lead_id':conversation.lead_id},
+        created_at=timestamp)
+    db.add(row);db.commit();return row
+
+
 async def _dispatch_part(
     db: Session, *, conversation: SalesConversation, lead: Lead, content: str,
     role: str, agent_run_id: str | None, author_user_id: str | None = None,
     metadata: dict | None = None,
     idempotency_key: str | None = None,
 ) -> SalesMessage:
+    from .execution import simulated
+    if conversation.channel == 'simulation':
+        if not simulated(conversation):
+            raise PermissionError('Simulation delivery requires its scoped adapter.')
+        if (metadata or {}).get('engine') == 'sales-active/1.0':
+            from .active_service import authorize_part
+            authorize_part(db,conversation,lead,metadata or {})
+        return _simulation_message(db, conversation, content, role, agent_run_id, metadata, idempotency_key)
     message_metadata = dict(metadata or {})
     if message_metadata.get('wait_request_id'):
         from .wait_service import authorize_part as authorize_wait_part
@@ -474,12 +497,12 @@ async def _dispatch_part(
         provider=conversation.provider,
         recipient=lead.phone, content=persisted_content, status="queued",
         approved_by_user_id=author_user_id,
-        approved_at=datetime.utcnow() if author_user_id else None,
+        approved_at=workflow_now(datetime) if author_user_id else None,
     )
     message = message or SalesMessage(
         conversation_id=conversation.id, channel=conversation.channel, direction="outbound", role=role,
         author_user_id=author_user_id, content=persisted_content, status="queued",
-        metadata_json=message_metadata, created_at=datetime.utcnow(),
+        metadata_json=message_metadata, created_at=workflow_now(datetime),
     )
     db.add_all([outbound, message]); db.flush()
     # Provider failures have no provider_message_id. Keep the durable queue
@@ -523,7 +546,7 @@ async def _dispatch_part(
         raise
     sid = result.get("sid")
     status = result.get("status") or "queued"
-    outbound.provider_message_id = sid; outbound.status = status; outbound.sent_at = datetime.utcnow()
+    outbound.provider_message_id = sid; outbound.status = status; outbound.sent_at = workflow_now(datetime)
     message.provider_message_id = sid; message.status = status
     for share in db.query(SalesAssetShare).filter(SalesAssetShare.id.in_(share_ids)).all() if share_ids else []:
         asset_share_service.record_event(db, share=share, event_type="message_dispatched")
@@ -768,7 +791,7 @@ def _execute_share_actions(
                 db.flush()
             else:
                 conversation.pending_asset_id = selected["asset_id"]
-                conversation.pending_asset_offered_at = datetime.utcnow()
+                conversation.pending_asset_offered_at = workflow_now(datetime)
                 db.add(conversation)
                 db.flush()
                 actions = [
@@ -882,7 +905,7 @@ def _execute_share_actions(
         alternatives = [item for item in approved.values() if item.get("has_file") and item.get("asset_type") in {"brochure", "unit_sheet"}]
         if alternatives:
             item = alternatives[0]
-            conversation.pending_asset_id = item["asset_id"]; conversation.pending_asset_offered_at = datetime.utcnow()
+            conversation.pending_asset_id = item["asset_id"]; conversation.pending_asset_offered_at = workflow_now(datetime)
             offer_details["asset_ids"] = [item["asset_id"]]
             reply = f"{_reconcile_shared_asset_reply(reply)}\n\nI don't have a separately approved resource matching all requested content. I can offer {item.get('name') or 'the approved Project file'}, containing {', '.join(sorted(_asset_tags(item))).replace('_', ' ')}. Would you like that link?"
         else:
@@ -903,6 +926,7 @@ def material_request_text(inbound, result):
 
 
 def _schedule_next_action(db: Session, conversation: SalesConversation, lead: Lead, event_id: str, *, refresh_pending=False) -> None:
+    if conversation.channel == 'simulation':return
     if lead.is_opt_out or conversation.is_paused:
         return
     from .first_booking import cadence_stopped
@@ -917,7 +941,7 @@ def _schedule_next_action(db: Session, conversation: SalesConversation, lead: Le
     hours = delays.get(lead.intent_tier, 72)
     project = db.query(Project).filter(Project.id == conversation.project_id).first()
     scheduled_at = next_cadence_time(
-        now=datetime.utcnow(), timezone_name=project.timezone if project else "UTC", delay_hours=hours,
+        now=workflow_now(datetime), timezone_name=project.timezone if project else "UTC", delay_hours=hours,
     )
     scheduled_at = max(scheduled_at, next_allowed_proactive_time(
         db, company_id=conversation.company_id, project_id=conversation.project_id, now=scheduled_at,
@@ -998,14 +1022,14 @@ def prepare_meta_simulation(db: Session, lead: Lead) -> tuple[SalesConversation,
             "lead_id": lead.id,
             "project_id": project.id,
         },
-        created_at=datetime.utcnow(),
+        created_at=workflow_now(datetime),
     )
     lead.agent_status = "simulation"
     lead.funnel_stage = FunnelStage.CONTACTED
     lead.pipeline_stage = "S01_RESEARCH"
-    lead.last_interaction_at = datetime.utcnow()
+    lead.last_interaction_at = workflow_now(datetime)
     conversation.stage = "contacted"
-    conversation.updated_at = datetime.utcnow()
+    conversation.updated_at = workflow_now(datetime)
     db.add_all([lead, conversation, message])
     db.commit()
     db.refresh(message)
@@ -1029,9 +1053,9 @@ async def launch_live_lead(db: Session, lead: Lead) -> tuple[SalesConversation |
     if not should_send and prior_message_count:
         return conversation, None
     allowed_at = next_allowed_proactive_time(
-        db, company_id=lead.company_id, project_id=lead.project_id, now=datetime.utcnow(),
+        db, company_id=lead.company_id, project_id=lead.project_id, now=workflow_now(datetime),
     )
-    if allowed_at > datetime.utcnow():
+    if allowed_at > workflow_now(datetime):
         if not db.query(SalesFollowUpJob).filter(
             SalesFollowUpJob.conversation_id == conversation.id,
             SalesFollowUpJob.status == "pending",
@@ -1058,7 +1082,7 @@ async def launch_live_lead(db: Session, lead: Lead) -> tuple[SalesConversation |
         idempotency_key=f"live-initial:{lead.id}",
     )
     lead.agent_status = "active"; lead.funnel_stage = FunnelStage.CONTACTED
-    lead.pipeline_stage = "S01_RESEARCH"; lead.last_interaction_at = datetime.utcnow()
+    lead.pipeline_stage = "S01_RESEARCH"; lead.last_interaction_at = workflow_now(datetime)
     _schedule_next_action(db, conversation, lead, f"initial:{lead.id}")
     db.commit()
     return conversation, message
@@ -1084,7 +1108,7 @@ def _prepare_run(
                               "prompt_snapshot": existing.prompt_snapshot,
                               "output_snapshot": existing.output_snapshot}
     run = existing or AgentRun(
-        conversation_id=conversation.id, event_id=event_id, mode="live",
+        conversation_id=conversation.id, event_id=event_id, mode="simulation" if conversation.channel == "simulation" else "live",
         graph_version=GRAPH_VERSION, toolset_version=TOOLSET_VERSION,
         prompt_snapshot={}, model=model, input_snapshot={"message_id": message_id},
     )
@@ -1116,7 +1140,7 @@ async def _process_deterministic_appointment_turn(
     allow_new_request: bool = False,
 ) -> bool:
     """Own appointment continuations; new requests are classified by the Sales Agent."""
-    now = datetime.utcnow()
+    now = workflow_now(datetime)
     selected = _offered_slot_selection(
         db, conversation_id=conversation.id, inbound_text=inbound.content,
         project=project, now=now,
@@ -1180,9 +1204,9 @@ async def _process_deterministic_appointment_turn(
         "response_policy_trace":{"route":"verified_offer_continuation", "active_offer":turn_context(db, conversation, lead)},
     }
     run.status = "completed"
-    run.completed_at = datetime.utcnow()
-    conversation.updated_at = datetime.utcnow()
-    lead.last_interaction_at = datetime.utcnow()
+    run.completed_at = workflow_now(datetime)
+    conversation.updated_at = workflow_now(datetime)
+    lead.last_interaction_at = workflow_now(datetime)
     db.add_all([run, conversation, lead]); db.commit()
     await _dispatch(
         db, conversation=conversation, lead=lead, content=reply,
@@ -1224,7 +1248,7 @@ def _execute_classified_appointment_request(
     )
     if not location_ready:
         return location_question, [{"type": "request_visit_location"}], []
-    selected = _classified_slot_selection(db,conversation=conversation,project=project,inbound_text=inbound.content,result=result or {},now=datetime.utcnow())
+    selected = _classified_slot_selection(db,conversation=conversation,project=project,inbound_text=inbound.content,result=result or {},now=workflow_now(datetime))
     if selected:
         try:
             reply, actions = _book_live_slot(db,conversation=conversation,lead=lead,project=project,selected=selected)
@@ -1235,7 +1259,7 @@ def _execute_classified_appointment_request(
         db,
         project=project,
         inbound_text=location_resume or inbound.content,
-        now=datetime.utcnow(),
+        now=workflow_now(datetime),
     )
     actions: list[dict] = [{"type": "request_available_slots"}]
     if offered_slots:
@@ -1245,17 +1269,29 @@ def _execute_classified_appointment_request(
 
 
 async def process_live_inbound(conversation_id: str, inbound_message_id: str) -> None:
+    """Only the deployed coordinator can process live inbound work."""
+    db = SessionLocal()
+    try:
+        conversation = db.query(SalesConversation).filter_by(id=conversation_id).with_for_update().first()
+        inbound = db.query(SalesMessage).filter_by(id=inbound_message_id, conversation_id=conversation_id).first()
+        if not conversation or not inbound:
+            return
+        from .active_service import maybe_process_active
+        if not await maybe_process_active(db, conversation, inbound):
+            raise RuntimeError('The current Sales coordinator did not handle this event.')
+    finally:
+        db.close()
+
+
+async def _legacy_process_live_inbound(conversation_id: str, inbound_message_id: str) -> None:
     db = SessionLocal()
     try:
         conversation = db.query(SalesConversation).filter(SalesConversation.id == conversation_id).with_for_update().first()
         inbound = db.query(SalesMessage).filter(SalesMessage.id == inbound_message_id).first()
         if not conversation or not inbound:
             return
-        # Active cohorts never fall back to the legacy graph, including retries
-        # of already-persisted booking/control replies.
-        from .active_service import maybe_process_active
-        if await maybe_process_active(db, conversation, inbound):
-            return
+        # Historical pipeline retained for explicit compatibility tests only.
+        # No production router, worker or setting selects this helper.
         lead = db.query(Lead).filter(Lead.id == conversation.lead_id, Lead.company_id == conversation.company_id).one()
         project = db.query(Project).filter(Project.id == conversation.project_id, Project.company_id == conversation.company_id).one()
         if lead.is_opt_out:
@@ -1340,7 +1376,7 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
                 "reply": reply, "proposed_actions": actions,
                 "requires_human": False, "policy_violations": [], "error_code": None,
             }
-            run.status = "completed"; run.completed_at = datetime.utcnow()
+            run.status = "completed"; run.completed_at = workflow_now(datetime)
             db.add(run); db.commit()
             await _dispatch(
                 db, conversation=conversation, lead=lead, content=reply,
@@ -1477,8 +1513,8 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
             "handoff_persisted": bool(intervention_case),
             "appointment_offer": appointment_offer,
         }
-        run.status = "blocked" if result.get("requires_human") else "completed"; run.completed_at = datetime.utcnow()
-        conversation.updated_at = datetime.utcnow(); lead.last_interaction_at = datetime.utcnow()
+        run.status = "blocked" if result.get("requires_human") else "completed"; run.completed_at = workflow_now(datetime)
+        conversation.updated_at = workflow_now(datetime); lead.last_interaction_at = workflow_now(datetime)
         db.add_all([run, conversation, lead]); db.commit()
         # The LLM call runs without holding a database lock. Re-lock immediately
         # before dispatch so an administrator taking manual control wins the race.
@@ -1523,7 +1559,7 @@ async def process_live_inbound(conversation_id: str, inbound_message_id: str) ->
             run.status = "failed"
             run.error_code = type(exc).__name__[:80]
             run.output_snapshot = {**(run.output_snapshot or {}), "safe_error": "Agent turn processing failed."}
-            run.completed_at = datetime.utcnow()
+            run.completed_at = workflow_now(datetime)
             db.commit()
         raise
     finally:
@@ -1545,7 +1581,7 @@ async def process_live_inbound_job(job_id: str) -> None:
         job = db.query(SalesInboundJob).filter(SalesInboundJob.id == job_id).one()
         message = db.query(SalesMessage).filter(SalesMessage.id == job.message_id).one()
         job.status = "processed"
-        job.processed_at = datetime.utcnow()
+        job.processed_at = workflow_now(datetime)
         job.error_code = None
         job.error_message = None
         message.metadata_json = {
@@ -1561,7 +1597,7 @@ async def process_live_inbound_job(job_id: str) -> None:
             ).first()
             if event:
                 event.status = "processed"
-                event.processed_at = datetime.utcnow()
+                event.processed_at = workflow_now(datetime)
         db.commit()
     except Exception as exc:
         db.rollback()
@@ -1570,7 +1606,7 @@ async def process_live_inbound_job(job_id: str) -> None:
             terminal = (job.attempt_number or 0) >= 3
             job.status = "failed" if terminal else "retry"
             job.claimed_at = None
-            job.scheduled_at = datetime.utcnow() + timedelta(minutes=5 if (job.attempt_number or 0) > 1 else 1)
+            job.scheduled_at = workflow_now(datetime) + timedelta(minutes=5 if (job.attempt_number or 0) > 1 else 1)
             job.error_code = type(exc).__name__[:80]
             job.error_message = "Agent turn processing failed. Retry is available."
             message = db.query(SalesMessage).filter(SalesMessage.id == job.message_id).first()
@@ -1610,7 +1646,7 @@ def retry_failed_inbound_turn(
         raise HTTPException(status_code=409, detail="This conversation has no failed agent turn to retry.")
     job.status = "retry"
     job.attempt_number = 0
-    job.scheduled_at = datetime.utcnow()
+    job.scheduled_at = workflow_now(datetime)
     job.claimed_at = None
     job.processed_at = None
     job.error_code = None
@@ -1648,7 +1684,7 @@ async def send_manual_message(db: Session, *, conversation_id: str, company_id: 
         db, company_id=conversation.company_id, project_id=conversation.project_id,
     )
     if policy and policy.is_enabled and policy.enforce_manual_messages:
-        now = datetime.utcnow()
+        now = workflow_now(datetime)
         allowed_at = next_allowed_proactive_time(
             db, company_id=conversation.company_id, project_id=conversation.project_id, now=now,
         )
@@ -1666,7 +1702,7 @@ async def send_manual_message(db: Session, *, conversation_id: str, company_id: 
     # Preserve the incident's original reason while staff reply to the lead.
     if not (conversation.pause_reason or '').startswith('Human intervention:'):
         conversation.pause_reason = "Manual control active"
-    conversation.updated_at = datetime.utcnow(); db.commit()
+    conversation.updated_at = workflow_now(datetime); db.commit()
     return message
 
 
@@ -1686,25 +1722,25 @@ async def process_live_followup_job(job_id: str) -> None:
         ).one()
         from .first_booking import cadence_stopped
         if conversation.channel not in {"sms", "whatsapp"} or conversation.is_paused or lead.is_opt_out or cadence_stopped(db,conversation):
-            job.status = "cancelled"; job.processed_at = datetime.utcnow(); db.commit(); return
+            job.status = "cancelled"; job.processed_at = workflow_now(datetime); db.commit(); return
         if conversation.channel == "whatsapp" and not _whatsapp_customer_window_open(db, conversation):
             # Re-engagement outside the customer-service window requires a
             # separately approved template; never attempt an illegal free-form send.
-            job.status = "cancelled"; job.processed_at = datetime.utcnow(); db.commit(); return
+            job.status = "cancelled"; job.processed_at = workflow_now(datetime); db.commit(); return
         dispatch_key = f"{conversation.provider}-followup:{job.id}"
         if db.query(OutboundMessage).filter(OutboundMessage.idempotency_key == dispatch_key).first():
-            job.status = "processed"; job.processed_at = datetime.utcnow(); db.commit(); return
+            job.status = "processed"; job.processed_at = workflow_now(datetime); db.commit(); return
         project = db.query(Project).filter(
             Project.id == conversation.project_id,
             Project.company_id == conversation.company_id,
         ).one()
         from .active_service import active_followup_requires_review
         if active_followup_requires_review(db,conversation):
-            job.status='cancelled'; job.processed_at=datetime.utcnow(); db.commit(); return
+            job.status='cancelled'; job.processed_at=workflow_now(datetime); db.commit(); return
         allowed_at = next_allowed_proactive_time(
-            db, company_id=conversation.company_id, project_id=conversation.project_id, now=datetime.utcnow(),
+            db, company_id=conversation.company_id, project_id=conversation.project_id, now=workflow_now(datetime),
         )
-        if allowed_at > datetime.utcnow():
+        if allowed_at > workflow_now(datetime):
             job.status = "pending"; job.scheduled_at = allowed_at; db.commit(); return
         event_id = f"followup:{job.id}"
         run = AgentRun(
@@ -1717,20 +1753,9 @@ async def process_live_followup_job(job_id: str) -> None:
         db.add(run); db.commit(); db.refresh(run)
         from .active_service import active_followup_result, ENGINE
         result = active_followup_result(db, conversation)
-        if result is not None:
-            run.graph_version = ENGINE
-            run.toolset_version = 'sales-actions/1.0'
-        else:
-            result = await build_sales_graph(db).ainvoke({
-                "event_id": event_id, "mode": "live", "conversation_id": conversation.id,
-                "company_id": lead.company_id, "project_id": project.id,
-                "campaign_id": lead.campaign_id, "lead_id": lead.id, "channel": conversation.channel,
-                "inbound_text": (
-                    "Write the next concise, helpful SMS follow-up based only on the verified context and chat. "
-                    "Do not invent urgency, inventory, price or availability. Include a simple question and opt-out language."
-                ),
-                "event_kind": "scheduled_follow_up", "requires_human": False, "policy_violations": [],
-            })
+        if result is None:
+            raise RuntimeError('The current Sales coordinator did not handle this follow-up.')
+        run.graph_version=ENGINE;run.toolset_version='sales-actions/1.0'
         result = apply_escalation_policy(result, inbound="", routing=((get_ai_config(db, None).agent_ventas or {}).get("intent_routing_config") or {}), event_kind="scheduled_follow_up")
         decision = result["escalation_decision"]
         reply = result.get("proposed_reply")
@@ -1760,7 +1785,7 @@ async def process_live_followup_job(job_id: str) -> None:
             "blocked" if result.get("requires_human") else "failed"
         )
         run.error_code = result.get("error_code")
-        run.completed_at = datetime.utcnow()
+        run.completed_at = workflow_now(datetime)
         db.add(run); db.commit()
         db.expire(conversation)
         conversation = db.query(SalesConversation).filter(
@@ -1768,14 +1793,14 @@ async def process_live_followup_job(job_id: str) -> None:
         ).populate_existing().with_for_update().one()
         if not reply or result.get("requires_human") or conversation.is_paused or lead.is_opt_out:
             job.status = "cancelled" if conversation.is_paused or lead.is_opt_out else "failed"
-            job.processed_at = datetime.utcnow(); db.commit(); return
+            job.processed_at = workflow_now(datetime); db.commit(); return
         await _dispatch(
             db, conversation=conversation, lead=lead, content=reply, role="assistant",
             agent_run_id=run.id, metadata={"event_kind": "scheduled_follow_up", "reason": job.reason, "engine":run.graph_version},
             idempotency_key=dispatch_key,
         )
-        job.status = "processed"; job.processed_at = datetime.utcnow()
-        lead.last_interaction_at = datetime.utcnow()
+        job.status = "processed"; job.processed_at = workflow_now(datetime)
+        lead.last_interaction_at = workflow_now(datetime)
         if lead.pipeline_stage not in {"S07_OBJECTION", "S08_APPOINTMENT", "S09_HANDOFF"}:
             lead.pipeline_stage = "S06_NURTURE"
         _schedule_next_action(db, conversation, lead, event_id)
@@ -1786,7 +1811,7 @@ async def process_live_followup_job(job_id: str) -> None:
         if job:
             job.status = "failed" if job.attempt_number >= 3 else "pending"
             job.attempt_number += 1
-            job.scheduled_at = datetime.utcnow() + timedelta(minutes=5)
+            job.scheduled_at = workflow_now(datetime) + timedelta(minutes=5)
             db.commit()
         raise
     finally:

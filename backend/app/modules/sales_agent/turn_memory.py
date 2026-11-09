@@ -1,4 +1,6 @@
 """Bounded structured memory and expiring proposals; never mutate a reservation."""
+from .execution import now as workflow_now
+
 from datetime import datetime,timezone,timedelta
 from .understanding_contract import ChangeProposal,TurnMemory
 from .turn_configuration import digest
@@ -36,7 +38,7 @@ def validate_proposal_scope(db,scope,proposal,*,check_target=True):
 
 def propose(db,scope,*,expected_revision,event_key,proposal,now=None):
     from .dialogue_store import load,save
-    now=utc(now or datetime.now(timezone.utc))
+    now=utc(now or workflow_now(datetime).replace(tzinfo=timezone.utc))
     proposal=ChangeProposal.model_validate(proposal)
     meeting=validate_proposal_scope(db,scope,proposal,check_target=False)
     from .dialogue_store import check_scope,DialogueConflict
@@ -100,7 +102,7 @@ def build(db,scope,*,inbound_message_id,now=None):
     from .lead_profile import resolve,for_context
     from .turn_context import latest_outbound
     from app.modules.sales_crm.models import Lead
-    now=utc(now or datetime.now(timezone.utc))
+    now=utc(now or workflow_now(datetime).replace(tzinfo=timezone.utc))
     with db.no_autoflush:
         conversation=check_scope(db,scope)
         inbound=scoped_messages_query(db,conversation).filter_by(id=inbound_message_id,role='user',direction='inbound').one()

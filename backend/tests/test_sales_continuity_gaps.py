@@ -197,7 +197,7 @@ def test_simulation_keeps_uncertain_consent_out_of_proactive_followups():
     import asyncio,json
     from unittest.mock import AsyncMock,patch
     from test_sales_agent_simulation_flow import _db,_fixture,_start
-    from app.modules.sales_agent.service import simulate_turn
+    from app.modules.sales_agent.service import _legacy_simulate_turn as simulate_turn
     from app.modules.sales_agent.models import SalesFollowUpJob
     db=_db();company,_,admin,_,_,project,campaign,product=_fixture(db)
     initial=_start(db,company,admin,project,campaign,product)
@@ -213,7 +213,7 @@ def test_simulation_human_control_does_not_get_reset_or_schedule_new_followups()
     import asyncio,json
     from unittest.mock import AsyncMock,patch
     from test_sales_agent_simulation_flow import _db,_fixture,_start
-    from app.modules.sales_agent.service import simulate_turn
+    from app.modules.sales_agent.service import _legacy_simulate_turn as simulate_turn
     from app.modules.sales_agent.models import SalesFollowUpJob
     db=_db();company,_,admin,_,_,project,campaign,product=_fixture(db)
     initial=_start(db,company,admin,project,campaign,product)
@@ -228,7 +228,7 @@ def test_simulation_human_control_does_not_get_reset_or_schedule_new_followups()
 def test_live_uncertain_consent_does_not_invoke_cadence_scheduling(case):
     import asyncio
     from unittest.mock import AsyncMock,patch
-    from app.modules.sales_agent.live_service import process_live_inbound
+    from app.modules.sales_agent.live_service import _legacy_process_live_inbound as process_live_inbound
     from app.modules.sales_agent.models import SalesMessage
     db,company,project,lead,conversation=case
     msg=SalesMessage(conversation_id=conversation.id,channel="sms",direction="inbound",role="user",content="Maybe stop those offers?",status="received")
@@ -245,7 +245,7 @@ def test_simulated_numeric_choice_cannot_book_during_consent_clarification():
     from datetime import timedelta
     from unittest.mock import AsyncMock,patch
     from test_sales_agent_simulation_flow import _db,_fixture,_start
-    from app.modules.sales_agent.service import simulate_turn
+    from app.modules.sales_agent.service import _legacy_simulate_turn as simulate_turn
     from app.modules.sales_agent.models import SalesMessage,SalesAgentSimulation
     db=_db();company,_,admin,_,_,project,campaign,product=_fixture(db)
     initial=_start(db,company,admin,project,campaign,product)

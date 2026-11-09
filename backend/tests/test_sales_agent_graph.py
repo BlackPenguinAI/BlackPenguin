@@ -10,7 +10,7 @@ from app.modules.ai_core.models import AIConfiguration
 from app.modules.companies.models import Company
 from app.modules.demo_projects.service import provision_demo_project
 from app.modules.sales_agent.models import OutboundMessage
-from app.modules.sales_agent.service import simulate_turn
+from app.modules.sales_agent.service import _legacy_simulate_turn as simulate_turn
 from app.modules.sales_crm.models import Lead
 from app.modules.users.models import User, UserRole
 

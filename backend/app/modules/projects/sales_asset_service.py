@@ -239,6 +239,8 @@ def archive(db: Session, item: ProjectSalesAsset, *, user_id: str | None = None)
 def approved_for_turn(
     db: Session, *, project_id: str, company_id: str, channel: str,
 ) -> list[ProjectSalesAsset]:
+    from app.modules.sales_agent.execution import channel as execution_channel
+    channel = execution_channel(channel)
     now = datetime.utcnow()
     rows = db.query(ProjectSalesAsset).join(
         ProjectOnboardingSource, ProjectOnboardingSource.id == ProjectSalesAsset.source_id,

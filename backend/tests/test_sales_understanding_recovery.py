@@ -23,7 +23,7 @@ def test_observed_response_remains_rejected_and_prompt_teaches_valid_example():
     example = SYSTEM_PROMPT.split('Output: ', 1)[1].split('\n', 1)[0]
     result = parse(example, TEXT)
     assert result.permits('inventory') and result.requests[0].subject is None
-    assert PROMPT_VERSION == 'sales-understanding-prompt/1.3'
+    assert PROMPT_VERSION == 'sales-understanding-prompt/1.4'
 
 
 def test_repair_recovers_available_properties_and_retry_does_not_resend(agent):

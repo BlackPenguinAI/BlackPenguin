@@ -20,7 +20,7 @@ from app.modules.project_team.models import ProjectUserAssignment
 from app.modules.projects.models import Project, ProjectCampaign, ProjectProfile, ProjectPropertyType, ProjectUnit
 from app.modules.sales_agent.models import SalesAgentSimulation, SalesConversation, SalesFollowUpJob, SalesMessage
 from app.modules.sales_agent.schemas import SimulationLeadForm
-from app.modules.sales_agent.service import _confirm_or_request_location, simulate_turn
+from app.modules.sales_agent.service import _confirm_or_request_location, _legacy_simulate_turn as simulate_turn
 from app.modules.sales_agent.simulation_service import (
     advance_simulation,
     confirm_simulation_appointment,
@@ -63,6 +63,12 @@ FALSE_CONFIRMATION_REPLY = (
     '"proposed_actions":[{"type":"appointment_confirmed"}],'
     '"requires_human":false,"reason":"Lead agreed"}'
 )
+
+
+@pytest.fixture(autouse=True)
+def historical_simulation_proposal_contract(monkeypatch):
+    from app.modules.sales_agent import simulation_service
+    monkeypatch.setattr(simulation_service, 'simulate_turn', simulate_turn)
 
 
 def _db():

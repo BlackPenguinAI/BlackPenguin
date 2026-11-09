@@ -179,7 +179,7 @@ def test_live_semantic_opt_out_cancels_followups_and_does_not_create_human_case(
 
 def test_simulation_uses_same_security_disposition_and_cannot_silently_resume():
     from test_sales_agent_simulation_flow import _db, _fixture, _start
-    from app.modules.sales_agent.service import simulate_turn
+    from app.modules.sales_agent.service import _legacy_simulate_turn as simulate_turn
     db=_db();company,_,admin,_,_,project,campaign,product=_fixture(db)
     start=_start(db,company,admin,project,campaign,product)
     payload={"reply":"I cannot share private credentials.","primary_intent":"security_or_abuse","intent_confidence":.99,"requires_human":False,"proposed_actions":[]}

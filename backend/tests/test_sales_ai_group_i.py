@@ -241,10 +241,10 @@ def test_operating_window_defers_proactive_contact(agent):
     assert agent.send.await_count==before
 
 
-def test_disabled_cohort_never_claims_or_sends_wait(agent,monkeypatch):
+def test_retired_cohort_filter_does_not_disable_current_wait(agent,monkeypatch):
     row,starts=registered(agent);add_block(agent,starts);before=agent.send.await_count
     monkeypatch.setattr(settings,'SALES_NEXT_FLOW_PROJECT_IDS','');worker(agent)
-    assert row.status=='waiting' and agent.send.await_count==before
+    assert row.status=='notified' and agent.send.await_count>before
 
 
 def test_provider_known_rejection_retries_stable_parts_without_new_booking(agent):
@@ -420,7 +420,8 @@ def test_bounded_wait_checks_rotate_across_entire_requested_range(agent):
 def test_scope_revoked_at_last_dispatch_boundary_never_sends(agent,monkeypatch):
     row,starts=registered(agent);add_block(agent,starts);original=wait_service.authorize_part;before=agent.send.await_count
     def revoked(db,conversation,lead,metadata,content,**kw):
-        if kw.get('before_provider'):monkeypatch.setattr(settings,'SALES_NEXT_FLOW_PROJECT_IDS','')
+        if kw.get('before_provider'):
+            lead.consent_status='withdrawn';db.commit()
         return original(db,conversation,lead,metadata,content,**kw)
     with patch.object(wait_service,'authorize_part',side_effect=revoked):worker(agent)
     assert row.status=='closed' and agent.send.await_count==before

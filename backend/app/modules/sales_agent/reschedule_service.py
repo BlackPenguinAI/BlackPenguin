@@ -1,3 +1,5 @@
+from .execution import now as workflow_now
+from .execution import permitted
 """Versioned rescheduling: preserve the original until an exact atomic replacement."""
 from dataclasses import replace
 from datetime import datetime,timedelta,timezone
@@ -76,9 +78,11 @@ def comparison(proposal,*,confirmed=False):
 
 
 def originals(db,scope):
+    conversation = check_scope(db,scope)
     return db.query(Meeting).join(Project,Project.id==Meeting.project_id).filter(
         Project.company_id==scope.company_id,Meeting.lead_id==scope.lead_id,
-        Meeting.status.in_([MeetingStatus.SCHEDULED,MeetingStatus.CONFIRMED]),Meeting.meeting_time>datetime.utcnow()).order_by(Meeting.meeting_time,Meeting.id).all()
+        Meeting.is_demo.is_(conversation.channel == 'simulation'),
+        Meeting.status.in_([MeetingStatus.SCHEDULED,MeetingStatus.CONFIRMED]),Meeting.meeting_time>workflow_now(datetime)).order_by(Meeting.meeting_time,Meeting.id).all()
 
 
 def resolve_original(db,scope,conversation,directive,state,*,offer_key='reschedule_meeting_offer'):
@@ -185,7 +189,7 @@ def build_target(db,scope,conversation,old,directive,state,u,inbound):
     previous_preferences=dict(search.get('preferences') or {'duration_minutes':old.duration_minutes})
     if search.get('target_project_id')!=project_id and not previous_preferences.get('source_evidence',{}).get('timezone_evidence'):
         previous_preferences.pop('timezone',None)
-    prefs=normalize_timing(proxy,inbound.content,project,datetime.utcnow(),previous_preferences)
+    prefs=normalize_timing(proxy,inbound.content,project,workflow_now(datetime),previous_preferences)
     allowed=None
     if directive and directive.target_specialist:
         ids={r.user_id for r in eligible_appointment_assignments(db,project_id)}
@@ -215,12 +219,12 @@ def validate_prepared(db,scope,metadata):
 
 
 def replace_visit(db,scope,conversation,lead,outcome,inbound,proposal):
-    now=datetime.utcnow();state=outcome.state
+    now=workflow_now(datetime);state=outcome.state
     from .first_booking import SalesBookingOperation as Booking
     # The F effect worker locks its receipt before its Meeting. Keep the same order.
     db.query(Lead).filter_by(id=scope.lead_id,company_id=scope.company_id,project_id=scope.project_id).populate_existing().with_for_update().one()
     db.query(Booking).filter_by(meeting_id=proposal['original']['id']).with_for_update().all()
-    old=db.query(Meeting).filter_by(id=proposal['original']['id'],lead_id=scope.lead_id).populate_existing().with_for_update().one_or_none()
+    old=db.query(Meeting).filter_by(id=proposal['original']['id'],lead_id=scope.lead_id,is_demo=conversation.channel == 'simulation').populate_existing().with_for_update().one_or_none()
     if not old or old.status not in {MeetingStatus.CONFIRMED,MeetingStatus.SCHEDULED} or old.meeting_time<=now or reservation_version(old)!=proposal['original']['booking_sha256']:
         state.reschedule_proposal=None
         return 'The original visit changed or is no longer eligible. Nothing else has been changed. Please review the current visit first.',{},[]
@@ -233,7 +237,7 @@ def replace_visit(db,scope,conversation,lead,outcome,inbound,proposal):
     db.query(User).filter(User.id.in_([v for v in lock_ids if v])).order_by(User.id).populate_existing().with_for_update().all()
     user=db.query(User).filter_by(id=option['sales_user_id'],company_id=scope.company_id,deleted_at=None,is_active=True).first()
     if not user or ' '.join(v for v in [user.first_name,user.last_name] if v)!=option['specialist_name']:raise ValueError('The proposed specialist changed. Your original visit is unchanged.')
-    if lead.deleted_at or lead.is_opt_out or lead.consent_status!='granted' or lead.agent_status=='human_control':raise PermissionError('Lead permissions changed before replacement.')
+    if lead.deleted_at or lead.is_opt_out or not permitted(lead) or lead.agent_status=='human_control':raise PermissionError('Lead permissions changed before replacement.')
     from app.modules.sales_crm.scheduling import create_agent_appointment
     from app.modules.governance.services import enqueue_notification
     old_data=meeting_snapshot(db,old)
@@ -278,7 +282,7 @@ def replace_visit(db,scope,conversation,lead,outcome,inbound,proposal):
 
 
 def handle(db,scope,conversation,lead,project,outcome,inbound,previous_meta):
-    state=outcome.state;u=state.last_understanding;directive=directive_for(u);now=datetime.utcnow()
+    state=outcome.state;u=state.last_understanding;directive=directive_for(u);now=workflow_now(datetime)
     if u.requires_clarification or u.confidence<.8:return 'Please clarify which visit you want to change. Your current reservation is unchanged.',{},[]
     if directive and directive.action=='decline':
         state.reschedule_proposal=None;state.reschedule_search={}
@@ -350,7 +354,7 @@ def advance_effect(db,operation_id):
     """Create the new event first. Retire only the exact former event after success."""
     op=db.get(SalesRescheduleOperation,operation_id)
     if not op or op.calendar_status in {'completed','review','simulation','cancelled'}:return
-    if op.calendar_status!='pending' and op.next_attempt_at>datetime.utcnow():return
+    if op.calendar_status!='pending' and op.next_attempt_at>workflow_now(datetime):return
     new_receipt=db.get(SalesBookingOperation,op.replacement_booking_operation_id)
     seen=set()
     while new_receipt.calendar_status=='cancelled':
@@ -366,7 +370,7 @@ def advance_effect(db,operation_id):
     from .active_service import selected_policy
     source_scope=Scope(op.company_id,op.project_id,op.conversation_id,op.lead_id)
     if not selected(source_scope) or not selected_policy(db,source_scope) or not selected(replace(source_scope,project_id=new_receipt.project_id)) or not selected_policy(db,replace(source_scope,project_id=new_receipt.project_id)):return
-    if new_receipt.calendar_status not in {'synced','simulation','review'} and new_receipt.next_attempt_at<=datetime.utcnow():
+    if new_receipt.calendar_status not in {'synced','simulation','review'} and new_receipt.next_attempt_at<=workflow_now(datetime):
         from .first_booking import sync_calendar
         sync_calendar(db,new_receipt.id)
     op=db.query(SalesRescheduleOperation).filter_by(id=operation_id).populate_existing().with_for_update(skip_locked=True).first()
@@ -376,7 +380,7 @@ def advance_effect(db,operation_id):
     if new_receipt.calendar_status not in {'synced','simulation'}:
         op.calendar_status='review' if new_receipt.calendar_status=='review' else 'waiting_new_calendar'
         op.last_error='NewCalendarNeedsReview' if op.calendar_status=='review' else None
-        op.next_attempt_at=datetime.utcnow()+timedelta(minutes=5);db.commit();return
+        op.next_attempt_at=workflow_now(datetime)+timedelta(minutes=5);db.commit();return
     if not cleanup.get('event_id'):
         op.calendar_status='completed';op.last_error=None;db.commit();return
     old=db.query(Meeting).filter_by(id=op.original_meeting_id,lead_id=op.lead_id).with_for_update().first()
@@ -387,7 +391,7 @@ def advance_effect(db,operation_id):
     if not connection or not owner or connection.calendar_id!=cleanup.get('calendar_id'):
         op.calendar_status='review';op.last_error='OriginalCalendarConnectionChanged';db.commit();return
     if connection.status!='connected':
-        op.calendar_status='waiting_old_connection';op.next_attempt_at=datetime.utcnow()+timedelta(minutes=10);db.commit();return
+        op.calendar_status='waiting_old_connection';op.next_attempt_at=workflow_now(datetime)+timedelta(minutes=10);db.commit();return
     from app.integrations.gcalendar_client import delete_calendar_event_for_connection
     op.attempts+=1
     try:
@@ -395,7 +399,7 @@ def advance_effect(db,operation_id):
         old.calendar_sync_status='rescheduled_removed';op.calendar_status='completed';op.last_error=None
     except Exception as exc:
         op.calendar_status='review' if op.attempts>=5 else 'retry';op.last_error=type(exc).__name__
-        op.next_attempt_at=datetime.utcnow()+timedelta(minutes=min(60,2**op.attempts))
+        op.next_attempt_at=workflow_now(datetime)+timedelta(minutes=min(60,2**op.attempts))
     db.commit()
 
 
@@ -405,28 +409,13 @@ def advance_for_meeting(db,scope,meeting_id):
 
 
 def retry_effects(db,limit=10):
-    from app.core.config import settings
-    from app.modules.ai_core.models import AIConfiguration
-    from .runtime_policy import RuntimePolicy
     from .next_flow import selected
     from .active_service import selected_policy
-    from uuid import UUID
-    if not settings.SALES_DIALOGUE_RUNTIME_ENABLED or not settings.SALES_NEXT_FLOW_ENABLED:return
-    ids=[v.strip() for v in settings.SALES_NEXT_FLOW_PROJECT_IDS.split(',') if v.strip()]
-    try:
-        if not ids or any(str(UUID(v))!=v for v in ids):return
-    except ValueError:return
-    config=db.query(AIConfiguration).filter_by(company_id=None).first()
-    policy=RuntimePolicy.model_validate((config.agent_ventas or {}).get('runtime_config') or {}) if config else RuntimePolicy()
-    if policy.mode!='active':return
     query=db.query(SalesRescheduleOperation).join(SalesBookingOperation,SalesBookingOperation.id==SalesRescheduleOperation.replacement_booking_operation_id).filter(
         SalesRescheduleOperation.calendar_status.in_(['pending','retry','waiting_new_calendar','waiting_old_connection']),
-        SalesRescheduleOperation.next_attempt_at<=datetime.utcnow(),SalesRescheduleOperation.project_id.in_(ids),SalesBookingOperation.project_id.in_(ids))
-    if policy.scope=='cohort':
-        query=query.filter(SalesRescheduleOperation.company_id.in_(policy.company_ids),SalesRescheduleOperation.project_id.in_(policy.project_ids),SalesBookingOperation.project_id.in_(policy.project_ids))
-        if policy.lead_ids:query=query.filter(SalesRescheduleOperation.lead_id.in_(policy.lead_ids))
+        SalesRescheduleOperation.next_attempt_at<=workflow_now(datetime))
     for row in query.order_by(SalesRescheduleOperation.next_attempt_at).limit(limit).all():
         scope=Scope(row.company_id,row.project_id,row.conversation_id,row.lead_id)
         receipt=db.get(SalesBookingOperation,row.replacement_booking_operation_id)
-        if selected(scope) and selected_policy(db,scope) and selected(replace(scope,project_id=receipt.project_id)):
-            advance_effect(db,row.id)
+        from .effect_recovery import attempt
+        attempt(db,SalesRescheduleOperation,row.id,lambda: advance_effect(db,row.id))

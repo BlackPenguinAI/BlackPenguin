@@ -377,15 +377,15 @@ def test_disconnected_calendar_waits_for_same_connection_recovery(agent):
     assert op.calendar_status=='completed'
 
 
-def test_disabled_scope_does_not_run_calendar_cleanup(agent,monkeypatch):
+def test_retired_scope_filter_does_not_prevent_authorized_calendar_cleanup(agent,monkeypatch):
     from app.core.config import settings
     row,connection=setup_old_calendar(agent);agent.turn('Cancel my visit',cancellation('Cancel my visit'))
     with patch('app.integrations.gcalendar_client.delete_calendar_event_for_connection',side_effect=RuntimeError('offline')):agent.turn('Yes',understanding('Yes','other'))
     op=agent.db.query(SalesCancellationOperation).one();op.next_attempt_at=datetime.utcnow()-timedelta(seconds=1);agent.db.commit()
     monkeypatch.setattr(settings,'SALES_NEXT_FLOW_PROJECT_IDS','')
     from app.modules.sales_agent.cancellation_service import retry_effects,advance_effect
-    with patch('app.integrations.gcalendar_client.delete_calendar_event_for_connection') as delete:retry_effects(agent.db);advance_effect(agent.db,op.id);delete.assert_not_called()
-    assert op.calendar_status=='retry' and row.status==MeetingStatus.CANCELLED
+    with patch('app.integrations.gcalendar_client.delete_calendar_event_for_connection') as delete:retry_effects(agent.db);advance_effect(agent.db,op.id);delete.assert_called_once()
+    assert op.calendar_status=='completed' and row.status==MeetingStatus.CANCELLED
 
 
 def test_cancellation_does_not_require_property_to_still_be_sellable(agent):

@@ -1,3 +1,5 @@
+from .execution import now as workflow_now
+from .execution import permitted
 """First visit: evidence-based preferences, exact confirmation, durable effect receipt."""
 from datetime import datetime, timedelta, timezone, time
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -20,10 +22,11 @@ ACCEPTED={'sent','delivered','read','accepted'}
 
 
 def active_meetings(db,scope,now=None):
-    now=now or datetime.utcnow()
+    now=now or workflow_now(datetime)
     rows=db.query(Meeting).join(Project,Project.id==Meeting.project_id).filter(
         Meeting.lead_id==scope.lead_id,Project.company_id==scope.company_id,Meeting.status.in_(list(ACTIVE))).all()
-    return [r for r in rows if r.meeting_time+timedelta(minutes=r.duration_minutes)>now]
+    from .execution import simulated
+    return [r for r in rows if bool(r.is_demo) == simulated(scope) and r.meeting_time+timedelta(minutes=r.duration_minutes)>now]
 
 
 def stop_cadence(db,conversation,lead,state,reason):
@@ -46,9 +49,9 @@ def recover_booking_pause(db,conversation):
     if not selected(scope) or not selected_policy(db,scope):return False
     check_scope(db,scope)
     lead=db.get(Lead,scope.lead_id)
-    if not lead or lead.deleted_at or lead.is_opt_out or lead.consent_status!='granted' or lead.agent_status=='human_control':return False
+    if not lead or lead.deleted_at or lead.is_opt_out or not permitted(lead) or lead.agent_status=='human_control':return False
     if db.query(HumanInterventionCase).filter_by(conversation_id=conversation.id,status='open').first():return False
-    if not db.query(Meeting).filter_by(project_id=scope.project_id,lead_id=scope.lead_id).first():return False
+    if not db.query(Meeting).filter_by(project_id=scope.project_id,lead_id=scope.lead_id,is_demo=conversation.channel == 'simulation').first():return False
     revision,state=load(db,scope)
     stop_cadence(db,conversation,lead,state,'booked')
     conversation.is_paused=False;conversation.pause_reason=None
@@ -197,7 +200,7 @@ def confirmation(snapshot,option,prefs,*,booked=False):
 def handle(db,scope,conversation,lead,project,outcome,inbound):
     from .service import _affirmative_slot_reply
     from .turn_context import choice_index,latest_outbound
-    state=outcome.state;u=state.last_understanding;now=datetime.utcnow()
+    state=outcome.state;u=state.last_understanding;now=workflow_now(datetime)
     if u.appointment_query:return None  # Existing scoped reader remains authoritative.
     if u.visit and u.visit.action=='decline' and not u.requires_clarification and u.confidence>=.8:
         state.booking_proposal=None;stop_cadence(db,conversation,lead,state,'cancelled' if state.cadence_stop_reason=='cancelled' else 'declined')
@@ -207,7 +210,8 @@ def handle(db,scope,conversation,lead,project,outcome,inbound):
     candidates={t.id for t in state.tasks if t.source_message_id==inbound.id and t.topic.value=='appointment' and not restricted(state,t)}
     if not candidates & set(outcome.plan.get('write_candidates_require_backend_authorization',[])):return '',{},[]
     from app.modules.onboarding_versions import require_capability
-    if project.profile:require_capability(project.profile,'appointments')
+    from .execution import simulated
+    if project.profile and not (simulated(scope) and project.is_demo):require_capability(project.profile,'appointments')
     existing=active_meetings(db,scope,now)
     if existing:
         stop_cadence(db,conversation,lead,state,'booked')
@@ -234,7 +238,7 @@ def handle(db,scope,conversation,lead,project,outcome,inbound):
         if proposal['scope']!=scope.__dict__:raise PermissionError('Booking proposal belongs to another opportunity.')
         # Serialize separate conversations/channels for this lead before checking active visits.
         locked_lead=db.query(Lead).filter_by(id=scope.lead_id,company_id=scope.company_id).populate_existing().with_for_update().one()
-        if locked_lead.deleted_at or locked_lead.is_opt_out or locked_lead.consent_status!='granted' or locked_lead.agent_status=='human_control':
+        if locked_lead.deleted_at or locked_lead.is_opt_out or not permitted(locked_lead) or locked_lead.agent_status=='human_control':
             raise PermissionError('Lead permissions changed before booking.')
         prior=db.query(SalesBookingOperation).filter_by(proposal_id=proposal['id']).first()
         if prior:
@@ -345,16 +349,21 @@ def sync_calendar(db,operation_id):
     if not op or op.calendar_status in {'synced','simulation','review','cancelled'}:return
     meeting=db.query(Meeting).filter_by(id=op.meeting_id).populate_existing().with_for_update().first();project=db.get(Project,op.project_id)
     if not meeting or not project or project.company_id!=op.company_id or meeting.lead_id!=op.lead_id or meeting.project_id!=op.project_id:raise PermissionError('Calendar operation scope changed.')
-    if meeting.status not in {MeetingStatus.CONFIRMED,MeetingStatus.SCHEDULED} or meeting.meeting_time<=datetime.utcnow():
+    if meeting.status not in {MeetingStatus.CONFIRMED,MeetingStatus.SCHEDULED} or meeting.meeting_time<=workflow_now(datetime):
         op.calendar_status='cancelled';db.commit();return
-    saved=op.snapshot_json
+    if meeting.is_demo:
+        op.calendar_status='simulation';db.commit();return
+    saved=op.snapshot_json or {}
+    if not all(key in saved for key in ('option','context')) or not all(
+        key in saved['option'] for key in ('starts_at','sales_user_id')) or not isinstance(saved['context'].get('location'),dict):
+        op.calendar_status='review';op.last_error='HistoricalBookingSnapshotIncomplete';db.commit();return
     if (utc(meeting.meeting_time).isoformat()!=saved['option']['starts_at'] or meeting.assigned_sales_user_id!=saved['option']['sales_user_id'] or
         meeting.duration_minutes!=saved['context']['duration_minutes'] or meeting.visit_address!=saved['context']['location']['address']):
         op.calendar_status='review';op.last_error='BookingChanged';db.commit();return
     user=db.query(User).filter_by(id=meeting.assigned_sales_user_id,company_id=op.company_id,deleted_at=None).first()
     connection=db.query(CalendarConnection).filter_by(user_id=meeting.assigned_sales_user_id,provider='google',status='connected').first() if user else None
     if not connection:
-        op.calendar_status='waiting_connection';op.next_attempt_at=datetime.utcnow()+timedelta(minutes=10);meeting.calendar_sync_status='not_connected';db.commit();return
+        op.calendar_status='waiting_connection';op.next_attempt_at=workflow_now(datetime)+timedelta(minutes=10);meeting.calendar_sync_status='not_connected';db.commit();return
     from app.integrations.gcalendar_client import create_calendar_event_for_connection
     op.calendar_attempts+=1
     try:
@@ -366,7 +375,7 @@ def sync_calendar(db,operation_id):
         meeting.gcal_event_id=event['id'];meeting.meeting_url=event.get('htmlLink');meeting.calendar_sync_status='synced';op.calendar_status='synced';op.last_error=None
     except Exception as exc:
         meeting.calendar_sync_status='failed';op.calendar_status='review' if op.calendar_attempts>=5 else 'retry'
-        op.last_error=type(exc).__name__;op.next_attempt_at=datetime.utcnow()+timedelta(minutes=min(60,2**op.calendar_attempts))
+        op.last_error=type(exc).__name__;op.next_attempt_at=workflow_now(datetime)+timedelta(minutes=min(60,2**op.calendar_attempts))
     db.commit()
 
 
@@ -374,32 +383,18 @@ def retry_calendars(db,limit=10):
     from .active_service import selected_policy
     from .next_flow import selected
     from .dialogue_store import Scope
-    from app.core.config import settings
-    from app.modules.ai_core.models import AIConfiguration
-    from .runtime_policy import RuntimePolicy
-    from uuid import UUID
-    if not settings.SALES_DIALOGUE_RUNTIME_ENABLED or not settings.SALES_NEXT_FLOW_ENABLED:return
-    ids=[value.strip() for value in settings.SALES_NEXT_FLOW_PROJECT_IDS.split(',') if value.strip()]
-    try:
-        if not ids or any(str(UUID(value))!=value for value in ids):return
-    except ValueError:return
-    config=db.query(AIConfiguration).filter_by(company_id=None).first()
-    policy=RuntimePolicy.model_validate((config.agent_ventas or {}).get('runtime_config') or {}) if config else RuntimePolicy()
-    if policy.mode!='active':return
     from .reschedule_models import SalesRescheduleOperation
     replacement=db.query(SalesRescheduleOperation.id).filter(
         SalesRescheduleOperation.replacement_booking_operation_id==SalesBookingOperation.id).exists()
     # G owns both activation scopes and the ordered replacement/cleanup effect.
     query=db.query(SalesBookingOperation).filter(~replacement,SalesBookingOperation.calendar_status.in_(['pending','retry','waiting_connection']),
-        SalesBookingOperation.next_attempt_at<=datetime.utcnow(),SalesBookingOperation.project_id.in_(ids))
-    if policy.scope=='cohort':
-        query=query.filter(SalesBookingOperation.company_id.in_(policy.company_ids),SalesBookingOperation.project_id.in_(policy.project_ids))
-        if policy.lead_ids:query=query.filter(SalesBookingOperation.lead_id.in_(policy.lead_ids))
+        SalesBookingOperation.next_attempt_at<=workflow_now(datetime))
     # Filter disabled scopes before the batch limit so they cannot starve live work.
     rows=query.order_by(SalesBookingOperation.next_attempt_at).limit(limit).all()
     for row in rows:
         scope=Scope(row.company_id,row.project_id,row.conversation_id,row.lead_id)
-        if selected(scope) and selected_policy(db,scope):sync_calendar(db,row.id)
+        from .effect_recovery import attempt
+        attempt(db,SalesBookingOperation,row.id,lambda: sync_calendar(db,row.id))
 
 
 def enrich_understanding(u,previous_meta,text):

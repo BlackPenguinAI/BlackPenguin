@@ -12,14 +12,12 @@ describe('AiSettingsPageComponent', () => {
     (component as any).refreshPromptKeys();
     expect(component.config.agent_ventas.runtime_config.scope).toBe('global');
   });
-  it('preserves the active cohort while normalizing runtime defaults and editing IDs', () => {
+  it('makes historical disabled cohort settings inert without losing execution limits', () => {
     const component = new AiSettingsPageComponent({} as any, {} as any, {} as any);
-    component.config.agent_ventas.runtime_config = {mode:'active',company_ids:['company-a'],project_ids:['project-a']};
+    component.config.agent_ventas.runtime_config = {mode:'disabled',scope:'cohort',company_ids:['company-a'],project_ids:['project-a'],max_steps:12};
     (component as any).refreshPromptKeys();
-    expect(component.config.agent_ventas.runtime_config.mode).toBe('active');
-    component.runtimeIds('lead_ids','lead-a, lead-b');
-    expect(component.config.agent_ventas.runtime_config.lead_ids).toEqual(['lead-a','lead-b']);
-    expect(component.config.agent_ventas.runtime_config.company_ids).toEqual(['company-a']);
+    expect(component.config.agent_ventas.runtime_config).toMatchObject({mode:'active',scope:'global',company_ids:[],project_ids:[],lead_ids:[],max_steps:12});
+    expect(component.config.agent_ventas.sales_playbook.conversation_protocol).toContain('approved facts');
   });
   it('exposes a structured sales prompt pack', () => {
     const component = new AiSettingsPageComponent({} as any, {} as any, {} as any);

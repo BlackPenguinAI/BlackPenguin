@@ -40,10 +40,9 @@ def execute(case,monkeypatch,payload=None,**kwargs):
     return run_turn(case[0],scope(case),message_id=message.id,understanding=u,expected_revision=kwargs.pop('expected_revision',0),event_key=kwargs.pop('event_key','turn'),**kwargs)
 
 
-def test_disabled_runtime_never_reads_db(monkeypatch):
-    monkeypatch.setattr(settings,'SALES_DIALOGUE_RUNTIME_ENABLED',False)
-    with pytest.raises(PermissionError):
-        run_turn(None,None,message_id='x',understanding={},expected_revision=0,event_key='x')
+def test_retired_runtime_flag_does_not_disable_the_current_planner(case,monkeypatch):
+    result=execute(case,monkeypatch,event_key='always-current')
+    assert result.revision == 1
 
 
 @pytest.mark.parametrize('scenario',CASES,ids=lambda c:c['id'])
@@ -195,7 +194,7 @@ def test_dependency_blocks_without_dropping_task(case,monkeypatch):
         {'id':'b','topic':'financing','status':'pending','depends_on':['a']}])
     save(case[0],scope(case),event_key='old',expected_revision=0,state=state);case[0].commit()
     result=execute(case,monkeypatch,expected_revision=1)
-    assert next(t for t in result.state.tasks if t.id=='b').status=='pending'
+    assert next(t for t in result.state.tasks if t.id=='b').blocked_reason == 'superseded_by_current_request'
 
 
 def test_tool_denies_forged_subject_or_foreign_selection(case):

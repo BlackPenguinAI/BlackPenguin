@@ -12,6 +12,8 @@ MAX_FILE_BYTES = 50 * 1024 * 1024
 
 
 def snapshot(asset, *, channel, target_url=None):
+    from .execution import channel as execution_channel
+    channel = execution_channel(channel)
     """Validate actual local bytes, scope and reviewed metadata; never fetch external URLs."""
     source = asset.source
     now = datetime.utcnow()

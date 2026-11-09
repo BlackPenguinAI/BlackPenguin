@@ -69,7 +69,8 @@ async def observe_shadow(db, conversation, inbound):
         config = db.query(AIConfiguration).filter_by(company_id=None).first()
         policy = RuntimePolicy.model_validate((config.agent_ventas or {}).get('runtime_config') or {}) if config else RuntimePolicy()
         scope = Scope(conversation.company_id,conversation.project_id,conversation.id,conversation.lead_id)
-        if policy.mode != 'shadow' or not policy.selects(scope):
+        # Explicit historical diagnostic helper; production never routes here.
+        if ((config.agent_ventas or {}).get('runtime_config') or {}).get('mode') != 'shadow':
             return 'not_selected'
         key = 'shadow-draft:'+inbound.id
         if scope.query(db,SalesDialogueEvent).filter_by(event_key=key).first():

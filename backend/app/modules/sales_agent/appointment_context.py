@@ -54,11 +54,12 @@ class AppointmentReadTool:
 
     def execute(self,query=None,*,now=None):
         from .dialogue_store import check_scope
-        check_scope(self.db,self.scope)
+        conversation = check_scope(self.db,self.scope)
         query=AppointmentQuery.model_validate(query or {})
         now=utc(now or datetime.now(timezone.utc))
         rows=self.db.query(Meeting,Project).join(Project,Project.id==Meeting.project_id).filter(
-            Meeting.lead_id==self.scope.lead_id,Project.company_id==self.scope.company_id)
+            Meeting.lead_id==self.scope.lead_id,Project.company_id==self.scope.company_id,
+            Meeting.is_demo.is_(conversation.channel == 'simulation'))
         if query.meeting_id:rows=rows.filter(Meeting.id==query.meeting_id)
         # Filter in SQL before limiting, including a visit currently in progress.
         if query.category=='cancelled':rows=rows.filter(Meeting.status==MeetingStatus.CANCELLED)

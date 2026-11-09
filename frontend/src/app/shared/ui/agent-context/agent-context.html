@@ -5,7 +5,14 @@
     <p *ngIf="c.scope_limited" class="notice">Only information permitted for this selection is shown. Historical or restricted enquiry context is unavailable.</p>
     <div class="status"><strong>Chat: {{label(c.chat?.status)}}</strong><span>Follow-ups: {{label(c.chat?.cadence)}}<ng-container *ngIf="c.chat?.cadence_reason"> · {{label(c.chat.cadence_reason)}}</ng-container></span></div>
     <p *ngIf="c.chat?.pause_reason" class="alert">{{c.chat.pause_reason}}</p>
-    <p *ngIf="c.execution&&!c.scope_limited" class="execution">Dialogue runtime: {{c.execution.new_engine_selected?'selected':'not selected'}} · New flow: {{c.execution.new_flow_enabled?'selected for this project':'not selected (legacy routing may apply)'}} · Project: {{c.execution.project_ready?'ready':'requires configuration review'}}<ng-container *ngIf="c.execution.job_status"> · Inbound work: {{label(c.execution.job_status)}}<ng-container *ngIf="c.execution.job_error"> · {{c.execution.job_error}}</ng-container></ng-container></p>
+    <dl *ngIf="c.execution&&!c.scope_limited" class="execution">
+      <div><dt>Sales workflow</dt><dd>Current · {{c.execution.workflow_version || 'Version not recorded'}}</dd></div>
+      <div><dt>Last recorded turn</dt><dd>{{c.trace?.workflow_version || 'Workflow version not recorded'}}<ng-container *ngIf="c.trace?.prompt_version"> · {{c.trace.prompt_version}}</ng-container></dd></div>
+      <div><dt>Configuration</dt><dd>{{c.execution.configuration_ready === false ? 'Requires review' : 'Available'}}</dd></div>
+      <div><dt>Project</dt><dd>{{c.execution.project_ready ? 'Ready' : 'Requires configuration review'}}</dd></div>
+      <div *ngIf="c.execution.job_status"><dt>Latest inbound work</dt><dd>{{label(c.execution.job_status)}}{{c.trace?.error_code ? ' · Response error' : ''}}</dd></div>
+      <div *ngIf="c.trace?.error_code || c.execution.job_error"><dt>Processing issue</dt><dd>{{c.trace?.error_code || c.execution.job_error}}</dd></div>
+    </dl>
     <p *ngIf="!c.trace?.engine&&!c.scope_limited"><small>No validated agent run has been recorded for this opportunity yet.</small></p>
     <div class="property-grid">
       <article><h4>Current enquiry</h4><p>{{c.current_interest?.project_name||'No visible enquiry'}}</p><strong>{{c.current_interest?.property||'No property selected'}}</strong><p *ngIf="c.current_interest?.unit">Unit {{c.current_interest.unit}}</p><small>Asking about another property does not change a visit.</small></article>

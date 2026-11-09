@@ -29,7 +29,7 @@ from app.modules.sales_crm.scheduling import available_slots, next_cadence_time
 from app.modules.sales_agent.default_prompt import merge_sales_agent_defaults
 from app.modules.sales_agent.live_service import (
     _lead_intelligence_input, _no_slot_alternative_selection, _persist_intervention_before_confirmation,
-    ensure_contact, get_or_create_live_conversation, process_live_inbound, process_live_inbound_job,
+    ensure_contact, get_or_create_live_conversation, _legacy_process_live_inbound as process_live_inbound, process_live_inbound_job,
 )
 from app.modules.sales_agent.models import SalesConversation, SalesInboundJob, SalesMessage
 from app.modules.sales_agent.live_worker import _claim_inbound_jobs
@@ -395,6 +395,7 @@ def test_live_appointment_intent_is_classified_by_model_and_slots_remain_determi
         company_id=company.id, name="Project", address="100 Main Street",
         timezone="America/Chicago",
     )
+    db.add(project); db.flush()
     lead = Lead(
         company_id=company.id, project_id=project.id, full_name="Lead",
         phone="+13055550000", source="manual", platform="manual", consent_status="granted",

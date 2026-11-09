@@ -68,6 +68,8 @@ def issue(
     agent_run_id: str | None = None, expires_in_days: int = 7,
     target_url: str | None = None,
 ) -> tuple[str, SalesAssetShare]:
+    from app.modules.sales_agent.execution import channel as execution_channel
+    channel = execution_channel(channel)
     """Issue a short opaque token. The raw token never persists in storage."""
     token = secrets.token_urlsafe(18)
     share = SalesAssetShare(

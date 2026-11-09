@@ -258,7 +258,7 @@ def test_current_coordinator_replays_reviewed_text_without_pause_or_booking(real
     case=next(c for c in history['cases'] if c['id']==case_id)
     result=run_case(real,case['project_id'],channel,case['inbound'],[interpretation(case['inbound'])],
                     case_id=case_id,origin='SCRIPTED_REPLAY_OF_HISTORICAL_TEXT',monkeypatch=monkeypatch)
-    assert result['passed_current_safety'], result['failures']
+    assert result['passed_current_safety'], (result['failures'], result['replies'])
     assert result['model_quality_evaluated'] is False and result['new_flow_acceptance']=='PENDING'
 
 
@@ -268,7 +268,7 @@ def test_current_coordinator_model_failure_keeps_response_and_deduplicates(synth
     responses=['invalid JSON']*2 if failure=='invalid_json' else [TimeoutError('SYNTHETIC timeout')]*2
     result=run_case(synthetic,synthetic['projects'][0]['project']['id'],channel,'Give me information',responses,
                     case_id=failure,origin='SYNTHETIC_FAILURE',monkeypatch=monkeypatch)
-    assert result['passed_current_safety'], result['failures']
+    assert result['passed_current_safety'], (result['failures'], result['replies'])
 
 
 def test_sandbox_prevents_fallback_network_connection(sandbox,monkeypatch):

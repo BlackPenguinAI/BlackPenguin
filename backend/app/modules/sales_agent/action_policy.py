@@ -6,6 +6,15 @@ from .turn_configuration import digest
 TOPICS={'catalog','property_details','inventory','pricing','financing','delivery','amenities','location','materials','appointment'}
 
 
+def standard_notes(notes):
+    """Exact platform onboarding choices, not a free-text permission compiler."""
+    choices = {'not applicable', 'use standard company compliance', 'no project-specific notes',
+               'use standard company compliance; no project-specific notes'}
+    values = notes if isinstance(notes, list) else [notes]
+    return bool(values) and all(isinstance(value, str) and value.strip().casefold() in choices
+                                for value in values)
+
+
 class ActionRule(BaseModel):
     model_config=ConfigDict(extra='forbid')
     id:str=Field(min_length=1,max_length=80)
@@ -41,7 +50,7 @@ def resolve(db,scope,company,project,*,target_project_id=None):
         for source,owner,notes in [('company',None,company.get('corporate_compliance_information')),
                                   ('project',project_id,project.get('compliance_notes'))]:
             matched=False
-            note_hash=digest(notes) if notes not in (None,'',[],{}) else None
+            note_hash=digest(notes) if notes not in (None,'',[],{}) and not standard_notes(notes) else None
             invalid=[]
             for record in (r for r in records if r.project_id==owner):
                 actor=db.get(User,record.approved_by_user_id) if record.approved_by_user_id else None

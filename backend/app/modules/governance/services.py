@@ -431,6 +431,11 @@ def enqueue_notification(
         entity_type=entity_type, entity_id=entity_id, payload_json=payload,
         dedupe_key=dedupe_key,
     )
+    from app.modules.sales_agent.execution import simulation
+    context = simulation()
+    if context and context.company_id == company_id:
+        item.status = 'processed'
+        item.payload_json = {**payload, 'simulation': True}
     db.add(item); db.flush()
     return item
 

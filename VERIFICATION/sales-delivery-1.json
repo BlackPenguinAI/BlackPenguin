@@ -1,0 +1,329 @@
+{
+  "delivery": "1",
+  "blocks": [
+    "SA-01",
+    "SA-02"
+  ],
+  "base_commit": "aac1fa6d263cb91019e6191349321af0aefeaa27",
+  "production_deployed": false,
+  "production_settings_changed": false,
+  "checks": [
+    {
+      "name": "full_backend_suite",
+      "passed": 2154,
+      "failed": 0,
+      "skipped": 4,
+      "seconds": 308.55
+    },
+    {
+      "name": "final_changed_guards_and_current_workflow_regression",
+      "passed": 320,
+      "failed": 0,
+      "seconds": 142.43,
+      "overlaps_full_suite": true,
+      "includes_two_new_guard_cases": true
+    },
+    {
+      "name": "frontend_angular_suite",
+      "passed": 476,
+      "failed": 0
+    },
+    {
+      "name": "frontend_direct_dom_suite",
+      "passed": 9,
+      "failed": 0
+    },
+    {
+      "name": "optimized_frontend_build",
+      "status": "passed",
+      "configuration": "production,offline-ci",
+      "existing_style_budget_warnings": [
+        "Agent",
+        "Sales"
+      ]
+    },
+    {
+      "name": "git_diff_check",
+      "status": "passed"
+    }
+  ],
+  "limitations": {
+    "inference": "scripted/mocked",
+    "messaging_and_calendar_effects": "mocked",
+    "live_model_quality_evaluated": false,
+    "postgresql_concurrency": "4 existing tests skipped: disposable PostgreSQL URL not supplied",
+    "legacy_tests": "Historical graph contracts explicitly exercise private compatibility helpers; current routing and simulator use separate current-core tests."
+  },
+  "new_alembic_migrations": [],
+  "required_existing_sales_head": "20261108_sales_moderation",
+  "files_excluding_this_report": [
+    {
+      "path": "backend/app/core/config.py",
+      "sha256": "2dbefba6831af2d2c5d9e2b3a124f900a4ea4ed837fb6375dc34c73eaf8cfb64"
+    },
+    {
+      "path": "backend/app/modules/governance/services.py",
+      "sha256": "5f77c4e12a4490751aebbb51bc60cfb444eebe6d28f3d213ea5008a68db7c5d9"
+    },
+    {
+      "path": "backend/app/modules/health/router.py",
+      "sha256": "1ac15aeae834abb27c80b335c5ddf6966a54983ff80820677d7f90af14fae467"
+    },
+    {
+      "path": "backend/app/modules/projects/asset_share_service.py",
+      "sha256": "3a2bd921a7806bd369f68ae2f27559726cfd3e5534d4934a5e77854aca332415"
+    },
+    {
+      "path": "backend/app/modules/projects/sales_asset_service.py",
+      "sha256": "dc98db669d12fe292dfd2dff3907d690cbb754e48d1731a5d2cfeddae2c73289"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/action_policy.py",
+      "sha256": "2a770a6ab1a0abaa6c79337ce9f533986268658408d4534c7d21fc58b7ff0dd5"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/active_service.py",
+      "sha256": "11aaff66a53794eded7cfee92c941d848a86cd4b95f177c986d5c57884153832"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/appointment_context.py",
+      "sha256": "c61933615b18003ed4d270fb708fced6d9f1c7fd9f610989cae70423a9812452"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/cancellation_service.py",
+      "sha256": "e80097a7a961b9aa47bef1d5fb6275d339b15b1c818bcbc608adef8218aa4b56"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/commercial_context.py",
+      "sha256": "35c8310e5609c8be01c8555d277092e0c96cb12383b17999afa93dfb8c6c4ead"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/current_simulation.py",
+      "sha256": "122fbf7a5d8519c3fb2e7b0d0626dc508602b8a478d6440a17c9815f3119cf9e"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/dialogue_orchestrator.py",
+      "sha256": "6c13863d8afbca26c80959c84d114604f95fce8d733d333cb0574b5747a29c3f"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/dialogue_shadow.py",
+      "sha256": "6e4197131e05678f029d6760d44469c8f28b17670677ef7bd79f05b0aaeac851"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/effect_recovery.py",
+      "sha256": "7a71c3e2c17ea1ff4aec6dd5cbf53b58ddd46f8e2cedaaca150af4f94dfabe00"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/evidence.py",
+      "sha256": "36935c8d5f4936581bc618f0a88de148ce33d251eb1b178fb37c66c571ea1994"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/execution.py",
+      "sha256": "64b387baf433709b193e5dced1d79b56c02a1e64cf89dad30a0621d6bada6952"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/first_booking.py",
+      "sha256": "70279f9ec9628c5a96cd635099270be0c5f6f2aee0f2e17c0372d170f20f0c77"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/language_policy.py",
+      "sha256": "842296c6ec432b818bc366e7f9ddf7dc20d44887d75dc5eaf8c17991acfe4944"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/live_service.py",
+      "sha256": "69d662abcaa38f15c56805bce1ace74e23699e323a220e7745f3224e2642fc74"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/material_delivery.py",
+      "sha256": "fdbd08a351d21f4587362b7313db6fcaee3f39d4b750626a4879e84ae0dfca63"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/moderation.py",
+      "sha256": "f4002d0e839b9d4bb0aa02b1c13831177326cba87815b93da3174cce645b9838"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/next_flow.py",
+      "sha256": "453e4efbca609d496ca31810edca4a941fd5ff728be8c47274ff7f9dcf7ece6e"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/operational_context.py",
+      "sha256": "865028653051ce2434fba6bd32ab6280ea9dc9b37449463d3ea1e15f4ba369e9"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/reference_resolution.py",
+      "sha256": "6bc7ec1d62d32649e1a316741f122ec499297151c67413e0b3de8ebd4ccba754"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/reschedule_service.py",
+      "sha256": "da8aa1527ef4a83b3c98544e90cf4019a721cf5dcbfd7b7ff1de4394eb11b0b3"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/runtime_errors.py",
+      "sha256": "2645a301d538d2e1d2aa8352fec60a0ebbdcea00957ce7a526c2ff22b59ef267"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/runtime_policy.py",
+      "sha256": "8f65ed93ed896c53231869702f3921d0b9fc699abed77b7306a76d4d79f19e13"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/service.py",
+      "sha256": "0f87f062a146e4e82373bd84a682bdbe7fd672f779294ddc7b9d42970b8e7a47"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/turn_configuration.py",
+      "sha256": "716a0f9e541f4bdd15d24a70c229424a50ce0fcc34a53359d16bdb3246e7f4d6"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/turn_context.py",
+      "sha256": "e3707c88b289b1fa9300886bcba02110d478129961f4c86818facf0b9df370ec"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/turn_memory.py",
+      "sha256": "0806275b3e5997f032c24ed8a92ffb18c99dab2372d54e22d1bcb443757fe9d2"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/understanding_contract.py",
+      "sha256": "532e510c8bef651042a6700aceff94da832bba744497ac10267089193781db2e"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/understanding_prompt.py",
+      "sha256": "92da9f6f4b01e3e138bdeb41c17a38decdf05bd5d2d71150f8f199d659d5b8fc"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/understanding_service.py",
+      "sha256": "c3a3da4db721044b88486e4145eb915321c66d262a4ff8ac1927bc1f4d714f81"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/wait_service.py",
+      "sha256": "aeb10102ba82d223e35eb4c035c7d067b312501cb630bc048cef804584190876"
+    },
+    {
+      "path": "backend/app/modules/sales_crm/scheduling.py",
+      "sha256": "e9dfb104b99472240c2727830b84b61a8e250756a6f9b9afba2d914f35d79425"
+    },
+    {
+      "path": "backend/tests/sales_ai_support/sandbox.py",
+      "sha256": "75d138e79b9ba63a9921a5613fd437c98d334b03fdbaf9c5a4447adf2cce9d6e"
+    },
+    {
+      "path": "backend/tests/test_live_sales_agent.py",
+      "sha256": "cd8af8aae6afe51023492c9fcbd36fab65d053a658b8abe4e62e44ff6b9c17b8"
+    },
+    {
+      "path": "backend/tests/test_meta_live_sms_control.py",
+      "sha256": "bf0b681382af786ac723c2ea180e677a13a39f4a0f0f15cf71bf53b291968200"
+    },
+    {
+      "path": "backend/tests/test_mixed_slot_selection.py",
+      "sha256": "ea4d62aa4a0bb191318827a97b8866f07f33224a1bafb5f5006a294403fa184e"
+    },
+    {
+      "path": "backend/tests/test_sales_active_integration.py",
+      "sha256": "84fd1778fa8124a1bbb2e0a141f09924438841bfad13cc88a540b1a96a9b4a82"
+    },
+    {
+      "path": "backend/tests/test_sales_agent_graph.py",
+      "sha256": "eb8df8237fe0af71e10d824801604a25f61a897b3bbdbfcd25b3daa7613dcafc"
+    },
+    {
+      "path": "backend/tests/test_sales_agent_simulation_flow.py",
+      "sha256": "5bb778fcba9a6190b67817ee8841335ddb512ecd56943dd492ad8884847c6a45"
+    },
+    {
+      "path": "backend/tests/test_sales_ai_group_a.py",
+      "sha256": "282d73480cb6ac79e7f7a79e65d07bcaab7ec80cc60e104e9cab488823303c18"
+    },
+    {
+      "path": "backend/tests/test_sales_ai_group_b.py",
+      "sha256": "cfa37b5345dd78795096bf4484e0921059f2f26ec982f0a38d5dd2d3c25f849f"
+    },
+    {
+      "path": "backend/tests/test_sales_ai_group_f.py",
+      "sha256": "f5404dc70d9a626885666f0a16033f232a696654e8da81716af7459146cbbfa2"
+    },
+    {
+      "path": "backend/tests/test_sales_ai_group_g.py",
+      "sha256": "abc671ab675ed43d06b225ddabdc30cecc082960f75f01e3251c4d9fc9d02887"
+    },
+    {
+      "path": "backend/tests/test_sales_ai_group_h.py",
+      "sha256": "8201bd52ad9f63e290ad71fc01fb1b3d7f2db2cda59149fec9afa99ab782df19"
+    },
+    {
+      "path": "backend/tests/test_sales_ai_group_i.py",
+      "sha256": "be2a8d10bbd87342dd25696c548e168a824cf13019e94355c73adc917bf05a27"
+    },
+    {
+      "path": "backend/tests/test_sales_continuity_gaps.py",
+      "sha256": "54c844fa212dcb1f68b51f9d2d96328f9ff117fe195947604d1037cf3b525a1c"
+    },
+    {
+      "path": "backend/tests/test_sales_conversation_review.py",
+      "sha256": "7c185eb4bb98d12bb67c63460874521b55d0fa22073aa1f4fbcb50796be2e860"
+    },
+    {
+      "path": "backend/tests/test_sales_corrections_continuity_2122.py",
+      "sha256": "b75e0b92bbd9cac7c8ce14644c4e1e3897b1362a87dcc8095c27f4658c634264"
+    },
+    {
+      "path": "backend/tests/test_sales_delivery1.py",
+      "sha256": "2beed4f1b5ca99755e0acc9660c43880dc9aaab080c5412d093d8596d17d7510"
+    },
+    {
+      "path": "backend/tests/test_sales_delivery_789.py",
+      "sha256": "2843a2eed762b7215f084b4837f8e3176053ecfcda3fcb1033fbd063d954d357"
+    },
+    {
+      "path": "backend/tests/test_sales_dialogue_foundation.py",
+      "sha256": "d80162e3461ea7ff5fbb707795003a06ac58ec8028441cbfef5fe38384803fcd"
+    },
+    {
+      "path": "backend/tests/test_sales_global_rollout.py",
+      "sha256": "db8cc8f32e3a94cbacfec6e5bc6f47bad8c15fc1629025ecf4a16afbaf0b9f5b"
+    },
+    {
+      "path": "backend/tests/test_sales_runtime_456.py",
+      "sha256": "a3bb1cc16fe0ca72812218bc1e6765f59bbbd1459e3c4dbd1b9303c415522c75"
+    },
+    {
+      "path": "backend/tests/test_sales_turn_1720.py",
+      "sha256": "142bfe3788e49896f00d0e7873d8d0667e673fdb95f25e58461650d725fb2dbd"
+    },
+    {
+      "path": "backend/tests/test_sales_understanding_recovery.py",
+      "sha256": "b8876bd4e3dffc757ca2493e8a7920d0e449a737d1be29875e998bd1fdad473d"
+    },
+    {
+      "path": "backend/tests/test_staff_monitor.py",
+      "sha256": "77dcb0b3f09f307488f0db24a2091c69f9a44d7a297b5272f4ac1f5794c2f786"
+    },
+    {
+      "path": "docs/sales-ai/delivery-1.md",
+      "sha256": "334204c74e3cb8492f687336c21463a08619813afdbced8189bd9a4f7eb31401"
+    },
+    {
+      "path": "frontend/src/app/features/admin-panel/ai-settings/ai-settings-page/ai-settings-page.html",
+      "sha256": "09c00ccfd66f6e80682f5a34819ce2ef3f0fa2922eca25b81958adc9e7f888a4"
+    },
+    {
+      "path": "frontend/src/app/features/admin-panel/ai-settings/ai-settings-page/ai-settings-page.spec.ts",
+      "sha256": "74d42094a50cd1e8914568f195ec9a9da3c8cb2a1053dee9115cc5b0f5e69c58"
+    },
+    {
+      "path": "frontend/src/app/features/admin-panel/ai-settings/ai-settings-page/ai-settings-page.ts",
+      "sha256": "85d13ea7e91807b8e36b19364f7c6d83b125a15f5117365dc5c596fb0d3c78fb"
+    },
+    {
+      "path": "frontend/src/app/shared/ui/agent-context/agent-context-render.spec.ts",
+      "sha256": "bb72b25bd6eb283c3f28ba04db1eb8f98e2658b1288582586b65972f78fcee2c"
+    },
+    {
+      "path": "frontend/src/app/shared/ui/agent-context/agent-context.html",
+      "sha256": "43af4ddd91f47ab551118c22556ffc53af7045ca182ec8be0b8d3496d234a908"
+    },
+    {
+      "path": "frontend/src/app/shared/ui/agent-context/agent-context.scss",
+      "sha256": "bb09f7e09dd4f5e1c46e4e98429d6d8014608a63eadf1167be1df346230e8138"
+    }
+  ]
+}

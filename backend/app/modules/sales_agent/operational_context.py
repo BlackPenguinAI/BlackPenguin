@@ -101,7 +101,15 @@ def snapshot(db,conversation,*,allowed_projects=None,scope_limited=False,meeting
     except Exception:ready=False
     inbound=scoped_messages_query(db,conversation).filter_by(direction='inbound',role='user').order_by(SalesMessage.created_at.desc(),SalesMessage.id.desc()).first()
     job=db.query(SalesInboundJob).filter_by(message_id=inbound.id).order_by(SalesInboundJob.created_at.desc()).first() if inbound else None
-    return redact({'execution':{} if scope_limited else {'new_engine_selected':bool(selected_policy(db,scope)),'new_flow_enabled':bool(selected(scope)),
+    configuration_ready = True
+    try:
+        if not scope_limited:
+            from .turn_configuration import published_configuration
+            published_configuration(db, scope.company_id)
+    except (ValueError, TypeError):
+        configuration_ready = False
+    return redact({'execution':{} if scope_limited else {'workflow_version':'sales-current/1.0',
+            'configuration_ready':configuration_ready,'new_engine_selected':True,'new_flow_enabled':True,
             'project_ready':ready,'job_status':job.status if job else None,'job_error':job.error_code if job else None,'job_next_attempt_at':job.scheduled_at if job else None},
         'version':'sales-operational-context/1.0','scope_limited':scope_limited,'revision':revision if not scope_limited else None,
         'chat':{'status':'scope_limited' if scope_limited else 'unsubscribed' if lead.is_opt_out or lead.consent_status!='granted' else 'paused' if conversation.is_paused else 'open',
@@ -111,7 +119,7 @@ def snapshot(db,conversation,*,allowed_projects=None,scope_limited=False,meeting
         'appointments':visits,'proposals':proposals if not scope_limited else [],'waits':waits if not scope_limited else [],'effects':effects,
         'tasks':[] if scope_limited else [{'id':t.id,'topic':t.topic,'status':t.status,'blocked_reason':t.blocked_reason} for t in state.tasks[-25:]],
         'interventions':cases,'moderation':moderation,
-        'trace':{} if scope_limited else {'engine':run.graph_version if run else None,'model':run.model if run else None,'run_status':run.status if run else None,'error_code':run.error_code if run else None,
+        'trace':{} if scope_limited else {'workflow_version':meta.get('workflow_version'),'prompt_version':(run.prompt_snapshot or {}).get('version') if run else None,'engine':run.graph_version if run else None,'model':run.model if run else None,'run_status':run.status if run else None,'error_code':run.error_code if run else None,
             'configuration':meta.get('configuration_ref'),'language_validation':meta.get('language_policy'),'action_policy':meta.get('action_policy'),
             'last_message_status':latest.status if latest else None,'last_message_at':latest.created_at if latest else None,
             'receipt_semantics':'provider accepted is distinct from device delivery'},

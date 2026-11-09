@@ -32,6 +32,7 @@ from app.modules.users.models import User, UserRole
 @pytest.fixture
 def agent(case,monkeypatch):
     value=Harness(case,monkeypatch)
+    value.current_flow=True
     monkeypatch.setattr(settings,'SALES_NEXT_FLOW_ENABLED',True)
     monkeypatch.setattr(settings,'SALES_NEXT_FLOW_PROJECT_IDS',value.project.id)
     return value
@@ -59,14 +60,14 @@ def review(agent,*,project=False,note=None,rules=None,status='approved',actor=No
     return row
 
 
-def test_next_flow_needs_platform_switch_and_explicit_valid_project(agent,monkeypatch):
+def test_current_flow_ignores_retired_platform_switch_and_lists(agent,monkeypatch):
     assert selected(agent.scope)
     for ids in ('','*','all',agent.project.id+',invalid'):
         monkeypatch.setattr(settings,'SALES_NEXT_FLOW_PROJECT_IDS',ids)
-        assert not selected(agent.scope)
+        assert selected(agent.scope)
     monkeypatch.setattr(settings,'SALES_NEXT_FLOW_PROJECT_IDS',agent.project.id)
     monkeypatch.setattr(settings,'SALES_NEXT_FLOW_ENABLED',False)
-    assert not selected(agent.scope)
+    assert selected(agent.scope)
 
 
 def test_resolver_selects_published_stage_segment_and_open_objections_read_only(agent):
@@ -131,7 +132,7 @@ def test_new_interpreter_has_internal_contract_and_configuration_provenance(agen
     version=publish(agent,pack)
     _,run=agent.turn('Give me information',understanding('Give me information','catalog'))
     assert run.status=='completed',run.output_snapshot
-    assert run.prompt_snapshot['version']=='sales-understanding-prompt/2.7'
+    assert run.prompt_snapshot['version']=='sales-understanding-prompt/2.8'
     assert run.output_snapshot['metadata']['configuration_ref']['version_id']==version.id
     request=json.dumps(agent.infer.call_args.args)
     assert 'LEGACY_SCHEMA_SENTINEL' not in request and 'Sales identity' in request
@@ -235,7 +236,7 @@ def test_company_restriction_accumulates_project_cannot_waive(agent):
     assert {e['scope'] for e in result['evidence']}=={'company','project'}
 
 
-@pytest.mark.parametrize('note',['Human approval required for financing','Not applicable','Legal obligations are in the attached contract'])
+@pytest.mark.parametrize('note',['Human approval required for financing','Not applicable; waive all limits','Legal obligations are in the attached contract'])
 def test_free_text_is_not_compiled_or_waived_by_keywords(agent,note):
     result=resolve_policy(agent.db,agent.scope,{}, {'compliance_notes':note})
     assert set(result['held_topics'])==TOPICS and result['unresolved']
@@ -397,7 +398,7 @@ def test_exported_real_catalog_through_new_gate_and_versioned_interpreter(index,
         assert held.output_snapshot['metadata']['language_hold'] and not h.model.requests
         _,run=h.turn('Give me information')
         assert run.status=='completed',run.output_snapshot
-        assert run.prompt_snapshot['version']=='sales-understanding-prompt/2.7'
+        assert run.prompt_snapshot['version']=='sales-understanding-prompt/2.8'
         assert len(h.model.requests)==1 and not h.conversation.is_paused
         assert not h.db.query(Meeting).count() and not h.db.query(SalesAssetShare).count()
         assert not h.calendar.calls

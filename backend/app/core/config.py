@@ -30,6 +30,8 @@ class Settings(BaseSettings):
     DEFAULT_AI_MODEL: str = "deepseek/deepseek-chat"
     # Development/evaluation only. No live caller is wired in groups 1–3.
     SALES_UNDERSTANDING_PREVIEW_ENABLED: bool = False
+    # Deprecated rollout fields: retained for old deployments/diagnostic tools.
+    # They no longer select or disable the current production Sales workflow.
     SALES_DIALOGUE_RUNTIME_ENABLED: bool = False
     # Staged next-flow policy: both the switch AND an explicit project allowlist
     # are required. Existing global runtime activation never enables this work.

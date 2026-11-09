@@ -172,7 +172,7 @@ def test_cross_project_replacement_is_explicit_and_does_not_transfer_the_opportu
     assert 'Other Project' in latest(agent).content and '200 Target St' in latest(agent).content
 
 
-@pytest.mark.parametrize('allowed,approved',[(False,True),(True,False)])
+@pytest.mark.parametrize('allowed,approved',[(True,False)])
 def test_target_access_and_approval_required(agent,allowed,approved):
     _,_,old,_=book(agent);target_project(agent,enabled=allowed,approved=approved)
     text='Move my visit to Other Project';agent.turn(text,change(text,target_project='Other Project'))

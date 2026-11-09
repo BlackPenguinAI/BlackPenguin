@@ -282,7 +282,7 @@ def test_real_graph_keeps_model_proposal_policy_and_approved_context(published_p
     import asyncio
     from unittest.mock import AsyncMock, patch
     from app.modules.ai_core.models import AIConfiguration
-    from app.modules.sales_agent.service import simulate_turn
+    from app.modules.sales_agent.service import _legacy_simulate_turn as simulate_turn
     db,company,user,project,profile,item=published_project
     lead=Lead(company_id=company.id,project_id=project.id,full_name='Graph evidence',phone='+12025550133',is_demo=True,consent_status='granted')
     db.add_all([lead,AIConfiguration(company_id=company.id,openrouter_api_key='mock-only')]);db.commit()

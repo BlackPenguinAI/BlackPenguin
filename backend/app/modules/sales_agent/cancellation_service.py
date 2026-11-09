@@ -1,3 +1,5 @@
+from .execution import now as workflow_now
+from .execution import permitted
 """Exact, scoped cancellation. Reservation writes commit before retryable external effects."""
 from dataclasses import replace
 from datetime import datetime,timedelta
@@ -100,16 +102,16 @@ def collect_cleanup(db,row):
 def cancel(db,scope,conversation,lead,outcome,inbound,proposal):
     db.query(Lead).filter_by(id=scope.lead_id,company_id=scope.company_id,project_id=scope.project_id).populate_existing().with_for_update().one()
     db.query(SalesBookingOperation).filter_by(meeting_id=proposal['appointment']['id']).with_for_update().all()
-    row=db.query(Meeting).filter_by(id=proposal['appointment']['id'],lead_id=scope.lead_id).populate_existing().with_for_update().one_or_none()
+    row=db.query(Meeting).filter_by(id=proposal['appointment']['id'],lead_id=scope.lead_id,is_demo=conversation.channel == 'simulation').populate_existing().with_for_update().one_or_none()
     state=outcome.state
-    if not row or row.status not in {MeetingStatus.CONFIRMED,MeetingStatus.SCHEDULED} or row.meeting_time<=datetime.utcnow() or reservation_version(row)!=proposal['appointment']['booking_sha256']:
+    if not row or row.status not in {MeetingStatus.CONFIRMED,MeetingStatus.SCHEDULED} or row.meeting_time<=workflow_now(datetime) or reservation_version(row)!=proposal['appointment']['booking_sha256']:
         state.cancellation_proposal=None
         return 'That visit changed or is no longer eligible for this cancellation. No other reservation has been changed. Please review the current visit.',{'cancellation_context_question':True},[]
     authorize(db,scope,row.project_id)
-    if lead.deleted_at or lead.is_opt_out or lead.consent_status!='granted' or lead.agent_status=='human_control':raise PermissionError('Lead permissions changed.')
+    if lead.deleted_at or lead.is_opt_out or not permitted(lead) or lead.agent_status=='human_control':raise PermissionError('Lead permissions changed.')
     if row.assigned_sales_user_id:db.query(User).filter_by(id=row.assigned_sales_user_id).with_for_update().all()
     targets,previous,chain_limit=collect_cleanup(db,row)
-    snapshot=meeting_snapshot(db,row);now=datetime.utcnow()
+    snapshot=meeting_snapshot(db,row);now=workflow_now(datetime)
     from app.modules.governance.services import enqueue_notification
     with db.begin_nested():
         op=SalesCancellationOperation(company_id=scope.company_id,project_id=scope.project_id,booking_project_id=row.project_id,
@@ -160,7 +162,7 @@ def handle(db,scope,conversation,lead,outcome,inbound,previous):
     if directive and directive.action=='reason':return 'A reason is optional. No reservation has been changed by this message.',{'cancellation_followup_closed':True},[]
     if directive and directive.action=='decline':
         proposal=state.cancellation_proposal
-        row=db.query(Meeting).filter_by(id=proposal['appointment']['id'],lead_id=scope.lead_id).first() if proposal else None
+        row=db.query(Meeting).filter_by(id=proposal['appointment']['id'],lead_id=scope.lead_id,is_demo=conversation.channel == 'simulation').first() if proposal else None
         kept=bool(row and row.status in {MeetingStatus.CONFIRMED,MeetingStatus.SCHEDULED})
         state.cancellation_search={};state.cancellation_proposal=None
         return ('I have kept your original reservation. You can continue asking questions.' if kept else 'No new cancellation has been made. You can continue asking questions.'),{'cancellation_followup_closed':True},[]
@@ -174,7 +176,7 @@ def handle(db,scope,conversation,lead,outcome,inbound,previous):
     if assent:
         if not proposal or not prompt or prompt.metadata_json['cancellation_confirmation'].get('id')!=proposal['id']:
             return 'Please review a current cancellation summary before confirming. No reservation has been changed.',{'cancellation_context_question':True},[]
-        if proposal['scope']!=scope.__dict__ or proposal['id']!=digest({k:v for k,v in proposal.items() if k!='id'}) or datetime.fromisoformat(proposal['expires_at'])<=utc(datetime.utcnow()):
+        if proposal['scope']!=scope.__dict__ or proposal['id']!=digest({k:v for k,v in proposal.items() if k!='id'}) or datetime.fromisoformat(proposal['expires_at'])<=utc(workflow_now(datetime)):
             state.cancellation_proposal=None
             return 'That cancellation proposal expired or changed. Your reservation is unchanged. Please request a current summary.',{'cancellation_context_question':True},[]
         try:return cancel(db,scope,conversation,lead,outcome,inbound,proposal)
@@ -188,7 +190,7 @@ def handle(db,scope,conversation,lead,outcome,inbound,previous):
     try:authorize(db,scope,old.project_id)
     except PermissionError:return 'The cancellation needs access or approval review. Your reservation is unchanged.',{'cancellation_context_question':True},[]
     proposal={'version':VERSION,'scope':scope.__dict__,'appointment':meeting_snapshot(db,old),
-        'reason':directive.reason if directive else None,'reason_message_id':inbound.id if directive and directive.reason else None,'expires_at':(utc(datetime.utcnow())+timedelta(minutes=30)).isoformat()}
+        'reason':directive.reason if directive else None,'reason_message_id':inbound.id if directive and directive.reason else None,'expires_at':(utc(workflow_now(datetime))+timedelta(minutes=30)).isoformat()}
     proposal['id']=digest(proposal);state.cancellation_proposal=proposal;state.cancellation_search={'original_meeting_id':old.id}
     state.booking_proposal=None;state.reschedule_proposal=None
     return 'Current visit: '+current_description(proposal['appointment'])+'. Your reservation will remain in place unless you confirm. Shall I cancel this exact visit?',{
@@ -206,7 +208,7 @@ def validate_prepared(db,scope,metadata):
 
 def advance_effect(db,operation_id):
     op=db.query(SalesCancellationOperation).filter_by(id=operation_id).populate_existing().with_for_update(skip_locked=True).first()
-    if not op or op.calendar_status in TERMINAL or op.next_attempt_at>datetime.utcnow():return
+    if not op or op.calendar_status in TERMINAL or op.next_attempt_at>workflow_now(datetime):return
     scope=Scope(op.company_id,op.project_id,op.conversation_id,op.lead_id)
     pending=[t for t in op.snapshot_json['cleanup'] if not t['completed']]
     if not enabled(db,scope,[op.booking_project_id,*[t['project_id'] for t in pending]]):return
@@ -224,33 +226,21 @@ def advance_effect(db,operation_id):
             if not row or not project or project.company_id!=op.company_id or row.project_id!=project.id or row.assigned_sales_user_id!=target['user_id'] or row.status!=MeetingStatus.CANCELLED or row.confirmation_status not in {'rescheduled','cancelled_by_lead'} or row.gcal_event_id!=target['expected_meeting_event_id'] or not owner or not connection or connection.calendar_id!=target['calendar_id']:
                 op.calendar_status='review';op.last_error='CalendarBindingChanged';break
             if connection.status!='connected':
-                op.attempts-=1;op.calendar_status='waiting_connection';op.next_attempt_at=datetime.utcnow()+timedelta(minutes=10);break
+                op.attempts-=1;op.calendar_status='waiting_connection';op.next_attempt_at=workflow_now(datetime)+timedelta(minutes=10);break
             delete_calendar_event_for_connection(db,connection,target['event_id'])
             row.calendar_sync_status='cancelled_removed';target['completed']=True
         else:op.calendar_status='completed';op.last_error=None
     except Exception as exc:
         op.calendar_status='review' if op.attempts>=5 else 'retry';op.last_error=type(exc).__name__
-        op.next_attempt_at=datetime.utcnow()+timedelta(minutes=min(60,2**op.attempts))
+        op.next_attempt_at=workflow_now(datetime)+timedelta(minutes=min(60,2**op.attempts))
     op.snapshot_json=snapshot;db.commit()
 
 
 def retry_effects(db,limit=10):
-    from app.core.config import settings
-    from app.modules.ai_core.models import AIConfiguration
-    from .runtime_policy import RuntimePolicy
-    from uuid import UUID
-    if not settings.SALES_DIALOGUE_RUNTIME_ENABLED or not settings.SALES_NEXT_FLOW_ENABLED:return
-    ids=[v.strip() for v in settings.SALES_NEXT_FLOW_PROJECT_IDS.split(',') if v.strip()]
-    try:
-        if not ids or any(str(UUID(v))!=v for v in ids):return
-    except ValueError:return
-    config=db.query(AIConfiguration).filter_by(company_id=None).first();policy=RuntimePolicy.model_validate((config.agent_ventas or {}).get('runtime_config') or {}) if config else RuntimePolicy()
-    if policy.mode!='active':return
-    query=db.query(SalesCancellationOperation).filter(SalesCancellationOperation.calendar_status.in_(['pending','retry','waiting_connection']),SalesCancellationOperation.next_attempt_at<=datetime.utcnow(),SalesCancellationOperation.project_id.in_(ids),SalesCancellationOperation.booking_project_id.in_(ids))
-    if policy.scope=='cohort':
-        query=query.filter(SalesCancellationOperation.company_id.in_(policy.company_ids),SalesCancellationOperation.project_id.in_(policy.project_ids),SalesCancellationOperation.booking_project_id.in_(policy.project_ids))
-        if policy.lead_ids:query=query.filter(SalesCancellationOperation.lead_id.in_(policy.lead_ids))
-    for row in query.order_by(SalesCancellationOperation.next_attempt_at).limit(limit).all():advance_effect(db,row.id)
+    query=db.query(SalesCancellationOperation).filter(SalesCancellationOperation.calendar_status.in_(['pending','retry','waiting_connection']),SalesCancellationOperation.next_attempt_at<=workflow_now(datetime))
+    for row in query.order_by(SalesCancellationOperation.next_attempt_at).limit(limit).all():
+        from .effect_recovery import attempt
+        attempt(db,SalesCancellationOperation,row.id,lambda: advance_effect(db,row.id))
 
 
 def process_notification(db,event):
@@ -259,7 +249,7 @@ def process_notification(db,event):
     if not op:
         from app.modules.governance.services import _process_notification_event
         return _process_notification_event(db,event)
-    if op.notification_status in {'processed','review'} or op.notification_next_attempt_at>datetime.utcnow():return 0
+    if op.notification_status in {'processed','review'} or op.notification_next_attempt_at>workflow_now(datetime):return 0
     from app.modules.governance.services import _process_notification_event
     try:
         with db.begin_nested():
@@ -271,7 +261,7 @@ def process_notification(db,event):
         return created
     except Exception as exc:
         op.notification_attempts+=1;op.notification_status='review' if op.notification_attempts>=5 else 'retry'
-        op.notification_last_error=type(exc).__name__;op.notification_next_attempt_at=datetime.utcnow()+timedelta(minutes=min(60,2**op.notification_attempts))
+        op.notification_last_error=type(exc).__name__;op.notification_next_attempt_at=workflow_now(datetime)+timedelta(minutes=min(60,2**op.notification_attempts))
         return 0
 
 
@@ -290,9 +280,9 @@ def reset_effects(db,op,*,commit=True):
         from fastapi import HTTPException
         raise HTTPException(status_code=409,detail='The replacement chain requires manual Calendar reconciliation.')
     if op.calendar_status not in {'completed','simulation'}:
-        op.calendar_status='pending';op.attempts=0;op.last_error=None;op.next_attempt_at=datetime.utcnow()
+        op.calendar_status='pending';op.attempts=0;op.last_error=None;op.next_attempt_at=workflow_now(datetime)
     if op.notification_status!='processed':
-        op.notification_status='pending';op.notification_attempts=0;op.notification_last_error=None;op.notification_next_attempt_at=datetime.utcnow()
+        op.notification_status='pending';op.notification_attempts=0;op.notification_last_error=None;op.notification_next_attempt_at=workflow_now(datetime)
         event=db.get(NotificationOutbox,op.notification_outbox_id)
         if event:event.status='pending'
     if commit:db.commit()

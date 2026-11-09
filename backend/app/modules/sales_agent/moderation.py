@@ -1,4 +1,6 @@
 """Conservative current-message moderation; actions remain permission checked."""
+from .execution import now as workflow_now
+
 from datetime import datetime,timedelta
 import re
 from .moderation_models import SalesModerationIncident
@@ -49,7 +51,7 @@ def assess(db,scope,inbound,u,event_key):
     prior=None
     if directed:
         prior=db.query(SalesModerationIncident).filter_by(company_id=scope.company_id,project_id=scope.project_id,conversation_id=scope.conversation_id,lead_id=scope.lead_id,category='harassment',disposition='warn',dismissed_at=None).filter(
-            SalesModerationIncident.message_id!=inbound.id,SalesModerationIncident.warning_accepted_at>=datetime.utcnow()-timedelta(hours=24),SalesModerationIncident.warning_accepted_at<=inbound.created_at).order_by(SalesModerationIncident.warning_accepted_at.desc()).first()
+            SalesModerationIncident.message_id!=inbound.id,SalesModerationIncident.warning_accepted_at>=workflow_now(datetime)-timedelta(hours=24),SalesModerationIncident.warning_accepted_at<=inbound.created_at).order_by(SalesModerationIncident.warning_accepted_at.desc()).first()
     row=SalesModerationIncident(company_id=scope.company_id,project_id=scope.project_id,conversation_id=scope.conversation_id,lead_id=scope.lead_id,message_id=inbound.id,
         event_key=event_key,category=category,evidence=(severe['evidence'] if severe else current)[:2000],
         disposition='pause' if severe or prior else 'warn' if directed else 'continue',prior_warning_id=prior.id if prior else None)
@@ -67,14 +69,14 @@ def accepted_warning(db,conversation,metadata):
     row=db.query(SalesModerationIncident).filter_by(id=identifier,conversation_id=conversation.id,company_id=conversation.company_id,lead_id=conversation.lead_id,disposition='warn').first()
     message=accepted_outbound(db,conversation,'moderation')
     if row and not row.warning_accepted_at and message and message.metadata_json['moderation'].get('id')==row.id:
-        row.warning_message_id=message.id;row.warning_accepted_at=datetime.utcnow();db.flush()
+        row.warning_message_id=message.id;row.warning_accepted_at=workflow_now(datetime);db.flush()
 
 
 def dismiss_cases(db,conversation,cases):
     identifiers=[case.id for case in cases]
     rows=db.query(SalesModerationIncident).filter_by(company_id=conversation.company_id,project_id=conversation.project_id,conversation_id=conversation.id,lead_id=conversation.lead_id).filter(SalesModerationIncident.intervention_case_id.in_(identifiers)).all()
     for row in rows:
-        row.dismissed_at=datetime.utcnow()
+        row.dismissed_at=workflow_now(datetime)
         if row.prior_warning_id:
             prior=db.query(SalesModerationIncident).filter_by(id=row.prior_warning_id,conversation_id=conversation.id).first()
-            if prior:prior.dismissed_at=datetime.utcnow()
+            if prior:prior.dismissed_at=workflow_now(datetime)

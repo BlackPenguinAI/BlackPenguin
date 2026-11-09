@@ -23,8 +23,6 @@ class TurnOutcome:
 
 def run_turn(db, scope, *, message_id, understanding, expected_revision, event_key,
              max_steps=8, max_seconds=5.0, max_rounds=3,max_read_units=12,clock=time.monotonic):
-    if not settings.SALES_DIALOGUE_RUNTIME_ENABLED:
-        raise PermissionError('Staged dialogue runtime is disabled.')
     validate_write_request(event_key, expected_revision, 'state_update')
     if type(max_steps) is not int or not 1 <= max_steps <= 30 or type(max_seconds) not in {int,float} or not 0 < max_seconds <= 30:
         raise ValueError('Invalid runtime limits.')

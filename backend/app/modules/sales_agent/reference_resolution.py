@@ -1,4 +1,6 @@
 """Reference binding to approved entities and complete, accepted outbound offers."""
+from .execution import now as workflow_now
+
 from datetime import datetime,timezone
 import re
 import unicodedata
@@ -21,7 +23,7 @@ def accepted(message):
 
 def offers_for_turn(db,conversation,state,*,now=None):
     from .dialogue_shadow import recorded_offers
-    now=now or datetime.now(timezone.utc)
+    now=now or workflow_now(datetime).replace(tzinfo=timezone.utc)
     latest=latest_outbound(db,conversation.id,skip_language_holds=True)
     if not latest or latest.role!='assistant':return []
     current=recorded_offers(db,conversation,extended=False) if accepted(latest) else []
@@ -52,7 +54,7 @@ def offers_for_turn(db,conversation,state,*,now=None):
 class Resolver:
     def __init__(self,db,scope,state,*,now=None):
         self.db,self.scope,self.state=db,scope,state
-        self.now=now or datetime.now(timezone.utc)
+        self.now=now or workflow_now(datetime).replace(tzinfo=timezone.utc)
         self.context=build_commercial_context(db,project=db.get(Project,scope.project_id),company_id=scope.company_id,lead_id=scope.lead_id)
         self.types={r['id']:r for r in self.context['property_types']}
         self.units={r['id']:r for r in self.context['inventory'] if r.get('unit_code')}

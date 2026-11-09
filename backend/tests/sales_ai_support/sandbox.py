@@ -153,6 +153,11 @@ class InboundHarness:
         from app.modules.sales_crm import scheduling
         self.sandbox,self.db,self.clock=sandbox,sandbox.db,sandbox.clock
         self.project,self.lead,self.conversation=sandbox.conversation(project_id,channel)
+        # Exercise approved catalog facts through mocked LIVE channels. A demo
+        # export is copied into an isolated non-Demo fixture; Demo delivery itself
+        # is tested through the dedicated current simulation adapter.
+        self.project.is_demo=False
+        self.db.commit()
         self.model=ScriptedModel(*responses);self.messenger=RecordingMessenger();self.calendar=FakeCalendar()
         self.monkeypatch=monkeypatch
         monkeypatch.setattr(settings,'SALES_DIALOGUE_RUNTIME_ENABLED',True)

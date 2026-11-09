@@ -3,6 +3,8 @@
 This module does not classify commercial intent: the published LLM contract
 does that. It bounds deterministic selections and execution to current evidence.
 """
+from .execution import now as workflow_now
+
 import re
 from .conversation_scope import scoped_messages_query
 from .models import SalesConversation, SalesMessage

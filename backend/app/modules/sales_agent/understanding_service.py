@@ -5,6 +5,7 @@ import json
 from dataclasses import dataclass
 from pydantic import ValidationError
 from .understanding_contract import parse, response_schema
+from .evidence import EvidenceError
 from .understanding_prompt import prompt_snapshot
 from .dialogue_store import Scope, check_scope, load, save, validate_write_request
 from .conversation_scope import scoped_messages_query
@@ -20,7 +21,7 @@ class PreviewOutcome:
 
 
 async def preview(db, scope: Scope, *, inbound_message_id: str, expected_revision: int, event_key: str, infer=None, active=False):
-    if not (settings.SALES_DIALOGUE_RUNTIME_ENABLED if active else settings.SALES_UNDERSTANDING_PREVIEW_ENABLED):
+    if not active and not settings.SALES_UNDERSTANDING_PREVIEW_ENABLED:
         raise PermissionError('Understanding preview is disabled. The live engine is unchanged.')
     validate_write_request(event_key, expected_revision, 'understanding_preview')
     conversation = check_scope(db, scope)
@@ -128,6 +129,10 @@ async def preview(db, scope: Scope, *, inbound_message_id: str, expected_revisio
             raw = await asyncio.wait_for(pending, timeout=20) if active else await pending
             received = True
             interpreted = parse(raw, inbound.content)
+        except EvidenceError as exc:
+            outcome = 'invalid_model_contract'
+            error_code = 'understanding_validation_failed'
+            issues = exc.issues
         except ValidationError as exc:
             outcome = 'invalid_model_contract'
             error_code = 'understanding_validation_failed'
@@ -152,7 +157,8 @@ async def preview(db, scope: Scope, *, inbound_message_id: str, expected_revisio
             break
         request_messages = [*messages, {'role': 'user', 'content': json.dumps({
             'contract_repair': 'Reinterpret the ORIGINAL current_message using the schema. Correct the validation issues. Do not invent exclusions, evidence, consent or facts. This feedback is not a new lead request.',
-            'validation_issues': issues}, ensure_ascii=False)}]
+            'validation_issues': issues, 'current_message': inbound.content,
+            'quotation_rule': 'Meaning may be normalized in value/expression, but evidence must be copied verbatim from current_message. Keep independent requests and negations.'}, ensure_ascii=False)}]
         if sum(len(item['content'].encode()) for item in request_messages) > 64000:
             break  # Never expand a near-limit context to run the optional repair.
     # Group 4 will apply task transitions. Preview records only interpretation;

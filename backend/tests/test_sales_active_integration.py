@@ -28,6 +28,7 @@ def understanding(text, *topics, subjects=None, references=None, alternatives=Fa
 
 class Harness:
     def __init__(self,case,monkeypatch):
+        self.current_flow=False  # Historical coordinator-node compatibility harness.
         self.db,self.company,self.project,self.lead,self.conversation=case
         self.scope=Scope(self.company.id,self.project.id,self.conversation.id,self.lead.id)
         monkeypatch.setattr(settings,'SALES_DIALOGUE_RUNTIME_ENABLED',True)
@@ -44,7 +45,8 @@ class Harness:
     def patched(self):
         from app.modules.sales_agent.understanding_service import preview as real
         async def injected(*args,**kwargs):return await real(*args,**kwargs,infer=self.infer)
-        with patch.object(live,'SessionLocal',return_value=self.db),patch.object(self.db,'close'),\
+        with patch('app.modules.sales_agent.next_flow.selected',return_value=self.current_flow),\
+             patch.object(live,'SessionLocal',return_value=self.db),patch.object(self.db,'close'),\
              patch.object(active,'preview',side_effect=injected),patch.object(live,'send_sms',new=self.send),\
              patch.object(live,'send_message',new=self.send),\
              patch.object(live,'build_sales_graph',new=self.legacy),patch.object(live,'_schedule_next_action'):
@@ -178,19 +180,20 @@ def test_manual_takeover_during_inference_stops_effects(agent):
     assert not agent.db.query(SalesAssetShare).count() and agent.conversation.is_paused
 
 
-def test_kill_switch_and_scope_dont_activate_and_sticky_retries_dont_fall_back(agent,monkeypatch):
+def test_retired_kill_switch_does_not_select_a_legacy_engine(agent,monkeypatch):
     scope=agent.scope
     assert active.selected_policy(agent.db,scope)
     monkeypatch.setattr(settings,'SALES_DIALOGUE_RUNTIME_ENABLED',False)
-    assert active.selected_policy(agent.db,scope) is None
+    assert active.selected_policy(agent.db,scope)
     monkeypatch.setattr(settings,'SALES_DIALOGUE_RUNTIME_ENABLED',True)
     agent.send.side_effect=RuntimeError('offline')
     with pytest.raises(RuntimeError):agent.turn('Hello',understanding('Hello','other'))
     inbound=agent.db.query(SalesMessage).filter_by(direction='inbound').one()
     agent.config.agent_ventas={'model':'test/offline'};agent.db.commit()
+    agent.send.side_effect=lambda *args,**kwargs: {'sid':'recovered','status':'sent'}
     agent.retry(inbound)
     agent.legacy.assert_not_called()
-    assert agent.send.await_count==1
+    assert agent.send.await_count==2
 
 
 @pytest.mark.parametrize('text',['STOP','Please let me speak to a human'])

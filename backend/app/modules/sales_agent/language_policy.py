@@ -37,6 +37,8 @@ everything whenever wherever currently verified approved recorded new old previo
 open closed sent delivered read received unavailable unconfirmed until into around
 howdy goodbye bye bye-bye stop unsubscribe end quit yes absolutely fine details don'''.split())
 ENGLISH.update('joke jokes respectful warning abuse harassment threatening'.split())
+# Ordinary conversational English must reach intent/empathetic handling too.
+ENGLISH.update('feel feeling felt bad sad happy unhappy stressed stressful stress anxious anxiety upset tired sick ill rough difficult doing fine well day days life work working sorry worried worry exhausted overwhelmed confused frustrated frustration hurt painful pain personal better thanks thank appreciate please'.split())
 ENGLISH.update('alert alerts notify notification notifications request requests wait waiting waitlist nearby'.split())
 ENGLISH.update('active past cancelled canceled recorded specialist specialists showroom status duration progress'.split())
 ENGLISH.update('contains content contents coverage file files arrange arranging prepared prepare expired expires preferences matching'.split())
@@ -93,6 +95,13 @@ def detect(text,*,names=(),contextual_answer=False,output=False):
                     result=part.get_probabilities()[0]
                     if result.lang!='en' and result.prob>=.90:
                         return Decision(result.lang,round(result.prob,6),'non_english_clause',True)
+        if not output and 2 <= len(tokens) <= 12 and all(t.isascii() for t in tokens):
+            known = sum(t in ENGLISH or len(t) == 1 for t in tokens)
+            # Short statistical language guesses are unreliable. Strong English
+            # context tolerates a couple of new words/typos, after the explicit
+            # non-English clause check above. This grants no action permission.
+            if known >= 2 and known / len(tokens) >= 2/3 and len(tokens) - known <= 2:
+                return Decision('en',None,'english_contextual_short_text',False)
         accepted=top.lang=='en' and top.prob>=.55
         return Decision(top.lang,round(top.prob,6),'statistical_local',not accepted)
     except Exception:

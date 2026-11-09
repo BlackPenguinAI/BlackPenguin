@@ -1,3 +1,5 @@
+from .execution import now as workflow_now
+from .execution import permitted
 """Explicit availability alerts. No reservation is ever created by this worker."""
 from datetime import datetime,timedelta,time,date,timezone
 from types import SimpleNamespace
@@ -36,7 +38,7 @@ def interest(state):return {'property_type_id':state.selected_property_type_id,'
 
 
 def wait_offer(db,scope,outcome,context,prefs,*,original=None,allowed=None):
-    now=datetime.utcnow();prefs=fixed_preferences(prefs,now)
+    now=workflow_now(datetime);prefs=fixed_preferences(prefs,now)
     offer={'version':VERSION,'scope':scope.__dict__,'context':context,'preferences':prefs,'interest':interest(outcome.state),
         'original':meeting_snapshot(db,original) if original else None,'allowed_user_ids':sorted(allowed) if allowed else [],
         'expires_at':(utc(now)+timedelta(minutes=30)).isoformat()}
@@ -58,7 +60,7 @@ def enrich(u,previous,text):
 
 
 def close(row,reason):
-    row.status='closed';row.close_reason=reason;row.active_key=None;row.closed_at=datetime.utcnow();row.lease_until=None
+    row.status='closed';row.close_reason=reason;row.active_key=None;row.closed_at=workflow_now(datetime);row.lease_until=None
 
 
 def close_for_lead(db,scope,reason):
@@ -82,7 +84,7 @@ def search_matches(offer,state):
 
 def reconcile(db,scope,state,metadata):
     lead=db.get(Lead,scope.lead_id)
-    if lead.is_opt_out or lead.consent_status!='granted':close_for_lead(db,scope,'consent_withdrawn');return
+    if lead.is_opt_out or not permitted(lead):close_for_lead(db,scope,'consent_withdrawn');return
     if metadata.get('meeting_id'):close_for_lead(db,scope,'booked');return
     if metadata.get('cancellation_operation_id'):close_for_lead(db,scope,'appointment_cancelled');return
     for row in db.query(SalesWaitRequest).filter_by(company_id=scope.company_id,conversation_id=scope.conversation_id).filter(SalesWaitRequest.status.in_(list(OPEN))).all():
@@ -105,13 +107,13 @@ def original_for(db,scope,offer):
         if active_meetings(db,scope):raise PermissionError('A visit is already active.')
         return None
     row=db.query(Meeting).filter_by(id=old['id'],lead_id=scope.lead_id).populate_existing().first()
-    if not row or row.status not in {MeetingStatus.CONFIRMED,MeetingStatus.SCHEDULED} or row.meeting_time<=datetime.utcnow() or reservation_version(row)!=old['booking_sha256']:raise PermissionError('Original reservation changed.')
+    if not row or row.status not in {MeetingStatus.CONFIRMED,MeetingStatus.SCHEDULED} or row.meeting_time<=workflow_now(datetime) or reservation_version(row)!=old['booking_sha256']:raise PermissionError('Original reservation changed.')
     return row
 
 
 def build_notice(scope,offer,options,*,now=None):
     from .first_booking import VERSION as BOOKING
-    now=now or datetime.utcnow();prefs=offer['preferences'];context=offer['context']
+    now=now or workflow_now(datetime);prefs=offer['preferences'];context=offer['context']
     expires=(utc(now)+timedelta(minutes=30)).isoformat()
     if offer.get('original'):
         from .reschedule_service import VERSION as RESCHEDULE
@@ -132,12 +134,12 @@ def build_notice(scope,offer,options,*,now=None):
 
 def nearby(db,scope,offer,directive):
     original=original_for(db,scope,offer);project=fresh_context(db,scope,offer)
-    prefs=offer['preferences'];today=utc(datetime.utcnow()).astimezone(ZoneInfo(prefs['timezone'])).date()
+    prefs=offer['preferences'];today=utc(workflow_now(datetime)).astimezone(ZoneInfo(prefs['timezone'])).date()
     ranges=[]
     if directive.timing:
         from .first_booking import normalize_timing
-        prefs=normalize_timing(SimpleNamespace(visit=SimpleNamespace(timing=directive.timing)),directive.evidence,project,datetime.utcnow(),prefs)
-        ranges=[fixed_preferences(prefs,datetime.utcnow())]
+        prefs=normalize_timing(SimpleNamespace(visit=SimpleNamespace(timing=directive.timing)),directive.evidence,project,workflow_now(datetime),prefs)
+        ranges=[fixed_preferences(prefs,workflow_now(datetime))]
     else:
         first=date.fromisoformat(prefs['date_from']);last=date.fromisoformat(prefs['date_until'])
         if first>today:ranges.append({**prefs,'date_from':max(today,first-timedelta(days=3)).isoformat(),'date_until':(first-timedelta(days=1)).isoformat()})
@@ -145,7 +147,7 @@ def nearby(db,scope,offer,directive):
     candidates=[]
     for values in ranges[:2]:
         try:
-            for option in search_slots(db,replace(scope,project_id=project.id),values,datetime.utcnow(),excluded_meeting=original,allowed_user_ids=set(offer['allowed_user_ids']) or None):candidates.append((option,values))
+            for option in search_slots(db,replace(scope,project_id=project.id),values,workflow_now(datetime),excluded_meeting=original,allowed_user_ids=set(offer['allowed_user_ids']) or None):candidates.append((option,values))
         except ValueError:continue
     if not candidates:return 'I found no verified time on the nearby dates checked. Your saved preferences and any existing reservation are unchanged.',{'wait_result':True},[]
     candidates.sort(key=lambda pair:min(abs((datetime.fromisoformat(pair[0]['starts_at']).astimezone(ZoneInfo(prefs['timezone'])).date()-date.fromisoformat(offer['preferences'][k])).days) for k in ['date_from','date_until']))
@@ -173,13 +175,13 @@ def handle(db,scope,conversation,lead,outcome,inbound,previous):
     from .service import _affirmative_slot_reply
     accepted=accepted_outbound(db,conversation,'wait_offer');offer=(accepted.metadata_json or {}).get('wait_offer') if accepted else state.wait_context
     if _affirmative_slot_reply(inbound.content) and not accepted:return 'Please review a current alert question before accepting. No alert request has been added.',{'wait_result':True},[]
-    if not offer or offer.get('scope')!=scope.__dict__ or offer.get('id')!=digest({k:v for k,v in offer.items() if k!='id'}) or datetime.fromisoformat(offer['expires_at'])<=utc(datetime.utcnow()):return 'Please request current visit options and specify the property, date range and timezone before saving an alert.',{'wait_result':True},[]
+    if not offer or offer.get('scope')!=scope.__dict__ or offer.get('id')!=digest({k:v for k,v in offer.items() if k!='id'}) or datetime.fromisoformat(offer['expires_at'])<=utc(workflow_now(datetime)):return 'Please request current visit options and specify the property, date range and timezone before saving an alert.',{'wait_result':True},[]
     if offer['interest']!=interest(state) or not search_matches(offer,state):
         return 'Please request current visit options for your updated preferences before saving an alert. No alert request has been added.',{'wait_result':True},[]
     try:
         fresh_context(db,scope,offer);original_for(db,scope,offer)
         if directive.action=='nearby':return nearby(db,scope,offer,directive)
-        fixed_preferences(offer['preferences'],datetime.utcnow())
+        fixed_preferences(offer['preferences'],workflow_now(datetime))
         if directive.timing:return 'Please request current visit options with the revised dates first, so I can save the exact preferences.',{'wait_result':True},[]
     except (PermissionError,ValueError):return 'The alert preferences need verification. No alert request has been added and your reservation is unchanged.',{'wait_result':True},[]
     # Serialize duplicate opt-ins across channels for this lead.
@@ -192,7 +194,7 @@ def handle(db,scope,conversation,lead,outcome,inbound,previous):
     if old:close(old,'replaced_by_new_request');db.flush()
     prefs=offer['preferences'];expires=datetime.combine(date.fromisoformat(prefs['date_until'])+timedelta(days=1),time.min,tzinfo=ZoneInfo(prefs['timezone'])).astimezone(timezone.utc).replace(tzinfo=None)
     row=SalesWaitRequest(company_id=scope.company_id,project_id=scope.project_id,target_project_id=offer['context']['project_id'],conversation_id=scope.conversation_id,lead_id=scope.lead_id,
-        requested_message_id=inbound.id,active_key=active_key,request_key=signature,snapshot_json={**offer,'provider':conversation.provider,'contact_sha256':digest(lead.phone)},channel=conversation.channel,expires_at=expires,next_check_at=datetime.utcnow())
+        requested_message_id=inbound.id,active_key=active_key,request_key=signature,snapshot_json={**offer,'provider':conversation.provider,'contact_sha256':digest(lead.phone)},channel=conversation.channel,expires_at=expires,next_check_at=workflow_now(datetime))
     db.add(row);db.flush()
     return f"Your availability alert request is saved for {prefs['date_from']} through {prefs['date_until']} ({prefs['timezone']}). I will check those preferences and can send one alert if a verified time becomes available and the channel permits contact. This does not reserve a time. You can cancel the alert request at any time.",{'wait_request_saved':row.id,'wait_result':True},[{'type':'availability_wait_saved','wait_request_id':row.id}]
 
@@ -208,8 +210,8 @@ def validate_saved(db,scope,metadata):
 def current(db,row):
     scope=Scope(row.company_id,row.project_id,row.conversation_id,row.lead_id)
     conversation=check_scope(db,scope);lead=db.query(Lead).filter_by(id=row.lead_id).populate_existing().one()
-    if row.expires_at<=datetime.utcnow():close(row,'expired');raise WaitBlocked('Expired')
-    if lead.deleted_at or lead.is_opt_out or lead.consent_status!='granted':close(row,'consent_withdrawn');raise WaitBlocked('ConsentWithdrawn')
+    if row.expires_at<=workflow_now(datetime):close(row,'expired');raise WaitBlocked('Expired')
+    if lead.deleted_at or lead.is_opt_out or not permitted(lead):close(row,'consent_withdrawn');raise WaitBlocked('ConsentWithdrawn')
     if conversation.channel!=row.channel or conversation.provider!=row.snapshot_json['provider'] or digest(lead.phone)!=row.snapshot_json['contact_sha256']:close(row,'contact_changed');raise WaitBlocked('ContactChanged')
     from .dialogue_models import SalesDialogueState
     scope.query(db,SalesDialogueState).populate_existing().first()
@@ -237,7 +239,7 @@ def contact_time(db,row,conversation):
     from app.modules.governance.services import next_allowed_proactive_time
     values=[next_allowed_proactive_time(db,company_id=row.company_id,project_id=pid) for pid in {row.project_id,row.target_project_id}]
     allowed=max(values)
-    if allowed>datetime.utcnow():
+    if allowed>workflow_now(datetime):
         row.next_check_at=allowed
         raise WaitBlocked('OperatingWindowClosed')
 
@@ -251,7 +253,7 @@ def locked_request(db,identifier,*,claim=False):
     query=db.query(SalesWaitRequest).filter_by(id=identifier).populate_existing().with_for_update(skip_locked=True)
     row=query.first()
     if not row or row.status not in OPEN:return None
-    if claim and (row.next_check_at>datetime.utcnow() and row.expires_at>datetime.utcnow() or row.status=='processing' and row.lease_until and row.lease_until>datetime.utcnow()):return None
+    if claim and (row.next_check_at>workflow_now(datetime) and row.expires_at>workflow_now(datetime) or row.status=='processing' and row.lease_until and row.lease_until>workflow_now(datetime)):return None
     return row
 
 
@@ -263,17 +265,17 @@ def authorize_part(db,conversation,lead,metadata,content,*,before_provider=False
     scope,_,_,revision,inbound_id,old=current(db,row);contact_time(db,row,conversation)
     if revision!=row.anchor_revision or inbound_id!=row.anchor_inbound_id:raise WaitBlocked('ConcurrentInboundTurn')
     payload=row.notice_json
-    if not payload or metadata.get('wait_notice_sha256')!=digest(payload) or datetime.fromisoformat(payload['expires_at'])<=utc(datetime.utcnow()):close(row,'notice_expired');raise WaitBlocked('NoticeExpired')
+    if not payload or metadata.get('wait_notice_sha256')!=digest(payload) or datetime.fromisoformat(payload['expires_at'])<=utc(workflow_now(datetime)):close(row,'notice_expired');raise WaitBlocked('NoticeExpired')
     from .response_policy import render_channel_text,split_channel_text
     expected=split_channel_text(render_channel_text(payload['text'],row.channel),row.channel)
     group=metadata.get('delivery_group',{});index=group.get('part',1)-1
     if group.get('total',1)!=len(expected) or not 0<=index<len(expected) or content!=expected[index]:raise PermissionError('Alert content changed during dispatch.')
     if before_provider:
-        row.lease_until=datetime.utcnow()+timedelta(minutes=10)
+        row.lease_until=workflow_now(datetime)+timedelta(minutes=10)
         from app.modules.sales_crm.scheduling import eligible_users_for_slot
         for option in payload['options']:
             starts=datetime.fromisoformat(option['starts_at']).astimezone(timezone.utc).replace(tzinfo=None)
-            if starts<=datetime.utcnow() or option['sales_user_id'] not in eligible_users_for_slot(db,project_id=row.target_project_id,starts_at=starts,duration_minutes=row.snapshot_json['preferences']['duration_minutes'],excluded_meeting=old,allowed_sales_user_ids={option['sales_user_id']}):
+            if starts<=workflow_now(datetime) or option['sales_user_id'] not in eligible_users_for_slot(db,project_id=row.target_project_id,starts_at=starts,duration_minutes=row.snapshot_json['preferences']['duration_minutes'],excluded_meeting=old,allowed_sales_user_ids={option['sales_user_id']}):
                 close(row,'offered_time_changed');raise WaitBlocked('OfferedTimeChanged')
 
 
@@ -284,17 +286,17 @@ async def process_one(db,identifier):
     try:
         scope,conversation,lead,revision,inbound_id,old=current(db,row);contact_time(db,row,conversation)
         row.anchor_revision=revision;row.anchor_inbound_id=inbound_id
-        row.status='processing';row.claim_token=token;row.lease_until=datetime.utcnow()+timedelta(minutes=10);db.commit()
+        row.status='processing';row.claim_token=token;row.lease_until=workflow_now(datetime)+timedelta(minutes=10);db.commit()
         if not row.notice_json:
             preferences=row.snapshot_json['preferences']
-            today=utc(datetime.utcnow()).astimezone(ZoneInfo(preferences['timezone'])).date()
+            today=utc(workflow_now(datetime)).astimezone(ZoneInfo(preferences['timezone'])).date()
             first=max(today,date.fromisoformat(preferences['date_from']))
             scan=max(first,date.fromisoformat(row.scan_date)) if row.scan_date else first
             last=date.fromisoformat(preferences['date_until'])
             if scan>last or scan>today+timedelta(days=90):scan=first
             until=min(last,scan+timedelta(days=13),today+timedelta(days=90))
             check_preferences={**preferences,'date_from':scan.isoformat(),'date_until':until.isoformat()}
-            options=search_slots(db,replace(scope,project_id=row.target_project_id),check_preferences,datetime.utcnow(),excluded_meeting=old,allowed_user_ids=set(row.snapshot_json['allowed_user_ids']) or None)
+            options=search_slots(db,replace(scope,project_id=row.target_project_id),check_preferences,workflow_now(datetime),excluded_meeting=old,allowed_user_ids=set(row.snapshot_json['allowed_user_ids']) or None)
             next_scan=until+timedelta(days=1) if until<last else first
             row=db.query(SalesWaitRequest).filter_by(id=identifier).populate_existing().with_for_update().one()
             if row.status!='processing' or row.claim_token!=token:db.rollback();return
@@ -302,7 +304,7 @@ async def process_one(db,identifier):
                 original=row.snapshot_json['original'];context=row.snapshot_json['context']
                 options=[o for o in options if not (o['starts_at']==original['starts_at'] and o['sales_user_id']==original['sales_user_id'] and context['project_id']==original['project_id'] and context['property_type_id']==original['property_type_id'] and context['unit_id']==original['unit_id'] and context['location']==original['location'] and context['duration_minutes']==original['duration_minutes'])]
             if not options:
-                row.scan_date=next_scan.isoformat();row.status='waiting';row.next_check_at=datetime.utcnow()+timedelta(minutes=15);row.lease_until=None;row.last_error=None;db.commit();return
+                row.scan_date=next_scan.isoformat();row.status='waiting';row.next_check_at=workflow_now(datetime)+timedelta(minutes=15);row.lease_until=None;row.last_error=None;db.commit();return
             text,metadata,expires=build_notice(scope,row.snapshot_json,options)
             from .language_policy import detect,scoped_names
             from .commercial_context import build_commercial_context
@@ -310,7 +312,7 @@ async def process_one(db,identifier):
             commercial=build_commercial_context(db,project=project,company_id=row.company_id,lead_id=row.lead_id,channel=row.channel)
             if detect(text,names=scoped_names(project,lead,commercial),output=True).needs_reentry:raise WaitBlocked('OutputLanguageReview')
             row.notice_json={'text':text,'metadata':metadata,'options':options,'expires_at':expires};db.commit()
-        if datetime.fromisoformat(row.notice_json['expires_at'])<=utc(datetime.utcnow()):close(row,'notice_expired');db.commit();return
+        if datetime.fromisoformat(row.notice_json['expires_at'])<=utc(workflow_now(datetime)):close(row,'notice_expired');db.commit();return
         from . import live_service
         row.attempts+=1;db.commit()
         metadata={**row.notice_json['metadata'],'wait_request_id':row.id,'wait_notice_sha256':digest(row.notice_json),'wait_claim_token':token,'engine':VERSION,'event_kind':'availability_wait_alert'}
@@ -324,16 +326,16 @@ async def process_one(db,identifier):
         db.refresh(row)
         if row.status not in OPEN or row.claim_token!=token:db.commit();return
         if complete:
-            row.status='notified';row.notified_message_id=message.id;row.active_key=None;row.closed_at=datetime.utcnow();row.lease_until=None;row.last_error=None
+            row.status='notified';row.notified_message_id=message.id;row.active_key=None;row.closed_at=workflow_now(datetime);row.lease_until=None;row.last_error=None
         elif all(p.status=='failed' or accepted(p) for p in matched) and any(p.status=='failed' for p in matched):
-            row.status='review' if row.attempts>=3 else 'retry';row.last_error='ProviderRejected';row.next_check_at=datetime.utcnow()+timedelta(minutes=2**row.attempts);row.lease_until=None
+            row.status='review' if row.attempts>=3 else 'retry';row.last_error='ProviderRejected';row.next_check_at=workflow_now(datetime)+timedelta(minutes=2**row.attempts);row.lease_until=None
             if row.status=='review':row.active_key=None
         else:row.status='review';row.active_key=None;row.lease_until=None;row.last_error='ProviderOutcomeUnknown'
         db.commit()
     except WaitBlocked as exc:
         if row.status in OPEN and row.claim_token in {None,token}:
             row.status='blocked_channel';row.last_error=str(exc);row.lease_until=None
-            row.next_check_at=max(row.next_check_at,datetime.utcnow()+timedelta(minutes=15))
+            row.next_check_at=max(row.next_check_at,workflow_now(datetime)+timedelta(minutes=15))
         db.commit()
     except Exception as exc:
         # Network timeouts can be ambiguous. Do not automatically send another alert.
@@ -343,27 +345,13 @@ async def process_one(db,identifier):
 
 
 async def process_due(limit=10):
-    from app.core.config import settings
-    from app.modules.ai_core.models import AIConfiguration
-    from .runtime_policy import RuntimePolicy
-    from uuid import UUID
-    if not settings.SALES_DIALOGUE_RUNTIME_ENABLED or not settings.SALES_NEXT_FLOW_ENABLED:return
-    ids=[v.strip() for v in settings.SALES_NEXT_FLOW_PROJECT_IDS.split(',') if v.strip()]
-    try:
-        if not ids or any(str(UUID(v))!=v for v in ids):return
-    except ValueError:return
     from app.db.postgres import SessionLocal
     db=SessionLocal()
     try:
-        config=db.query(AIConfiguration).filter_by(company_id=None).first();policy=RuntimePolicy.model_validate((config.agent_ventas or {}).get('runtime_config') or {}) if config else RuntimePolicy()
-        if policy.mode!='active':return
         from sqlalchemy import or_
-        now=datetime.utcnow()
-        query=db.query(SalesWaitRequest).filter(SalesWaitRequest.status.in_(list(OPEN)),SalesWaitRequest.project_id.in_(ids),SalesWaitRequest.target_project_id.in_(ids),
+        now=workflow_now(datetime)
+        query=db.query(SalesWaitRequest).filter(SalesWaitRequest.status.in_(list(OPEN)),
             or_(SalesWaitRequest.next_check_at<=now,SalesWaitRequest.expires_at<=now),or_(SalesWaitRequest.lease_until.is_(None),SalesWaitRequest.lease_until<=now))
-        if policy.scope=='cohort':
-            query=query.filter(SalesWaitRequest.company_id.in_(policy.company_ids),SalesWaitRequest.project_id.in_(policy.project_ids),SalesWaitRequest.target_project_id.in_(policy.project_ids))
-            if policy.lead_ids:query=query.filter(SalesWaitRequest.lead_id.in_(policy.lead_ids))
         values=[r.id for r in query.order_by(SalesWaitRequest.next_check_at).limit(max(1,min(limit,10))).all()]
         db.commit()
         for identifier in values:await process_one(db,identifier)

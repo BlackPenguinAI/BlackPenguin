@@ -1,4 +1,5 @@
 from __future__ import annotations
+from .execution import now as workflow_now
 
 from datetime import datetime, timezone
 import ipaddress
@@ -47,7 +48,7 @@ def _trusted_inventory_date(value: datetime | None) -> datetime | None:
     if value is None:
         return None
     aware = value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
-    return value if aware <= datetime.now(timezone.utc) else None
+    return value if aware <= workflow_now(datetime).replace(tzinfo=timezone.utc) else None
 
 
 def _asset_capabilities(item: Any) -> list[str]:
@@ -217,7 +218,7 @@ def _project_fact_conflicts(facts: dict[str, Any]) -> list[dict[str, Any]]:
     delivery = str(facts.get("delivery_dates") or facts.get("delivery_timeline") or "")
     years = [int(value) for value in re.findall(r"\b20\d{2}\b", delivery)]
     ready_now = any(term in status for term in ("ready for occupancy", "move-in ready", "ready to move", "completed"))
-    if ready_now and any(year > datetime.now(timezone.utc).year for year in years):
+    if ready_now and any(year > workflow_now(datetime).replace(tzinfo=timezone.utc).year for year in years):
         conflicts.append({
             "code": "ready_status_future_delivery",
             "fields": ["project_status", "delivery_dates"],

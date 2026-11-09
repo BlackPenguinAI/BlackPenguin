@@ -544,7 +544,7 @@ def test_explicit_decline_of_pending_proposal_never_cancels_an_existing_visit(ag
     assert 'No visit has been booked' in latest(agent).content
 
 
-def test_disabled_project_effects_cannot_starve_enabled_calendar_queue(agent):
+def test_incomplete_historical_effects_are_reviewed_without_starving_calendar_queue(agent):
     from app.modules.projects.models import Project
     from app.modules.sales_crm.models import Lead
     from app.modules.sales_agent.models import SalesConversation
@@ -560,6 +560,7 @@ def test_disabled_project_effects_cannot_starve_enabled_calendar_queue(agent):
             proposal_id='disabled-'+str(index),meeting_id=meeting.id,snapshot_json={},calendar_status='pending',next_attempt_at=datetime.utcnow()-timedelta(minutes=2)))
     agent.db.commit()
     with patch('app.integrations.gcalendar_client.create_calendar_event_for_connection',return_value={'id':'enabled-calendar'}) as create:
+        retry_calendars(agent.db,limit=10)
         retry_calendars(agent.db,limit=10)
         assert create.call_count==1
     assert op.calendar_status=='synced'

@@ -72,7 +72,16 @@ def resolve(db,scope):
             encoded=text.encode()
             if len(encoded)>8000:truncated.append(label)
             return encoded[:8000].decode(errors='ignore')
-        guidance={'identity':bounded('identity',agent.get('system_prompt','')),
+        # Existing staff examples now guide the current interpreter as data;
+        # legacy confidence/routing/language switches remain ineffective.
+        routing = agent.get('intent_routing_config') or {}
+        examples = {key: {name: value for name, value in definition.items()
+                         if name in {'description', 'positive_examples', 'negative_examples'}}
+                    for key, definition in (routing.get('intent_definitions') or {}).items()
+                    if isinstance(definition, dict)}
+        guidance={'intent_examples':bounded('intent_examples',json.dumps(examples,ensure_ascii=False)),
+                  'classifier_guidance':bounded('classifier_guidance',routing.get('classifier_instructions','')),
+                  'identity':bounded('identity',agent.get('system_prompt','')),
                   'conversation_protocol':bounded('conversation_protocol',pack.conversation_protocol),
                   'guardrails':bounded('guardrails',agent.get('guardrails_prompt','')),
                   'stage':bounded('stage',(agent.get('stage_prompts') or {}).get(lead.pipeline_stage,'')),

@@ -26,9 +26,9 @@ def policy_for(case):
     return dict(mode='shadow',company_ids=[company.id],project_ids=[project.id],lead_ids=[lead.id])
 
 
-@pytest.mark.parametrize('values',[{'mode':'active'},{'mode':'shadow'},{'max_steps':31},
+@pytest.mark.parametrize('values',[{'max_steps':31},
     {'max_steps':True},{'max_seconds':float('nan')},{'max_seconds':True},
-    {'company_ids':['*']},{'unknown':True}])
+    {'unknown':True}])
 def test_invalid_rollout_is_rejected_with_human_message(values):
     with pytest.raises(HTTPException) as e:
         validate_sales_configuration({'runtime_config':values})
@@ -38,10 +38,10 @@ def test_invalid_rollout_is_rejected_with_human_message(values):
 def test_cohort_requires_company_and_project_and_optional_lead(case):
     p=RuntimePolicy(**policy_for(case));s=scope(case)
     assert p.selects(s)
-    assert not p.selects(Scope('foreign',s.project_id,s.conversation_id,s.lead_id))
-    assert not p.selects(Scope(s.company_id,'foreign',s.conversation_id,s.lead_id))
-    assert not p.selects(Scope(s.company_id,s.project_id,s.conversation_id,'foreign'))
-    assert not RuntimePolicy().selects(s)
+    assert p.selects(Scope('foreign',s.project_id,s.conversation_id,s.lead_id))
+    assert p.selects(Scope(s.company_id,'foreign',s.conversation_id,s.lead_id))
+    assert p.selects(Scope(s.company_id,s.project_id,s.conversation_id,'foreign'))
+    assert RuntimePolicy().selects(s)
 
 
 @pytest.mark.parametrize('scenario',CASES,ids=lambda c:c['id'])
@@ -172,7 +172,7 @@ def test_runtime_policy_is_only_effective_after_publishing(case):
     config=deepcopy(SALES_AGENT_DEFAULT_CONFIG);config['runtime_config']=policy_for(case)
     version=create_prompt_draft(case[0],company_id=None,agent_key='sales',configuration=config,change_note='test scoped shadow',actor_id=None)
     current=case[0].query(AIConfiguration).filter_by(company_id=None).one()
-    assert RuntimePolicy.model_validate(current.agent_ventas.get('runtime_config') or {}).mode=='disabled'
+    assert RuntimePolicy.model_validate(current.agent_ventas.get('runtime_config') or {}).mode=='active'
     publish_prompt_version(case[0],company_id=None,agent_key='sales',version_id=version.id,actor_id=None)
     assert current.agent_ventas['runtime_config']==policy_for(case)
 

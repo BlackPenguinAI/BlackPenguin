@@ -218,9 +218,13 @@ export class AiSettingsPageComponent implements OnInit {
   private refreshPromptKeys(): void {
     this.config.agent_ventas ||= {};
     this.config.agent_ventas.runtime_config = {
-      mode: 'disabled', scope: 'cohort', company_ids: [], project_ids: [], lead_ids: [],
-      max_steps: 8, max_seconds: 5, understanding_guidance: '', composition_style: 'concise',
-      ...(this.config.agent_ventas.runtime_config || {})
+      max_steps: 8, max_seconds: 5, composition_style: 'concise', understanding_guidance: '',
+      ...(this.config.agent_ventas.runtime_config || {}),
+      mode: 'active', scope: 'global', company_ids: [], project_ids: [], lead_ids: []
+    };
+    this.config.agent_ventas.sales_playbook ||= {
+      version: 'sales-playbook/1.0',
+      conversation_protocol: 'Answer the current question with approved facts first. Use explicit lead preferences, avoid repeated questions and ask at most one useful next question. Follow changes of topic naturally without pressure. Communicate in English. The backend controls permissions and actions.'
     };
     const sales = this.config.agent_ventas ||= {};
     sales.intent_routing_config ||= { intent_definitions: {} };

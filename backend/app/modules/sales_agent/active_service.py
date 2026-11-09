@@ -1,4 +1,6 @@
 """Structured production coordinator. No legacy graph or text-based asset selection."""
+from .execution import now as workflow_now
+
 import asyncio
 from dataclasses import asdict
 from datetime import datetime, timezone, timedelta
@@ -39,10 +41,12 @@ def authorize_part(db,conversation,lead,metadata):
         raise PermissionError('Lead no longer permits messages.')
     if conversation.is_paused and conversation.pause_reason!=metadata.get('expected_pause_reason'):
         raise PermissionError('Manual control interrupted dispatch.')
-    if lead.consent_status!='granted' and metadata.get('control_outcome')!='opt_out':
+    from .execution import permitted
+    if not permitted(lead) and metadata.get('control_outcome')!='opt_out':
         raise PermissionError('Messaging consent was withdrawn.')
     project=db.get(Project,scope.project_id)
-    if project.profile and metadata.get('control_outcome') != 'opt_out':
+    from .execution import simulated
+    if project.profile and metadata.get('control_outcome') != 'opt_out' and not (simulated(scope) and project.is_demo):
         db.refresh(project.profile);require_capability(project.profile)
     if not metadata.get('control_outcome'):
         from .sales_policy import policy_context, compliance_action_holds
@@ -56,7 +60,7 @@ def authorize_part(db,conversation,lead,metadata):
         approved={a.id for a in sales_asset_service.approved_for_turn(db,project_id=scope.project_id,company_id=scope.company_id,channel=conversation.channel)}
         shares=db.query(SalesAssetShare).filter(SalesAssetShare.id.in_(ids),SalesAssetShare.company_id==scope.company_id,
             SalesAssetShare.project_id==scope.project_id,SalesAssetShare.lead_id==scope.lead_id).all()
-        if len(shares)!=len(ids) or any(s.sales_asset_id not in approved or s.revoked or s.expires_at<=datetime.utcnow() for s in shares):
+        if len(shares)!=len(ids) or any(s.sales_asset_id not in approved or s.revoked or s.expires_at<=workflow_now(datetime) for s in shares):
             raise PermissionError('Material approval changed before dispatch.')
         if metadata.get('material_delivery_version'):
             from .material_delivery import validate_shares
@@ -65,11 +69,15 @@ def authorize_part(db,conversation,lead,metadata):
 
 
 def selected_policy(db,scope):
-    if not settings.SALES_DIALOGUE_RUNTIME_ENABLED:
-        return None
-    config=db.query(AIConfiguration).filter_by(company_id=None).first()
-    policy=RuntimePolicy.model_validate((config.agent_ventas or {}).get('runtime_config') or {}) if config else RuntimePolicy()
-    return policy if policy.mode=='active' and policy.selects(scope) else None
+    from .turn_configuration import published_configuration
+    try:
+        agent, _ = published_configuration(db, scope.company_id)
+    except ValueError:
+        # Selection is unconditional, even before a model is configured. Control
+        # events (especially STOP) never depend on a model/publication existing.
+        # The interpreter validates configuration before any commercial action.
+        return RuntimePolicy()
+    return RuntimePolicy.model_validate(agent.get('runtime_config') or {})
 
 
 def _current(db,scope,control=False):
@@ -79,10 +87,15 @@ def _current(db,scope,control=False):
     if lead.deleted_at or lead.is_opt_out or (conversation.is_paused and not control):
         raise PermissionError('Manual control, opt-out or a changed opportunity interrupted this turn.')
     project=db.query(Project).filter_by(id=scope.project_id,company_id=scope.company_id).populate_existing().one()
-    if project.profile and not control:
+    from .execution import simulated, permitted
+    if (lead.is_demo or project.is_demo) and conversation.channel != 'simulation':
+        raise PermissionError('Demo data may only use explicit simulation.')
+    if conversation.channel == 'simulation' and not simulated(scope):
+        raise PermissionError('Simulation adapter is required.')
+    if project.profile and not control and not (simulated(scope) and project.is_demo):
         db.refresh(project.profile)
         require_capability(project.profile)
-    if lead.consent_status!='granted' and not control:
+    if not permitted(lead) and not control:
         raise PermissionError('Messaging consent is not granted.')
     return conversation,lead,project
 
@@ -266,7 +279,7 @@ def _appointment(db,scope,conversation,lead,project,outcome,inbound):
             conversation.stage='appointment_confirmed';conversation.is_paused=True;conversation.pause_reason='Appointment confirmed'
             lead.pipeline_stage='S09_HANDOFF';lead.agent_status='appointment_confirmed';lead.next_action_at=None
             return live._appointment_confirmation(project=project,lead=lead,user=user,starts_at=meeting.meeting_time),{'meeting_id':meeting.id},[{'type':'appointment_confirmed','meeting_id':meeting.id}]
-    reply,slots=live._availability_reply(db,project=project,inbound_text=resume or inbound.content,now=datetime.utcnow())
+    reply,slots=live._availability_reply(db,project=project,inbound_text=resume or inbound.content,now=workflow_now(datetime))
     lead.pipeline_stage='S08_APPOINTMENT'
     offer={'slots':[s.isoformat() for s in slots],'duration_minutes':45,'project_timezone':project.timezone or 'UTC'}
     if next_selected(scope):offer.update(project_id=scope.project_id,property_type_id=outcome.state.selected_property_type_id,
@@ -294,7 +307,7 @@ def _calendar_after_commit(db,meeting_id,scope):
     meeting=db.query(Meeting).filter_by(id=meeting_id,project_id=scope.project_id,lead_id=scope.lead_id).with_for_update().one()
     from app.modules.sales_crm.models import MeetingStatus
     if (meeting.calendar_sync_status not in {'pending','failed'} or meeting.is_demo
-        or meeting.status!=MeetingStatus.CONFIRMED or meeting.meeting_time<=datetime.utcnow()):return
+        or meeting.status!=MeetingStatus.CONFIRMED or meeting.meeting_time<=workflow_now(datetime)):return
     from app.modules.sales_crm.models import CalendarConnection
     connection=db.query(CalendarConnection).filter_by(user_id=meeting.assigned_sales_user_id,provider='google',status='connected').first()
     if not connection:return
@@ -316,7 +329,6 @@ def _calendar_after_commit(db,meeting_id,scope):
 
 def retry_active_calendars(db,limit=10):
     """Bounded worker retry; no legacy bookings or disabled cohorts touched."""
-    if not settings.SALES_DIALOGUE_RUNTIME_ENABLED:return
     from .first_booking import retry_calendars
     retry_calendars(db,limit)
     from .reschedule_service import retry_effects
@@ -325,7 +337,7 @@ def retry_active_calendars(db,limit=10):
     retry_cancellations(db,limit)
     from app.modules.sales_crm.models import MeetingStatus
     rows=db.query(Meeting).filter(Meeting.source=='agent_sms_active',Meeting.status==MeetingStatus.CONFIRMED,
-        Meeting.calendar_sync_status.in_(['pending','failed']),Meeting.meeting_time>datetime.utcnow()).order_by(
+        Meeting.calendar_sync_status.in_(['pending','failed']),Meeting.meeting_time>workflow_now(datetime)).order_by(
         Meeting.created_at).limit(limit).all()
     for meeting in rows:
         conversation=db.query(SalesConversation).filter_by(project_id=meeting.project_id,lead_id=meeting.lead_id).first()
@@ -367,15 +379,23 @@ def active_followup_result(db,scope):
     return {'proposed_reply':reply+' Reply STOP to opt out.',
         'model':'deterministic-active-followup','prompt_snapshot':{},'proposed_actions':[],
         'primary_intent':'scheduled_follow_up','requires_human':False,'policy_violations':[],
-        'response_policy_trace':{'engine':ENGINE,'source':'cadence_no_new_user_intent'}}
+        'response_policy_trace':{'engine':ENGINE,'workflow_version':'sales-current/1.0','source':'cadence_no_new_user_intent'}}
 
 
-async def maybe_process_active(db,conversation,inbound):
+async def maybe_process_active(db,conversation,inbound,*,event_id_override=None):
     from . import live_service as live
     scope=Scope(conversation.company_id,conversation.project_id,conversation.id,conversation.lead_id)
-    event_id=f'{conversation.provider}:{inbound.provider_message_id or inbound.id}'
+    event_id=event_id_override or f'{conversation.provider}:{inbound.provider_message_id or inbound.id}'
     existing=db.query(AgentRun).filter_by(event_id=event_id).first()
+    if existing and existing.conversation_id != conversation.id:
+        raise DialogueConflict('The inbound event belongs to another conversation.')
     sticky=bool(existing and existing.graph_version==ENGINE)
+    if existing and existing.graph_version != ENGINE and existing.status not in {'completed','blocked'}:
+        # Historical effects may already exist. Never reinterpret or overwrite
+        # an unfinished legacy event under a different workflow.
+        existing.error_code='historical_turn_requires_reconciliation'
+        existing.status='blocked';db.commit()
+        return True
     policy=selected_policy(db,scope)
     if policy:
         from .first_booking import recover_booking_pause
@@ -421,7 +441,7 @@ async def maybe_process_active(db,conversation,inbound):
             if release_offer and live._affirmative_slot_reply(inbound.content):
                 state.constraints=[c for c in state.constraints if not (c.topic.value==release_offer['topic'] and c.subject==release_offer.get('subject'))]
             revision,state=save(db,scope,event_key='active-context:'+inbound.id,expected_revision=revision,state=state,
-                metadata={'engine':ENGINE,'message_id':inbound.id})
+                metadata={'engine':ENGINE,'workflow_version':'sales-current/1.0','message_id':inbound.id})
             protected=evidenced_pause_reason(inbound.content)
             if next_enabled and not protected:
                 from .language_policy import credential_request
@@ -492,7 +512,7 @@ async def maybe_process_active(db,conversation,inbound):
             # a specific fallback question; never send "not sent yet" diagnostics.
             text=draft.text
             text='\n\n'.join(b for b in text.split('\n\n') if not b.startswith('Available material:'))
-            metadata={'engine':ENGINE,'inbound_message_id':inbound.id,'selected_property_type_id':outcome.state.selected_property_type_id}
+            metadata={'engine':ENGINE,'workflow_version':'sales-current/1.0','inbound_message_id':inbound.id,'selected_property_type_id':outcome.state.selected_property_type_id}
             if next_enabled:metadata['selected_unit_id']=outcome.state.selected_unit_id
             if moderation_decision:metadata['moderation']=moderation_decision
             metadata['requested_topics']=sorted({r.topic.value for r in u.requests if r.polarity=='request'})
@@ -690,7 +710,7 @@ async def maybe_process_active(db,conversation,inbound):
                 if decision.needs_reentry:raise LanguageHold(decision,output=True)
                 metadata['language_policy']={'version':decision.version,'output_language':'en'}
             final_revision,state=save(db,scope,event_key='active-prepared:'+inbound.id,expected_revision=outcome.revision,state=outcome.state,
-                metadata={'engine':ENGINE,'message_id':inbound.id,'draft':asdict(draft),'actions':actions,
+                metadata={'engine':ENGINE,'workflow_version':'sales-current/1.0','message_id':inbound.id,'draft':asdict(draft),'actions':actions,
                     'share_ids':share_ids,'delivery_state':'prepared_not_delivered'})
             interpretation=scope.query(db,SalesDialogueEvent).filter_by(event_key='active-understanding:'+inbound.id).first()
             trace=interpretation.payload_json['metadata'] if interpretation else {
@@ -702,10 +722,10 @@ async def maybe_process_active(db,conversation,inbound):
                 metadata['turn_context_version']=trace.get('turn_context_version')
                 metadata['turn_context_sha256']=trace.get('turn_context_sha256')
             run.input_snapshot={**run.input_snapshot,'understanding':safe_u.model_dump(mode='json'),'runtime_policy':policy.model_dump()}
-            run.output_snapshot={'engine':ENGINE,'reply_ready':True,'reply':text,'metadata':metadata,'proposed_actions':actions,
+            run.output_snapshot={'engine':ENGINE,'workflow_version':'sales-current/1.0','reply_ready':True,'reply':text,'metadata':metadata,'proposed_actions':actions,
                 'sales_asset_share_ids':share_ids,'delivered_task_ids':list(delivered),'state_revision':final_revision,
                 'requires_human':metadata.get('control_outcome')=='handoff','policy_violations':[]}
-            run.status='prepared';conversation.updated_at=datetime.utcnow();lead.last_interaction_at=datetime.utcnow()
+            run.status='prepared';conversation.updated_at=workflow_now(datetime);lead.last_interaction_at=workflow_now(datetime)
             db.add_all([run,conversation,lead]);db.commit()
         except LanguageHold as hold:
             # Input holds occur before reference/task changes. Output rejection
@@ -722,8 +742,8 @@ async def maybe_process_active(db,conversation,inbound):
             run.model='deterministic-language-policy';run.prompt_configuration_id=None
             run.prompt_snapshot={'version':VERSION,'decision':hold.decision.metadata()}
             run.error_code='reply_language_rejected' if hold.output else None
-            run.output_snapshot={'engine':ENGINE,'reply_ready':True,'reply':OUTPUT_FALLBACK if hold.output else REENTRY,
-                'metadata':{'engine':ENGINE,'inbound_message_id':inbound.id,'language_hold':True,
+            run.output_snapshot={'engine':ENGINE,'workflow_version':'sales-current/1.0','reply_ready':True,'reply':OUTPUT_FALLBACK if hold.output else REENTRY,
+                'metadata':{'engine':ENGINE,'workflow_version':'sales-current/1.0','inbound_message_id':inbound.id,'language_hold':True,
                             'output_rejected':hold.output,'language_policy':hold.decision.metadata(),
                             'rejected_turn':rejected_trace},
                 'sales_asset_share_ids':[],'delivered_task_ids':[],'proposed_actions':[],
@@ -743,8 +763,11 @@ async def maybe_process_active(db,conversation,inbound):
                 run.prompt_snapshot=trace.get('prompt_snapshot') or run.prompt_snapshot
                 run.prompt_configuration_id=trace.get('prompt_configuration_id')
             run.error_code=trace.get('error_code') or type(exc).__name__
-            run.output_snapshot={'engine':ENGINE,'reply_ready':True,'reply':"I'm having trouble processing your message right now. You can ask about available properties, prices, or a visit, or request help from the Sales team.",
-                'metadata':{'engine':ENGINE,'inbound_message_id':inbound.id},'error_code':type(exc).__name__,
+            from .runtime_errors import response as error_response
+            reply, suppress, consecutive = error_response(db, conversation, run)
+            run.output_snapshot={'engine':ENGINE,'workflow_version':'sales-current/1.0','reply_ready':True,'reply':reply,
+                'suppress_duplicate_error_reply':suppress,'consecutive_processing_failures':consecutive,
+                'metadata':{'engine':ENGINE,'workflow_version':'sales-current/1.0','inbound_message_id':inbound.id},'error_code':type(exc).__name__,
                 'interpretation_outcome':trace.get('outcome'),'interpretation_attempt_count':len(trace.get('interpretation_attempts') or []),
                 'sales_asset_share_ids':[],'delivered_task_ids':[],'policy_violations':[]}
             run.status='prepared';db.commit()
@@ -754,6 +777,9 @@ async def maybe_process_active(db,conversation,inbound):
     conversation=db.query(SalesConversation).filter_by(id=scope.conversation_id).populate_existing().with_for_update().one()
     check_scope(db,scope)
     lead=db.query(Lead).filter_by(id=scope.lead_id).populate_existing().one()
+    if data.get('suppress_duplicate_error_reply'):
+        run.status='completed';run.completed_at=workflow_now(datetime);db.commit()
+        return True
     metadata=dict(data.get('metadata') or {})
     expected_pause=metadata.get('expected_pause_reason')
     if metadata.get('meeting_id') and not metadata.get('booking_operation_id'):expected_pause='Appointment confirmed'
@@ -765,10 +791,12 @@ async def maybe_process_active(db,conversation,inbound):
         own_control=bool(case and case.status=='open' and lead.agent_status=='human_control')
     if conversation.is_paused and not (own_control and conversation.pause_reason==expected_pause):return True
     if lead.deleted_at or (lead.is_opt_out and metadata.get('control_outcome')!='opt_out'):return True
-    if lead.consent_status!='granted' and metadata.get('control_outcome')!='opt_out':return True
+    from .execution import permitted
+    if not permitted(lead) and metadata.get('control_outcome')!='opt_out':return True
     if not selected_policy(db,scope):return True
     project=db.query(Project).filter_by(id=scope.project_id,company_id=scope.company_id).populate_existing().one()
-    if project.profile and metadata.get('control_outcome') != 'opt_out':
+    from .execution import simulated
+    if project.profile and metadata.get('control_outcome') != 'opt_out' and not (simulated(scope) and project.is_demo):
         db.refresh(project.profile)
         require_capability(project.profile)
     approved_ids={a.id for a in sales_asset_service.approved_for_turn(db,project_id=scope.project_id,company_id=scope.company_id,channel=conversation.channel)}
@@ -779,7 +807,7 @@ async def maybe_process_active(db,conversation,inbound):
     if metadata.get('material_delivery_version'):
         from .material_delivery import validate_shares
         exact_valid=validate_shares(db,scope,shares,metadata)
-    if not exact_valid or len(shares)!=len(data.get('sales_asset_share_ids') or []) or any(s.sales_asset_id not in approved_ids or s.revoked or s.expires_at<=datetime.utcnow() for s in shares):
+    if not exact_valid or len(shares)!=len(data.get('sales_asset_share_ids') or []) or any(s.sales_asset_id not in approved_ids or s.revoked or s.expires_at<=workflow_now(datetime) for s in shares):
         if metadata.get('material_delivery_version'):
             data['reply']='\n\n'.join(v for v in data['reply'].split('\n\n') if '/projects/a/' not in v)
             data['reply']+='\n\nSome requested materials changed or are unavailable. No new file link has been sent.'
@@ -818,11 +846,11 @@ async def maybe_process_active(db,conversation,inbound):
             interest={'property_type_id':metadata.get('selected_property_type_id'),'unit_id':metadata.get('selected_unit_id')})
     if not scope.query(db,SalesDialogueEvent).filter_by(event_key='active-receipt:'+inbound.id).first():
         save(db,scope,event_key='active-receipt:'+inbound.id,expected_revision=revision,state=state,
-            metadata={'engine':ENGINE,'message_id':inbound.id,'run_id':run.id,'delivery_state':'provider_accepted_not_delivery_confirmed','share_ids':metadata['sales_asset_share_ids']})
+            metadata={'engine':ENGINE,'workflow_version':'sales-current/1.0','message_id':inbound.id,'run_id':run.id,'delivery_state':'provider_accepted_not_delivery_confirmed','share_ids':metadata['sales_asset_share_ids']})
     if next_selected(scope):
         from .moderation import accepted_warning
         accepted_warning(db,conversation,metadata)
-    run.status='completed';run.completed_at=datetime.utcnow();db.commit()
+    run.status='completed';run.completed_at=workflow_now(datetime);db.commit()
     from .first_booking import cadence_stopped
     if not conversation.is_paused and not lead.is_opt_out and not run.error_code and not metadata.get('language_hold') and not cadence_stopped(db,conversation):
         live._schedule_next_action(db,conversation,lead,event_id,refresh_pending=True);db.commit()

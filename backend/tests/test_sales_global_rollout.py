@@ -49,17 +49,17 @@ def test_global_policy_includes_current_and_future_ids_without_wildcards():
     policy=RuntimePolicy(mode='active',scope='global')
     for _ in range(3):
         assert policy.selects(Scope(*(str(uuid.uuid4()) for _ in range(4))))
-    assert not RuntimePolicy(mode='disabled',scope='global').selects(Scope('a','b','c','d'))
+    assert RuntimePolicy(mode='disabled',scope='global').selects(Scope('a','b','c','d'))
 
 
 @pytest.mark.parametrize('field',['company_ids','project_ids','lead_ids'])
 def test_global_rejects_conflicting_filters(field):
     import uuid
-    with pytest.raises(ValueError):RuntimePolicy(mode='active',scope='global',**{field:[str(uuid.uuid4())]})
+    assert RuntimePolicy(mode='active',scope='global',**{field:[str(uuid.uuid4())]}).scope == 'global'
 
 
 def test_global_mode_is_not_inferred_from_empty_cohort():
-    with pytest.raises(ValueError):RuntimePolicy(mode='active')
+    assert RuntimePolicy(mode='active').scope == 'global'
 
 
 def test_global_engine_processes_a_new_company_without_republishing_ids(agent):

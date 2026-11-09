@@ -69,36 +69,18 @@
 
             <section class="rounded-xl border border-white/10 bg-black/20 p-4">
               <div class="flex flex-col gap-1">
-                <h3 class="text-sm font-medium uppercase tracking-wider text-secondary">Intent classification &amp; routing</h3>
+                <h3 class="text-sm font-medium uppercase tracking-wider text-secondary">Understanding guidance &amp; examples</h3>
                 <fieldset *ngIf="activeAgent.runtime_config" class="my-4 grid gap-3 rounded border border-white/20 p-4">
-                  <legend>Sales dialogue engine · controlled rollout</legend>
+                  <legend>Current Sales workflow · all Companies and Projects</legend>
                   <label>Catalog style<select name="runtime_style" [(ngModel)]="activeAgent.runtime_config.composition_style" class="block bg-black p-2"><option value="concise">Concise summaries</option><option value="detailed">Include bathrooms in catalog summaries</option></select></label>
-                  <p>Disabled uses the legacy engine. Shadow records diagnostics only. Active sends structured-engine replies and may perform validated actions for the selected cohort. Publish the draft to apply; SALES_DIALOGUE_RUNTIME_ENABLED must also be enabled on the server.</p>
-                  <p *ngIf="activeAgent.runtime_config.mode === 'active'" class="text-yellow-400">Active mode affects real conversations. Global includes all current and future Companies and Projects; consent, approvals and manual pauses still apply. Cohort requires Company and Project IDs. Reverting to disabled stops new active turns; unfinished active turns never fall back to legacy.</p>
-                  <label>Mode<select name="runtime_mode" [(ngModel)]="activeAgent.runtime_config.mode" class="block bg-black p-2"><option value="disabled">Disabled · legacy</option><option value="shadow">Selected shadow evaluation</option><option value="active">Active · structured engine</option></select></label>
-                  <label>Scope<select name="runtime_scope" [(ngModel)]="activeAgent.runtime_config.scope" (ngModelChange)="runtimeScopeChanged()" class="block bg-black p-2"><option value="cohort">Selected cohort</option><option value="global">Global · all Companies and Projects</option></select></label>
-                  <label *ngIf="activeAgent.runtime_config.scope !== 'global'">Company IDs (comma separated)<input name="runtime_companies" [ngModel]="runtimeIds('company_ids')" (ngModelChange)="runtimeIds('company_ids', $event)" class="block w-full bg-black p-2"></label>
-                  <label *ngIf="activeAgent.runtime_config.scope !== 'global'">Project IDs (comma separated)<input name="runtime_projects" [ngModel]="runtimeIds('project_ids')" (ngModelChange)="runtimeIds('project_ids', $event)" class="block w-full bg-black p-2"></label>
-                  <label *ngIf="activeAgent.runtime_config.scope !== 'global'">Lead IDs (optional, comma separated)<input name="runtime_leads" [ngModel]="runtimeIds('lead_ids')" (ngModelChange)="runtimeIds('lead_ids', $event)" class="block w-full bg-black p-2"></label>
+                  <p>The current Sales workflow applies to all existing and new Companies and Projects. Consent, approved data and manual pauses still control contact and actions.</p>
                   <label>Maximum steps<input name="runtime_steps" type="number" min="1" max="30" [(ngModel)]="activeAgent.runtime_config.max_steps" class="block bg-black p-2"></label>
-                  <label>Read-tool loop budget (seconds; model interpretation has a separate 45-second timeout)<input name="runtime_seconds" type="number" min="0.1" max="30" [(ngModel)]="activeAgent.runtime_config.max_seconds" class="block bg-black p-2"></label>
+                  <label>Read-tool loop budget (seconds; each model interpretation attempt has a separate 20-second timeout)<input name="runtime_seconds" type="number" min="0.1" max="30" [(ngModel)]="activeAgent.runtime_config.max_seconds" class="block bg-black p-2"></label>
                   <label>Understanding guidance (reference data, cannot override safeguards)<textarea name="runtime_guidance" [(ngModel)]="activeAgent.runtime_config.understanding_guidance" rows="4" class="block w-full bg-black p-2"></textarea></label>
                 </fieldset>
-                <p class="text-xs text-gray-400">Runtime contract sales-intents-v1: canonical primary/secondary intents, numeric confidence, validated entities and an explicit clarification flag. Missing or invalid confidence is not treated as certainty. Published instructions and examples remain configurable below.</p>
-                <p class="text-xs leading-relaxed text-gray-500">The model interprets one or more lead intents. Protected backend tools still validate assets, appointments, consent and tenant scope.</p>
               </div>
-              <div class="mt-4 grid gap-3 md:grid-cols-3">
-                <label class="grid gap-1 text-xs text-gray-400">Minimum confidence<input type="number" min="0.01" max="1" step="0.01" name="intent_minimum_confidence" [(ngModel)]="activeAgent.intent_routing_config.minimum_confidence" class="rounded-lg border border-white/10 bg-black/50 p-2 text-white"></label>
-                <label class="grid gap-1 text-xs text-gray-400">Clarification threshold<input type="number" min="0" max="0.99" step="0.01" name="intent_clarification_threshold" [(ngModel)]="activeAgent.intent_routing_config.clarification_threshold" class="rounded-lg border border-white/10 bg-black/50 p-2 text-white"></label>
-                <label class="grid gap-1 text-xs text-gray-400">Maximum intents<input type="number" min="1" max="8" name="intent_maximum" [(ngModel)]="activeAgent.intent_routing_config.maximum_intents" class="rounded-lg border border-white/10 bg-black/50 p-2 text-white"></label>
-              </div>
-              <div class="mt-4 grid gap-2 md:grid-cols-2 text-xs text-gray-300">
-                <label class="flex items-center gap-2"><input type="checkbox" name="intent_enabled" [(ngModel)]="activeAgent.intent_routing_config.enabled"> Enable LLM intent routing</label>
-                <label class="flex items-center gap-2"><input type="checkbox" name="intent_multilingual" [(ngModel)]="activeAgent.intent_routing_config.multilingual_input"> Interpret multilingual input</label>
-                <label class="flex items-center gap-2"><input type="checkbox" name="intent_explicit_appointment" [(ngModel)]="activeAgent.intent_routing_config.appointment_requires_explicit_request"> Require an explicit appointment request</label>
-                <p class="text-gray-400">Ambiguous intent, missing information and missing materials keep the conversation active. Only verified intervention cases pause the AI.</p>
-              </div>
-              <label class="mt-4 grid gap-1 text-xs text-gray-400">Classifier instructions<textarea rows="4" name="intent_classifier_instructions" [(ngModel)]="activeAgent.intent_routing_config.classifier_instructions" class="rounded-lg border border-white/10 bg-black/50 p-3 text-xs text-white"></textarea></label>
+              <p class="mt-3 text-xs text-gray-400">The platform interprets multiple requests, references and explicit restrictions. Replies are in English; spelling mistakes and missing question marks do not require exact phrases. Appointment actions require explicit evidence and backend validation.</p>
+              <label class="mt-4 grid gap-1 text-xs text-gray-400">Interpretation guidance (reference only)<textarea rows="4" name="intent_classifier_instructions" [(ngModel)]="activeAgent.intent_routing_config.classifier_instructions" class="rounded-lg border border-white/10 bg-black/50 p-3 text-xs text-white"></textarea></label>
               <details class="mt-4 rounded-lg border border-white/10 bg-black/30 p-3">
                 <summary class="cursor-pointer text-xs font-semibold uppercase tracking-wider text-gray-300">Intent examples and disambiguation</summary>
                 <div class="mt-4 grid gap-4">
@@ -142,7 +124,9 @@
 
           <div class="flex flex-col gap-2">
             <label class="text-sm font-medium text-secondary uppercase tracking-wider flex items-center gap-2"><span>●</span> Flow & Protocol (Pasos)</label>
-            <textarea rows="6" name="protPrompt" [(ngModel)]="activeAgent.protocol_prompt" placeholder="1. Pide el nombre... 2. Evalúa..." class="bg-black/50 border border-white/10 focus:border-secondary rounded-xl p-4 text-sm text-white focus:outline-none font-mono resize-y leading-relaxed"></textarea>
+            <textarea *ngIf="activeTab !== 'ventas'" rows="6" name="protPrompt" [(ngModel)]="activeAgent.protocol_prompt" placeholder="1. Pide el nombre... 2. Evalúa..." class="bg-black/50 border border-white/10 focus:border-secondary rounded-xl p-4 text-sm text-white focus:outline-none font-mono resize-y leading-relaxed"></textarea>
+            <textarea *ngIf="activeTab === 'ventas' && activeAgent.sales_playbook" rows="6" name="salesBusinessProtocol" [(ngModel)]="activeAgent.sales_playbook.conversation_protocol" class="bg-black/50 border border-white/10 rounded-xl p-4 text-sm text-white font-mono"></textarea>
+            <p *ngIf="activeTab === 'ventas'" class="text-xs text-gray-400">Commercial conversation guidance only. Technical schemas, routing and permissions are managed by the deployed workflow.</p>
           </div>
 
           <div class="flex flex-col gap-2">

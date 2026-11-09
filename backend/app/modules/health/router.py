@@ -41,6 +41,19 @@ REQUIRED_COLUMNS = {
 }
 
 
+# The current Sales coordinator is mandatory, so readiness must cover its
+# durable state/effect tables rather than only the older onboarding marker.
+REQUIRED_COLUMNS.update({
+    'sales_dialogue_states': {'revision','schema_version','state_json','conversation_id','lead_id'},
+    'sales_dialogue_events': {'event_key','revision','payload_json','state_after'},
+    'sales_booking_operations': {'snapshot_json','meeting_id','calendar_status','next_attempt_at'},
+    'sales_reschedule_operations': {'snapshot_json','replacement_booking_operation_id','calendar_status'},
+    'sales_cancellation_operations': {'snapshot_json','calendar_status','next_attempt_at'},
+    'sales_wait_requests': {'snapshot_json','status','claim_token','lease_until','next_check_at'},
+    'sales_moderation_incidents': {'category','disposition','warning_accepted_at','dismissed_at'},
+})
+
+
 @router.get("/version")
 def version() -> dict[str, str]:
     return {

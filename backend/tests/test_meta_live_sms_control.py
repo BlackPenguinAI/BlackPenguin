@@ -22,7 +22,7 @@ from app.modules.sales_agent.live_test_service import (
     create_live_lead, create_live_meta_test, live_lead_source_options, meta_lead_form_preview,
 )
 from app.modules.sales_agent.live_service import launch_live_lead
-from app.modules.sales_agent.service import simulate_turn
+from app.modules.sales_agent.service import _legacy_simulate_turn as simulate_turn
 from app.modules.sales_agent.models import SalesConversation, SalesConversationLeadContext, SalesMessage
 from app.modules.sales_crm.models import Lead, LeadContact
 from app.modules.system_settings.models import TwilioConfig
