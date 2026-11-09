@@ -357,6 +357,9 @@ async def _dispatch_part(
     idempotency_key: str | None = None,
 ) -> SalesMessage:
     message_metadata = dict(metadata or {})
+    if message_metadata.get('wait_request_id'):
+        from .wait_service import authorize_part as authorize_wait_part
+        authorize_wait_part(db,conversation,lead,message_metadata,content)
     if message_metadata.get('engine') == 'sales-active/1.0':
         from .active_service import authorize_part
         authorize_part(db, conversation, lead, message_metadata)
@@ -494,6 +497,10 @@ async def _dispatch_part(
             share.outbound_message_id = outbound.id
             db.add(share)
         db.commit()
+    if message_metadata.get('wait_request_id'):
+        try:authorize_wait_part(db,conversation,lead,message_metadata,content,before_provider=True)
+        except Exception:
+            outbound.status='failed';message.status='failed';db.commit();raise
     try:
         if conversation.channel == "sms":
             result = await send_sms(

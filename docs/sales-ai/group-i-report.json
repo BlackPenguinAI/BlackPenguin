@@ -1,0 +1,199 @@
+{
+  "version": "sales-ai-group-i-report/1.0",
+  "date": "2026-11-08",
+  "base_commit": "b1b3ec29c504b3b0fd9c050836dc420c9ebe721d",
+  "main_reverified_at_close": "b1b3ec29c504b3b0fd9c050836dc420c9ebe721d",
+  "branch": "sales-ai/group-i-waitlist",
+  "steps": [
+    15
+  ],
+  "status": "implemented_and_verified",
+  "checks": [
+    {
+      "name": "group_i_focused",
+      "passed": 47,
+      "skipped": 0,
+      "warnings": 4595,
+      "seconds": 48.5,
+      "failed": 0,
+      "exit_code": 0
+    },
+    {
+      "name": "inherited_group_f_with_explicit_wait_optin",
+      "passed": 68,
+      "skipped": 2,
+      "warnings": 4909,
+      "seconds": 32.3,
+      "failed": 0,
+      "exit_code": 0
+    },
+    {
+      "name": "full_backend_final_tree_isolated_actions_layout",
+      "passed": 2003,
+      "skipped": 4,
+      "warnings": 46850,
+      "seconds": 342.75,
+      "failed": 0,
+      "exit_code": 0,
+      "unchanged_reference_files": 237,
+      "matching_application_tools_migration_files": 285,
+      "physical_copies": true,
+      "checkout_imports": false
+    },
+    {
+      "name": "existing_safety_replay",
+      "passed": 20,
+      "total": 20,
+      "external_actions": 0,
+      "model_quality_evaluated": false
+    },
+    {
+      "name": "migration_heads",
+      "head": "20261108_sales_wait_requests"
+    },
+    {
+      "name": "sqlite_roundtrip_and_postgres_ddl",
+      "included_in_focused_tests": true,
+      "existing_reservations_preserved": true
+    },
+    {
+      "name": "dependency_consistency",
+      "exit_code": 0
+    },
+    {
+      "name": "whitespace",
+      "exit_code": 0
+    }
+  ],
+  "coverage": {
+    "channels": [
+      "sms",
+      "whatsapp"
+    ],
+    "model": "INJECTED_SCRIPTED",
+    "providers": "MOCKED",
+    "real_postgres_concurrency_proven": false,
+    "inherited_postgres_cases_skipped": 4,
+    "partial_acceptance_cases": [
+      "T13",
+      "T17",
+      "T18",
+      "T19",
+      "T20",
+      "T21",
+      "T25",
+      "T26"
+    ],
+    "complete_T01_T26_acceptance": false
+  },
+  "wait": {
+    "version": "sales-availability-wait/1.0",
+    "table": "sales_wait_requests",
+    "registration": "exact current backend opt-in or explicit current alert request with verified unexpired context",
+    "opt_in_offer_expiry_minutes": 30,
+    "persisted_before_contact_promise": true,
+    "one_active_request_per_company_lead": true,
+    "saved_fields": [
+      "source and target scope",
+      "request message",
+      "property/unit/location",
+      "fixed dates and timezone",
+      "duration/time-of-day/specialist preferences",
+      "source interest",
+      "original appointment/version for replacement",
+      "channel/provider/contact fingerprint"
+    ],
+    "default_range_days": 14,
+    "maximum_range_days": 31,
+    "future_start_horizon_days": 90,
+    "expires": "end of requested last day in saved timezone",
+    "close_events": [
+      "booked or rescheduled",
+      "appointment cancelled",
+      "alert cancelled",
+      "interest or visit preferences changed",
+      "consent withdrawn",
+      "expiry",
+      "original reservation or approved context changed"
+    ],
+    "notified_state_is_terminal": true
+  },
+  "nearby": {
+    "requires_explicit_request": true,
+    "maximum_days_each_side": 3,
+    "maximum_search_scans": 2,
+    "maximum_offered_options": 3,
+    "preserved_preferences": [
+      "property/unit/location",
+      "timezone",
+      "duration",
+      "time of day",
+      "specialist restriction"
+    ],
+    "silently_relaxes_preferences": false,
+    "creates_booking_or_alert_request": false,
+    "selection_requires_full_f_or_g_confirmation": true
+  },
+  "worker": {
+    "integration": "existing live followup worker, once per minute at most",
+    "maximum_batch": 10,
+    "no_match_check_interval_minutes": 15,
+    "maximum_days_per_scan": 14,
+    "durable_range_cursor": true,
+    "lease_minutes": 10,
+    "claim_token_fences_old_workers": true,
+    "creates_meetings": false,
+    "original_reschedule_reservation_retained": true,
+    "notice_expiry_minutes": 30,
+    "notice_payload_immutable_on_retry": true,
+    "outbound_idempotency": "availability-wait:<request-id> with stable part suffixes",
+    "known_provider_rejection_attempt_cap": 3,
+    "uncertain_network_or_provider_outcome": "review, no automatic blind resend",
+    "late_checks": [
+      "Company/source/target runtime and policy",
+      "consent and manual control",
+      "contact fingerprint/channel/provider",
+      "interest and visit preferences",
+      "latest processed inbound and state revision",
+      "approved context and original reservation",
+      "exact rendered part content",
+      "current specialist availability"
+    ],
+    "receipt_semantics": "all parts provider accepted; not handset delivery"
+  },
+  "channel": {
+    "operating_windows": "source and target project configured proactive windows",
+    "whatsapp": "existing customer window required for free form; deferred outside window",
+    "fabricated_template_or_sms_fallback": false
+  },
+  "compatibility": {
+    "internal_prompt_version": "sales-understanding-prompt/2.6",
+    "short_english_vocabulary_extended_for_alert_terms": true,
+    "published_prompts_changed": false,
+    "product_model_changed": false,
+    "new_state_fields_have_defaults": true
+  },
+  "new_migrations": [
+    "20261108_sales_wait_requests"
+  ],
+  "production_migration_applied": false,
+  "production_changes": false,
+  "deployment_performed": false,
+  "model_quality_evaluated": false,
+  "live_channel_acceptance": "not_run",
+  "new_flow_activation": "disabled_by_default_explicit_project_allowlist_required",
+  "limits": [
+    "Real model, Calendar, SMS/WhatsApp and PostgreSQL parallel contention not exercised.",
+    "A periodic bounded process is supplied; no instant availability-change trigger or external latency guarantee.",
+    "Uncertain deliveries halt for review; exactly-once network delivery is not claimed.",
+    "General agent visibility and moderation remain J; no new frontend is included.",
+    "Docker unavailable: isolated physical Actions layout is tested, not an image build or remote workflow.",
+    "Full T01\u2013T26 acceptance remains K/L.",
+    "Operational rollback must preserve waits, closures, prepared notices, reservations and compatible JSON readers."
+  ],
+  "next_group": "J",
+  "next_steps": [
+    16,
+    17
+  ]
+}

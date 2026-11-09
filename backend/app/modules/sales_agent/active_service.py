@@ -195,6 +195,9 @@ def _appointment(db,scope,conversation,lead,project,outcome,inbound):
         from .reschedule_service import should_handle,handle as reschedule
         previous=latest_outbound(db,conversation.id,skip_language_holds=True)
         previous_meta=(previous.metadata_json or {}) if previous else {}
+        if u.wait:
+            from .wait_service import handle as handle_wait
+            return handle_wait(db,scope,conversation,lead,outcome,inbound,previous_meta)
         from .cancellation_service import should_handle as should_cancel,handle as cancel
         if should_cancel(u,previous_meta):return cancel(db,scope,conversation,lead,outcome,inbound,previous_meta)
         if should_handle(u,outcome.state,previous_meta,outcome):return reschedule(db,scope,conversation,lead,project,outcome,inbound,previous_meta)
@@ -451,6 +454,8 @@ async def maybe_process_active(db,conversation,inbound):
                     u=enrich_reschedule(u,previous_meta,inbound.content)
                     from .cancellation_service import enrich as enrich_cancellation
                     u=enrich_cancellation(u,previous_meta,inbound.content)
+                    from .wait_service import enrich as enrich_wait
+                    u=enrich_wait(u,previous_meta,inbound.content)
                 u=confirmed_controls(u,inbound.content,pause_reason=protected)
                 interpreted_revision=interpreted.revision
             if u.confidence < .8 and not u.requires_clarification:
@@ -501,7 +506,7 @@ async def maybe_process_active(db,conversation,inbound):
                     if task.source_message_id==inbound.id and restricted(outcome.state,task) and safe_u.permits(task.topic,task.subject):
                         extra.append('You previously asked not to receive this. Do you want to allow it now?')
                         metadata['release_offer']={'topic':task.topic.value,'subject':task.subject}
-                appointment,appointment_meta,actions=(None,{},[]) if 'appointment' in action_holds else _appointment(db,scope,conversation,lead,project,outcome,inbound)
+                appointment,appointment_meta,actions=(None,{},[]) if 'appointment' in action_holds and not (safe_u.wait and safe_u.wait.action in {'cancel','decline'}) else _appointment(db,scope,conversation,lead,project,outcome,inbound)
                 metadata.update(appointment_meta)
                 if appointment:extra.append(appointment)
                 if next_enabled and 'materials' not in action_holds:
@@ -527,6 +532,9 @@ async def maybe_process_active(db,conversation,inbound):
                 notify_sales(db,conversation=conversation,lead=lead,decision=decision,event_id=inbound.id,evidence=inbound.content)
                 metadata['review_notice']=decision
                 extra.append('The Sales team needs to verify that part of your request. I can continue helping with other approved information. What else would you like to know?')
+            if next_enabled:
+                from .wait_service import reconcile
+                reconcile(db,scope,outcome.state,metadata)
             if conversation.is_paused:
                 metadata['expected_pause_reason']=conversation.pause_reason
                 db.query(SalesFollowUpJob).filter(SalesFollowUpJob.conversation_id==conversation.id,SalesFollowUpJob.status.in_(['pending','processing'])).update({'status':'cancelled'},synchronize_session=False)
@@ -618,6 +626,7 @@ async def maybe_process_active(db,conversation,inbound):
                         metadata.pop('reschedule_meeting_offer',None)
                         metadata.pop('cancellation_confirmation',None)
                         metadata.pop('cancellation_meeting_offer',None)
+                        metadata.pop('wait_offer',None)
                         if metadata.pop('booking_property_question',None):metadata.pop('property_catalog_offer',None)
                         details.append('Your visit request remains pending while we review the information request.')
                 elif appointment:details.append(appointment)
@@ -643,6 +652,8 @@ async def maybe_process_active(db,conversation,inbound):
                 validate_prepared(db,scope,metadata)
                 from .cancellation_service import validate_prepared as validate_cancellation
                 validate_cancellation(db,scope,metadata)
+                from .wait_service import validate_saved
+                validate_saved(db,scope,metadata)
                 text=commercial_draft.text
                 metadata['composition']=commercial_draft.trace
                 metadata.update(commercial_draft.trace['closing_metadata'])

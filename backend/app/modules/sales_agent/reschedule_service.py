@@ -334,7 +334,10 @@ def handle(db,scope,conversation,lead,project,outcome,inbound,previous_meta):
     options=[o for o in options if not (o['starts_at']==original['starts_at'] and o['sales_user_id']==original['sales_user_id'] and
         context['project_id']==original['project_id'] and context['property_type_id']==original['property_type_id'] and
         context['unit_id']==original['unit_id'] and context['location']['address']==original['location']['address'] and context['duration_minutes']==original['duration_minutes'])]
-    if not options:return 'I found no verified replacement in the checked range. Your original reservation is unchanged. Would you like a different date or time?',{'reschedule_context_question':True},[]
+    if not options:
+        from .wait_service import wait_offer
+        try:return wait_offer(db,scope,outcome,context,prefs,original=old,allowed=allowed)
+        except ValueError:return 'Please specify a future replacement range. Your original reservation is unchanged.',{'reschedule_context_question':True},[]
     offer={'version':VERSION,'scope':scope.__dict__,'original':original,'target_context':context,'preferences':prefs,'options':options,
         'expires_at':(utc(now)+timedelta(minutes=30)).isoformat()}
     offer['id']=digest(offer)

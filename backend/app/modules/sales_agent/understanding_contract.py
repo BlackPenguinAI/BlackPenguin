@@ -104,6 +104,12 @@ class Courtesy(StrictModel):
     evidence: str = Field(min_length=1,max_length=2000)
 
 
+class WaitDirective(StrictModel):
+    action: Literal['request','decline','cancel','nearby']
+    evidence: str = Field(min_length=1,max_length=2000)
+    timing: VisitTiming | None = None
+
+
 class CancellationDirective(StrictModel):
     action: Literal['request','confirm','decline','reason']
     evidence: str = Field(min_length=1,max_length=2000)
@@ -138,6 +144,7 @@ class Understanding(StrictModel):
     courtesy: Courtesy | None = None
     reschedule: RescheduleDirective | None = None
     cancellation: CancellationDirective | None = None
+    wait: WaitDirective | None = None
     appointment_query: Literal['active','past','cancelled','all'] | None = None
     selected_reference_id: str | None = Field(default=None,max_length=60)
     requires_clarification: StrictBool
@@ -190,6 +197,9 @@ class Understanding(StrictModel):
             if self.reschedule.timing:evidence.extend(v for k,v in self.reschedule.timing.model_dump().items() if k!='time_relation' and v is not None)
         if self.cancellation:
             evidence.extend(v for k,v in self.cancellation.model_dump().items() if k!='action' and v)
+        if self.wait:
+            evidence.append(self.wait.evidence)
+            if self.wait.timing:evidence.extend(v for k,v in self.wait.timing.model_dump().items() if k!='time_relation' and v is not None)
         if self.courtesy:evidence.append(self.courtesy.evidence)
         if any(not item.strip() or item not in inbound for item in evidence):
             raise ValueError('Evidence must be an exact non-empty substring of the current message.')
@@ -279,6 +289,7 @@ class DialogueState(StrictModel):
     preferences: list[Preference] = Field(default_factory=list, max_length=100)
     last_understanding: Understanding | None = None
     memory: 'TurnMemory' = Field(default_factory=lambda: TurnMemory())
+    wait_context: dict = Field(default_factory=dict)
     cancellation_search: dict = Field(default_factory=dict)
     cancellation_proposal: dict | None = None
     cancellation_followup_id: str | None = None

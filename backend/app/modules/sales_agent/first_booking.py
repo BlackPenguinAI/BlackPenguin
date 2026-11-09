@@ -325,11 +325,14 @@ def handle(db,scope,conversation,lead,project,outcome,inbound):
         return 'Which location would you like to visit?\n\n'+'\n'.join(f"{i}. {r['label']}: {r['address']}" for i,r in enumerate(locations,1)),{'location_offer':{'option_ids':[r['address'] for r in locations],'pending':True}},[]
     try:options=search_slots(db,scope,prefs,now)
     except ValueError as exc:return str(exc),{},[]
-    if not options:return 'I checked up to 14 calendar days within your requested range and could not find a verified time matching those preferences. Would you like to try another date or time range?',{'booking_search_status':'no_matching_time','booking_preferences':prefs},[]
     try:context=context_snapshot(db,scope,project,state,location)
     except (PermissionError,ValueError):
         state.booking_search={**prefs,'property_type_id':None,'unit_id':None,'location':location}
         return 'The property details need to be verified before I can offer that visit. Which property would you like to review?',{},[]
+    if not options:
+        from .wait_service import wait_offer
+        try:return wait_offer(db,scope,outcome,context,prefs)
+        except ValueError:return 'Please specify a future date range and timezone for the visit.',{},[]
     offer={'version':VERSION,'slots':[o['starts_at'] for o in options],'options':options,'preferences':prefs,'context':context,
         'property_type_id':property_id,'unit_id':unit_id,'visit_location':location,'duration_minutes':prefs['duration_minutes'],
         'project_timezone':project.timezone or 'UTC','expires_at':(utc(now)+timedelta(minutes=30)).isoformat()}

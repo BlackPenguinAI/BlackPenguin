@@ -1,0 +1,1658 @@
+diff --git a/backend/alembic/versions/20261108_sales_wait_requests.py b/backend/alembic/versions/20261108_sales_wait_requests.py
+new file mode 100644
+index 0000000..4a096fa
+--- /dev/null
++++ b/backend/alembic/versions/20261108_sales_wait_requests.py
+@@ -0,0 +1,32 @@
++"""Persist scoped, expiring availability alerts; do not change reservations."""
++from alembic import op
++import sqlalchemy as sa
++revision='20261108_sales_wait_requests'
++down_revision='20261108_sales_cancel_ops'
++branch_labels=None
++depends_on=None
++
++
++def upgrade():
++    op.create_table('sales_wait_requests',
++        sa.Column('id',sa.String(36),primary_key=True),
++        sa.Column('company_id',sa.String(36),sa.ForeignKey('companies.id',ondelete='CASCADE'),nullable=False),
++        sa.Column('project_id',sa.String(36),sa.ForeignKey('projects.id',ondelete='CASCADE'),nullable=False),
++        sa.Column('target_project_id',sa.String(36),sa.ForeignKey('projects.id',ondelete='CASCADE'),nullable=False),
++        sa.Column('conversation_id',sa.String(36),sa.ForeignKey('sales_conversations.id',ondelete='CASCADE'),nullable=False),
++        sa.Column('lead_id',sa.String(36),sa.ForeignKey('leads.id',ondelete='CASCADE'),nullable=False),
++        sa.Column('requested_message_id',sa.String(36),sa.ForeignKey('sales_messages.id',ondelete='CASCADE'),nullable=False),
++        sa.Column('active_key',sa.String(64),unique=True),sa.Column('request_key',sa.String(64),nullable=False),
++        sa.Column('snapshot_json',sa.JSON(),nullable=False),sa.Column('channel',sa.String(20),nullable=False),
++        sa.Column('status',sa.String(30),nullable=False),sa.Column('close_reason',sa.String(100)),
++        sa.Column('expires_at',sa.DateTime(),nullable=False),sa.Column('next_check_at',sa.DateTime(),nullable=False),
++        sa.Column('lease_until',sa.DateTime()),sa.Column('claim_token',sa.String(36)),sa.Column('attempts',sa.Integer(),nullable=False),sa.Column('last_error',sa.String(100)),
++        sa.Column('scan_date',sa.String(10)),sa.Column('notice_json',sa.JSON()),sa.Column('anchor_revision',sa.Integer()),sa.Column('anchor_inbound_id',sa.String(36)),
++        sa.Column('notified_message_id',sa.String(36),sa.ForeignKey('sales_messages.id',ondelete='SET NULL')),
++        sa.Column('created_at',sa.DateTime(),nullable=False),sa.Column('closed_at',sa.DateTime()))
++    op.create_index('ix_sales_wait_requests_status','sales_wait_requests',['status'])
++
++
++def downgrade():
++    op.drop_index('ix_sales_wait_requests_status',table_name='sales_wait_requests')
++    op.drop_table('sales_wait_requests')
+diff --git a/backend/app/db/base.py b/backend/app/db/base.py
+index 0a50a46..e959062 100644
+--- a/backend/app/db/base.py
++++ b/backend/app/db/base.py
+@@ -58,3 +58,4 @@ from app.modules.sales_agent.dialogue_models import SalesDialogueState, SalesDia
+ from app.modules.sales_agent.booking_models import SalesBookingOperation
+ from app.modules.sales_agent.reschedule_models import SalesRescheduleOperation
+ from app.modules.sales_agent.cancellation_models import SalesCancellationOperation
++from app.modules.sales_agent.wait_models import SalesWaitRequest
+diff --git a/backend/app/modules/sales_agent/active_service.py b/backend/app/modules/sales_agent/active_service.py
+index f9dc1cc..7ee00e9 100644
+--- a/backend/app/modules/sales_agent/active_service.py
++++ b/backend/app/modules/sales_agent/active_service.py
+@@ -195,6 +195,9 @@ def _appointment(db,scope,conversation,lead,project,outcome,inbound):
+         from .reschedule_service import should_handle,handle as reschedule
+         previous=latest_outbound(db,conversation.id,skip_language_holds=True)
+         previous_meta=(previous.metadata_json or {}) if previous else {}
++        if u.wait:
++            from .wait_service import handle as handle_wait
++            return handle_wait(db,scope,conversation,lead,outcome,inbound,previous_meta)
+         from .cancellation_service import should_handle as should_cancel,handle as cancel
+         if should_cancel(u,previous_meta):return cancel(db,scope,conversation,lead,outcome,inbound,previous_meta)
+         if should_handle(u,outcome.state,previous_meta,outcome):return reschedule(db,scope,conversation,lead,project,outcome,inbound,previous_meta)
+@@ -451,6 +454,8 @@ async def maybe_process_active(db,conversation,inbound):
+                     u=enrich_reschedule(u,previous_meta,inbound.content)
+                     from .cancellation_service import enrich as enrich_cancellation
+                     u=enrich_cancellation(u,previous_meta,inbound.content)
++                    from .wait_service import enrich as enrich_wait
++                    u=enrich_wait(u,previous_meta,inbound.content)
+                 u=confirmed_controls(u,inbound.content,pause_reason=protected)
+                 interpreted_revision=interpreted.revision
+             if u.confidence < .8 and not u.requires_clarification:
+@@ -501,7 +506,7 @@ async def maybe_process_active(db,conversation,inbound):
+                     if task.source_message_id==inbound.id and restricted(outcome.state,task) and safe_u.permits(task.topic,task.subject):
+                         extra.append('You previously asked not to receive this. Do you want to allow it now?')
+                         metadata['release_offer']={'topic':task.topic.value,'subject':task.subject}
+-                appointment,appointment_meta,actions=(None,{},[]) if 'appointment' in action_holds else _appointment(db,scope,conversation,lead,project,outcome,inbound)
++                appointment,appointment_meta,actions=(None,{},[]) if 'appointment' in action_holds and not (safe_u.wait and safe_u.wait.action in {'cancel','decline'}) else _appointment(db,scope,conversation,lead,project,outcome,inbound)
+                 metadata.update(appointment_meta)
+                 if appointment:extra.append(appointment)
+                 if next_enabled and 'materials' not in action_holds:
+@@ -527,6 +532,9 @@ async def maybe_process_active(db,conversation,inbound):
+                 notify_sales(db,conversation=conversation,lead=lead,decision=decision,event_id=inbound.id,evidence=inbound.content)
+                 metadata['review_notice']=decision
+                 extra.append('The Sales team needs to verify that part of your request. I can continue helping with other approved information. What else would you like to know?')
++            if next_enabled:
++                from .wait_service import reconcile
++                reconcile(db,scope,outcome.state,metadata)
+             if conversation.is_paused:
+                 metadata['expected_pause_reason']=conversation.pause_reason
+                 db.query(SalesFollowUpJob).filter(SalesFollowUpJob.conversation_id==conversation.id,SalesFollowUpJob.status.in_(['pending','processing'])).update({'status':'cancelled'},synchronize_session=False)
+@@ -618,6 +626,7 @@ async def maybe_process_active(db,conversation,inbound):
+                         metadata.pop('reschedule_meeting_offer',None)
+                         metadata.pop('cancellation_confirmation',None)
+                         metadata.pop('cancellation_meeting_offer',None)
++                        metadata.pop('wait_offer',None)
+                         if metadata.pop('booking_property_question',None):metadata.pop('property_catalog_offer',None)
+                         details.append('Your visit request remains pending while we review the information request.')
+                 elif appointment:details.append(appointment)
+@@ -643,6 +652,8 @@ async def maybe_process_active(db,conversation,inbound):
+                 validate_prepared(db,scope,metadata)
+                 from .cancellation_service import validate_prepared as validate_cancellation
+                 validate_cancellation(db,scope,metadata)
++                from .wait_service import validate_saved
++                validate_saved(db,scope,metadata)
+                 text=commercial_draft.text
+                 metadata['composition']=commercial_draft.trace
+                 metadata.update(commercial_draft.trace['closing_metadata'])
+diff --git a/backend/app/modules/sales_agent/commercial_composer.py b/backend/app/modules/sales_agent/commercial_composer.py
+index cbe17d0..ad1688b 100644
+--- a/backend/app/modules/sales_agent/commercial_composer.py
++++ b/backend/app/modules/sales_agent/commercial_composer.py
+@@ -95,6 +95,9 @@ def select_continuations(*, outcome, commercial, metadata, previous_meta, lead,
+     if metadata.get('material_offer'):
+         # The caller supplies this as priority; never make an offer invisible.
+         raise ValueError('Material proposal needs an explicit continuation.')
++    if metadata.get('wait_offer') or metadata.get('wait_result'):
++        add('none','')
++        return choices
+     if any(metadata.get(k) for k in ['cancellation_confirmation','cancellation_meeting_offer','cancellation_context_question','cancellation_operation_id','cancellation_followup_closed']):
+         add('none','')
+         return choices
+diff --git a/backend/app/modules/sales_agent/first_booking.py b/backend/app/modules/sales_agent/first_booking.py
+index 4a9b238..3473e3f 100644
+--- a/backend/app/modules/sales_agent/first_booking.py
++++ b/backend/app/modules/sales_agent/first_booking.py
+@@ -325,11 +325,14 @@ def handle(db,scope,conversation,lead,project,outcome,inbound):
+         return 'Which location would you like to visit?\n\n'+'\n'.join(f"{i}. {r['label']}: {r['address']}" for i,r in enumerate(locations,1)),{'location_offer':{'option_ids':[r['address'] for r in locations],'pending':True}},[]
+     try:options=search_slots(db,scope,prefs,now)
+     except ValueError as exc:return str(exc),{},[]
+-    if not options:return 'I checked up to 14 calendar days within your requested range and could not find a verified time matching those preferences. Would you like to try another date or time range?',{'booking_search_status':'no_matching_time','booking_preferences':prefs},[]
+     try:context=context_snapshot(db,scope,project,state,location)
+     except (PermissionError,ValueError):
+         state.booking_search={**prefs,'property_type_id':None,'unit_id':None,'location':location}
+         return 'The property details need to be verified before I can offer that visit. Which property would you like to review?',{},[]
++    if not options:
++        from .wait_service import wait_offer
++        try:return wait_offer(db,scope,outcome,context,prefs)
++        except ValueError:return 'Please specify a future date range and timezone for the visit.',{},[]
+     offer={'version':VERSION,'slots':[o['starts_at'] for o in options],'options':options,'preferences':prefs,'context':context,
+         'property_type_id':property_id,'unit_id':unit_id,'visit_location':location,'duration_minutes':prefs['duration_minutes'],
+         'project_timezone':project.timezone or 'UTC','expires_at':(utc(now)+timedelta(minutes=30)).isoformat()}
+diff --git a/backend/app/modules/sales_agent/language_policy.py b/backend/app/modules/sales_agent/language_policy.py
+index 1678ad5..4c7dbec 100644
+--- a/backend/app/modules/sales_agent/language_policy.py
++++ b/backend/app/modules/sales_agent/language_policy.py
+@@ -36,6 +36,7 @@ too very much many few less just actually instead sorry nothing something anythi
+ everything whenever wherever currently verified approved recorded new old previous
+ open closed sent delivered read received unavailable unconfirmed until into around
+ howdy goodbye bye bye-bye stop unsubscribe end quit yes absolutely fine details don'''.split())
++ENGLISH.update('alert alerts notify notification notifications request requests wait waiting waitlist nearby'.split())
+ ENGLISH.update('active past cancelled canceled recorded specialist specialists showroom status duration progress'.split())
+ ENGLISH.update('contains content contents coverage file files arrange arranging prepared prepare expired expires preferences matching'.split())
+ 
+diff --git a/backend/app/modules/sales_agent/live_service.py b/backend/app/modules/sales_agent/live_service.py
+index 8f65347..5db2201 100644
+--- a/backend/app/modules/sales_agent/live_service.py
++++ b/backend/app/modules/sales_agent/live_service.py
+@@ -357,6 +357,9 @@ async def _dispatch_part(
+     idempotency_key: str | None = None,
+ ) -> SalesMessage:
+     message_metadata = dict(metadata or {})
++    if message_metadata.get('wait_request_id'):
++        from .wait_service import authorize_part as authorize_wait_part
++        authorize_wait_part(db,conversation,lead,message_metadata,content)
+     if message_metadata.get('engine') == 'sales-active/1.0':
+         from .active_service import authorize_part
+         authorize_part(db, conversation, lead, message_metadata)
+@@ -494,6 +497,10 @@ async def _dispatch_part(
+             share.outbound_message_id = outbound.id
+             db.add(share)
+         db.commit()
++    if message_metadata.get('wait_request_id'):
++        try:authorize_wait_part(db,conversation,lead,message_metadata,content,before_provider=True)
++        except Exception:
++            outbound.status='failed';message.status='failed';db.commit();raise
+     try:
+         if conversation.channel == "sms":
+             result = await send_sms(
+diff --git a/backend/app/modules/sales_agent/live_worker.py b/backend/app/modules/sales_agent/live_worker.py
+index 1079b2e..20a8d25 100644
+--- a/backend/app/modules/sales_agent/live_worker.py
++++ b/backend/app/modules/sales_agent/live_worker.py
+@@ -112,6 +112,7 @@ def _claim_inbound_jobs(limit: int = 10) -> list[str]:
+ 
+ async def run_live_followup_worker(stop_event: asyncio.Event) -> None:
+     next_calendar_retry = datetime.min
++    next_wait_check = datetime.min
+     while not stop_event.is_set():
+         if datetime.utcnow() >= next_calendar_retry:
+             next_calendar_retry = datetime.utcnow() + timedelta(minutes=1)
+@@ -119,6 +120,13 @@ async def run_live_followup_worker(stop_event: asyncio.Event) -> None:
+                 await asyncio.to_thread(_retry_active_calendars)
+             except Exception:
+                 logger.exception("Active appointment calendar retry failed")
++        if datetime.utcnow() >= next_wait_check:
++            next_wait_check = datetime.utcnow() + timedelta(minutes=1)
++            try:
++                from .wait_service import process_due
++                await process_due(limit=10)
++            except Exception:
++                logger.exception('Availability wait check failed')
+         try:
+             await asyncio.to_thread(_process_operational_outboxes)
+         except Exception:
+diff --git a/backend/app/modules/sales_agent/reschedule_service.py b/backend/app/modules/sales_agent/reschedule_service.py
+index 457a879..4e12085 100644
+--- a/backend/app/modules/sales_agent/reschedule_service.py
++++ b/backend/app/modules/sales_agent/reschedule_service.py
+@@ -334,7 +334,10 @@ def handle(db,scope,conversation,lead,project,outcome,inbound,previous_meta):
+     options=[o for o in options if not (o['starts_at']==original['starts_at'] and o['sales_user_id']==original['sales_user_id'] and
+         context['project_id']==original['project_id'] and context['property_type_id']==original['property_type_id'] and
+         context['unit_id']==original['unit_id'] and context['location']['address']==original['location']['address'] and context['duration_minutes']==original['duration_minutes'])]
+-    if not options:return 'I found no verified replacement in the checked range. Your original reservation is unchanged. Would you like a different date or time?',{'reschedule_context_question':True},[]
++    if not options:
++        from .wait_service import wait_offer
++        try:return wait_offer(db,scope,outcome,context,prefs,original=old,allowed=allowed)
++        except ValueError:return 'Please specify a future replacement range. Your original reservation is unchanged.',{'reschedule_context_question':True},[]
+     offer={'version':VERSION,'scope':scope.__dict__,'original':original,'target_context':context,'preferences':prefs,'options':options,
+         'expires_at':(utc(now)+timedelta(minutes=30)).isoformat()}
+     offer['id']=digest(offer)
+diff --git a/backend/app/modules/sales_agent/turn_memory.py b/backend/app/modules/sales_agent/turn_memory.py
+index d6f5a0a..c3bc999 100644
+--- a/backend/app/modules/sales_agent/turn_memory.py
++++ b/backend/app/modules/sales_agent/turn_memory.py
+@@ -127,6 +127,7 @@ def build(db,scope,*,inbound_message_id,now=None):
+             'appointments':{category:tool.execute({'category':category,'limit':5},now=now) for category in ('active','past','cancelled')},
+             'memory':state.memory.model_dump(mode='json'),'history':list(reversed(pertinent)),
+             'history_coverage':{'messages':len(pertinent),'bounded':True,'older_messages_omitted':len(history)==20 or remaining<=0},
++            'wait_context':state.wait_context,
+             'cancellation_search':state.cancellation_search,'cancellation_proposal':state.cancellation_proposal,
+             'cancellation_followup_id':state.cancellation_followup_id,
+             'reschedule_search':state.reschedule_search,'reschedule_proposal':state.reschedule_proposal,
+diff --git a/backend/app/modules/sales_agent/understanding_contract.py b/backend/app/modules/sales_agent/understanding_contract.py
+index e8f7407..6d2f1ed 100644
+--- a/backend/app/modules/sales_agent/understanding_contract.py
++++ b/backend/app/modules/sales_agent/understanding_contract.py
+@@ -104,6 +104,12 @@ class Courtesy(StrictModel):
+     evidence: str = Field(min_length=1,max_length=2000)
+ 
+ 
++class WaitDirective(StrictModel):
++    action: Literal['request','decline','cancel','nearby']
++    evidence: str = Field(min_length=1,max_length=2000)
++    timing: VisitTiming | None = None
++
++
+ class CancellationDirective(StrictModel):
+     action: Literal['request','confirm','decline','reason']
+     evidence: str = Field(min_length=1,max_length=2000)
+@@ -138,6 +144,7 @@ class Understanding(StrictModel):
+     courtesy: Courtesy | None = None
+     reschedule: RescheduleDirective | None = None
+     cancellation: CancellationDirective | None = None
++    wait: WaitDirective | None = None
+     appointment_query: Literal['active','past','cancelled','all'] | None = None
+     selected_reference_id: str | None = Field(default=None,max_length=60)
+     requires_clarification: StrictBool
+@@ -190,6 +197,9 @@ class Understanding(StrictModel):
+             if self.reschedule.timing:evidence.extend(v for k,v in self.reschedule.timing.model_dump().items() if k!='time_relation' and v is not None)
+         if self.cancellation:
+             evidence.extend(v for k,v in self.cancellation.model_dump().items() if k!='action' and v)
++        if self.wait:
++            evidence.append(self.wait.evidence)
++            if self.wait.timing:evidence.extend(v for k,v in self.wait.timing.model_dump().items() if k!='time_relation' and v is not None)
+         if self.courtesy:evidence.append(self.courtesy.evidence)
+         if any(not item.strip() or item not in inbound for item in evidence):
+             raise ValueError('Evidence must be an exact non-empty substring of the current message.')
+@@ -279,6 +289,7 @@ class DialogueState(StrictModel):
+     preferences: list[Preference] = Field(default_factory=list, max_length=100)
+     last_understanding: Understanding | None = None
+     memory: 'TurnMemory' = Field(default_factory=lambda: TurnMemory())
++    wait_context: dict = Field(default_factory=dict)
+     cancellation_search: dict = Field(default_factory=dict)
+     cancellation_proposal: dict | None = None
+     cancellation_followup_id: str | None = None
+diff --git a/backend/app/modules/sales_agent/understanding_prompt.py b/backend/app/modules/sales_agent/understanding_prompt.py
+index b0331ce..6499b0e 100644
+--- a/backend/app/modules/sales_agent/understanding_prompt.py
++++ b/backend/app/modules/sales_agent/understanding_prompt.py
+@@ -53,7 +53,7 @@ def prompt_snapshot(agent):
+ 
+ 
+ def next_prompt_snapshot(guidance):
+-    return {'version':'sales-understanding-prompt/2.5','system':SYSTEM_PROMPT+'''
++    return {'version':'sales-understanding-prompt/2.6','system':SYSTEM_PROMPT+'''
+ The backend has already applied English-only input controls. Interpret the current request;
+ do not translate it, generate a lead-facing response, execute commercial instructions, or
+ reinterpret the output schema from published guidance. All supplied commercial playbooks
+@@ -112,5 +112,14 @@ only for a current voluntary answer to the backend optional-reason question. A n
+ farewell or 'no more questions' never cancels any visit, opts out or requests a new booking.
+ Do not interpret a reason, yes to an optional-reason question, property inquiry, or farewell as
+ permission to schedule a new visit. A fresh visit requires its own explicit request.
++For an explicit availability alert use wait.action request and request appointment, with exact
++current evidence. A bare yes authorizes an alert only to the current backend wait_offer, never
++a material offer or a booking confirmation. The alert is separate from a booking: do not emit
++visit/reschedule/cancellation with wait for the same instruction. Cancelling only the alert
++uses wait.action cancel and never cancellation or visit.cancel. No to an alert question uses
++wait.action decline, not opt_out. Nearby dates require explicit wait.action nearby; preserve
++property, specialist restrictions, duration, timezone and time-of-day preferences. wait.timing
++contains only exact current evidence for a changed range. The backend must persist an alert
++before promising it; never promise contact, availability or a reservation from interpretation.
+ ''','published_guidance':guidance,
+             'configuration_ref':guidance['source']}
+diff --git a/backend/app/modules/sales_agent/wait_models.py b/backend/app/modules/sales_agent/wait_models.py
+new file mode 100644
+index 0000000..71f3327
+--- /dev/null
++++ b/backend/app/modules/sales_agent/wait_models.py
+@@ -0,0 +1,35 @@
++"""One explicit, bounded alert request per lead; one immutable notice per request."""
++from datetime import datetime
++import uuid
++from sqlalchemy import Column,String,Integer,DateTime,JSON,ForeignKey
++from app.db.postgres import Base
++
++
++class SalesWaitRequest(Base):
++    __tablename__='sales_wait_requests'
++    id=Column(String(36),primary_key=True,default=lambda:str(uuid.uuid4()))
++    company_id=Column(String(36),ForeignKey('companies.id',ondelete='CASCADE'),nullable=False)
++    project_id=Column(String(36),ForeignKey('projects.id',ondelete='CASCADE'),nullable=False)
++    target_project_id=Column(String(36),ForeignKey('projects.id',ondelete='CASCADE'),nullable=False)
++    conversation_id=Column(String(36),ForeignKey('sales_conversations.id',ondelete='CASCADE'),nullable=False)
++    lead_id=Column(String(36),ForeignKey('leads.id',ondelete='CASCADE'),nullable=False)
++    requested_message_id=Column(String(36),ForeignKey('sales_messages.id',ondelete='CASCADE'),nullable=False)
++    active_key=Column(String(64),nullable=True,unique=True)
++    request_key=Column(String(64),nullable=False)
++    snapshot_json=Column(JSON,nullable=False)
++    channel=Column(String(20),nullable=False)
++    status=Column(String(30),nullable=False,default='waiting',index=True)
++    close_reason=Column(String(100))
++    expires_at=Column(DateTime(),nullable=False)
++    next_check_at=Column(DateTime(),nullable=False,default=datetime.utcnow)
++    lease_until=Column(DateTime())
++    claim_token=Column(String(36))
++    attempts=Column(Integer(),nullable=False,default=0)
++    last_error=Column(String(100))
++    scan_date=Column(String(10))
++    notice_json=Column(JSON())
++    anchor_revision=Column(Integer())
++    anchor_inbound_id=Column(String(36))
++    notified_message_id=Column(String(36),ForeignKey('sales_messages.id',ondelete='SET NULL'))
++    created_at=Column(DateTime(),nullable=False,default=datetime.utcnow)
++    closed_at=Column(DateTime())
+diff --git a/backend/app/modules/sales_agent/wait_service.py b/backend/app/modules/sales_agent/wait_service.py
+new file mode 100644
+index 0000000..ed0b3e8
+--- /dev/null
++++ b/backend/app/modules/sales_agent/wait_service.py
+@@ -0,0 +1,370 @@
++"""Explicit availability alerts. No reservation is ever created by this worker."""
++from datetime import datetime,timedelta,time,date,timezone
++from types import SimpleNamespace
++from dataclasses import replace
++from zoneinfo import ZoneInfo
++import re,uuid
++from app.modules.sales_crm.models import Lead,Meeting,MeetingStatus
++from app.modules.projects.models import Project
++from .models import SalesConversation,SalesMessage,OutboundMessage
++from .wait_models import SalesWaitRequest
++from .dialogue_store import Scope,check_scope,load
++from .understanding_contract import Understanding,Task
++from .turn_configuration import digest
++from .appointment_context import utc
++from .first_booking import accepted_outbound,search_slots,label,active_meetings
++from .reschedule_service import authorize_target,target_context,reservation_version,meeting_snapshot
++from app.modules.projects.locations import resolve_visit_location
++
++VERSION='sales-availability-wait/1.0'
++OPEN={'waiting','processing','retry','blocked_channel'}
++
++
++class WaitBlocked(Exception):pass
++
++
++def fixed_preferences(prefs,now):
++    value=dict(prefs);today=utc(now).astimezone(ZoneInfo(value['timezone'])).date()
++    first=date.fromisoformat(value['date_from']) if value.get('date_from') else today
++    last=date.fromisoformat(value['date_until']) if value.get('date_until') else first+timedelta(days=13)
++    if last<today or first>today+timedelta(days=90) or (last-first).days>30 or last<first:raise ValueError('Invalid alert range.')
++    value.update(date_from=max(first,today).isoformat(),date_until=last.isoformat())
++    return value
++
++
++def interest(state):return {'property_type_id':state.selected_property_type_id,'unit_id':state.selected_unit_id}
++
++
++def wait_offer(db,scope,outcome,context,prefs,*,original=None,allowed=None):
++    now=datetime.utcnow();prefs=fixed_preferences(prefs,now)
++    offer={'version':VERSION,'scope':scope.__dict__,'context':context,'preferences':prefs,'interest':interest(outcome.state),
++        'original':meeting_snapshot(db,original) if original else None,'allowed_user_ids':sorted(allowed) if allowed else [],
++        'expires_at':(utc(now)+timedelta(minutes=30)).isoformat()}
++    offer['id']=digest(offer);outcome.state.wait_context=offer
++    name=context['project_name']+(' / '+context['property_type_name'] if context.get('property_type_name') else '')
++    if context.get('unit_code'):name+=' / unit '+context['unit_code']
++    return 'I checked up to 14 calendar days within your requested range and could not find a verified time matching those preferences. '+('Your original reservation is unchanged. ' if original else '')+f"Alert preferences: {name}; {prefs['date_from']} through {prefs['date_until']} ({prefs['timezone']}); {prefs['duration_minutes']} minutes. Would you like me to save a request to check these preferences and notify you once if a verified time becomes available?",{
++        'wait_offer':offer,'booking_search_status':'no_matching_time','booking_preferences':prefs},[]
++
++
++def enrich(u,previous,text):
++    from .service import _affirmative_slot_reply
++    if not previous.get('wait_offer') or previous.get('material_offer') or previous.get('release_offer'):return u
++    short=' '.join(re.sub('[^a-z ]',' ',text.lower()).split())
++    decline=short in {'no','no thanks','no thank you','not now','no more questions'}
++    if not decline and not _affirmative_slot_reply(text):return u
++    data=u.model_dump(mode='json');data.update(requests=[{'id':'wait_reply','topic':'appointment','subject':None,'polarity':'request','evidence':text}],all_of=['wait_reply'],alternatives=[],references=[],requires_clarification=False,clarification_question=None,visit=None,reschedule=None,cancellation=None,courtesy=None,appointment_query=None,wait={'action':'decline' if decline else 'request','evidence':text})
++    return Understanding.model_validate(data)
++
++
++def close(row,reason):
++    row.status='closed';row.close_reason=reason;row.active_key=None;row.closed_at=datetime.utcnow();row.lease_until=None
++
++
++def close_for_lead(db,scope,reason):
++    for row in db.query(SalesWaitRequest).filter_by(company_id=scope.company_id,lead_id=scope.lead_id).filter(SalesWaitRequest.status.in_(list(OPEN))).all():close(row,reason)
++
++
++def search_matches(offer,state):
++    search=state.reschedule_search if offer.get('original') else state.booking_search
++    context=offer['context']
++    if not search:return True
++    for key in ['property_type_id','unit_id','location']:
++        if key in search and search[key]!=context.get(key):return False
++    if search.get('target_project_id') and search['target_project_id']!=context['project_id']:return False
++    if offer.get('original') and search.get('original_meeting_id')!=offer['original']['id']:return False
++    if offer.get('original') and sorted(search.get('allowed_user_ids',[]))!=sorted(offer.get('allowed_user_ids',[])):return False
++    preferences=search.get('preferences',{}) if offer.get('original') else search
++    for key in ['date_from','date_until','time_relation','time_from','time_until','timezone','duration_minutes']:
++        if preferences.get(key) is not None and preferences[key]!=offer['preferences'].get(key):return False
++    return True
++
++
++def reconcile(db,scope,state,metadata):
++    lead=db.get(Lead,scope.lead_id)
++    if lead.is_opt_out or lead.consent_status!='granted':close_for_lead(db,scope,'consent_withdrawn');return
++    if metadata.get('meeting_id'):close_for_lead(db,scope,'booked');return
++    if metadata.get('cancellation_operation_id'):close_for_lead(db,scope,'appointment_cancelled');return
++    for row in db.query(SalesWaitRequest).filter_by(company_id=scope.company_id,conversation_id=scope.conversation_id).filter(SalesWaitRequest.status.in_(list(OPEN))).all():
++        if row.snapshot_json['interest']!=interest(state):close(row,'interest_changed')
++        elif not search_matches(row.snapshot_json,state):close(row,'preferences_changed')
++
++
++def fresh_context(db,scope,offer):
++    from app.modules.ai_core.models import AIConfiguration
++    db.query(AIConfiguration).filter_by(company_id=None).populate_existing().all()
++    project,_=authorize_target(db,scope,offer['context']['project_id']);context=offer['context']
++    fresh=target_context(db,scope,project,context['property_type_id'],context['unit_id'],resolve_visit_location(project,context['location']),context['duration_minutes'])
++    if fresh!=context or not fresh['location']:raise PermissionError('Approved alert context changed.')
++    return project
++
++
++def original_for(db,scope,offer):
++    old=offer.get('original')
++    if not old:
++        if active_meetings(db,scope):raise PermissionError('A visit is already active.')
++        return None
++    row=db.query(Meeting).filter_by(id=old['id'],lead_id=scope.lead_id).populate_existing().first()
++    if not row or row.status not in {MeetingStatus.CONFIRMED,MeetingStatus.SCHEDULED} or row.meeting_time<=datetime.utcnow() or reservation_version(row)!=old['booking_sha256']:raise PermissionError('Original reservation changed.')
++    return row
++
++
++def build_notice(scope,offer,options,*,now=None):
++    from .first_booking import VERSION as BOOKING
++    now=now or datetime.utcnow();prefs=offer['preferences'];context=offer['context']
++    expires=(utc(now)+timedelta(minutes=30)).isoformat()
++    if offer.get('original'):
++        from .reschedule_service import VERSION as RESCHEDULE
++        proposal={'version':RESCHEDULE,'scope':scope.__dict__,'original':offer['original'],'target_context':context,
++            'preferences':prefs,'options':options,'expires_at':expires}
++        proposal['id']=digest(proposal)
++        metadata={'reschedule_offer':proposal,'appointment_offer':{'version':RESCHEDULE,'slots':[v['starts_at'] for v in options],
++            'options':options,'duration_minutes':prefs['duration_minutes'],'project_timezone':prefs['timezone']}}
++        intro='Your original reservation is unchanged. Verified replacement options:'
++    else:
++        metadata={'appointment_offer':{'version':BOOKING,'slots':[v['starts_at'] for v in options],'options':options,'preferences':prefs,'context':context,
++            'property_type_id':context['property_type_id'],'unit_id':context['unit_id'],'visit_location':context['location'],
++            'duration_minutes':prefs['duration_minutes'],'project_timezone':prefs['timezone'],'expires_at':expires}}
++        intro='Verified visit options:'
++    text=intro+'\n\n'+'\n\n'.join(f'{i}. {label(o,prefs)}' for i,o in enumerate(options,1))+'\n\nAvailability can change. Which time would you like me to prepare for confirmation?'
++    return text,metadata,expires
++
++
++def nearby(db,scope,offer,directive):
++    original=original_for(db,scope,offer);project=fresh_context(db,scope,offer)
++    prefs=offer['preferences'];today=utc(datetime.utcnow()).astimezone(ZoneInfo(prefs['timezone'])).date()
++    ranges=[]
++    if directive.timing:
++        from .first_booking import normalize_timing
++        prefs=normalize_timing(SimpleNamespace(visit=SimpleNamespace(timing=directive.timing)),directive.evidence,project,datetime.utcnow(),prefs)
++        ranges=[fixed_preferences(prefs,datetime.utcnow())]
++    else:
++        first=date.fromisoformat(prefs['date_from']);last=date.fromisoformat(prefs['date_until'])
++        if first>today:ranges.append({**prefs,'date_from':max(today,first-timedelta(days=3)).isoformat(),'date_until':(first-timedelta(days=1)).isoformat()})
++        ranges.append({**prefs,'date_from':(last+timedelta(days=1)).isoformat(),'date_until':(last+timedelta(days=3)).isoformat()})
++    candidates=[]
++    for values in ranges[:2]:
++        try:
++            for option in search_slots(db,replace(scope,project_id=project.id),values,datetime.utcnow(),excluded_meeting=original,allowed_user_ids=set(offer['allowed_user_ids']) or None):candidates.append((option,values))
++        except ValueError:continue
++    if not candidates:return 'I found no verified time on the nearby dates checked. Your saved preferences and any existing reservation are unchanged.',{'wait_result':True},[]
++    candidates.sort(key=lambda pair:min(abs((datetime.fromisoformat(pair[0]['starts_at']).astimezone(ZoneInfo(prefs['timezone'])).date()-date.fromisoformat(offer['preferences'][k])).days) for k in ['date_from','date_until']))
++    options=[]
++    for option,values in candidates:
++        if option['starts_at'] not in {v['starts_at'] for v in options}:options.append(option)
++        if len(options)==3:break
++    dates=[datetime.fromisoformat(o['starts_at']).astimezone(ZoneInfo(prefs['timezone'])).date().isoformat() for o in options]
++    updated={**offer,'preferences':{**prefs,'date_from':min(dates),'date_until':max(dates)}}
++    text,metadata,_=build_notice(scope,updated,options)
++    return 'These nearby dates are outside or different from the original requested range. '+text,metadata,[]
++
++
++def handle(db,scope,conversation,lead,outcome,inbound,previous):
++    u=outcome.state.last_understanding;directive=u.wait;state=outcome.state
++    if u.visit or u.reschedule or u.cancellation:return 'Please clarify whether you want an availability alert or a visit change. No reservation has been changed.',{'wait_result':True},[]
++    if directive.action in {'cancel','decline'}:
++        if directive.action=='cancel':close_for_lead(db,scope,'cancelled_by_lead')
++        state.wait_context={}
++        return ('Your availability alert request has been closed. Any existing reservation is unchanged.' if directive.action=='cancel' else 'No alert request has been added. You can continue asking about the property.'),{'wait_result':True},[]
++    if not u.permits('appointment') or u.confidence<.8:return '',{},[]
++    from .dialogue_tasks import restricted
++    if not any(t.source_message_id==inbound.id and t.topic.value=='appointment' and not restricted(state,t) and t.id in outcome.plan.get('write_candidates_require_backend_authorization',[]) for t in state.tasks):
++        return 'Your appointment preferences need confirmation before I can save or change an alert. No reservation has been changed.',{'wait_result':True},[]
++    from .service import _affirmative_slot_reply
++    accepted=accepted_outbound(db,conversation,'wait_offer');offer=(accepted.metadata_json or {}).get('wait_offer') if accepted else state.wait_context
++    if _affirmative_slot_reply(inbound.content) and not accepted:return 'Please review a current alert question before accepting. No alert request has been added.',{'wait_result':True},[]
++    if not offer or offer.get('scope')!=scope.__dict__ or offer.get('id')!=digest({k:v for k,v in offer.items() if k!='id'}) or datetime.fromisoformat(offer['expires_at'])<=utc(datetime.utcnow()):return 'Please request current visit options and specify the property, date range and timezone before saving an alert.',{'wait_result':True},[]
++    if offer['interest']!=interest(state) or not search_matches(offer,state):
++        return 'Please request current visit options for your updated preferences before saving an alert. No alert request has been added.',{'wait_result':True},[]
++    try:
++        fresh_context(db,scope,offer);original_for(db,scope,offer)
++        if directive.action=='nearby':return nearby(db,scope,offer,directive)
++        fixed_preferences(offer['preferences'],datetime.utcnow())
++        if directive.timing:return 'Please request current visit options with the revised dates first, so I can save the exact preferences.',{'wait_result':True},[]
++    except (PermissionError,ValueError):return 'The alert preferences need verification. No alert request has been added and your reservation is unchanged.',{'wait_result':True},[]
++    # Serialize duplicate opt-ins across channels for this lead.
++    db.query(Lead).filter_by(id=lead.id,company_id=scope.company_id).populate_existing().with_for_update().one()
++    active_key=digest({'company_id':scope.company_id,'lead_id':scope.lead_id})
++    signature=digest({k:v for k,v in offer.items() if k not in {'id','expires_at'}})
++    old=db.query(SalesWaitRequest).filter_by(active_key=active_key).with_for_update().first()
++    if old and old.request_key==signature and old.channel==conversation.channel and old.snapshot_json['provider']==conversation.provider and old.snapshot_json['contact_sha256']==digest(lead.phone):
++        return 'Your availability alert request is already saved. It does not reserve a time. You can continue asking about the property.',{'wait_request_saved':old.id,'wait_result':True},[]
++    if old:close(old,'replaced_by_new_request');db.flush()
++    prefs=offer['preferences'];expires=datetime.combine(date.fromisoformat(prefs['date_until'])+timedelta(days=1),time.min,tzinfo=ZoneInfo(prefs['timezone'])).astimezone(timezone.utc).replace(tzinfo=None)
++    row=SalesWaitRequest(company_id=scope.company_id,project_id=scope.project_id,target_project_id=offer['context']['project_id'],conversation_id=scope.conversation_id,lead_id=scope.lead_id,
++        requested_message_id=inbound.id,active_key=active_key,request_key=signature,snapshot_json={**offer,'provider':conversation.provider,'contact_sha256':digest(lead.phone)},channel=conversation.channel,expires_at=expires,next_check_at=datetime.utcnow())
++    db.add(row);db.flush()
++    return f"Your availability alert request is saved for {prefs['date_from']} through {prefs['date_until']} ({prefs['timezone']}). I will check those preferences and can send one alert if a verified time becomes available and the channel permits contact. This does not reserve a time. You can cancel the alert request at any time.",{'wait_request_saved':row.id,'wait_result':True},[{'type':'availability_wait_saved','wait_request_id':row.id}]
++
++
++def validate_saved(db,scope,metadata):
++    if not metadata.get('wait_request_saved'):return
++    row=db.query(SalesWaitRequest).filter_by(id=metadata['wait_request_saved'],company_id=scope.company_id,lead_id=scope.lead_id).one()
++    if row.status not in OPEN:raise ValueError('The alert is no longer active before commit.')
++    try:fresh_context(db,scope,row.snapshot_json);original_for(db,scope,row.snapshot_json)
++    except PermissionError as exc:raise ValueError('Alert approval changed before commit.') from exc
++
++
++def current(db,row):
++    scope=Scope(row.company_id,row.project_id,row.conversation_id,row.lead_id)
++    conversation=check_scope(db,scope);lead=db.query(Lead).filter_by(id=row.lead_id).populate_existing().one()
++    if row.expires_at<=datetime.utcnow():close(row,'expired');raise WaitBlocked('Expired')
++    if lead.deleted_at or lead.is_opt_out or lead.consent_status!='granted':close(row,'consent_withdrawn');raise WaitBlocked('ConsentWithdrawn')
++    if conversation.channel!=row.channel or conversation.provider!=row.snapshot_json['provider'] or digest(lead.phone)!=row.snapshot_json['contact_sha256']:close(row,'contact_changed');raise WaitBlocked('ContactChanged')
++    from .dialogue_models import SalesDialogueState
++    scope.query(db,SalesDialogueState).populate_existing().first()
++    revision,state=load(db,scope)
++    if interest(state)!=row.snapshot_json['interest']:close(row,'interest_changed');raise WaitBlocked('InterestChanged')
++    if not search_matches(row.snapshot_json,state):close(row,'preferences_changed');raise WaitBlocked('PreferencesChanged')
++    from .dialogue_tasks import restricted
++    context=row.snapshot_json['context']
++    task=Task(id='wait_notification',topic='appointment',status='pending',property_id=context['property_type_id'],unit_id=context['unit_id'])
++    if restricted(state,task):close(row,'appointment_permission_withdrawn');raise WaitBlocked('AppointmentPermissionWithdrawn')
++    from app.modules.governance.models import HumanInterventionCase
++    if conversation.is_paused or lead.agent_status=='human_control' or db.query(HumanInterventionCase).filter_by(conversation_id=conversation.id,status='open').first():raise WaitBlocked('ManualControl')
++    try:
++        fresh_context(db,scope,row.snapshot_json);old=original_for(db,scope,row.snapshot_json)
++    except (PermissionError,ValueError) as exc:close(row,'reservation_or_approval_changed');raise WaitBlocked('ContextChanged') from exc
++    inbound=db.query(SalesMessage).filter_by(conversation_id=conversation.id,direction='inbound',role='user').order_by(SalesMessage.created_at.desc(),SalesMessage.id.desc()).first()
++    if not inbound or state.memory.as_of_message_id!=inbound.id:raise WaitBlocked('InboundTurnPending')
++    return scope,conversation,lead,revision,inbound.id,old
++
++
++def contact_time(db,row,conversation):
++    from .live_service import _whatsapp_customer_window_open
++    if row.channel=='whatsapp' and not _whatsapp_customer_window_open(db,conversation):raise WaitBlocked('WhatsAppWindowClosed')
++    if row.channel not in {'sms','whatsapp'}:raise WaitBlocked('UnsupportedChannel')
++    from app.modules.governance.services import next_allowed_proactive_time
++    values=[next_allowed_proactive_time(db,company_id=row.company_id,project_id=pid) for pid in {row.project_id,row.target_project_id}]
++    allowed=max(values)
++    if allowed>datetime.utcnow():
++        row.next_check_at=allowed
++        raise WaitBlocked('OperatingWindowClosed')
++
++
++def locked_request(db,identifier,*,claim=False):
++    hint=db.get(SalesWaitRequest,identifier)
++    if not hint:return None
++    conversation=db.query(SalesConversation).filter_by(id=hint.conversation_id).populate_existing().with_for_update(skip_locked=True).first()
++    if not conversation:return None
++    db.query(Lead).filter_by(id=hint.lead_id).populate_existing().with_for_update().first()
++    query=db.query(SalesWaitRequest).filter_by(id=identifier).populate_existing().with_for_update(skip_locked=True)
++    row=query.first()
++    if not row or row.status not in OPEN:return None
++    if claim and (row.next_check_at>datetime.utcnow() and row.expires_at>datetime.utcnow() or row.status=='processing' and row.lease_until and row.lease_until>datetime.utcnow()):return None
++    return row
++
++
++def authorize_part(db,conversation,lead,metadata,content,*,before_provider=False):
++    """Recheck every part immediately before the provider, including queued retries."""
++    identifier=metadata.get('wait_request_id');row=locked_request(db,identifier)
++    if not row or row.status!='processing' or row.claim_token!=metadata.get('wait_claim_token'):raise WaitBlocked('AlertNoLongerActive')
++    if row.company_id!=conversation.company_id or row.conversation_id!=conversation.id or row.lead_id!=lead.id:raise PermissionError('Alert dispatch scope changed.')
++    scope,_,_,revision,inbound_id,old=current(db,row);contact_time(db,row,conversation)
++    if revision!=row.anchor_revision or inbound_id!=row.anchor_inbound_id:raise WaitBlocked('ConcurrentInboundTurn')
++    payload=row.notice_json
++    if not payload or metadata.get('wait_notice_sha256')!=digest(payload) or datetime.fromisoformat(payload['expires_at'])<=utc(datetime.utcnow()):close(row,'notice_expired');raise WaitBlocked('NoticeExpired')
++    from .response_policy import render_channel_text,split_channel_text
++    expected=split_channel_text(render_channel_text(payload['text'],row.channel),row.channel)
++    group=metadata.get('delivery_group',{});index=group.get('part',1)-1
++    if group.get('total',1)!=len(expected) or not 0<=index<len(expected) or content!=expected[index]:raise PermissionError('Alert content changed during dispatch.')
++    if before_provider:
++        row.lease_until=datetime.utcnow()+timedelta(minutes=10)
++        from app.modules.sales_crm.scheduling import eligible_users_for_slot
++        for option in payload['options']:
++            starts=datetime.fromisoformat(option['starts_at']).astimezone(timezone.utc).replace(tzinfo=None)
++            if starts<=datetime.utcnow() or option['sales_user_id'] not in eligible_users_for_slot(db,project_id=row.target_project_id,starts_at=starts,duration_minutes=row.snapshot_json['preferences']['duration_minutes'],excluded_meeting=old,allowed_sales_user_ids={option['sales_user_id']}):
++                close(row,'offered_time_changed');raise WaitBlocked('OfferedTimeChanged')
++
++
++async def process_one(db,identifier):
++    row=locked_request(db,identifier,claim=True)
++    if not row:return
++    token=str(uuid.uuid4())
++    try:
++        scope,conversation,lead,revision,inbound_id,old=current(db,row);contact_time(db,row,conversation)
++        row.anchor_revision=revision;row.anchor_inbound_id=inbound_id
++        row.status='processing';row.claim_token=token;row.lease_until=datetime.utcnow()+timedelta(minutes=10);db.commit()
++        if not row.notice_json:
++            preferences=row.snapshot_json['preferences']
++            today=utc(datetime.utcnow()).astimezone(ZoneInfo(preferences['timezone'])).date()
++            first=max(today,date.fromisoformat(preferences['date_from']))
++            scan=max(first,date.fromisoformat(row.scan_date)) if row.scan_date else first
++            last=date.fromisoformat(preferences['date_until'])
++            if scan>last or scan>today+timedelta(days=90):scan=first
++            until=min(last,scan+timedelta(days=13),today+timedelta(days=90))
++            check_preferences={**preferences,'date_from':scan.isoformat(),'date_until':until.isoformat()}
++            options=search_slots(db,replace(scope,project_id=row.target_project_id),check_preferences,datetime.utcnow(),excluded_meeting=old,allowed_user_ids=set(row.snapshot_json['allowed_user_ids']) or None)
++            next_scan=until+timedelta(days=1) if until<last else first
++            row=db.query(SalesWaitRequest).filter_by(id=identifier).populate_existing().with_for_update().one()
++            if row.status!='processing' or row.claim_token!=token:db.rollback();return
++            if old:
++                original=row.snapshot_json['original'];context=row.snapshot_json['context']
++                options=[o for o in options if not (o['starts_at']==original['starts_at'] and o['sales_user_id']==original['sales_user_id'] and context['project_id']==original['project_id'] and context['property_type_id']==original['property_type_id'] and context['unit_id']==original['unit_id'] and context['location']==original['location'] and context['duration_minutes']==original['duration_minutes'])]
++            if not options:
++                row.scan_date=next_scan.isoformat();row.status='waiting';row.next_check_at=datetime.utcnow()+timedelta(minutes=15);row.lease_until=None;row.last_error=None;db.commit();return
++            text,metadata,expires=build_notice(scope,row.snapshot_json,options)
++            from .language_policy import detect,scoped_names
++            from .commercial_context import build_commercial_context
++            project=db.get(Project,row.target_project_id)
++            commercial=build_commercial_context(db,project=project,company_id=row.company_id,lead_id=row.lead_id,channel=row.channel)
++            if detect(text,names=scoped_names(project,lead,commercial),output=True).needs_reentry:raise WaitBlocked('OutputLanguageReview')
++            row.notice_json={'text':text,'metadata':metadata,'options':options,'expires_at':expires};db.commit()
++        if datetime.fromisoformat(row.notice_json['expires_at'])<=utc(datetime.utcnow()):close(row,'notice_expired');db.commit();return
++        from . import live_service
++        row.attempts+=1;db.commit()
++        metadata={**row.notice_json['metadata'],'wait_request_id':row.id,'wait_notice_sha256':digest(row.notice_json),'wait_claim_token':token,'engine':VERSION,'event_kind':'availability_wait_alert'}
++        message=await live_service._dispatch(db,conversation=conversation,lead=lead,content=row.notice_json['text'],role='assistant',agent_run_id=None,
++            metadata=metadata,idempotency_key='availability-wait:'+row.id)
++        from .reference_resolution import accepted
++        group=message.metadata_json.get('delivery_group',{})
++        parts=db.query(SalesMessage).filter_by(conversation_id=conversation.id,direction='outbound').all()
++        matched=[p for p in parts if (p.metadata_json or {}).get('delivery_group',{}).get('key')==group.get('key')]
++        complete={p.metadata_json['delivery_group']['part'] for p in matched if accepted(p)}==set(range(1,group.get('total',1)+1))
++        db.refresh(row)
++        if row.status not in OPEN or row.claim_token!=token:db.commit();return
++        if complete:
++            row.status='notified';row.notified_message_id=message.id;row.active_key=None;row.closed_at=datetime.utcnow();row.lease_until=None;row.last_error=None
++        elif all(p.status=='failed' or accepted(p) for p in matched) and any(p.status=='failed' for p in matched):
++            row.status='review' if row.attempts>=3 else 'retry';row.last_error='ProviderRejected';row.next_check_at=datetime.utcnow()+timedelta(minutes=2**row.attempts);row.lease_until=None
++            if row.status=='review':row.active_key=None
++        else:row.status='review';row.active_key=None;row.lease_until=None;row.last_error='ProviderOutcomeUnknown'
++        db.commit()
++    except WaitBlocked as exc:
++        if row.status in OPEN and row.claim_token in {None,token}:
++            row.status='blocked_channel';row.last_error=str(exc);row.lease_until=None
++            row.next_check_at=max(row.next_check_at,datetime.utcnow()+timedelta(minutes=15))
++        db.commit()
++    except Exception as exc:
++        # Network timeouts can be ambiguous. Do not automatically send another alert.
++        db.rollback();row=db.get(SalesWaitRequest,identifier)
++        if row and row.status in OPEN and row.claim_token in {None,token}:
++            row.status='review';row.active_key=None;row.lease_until=None;row.last_error=type(exc).__name__;db.commit()
++
++
++async def process_due(limit=10):
++    from app.core.config import settings
++    from app.modules.ai_core.models import AIConfiguration
++    from .runtime_policy import RuntimePolicy
++    from uuid import UUID
++    if not settings.SALES_DIALOGUE_RUNTIME_ENABLED or not settings.SALES_NEXT_FLOW_ENABLED:return
++    ids=[v.strip() for v in settings.SALES_NEXT_FLOW_PROJECT_IDS.split(',') if v.strip()]
++    try:
++        if not ids or any(str(UUID(v))!=v for v in ids):return
++    except ValueError:return
++    from app.db.postgres import SessionLocal
++    db=SessionLocal()
++    try:
++        config=db.query(AIConfiguration).filter_by(company_id=None).first();policy=RuntimePolicy.model_validate((config.agent_ventas or {}).get('runtime_config') or {}) if config else RuntimePolicy()
++        if policy.mode!='active':return
++        from sqlalchemy import or_
++        now=datetime.utcnow()
++        query=db.query(SalesWaitRequest).filter(SalesWaitRequest.status.in_(list(OPEN)),SalesWaitRequest.project_id.in_(ids),SalesWaitRequest.target_project_id.in_(ids),
++            or_(SalesWaitRequest.next_check_at<=now,SalesWaitRequest.expires_at<=now),or_(SalesWaitRequest.lease_until.is_(None),SalesWaitRequest.lease_until<=now))
++        if policy.scope=='cohort':
++            query=query.filter(SalesWaitRequest.company_id.in_(policy.company_ids),SalesWaitRequest.project_id.in_(policy.project_ids),SalesWaitRequest.target_project_id.in_(policy.project_ids))
++            if policy.lead_ids:query=query.filter(SalesWaitRequest.lead_id.in_(policy.lead_ids))
++        values=[r.id for r in query.order_by(SalesWaitRequest.next_check_at).limit(max(1,min(limit,10))).all()]
++        db.commit()
++        for identifier in values:await process_one(db,identifier)
++    finally:db.close()
+diff --git a/backend/tests/test_sales_ai_group_b.py b/backend/tests/test_sales_ai_group_b.py
+index 54974ee..4dd7aa1 100644
+--- a/backend/tests/test_sales_ai_group_b.py
++++ b/backend/tests/test_sales_ai_group_b.py
+@@ -131,7 +131,7 @@ def test_new_interpreter_has_internal_contract_and_configuration_provenance(agen
+     version=publish(agent,pack)
+     _,run=agent.turn('Give me information',understanding('Give me information','catalog'))
+     assert run.status=='completed',run.output_snapshot
+-    assert run.prompt_snapshot['version']=='sales-understanding-prompt/2.5'
++    assert run.prompt_snapshot['version']=='sales-understanding-prompt/2.6'
+     assert run.output_snapshot['metadata']['configuration_ref']['version_id']==version.id
+     request=json.dumps(agent.infer.call_args.args)
+     assert 'LEGACY_SCHEMA_SENTINEL' not in request and 'Sales identity' in request
+@@ -397,7 +397,7 @@ def test_exported_real_catalog_through_new_gate_and_versioned_interpreter(index,
+         assert held.output_snapshot['metadata']['language_hold'] and not h.model.requests
+         _,run=h.turn('Give me information')
+         assert run.status=='completed',run.output_snapshot
+-        assert run.prompt_snapshot['version']=='sales-understanding-prompt/2.5'
++        assert run.prompt_snapshot['version']=='sales-understanding-prompt/2.6'
+         assert len(h.model.requests)==1 and not h.conversation.is_paused
+         assert not h.db.query(Meeting).count() and not h.db.query(SalesAssetShare).count()
+         assert not h.calendar.calls
+diff --git a/backend/tests/test_sales_ai_group_f.py b/backend/tests/test_sales_ai_group_f.py
+index 84f44da..bde5ab9 100644
+--- a/backend/tests/test_sales_ai_group_f.py
++++ b/backend/tests/test_sales_ai_group_f.py
+@@ -262,11 +262,14 @@ def test_booking_cadence_is_cancelled_and_claimed_old_job_never_sends(agent,chan
+     assert job.status=='cancelled' and agent.send.await_count==before
+ 
+ 
+-def test_no_qualified_sales_or_no_matching_time_never_creates_wait_promise(agent):
++def test_no_qualified_sales_asks_alert_permission_without_creating_wait(agent):
+     product(agent)
+     agent.turn('Arrange a visit',visit('Arrange a visit'))
+     assert not agent.db.query(Meeting).count() and 'could not find a verified time' in latest(agent).content
+-    assert 'notify you' not in latest(agent).content and not agent.conversation.is_paused
++    from app.modules.sales_agent.wait_models import SalesWaitRequest
++    assert not agent.db.query(SalesWaitRequest).count() and not agent.conversation.is_paused
++    assert latest(agent).metadata_json.get('wait_offer') and 'Would you like me to save a request' in latest(agent).content
++    assert 'I will notify' not in latest(agent).content
+     assert load(agent.db,agent.scope)[1].booking_search
+ 
+ 
+diff --git a/backend/tests/test_sales_ai_group_i.py b/backend/tests/test_sales_ai_group_i.py
+new file mode 100644
+index 0000000..d62558d
+--- /dev/null
++++ b/backend/tests/test_sales_ai_group_i.py
+@@ -0,0 +1,450 @@
++"""Availability alerts with real coordinator, persisted waits and dispatcher; no live sends."""
++import asyncio,uuid
++from datetime import datetime,timedelta
++from unittest.mock import patch
++import pytest
++from test_sales_turn_1720 import case,outbound,approved_asset
++from test_sales_ai_group_b import agent
++from test_sales_ai_group_c import product
++from test_sales_ai_group_d import availability,typed,req,ref
++from test_sales_ai_group_f import visit,latest,book
++from test_sales_ai_group_g import change
++from test_sales_active_integration import understanding
++from app.modules.sales_agent.understanding_contract import Understanding
++from app.modules.sales_agent.wait_models import SalesWaitRequest
++from app.modules.sales_agent import wait_service
++from app.modules.sales_agent.dialogue_store import load,save
++from app.modules.sales_agent.models import SalesMessage,OutboundMessage,AgentRun
++from app.modules.sales_crm.models import Meeting,MeetingStatus,SalesAvailabilityBlock
++from app.core.config import settings
++
++
++def wait(text,action='request',timing=None):
++    return Understanding.model_validate({**understanding(text,'appointment').model_dump(),'wait':{'action':action,'evidence':text,'timing':timing}})
++
++
++def offer(agent):
++    start=availability(agent);product(agent,'Studio')
++    blocks=agent.db.query(SalesAvailabilityBlock).all()
++    for block in blocks:agent.db.delete(block)
++    agent.db.commit();agent.turn('I want to arrange a visit',visit('I want to arrange a visit'))
++    assert latest(agent).metadata_json.get('wait_offer'),agent.db.query(AgentRun).all()[-1].output_snapshot
++    return start
++
++
++def registered(agent):
++    starts=offer(agent);message,run=agent.turn('Yes',understanding('Yes','other'))
++    assert agent.db.query(SalesWaitRequest).count()==1,run.output_snapshot
++    return agent.db.query(SalesWaitRequest).one(),starts
++
++
++def add_block(agent,starts):
++    from app.modules.project_team.models import ProjectUserAssignment
++    user=agent.db.query(ProjectUserAssignment).filter_by(project_id=agent.project.id).first().user_id
++    agent.db.add(SalesAvailabilityBlock(user_id=user,starts_at=starts,ends_at=starts+timedelta(hours=2),timezone='UTC'));agent.db.commit()
++
++
++def worker(agent):
++    with agent.patched(),patch('app.db.postgres.SessionLocal',return_value=agent.db),patch.object(agent.db,'close'):
++        asyncio.run(wait_service.process_due())
++
++
++def due(agent,row):
++    row.next_check_at=datetime.utcnow()-timedelta(seconds=1);row.lease_until=None;agent.db.commit()
++
++
++@pytest.mark.parametrize('channel',['sms','whatsapp'])
++def test_no_promise_without_explicit_optin_and_persistent_scoped_preferences(agent,channel):
++    agent.conversation.channel=channel;starts=offer(agent)
++    assert not agent.db.query(SalesWaitRequest).count() and not agent.db.query(Meeting).count()
++    assert latest(agent).content.count('?')==1 and 'Would you like me to save' in latest(agent).content
++    agent.turn('Yes',understanding('Yes','other'));row=agent.db.query(SalesWaitRequest).one()
++    assert row.status=='waiting' and row.channel==channel and row.requested_message_id
++    assert row.snapshot_json['context']['property_type_name']=='Studio' and row.snapshot_json['preferences']['timezone']=='UTC'
++    assert row.snapshot_json['preferences']['date_from'] and row.snapshot_json['preferences']['date_until'] and row.expires_at>datetime.utcnow()
++    assert 'request is saved' in latest(agent).content and not agent.db.query(Meeting).count()
++    worker(agent);assert row.status=='waiting' and row.notified_message_id is None
++
++
++@pytest.mark.parametrize('channel',['sms','whatsapp'])
++def test_verified_alert_is_deduplicated_and_requires_normal_booking_confirmation(agent,channel):
++    agent.conversation.channel=channel;row,starts=registered(agent);add_block(agent,starts);before=agent.send.await_count
++    worker(agent)
++    assert row.status=='notified',row.last_error
++    assert agent.send.await_count>before and latest(agent).metadata_json.get('appointment_offer')
++    assert 'Verified visit options' in latest(agent).content and not agent.db.query(Meeting).count()
++    sent=agent.send.await_count;worker(agent);assert agent.send.await_count==sent
++    agent.turn('1',typed('1',[req('t','appointment','1',ref='s')],[ref('s','appointment','1')]))
++    assert latest(agent).metadata_json.get('booking_confirmation') and not agent.db.query(Meeting).count()
++    agent.turn('Yes',understanding('Yes','other'))
++    assert agent.db.query(Meeting).count()==1 and row.status=='notified'
++
++
++def test_duplicate_explicit_request_reuses_one_active_record(agent):
++    row,starts=registered(agent)
++    agent.turn('Please notify me if a time becomes available',wait('Please notify me if a time becomes available'))
++    assert agent.db.query(SalesWaitRequest).count()==1 and 'already saved' in latest(agent).content and row.active_key
++
++
++def test_no_to_alert_question_is_not_channel_optout(agent):
++    offer(agent);agent.turn('No',understanding('No','opt_out'))
++    assert not agent.db.query(SalesWaitRequest).count() and not agent.lead.is_opt_out and not agent.conversation.is_paused
++
++
++def test_alert_cancellation_does_not_cancel_an_appointment(agent):
++    row,starts=registered(agent)
++    _,run=agent.turn('Cancel my alert request',wait('Cancel my alert request','cancel'))
++    assert row.status=='closed' and row.close_reason=='cancelled_by_lead' and not agent.db.query(Meeting).count(),run.output_snapshot
++    assert 'existing reservation is unchanged' in latest(agent).content
++
++
++def test_other_offer_yes_does_not_register_wait(agent):
++    offer(agent);approved_asset((agent.db,agent.company,agent.project,agent.lead,agent.conversation),['brochure'])
++    agent.turn('Send photos',understanding('Send photos','materials',subjects={0:'photos'}))
++    agent.turn('Yes',wait('Yes'))
++    assert not agent.db.query(SalesWaitRequest).count()
++
++
++def test_opt_out_closes_wait_and_worker_does_not_contact(agent):
++    row,starts=registered(agent);agent.turn('STOP',understanding('STOP','other'))
++    assert row.status=='closed' and row.close_reason=='consent_withdrawn'
++    add_block(agent,starts);before=agent.send.await_count;worker(agent);assert agent.send.await_count==before
++
++
++def test_interest_change_closes_wait_without_booking(agent):
++    row,starts=registered(agent);product(agent,'Loft')
++    text='Tell me about Loft';agent.turn(text,typed(text,[req('p','property_details',text,ref='p')],[ref('p','property','Loft')]))
++    assert row.status=='closed' and row.close_reason=='interest_changed' and not agent.db.query(Meeting).count()
++
++
++def test_expired_wait_cannot_send_even_when_availability_returns(agent):
++    row,starts=registered(agent);row.expires_at=datetime.utcnow()-timedelta(seconds=1);agent.db.commit();add_block(agent,starts)
++    before=agent.send.await_count;worker(agent)
++    assert row.status=='closed' and row.close_reason=='expired' and agent.send.await_count==before
++
++
++def test_withdrawn_consent_from_another_entrypoint_blocks_contact(agent):
++    row,starts=registered(agent);agent.lead.consent_status='revoked';agent.db.commit();add_block(agent,starts)
++    before=agent.send.await_count;worker(agent)
++    assert row.status=='closed' and agent.send.await_count==before
++
++
++def test_closed_whatsapp_window_defers_without_template_or_sms_fallback(agent):
++    agent.conversation.channel='whatsapp';row,starts=registered(agent);add_block(agent,starts)
++    for msg in agent.db.query(SalesMessage).filter_by(direction='inbound').all():msg.created_at=datetime.utcnow()-timedelta(days=2)
++    agent.db.commit();before=agent.send.await_count;worker(agent)
++    assert row.status=='blocked_channel' and row.last_error=='WhatsAppWindowClosed' and agent.send.await_count==before
++    agent.turn('Thank you',understanding('Thank you','other'));due(agent,row);worker(agent)
++    assert row.status=='notified',row.last_error
++
++
++def test_ambiguous_provider_exception_is_visible_and_not_automatically_resent(agent):
++    row,starts=registered(agent);add_block(agent,starts);agent.send.side_effect=RuntimeError('network timeout')
++    worker(agent)
++    assert row.status=='review' and row.last_error=='RuntimeError' and not agent.db.query(Meeting).count()
++    count=agent.send.await_count;due(agent,row);worker(agent);assert agent.send.await_count==count
++
++
++def test_manual_control_prevents_wait_contact(agent):
++    row,starts=registered(agent);add_block(agent,starts);agent.conversation.is_paused=True;agent.conversation.pause_reason='Manual control active';agent.db.commit()
++    before=agent.send.await_count;worker(agent)
++    assert row.status=='blocked_channel' and row.last_error=='ManualControl' and agent.send.await_count==before
++
++
++def test_restart_reloads_wait_and_checks_current_availability(agent):
++    row,starts=registered(agent);identifier=row.id;agent.db.expunge(row);row=agent.db.get(SalesWaitRequest,identifier)
++    add_block(agent,starts);worker(agent)
++    assert row.status=='notified' and row.notified_message_id
++
++
++def test_no_persistence_means_no_saved_alert_promise(agent):
++    offer(agent)
++    with patch('app.modules.sales_agent.wait_service.validate_saved',side_effect=ValueError('write failed')):agent.turn('Yes',understanding('Yes','other'))
++    assert not agent.db.query(SalesWaitRequest).count() and 'request is saved' not in latest(agent).content
++
++
++def test_nearby_dates_are_explicit_keep_time_preferences_and_never_book(agent):
++    starts=availability(agent);product(agent,'Studio')
++    for block in agent.db.query(SalesAvailabilityBlock).all():agent.db.delete(block)
++    agent.db.commit();day=starts.date().isoformat();text=f'I want a visit on {day} at 3 PM'
++    agent.turn(text,visit(text,timing={'date_from_evidence':day,'time_from_evidence':'3 PM','time_relation':'exact'}))
++    assert latest(agent).metadata_json.get('wait_offer')
++    assert not agent.db.query(SalesWaitRequest).count()
++    add_block(agent,starts+timedelta(days=1))
++    agent.turn('Show nearby dates',wait('Show nearby dates','nearby'))
++    result=latest(agent).metadata_json.get('appointment_offer');assert result,agent.db.query(AgentRun).all()[-1].output_snapshot
++    assert result['preferences']['time_relation']=='exact' and result['preferences']['time_from']=='15:00'
++    assert result['preferences']['timezone']=='UTC' and result['context']['property_type_name']=='Studio'
++    assert all(datetime.fromisoformat(v['starts_at']).hour==15 for v in result['options'])
++    assert all(datetime.fromisoformat(v['starts_at']).date()!=starts.date() for v in result['options'])
++    assert not agent.db.query(Meeting).count() and not agent.db.query(SalesWaitRequest).count()
++
++
++def test_reschedule_wait_keeps_original_then_requires_exact_replacement_confirmation(agent):
++    _,_,old,starts=book(agent)
++    for block in agent.db.query(SalesAvailabilityBlock).all():agent.db.delete(block)
++    agent.db.commit();agent.turn('I want to reschedule my visit',change('I want to reschedule my visit'))
++    assert latest(agent).metadata_json.get('wait_offer') and old.status==MeetingStatus.CONFIRMED
++    agent.turn('Yes',understanding('Yes','other'));row=agent.db.query(SalesWaitRequest).one()
++    assert row.snapshot_json['original']['id']==old.id and old.status==MeetingStatus.CONFIRMED
++    add_block(agent,starts+timedelta(days=1));worker(agent)
++    assert row.status=='notified',row.last_error
++    assert latest(agent).metadata_json.get('reschedule_offer') and old.status==MeetingStatus.CONFIRMED
++    agent.turn('1',typed('1',[req('t','appointment','1',ref='t')],[ref('t','appointment','1')]))
++    assert latest(agent).metadata_json.get('reschedule_confirmation') and old.status==MeetingStatus.CONFIRMED
++    agent.turn('Yes',understanding('Yes','other'))
++    assert old.status==MeetingStatus.CANCELLED and agent.db.query(Meeting).filter_by(status=MeetingStatus.CONFIRMED).count()==1
++
++
++def test_cancel_wait_during_rescheduling_keeps_old_reservation(agent):
++    _,_,old,starts=book(agent)
++    for block in agent.db.query(SalesAvailabilityBlock).all():agent.db.delete(block)
++    agent.db.commit();agent.turn('Reschedule my visit',change('Reschedule my visit'));agent.turn('Yes',understanding('Yes','other'))
++    row=agent.db.query(SalesWaitRequest).one()
++    agent.turn('Cancel my alert request',wait('Cancel my alert request','cancel'))
++    assert row.status=='closed' and old.status==MeetingStatus.CONFIRMED and agent.db.query(Meeting).count()==1
++
++
++def test_appointment_cancellation_closes_its_rescheduling_wait(agent):
++    from test_sales_ai_group_h import cancellation
++    _,_,old,starts=book(agent)
++    for block in agent.db.query(SalesAvailabilityBlock).all():agent.db.delete(block)
++    agent.db.commit();agent.turn('Reschedule my visit',change('Reschedule my visit'));agent.turn('Yes',understanding('Yes','other'))
++    row=agent.db.query(SalesWaitRequest).one()
++    agent.turn('Cancel my visit',cancellation('Cancel my visit'));agent.turn('Yes',understanding('Yes','other'))
++    assert old.status==MeetingStatus.CANCELLED and row.status=='closed' and row.close_reason=='appointment_cancelled'
++
++
++def test_booking_elsewhere_closes_pending_wait(agent):
++    row,starts=registered(agent);add_block(agent,starts)
++    agent.turn('I want to arrange a visit',visit('I want to arrange a visit'))
++    agent.turn('1',typed('1',[req('t','appointment','1',ref='s')],[ref('s','appointment','1')]))
++    agent.turn('Yes',understanding('Yes','other'))
++    assert agent.db.query(Meeting).count()==1 and row.status=='closed' and row.close_reason=='booked'
++
++
++@pytest.mark.parametrize('kind',['phone','provider','channel'])
++def test_contact_changes_never_redirect_a_saved_alert(agent,kind):
++    row,starts=registered(agent);add_block(agent,starts)
++    if kind=='phone':agent.lead.phone='+15550109999'
++    if kind=='provider':agent.conversation.provider='changed-provider'
++    if kind=='channel':agent.conversation.channel='whatsapp'
++    agent.db.commit();before=agent.send.await_count;worker(agent)
++    assert row.status=='closed' and row.close_reason=='contact_changed' and agent.send.await_count==before
++
++
++def test_operating_window_defers_proactive_contact(agent):
++    row,starts=registered(agent);add_block(agent,starts);future=datetime.utcnow()+timedelta(hours=2)
++    before=agent.send.await_count
++    with patch('app.modules.governance.services.next_allowed_proactive_time',return_value=future):worker(agent)
++    assert row.status=='blocked_channel' and row.next_check_at>=future and row.last_error=='OperatingWindowClosed'
++    assert agent.send.await_count==before
++
++
++def test_disabled_cohort_never_claims_or_sends_wait(agent,monkeypatch):
++    row,starts=registered(agent);add_block(agent,starts);before=agent.send.await_count
++    monkeypatch.setattr(settings,'SALES_NEXT_FLOW_PROJECT_IDS','');worker(agent)
++    assert row.status=='waiting' and agent.send.await_count==before
++
++
++def test_provider_known_rejection_retries_stable_parts_without_new_booking(agent):
++    row,starts=registered(agent);add_block(agent,starts)
++    agent.send.side_effect=lambda *a,**kw:{'sid':None,'status':'failed'}
++    worker(agent)
++    assert row.status=='retry' and row.last_error=='ProviderRejected',row.last_error
++    prepared=row.notice_json
++    due(agent,row);agent.send.side_effect=lambda *a,**kw:{'sid':str(uuid.uuid4()),'status':'sent'}
++    worker(agent);assert row.status=='notified' and row.notice_json==prepared and row.attempts==2
++    assert not agent.db.query(Meeting).count()
++    count=agent.send.await_count;worker(agent);assert agent.send.await_count==count
++
++
++def test_restart_after_provider_accepted_does_not_repeat_notice(agent):
++    row,starts=registered(agent);add_block(agent,starts);worker(agent)
++    assert row.status=='notified';count=agent.send.await_count
++    row.status='processing';row.closed_at=None;row.lease_until=datetime.utcnow()-timedelta(seconds=1);row.next_check_at=datetime.utcnow()-timedelta(seconds=1);agent.db.commit()
++    worker(agent)
++    assert row.status=='notified' and agent.send.await_count==count
++
++
++def test_unprocessed_new_inbound_defers_notice_before_interpretation(agent):
++    row,starts=registered(agent);add_block(agent,starts)
++    msg=SalesMessage(conversation_id=agent.conversation.id,channel='sms',direction='inbound',role='user',content='Tell me about another property',status='received')
++    agent.db.add(msg);agent.db.commit();before=agent.send.await_count;worker(agent)
++    assert row.status=='blocked_channel' and row.last_error=='InboundTurnPending' and agent.send.await_count==before
++
++
++def test_live_last_boundary_catches_consent_change_before_provider(agent):
++    row,starts=registered(agent);add_block(agent,starts);original=wait_service.authorize_part;before=agent.send.await_count
++    def change_before_send(db,conversation,lead,metadata,content,**kw):
++        if kw.get('before_provider'):
++            lead.is_opt_out=True;lead.consent_status='opted_out';db.commit()
++        return original(db,conversation,lead,metadata,content,**kw)
++    with patch.object(wait_service,'authorize_part',side_effect=change_before_send):worker(agent)
++    assert row.status=='closed' and agent.send.await_count==before and not agent.db.query(Meeting).count()
++
++
++def test_manual_offer_cannot_authorize_wait_from_bare_yes(agent):
++    offer(agent);outbound(agent.db,agent.conversation,'Would you like an alert?',{})
++    agent.turn('Yes',wait('Yes'))
++    assert not agent.db.query(SalesWaitRequest).count()
++
++
++def test_wait_registration_expired_offer_is_not_saved(agent):
++    offer(agent);rev,state=load(agent.db,agent.scope)
++    from app.modules.sales_agent.turn_configuration import digest
++    value=state.wait_context;value['expires_at']=(datetime.now().astimezone()-timedelta(seconds=1)).isoformat();value['id']=digest({k:v for k,v in value.items() if k!='id'})
++    save(agent.db,agent.scope,event_key='expire-wait-offer',expected_revision=rev,state=state);agent.db.commit()
++    msg=latest(agent);msg.metadata_json={**msg.metadata_json,'wait_offer':value};agent.db.commit()
++    agent.turn('Yes',understanding('Yes','other'));assert not agent.db.query(SalesWaitRequest).count()
++
++
++def test_appointment_prohibition_is_not_implicitly_released_by_alert_request(agent):
++    row,starts=registered(agent)
++    text='I do not want any appointment alerts'
++    agent.turn(text,Understanding.model_validate({**understanding(text,'other').model_dump(),
++        'constraints':[{'topic':'appointment','subject':None,'evidence':text,'scope':'until_explicit_change'}]}))
++    add_block(agent,starts);before=agent.send.await_count;worker(agent)
++    assert row.status=='closed' and agent.send.await_count==before
++
++
++def test_superseded_worker_claim_cannot_send_after_lease_takeover(agent):
++    row,starts=registered(agent);add_block(agent,starts);original=wait_service.authorize_part;before=agent.send.await_count
++    def takeover(db,conversation,lead,metadata,content,**kw):
++        if kw.get('before_provider'):
++            row.claim_token='new-worker-claim';db.commit()
++        return original(db,conversation,lead,metadata,content,**kw)
++    with patch.object(wait_service,'authorize_part',side_effect=takeover):worker(agent)
++    assert agent.send.await_count==before and row.claim_token=='new-worker-claim' and not agent.db.query(Meeting).count()
++
++
++def test_offered_slot_disappearing_before_provider_never_produces_an_alert(agent):
++    row,starts=registered(agent);add_block(agent,starts);original=wait_service.authorize_part;before=agent.send.await_count
++    def unavailable(db,conversation,lead,metadata,content,**kw):
++        if kw.get('before_provider'):
++            for block in db.query(SalesAvailabilityBlock).all():db.delete(block)
++            db.commit()
++        return original(db,conversation,lead,metadata,content,**kw)
++    with patch.object(wait_service,'authorize_part',side_effect=unavailable):worker(agent)
++    assert row.status=='closed' and row.close_reason=='offered_time_changed' and agent.send.await_count==before
++
++
++def test_saved_context_revocation_closes_wait_without_sending(agent):
++    from app.modules.projects.models import ProjectPropertyType
++    row,starts=registered(agent);add_block(agent,starts)
++    agent.db.get(ProjectPropertyType,row.snapshot_json['context']['property_type_id']).review_status='draft';agent.db.commit()
++    before=agent.send.await_count;worker(agent)
++    assert row.status=='closed' and agent.send.await_count==before
++
++
++def test_pending_reschedule_original_changed_elsewhere_closes_wait(agent):
++    _,_,old,starts=book(agent)
++    for block in agent.db.query(SalesAvailabilityBlock).all():agent.db.delete(block)
++    agent.db.commit();agent.turn('Reschedule my visit',change('Reschedule my visit'));agent.turn('Yes',understanding('Yes','other'))
++    row=agent.db.query(SalesWaitRequest).one();old.meeting_time+=timedelta(hours=1);agent.db.commit();add_block(agent,starts+timedelta(days=1))
++    before=agent.send.await_count;worker(agent)
++    assert row.status=='closed' and old.status==MeetingStatus.CONFIRMED and agent.send.await_count==before
++
++
++def test_stale_notice_does_not_resend_or_refresh_its_original_expiry(agent):
++    row,starts=registered(agent);add_block(agent,starts)
++    agent.send.side_effect=lambda *a,**kw:{'sid':None,'status':'failed'};worker(agent)
++    assert row.status=='retry'
++    row.notice_json={**row.notice_json,'expires_at':(datetime.now().astimezone()-timedelta(seconds=1)).isoformat()};due(agent,row)
++    count=agent.send.await_count;worker(agent)
++    assert row.status=='closed' and row.close_reason=='notice_expired' and agent.send.await_count==count
++
++
++def test_mixed_material_request_does_not_expose_an_invisible_wait_question(agent):
++    starts=availability(agent);product(agent,'Studio')
++    for block in agent.db.query(SalesAvailabilityBlock).all():agent.db.delete(block)
++    approved_asset((agent.db,agent.company,agent.project,agent.lead,agent.conversation),['brochure']);agent.db.commit()
++    text='I want a visit and photos'
++    u=Understanding.model_validate({**understanding(text,'appointment','materials',subjects={1:'photos'}).model_dump(),
++        'visit':{'action':'request','evidence':'I want a visit'}})
++    agent.turn(text,u)
++    assert latest(agent).metadata_json.get('material_offer') and not latest(agent).metadata_json.get('wait_offer')
++    agent.turn('Yes',understanding('Yes','other'))
++    assert not agent.db.query(SalesWaitRequest).count()
++
++
++def test_wait_migration_roundtrip_preserves_reservations():
++    import importlib.util
++    from pathlib import Path
++    from sqlalchemy import create_engine,text,inspect
++    from alembic.migration import MigrationContext
++    from alembic.operations import Operations
++    path=Path(__file__).resolve().parents[1]/'alembic/versions/20261108_sales_wait_requests.py'
++    spec=importlib.util.spec_from_file_location('wait_migration',path);module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
++    engine=create_engine('sqlite://')
++    with engine.begin() as connection:
++        for table in ['companies','projects','sales_conversations','leads','sales_messages']:connection.execute(text(f'CREATE TABLE {table} (id VARCHAR(36) PRIMARY KEY)'))
++        connection.execute(text('CREATE TABLE meetings (id VARCHAR(36) PRIMARY KEY, value TEXT)'))
++        connection.execute(text("INSERT INTO meetings VALUES ('old','unchanged')"))
++        with Operations.context(MigrationContext.configure(connection)):
++            module.upgrade();assert 'sales_wait_requests' in inspect(connection).get_table_names()
++            module.downgrade();assert 'sales_wait_requests' not in inspect(connection).get_table_names()
++            assert connection.execute(text('SELECT value FROM meetings')).scalar()=='unchanged'
++    engine.dispose()
++
++
++def test_wait_migration_generates_postgres_uniqueness_and_no_meeting_writes():
++    import importlib.util,io
++    from pathlib import Path
++    from alembic.migration import MigrationContext
++    from alembic.operations import Operations
++    path=Path(__file__).resolve().parents[1]/'alembic/versions/20261108_sales_wait_requests.py'
++    spec=importlib.util.spec_from_file_location('wait_sql',path);module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
++    output=io.StringIO()
++    with Operations.context(MigrationContext.configure(dialect_name='postgresql',opts={'as_sql':True,'output_buffer':output})):module.upgrade()
++    sql=output.getvalue()
++    assert 'UNIQUE (active_key)' in sql and 'CREATE TABLE sales_wait_requests' in sql
++    assert 'UPDATE meetings' not in sql and 'DELETE' not in sql.replace('ON DELETE CASCADE','').replace('ON DELETE SET NULL','')
++
++
++def test_bounded_wait_checks_rotate_across_entire_requested_range(agent):
++    starts=availability(agent);product(agent,'Studio')
++    for block in agent.db.query(SalesAvailabilityBlock).all():agent.db.delete(block)
++    agent.db.commit();first=starts.date().isoformat();last=(starts+timedelta(days=30)).date().isoformat()
++    text=f'I want a visit from {first} to {last}'
++    agent.turn(text,visit(text,timing={'date_from_evidence':first,'date_until_evidence':last}))
++    agent.turn('Yes',understanding('Yes','other'));row=agent.db.query(SalesWaitRequest).one()
++    add_block(agent,starts+timedelta(days=20));before=agent.send.await_count;worker(agent)
++    assert row.status=='waiting' and row.scan_date and agent.send.await_count==before
++    due(agent,row);worker(agent)
++    assert row.status=='notified',row.last_error
++    assert all(datetime.fromisoformat(o['starts_at']).date()>=(starts+timedelta(days=14)).date() for o in row.notice_json['options'])
++    assert row.snapshot_json['preferences']['date_from']==first and row.snapshot_json['preferences']['date_until']==last
++
++
++def test_scope_revoked_at_last_dispatch_boundary_never_sends(agent,monkeypatch):
++    row,starts=registered(agent);add_block(agent,starts);original=wait_service.authorize_part;before=agent.send.await_count
++    def revoked(db,conversation,lead,metadata,content,**kw):
++        if kw.get('before_provider'):monkeypatch.setattr(settings,'SALES_NEXT_FLOW_PROJECT_IDS','')
++        return original(db,conversation,lead,metadata,content,**kw)
++    with patch.object(wait_service,'authorize_part',side_effect=revoked):worker(agent)
++    assert row.status=='closed' and agent.send.await_count==before
++
++
++def test_explicitly_changed_visit_preferences_close_old_wait(agent):
++    row,starts=registered(agent)
++    agent.turn('I want a visit at 4 PM',visit('I want a visit at 4 PM',timing={'time_from_evidence':'4 PM','time_relation':'exact'}))
++    assert row.status=='closed' and row.close_reason=='preferences_changed'
++    assert not agent.db.query(Meeting).count()
++
++
++def test_replacement_interest_changes_close_old_wait_even_when_commercial_interest_stays(agent):
++    _,_,old,starts=book(agent);product(agent,'Loft')
++    for block in agent.db.query(SalesAvailabilityBlock).all():agent.db.delete(block)
++    agent.db.commit();agent.turn('Reschedule my visit',change('Reschedule my visit'));agent.turn('Yes',understanding('Yes','other'))
++    row=agent.db.query(SalesWaitRequest).one()
++    agent.turn('Reschedule my visit to Loft',change('Reschedule my visit to Loft',target_property='Loft'))
++    assert row.status=='closed' and row.close_reason=='preferences_changed' and old.status==MeetingStatus.CONFIRMED
++
++
++def test_explicit_notify_after_interest_changed_does_not_save_or_promise_stale_preferences(agent):
++    offer(agent);product(agent,'Loft')
++    text='Tell me about Loft';agent.turn(text,typed(text,[req('p','property_details',text,ref='p')],[ref('p','property','Loft')]))
++    agent.turn('Notify me if a time becomes available',wait('Notify me if a time becomes available'))
++    assert not agent.db.query(SalesWaitRequest).count() and 'request is saved' not in latest(agent).content
++    assert 'updated preferences' in latest(agent).content
+diff --git a/backend/tools/sales_ai/offline.sh b/backend/tools/sales_ai/offline.sh
+index cf8d972..412065b 100644
+--- a/backend/tools/sales_ai/offline.sh
++++ b/backend/tools/sales_ai/offline.sh
+@@ -14,9 +14,10 @@ case "$BP_MODE" in
+     group-f) BP_ARGS=(-m pytest tests/test_sales_ai_group_f.py tests/test_sales_booking_postgres.py -q --disable-warnings) ;;
+     group-g) BP_ARGS=(-m pytest tests/test_sales_ai_group_g.py -q --disable-warnings) ;;
+     group-h) BP_ARGS=(-m pytest tests/test_sales_ai_group_h.py -q --disable-warnings) ;;
++    group-i) BP_ARGS=(-m pytest tests/test_sales_ai_group_i.py -q --disable-warnings) ;;
+     baseline) BP_ARGS=(-m pytest tests -q --disable-warnings) ;;
+     replay) BP_ARGS=(-m tools.sales_ai.replay --output "${2:?Provide the report output path}") ;;
+-    *) printf 'Usage: bash tools/sales_ai/offline.sh test|group-b|group-c|group-d|group-e|group-f|group-g|group-h|baseline|replay OUTPUT\n' >&2; exit 2 ;;
++    *) printf 'Usage: bash tools/sales_ai/offline.sh test|group-b|group-c|group-d|group-e|group-f|group-g|group-h|group-i|baseline|replay OUTPUT\n' >&2; exit 2 ;;
+ esac
+ exec env SECRET_KEY=group-a-offline-test ACCESS_TOKEN_EXPIRE_MINUTES=60 \
+     DATABASE_URL=sqlite:// ENVIRONMENT=test \
+diff --git a/docs/sales-ai/group-i-report.json b/docs/sales-ai/group-i-report.json
+new file mode 100644
+index 0000000..afd2902
+--- /dev/null
++++ b/docs/sales-ai/group-i-report.json
+@@ -0,0 +1,199 @@
++{
++  "version": "sales-ai-group-i-report/1.0",
++  "date": "2026-11-08",
++  "base_commit": "b1b3ec29c504b3b0fd9c050836dc420c9ebe721d",
++  "main_reverified_at_close": "b1b3ec29c504b3b0fd9c050836dc420c9ebe721d",
++  "branch": "sales-ai/group-i-waitlist",
++  "steps": [
++    15
++  ],
++  "status": "implemented_and_verified",
++  "checks": [
++    {
++      "name": "group_i_focused",
++      "passed": 47,
++      "skipped": 0,
++      "warnings": 4595,
++      "seconds": 48.5,
++      "failed": 0,
++      "exit_code": 0
++    },
++    {
++      "name": "inherited_group_f_with_explicit_wait_optin",
++      "passed": 68,
++      "skipped": 2,
++      "warnings": 4909,
++      "seconds": 32.3,
++      "failed": 0,
++      "exit_code": 0
++    },
++    {
++      "name": "full_backend_final_tree_isolated_actions_layout",
++      "passed": 2003,
++      "skipped": 4,
++      "warnings": 46850,
++      "seconds": 342.75,
++      "failed": 0,
++      "exit_code": 0,
++      "unchanged_reference_files": 237,
++      "matching_application_tools_migration_files": 285,
++      "physical_copies": true,
++      "checkout_imports": false
++    },
++    {
++      "name": "existing_safety_replay",
++      "passed": 20,
++      "total": 20,
++      "external_actions": 0,
++      "model_quality_evaluated": false
++    },
++    {
++      "name": "migration_heads",
++      "head": "20261108_sales_wait_requests"
++    },
++    {
++      "name": "sqlite_roundtrip_and_postgres_ddl",
++      "included_in_focused_tests": true,
++      "existing_reservations_preserved": true
++    },
++    {
++      "name": "dependency_consistency",
++      "exit_code": 0
++    },
++    {
++      "name": "whitespace",
++      "exit_code": 0
++    }
++  ],
++  "coverage": {
++    "channels": [
++      "sms",
++      "whatsapp"
++    ],
++    "model": "INJECTED_SCRIPTED",
++    "providers": "MOCKED",
++    "real_postgres_concurrency_proven": false,
++    "inherited_postgres_cases_skipped": 4,
++    "partial_acceptance_cases": [
++      "T13",
++      "T17",
++      "T18",
++      "T19",
++      "T20",
++      "T21",
++      "T25",
++      "T26"
++    ],
++    "complete_T01_T26_acceptance": false
++  },
++  "wait": {
++    "version": "sales-availability-wait/1.0",
++    "table": "sales_wait_requests",
++    "registration": "exact current backend opt-in or explicit current alert request with verified unexpired context",
++    "opt_in_offer_expiry_minutes": 30,
++    "persisted_before_contact_promise": true,
++    "one_active_request_per_company_lead": true,
++    "saved_fields": [
++      "source and target scope",
++      "request message",
++      "property/unit/location",
++      "fixed dates and timezone",
++      "duration/time-of-day/specialist preferences",
++      "source interest",
++      "original appointment/version for replacement",
++      "channel/provider/contact fingerprint"
++    ],
++    "default_range_days": 14,
++    "maximum_range_days": 31,
++    "future_start_horizon_days": 90,
++    "expires": "end of requested last day in saved timezone",
++    "close_events": [
++      "booked or rescheduled",
++      "appointment cancelled",
++      "alert cancelled",
++      "interest or visit preferences changed",
++      "consent withdrawn",
++      "expiry",
++      "original reservation or approved context changed"
++    ],
++    "notified_state_is_terminal": true
++  },
++  "nearby": {
++    "requires_explicit_request": true,
++    "maximum_days_each_side": 3,
++    "maximum_search_scans": 2,
++    "maximum_offered_options": 3,
++    "preserved_preferences": [
++      "property/unit/location",
++      "timezone",
++      "duration",
++      "time of day",
++      "specialist restriction"
++    ],
++    "silently_relaxes_preferences": false,
++    "creates_booking_or_alert_request": false,
++    "selection_requires_full_f_or_g_confirmation": true
++  },
++  "worker": {
++    "integration": "existing live followup worker, once per minute at most",
++    "maximum_batch": 10,
++    "no_match_check_interval_minutes": 15,
++    "maximum_days_per_scan": 14,
++    "durable_range_cursor": true,
++    "lease_minutes": 10,
++    "claim_token_fences_old_workers": true,
++    "creates_meetings": false,
++    "original_reschedule_reservation_retained": true,
++    "notice_expiry_minutes": 30,
++    "notice_payload_immutable_on_retry": true,
++    "outbound_idempotency": "availability-wait:<request-id> with stable part suffixes",
++    "known_provider_rejection_attempt_cap": 3,
++    "uncertain_network_or_provider_outcome": "review, no automatic blind resend",
++    "late_checks": [
++      "Company/source/target runtime and policy",
++      "consent and manual control",
++      "contact fingerprint/channel/provider",
++      "interest and visit preferences",
++      "latest processed inbound and state revision",
++      "approved context and original reservation",
++      "exact rendered part content",
++      "current specialist availability"
++    ],
++    "receipt_semantics": "all parts provider accepted; not handset delivery"
++  },
++  "channel": {
++    "operating_windows": "source and target project configured proactive windows",
++    "whatsapp": "existing customer window required for free form; deferred outside window",
++    "fabricated_template_or_sms_fallback": false
++  },
++  "compatibility": {
++    "internal_prompt_version": "sales-understanding-prompt/2.6",
++    "short_english_vocabulary_extended_for_alert_terms": true,
++    "published_prompts_changed": false,
++    "product_model_changed": false,
++    "new_state_fields_have_defaults": true
++  },
++  "new_migrations": [
++    "20261108_sales_wait_requests"
++  ],
++  "production_migration_applied": false,
++  "production_changes": false,
++  "deployment_performed": false,
++  "model_quality_evaluated": false,
++  "live_channel_acceptance": "not_run",
++  "new_flow_activation": "disabled_by_default_explicit_project_allowlist_required",
++  "limits": [
++    "Real model, Calendar, SMS/WhatsApp and PostgreSQL parallel contention not exercised.",
++    "A periodic bounded process is supplied; no instant availability-change trigger or external latency guarantee.",
++    "Uncertain deliveries halt for review; exactly-once network delivery is not claimed.",
++    "General agent visibility and moderation remain J; no new frontend is included.",
++    "Docker unavailable: isolated physical Actions layout is tested, not an image build or remote workflow.",
++    "Full T01\u2013T26 acceptance remains K/L.",
++    "Operational rollback must preserve waits, closures, prepared notices, reservations and compatible JSON readers."
++  ],
++  "next_group": "J",
++  "next_steps": [
++    16,
++    17
++  ]
++}
+diff --git a/docs/sales-ai/group-i.md b/docs/sales-ai/group-i.md
+new file mode 100644
+index 0000000..e4f3a26
+--- /dev/null
++++ b/docs/sales-ai/group-i.md
+@@ -0,0 +1,139 @@
++# Sales AI — Grupo I: paso 15
++
++Fecha: 8 de noviembre de 2026. Base de main con H: `b1b3ec29c504b3b0fd9c050836dc420c9ebe721d`.
++Rama: `sales-ai/group-i-waitlist`. Continúa A–H. Siguiente: **J, pasos 16 y 17**, pendiente.
++Resultados reproducibles y límites: `group-i-report.json`.
++
++## Espera explícita y persistente
++
++El motor `sales-availability-wait/1.0` ofrece guardar una solicitud cuando F/G no encuentran
++un horario verificado. Presenta propiedad/proyecto, rango, zona y duración antes de pedir
++aceptación. Una pregunta sobre un aviso no afirma que éste ya exista. Sólo una aceptación de
++esa pregunta actual, completa y aceptada por el proveedor, o una solicitud explícita vinculada
++al contexto verificado y vigente, guarda el registro. Un “yes” a material, una respuesta manual,
++una propuesta caducada o una oferta oculta no lo autoriza. Un “No” contextual declina el aviso,
++sin dar de baja el canal ni cancelar una cita.
++
++La nueva tabla `sales_wait_requests` guarda Company, proyecto de origen y destino, conversación,
++lead, mensaje del permiso, propiedad/unidad, ubicación, preferencias temporales, duración,
++especialistas restringidos si los hubo, zona, interés de origen y visita original en caso de
++reprogramación. También conserva canal/proveedor y una huella del contacto; un cambio no redirige
++silenciosamente el aviso. El rango se fija en fechas, incluso cuando F usó sus catorce días
++predeterminados. Caduca al terminar el último día solicitado en esa zona. Mantiene los límites
++de F: inicio dentro de noventa días y rango de hasta treinta y un días.
++
++Existe una sola espera activa por lead y Company, con clave única en base de datos. Una petición
++idéntica reutiliza el registro; una nueva petición con contexto/canal/contacto distinto sustituye
++explícitamente la anterior. No se afirma un aviso antes de guardar el registro en la misma
++transacción que la respuesta preparada. Se comprueban otra vez los permisos después de componer
++la respuesta. Un fallo de persistencia no deja una promesa de contacto sin registro.
++
++El contrato interno pasa a `sales-understanding-prompt/2.6`, con `wait` y evidencia exacta para
++solicitar, declinar, cancelar o consultar fechas cercanas. Se añaden sólo términos ingleses del
++aviso al vocabulario breve de B, para admitir frases como “Cancel my alert request” sin confundir
++su idioma. No se publica un prompt administrativo ni se cambia el modelo. Los lectores anteriores
++con esquema estricto necesitan compatibilidad antes de recibir estos campos nuevos.
++
++## Opciones cercanas y consentimiento de reserva
++
++Las fechas cercanas requieren una petición explícita. Se consultan hasta tres días antes y tres
++después del rango original, con un máximo de dos exploraciones; se devuelven hasta tres opciones
++verificadas. Se mantienen propiedad/unidad, ubicación, duración, zona, horario del día y restricción
++de especialista. Una modificación temporal explícita se normaliza desde su evidencia. No se
++relajan las preferencias en silencio ni se agrega una espera por consultar alternativas.
++
++La respuesta identifica que las fechas difieren del rango original. Elegir una opción sigue
++preparando el resumen completo de F o la comparación completa de G; sólo una aceptación posterior
++de esa propuesta exacta permite reservar/reemplazar. El worker de espera nunca crea Meetings.
++En reprogramación se conserva la cita original al guardar, buscar, avisar, declinar o cerrar la
++espera. G vuelve a validar la cita original al confirmar el reemplazo.
++
++## Comprobación acotada y aviso único
++
++El worker existente revisa solicitudes habilitadas en lotes de hasta diez, aproximadamente una
++vez por minuto. Cada espera sin resultado vuelve a quedar disponible para comprobarse quince
++minutos después. Cada comprobación explora hasta catorce días; un cursor durable rota por los
++segmentos restantes de un rango mayor, sin limitarse siempre a las primeras dos semanas. Las
++comprobaciones se mantienen dentro del horizonte vigente y vuelven al inicio útil al completar
++el rango. Esto es un proceso periódico acotado, no un disparador inmediato ni una garantía de
++latencia de un proveedor externo.
++
++Se filtran Company/proyectos/leads autorizados y estados vencidos/diferidos antes de seleccionar
++el lote. Se validan otra vez catálogo, ubicación, capacidades, políticas y elegibilidad del
++especialista. Se comprueban consentimiento, control humano, pausa, contacto, interés, restricciones
++persistidas y reserva original. Una nueva entrada pendiente de interpretar difiere el aviso:
++no se envía usando el interés antiguo mientras otro turno aún puede cambiarlo.
++
++La solicitud se reclama con bloqueo, arrendamiento de diez minutos y token por ejecución. Al
++reiniciar puede recuperarse una reclamación vencida. Una ejecución sustituida no puede completar
++el envío ni cambiar el estado del nuevo dueño. La notificación preparada conserva contenido,
++opciones y vencimiento propios de treinta minutos; un reintento no los renueva.
++
++El aviso usa el despachador existente y una clave estable por solicitud/parte. Antes de cada parte
++y justo antes de intentar llamar al proveedor, se vuelven a comprobar ámbito, consentimiento,
++interés, turno actual, canal, contenido exacto y disponibilidad. Los cambios bloquean el envío.
++Los fragmentos ya aceptados se reutilizan; una entrega incompleta no permite aceptar una oferta
++como si se hubiera mostrado completa. Se registra `notified` sólo con aceptación de todas las
++partes por el proveedor; no equivale a entrega al teléfono.
++
++Una respuesta explícita `failed` del proveedor puede reintentarse, con backoff y hasta tres
++intentos de la notificación preparada. Un resultado sin confirmación, una excepción de red o una
++salida incierta queda en `review`, sin reenvío automático que pudiera duplicar un aviso ya enviado.
++Los errores/tipos y estados quedan en el registro. Una propuesta de aviso vencida o cuyos horarios
++cambiaron deja de enviarse; no se reemplaza silenciosamente por un texto distinto con la misma
++clave. Para otra solicitud se requiere un permiso nuevo del lead. La visibilidad general de estos
++estados en una pantalla corresponde a J; esta entrega no añade frontend.
++
++El aviso es de una sola vez por solicitud. Los controles de deduplicación, reclamación y la clave
++del despachador se verifican con pruebas secuenciales y fallos simulados; no se presentan como
++prueba ejecutada de concurrencia real PostgreSQL o de entrega exactamente una vez en una red
++externa. El tratamiento conservador de resultados inciertos evita un reenvío automático a ciegas.
++
++## Condiciones del canal y cierre
++
++Se aplican las ventanas proactivas configuradas en los proyectos de origen y destino. WhatsApp
++sólo usa texto libre dentro de su ventana de atención existente; fuera de ella se difiere la
++solicitud hasta que exista una nueva entrada válida o venza. No se inventa una plantilla aprobada
++ni se cambia a SMS para eludir la restricción. SMS conserva proveedor, destinatario y reglas
++operativas guardadas. El permiso de aviso es independiente de la cadencia comercial de F/H.
++
++La espera se cierra al reservar/reprogramar, al confirmar la cancelación de la visita, al cancelar
++sólo el aviso, al cambiar el interés o las preferencias de la visita, al retirar consentimiento o cuando el rango termina. Los
++cambios externos de permisos, propiedad o visita original también impiden continuar. Las entradas
++procesadas reconcilian los cierres correspondientes; el proceso periódico y el último límite de
++envío comprueban cambios realizados desde otros puntos. No se envía una alerta después de detectar
++que ya no existe permiso de contacto. `notified` es un estado terminal: no provoca nuevos avisos
++cuando vuelve a cambiar la disponibilidad. Cerrar una espera de reprogramación no libera la cita.
++
++## Migración y verificación
++
++Nueva revisión: **`20261108_sales_wait_requests`**, posterior a `20261108_sales_cancel_ops`.
++Crea solamente la tabla de esperas y su índice, sin reescribir reservas ni outboxes existentes.
++Aplicar antes de iniciar API/worker con este código:
++
++```bash
++cd backend
++alembic upgrade head
++BP_PYTHON=python bash tools/sales_ai/offline.sh group-i
++BP_PYTHON=python bash tools/sales_ai/offline.sh baseline
++BP_PYTHON=python bash tools/sales_ai/offline.sh replay /tmp/group-i-replay.json
++```
++
++Las 47 pruebas enfocadas usan coordinador, persistencia, búsqueda y despachador reales con
++interpretación/proveedores simulados. Incluyen SMS/WhatsApp, selección/confirmación posterior,
++recuperación de reclamaciones/envíos, preferencias y fechas cercanas, rotación del rango, cierre,
++reprogramación, fallos, control humano, baja, ventanas de contacto, revocación al último límite,
++migración SQLite y DDL PostgreSQL. La regresión completa se ejecuta sobre una copia física aislada
++del layout de Actions, con las referencias comprobadas sin modificaciones; no se duplica otra
++regresión completa equivalente sólo para repetir el mismo resultado en el checkout.
++
++No se ejecutaron modelo, Calendar o mensajería reales, concurrencia real PostgreSQL, Docker,
++workflow remoto, despliegue ni migración productiva. Los cuatro tests PostgreSQL heredados se
++omiten sin URL desechable. La aceptación integral T01–T26 y la calidad/latencia reales siguen
++pendientes en K/L. Los interruptores y allowlists no cambian ni se activan con estos archivos.
++La operación requiere el worker existente en funcionamiento al habilitar la cohorte.
++
++Para rollback operativo detener la cohorte, conservar registros/citas/respuestas y revisar avisos
++preparados o inciertos. No usar un downgrade destructivo ni una imagen con lector JSON incompatible.
++Desactivar el worker no revierte reservas, cancelaciones o avisos aceptados. Mantener los cierres
++y bajas al reconciliar solicitudes antes de reactivar otra versión.
+diff --git a/docs/sales-ai/implementation-state.json b/docs/sales-ai/implementation-state.json
+index 1a710b3..2d528ad 100644
+--- a/docs/sales-ai/implementation-state.json
++++ b/docs/sales-ai/implementation-state.json
+@@ -1,8 +1,8 @@
+ {
+   "version": "sales-ai-implementation-state/1.0",
+-  "base_commit": "95c062dea640033300f559544c2649417bce5851",
+-  "branch": "sales-ai/group-h-cancellation",
+-  "current_group": "H",
++  "base_commit": "b1b3ec29c504b3b0fd9c050836dc420c9ebe721d",
++  "branch": "sales-ai/group-i-waitlist",
++  "current_group": "I",
+   "completed_steps": [
+     1,
+     2,
+@@ -17,11 +17,13 @@
+     11,
+     12,
+     13,
+-    14
++    14,
++    15
+   ],
+-  "next_group": "I",
++  "next_group": "J",
+   "next_steps": [
+-    15
++    16,
++    17
+   ],
+   "groups": {
+     "A": "implemented_and_verified",
+@@ -32,7 +34,7 @@
+     "F": "implemented_and_verified",
+     "G": "implemented_and_verified",
+     "H": "implemented_and_verified",
+-    "I": "pending",
++    "I": "implemented_and_verified",
+     "J": "pending",
+     "K": "pending",
+     "L": "pending"
+@@ -43,12 +45,13 @@
+     "20261108_sales_visit_context",
+     "20261108_sales_booking_ops",
+     "20261108_sales_reschedule_ops",
+-    "20261108_sales_cancel_ops"
++    "20261108_sales_cancel_ops",
++    "20261108_sales_wait_requests"
+   ],
+   "model_quality_evaluated": false,
+   "live_channel_acceptance": "not_run",
+   "acceptance_matrix": "backend/tests/fixtures/sales_ai/acceptance_matrix.json",
+-  "verification_report": "docs/sales-ai/group-h-report.json",
++  "verification_report": "docs/sales-ai/group-i-report.json",
+   "replay_report": "docs/sales-ai/group-b-baseline-replay.json",
+   "continuity": "Continue from this accumulated delivery, reconcile a newer main, and implement only the next explicitly requested group.",
+   "maintenance": [
+@@ -70,11 +73,13 @@
+     "docs/sales-ai/group-d-report.json",
+     "docs/sales-ai/group-e-report.json",
+     "docs/sales-ai/group-f-report.json",
+-    "docs/sales-ai/group-g-report.json"
++    "docs/sales-ai/group-g-report.json",
++    "docs/sales-ai/group-h-report.json"
+   ],
+   "production_migration_applied": false,
+   "commercial_composition": "evidence_bound_llm_selection_with_backend_wordings",
+   "booking_engine": "sales-first-booking/1.0",
+   "reschedule_engine": "sales-reschedule/1.0",
+-  "cancellation_engine": "sales-cancellation/1.0"
++  "cancellation_engine": "sales-cancellation/1.0",
++  "wait_engine": "sales-availability-wait/1.0"
+ }

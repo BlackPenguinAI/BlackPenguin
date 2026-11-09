@@ -95,6 +95,9 @@ def select_continuations(*, outcome, commercial, metadata, previous_meta, lead, 
     if metadata.get('material_offer'):
         # The caller supplies this as priority; never make an offer invisible.
         raise ValueError('Material proposal needs an explicit continuation.')
+    if metadata.get('wait_offer') or metadata.get('wait_result'):
+        add('none','')
+        return choices
     if any(metadata.get(k) for k in ['cancellation_confirmation','cancellation_meeting_offer','cancellation_context_question','cancellation_operation_id','cancellation_followup_closed']):
         add('none','')
         return choices
