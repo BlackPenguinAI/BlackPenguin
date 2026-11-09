@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 
-import { Chat } from './chat';
+import { ChatService as Chat } from './chat';
 
 describe('Chat', () => {
   let service: Chat;

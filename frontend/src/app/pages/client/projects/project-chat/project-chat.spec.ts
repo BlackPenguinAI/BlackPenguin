@@ -12,6 +12,7 @@ describe('ProjectChatComponent', () => {
   let http: HttpTestingController;
 
   beforeEach(async () => {
+    vi.spyOn(ProjectChatComponent.prototype, 'ngOnInit').mockImplementation(() => undefined);
     await TestBed.configureTestingModule({
       imports: [ProjectChatComponent, HttpClientTestingModule, RouterTestingModule],
       providers: [
@@ -29,6 +30,8 @@ describe('ProjectChatComponent', () => {
 
     fixture = TestBed.createComponent(ProjectChatComponent);
     component = fixture.componentInstance;
+    component.projectId = 'project-1';
+    // Most cases exercise loaded-state methods, not the startup HTTP sequence.
     http = TestBed.inject(HttpTestingController);
   });
 
@@ -40,7 +43,7 @@ describe('ProjectChatComponent', () => {
       });
     }
     for (const request of http.match((candidate) => candidate.url.includes('/sales-assets'))) request.flush([]);
-    http.verify();
+    try { http.verify(); } finally { TestBed.resetTestingModule(); }
   });
 
   it('should create', () => {
@@ -63,6 +66,7 @@ describe('ProjectChatComponent', () => {
       },
     };
 
+    component.initialState = 'ready';
     fixture.detectChanges();
 
     expect(component.finalizationBlockers).toHaveLength(1);
@@ -71,6 +75,7 @@ describe('ProjectChatComponent', () => {
   });
 
   it('renders a structured finalization conflict instead of a connection error', () => {
+    vi.spyOn(component as unknown as { syncState(): void }, 'syncState').mockImplementation(() => undefined);
     const detail = {
       message: 'The Project Profile is not ready for final confirmation.',
       blockers: ['pending_sales_materials'],
@@ -602,6 +607,8 @@ describe('ProjectChatComponent', () => {
     vi.spyOn(component, 'loadMetaSetupConfiguration').mockImplementation(() => undefined);
     const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
 
+    vi.mocked(component.ngOnInit).mockRestore();
+    vi.spyOn(component, 'loadMetaSetupState').mockImplementation(() => undefined);
     component.ngOnInit();
 
     expect(syncState).toHaveBeenCalledWith('bottom');

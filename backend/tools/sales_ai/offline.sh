@@ -5,6 +5,9 @@ BP_BACKEND_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 BP_PYTHON="${BP_PYTHON:-python3}"
 cd "$BP_BACKEND_DIR"
 BP_MODE="${1:-test}"
+if [[ -n "${BP_POSTGRES_TEST_URL:-}" ]]; then
+    "$BP_PYTHON" -c 'import sys; from urllib.parse import urlparse; u=urlparse(sys.argv[1]); sys.exit(0 if u.scheme in {"postgresql","postgresql+psycopg2"} and u.path.endswith("_test") else 2)' "$BP_POSTGRES_TEST_URL" || { printf 'Refusing a non-test PostgreSQL URL.\n' >&2; exit 2; }
+fi
 case "$BP_MODE" in
     test) BP_ARGS=(-m pytest tests/test_sales_ai_group_a.py -q --disable-warnings) ;;
     group-b) BP_ARGS=(-m pytest tests/test_sales_ai_group_b.py -q --disable-warnings) ;;
@@ -16,14 +19,15 @@ case "$BP_MODE" in
     group-h) BP_ARGS=(-m pytest tests/test_sales_ai_group_h.py -q --disable-warnings) ;;
     group-i) BP_ARGS=(-m pytest tests/test_sales_ai_group_i.py -q --disable-warnings) ;;
     group-j) BP_ARGS=(-m pytest tests/test_sales_ai_group_j.py -q --disable-warnings) ;;
+    group-k) BP_ARGS=(-m pytest tests/test_sales_ai_group_k.py tests/test_sales_booking_postgres.py tests/test_sales_dialogue_postgres.py -q --disable-warnings) ;;
     baseline) BP_ARGS=(-m pytest tests -q --disable-warnings) ;;
     replay) BP_ARGS=(-m tools.sales_ai.replay --output "${2:?Provide the report output path}") ;;
-    *) printf 'Usage: bash tools/sales_ai/offline.sh test|group-b|group-c|group-d|group-e|group-f|group-g|group-h|group-i|group-j|baseline|replay OUTPUT\n' >&2; exit 2 ;;
+    *) printf 'Usage: bash tools/sales_ai/offline.sh test|group-b|group-c|group-d|group-e|group-f|group-g|group-h|group-i|group-j|group-k|baseline|replay OUTPUT\n' >&2; exit 2 ;;
 esac
 exec env SECRET_KEY=group-a-offline-test ACCESS_TOKEN_EXPIRE_MINUTES=60 \
     DATABASE_URL=sqlite:// ENVIRONMENT=test \
     FIRST_SUPERADMIN_EMAIL=test@example.invalid FIRST_SUPERADMIN_PASSWORD=offline-only \
-    META_ACCESS_TOKEN=offline-only OPENROUTER_API_KEY=offline-only DIALOGUE_POSTGRES_TEST_URL= \
+    META_ACCESS_TOKEN=offline-only OPENROUTER_API_KEY=offline-only DIALOGUE_POSTGRES_TEST_URL="${BP_POSTGRES_TEST_URL:-}" \
     SALES_DIALOGUE_RUNTIME_ENABLED=false SALES_UNDERSTANDING_PREVIEW_ENABLED=false \
     SALES_NEXT_FLOW_ENABLED=false SALES_NEXT_FLOW_PROJECT_IDS= \
     APP_COMMIT_SHA=f7e7f055fd0499f2224b43bad8f9128db2eaf434 PYTHONPATH="$BP_BACKEND_DIR" \

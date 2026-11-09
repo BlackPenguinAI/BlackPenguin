@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
-import { WaitlistPage } from './waitlist-page';
+import { WaitlistPageComponent as WaitlistPage } from './waitlist-page';
 
 describe('WaitlistPage', () => {
   let component: WaitlistPage;

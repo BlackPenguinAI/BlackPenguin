@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
-import { AiInfraPage } from './ai-infra-page';
+import { AiInfraPageComponent as AiInfraPage } from './ai-infra-page';
 
 describe('AiInfraPage', () => {
   let component: AiInfraPage;

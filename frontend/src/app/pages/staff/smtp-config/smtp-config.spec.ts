@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
-import { SmtpConfig } from './smtp-config';
+import { SmtpConfigComponent as SmtpConfig } from './smtp-config';
 
 describe('SmtpConfig', () => {
   let component: SmtpConfig;

@@ -1,6 +1,7 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
+import { Router, provideRouter } from '@angular/router';
 
 import { API_V1_URL } from '../../../../core/config/api.config';
 import { ToastService } from '../../../../core/services/toast';
@@ -15,6 +16,7 @@ describe('ProjectListComponent', () => {
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
+        provideRouter([]),
         {
           provide: ToastService,
           useValue: { showError: vi.fn(), showSuccess: vi.fn() },
@@ -36,15 +38,17 @@ describe('ProjectListComponent', () => {
     request.flush([]);
   });
 
-  it('creates projects through the canonical collection URL', () => {
+  it('creates an onboarding draft and navigates to the returned chat URL', () => {
     const fixture = TestBed.createComponent(ProjectListComponent);
     const component = fixture.componentInstance;
-    component.newProject = { name: 'Demo', address: 'Av. Demo 123', city: 'Lima' };
+    const navigate=vi.spyOn(TestBed.inject(Router),'navigateByUrl').mockResolvedValue(true);
 
     component.createProject();
 
-    const request = http.expectOne(`${API_V1_URL}/projects/`);
+    const request = http.expectOne(`${API_V1_URL}/projects/drafts`);
     expect(request.request.method).toBe('POST');
-    request.flush({ id: 'project-1', ...component.newProject });
+    expect(request.request.body).toEqual({});
+    request.flush({ id: 'project-1', onboarding_url:'/app/projects/project-1/onboarding' });
+    expect(navigate).toHaveBeenCalledWith('/app/projects/project-1/onboarding');
   });
 });

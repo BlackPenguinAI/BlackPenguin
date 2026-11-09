@@ -1,0 +1,247 @@
+{
+  "version": "sales-ai-group-k-report/1.0",
+  "date": "2026-11-09",
+  "base_commit": "306dd648b0e8749973e4ce5a78a1ee2cccd82576",
+  "main_reverified_at_close": "306dd648b0e8749973e4ce5a78a1ee2cccd82576",
+  "branch": "sales-ai/group-k-evaluation-integration",
+  "steps": [
+    18,
+    19
+  ],
+  "status": "partially_executed_external_acceptance_pending",
+  "step_status": {
+    "18": "tooling_prepared_actual_model_blocked",
+    "19": "local_regression_passed_external_contention_and_visual_pending"
+  },
+  "checks": [
+    {
+      "name": "group_k_focused",
+      "passed": 22,
+      "skipped": 4,
+      "warnings": 1104,
+      "seconds": 6.98,
+      "failed": 0,
+      "exit_code": 0
+    },
+    {
+      "name": "full_backend_physical_isolated_actions_layout",
+      "passed": 2053,
+      "skipped": 4,
+      "warnings": 49072,
+      "seconds": 278.48,
+      "failed": 0,
+      "exit_code": 0,
+      "matching_application_tools_migration_files": 292,
+      "unchanged_tests_and_prior_reference_files": 143,
+      "physical_copies": true,
+      "checkout_imports": false
+    },
+    {
+      "name": "complete_frontend_suite",
+      "passed": 439,
+      "files": 85,
+      "angular_cli": {
+        "passed": 430,
+        "files": 83
+      },
+      "direct_dom": {
+        "passed": 9,
+        "files": 2
+      },
+      "all_spec_files_covered": true,
+      "exit_code": 0
+    },
+    {
+      "name": "production_build_initial",
+      "status": "passed",
+      "log": "group-k-build.log"
+    },
+    {
+      "name": "production_build_subsequent",
+      "status": "blocked_external_font_download",
+      "http_status": 403,
+      "host": "fonts.googleapis.com",
+      "log": "group-k-build-final.log"
+    },
+    {
+      "name": "optimized_production_offline_ci_build",
+      "status": "passed",
+      "command": "npm run build -- --configuration=production,offline-ci",
+      "scripts_and_styles_optimized": true,
+      "external_font_inlining": false,
+      "default_build_configuration_changed": false,
+      "existing_style_budget_warnings": [
+        "Agent: 9.98 kB versus 8 kB warning budget",
+        "Schedule: 9.82 kB versus 8 kB warning budget"
+      ]
+    },
+    {
+      "name": "existing_safety_replay",
+      "passed": 20,
+      "total": 20,
+      "external_actions": 0,
+      "model_quality_evaluated": false
+    },
+    {
+      "name": "migration_heads",
+      "head": "20261108_sales_moderation",
+      "new_migrations": [],
+      "roundtrip_and_postgres_ddl_regressions": "in full backend suite; actual PostgreSQL execution not claimed"
+    },
+    {
+      "name": "dependency_consistency",
+      "exit_code": 0
+    },
+    {
+      "name": "whitespace",
+      "exit_code": 0
+    },
+    {
+      "name": "manual_ci_workflow",
+      "yaml_parsed": true,
+      "repository_permission": "contents:read",
+      "production_secrets": false,
+      "production_deployment": false,
+      "executed": false
+    },
+    {
+      "name": "real_model_evaluation",
+      "status": "blocked",
+      "reason": "OPENROUTER_API_KEY_MISSING",
+      "planned_cases": 24,
+      "independent_repeats": 3,
+      "actual_calls": 0,
+      "actual_spend_usd": 0,
+      "quality_accepted": false
+    },
+    {
+      "name": "postgres_parallel_contention",
+      "status": "not_executed",
+      "cases_skipped": 4,
+      "reason": "No disposable PostgreSQL URL/binaries or Docker available",
+      "manual_ci_disposable_service_prepared": true
+    },
+    {
+      "name": "desktop_mobile_browser_acceptance",
+      "status": "pending_inherited_environment_block",
+      "reason": "Chromium Unix socket restriction; separate browser cannot reach localhost and native input unavailable in J",
+      "workflow_prepared": true,
+      "workflow_executed": false
+    }
+  ],
+  "findings_resolved": [
+    {
+      "problem": "Out-of-order provider callbacks could regress delivered/read evidence",
+      "change": "Shared Twilio/Telnyx receipt helper preserves stronger terminal evidence and serializes outbound/message updates",
+      "proof": "Actual signed Telnyx ASGI callback paths on SMS and WhatsApp; duplicate events, late sent/queued/failed/delivered and tampered signatures",
+      "applies_to_legacy_and_new_flow": true,
+      "real_parallel_contention_proven": false
+    },
+    {
+      "problem": "Full frontend regression did not compile obsolete generated test imports and creation expectations",
+      "change": "Update test symbol imports and existing draft/outlet assertions; isolate HTTP, Router, translation, localStorage, media and observers",
+      "production_ui_changed": false
+    },
+    {
+      "problem": "Coverage lookup assumed repository layout",
+      "change": "Honor SALES_ACCEPTANCE_ROOT in physical isolated reference layout",
+      "proof": "Full final backend suite passed with immutable physical reference copies"
+    },
+    {
+      "problem": "Google Fonts inlining made later production build depend on a 403 external download",
+      "change": "Add optional offline-ci optimization overlay; retain default production configuration and HTML font links",
+      "proof": "Optimized scripts/styles build passed with font inlining disabled"
+    }
+  ],
+  "connected_journeys": {
+    "channels": [
+      "sms",
+      "whatsapp"
+    ],
+    "provider_effects": "MOCKED",
+    "sequences": [
+      "availability wait -> verified notice -> exact first reservation -> new property enquiry -> exact replacement -> exact cancellation -> continuing enquiry",
+      "failed replacement dispatch -> fresh SQL session -> retry same inbound -> same persisted replacement without another inference"
+    ],
+    "actual_database_for_local_journeys": "ephemeral SQLite",
+    "actual_network_provider_calls": 0
+  },
+  "model_evaluator": {
+    "requested_model": "openai/gpt-4o-mini",
+    "production_model_changed": false,
+    "published_configuration_changed": false,
+    "source_copy": "published Sales version 8 captured 2026-11-08",
+    "sandbox_publication_only": "local version 1 identified by configuration hash",
+    "configuration_fixture": "backend/tests/fixtures/sales_ai/published_sales_v8_20261108.json",
+    "config_copy_excludes": [
+      "credentials",
+      "technical runtime settings",
+      "other services"
+    ],
+    "real_data_catalog": "backend/tests/fixtures/sales_ai/real_catalog_20261108.json",
+    "synthetic_catalog": "backend/tests/fixtures/sales_ai/synthetic_catalog.json",
+    "origins_separated": true,
+    "default_probe": "representative project plus moderation reference project; catalog/mixed/ordinal/moderation by SMS/WA over 3 independent repeats",
+    "bounded": [
+      "explicit prepare/real mode",
+      "fixed model and HTTPS OpenRouter endpoint",
+      "no HTTP redirects or model substitution",
+      "64 KB maximum input",
+      "2048 maximum output tokens",
+      "per-request timeout and process cleanup on cancellation",
+      "call and conservative reserved-budget caps",
+      "provider price ceiling; no claim of account-fee total cap",
+      "uncertain cost retained; reported cost and unknown cost distinguished"
+    ],
+    "commercial_review": "PENDING_HUMAN_REVIEW",
+    "real_quality_evaluated": false,
+    "actual_inference_calls": 0,
+    "raw_private_reasoning_recorded": false,
+    "key_values_recorded": false
+  },
+  "acceptance": {
+    "coverage_file": "backend/tests/fixtures/sales_ai/group_k_coverage.json",
+    "mapped_cases": 26,
+    "kind": "automated partial evidence linked to executable tests",
+    "complete_T01_T26_accepted": false,
+    "real_channel_acceptance": "NOT_RUN",
+    "advancement_to_L_approved": false
+  },
+  "graph_comparison": {
+    "document": "docs/sales-ai/group-k-graph-comparison.md",
+    "targets": [
+      "processing each message",
+      "commercial conversation progression",
+      "appointment lookup/modification"
+    ],
+    "functional_requirements_mapped_to_code_and_tests": true,
+    "original_full_diagrams_available": false,
+    "exact_node_edge_equivalence_claimed": false,
+    "runtime_modes_are_not_the_three_target_graphs": true
+  },
+  "production_changes": false,
+  "production_migration_applied": false,
+  "deployment_performed": false,
+  "provider_receipt_runtime_behavior_changed_in_source": true,
+  "new_flow_activation": "disabled_by_default_explicit_project_allowlist_required",
+  "new_migrations": [],
+  "remaining": [
+    "Configure a safely scoped OpenRouter evaluation key and run the real evaluator; assess semantic variation and human commercial quality.",
+    "Execute the disposable PostgreSQL contention cases and complete missing parallel acceptance before promotion.",
+    "Execute desktop/mobile browser walkthroughs in a functioning browser environment.",
+    "Resolve any failed real evaluation; keep T01\u2013T26 and live-channel acceptance pending until supported.",
+    "Original diagrams are unavailable for exact node/edge equivalence; functional three-journey comparison is supplied."
+  ],
+  "next_group": "K",
+  "next_steps": [
+    18,
+    19
+  ],
+  "next_after_k_closure": {
+    "group": "L",
+    "steps": [
+      20,
+      21
+    ]
+  }
+}

@@ -1,8 +1,8 @@
 {
   "version": "sales-ai-implementation-state/1.0",
-  "base_commit": "ffe90014abc18f2aa45633ce01fc6f78099c129a",
-  "branch": "sales-ai/group-j-moderation-monitor",
-  "current_group": "J",
+  "base_commit": "306dd648b0e8749973e4ce5a78a1ee2cccd82576",
+  "branch": "sales-ai/group-k-evaluation-integration",
+  "current_group": "K",
   "completed_steps": [
     1,
     2,
@@ -38,7 +38,7 @@
     "H": "implemented_and_verified",
     "I": "implemented_and_verified",
     "J": "implemented_visual_acceptance_pending",
-    "K": "pending",
+    "K": "partially_executed_external_acceptance_pending",
     "L": "pending"
   },
   "production_changes": false,
@@ -54,7 +54,7 @@
   "model_quality_evaluated": false,
   "live_channel_acceptance": "not_run",
   "acceptance_matrix": "backend/tests/fixtures/sales_ai/acceptance_matrix.json",
-  "verification_report": "docs/sales-ai/group-j-report.json",
+  "verification_report": "docs/sales-ai/group-k-report.json",
   "replay_report": "docs/sales-ai/group-b-baseline-replay.json",
   "continuity": "Continue from this accumulated delivery, reconcile a newer main, and implement only the next explicitly requested group.",
   "maintenance": [
@@ -78,7 +78,8 @@
     "docs/sales-ai/group-f-report.json",
     "docs/sales-ai/group-g-report.json",
     "docs/sales-ai/group-h-report.json",
-    "docs/sales-ai/group-i-report.json"
+    "docs/sales-ai/group-i-report.json",
+    "docs/sales-ai/group-j-report.json"
   ],
   "production_migration_applied": false,
   "commercial_composition": "evidence_bound_llm_selection_with_backend_wordings",
@@ -89,8 +90,10 @@
   "moderation_engine": "sales-gradual-moderation/1.0",
   "operational_context": "sales-operational-context/1.0",
   "pending_acceptance": [
-    "J: desktop/mobile browser walkthrough still blocked; 66 frontend checks passed (57 component + 9 DOM render). Manual isolated CI workflow supplied, not run.",
-    "K/L: real model, PostgreSQL parallel contention and controlled live channels."
+    "K18: real OpenRouter model evaluation blocked: no OPENROUTER_API_KEY; prepared representative repeated cases, no model-quality approval.",
+    "K19: actual PostgreSQL contention not executed: no disposable database/binaries/Docker; isolated manual CI supplied.",
+    "J/K19: desktop/mobile browser acceptance still blocked by environment; CI supplied, not run.",
+    "K: human review of real commercial answers pending; complete T01\u2013T26 acceptance not asserted."
   ],
   "group_j_continuation": {
     "prior_delivery_commit": "41b5e483922d731801b80afb27eb44121bc6ce3f",
@@ -98,5 +101,12 @@
     "new_dom_tests": 8,
     "browser_ci_prepared": true,
     "browser_ci_executed": false
+  },
+  "next_after_k_closure": {
+    "group": "L",
+    "steps": [
+      20,
+      21
+    ]
   }
 }

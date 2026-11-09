@@ -1,0 +1,1968 @@
+{
+  "version": "sales-ai-baseline-replay/1.0",
+  "mode": "OFFLINE_COORDINATOR",
+  "base_commit": "f7e7f055fd0499f2224b43bad8f9128db2eaf434",
+  "source_configuration": {
+    "id": "cbc8abfa-23d3-417c-97dd-fd12e3406ed4",
+    "model": "openai/gpt-4o-mini",
+    "updated_at": "2026-11-06T23:03:38.861154+00:00",
+    "published_version": 8,
+    "published_at": "2026-11-06T23:03:38.860406+00:00"
+  },
+  "fixture_sha256": {
+    "acceptance_matrix.json": "ac31e3d2ccd2015715b3e3c75cfa9b4902266c24de4b49577d5a5d9bd00804a1",
+    "group_k_coverage.json": "8b8907209fa110a3f31e07c2179138f58a7c073b1186ca698061d51fc316c124",
+    "historical_cases_20261108.json": "81d2257f1e58bbecafa555a684406e7286228a63a219483f19a9d2540a48cecc",
+    "published_sales_v8_20261108.json": "54db6d1e584949d5116646e986cbe9d1fcb1767a7dab81e48919d6dcf0c81ff7",
+    "real_catalog_20261108.json": "13d0dade18cc417d48a37408b031091bd0c6920a41baca027069a169889ec0cc",
+    "synthetic_catalog.json": "5b791214f4599a1d2a6af220a416be33f7a1f69bd96fccd994fc031b5af2e0a0"
+  },
+  "total": 20,
+  "passed_current_safety": 20,
+  "model_quality_evaluated": false,
+  "external_actions": 0,
+  "live_channel_acceptance": "NOT_RUN",
+  "t01_t26_acceptance": "PENDING_NEW_FLOW",
+  "results": [
+    {
+      "id": "H01:sms",
+      "origin": "SCRIPTED_REPLAY_OF_HISTORICAL_TEXT",
+      "channel": "sms",
+      "project_id": "cf50fe57-7db6-425e-9cc2-d042feb14ea8",
+      "passed_current_safety": true,
+      "failures": [],
+      "recorded_engine": "sales-active/1.0",
+      "recorded_run_status": "completed",
+      "recorded_error_code": null,
+      "replies": [
+        "Confirmed catalog:\n\n1. LENNAR HOMES\n3 bedrooms · 1527.0 ft² · from 198,490.00 USD · 10 confirmed units\n\n2. COVENTRY HOMES\n4 bedrooms · 2399.0 ft² · from 334,990.00 USD · 15 confirmed units\n\nCatalog coverage may be partial.\n\nWhich property option would you like to explore in more detail?\n\nWhat budget range and currency are you considering?"
+      ],
+      "trace": {
+        "version": "sales-ai-test-trace/1.0",
+        "source": "OFFLINE_TEST",
+        "company_id": "4fa8155a-cdc1-4fca-bdea-8f78af688c11",
+        "project_id": "cf50fe57-7db6-425e-9cc2-d042feb14ea8",
+        "lead_id": "579408f4-71ed-536a-9275-237b32f3081e",
+        "conversation_id": "a06811ee-b7f0-5c10-b291-bdf0ca2686c6",
+        "inbound_message_id": "faa3632f-c6fb-4a3a-a2c3-7628278b7402",
+        "run_id": "1dcf4392-837d-4f86-88b7-bd06341933db",
+        "code_commit": "f7e7f055fd0499f2224b43bad8f9128db2eaf434",
+        "configuration_id": "15c440c9-eeb4-4b09-a67c-e375317e3b3b",
+        "configuration_version": null,
+        "model": "test/offline-scripted",
+        "events": [
+          {
+            "sequence": 1,
+            "phase": "inbound",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "channel": "sms",
+              "fixture_origin": "SCRIPTED_REPLAY_OF_HISTORICAL_TEXT"
+            }
+          },
+          {
+            "sequence": 2,
+            "phase": "context",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "source_capture": "2026-11-08T13:23:41.237176+00:00",
+              "project_id": "cf50fe57-7db6-425e-9cc2-d042feb14ea8"
+            }
+          },
+          {
+            "sequence": 3,
+            "phase": "understanding",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "error_code": null,
+              "scripted_calls": 1
+            }
+          },
+          {
+            "sequence": 4,
+            "phase": "persist",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "response_ids": [
+                "5ee7b482-c120-46c2-8d75-e697903ea4b7"
+              ]
+            }
+          },
+          {
+            "sequence": 5,
+            "phase": "dispatch",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "acceptances": 1,
+              "actual_provider_calls": 0,
+              "delivered_receipts": 0
+            }
+          },
+          {
+            "sequence": 6,
+            "phase": "complete",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "retry_deduplicated": true,
+              "safety_failures": []
+            }
+          }
+        ],
+        "external_actions": 0,
+        "model_quality_evaluated": false
+      },
+      "new_flow_acceptance": "PENDING",
+      "model_quality_evaluated": false,
+      "external_actions": 0
+    },
+    {
+      "id": "H01:whatsapp",
+      "origin": "SCRIPTED_REPLAY_OF_HISTORICAL_TEXT",
+      "channel": "whatsapp",
+      "project_id": "cf50fe57-7db6-425e-9cc2-d042feb14ea8",
+      "passed_current_safety": true,
+      "failures": [],
+      "recorded_engine": "sales-active/1.0",
+      "recorded_run_status": "completed",
+      "recorded_error_code": null,
+      "replies": [
+        "Confirmed catalog:\n\n1. LENNAR HOMES\n3 bedrooms · 1527.0 ft² · from 198,490.00 USD · 10 confirmed units\n\n2. COVENTRY HOMES\n4 bedrooms · 2399.0 ft² · from 334,990.00 USD · 15 confirmed units\n\nCatalog coverage may be partial.\n\nWhich property option would you like to explore in more detail?\n\nWhat budget range and currency are you considering?"
+      ],
+      "trace": {
+        "version": "sales-ai-test-trace/1.0",
+        "source": "OFFLINE_TEST",
+        "company_id": "4fa8155a-cdc1-4fca-bdea-8f78af688c11",
+        "project_id": "cf50fe57-7db6-425e-9cc2-d042feb14ea8",
+        "lead_id": "40c1b35d-957e-5e39-a113-c73c6e63285d",
+        "conversation_id": "68a0204c-de37-5dd6-948b-4849e687329f",
+        "inbound_message_id": "95c4a7cd-0a0d-47bc-a1b0-5f85dd0c307c",
+        "run_id": "5ed13fe6-58f3-4970-986d-754f3b4d1ad7",
+        "code_commit": "f7e7f055fd0499f2224b43bad8f9128db2eaf434",
+        "configuration_id": "e37fbb20-7633-4ee5-8271-d342d8c5f1ba",
+        "configuration_version": null,
+        "model": "test/offline-scripted",
+        "events": [
+          {
+            "sequence": 1,
+            "phase": "inbound",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "channel": "whatsapp",
+              "fixture_origin": "SCRIPTED_REPLAY_OF_HISTORICAL_TEXT"
+            }
+          },
+          {
+            "sequence": 2,
+            "phase": "context",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "source_capture": "2026-11-08T13:23:41.237176+00:00",
+              "project_id": "cf50fe57-7db6-425e-9cc2-d042feb14ea8"
+            }
+          },
+          {
+            "sequence": 3,
+            "phase": "understanding",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "error_code": null,
+              "scripted_calls": 1
+            }
+          },
+          {
+            "sequence": 4,
+            "phase": "persist",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "response_ids": [
+                "095716ab-308b-4b02-9017-0443aaf7a3ac"
+              ]
+            }
+          },
+          {
+            "sequence": 5,
+            "phase": "dispatch",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "acceptances": 1,
+              "actual_provider_calls": 0,
+              "delivered_receipts": 0
+            }
+          },
+          {
+            "sequence": 6,
+            "phase": "complete",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "retry_deduplicated": true,
+              "safety_failures": []
+            }
+          }
+        ],
+        "external_actions": 0,
+        "model_quality_evaluated": false
+      },
+      "new_flow_acceptance": "PENDING",
+      "model_quality_evaluated": false,
+      "external_actions": 0
+    },
+    {
+      "id": "H02:sms",
+      "origin": "SCRIPTED_REPLAY_OF_HISTORICAL_TEXT",
+      "channel": "sms",
+      "project_id": "cf50fe57-7db6-425e-9cc2-d042feb14ea8",
+      "passed_current_safety": true,
+      "failures": [],
+      "recorded_engine": "sales-active/1.0",
+      "recorded_run_status": "completed",
+      "recorded_error_code": null,
+      "replies": [
+        "Confirmed catalog:\n\n1. LENNAR HOMES\n3 bedrooms · 1527.0 ft² · from 198,490.00 USD · 10 confirmed units\n\n2. COVENTRY HOMES\n4 bedrooms · 2399.0 ft² · from 334,990.00 USD · 15 confirmed units\n\nCatalog coverage may be partial.\n\nWhich property option would you like to explore in more detail?\n\nWhat budget range and currency are you considering?"
+      ],
+      "trace": {
+        "version": "sales-ai-test-trace/1.0",
+        "source": "OFFLINE_TEST",
+        "company_id": "4fa8155a-cdc1-4fca-bdea-8f78af688c11",
+        "project_id": "cf50fe57-7db6-425e-9cc2-d042feb14ea8",
+        "lead_id": "579408f4-71ed-536a-9275-237b32f3081e",
+        "conversation_id": "a06811ee-b7f0-5c10-b291-bdf0ca2686c6",
+        "inbound_message_id": "ca2a421f-1bf7-466f-a54d-180b07949750",
+        "run_id": "217e03ee-09f5-43d8-ad6b-c29afaad9ab2",
+        "code_commit": "f7e7f055fd0499f2224b43bad8f9128db2eaf434",
+        "configuration_id": "5da8feab-4acb-4241-a087-20e090966163",
+        "configuration_version": null,
+        "model": "test/offline-scripted",
+        "events": [
+          {
+            "sequence": 1,
+            "phase": "inbound",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "channel": "sms",
+              "fixture_origin": "SCRIPTED_REPLAY_OF_HISTORICAL_TEXT"
+            }
+          },
+          {
+            "sequence": 2,
+            "phase": "context",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "source_capture": "2026-11-08T13:23:41.237176+00:00",
+              "project_id": "cf50fe57-7db6-425e-9cc2-d042feb14ea8"
+            }
+          },
+          {
+            "sequence": 3,
+            "phase": "understanding",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "error_code": null,
+              "scripted_calls": 1
+            }
+          },
+          {
+            "sequence": 4,
+            "phase": "persist",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "response_ids": [
+                "bd398a6e-bbe3-40a9-856c-1dda694b95d8"
+              ]
+            }
+          },
+          {
+            "sequence": 5,
+            "phase": "dispatch",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "acceptances": 1,
+              "actual_provider_calls": 0,
+              "delivered_receipts": 0
+            }
+          },
+          {
+            "sequence": 6,
+            "phase": "complete",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "retry_deduplicated": true,
+              "safety_failures": []
+            }
+          }
+        ],
+        "external_actions": 0,
+        "model_quality_evaluated": false
+      },
+      "new_flow_acceptance": "PENDING",
+      "model_quality_evaluated": false,
+      "external_actions": 0
+    },
+    {
+      "id": "H02:whatsapp",
+      "origin": "SCRIPTED_REPLAY_OF_HISTORICAL_TEXT",
+      "channel": "whatsapp",
+      "project_id": "cf50fe57-7db6-425e-9cc2-d042feb14ea8",
+      "passed_current_safety": true,
+      "failures": [],
+      "recorded_engine": "sales-active/1.0",
+      "recorded_run_status": "completed",
+      "recorded_error_code": null,
+      "replies": [
+        "Confirmed catalog:\n\n1. LENNAR HOMES\n3 bedrooms · 1527.0 ft² · from 198,490.00 USD · 10 confirmed units\n\n2. COVENTRY HOMES\n4 bedrooms · 2399.0 ft² · from 334,990.00 USD · 15 confirmed units\n\nCatalog coverage may be partial.\n\nWhich property option would you like to explore in more detail?\n\nWhat budget range and currency are you considering?"
+      ],
+      "trace": {
+        "version": "sales-ai-test-trace/1.0",
+        "source": "OFFLINE_TEST",
+        "company_id": "4fa8155a-cdc1-4fca-bdea-8f78af688c11",
+        "project_id": "cf50fe57-7db6-425e-9cc2-d042feb14ea8",
+        "lead_id": "40c1b35d-957e-5e39-a113-c73c6e63285d",
+        "conversation_id": "68a0204c-de37-5dd6-948b-4849e687329f",
+        "inbound_message_id": "81482228-15a2-46d2-aba4-5c382c517a04",
+        "run_id": "05d8cc2d-a8bb-4be9-8fb7-6b227dfb754d",
+        "code_commit": "f7e7f055fd0499f2224b43bad8f9128db2eaf434",
+        "configuration_id": "12d31337-7ca6-49c9-b81e-81ca9cfa0555",
+        "configuration_version": null,
+        "model": "test/offline-scripted",
+        "events": [
+          {
+            "sequence": 1,
+            "phase": "inbound",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "channel": "whatsapp",
+              "fixture_origin": "SCRIPTED_REPLAY_OF_HISTORICAL_TEXT"
+            }
+          },
+          {
+            "sequence": 2,
+            "phase": "context",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "source_capture": "2026-11-08T13:23:41.237176+00:00",
+              "project_id": "cf50fe57-7db6-425e-9cc2-d042feb14ea8"
+            }
+          },
+          {
+            "sequence": 3,
+            "phase": "understanding",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "error_code": null,
+              "scripted_calls": 1
+            }
+          },
+          {
+            "sequence": 4,
+            "phase": "persist",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "response_ids": [
+                "a9439ddb-2728-4aa8-ac9e-c918a4aa2520"
+              ]
+            }
+          },
+          {
+            "sequence": 5,
+            "phase": "dispatch",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "acceptances": 1,
+              "actual_provider_calls": 0,
+              "delivered_receipts": 0
+            }
+          },
+          {
+            "sequence": 6,
+            "phase": "complete",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "retry_deduplicated": true,
+              "safety_failures": []
+            }
+          }
+        ],
+        "external_actions": 0,
+        "model_quality_evaluated": false
+      },
+      "new_flow_acceptance": "PENDING",
+      "model_quality_evaluated": false,
+      "external_actions": 0
+    },
+    {
+      "id": "H03:sms",
+      "origin": "SCRIPTED_REPLAY_OF_HISTORICAL_TEXT",
+      "channel": "sms",
+      "project_id": "49c3922c-2536-45e9-b3f6-064d817fde67",
+      "passed_current_safety": true,
+      "failures": [],
+      "recorded_engine": "sales-active/1.0",
+      "recorded_run_status": "completed",
+      "recorded_error_code": null,
+      "replies": [
+        "Confirmed catalog:\n\n1. 4-bedroom single-family home\n4 bedrooms · 3734.0 m² · from 1,394,900.00 USD · 1 confirmed units\n\nCatalog coverage may be partial.\n\nWhich property option would you like to explore in more detail?\n\nWhat budget range and currency are you considering?"
+      ],
+      "trace": {
+        "version": "sales-ai-test-trace/1.0",
+        "source": "OFFLINE_TEST",
+        "company_id": "a73df3b4-95fa-4ed4-bb2c-bfe3543dfa4b",
+        "project_id": "49c3922c-2536-45e9-b3f6-064d817fde67",
+        "lead_id": "2a537012-152c-5997-9506-7db52c31001a",
+        "conversation_id": "bc6d802a-8723-5ef5-91d8-ee8d28a07624",
+        "inbound_message_id": "63058831-2f74-47ec-bf56-24a35406050c",
+        "run_id": "9cdd02d4-1502-4817-8e73-949d38d5db58",
+        "code_commit": "f7e7f055fd0499f2224b43bad8f9128db2eaf434",
+        "configuration_id": "bdc2ae80-1dfe-4141-8e00-5eef85864d88",
+        "configuration_version": null,
+        "model": "test/offline-scripted",
+        "events": [
+          {
+            "sequence": 1,
+            "phase": "inbound",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "channel": "sms",
+              "fixture_origin": "SCRIPTED_REPLAY_OF_HISTORICAL_TEXT"
+            }
+          },
+          {
+            "sequence": 2,
+            "phase": "context",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "source_capture": "2026-11-08T13:23:41.237176+00:00",
+              "project_id": "49c3922c-2536-45e9-b3f6-064d817fde67"
+            }
+          },
+          {
+            "sequence": 3,
+            "phase": "understanding",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "error_code": null,
+              "scripted_calls": 1
+            }
+          },
+          {
+            "sequence": 4,
+            "phase": "persist",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "response_ids": [
+                "7380b21b-f806-49c4-9bac-c85778d3387d"
+              ]
+            }
+          },
+          {
+            "sequence": 5,
+            "phase": "dispatch",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "acceptances": 1,
+              "actual_provider_calls": 0,
+              "delivered_receipts": 0
+            }
+          },
+          {
+            "sequence": 6,
+            "phase": "complete",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "retry_deduplicated": true,
+              "safety_failures": []
+            }
+          }
+        ],
+        "external_actions": 0,
+        "model_quality_evaluated": false
+      },
+      "new_flow_acceptance": "PENDING",
+      "model_quality_evaluated": false,
+      "external_actions": 0
+    },
+    {
+      "id": "H03:whatsapp",
+      "origin": "SCRIPTED_REPLAY_OF_HISTORICAL_TEXT",
+      "channel": "whatsapp",
+      "project_id": "49c3922c-2536-45e9-b3f6-064d817fde67",
+      "passed_current_safety": true,
+      "failures": [],
+      "recorded_engine": "sales-active/1.0",
+      "recorded_run_status": "completed",
+      "recorded_error_code": null,
+      "replies": [
+        "Confirmed catalog:\n\n1. 4-bedroom single-family home\n4 bedrooms · 3734.0 m² · from 1,394,900.00 USD · 1 confirmed units\n\nCatalog coverage may be partial.\n\nWhich property option would you like to explore in more detail?\n\nWhat budget range and currency are you considering?"
+      ],
+      "trace": {
+        "version": "sales-ai-test-trace/1.0",
+        "source": "OFFLINE_TEST",
+        "company_id": "a73df3b4-95fa-4ed4-bb2c-bfe3543dfa4b",
+        "project_id": "49c3922c-2536-45e9-b3f6-064d817fde67",
+        "lead_id": "428b4c1f-81a8-5f63-bd9c-552b0fcddb7b",
+        "conversation_id": "ee7580ad-76df-5d02-8916-58c4c26e3a84",
+        "inbound_message_id": "6065f6cf-b0f0-4d8c-bf0b-d6e2ce6b6231",
+        "run_id": "3dbd45ff-4526-4e3e-86ea-8ef2cb105fb4",
+        "code_commit": "f7e7f055fd0499f2224b43bad8f9128db2eaf434",
+        "configuration_id": "c6668535-f201-456b-9861-dfa612e01abd",
+        "configuration_version": null,
+        "model": "test/offline-scripted",
+        "events": [
+          {
+            "sequence": 1,
+            "phase": "inbound",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "channel": "whatsapp",
+              "fixture_origin": "SCRIPTED_REPLAY_OF_HISTORICAL_TEXT"
+            }
+          },
+          {
+            "sequence": 2,
+            "phase": "context",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "source_capture": "2026-11-08T13:23:41.237176+00:00",
+              "project_id": "49c3922c-2536-45e9-b3f6-064d817fde67"
+            }
+          },
+          {
+            "sequence": 3,
+            "phase": "understanding",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "error_code": null,
+              "scripted_calls": 1
+            }
+          },
+          {
+            "sequence": 4,
+            "phase": "persist",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "response_ids": [
+                "d440f676-9fda-4a4b-91cd-21cdab168d55"
+              ]
+            }
+          },
+          {
+            "sequence": 5,
+            "phase": "dispatch",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "acceptances": 1,
+              "actual_provider_calls": 0,
+              "delivered_receipts": 0
+            }
+          },
+          {
+            "sequence": 6,
+            "phase": "complete",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "retry_deduplicated": true,
+              "safety_failures": []
+            }
+          }
+        ],
+        "external_actions": 0,
+        "model_quality_evaluated": false
+      },
+      "new_flow_acceptance": "PENDING",
+      "model_quality_evaluated": false,
+      "external_actions": 0
+    },
+    {
+      "id": "H04:sms",
+      "origin": "SCRIPTED_REPLAY_OF_HISTORICAL_TEXT",
+      "channel": "sms",
+      "project_id": "49c3922c-2536-45e9-b3f6-064d817fde67",
+      "passed_current_safety": true,
+      "failures": [],
+      "recorded_engine": "sales-active/1.0",
+      "recorded_run_status": "completed",
+      "recorded_error_code": null,
+      "replies": [
+        "Confirmed catalog:\n\n1. 4-bedroom single-family home\n4 bedrooms · 3734.0 m² · from 1,394,900.00 USD · 1 confirmed units\n\nCatalog coverage may be partial.\n\nWhich property option would you like to explore in more detail?\n\nWhat budget range and currency are you considering?"
+      ],
+      "trace": {
+        "version": "sales-ai-test-trace/1.0",
+        "source": "OFFLINE_TEST",
+        "company_id": "a73df3b4-95fa-4ed4-bb2c-bfe3543dfa4b",
+        "project_id": "49c3922c-2536-45e9-b3f6-064d817fde67",
+        "lead_id": "2a537012-152c-5997-9506-7db52c31001a",
+        "conversation_id": "bc6d802a-8723-5ef5-91d8-ee8d28a07624",
+        "inbound_message_id": "eaf1ffe2-d912-4a64-9fe0-7b4f2448e918",
+        "run_id": "b12d02a2-6251-412f-b8e7-f88bd317764d",
+        "code_commit": "f7e7f055fd0499f2224b43bad8f9128db2eaf434",
+        "configuration_id": "1a1fecbf-4c2e-4e19-afd0-a3df3ec76711",
+        "configuration_version": null,
+        "model": "test/offline-scripted",
+        "events": [
+          {
+            "sequence": 1,
+            "phase": "inbound",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "channel": "sms",
+              "fixture_origin": "SCRIPTED_REPLAY_OF_HISTORICAL_TEXT"
+            }
+          },
+          {
+            "sequence": 2,
+            "phase": "context",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "source_capture": "2026-11-08T13:23:41.237176+00:00",
+              "project_id": "49c3922c-2536-45e9-b3f6-064d817fde67"
+            }
+          },
+          {
+            "sequence": 3,
+            "phase": "understanding",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "error_code": null,
+              "scripted_calls": 1
+            }
+          },
+          {
+            "sequence": 4,
+            "phase": "persist",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "response_ids": [
+                "1d5f408b-96d2-4e1c-a9c9-3f0607bbdf0c"
+              ]
+            }
+          },
+          {
+            "sequence": 5,
+            "phase": "dispatch",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "acceptances": 1,
+              "actual_provider_calls": 0,
+              "delivered_receipts": 0
+            }
+          },
+          {
+            "sequence": 6,
+            "phase": "complete",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "retry_deduplicated": true,
+              "safety_failures": []
+            }
+          }
+        ],
+        "external_actions": 0,
+        "model_quality_evaluated": false
+      },
+      "new_flow_acceptance": "PENDING",
+      "model_quality_evaluated": false,
+      "external_actions": 0
+    },
+    {
+      "id": "H04:whatsapp",
+      "origin": "SCRIPTED_REPLAY_OF_HISTORICAL_TEXT",
+      "channel": "whatsapp",
+      "project_id": "49c3922c-2536-45e9-b3f6-064d817fde67",
+      "passed_current_safety": true,
+      "failures": [],
+      "recorded_engine": "sales-active/1.0",
+      "recorded_run_status": "completed",
+      "recorded_error_code": null,
+      "replies": [
+        "Confirmed catalog:\n\n1. 4-bedroom single-family home\n4 bedrooms · 3734.0 m² · from 1,394,900.00 USD · 1 confirmed units\n\nCatalog coverage may be partial.\n\nWhich property option would you like to explore in more detail?\n\nWhat budget range and currency are you considering?"
+      ],
+      "trace": {
+        "version": "sales-ai-test-trace/1.0",
+        "source": "OFFLINE_TEST",
+        "company_id": "a73df3b4-95fa-4ed4-bb2c-bfe3543dfa4b",
+        "project_id": "49c3922c-2536-45e9-b3f6-064d817fde67",
+        "lead_id": "428b4c1f-81a8-5f63-bd9c-552b0fcddb7b",
+        "conversation_id": "ee7580ad-76df-5d02-8916-58c4c26e3a84",
+        "inbound_message_id": "8a2a0187-6cd4-4fb5-bc55-5188429b48bc",
+        "run_id": "3d6fff33-363a-4f94-8416-41e7a747da53",
+        "code_commit": "f7e7f055fd0499f2224b43bad8f9128db2eaf434",
+        "configuration_id": "996146fa-357e-426b-8d43-6e369037d353",
+        "configuration_version": null,
+        "model": "test/offline-scripted",
+        "events": [
+          {
+            "sequence": 1,
+            "phase": "inbound",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "channel": "whatsapp",
+              "fixture_origin": "SCRIPTED_REPLAY_OF_HISTORICAL_TEXT"
+            }
+          },
+          {
+            "sequence": 2,
+            "phase": "context",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "source_capture": "2026-11-08T13:23:41.237176+00:00",
+              "project_id": "49c3922c-2536-45e9-b3f6-064d817fde67"
+            }
+          },
+          {
+            "sequence": 3,
+            "phase": "understanding",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "error_code": null,
+              "scripted_calls": 1
+            }
+          },
+          {
+            "sequence": 4,
+            "phase": "persist",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "response_ids": [
+                "a0f93131-1552-488a-8f3c-eb4ea1861fee"
+              ]
+            }
+          },
+          {
+            "sequence": 5,
+            "phase": "dispatch",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "acceptances": 1,
+              "actual_provider_calls": 0,
+              "delivered_receipts": 0
+            }
+          },
+          {
+            "sequence": 6,
+            "phase": "complete",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "retry_deduplicated": true,
+              "safety_failures": []
+            }
+          }
+        ],
+        "external_actions": 0,
+        "model_quality_evaluated": false
+      },
+      "new_flow_acceptance": "PENDING",
+      "model_quality_evaluated": false,
+      "external_actions": 0
+    },
+    {
+      "id": "H05:sms",
+      "origin": "SCRIPTED_REPLAY_OF_HISTORICAL_TEXT",
+      "channel": "sms",
+      "project_id": "49c3922c-2536-45e9-b3f6-064d817fde67",
+      "passed_current_safety": true,
+      "failures": [],
+      "recorded_engine": "sales-active/1.0",
+      "recorded_run_status": "completed",
+      "recorded_error_code": null,
+      "replies": [
+        "Confirmed catalog:\n\n1. 4-bedroom single-family home\n4 bedrooms · 3734.0 m² · from 1,394,900.00 USD · 1 confirmed units\n\nCatalog coverage may be partial.\n\nWhich property option would you like to explore in more detail?\n\nWhat budget range and currency are you considering?"
+      ],
+      "trace": {
+        "version": "sales-ai-test-trace/1.0",
+        "source": "OFFLINE_TEST",
+        "company_id": "a73df3b4-95fa-4ed4-bb2c-bfe3543dfa4b",
+        "project_id": "49c3922c-2536-45e9-b3f6-064d817fde67",
+        "lead_id": "2a537012-152c-5997-9506-7db52c31001a",
+        "conversation_id": "bc6d802a-8723-5ef5-91d8-ee8d28a07624",
+        "inbound_message_id": "daf53c79-e98b-4c8f-b173-53a63d61cb93",
+        "run_id": "adc48c2d-2b5a-42e0-a5d7-846ce71f05e1",
+        "code_commit": "f7e7f055fd0499f2224b43bad8f9128db2eaf434",
+        "configuration_id": "e1579062-f614-4cbb-a82b-3452820ab512",
+        "configuration_version": null,
+        "model": "test/offline-scripted",
+        "events": [
+          {
+            "sequence": 1,
+            "phase": "inbound",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "channel": "sms",
+              "fixture_origin": "SCRIPTED_REPLAY_OF_HISTORICAL_TEXT"
+            }
+          },
+          {
+            "sequence": 2,
+            "phase": "context",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "source_capture": "2026-11-08T13:23:41.237176+00:00",
+              "project_id": "49c3922c-2536-45e9-b3f6-064d817fde67"
+            }
+          },
+          {
+            "sequence": 3,
+            "phase": "understanding",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "error_code": null,
+              "scripted_calls": 1
+            }
+          },
+          {
+            "sequence": 4,
+            "phase": "persist",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "response_ids": [
+                "0bb09498-823f-478b-911d-11deb2593d28"
+              ]
+            }
+          },
+          {
+            "sequence": 5,
+            "phase": "dispatch",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "acceptances": 1,
+              "actual_provider_calls": 0,
+              "delivered_receipts": 0
+            }
+          },
+          {
+            "sequence": 6,
+            "phase": "complete",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "retry_deduplicated": true,
+              "safety_failures": []
+            }
+          }
+        ],
+        "external_actions": 0,
+        "model_quality_evaluated": false
+      },
+      "new_flow_acceptance": "PENDING",
+      "model_quality_evaluated": false,
+      "external_actions": 0
+    },
+    {
+      "id": "H05:whatsapp",
+      "origin": "SCRIPTED_REPLAY_OF_HISTORICAL_TEXT",
+      "channel": "whatsapp",
+      "project_id": "49c3922c-2536-45e9-b3f6-064d817fde67",
+      "passed_current_safety": true,
+      "failures": [],
+      "recorded_engine": "sales-active/1.0",
+      "recorded_run_status": "completed",
+      "recorded_error_code": null,
+      "replies": [
+        "Confirmed catalog:\n\n1. 4-bedroom single-family home\n4 bedrooms · 3734.0 m² · from 1,394,900.00 USD · 1 confirmed units\n\nCatalog coverage may be partial.\n\nWhich property option would you like to explore in more detail?\n\nWhat budget range and currency are you considering?"
+      ],
+      "trace": {
+        "version": "sales-ai-test-trace/1.0",
+        "source": "OFFLINE_TEST",
+        "company_id": "a73df3b4-95fa-4ed4-bb2c-bfe3543dfa4b",
+        "project_id": "49c3922c-2536-45e9-b3f6-064d817fde67",
+        "lead_id": "428b4c1f-81a8-5f63-bd9c-552b0fcddb7b",
+        "conversation_id": "ee7580ad-76df-5d02-8916-58c4c26e3a84",
+        "inbound_message_id": "27f812be-01df-4ca4-8cdb-1e4c8dafb91f",
+        "run_id": "4b5146bf-ef19-4dd8-be09-55118e8622be",
+        "code_commit": "f7e7f055fd0499f2224b43bad8f9128db2eaf434",
+        "configuration_id": "1a942e51-7b1b-4e0f-b8b1-ab973a06bfb9",
+        "configuration_version": null,
+        "model": "test/offline-scripted",
+        "events": [
+          {
+            "sequence": 1,
+            "phase": "inbound",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "channel": "whatsapp",
+              "fixture_origin": "SCRIPTED_REPLAY_OF_HISTORICAL_TEXT"
+            }
+          },
+          {
+            "sequence": 2,
+            "phase": "context",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "source_capture": "2026-11-08T13:23:41.237176+00:00",
+              "project_id": "49c3922c-2536-45e9-b3f6-064d817fde67"
+            }
+          },
+          {
+            "sequence": 3,
+            "phase": "understanding",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "error_code": null,
+              "scripted_calls": 1
+            }
+          },
+          {
+            "sequence": 4,
+            "phase": "persist",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "response_ids": [
+                "2d16e5a5-5a17-4884-a413-6efb6c7a5766"
+              ]
+            }
+          },
+          {
+            "sequence": 5,
+            "phase": "dispatch",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "acceptances": 1,
+              "actual_provider_calls": 0,
+              "delivered_receipts": 0
+            }
+          },
+          {
+            "sequence": 6,
+            "phase": "complete",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "retry_deduplicated": true,
+              "safety_failures": []
+            }
+          }
+        ],
+        "external_actions": 0,
+        "model_quality_evaluated": false
+      },
+      "new_flow_acceptance": "PENDING",
+      "model_quality_evaluated": false,
+      "external_actions": 0
+    },
+    {
+      "id": "H06:sms",
+      "origin": "SCRIPTED_REPLAY_OF_HISTORICAL_TEXT",
+      "channel": "sms",
+      "project_id": "cf50fe57-7db6-425e-9cc2-d042feb14ea8",
+      "passed_current_safety": true,
+      "failures": [],
+      "recorded_engine": "sales-active/1.0",
+      "recorded_run_status": "completed",
+      "recorded_error_code": null,
+      "replies": [
+        "Confirmed catalog:\n\n1. LENNAR HOMES\n3 bedrooms · 1527.0 ft² · from 198,490.00 USD · 10 confirmed units\n\n2. COVENTRY HOMES\n4 bedrooms · 2399.0 ft² · from 334,990.00 USD · 15 confirmed units\n\nCatalog coverage may be partial.\n\nWhich property option would you like to explore in more detail?\n\nWhat budget range and currency are you considering?"
+      ],
+      "trace": {
+        "version": "sales-ai-test-trace/1.0",
+        "source": "OFFLINE_TEST",
+        "company_id": "4fa8155a-cdc1-4fca-bdea-8f78af688c11",
+        "project_id": "cf50fe57-7db6-425e-9cc2-d042feb14ea8",
+        "lead_id": "579408f4-71ed-536a-9275-237b32f3081e",
+        "conversation_id": "a06811ee-b7f0-5c10-b291-bdf0ca2686c6",
+        "inbound_message_id": "26645ba6-1aa0-472a-983b-8934bae453cb",
+        "run_id": "dca2cbb0-a5f2-4ad5-a4c3-35e2c08a09ed",
+        "code_commit": "f7e7f055fd0499f2224b43bad8f9128db2eaf434",
+        "configuration_id": "a2618f21-f5e7-45c9-b691-ff502066e212",
+        "configuration_version": null,
+        "model": "test/offline-scripted",
+        "events": [
+          {
+            "sequence": 1,
+            "phase": "inbound",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "channel": "sms",
+              "fixture_origin": "SCRIPTED_REPLAY_OF_HISTORICAL_TEXT"
+            }
+          },
+          {
+            "sequence": 2,
+            "phase": "context",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "source_capture": "2026-11-08T13:23:41.237176+00:00",
+              "project_id": "cf50fe57-7db6-425e-9cc2-d042feb14ea8"
+            }
+          },
+          {
+            "sequence": 3,
+            "phase": "understanding",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "error_code": null,
+              "scripted_calls": 1
+            }
+          },
+          {
+            "sequence": 4,
+            "phase": "persist",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "response_ids": [
+                "48fd7dae-3e29-4199-a6b3-649859497d66"
+              ]
+            }
+          },
+          {
+            "sequence": 5,
+            "phase": "dispatch",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "acceptances": 1,
+              "actual_provider_calls": 0,
+              "delivered_receipts": 0
+            }
+          },
+          {
+            "sequence": 6,
+            "phase": "complete",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "retry_deduplicated": true,
+              "safety_failures": []
+            }
+          }
+        ],
+        "external_actions": 0,
+        "model_quality_evaluated": false
+      },
+      "new_flow_acceptance": "PENDING",
+      "model_quality_evaluated": false,
+      "external_actions": 0
+    },
+    {
+      "id": "H06:whatsapp",
+      "origin": "SCRIPTED_REPLAY_OF_HISTORICAL_TEXT",
+      "channel": "whatsapp",
+      "project_id": "cf50fe57-7db6-425e-9cc2-d042feb14ea8",
+      "passed_current_safety": true,
+      "failures": [],
+      "recorded_engine": "sales-active/1.0",
+      "recorded_run_status": "completed",
+      "recorded_error_code": null,
+      "replies": [
+        "Confirmed catalog:\n\n1. LENNAR HOMES\n3 bedrooms · 1527.0 ft² · from 198,490.00 USD · 10 confirmed units\n\n2. COVENTRY HOMES\n4 bedrooms · 2399.0 ft² · from 334,990.00 USD · 15 confirmed units\n\nCatalog coverage may be partial.\n\nWhich property option would you like to explore in more detail?\n\nWhat budget range and currency are you considering?"
+      ],
+      "trace": {
+        "version": "sales-ai-test-trace/1.0",
+        "source": "OFFLINE_TEST",
+        "company_id": "4fa8155a-cdc1-4fca-bdea-8f78af688c11",
+        "project_id": "cf50fe57-7db6-425e-9cc2-d042feb14ea8",
+        "lead_id": "40c1b35d-957e-5e39-a113-c73c6e63285d",
+        "conversation_id": "68a0204c-de37-5dd6-948b-4849e687329f",
+        "inbound_message_id": "9ceb7ca1-f4fb-4187-8050-aa61d8ad8589",
+        "run_id": "51052c83-f137-4cae-baeb-26e2694b5088",
+        "code_commit": "f7e7f055fd0499f2224b43bad8f9128db2eaf434",
+        "configuration_id": "30c1060d-c0ab-4d25-8c6b-92585215cc98",
+        "configuration_version": null,
+        "model": "test/offline-scripted",
+        "events": [
+          {
+            "sequence": 1,
+            "phase": "inbound",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "channel": "whatsapp",
+              "fixture_origin": "SCRIPTED_REPLAY_OF_HISTORICAL_TEXT"
+            }
+          },
+          {
+            "sequence": 2,
+            "phase": "context",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "source_capture": "2026-11-08T13:23:41.237176+00:00",
+              "project_id": "cf50fe57-7db6-425e-9cc2-d042feb14ea8"
+            }
+          },
+          {
+            "sequence": 3,
+            "phase": "understanding",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "error_code": null,
+              "scripted_calls": 1
+            }
+          },
+          {
+            "sequence": 4,
+            "phase": "persist",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "response_ids": [
+                "6845a617-7dcb-4083-bb10-e80a54b125bb"
+              ]
+            }
+          },
+          {
+            "sequence": 5,
+            "phase": "dispatch",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "acceptances": 1,
+              "actual_provider_calls": 0,
+              "delivered_receipts": 0
+            }
+          },
+          {
+            "sequence": 6,
+            "phase": "complete",
+            "status": "ok",
+            "at": "2026-11-08T13:23:42.237176+00:00",
+            "evidence": {
+              "retry_deduplicated": true,
+              "safety_failures": []
+            }
+          }
+        ],
+        "external_actions": 0,
+        "model_quality_evaluated": false
+      },
+      "new_flow_acceptance": "PENDING",
+      "model_quality_evaluated": false,
+      "external_actions": 0
+    },
+    {
+      "id": "SYN_SINGLE:sms",
+      "origin": "SYNTHETIC",
+      "channel": "sms",
+      "project_id": "cb9b071e-09b6-5eea-8405-acff1cff4936",
+      "passed_current_safety": true,
+      "failures": [],
+      "recorded_engine": "sales-active/1.0",
+      "recorded_run_status": "completed",
+      "recorded_error_code": null,
+      "replies": [
+        "Confirmed catalog:\n\n1. Maple Studio\n0 bedrooms · 45.0–50.0 m² · from 100,000.00 USD · 2 confirmed units\n\nCatalog coverage may be partial.\n\nWhich property option would you like to explore in more detail?\n\nWhat budget range and currency are you considering?"
+      ],
+      "trace": {
+        "version": "sales-ai-test-trace/1.0",
+        "source": "OFFLINE_TEST",
+        "company_id": "c0b86ce0-1ebb-5cc9-ac12-7e3f1139eb89",
+        "project_id": "cb9b071e-09b6-5eea-8405-acff1cff4936",
+        "lead_id": "ba9d7867-c259-5274-99bf-78ffe73dc6b5",
+        "conversation_id": "837eeb21-9f23-5334-80ba-3a889d3c8402",
+        "inbound_message_id": "dc31b782-7153-4063-8f4a-b9e9c8f4f2db",
+        "run_id": "34ba2394-c54c-45ee-866b-c22baa8fa2c4",
+        "code_commit": "f7e7f055fd0499f2224b43bad8f9128db2eaf434",
+        "configuration_id": "a158c1a6-4d6c-49bc-9599-d7c0f74a4760",
+        "configuration_version": null,
+        "model": "test/offline-scripted",
+        "events": [
+          {
+            "sequence": 1,
+            "phase": "inbound",
+            "status": "ok",
+            "at": "2026-11-08T13:23:43+00:00",
+            "evidence": {
+              "channel": "sms",
+              "fixture_origin": "SYNTHETIC"
+            }
+          },
+          {
+            "sequence": 2,
+            "phase": "context",
+            "status": "ok",
+            "at": "2026-11-08T13:23:43+00:00",
+            "evidence": {
+              "source_capture": "2026-11-08T13:23:42+00:00",
+              "project_id": "cb9b071e-09b6-5eea-8405-acff1cff4936"
+            }
+          },
+          {
+            "sequence": 3,
+            "phase": "understanding",
+            "status": "ok",
+            "at": "2026-11-08T13:23:43+00:00",
+            "evidence": {
+              "error_code": null,
+              "scripted_calls": 1
+            }
+          },
+          {
+            "sequence": 4,
+            "phase": "persist",
+            "status": "ok",
+            "at": "2026-11-08T13:23:43+00:00",
+            "evidence": {
+              "response_ids": [
+                "2e092bc5-f76e-4f5e-86bc-b2d984b6d3d6"
+              ]
+            }
+          },
+          {
+            "sequence": 5,
+            "phase": "dispatch",
+            "status": "ok",
+            "at": "2026-11-08T13:23:43+00:00",
+            "evidence": {
+              "acceptances": 1,
+              "actual_provider_calls": 0,
+              "delivered_receipts": 0
+            }
+          },
+          {
+            "sequence": 6,
+            "phase": "complete",
+            "status": "ok",
+            "at": "2026-11-08T13:23:43+00:00",
+            "evidence": {
+              "retry_deduplicated": true,
+              "safety_failures": []
+            }
+          }
+        ],
+        "external_actions": 0,
+        "model_quality_evaluated": false
+      },
+      "new_flow_acceptance": "PENDING",
+      "model_quality_evaluated": false,
+      "external_actions": 0
+    },
+    {
+      "id": "SYN_SINGLE:whatsapp",
+      "origin": "SYNTHETIC",
+      "channel": "whatsapp",
+      "project_id": "cb9b071e-09b6-5eea-8405-acff1cff4936",
+      "passed_current_safety": true,
+      "failures": [],
+      "recorded_engine": "sales-active/1.0",
+      "recorded_run_status": "completed",
+      "recorded_error_code": null,
+      "replies": [
+        "Confirmed catalog:\n\n1. Maple Studio\n0 bedrooms · 45.0–50.0 m² · from 100,000.00 USD · 2 confirmed units\n\nCatalog coverage may be partial.\n\nWhich property option would you like to explore in more detail?\n\nWhat budget range and currency are you considering?"
+      ],
+      "trace": {
+        "version": "sales-ai-test-trace/1.0",
+        "source": "OFFLINE_TEST",
+        "company_id": "c0b86ce0-1ebb-5cc9-ac12-7e3f1139eb89",
+        "project_id": "cb9b071e-09b6-5eea-8405-acff1cff4936",
+        "lead_id": "e6f6abdb-67df-55de-b9f5-0490d919ba88",
+        "conversation_id": "a0a1f688-5407-574e-80d1-2173f68b82cd",
+        "inbound_message_id": "1d576f5a-5dd2-4939-86d7-88bb4ad9b62b",
+        "run_id": "d79fd900-2dc4-42b9-b776-a2ffa9f1528a",
+        "code_commit": "f7e7f055fd0499f2224b43bad8f9128db2eaf434",
+        "configuration_id": "3ca50426-1de2-4289-a8b2-a75c12743626",
+        "configuration_version": null,
+        "model": "test/offline-scripted",
+        "events": [
+          {
+            "sequence": 1,
+            "phase": "inbound",
+            "status": "ok",
+            "at": "2026-11-08T13:23:43+00:00",
+            "evidence": {
+              "channel": "whatsapp",
+              "fixture_origin": "SYNTHETIC"
+            }
+          },
+          {
+            "sequence": 2,
+            "phase": "context",
+            "status": "ok",
+            "at": "2026-11-08T13:23:43+00:00",
+            "evidence": {
+              "source_capture": "2026-11-08T13:23:42+00:00",
+              "project_id": "cb9b071e-09b6-5eea-8405-acff1cff4936"
+            }
+          },
+          {
+            "sequence": 3,
+            "phase": "understanding",
+            "status": "ok",
+            "at": "2026-11-08T13:23:43+00:00",
+            "evidence": {
+              "error_code": null,
+              "scripted_calls": 1
+            }
+          },
+          {
+            "sequence": 4,
+            "phase": "persist",
+            "status": "ok",
+            "at": "2026-11-08T13:23:43+00:00",
+            "evidence": {
+              "response_ids": [
+                "df08de43-df59-407f-a6ae-e05524885ad9"
+              ]
+            }
+          },
+          {
+            "sequence": 5,
+            "phase": "dispatch",
+            "status": "ok",
+            "at": "2026-11-08T13:23:43+00:00",
+            "evidence": {
+              "acceptances": 1,
+              "actual_provider_calls": 0,
+              "delivered_receipts": 0
+            }
+          },
+          {
+            "sequence": 6,
+            "phase": "complete",
+            "status": "ok",
+            "at": "2026-11-08T13:23:43+00:00",
+            "evidence": {
+              "retry_deduplicated": true,
+              "safety_failures": []
+            }
+          }
+        ],
+        "external_actions": 0,
+        "model_quality_evaluated": false
+      },
+      "new_flow_acceptance": "PENDING",
+      "model_quality_evaluated": false,
+      "external_actions": 0
+    },
+    {
+      "id": "SYN_MULTI:sms",
+      "origin": "SYNTHETIC",
+      "channel": "sms",
+      "project_id": "6ad0ef0b-bf27-571a-a423-cb79a44e8f01",
+      "passed_current_safety": true,
+      "failures": [],
+      "recorded_engine": "sales-active/1.0",
+      "recorded_run_status": "completed",
+      "recorded_error_code": null,
+      "replies": [
+        "Confirmed catalog:\n\n1. Oak Two Bedroom\n2 bedrooms · 90.0–110.0 m² · from 200,000.00 USD · 2 confirmed units\n\n2. Pine Three Bedroom\n3 bedrooms · 120.0–140.0 m² · from 300,000.00 USD · 2 confirmed units\n\n3. Cedar Four Bedroom\n4 bedrooms · 150.0–170.0 m² · from 400,000.00 USD · 2 confirmed units\n\nCatalog coverage may be partial.\n\nWhich property option would you like to explore in more detail?\n\nWhat budget range and currency are you considering?"
+      ],
+      "trace": {
+        "version": "sales-ai-test-trace/1.0",
+        "source": "OFFLINE_TEST",
+        "company_id": "c0b86ce0-1ebb-5cc9-ac12-7e3f1139eb89",
+        "project_id": "6ad0ef0b-bf27-571a-a423-cb79a44e8f01",
+        "lead_id": "7d161be5-c3d2-5806-9c0c-c59c905fe455",
+        "conversation_id": "bcee30dd-6bca-5ddf-9798-9b029a4773e2",
+        "inbound_message_id": "0fe827be-61c8-4176-bf01-a879e49e4e8d",
+        "run_id": "dec72415-4fdd-475d-a71b-db077c7c6201",
+        "code_commit": "f7e7f055fd0499f2224b43bad8f9128db2eaf434",
+        "configuration_id": "bb65d5f3-b55a-4c6f-9b1e-0b27bc161adf",
+        "configuration_version": null,
+        "model": "test/offline-scripted",
+        "events": [
+          {
+            "sequence": 1,
+            "phase": "inbound",
+            "status": "ok",
+            "at": "2026-11-08T13:23:43+00:00",
+            "evidence": {
+              "channel": "sms",
+              "fixture_origin": "SYNTHETIC"
+            }
+          },
+          {
+            "sequence": 2,
+            "phase": "context",
+            "status": "ok",
+            "at": "2026-11-08T13:23:43+00:00",
+            "evidence": {
+              "source_capture": "2026-11-08T13:23:42+00:00",
+              "project_id": "6ad0ef0b-bf27-571a-a423-cb79a44e8f01"
+            }
+          },
+          {
+            "sequence": 3,
+            "phase": "understanding",
+            "status": "ok",
+            "at": "2026-11-08T13:23:43+00:00",
+            "evidence": {
+              "error_code": null,
+              "scripted_calls": 1
+            }
+          },
+          {
+            "sequence": 4,
+            "phase": "persist",
+            "status": "ok",
+            "at": "2026-11-08T13:23:43+00:00",
+            "evidence": {
+              "response_ids": [
+                "0729a8a6-7181-415b-a70a-794ebfe7ff2d"
+              ]
+            }
+          },
+          {
+            "sequence": 5,
+            "phase": "dispatch",
+            "status": "ok",
+            "at": "2026-11-08T13:23:43+00:00",
+            "evidence": {
+              "acceptances": 1,
+              "actual_provider_calls": 0,
+              "delivered_receipts": 0
+            }
+          },
+          {
+            "sequence": 6,
+            "phase": "complete",
+            "status": "ok",
+            "at": "2026-11-08T13:23:43+00:00",
+            "evidence": {
+              "retry_deduplicated": true,
+              "safety_failures": []
+            }
+          }
+        ],
+        "external_actions": 0,
+        "model_quality_evaluated": false
+      },
+      "new_flow_acceptance": "PENDING",
+      "model_quality_evaluated": false,
+      "external_actions": 0
+    },
+    {
+      "id": "SYN_MULTI:whatsapp",
+      "origin": "SYNTHETIC",
+      "channel": "whatsapp",
+      "project_id": "6ad0ef0b-bf27-571a-a423-cb79a44e8f01",
+      "passed_current_safety": true,
+      "failures": [],
+      "recorded_engine": "sales-active/1.0",
+      "recorded_run_status": "completed",
+      "recorded_error_code": null,
+      "replies": [
+        "Confirmed catalog:\n\n1. Oak Two Bedroom\n2 bedrooms · 90.0–110.0 m² · from 200,000.00 USD · 2 confirmed units\n\n2. Pine Three Bedroom\n3 bedrooms · 120.0–140.0 m² · from 300,000.00 USD · 2 confirmed units\n\n3. Cedar Four Bedroom\n4 bedrooms · 150.0–170.0 m² · from 400,000.00 USD · 2 confirmed units\n\nCatalog coverage may be partial.\n\nWhich property option would you like to explore in more detail?\n\nWhat budget range and currency are you considering?"
+      ],
+      "trace": {
+        "version": "sales-ai-test-trace/1.0",
+        "source": "OFFLINE_TEST",
+        "company_id": "c0b86ce0-1ebb-5cc9-ac12-7e3f1139eb89",
+        "project_id": "6ad0ef0b-bf27-571a-a423-cb79a44e8f01",
+        "lead_id": "1084c632-474c-5471-854d-1d93e21e07c8",
+        "conversation_id": "249315dc-15cd-50af-a456-80a817aab1e9",
+        "inbound_message_id": "aa368c01-9210-4663-b5a8-bd8b1b9515c2",
+        "run_id": "922efc86-593c-4b52-a553-818cb2c6517f",
+        "code_commit": "f7e7f055fd0499f2224b43bad8f9128db2eaf434",
+        "configuration_id": "c6a3a782-d514-4f0f-b8c7-22d7efd2651f",
+        "configuration_version": null,
+        "model": "test/offline-scripted",
+        "events": [
+          {
+            "sequence": 1,
+            "phase": "inbound",
+            "status": "ok",
+            "at": "2026-11-08T13:23:43+00:00",
+            "evidence": {
+              "channel": "whatsapp",
+              "fixture_origin": "SYNTHETIC"
+            }
+          },
+          {
+            "sequence": 2,
+            "phase": "context",
+            "status": "ok",
+            "at": "2026-11-08T13:23:43+00:00",
+            "evidence": {
+              "source_capture": "2026-11-08T13:23:42+00:00",
+              "project_id": "6ad0ef0b-bf27-571a-a423-cb79a44e8f01"
+            }
+          },
+          {
+            "sequence": 3,
+            "phase": "understanding",
+            "status": "ok",
+            "at": "2026-11-08T13:23:43+00:00",
+            "evidence": {
+              "error_code": null,
+              "scripted_calls": 1
+            }
+          },
+          {
+            "sequence": 4,
+            "phase": "persist",
+            "status": "ok",
+            "at": "2026-11-08T13:23:43+00:00",
+            "evidence": {
+              "response_ids": [
+                "9e88d194-89d0-46d8-84a1-5c2550dc820e"
+              ]
+            }
+          },
+          {
+            "sequence": 5,
+            "phase": "dispatch",
+            "status": "ok",
+            "at": "2026-11-08T13:23:43+00:00",
+            "evidence": {
+              "acceptances": 1,
+              "actual_provider_calls": 0,
+              "delivered_receipts": 0
+            }
+          },
+          {
+            "sequence": 6,
+            "phase": "complete",
+            "status": "ok",
+            "at": "2026-11-08T13:23:43+00:00",
+            "evidence": {
+              "retry_deduplicated": true,
+              "safety_failures": []
+            }
+          }
+        ],
+        "external_actions": 0,
+        "model_quality_evaluated": false
+      },
+      "new_flow_acceptance": "PENDING",
+      "model_quality_evaluated": false,
+      "external_actions": 0
+    },
+    {
+      "id": "invalid_json:sms",
+      "origin": "SYNTHETIC_FAILURE",
+      "channel": "sms",
+      "project_id": "cb9b071e-09b6-5eea-8405-acff1cff4936",
+      "passed_current_safety": true,
+      "failures": [],
+      "recorded_engine": "sales-active/1.0",
+      "recorded_run_status": "completed",
+      "recorded_error_code": "understanding_validation_failed",
+      "replies": [
+        "I'm having trouble processing your message right now. You can ask about available properties, prices, or a visit, or request help from the Sales team."
+      ],
+      "trace": {
+        "version": "sales-ai-test-trace/1.0",
+        "source": "OFFLINE_TEST",
+        "company_id": "c0b86ce0-1ebb-5cc9-ac12-7e3f1139eb89",
+        "project_id": "cb9b071e-09b6-5eea-8405-acff1cff4936",
+        "lead_id": "ba9d7867-c259-5274-99bf-78ffe73dc6b5",
+        "conversation_id": "837eeb21-9f23-5334-80ba-3a889d3c8402",
+        "inbound_message_id": "cc095e7a-b373-40fe-b3d0-8d66f621b99a",
+        "run_id": "8be80410-2999-44d4-8899-90de2a482a6b",
+        "code_commit": "f7e7f055fd0499f2224b43bad8f9128db2eaf434",
+        "configuration_id": "8c7e0506-6907-4855-82dc-3ca1a5d07aa1",
+        "configuration_version": null,
+        "model": "test/offline-scripted",
+        "events": [
+          {
+            "sequence": 1,
+            "phase": "inbound",
+            "status": "ok",
+            "at": "2026-11-08T13:23:43+00:00",
+            "evidence": {
+              "channel": "sms",
+              "fixture_origin": "SYNTHETIC_FAILURE"
+            }
+          },
+          {
+            "sequence": 2,
+            "phase": "context",
+            "status": "ok",
+            "at": "2026-11-08T13:23:43+00:00",
+            "evidence": {
+              "source_capture": "2026-11-08T13:23:42+00:00",
+              "project_id": "cb9b071e-09b6-5eea-8405-acff1cff4936"
+            }
+          },
+          {
+            "sequence": 3,
+            "phase": "understanding",
+            "status": "failed",
+            "at": "2026-11-08T13:23:43+00:00",
+            "evidence": {
+              "error_code": "ValueError",
+              "scripted_calls": 2
+            }
+          },
+          {
+            "sequence": 4,
+            "phase": "persist",
+            "status": "ok",
+            "at": "2026-11-08T13:23:43+00:00",
+            "evidence": {
+              "response_ids": [
+                "3b663f94-1cdf-4403-ac05-b92c90bbb1ac"
+              ]
+            }
+          },
+          {
+            "sequence": 5,
+            "phase": "dispatch",
+            "status": "ok",
+            "at": "2026-11-08T13:23:43+00:00",
+            "evidence": {
+              "acceptances": 1,
+              "actual_provider_calls": 0,
+              "delivered_receipts": 0
+            }
+          },
+          {
+            "sequence": 6,
+            "phase": "complete",
+            "status": "ok",
+            "at": "2026-11-08T13:23:43+00:00",
+            "evidence": {
+              "retry_deduplicated": true,
+              "safety_failures": []
+            }
+          }
+        ],
+        "external_actions": 0,
+        "model_quality_evaluated": false
+      },
+      "new_flow_acceptance": "PENDING",
+      "model_quality_evaluated": false,
+      "external_actions": 0
+    },
+    {
+      "id": "invalid_json:whatsapp",
+      "origin": "SYNTHETIC_FAILURE",
+      "channel": "whatsapp",
+      "project_id": "cb9b071e-09b6-5eea-8405-acff1cff4936",
+      "passed_current_safety": true,
+      "failures": [],
+      "recorded_engine": "sales-active/1.0",
+      "recorded_run_status": "completed",
+      "recorded_error_code": "understanding_validation_failed",
+      "replies": [
+        "I'm having trouble processing your message right now. You can ask about available properties, prices, or a visit, or request help from the Sales team."
+      ],
+      "trace": {
+        "version": "sales-ai-test-trace/1.0",
+        "source": "OFFLINE_TEST",
+        "company_id": "c0b86ce0-1ebb-5cc9-ac12-7e3f1139eb89",
+        "project_id": "cb9b071e-09b6-5eea-8405-acff1cff4936",
+        "lead_id": "e6f6abdb-67df-55de-b9f5-0490d919ba88",
+        "conversation_id": "a0a1f688-5407-574e-80d1-2173f68b82cd",
+        "inbound_message_id": "24ee93b0-5080-4047-83c4-a4bafbffaf34",
+        "run_id": "5afff10a-62b0-4caf-844a-b399dcaac68b",
+        "code_commit": "f7e7f055fd0499f2224b43bad8f9128db2eaf434",
+        "configuration_id": "e10edb67-444a-4259-be0e-799e8217a0df",
+        "configuration_version": null,
+        "model": "test/offline-scripted",
+        "events": [
+          {
+            "sequence": 1,
+            "phase": "inbound",
+            "status": "ok",
+            "at": "2026-11-08T13:23:43+00:00",
+            "evidence": {
+              "channel": "whatsapp",
+              "fixture_origin": "SYNTHETIC_FAILURE"
+            }
+          },
+          {
+            "sequence": 2,
+            "phase": "context",
+            "status": "ok",
+            "at": "2026-11-08T13:23:43+00:00",
+            "evidence": {
+              "source_capture": "2026-11-08T13:23:42+00:00",
+              "project_id": "cb9b071e-09b6-5eea-8405-acff1cff4936"
+            }
+          },
+          {
+            "sequence": 3,
+            "phase": "understanding",
+            "status": "failed",
+            "at": "2026-11-08T13:23:43+00:00",
+            "evidence": {
+              "error_code": "ValueError",
+              "scripted_calls": 2
+            }
+          },
+          {
+            "sequence": 4,
+            "phase": "persist",
+            "status": "ok",
+            "at": "2026-11-08T13:23:43+00:00",
+            "evidence": {
+              "response_ids": [
+                "69820793-0f9c-426d-a789-ed1c04d3f4b2"
+              ]
+            }
+          },
+          {
+            "sequence": 5,
+            "phase": "dispatch",
+            "status": "ok",
+            "at": "2026-11-08T13:23:43+00:00",
+            "evidence": {
+              "acceptances": 1,
+              "actual_provider_calls": 0,
+              "delivered_receipts": 0
+            }
+          },
+          {
+            "sequence": 6,
+            "phase": "complete",
+            "status": "ok",
+            "at": "2026-11-08T13:23:43+00:00",
+            "evidence": {
+              "retry_deduplicated": true,
+              "safety_failures": []
+            }
+          }
+        ],
+        "external_actions": 0,
+        "model_quality_evaluated": false
+      },
+      "new_flow_acceptance": "PENDING",
+      "model_quality_evaluated": false,
+      "external_actions": 0
+    },
+    {
+      "id": "timeout:sms",
+      "origin": "SYNTHETIC_FAILURE",
+      "channel": "sms",
+      "project_id": "cb9b071e-09b6-5eea-8405-acff1cff4936",
+      "passed_current_safety": true,
+      "failures": [],
+      "recorded_engine": "sales-active/1.0",
+      "recorded_run_status": "completed",
+      "recorded_error_code": "TimeoutError",
+      "replies": [
+        "I'm having trouble processing your message right now. You can ask about available properties, prices, or a visit, or request help from the Sales team."
+      ],
+      "trace": {
+        "version": "sales-ai-test-trace/1.0",
+        "source": "OFFLINE_TEST",
+        "company_id": "c0b86ce0-1ebb-5cc9-ac12-7e3f1139eb89",
+        "project_id": "cb9b071e-09b6-5eea-8405-acff1cff4936",
+        "lead_id": "ba9d7867-c259-5274-99bf-78ffe73dc6b5",
+        "conversation_id": "837eeb21-9f23-5334-80ba-3a889d3c8402",
+        "inbound_message_id": "45fdd92d-28d6-455b-b5b6-05c2e4687799",
+        "run_id": "ae293910-9290-42c3-aeab-02a6a170faa4",
+        "code_commit": "f7e7f055fd0499f2224b43bad8f9128db2eaf434",
+        "configuration_id": "ce07b738-747f-4adf-869f-efb495213b31",
+        "configuration_version": null,
+        "model": "test/offline-scripted",
+        "events": [
+          {
+            "sequence": 1,
+            "phase": "inbound",
+            "status": "ok",
+            "at": "2026-11-08T13:23:43+00:00",
+            "evidence": {
+              "channel": "sms",
+              "fixture_origin": "SYNTHETIC_FAILURE"
+            }
+          },
+          {
+            "sequence": 2,
+            "phase": "context",
+            "status": "ok",
+            "at": "2026-11-08T13:23:43+00:00",
+            "evidence": {
+              "source_capture": "2026-11-08T13:23:42+00:00",
+              "project_id": "cb9b071e-09b6-5eea-8405-acff1cff4936"
+            }
+          },
+          {
+            "sequence": 3,
+            "phase": "understanding",
+            "status": "failed",
+            "at": "2026-11-08T13:23:43+00:00",
+            "evidence": {
+              "error_code": "ValueError",
+              "scripted_calls": 1
+            }
+          },
+          {
+            "sequence": 4,
+            "phase": "persist",
+            "status": "ok",
+            "at": "2026-11-08T13:23:43+00:00",
+            "evidence": {
+              "response_ids": [
+                "86a48edf-fbd0-4df6-82ff-2bb7d9429d32"
+              ]
+            }
+          },
+          {
+            "sequence": 5,
+            "phase": "dispatch",
+            "status": "ok",
+            "at": "2026-11-08T13:23:43+00:00",
+            "evidence": {
+              "acceptances": 1,
+              "actual_provider_calls": 0,
+              "delivered_receipts": 0
+            }
+          },
+          {
+            "sequence": 6,
+            "phase": "complete",
+            "status": "ok",
+            "at": "2026-11-08T13:23:43+00:00",
+            "evidence": {
+              "retry_deduplicated": true,
+              "safety_failures": []
+            }
+          }
+        ],
+        "external_actions": 0,
+        "model_quality_evaluated": false
+      },
+      "new_flow_acceptance": "PENDING",
+      "model_quality_evaluated": false,
+      "external_actions": 0
+    },
+    {
+      "id": "timeout:whatsapp",
+      "origin": "SYNTHETIC_FAILURE",
+      "channel": "whatsapp",
+      "project_id": "cb9b071e-09b6-5eea-8405-acff1cff4936",
+      "passed_current_safety": true,
+      "failures": [],
+      "recorded_engine": "sales-active/1.0",
+      "recorded_run_status": "completed",
+      "recorded_error_code": "TimeoutError",
+      "replies": [
+        "I'm having trouble processing your message right now. You can ask about available properties, prices, or a visit, or request help from the Sales team."
+      ],
+      "trace": {
+        "version": "sales-ai-test-trace/1.0",
+        "source": "OFFLINE_TEST",
+        "company_id": "c0b86ce0-1ebb-5cc9-ac12-7e3f1139eb89",
+        "project_id": "cb9b071e-09b6-5eea-8405-acff1cff4936",
+        "lead_id": "e6f6abdb-67df-55de-b9f5-0490d919ba88",
+        "conversation_id": "a0a1f688-5407-574e-80d1-2173f68b82cd",
+        "inbound_message_id": "0ca49007-4526-4bb2-975e-5dbab3243dd7",
+        "run_id": "65def7be-d33d-428c-be30-16a6d120e34e",
+        "code_commit": "f7e7f055fd0499f2224b43bad8f9128db2eaf434",
+        "configuration_id": "950a748e-cf96-46f2-b2fe-b36b36c3f114",
+        "configuration_version": null,
+        "model": "test/offline-scripted",
+        "events": [
+          {
+            "sequence": 1,
+            "phase": "inbound",
+            "status": "ok",
+            "at": "2026-11-08T13:23:43+00:00",
+            "evidence": {
+              "channel": "whatsapp",
+              "fixture_origin": "SYNTHETIC_FAILURE"
+            }
+          },
+          {
+            "sequence": 2,
+            "phase": "context",
+            "status": "ok",
+            "at": "2026-11-08T13:23:43+00:00",
+            "evidence": {
+              "source_capture": "2026-11-08T13:23:42+00:00",
+              "project_id": "cb9b071e-09b6-5eea-8405-acff1cff4936"
+            }
+          },
+          {
+            "sequence": 3,
+            "phase": "understanding",
+            "status": "failed",
+            "at": "2026-11-08T13:23:43+00:00",
+            "evidence": {
+              "error_code": "ValueError",
+              "scripted_calls": 1
+            }
+          },
+          {
+            "sequence": 4,
+            "phase": "persist",
+            "status": "ok",
+            "at": "2026-11-08T13:23:43+00:00",
+            "evidence": {
+              "response_ids": [
+                "6efdbf38-e1a7-4747-a97e-77a8185564b8"
+              ]
+            }
+          },
+          {
+            "sequence": 5,
+            "phase": "dispatch",
+            "status": "ok",
+            "at": "2026-11-08T13:23:43+00:00",
+            "evidence": {
+              "acceptances": 1,
+              "actual_provider_calls": 0,
+              "delivered_receipts": 0
+            }
+          },
+          {
+            "sequence": 6,
+            "phase": "complete",
+            "status": "ok",
+            "at": "2026-11-08T13:23:43+00:00",
+            "evidence": {
+              "retry_deduplicated": true,
+              "safety_failures": []
+            }
+          }
+        ],
+        "external_actions": 0,
+        "model_quality_evaluated": false
+      },
+      "new_flow_acceptance": "PENDING",
+      "model_quality_evaluated": false,
+      "external_actions": 0
+    }
+  ]
+}

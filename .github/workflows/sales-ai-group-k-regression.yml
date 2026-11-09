@@ -1,0 +1,92 @@
+name: Sales AI group K isolated regression
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: blackpenguin_test
+          POSTGRES_USER: bp_test
+          POSTGRES_PASSWORD: disposable_ci_only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - run: python -m pip install -r backend/requirements.txt
+      - name: Test isolated application layout and disposable PostgreSQL
+        shell: bash
+        env:
+          BP_POSTGRES_TEST_URL: postgresql+psycopg2://bp_test:disposable_ci_only@localhost:5432/blackpenguin_test
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/bp-k-app" "$RUNNER_TEMP/bp-k-reference" qa-group-k
+          cp -a backend/app backend/tools backend/alembic backend/alembic.ini backend/migrations backend/tests "$RUNNER_TEMP/bp-k-app/"
+          cp -a docs "$RUNNER_TEMP/bp-k-reference/"
+          mkdir -p "$RUNNER_TEMP/bp-k-reference/backend"
+          cp -a backend/tests "$RUNNER_TEMP/bp-k-reference/backend/"
+          cd "$RUNNER_TEMP/bp-k-app"
+          SALES_ACCEPTANCE_ROOT="$RUNNER_TEMP/bp-k-reference" bash tools/sales_ai/offline.sh baseline | tee "$GITHUB_WORKSPACE/qa-group-k/backend.log"
+      - name: Retain regression logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sales-ai-group-k-regression
+          path: qa-group-k/*.log
+          retention-days: 7
+
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: frontend
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - name: Full frontend regression (Angular CLI and direct DOM suites)
+        run: TZ=UTC npm run test:sales-ai-k
+      - run: npm run build -- --configuration=production,offline-ci
+      - name: Install isolated browser
+        run: |
+          npm install --prefix "$RUNNER_TEMP/bp-ui-browser" --no-package-lock --no-save playwright@1.62.1
+          "$RUNNER_TEMP/bp-ui-browser/node_modules/.bin/playwright" install --with-deps chromium
+      - name: Desktop and mobile synthetic journeys
+        run: |
+          mkdir -p qa-group-k
+          node tools/sales-ai/group-j-preview.cjs > qa-group-k/server.log 2>&1 &
+          preview_pid=$!
+          trap 'kill "$preview_pid" 2>/dev/null || true' EXIT
+          node -e '(async()=>{for(let i=0;i<30;i++){try{if((await fetch("http://127.0.0.1:4180")).ok)return}catch{}await new Promise(r=>setTimeout(r,100))}process.exit(1)})()'
+          NODE_PATH="$RUNNER_TEMP/bp-ui-browser/node_modules" node tools/sales-ai/group-j-browser.cjs | tee qa-group-k/browser.log
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sales-ai-group-k-ui
+          path: frontend/qa-group-k/*.log
+          if-no-files-found: ignore
+          retention-days: 7

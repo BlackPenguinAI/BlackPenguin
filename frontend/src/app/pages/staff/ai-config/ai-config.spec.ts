@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
-import { AiConfig } from './ai-config';
+import { StaffAiConfigComponent as AiConfig } from './ai-config';
 
 describe('AiConfig', () => {
   let component: AiConfig;

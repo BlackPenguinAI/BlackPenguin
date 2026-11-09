@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
-import { TermsConditions } from './terms-conditions';
+import { TermsConditionsComponent as TermsConditions } from './terms-conditions';
 
 describe('TermsConditions', () => {
   let component: TermsConditions;

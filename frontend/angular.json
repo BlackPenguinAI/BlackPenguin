@@ -55,6 +55,18 @@
               "optimization": false,
               "extractLicenses": false,
               "sourceMap": true
+            },
+            "offline-ci": {
+              "optimization": {
+                "scripts": true,
+                "styles": {
+                  "minify": true,
+                  "inlineCritical": true
+                },
+                "fonts": {
+                  "inline": false
+                }
+              }
             }
           },
           "defaultConfiguration": "production"

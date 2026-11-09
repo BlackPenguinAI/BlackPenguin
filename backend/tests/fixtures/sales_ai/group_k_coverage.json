@@ -1,0 +1,293 @@
+{
+  "version": "sales-ai-group-k-coverage/1.0",
+  "evidence_kind": "deterministic_coordinator_regression",
+  "complete_T01_T26_acceptance": false,
+  "cases": [
+    {
+      "id": "T01",
+      "title": "General information after greeting",
+      "automated_partial_evidence": [
+        "backend/tests/test_sales_ai_group_e.py::test_t01_catalog_one_close_not_catalog_plus_budget"
+      ],
+      "status": "AUTOMATED_PARTIAL_NOT_FINAL_ACCEPTANCE",
+      "model_quality_evaluated": false,
+      "live_channels": "NOT_RUN",
+      "parallel_postgres": "not_claimed"
+    },
+    {
+      "id": "T02",
+      "title": "Single property option",
+      "automated_partial_evidence": [
+        "backend/tests/test_sales_ai_group_e.py::test_t02_single_option_has_details_and_no_redundant_type_question"
+      ],
+      "status": "AUTOMATED_PARTIAL_NOT_FINAL_ACCEPTANCE",
+      "model_quality_evaluated": false,
+      "live_channels": "NOT_RUN",
+      "parallel_postgres": "not_claimed"
+    },
+    {
+      "id": "T03",
+      "title": "Ordinal resolves last delivered list",
+      "automated_partial_evidence": [
+        "backend/tests/test_sales_ai_group_d.py::test_ordinal_uses_delivered_order_after_catalog_reordering"
+      ],
+      "status": "AUTOMATED_PARTIAL_NOT_FINAL_ACCEPTANCE",
+      "model_quality_evaluated": false,
+      "live_channels": "NOT_RUN",
+      "parallel_postgres": "not_claimed"
+    },
+    {
+      "id": "T04",
+      "title": "Explicit pivot between properties",
+      "automated_partial_evidence": [
+        "backend/tests/test_sales_ai_group_d.py::test_explicit_focus_updates_interest_without_changing_existing_booking"
+      ],
+      "status": "AUTOMATED_PARTIAL_NOT_FINAL_ACCEPTANCE",
+      "model_quality_evaluated": false,
+      "live_channels": "NOT_RUN",
+      "parallel_postgres": "not_claimed"
+    },
+    {
+      "id": "T05",
+      "title": "Ambiguous pivot",
+      "automated_partial_evidence": [
+        "backend/tests/test_sales_ai_group_d.py::test_other_property_selects_only_when_unique"
+      ],
+      "status": "AUTOMATED_PARTIAL_NOT_FINAL_ACCEPTANCE",
+      "model_quality_evaluated": false,
+      "live_channels": "NOT_RUN",
+      "parallel_postgres": "not_claimed"
+    },
+    {
+      "id": "T06",
+      "title": "Approved materials",
+      "automated_partial_evidence": [
+        "backend/tests/test_sales_ai_group_e.py::test_t06_actual_file_link_receipt_and_no_raw_token_sent_to_composer"
+      ],
+      "status": "AUTOMATED_PARTIAL_NOT_FINAL_ACCEPTANCE",
+      "model_quality_evaluated": false,
+      "live_channels": "NOT_RUN",
+      "parallel_postgres": "not_claimed"
+    },
+    {
+      "id": "T07",
+      "title": "Photos missing, offer PDF",
+      "automated_partial_evidence": [
+        "backend/tests/test_sales_ai_group_e.py::test_t07_photo_fallback_accepts_exact_file_even_when_another_is_added"
+      ],
+      "status": "AUTOMATED_PARTIAL_NOT_FINAL_ACCEPTANCE",
+      "model_quality_evaluated": false,
+      "live_channels": "NOT_RUN",
+      "parallel_postgres": "not_claimed"
+    },
+    {
+      "id": "T08",
+      "title": "Mixed alternatives and restriction",
+      "automated_partial_evidence": [
+        "backend/tests/test_sales_ai_group_e.py::test_t08_photos_or_pdf_plus_financing_and_no_visit"
+      ],
+      "status": "AUTOMATED_PARTIAL_NOT_FINAL_ACCEPTANCE",
+      "model_quality_evaluated": false,
+      "live_channels": "NOT_RUN",
+      "parallel_postgres": "not_claimed"
+    },
+    {
+      "id": "T09",
+      "title": "Meta profile prevents repeated qualification",
+      "automated_partial_evidence": [
+        "backend/tests/test_sales_ai_group_e.py::test_t09_known_meta_fields_not_reasked_and_context_reaches_composer"
+      ],
+      "status": "AUTOMATED_PARTIAL_NOT_FINAL_ACCEPTANCE",
+      "model_quality_evaluated": false,
+      "live_channels": "NOT_RUN",
+      "parallel_postgres": "not_claimed"
+    },
+    {
+      "id": "T10",
+      "title": "Prudent sales invitation",
+      "automated_partial_evidence": [
+        "backend/tests/test_sales_ai_group_e.py::test_t10_visit_invitation_has_supported_purpose_and_no_operation"
+      ],
+      "status": "AUTOMATED_PARTIAL_NOT_FINAL_ACCEPTANCE",
+      "model_quality_evaluated": false,
+      "live_channels": "NOT_RUN",
+      "parallel_postgres": "not_claimed"
+    },
+    {
+      "id": "T11",
+      "title": "Lead requests visit directly",
+      "automated_partial_evidence": [
+        "backend/tests/test_sales_ai_group_f.py::test_multiple_properties_are_resolved_before_offering_a_visit"
+      ],
+      "status": "AUTOMATED_PARTIAL_NOT_FINAL_ACCEPTANCE",
+      "model_quality_evaluated": false,
+      "live_channels": "NOT_RUN",
+      "parallel_postgres": "not_claimed"
+    },
+    {
+      "id": "T12",
+      "title": "Select and confirm a real slot",
+      "automated_partial_evidence": [
+        "backend/tests/test_sales_ai_group_f.py::test_first_booking_is_two_step_complete_scoped_and_open"
+      ],
+      "status": "AUTOMATED_PARTIAL_NOT_FINAL_ACCEPTANCE",
+      "model_quality_evaluated": false,
+      "live_channels": "NOT_RUN",
+      "parallel_postgres": "PENDING"
+    },
+    {
+      "id": "T13",
+      "title": "No compatible availability",
+      "automated_partial_evidence": [
+        "backend/tests/test_sales_ai_group_i.py::test_verified_alert_is_deduplicated_and_requires_normal_booking_confirmation"
+      ],
+      "status": "AUTOMATED_PARTIAL_NOT_FINAL_ACCEPTANCE",
+      "model_quality_evaluated": false,
+      "live_channels": "NOT_RUN",
+      "parallel_postgres": "not_claimed"
+    },
+    {
+      "id": "T14",
+      "title": "Post-booking questions and return",
+      "automated_partial_evidence": [
+        "backend/tests/test_sales_ai_group_f.py::test_after_booking_queries_other_property_and_farewell_preserve_visit"
+      ],
+      "status": "AUTOMATED_PARTIAL_NOT_FINAL_ACCEPTANCE",
+      "model_quality_evaluated": false,
+      "live_channels": "NOT_RUN",
+      "parallel_postgres": "not_claimed"
+    },
+    {
+      "id": "T15",
+      "title": "Missing/past/cancelled appointment",
+      "automated_partial_evidence": [
+        "backend/tests/test_sales_ai_group_h.py::test_no_future_or_in_progress_booking_is_never_invented_or_cancelled"
+      ],
+      "status": "AUTOMATED_PARTIAL_NOT_FINAL_ACCEPTANCE",
+      "model_quality_evaluated": false,
+      "live_channels": "NOT_RUN",
+      "parallel_postgres": "not_claimed"
+    },
+    {
+      "id": "T16",
+      "title": "New property interest leaves reservation intact",
+      "automated_partial_evidence": [
+        "backend/tests/test_sales_ai_group_j.py::test_context_separates_enquiry_from_booked_property_and_exposes_receipts"
+      ],
+      "status": "AUTOMATED_PARTIAL_NOT_FINAL_ACCEPTANCE",
+      "model_quality_evaluated": false,
+      "live_channels": "NOT_RUN",
+      "parallel_postgres": "not_claimed"
+    },
+    {
+      "id": "T17",
+      "title": "Reject or expire reschedule proposal",
+      "automated_partial_evidence": [
+        "backend/tests/test_sales_ai_group_g.py::test_expiry_preserves_original"
+      ],
+      "status": "AUTOMATED_PARTIAL_NOT_FINAL_ACCEPTANCE",
+      "model_quality_evaluated": false,
+      "live_channels": "NOT_RUN",
+      "parallel_postgres": "not_claimed"
+    },
+    {
+      "id": "T18",
+      "title": "Confirm new time/property/specialist",
+      "automated_partial_evidence": [
+        "backend/tests/test_sales_ai_group_g.py::test_cross_project_replacement_is_explicit_and_does_not_transfer_the_opportunity"
+      ],
+      "status": "AUTOMATED_PARTIAL_NOT_FINAL_ACCEPTANCE",
+      "model_quality_evaluated": false,
+      "live_channels": "NOT_RUN",
+      "parallel_postgres": "PENDING"
+    },
+    {
+      "id": "T19",
+      "title": "Duplicate and concurrent confirmations",
+      "automated_partial_evidence": [
+        "backend/tests/test_sales_ai_group_g.py::test_failed_delivery_and_double_confirmation_do_not_replace_twice"
+      ],
+      "status": "AUTOMATED_PARTIAL_NOT_FINAL_ACCEPTANCE",
+      "model_quality_evaluated": false,
+      "live_channels": "NOT_RUN",
+      "parallel_postgres": "PENDING"
+    },
+    {
+      "id": "T20",
+      "title": "Confirmed cancellation then research",
+      "automated_partial_evidence": [
+        "backend/tests/test_sales_ai_group_h.py::test_request_then_exact_confirmation_cancels_once_and_keeps_chat_open"
+      ],
+      "status": "AUTOMATED_PARTIAL_NOT_FINAL_ACCEPTANCE",
+      "model_quality_evaluated": false,
+      "live_channels": "NOT_RUN",
+      "parallel_postgres": "PENDING"
+    },
+    {
+      "id": "T21",
+      "title": "Contextual no is a farewell",
+      "automated_partial_evidence": [
+        "backend/tests/test_sales_ai_group_f.py::test_no_after_confirmation_question_is_farewell_not_cancel_or_opt_out"
+      ],
+      "status": "AUTOMATED_PARTIAL_NOT_FINAL_ACCEPTANCE",
+      "model_quality_evaluated": false,
+      "live_channels": "NOT_RUN",
+      "parallel_postgres": "not_claimed"
+    },
+    {
+      "id": "T22",
+      "title": "English-only and universal controls",
+      "automated_partial_evidence": [
+        "backend/tests/test_sales_ai_group_b.py::test_input_language_hold_preserves_state_no_model_no_actions_and_retry"
+      ],
+      "status": "AUTOMATED_PARTIAL_NOT_FINAL_ACCEPTANCE",
+      "model_quality_evaluated": false,
+      "live_channels": "NOT_RUN",
+      "parallel_postgres": "not_claimed"
+    },
+    {
+      "id": "T23",
+      "title": "Proportionate moderation",
+      "automated_partial_evidence": [
+        "backend/tests/test_sales_ai_group_j.py::test_first_personal_abuse_warns_then_distinct_message_after_accepted_warning_pauses"
+      ],
+      "status": "AUTOMATED_PARTIAL_NOT_FINAL_ACCEPTANCE",
+      "model_quality_evaluated": false,
+      "live_channels": "NOT_RUN",
+      "parallel_postgres": "not_claimed"
+    },
+    {
+      "id": "T24",
+      "title": "Credential or tenant-data extraction",
+      "automated_partial_evidence": [
+        "backend/tests/test_sales_ai_group_j.py::test_concrete_threats_and_extraction_block_immediately_without_prior_warning"
+      ],
+      "status": "AUTOMATED_PARTIAL_NOT_FINAL_ACCEPTANCE",
+      "model_quality_evaluated": false,
+      "live_channels": "NOT_RUN",
+      "parallel_postgres": "not_claimed"
+    },
+    {
+      "id": "T25",
+      "title": "Model/tool/provider failures",
+      "automated_partial_evidence": [
+        "backend/tests/test_sales_ai_group_d.py::test_tool_failure_stops_without_repeating_or_losing_task"
+      ],
+      "status": "AUTOMATED_PARTIAL_NOT_FINAL_ACCEPTANCE",
+      "model_quality_evaluated": false,
+      "live_channels": "NOT_RUN",
+      "parallel_postgres": "not_claimed"
+    },
+    {
+      "id": "T26",
+      "title": "Durability, receipts and false-positive review",
+      "automated_partial_evidence": [
+        "backend/tests/test_sales_ai_group_k.py::test_replacement_receipt_survives_a_new_session_and_failed_dispatch"
+      ],
+      "status": "AUTOMATED_PARTIAL_NOT_FINAL_ACCEPTANCE",
+      "model_quality_evaluated": false,
+      "live_channels": "NOT_RUN",
+      "parallel_postgres": "PENDING"
+    }
+  ]
+}

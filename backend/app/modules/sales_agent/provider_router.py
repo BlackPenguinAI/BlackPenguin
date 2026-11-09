@@ -83,12 +83,22 @@ def _record_inbound(
 
 def _apply_status(db: Session, *, provider: str, message_id: str, status: str, error: str | None = None):
     conversation_ids = db.query(SalesConversation.id).filter(SalesConversation.provider == provider)
-    message = db.query(SalesMessage).filter(SalesMessage.provider_message_id == message_id, SalesMessage.conversation_id.in_(conversation_ids)).first()
-    outbound = db.query(OutboundMessage).filter(OutboundMessage.provider == provider, OutboundMessage.provider_message_id == message_id).first()
-    if message:
+    # Match dispatch's lock order: outbound operation, then its rendered message.
+    outbound = db.query(OutboundMessage).filter(OutboundMessage.provider == provider, OutboundMessage.provider_message_id == message_id).populate_existing().with_for_update().first()
+    message = db.query(SalesMessage).filter(SalesMessage.provider_message_id == message_id, SalesMessage.conversation_id.in_(conversation_ids)).populate_existing().with_for_update().first()
+    def advances(current):
+        # Provider callbacks can arrive out of order or repeat. A confirmed
+        # delivery/read receipt is stronger evidence than a late lifecycle event.
+        if current == 'read':return status == 'read'
+        if current == 'delivered':return status in {'delivered','read'}
+        if current in {'failed','undelivered','delivery_failed','sending_failed'}:
+            return status in {'delivered','read'}
+        ranks={'queued':0,'accepted':1,'sending':2,'sent':3}
+        return status not in ranks or current not in ranks or ranks[status]>=ranks[current]
+    if message and advances(message.status):
         message.status = status
         message.metadata_json = {**(message.metadata_json or {}), "provider_error": error}
-    if outbound:
+    if outbound and advances(outbound.status):
         outbound.status = status; outbound.last_error = error
     if message or outbound:
         db.commit()

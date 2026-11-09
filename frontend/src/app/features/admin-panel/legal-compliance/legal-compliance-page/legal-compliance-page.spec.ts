@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
-import { LegalCompliancePage } from './legal-compliance-page';
+import { LegalCompliancePageComponent as LegalCompliancePage } from './legal-compliance-page';
 
 describe('LegalCompliancePage', () => {
   let component: LegalCompliancePage;

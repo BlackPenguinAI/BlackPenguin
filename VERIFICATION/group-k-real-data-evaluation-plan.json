@@ -1,0 +1,64 @@
+{
+  "version": "sales-ai-model-evaluation/1.0",
+  "mode": "prepare",
+  "model": "openai/gpt-4o-mini",
+  "status": "PREPARED_NOT_RUN",
+  "model_quality_evaluated": false,
+  "configuration_sha256": "3232b174833358ab31f994254e043d53d53e7ebcd3b8e1634a84d1f5a04eee3a",
+  "catalog_sha256": "13d0dade18cc417d48a37408b031091bd0c6920a41baca027069a169889ec0cc",
+  "planned_cases": 24,
+  "selected_cases": [
+    {
+      "id": "984c4c66-8910-438e-8c71-11706b4195e9:catalog",
+      "origin": "REAL_APPROVED",
+      "project_id": "984c4c66-8910-438e-8c71-11706b4195e9",
+      "kind": "catalog"
+    },
+    {
+      "id": "984c4c66-8910-438e-8c71-11706b4195e9:mixed",
+      "origin": "REAL_APPROVED",
+      "project_id": "984c4c66-8910-438e-8c71-11706b4195e9",
+      "kind": "mixed"
+    },
+    {
+      "id": "984c4c66-8910-438e-8c71-11706b4195e9:ordinal",
+      "origin": "REAL_APPROVED",
+      "project_id": "984c4c66-8910-438e-8c71-11706b4195e9",
+      "kind": "ordinal"
+    },
+    {
+      "id": "repeated-abuse",
+      "origin": "SYNTHETIC_TEXT_ON_REAL_APPROVED",
+      "project_id": "49c3922c-2536-45e9-b3f6-064d817fde67",
+      "kind": "moderation"
+    }
+  ],
+  "project_strategy": "one representative project plus moderation reference project",
+  "repeats": 3,
+  "provider_effects": "MOCKED",
+  "results": [],
+  "budget_usd": 3.0,
+  "max_calls": 80,
+  "real_channel_acceptance": "NOT_RUN",
+  "commercial_human_review": "PENDING",
+  "t01_t26_acceptance": "NOT_COMPLETE",
+  "limitations": [
+    "Narrow semantic probes do not constitute full T01–T26 acceptance.",
+    "A budget reservation is conservative inference accounting, not a guarantee covering provider/account fees.",
+    "Exported materials have metadata only; document contents are not validated."
+  ],
+  "budget_stop_reason": null,
+  "calls": [],
+  "reserved_usd": 0.0,
+  "actual_cost_usd": 0,
+  "cost_fully_reported": true,
+  "passed": 0,
+  "summary": {
+    "by_origin": {},
+    "repeat_consistency": [],
+    "latency_ms": {
+      "p50": null,
+      "p95": null
+    }
+  }
+}

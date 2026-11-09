@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
-import { AiKeys } from './ai-keys';
+import { StaffAiKeysComponent as AiKeys } from './ai-keys';
 
 describe('AiKeys', () => {
   let component: AiKeys;
