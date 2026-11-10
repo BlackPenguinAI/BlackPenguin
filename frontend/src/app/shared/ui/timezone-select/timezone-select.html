@@ -1,5 +1,10 @@
+<label class="sr-only" [attr.for]="inputId">{{ ariaLabel }}</label>
 <ng-select
   class="timezone-select"
+  appendTo="body"
+  dropdownPosition="auto"
+  (open)="opened()"
+  (close)="closed()"
   [class.timezone-select--compact]="compact"
   [items]="options"
   bindLabel="label"
@@ -12,7 +17,9 @@
   [ngModel]="value"
   [ngModelOptions]="{ standalone: true }"
   (ngModelChange)="update($event)"
-  placeholder="Search Lima, Bogotá, America/Lima or UTC-5"
+  [placeholder]="placeholder"
+  [labelForId]="inputId"
+  [ariaLabelDropdown]="ariaLabel"
   [attr.aria-label]="ariaLabel"
 >
   <ng-template ng-label-tmp let-item="item">

@@ -14,10 +14,10 @@ import { API_V1_URL } from '../../../../core/config/api.config';
 const callbackOrigin=new URL(API_V1_URL,window.location.href).origin;
 const start={authorization_url:'https://www.facebook.com/v26.0/dialog/oauth?state=nonce-1',state:'nonce-1',expires_at:new Date(Date.now()+600000).toISOString()};
 const emptyAssets={authorizations:[],pages:[],ad_accounts:[],lead_forms:[],campaigns:[],adsets:[],ads:[],warnings:[]};
-const savedState={project_id:'project-1',account_status:'connected' as const,authorizations:[],missing_permissions:[],routing_status:'not_linked' as const,mappings:[]};
 const savedAuth={id:'auth-1',meta_user_id:'meta-person',meta_user_name:'Saved person',scopes:[],status:'active',expires_at:null,created_at:''};
+const savedState={project_id:'project-1',account_status:'connected' as const,authorizations:[savedAuth],last_authorization:savedAuth,missing_permissions:[],routing_status:'not_linked' as const,mappings:[]};
 function service() {
-  return {getMetaSetupState:vi.fn(()=>of(savedState)),getMetaAuthorizations:vi.fn(()=>of([savedAuth])),
+  return {applyOnboardingAction:vi.fn(),getMetaSetupState:vi.fn(()=>of(savedState)),getMetaAuthorizations:vi.fn(()=>of([savedAuth])),
     getCampaigns:vi.fn(()=>of([])),getMetaConnections:vi.fn(()=>of([])),discoverMetaAssets:vi.fn(()=>of(emptyAssets)),
     getProjectTeam:vi.fn(()=>of([])),getSalesCandidates:vi.fn(()=>of([])),startMetaOAuth:vi.fn(()=>of(start))};
 }
@@ -81,11 +81,13 @@ describe('Project team and independent Meta steps',()=>{
   it('uses same-tab OAuth, persists drafts, and ignores duplicate connection clicks',()=>{
     const api=service(),pending=new Subject<typeof start>();api.startMetaOAuth.mockReturnValue(pending as any);
     const c=component(api);const navigate=vi.spyOn(c,'navigateToMeta').mockImplementation(()=>undefined);
-    c.prompt='Unsaved chat';c.propertyTypeDraft.name='Unsaved unit';
+    c.prompt='Unsaved chat';c.propertyTypeDraft.name='Unsaved unit';c.metaOAuth.page_id='draft-page';c.metaOAuth.campaign_name='Draft campaign';
     c.connectMeta();c.connectMeta();expect(api.startMetaOAuth).toHaveBeenCalledOnce();
     expect(navigate).not.toHaveBeenCalled();pending.next(start);
     expect(navigate).toHaveBeenCalledWith(start.authorization_url);
     expect(JSON.parse(sessionStorage.getItem('bp-meta-draft:project-1')!).prompt).toBe('Unsaved chat');
+    const restored=component(api);(restored as any).restoreOAuthDraft();
+    expect(restored.metaOAuth.page_id).toBe('draft-page');expect(restored.metaOAuth.campaign_name).toBe('Draft campaign');
     sessionStorage.removeItem('bp-meta-draft:project-1');
   });
   it('rejects unsafe destinations and recovers from start errors',()=>{
@@ -100,10 +102,11 @@ describe('Project team and independent Meta steps',()=>{
     const c=component(api);c.propertyTypeDraft.name='Keep';c.connectMeta();vi.advanceTimersByTime(20001);
     expect(c.metaOAuthBusy).toBe(false);expect(c.metaLoginBusy).toBe(false);expect(c.propertyTypeDraft.name).toBe('Keep');
   });
-  it('does not discover or associate assets merely by loading the saved account',()=>{
+  it('opens verified account assets for review without associating them',()=>{
     const api=service(),c=component(api);c.loadMetaAuthorizations();c.loadMetaSetupState();
     expect(c.metaOAuth.authorization_id).toBe('auth-1');expect(c.metaAccountState?.routing_status).toBe('not_linked');
-    expect(api.discoverMetaAssets).not.toHaveBeenCalled();c.openMetaAssetStep();expect(api.discoverMetaAssets).toHaveBeenCalledOnce();
+    expect(c.metaReviewStep).toBe('assets');expect(api.discoverMetaAssets).toHaveBeenCalledOnce();
+    expect(api.applyOnboardingAction).not.toHaveBeenCalled();
   });
   it('ignores a stale asset discovery response after a different account is selected',()=>{
     const api=service();const first=new Subject<any>(),second=new Subject<any>();let calls=0;
@@ -159,7 +162,7 @@ it('renders saved Meta states with a single campaign deferral after account conn
   expect(html.querySelector('[data-testid=meta-account-step]')?.querySelectorAll('app-configure-later')).toHaveLength(0);
   expect(html.querySelector('[data-testid=meta-campaign-deferral]')?.querySelectorAll('app-configure-later')).toHaveLength(1);
   expect(html.textContent).toContain('Set up campaigns later');
-  expect(html.querySelector('iframe')).toBeNull();expect(html.querySelector('[data-testid=meta-saved-summary]')).not.toBeNull();
+  expect(html.querySelector('iframe')).toBeNull();expect(html.querySelector('[data-testid=meta-saved-summary]')).toBeNull();
   f.destroy();
 });
 

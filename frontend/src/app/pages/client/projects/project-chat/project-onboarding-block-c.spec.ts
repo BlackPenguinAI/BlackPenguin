@@ -61,24 +61,24 @@ describe('Project onboarding Block C interface regression', () => {
     expect(disclosure('meta-account-step').getAttribute('aria-expanded')).toBe('true');
     expect(disclosure('meta-project-step').getAttribute('aria-expanded')).toBe('false');
     const summary=fixture.nativeElement.querySelector('[data-testid="meta-saved-summary"]');
-    expect(summary.closest('.structured-card')).toBeTruthy();
-    expect(summary.textContent).toContain('Company level');
+    expect(summary).toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid=meta-account-status]').textContent).toContain('Company level');
     http.expectNone(request => request.method === 'POST');
   });
 
-  it('keeps account review open when its saved connection status arrives asynchronously', () => {
+  it('opens campaigns when a connected saved account is verified asynchronously', () => {
     c.metaAccountState=null;meta();
     c.loadMetaSetupState();
     http.expectOne(request => request.url.includes('/meta/setup-state')).flush(saved);
     fixture.detectChanges();
-    expect(disclosure('meta-account-step').getAttribute('aria-expanded')).toBe('true');
-    expect(disclosure('meta-project-step').getAttribute('aria-expanded')).toBe('false');
+    expect(disclosure('meta-account-step').getAttribute('aria-expanded')).toBe('false');
+    expect(disclosure('meta-project-step').getAttribute('aria-expanded')).toBe('true');
   });
 
   it('opens step 2 only on explicit continuation and preserves the selected assets when switching', () => {
     const discover=vi.spyOn(c,'loadMetaAssets').mockImplementation(() => undefined);
     c.metaOAuth.authorization_id='auth-1';c.metaOAuth.page_id='page-to-keep';meta();
-    const button=[...fixture.nativeElement.querySelectorAll('button')].find((b:any)=>b.textContent?.includes('Continue to project campaigns')) as HTMLButtonElement;
+    const button=disclosure('meta-project-step') as HTMLButtonElement;
     button.click();fixture.detectChanges();
     expect(disclosure('meta-project-step').getAttribute('aria-expanded')).toBe('true');
     expect(disclosure('meta-account-step').getAttribute('aria-expanded')).toBe('false');
@@ -90,11 +90,11 @@ describe('Project onboarding Block C interface regression', () => {
     http.expectNone(request => request.method === 'POST');
   });
 
-  it('keeps campaign deferral accessible without expanding its form and does not revoke the account', () => {
+  it('places campaign deferral in step 2 without revoking the Company account', () => {
     const sync=vi.spyOn(c as any,'syncState').mockImplementation(() => undefined);
     c.metaOAuth.page_id='unsaved-page';const before=structuredClone(c.profile.data);meta();
     const footer=fixture.nativeElement.querySelector('[data-testid="meta-campaign-deferral"]') as HTMLElement;
-    expect(footer.closest('app-review-card')).toBeNull();
+    expect(footer.closest('app-review-card')).not.toBeNull();
     const button=footer.querySelector('button')!;
     expect(button.textContent).toContain('Set up campaigns later');button.click();
     const request=http.expectOne(request => request.url.includes('/onboarding-deferrals/project/project-1'));
@@ -167,7 +167,7 @@ describe('Project onboarding Block C interface regression', () => {
     http.expectNone(request=>request.method==='POST');
   });
 
-  it('returns from OAuth to account review while retaining an unsaved campaign selection', () => {
+  it('checks the OAuth return before advancing to campaigns and retains unsaved selection', () => {
     for(const method of ['syncState','loadCampaigns','loadMetaConnections','loadSalesTeam','loadMetaSetupConfiguration','loadMetaSetupState'] as const) {
       vi.spyOn(c as any,method).mockImplementation(()=>undefined);
     }
@@ -177,11 +177,15 @@ describe('Project onboarding Block C interface regression', () => {
     initialize.call(c);
     expect(c.metaReviewStep).toBe('account');expect(c.showMetaAssetStep).toBe(false);
     expect(c.metaOAuth.page_id).toBe('keep-page');
-    expect(c.metaSetupMessage).toContain('Review the saved Company account');
+    expect(c.metaSetupMessage).toContain('Checking your saved Meta connection');
+    vi.mocked(c.loadMetaSetupState).mockRestore();
+    c.loadMetaSetupState();
+    http.expectOne(request => request.url.includes('/meta/setup-state')).flush(saved);
+    expect(c.metaReviewStep).toBe('assets');expect(c.showMetaAssetStep).toBe(true);
     vi.spyOn(c,'loadPropertyTypes').mockImplementation(()=>undefined);
     vi.spyOn(c as any,'loadSalesAssets').mockImplementation(()=>undefined);
     (c as any).applyState({version:1,messages:[message()],profile:EMPTY_PROJECT_PROFILE,sources:[],next_question:{...payload,task:'meta_assets'},stage:'conversation'});
-    expect(c.metaReviewStep).toBe('account');expect(c.showMetaAssetStep).toBe(false);
+    expect(c.metaReviewStep).toBe('assets');expect(c.showMetaAssetStep).toBe(true);
     http.expectNone(request=>request.method==='POST');
   });
 

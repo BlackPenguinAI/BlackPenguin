@@ -1,0 +1,13 @@
+// The dropdown is appended to body, outside clipped cards and scroll containers.
+.ng-dropdown-panel.timezone-select {
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, .12);
+  border-radius: .75rem;
+  background: #111;
+  box-shadow: 0 18px 45px rgba(0, 0, 0, .5);
+  z-index: 1100;
+}
+.ng-dropdown-panel.timezone-select .ng-dropdown-panel-items { max-height: 16rem; }
+.ng-dropdown-panel.timezone-select .ng-option { display: flex; min-width: 0; flex-direction: column; gap: .15rem; padding: .65rem .9rem; background: #111; color: #d1d5db; }
+.ng-dropdown-panel.timezone-select .ng-option.ng-option-marked { background: rgba(233, 158, 16, .12); color: #f5c96e; }
+.ng-dropdown-panel.timezone-select .ng-option.ng-option-selected { background: rgba(233, 158, 16, .2); color: #f3b43b; }

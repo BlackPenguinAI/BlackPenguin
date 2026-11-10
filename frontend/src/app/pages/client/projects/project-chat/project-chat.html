@@ -154,26 +154,18 @@
                   <h2 class="text-sm font-semibold">Meta Lead Ads · two separate steps</h2>
                   <p class="mt-1 text-xs leading-relaxed text-gray-400">1. Save Company account permissions. 2. Explicitly link this Project's Page and Lead Form, with optional campaign and Ad filters. Saving step 1 does not associate any campaign or activate Meta lead delivery.</p>
                 </div>
-                <span class="material-symbols-outlined text-secondary">hub</span>
+                <img src="/images/meta-connection.svg" alt="Meta" class="h-8 w-10 shrink-0" />
               </div>
-      <section *ngIf="metaAccountState?.account_status === 'connected' && !isAnalyzing" class="rounded-xl border border-white/15 p-4 text-xs" data-testid="meta-saved-summary">
-        <h2 class="font-semibold">Saved Meta setup · {{ projectName }}</h2>
-        <p class="mt-2">Step 1 · {{ metaAccountLabel }}</p><p class="mt-1">Step 2 · {{ metaRoutingLabel }}</p>
-        <p *ngFor="let mapping of metaAccountState?.mappings" class="mt-2 text-gray-400">{{ mapping.name }} · Page {{ mapping.page_id || 'pending' }} · Form {{ mapping.lead_form_id || 'pending' }} · {{ mapping.ready ? 'Verified' : 'Review required' }}</p>
-      </section>
               <p *ngIf="metaStateError" role="alert" class="mt-3 text-xs text-amber-200">{{ metaStateError }}</p>
               <div class="mt-4 rounded-lg border border-white/15 p-3" data-testid="meta-account-step">
-              <app-review-card [open]="metaReviewStep === 'account'" (openChange)="setMetaReviewStep('account',$event)" title="Step 1 · Account and permissions" [status]="metaAccountReviewStatus" [summary]="metaAccountLabel" [complete]="metaAccountState?.account_status === 'connected'">
-              <h3 class="text-sm font-semibold">Step 1 · Account and permissions</h3>
-
-              <p class="mt-2 text-xs" data-testid="meta-account-status">{{ metaAccountLabel }}</p>
+              <app-review-card [open]="metaReviewStep === 'account'" (openChange)="setMetaReviewStep('account',$event)" title="Step 1 · Account and permissions" [status]="metaAccountReviewStatus" [summary]="metaAccountLabel" [complete]="metaAccountState?.account_status === 'connected'" data-testid="meta-account-status">
               <p *ngIf="metaAccountState?.missing_permissions?.length" class="mt-2 text-xs text-amber-200">Missing permissions: {{ metaAccountState!.missing_permissions.join(', ') }}. Reconnect and grant access before linking assets.</p>
               <div *ngIf="metaSetupConfig.oauth_enabled" class="mt-4 rounded-lg border border-secondary/20 bg-secondary/[0.06] p-3">
                 <div class="flex flex-wrap items-center justify-between gap-3"><div><p class="text-[10px] font-bold uppercase tracking-wider text-secondary">Secure Meta login</p><p class="mt-1 text-xs text-gray-300">The authorization is stored at Company level and can be reused for its Projects.</p></div><button type="button" (click)="connectMeta()" [disabled]="metaOAuthBusy || metaLoginBusy" class="structured-primary">{{ metaLoginBusy ? 'Waiting for Meta…' : (metaAuthorizations.length ? 'Connect another Meta account' : 'Continue with Meta') }}</button></div>
               </div>
               <a *ngIf="metaOAuthFallbackUrl" [href]="metaOAuthFallbackUrl" target="_blank" rel="noopener noreferrer" class="structured-secondary mt-3" data-testid="meta-popup-fallback">Open Meta authorization in a new tab</a>
               <button type="button" (click)="refreshMetaAccount()" class="structured-secondary mt-3">I finished authorization · refresh saved status</button>
-              <p class="mt-2 text-xs text-gray-400">You will return to this Project after Meta authorization. Saved settings and local text drafts are preserved.</p><button *ngIf="metaAccountState?.account_status === 'connected'" type="button" (click)="openMetaAssetStep()" class="structured-primary mt-3">Continue to project campaigns</button><app-configure-later [contextual]="true" *ngIf="metaAccountState?.account_status !== 'connected'" actionLabel="Connect Meta later" scope="project" [entityId]="projectId" card="field:meta_connection_verified" label="Meta account and permissions" [draft]="cardDraft('meta_connection_verified')" [blocked]="isAnalyzing || metaLoginBusy || metaOAuthBusy || metaSetupBusy" [records]="profile.ui_deferrals || {}" (saved)="deferralsSaved($event)"></app-configure-later>
+              <p class="mt-2 text-xs text-gray-400">You will return to this Project after Meta authorization. Saved settings and local text drafts are preserved.</p><app-configure-later [contextual]="true" *ngIf="metaAccountState?.account_status !== 'connected'" actionLabel="Connect Meta later" scope="project" [entityId]="projectId" card="field:meta_connection_verified" label="Meta account and permissions" [draft]="cardDraft('meta_connection_verified')" [blocked]="isAnalyzing || metaLoginBusy || metaOAuthBusy || metaSetupBusy" [records]="profile.ui_deferrals || {}" (saved)="deferralsSaved($event)"></app-configure-later>
               </app-review-card>
               </div>
               <div *ngIf="!metaSetupConfig.oauth_enabled" class="mt-4 rounded-lg border border-amber-500/25 bg-amber-500/[0.08] p-3" data-testid="meta-oauth-blocker">
@@ -182,12 +174,11 @@
                 <a *ngIf="isPlatformAdmin" routerLink="/admin/integrations" class="mt-3 inline-flex rounded-lg border border-amber-400/30 px-3 py-2 text-[10px] font-semibold text-amber-200">Open platform integrations</a>
               </div>
               <div class="mt-4 rounded-lg border border-white/15 p-3" data-testid="meta-project-step">
-              <app-review-card [open]="metaReviewStep === 'assets'" (openChange)="setMetaReviewStep('assets',$event)" title="Step 2 · Project campaign and form" [status]="metaRoutingReviewStatus" [summary]="metaRoutingLabel" [complete]="metaAccountState?.routing_status === 'connected'">
-              <h3 class="text-sm font-semibold">Step 2 · Project campaign and form</h3><p *ngIf="metaAccountState?.account_status !== 'connected'" class="mt-2 text-xs text-gray-400">Connect the account in step 1 to select this Project’s assets.</p>
-              <p class="mt-2 text-xs" data-testid="meta-routing-status">{{ metaRoutingLabel }}</p>
+              <app-review-card [open]="metaReviewStep === 'assets'" (openChange)="setMetaReviewStep('assets',$event)" title="Step 2 · Project campaign and form" [status]="metaRoutingReviewStatus" [summary]="metaRoutingLabel" [complete]="metaAccountState?.routing_status === 'connected'" data-testid="meta-routing-status">
+              <p *ngIf="metaAccountState?.account_status !== 'connected'" class="mt-2 text-xs text-gray-400">Connect the account in step 1 to select this Project’s assets.</p>
               <p class="mt-2 text-xs text-gray-400">Target Project: {{ projectName }}. No selection is linked until you explicitly save and verify it.</p>
               <p *ngFor="let mapping of metaAccountState?.mappings" class="mt-2 text-xs text-gray-300">{{ mapping.name }} · Page {{ mapping.page_id || 'pending' }} · Form {{ mapping.lead_form_id || 'pending' }} · {{ mapping.ready ? 'Verified' : 'Review required (not live)' }}</p>
-              <button *ngIf="metaSetupConfig.oauth_enabled && metaAuthorizations.length" type="button" (click)="openMetaAssetStep()" [disabled]="metaOAuthBusy || metaLoginBusy" class="structured-secondary mt-3">Choose or review this Project's assets</button>
+              <button *ngIf="metaSetupConfig.oauth_enabled && metaAuthorizations.length" type="button" (click)="openMetaAssetStep()" [disabled]="metaOAuthBusy || metaLoginBusy" class="structured-secondary mt-3">Refresh available Meta assets</button>
               <div *ngIf="showMetaAssetStep && metaSetupConfig.oauth_enabled && metaAuthorizations.length" class="mt-4 grid gap-3 sm:grid-cols-2">
                 <label class="field-label sm:col-span-2">Company Meta authorization<select [(ngModel)]="metaOAuth.authorization_id" (change)="metaAuthorizationChanged()" class="secure-input"><option *ngFor="let authorization of metaAuthorizations" [value]="authorization.id">{{ authorization.meta_user_name || authorization.meta_user_id }}</option></select></label>
                 <label class="field-label">Facebook Page *<select [(ngModel)]="metaOAuth.page_id" (change)="metaPageChanged()" class="secure-input"><option value="">Select a Page</option><option *ngFor="let item of metaAssets.pages" [value]="item.id">{{ item.name }}</option></select></label>
@@ -203,11 +194,12 @@
                 <button type="button" (click)="completeMetaOAuth(msg)" [disabled]="metaOAuthBusy || metaLoginBusy || !metaOAuth.page_id || !metaOAuth.ad_account_id || !metaOAuth.lead_form_id || !metaOAuth.campaign_name.trim()" class="structured-primary sm:col-span-2">{{ metaOAuthBusy ? 'Loading Meta assets…' : 'Save and verify selected assets for this Project' }}</button>
               </div>
 
-              </app-review-card>
-              </div>
               <div *ngIf="metaAccountState?.account_status === 'connected' && metaAccountState?.routing_status !== 'connected'" class="mt-4 border-t border-white/10 pt-2" data-testid="meta-campaign-deferral">
                 <app-configure-later [contextual]="true" actionLabel="Set up campaigns later" scope="project" [entityId]="projectId" card="field:campaigns_defined" label="Project campaigns and forms" [draft]="cardDraft('campaigns_defined')" [blocked]="isAnalyzing || metaOAuthBusy || metaLoginBusy || metaSetupBusy" [records]="profile.ui_deferrals || {}" (saved)="deferralsSaved($event)"></app-configure-later>
                 <p class="text-xs text-gray-400">Your Company account stays connected. Lead delivery remains pending until this Project's assets are saved and verified.</p>
+              </div>
+
+              </app-review-card>
               </div>
               <button *ngIf="metaSetupConfig.manual_fallback_enabled" type="button" (click)="showManualMetaSetup = !showManualMetaSetup" class="structured-secondary mt-4">{{ showManualMetaSetup ? 'Hide manual setup' : 'Use asset IDs manually' }}</button>
               <div *ngIf="showManualMetaSetup">
@@ -227,7 +219,7 @@
                 <button (click)="testMetaSetup(msg)" [disabled]="!canTestMetaSetup" [title]="canTestMetaSetup ? '' : 'Complete all required Meta fields and confirmations.'" class="structured-primary">{{ metaSetupBusy ? 'Testing...' : (metaSetupErrorCount ? 'Complete required items' : 'Run simulated connection test') }}</button>
               </div>
               </div>
-              <p *ngIf="metaSetupMessage" class="mt-3 rounded-lg border border-green-500/20 bg-green-500/10 p-3 text-xs text-green-300">{{ metaSetupMessage }}</p>
+              <p *ngIf="metaSetupMessage" role="status" data-testid="meta-connection-message" class="mt-3 rounded-lg border p-3 text-xs" [ngClass]="metaConnectionChecking ? 'border-white/15 bg-white/5 text-gray-300' : 'border-green-500/20 bg-green-500/10 text-green-300'">{{ metaSetupMessage }}</p>
             </section>
             <section *ngIf="isStructuredQuestion(msg,'meta_task_choice')" class="structured-card"><button type="button" (click)="openEditorTask('meta_account')">Reconnect account</button><button type="button" (click)="openEditorTask('meta_assets')">Associate campaigns / forms</button></section>
             <app-onboarding-detail-editor *ngIf="isActiveQuestion(msg) && ['delivery_dates','parking_and_storage'].includes(msg.ui_payload?.field || '')" [field]="msg.ui_payload!.field!" [entityId]="projectId" [currentValue]="profile.data[msg.ui_payload!.field!]" [records]="profile.ui_deferrals || {}" [busy]="isAnalyzing" [error]="errorMessage" (saved)="saveProjectDetails($event,msg)" (deferred)="deferralsSaved($event)" (notApplicable)="chooseAnswer('Not applicable',msg)"></app-onboarding-detail-editor>

@@ -79,8 +79,8 @@ function offsetLabel(minutes: number, padded = true): string {
   return `UTC${sign}${hourText}:${String(absolute % 60).padStart(2, '0')}`;
 }
 
-export function timezoneOptions(at = new Date()): TimezoneOption[] {
-  return availableTimezones()
+export function timezoneOptions(at = new Date(), zones?: readonly string[]): TimezoneOption[] {
+  return [...new Set(zones ?? availableTimezones())].filter(validTimezone)
     .map(value => {
       const offsetMinutes = zoneOffsetMinutes(value, at);
       const city = cityLabel(value);

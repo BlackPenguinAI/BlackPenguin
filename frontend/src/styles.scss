@@ -1,3 +1,5 @@
+@use './app/shared/ui/timezone-select/timezone-panel';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -5,6 +7,8 @@
 // ==========================================
 // CONFIGURACIÓN BASE BLACK PENGUIN
 // ==========================================
+body { position: relative; }
+
 html, body {
   margin: 0;
   padding: 0;

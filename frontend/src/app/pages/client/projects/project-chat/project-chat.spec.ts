@@ -648,7 +648,7 @@ describe('ProjectChatComponent', () => {
     component.ngOnInit();
 
     expect(syncState).toHaveBeenCalledWith('bottom');
-    expect(component.metaSetupMessage).toContain('Meta connected');
+    expect(component.metaSetupMessage).toContain('Checking your saved Meta connection');
     expect(navigate).toHaveBeenCalledWith([], expect.objectContaining({ replaceUrl: true }));
   });
 

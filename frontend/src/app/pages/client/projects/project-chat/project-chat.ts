@@ -128,6 +128,11 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   metaStateError = '';
   showMetaAssetStep = false;
   metaReviewStep: 'account' | 'assets' | null = 'account';
+  private metaReturnPending = false;
+  private metaStepChosenByUser = false;
+  private metaStepInitialized = false;
+  private metaStateRequestVersion = 0;
+  private metaAuthorizationsRequestVersion = 0;
   private metaReviewRestored = false;
   metaOAuthFallbackUrl = '';
   private metaWindow?: MetaOAuthWindow;
@@ -252,6 +257,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
   }
   setMetaReviewStep(step: 'account' | 'assets', open=true): void {
+    this.metaStepChosenByUser = true;
     if (!open) { this.metaReviewStep=null; return; }
     this.metaReviewStep=step;
     if (step === 'assets') this.openMetaAssetStep();
@@ -320,9 +326,17 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     if(oauthStatus)this.restoreOAuthDraft();
     const task=this.route.snapshot.queryParamMap?.get('task');
     this.requestedEditorTask=['meta_account','meta_assets'].includes(task || '') ? task || '' : '';
-    if (oauthStatus === 'connected') { this.metaReviewStep='account'; this.showMetaAssetStep=false; this.metaReviewRestored=true; }
-    if (oauthStatus === 'connected') this.metaSetupMessage = 'Meta connected. Review the saved Company account, then continue to this Project’s campaigns.';
-    if (oauthStatus === 'error') this.errorMessage = this.route.snapshot.queryParamMap?.get('reason') || 'Meta connection could not be completed.';
+    if (task === 'meta_account') this.metaStepChosenByUser = true;
+    if (oauthStatus === 'connected') {
+      this.metaReturnPending = true; this.requestedEditorTask = '';
+      this.metaReviewStep='account'; this.showMetaAssetStep=false; this.metaReviewRestored=true;
+      this.metaSetupMessage = 'Checking your saved Meta connection…';
+    }
+    if (oauthStatus === 'error') {
+      this.metaStepChosenByUser = true; this.metaReviewStep='account';
+      this.showMetaAssetStep=false; this.metaReviewRestored=true;
+      this.errorMessage = this.route.snapshot.queryParamMap?.get('reason') || 'Meta connection could not be completed.';
+    }
     this.syncState('bottom');
     this.loadCampaigns(); this.loadMetaConnections(); this.loadSalesTeam(); this.loadMetaSetupConfiguration(); this.loadMetaSetupState();
     if (oauthStatus) {
@@ -660,6 +674,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
       const draft=JSON.parse(raw); sessionStorage.removeItem(this.oauthDraftKey());
       this.prompt=typeof draft.prompt==='string'?draft.prompt:'';
       restoreDraft(this.propertyTypeDraft,draft.newType);
+      restoreDraft(this.metaOAuth,draft.metaOAuth);
       this.propertyTypeDraftImageSelection.clear();
       for(const id of draft.newType?.selected_images || [])this.propertyTypeDraftImageSelection.add(id);
       this.restoredOAuthItems=Object.fromEntries((draft.items || []).map((item:any)=>[item.id,item]));
@@ -675,7 +690,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
         try {
           const target = new URL(value.authorization_url);
           if (target.searchParams.get('state') !== value.state || target.protocol !== 'https:' || !['facebook.com','www.facebook.com'].includes(target.hostname)) throw new Error('Invalid authorization URL');
-          sessionStorage.setItem(this.oauthDraftKey(),JSON.stringify({prompt:this.prompt,newType:this.newPropertyDraft(),items:this.propertyCatalog.items.filter(item=>this.dirtyPropertyTypeIds.has(item.id)).map(item=>this.propertyDraft(item))}));
+          sessionStorage.setItem(this.oauthDraftKey(),JSON.stringify({prompt:this.prompt,metaOAuth:{...this.metaOAuth},newType:this.newPropertyDraft(),items:this.propertyCatalog.items.filter(item=>this.dirtyPropertyTypeIds.has(item.id)).map(item=>this.propertyDraft(item))}));
           this.navigateToMeta(target.href);
         } catch { this.metaOAuthBusy=false; this.metaLoginBusy=false; this.errorMessage='Meta authorization could not be opened safely. Your saved draft is unchanged.'; this.cdr.detectChanges(); }
       },
@@ -684,9 +699,39 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   }
 
   loadMetaSetupState(): void {
+    const version = ++this.metaStateRequestVersion;
     this.onboarding.getMetaSetupState(this.projectId).subscribe({
-      next: state => { this.metaAccountState = state; this.metaStateError = ''; this.cdr.detectChanges(); },
-      error: () => { this.metaStateError = 'Saved Meta setup status could not be loaded. Refresh before making changes.'; this.cdr.detectChanges(); },
+      next: state => {
+        if (version !== this.metaStateRequestVersion) return;
+        this.metaAccountState = state; this.metaStateError = '';
+        if (state.authorizations) {
+          ++this.metaAuthorizationsRequestVersion;
+          this.updateMetaAuthorizationOptions(state.authorizations, state.last_authorization?.id);
+        }
+        if (state.account_status === 'connected') {
+          if (this.metaReturnPending || (!this.metaStepInitialized && !this.metaStepChosenByUser)) {
+            this.metaReviewRestored = true;
+            if (!this.metaOAuth.authorization_id && state.last_authorization)
+              this.metaOAuth.authorization_id = state.last_authorization.id;
+            this.openMetaAssetStep(false);
+          }
+          if (this.metaReturnPending) this.metaSetupMessage = 'Meta connected. Choose and verify this Project’s campaigns and forms in step 2.';
+          this.metaReturnPending = false;
+        } else if (this.metaReturnPending) {
+          this.metaSetupMessage = '';
+          this.metaStateError = 'Meta authorization still needs attention. Review the saved account and permissions in step 1.';
+          this.metaReviewStep = 'account'; this.showMetaAssetStep = false;
+          this.metaReturnPending = false;
+        }
+        this.metaStepInitialized = true;
+        this.cdr.detectChanges();
+      },
+      error: () => {
+        if (version !== this.metaStateRequestVersion) return;
+        this.metaSetupMessage = '';
+        this.metaStateError = 'Saved Meta setup status could not be loaded. Refresh before making changes.';
+        this.cdr.detectChanges();
+      },
     });
   }
   get metaAccountReviewStatus(): string {
@@ -695,35 +740,51 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   get metaRoutingReviewStatus(): string {
     return this.metaAccountState ? {connected:'Verified',review_required:'Review required',not_linked:'Not configured'}[this.metaAccountState.routing_status] : 'Loading';
   }
+  get metaConnectionChecking(): boolean { return this.metaReturnPending && !this.metaStateError; }
+  get metaAccountName(): string {
+    return this.metaAccountState?.last_authorization?.meta_user_name
+      || this.metaAccountState?.authorizations?.find(item => item.id === this.metaOAuth.authorization_id)?.meta_user_name
+      || this.metaAuthorizations.find(item => item.id === this.metaOAuth.authorization_id)?.meta_user_name || '';
+  }
   get metaAccountLabel(): string {
     if (!this.metaAccountState) return 'Saved account status has not been loaded.';
-    return {connected:'Account authorized · saved at Company level.', permissions_required:'Account saved · additional permissions required.', reconnect_required:'Account expired or inactive · reconnect required.', not_connected:'No reusable Meta account authorization saved.'}[this.metaAccountState.account_status];
+    return {connected:(this.metaAccountName ? this.metaAccountName + ' · ' : '') + 'Account authorized · saved at Company level.', permissions_required:'Account saved · additional permissions required.', reconnect_required:'Account expired or inactive · reconnect required.', not_connected:'No reusable Meta account authorization saved.'}[this.metaAccountState.account_status];
   }
   get metaRoutingLabel(): string {
     if (!this.metaAccountState) return 'Saved Project routing status has not been loaded.';
     return {connected:'Project route verified.', review_required:'Saved Project routes require review; not ready for live leads.', not_linked:'No campaign or form linked to this Project yet.'}[this.metaAccountState.routing_status];
   }
   refreshMetaAccount(): void {
+    this.metaReturnPending = true;
+    this.metaSetupMessage = 'Checking your saved Meta connection…';
     this.loadMetaSetupState(); this.loadMetaAuthorizations(); this.loadCampaigns(); this.loadMetaConnections();
   }
-  openMetaAssetStep(): void {
+  openMetaAssetStep(userInitiated = true): void {
+    if (userInitiated) this.metaStepChosenByUser = true;
     this.metaReviewStep = 'assets';
     this.showMetaAssetStep = true;
     if (this.metaOAuth.authorization_id) this.loadMetaAssets();
   }
   loadMetaAuthorizations(): void {
+    const version = ++this.metaAuthorizationsRequestVersion;
     this.onboarding.getMetaAuthorizations(this.projectId).subscribe({
       next: items => {
-        this.metaAuthorizations = items;
-        if (this.metaOAuth.authorization_id && !items.some(item => item.id === this.metaOAuth.authorization_id)) {
-          this.metaOAuth.authorization_id = ''; this.metaOAuth.page_id = ''; this.metaOAuth.ad_account_id = ''; this.resetMetaHierarchy();
-        }
-        if (!this.metaOAuth.authorization_id && items.length) this.metaOAuth.authorization_id = items[0].id;
+        if (version !== this.metaAuthorizationsRequestVersion) return;
+        this.updateMetaAuthorizationOptions(items, this.metaAccountState?.last_authorization?.id);
         if (this.showMetaAssetStep && this.metaOAuth.authorization_id) this.loadMetaAssets();
         this.cdr.detectChanges();
       },
-      error: () => { this.errorMessage = 'Existing Meta authorizations could not be loaded.'; },
+      error: () => { if (version !== this.metaAuthorizationsRequestVersion) return; this.errorMessage = 'Existing Meta authorizations could not be loaded.'; },
     });
+  }
+  private updateMetaAuthorizationOptions(items: MetaAuthorization[], preferredId?: string): void {
+    this.metaAuthorizations = items;
+    if (this.metaOAuth.authorization_id && !items.some(item => item.id === this.metaOAuth.authorization_id)) {
+      ++this.metaAssetRequestVersion; this.metaOAuthBusy = false;
+      this.metaOAuth.authorization_id = ''; this.metaOAuth.page_id = ''; this.metaOAuth.ad_account_id = ''; this.resetMetaHierarchy();
+    }
+    if (!this.metaOAuth.authorization_id && items.length)
+      this.metaOAuth.authorization_id = items.some(item => item.id === preferredId) ? preferredId! : items[0].id;
   }
   loadMetaAssets(): void {
     if (!this.metaOAuth.authorization_id) return;
@@ -2009,7 +2070,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   private applyTurn(turn: ChatTurn): void {
     this.renderGeneration++;
     if (turn.next_question?.input_type === 'meta_lead_setup') this.metaReviewRestored=true;
-    if (turn.next_question?.input_type === 'meta_lead_setup' && turn.next_question?.task !== 'meta_assets') {this.metaReviewStep='account';this.showMetaAssetStep=false;}
+    if (turn.next_question?.input_type === 'meta_lead_setup' && turn.next_question?.task !== 'meta_assets') {this.metaStepChosenByUser=true;this.metaReviewStep='account';this.showMetaAssetStep=false;}
     if (turn.next_question?.task === 'meta_assets') {this.metaReviewStep='assets';this.showMetaAssetStep=true;if(this.metaOAuth.authorization_id)this.loadMetaAssets();}
     const additions = [turn.user_message, turn.message].filter((message): message is ChatMessage => !!message);
     const withIds = new Map(this.messages.filter((message) => message.id).map((message) => [message.id!, message]));

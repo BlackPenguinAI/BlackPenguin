@@ -18,7 +18,8 @@ it('renders selectable country, city suggestions and timezone without submitting
  const f=TestBed.createComponent(OnboardingLocationComponent);f.componentInstance.entityId='project-1';
  const http=TestBed.inject(HttpTestingController);f.detectChanges();
  http.expectOne(r=>r.url.endsWith('/project/project-1/location')).flush(options);f.detectChanges();await f.whenStable();
- expect(f.nativeElement.querySelectorAll('select').length).toBe(2);
+ expect(f.nativeElement.querySelectorAll('select').length).toBe(1);
+ expect(f.nativeElement.querySelector('app-timezone-select')).toBeTruthy();
  expect(f.nativeElement.querySelectorAll('datalist option').length).toBe(2);
  expect(f.nativeElement.textContent).toContain('Project website');
  http.expectNone(r=>r.method==='POST');f.destroy();http.verify();
@@ -35,8 +36,8 @@ it('suggests by country and city, but unknown city requires an explicit timezone
 it('keeps selections on failed save and renders a readable error',()=>{
  const post=vi.fn(()=>throwError(()=>({error:{detail:'Choose a matching timezone.'}})));
  const c=new OnboardingLocationComponent({post} as any,{markForCheck:vi.fn()} as any);
- c.entityId='project-1';c.country='US';c.city='Miami';c.timezone='America/Chicago';c.save();
- expect(c.city).toBe('Miami');expect(c.timezone).toBe('America/Chicago');expect(c.message).toContain('matching timezone');expect(c.busy).toBe(false);
+ c.options=options;c.entityId='project-1';c.country='US';c.city='Another city';c.timezone='America/Chicago';c.save();
+ expect(c.city).toBe('Another city');expect(c.timezone).toBe('America/Chicago');expect(c.message).toContain('matching timezone');expect(c.busy).toBe(false);
 });
 function project(api:any){
  const c=new ProjectChatComponent({} as any,api,{detectChanges:vi.fn(),markForCheck:vi.fn()} as any,{isSupported:false} as any,{} as any);
