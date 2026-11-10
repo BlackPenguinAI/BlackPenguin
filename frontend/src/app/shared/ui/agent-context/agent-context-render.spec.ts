@@ -29,6 +29,12 @@ async function mount(inputs:any={},http:any={get:vi.fn(()=>of(saved())),post:vi.
 }
 afterEach(()=>{TestBed.resetTestingModule();vi.restoreAllMocks();});
 describe('Operational context template',()=>{
+  it('explains an uncertain provider receipt without claiming delivery',async()=>{
+    const context={...saved(),trace:{...saved().trace,last_message_status:'delivery_unknown'}};
+    const {element}=await mount({context});
+    expect(element.textContent).toContain('Provider acceptance is uncertain');
+    expect(element.textContent).toContain('automatic resend is stopped');
+  });
   it('distinguishes manual responses, pending resume and inactivity from inbound processing',async()=>{
     const context={...saved(),trace:{...saved().trace,last_response_role:'human'},
       continuity:{pending_message_count:2,waiting_for_lead:false,jobs:[{kind:'resume',status:'pending',scheduled_at:'2026-11-10T17:00:00Z'},{kind:'inactivity',status:'review',scheduled_at:'2026-11-10T18:00:00Z'}]},

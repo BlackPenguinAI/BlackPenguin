@@ -10,6 +10,7 @@ from uuid import UUID
 
 REQUIRED=('real_model_evaluation','postgres_parallel','desktop_mobile','configuration_review',
     'backup_restore_check','rollback_plan_review','live_sms','live_whatsapp','lead_delivery_receipts',
+    'current_64_case_registry','sales_queue_progress','inactivity_episode',
     'calendar_booking','calendar_replacement','calendar_cancellation','sales_notification','manual_control_and_resume')
 SHA=re.compile(r'^[0-9a-f]{40}$');DIGEST=re.compile(r'^[0-9a-f]{64}$')
 
@@ -51,7 +52,7 @@ def assess(value,evidence_root,now=None):
     components=value.get('components') or {}
     for field in ['api_commit','worker_commit','frontend_commit']:
         if components.get(field)!=candidate or not isinstance(candidate,str) or not SHA.fullmatch(candidate):blockers.append(field+'_does_not_match_candidate')
-    if components.get('alembic_head')!='20261108_sales_moderation':blockers.append('migration_head_unverified')
+    if components.get('alembic_head')!='20261109_sales_worker_progress':blockers.append('migration_head_unverified')
     if not isinstance(components.get('configuration_sha256'),str) or not DIGEST.fullmatch(components['configuration_sha256']):blockers.append('published_configuration_unverified')
     for key in REQUIRED:
         check=(value.get('checks') or {}).get(key) or {}

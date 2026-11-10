@@ -1,0 +1,2654 @@
+{
+  "version": "sales-current-acceptance-results/1.0",
+  "mode": "regression",
+  "status": "REGRESSION_COMPLETE_LIVE_ACCEPTANCE_PENDING",
+  "matrix_sha256": "363dd03e7f2b4e6d2d0913a979d95f0f102c29ae24684d2b15226f2228135ac3",
+  "candidate_commit": null,
+  "runtime_tree_sha256": "3e7e8dd43e04d329ead2f8db3fc812daa43a557c03238744508705b2b3fadac8",
+  "runtime_file_count": 240,
+  "regression_exit_code": 0,
+  "provider_calls": 0,
+  "model_quality_evaluated": false,
+  "production_acceptance_proven": false,
+  "tests_sha256": {
+    "tests/test_monetary_range_context.py": "9794b8922e1dcf9e4693deddb4083c6e5e3f2f179a181e888ba328da92ad9f8a",
+    "tests/test_sales_active_integration.py": "84fd1778fa8124a1bbb2e0a141f09924438841bfad13cc88a540b1a96a9b4a82",
+    "tests/test_sales_ai_group_b.py": "ac098ef307379f0a58cc215023e79067744f527690f9073f469665042158ce42",
+    "tests/test_sales_ai_group_c.py": "b7775c3f6e93f66ee24ffead3c71ca528fe76e454404888a106649b5d102e0a3",
+    "tests/test_sales_ai_group_e.py": "6712531dc8f79ab3c239601e0c2ef65301758747f730e70872ad8f6e2dd5d8ea",
+    "tests/test_sales_ai_group_f.py": "f5404dc70d9a626885666f0a16033f232a696654e8da81716af7459146cbbfa2",
+    "tests/test_sales_ai_group_h.py": "8201bd52ad9f63e290ad71fc01fb1b3d7f2db2cda59149fec9afa99ab782df19",
+    "tests/test_sales_continuity_gaps.py": "54c844fa212dcb1f68b51f9d2d96328f9ff117fe195947604d1037cf3b525a1c",
+    "tests/test_sales_conversation_review.py": "7c185eb4bb98d12bb67c63460874521b55d0fa22073aa1f4fbcb50796be2e860",
+    "tests/test_sales_delivery1.py": "6f027ef85fee77168c088a9b48e4525ccf464695c3d396314e1f0c4e55e54335",
+    "tests/test_sales_delivery2.py": "e7e6a150660acf66a605ac97f9f77b53e6a48a64ab30a8994fd240151df28258",
+    "tests/test_sales_delivery3.py": "cc8b4d7c5afc236bd35f47472e39973daeb13973b09d1d197ca2064545f6e3c6",
+    "tests/test_sales_delivery4.py": "b4d598227803de64aea0e732ff85dd9b8773e7d9da89ed71ac7dc614a7cf0753",
+    "tests/test_sales_delivery5.py": "be4a482a5862c6146ebaf293d7d3b35b366c61a13f906a649016bf6052ab0ea8",
+    "tests/test_sales_understanding_recovery.py": "b8876bd4e3dffc757ca2493e8a7920d0e449a737d1be29875e998bd1fdad473d"
+  },
+  "summary": {
+    "PASS": 63,
+    "FAIL": 0,
+    "NOT_RUN": 1
+  },
+  "cases": [
+    {
+      "id": 1,
+      "title": "Datos mínimos de Meta y alta manual",
+      "regression_nodes": [
+        "tests/test_sales_delivery2.py::test_optional_meta_separate_and_manual_lead_unknown"
+      ],
+      "semantic_outcome": "Datos mínimos de Meta y alta manual",
+      "forbidden_effects": [
+        "unverified_commercial_claims",
+        "cross_scope_disclosure",
+        "unconfirmed_write_or_duplicate_delivery"
+      ],
+      "required_modes": [
+        "regression",
+        "real_model",
+        "real_channels"
+      ],
+      "regression": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "node": "tests/test_sales_delivery2.py::test_optional_meta_separate_and_manual_lead_unknown[flat]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery2.py::test_optional_meta_separate_and_manual_lead_unknown[graph]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery2.py::test_optional_meta_separate_and_manual_lead_unknown[source_answers]",
+            "status": "PASS"
+          }
+        ]
+      },
+      "real_model": {
+        "status": "NOT_RUN"
+      },
+      "real_channels": {
+        "sms": "NOT_RUN",
+        "whatsapp": "NOT_RUN"
+      },
+      "business_acceptance": "NOT_RUN"
+    },
+    {
+      "id": 2,
+      "title": "Datos comerciales compartidos espontáneamente",
+      "regression_nodes": [
+        "tests/test_sales_ai_group_c.py::test_correction_supersedes_meta_and_retains_evidence_history_without_model_value"
+      ],
+      "semantic_outcome": "Datos comerciales compartidos espontáneamente",
+      "forbidden_effects": [
+        "unverified_commercial_claims",
+        "cross_scope_disclosure",
+        "unconfirmed_write_or_duplicate_delivery"
+      ],
+      "required_modes": [
+        "regression",
+        "real_model",
+        "real_channels"
+      ],
+      "regression": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "node": "tests/test_sales_ai_group_c.py::test_correction_supersedes_meta_and_retains_evidence_history_without_model_value",
+            "status": "PASS"
+          }
+        ]
+      },
+      "real_model": {
+        "status": "NOT_RUN"
+      },
+      "real_channels": {
+        "sms": "NOT_RUN",
+        "whatsapp": "NOT_RUN"
+      },
+      "business_acceptance": "NOT_RUN"
+    },
+    {
+      "id": 3,
+      "title": "Edad y ocupación voluntarias",
+      "regression_nodes": [
+        "tests/test_sales_delivery2.py::test_personal_correction_withdrawal_restart"
+      ],
+      "semantic_outcome": "Edad y ocupación voluntarias",
+      "forbidden_effects": [
+        "unverified_commercial_claims",
+        "cross_scope_disclosure",
+        "unconfirmed_write_or_duplicate_delivery"
+      ],
+      "required_modes": [
+        "regression",
+        "real_model",
+        "real_channels"
+      ],
+      "regression": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "node": "tests/test_sales_delivery2.py::test_personal_correction_withdrawal_restart",
+            "status": "PASS"
+          }
+        ]
+      },
+      "real_model": {
+        "status": "NOT_RUN"
+      },
+      "real_channels": {
+        "sms": "NOT_RUN",
+        "whatsapp": "NOT_RUN"
+      },
+      "business_acceptance": "NOT_RUN"
+    },
+    {
+      "id": 4,
+      "title": "Otros detalles personales voluntarios y pertinentes",
+      "regression_nodes": [
+        "tests/test_sales_delivery2.py::test_work_needs_are_explicit_not_inferred_from_occupation"
+      ],
+      "semantic_outcome": "Otros detalles personales voluntarios y pertinentes",
+      "forbidden_effects": [
+        "unverified_commercial_claims",
+        "cross_scope_disclosure",
+        "unconfirmed_write_or_duplicate_delivery"
+      ],
+      "required_modes": [
+        "regression",
+        "real_model",
+        "real_channels"
+      ],
+      "regression": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "node": "tests/test_sales_delivery2.py::test_work_needs_are_explicit_not_inferred_from_occupation",
+            "status": "PASS"
+          }
+        ]
+      },
+      "real_model": {
+        "status": "NOT_RUN"
+      },
+      "real_channels": {
+        "sms": "NOT_RUN",
+        "whatsapp": "NOT_RUN"
+      },
+      "business_acceptance": "NOT_RUN"
+    },
+    {
+      "id": 5,
+      "title": "No interrogar por información privada; respetar rechazo",
+      "regression_nodes": [
+        "tests/test_sales_delivery2.py::test_varied_refusals_declined"
+      ],
+      "semantic_outcome": "No interrogar por información privada; respetar rechazo",
+      "forbidden_effects": [
+        "unverified_commercial_claims",
+        "cross_scope_disclosure",
+        "unconfirmed_write_or_duplicate_delivery"
+      ],
+      "required_modes": [
+        "regression",
+        "real_model",
+        "real_channels"
+      ],
+      "regression": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "node": "tests/test_sales_delivery2.py::test_varied_refusals_declined[I'd rather keep that private]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery2.py::test_varied_refusals_declined[Please skip that question]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery2.py::test_varied_refusals_declined[I would rather not share my budget]",
+            "status": "PASS"
+          }
+        ]
+      },
+      "real_model": {
+        "status": "NOT_RUN"
+      },
+      "real_channels": {
+        "sms": "NOT_RUN",
+        "whatsapp": "NOT_RUN"
+      },
+      "business_acceptance": "NOT_RUN"
+    },
+    {
+      "id": 6,
+      "title": "Correcciones y contradicciones del perfil",
+      "regression_nodes": [
+        "tests/test_sales_ai_group_c.py::test_conflicting_forms_are_unknown_instead_of_silent_choice"
+      ],
+      "semantic_outcome": "Correcciones y contradicciones del perfil",
+      "forbidden_effects": [
+        "unverified_commercial_claims",
+        "cross_scope_disclosure",
+        "unconfirmed_write_or_duplicate_delivery"
+      ],
+      "required_modes": [
+        "regression",
+        "real_model",
+        "real_channels"
+      ],
+      "regression": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "node": "tests/test_sales_ai_group_c.py::test_conflicting_forms_are_unknown_instead_of_silent_choice",
+            "status": "PASS"
+          }
+        ]
+      },
+      "real_model": {
+        "status": "NOT_RUN"
+      },
+      "real_channels": {
+        "sms": "NOT_RUN",
+        "whatsapp": "NOT_RUN"
+      },
+      "business_acceptance": "NOT_RUN"
+    },
+    {
+      "id": 7,
+      "title": "Memoria futura y separación por ámbito",
+      "regression_nodes": [
+        "tests/test_sales_ai_group_c.py::test_context_history_is_bounded_and_does_not_include_future_or_other_lead_messages"
+      ],
+      "semantic_outcome": "Memoria futura y separación por ámbito",
+      "forbidden_effects": [
+        "unverified_commercial_claims",
+        "cross_scope_disclosure",
+        "unconfirmed_write_or_duplicate_delivery"
+      ],
+      "required_modes": [
+        "regression",
+        "real_model",
+        "real_channels"
+      ],
+      "regression": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "node": "tests/test_sales_ai_group_c.py::test_context_history_is_bounded_and_does_not_include_future_or_other_lead_messages",
+            "status": "PASS"
+          }
+        ]
+      },
+      "real_model": {
+        "status": "NOT_RUN"
+      },
+      "real_channels": {
+        "sms": "NOT_RUN",
+        "whatsapp": "NOT_RUN"
+      },
+      "business_acceptance": "NOT_RUN"
+    },
+    {
+      "id": 8,
+      "title": "Variantes para catálogo e inventario",
+      "regression_nodes": [
+        "tests/test_sales_delivery5.py::test_catalog_paraphrases_use_semantic_contract_not_exact_phrase_templates"
+      ],
+      "semantic_outcome": "Variantes para catálogo e inventario",
+      "forbidden_effects": [
+        "unverified_commercial_claims",
+        "cross_scope_disclosure",
+        "unconfirmed_write_or_duplicate_delivery"
+      ],
+      "required_modes": [
+        "regression",
+        "real_model",
+        "real_channels"
+      ],
+      "regression": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "node": "tests/test_sales_delivery5.py::test_catalog_paraphrases_use_semantic_contract_not_exact_phrase_templates[I would like to he information about propertied]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery5.py::test_catalog_paraphrases_use_semantic_contract_not_exact_phrase_templates[I would like to get information about properties]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery5.py::test_catalog_paraphrases_use_semantic_contract_not_exact_phrase_templates[Give me information about the properties you have available]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery5.py::test_catalog_paraphrases_use_semantic_contract_not_exact_phrase_templates[About available properties]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery5.py::test_catalog_paraphrases_use_semantic_contract_not_exact_phrase_templates[Show me property types]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery5.py::test_catalog_paraphrases_use_semantic_contract_not_exact_phrase_templates[What houses do u hav avail]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery5.py::test_catalog_paraphrases_use_semantic_contract_not_exact_phrase_templates[Tell me which apartments are available]",
+            "status": "PASS"
+          }
+        ]
+      },
+      "real_model": {
+        "status": "NOT_RUN"
+      },
+      "real_channels": {
+        "sms": "NOT_RUN",
+        "whatsapp": "NOT_RUN"
+      },
+      "business_acceptance": "NOT_RUN"
+    },
+    {
+      "id": 9,
+      "title": "Errores de escritura y ausencia de ?",
+      "regression_nodes": [
+        "tests/test_sales_delivery5.py::test_catalog_paraphrases_use_semantic_contract_not_exact_phrase_templates"
+      ],
+      "semantic_outcome": "Errores de escritura y ausencia de ?",
+      "forbidden_effects": [
+        "unverified_commercial_claims",
+        "cross_scope_disclosure",
+        "unconfirmed_write_or_duplicate_delivery"
+      ],
+      "required_modes": [
+        "regression",
+        "real_model",
+        "real_channels"
+      ],
+      "regression": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "node": "tests/test_sales_delivery5.py::test_catalog_paraphrases_use_semantic_contract_not_exact_phrase_templates[I would like to he information about propertied]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery5.py::test_catalog_paraphrases_use_semantic_contract_not_exact_phrase_templates[I would like to get information about properties]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery5.py::test_catalog_paraphrases_use_semantic_contract_not_exact_phrase_templates[Give me information about the properties you have available]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery5.py::test_catalog_paraphrases_use_semantic_contract_not_exact_phrase_templates[About available properties]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery5.py::test_catalog_paraphrases_use_semantic_contract_not_exact_phrase_templates[Show me property types]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery5.py::test_catalog_paraphrases_use_semantic_contract_not_exact_phrase_templates[What houses do u hav avail]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery5.py::test_catalog_paraphrases_use_semantic_contract_not_exact_phrase_templates[Tell me which apartments are available]",
+            "status": "PASS"
+          }
+        ]
+      },
+      "real_model": {
+        "status": "NOT_RUN"
+      },
+      "real_channels": {
+        "sms": "NOT_RUN",
+        "whatsapp": "NOT_RUN"
+      },
+      "business_acceptance": "NOT_RUN"
+    },
+    {
+      "id": 10,
+      "title": "Sinónimos property/units/houses/apartments",
+      "regression_nodes": [
+        "tests/test_sales_delivery5.py::test_catalog_paraphrases_use_semantic_contract_not_exact_phrase_templates"
+      ],
+      "semantic_outcome": "Sinónimos property/units/houses/apartments",
+      "forbidden_effects": [
+        "unverified_commercial_claims",
+        "cross_scope_disclosure",
+        "unconfirmed_write_or_duplicate_delivery"
+      ],
+      "required_modes": [
+        "regression",
+        "real_model",
+        "real_channels"
+      ],
+      "regression": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "node": "tests/test_sales_delivery5.py::test_catalog_paraphrases_use_semantic_contract_not_exact_phrase_templates[I would like to he information about propertied]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery5.py::test_catalog_paraphrases_use_semantic_contract_not_exact_phrase_templates[I would like to get information about properties]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery5.py::test_catalog_paraphrases_use_semantic_contract_not_exact_phrase_templates[Give me information about the properties you have available]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery5.py::test_catalog_paraphrases_use_semantic_contract_not_exact_phrase_templates[About available properties]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery5.py::test_catalog_paraphrases_use_semantic_contract_not_exact_phrase_templates[Show me property types]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery5.py::test_catalog_paraphrases_use_semantic_contract_not_exact_phrase_templates[What houses do u hav avail]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery5.py::test_catalog_paraphrases_use_semantic_contract_not_exact_phrase_templates[Tell me which apartments are available]",
+            "status": "PASS"
+          }
+        ]
+      },
+      "real_model": {
+        "status": "NOT_RUN"
+      },
+      "real_channels": {
+        "sms": "NOT_RUN",
+        "whatsapp": "NOT_RUN"
+      },
+      "business_acceptance": "NOT_RUN"
+    },
+    {
+      "id": 11,
+      "title": "Solicitudes concatenadas y AND/OR/NOT",
+      "regression_nodes": [
+        "tests/test_sales_active_integration.py::test_and_or_materials_use_actual_approved_shares"
+      ],
+      "semantic_outcome": "Solicitudes concatenadas y AND/OR/NOT",
+      "forbidden_effects": [
+        "unverified_commercial_claims",
+        "cross_scope_disclosure",
+        "unconfirmed_write_or_duplicate_delivery"
+      ],
+      "required_modes": [
+        "regression",
+        "real_model",
+        "real_channels"
+      ],
+      "regression": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "node": "tests/test_sales_active_integration.py::test_and_or_materials_use_actual_approved_shares[False-2]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_active_integration.py::test_and_or_materials_use_actual_approved_shares[True-1]",
+            "status": "PASS"
+          }
+        ]
+      },
+      "real_model": {
+        "status": "NOT_RUN"
+      },
+      "real_channels": {
+        "sms": "NOT_RUN",
+        "whatsapp": "NOT_RUN"
+      },
+      "business_acceptance": "NOT_RUN"
+    },
+    {
+      "id": 12,
+      "title": "Referencias y sí/no contextual",
+      "regression_nodes": [
+        "tests/test_sales_ai_group_f.py::test_confirmation_cannot_use_an_unrelated_or_incomplete_offer"
+      ],
+      "semantic_outcome": "Referencias y sí/no contextual",
+      "forbidden_effects": [
+        "unverified_commercial_claims",
+        "cross_scope_disclosure",
+        "unconfirmed_write_or_duplicate_delivery"
+      ],
+      "required_modes": [
+        "regression",
+        "real_model",
+        "real_channels"
+      ],
+      "regression": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "node": "tests/test_sales_ai_group_f.py::test_confirmation_cannot_use_an_unrelated_or_incomplete_offer[property]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_ai_group_f.py::test_confirmation_cannot_use_an_unrelated_or_incomplete_offer[manual]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_ai_group_f.py::test_confirmation_cannot_use_an_unrelated_or_incomplete_offer[incomplete]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_ai_group_f.py::test_confirmation_cannot_use_an_unrelated_or_incomplete_offer[expired]",
+            "status": "PASS"
+          }
+        ]
+      },
+      "real_model": {
+        "status": "NOT_RUN"
+      },
+      "real_channels": {
+        "sms": "NOT_RUN",
+        "whatsapp": "NOT_RUN"
+      },
+      "business_acceptance": "NOT_RUN"
+    },
+    {
+      "id": 13,
+      "title": "Inglés de entrada/salida y configuración multilingüe",
+      "regression_nodes": [
+        "tests/test_sales_ai_group_b.py::test_english_and_context_neutral_inputs"
+      ],
+      "semantic_outcome": "Inglés de entrada/salida y configuración multilingüe",
+      "forbidden_effects": [
+        "unverified_commercial_claims",
+        "cross_scope_disclosure",
+        "unconfirmed_write_or_duplicate_delivery"
+      ],
+      "required_modes": [
+        "regression",
+        "real_model",
+        "real_channels"
+      ],
+      "regression": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "node": "tests/test_sales_ai_group_b.py::test_english_and_context_neutral_inputs[Photos]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_ai_group_b.py::test_english_and_context_neutral_inputs[Price?]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_ai_group_b.py::test_english_and_context_neutral_inputs[What units are available?]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_ai_group_b.py::test_english_and_context_neutral_inputs[Bank financing]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_ai_group_b.py::test_english_and_context_neutral_inputs[I want a 3 bedroom house]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_ai_group_b.py::test_english_and_context_neutral_inputs[Give me information]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_ai_group_b.py::test_english_and_context_neutral_inputs[More details please]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_ai_group_b.py::test_english_and_context_neutral_inputs[3:00 PM]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_ai_group_b.py::test_english_and_context_neutral_inputs[2]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_ai_group_b.py::test_english_and_context_neutral_inputs[100000 USD]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_ai_group_b.py::test_english_and_context_neutral_inputs[Yes]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_ai_group_b.py::test_english_and_context_neutral_inputs[Fouquet\\u2019s]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_ai_group_b.py::test_english_and_context_neutral_inputs[The Trails]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_ai_group_b.py::test_english_and_context_neutral_inputs[I would like to buy a unit]",
+            "status": "PASS"
+          }
+        ]
+      },
+      "real_model": {
+        "status": "NOT_RUN"
+      },
+      "real_channels": {
+        "sms": "NOT_RUN",
+        "whatsapp": "NOT_RUN"
+      },
+      "business_acceptance": "NOT_RUN"
+    },
+    {
+      "id": 14,
+      "title": "Respuesta directa, natural y no repetitiva",
+      "regression_nodes": [
+        "tests/test_sales_delivery3.py::test_multiple_catalog_reads_synthesize_once_and_do_not_change_booking"
+      ],
+      "semantic_outcome": "Respuesta directa, natural y no repetitiva",
+      "forbidden_effects": [
+        "unverified_commercial_claims",
+        "cross_scope_disclosure",
+        "unconfirmed_write_or_duplicate_delivery"
+      ],
+      "required_modes": [
+        "regression",
+        "real_model",
+        "real_channels"
+      ],
+      "regression": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "node": "tests/test_sales_delivery3.py::test_multiple_catalog_reads_synthesize_once_and_do_not_change_booking",
+            "status": "PASS"
+          }
+        ]
+      },
+      "real_model": {
+        "status": "NOT_RUN"
+      },
+      "real_channels": {
+        "sms": "NOT_RUN",
+        "whatsapp": "NOT_RUN"
+      },
+      "business_acceptance": "NOT_RUN"
+    },
+    {
+      "id": 15,
+      "title": "Empatía ante asuntos personales y retorno al tema",
+      "regression_nodes": [
+        "tests/test_sales_delivery3.py::test_empathy_gently_returns_to_current_property_not_an_abuse_warning"
+      ],
+      "semantic_outcome": "Empatía ante asuntos personales y retorno al tema",
+      "forbidden_effects": [
+        "unverified_commercial_claims",
+        "cross_scope_disclosure",
+        "unconfirmed_write_or_duplicate_delivery"
+      ],
+      "required_modes": [
+        "regression",
+        "real_model",
+        "real_channels"
+      ],
+      "regression": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "node": "tests/test_sales_delivery3.py::test_empathy_gently_returns_to_current_property_not_an_abuse_warning[feeling_unwell-I feel bad]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery3.py::test_empathy_gently_returns_to_current_property_not_an_abuse_warning[personal_setback-I am having a difficult day]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery3.py::test_empathy_gently_returns_to_current_property_not_an_abuse_warning[frustrated-I am feeling frustrated]",
+            "status": "PASS"
+          }
+        ]
+      },
+      "real_model": {
+        "status": "NOT_RUN"
+      },
+      "real_channels": {
+        "sms": "NOT_RUN",
+        "whatsapp": "NOT_RUN"
+      },
+      "business_acceptance": "NOT_RUN"
+    },
+    {
+      "id": 16,
+      "title": "Saludos, agradecimientos, despedidas y no por ahora",
+      "regression_nodes": [
+        "tests/test_sales_ai_group_f.py::test_farewell_stops_cadence_but_later_question_is_answered"
+      ],
+      "semantic_outcome": "Saludos, agradecimientos, despedidas y no por ahora",
+      "forbidden_effects": [
+        "unverified_commercial_claims",
+        "cross_scope_disclosure",
+        "unconfirmed_write_or_duplicate_delivery"
+      ],
+      "required_modes": [
+        "regression",
+        "real_model",
+        "real_channels"
+      ],
+      "regression": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "node": "tests/test_sales_ai_group_f.py::test_farewell_stops_cadence_but_later_question_is_answered",
+            "status": "PASS"
+          }
+        ]
+      },
+      "real_model": {
+        "status": "NOT_RUN"
+      },
+      "real_channels": {
+        "sms": "NOT_RUN",
+        "whatsapp": "NOT_RUN"
+      },
+      "business_acceptance": "NOT_RUN"
+    },
+    {
+      "id": 17,
+      "title": "Catálogo conciso y disponibilidad verificada",
+      "regression_nodes": [
+        "tests/test_sales_ai_group_e.py::test_t01_catalog_one_close_not_catalog_plus_budget"
+      ],
+      "semantic_outcome": "Catálogo conciso y disponibilidad verificada",
+      "forbidden_effects": [
+        "unverified_commercial_claims",
+        "cross_scope_disclosure",
+        "unconfirmed_write_or_duplicate_delivery"
+      ],
+      "required_modes": [
+        "regression",
+        "real_model",
+        "real_channels"
+      ],
+      "regression": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "node": "tests/test_sales_ai_group_e.py::test_t01_catalog_one_close_not_catalog_plus_budget",
+            "status": "PASS"
+          }
+        ]
+      },
+      "real_model": {
+        "status": "NOT_RUN"
+      },
+      "real_channels": {
+        "sms": "NOT_RUN",
+        "whatsapp": "NOT_RUN"
+      },
+      "business_acceptance": "NOT_RUN"
+    },
+    {
+      "id": 18,
+      "title": "Más información en texto sobre una propiedad",
+      "regression_nodes": [
+        "tests/test_sales_delivery3.py::test_focused_details_answer_requested_feature_without_full_fact_dump"
+      ],
+      "semantic_outcome": "Más información en texto sobre una propiedad",
+      "forbidden_effects": [
+        "unverified_commercial_claims",
+        "cross_scope_disclosure",
+        "unconfirmed_write_or_duplicate_delivery"
+      ],
+      "required_modes": [
+        "regression",
+        "real_model",
+        "real_channels"
+      ],
+      "regression": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "node": "tests/test_sales_delivery3.py::test_focused_details_answer_requested_feature_without_full_fact_dump[fields0-None-2 bedrooms-Published prices]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery3.py::test_focused_details_answer_requested_feature_without_full_fact_dump[fields1-island-Kitchen island-3 bathrooms]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery3.py::test_focused_details_answer_requested_feature_without_full_fact_dump[fields2-balcony-Balcony-Separate parking]",
+            "status": "PASS"
+          }
+        ]
+      },
+      "real_model": {
+        "status": "NOT_RUN"
+      },
+      "real_channels": {
+        "sms": "NOT_RUN",
+        "whatsapp": "NOT_RUN"
+      },
+      "business_acceptance": "NOT_RUN"
+    },
+    {
+      "id": 19,
+      "title": "Elegir y conservar interés actual",
+      "regression_nodes": [
+        "tests/test_sales_delivery2.py::test_all_compare_no_selection_explicit_switch_no_booking_change"
+      ],
+      "semantic_outcome": "Elegir y conservar interés actual",
+      "forbidden_effects": [
+        "unverified_commercial_claims",
+        "cross_scope_disclosure",
+        "unconfirmed_write_or_duplicate_delivery"
+      ],
+      "required_modes": [
+        "regression",
+        "real_model",
+        "real_channels"
+      ],
+      "regression": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "node": "tests/test_sales_delivery2.py::test_all_compare_no_selection_explicit_switch_no_booking_change",
+            "status": "PASS"
+          }
+        ]
+      },
+      "real_model": {
+        "status": "NOT_RUN"
+      },
+      "real_channels": {
+        "sms": "NOT_RUN",
+        "whatsapp": "NOT_RUN"
+      },
+      "business_acceptance": "NOT_RUN"
+    },
+    {
+      "id": 20,
+      "title": "Cambiar propiedad sin cambiar una reserva existente",
+      "regression_nodes": [
+        "tests/test_sales_ai_group_c.py::test_real_property_inquiry_pivots_interest_but_not_booked_visit"
+      ],
+      "semantic_outcome": "Cambiar propiedad sin cambiar una reserva existente",
+      "forbidden_effects": [
+        "unverified_commercial_claims",
+        "cross_scope_disclosure",
+        "unconfirmed_write_or_duplicate_delivery"
+      ],
+      "required_modes": [
+        "regression",
+        "real_model",
+        "real_channels"
+      ],
+      "regression": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "node": "tests/test_sales_ai_group_c.py::test_real_property_inquiry_pivots_interest_but_not_booked_visit",
+            "status": "PASS"
+          }
+        ]
+      },
+      "real_model": {
+        "status": "NOT_RUN"
+      },
+      "real_channels": {
+        "sms": "NOT_RUN",
+        "whatsapp": "NOT_RUN"
+      },
+      "business_acceptance": "NOT_RUN"
+    },
+    {
+      "id": 21,
+      "title": "Comparación general de dos o más propiedades",
+      "regression_nodes": [
+        "tests/test_sales_delivery2.py::test_live_compare_current_other_keeps_focus_booking_and_idempotency"
+      ],
+      "semantic_outcome": "Comparación general de dos o más propiedades",
+      "forbidden_effects": [
+        "unverified_commercial_claims",
+        "cross_scope_disclosure",
+        "unconfirmed_write_or_duplicate_delivery"
+      ],
+      "required_modes": [
+        "regression",
+        "real_model",
+        "real_channels"
+      ],
+      "regression": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "node": "tests/test_sales_delivery2.py::test_live_compare_current_other_keeps_focus_booking_and_idempotency[sms]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery2.py::test_live_compare_current_other_keeps_focus_booking_and_idempotency[whatsapp]",
+            "status": "PASS"
+          }
+        ]
+      },
+      "real_model": {
+        "status": "NOT_RUN"
+      },
+      "real_channels": {
+        "sms": "NOT_RUN",
+        "whatsapp": "NOT_RUN"
+      },
+      "business_acceptance": "NOT_RUN"
+    },
+    {
+      "id": 22,
+      "title": "Comparación por baños, dormitorios, cocina o features",
+      "regression_nodes": [
+        "tests/test_sales_delivery2.py::test_kitchen_and_features_concise"
+      ],
+      "semantic_outcome": "Comparación por baños, dormitorios, cocina o features",
+      "forbidden_effects": [
+        "unverified_commercial_claims",
+        "cross_scope_disclosure",
+        "unconfirmed_write_or_duplicate_delivery"
+      ],
+      "required_modes": [
+        "regression",
+        "real_model",
+        "real_channels"
+      ],
+      "regression": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "node": "tests/test_sales_delivery2.py::test_kitchen_and_features_concise",
+            "status": "PASS"
+          }
+        ]
+      },
+      "real_model": {
+        "status": "NOT_RUN"
+      },
+      "real_channels": {
+        "sms": "NOT_RUN",
+        "whatsapp": "NOT_RUN"
+      },
+      "business_acceptance": "NOT_RUN"
+    },
+    {
+      "id": 23,
+      "title": "Superlativos y recomendación fundada",
+      "regression_nodes": [
+        "tests/test_sales_delivery2.py::test_numeric_extrema"
+      ],
+      "semantic_outcome": "Superlativos y recomendación fundada",
+      "forbidden_effects": [
+        "unverified_commercial_claims",
+        "cross_scope_disclosure",
+        "unconfirmed_write_or_duplicate_delivery"
+      ],
+      "required_modes": [
+        "regression",
+        "real_model",
+        "real_channels"
+      ],
+      "regression": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "node": "tests/test_sales_delivery2.py::test_numeric_extrema[bedrooms-maximum-Loft]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery2.py::test_numeric_extrema[bathrooms-minimum-Studio]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery2.py::test_numeric_extrema[price-minimum-Studio]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery2.py::test_numeric_extrema[availability-maximum-Loft]",
+            "status": "PASS"
+          }
+        ]
+      },
+      "real_model": {
+        "status": "NOT_RUN"
+      },
+      "real_channels": {
+        "sms": "NOT_RUN",
+        "whatsapp": "NOT_RUN"
+      },
+      "business_acceptance": "NOT_RUN"
+    },
+    {
+      "id": 24,
+      "title": "Precios, moneda, promociones, financiación y entrega",
+      "regression_nodes": [
+        "tests/test_monetary_range_context.py::test_actual_dispatch_uses_corrected_price_but_preserves_valid_features"
+      ],
+      "semantic_outcome": "Precios, moneda, promociones, financiación y entrega",
+      "forbidden_effects": [
+        "unverified_commercial_claims",
+        "cross_scope_disclosure",
+        "unconfirmed_write_or_duplicate_delivery"
+      ],
+      "required_modes": [
+        "regression",
+        "real_model",
+        "real_channels"
+      ],
+      "regression": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "node": "tests/test_monetary_range_context.py::test_actual_dispatch_uses_corrected_price_but_preserves_valid_features[Residence A prices range from 30 USD to 30000.-True]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_monetary_range_context.py::test_actual_dispatch_uses_corrected_price_but_preserves_valid_features[Residence A: 30 USD\\u201330000.-True]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_monetary_range_context.py::test_actual_dispatch_uses_corrected_price_but_preserves_valid_features[Residence A cuesta entre 30 d\\xf3lares y 30000.-True]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_monetary_range_context.py::test_actual_dispatch_uses_corrected_price_but_preserves_valid_features[Residence A: USD 30 and 2 bedrooms.-False]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_monetary_range_context.py::test_actual_dispatch_uses_corrected_price_but_preserves_valid_features[Residence A: USD 30 and 2 bedrooms. Brochure: https://example.test/brochure.pdf-False]",
+            "status": "PASS"
+          }
+        ]
+      },
+      "real_model": {
+        "status": "NOT_RUN"
+      },
+      "real_channels": {
+        "sms": "NOT_RUN",
+        "whatsapp": "NOT_RUN"
+      },
+      "business_acceptance": "NOT_RUN"
+    },
+    {
+      "id": 25,
+      "title": "Amenidades, ubicación y datos no confirmados",
+      "regression_nodes": [
+        "tests/test_sales_delivery3.py::test_missing_individual_unit_feature_is_explicit_unknown_not_other_unit_facts"
+      ],
+      "semantic_outcome": "Amenidades, ubicación y datos no confirmados",
+      "forbidden_effects": [
+        "unverified_commercial_claims",
+        "cross_scope_disclosure",
+        "unconfirmed_write_or_duplicate_delivery"
+      ],
+      "required_modes": [
+        "regression",
+        "real_model",
+        "real_channels"
+      ],
+      "regression": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "node": "tests/test_sales_delivery3.py::test_missing_individual_unit_feature_is_explicit_unknown_not_other_unit_facts",
+            "status": "PASS"
+          }
+        ]
+      },
+      "real_model": {
+        "status": "NOT_RUN"
+      },
+      "real_channels": {
+        "sms": "NOT_RUN",
+        "whatsapp": "NOT_RUN"
+      },
+      "business_acceptance": "NOT_RUN"
+    },
+    {
+      "id": 26,
+      "title": "Fotos sin propiedad seleccionada",
+      "regression_nodes": [
+        "tests/test_sales_delivery3.py::test_property_selection_resumes_pending_material_without_repeating_request"
+      ],
+      "semantic_outcome": "Fotos sin propiedad seleccionada",
+      "forbidden_effects": [
+        "unverified_commercial_claims",
+        "cross_scope_disclosure",
+        "unconfirmed_write_or_duplicate_delivery"
+      ],
+      "required_modes": [
+        "regression",
+        "real_model",
+        "real_channels"
+      ],
+      "regression": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "node": "tests/test_sales_delivery3.py::test_property_selection_resumes_pending_material_without_repeating_request[photos]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery3.py::test_property_selection_resumes_pending_material_without_repeating_request[floor_plan]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery3.py::test_property_selection_resumes_pending_material_without_repeating_request[unit_sheet]",
+            "status": "PASS"
+          }
+        ]
+      },
+      "real_model": {
+        "status": "NOT_RUN"
+      },
+      "real_channels": {
+        "sms": "NOT_RUN",
+        "whatsapp": "NOT_RUN"
+      },
+      "business_acceptance": "NOT_RUN"
+    },
+    {
+      "id": 27,
+      "title": "Planos sin propiedad seleccionada",
+      "regression_nodes": [
+        "tests/test_sales_delivery3.py::test_property_selection_resumes_pending_material_without_repeating_request"
+      ],
+      "semantic_outcome": "Planos sin propiedad seleccionada",
+      "forbidden_effects": [
+        "unverified_commercial_claims",
+        "cross_scope_disclosure",
+        "unconfirmed_write_or_duplicate_delivery"
+      ],
+      "required_modes": [
+        "regression",
+        "real_model",
+        "real_channels"
+      ],
+      "regression": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "node": "tests/test_sales_delivery3.py::test_property_selection_resumes_pending_material_without_repeating_request[photos]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery3.py::test_property_selection_resumes_pending_material_without_repeating_request[floor_plan]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery3.py::test_property_selection_resumes_pending_material_without_repeating_request[unit_sheet]",
+            "status": "PASS"
+          }
+        ]
+      },
+      "real_model": {
+        "status": "NOT_RUN"
+      },
+      "real_channels": {
+        "sms": "NOT_RUN",
+        "whatsapp": "NOT_RUN"
+      },
+      "business_acceptance": "NOT_RUN"
+    },
+    {
+      "id": 28,
+      "title": "Fotos o planos con propiedad ya elegida",
+      "regression_nodes": [
+        "tests/test_sales_delivery3.py::test_complementary_material_requires_exact_current_acceptance"
+      ],
+      "semantic_outcome": "Fotos o planos con propiedad ya elegida",
+      "forbidden_effects": [
+        "unverified_commercial_claims",
+        "cross_scope_disclosure",
+        "unconfirmed_write_or_duplicate_delivery"
+      ],
+      "required_modes": [
+        "regression",
+        "real_model",
+        "real_channels"
+      ],
+      "regression": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "node": "tests/test_sales_delivery3.py::test_complementary_material_requires_exact_current_acceptance[photos-floor_plan]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery3.py::test_complementary_material_requires_exact_current_acceptance[floor_plan-photos]",
+            "status": "PASS"
+          }
+        ]
+      },
+      "real_model": {
+        "status": "NOT_RUN"
+      },
+      "real_channels": {
+        "sms": "NOT_RUN",
+        "whatsapp": "NOT_RUN"
+      },
+      "business_acceptance": "NOT_RUN"
+    },
+    {
+      "id": 29,
+      "title": "Fotos en PDF; planos como imagen o PDF",
+      "regression_nodes": [
+        "tests/test_sales_delivery3.py::test_multi_property_pdf_sent_once_for_photos_and_plans"
+      ],
+      "semantic_outcome": "Fotos en PDF; planos como imagen o PDF",
+      "forbidden_effects": [
+        "unverified_commercial_claims",
+        "cross_scope_disclosure",
+        "unconfirmed_write_or_duplicate_delivery"
+      ],
+      "required_modes": [
+        "regression",
+        "real_model",
+        "real_channels"
+      ],
+      "regression": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "node": "tests/test_sales_delivery3.py::test_multi_property_pdf_sent_once_for_photos_and_plans[sms]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery3.py::test_multi_property_pdf_sent_once_for_photos_and_plans[whatsapp]",
+            "status": "PASS"
+          }
+        ]
+      },
+      "real_model": {
+        "status": "NOT_RUN"
+      },
+      "real_channels": {
+        "sms": "NOT_RUN",
+        "whatsapp": "NOT_RUN"
+      },
+      "business_acceptance": "NOT_RUN"
+    },
+    {
+      "id": 30,
+      "title": "Links para SMS y WhatsApp; no adjuntos necesarios",
+      "regression_nodes": [
+        "tests/test_sales_delivery3.py::test_multi_property_pdf_sent_once_for_photos_and_plans"
+      ],
+      "semantic_outcome": "Links para SMS y WhatsApp; no adjuntos necesarios",
+      "forbidden_effects": [
+        "unverified_commercial_claims",
+        "cross_scope_disclosure",
+        "unconfirmed_write_or_duplicate_delivery"
+      ],
+      "required_modes": [
+        "regression",
+        "real_model",
+        "real_channels"
+      ],
+      "regression": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "node": "tests/test_sales_delivery3.py::test_multi_property_pdf_sent_once_for_photos_and_plans[sms]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery3.py::test_multi_property_pdf_sent_once_for_photos_and_plans[whatsapp]",
+            "status": "PASS"
+          }
+        ]
+      },
+      "real_model": {
+        "status": "NOT_RUN"
+      },
+      "real_channels": {
+        "sms": "NOT_RUN",
+        "whatsapp": "NOT_RUN"
+      },
+      "business_acceptance": "NOT_RUN"
+    },
+    {
+      "id": 31,
+      "title": "Ofrecer planos adicionales después de fotos y viceversa",
+      "regression_nodes": [
+        "tests/test_sales_delivery3.py::test_complementary_decline_keeps_chat_active_and_does_not_send_file"
+      ],
+      "semantic_outcome": "Ofrecer planos adicionales después de fotos y viceversa",
+      "forbidden_effects": [
+        "unverified_commercial_claims",
+        "cross_scope_disclosure",
+        "unconfirmed_write_or_duplicate_delivery"
+      ],
+      "required_modes": [
+        "regression",
+        "real_model",
+        "real_channels"
+      ],
+      "regression": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "node": "tests/test_sales_delivery3.py::test_complementary_decline_keeps_chat_active_and_does_not_send_file",
+            "status": "PASS"
+          }
+        ]
+      },
+      "real_model": {
+        "status": "NOT_RUN"
+      },
+      "real_channels": {
+        "sms": "NOT_RUN",
+        "whatsapp": "NOT_RUN"
+      },
+      "business_acceptance": "NOT_RUN"
+    },
+    {
+      "id": 32,
+      "title": "Un PDF cubre varias necesidades de la misma propiedad",
+      "regression_nodes": [
+        "tests/test_sales_delivery3.py::test_multi_property_pdf_sent_once_for_photos_and_plans"
+      ],
+      "semantic_outcome": "Un PDF cubre varias necesidades de la misma propiedad",
+      "forbidden_effects": [
+        "unverified_commercial_claims",
+        "cross_scope_disclosure",
+        "unconfirmed_write_or_duplicate_delivery"
+      ],
+      "required_modes": [
+        "regression",
+        "real_model",
+        "real_channels"
+      ],
+      "regression": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "node": "tests/test_sales_delivery3.py::test_multi_property_pdf_sent_once_for_photos_and_plans[sms]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery3.py::test_multi_property_pdf_sent_once_for_photos_and_plans[whatsapp]",
+            "status": "PASS"
+          }
+        ]
+      },
+      "real_model": {
+        "status": "NOT_RUN"
+      },
+      "real_channels": {
+        "sms": "NOT_RUN",
+        "whatsapp": "NOT_RUN"
+      },
+      "business_acceptance": "NOT_RUN"
+    },
+    {
+      "id": 33,
+      "title": "Un archivo vinculado a varias tipologías/unidades",
+      "regression_nodes": [
+        "tests/test_sales_delivery3.py::test_coverage_for_one_property_never_proves_another_propertys_plan"
+      ],
+      "semantic_outcome": "Un archivo vinculado a varias tipologías/unidades",
+      "forbidden_effects": [
+        "unverified_commercial_claims",
+        "cross_scope_disclosure",
+        "unconfirmed_write_or_duplicate_delivery"
+      ],
+      "required_modes": [
+        "regression",
+        "real_model",
+        "real_channels"
+      ],
+      "regression": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "node": "tests/test_sales_delivery3.py::test_coverage_for_one_property_never_proves_another_propertys_plan",
+            "status": "PASS"
+          }
+        ]
+      },
+      "real_model": {
+        "status": "NOT_RUN"
+      },
+      "real_channels": {
+        "sms": "NOT_RUN",
+        "whatsapp": "NOT_RUN"
+      },
+      "business_acceptance": "NOT_RUN"
+    },
+    {
+      "id": 34,
+      "title": "Documento/galería accesible para el lead y revisiones posteriores",
+      "regression_nodes": [
+        "tests/test_sales_delivery3.py::test_coverage_edit_revokes_previous_links_requires_reapproval_and_changes_snapshot"
+      ],
+      "semantic_outcome": "Documento/galería accesible para el lead y revisiones posteriores",
+      "forbidden_effects": [
+        "unverified_commercial_claims",
+        "cross_scope_disclosure",
+        "unconfirmed_write_or_duplicate_delivery"
+      ],
+      "required_modes": [
+        "regression",
+        "real_model",
+        "real_channels"
+      ],
+      "regression": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "node": "tests/test_sales_delivery3.py::test_coverage_edit_revokes_previous_links_requires_reapproval_and_changes_snapshot",
+            "status": "PASS"
+          }
+        ]
+      },
+      "real_model": {
+        "status": "NOT_RUN"
+      },
+      "real_channels": {
+        "sms": "NOT_RUN",
+        "whatsapp": "NOT_RUN"
+      },
+      "business_acceptance": "NOT_RUN"
+    },
+    {
+      "id": 35,
+      "title": "Falta material solicitado",
+      "regression_nodes": [
+        "tests/test_sales_delivery3.py::test_unavailable_plan_offers_approved_photos_without_pause"
+      ],
+      "semantic_outcome": "Falta material solicitado",
+      "forbidden_effects": [
+        "unverified_commercial_claims",
+        "cross_scope_disclosure",
+        "unconfirmed_write_or_duplicate_delivery"
+      ],
+      "required_modes": [
+        "regression",
+        "real_model",
+        "real_channels"
+      ],
+      "regression": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "node": "tests/test_sales_delivery3.py::test_unavailable_plan_offers_approved_photos_without_pause",
+            "status": "PASS"
+          }
+        ]
+      },
+      "real_model": {
+        "status": "NOT_RUN"
+      },
+      "real_channels": {
+        "sms": "NOT_RUN",
+        "whatsapp": "NOT_RUN"
+      },
+      "business_acceptance": "NOT_RUN"
+    },
+    {
+      "id": 36,
+      "title": "Ver la propiedad vs ver más información vs visitar",
+      "regression_nodes": [
+        "tests/test_sales_ai_group_f.py::test_property_question_interrupted_by_photos_does_not_start_scheduling"
+      ],
+      "semantic_outcome": "Ver la propiedad vs ver más información vs visitar",
+      "forbidden_effects": [
+        "unverified_commercial_claims",
+        "cross_scope_disclosure",
+        "unconfirmed_write_or_duplicate_delivery"
+      ],
+      "required_modes": [
+        "regression",
+        "real_model",
+        "real_channels"
+      ],
+      "regression": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "node": "tests/test_sales_ai_group_f.py::test_property_question_interrupted_by_photos_does_not_start_scheduling",
+            "status": "PASS"
+          }
+        ]
+      },
+      "real_model": {
+        "status": "NOT_RUN"
+      },
+      "real_channels": {
+        "sms": "NOT_RUN",
+        "whatsapp": "NOT_RUN"
+      },
+      "business_acceptance": "NOT_RUN"
+    },
+    {
+      "id": 37,
+      "title": "Restricciones explícitas y ofertas vencidas",
+      "regression_nodes": [
+        "tests/test_sales_delivery3.py::test_exact_offer_is_revalidated_before_confirmation"
+      ],
+      "semantic_outcome": "Restricciones explícitas y ofertas vencidas",
+      "forbidden_effects": [
+        "unverified_commercial_claims",
+        "cross_scope_disclosure",
+        "unconfirmed_write_or_duplicate_delivery"
+      ],
+      "required_modes": [
+        "regression",
+        "real_model",
+        "real_channels"
+      ],
+      "regression": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "node": "tests/test_sales_delivery3.py::test_exact_offer_is_revalidated_before_confirmation[channels]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery3.py::test_exact_offer_is_revalidated_before_confirmation[expired]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery3.py::test_exact_offer_is_revalidated_before_confirmation[revoked]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery3.py::test_exact_offer_is_revalidated_before_confirmation[bytes]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery3.py::test_exact_offer_is_revalidated_before_confirmation[coverage]",
+            "status": "PASS"
+          }
+        ]
+      },
+      "real_model": {
+        "status": "NOT_RUN"
+      },
+      "real_channels": {
+        "sms": "NOT_RUN",
+        "whatsapp": "NOT_RUN"
+      },
+      "business_acceptance": "NOT_RUN"
+    },
+    {
+      "id": 38,
+      "title": "Despedida breve por inactividad",
+      "regression_nodes": [
+        "tests/test_sales_delivery4.py::test_inactivity_once_and_responsive_to_new_message"
+      ],
+      "semantic_outcome": "Despedida breve por inactividad",
+      "forbidden_effects": [
+        "unverified_commercial_claims",
+        "cross_scope_disclosure",
+        "unconfirmed_write_or_duplicate_delivery"
+      ],
+      "required_modes": [
+        "regression",
+        "real_model",
+        "real_channels"
+      ],
+      "regression": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "node": "tests/test_sales_delivery4.py::test_inactivity_once_and_responsive_to_new_message[sms]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery4.py::test_inactivity_once_and_responsive_to_new_message[whatsapp]",
+            "status": "PASS"
+          }
+        ]
+      },
+      "real_model": {
+        "status": "NOT_RUN"
+      },
+      "real_channels": {
+        "sms": "NOT_RUN",
+        "whatsapp": "NOT_RUN"
+      },
+      "business_acceptance": "NOT_RUN"
+    },
+    {
+      "id": 39,
+      "title": "Cadencias comerciales y avisos de disponibilidad",
+      "regression_nodes": [
+        "tests/test_sales_delivery4.py::test_configurable_closing_is_separate_from_published_cadence"
+      ],
+      "semantic_outcome": "Cadencias comerciales y avisos de disponibilidad",
+      "forbidden_effects": [
+        "unverified_commercial_claims",
+        "cross_scope_disclosure",
+        "unconfirmed_write_or_duplicate_delivery"
+      ],
+      "required_modes": [
+        "regression",
+        "real_model",
+        "real_channels"
+      ],
+      "regression": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "node": "tests/test_sales_delivery4.py::test_configurable_closing_is_separate_from_published_cadence",
+            "status": "PASS"
+          }
+        ]
+      },
+      "real_model": {
+        "status": "NOT_RUN"
+      },
+      "real_channels": {
+        "sms": "NOT_RUN",
+        "whatsapp": "NOT_RUN"
+      },
+      "business_acceptance": "NOT_RUN"
+    },
+    {
+      "id": 40,
+      "title": "Mensajes recibidos durante pausa",
+      "regression_nodes": [
+        "tests/test_sales_delivery4.py::test_received_provider_messages_are_saved_while_paused_and_stop_is_queued"
+      ],
+      "semantic_outcome": "Mensajes recibidos durante pausa",
+      "forbidden_effects": [
+        "unverified_commercial_claims",
+        "cross_scope_disclosure",
+        "unconfirmed_write_or_duplicate_delivery"
+      ],
+      "required_modes": [
+        "regression",
+        "real_model",
+        "real_channels"
+      ],
+      "regression": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "node": "tests/test_sales_delivery4.py::test_received_provider_messages_are_saved_while_paused_and_stop_is_queued",
+            "status": "PASS"
+          }
+        ]
+      },
+      "real_model": {
+        "status": "NOT_RUN"
+      },
+      "real_channels": {
+        "sms": "NOT_RUN",
+        "whatsapp": "NOT_RUN"
+      },
+      "business_acceptance": "NOT_RUN"
+    },
+    {
+      "id": 41,
+      "title": "Administrador escribe y luego Resume",
+      "regression_nodes": [
+        "tests/test_sales_delivery4.py::test_accepted_manual_response_waits_for_lead_but_failed_send_does_not"
+      ],
+      "semantic_outcome": "Administrador escribe y luego Resume",
+      "forbidden_effects": [
+        "unverified_commercial_claims",
+        "cross_scope_disclosure",
+        "unconfirmed_write_or_duplicate_delivery"
+      ],
+      "required_modes": [
+        "regression",
+        "real_model",
+        "real_channels"
+      ],
+      "regression": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "node": "tests/test_sales_delivery4.py::test_accepted_manual_response_waits_for_lead_but_failed_send_does_not",
+            "status": "PASS"
+          }
+        ]
+      },
+      "real_model": {
+        "status": "NOT_RUN"
+      },
+      "real_channels": {
+        "sms": "NOT_RUN",
+        "whatsapp": "NOT_RUN"
+      },
+      "business_acceptance": "NOT_RUN"
+    },
+    {
+      "id": 42,
+      "title": "Resume sin mensaje humano",
+      "regression_nodes": [
+        "tests/test_sales_delivery4.py::test_resume_combines_pending_once_without_historical_replay"
+      ],
+      "semantic_outcome": "Resume sin mensaje humano",
+      "forbidden_effects": [
+        "unverified_commercial_claims",
+        "cross_scope_disclosure",
+        "unconfirmed_write_or_duplicate_delivery"
+      ],
+      "required_modes": [
+        "regression",
+        "real_model",
+        "real_channels"
+      ],
+      "regression": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "node": "tests/test_sales_delivery4.py::test_resume_combines_pending_once_without_historical_replay[sms]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery4.py::test_resume_combines_pending_once_without_historical_replay[whatsapp]",
+            "status": "PASS"
+          }
+        ]
+      },
+      "real_model": {
+        "status": "NOT_RUN"
+      },
+      "real_channels": {
+        "sms": "NOT_RUN",
+        "whatsapp": "NOT_RUN"
+      },
+      "business_acceptance": "NOT_RUN"
+    },
+    {
+      "id": 43,
+      "title": "Pedido de humano o callback",
+      "regression_nodes": [
+        "tests/test_sales_conversation_review.py::test_normal_resume_can_create_another_incident_of_the_same_reason"
+      ],
+      "semantic_outcome": "Pedido de humano o callback",
+      "forbidden_effects": [
+        "unverified_commercial_claims",
+        "cross_scope_disclosure",
+        "unconfirmed_write_or_duplicate_delivery"
+      ],
+      "required_modes": [
+        "regression",
+        "real_model",
+        "real_channels"
+      ],
+      "regression": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "node": "tests/test_sales_conversation_review.py::test_normal_resume_can_create_another_incident_of_the_same_reason",
+            "status": "PASS"
+          }
+        ]
+      },
+      "real_model": {
+        "status": "NOT_RUN"
+      },
+      "real_channels": {
+        "sms": "NOT_RUN",
+        "whatsapp": "NOT_RUN"
+      },
+      "business_acceptance": "NOT_RUN"
+    },
+    {
+      "id": 44,
+      "title": "Motivo de pausa, atención y falso positivo en espejo",
+      "regression_nodes": [
+        "tests/test_sales_delivery4.py::test_mirror_exposes_receipts_summary_and_separate_jobs"
+      ],
+      "semantic_outcome": "Motivo de pausa, atención y falso positivo en espejo",
+      "forbidden_effects": [
+        "unverified_commercial_claims",
+        "cross_scope_disclosure",
+        "unconfirmed_write_or_duplicate_delivery"
+      ],
+      "required_modes": [
+        "regression",
+        "real_model",
+        "real_channels"
+      ],
+      "regression": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "node": "tests/test_sales_delivery4.py::test_mirror_exposes_receipts_summary_and_separate_jobs",
+            "status": "PASS"
+          }
+        ]
+      },
+      "real_model": {
+        "status": "NOT_RUN"
+      },
+      "real_channels": {
+        "sms": "NOT_RUN",
+        "whatsapp": "NOT_RUN"
+      },
+      "business_acceptance": "NOT_RUN"
+    },
+    {
+      "id": 45,
+      "title": "Insulto dirigido: advertir antes de pausar",
+      "regression_nodes": [
+        "tests/test_sales_delivery5.py::test_semantic_personal_harassment_warns_then_pauses_after_actual_warning"
+      ],
+      "semantic_outcome": "Insulto dirigido: advertir antes de pausar",
+      "forbidden_effects": [
+        "unverified_commercial_claims",
+        "cross_scope_disclosure",
+        "unconfirmed_write_or_duplicate_delivery"
+      ],
+      "required_modes": [
+        "regression",
+        "real_model",
+        "real_channels"
+      ],
+      "regression": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "node": "tests/test_sales_delivery5.py::test_semantic_personal_harassment_warns_then_pauses_after_actual_warning[Your bot has the intellect of a brick]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery5.py::test_semantic_personal_harassment_warns_then_pauses_after_actual_warning[ur assistant is completely useless]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery5.py::test_semantic_personal_harassment_warns_then_pauses_after_actual_warning[You are a waste of oxygen]",
+            "status": "PASS"
+          }
+        ]
+      },
+      "real_model": {
+        "status": "NOT_RUN"
+      },
+      "real_channels": {
+        "sms": "NOT_RUN",
+        "whatsapp": "NOT_RUN"
+      },
+      "business_acceptance": "NOT_RUN"
+    },
+    {
+      "id": 46,
+      "title": "Desescalada y resistencia comercial legítima",
+      "regression_nodes": [
+        "tests/test_sales_delivery5.py::test_respectful_return_after_warning_continues_property_enquiry"
+      ],
+      "semantic_outcome": "Desescalada y resistencia comercial legítima",
+      "forbidden_effects": [
+        "unverified_commercial_claims",
+        "cross_scope_disclosure",
+        "unconfirmed_write_or_duplicate_delivery"
+      ],
+      "required_modes": [
+        "regression",
+        "real_model",
+        "real_channels"
+      ],
+      "regression": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "node": "tests/test_sales_delivery5.py::test_respectful_return_after_warning_continues_property_enquiry",
+            "status": "PASS"
+          }
+        ]
+      },
+      "real_model": {
+        "status": "NOT_RUN"
+      },
+      "real_channels": {
+        "sms": "NOT_RUN",
+        "whatsapp": "NOT_RUN"
+      },
+      "business_acceptance": "NOT_RUN"
+    },
+    {
+      "id": 47,
+      "title": "Amenazas concretas y extracción privada",
+      "regression_nodes": [
+        "tests/test_sales_delivery5.py::test_semantic_concrete_threat_is_not_treated_as_ordinary_disagreement"
+      ],
+      "semantic_outcome": "Amenazas concretas y extracción privada",
+      "forbidden_effects": [
+        "unverified_commercial_claims",
+        "cross_scope_disclosure",
+        "unconfirmed_write_or_duplicate_delivery"
+      ],
+      "required_modes": [
+        "regression",
+        "real_model",
+        "real_channels"
+      ],
+      "regression": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "node": "tests/test_sales_delivery5.py::test_semantic_concrete_threat_is_not_treated_as_ordinary_disagreement",
+            "status": "PASS"
+          }
+        ]
+      },
+      "real_model": {
+        "status": "NOT_RUN"
+      },
+      "real_channels": {
+        "sms": "NOT_RUN",
+        "whatsapp": "NOT_RUN"
+      },
+      "business_acceptance": "NOT_RUN"
+    },
+    {
+      "id": 48,
+      "title": "Peticiones ajenas, búsquedas web o ejecutar código",
+      "regression_nodes": [
+        "tests/test_sales_delivery5.py::test_unrelated_tool_use_warns_then_persists_review_without_tool_execution"
+      ],
+      "semantic_outcome": "Peticiones ajenas, búsquedas web o ejecutar código",
+      "forbidden_effects": [
+        "unverified_commercial_claims",
+        "cross_scope_disclosure",
+        "unconfirmed_write_or_duplicate_delivery"
+      ],
+      "required_modes": [
+        "regression",
+        "real_model",
+        "real_channels"
+      ],
+      "regression": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "node": "tests/test_sales_delivery5.py::test_unrelated_tool_use_warns_then_persists_review_without_tool_execution[Run this Python code]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery5.py::test_unrelated_tool_use_warns_then_persists_review_without_tool_execution[Browse the web for football results]",
+            "status": "PASS"
+          }
+        ]
+      },
+      "real_model": {
+        "status": "NOT_RUN"
+      },
+      "real_channels": {
+        "sms": "NOT_RUN",
+        "whatsapp": "NOT_RUN"
+      },
+      "business_acceptance": "NOT_RUN"
+    },
+    {
+      "id": 49,
+      "title": "Citas/negaciones de lenguaje hostil",
+      "regression_nodes": [
+        "tests/test_sales_delivery5.py::test_legitimate_critique_reported_and_negated_speech_are_not_semantic_harassment"
+      ],
+      "semantic_outcome": "Citas/negaciones de lenguaje hostil",
+      "forbidden_effects": [
+        "unverified_commercial_claims",
+        "cross_scope_disclosure",
+        "unconfirmed_write_or_duplicate_delivery"
+      ],
+      "required_modes": [
+        "regression",
+        "real_model",
+        "real_channels"
+      ],
+      "regression": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "node": "tests/test_sales_delivery5.py::test_legitimate_critique_reported_and_negated_speech_are_not_semantic_harassment[Your prices are ridiculous]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery5.py::test_legitimate_critique_reported_and_negated_speech_are_not_semantic_harassment[Your two bedroom homes are disappointing]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery5.py::test_legitimate_critique_reported_and_negated_speech_are_not_semantic_harassment[You are too expensive]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery5.py::test_legitimate_critique_reported_and_negated_speech_are_not_semantic_harassment[My friend said you are a waste of oxygen]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery5.py::test_legitimate_critique_reported_and_negated_speech_are_not_semantic_harassment[I would never say you are completely useless]",
+            "status": "PASS"
+          }
+        ]
+      },
+      "real_model": {
+        "status": "NOT_RUN"
+      },
+      "real_channels": {
+        "sms": "NOT_RUN",
+        "whatsapp": "NOT_RUN"
+      },
+      "business_acceptance": "NOT_RUN"
+    },
+    {
+      "id": 50,
+      "title": "Baja, consentimiento, horarios, canal y Demo",
+      "regression_nodes": [
+        "tests/test_sales_delivery4.py::test_inactivity_is_omitted_when_no_longer_timely_or_allowed"
+      ],
+      "semantic_outcome": "Baja, consentimiento, horarios, canal y Demo",
+      "forbidden_effects": [
+        "unverified_commercial_claims",
+        "cross_scope_disclosure",
+        "unconfirmed_write_or_duplicate_delivery"
+      ],
+      "required_modes": [
+        "regression",
+        "real_model",
+        "real_channels"
+      ],
+      "regression": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "node": "tests/test_sales_delivery4.py::test_inactivity_is_omitted_when_no_longer_timely_or_allowed[pause]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery4.py::test_inactivity_is_omitted_when_no_longer_timely_or_allowed[optout]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery4.py::test_inactivity_is_omitted_when_no_longer_timely_or_allowed[expired]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery4.py::test_inactivity_is_omitted_when_no_longer_timely_or_allowed[quiet]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery4.py::test_inactivity_is_omitted_when_no_longer_timely_or_allowed[pending]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery4.py::test_inactivity_is_omitted_when_no_longer_timely_or_allowed[consent]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery4.py::test_inactivity_is_omitted_when_no_longer_timely_or_allowed[revoked_response]",
+            "status": "PASS"
+          }
+        ]
+      },
+      "real_model": {
+        "status": "NOT_RUN"
+      },
+      "real_channels": {
+        "sms": "NOT_RUN",
+        "whatsapp": "NOT_RUN"
+      },
+      "business_acceptance": "NOT_RUN"
+    },
+    {
+      "id": 51,
+      "title": "Company/Project/lead aislados y recursos autorizados",
+      "regression_nodes": [
+        "tests/test_sales_delivery3.py::test_api_targets_and_updates_reject_other_project_ids"
+      ],
+      "semantic_outcome": "Company/Project/lead aislados y recursos autorizados",
+      "forbidden_effects": [
+        "unverified_commercial_claims",
+        "cross_scope_disclosure",
+        "unconfirmed_write_or_duplicate_delivery"
+      ],
+      "required_modes": [
+        "regression",
+        "real_model",
+        "real_channels"
+      ],
+      "regression": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "node": "tests/test_sales_delivery3.py::test_api_targets_and_updates_reject_other_project_ids",
+            "status": "PASS"
+          }
+        ]
+      },
+      "real_model": {
+        "status": "NOT_RUN"
+      },
+      "real_channels": {
+        "sms": "NOT_RUN",
+        "whatsapp": "NOT_RUN"
+      },
+      "business_acceptance": "NOT_RUN"
+    },
+    {
+      "id": 52,
+      "title": "Primera cita, horarios y confirmación",
+      "regression_nodes": [
+        "tests/test_sales_ai_group_f.py::test_first_booking_is_two_step_complete_scoped_and_open"
+      ],
+      "semantic_outcome": "Primera cita, horarios y confirmación",
+      "forbidden_effects": [
+        "unverified_commercial_claims",
+        "cross_scope_disclosure",
+        "unconfirmed_write_or_duplicate_delivery"
+      ],
+      "required_modes": [
+        "regression",
+        "real_model",
+        "real_channels"
+      ],
+      "regression": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "node": "tests/test_sales_ai_group_f.py::test_first_booking_is_two_step_complete_scoped_and_open[sms]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_ai_group_f.py::test_first_booking_is_two_step_complete_scoped_and_open[whatsapp]",
+            "status": "PASS"
+          }
+        ]
+      },
+      "real_model": {
+        "status": "NOT_RUN"
+      },
+      "real_channels": {
+        "sms": "NOT_RUN",
+        "whatsapp": "NOT_RUN"
+      },
+      "business_acceptance": "NOT_RUN"
+    },
+    {
+      "id": 53,
+      "title": "Consultar, cambiar o cancelar citas existentes",
+      "regression_nodes": [
+        "tests/test_sales_ai_group_h.py::test_request_then_exact_confirmation_cancels_once_and_keeps_chat_open"
+      ],
+      "semantic_outcome": "Consultar, cambiar o cancelar citas existentes",
+      "forbidden_effects": [
+        "unverified_commercial_claims",
+        "cross_scope_disclosure",
+        "unconfirmed_write_or_duplicate_delivery"
+      ],
+      "required_modes": [
+        "regression",
+        "real_model",
+        "real_channels"
+      ],
+      "regression": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "node": "tests/test_sales_ai_group_h.py::test_request_then_exact_confirmation_cancels_once_and_keeps_chat_open[sms]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_ai_group_h.py::test_request_then_exact_confirmation_cancels_once_and_keeps_chat_open[whatsapp]",
+            "status": "PASS"
+          }
+        ]
+      },
+      "real_model": {
+        "status": "NOT_RUN"
+      },
+      "real_channels": {
+        "sms": "NOT_RUN",
+        "whatsapp": "NOT_RUN"
+      },
+      "business_acceptance": "NOT_RUN"
+    },
+    {
+      "id": 54,
+      "title": "FIFO, duplicados y fallos de entrega",
+      "regression_nodes": [
+        "tests/test_sales_delivery5.py::test_ambiguous_transport_failure_has_one_attempt_and_reviewable_receipt"
+      ],
+      "semantic_outcome": "FIFO, duplicados y fallos de entrega",
+      "forbidden_effects": [
+        "unverified_commercial_claims",
+        "cross_scope_disclosure",
+        "unconfirmed_write_or_duplicate_delivery"
+      ],
+      "required_modes": [
+        "regression",
+        "real_model",
+        "real_channels"
+      ],
+      "regression": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "node": "tests/test_sales_delivery5.py::test_ambiguous_transport_failure_has_one_attempt_and_reviewable_receipt[error0]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery5.py::test_ambiguous_transport_failure_has_one_attempt_and_reviewable_receipt[error1]",
+            "status": "PASS"
+          }
+        ]
+      },
+      "real_model": {
+        "status": "NOT_RUN"
+      },
+      "real_channels": {
+        "sms": "NOT_RUN",
+        "whatsapp": "NOT_RUN"
+      },
+      "business_acceptance": "NOT_RUN"
+    },
+    {
+      "id": 55,
+      "title": "Interpretación inválida y reparación",
+      "regression_nodes": [
+        "tests/test_sales_understanding_recovery.py::test_repair_recovers_available_properties_and_retry_does_not_resend"
+      ],
+      "semantic_outcome": "Interpretación inválida y reparación",
+      "forbidden_effects": [
+        "unverified_commercial_claims",
+        "cross_scope_disclosure",
+        "unconfirmed_write_or_duplicate_delivery"
+      ],
+      "required_modes": [
+        "regression",
+        "real_model",
+        "real_channels"
+      ],
+      "regression": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "node": "tests/test_sales_understanding_recovery.py::test_repair_recovers_available_properties_and_retry_does_not_resend",
+            "status": "PASS"
+          }
+        ]
+      },
+      "real_model": {
+        "status": "NOT_RUN"
+      },
+      "real_channels": {
+        "sms": "NOT_RUN",
+        "whatsapp": "NOT_RUN"
+      },
+      "business_acceptance": "NOT_RUN"
+    },
+    {
+      "id": 56,
+      "title": "Activación y configuración efectiva coherentes",
+      "regression_nodes": [
+        "tests/test_sales_delivery1.py::test_current_workflow_ignores_old_flags_lists_and_modes"
+      ],
+      "semantic_outcome": "Activación y configuración efectiva coherentes",
+      "forbidden_effects": [
+        "unverified_commercial_claims",
+        "cross_scope_disclosure",
+        "unconfirmed_write_or_duplicate_delivery"
+      ],
+      "required_modes": [
+        "regression",
+        "real_model",
+        "real_channels"
+      ],
+      "regression": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "node": "tests/test_sales_delivery1.py::test_current_workflow_ignores_old_flags_lists_and_modes[disabled]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery1.py::test_current_workflow_ignores_old_flags_lists_and_modes[shadow]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery1.py::test_current_workflow_ignores_old_flags_lists_and_modes[active]",
+            "status": "PASS"
+          }
+        ]
+      },
+      "real_model": {
+        "status": "NOT_RUN"
+      },
+      "real_channels": {
+        "sms": "NOT_RUN",
+        "whatsapp": "NOT_RUN"
+      },
+      "business_acceptance": "NOT_RUN"
+    },
+    {
+      "id": 57,
+      "title": "Calidad real del modelo y aceptación end-to-end",
+      "regression_nodes": [],
+      "semantic_outcome": "Requires real-model evaluation and reviewed real-channel receipts",
+      "forbidden_effects": [
+        "unverified_commercial_claims",
+        "cross_scope_disclosure",
+        "unconfirmed_write_or_duplicate_delivery"
+      ],
+      "required_modes": [
+        "regression",
+        "real_model",
+        "real_channels"
+      ],
+      "regression": {
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "real_model": {
+        "status": "NOT_RUN"
+      },
+      "real_channels": {
+        "sms": "NOT_RUN",
+        "whatsapp": "NOT_RUN"
+      },
+      "business_acceptance": "NOT_RUN"
+    },
+    {
+      "id": 58,
+      "title": "Saludo inicial contextual y captura de campaña",
+      "regression_nodes": [
+        "tests/test_sales_delivery1.py::test_current_simulation_initial_contact_and_virtual_followup_are_idempotent"
+      ],
+      "semantic_outcome": "Saludo inicial contextual y captura de campaña",
+      "forbidden_effects": [
+        "unverified_commercial_claims",
+        "cross_scope_disclosure",
+        "unconfirmed_write_or_duplicate_delivery"
+      ],
+      "required_modes": [
+        "regression",
+        "real_model",
+        "real_channels"
+      ],
+      "regression": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "node": "tests/test_sales_delivery1.py::test_current_simulation_initial_contact_and_virtual_followup_are_idempotent",
+            "status": "PASS"
+          }
+        ]
+      },
+      "real_model": {
+        "status": "NOT_RUN"
+      },
+      "real_channels": {
+        "sms": "NOT_RUN",
+        "whatsapp": "NOT_RUN"
+      },
+      "business_acceptance": "NOT_RUN"
+    },
+    {
+      "id": 59,
+      "title": "Cualificación comercial progresiva y no obligatoria",
+      "regression_nodes": [
+        "tests/test_sales_ai_group_c.py::test_meta_budget_reaches_real_interpreter_and_next_question_is_not_budget"
+      ],
+      "semantic_outcome": "Cualificación comercial progresiva y no obligatoria",
+      "forbidden_effects": [
+        "unverified_commercial_claims",
+        "cross_scope_disclosure",
+        "unconfirmed_write_or_duplicate_delivery"
+      ],
+      "required_modes": [
+        "regression",
+        "real_model",
+        "real_channels"
+      ],
+      "regression": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "node": "tests/test_sales_ai_group_c.py::test_meta_budget_reaches_real_interpreter_and_next_question_is_not_budget",
+            "status": "PASS"
+          }
+        ]
+      },
+      "real_model": {
+        "status": "NOT_RUN"
+      },
+      "real_channels": {
+        "sms": "NOT_RUN",
+        "whatsapp": "NOT_RUN"
+      },
+      "business_acceptance": "NOT_RUN"
+    },
+    {
+      "id": 60,
+      "title": "Tour virtual y mapa como recursos",
+      "regression_nodes": [
+        "tests/test_sales_delivery3.py::test_reviewed_external_resources_still_use_audited_links_and_no_fetch"
+      ],
+      "semantic_outcome": "Tour virtual y mapa como recursos",
+      "forbidden_effects": [
+        "unverified_commercial_claims",
+        "cross_scope_disclosure",
+        "unconfirmed_write_or_duplicate_delivery"
+      ],
+      "required_modes": [
+        "regression",
+        "real_model",
+        "real_channels"
+      ],
+      "regression": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "node": "tests/test_sales_delivery3.py::test_reviewed_external_resources_still_use_audited_links_and_no_fetch[virtual_tour-tags0]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery3.py::test_reviewed_external_resources_still_use_audited_links_and_no_fetch[location_map-tags1]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery3.py::test_reviewed_external_resources_still_use_audited_links_and_no_fetch[floor_plan-tags2]",
+            "status": "PASS"
+          }
+        ]
+      },
+      "real_model": {
+        "status": "NOT_RUN"
+      },
+      "real_channels": {
+        "sms": "NOT_RUN",
+        "whatsapp": "NOT_RUN"
+      },
+      "business_acceptance": "NOT_RUN"
+    },
+    {
+      "id": 61,
+      "title": "Scoring interno y temperaturas hot/warm/cold",
+      "regression_nodes": [
+        "tests/test_sales_delivery2.py::test_negative_current_facts_no_positive_score"
+      ],
+      "semantic_outcome": "Scoring interno y temperaturas hot/warm/cold",
+      "forbidden_effects": [
+        "unverified_commercial_claims",
+        "cross_scope_disclosure",
+        "unconfirmed_write_or_duplicate_delivery"
+      ],
+      "required_modes": [
+        "regression",
+        "real_model",
+        "real_channels"
+      ],
+      "regression": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "node": "tests/test_sales_delivery2.py::test_negative_current_facts_no_positive_score[purchase_timeline-I am not buying next month-timeline]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery2.py::test_negative_current_facts_no_positive_score[financing-I am not pre-approved-financial_readiness]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery2.py::test_negative_current_facts_no_positive_score[visit_readiness-I do not want a visit-appointment_intent]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery2.py::test_negative_current_facts_no_positive_score[decision_structure-My partner has not decided-decision_authority]",
+            "status": "PASS"
+          }
+        ]
+      },
+      "real_model": {
+        "status": "NOT_RUN"
+      },
+      "real_channels": {
+        "sms": "NOT_RUN",
+        "whatsapp": "NOT_RUN"
+      },
+      "business_acceptance": "NOT_RUN"
+    },
+    {
+      "id": 62,
+      "title": "Segmentación y estrategias publicadas",
+      "regression_nodes": [
+        "tests/test_sales_delivery2.py::test_explicit_segment_and_withdrawal"
+      ],
+      "semantic_outcome": "Segmentación y estrategias publicadas",
+      "forbidden_effects": [
+        "unverified_commercial_claims",
+        "cross_scope_disclosure",
+        "unconfirmed_write_or_duplicate_delivery"
+      ],
+      "required_modes": [
+        "regression",
+        "real_model",
+        "real_channels"
+      ],
+      "regression": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "node": "tests/test_sales_delivery2.py::test_explicit_segment_and_withdrawal[first_time_buyer-I am buying my first home]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery2.py::test_explicit_segment_and_withdrawal[move_up_buyer-I want more space]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery2.py::test_explicit_segment_and_withdrawal[relocation-I am relocating for work]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery2.py::test_explicit_segment_and_withdrawal[downsizing-I want less maintenance]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery2.py::test_explicit_segment_and_withdrawal[rental_yield_investor-I want rental income]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery2.py::test_explicit_segment_and_withdrawal[appreciation_resale_investor-I plan to resell]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_delivery2.py::test_explicit_segment_and_withdrawal[portfolio_diversification-I want to diversify my property portfolio]",
+            "status": "PASS"
+          }
+        ]
+      },
+      "real_model": {
+        "status": "NOT_RUN"
+      },
+      "real_channels": {
+        "sms": "NOT_RUN",
+        "whatsapp": "NOT_RUN"
+      },
+      "business_acceptance": "NOT_RUN"
+    },
+    {
+      "id": 63,
+      "title": "Objeciones, quejas y excepciones legales/comerciales",
+      "regression_nodes": [
+        "tests/test_sales_continuity_gaps.py::test_negated_exception_request_does_not_pause_normal_material_request"
+      ],
+      "semantic_outcome": "Objeciones, quejas y excepciones legales/comerciales",
+      "forbidden_effects": [
+        "unverified_commercial_claims",
+        "cross_scope_disclosure",
+        "unconfirmed_write_or_duplicate_delivery"
+      ],
+      "required_modes": [
+        "regression",
+        "real_model",
+        "real_channels"
+      ],
+      "regression": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "node": "tests/test_sales_continuity_gaps.py::test_negated_exception_request_does_not_pause_normal_material_request[I don't need legal advice; just send the approved brochure.]",
+            "status": "PASS"
+          },
+          {
+            "node": "tests/test_sales_continuity_gaps.py::test_negated_exception_request_does_not_pause_normal_material_request[I'm not asking for a special discount; just send the approved price list.]",
+            "status": "PASS"
+          }
+        ]
+      },
+      "real_model": {
+        "status": "NOT_RUN"
+      },
+      "real_channels": {
+        "sms": "NOT_RUN",
+        "whatsapp": "NOT_RUN"
+      },
+      "business_acceptance": "NOT_RUN"
+    },
+    {
+      "id": 64,
+      "title": "Handoff con resumen útil para Sales",
+      "regression_nodes": [
+        "tests/test_sales_delivery4.py::test_mirror_exposes_receipts_summary_and_separate_jobs"
+      ],
+      "semantic_outcome": "Handoff con resumen útil para Sales",
+      "forbidden_effects": [
+        "unverified_commercial_claims",
+        "cross_scope_disclosure",
+        "unconfirmed_write_or_duplicate_delivery"
+      ],
+      "required_modes": [
+        "regression",
+        "real_model",
+        "real_channels"
+      ],
+      "regression": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "node": "tests/test_sales_delivery4.py::test_mirror_exposes_receipts_summary_and_separate_jobs",
+            "status": "PASS"
+          }
+        ]
+      },
+      "real_model": {
+        "status": "NOT_RUN"
+      },
+      "real_channels": {
+        "sms": "NOT_RUN",
+        "whatsapp": "NOT_RUN"
+      },
+      "business_acceptance": "NOT_RUN"
+    }
+  ],
+  "limitations": [
+    "Scripted contracts do not prove model understanding of every paraphrase.",
+    "Case 57 and real SMS/WhatsApp acceptance require observed model/provider results and operator review."
+  ]
+}

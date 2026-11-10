@@ -20,7 +20,7 @@ def documented(tmp_path):
     reference={'path':file.name,'sha256':hashlib.sha256(file.read_bytes()).hexdigest()}
     value=template();commit='a'*40
     value.update(candidate_commit=commit,components={key:commit for key in ['api_commit','worker_commit','frontend_commit']})
-    value['components'].update(alembic_head='20261108_sales_moderation',configuration_sha256='b'*64)
+    value['components'].update(alembic_head='20261109_sales_worker_progress',configuration_sha256='b'*64)
     value['authorization']={'approved':True,'operator':'Synthetic reviewer','environment':'synthetic-no-network','company_id':str(uuid.uuid4()),'project_id':str(uuid.uuid4()),'test_contact_reference':reference,'channels':['sms','whatsapp'],'expires_at':(NOW+timedelta(hours=1)).isoformat()}
     value['checks']={key:{'status':'passed','candidate_commit':commit,'reviewed_by':'Synthetic reviewer','reviewed_at':(NOW-timedelta(minutes=1)).isoformat(),'evidence':[reference]} for key in REQUIRED}
     return value

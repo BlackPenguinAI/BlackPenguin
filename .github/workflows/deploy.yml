@@ -147,12 +147,13 @@ jobs:
             wait_for_readiness() {
               for attempt in $(seq 1 30); do
                 if curl --fail --silent --show-error \
-                  http://127.0.0.1:8000/api/v1/health/ready >/dev/null; then
+                  http://127.0.0.1:8000/api/v1/health/ready >/dev/null && \
+                  curl --fail --silent --show-error http://127.0.0.1:8000/api/v1/health/sales >/dev/null; then
                   return 0
                 fi
                 sleep 2
               done
-              echo "API readiness check did not pass."
+              echo "API or Sales queue readiness check did not pass."
               docker inspect --format \
                 'running={{.State.Running}} status={{.State.Status}} exit={{.State.ExitCode}}' \
                 bp_api_prod 2>/dev/null || true
@@ -304,9 +305,34 @@ jobs:
               -e SALES_ACCEPTANCE_ROOT=/preflight \
               -v "$REPOSITORY_DIR/backend/tests:/app/tests:ro" \
               -v "$REPOSITORY_DIR/docs:/preflight/docs:ro" \
+              -v "$REPOSITORY_DIR/.github:/preflight/.github:ro" \
               -v "$REPOSITORY_DIR/backend/tests:/preflight/backend/tests:ro" \
               "$API_IMAGE" \
               python -m pytest -q /app/tests
+
+            # Bind the 64-case scripted report to the immutable candidate image.
+            # Model/channel acceptance remains explicitly NOT_RUN in that report.
+            SALES_EVIDENCE_DIR="/tmp/blackpenguin-sales-evidence-$DEPLOY_SHA"
+            mkdir -p "$SALES_EVIDENCE_DIR"
+            docker run --rm --network none \
+              -e ENVIRONMENT=test -e DATABASE_URL=sqlite:////tmp/sales-registry.db \
+              -e SECRET_KEY=candidate-regression-only -e ACCESS_TOKEN_EXPIRE_MINUTES=60 \
+              -e FIRST_SUPERADMIN_EMAIL=test@example.invalid -e FIRST_SUPERADMIN_PASSWORD=test-only \
+              -e META_ACCESS_TOKEN=test-only -e OPENROUTER_API_KEY=test-only \
+              -e PROJECT_UPLOAD_ROOT=/tmp/blackpenguin-test-uploads \
+              -v "$REPOSITORY_DIR/backend/tests:/app/tests:ro" \
+              -v "$SALES_EVIDENCE_DIR:/evidence" \
+              "$API_IMAGE" python -m tools.sales_ai.current_acceptance \
+              --mode regression --output /evidence/acceptance64.json
+
+            # Real PostgreSQL races run before stopping any production process.
+            # The helper uses only an internal disposable network/database and
+            # rejects an API image from a different candidate commit.
+            python3 backend/tools/sales_ai/postgres_checks.py \
+              --image "$API_IMAGE" \
+              --expected-commit "$DEPLOY_SHA" \
+              --tests "$REPOSITORY_DIR/backend/tests" \
+              --output "/tmp/blackpenguin-sales-postgres-$DEPLOY_SHA.json"
 
             # Docker creates the bind-mount directory when it does not exist.
             # The write check runs as the same image user as API and worker and
@@ -378,6 +404,7 @@ jobs:
               false
             }
 
+            curl --fail --silent --show-error http://127.0.0.1:8000/api/v1/health/sales >/dev/null
             RELEASE_STARTED=false
             trap - ERR
             printf '%s\n' "$DEPLOY_SHA" > "$DEPLOY_STATE_FILE"

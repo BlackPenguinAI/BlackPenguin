@@ -62,7 +62,15 @@ def prompt_snapshot(agent):
 
 
 def next_prompt_snapshot(guidance):
-    return {'version':'sales-understanding-prompt/2.11','system':SYSTEM_PROMPT+'''
+    return {'version':'sales-understanding-prompt/2.12','system':SYSTEM_PROMPT+'''
+SA-09: classify directed personal harassment semantically, including paraphrases and typos,
+with an exact current quotation. Criticizing prices, layouts or service and expressing
+frustration is not personal harassment. Quoted, reported, hypothetical and negated abuse
+is not the lead attacking the agent. A respectful return to property questions is safe.
+Use unauthorized_use only for requests to execute code or browse/search unrelated material;
+a Project website, approved material or a property question is not unauthorized use.
+Never execute code, browse or reveal credentials; classification never grants tool access.
+
 When resume_sources is present, current_message is an internal consolidation of unanswered
 lead messages after human takeover. Answer their pending requests together. Each evidence
 quote must come from one original resume_sources content; never join quotes across messages.

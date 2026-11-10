@@ -643,6 +643,7 @@ def create_intervention_case(
         "ABUSE": "Abusive behavior requires human review",
         "THREAT": "A concrete threat requires human review",
         "REPEATED_ABUSE": "Personal abuse continued after an accepted warning",
+        "REPEATED_UNAUTHORIZED_USE": "Unrelated web or code requests continued after an accepted warning",
         "LEGAL": "Legal or regulatory review is required",
         "POLICY_VIOLATION": "A protected policy prevented the automated response",
         "LOW_CONFIDENCE": "The request requires human clarification",

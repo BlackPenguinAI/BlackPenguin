@@ -469,6 +469,9 @@ async def _dispatch_part(
             OutboundMessage.idempotency_key == idempotency_key,
         ).first()
         if existing_outbound:
+            if existing_outbound.status=='delivery_unknown':
+                from .delivery_policy import DeliveryUncertainError
+                raise DeliveryUncertainError('Provider acceptance is uncertain; review the original receipt.')
             message_query = db.query(SalesMessage).filter(
                 SalesMessage.conversation_id == conversation.id,
                 SalesMessage.direction == "outbound",
@@ -539,6 +542,12 @@ async def _dispatch_part(
         db.refresh(lead)
         if (lead.is_opt_out and message_metadata.get('control_outcome')!='opt_out') or (conversation.is_paused and not message_metadata.get('control_outcome') and not message_metadata.get('meeting_id')):
             raise PermissionError('Automatic dispatch was interrupted by manual control or opt-out.')
+        if message_metadata.get('engine')=='sales-active/1.0':
+            from .active_service import authorize_part
+            authorize_part(db,conversation,lead,message_metadata)
+        if message_metadata.get('inactivity_job_id') or message_metadata.get('cadence_job_id'):
+            from .execution import permitted
+            if not permitted(lead):raise PermissionError('Contact consent changed before dispatch.')
         if message_metadata.get('cadence_job_id'):
             from .continuity import state as continuity_state,pending as pending_messages
             cadence_job=db.get(SalesFollowUpJob,message_metadata['cadence_job_id'])
@@ -562,14 +571,21 @@ async def _dispatch_part(
                 template_parameters=template_parameters,
             )
     except Exception as exc:
-        outbound.status = "failed"; outbound.last_error = type(exc).__name__
-        message.status = "failed"
+        from .delivery_policy import uncertain,DeliveryUncertainError
+        unknown=uncertain(exc)
+        outbound.status = 'delivery_unknown' if unknown else 'failed'; outbound.last_error = type(exc).__name__
+        message.status = outbound.status
         for share in db.query(SalesAssetShare).filter(SalesAssetShare.id.in_(share_ids)).all() if share_ids else []:
             asset_share_service.record_event(db, share=share, event_type="delivery_failed")
         db.commit()
+        if unknown:raise DeliveryUncertainError('Provider acceptance is uncertain; reconcile the receipt before another send.') from exc
         raise
     sid = result.get("sid")
     status = result.get("status") or "queued"
+    if not sid and status not in {'failed','undelivered','delivery_failed','sending_failed','rejected'}:
+        from .delivery_policy import DeliveryUncertainError
+        outbound.status=message.status='delivery_unknown';outbound.last_error='MissingProviderReceipt'
+        db.commit();raise DeliveryUncertainError('The provider did not return a message identifier.')
     outbound.provider_message_id = sid; outbound.status = status; outbound.sent_at = workflow_now(datetime)
     message.provider_message_id = sid; message.status = status
     for share in db.query(SalesAssetShare).filter(SalesAssetShare.id.in_(share_ids)).all() if share_ids else []:
@@ -1631,6 +1647,15 @@ async def process_live_inbound_job(job_id: str) -> None:
         db.rollback()
         job = db.query(SalesInboundJob).filter(SalesInboundJob.id == job_id).first()
         if job:
+            from .delivery_policy import DeliveryUncertainError
+            if isinstance(exc,DeliveryUncertainError):
+                job.status='review';job.error_code='DELIVERY_UNCERTAIN';job.error_message='Review the provider receipt before any resend.'
+                conversation=db.get(SalesConversation,job.conversation_id)
+                lead=db.get(Lead,conversation.lead_id) if conversation else None
+                if lead:lead.agent_status='attention_required'
+                message=db.get(SalesMessage,job.message_id)
+                if message:message.metadata_json={**(message.metadata_json or {}),'agent_turn_status':'review','agent_turn_error':job.error_message}
+                db.commit();raise
             terminal = (job.attempt_number or 0) >= 3
             job.status = "failed" if terminal else "retry"
             job.claimed_at = None
@@ -1846,10 +1871,13 @@ async def process_live_followup_job(job_id: str) -> None:
             lead.pipeline_stage = "S06_NURTURE"
         _schedule_next_action(db, conversation, lead, event_id)
         db.add_all([job, lead]); db.commit()
-    except Exception:
+    except Exception as exc:
         db.rollback()
         job = db.query(SalesFollowUpJob).filter(SalesFollowUpJob.id == job_id).first()
         if job and job.status not in {'cancelled','processed','review'}:
+            from .delivery_policy import DeliveryUncertainError
+            if isinstance(exc,DeliveryUncertainError):
+                job.status='review';job.reason='provider_receipt_requires_review';db.commit();raise
             if job.kind in {'resume','inactivity'}:
                 job.status='review';job.reason=job.kind+'_send_requires_review';db.commit();raise
             job.status = "failed" if job.attempt_number >= 3 else "pending"

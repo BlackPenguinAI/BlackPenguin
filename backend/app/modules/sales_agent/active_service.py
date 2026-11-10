@@ -555,6 +555,8 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
                     text="I cannot share private credentials or access another company's data. Your request has been recorded for the Sales team to review."
                 if protected in {'THREAT','REPEATED_ABUSE'}:
                     text='This conversation needs the Sales team to review the '+('threatening message.' if protected=='THREAT' else 'continued personal abuse after the warning.')
+                if protected=='REPEATED_UNAUTHORIZED_USE':
+                    text='Continued requests outside property assistance after the warning have been recorded for the Sales team to review.'
                 if moderation_decision and moderation_decision.get('id'):
                     from .moderation_models import SalesModerationIncident
                     db.get(SalesModerationIncident,moderation_decision['id']).intervention_case_id=case.id
@@ -667,8 +669,8 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
                         metadata['qualification_offer']={'field':field,'question':question}
             moderation_boundary=bool(moderation_decision and moderation_decision['disposition'] in {'warn','boundary'})
             if moderation_boundary:
-                from .moderation import WARNING,BOUNDARY
-                text=WARNING if moderation_decision['disposition']=='warn' else BOUNDARY
+                from .moderation import WARNING,BOUNDARY,USE_WARNING
+                text=(USE_WARNING if moderation_decision['category']=='unauthorized_use' else WARNING) if moderation_decision['disposition']=='warn' else BOUNDARY
             if next_enabled and not exact_stop and not protected and not moderation_boundary:
                 from .commercial_composer import compose as compose_commercial
                 # Replace stacked catalog/material/qualification questions with

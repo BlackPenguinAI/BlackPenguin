@@ -167,7 +167,7 @@ class Courtesy(StrictModel):
 
 
 class ModerationInterpretation(StrictModel):
-    category: Literal['disagreement','off_topic','profanity','harassment','threat','security']
+    category: Literal['disagreement','off_topic','profanity','harassment','unauthorized_use','threat','security']
     evidence: str = Field(min_length=1,max_length=2000)
 
 

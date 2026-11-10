@@ -5,6 +5,7 @@
     <p *ngIf="c.scope_limited" class="notice">Only information permitted for this selection is shown. Historical or restricted enquiry context is unavailable.</p>
     <div class="status"><strong>Chat: {{label(c.chat?.status)}}</strong><span>Follow-ups: {{label(c.chat?.cadence)}}<ng-container *ngIf="c.chat?.cadence_reason"> · {{label(c.chat.cadence_reason)}}</ng-container></span></div>
     <p *ngIf="c.chat?.pause_reason" class="alert">{{c.chat.pause_reason}}</p>
+    <p *ngIf="c.trace?.last_message_status === 'delivery_unknown'" class="alert">Provider acceptance is uncertain. Review the original provider receipt before sending again; automatic resend is stopped.</p>
     <dl *ngIf="c.execution&&!c.scope_limited" class="execution">
       <div><dt>Sales workflow</dt><dd>Current · {{c.execution.workflow_version || 'Version not recorded'}}</dd></div>
       <div><dt>Last recorded turn</dt><dd>{{c.trace?.workflow_version || 'Workflow version not recorded'}}<ng-container *ngIf="c.trace?.prompt_version"> · {{c.trace.prompt_version}}</ng-container></dd></div>

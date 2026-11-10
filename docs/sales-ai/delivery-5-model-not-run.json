@@ -1,0 +1,65 @@
+{
+  "version": "sales-ai-model-evaluation/1.0",
+  "mode": "real",
+  "model": "openai/gpt-4o-mini",
+  "status": "BLOCKED",
+  "model_quality_evaluated": false,
+  "configuration_sha256": "3232b174833358ab31f994254e043d53d53e7ebcd3b8e1634a84d1f5a04eee3a",
+  "catalog_sha256": "5b791214f4599a1d2a6af220a416be33f7a1f69bd96fccd994fc031b5af2e0a0",
+  "planned_cases": 16,
+  "selected_cases": [
+    {
+      "id": "SYN_MULTI:catalog",
+      "origin": "SYNTHETIC",
+      "project_id": "6ad0ef0b-bf27-571a-a423-cb79a44e8f01",
+      "kind": "catalog"
+    },
+    {
+      "id": "SYN_MULTI:mixed",
+      "origin": "SYNTHETIC",
+      "project_id": "6ad0ef0b-bf27-571a-a423-cb79a44e8f01",
+      "kind": "mixed"
+    },
+    {
+      "id": "6ad0ef0b-bf27-571a-a423-cb79a44e8f01:ordinal",
+      "origin": "SYNTHETIC",
+      "project_id": "6ad0ef0b-bf27-571a-a423-cb79a44e8f01",
+      "kind": "ordinal"
+    },
+    {
+      "id": "repeated-abuse",
+      "origin": "SYNTHETIC_TEXT_ON_SYNTHETIC",
+      "project_id": "cb9b071e-09b6-5eea-8405-acff1cff4936",
+      "kind": "moderation"
+    }
+  ],
+  "project_strategy": "one representative project plus moderation reference project",
+  "repeats": 2,
+  "provider_effects": "MOCKED",
+  "results": [],
+  "budget_usd": 0.1,
+  "max_calls": 2,
+  "real_channel_acceptance": "NOT_RUN",
+  "commercial_human_review": "PENDING",
+  "t01_t26_acceptance": "NOT_COMPLETE",
+  "limitations": [
+    "Narrow semantic probes do not constitute full T01–T26 acceptance.",
+    "A budget reservation is conservative inference accounting, not a guarantee covering provider/account fees.",
+    "Exported materials have metadata only; document contents are not validated."
+  ],
+  "blocked_reason": "OPENROUTER_API_KEY_MISSING",
+  "budget_stop_reason": null,
+  "calls": [],
+  "reserved_usd": 0.0,
+  "actual_cost_usd": 0,
+  "cost_fully_reported": true,
+  "passed": 0,
+  "summary": {
+    "by_origin": {},
+    "repeat_consistency": [],
+    "latency_ms": {
+      "p50": null,
+      "p95": null
+    }
+  }
+}

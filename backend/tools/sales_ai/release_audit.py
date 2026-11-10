@@ -25,7 +25,7 @@ def audit(engine,company_id,project_id,*,commit='unknown',service='api',after_st
     if commit!='unknown' and not re.fullmatch('[0-9a-f]{40}',commit):raise ValueError('Use a full commit SHA')
     required={'projects','ai_configurations','prompt_versions','sales_conversations','sales_dialogue_states','meetings',
         'sales_booking_operations','sales_reschedule_operations','sales_cancellation_operations','sales_wait_requests',
-        'sales_moderation_incidents','sales_inbound_jobs','sales_follow_up_jobs','outbound_messages','notification_outbox'}
+        'sales_worker_progress','sales_moderation_incidents','sales_inbound_jobs','sales_follow_up_jobs','outbound_messages','notification_outbox'}
     with engine.connect() as connection:
         sqlite_before=None
         try:
@@ -41,6 +41,10 @@ def audit(engine,company_id,project_id,*,commit='unknown',service='api',after_st
             report={'version':'sales-release-audit/1.0','captured_at':datetime.now(timezone.utc).isoformat(),'service':service,'commit':commit,
                 'scope':{'company_id':company_id,'project_id':project_id},'database_writes':0,'provider_calls':0,'acceptance_proven':False}
             if missing:return {**report,'status':'INCOMPATIBLE_SCHEMA','missing_tables':missing}
+            required_columns={'sales_follow_up_jobs':{'kind','payload_json','claimed_at'},'sales_conversations':{'continuity_json'},'project_sales_assets':{'coverage'}}
+            missing_columns={t:sorted(cols-{c['name'] for c in inspect(connection).get_columns(t)}) for t,cols in required_columns.items() if t in existing}
+            missing_columns={t:cols for t,cols in missing_columns.items() if cols}
+            if missing_columns:return {**report,'status':'INCOMPATIBLE_SCHEMA','missing_columns':missing_columns}
             meta=MetaData()
             def table(name):return Table(name,meta,autoload_with=connection) if name not in meta.tables else meta.tables[name]
             project=table('projects')
@@ -57,7 +61,7 @@ def audit(engine,company_id,project_id,*,commit='unknown',service='api',after_st
                 selected_config={'configuration_id':source['id'],'version_id':published['id'] if published else None,'version_number':published['version_number'] if published else None,
                     'version_source':'published_snapshot' if published else 'legacy_active_config','configuration_sha256':digest(pack),'model':str(pack.get('model') or '')[:100],
                     'draft_differs_from_published':bool(published and digest(pack)!=digest(source['agent_ventas'])),
-                    'runtime':{'mode':runtime.get('mode','disabled'),'scope':runtime.get('scope','cohort'),'lead_filter_count':len(runtime.get('lead_ids') or [])}}
+                    'runtime':{'mode':'active','scope':'global','workflow_version':'sales-current/1.0','mandatory':True,'historical_mode':runtime.get('mode'),'historical_scope':runtime.get('scope'),'historical_lead_filter_count':len(runtime.get('lead_ids') or [])}}
                 break
             counts={}
             for name,column in [('sales_booking_operations','calendar_status'),('sales_reschedule_operations','calendar_status'),('sales_cancellation_operations','calendar_status'),('sales_wait_requests','status'),('sales_moderation_incidents','disposition'),('notification_outbox','status')]:
@@ -67,6 +71,8 @@ def audit(engine,company_id,project_id,*,commit='unknown',service='api',after_st
             conversations=table('sales_conversations');conversation_ids=select(conversations.c.id).where(conversations.c.company_id==company_id,conversations.c.project_id==project_id)
             for name in ['sales_inbound_jobs','sales_follow_up_jobs','outbound_messages']:
                 t=table(name);counts[name]={str(status):n for status,n in connection.execute(select(t.c.status,func.count()).where(t.c.conversation_id.in_(conversation_ids)).group_by(t.c.status))}
+            followups=table('sales_follow_up_jobs')
+            counts['scheduled_work_by_kind']={str(kind)+':'+str(status):n for kind,status,n in connection.execute(select(followups.c.kind,followups.c.status,func.count()).where(followups.c.conversation_id.in_(conversation_ids)).group_by(followups.c.kind,followups.c.status))}
             states=table('sales_dialogue_states');query=select(states.c.id,states.c.conversation_id,states.c.revision,states.c.state_json).where(states.c.company_id==company_id,states.c.project_id==project_id)
             if after_state_id:query=query.where(states.c.id>after_state_id)
             rows=connection.execute(query.order_by(states.c.id).limit(101)).mappings().all();pending=[]

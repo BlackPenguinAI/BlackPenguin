@@ -26,6 +26,7 @@ class MultiTenantMiddleware(BaseHTTPMiddleware):
         is_health_route = request.method == "GET" and path in {
             f"{settings.API_V1_STR}/health/version",
             f"{settings.API_V1_STR}/health/ready",
+            f"{settings.API_V1_STR}/health/sales",
         }
 
         is_google_calendar_callback = (

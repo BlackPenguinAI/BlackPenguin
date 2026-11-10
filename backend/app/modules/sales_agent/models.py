@@ -182,3 +182,13 @@ class SalesFollowUpJob(Base):
     attempt_number = Column(Integer, default=1, nullable=False)
     processed_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class SalesWorkerProgress(Base):
+    """Actual queue scans and job completion evidence for one API process."""
+    __tablename__='sales_worker_progress'
+    id=Column(String(36),primary_key=True)
+    commit_sha=Column(String(64),nullable=False)
+    progress_json=Column(JSON,default=dict,nullable=False)
+    last_progress_at=Column(DateTime,nullable=False,index=True)
+    stopped_at=Column(DateTime,nullable=True)

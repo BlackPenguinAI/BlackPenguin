@@ -50,6 +50,10 @@ REQUIRED_COLUMNS.update({
     'sales_reschedule_operations': {'snapshot_json','replacement_booking_operation_id','calendar_status'},
     'sales_cancellation_operations': {'snapshot_json','calendar_status','next_attempt_at'},
     'sales_wait_requests': {'snapshot_json','status','claim_token','lease_until','next_check_at'},
+    'sales_conversations': {'continuity_json'},
+    'sales_follow_up_jobs': {'kind','payload_json','claimed_at'},
+    'project_sales_assets': {'coverage'},
+    'sales_worker_progress': {'commit_sha','progress_json','last_progress_at','stopped_at'},
     'sales_moderation_incidents': {'category','disposition','warning_accepted_at','dismissed_at'},
 })
 
@@ -116,3 +120,17 @@ def readiness() -> dict[str, str]:
             detail={"status": "not_ready", "reason": "schema_incompatible"},
         )
     return {"status": "ready", "schema_version": CURRENT_SCHEMA_VERSION}
+
+
+@router.get('/sales')
+def sales_readiness():
+    readiness()
+    from app.modules.sales_agent.runtime_health import snapshot
+    from sqlalchemy.orm import Session
+    try:
+        with Session(engine) as db:
+            value=snapshot(db)
+    except Exception as exc:
+        raise HTTPException(503,detail={'status':'not_ready','reason':'sales_progress_unavailable'}) from exc
+    if value['status']!='ready':raise HTTPException(503,detail=value)
+    return value

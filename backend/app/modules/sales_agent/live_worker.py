@@ -113,7 +113,22 @@ def _claim_inbound_jobs(limit: int = 10) -> list[str]:
         db.close()
 
 
+def _progress(phase,**kwargs):
+    try:
+        from .runtime_health import record
+        record(phase,**kwargs)
+    except Exception:
+        logger.exception('Sales worker progress could not be recorded')
+
+
 async def run_live_followup_worker(stop_event: asyncio.Event) -> None:
+    try:
+        await _run_live_followup_worker(stop_event)
+    finally:
+        await asyncio.to_thread(_progress,'stopped',stop=True)
+
+
+async def _run_live_followup_worker(stop_event: asyncio.Event) -> None:
     next_calendar_retry = datetime.min
     next_wait_check = datetime.min
     while not stop_event.is_set():
@@ -121,33 +136,50 @@ async def run_live_followup_worker(stop_event: asyncio.Event) -> None:
             next_calendar_retry = datetime.utcnow() + timedelta(minutes=1)
             try:
                 await asyncio.to_thread(_retry_active_calendars)
-            except Exception:
+                await asyncio.to_thread(_progress,'calendar')
+            except Exception as exc:
+                await asyncio.to_thread(_progress,'calendar',error=exc)
                 logger.exception("Active appointment calendar retry failed")
         if datetime.utcnow() >= next_wait_check:
             next_wait_check = datetime.utcnow() + timedelta(minutes=1)
             try:
                 from .wait_service import process_due
                 await process_due(limit=10)
-            except Exception:
+                await asyncio.to_thread(_progress,'waits')
+            except Exception as exc:
+                await asyncio.to_thread(_progress,'waits',error=exc)
                 logger.exception('Availability wait check failed')
         try:
             await asyncio.to_thread(_process_operational_outboxes)
-        except Exception:
+            await asyncio.to_thread(_progress,'outbox')
+        except Exception as exc:
+            await asyncio.to_thread(_progress,'outbox',error=exc)
             logger.exception("Operational notification outbox processing failed")
         try:
             await asyncio.to_thread(_recover_stale_inbound_jobs)
             inbound_ids = await asyncio.to_thread(_claim_inbound_jobs)
-        except Exception:
+            await asyncio.to_thread(_progress,'inbound')
+        except Exception as exc:
+            await asyncio.to_thread(_progress,'inbound',error=exc)
             logger.exception("Inbound agent queue claim failed")
             inbound_ids = []
         for job_id in inbound_ids:
             try:
                 await process_live_inbound_job(job_id)
+                await asyncio.to_thread(_progress,'inbound',completed=True)
             except Exception:
                 logger.exception("Live inbound agent turn failed", extra={"job_id": job_id})
-        for job_id in await asyncio.to_thread(_claim_due_jobs):
+        try:
+            due_ids=await asyncio.to_thread(_claim_due_jobs)
+            await asyncio.to_thread(_progress,'followup')
+        except Exception as exc:
+            await asyncio.to_thread(_progress,'followup',error=exc)
+            logger.exception('Sales scheduled-work claim failed')
+            due_ids=[]
+        for job_id in due_ids:
             try:
                 await process_live_followup_job(job_id)
+                await asyncio.to_thread(_progress,'followup',completed=True)
             except Exception:
                 logger.exception("Live SMS follow-up failed", extra={"job_id": job_id})
         try:
