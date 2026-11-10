@@ -20,14 +20,14 @@ def personas(project):
             'budget_currency':'USD','budget_amount':900000,'payment':'cash',
             'boundaries':'Do not book, pay, give a real phone number, or consent to external contact.'}
     return {
-        'new_buyer':{**common,'goals':['Ask which property types are available and their prices.',
+        'new_buyer':{**common,'scenario':'new_buyer','detail_property':first['name'],'goals':['Ask which property types are available and their prices.',
             'Ask about bedrooms and area of '+first['name']+'.',
             'Disclose your budget and cash payment if asked; do not repeat already answered questions.']},
-        'targeted_materials':{**common,'property_interest':material['name'],
+        'targeted_materials':{**common,'scenario':'targeted_materials','property_interest':material['name'],
             'goals':['Ask for photos and a PDF brochure specifically for '+material['name']+'.',
                 'Accept an offered exact requested resource; if unavailable accept the answer without requesting substitutes.',
                 'Ask whether parking is confirmed for this property. Do not switch properties.']},
-        'continuity':{**common,'property_interest':focus['name'],
+        'continuity':{**common,'scenario':'continuity','property_interest':focus['name'],
             'goals':['Ask price and current availability of '+focus['name']+'.',
                 'Explain you have cash; if misunderstood correct the misunderstanding naturally.',
                 'Then explicitly change payment preference to bank financing and ask about bedrooms in the SAME message.',
@@ -121,7 +121,7 @@ def run(options_path, output):
                 summary['lead_model']=options.get('lead_model') or credential['pack']['model']
                 summary['sales_model']=credential['pack']['model']
                 summary['configuration_version']=credential['version_number']
-                totals={'PASS':0,'FAIL':0,'BLOCKED':0};projects=manifest['projects']
+                totals={'PASS':0,'FAIL':0,'BLOCKED':0};projects=manifest['projects'];all_cases=[]
                 for index,project in enumerate(projects):
                     remaining=options['max_calls']-budget.calls
                     allocation=remaining//(len(projects)-index)
@@ -151,7 +151,10 @@ def run(options_path, output):
                     summary['projects'].append({'project':project['name'],'status':result['status'],
                         'summary':result['summary'],'report':project['key']+'/report.json','provider_calls':report['provider_calls'],'budget_exhausted':budget.calls>=budget.maximum})
                     summary['scenario_count']+=len(report['cases'])
+                    all_cases.extend(report['cases'])
                     for status,value in result['summary'].items():totals[status]+=value
+                from .lead_controller import metrics
+                summary['lead_controller_metrics']=metrics(all_cases)
                 summary.update(summary=totals,provider_calls=budget.calls,provider_usage=budget.usage,
                     blocked_network_calls=budget.blocked)
                 statuses={p['status'] for p in summary['projects']}

@@ -19,7 +19,6 @@ from tools.sales_ai.synthetic_fixtures import seed, PROJECTS, brochure
 from tools.sales_ai.synthetic_lab import configuration
 from tools.sales_ai.synthetic_lab_worker import run, personas, material_checks
 from tools.sales_ai.evaluation_guard import Budget, guard
-from tools.sales_ai.evaluation_worker import driver
 from app.modules.projects.models import Project, ProjectSalesAsset, SalesAssetShare
 from app.modules.sales_agent.commercial_context import build_commercial_context
 from app.modules.sales_agent.understanding_contract import Understanding
@@ -100,29 +99,31 @@ def mock_models():
         if name=='evaluation_lead':
             system=payload['messages'][0]['content']
             persona=json.JSONDecoder().raw_decode(system.split('profile and goals: ',1)[1])[0]
-            turns=len(ctx['turns']);focus=persona.get('property_interest')
-            if persona['goals'][0].startswith('Ask price'):
-                messages=[f'What properties are available?', 'I can pay cash', 'I need bank financing. How many bedrooms are there?']
-            elif focus:
-                messages=[f'Please send photos and a brochure for {focus}', 'Is there parking?', 'Thanks']
-            else:messages=['What properties are available?', 'How many bedrooms are there?', 'I can pay cash']
-            content=json.dumps({'message':messages[turns] if turns<3 else '', 'done':turns>=3})
+            control=ctx['controller'];current=control['current_goal'];following=control['next_goal']
+            reply=ctx['turns'][-1]['agent'] if ctx['turns'] else ''
+            content=json.dumps({'response_status':'answered' if reply else 'pending',
+                'response_evidence':reply[:500], 'retry_message':current['question'],
+                'next_message':following['question'] if following else ''})
         elif name=='sales_understanding':
             text=ctx['current_message'];data={'version':'sales-understanding/1.0','requests':[],
                 'all_of':[],'alternatives':[],'constraints':[],'references':[],'preferences':[],
                 'requires_clarification':False,'clarification_question':None,'confidence':.99}
+            for item in ctx['approved_context']['property_types']:
+                name=item['property_type']
+                if name in text:
+                    data['references']=[{'id':'ref1','kind':'property','expression':name,'evidence':name}];break
             def req(topic,subject=None,ref=None,**kw):
                 rid='r'+str(len(data['requests']))
-                data['requests'].append({'id':rid,'topic':topic,'subject':subject,'polarity':'request','evidence':text,'reference_id':ref,**kw});data['all_of'].append(rid)
-            if 'photos and a brochure for ' in text:
-                focus=text.split('for ',1)[1]
+                data['requests'].append({'id':rid,'topic':topic,'subject':subject,'polarity':'request','evidence':text,'reference_id':ref or ('ref1' if data['references'] else None),**kw});data['all_of'].append(rid)
+            if 'photos and a' in text and 'brochure for ' in text:
+                focus=text.split('brochure for ',1)[1].strip().rstrip('?')
                 data['references']=[{'id':'ref1','kind':'property','expression':focus,'evidence':focus}]
                 req('materials','photos','ref1');req('materials','brochure','ref1')
             elif 'parking' in text:req('property_details',detail_fields=['features'],feature='parking')
             elif 'bank financing' in text:
                 req('property_details',detail_fields=['bedrooms'])
-                data['preferences']=[{'key':'financing','value':'bank financing','evidence':'I need bank financing','status':'declared'}]
-            elif 'bedrooms' in text:req('property_details',detail_fields=['bedrooms'])
+                data['preferences']=[{'key':'financing','value':'bank financing','evidence':text.split('.',1)[0],'status':'declared'}]
+            elif 'bedrooms' in text:req('property_details',detail_fields=['bedrooms','area'] if 'floor area' in text else ['bedrooms'])
             elif 'cash' in text:data['preferences']=[{'key':'financing','value':'cash','evidence':text,'status':'declared'}]
             elif text=='Thanks':data['courtesy']={'kind':'acknowledgement','evidence':'Thanks'}
             else:req('inventory')
@@ -165,7 +166,12 @@ def test_complete_lab_runs_real_engine_in_private_worker_and_hides_credential(tm
         assert not any(name.endswith('.db') or 'options.json' in name for name in z.namelist())
     with sessionmaker(bind=engine)() as db:
         assert db.query(Lead).count()==9
-        assert db.query(AgentRun).count()==27
+        counts=sum(len(json.loads((output/p['report']).read_text())['cases'][i]['turns'])
+                   for p in summary['projects'] for i in range(3))
+        assert db.query(AgentRun).count()==counts
+        assert 18 <= counts <= 54
+    assert summary['lead_controller_metrics']['finished']==9
+    assert summary['lead_controller_metrics']['role_violations_delivered']==0
     engine.dispose()
 
 

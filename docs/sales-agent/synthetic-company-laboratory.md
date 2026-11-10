@@ -42,7 +42,9 @@ The buyer is an LLM, not a fixed list of lead messages. It receives its initial
 fictional profile and goals plus only the customer-visible transcript. It does not
 receive the database, true asset availability, expected answers or private traces.
 It generates one short message at a time and responds to the actual agent reply.
-A separate lead model may be selected with `--lead-model`; the sales model remains
+As of lead-controller/2.0, the backend owns goal progression with at most two
+attempts per goal and logs unresolved goals separately from controller completion.
+See [lead-controller-v2.md](lead-controller-v2.md). A separate lead model may be selected with `--lead-model`; the sales model remains
 exactly the currently published platform configuration.
 
 The resources scenario covers both resources, PDF only and no resources across the
@@ -53,10 +55,10 @@ or rerun with new wording after reviewing the reports; no prompts self-publish.
 
 Deterministic checks audit current workflow, interpretation/composition acceptance,
 customer-visible receipts, no internal processing narration, no transport/calendar
-side effects, minimum dialogue length and actual exercised goals. Material cases
+side effects, bounded goal completion and actual exercised goals. Material cases
 require the available requested resources to have real sandbox share receipts and
-reject cross-Project or unrequested-property shares. The driver saying `done` is
-not by itself success. Traces retain the actual interpreted facts and responses.
+reject cross-Project or unrequested-property shares. The buyer no longer controls a `done` flag; the controller ending is
+not by itself sales success. Traces retain the actual interpreted facts and responses.
 
 The optional `--judge` uses the existing advisory semantic judge. It is disabled
 by default because its earlier scores required calibration. A machine PASS proves
