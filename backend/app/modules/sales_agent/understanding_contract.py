@@ -432,7 +432,7 @@ def response_schema(current_message=None):
     return schema
 
 
-def parse(raw, inbound):
+def decode(raw):
     if not isinstance(raw, str) or len(raw.encode()) > 64000:
         raise ValueError('Invalid or oversized understanding response.')
     def pairs(items):
@@ -446,7 +446,11 @@ def parse(raw, inbound):
         payload = json.loads(raw, object_pairs_hook=pairs)
     except RecursionError as exc:
         raise ValueError('Understanding JSON is nested too deeply.') from exc
+    return Understanding.model_validate(payload)
+
+
+def parse(raw, inbound):
     from .evidence import anchor
-    validated = Understanding.model_validate(payload)
+    validated = decode(raw)
     anchored = anchor(validated.model_dump(mode='json'), inbound, repair_format=True)
     return Understanding.model_validate(anchored).check_evidence(inbound)

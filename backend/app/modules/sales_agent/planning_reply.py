@@ -25,5 +25,7 @@ def continuation(outcome,holds):
         text='I still have requests to review'+(': '+', '.join(t.replace('_',' ') for t in topics[:4]) if topics else '')+'. Which would you like me to handle next?'
         return text,{}
     if 'appointment' in plan.get('pending_topics',[]) and not outcome.state.last_understanding.permits('appointment'):
+        if getattr(outcome.state,"wait_context",None):
+            return "You can ask me to check for new viewing times later.",{}
         return "We can return to arranging your visit when you're ready.",{}
     return '',{}

@@ -62,7 +62,7 @@ def prompt_snapshot(agent):
 
 
 def next_prompt_snapshot(guidance):
-    return {'version':'sales-understanding-prompt/2.15','system':SYSTEM_PROMPT+'''
+    return {'version':'sales-understanding-prompt/2.16','system':SYSTEM_PROMPT+'''
 SA-09: classify directed personal harassment semantically, including paraphrases and typos,
 with an exact current quotation. Criticizing prices, layouts or service and expressing
 frustration is not personal harassment. Quoted, reported, hypothetical and negated abuse
@@ -301,4 +301,16 @@ REPAIR AND TIMEZONE:
   Correcting payment capture must not discard an already valid visit directive.
 - Optional empathy must not block a factual answer or an explicit refusal. A neutral
   refusal to book or set an alert does not imply frustration or human escalation.
+"""
+
+TURN_RULES += """
+DECLARATION PRESERVATION:
+- A repair must preserve every independently valid current declaration. A budget
+  remains a budget when payment is corrected; never turn that evidence into an
+  inventory, pricing, delivery or financing-policy question.
+- "My budget is 900,000 USD, paying cash" supplies BOTH budget and financing
+  preferences. It does not request catalog or inventory information.
+- "Any time in the next seven days works" is appointment timing, not inventory.
+- Report all applicable issues together; correcting quotation must also correct
+  missing declarations and preserve valid appointment timing.
 """

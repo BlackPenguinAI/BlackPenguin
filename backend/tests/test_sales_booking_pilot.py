@@ -96,11 +96,11 @@ def test_scripted_driver_reaches_real_coordinator_booking(lab,monkeypatch,scenar
             else:
                 value=understanding(text,'appointment')
                 data=value.model_dump();data['visit']={'action':'request','evidence':text,'timing':None}
-                if 'paying cash' in text:data['preferences']=[{'key':'financing','value':'cash','evidence':'paying cash','status':'declared'}]
+                if 'paying cash' in text:data['preferences']=[{'key':'financing','value':'cash','evidence':'paying cash','status':'declared'},{'key':'budget','value':'900000 USD','evidence':'My budget is 900,000 USD','status':'declared'}]
                 if 'Bay Residence' in text:
                     data['references']=[{'id':'p','kind':'property','expression':'Bay Residence','evidence':'Bay Residence'}]
                     data['requests'][0]['reference_id']='p'
-                if omit_refs and seen[text]==1 and 'paying cash' in text:data['preferences']=[]
+                if omit_refs and 'paying cash' in text:data['preferences']=[p for p in data['preferences'] if p['key']==('budget' if seen[text]==1 else 'financing')]
                 value=Understanding.model_validate(data)
             if text.startswith('Understood') and omit_refs:
                 data=value.model_dump();data['empathy']={'kind':'frustrated','evidence':text}
@@ -130,6 +130,7 @@ def test_scripted_driver_reaches_real_coordinator_booking(lab,monkeypatch,scenar
             assert acknowledgement['understanding']['empathy'] is None
             assert acknowledgement['interpretation_attempts'][0]['normalizations'][0]['action']=='omit_unsupported_optional_affect'
             assert len(acknowledgement['interpretation_attempts'])==1
+    assert all(c['status']=='PASS' for row in result['turns'] for c in row.get('checks',[])),result
     assert not any(c['status']=='FAIL' for c in result['checks']),{'checks':result['checks'],'replies':[r.get('reply') for r in result['turns']]}
 
 

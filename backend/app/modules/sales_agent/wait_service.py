@@ -45,8 +45,13 @@ def wait_offer(db,scope,outcome,context,prefs,*,original=None,allowed=None):
     offer['id']=digest(offer);outcome.state.wait_context=offer
     name=context['project_name']+(' / '+context['property_type_name'] if context.get('property_type_name') else '')
     if context.get('unit_code'):name+=' / unit '+context['unit_code']
-    return 'I checked up to 14 calendar days within your requested range and could not find a verified time matching those preferences. '+('Your original reservation is unchanged. ' if original else '')+f"Alert preferences: {name}; {prefs['date_from']} through {prefs['date_until']} ({prefs['timezone']}); {prefs['duration_minutes']} minutes. Would you like me to save a request to check these preferences and notify you once if a verified time becomes available?",{
+    checked_until=min(date.fromisoformat(prefs['date_until']),date.fromisoformat(prefs['date_from'])+timedelta(days=13)).isoformat()
+    searched=f"{prefs['date_from']} through {checked_until} ({prefs['timezone']})"
+    requested=(f"your requested range, {prefs['date_from']} through {prefs['date_until']} ({prefs['timezone']})"
+        if checked_until!=prefs['date_until'] else 'these dates')
+    return f"I couldn't find an available viewing time for {name} for {searched}. "+('Your original reservation is unchanged. ' if original else '')+f"Would you like me to save {requested} for a {prefs['duration_minutes']}-minute visit and notify you once if a matching time becomes available?",{
         'wait_offer':offer,'booking_search_status':'no_matching_time','booking_preferences':prefs},[]
+
 
 
 def enrich(u,previous,text):

@@ -265,10 +265,10 @@ def test_booking_cadence_is_cancelled_and_claimed_old_job_never_sends(agent,chan
 def test_no_qualified_sales_asks_alert_permission_without_creating_wait(agent):
     product(agent)
     agent.turn('Arrange a visit',visit('Arrange a visit'))
-    assert not agent.db.query(Meeting).count() and 'could not find a verified time' in latest(agent).content
+    assert not agent.db.query(Meeting).count() and "couldn't find an available viewing time" in latest(agent).content
     from app.modules.sales_agent.wait_models import SalesWaitRequest
     assert not agent.db.query(SalesWaitRequest).count() and not agent.conversation.is_paused
-    assert latest(agent).metadata_json.get('wait_offer') and 'Would you like me to save a request' in latest(agent).content
+    assert latest(agent).metadata_json.get('wait_offer') and 'Would you like me to save' in latest(agent).content and 'notify you once' in latest(agent).content
     assert 'I will notify' not in latest(agent).content
     assert load(agent.db,agent.scope)[1].booking_search
 

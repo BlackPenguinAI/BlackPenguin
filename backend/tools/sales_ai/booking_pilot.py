@@ -58,7 +58,7 @@ def next_message(reply, history, *, alternative=False):
 
 
 def explains_unavailability(reply):
-    return bool(re.search(r'no .*(?:available|times|slots)|not available|no availability|could not find a verified time|unable|cannot.*(?:visit|schedule)',reply,re.I))
+    return bool(re.search(r'no .*(?:available|times|slots)|not available|no availability|could not find a verified time|couldn.t find an available viewing time|unable|cannot.*(?:visit|schedule)',reply,re.I))
 
 
 def unavailable_message(reply):
@@ -74,6 +74,8 @@ async def evaluate_case(db, manifest, scenario, budget, max_turns):
     from app.modules.sales_agent.models import SalesConversation,SalesMessage,AgentRun,OutboundMessage
     from app.modules.sales_agent.current_simulation import turn
     from app.modules.sales_agent.dialogue_models import SalesDialogueEvent
+    from app.modules.sales_agent.understanding_semantics import issues_for
+    from app.modules.sales_agent.understanding_contract import Understanding
     from app.modules.project_team.service import eligible_appointment_assignments
     from .evaluation_checks import check, error_details, internal_process_narration
     project=manifest['projects'][0]
@@ -119,10 +121,17 @@ async def evaluate_case(db, manifest, scenario, budget, max_turns):
             events=db.query(SalesDialogueEvent).filter_by(conversation_id=conversation.id,kind='understanding_preview').order_by(SalesDialogueEvent.revision).all()
             attempts=next(((event.payload_json.get('metadata') or {}).get('interpretation_attempts',[]) for event in reversed(events)
                 if (event.payload_json.get('metadata') or {}).get('inbound_message_id')==(run.input_snapshot or {}).get('message_id')),[])
-            rows.append({'interpretation_attempts':attempts,'turn':index+1,'action':action,'lead_message':message,'reply':last,
+            from app.modules.sales_agent.lead_profile import resolve as profile_for
+            db.refresh(lead)
+            profile=profile_for(lead)
+            rows.append({'profile':profile,'interpretation_attempts':attempts,'turn':index+1,'action':action,'lead_message':message,'reply':last,
                 'understanding':(run.input_snapshot or {}).get('understanding'),'output':run.output_snapshot,
                 'input_trace':run.input_snapshot,'error_code':run.error_code,
-                'checks':[check('reply_present',bool(last.strip())),check('interpretation_accepted',not run.error_code),
+                'checks':[check('reply_present',bool(last.strip())),
+                    check('budget_preserved_in_interpretation',index!=0 or any(p.get('key')=='budget' and p.get('status')=='declared' for p in ((run.input_snapshot or {}).get('understanding') or {}).get('preferences',[]))),
+                    check('cash_preserved_in_interpretation',index!=0 or any(p.get('key')=='financing' and p.get('status')=='declared' and p.get('value','').casefold()=='cash' for p in ((run.input_snapshot or {}).get('understanding') or {}).get('preferences',[]))),
+                    check('budget_remains_in_saved_profile',(profile.get('current',{}).get('budget') or {}).get('status')=='declared' and bool(re.search(r'(?<!\d)900000(?:\.0+)?(?!\d)',str((profile.get('current',{}).get('budget') or {}).get('value','')).replace(',',''))) and 'USD' in str((profile.get('current',{}).get('budget') or {}).get('value','')).upper()),
+                    check('no_invented_question_from_declaration',not any(q['type'] in {'budget_declaration_as_question','declaration_as_question','visit_timing_as_inventory'} for q in issues_for(Understanding.model_validate((run.input_snapshot or {}).get('understanding')),message)) if (run.input_snapshot or {}).get('understanding') else False),check('interpretation_accepted',not run.error_code),
                     check('no_internal_narration',not internal_process_narration(last)),
                     check('no_booking_before_confirmation',not meetings or confirmed),
                     check('selection_advances_to_confirmation',action not in {'select','reject_first'} or bool(re.search(r'Please confirm your visit',last,re.I))),

@@ -14,7 +14,14 @@ def issues_for(value, text, *, appointment_offer=False):
         for i,r in enumerate(requests):
             if r.topic.value=='financing' and re.search(r'\b(?:paying cash|I (?:can|will) pay (?:in )?cash|I have cash available)\b',r.evidence,re.I) and not re.search(r'\?|\b(?:what|how|which|can I|do you|does|accept|options|allowed|offer)\b',r.evidence,re.I):
                 add(['requests',i],'declaration_as_question','A cash declaration is not a request about financing.')
+    budget=re.search(r'\bmy budget(?: is|:)\s*[\d,.]+\s*(?:USD|EUR|GBP|PEN|MXN)\b',text,re.I)
+    if budget and not re.search(r'\b(?:if|suppose|friend|said|not)\b',text,re.I) and not any(p.key=='budget' and p.status=='declared' for p in value.preferences):
+        add(['preferences'],'budget_declaration_missing','Preserve the explicit own budget and currency as a budget preference, including during payment repair.')
     for i,r in enumerate(requests):
+        if r.topic.value in {'inventory','catalog','pricing','delivery','financing'} and re.fullmatch(r'\s*My budget(?: is|:)\s*[\d,.]+\s*(?:USD|EUR|GBP|PEN|MXN)(?:,?\s+paying cash)?[.!]?\s*',r.evidence,re.I):
+            add(['requests',i],'budget_declaration_as_question','A pure budget/payment declaration is not a project-information question. Capture preferences without inventing a request.')
+        if r.topic.value in {'inventory','catalog'} and re.fullmatch(r'\s*Any (?:available )?time in the next (?:seven|7) days works(?: for me)?[;.!]?\s*',r.evidence,re.I):
+            add(['requests',i],'visit_timing_as_inventory','This quote states visit timing, not inventory interest. Preserve visit timing and omit the invented inventory question.')
         if r.topic.value=='delivery' and re.search(r'\bnext (?:seven|7) days\b',r.evidence,re.I) and re.search(r'\b(?:visit|appointment|in.person)\b',text,re.I) and not re.search(r'\b(?:delivery|move.in|completion|construction)\b',r.evidence,re.I):
             add(['requests',i],'visit_timing_as_delivery','This is a visit date preference, not a property delivery question. Put the exact quote in visit.timing.')
     if appointment_offer and re.search(r'\b(?:I would like|I.d like|I choose|I.ll take) the (?:first|second|third) appointment\b',text,re.I):

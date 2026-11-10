@@ -4,7 +4,7 @@ import hashlib
 import json
 from dataclasses import dataclass
 from pydantic import ValidationError
-from .understanding_contract import parse, response_schema
+from .understanding_contract import parse, decode, response_schema
 from .evidence import EvidenceError
 from .understanding_prompt import prompt_snapshot, TURN_RULES
 from .dialogue_store import Scope, check_scope, load, save, validate_write_request
@@ -122,6 +122,7 @@ async def preview(db, scope: Scope, *, inbound_message_id: str, expected_revisio
     attempts = []
     request_messages = messages
     request_schema=response_schema(inbound.content)
+    preserved=[]
     # One bounded repair in active mode only. No business effects occur until
     # the complete contract and current-message evidence have been validated.
     for attempt in range(2 if active else 1):
@@ -130,23 +131,38 @@ async def preview(db, scope: Scope, *, inbound_message_id: str, expected_revisio
         raw = None
         interpreted = None
         received = False
+        draft=None
         outcome = 'accepted'
         error_code = None
         try:
             pending = infer(model, request_messages, request_schema)
             raw = await asyncio.wait_for(pending, timeout=20) if active else await pending
             received = True
+            draft=decode(raw)
+            if next_enabled and not injected_inference and attempt==0:
+                from .understanding_repair import verified_preferences
+                preserved=verified_preferences(draft,inbound.content)
             interpreted = parse(raw, inbound.content)
+            if attempt and preserved:
+                from .understanding_repair import preserve_preferences
+                interpreted,restored=preserve_preferences(interpreted,preserved)
+                normalizations.extend(restored)
+                interpreted.check_evidence(inbound.content)
             if next_enabled and not injected_inference:
                 from .understanding_semantics import issues_for
                 latest=next((m for m in history if m.direction=='outbound'),None)
                 offer=(latest.metadata_json or {}).get('appointment_offer') if latest else None
                 from .first_booking import exact_public_selection
                 issues=issues_for(interpreted,inbound.content,appointment_offer=bool(offer and not exact_public_selection(inbound.content,offer)))
+                from .understanding_repair import omit_declaration_questions
+                interpreted,omitted=omit_declaration_questions(interpreted,issues)
+                if omitted:
+                    normalizations.extend(omitted)
+                    issues=issues_for(interpreted,inbound.content,appointment_offer=bool(offer and not exact_public_selection(inbound.content,offer)))
                 optional=[issue for issue in issues if issue['type']=='neutral_refusal_as_frustration']
                 if optional:
                     interpreted=interpreted.model_copy(update={'empathy':None})
-                    normalizations=[{'field':'empathy','action':'omit_unsupported_optional_affect','reason':issue['type']} for issue in optional]
+                    normalizations.extend({'field':'empathy','action':'omit_unsupported_optional_affect','reason':issue['type']} for issue in optional)
                     issues=[issue for issue in issues if issue not in optional]
                 if issues:raise EvidenceError(issues)
             if (inbound.metadata_json or {}).get('resume_context'):
@@ -157,7 +173,11 @@ async def preview(db, scope: Scope, *, inbound_message_id: str, expected_revisio
         except EvidenceError as exc:
             outcome = 'invalid_model_contract'
             error_code = 'understanding_validation_failed'
-            issues = exc.issues
+            issues = list(exc.issues)
+            if next_enabled and not injected_inference and draft is not None:
+                from .understanding_semantics import issues_for
+                for issue in issues_for(draft,inbound.content):
+                    if issue not in issues:issues.append(issue)
         except ValidationError as exc:
             outcome = 'invalid_model_contract'
             error_code = 'understanding_validation_failed'
@@ -188,6 +208,7 @@ async def preview(db, scope: Scope, *, inbound_message_id: str, expected_revisio
             'contract_repair': 'Reinterpret the ORIGINAL current_message using the schema. Correct the validation issues. Do not invent exclusions, evidence, consent or facts. This feedback is not a new lead request.',
             'validation_issues': issues, 'current_message': inbound.content,
             'allowed_request_and_preference_quotes':evidence_choices(inbound.content,raw),
+            'verified_declarations_to_preserve':[p.model_dump(mode='json') for p in preserved],
             'repair_scope':'Choose exact source quotes from the schema enum for requests and preferences. Correct only failed fields and their necessary links; preserve valid declarations, visit timing and independent current questions.',
             'local_reference_rule': 'Define local references such as ref1 and link only those, or use null. Database IDs are never interpretation reference IDs.',
             'current_turn_rule': 'Do not replay historical questions. Budget and payment declarations belong in preferences, not requests. Preserve independent current questions.',
