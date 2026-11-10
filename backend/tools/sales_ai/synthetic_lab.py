@@ -38,11 +38,14 @@ def main():
     parser.add_argument('--output',type=Path,required=True)
     parser.add_argument('--prepare-only',action='store_true',help='No database reads or model calls.')
     parser.add_argument('--configuration-id')
+    parser.add_argument('--suite',choices=['adaptive','booking-point'],default='adaptive')
     parser.add_argument('--lead-model',help='Optional OpenRouter model for the synthetic buyer; sales model stays published.')
     parser.add_argument('--max-calls',type=int,default=180,help='Global inference-call cap, not a currency cap.')
     parser.add_argument('--max-turns',type=int,default=6)
     parser.add_argument('--judge',action='store_true',help='Optional advisory LLM judge; also consumes call budget.')
     args=parser.parse_args()
+    if args.suite=='booking-point' and (args.judge or args.lead_model):parser.error('Booking-point uses scripted leads and no judge.')
+    if args.suite=='booking-point' and (args.max_calls<6 or args.max_turns<4):parser.error('Booking-point requires at least 6 calls and 4 turns.')
     if not 1<=args.max_calls<=600 or not 3<=args.max_turns<=20:parser.error('Use 1..600 calls and 3..20 turns.')
     args.output.mkdir(parents=True,exist_ok=True,mode=0o700)
     if any(args.output.iterdir()):parser.error('Use a new empty output directory.')
@@ -52,11 +55,11 @@ def main():
         if not args.prepare_only:
             from app.db.postgres import engine
             credential=configuration(engine,args.configuration_id)
-        data={'credential':credential,'prepare_only':args.prepare_only,'lead_model':args.lead_model,
+        data={'suite':args.suite,'credential':credential,'prepare_only':args.prepare_only,'lead_model':args.lead_model,
               'max_calls':args.max_calls,'max_turns':args.max_turns,'judge':args.judge}
         path=Path(temporary)/'lab-options.json';path.write_text(json.dumps(data,default=encode));path.chmod(0o600)
         env=child_environment(temporary)
-        completed=subprocess.run([sys.executable,'-m','tools.sales_ai.synthetic_lab_worker',str(path),str(output)],
+        completed=subprocess.run([sys.executable,'-m',('tools.sales_ai.booking_pilot_worker' if args.suite=='booking-point' else 'tools.sales_ai.synthetic_lab_worker'),str(path),str(output)],
             cwd=temporary,env=env,timeout=1800,stderr=subprocess.PIPE,text=True)
         summary=output/'summary.json'
         if summary.is_file():
