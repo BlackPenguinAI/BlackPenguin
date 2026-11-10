@@ -102,6 +102,11 @@ def test_scripted_driver_reaches_real_coordinator_booking(lab,monkeypatch,scenar
                     data['requests'][0]['reference_id']='p'
                 if omit_refs and seen[text]==1 and 'paying cash' in text:data['preferences']=[]
                 value=Understanding.model_validate(data)
+            if text.startswith('Understood') and omit_refs:
+                data=value.model_dump();data['empathy']={'kind':'frustrated','evidence':text}
+                value=Understanding.model_validate(data)
+            if seen[text]>1:
+                assert payload['response_format']['json_schema']['schema']['$defs']['Request']['properties']['evidence']['enum']
             content=value.model_dump_json()
         elif name=='sales_commercial_composition':
             rows=ctx['evidence_blocks'];content=json.dumps({'version':'sales-commercial-composer/1.0','opening':'direct',
@@ -120,6 +125,11 @@ def test_scripted_driver_reaches_real_coordinator_booking(lab,monkeypatch,scenar
     if omit_refs:
         attempts=result['turns'][0]['interpretation_attempts']
         assert len(attempts)==2 and attempts[0]['validation_issues'][0]['type']=='payment_declaration_missing'
+        if scenario not in BOOKING_CASES:
+            acknowledgement=next(r for r in result['turns'] if r['action']=='acknowledge_unavailable')
+            assert acknowledgement['understanding']['empathy'] is None
+            assert acknowledgement['interpretation_attempts'][0]['normalizations'][0]['action']=='omit_unsupported_optional_affect'
+            assert len(acknowledgement['interpretation_attempts'])==1
     assert not any(c['status']=='FAIL' for c in result['checks']),{'checks':result['checks'],'replies':[r.get('reply') for r in result['turns']]}
 
 

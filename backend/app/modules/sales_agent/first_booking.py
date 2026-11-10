@@ -88,7 +88,9 @@ def normalize_timing(u,text,project,now,previous):
     from .service import _requested_period,_selected_time
     timing=u.visit.timing if u.visit else None
     supplied=timing.model_dump() if timing else {}
-    zone_name=supplied.get('timezone_evidence') or previous.get('timezone') or project.timezone or 'UTC'
+    zone_evidence=supplied.get('timezone_evidence')
+    project_zone=bool(zone_evidence and re.fullmatch(r"(?:(?:the|this)\s+)?(?:project(?:['’]s)?|property(?:['’]s)?)\s+(?:time\s*zone|timezone|local\s+time)",zone_evidence.strip(),re.I))
+    zone_name=(project.timezone or 'UTC') if project_zone else (zone_evidence or previous.get('timezone') or project.timezone or 'UTC')
     try:zone=ZoneInfo(zone_name)
     except (ZoneInfoNotFoundError,ValueError):raise ValueError('Please specify a valid IANA timezone, such as America/Chicago.')
     def period(evidence):

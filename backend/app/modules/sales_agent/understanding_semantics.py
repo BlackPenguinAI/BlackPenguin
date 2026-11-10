@@ -12,7 +12,7 @@ def issues_for(value, text, *, appointment_offer=False):
         if not any(p.key=='financing' and p.status=='declared' for p in value.preferences):
             add(['preferences'],'payment_declaration_missing','Capture the explicit own payment declaration as financing preference. It is not a financing-policy question.')
         for i,r in enumerate(requests):
-            if r.topic.value=='financing' and re.fullmatch(r'\s*(?:paying cash|I (?:can|will) pay (?:in )?cash|I have cash available)[.!]?\s*',r.evidence,re.I):
+            if r.topic.value=='financing' and re.search(r'\b(?:paying cash|I (?:can|will) pay (?:in )?cash|I have cash available)\b',r.evidence,re.I) and not re.search(r'\?|\b(?:what|how|which|can I|do you|does|accept|options|allowed|offer)\b',r.evidence,re.I):
                 add(['requests',i],'declaration_as_question','A cash declaration is not a request about financing.')
     for i,r in enumerate(requests):
         if r.topic.value=='delivery' and re.search(r'\bnext (?:seven|7) days\b',r.evidence,re.I) and re.search(r'\b(?:visit|appointment|in.person)\b',text,re.I) and not re.search(r'\b(?:delivery|move.in|completion|construction)\b',r.evidence,re.I):

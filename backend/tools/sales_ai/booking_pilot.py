@@ -57,6 +57,18 @@ def next_message(reply, history, *, alternative=False):
     return 'I would like to visit Bay Residence in person. Any available time in the next seven days works for me. Please offer the available times in the project timezone.', 'request'
 
 
+def explains_unavailability(reply):
+    return bool(re.search(r'no .*(?:available|times|slots)|not available|no availability|could not find a verified time|unable|cannot.*(?:visit|schedule)',reply,re.I))
+
+
+def unavailable_message(reply):
+    """The scripted buyer cannot see the expected outcome or seller roster."""
+    if re.search(r'Verified visit options',reply,re.I):return None,'unexpected_visit_offer'
+    if explains_unavailability(reply):
+        return 'Understood, thank you. I will keep an eye out for new availability. Please do not book anything or set up an alert now.','acknowledge_unavailable'
+    return 'I would like to arrange an in-person visit to Bay Residence. Please use the project timezone and check whether any viewing times are available.','clarify_visit_request'
+
+
 async def evaluate_case(db, manifest, scenario, budget, max_turns):
     from app.modules.sales_crm.models import Lead,Meeting
     from app.modules.sales_agent.models import SalesConversation,SalesMessage,AgentRun,OutboundMessage
@@ -83,7 +95,7 @@ async def evaluate_case(db, manifest, scenario, budget, max_turns):
             message='I am interested in Bay Residence at Harbor Gardens and would like to book an in-person visit. My budget is 900,000 USD, paying cash. Any time in the next seven days works; please use the project timezone.'
             action='request'
         elif not booking:
-            message,action='Understood, thank you. I will keep an eye out for new availability. Please do not book anything or set up an alert now.','acknowledge_unavailable'
+            message,action=unavailable_message(last)
         else:message,action=next_message(last,rows,alternative=scenario=='alternative_slot')
         if not message:stop=action;break
         if sum(r.get('lead_message')==message for r in rows)>=2:
@@ -119,7 +131,7 @@ async def evaluate_case(db, manifest, scenario, budget, max_turns):
                     check('no_duplicate_booking',len(meetings)<=1)]})
             if meetings:
                 stop='booked';break
-            if not booking and index>=1:
+            if not booking and action=='acknowledge_unavailable':
                 stop='unavailable_dialogue_observed';break
         except Exception as exc:
             db.rollback();rows.append({'turn':index+1,'action':action,'lead_message':message,**error_details(exc),'checks':[check('engine_turn_completed',False)]})
@@ -141,7 +153,8 @@ async def evaluate_case(db, manifest, scenario, budget, max_turns):
         await turn(db,company_id=manifest['company_id'],lead_id=lead.id,inbound_text=message,event_id=event_id)
         checks += [check('duplicate_event_is_idempotent',db.query(Meeting).filter_by(lead_id=lead.id).count()==1 and budget.calls==calls)]
     if not booking:
-        checks += [check('unavailability_explained',bool(re.search(r'no .*(?:available|times|slots)|not available|no availability|could not find a verified time|unable|cannot.*(?:visit|schedule)',' '.join(r.get('reply','') for r in rows),re.I))),
+        checks += [check('unavailability_explained',any(explains_unavailability(r.get('reply','')) for r in rows)),
+            check('buyer_acknowledges_only_explained_unavailability',not any(r['action']=='acknowledge_unavailable' and (i==0 or not explains_unavailability(rows[i-1].get('reply',''))) for i,r in enumerate(rows))),
             check('no_visit_options_offered',not any(re.search(r'Verified visit options',r.get('reply','')) for r in rows))]
         checks.append({'check':'appropriate_future_availability_wording','status':'BLOCKED','detail':'Human review required; no future notification automation is created.'})
     if scenario=='alternative_slot':checks.append(check('alternative_chosen',any(r['action']=='reject_first' for r in rows)))

@@ -121,17 +121,19 @@ async def preview(db, scope: Scope, *, inbound_message_id: str, expected_revisio
     interpreted = None
     attempts = []
     request_messages = messages
+    request_schema=response_schema(inbound.content)
     # One bounded repair in active mode only. No business effects occur until
     # the complete contract and current-message evidence have been validated.
     for attempt in range(2 if active else 1):
         issues = []
+        normalizations=[]
         raw = None
         interpreted = None
         received = False
         outcome = 'accepted'
         error_code = None
         try:
-            pending = infer(model, request_messages, response_schema(inbound.content))
+            pending = infer(model, request_messages, request_schema)
             raw = await asyncio.wait_for(pending, timeout=20) if active else await pending
             received = True
             interpreted = parse(raw, inbound.content)
@@ -141,6 +143,11 @@ async def preview(db, scope: Scope, *, inbound_message_id: str, expected_revisio
                 offer=(latest.metadata_json or {}).get('appointment_offer') if latest else None
                 from .first_booking import exact_public_selection
                 issues=issues_for(interpreted,inbound.content,appointment_offer=bool(offer and not exact_public_selection(inbound.content,offer)))
+                optional=[issue for issue in issues if issue['type']=='neutral_refusal_as_frustration']
+                if optional:
+                    interpreted=interpreted.model_copy(update={'empathy':None})
+                    normalizations=[{'field':'empathy','action':'omit_unsupported_optional_affect','reason':issue['type']} for issue in optional]
+                    issues=[issue for issue in issues if issue not in optional]
                 if issues:raise EvidenceError(issues)
             if (inbound.metadata_json or {}).get('resume_context'):
                 from .evidence import quotations
@@ -167,16 +174,21 @@ async def preview(db, scope: Scope, *, inbound_message_id: str, expected_revisio
             error_code = type(exc).__name__
         raw_bytes = raw.encode(errors='replace') if isinstance(raw, str) else b''
         attempts.append({'attempt': attempt + 1, 'outcome': outcome, 'error_code': error_code,
-                         'validation_issues': issues,
+                         'validation_issues': issues, 'normalizations':normalizations,
+                         'quotation_schema':'source_enum' if request_schema.get('$defs',{}).get('Request',{}).get('properties',{}).get('evidence',{}).get('enum') else 'standard',
                          'repair_feedback': request_messages[-1]['content'] if attempt else None,
                          'raw_response': raw_bytes[:16000].decode(errors='replace') if isinstance(raw, str) else None,
                          'raw_response_sha256': hashlib.sha256(raw_bytes).hexdigest() if isinstance(raw, str) else None,
                          'raw_response_truncated': len(raw_bytes) > 16000})
         if outcome != 'invalid_model_contract':
             break
+        from .understanding_repair import constrained_repair_schema,evidence_choices
+        request_schema=constrained_repair_schema(response_schema(inbound.content),inbound.content,raw)
         request_messages = [*messages, {'role': 'user', 'content': json.dumps({
             'contract_repair': 'Reinterpret the ORIGINAL current_message using the schema. Correct the validation issues. Do not invent exclusions, evidence, consent or facts. This feedback is not a new lead request.',
             'validation_issues': issues, 'current_message': inbound.content,
+            'allowed_request_and_preference_quotes':evidence_choices(inbound.content,raw),
+            'repair_scope':'Choose exact source quotes from the schema enum for requests and preferences. Correct only failed fields and their necessary links; preserve valid declarations, visit timing and independent current questions.',
             'local_reference_rule': 'Define local references such as ref1 and link only those, or use null. Database IDs are never interpretation reference IDs.',
             'current_turn_rule': 'Do not replay historical questions. Budget and payment declarations belong in preferences, not requests. Preserve independent current questions.',
             'exact_short_quote': inbound.content if len(inbound.content) <= 2000 else None,
