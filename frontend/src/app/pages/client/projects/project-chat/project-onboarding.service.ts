@@ -28,8 +28,8 @@ export class ProjectOnboardingService {
   startChat(id: string): Observable<ChatTurn> { return this.http.post<ChatTurn>(`${this.baseUrl}/${id}/chat/start`, {}); }
   bootstrap(id: string, initialUrl: string): Observable<ChatTurn> { return this.http.post<ChatTurn>(`${this.baseUrl}/${id}/chat/bootstrap`, { initial_url: initialUrl, skip_website: false }); }
   getState(id: string): Observable<OnboardingState> { return this.http.get<OnboardingState>(`${this.baseUrl}/${id}/chat/state`); }
-  complete(id: string): Observable<{ completed: boolean; redirect_url: string; profile: ProjectProfile }> {
-    return this.http.post<{ completed: boolean; redirect_url: string; profile: ProjectProfile }>(`${this.baseUrl}/${id}/onboarding/complete`, {});
+  complete(id: string, expectedRevision?: number): Observable<{ completed: boolean; redirect_url: string; profile: ProjectProfile }> {
+    return this.http.post<{ completed: boolean; redirect_url: string; profile: ProjectProfile }>(`${this.baseUrl}/${id}/onboarding/complete`, expectedRevision === undefined ? {} : { expected_revision: expectedRevision });
   }
   sendMessage(id: string, message: string, inReplyToMessageId: string | null, clientMessageId: string, selectedValues?: string[]): Observable<ChatTurn> {
     return this.http.post<ChatTurn>(`${this.baseUrl}/${id}/chat`, {

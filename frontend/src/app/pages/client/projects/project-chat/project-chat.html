@@ -56,11 +56,11 @@
       <section *ngIf="requestedEditorTask" class="rounded-xl border border-secondary/30 p-4" data-testid="requested-editor-task"><p>Marketing setup review requested. Your saved settings remain unchanged until you explicitly save an update.</p><button type="button" class="structured-primary mt-2" (click)="openEditorTask(requestedEditorTask); requestedEditorTask=''" [disabled]="isAnalyzing">{{requestedEditorTask === 'meta_account' ? 'Review Meta account and permissions' : 'Review Project campaigns and forms'}}</button></section>
 
 <section *ngIf="deferredCards.length && !hasProcessingSources" class="rounded-xl border border-amber-400/30 p-4"><h2>Configurations saved for later</h2><p class="text-xs text-gray-400">Required reviews remain pending. No files or permissions were approved.</p><ng-container *ngFor="let key of deferredCards"><app-configure-later [contextual]="true"  scope="project" [entityId]="projectId" [card]="key" [label]="deferredLabel(key)" [draft]="{}" [records]="profile.ui_deferrals || {}" (saved)="deferralsSaved($event)"></app-configure-later></ng-container></section>
-      <ng-container *ngFor="let msg of visibleMessages">
+      <ng-container *ngFor="let msg of visibleMessages; trackBy: trackById">
         <div class="flex" [attr.data-message-id]="msg.id" [attr.data-active-question]="isActiveQuestion(msg) ? 'true' : null" [ngClass]="msg.sender === 'user' ? 'justify-end' : 'justify-start'">
           <div *ngIf="msg.sender === 'ai'" class="flex min-w-0 w-full flex-col">
             <app-onboarding-ai-message
-              *ngIf="!isGlobalStructuredQuestion(msg) || hasPersistedStructuredTransition(msg)"
+              *ngIf="!isFinalApprovalMessage(msg) && (!isGlobalStructuredQuestion(msg) || hasPersistedStructuredTransition(msg))"
               [message]="msg"
               [active]="isActiveQuestion(msg)"
               [disabled]="isAnalyzing || (profile.completion.can_complete && !(msg.ui_payload?.field && profile.ui_deferrals?.['field:'+msg.ui_payload!.field]?.resumed)) || hasExclusiveSourceFlow"
@@ -68,6 +68,13 @@
               (deferred)="deferSelection($event,msg)"
               (custom)="writeCustomAnswer(msg)"
             ><app-configure-later [contextual]="true" *ngIf="msg.ui_payload?.field != null && msg.ui_payload?.input_type !== 'final_approval' && !msg.ui_payload?.options?.includes('Provide later') && !hasInlineDeferral(msg) && isActiveQuestion(msg) && !isGlobalStructuredQuestion(msg) && msg.ui_payload?.input_type !== 'complete' && msg.ui_payload?.input_type !== 'deferred_review' && msg.ui_payload?.input_type !== 'meta_lead_setup' && msg.ui_payload?.input_type !== 'location_editor' && msg.ui_payload?.field !== 'country' && msg.ui_payload?.field !== 'city'" scope="project" [entityId]="projectId" [card]="questionCard(msg.ui_payload!)" [label]="msg.ui_payload!.label" [draft]="cardDraft(msg.ui_payload!.field)" [records]="profile.ui_deferrals || {}" (saved)="deferralsSaved($event)"></app-configure-later></app-onboarding-ai-message>
+
+            <section *ngIf="isFinalApprovalMessage(msg)" class="ml-11 max-w-3xl rounded-xl border border-white/10 bg-black/20 p-4" data-testid="historical-final-review">
+              <p class="text-xs font-semibold text-gray-400">Final approval · History</p>
+              <p class="mt-2 text-xs text-gray-400">{{msg.response_payload?.answer || 'Approval was requested at this point in the conversation.'}}</p>
+              <p class="mt-1 text-[10px] text-gray-500">{{msg.created_at | date:'medium'}}</p>
+              <p class="mt-2 text-xs text-gray-500">This is a historical record. Use the current Project review at the end of the conversation.</p>
+            </section>
 
             <div *ngIf="msg.media_evidence as media" class="order-first ml-11 mb-2 max-w-sm rounded-xl border border-green-500/20 bg-green-500/[0.06] p-3">
               <div class="flex items-center gap-3">
@@ -375,8 +382,8 @@
           <p class="mx-auto mt-1 max-w-xl text-xs leading-5 text-gray-500">The source did not provide enough structured inventory information. Add the first property type manually; no empty property has been created.</p>
         </div>
         <div class="mt-4 space-y-4">
-          <article *ngFor="let item of visiblePropertyTypes" class="rounded-xl border p-4" [class.border-secondary/25]="item.review_status === 'candidate'" [class.border-white/10]="item.review_status !== 'candidate'">
-<app-review-card [title]="item.name || 'Unnamed property type'" [status]="cardDeferred('property:'+item.id) ? 'Pending · saved for later' : (dirtyPropertyTypeIds.has(item.id) ? 'Unsaved changes' : item.review_status)" [summary]="propertySummary(item)" [complete]="propertyReviewComplete(item)" [revision]="item.updated_at">
+          <article *ngFor="let item of visiblePropertyTypes; trackBy: trackById" [attr.data-property-id]="item.id" class="rounded-xl border p-4" [class.border-secondary/25]="item.review_status === 'candidate'" [class.border-white/10]="item.review_status !== 'candidate'">
+<app-review-card [title]="item.name || 'Unnamed property type'" [status]="cardDeferred('property:'+item.id) ? 'Pending · saved for later' : (dirtyPropertyTypeIds.has(item.id) ? 'Unsaved changes' : item.review_status)" [summary]="propertySummary(item)" [complete]="propertyReviewComplete(item)" [revision]="item.updated_at" [open]="propertyReviewIsOpen(item)" (openChange)="propertyReviewOpen.set(item.id,$event)">
 
 <ng-container *ngIf="!cardDeferred('property:'+item.id)">
             <div class="flex flex-wrap items-center justify-between gap-2"><div><span class="text-[9px] font-bold uppercase tracking-wider" [class.text-secondary]="item.review_status === 'candidate'" [class.text-green-400]="item.review_status === 'confirmed'">{{ item.review_status }}</span><h3 class="mt-1 font-medium">{{ item.name || 'Unnamed property type' }}</h3></div><button type="button" (click)="rejectPropertyType(item)" [disabled]="removingPropertyTypeIds.has(item.id)" class="rounded-lg border border-red-500/20 px-3 py-1.5 text-[10px] text-red-300 hover:bg-red-500/10 disabled:cursor-wait disabled:opacity-50">{{ removingPropertyTypeIds.has(item.id) ? 'Removing...' : 'Remove' }}</button></div>
@@ -384,7 +391,7 @@
             <p *ngIf="propertyTypeFormError(item)" class="mt-3 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-200" role="alert">{{ propertyTypeFormError(item) }}</p>
             <ng-container *ngTemplateOutlet="propertyTypeForm; context: {$implicit: item}"></ng-container>
             <p *ngIf="dirtyPropertyTypeIds.has(item.id)" class="mt-3 text-xs text-amber-200" role="status">Unsaved changes. Save this type before confirming the catalog.</p>
-            <div class="mt-4 flex flex-wrap gap-2"><button *ngIf="propertyTypeImageSelection.get(item.id)?.size" (click)="attachSelectedImages(item)" [disabled]="isPropertyTypeSaving(item)" class="rounded-lg border border-secondary/30 px-4 py-2 text-xs text-secondary">Attach selected images</button><button *ngIf="item.images_status !== 'provided'" (click)="deferPropertyTypeImages(item)" [disabled]="isPropertyTypeSaving(item)" class="rounded-lg border border-white/10 px-4 py-2 text-xs text-gray-400">Add images later</button></div><p *ngIf="propertyTypeImageSelection.get(item.id)?.size" class="mt-2 text-xs text-amber-200">Attach or deselect pending images before confirming this type.</p><div class="mt-4 border-t border-white/10 pt-4"><button (click)="confirmPropertyType(item)" [disabled]="!canSavePropertyType(item)" [title]="canSavePropertyType(item) ? '' : 'Complete all required fields and correct invalid ranges.'" class="rounded-lg bg-secondary px-4 py-2 text-xs font-semibold text-black disabled:cursor-not-allowed disabled:opacity-40">{{ isPropertyTypeSaving(item) ? 'Saving...' : (propertyTypeErrorCount(item) || propertyTypeFormError(item) ? 'Review required fields' : (item.review_status === 'candidate' ? 'Confirm this type' : 'Save updates')) }}</button></div>
+            <div class="mt-4 flex flex-wrap gap-2"><button *ngIf="propertyTypeImageSelection.get(item.id)?.size" (click)="attachSelectedImages(item)" [disabled]="isPropertyTypeSaving(item)" class="rounded-lg border border-secondary/30 px-4 py-2 text-xs text-secondary">Attach selected images</button><button *ngIf="item.images_status !== 'provided'" (click)="deferPropertyTypeImages(item)" [disabled]="isPropertyTypeSaving(item)" class="rounded-lg border border-white/10 px-4 py-2 text-xs text-gray-400">Add images later</button></div><p *ngIf="propertyTypeImageSelection.get(item.id)?.size" class="mt-2 text-xs text-amber-200">Attach or deselect pending images before confirming this type.</p><div class="mt-4 border-t border-white/10 pt-4"><button (click)="confirmPropertyType(item)" [disabled]="!canSavePropertyType(item) || !propertyDetailsNeedSave(item)" [title]="canSavePropertyType(item) ? '' : 'Complete all required fields and correct invalid ranges.'" class="rounded-lg bg-secondary px-4 py-2 text-xs font-semibold text-black disabled:cursor-not-allowed disabled:opacity-40">{{ isPropertyTypeSaving(item) ? 'Saving...' : (propertyTypeErrorCount(item) || propertyTypeFormError(item) ? 'Review required fields' : (item.review_status === 'candidate' ? 'Confirm this type' : (propertyDetailsNeedSave(item) ? 'Save property details' : 'Property details saved'))) }}</button></div>
 <app-configure-later [contextual]="true" scope="project" [entityId]="projectId" [card]="'property:'+item.id" [label]="item.name" [draft]="propertyDraft(item)" [blocked]="isPropertyTypeSaving(item)" [records]="profile.ui_deferrals || {}" (saved)="deferralsSaved($event)"></app-configure-later>
 </ng-container>
           </app-review-card>
@@ -445,7 +452,7 @@
           <section *ngIf="item.id" class="sm:col-span-6 border-t border-white/10 pt-4" data-testid="property-resources">
             <h3 class="text-sm font-semibold">Photos and lead gallery</h3>
             <div class="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <div *ngFor="let photo of item.media" class="rounded-lg border border-white/10 p-2">
+              <div *ngFor="let photo of item.media; trackBy: trackById" class="rounded-lg border border-white/10 p-2">
                 <img *ngIf="sourceImageUrls.get(photo.source_id) as preview" [src]="preview" [alt]="item.name" class="h-20 w-full object-cover rounded">
                 <button type="button" class="mt-2 text-xs text-red-300" [disabled]="propertyResourceBusy.has(item.id)" (click)="removePropertyImage(item,photo.source_id)">Remove image</button>
               </div>
@@ -458,26 +465,27 @@
               <button type="button" class="text-secondary" (click)="editMaterialCoverage(gallery,'property',item.id)">Edit gallery coverage</button>
               <p *ngIf="gallery.coverage != null" class="mt-1 text-gray-400">Lead sharing follows the reviewed targets. Saving gallery access reviews this property's current image selection again.</p>
             </div>
-            <article *ngFor="let material of sharedPropertyMaterials(item)" class="mt-3 rounded-lg border border-white/10 p-3">
+            <article *ngFor="let material of sharedPropertyMaterials(item); trackBy: trackById" class="mt-3 rounded-lg border border-white/10 p-3">
               <p class="text-sm">Shared material · {{material.display_name}}</p>
               <p class="mt-1 text-xs text-gray-400">{{material.approval_status === 'approved' ? 'Accessible to leads' : 'Internal only'}} · Sharing is managed by this material's reviewed coverage.</p>
               <app-public-resource-link *ngIf="material.approval_status === 'approved' && material.resource_url" [url]="material.resource_url"></app-public-resource-link>
               <button *ngIf="!material.resource_url" type="button" class="mt-2 text-xs text-gray-300" (click)="previewSalesAsset(material)">Preview internal source</button>
               <button type="button" class="ml-3 text-xs text-secondary" (click)="editMaterialCoverage(material,'property',item.id)">Edit coverage</button>
             </article>
-            <h3 class="mt-6 text-sm font-semibold">Property PDFs</h3>
+            <h3 class="mt-6 border-t border-white/15 pt-6 text-sm font-semibold">Property PDFs</h3>
             <p class="mt-2 text-xs text-gray-400">A PDF may contain plans, photos or other information. Select its contents yourself; attaching it does not change Project facts.</p>
             <div class="mt-3 flex flex-wrap gap-3"><label *ngFor="let tag of salesAssetTypes" class="text-xs"><input type="checkbox" [checked]="(propertyDocumentTags[item.id] || ['brochure']).includes(tag.value)" (change)="togglePropertyDocumentTag(item,tag.value)"> {{tag.label}}</label></div>
             <label class="mt-3 block text-xs"><input type="checkbox" [(ngModel)]="propertyDocumentAccess[item.id]"> New PDF accessible to leads (SMS / WhatsApp)</label>
             <label class="structured-secondary mt-3 inline-block cursor-pointer"><input type="file" accept="application/pdf" class="hidden" [disabled]="propertyResourceBusy.has(item.id)" (change)="uploadPropertyDocument(item,$event)">Add PDF (up to 15 MB)</label>
-            <article *ngFor="let document of propertyDocuments(item)" class="mt-3 rounded-lg border border-white/10 p-3">
+            <article *ngFor="let document of propertyDocuments(item); trackBy: trackById" class="mt-3 rounded-lg border border-white/10 p-3">
               <p class="text-sm">{{document.display_name}}</p><p class="mt-1 text-xs text-gray-400">{{document.approval_status === 'approved' ? 'Accessible to leads' : 'Internal only'}} · {{document.content_tags.join(' + ').replaceAll('_',' ')}}</p>
               <div class="mt-2 flex flex-wrap gap-3">
-                <button *ngIf="!document.resource_url" type="button" class="text-xs text-gray-300" (click)="previewSalesAsset(document)">Preview internal PDF</button>
-                <button type="button" class="text-xs text-secondary" [disabled]="salesAssetBusy" (click)="document.approval_status === 'approved' ? archiveSalesAsset(document) : approveSalesAsset(document)">{{document.approval_status === 'approved' ? 'Keep internal / revoke access' : 'Allow lead access'}}</button>
+                <button *ngIf="!document.resource_url" type="button" class="structured-secondary" (click)="previewSalesAsset(document)">Preview internal PDF</button>
+                <button type="button" class="structured-secondary" [disabled]="salesAssetBusy" (click)="document.approval_status === 'approved' ? archiveSalesAsset(document) : approveSalesAsset(document)">{{document.approval_status === 'approved' ? 'Keep internal / revoke access' : 'Allow lead access'}}</button>
                 <app-public-resource-link *ngIf="document.approval_status === 'approved'" [url]="document.resource_url" label="Open public PDF"></app-public-resource-link>
-                <button type="button" class="text-xs text-gray-300" (click)="editMaterialCoverage(document,'property',item.id)">Edit coverage</button><button type="button" class="text-xs text-red-300" [disabled]="propertyResourceBusy.has(item.id)" (click)="removePropertyDocument(item,document)">Remove PDF</button>
+                <button type="button" class="structured-secondary" [disabled]="salesAssetBusy" (click)="editMaterialCoverage(document,'property',item.id)">Edit coverage</button><button type="button" class="rounded-lg border border-red-400/30 px-3 py-2 text-xs text-red-300" [disabled]="propertyResourceBusy.has(item.id) || salesAssetBusy" (click)="removePropertyDocument(item,document)">Remove PDF</button>
               </div>
+              <p *ngIf="resourceMessages.get(document.id) as saved" class="mt-3 text-xs text-green-300" role="status">{{saved}}</p>
             </article>
             <app-material-coverage-editor *ngIf="coverageEditor?.origin === 'property' && coverageEditor?.propertyId === item.id && coverageEditor?.asset as editing" [asset]="editing" [projectId]="projectId" (saved)="materialCoverageSaved($event)" (closed)="coverageEditor=null"></app-material-coverage-editor>
           </section>
@@ -513,6 +521,20 @@
         </div>
       </section>
 
+      <section *ngIf="showCurrentFinalReview" class="ml-0 max-w-3xl rounded-2xl border border-secondary/30 bg-secondary/5 p-5 md:ml-11" data-testid="current-final-review" [attr.data-revision]="profile.completion.draft_revision">
+        <h2 class="text-base font-semibold">{{profile.completion.final_approved ? 'Project profile approved' : 'Final approval · Current review'}}</h2>
+        <p class="mt-2 text-xs text-gray-400">Current revision: {{profile.completion.draft_revision ?? '—'}}<span *ngIf="profile.completion.published_revision != null"> · Published revision: {{profile.completion.published_revision}}</span></p>
+        <p class="mt-3 text-sm text-gray-300">{{profile.completion.final_approved ? 'There are no profile changes pending approval. Resource access is saved separately.' : 'Review the current Project Profile. Approving publishes this revision and returns you to the Project summary.'}}</p>
+        <p *ngIf="catalogEditorOpen" class="mt-3 text-xs text-amber-200" role="status">Finish the property review with Confirm catalog and continue to proceed.</p>
+        <p *ngIf="dirtyPropertyTypeIds.size || hasUnattachedImages || hasUnsavedGalleryAccess" class="mt-2 text-xs text-amber-200" role="status">Save pending property details, attach selected images and save any gallery-access changes first.</p>
+        <p *ngIf="!profile.completion.ready_for_confirmation && !profile.completion.final_approved" class="mt-2 text-xs text-amber-200" role="status">Resolve the remaining review items above before approval.</p>
+        <div class="mt-4 flex flex-wrap gap-3">
+          <button *ngIf="!profile.completion.final_approved" type="button" class="structured-primary" [disabled]="!profile.completion.ready_for_confirmation || approvalUiBlocked" (click)="completeOnboarding()">{{isCompleting ? 'Approving…' : 'Approve profile'}}</button>
+          <button *ngIf="profile.completion.final_approved" type="button" class="structured-primary" [disabled]="approvalUiBlocked" (click)="returnToProjectSummary()">Return to Project summary</button>
+          <button type="button" class="structured-secondary" [disabled]="projectReviewBusy || isCompleting" (click)="openProjectReviewPanel()">Review / edit profile</button>
+        </div>
+      </section>
+
       <div *ngIf="isAnalyzing" class="ml-11 flex w-fit gap-2 rounded-2xl border border-white/10 bg-white/5 p-4"><span class="h-2 w-2 animate-bounce rounded-full bg-secondary"></span><span class="h-2 w-2 animate-bounce rounded-full bg-secondary [animation-delay:0.2s]"></span><span class="h-2 w-2 animate-bounce rounded-full bg-secondary [animation-delay:0.4s]"></span></div>
     </div>
 
@@ -528,7 +550,7 @@
               <button (click)="removeSelectedFile(index)" [disabled]="isUploading" class="text-gray-500 hover:text-red-300"><span class="material-symbols-outlined text-[14px]">close</span></button>
             </div>
           </div>
-          <textarea [(ngModel)]="prompt" (keydown)="handleKeyDown($event)" [disabled]="isAnalyzing || hasExclusiveSourceFlow" rows="2" class="min-h-14 w-full resize-none bg-transparent py-2 pl-11 pr-24 text-sm outline-none" [placeholder]="profile.completion.can_complete ? 'Describe the Project data you want to update' : ('Next: ' + nextBlocker)"></textarea>
+          <textarea [(ngModel)]="prompt" (keydown)="handleKeyDown($event)" [disabled]="isAnalyzing || isCompleting || hasExclusiveSourceFlow" rows="2" class="min-h-14 w-full resize-none bg-transparent py-2 pl-11 pr-24 text-sm outline-none" [placeholder]="profile.completion.can_complete ? 'Describe the Project data you want to update' : ('Next: ' + nextBlocker)"></textarea>
           <label class="absolute bottom-3 left-2 cursor-pointer rounded-lg p-2 text-gray-400 hover:bg-white/10 hover:text-white" [class.pointer-events-none]="isUploading" [class.opacity-30]="isUploading" title="Attach project files">
             <span class="material-symbols-outlined text-[20px]">{{ isUploading ? 'progress_activity' : 'attach_file' }}</span>
             <input type="file" multiple accept=".pdf,.docx,.txt,.csv,.xlsx,.jpg,.jpeg,.png,.webp" class="hidden" [disabled]="isUploading || hasExclusiveSourceFlow" (change)="onFilesSelected($event)" />

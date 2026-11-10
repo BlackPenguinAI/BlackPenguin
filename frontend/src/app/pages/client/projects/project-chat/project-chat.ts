@@ -146,10 +146,11 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   propertyCatalog: PropertyTypeCatalog = { items: [], confirmed_count: 0, candidate_count: 0, limit: 0, remaining: 0, catalog_complete: false };
   salesAssets: ProjectSalesAsset[] = [];
   coverageEditor: {asset:ProjectSalesAsset; origin:'source'|'property'; propertyId?:string} | null = null;
-  editMaterialCoverage(asset:ProjectSalesAsset,origin:'source'|'property',propertyId?:string):void { this.coverageEditor={asset,origin,propertyId}; }
+  editMaterialCoverage(asset:ProjectSalesAsset,origin:'source'|'property',propertyId?:string):void { this.resourceMessages.delete(asset.id); this.coverageEditor={asset,origin,propertyId}; }
   materialCoverageSaved(asset:ProjectSalesAsset):void {
+    ++this.salesAssetsRequestVersion;
     this.salesAssets=this.salesAssets.map(row=>row.id===asset.id?asset:row);
-    this.coverageEditor=null;this.cdr.detectChanges();
+    this.coverageEditor=null;this.syncState('preserve');this.cdr.detectChanges();
   }
   salesAssetBusy = false;
   showSalesAssetForm = false;
@@ -211,6 +212,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   private pendingSelection: {text:string; questionId:string|null; values:string[]} | null = null;
   private retryClientMessageId: string | null = null;
   private lastStateVersion = 0;
+  private pendingStateSyncs = 0;
   requestedEditorTask='';
   private renderGeneration = 0;
   private detailAttempt:{fingerprint:string;id:string}|null=null;
@@ -227,7 +229,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   readonly editorTasks = [{key:'meta_account',label:'Meta account'},{key:'meta_assets',label:'Campaigns / forms'},{key:'team',label:'Assign team'},{key:'catalog',label:'Property types'},{key:'delivery',label:'Delivery dates'},{key:'parking',label:'Parking / storage'},{key:'documents',label:'Add documents'},{key:'location',label:'Location / timezone'}];
   reviewPanelOpen = false;
   private reviewPanelTrigger: HTMLElement | null = null;
-  get projectReviewBusy(): boolean { return this.isAnalyzing || this.hasProcessingSources || this.onboardingStage === 'processing'; }
+  get projectReviewBusy(): boolean { return this.isAnalyzing || this.isCompleting || this.hasProcessingSources || this.onboardingStage === 'processing'; }
   openProjectReviewPanel(): void {
     this.reviewPanelTrigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     this.reviewPanelOpen = true; this.cdr.detectChanges();
@@ -256,6 +258,12 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     else this.showMetaAssetStep=false;
   }
   catalogEditorOpen = false;
+  readonly propertyReviewOpen = new Map<string, boolean>();
+  readonly resourceMessages = new Map<string, string>();
+  trackById(index: number, item: {id?: string}): string | number { return item.id || index; }
+  propertyReviewIsOpen(item: ProjectPropertyType): boolean {
+    return this.propertyReviewOpen.get(item.id) ?? !this.propertyReviewComplete(item);
+  }
   selectedPropertyId = '';
   readonly propertyResourceBusy = new Set<string>();
   propertyGalleryAccess: Record<string, boolean | undefined> = {};
@@ -346,12 +354,42 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     for (const url of this.pendingFilePreviewUrls) URL.revokeObjectURL(url);
   }
 
-  get canSend(): boolean { return (!!this.prompt.trim() || !!this.selectedFiles.length) && !this.isAnalyzing && !this.hasExclusiveSourceFlow; }
+  get canSend(): boolean { return (!!this.prompt.trim() || !!this.selectedFiles.length) && !this.isAnalyzing && !this.isCompleting && !this.hasExclusiveSourceFlow; }
   get projectName(): string { return this.profile.project_name || 'Untitled Project'; }
   get pendingSalesAssets(): ProjectSalesAsset[] { return this.salesAssets.filter(item => item.approval_status === 'draft'); }
   get finalizationBlockers() { return this.profile.completion.finalization_blockers || []; }
   get showFinalizationReview(): boolean {
     return this.profile.completion.required_fields_complete && this.finalizationBlockers.length > 0;
+  }
+  isFinalApprovalMessage(message: ChatMessage): boolean {
+    return message.sender === 'ai' && (message.ui_payload?.label === 'Final approval'
+      || Object.values(message.ui_payload?.answer_actions || {}).some(action => action.kind === 'approve_profile'));
+  }
+  get showCurrentFinalReview(): boolean {
+    return (this.profile.completion.required_fields_complete || this.profile.completion.ready_for_confirmation)
+      && !this.hasExclusiveSourceFlow
+      && !this.cardDeferred('final_approval');
+  }
+  returnToProjectSummary(): void {
+    if (this.profile.completion.final_approved && !this.approvalUiBlocked)
+      this.router.navigateByUrl('/app/projects/' + this.projectId);
+  }
+  get hasUnsavedGalleryAccess(): boolean {
+    return this.propertyCatalog.items.some(item => this.propertyGalleryAccess[item.id] !== undefined
+      && this.propertyGalleryAccess[item.id] !== (this.propertyGallery(item)?.approval_status === 'approved'));
+  }
+  propertyDetailsNeedSave(item: ProjectPropertyType): boolean {
+    return item.review_status !== 'confirmed' || this.dirtyPropertyTypeIds.has(item.id)
+      || !!this.profile.ui_deferrals?.['property:'+item.id]?.resumed;
+  }
+  get approvalUiBlocked(): boolean {
+    return this.projectReviewBusy || this.isCompleting || this.pendingStateSyncs > 0 || this.salesAssetBusy || !!this.coverageEditor
+      || this.catalogEditorOpen || this.showPropertyTypeForm || this.selectedFiles.length > 0
+      || this.dirtyPropertyTypeIds.size > 0 || this.hasUnattachedImages || this.hasUnsavedGalleryAccess
+      || this.creatingPropertyType || this.confirmingPropertyCatalog
+      || this.savingPropertyTypeIds.size > 0 || this.mediaUpdatingPropertyTypeIds.size > 0
+      || this.propertyResourceBusy.size > 0 || this.propertyImageUploads.size > 0
+      || this.pendingSalesAssets.length > 0;
   }
   get showSalesMaterials(): boolean { return this.salesAssets.length > 0; }
   get availableSalesAssetSources(): ProjectSource[] {
@@ -421,19 +459,21 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
       && this.propertyTypeErrorCount(item) === 0;
   }
   isPropertyTypeSaving(item: Partial<ProjectPropertyType>): boolean {
-    return this.propertyImageUploads.has(item.id || 'new') || this.propertyResourceBusy.has(item.id || 'new') || (item.id ? this.savingPropertyTypeIds.has(item.id) || this.mediaUpdatingPropertyTypeIds.has(item.id) : this.creatingPropertyType);
+    return this.isCompleting || this.propertyImageUploads.has(item.id || 'new') || this.propertyResourceBusy.has(item.id || 'new') || (item.id ? this.savingPropertyTypeIds.has(item.id) || this.mediaUpdatingPropertyTypeIds.has(item.id) : this.creatingPropertyType);
   }
   get reviewingAvailability(): boolean { return this.nextQuestion?.label === 'Confirm current availability'; }
   get catalogReady(): boolean {
     return (!this.reviewingAvailability || this.propertyCatalog.items.filter(item => item.review_status === 'confirmed').every(item => item.available_units != null))
       && !this.creatingPropertyType
       && !this.hasUnattachedImages
+      && !this.hasUnsavedGalleryAccess
       && this.dirtyPropertyTypeIds.size === 0
       && this.mediaUpdatingPropertyTypeIds.size === 0
       && this.savingPropertyTypeIds.size === 0
       && this.propertyImageUploads.size === 0
       && this.propertyResourceBusy.size === 0
       && !this.confirmingPropertyCatalog
+      && !this.salesAssetBusy && !this.coverageEditor
       && this.propertyCatalog.confirmed_count > 0
       && this.propertyCatalog.candidate_count === 0
       && this.propertyCatalog.items
@@ -496,9 +536,11 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     });
   }
   loadSources(): void { this.onboarding.getSources(this.projectId).subscribe({ next: (items) => { this.sources = this.prepareSources(items); this.loadSourceImagePreviews(); } }); }
+  private salesAssetsRequestVersion = 0;
   loadSalesAssets(): void {
+    const version = ++this.salesAssetsRequestVersion;
     this.onboarding.getSalesAssets(this.projectId).subscribe({
-      next: items => { this.salesAssets = items; this.cdr.detectChanges(); },
+      next: items => { if (version !== this.salesAssetsRequestVersion) return; this.salesAssets = items; this.cdr.detectChanges(); },
       error: () => { this.errorMessage = 'Approved sales materials could not be loaded.'; },
     });
   }
@@ -563,19 +605,22 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   }
   approveSalesAsset(item: ProjectSalesAsset): void {
     if (this.salesAssetBusy) return; this.salesAssetBusy = true; this.errorMessage = '';
+    ++this.salesAssetsRequestVersion; this.resourceMessages.delete(item.id);
     this.onboarding.approveSalesAsset(this.projectId, item.id).subscribe({
-      next: updated => { this.salesAssets = this.salesAssets.map(row => row.id === updated.id ? updated : row); this.salesAssetBusy = false; this.syncState('none'); },
+      next: updated => { ++this.salesAssetsRequestVersion; this.salesAssets = this.salesAssets.map(row => row.id === updated.id ? updated : row); this.salesAssetBusy = false; this.resourceMessages.set(updated.id, 'Lead access saved. Property details were not changed.'); this.syncState('preserve'); },
       error: (error: HttpErrorResponse) => { this.salesAssetBusy = false; this.errorMessage = this.apiDetail(error, 'Sales material could not be approved.'); this.cdr.detectChanges(); },
     });
   }
   archiveSalesAsset(item: ProjectSalesAsset): void {
     if (this.salesAssetBusy) return; this.salesAssetBusy = true; this.errorMessage = '';
+    ++this.salesAssetsRequestVersion; this.resourceMessages.delete(item.id);
     this.onboarding.archiveSalesAsset(this.projectId, item.id).subscribe({
       next: () => {
+        ++this.salesAssetsRequestVersion;
         this.salesAssets = this.salesAssets.map(row => row.id === item.id
           ? { ...row, approval_status: 'archived', resource_url: null, approved_at: null, approved_by_user_id: null }
           : row);
-        this.salesAssetBusy = false; this.syncState('none');
+        this.salesAssetBusy = false; this.resourceMessages.set(item.id, 'Lead access revoked. Property details were not changed.'); this.syncState('preserve');
       },
       error: (error: HttpErrorResponse) => { this.salesAssetBusy = false; this.errorMessage = this.apiDetail(error, 'Sales material could not be archived.'); this.cdr.detectChanges(); },
     });
@@ -816,6 +861,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
 
   confirmPropertyType(item: ProjectPropertyType): void {
     if (!this.canSavePropertyType(item)) return;
+    this.propertyReviewOpen.set(item.id, true);
     this.savingPropertyTypeIds.add(item.id);
     this.propertyTypeServerErrors.delete(item.id);
     this.errorMessage = '';
@@ -835,7 +881,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
         this.propertyTypeBases.set(item.id, propertyTypeDetails(updated));
         for (const key of ['property:'+item.id, 'field:property_type_catalog']) this.consumedPropertyDrafts.set(item.id+':'+key, JSON.stringify(this.profile.ui_deferrals?.[key] || {}));
         this.replacePropertyType(merged);
-        this.syncState('none');
+        this.syncState('preserve');
       },
       error: (error: HttpErrorResponse) => this.handlePropertyTypeError(
         item.id, error, 'This property type could not be saved. Review the highlighted fields and try again.',
@@ -845,6 +891,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
 
   markPropertyTypeDirty(item: Partial<ProjectPropertyType>): void {
     if (item.id) {
+      this.propertyReviewOpen.set(item.id, true);
       this.dirtyPropertyTypeIds.add(item.id);
       this.propertyTypeServerErrors.delete(item.id);
     } else this.propertyTypeDraftInitialized = true;
@@ -918,6 +965,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     })).subscribe({next: updated => {
       this.mergePropertyTypeMedia(updated); this.loadSalesAssets(); this.syncState('preserve');
       delete this.propertyGalleryAccess[item.id];
+      this.syncState('preserve');
     }, error: error => this.errorMessage = this.apiDetail(error, 'The image could not be removed. Your other data is unchanged.')});
   }
   savePropertyGallery(item: ProjectPropertyType): void {
@@ -945,7 +993,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     this.propertyResourceBusy.add(item.id); this.errorMessage = '';
     this.onboarding.uploadPropertyDocument(this.projectId, item.id, file, this.propertyDocumentAccess[item.id] || false, tags).pipe(finalize(() => {
       this.propertyResourceBusy.delete(item.id); this.cdr.detectChanges();
-    })).subscribe({next: asset => { this.salesAssets = [asset, ...this.salesAssets.filter(row => row.id !== asset.id)]; },
+    })).subscribe({next: asset => { ++this.salesAssetsRequestVersion; this.salesAssets = [asset, ...this.salesAssets.filter(row => row.id !== asset.id)]; this.syncState('preserve'); },
       error: error => this.errorMessage = this.apiDetail(error, 'The PDF could not be uploaded. Your property data is unchanged.')});
   }
   removePropertyDocument(item: ProjectPropertyType, asset: ProjectSalesAsset): void {
@@ -953,7 +1001,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     this.propertyResourceBusy.add(item.id); this.errorMessage = '';
     this.onboarding.removePropertyDocument(this.projectId, item.id, asset.id).pipe(finalize(() => {
       this.propertyResourceBusy.delete(item.id); this.cdr.detectChanges();
-    })).subscribe({next: () => { this.salesAssets = this.salesAssets.filter(row => row.id !== asset.id); if (asset.coverage != null) this.loadSalesAssets(); },
+    })).subscribe({next: () => { ++this.salesAssetsRequestVersion; this.salesAssets = this.salesAssets.filter(row => row.id !== asset.id); this.syncState('preserve'); },
       error: error => this.errorMessage = this.apiDetail(error, 'The PDF could not be removed.')});
   }
 
@@ -1309,26 +1357,9 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     });
   }
   chooseAnswer(value: string | string[], message?: ChatMessage): void {
-    if (typeof value === 'string' && message?.ui_payload?.answer_actions?.[value]?.kind === 'approve_profile') {
-      if (this.isAnalyzing || !this.isActiveQuestion(message)) return;
-      this.isAnalyzing = true;
-      this.errorMessage = '';
-      this.onboarding.complete(this.projectId).pipe(finalize(() => {
-        this.isAnalyzing = false;
-        this.cdr.detectChanges();
-      })).subscribe({
-        next: result => {
-          this.profile = result.profile;
-          this.markReply(message.id || null, value);
-          this.router.navigateByUrl(result.redirect_url);
-        },
-        error: error => {
-          this.errorMessage = this.apiDetail(error, 'The profile could not be approved. Review the remaining items and retry.');
-          this.syncState('preserve');
-        },
-      });
-      return;
-    }
+    // Approval controls in conversation history are read-only. Only the
+    // current, revision-bound review below the editors can publish changes.
+    if (message && this.isFinalApprovalMessage(message)) return;
     this.prompt = Array.isArray(value) ? value.join('; ') : value;
     this.replyToMessageId = message?.id || null;
     this.pendingSelection = Array.isArray(value) ? {text:this.prompt, questionId:this.replyToMessageId, values:[...value]} : null;
@@ -1336,7 +1367,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   }
   writeCustomAnswer(message?: ChatMessage): void { this.pendingSelection=null; this.prompt = ''; this.replyToMessageId = message?.id || null; }
   isActiveQuestion(message: ChatMessage): boolean {
-    return !this.hasExclusiveSourceFlow && message.sender === 'ai' && !!message.ui_payload && !message.response_payload
+    return !this.isFinalApprovalMessage(message) && !this.hasExclusiveSourceFlow && message.sender === 'ai' && !!message.ui_payload && !message.response_payload
       && this.visibleMessages.filter((item) => item.sender === 'ai' && !!item.ui_payload && !item.response_payload).at(-1) === message;
   }
 
@@ -1347,9 +1378,8 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   get visibleMessages(): ChatMessage[] {
     return this.messages.filter((message) => {
       const unanswered = message.sender === 'ai' && !!message.ui_payload && !message.response_payload;
-      if (this.hasExclusiveSourceFlow && unanswered) return false;
-      const finalApproval = message.ui_payload?.field === null && message.ui_payload?.label === 'Final approval';
-      return !(unanswered && finalApproval && !this.profile.completion.ready_for_confirmation);
+      if (this.isFinalApprovalMessage(message)) return true;
+      return !(this.hasExclusiveSourceFlow && unanswered);
     });
   }
   sourcesForMessage(messageId?: string): ProjectSource[] {
@@ -1737,6 +1767,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     ).subscribe({
       next: catalog => {
         this.propertyCatalog = catalog;
+        this.closeCatalogEditor();
         this.syncState('bottom');
       },
       error: (error: HttpErrorResponse) => {
@@ -1746,15 +1777,16 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   }
 
   completeOnboarding(): void {
-    if (!this.profile.completion.ready_for_confirmation || this.isCompleting) return;
+    if (!this.showCurrentFinalReview || this.profile.completion.final_approved || !this.profile.completion.ready_for_confirmation || this.approvalUiBlocked) return;
     this.isCompleting = true; this.errorMessage = '';
-    this.onboarding.complete(this.projectId).subscribe({
-      next: (result) => this.router.navigateByUrl(result.redirect_url),
+    const revision = this.profile.completion.draft_revision;
+    this.onboarding.complete(this.projectId, revision).pipe(finalize(() => {
+      this.isCompleting = false; this.cdr.detectChanges();
+    })).subscribe({
+      next: result => { this.profile = result.profile; this.router.navigateByUrl(result.redirect_url); },
       error: (error: HttpErrorResponse) => {
-        this.isCompleting = false;
-        this.errorMessage = this.apiDetail(error, 'The onboarding could not be completed. Please try again.');
-        if (error.status === 409) this.syncState();
-        this.cdr.detectChanges();
+        this.errorMessage = this.apiDetail(error, 'The profile could not be approved. Review the remaining items and retry.');
+        this.syncState('preserve');
       },
     });
   }
@@ -1883,15 +1915,32 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     anchor: ReviewScrollAnchor | null = null,
   ): void {
     const generation = this.renderGeneration;
+    const container = this.chatScroll?.nativeElement;
+    const scrollTop = container?.scrollTop;
+    const activeCard = document.activeElement?.closest<HTMLElement>('[data-property-id]');
+    const propertyId = activeCard?.dataset['propertyId'];
+    const propertyTop = activeCard?.getBoundingClientRect().top;
     const shouldScrollToBottom = scrollMode === 'bottom'
       || (scrollMode === 'auto' && isNearScrollBottom(this.chatScroll?.nativeElement));
-    this.onboarding.getState(this.projectId).subscribe({
+    ++this.pendingStateSyncs;
+    this.onboarding.getState(this.projectId).pipe(finalize(() => {
+      --this.pendingStateSyncs; this.cdr.markForCheck();
+    })).subscribe({
       next: (state) => {
         if (generation !== this.renderGeneration) return;
         this.initialState = 'ready';
         this.applyState(state);
         if(this.requestedEditorTask && !this.projectReviewBusy) {const task=this.requestedEditorTask;this.requestedEditorTask='';this.openEditorTask(task);}
-        if (scrollMode === 'preserve') this.restoreProposalAnchor(anchor);
+        if (scrollMode === 'preserve') {
+          if (anchor) this.restoreProposalAnchor(anchor);
+          else setTimeout(() => {
+            if (!container || generation !== this.renderGeneration) return;
+            const card = propertyId ? Array.from(container.querySelectorAll<HTMLElement>('[data-property-id]'))
+              .find(row => row.dataset['propertyId'] === propertyId) : null;
+            if (card && propertyTop !== undefined) container.scrollTop += card.getBoundingClientRect().top - propertyTop;
+            else if (scrollTop !== undefined) container.scrollTop = scrollTop;
+          });
+        }
         else if (shouldScrollToBottom) this.scrollToBottom();
       },
       error: (error: HttpErrorResponse) => {

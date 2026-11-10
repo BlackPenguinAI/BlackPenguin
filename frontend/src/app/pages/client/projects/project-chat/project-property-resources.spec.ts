@@ -19,6 +19,7 @@ describe('Project property editor and reviewed resource controls', () => {
     fixture = TestBed.createComponent(ProjectChatComponent);
     component = fixture.componentInstance;
     component.projectId = 'project-1';
+    vi.spyOn(component as any,'syncState').mockImplementation(() => undefined);
     http = TestBed.inject(HttpTestingController);
   });
   afterEach(() => { http.verify(); TestBed.resetTestingModule(); });

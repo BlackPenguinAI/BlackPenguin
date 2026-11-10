@@ -45,7 +45,7 @@ from .schemas import (
     MetaAssetDiscoveryResponse, MetaAuthorizationResponse, MetaOAuthStartResponse,
     MetaSetupConfigurationResponse, MetaSetupStateResponse, ProjectCreate, ProjectProfilePatch, ProjectTimezoneUpdate,
     ProjectOnboardingActionRequest,
-    ProjectStartRequest, ProjectCompleteResponse, ProjectDeleteRequest, ProjectDeletionImpact, ProjectDraftResponse,
+    ProjectStartRequest, ProjectCompleteRequest, ProjectCompleteResponse, ProjectDeleteRequest, ProjectDeletionImpact, ProjectDraftResponse,
     ProjectOverviewResponse, ProjectProfileResponse, ProjectResponse,
     PropertyTypeCatalogResponse, PropertyTypeCreate, PropertyTypeMediaAttach,
     PropertyTypeResponse, PropertyTypeUpdate, ProjectMarketingSummary, PropertyGalleryRequest,
@@ -782,18 +782,26 @@ def get_project_overview(
 
 @router.post("/{project_id}/onboarding/complete", response_model=ProjectCompleteResponse)
 def complete_project_onboarding(
-    project_id: str, db: Session = Depends(get_db),
+    project_id: str, payload: ProjectCompleteRequest | None = None, db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker(EDITOR_ROLES)),
 ):
     project = services.get_project(db, project_id, current_user.company_id)
-    profile = services.complete_onboarding(db, project, current_user.id)
+    was_approved = services.get_profile(project).final_approved
+    profile = services.complete_onboarding(db, project, current_user.id,
+        expected_revision=payload.expected_revision if payload else None)
     active_question = services.get_active_question(db, project.session.id)
     active_payload = active_question.ui_payload if active_question else {}
+    current_review = payload is not None and payload.expected_revision is not None
     if active_question and active_payload and active_payload.get("field") is None and active_payload.get("label") == "Final approval":
         services.record_message_response(
-            db, project.session.id, active_question.id, "Approve profile",
-            status="accepted", commit=True,
+            db, project.session.id, active_question.id,
+            "See the current revision approval receipt." if current_review else "Approve profile",
+            status="superseded" if current_review else "accepted", commit=True,
         )
+    if current_review and not was_approved:
+        revision = (profile.published_snapshot or {}).get("revision", profile.draft_revision)
+        services.save_message(db, project.session.id, SenderType.AI,
+            f"Project Profile approved. Published revision: {revision}.")
     return {"completed": True, "redirect_url": f"/app/projects/{project.id}", "profile": services.serialize_profile(profile)}
 
 

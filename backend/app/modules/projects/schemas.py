@@ -361,6 +361,10 @@ class ProjectDraftResponse(BaseModel):
     onboarding_status: str
 
 
+class ProjectCompleteRequest(BaseModel):
+    expected_revision: StrictInt | None = Field(default=None, ge=0)
+
+
 class ProjectCompleteResponse(BaseModel):
     completed: bool
     redirect_url: str

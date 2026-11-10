@@ -39,7 +39,7 @@ it('keeps selections on failed save and renders a readable error',()=>{
  expect(c.city).toBe('Miami');expect(c.timezone).toBe('America/Chicago');expect(c.message).toContain('matching timezone');expect(c.busy).toBe(false);
 });
 function project(api:any){
- const c=new ProjectChatComponent({} as any,api,{detectChanges:vi.fn()} as any,{isSupported:false} as any,{} as any);
+ const c=new ProjectChatComponent({} as any,api,{detectChanges:vi.fn(),markForCheck:vi.fn()} as any,{isSupported:false} as any,{} as any);
  c.projectId='project-1';return c;
 }
 const question={task:'meta_account',input_type:'meta_lead_setup',field:'campaigns_defined',label:'Meta',prompt:'Meta',options:[],examples:[],allow_custom:false,minimum_words:null};
@@ -73,14 +73,14 @@ it('still shows a current Project synchronization failure',()=>{
 });
 it.each([0,401,500,502,504])('ignores stale Company state errors (%s) after a successful turn',(status)=>{
  const old=new Subject<any>(),current=new Subject<any>();let calls=0;
- const c=new ChatComponent({use:vi.fn()} as any,{getState:()=>++calls===1?old:current} as any,{detectChanges:vi.fn()} as any,{isSupported:false} as any,{} as any);
+ const c=new ChatComponent({use:vi.fn()} as any,{getState:()=>++calls===1?old:current} as any,{detectChanges:vi.fn(),markForCheck:vi.fn()} as any,{isSupported:false} as any,{} as any);
  c.initialState='ready';c.prompt='Keep Company draft';(c as any).syncState();
  (c as any).applyTurn({...turn,profile:EMPTY_COMPANY_PROFILE});old.error({status});
  expect(c.messages.map(m=>m.id)).toEqual(['new-answer']);expect(c.initialState).toBe('ready');
  expect(c.errorMessage).toBe('');expect(c.prompt).toBe('Keep Company draft');
 });
 it('still shows a current Company synchronization failure',()=>{
- const request=new Subject<any>();const c=new ChatComponent({use:vi.fn()} as any,{getState:()=>request} as any,{detectChanges:vi.fn()} as any,{isSupported:false} as any,{} as any);
+ const request=new Subject<any>();const c=new ChatComponent({use:vi.fn()} as any,{getState:()=>request} as any,{detectChanges:vi.fn(),markForCheck:vi.fn()} as any,{isSupported:false} as any,{} as any);
  c.initialState='ready';(c as any).syncState();request.error({status:500});
  expect(c.initialState).toBe('error');expect(c.errorMessage).toContain('could not be synchronized');
 });

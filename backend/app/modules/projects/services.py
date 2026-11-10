@@ -845,9 +845,17 @@ def enrich_finalization_readiness(db: Session, project: Project, payload: dict[s
     return payload
 
 
-def complete_onboarding(db: Session, project: Project, user_id: str) -> ProjectProfile:
+def complete_onboarding(db: Session, project: Project, user_id: str, *, expected_revision: int | None = None) -> ProjectProfile:
     profile = get_profile(project)
     versions.lock_for_approval(db, profile)
+    # Check after taking the editing lock, before publishing or returning an
+    # already-approved revision. A stale tab must not approve a newer draft.
+    revision = int(profile.draft_revision or 0)
+    if expected_revision is not None and expected_revision != revision:
+        raise HTTPException(status_code=409, detail={
+            "message": "This Project changed in another session. Review the current revision before approving.",
+            "code": "onboarding_revision_conflict", "current_revision": revision,
+        })
     ready, reasons = readiness_for_confirmation(db, project)
     if project.onboarding_status == "completed" and profile.final_approved:
         return profile

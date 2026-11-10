@@ -51,14 +51,14 @@ describe('ProjectChatComponent', () => {
     const question = {id:'approval-1',sender:'ai' as const,content:'Review',created_at:new Date(),attachments:[],ui_payload:{field:null,label:'Final approval',input_type:'boolean',options:['Approve profile'],answer_actions:{'Approve profile':{kind:'approve_profile'}}}};
     component.messages = [question as never];
     const navigate = vi.spyOn(TestBed.inject(Router),'navigateByUrl').mockResolvedValue(true);
-    component.chooseAnswer('Approve profile', question as never);
-    component.chooseAnswer('Approve profile', question as never);
+    component.completeOnboarding();
+    component.completeOnboarding();
     const request = http.expectOne(candidate => candidate.url.endsWith('/project-1/onboarding/complete'));
     expect(request.request.method).toBe('POST');
     http.expectNone(candidate => candidate.url.endsWith('/project-1/chat'));
     request.flush({completed:true,redirect_url:'/app/projects/project-1',profile:component.profile});
     expect(navigate).toHaveBeenCalledExactlyOnceWith('/app/projects/project-1');
-    expect(component.isAnalyzing).toBe(false);
+    expect(component.isCompleting).toBe(false);
   });
 
   it('keeps a failed approval retryable and reloads current readiness', () => {
@@ -67,7 +67,7 @@ describe('ProjectChatComponent', () => {
     component.messages = [question as never];
     const sync = vi.spyOn(component as any, 'syncState').mockImplementation(() => undefined);
     const navigate = vi.spyOn(TestBed.inject(Router),'navigateByUrl').mockResolvedValue(true);
-    component.chooseAnswer('Approve profile', question as never);
+    component.completeOnboarding();
     http.expectOne(candidate => candidate.url.endsWith('/onboarding/complete')).flush({detail:{message:'Review the remaining items'}},{status:409,statusText:'Conflict'});
     expect(component.isAnalyzing).toBe(false);
     expect(component.errorMessage).toContain('Review the remaining items');
