@@ -49,7 +49,8 @@ def test_repair_recovers_available_properties_and_retry_does_not_resend(agent):
 def test_repeated_invalid_reply_is_bounded_audited_and_does_not_blame_lead(agent):
     message, run = agent.turn(TEXT, BAD)
     assert agent.infer.await_count == 2
-    assert 'trouble processing your message' in agent.reply()
+    assert 'connect you with the sales team' in agent.reply()
+    assert 'processing your message' not in agent.reply()
     assert 'safely' not in agent.reply()
     assert run.model == 'test/offline' and run.error_code == 'understanding_validation_failed'
     assert run.output_snapshot['interpretation_attempt_count'] == 2

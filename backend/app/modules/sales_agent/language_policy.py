@@ -5,7 +5,7 @@ import re
 
 VERSION='sales-language-policy/1.0'
 REENTRY='This conversation is currently available in English. Please re-enter your question in English.'
-OUTPUT_FALLBACK='I could not prepare a verified English response yet. I can continue helping in English. Which property would you like to discuss?'
+OUTPUT_FALLBACK='Would you like me to connect you with the sales team to help with your question?'
 # Short English/property vocabulary avoids the documented short-text ambiguity
 # of statistical language detection. It never chooses a commercial action.
 ENGLISH=set('''a an the i you we me my your our it its they their this that these those
@@ -36,6 +36,7 @@ too very much many few less just actually instead sorry nothing something anythi
 everything whenever wherever currently verified approved recorded new old previous
 open closed sent delivered read received unavailable unconfirmed until into around
 howdy goodbye bye bye-bye stop unsubscribe end quit yes absolutely fine details don'''.split())
+ENGLISH.update('limit maximum minimum million millions outright funds full afford garage included include private privacy pictures describe amenities'.split())
 ENGLISH.update('joke jokes respectful warning abuse harassment threatening'.split())
 # Ordinary conversational English must reach intent/empathetic handling too.
 ENGLISH.update('feel feeling felt bad sad happy unhappy stressed stressful stress anxious anxiety upset tired sick ill rough difficult doing fine well day days life work working sorry worried worry exhausted overwhelmed confused frustrated frustration hurt painful pain personal better thanks thank appreciate please'.split())

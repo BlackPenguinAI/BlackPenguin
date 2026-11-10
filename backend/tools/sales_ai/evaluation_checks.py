@@ -27,7 +27,8 @@ def turn_checks(run, reply, expected, profile, share_count, previous_reply=None,
     understanding = (run.input_snapshot or {}).get('understanding') or {}
     findings = [check('current_workflow', output.get('workflow_version') == 'sales-current/1.0'),
                 check('interpretation', not run.error_code, run.error_code or ''),
-                check('reply_present', bool(reply.strip()))]
+                check('reply_present', bool(reply.strip())),
+                check('no_internal_process_narration', not internal_process_narration(reply))]
     if composition:
         findings.append(check('composition_accepted', composition.get('status') == 'accepted'))
     elif run.error_code:
@@ -47,6 +48,14 @@ def turn_checks(run, reply, expected, profile, share_count, previous_reply=None,
         cash = str(value.get('value')).lower()
         findings.append(check('cash_captured', value.get('status') == 'declared' and bool(re.search(r'\bcash\b',cash))
                               and not re.search(r'\b(?:no|not|without)\s+(?:any\s+)?cash\b',cash)))
+    if expected == 'not_cash_owner':
+        value = str(current.get('financing', {}).get('value') or '')
+        findings.append(check('third_party_cash_not_attributed_to_lead', not re.search(r'\b(?:friend|colleague)\b', value, re.I)))
+    if expected == 'not_cash':
+        value = str(current.get('financing', {}).get('value') or '')
+        findings.append(check('cash_not_invented', bool(re.search(r"\b(?:no|not|don't|do not|without)\b", value, re.I))))
+    if expected == 'budget_declined':
+        findings.append(check('budget_decline_retained', current.get('budget', {}).get('status') == 'declined'))
     if expected == 'parking':
         requests = understanding.get('requests') or []
         findings.append(check('parking_not_inventory', bool(requests) and
@@ -76,3 +85,13 @@ def sanitize(value, secrets=()):
             if secret: value = value.replace(secret, '[REDACTED]')
         return re.sub(r'https?://[^\s]+/projects/a/[^\s]+', '[sandbox-material-link]', value)
     return value
+
+
+def internal_process_narration(reply):
+    """Observable UX regression, not a substitute for a semantic quality judge."""
+    return bool(re.search(
+        r"trouble (?:processing|understanding)|couldn't prepare a reliable|"
+        r"flagged this (?:issue|problem)|understanding_validation_failed|"
+        r"HTTP(?:StatusError|\s+[45]\d\d)|schema validation|"
+        r"(?:processing|interpreting|parsing) your message|"
+        r"information I could verify", reply, re.I))

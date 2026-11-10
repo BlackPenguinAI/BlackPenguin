@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pydantic import ValidationError
 from .understanding_contract import parse, response_schema
 from .evidence import EvidenceError
-from .understanding_prompt import prompt_snapshot
+from .understanding_prompt import prompt_snapshot, TURN_RULES
 from .dialogue_store import Scope, check_scope, load, save, validate_write_request
 from .conversation_scope import scoped_messages_query
 from .models import SalesMessage
@@ -96,6 +96,7 @@ async def preview(db, scope: Scope, *, inbound_message_id: str, expected_revisio
         # history into the model twice; this is a reference projection only.
         context_payload['state']={'version':state.version,'selected_property_type_id':state.selected_property_type_id,
             'selected_unit_id':state.selected_unit_id,'offers':[o.model_dump(mode='json') for o in state.offers]}
+    snapshot = {**snapshot, 'system': snapshot['system'] + TURN_RULES}
     messages = [
         {'role': 'system', 'content': snapshot['system']},
         {'role': 'user', 'content': json.dumps(context_payload,ensure_ascii=False,default=str)},
@@ -125,11 +126,12 @@ async def preview(db, scope: Scope, *, inbound_message_id: str, expected_revisio
     for attempt in range(2 if active else 1):
         issues = []
         raw = None
+        interpreted = None
         received = False
         outcome = 'accepted'
         error_code = None
         try:
-            pending = infer(model, request_messages, response_schema())
+            pending = infer(model, request_messages, response_schema(inbound.content))
             raw = await asyncio.wait_for(pending, timeout=20) if active else await pending
             received = True
             interpreted = parse(raw, inbound.content)
@@ -167,16 +169,19 @@ async def preview(db, scope: Scope, *, inbound_message_id: str, expected_revisio
         request_messages = [*messages, {'role': 'user', 'content': json.dumps({
             'contract_repair': 'Reinterpret the ORIGINAL current_message using the schema. Correct the validation issues. Do not invent exclusions, evidence, consent or facts. This feedback is not a new lead request.',
             'validation_issues': issues, 'current_message': inbound.content,
-            'quotation_rule': 'Meaning may be normalized in value/expression, but evidence must be copied verbatim from current_message. Keep independent requests and negations.'}, ensure_ascii=False)}]
+            'local_reference_rule': 'Define local references such as ref1 and link only those, or use null. Database IDs are never interpretation reference IDs.',
+            'current_turn_rule': 'Do not replay historical questions. Budget and payment declarations belong in preferences, not requests. Preserve independent current questions.',
+            'exact_short_quote': inbound.content if len(inbound.content) <= 2000 else None,
+            'quotation_rule': 'Do not append punctuation. Meaning may be normalized in value/expression, but evidence must be copied verbatim from current_message. Keep independent requests and negations.'}, ensure_ascii=False)}]
         if sum(len(item['content'].encode()) for item in request_messages) > 64000:
             break  # Never expand a near-limit context to run the optional repair.
     # Group 4 will apply task transitions. Preview records only interpretation;
     # existing tasks, preferences and restrictions are never implicitly replaced.
-    if interpreted is not None:
+    if outcome == 'accepted' and interpreted is not None:
         state = state.model_copy(update={'last_understanding': interpreted})
     model_request = {'model': model, 'messages': messages, 'temperature': 0.2,
         'response_format': {'type': 'json_schema', 'json_schema': {
-            'name': 'sales_understanding', 'strict': True, 'schema': response_schema()}}}
+            'name': 'sales_understanding', 'strict': True, 'schema': response_schema(inbound.content)}}}
     raw_bytes = raw.encode(errors='replace') if isinstance(raw, str) else b''
     metadata = {'code_commit': settings.APP_COMMIT_SHA, 'model': model,
         'inference_mode': 'injected' if injected_inference else 'provider',

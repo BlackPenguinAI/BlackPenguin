@@ -1,4 +1,4 @@
-"""Bounded, visible recovery from repeated interpretation failures; no handoff."""
+"""Internal failure auditing and customer-facing assistance; no implicit handoff."""
 from .models import AgentRun
 from .conversation_scope import scoped_messages_query
 
@@ -16,7 +16,7 @@ def response(db, conversation, run):
         failed.append(item)
     count = len(failed) + 1
     if count == 1:
-        return "I'm having trouble processing your message right now. You can ask about available properties, prices, or a visit, or request help from the Sales team.", False, count
+        return "Would you like me to connect you with the sales team to help with your question?", False, count
     from app.modules.governance.services import enqueue_notification
     enqueue_notification(db, company_id=conversation.company_id, project_id=conversation.project_id,
         event_type='sales_processing_issue', entity_type='sales_conversation', entity_id=conversation.id,
@@ -25,4 +25,4 @@ def response(db, conversation, run):
                  'action_url':'/app/agent','recipient_roles':['admin','assistant'],
                  'conversation_id':conversation.id,'error_code':run.error_code},
         dedupe_key='sales-processing-issue:'+conversation.id+':'+(failed[-1].id if failed else run.id))
-    return ("I couldn't prepare a reliable answer, so I've flagged this issue for review. You don't need to rephrase your request. You can still message here.", count > 2, count)
+    return ("Would you prefer to continue here or speak with the sales team?", False, count)

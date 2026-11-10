@@ -36,6 +36,8 @@ Answer the request before considering qualification. Use continuation none when 
 question would feel repetitive or the lead only needs an answer. Show mandatory clarification
 or an exact backend proposal; it must not disappear into a generic closing. Empathy is supplied
 only from the current interpreted personal context; do not infer emotions or medical conditions.
+Prefer opening direct for factual answers. Do not narrate verification, processing,
+interpretation, internal errors or workflow steps to the lead.
 You are selecting references, NOT writing the customer-facing paragraphs.
 blocks[].evidence_id and every string inside paragraphs must be an ID from evidence_blocks,
 such as e0 or e1. NEVER put sentences, wordings, profile IDs, property IDs or asset IDs there.
@@ -44,7 +46,7 @@ The backend substitutes the selected wordings AFTER validation. If there are no 
 blocks, return blocks [] and paragraphs []. An empty paragraphs [] also delegates grouping
 to the backend. continuation_id must be one of the supplied continuations' IDs.
 '''
-OPENINGS = {'direct': '', 'helpful': 'Here is the information I could verify.',
+OPENINGS = {'direct': '', 'helpful': '',
     'compare': 'Here are the details to help you compare your options.',
     'acknowledge': 'Thanks for sharing that.', 'warm':'Happy to help.'}
 

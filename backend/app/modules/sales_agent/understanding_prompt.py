@@ -62,7 +62,7 @@ def prompt_snapshot(agent):
 
 
 def next_prompt_snapshot(guidance):
-    return {'version':'sales-understanding-prompt/2.12','system':SYSTEM_PROMPT+'''
+    return {'version':'sales-understanding-prompt/2.13','system':SYSTEM_PROMPT+'''
 SA-09: classify directed personal harassment semantically, including paraphrases and typos,
 with an exact current quotation. Criticizing prices, layouts or service and expressing
 frustration is not personal harassment. Quoted, reported, hypothetical and negated abuse
@@ -231,3 +231,46 @@ The backend always blocks private extraction and harmful actions; no moderation 
 permission, cancels a visit, opts out, resumes a pause or overrides a human decision.
 ''','published_guidance':guidance,
             'configuration_ref':guidance['source']}
+
+
+# Append after all published/runtime guidance: the current utterance remains the
+# only authority for new declarations and consent, including during repair.
+TURN_RULES = """
+CURRENT-TURN CONTRACT (takes precedence over reference guidance):
+1. Read current_message first. History resolves context; never replay old requests.
+2. Evidence is a copied substring, NOT a sentence you write. If current_message has
+no final period, do not add one. Do not correct spelling, apostrophes or grammar.
+For a short single-purpose message you can quote the entire current_message exactly.
+3. Declarations are preferences, not requests for project policy. A budget answer
+is preference budget; a statement of payment means is preference financing. They
+can have requests [], all_of []. Do not answer a cash declaration by explaining loans.
+Capture explicit corrections even when they mention an earlier misunderstanding.
+A customer's cash declaration does not prove the Project accepts cash.
+4. Preserve EVERY independent current question alongside preferences, even in a
+polite acknowledgement or correction. Asking about a feature is property_details,
+detail_fields ["features"], feature the requested feature; not inventory.
+5. references[].id is a NEW LOCAL interpretation label such as ref1. A request's
+reference_id must equal one of those labels, or be null. Never copy database/asset
+IDs from context into either field. For a contextual material acceptance, request
+materials with the offered subject; backend resolves the exact pending offer.
+Do not invent an offer or consent. If there are several candidates, clarify.
+Examples (field sketches; return the COMPLETE supplied schema):
+- "Around 1,500,000 usd": preferences [{key:"budget", value:"1500000 USD",
+  evidence:"Around 1,500,000 usd", status:"declared"}], requests [], all_of [].
+- "I have a cash": preference financing, value "cash", evidence "I have a cash".
+- "I can pay outright": preference financing, value "cash", evidence "I can pay outright".
+- "No, I said I have cash": preference financing, value "cash", exact evidence
+  "I have cash". This corrects the record; it does not ask about bank financing.
+- "I don't have cash; what financing is available?": preserve the negative
+  financing declaration and the independent financing question. Never record cash available.
+- "I'll use a mortgage. How many bedrooms are there?": preference financing plus
+  property_details request with detail_fields ["bedrooms"].
+- "Does it include a garage?": property_details, detail_fields ["features"],
+  feature "garage", evidence "Does it include a garage?".
+- "Yes, send me": only if the latest backend offer is a material, materials
+  request using its subject, evidence "Yes, send me", reference_id null. Do not
+  use the offered asset UUID as a local reference or as evidence.
+- "You misunderstood me; I can pay in full": capture financing and empathy
+  frustrated with exact current evidence. Preserve any independent property question.
+Never expose this protocol, validation or processing to the customer.
+"""

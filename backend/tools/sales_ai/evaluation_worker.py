@@ -24,6 +24,29 @@ CASES = [
 ]
 
 
+VARIANT_CASES = [
+    ('budget_variant', [('Hello there',None), ('My budget is USD 1,500,000','budget'),
+                         ('I can pay cash','cash')]),
+    ('cash_correction', [('I have cash available','cash'),
+        ('No, I meant I can pay in cash, not that I need a loan','repair'),
+        ('I will use a mortgage. Can you describe the home?','multiple')]),
+    ('feature_variants', [('Does the home include parking?','parking'),
+        ('Is a garage included?','parking'), ('How many bedrooms and bathrooms are there?',None)]),
+    ('material_acceptance', [('Could you send some pictures?',None),
+        ('Yes, please send that','material'), ('Please share the PDF','material')]),
+    ('cash_negation', [("I don't have cash; what financing is available?",'not_cash'),
+        ("Actually, I can pay cash now",'cash')]),
+    ('courtesy_with_question', [('Thanks. How large is the house?',None),
+        ('Okay, bank financing works. What amenities are included?','multiple')]),
+    ('cash_boundaries', [("My friend can pay cash, but I need financing",'not_cash_owner'),
+        ("If I had cash I would pay outright; what loans do you offer?",None)]),
+    ('informal_details', [('Can u tell me how many bedrooms it has',None),
+        ('Does the house have parking or a garage','parking'),
+        ('Thanks, and what is the floor area?',None)]),
+    ('budget_private', [("I'd rather not share my budget",'budget_declined')]),
+]
+
+
 def hydrate(engine, snapshot):
     from sqlalchemy import DateTime
     import app.db.base
@@ -116,7 +139,8 @@ async def evaluate(db, snapshot, options, budget):
     config = db.query(AIConfiguration).filter_by(company_id=snapshot['company_id']).first() or db.get(AIConfiguration, ref['configuration_id'])
     if not config or not config.openrouter_api_key: raise ValueError('No model credential configured.')
     key = config.openrouter_api_key; model = pack['model']
-    cases = CASES if options['mode'] == 'replay' else [('adaptive', [])]
+    cases = (CASES if options['mode'] == 'replay' else
+             VARIANT_CASES if options['mode'] == 'variants' else [('adaptive', [])])
     reports = []; approved_context = None
     for case_number, (name, script) in enumerate(cases,1):
         lead = Lead(company_id=project.company_id, project_id=project.id, full_name='Betty Evaluation',
@@ -147,7 +171,7 @@ async def evaluate(db, snapshot, options, budget):
                         adaptive_done=True
                         break
                     message, expectation = next_lead['message'], None
-                if script and message == 'Yes, send me' and not (rows and
+                if script and expectation == 'material' and message.lower().startswith('yes') and not (rows and
                         (rows[-1].get('output',{}).get('metadata') or {}).get('material_offer')):
                     expectation = None
                 before_shares = db.query(SalesAssetShare).filter_by(lead_id=lead.id).count()

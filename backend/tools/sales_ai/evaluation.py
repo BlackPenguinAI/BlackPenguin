@@ -142,7 +142,7 @@ def main():
     parser.add_argument('--company-id', required=True)
     parser.add_argument('--project-id', required=True)
     parser.add_argument('--output', type=Path, required=True)
-    parser.add_argument('--mode', choices=['replay','adaptive'], default='replay')
+    parser.add_argument('--mode', choices=['replay','variants','adaptive'], default='replay')
     parser.add_argument('--max-calls', type=int, default=80)
     parser.add_argument('--max-turns', type=int, default=8)
     parser.add_argument('--no-judge', action='store_true')

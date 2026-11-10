@@ -400,7 +400,7 @@ class DialogueState(StrictModel):
         return self
 
 
-def response_schema():
+def response_schema(current_message=None):
     """Provider-neutral strict JSON schema; importing this needs no settings/DB."""
     schema = Understanding.model_json_schema()
     def strict(node):
@@ -415,6 +415,20 @@ def response_schema():
             for child in node:
                 strict(child)
     strict(schema)
+    if current_message is not None:
+        # A quote cannot be longer than its source. Preserve exact anchoring in
+        # parse as the final authority; do not fuzzily rewrite consent/evidence.
+        def bound(node):
+            if isinstance(node, dict):
+                evidence = node.get('properties', {}).get('evidence')
+                if evidence is not None:
+                    evidence['maxLength'] = min(2000, max(1, len(current_message)))
+                    evidence['description'] = ('Copy a non-empty substring of current_message exactly. '
+                        'Never append punctuation, quote history or normalize this field.')
+                for child in node.values(): bound(child)
+            elif isinstance(node, list):
+                for child in node: bound(child)
+        bound(schema)
     return schema
 
 
