@@ -125,6 +125,17 @@ class ChatMessagePayload(StructuredChatMessagePayload):
     client_message_id: str | None = Field(default=None, min_length=36, max_length=36)
 
 
+class EditorTransition(BaseModel):
+    from_task: str | None = None
+    expected_navigation_revision: StrictInt = Field(default=0, ge=0)
+    changed: bool = False
+    draft: dict[str, Any] = Field(default_factory=dict)
+
+
+class EditorOpenRequest(ChatMessagePayload):
+    transition: EditorTransition | None = None
+
+
 class ProjectOnboardingActionRequest(BaseModel):
     action: Literal[
         "authorize_ai_sales",

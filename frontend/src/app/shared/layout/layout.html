@@ -1,4 +1,4 @@
-<div class="flex h-screen bg-black text-white font-sans overflow-hidden">
+<div [class.onboarding-layout]="isProjectOnboarding" class="flex h-screen bg-black text-white font-sans overflow-hidden">
   
   <aside class="w-64 border-r border-white/10 liquid-glass flex flex-col justify-between relative z-20">
     
@@ -177,7 +177,7 @@
 
   </aside>
 
-  <main class="flex-1 overflow-y-auto bg-black relative">
+  <main [class.onboarding-workspace]="isProjectOnboarding" class="min-w-0 flex-1 overflow-y-auto bg-black relative">
     <router-outlet></router-outlet>
   </main>
 

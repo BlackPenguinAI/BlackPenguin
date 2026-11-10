@@ -29,6 +29,9 @@ export class OnboardingDetailEditor implements OnChanges {
  deliveries:DeliveryRow[]=[];parking:Record<string,string>={applies_to:'',garage:'',assigned_spaces:'',visitor_parking:'',storage:'',conditions:''};
  readonly parkingFields=[{key:'garage',label:'Garage'},{key:'assigned_spaces',label:'Assigned parking'},{key:'visitor_parking',label:'Visitor parking'},{key:'storage',label:'Storage'},{key:'conditions',label:'Included / optional, pricing and other conditions'}];
  private loaded='';
+ private initialDraft='';
+ get editorDraft(){return {deliveries:this.deliveries,parking:this.parking};}
+ get draftChanged(){return !!this.initialDraft && JSON.stringify(this.editorDraft)!==this.initialDraft;}
  ngOnChanges(){const key=JSON.stringify([this.field,this.currentValue,this.records['field:'+this.field]?.updated_at]);if(key===this.loaded)return;this.loaded=key;this.deliveries=[];
    const draft=this.records['field:'+this.field]?.draft;
    if(this.field==='delivery_dates'){
@@ -40,6 +43,7 @@ export class OnboardingDetailEditor implements OnChanges {
      const labels:Record<string,string>={'Applies to':'applies_to','Garage':'garage','Assigned spaces':'assigned_spaces','Visitor parking':'visitor_parking','Storage':'storage','Inclusion, pricing and conditions':'conditions'};
      for(const line of this.currentValue.split('\n')){const index=line.indexOf(':');const field=labels[line.slice(0,index)];if(field)this.parking[field]=line.slice(index+1).trim();}
    }
+   this.initialDraft=JSON.stringify(this.editorDraft);
  }
  get previousText():string {
    const format=(value:unknown):string=>{

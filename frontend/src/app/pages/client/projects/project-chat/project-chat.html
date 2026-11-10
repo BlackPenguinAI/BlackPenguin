@@ -25,12 +25,12 @@
   (skip)="startConversation()"
 ></app-onboarding-welcome>
 
-<div *ngIf="initialState === 'ready' && !showWelcome" class="flex h-full w-full flex-col overflow-hidden bg-[#050505] text-white md:flex-row">
-  <section class="flex min-w-0 flex-1 flex-col">
+<div *ngIf="initialState === 'ready' && !showWelcome" class="flex h-full min-h-0 w-full flex-col overflow-hidden bg-[#050505] text-white md:flex-row">
+  <section class="flex min-h-0 min-w-0 flex-1 flex-col">
     <p *ngIf="profile.completion.has_pending_changes" role="status" class="border-b border-secondary/20 bg-secondary/10 px-5 py-3 text-sm text-secondary">
       Changes pending approval. Leads continue using the previously approved Project version. Review and approve this revision to publish the changes; completed answers and conversation history are preserved.
     </p>
-    <header class="flex items-center gap-4 border-b border-white/5 bg-black/40 p-4 backdrop-blur-md md:p-6">
+    <header [attr.inert]="editorNavigationBusy ? '' : null" class="shrink-0 flex items-center gap-4 border-b border-white/5 bg-black/40 p-4 backdrop-blur-md md:p-6">
       <a routerLink="/app/projects" class="flex h-9 w-9 items-center justify-center rounded-full text-gray-400 hover:bg-white/10 hover:text-white"><span class="material-symbols-outlined">arrow_back</span></a>
       <div class="min-w-0 flex-1">
         <div *ngIf="!isEditingProjectName" class="flex min-w-0 items-center gap-2">
@@ -48,10 +48,16 @@
         <p *ngIf="projectNameError" class="mt-1 text-xs text-red-300" role="alert">{{ projectNameError }}</p>
         <p class="mt-1 text-xs text-gray-400">Build, validate, and prepare this project for artificial intelligence (AI)-assisted sales.</p>
       </div>
-      <button type="button" class="structured-secondary md:hidden" aria-controls="project-review-panel" [attr.aria-expanded]="reviewPanelOpen" (click)="openProjectReviewPanel()">Project review</button>
+      <button type="button" class="structured-secondary xl:hidden" aria-controls="project-review-panel" [attr.aria-expanded]="reviewPanelOpen" (click)="openProjectReviewPanel()">Project review</button>
     </header>
 
-    <div #chatScroll class="flex flex-1 flex-col gap-6 overflow-y-auto p-4 md:p-8">
+    <div #chatScroll data-testid="onboarding-chat-scroll" [attr.inert]="editorNavigationBusy ? '' : null" class="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto p-4 md:p-8">
+
+      <section *ngIf="activeEditorTask || editorNavigationNote" class="sticky top-0 z-20 rounded-xl border border-secondary/30 bg-[#101010] p-3" role="status" data-testid="active-editor-status">
+        <p class="text-sm font-semibold">Current review: {{activeEditorLabel}}</p>
+        <p *ngIf="editorNavigationNote" class="mt-1 text-xs text-gray-300">{{editorNavigationNote}}</p>
+        <button *ngIf="activeEditorTask" type="button" class="structured-secondary mt-2" (click)="openEditorTask('review')">Return to guided onboarding</button>
+      </section>
 
       <section *ngIf="requestedEditorTask" class="rounded-xl border border-secondary/30 p-4" data-testid="requested-editor-task"><p>Marketing setup review requested. Your saved settings remain unchanged until you explicitly save an update.</p><button type="button" class="structured-primary mt-2" (click)="openEditorTask(requestedEditorTask); requestedEditorTask=''" [disabled]="isAnalyzing">{{requestedEditorTask === 'meta_account' ? 'Review Meta account and permissions' : 'Review Project campaigns and forms'}}</button></section>
 
@@ -148,7 +154,7 @@
               </app-review-card>
             </section>
 
-            <section *ngIf="isStructuredQuestion(msg, 'meta_lead_setup')" class="structured-card ml-11 mt-4 max-w-3xl">
+            <section *ngIf="isStructuredQuestion(msg, 'meta_lead_setup')" class="structured-card ml-11 mt-4 max-w-3xl" data-editor-task="meta_assets" (input)="metaFormTouched=true" (change)="metaFormTouched=true">
               <div class="flex items-start justify-between gap-3">
                 <div>
                   <h2 class="text-sm font-semibold">Meta Lead Ads · two separate steps</h2>
@@ -222,8 +228,8 @@
               <p *ngIf="metaSetupMessage" role="status" data-testid="meta-connection-message" class="mt-3 rounded-lg border p-3 text-xs" [ngClass]="metaConnectionChecking ? 'border-white/15 bg-white/5 text-gray-300' : 'border-green-500/20 bg-green-500/10 text-green-300'">{{ metaSetupMessage }}</p>
             </section>
             <section *ngIf="isStructuredQuestion(msg,'meta_task_choice')" class="structured-card"><button type="button" (click)="openEditorTask('meta_account')">Reconnect account</button><button type="button" (click)="openEditorTask('meta_assets')">Associate campaigns / forms</button></section>
-            <app-onboarding-detail-editor *ngIf="isActiveQuestion(msg) && ['delivery_dates','parking_and_storage'].includes(msg.ui_payload?.field || '')" [field]="msg.ui_payload!.field!" [entityId]="projectId" [currentValue]="profile.data[msg.ui_payload!.field!]" [records]="profile.ui_deferrals || {}" [busy]="isAnalyzing" [error]="errorMessage" (saved)="saveProjectDetails($event,msg)" (deferred)="deferralsSaved($event)" (notApplicable)="chooseAnswer('Not applicable',msg)"></app-onboarding-detail-editor>
-            <app-onboarding-location *ngIf="!cardDeferred('field:country') && isActiveQuestion(msg) && (msg.ui_payload?.input_type==='location_editor' || msg.ui_payload?.field==='country' || msg.ui_payload?.field==='city')" [entityId]="projectId" [records]="profile.ui_deferrals || {}" (deferred)="deferralsSaved($event)" (saved)="locationSaved()"></app-onboarding-location>
+            <app-onboarding-detail-editor [attr.data-editor-task]="msg.ui_payload?.field === 'delivery_dates' ? 'delivery' : 'parking'" *ngIf="isActiveQuestion(msg) && ['delivery_dates','parking_and_storage'].includes(msg.ui_payload?.field || '')" [field]="msg.ui_payload!.field!" [entityId]="projectId" [currentValue]="profile.data[msg.ui_payload!.field!]" [records]="profile.ui_deferrals || {}" [busy]="isAnalyzing" [error]="errorMessage" (saved)="saveProjectDetails($event,msg)" (deferred)="deferralsSaved($event)" (notApplicable)="chooseAnswer('Not applicable',msg)"></app-onboarding-detail-editor>
+            <app-onboarding-location data-editor-task="location" *ngIf="!cardDeferred('field:country') && isActiveQuestion(msg) && (msg.ui_payload?.input_type==='location_editor' || msg.ui_payload?.field==='country' || msg.ui_payload?.field==='city')" [entityId]="projectId" [records]="profile.ui_deferrals || {}" (deferred)="deferralsSaved($event)" (saved)="locationSaved()"></app-onboarding-location>
           </div>
           <div *ngIf="msg.sender === 'user'" class="max-w-[85%] text-right md:max-w-[80%]">
           <span class="mb-1 block text-[10px] text-gray-500">{{ userName }}</span>
@@ -256,7 +262,7 @@
 
       <ng-template #sourceReview let-source>
 
-<ng-container *ngIf="!cardDeferred('source:'+source.id)">
+<ng-container *ngIf="(!activeEditorTask || activeEditorTask === 'documents') && !cardDeferred('source:'+source.id)">
       <section *ngIf="source.status === 'processing'" class="processing-source ml-11 max-w-3xl" role="status" aria-live="polite">
         <span class="processing-source__spinner" aria-hidden="true"></span>
         <div class="min-w-0">
@@ -359,12 +365,12 @@
 <app-configure-later [contextual]="true" scope="project" [entityId]="projectId" card="field:project_cover" label="Project cover image" [draft]="cardDraft('project_cover')" [blocked]="coverBusy || coverUploadBusy" [records]="profile.ui_deferrals || {}" (saved)="deferralsSaved($event)"></app-configure-later>
 </section>
 
-      <section *ngIf="showPropertyCatalog && (!hasExclusiveSourceFlow || catalogEditorOpen)" class="ml-0 max-w-3xl rounded-2xl border border-white/10 bg-white/[0.025] p-5 md:ml-11" data-testid="property-type-catalog">
+      <section *ngIf="showPropertyCatalog && (!hasExclusiveSourceFlow || catalogEditorOpen)" class="ml-0 max-w-3xl rounded-2xl border border-white/10 bg-white/[0.025] p-5 md:ml-11" data-testid="property-type-catalog" data-editor-task="catalog">
 
         <div class="flex flex-wrap items-start justify-between gap-3"><div><p class="text-[10px] font-bold uppercase tracking-[.18em] text-secondary">Property catalog</p><h2 class="mt-1 text-lg font-medium">{{ reviewingAvailability ? 'Confirm current availability' : 'Property types and availability' }}</h2><p *ngIf="reviewingAvailability" class="mt-2 text-sm text-amber-200">Enter available units in each type and save. Unknown is not zero; confirming the catalog alone does not confirm inventory.</p><p class="mt-2 text-xs leading-5 text-gray-500">Extracted types are candidates. Commercial fields are optional: leave price or availability blank unless the source confirms them.</p></div><div class="text-right"><p class="text-sm font-semibold">{{ propertyCatalog.confirmed_count }} / {{ propertyCatalog.limit }}</p><p class="text-[10px] text-gray-500">confirmed types</p></div></div>
         <div class="mt-4 flex flex-wrap gap-3" *ngIf="catalogEditorOpen">
           <label class="field-label">Choose a property type<select class="catalog-input" [(ngModel)]="selectedPropertyId"><option value="">All property types</option><option *ngFor="let type of propertyCatalog.items" [value]="type.id">{{type.name}}</option></select></label>
-          <button type="button" class="structured-secondary" (click)="closeCatalogEditor()">Return to conversation</button>
+          <button type="button" class="structured-secondary" (click)="openEditorTask('review')">Return to conversation</button>
           <p class="text-xs text-gray-400">Your current onboarding question is preserved. Existing published facts remain active until you approve profile changes.</p>
         </div>
         <div *ngIf="propertyCatalog.candidate_count" class="mt-4 rounded-xl border border-secondary/20 bg-secondary/5 px-4 py-3 text-xs text-secondary">I found {{ propertyCatalog.candidate_count }} possible property type{{ propertyCatalog.candidate_count === 1 ? '' : 's' }}. This is not assumed to be the complete catalog.</div>
@@ -485,7 +491,7 @@
       </ng-template>
 
       <ng-template #salesAssetReceipt let-item>
-        <section *ngIf="!hasExclusiveSourceFlow" class="ml-0 max-w-3xl rounded-2xl border border-white/10 bg-white/[0.025] p-5 md:ml-11" data-testid="sales-materials">
+        <section *ngIf="(!activeEditorTask || activeEditorTask === 'documents') && !hasExclusiveSourceFlow" class="ml-0 max-w-3xl rounded-2xl border border-white/10 bg-white/[0.025] p-5 md:ml-11" data-testid="sales-materials" data-editor-task="documents">
 <app-review-card [title]="item.display_name" [status]="cardDeferred('material:'+item.id) ? 'Pending · saved for later' : item.approval_status" [summary]="item.content_tags.join(' + ').replaceAll('_',' ') + ' · ' + item.allowed_channels.join(' + ')" [complete]="item.approval_status !== 'draft' || cardDeferred('material:'+item.id)" [revision]="item.version">
 <app-configure-later [contextual]="true" *ngIf="item.approval_status === 'draft'" scope="project" [entityId]="projectId" [card]="'material:'+item.id" [label]="item.display_name" [draft]="{display_name:item.display_name,content_tags:item.content_tags,allowed_channels:item.allowed_channels}" [blocked]="salesAssetBusy" [records]="profile.ui_deferrals || {}" (saved)="deferralsSaved($event)"></app-configure-later>
           <div><p class="text-[10px] font-bold uppercase tracking-[.18em] text-secondary">Lead-safe material</p><h2 class="mt-1 text-lg font-medium">Review file for lead sharing</h2><p class="mt-2 text-xs leading-5 text-gray-500">This decision stays beside the original source in onboarding history. Only Draft items require action.</p></div>
@@ -530,7 +536,7 @@
       <div *ngIf="isAnalyzing" class="ml-11 flex w-fit gap-2 rounded-2xl border border-white/10 bg-white/5 p-4"><span class="h-2 w-2 animate-bounce rounded-full bg-secondary"></span><span class="h-2 w-2 animate-bounce rounded-full bg-secondary [animation-delay:0.2s]"></span><span class="h-2 w-2 animate-bounce rounded-full bg-secondary [animation-delay:0.4s]"></span></div>
     </div>
 
-    <footer class="border-t border-white/5 bg-[#050505] p-4">
+    <footer data-testid="onboarding-composer" class="shrink-0 border-t border-white/5 bg-[#050505] p-4">
       <div class="mx-auto max-w-4xl">
         <div *ngIf="errorMessage" class="mb-3 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-xs text-red-200">{{ errorMessage }}</div>
         <div class="relative rounded-2xl border border-white/10 bg-[#111] p-3">
@@ -542,7 +548,7 @@
               <button (click)="removeSelectedFile(index)" [disabled]="isUploading" class="text-gray-500 hover:text-red-300"><span class="material-symbols-outlined text-[14px]">close</span></button>
             </div>
           </div>
-          <textarea [(ngModel)]="prompt" (keydown)="handleKeyDown($event)" [disabled]="isAnalyzing || isCompleting || hasExclusiveSourceFlow" rows="2" class="min-h-14 w-full resize-none bg-transparent py-2 pl-11 pr-24 text-sm outline-none" [placeholder]="profile.completion.can_complete ? 'Describe the Project data you want to update' : ('Next: ' + nextBlocker)"></textarea>
+          <textarea [(ngModel)]="prompt" (keydown)="handleKeyDown($event)" [disabled]="isAnalyzing || isCompleting || editorNavigationBusy || hasExclusiveSourceFlow" rows="2" class="min-h-14 w-full resize-none bg-transparent py-2 pl-11 pr-24 text-sm outline-none" [placeholder]="profile.completion.can_complete ? 'Describe the Project data you want to update' : ('Next: ' + nextBlocker)"></textarea>
           <label class="absolute bottom-3 left-2 cursor-pointer rounded-lg p-2 text-gray-400 hover:bg-white/10 hover:text-white" [class.pointer-events-none]="isUploading" [class.opacity-30]="isUploading" title="Attach project files">
             <span class="material-symbols-outlined text-[20px]">{{ isUploading ? 'progress_activity' : 'attach_file' }}</span>
             <input type="file" multiple accept=".pdf,.docx,.txt,.csv,.xlsx,.jpg,.jpeg,.png,.webp" class="hidden" [disabled]="isUploading || hasExclusiveSourceFlow" (change)="onFilesSelected($event)" />
@@ -558,7 +564,7 @@
 
     <div *ngIf="showFileClassification" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="file-purpose-title">
       <section class="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-white/15 bg-[#0b0b0b] shadow-2xl">
-        <header class="border-b border-white/10 p-5">
+        <header class="shrink-0 border-b border-white/10 p-5">
           <p class="text-[10px] font-bold uppercase tracking-[.18em] text-secondary">Document purpose</p>
           <h2 id="file-purpose-title" class="mt-1 text-lg font-medium text-white">How should Black Penguin use these files?</h2>
           <p class="mt-2 text-xs leading-5 text-gray-400">Internal files help build the Project Profile. Lead-sharing files are registered only as drafts and still require approval after processing.</p>
@@ -581,7 +587,7 @@
             </div>
           </article>
         </div>
-        <footer class="flex flex-wrap justify-end gap-3 border-t border-white/10 p-4"><button type="button" (click)="closeFileClassification()" class="rounded-xl border border-white/10 px-4 py-2.5 text-xs text-gray-300">Cancel</button><button type="button" (click)="confirmFileClassification()" class="rounded-xl bg-secondary px-5 py-2.5 text-xs font-semibold text-black">Add to message</button></footer>
+        <footer class="shrink-0 flex flex-wrap justify-end gap-3 border-t border-white/10 p-4"><button type="button" (click)="closeFileClassification()" class="rounded-xl border border-white/10 px-4 py-2.5 text-xs text-gray-300">Cancel</button><button type="button" (click)="confirmFileClassification()" class="rounded-xl bg-secondary px-5 py-2.5 text-xs font-semibold text-black">Add to message</button></footer>
       </section>
     </div>
   </section>
@@ -589,15 +595,15 @@
   <button *ngIf="reviewPanelOpen" type="button" class="project-review-backdrop" aria-label="Close project review panel" (click)="closeProjectReviewPanel()"></button>
   <aside id="project-review-panel" class="project-review-panel h-full shrink-0 flex-col border-l border-white/10 bg-[#0a0a0a]" [class.project-review-panel--open]="reviewPanelOpen" aria-label="Project profile and review tasks" (keydown)="reviewPanelKeydown($event)">
     <div class="flex justify-between items-center px-4 pt-4 md:hidden"><h2 class="text-sm font-semibold">Project review</h2><button type="button" class="structured-secondary" (click)="closeProjectReviewPanel()">Close review panel</button></div>
-    <nav aria-label="Project review tasks" class="flex flex-wrap gap-2 p-4"><button *ngFor="let task of editorTasks" type="button" class="structured-secondary" (click)="openEditorTask(task.key)" [disabled]="projectReviewBusy">{{task.label}}</button><button type="button" (click)="openEditorTask('review')" [disabled]="projectReviewBusy">Review / approve profile</button></nav>
+    <nav aria-label="Project review tasks" class="flex flex-wrap gap-2 p-4"><button *ngFor="let task of editorTasks" type="button" class="structured-secondary" (click)="openEditorTask(task.key)" [attr.aria-pressed]="activeEditorTask === task.key" [class.active-review-task]="activeEditorTask === task.key" [disabled]="projectReviewBusy">{{task.label}}</button><button type="button" (click)="openEditorTask('review')" [disabled]="projectReviewBusy">Review / approve profile</button></nav>
     <p *ngIf="projectReviewBusy" class="px-4 pb-3 text-xs text-gray-400" role="status">Review actions will be available when the current processing finishes.</p>
-    <header class="border-b border-white/10 p-5">
+    <header class="shrink-0 border-b border-white/10 p-5">
       <div class="flex items-center justify-between"><h2 class="text-xs font-bold uppercase tracking-widest">Project Profile</h2><span class="text-2xl font-semibold text-secondary">{{ projectProfileProgress.percentage }}%</span></div>
       <div class="mt-3 h-2 overflow-hidden rounded-full bg-white/10"><div class="h-full rounded-full bg-secondary transition-all" [style.width.%]="projectProfileProgress.percentage"></div></div>
       <p class="mt-3 text-[11px] text-gray-500">{{ projectProfileProgress.completed }} of {{ projectProfileProgress.total }} Project Profile fields resolved.</p>
     </header>
 
-    <div class="flex-1 space-y-5 overflow-y-auto p-5">
+    <div class="min-h-0 flex-1 space-y-5 overflow-y-auto p-5">
       <section *ngFor="let section of profileSections" class="rounded-xl border border-white/10 bg-white/[0.025] p-3">
         <div class="flex items-center justify-between"><h3 class="text-[11px] font-semibold text-gray-200">{{ section.label }}</h3><span class="text-[10px] text-gray-500">{{ section.completed }}/{{ section.total }}</span></div>
         <div class="mt-2 h-1 overflow-hidden rounded bg-white/10"><div class="h-full bg-secondary" [style.width.%]="section.percentage"></div></div>
@@ -620,7 +626,7 @@
       </section>
     </div>
 
-    <footer class="border-t border-white/10 p-5">
+    <footer class="shrink-0 border-t border-white/10 p-5">
       <div class="rounded-xl border p-4" [ngClass]="profile.completion.sales_activation_status === 'ready' ? 'border-green-500/30 bg-green-500/10 text-green-300' : 'border-secondary/20 bg-secondary/10 text-secondary'">
         <p class="text-[10px] font-bold uppercase tracking-wider">Sales activation: {{ profile.completion.sales_activation_status.replace('_', ' ') }}</p>
         <p class="mt-1 text-[11px]">{{ profile.completion.sales_activation_status === 'ready' ? 'Project approved and operationally ready.' : 'Check each capability below. A deferred setup step is not an approval or permission.' }}</p>

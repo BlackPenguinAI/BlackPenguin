@@ -44,7 +44,7 @@ from .schemas import (
     MetaConnectionCreate, MetaConnectionResponse, MetaProjectSetupRequest, MetaProjectSetupResponse,
     MetaAssetDiscoveryResponse, MetaAuthorizationResponse, MetaOAuthStartResponse,
     MetaSetupConfigurationResponse, MetaSetupStateResponse, ProjectCreate, ProjectProfilePatch, ProjectTimezoneUpdate,
-    ProjectOnboardingActionRequest,
+    ProjectOnboardingActionRequest, EditorOpenRequest,
     ProjectStartRequest, ProjectCompleteRequest, ProjectCompleteResponse, ProjectDeleteRequest, ProjectDeletionImpact, ProjectDraftResponse,
     ProjectOverviewResponse, ProjectProfileResponse, ProjectResponse,
     PropertyTypeCatalogResponse, PropertyTypeCreate, PropertyTypeMediaAttach,
@@ -2216,14 +2216,22 @@ def _open_editor_task(db, project, actor, task, client_id, text, request_id):
 
 
 @router.post("/{project_id}/editor/{task}", response_model=ChatTurnResponse)
-def open_editor_task(project_id: str, task: str, payload: ChatMessagePayload, db: Session = Depends(get_db), current_user: User = Depends(RoleChecker(EDITOR_ROLES))):
+def open_editor_task(project_id: str, task: str, payload: EditorOpenRequest, db: Session = Depends(get_db), current_user: User = Depends(RoleChecker(EDITOR_ROLES))):
     from .editor_tasks import TASKS
     if task not in TASKS: raise HTTPException(422, "Unknown onboarding task.")
     project = services.get_project(db, project_id, current_user.company_id)
     require_project_access(db, current_user, project_id)
     db.query(ProjectSession).filter_by(id=project.session.id).with_for_update().one()
     existing = _existing_turn(db, project=project, client_message_id=payload.client_message_id, request_id="editor")
-    return existing or _open_editor_task(db, project, current_user, task, payload.client_message_id, payload.message, "editor")
+    if existing: return existing
+    try:
+        if payload.transition:
+            from .editor_navigation import transition
+            transition(db, project, task, payload.transition)
+        return _open_editor_task(db, project, current_user, task, payload.client_message_id, payload.message, "editor")
+    except Exception:
+        db.rollback()
+        raise
 
 
 @router.post("/{project_id}/details", response_model=ChatTurnResponse)

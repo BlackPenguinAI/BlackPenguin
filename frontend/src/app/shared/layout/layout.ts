@@ -15,6 +15,7 @@ import { API_V1_URL } from '../../core/config/api.config';
   styleUrl: './layout.scss'
 })
 export class LayoutComponent implements OnInit, OnDestroy {
+  get isProjectOnboarding(): boolean { return /^\/app\/projects\/[^/?]+\/onboarding\/?(?:[?#]|$)/.test(this.router.url || ''); }
   userRole: string = '';
   currentLang: string = 'en';
   profile: any = null;

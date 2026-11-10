@@ -57,7 +57,7 @@ it('deduplicates repeated turn delivery without losing reply order',()=>{
 });
 it('opens the same persisted task through the explicit editor endpoint without navigating',()=>{
  const api={openEditorTask:vi.fn(()=>of(turn))};const c=project(api);vi.spyOn(c as any,'scrollToBottom').mockImplementation(()=>undefined);
- c.openEditorTask('meta_account');expect(api.openEditorTask).toHaveBeenCalledWith('project-1','meta_account',expect.any(String));
+ c.openEditorTask('meta_account');expect(api.openEditorTask).toHaveBeenCalledWith('project-1','meta_account',expect.any(String),expect.objectContaining({expected_navigation_revision:0}));
  expect(c.isAnalyzing).toBe(false);expect(c.nextQuestion?.task).toBe('meta_account');
 });
 

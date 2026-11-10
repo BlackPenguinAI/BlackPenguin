@@ -32,19 +32,17 @@ describe('Project property editor and reviewed resource controls', () => {
     open.mockRestore();
   });
 
-  it('opens and closes the saved catalog without consuming the active question', () => {
+  it('opens the catalog through the atomic editor transition and retains previous question history', () => {
     const load = vi.spyOn(component,'loadPropertyTypes').mockImplementation(() => undefined);
     vi.spyOn(component as any,'loadSalesAssets').mockImplementation(() => undefined);
     const question = {field:'target_audience',input_type:'text'} as never;
-    component.nextQuestion = question;
-    component.openEditorTask('catalog');
-    expect(component.catalogEditorOpen).toBe(true);
-    expect(component.nextQuestion).toBe(question);
-    expect(load).toHaveBeenCalledOnce();
-    http.expectNone(request => request.method === 'POST');
-    component.closeCatalogEditor();
-    expect(component.catalogEditorOpen).toBe(false);
-    expect(component.nextQuestion).toBe(question);
+    component.nextQuestion=question;component.openEditorTask('catalog');
+    const request=http.expectOne(request=>request.url.endsWith('/editor/catalog'));
+    expect(request.request.body.transition.expected_navigation_revision).toBe(0);
+    const next={field:'property_type_catalog',input_type:'property_type_catalog',task:'catalog'};
+    request.flush({message:{id:'catalog-q',sender:'ai',created_at:'2026-11-09',content:'Catalog',ui_payload:next},profile:EMPTY_PROJECT_PROFILE,sources:[],next_question:next});
+    expect(component.catalogEditorOpen).toBe(true);expect(component.activeEditorTask).toBe('catalog');
+    expect(load).toHaveBeenCalledOnce();expect(question).toEqual({field:'target_audience',input_type:'text'});
   });
 
   it('lets the user choose a saved property without mutating other types', () => {

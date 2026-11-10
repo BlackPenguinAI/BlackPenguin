@@ -140,8 +140,11 @@ describe('Project onboarding Block C interface regression', () => {
     vi.spyOn(c,'loadPropertyTypes').mockImplementation(()=>undefined);
     vi.spyOn(c as any,'loadSalesAssets').mockImplementation(()=>undefined);
     c.reviewPanelOpen=true;c.openEditorTask('catalog');
-    expect(c.catalogEditorOpen).toBe(true);expect(c.reviewPanelOpen).toBe(false);
-    http.expectNone(request => request.method==='POST');
+    expect(c.editorNavigationBusy).toBe(true);expect(c.reviewPanelOpen).toBe(false);
+    const request=http.expectOne(request=>request.url.endsWith('/editor/catalog'));
+    const next={...payload,input_type:'property_type_catalog',task:'catalog'};
+    request.flush({message:{...message(),ui_payload:next},profile:EMPTY_PROJECT_PROFILE,sources:[],next_question:next});
+    expect(c.catalogEditorOpen).toBe(true);
     vi.clearAllTimers();vi.useRealTimers();
   });
 

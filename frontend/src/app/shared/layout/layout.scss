@@ -1,0 +1,6 @@
+
+.onboarding-layout { height:100dvh; max-height:100dvh; overflow:hidden; }
+main.onboarding-workspace { display:flex; flex-direction:column; min-height:0; overflow:hidden; overscroll-behavior:contain; }
+main.onboarding-workspace > router-outlet { display:none; }
+
+@media (max-width:767px) { .onboarding-layout > aside { display:none; } }

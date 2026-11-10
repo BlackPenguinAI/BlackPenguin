@@ -53,7 +53,7 @@ def resolve_in_sources(sources, card):
     if card not in sources.get(KEY, {}):
         return
     bag = deepcopy(sources[KEY])
-    bag[card] = {**bag[card], "deferred": False, "resumed": False, "draft": {}, "completed_at": datetime.utcnow().isoformat()}
+    bag[card] = {**bag[card], "deferred": False, "resumed": False, "pending_draft": False, "draft": {}, "completed_at": datetime.utcnow().isoformat()}
     sources[KEY] = bag
 
 

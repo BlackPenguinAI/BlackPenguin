@@ -1,4 +1,5 @@
-import { Component, Input, OnInit, Output, EventEmitter, ChangeDetectorRef } from '@angular/core';
+import { Component, Input, OnInit, Output, EventEmitter, ChangeDetectorRef, OnDestroy } from '@angular/core';
+import { Subscription } from 'rxjs';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
@@ -9,22 +10,27 @@ import { ConfigureLaterComponent, DeferredCards } from './configure-later/config
 @Component({selector:'app-onboarding-location',standalone:true,imports:[CommonModule,FormsModule,ConfigureLaterComponent,TimezoneSelectComponent],styles:[`:host{display:block;max-width:48rem;margin:1rem 0}section{background:#101010;border-radius:1rem;padding:1.25rem}h3{font-size:1rem;font-weight:600}label{font-size:.8rem;color:#d1d5db}input,select{display:block;width:100%;margin-top:.4rem;border:1px solid #ffffff26;border-radius:.65rem;background:#080808;color:#fff;padding:.7rem}.structured-primary{background:#e5aa00;color:#050505;border-radius:.65rem;padding:.7rem 1rem;font-weight:600;margin-top:.8rem}.structured-primary:disabled{opacity:.4}p{line-height:1.6}`],template:
 `<section class="rounded-xl border border-white/20 p-4 space-y-3" data-testid="location-editor">
 <h3>Country, city and timezone</h3><p class="text-xs text-gray-400">{{options?.source}}. Suggestions are not approved automatically.</p>
-<label class="block">Country<select class="secure-input w-full" [(ngModel)]="country" [disabled]="busy" (ngModelChange)="countryChanged()"><option value="">Choose country</option><option *ngFor="let item of options?.countries" [value]="item.code">{{item.name}}</option></select></label>
-<label class="block">City<input class="secure-input w-full" [(ngModel)]="city" [disabled]="busy" (ngModelChange)="cityChanged()" [attr.list]="'location-cities-'+entityId" placeholder="Choose a suggested city or enter another city"><datalist [id]="'location-cities-'+entityId"><option *ngFor="let item of cities" [value]="item.city"></option></datalist></label>
-<div class="block"><p class="text-sm text-gray-300">IANA timezone</p><app-timezone-select [value]="timezone" (valueChange)="timezone=$event" [allowedZones]="zones" [disabled]="busy || !country" [ariaLabel]="scope === 'project' ? 'Project location timezone' : 'Company location timezone'" placeholder="Search city, IANA timezone or UTC offset"></app-timezone-select></div>
+<label class="block">Country<select class="secure-input w-full" [(ngModel)]="country" [disabled]="busy || !options" (ngModelChange)="countryChanged()"><option value="">Choose country</option><option *ngFor="let item of options?.countries" [value]="item.code">{{item.name}}</option></select></label>
+<label class="block">City<input class="secure-input w-full" [(ngModel)]="city" [disabled]="busy || !options" (ngModelChange)="cityChanged()" [attr.list]="'location-cities-'+entityId" placeholder="Choose a suggested city or enter another city"><datalist [id]="'location-cities-'+entityId"><option *ngFor="let item of cities" [value]="item.city"></option></datalist></label>
+<div class="block"><p class="text-sm text-gray-300">IANA timezone</p><app-timezone-select [value]="timezone" (valueChange)="timezone=$event" [allowedZones]="zones" [disabled]="busy || !options || !country" [ariaLabel]="scope === 'project' ? 'Project location timezone' : 'Company location timezone'" placeholder="Search city, IANA timezone or UTC offset"></app-timezone-select></div>
 <button type="button" (click)="showAllZones=!showAllZones">{{showAllZones ? 'Show city suggestions' : 'Search all timezones for this country'}}</button><p class="text-xs text-gray-400">Offsets reflect today and may change seasonally. Other cities are supported: enter the city and explicitly choose its timezone. Existing appointments will not move. Project changes require profile approval.</p>
 <button type="button" class="structured-primary" (click)="save()" [disabled]="busy || !country || !city.trim() || !zones.includes(timezone)">Confirm location</button>
 <app-configure-later [scope]="scope" [entityId]="entityId" card="field:country" label="Country, city and timezone" [draft]="{country:country,city:city,timezone:timezone}" [blocked]="busy" [records]="records" (saved)="deferred.emit($event)"></app-configure-later>
 <p role="status">{{message}}</p></section>`})
-export class OnboardingLocationComponent implements OnInit {
+export class OnboardingLocationComponent implements OnInit, OnDestroy {
+ private loadSubscription?: Subscription;
+ ngOnDestroy(){this.loadSubscription?.unsubscribe();}
  @Input() scope:'company'|'project'='project'; @Input() entityId='';
  @Input() records:DeferredCards={};
  @Output() deferred=new EventEmitter<DeferredCards>();
  @Output() saved=new EventEmitter<void>();
+ private initialDraft='';
+ get editorDraft(){return {country:this.country,city:this.city,timezone:this.timezone};}
+ get draftChanged(){return !!this.initialDraft && JSON.stringify(this.editorDraft)!==this.initialDraft;}
  options:any=null;country='';city='';timezone='';busy=false;message='';
  constructor(private http:HttpClient,private cdr:ChangeDetectorRef){}
  get url(){return API_V1_URL+'/onboarding-editor/'+this.scope+'/'+encodeURIComponent(this.entityId)+'/location';}
- ngOnInit(){if(this.entityId)this.http.get<any>(this.url).subscribe({next:v=>{this.options=v;const draft=this.records['field:country']?.draft;for(const key of ['country','city','timezone'] as const)this[key]=typeof draft?.[key]==='string' ? draft[key] : String(v[key] || '');this.cdr.markForCheck();},error:()=>{this.message='Could not load location suggestions. Retry by reopening this review.';this.cdr.markForCheck();}});}
+ ngOnInit(){if(this.entityId)this.loadSubscription=this.http.get<any>(this.url).subscribe({next:v=>{this.options=v;const draft=this.records['field:country']?.draft;for(const key of ['country','city','timezone'] as const)this[key]=typeof draft?.[key]==='string' ? draft[key] : String(v[key] || '');this.initialDraft=JSON.stringify(this.editorDraft);this.cdr.markForCheck();},error:()=>{this.message='Could not load location suggestions. Retry by reopening this review.';this.cdr.markForCheck();}});}
  get cities():Array<any>{return (this.options?.cities || []).filter((i:any)=>i.country===this.country);}
  showAllZones=false;
  get zones():string[]{
@@ -41,6 +47,6 @@ export class OnboardingLocationComponent implements OnInit {
  }
  countryChanged(){this.showAllZones=false;this.city='';this.timezone='';}
  cityChanged(){const match=[...new Set<string>(this.cities.filter(i=>this.normalizeCity(i.city)===this.normalizeCity(this.city)).map(i=>i.timezone))];this.timezone=match.length===1?match[0]:'';this.showAllZones=false;}
- save(){if(this.busy || !this.country || !this.city.trim() || !this.zones.includes(this.timezone))return;this.busy=true;this.message='';this.http.post<any>(this.url,{country:this.country,city:this.city.trim(),timezone:this.timezone}).subscribe({next:v=>{this.busy=false;this.message=v.message;this.saved.emit();this.cdr.markForCheck();},error:e=>{this.busy=false;this.message=typeof e.error?.detail==='string'?e.error.detail:'Location was not saved. Please retry; your selection remains.';this.cdr.markForCheck();}});}
+ save(){if(this.busy || !this.country || !this.city.trim() || !this.zones.includes(this.timezone))return;this.busy=true;this.message='';this.http.post<any>(this.url,{country:this.country,city:this.city.trim(),timezone:this.timezone}).subscribe({next:v=>{this.busy=false;this.message=v.message;this.initialDraft=JSON.stringify(this.editorDraft);this.saved.emit();this.cdr.markForCheck();},error:e=>{this.busy=false;this.message=typeof e.error?.detail==='string'?e.error.detail:'Location was not saved. Please retry; your selection remains.';this.cdr.markForCheck();}});}
 }
 

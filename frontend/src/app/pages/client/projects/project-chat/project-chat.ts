@@ -1,6 +1,6 @@
 import { PublicResourceLinkComponent } from '../../../../shared/ui/public-resource-link/public-resource-link';
 import { MaterialCoverageEditor } from './material-coverage-editor';
-import { ChangeDetectorRef, Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
+import { ChangeDetectorRef, Component, ElementRef, OnDestroy, OnInit, ViewChild, ViewChildren, QueryList } from '@angular/core';
 import { ConfigureLaterComponent, DeferredCards, restoreDraft, questionCard } from '../../../../shared/ui/configure-later/configure-later';
 import { ReviewCardComponent } from '../../../../shared/ui/review-card';
 import { OnboardingDetailEditor } from '../../../../shared/ui/onboarding-detail-editor';
@@ -76,7 +76,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     if (field === 'campaigns_defined' || field === 'meta_connection_verified') return {manual:this.metaSetup,oauth:this.metaOAuth};
     if (field === 'sales_contacts') return {selected_user_id:this.selectedSalesUserId};
     if (field === 'project_cover') return {selected_source_id:this.selectedCoverSourceId};
-    if (field === 'property_type_catalog') return {items:this.propertyCatalog.items.map(item=>this.propertyDraft(item)),newType:this.newPropertyDraft()};
+    if (field === 'property_type_catalog') return {items:this.propertyCatalog.items.map(item=>this.propertyDraft(item)),newType:this.newPropertyDraft(),galleryAccess:this.propertyGalleryAccess};
     return {answer:this.prompt};
   }
   @ViewChild('chatScroll') chatScroll!: ElementRef<HTMLElement>;
@@ -230,7 +230,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
       error:e=>{this.isAnalyzing=false;this.errorMessage=this.apiDetail(e,'Details were not saved. Your entries remain in the form.');this.cdr.detectChanges();}
     });
   }
-  locationSaved():void {this.syncState('bottom');}
+  locationSaved():void {if(this.activeEditorTask==='location')this.openEditorTask('review');else this.syncState('bottom');}
   readonly editorTasks = [{key:'meta_account',label:'Meta account'},{key:'meta_assets',label:'Campaigns / forms'},{key:'team',label:'Assign team'},{key:'catalog',label:'Property types'},{key:'delivery',label:'Delivery dates'},{key:'parking',label:'Parking / storage'},{key:'documents',label:'Add documents'},{key:'location',label:'Location / timezone'}];
   reviewPanelOpen = false;
   private reviewPanelTrigger: HTMLElement | null = null;
@@ -246,7 +246,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     this.reviewPanelTrigger?.focus();
   }
   reviewPanelKeydown(event: KeyboardEvent): void {
-    if (!this.reviewPanelOpen || window.innerWidth >= 768) return;
+    if (!this.reviewPanelOpen || window.innerWidth >= 1280) return;
     if (event.key === 'Escape') { event.preventDefault(); this.closeProjectReviewPanel(); return; }
     if (event.key !== 'Tab') return;
     const panel = document.getElementById('project-review-panel');
@@ -262,6 +262,45 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     this.metaReviewStep=step;
     if (step === 'assets') this.openMetaAssetStep();
     else this.showMetaAssetStep=false;
+  }
+  activeEditorTask = '';
+  editorNavigationBusy = false;
+  editorNavigationNote = '';
+  private queuedEditorTask = '';
+  private editorAttempt: {fingerprint:string;id:string} | null = null;
+  private editorWaitTimer?: ReturnType<typeof setTimeout>;
+  @ViewChildren(OnboardingLocationComponent) locationEditors?: QueryList<OnboardingLocationComponent>;
+  @ViewChildren(OnboardingDetailEditor) detailEditors?: QueryList<OnboardingDetailEditor>;
+  editorTaskForQuestion(question: OnboardingQuestion | null | undefined): string {
+    if (!question) return '';
+    if (question.task) return question.task;
+    return ({property_type_catalog:'catalog',meta_lead_setup:'meta_assets',project_sales_team:'team',location_editor:'location',documents:'documents'} as Record<string,string>)[question.input_type]
+      || ({country:'location',city:'location',delivery_dates:'delivery',parking_and_storage:'parking',sales_contacts:'team',meta_connection_verified:'meta_account',campaigns_defined:'meta_assets'} as Record<string,string>)[question.field || ''] || '';
+  }
+  private get editorWorkBusy(): boolean {
+    return this.isAnalyzing || this.isCompleting || this.savingPropertyTypeIds.size>0 || this.propertyResourceBusy.size>0
+      || this.mediaUpdatingPropertyTypeIds.size>0 || this.propertyImageUploads.size>0 || this.salesAssetBusy
+      || this.metaOAuthBusy || this.metaLoginBusy || this.metaSetupBusy || this.teamBusy
+      || !!this.locationEditors?.some(editor=>editor.busy);
+  }
+  private captureEditorDraft(task:string): {draft:Record<string,unknown>;changed:boolean} {
+    if(task==='location') {const editor=this.locationEditors?.first;return {draft:editor?.editorDraft || {},changed:editor?.draftChanged || false};}
+    if(task==='delivery'||task==='parking') {const editor=this.detailEditors?.first;return {draft:editor?.editorDraft || {},changed:editor?.draftChanged || false};}
+    if(task==='catalog') return {draft:this.cardDraft('property_type_catalog'),changed:this.dirtyPropertyTypeIds.size>0 || this.hasUnattachedImages || this.hasUnsavedGalleryAccess || this.hasNewPropertyDraft};
+    if(task==='meta_account'||task==='meta_assets') return {draft:this.cardDraft('campaigns_defined'),changed:this.metaFormTouched};
+    if(task==='team') return {draft:this.cardDraft('sales_contacts'),changed:!!this.selectedSalesUserId};
+    return {draft:{},changed:false};
+  }
+  get activeEditorLabel(): string { return this.editorTasks.find(task=>task.key===this.activeEditorTask)?.label || 'Guided onboarding'; }
+  get hasNewPropertyDraft(): boolean { return JSON.stringify(toPropertyTypePayload(this.propertyTypeDraft))!==JSON.stringify(toPropertyTypePayload(this.emptyPropertyType())); }
+  metaFormTouched=false;
+  private focusActiveEditor(): void {
+    setTimeout(()=>{
+      const box=this.chatScroll?.nativeElement;if(!box)return;
+      const target=box.querySelector<HTMLElement>('[data-editor-task="'+this.activeEditorTask+'"]')
+        || box.querySelector<HTMLElement>('[data-active-question="true"]');
+      if(target){box.scrollTop+=target.getBoundingClientRect().top-box.getBoundingClientRect().top-16;target.setAttribute('tabindex','-1');target.focus({preventScroll:true});}
+    });
   }
   catalogEditorOpen = false;
   readonly propertyReviewOpen = new Map<string, boolean>();
@@ -290,18 +329,45 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   }
   closeCatalogEditor(): void { this.catalogEditorOpen = false; this.selectedPropertyId = ''; }
   openEditorTask(task:string):void {
-    if (this.projectReviewBusy) return;
-    this.closeProjectReviewPanel();
-    if (task === 'catalog') {
-      this.catalogEditorOpen = true;
-      this.loadPropertyTypes(); this.loadSalesAssets();
-      this.cdr.detectChanges();
-      setTimeout(() => this.chatScroll?.nativeElement.querySelector('[data-testid="property-type-catalog"]')?.scrollIntoView({block:'start'}));
+    if(this.editorNavigationBusy){this.queuedEditorTask=task;return;}
+    if(this.isCompleting || this.hasProcessingSources || this.onboardingStage==='processing')return;
+    if(this.editorWorkBusy){
+      this.queuedEditorTask=task;this.editorNavigationNote='Finishing the current save before switching sections…';
+      if(!this.editorWaitTimer)this.editorWaitTimer=setTimeout(()=>{
+        this.editorWaitTimer=undefined;
+        const target=this.queuedEditorTask;this.queuedEditorTask='';
+        if(this.errorMessage){this.editorNavigationNote='The section remains open. Resolve the save error before switching.';return;}
+        if(target)this.openEditorTask(target);
+      },150);
       return;
     }
-    if(this.isAnalyzing)return;
-    this.isAnalyzing=true;this.errorMessage='';
-    this.onboarding.openEditorTask(this.projectId,task,this.createClientMessageId()).pipe(timeout(20_000)).subscribe({next:turn=>{this.isAnalyzing=false;this.applyTurn(turn);this.showMetaAssetStep=task==='meta_assets';if(task==='meta_account' || task==='meta_assets')this.metaReviewStep=task==='meta_assets'?'assets':'account';this.scrollToBottom();},error:e=>{this.isAnalyzing=false;this.errorMessage=this.apiDetail(e,'The review could not be opened. Your data is unchanged; retry.');this.cdr.detectChanges();}});
+    if(task===this.activeEditorTask){this.closeProjectReviewPanel();this.focusActiveEditor();return;}
+    if(this.selectedFiles.length){this.errorMessage='Upload or remove the selected files before switching sections. Your files remain selected.';return;}
+    const focus=this.profile.ui_deferrals?.['__editor_focus__']?.draft || {};
+    const source=focus.active_task || this.activeEditorTask || this.editorTaskForQuestion(this.nextQuestion) || null;
+    const state=this.captureEditorDraft(source || '');
+    this.editorNavigationBusy=true;this.errorMessage='';this.editorNavigationNote='Switching review section…';
+    this.closeProjectReviewPanel();
+    const transition={from_task:source,expected_navigation_revision:focus.revision || 0,...state};
+    const fingerprint=JSON.stringify({task,transition});
+    if(this.editorAttempt?.fingerprint!==fingerprint)this.editorAttempt={fingerprint,id:this.createClientMessageId()};
+    this.speechSubscriptions.add(this.onboarding.openEditorTask(this.projectId,task,this.editorAttempt!.id,transition).pipe(timeout(20_000)).subscribe({next:turn=>{
+      this.activeEditorTask=task==='review'?'':task;this.catalogEditorOpen=task==='catalog';
+      this.showPropertyTypeForm=task==='catalog' && this.hasNewPropertyDraft;
+      this.coverageEditor=null;this.metaFormTouched=false;this.applyTurn(turn);
+      this.showMetaAssetStep=task==='meta_assets';
+      if(task==='meta_account'||task==='meta_assets')this.metaReviewStep=task==='meta_assets'?'assets':'account';
+      if(task==='catalog')this.loadSalesAssets();
+      this.editorNavigationBusy=false;this.editorAttempt=null;
+      const card=({catalog:'field:property_type_catalog',location:'field:country',delivery:'field:delivery_dates',parking:'field:parking_and_storage',team:'field:sales_contacts',meta_account:'field:meta_connection_verified',meta_assets:'field:campaigns_defined',documents:'documents'} as Record<string,string>)[source || ''];
+      this.editorNavigationNote=state.changed?'Previous changes were saved as a draft, not published.':this.profile.ui_deferrals?.[card]?.deferred?'Previous incomplete review was saved for later.':'';
+      this.cdr.detectChanges();this.focusActiveEditor();
+      const queued=this.queuedEditorTask;this.queuedEditorTask='';if(queued)this.openEditorTask(queued);
+    },error:error=>{
+      this.editorNavigationBusy=false;this.queuedEditorTask='';this.editorNavigationNote='';
+      this.errorMessage=this.apiDetail(error,'The section could not be changed. The current editor and draft remain available. Retry.');
+      this.cdr.detectChanges();
+    }}));
   }
   private pollingStartedAt = 0;
   private propertyCatalogRequestVersion = 0;
@@ -360,6 +426,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    if(this.editorWaitTimer)clearTimeout(this.editorWaitTimer);
     this.metaWindow?.dispose();
     this.speech.abort();
     this.speechSubscriptions.unsubscribe();
@@ -368,7 +435,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     for (const url of this.pendingFilePreviewUrls) URL.revokeObjectURL(url);
   }
 
-  get canSend(): boolean { return (!!this.prompt.trim() || !!this.selectedFiles.length) && !this.isAnalyzing && !this.isCompleting && !this.hasExclusiveSourceFlow; }
+  get canSend(): boolean { return (!!this.prompt.trim() || !!this.selectedFiles.length) && !this.isAnalyzing && !this.isCompleting && !this.editorNavigationBusy && !this.hasExclusiveSourceFlow; }
   get projectName(): string { return this.profile.project_name || 'Untitled Project'; }
   get pendingSalesAssets(): ProjectSalesAsset[] { return this.salesAssets.filter(item => item.approval_status === 'draft'); }
   get finalizationBlockers() { return this.profile.completion.finalization_blockers || []; }
@@ -397,7 +464,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
       || !!this.profile.ui_deferrals?.['property:'+item.id]?.resumed;
   }
   get approvalUiBlocked(): boolean {
-    return this.projectReviewBusy || this.isCompleting || this.pendingStateSyncs > 0 || this.salesAssetBusy || !!this.coverageEditor
+    return !!this.activeEditorTask || this.editorNavigationBusy || this.projectReviewBusy || this.isCompleting || this.pendingStateSyncs > 0 || this.salesAssetBusy || !!this.coverageEditor
       || this.catalogEditorOpen || this.showPropertyTypeForm || this.selectedFiles.length > 0
       || this.dirtyPropertyTypeIds.size > 0 || this.hasUnattachedImages || this.hasUnsavedGalleryAccess
       || this.creatingPropertyType || this.confirmingPropertyCatalog
@@ -414,7 +481,9 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   get nextBlocker(): string { return this.profile.completion.blockers[0]?.label || 'Final profile approval'; }
   reviewFinalizationBlocker(action: string): void {
     const selector = action === 'review_sales_materials' ? '[data-testid="sales-materials"]' : '[data-active-question="true"]';
-    document.querySelector(selector)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if(action==='review_sales_materials'){this.openEditorTask('documents');return;}
+    const box=this.chatScroll?.nativeElement;const target=box?.querySelector<HTMLElement>(selector);
+    if(box && target)box.scrollTop+=target.getBoundingClientRect().top-box.getBoundingClientRect().top-16;
   }
   get profileSections(): SectionProgress[] {
     return this.profile.completion.sections.filter((section) => section.total > 0 && this.fieldsForSection(section.key).length > 0);
@@ -854,7 +923,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
       external_adset_id: optional(this.metaOAuth.external_adset_id), external_ad_id: optional(this.metaOAuth.external_ad_id),
       instagram_account_id: optional(this.metaOAuth.instagram_account_id),
     }).subscribe({
-      next: turn => { this.metaOAuthBusy = false; this.metaSetupMessage = 'Step 2 saved: the selected Meta assets are linked and verified for this Project.'; this.applyTurn(turn); this.refreshMetaAccount(); this.scrollToBottom(); },
+      next: turn => { this.metaFormTouched=false; this.metaOAuthBusy = false; this.metaSetupMessage = 'Step 2 saved: the selected Meta assets are linked and verified for this Project.'; this.applyTurn(turn); this.refreshMetaAccount(); this.scrollToBottom(); },
       error: (error: HttpErrorResponse) => { this.metaOAuthBusy = false; this.handleStructuredActionError(error, 'The selected Meta assets could not be connected.'); },
     });
   }
@@ -1138,7 +1207,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
 
   get readyProjectImages(): ProjectSource[] { return this.sources.filter(source => source.kind === 'image' && source.status === 'ready' && !!source.download_url); }
   get showCoverPicker(): boolean { return !this.cardDeferred('field:project_cover') && this.nextQuestion?.input_type === 'project_cover'; }
-  get showPropertyCatalog(): boolean { return this.catalogEditorOpen || (this.nextQuestion?.input_type === 'property_type_catalog' || !this.cardDeferred('field:property_type_catalog')) && (this.nextQuestion?.input_type === 'property_type_catalog' || this.showPropertyTypeForm || Object.entries(this.profile.ui_deferrals || {}).some(([key,value])=>key.startsWith('property:') && value.resumed)); }
+  get showPropertyCatalog(): boolean { if(this.activeEditorTask)return this.activeEditorTask==='catalog'; return this.catalogEditorOpen || (this.nextQuestion?.input_type === 'property_type_catalog' || !this.cardDeferred('field:property_type_catalog')) && (this.nextQuestion?.input_type === 'property_type_catalog' || this.showPropertyTypeForm || Object.entries(this.profile.ui_deferrals || {}).some(([key,value])=>key.startsWith('property:') && value.resumed)); }
 
   private emptyPropertyType(): Partial<ProjectPropertyType> {
     return { name: '', code: null, description: null, bedrooms: null, bathrooms: null, area_min: null, area_max: null,
@@ -1378,7 +1447,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     this.onboarding.applyOnboardingAction(this.projectId, {
       action: 'defer_meta_setup', question_message_id: message.id, client_action_id: this.createClientMessageId(),
     }).subscribe({
-      next: (turn) => { this.metaSetupBusy = false; this.applyTurn(turn); this.scrollToBottom(); },
+      next: (turn) => { this.metaFormTouched=false; this.metaSetupBusy = false; this.applyTurn(turn); this.scrollToBottom(); },
       error: (error: HttpErrorResponse) => {
         this.metaSetupBusy = false;
         this.handleStructuredActionError(error, 'The Meta setup decision could not be saved.');
@@ -1428,7 +1497,9 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
   }
   writeCustomAnswer(message?: ChatMessage): void { this.pendingSelection=null; this.prompt = ''; this.replyToMessageId = message?.id || null; }
   isActiveQuestion(message: ChatMessage): boolean {
-    return !this.isFinalApprovalMessage(message) && !this.hasExclusiveSourceFlow && message.sender === 'ai' && !!message.ui_payload && !message.response_payload
+    const task=this.editorTaskForQuestion(message.ui_payload);
+    if(this.activeEditorTask && task!==this.activeEditorTask && !(task.startsWith('meta') && this.activeEditorTask.startsWith('meta')))return false;
+    return !this.isFinalApprovalMessage(message) && (!this.hasExclusiveSourceFlow || !!this.activeEditorTask) && message.sender === 'ai' && !!message.ui_payload && !message.response_payload
       && this.visibleMessages.filter((item) => item.sender === 'ai' && !!item.ui_payload && !item.response_payload).at(-1) === message;
   }
 
@@ -1828,6 +1899,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     ).subscribe({
       next: catalog => {
         this.propertyCatalog = catalog;
+        this.activeEditorTask='';
         this.closeCatalogEditor();
         this.syncState('bottom');
       },
@@ -2031,6 +2103,8 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
           draft.value.selected_images.forEach((id:string)=>this.propertyTypeDraftImageSelection.add(id));
         }
       }
+      const access=this.profile.ui_deferrals?.['field:property_type_catalog']?.draft?.galleryAccess;
+      if(access && typeof access==='object')this.propertyGalleryAccess={...access};
       this.propertyTypeDraftInitialized = true;
     }
     if (this.profile.ui_deferrals?.['property:new']?.resumed) this.showPropertyTypeForm=true;
@@ -2051,6 +2125,11 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     restoreDraft(this.salesAssetDraft, this.profile.ui_deferrals?.['materials']?.draft);
     this.onboardingStage = state.stage;
     this.sources = this.prepareSources(state.sources); this.nextQuestion = state.next_question;
+    const focus=this.profile.ui_deferrals?.['__editor_focus__']?.draft?.active_task;
+    const currentTask=state.messages.filter(row=>row.sender==='ai' && row.ui_payload && !row.response_payload).at(-1)?.ui_payload?.task;
+    if(focus && focus!=='review' && currentTask===focus){this.activeEditorTask=focus;this.catalogEditorOpen=focus==='catalog';}
+    else if(this.activeEditorTask && !this.editorNavigationBusy && currentTask!==this.activeEditorTask){this.activeEditorTask='';this.catalogEditorOpen=false;}
+    if(this.activeEditorTask==='catalog' && this.hasNewPropertyDraft)this.showPropertyTypeForm=true;
     if (!this.metaReviewRestored && this.nextQuestion?.input_type === 'meta_lead_setup') {
       this.metaReviewRestored = true;
       this.metaReviewStep = this.nextQuestion.task === 'meta_assets' ? 'assets' : 'account';
@@ -2068,6 +2147,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     this.cdr.detectChanges();
   }
   private applyTurn(turn: ChatTurn): void {
+    if(this.activeEditorTask && !this.editorNavigationBusy && turn.next_question?.task!==this.activeEditorTask){this.activeEditorTask='';this.catalogEditorOpen=false;}
     this.renderGeneration++;
     if (turn.next_question?.input_type === 'meta_lead_setup') this.metaReviewRestored=true;
     if (turn.next_question?.input_type === 'meta_lead_setup' && turn.next_question?.task !== 'meta_assets') {this.metaStepChosenByUser=true;this.metaReviewStep='account';this.showMetaAssetStep=false;}
