@@ -1,7 +1,5 @@
 FROM python:3.12-slim
 
-ARG APP_COMMIT_SHA=unknown
-
 WORKDIR /app
 
 COPY requirements.txt .
@@ -13,6 +11,7 @@ COPY ./alembic.ini /app/alembic.ini
 COPY ./alembic /app/alembic
 COPY ./migrations /app/migrations
 
+ARG APP_COMMIT_SHA=unknown
 ENV APP_COMMIT_SHA=$APP_COMMIT_SHA
 ENV FORWARDED_ALLOW_IPS="127.0.0.1,172.17.0.1"
 

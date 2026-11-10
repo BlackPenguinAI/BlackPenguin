@@ -1,1 +1,0 @@
-fix(ci): remove retired Firebase email bridge workflow and tests

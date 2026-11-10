@@ -1,13 +1,13 @@
 ARG APP_COMMIT_SHA=unknown
 
 FROM node:20-alpine AS build
-ARG APP_COMMIT_SHA
-ARG BP_BUILD_CONFIGURATION=production
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 COPY . .
+ARG BP_BUILD_CONFIGURATION=production
 RUN npm run build -- --configuration=$BP_BUILD_CONFIGURATION
+ARG APP_COMMIT_SHA
 RUN APP_COMMIT_SHA=$APP_COMMIT_SHA npm run stamp:release
 
 FROM nginx:alpine

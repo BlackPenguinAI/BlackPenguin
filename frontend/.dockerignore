@@ -1,0 +1,13 @@
+# Build contexts must not contain local credentials or generated artifacts.
+.git
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+node_modules
+.angular
+dist
+coverage
+playwright-report
+test-results

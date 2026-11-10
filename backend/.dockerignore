@@ -1,0 +1,19 @@
+# Build contexts must not contain local credentials or generated artifacts.
+.git
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+__pycache__
+**/__pycache__
+*.py[cod]
+.venv
+venv
+.pytest_cache
+.coverage
+htmlcov
+uploads
+*.db
+*.sqlite
+*.sqlite3
