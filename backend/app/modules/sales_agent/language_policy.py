@@ -37,6 +37,7 @@ everything whenever wherever currently verified approved recorded new old previo
 open closed sent delivered read received unavailable unconfirmed until into around
 howdy goodbye bye bye-bye stop unsubscribe end quit yes absolutely fine details don'''.split())
 ENGLISH.update('limit maximum minimum million millions outright funds full afford garage included include private privacy pictures describe amenities'.split())
+ENGLISH.update('message messages here comes up welcome free re ll'.split())
 ENGLISH.update('joke jokes respectful warning abuse harassment threatening'.split())
 # Ordinary conversational English must reach intent/empathetic handling too.
 ENGLISH.update('feel feeling felt bad sad happy unhappy stressed stressful stress anxious anxiety upset tired sick ill rough difficult doing fine well day days life work working sorry worried worry exhausted overwhelmed confused frustrated frustration hurt painful pain personal better thanks thank appreciate please'.split())
