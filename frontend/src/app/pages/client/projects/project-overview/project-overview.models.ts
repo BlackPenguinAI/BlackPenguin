@@ -37,7 +37,7 @@ export interface ProjectOverview {
     id: string; display_name: string; asset_type: string; content_tags: string[];
     description: string | null; approval_status: 'draft' | 'approved' | 'archived';
     allowed_channels: string[]; source_name: string | null; mime_type: string | null;
-    download_url: string | null; extracted_links: Array<{ url: string; label: string; kind: string; page?: number | null }>;
+    resource_url?: string | null; download_url: string | null; extracted_links: Array<{ url: string; label: string; kind: string; page?: number | null }>;
     approved_at: string | null; approved_by_user_id: string | null; version: number; updated_at: string;
   }>;
   location: { address: string | null; latitude: number | null; longitude: number | null };

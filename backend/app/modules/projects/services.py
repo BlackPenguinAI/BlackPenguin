@@ -968,6 +968,8 @@ def overview_address(primary: str | None, *context: Any) -> str | None:
 
 
 def serialize_overview(db: Session, project: Project, viewer_user: User | None = None) -> dict[str, Any]:
+    from .property_resource_service import resource_url
+    from .asset_coverage import approved
     profile = get_profile(project)
     data = profile.profile_data or {}
     units = db.query(ProjectUnit).filter(ProjectUnit.project_id == project.id).all()
@@ -1130,7 +1132,8 @@ def serialize_overview(db: Session, project: Project, viewer_user: User | None =
                 "asset_type": item.asset_type,
                 "content_tags": item.content_tags or [item.asset_type],
                 "description": item.description,
-                "approval_status": item.approval_status,
+                "approval_status": "approved" if approved(item) else item.approval_status,
+                "resource_url": resource_url(item),
                 "allowed_channels": item.allowed_channels or [],
                 "source_name": item.source.original_filename or item.source.name if item.source else None,
                 "mime_type": item.source.mime_type if item.source else None,

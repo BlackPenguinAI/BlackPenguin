@@ -1,3 +1,4 @@
+import { PublicResourceLinkComponent } from '../../../../shared/ui/public-resource-link/public-resource-link';
 import { MaterialCoverageEditor } from './material-coverage-editor';
 import { ChangeDetectorRef, Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { ConfigureLaterComponent, DeferredCards, restoreDraft, questionCard } from '../../../../shared/ui/configure-later/configure-later';
@@ -52,7 +53,7 @@ import {
 
 @Component({
   selector: 'app-project-chat', standalone: true,
-  imports: [MaterialCoverageEditor, CommonModule, FormsModule, RouterModule, OnboardingAiMessageComponent, OnboardingWelcomeComponent, ConfigureLaterComponent, OnboardingLocationComponent, ReviewCardComponent, OnboardingDetailEditor],
+  imports: [PublicResourceLinkComponent, MaterialCoverageEditor, CommonModule, FormsModule, RouterModule, OnboardingAiMessageComponent, OnboardingWelcomeComponent, ConfigureLaterComponent, OnboardingLocationComponent, ReviewCardComponent, OnboardingDetailEditor],
   templateUrl: './project-chat.html', styleUrls: ['./project-chat.scss'],
 })
 export class ProjectChatComponent implements OnInit, OnDestroy {
@@ -572,7 +573,7 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     this.onboarding.archiveSalesAsset(this.projectId, item.id).subscribe({
       next: () => {
         this.salesAssets = this.salesAssets.map(row => row.id === item.id
-          ? { ...row, approval_status: 'archived', approved_at: null, approved_by_user_id: null }
+          ? { ...row, approval_status: 'archived', resource_url: null, approved_at: null, approved_by_user_id: null }
           : row);
         this.salesAssetBusy = false; this.syncState('none');
       },
@@ -1471,6 +1472,10 @@ export class ProjectChatComponent implements OnInit, OnDestroy {
     return this.salesAssets.filter(item => item.source_id === sourceId);
   }
   previewSalesAsset(item: ProjectSalesAsset): void {
+    if (item.approval_status === 'approved' && item.resource_url) {
+      window.open(item.resource_url, '_blank', 'noopener,noreferrer');
+      return;
+    }
     const source = this.sourceForSalesAsset(item);
     const downloadUrl = source?.download_url || item.source_download_url;
     if (!downloadUrl) {

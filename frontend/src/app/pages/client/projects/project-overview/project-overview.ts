@@ -1,3 +1,4 @@
+import { PublicResourceLinkComponent } from '../../../../shared/ui/public-resource-link/public-resource-link';
 import { CommonModule } from '@angular/common';
 import { ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
 import { ActivatedRoute, RouterModule } from '@angular/router';
@@ -9,7 +10,7 @@ import { ProjectOverviewService } from './project-overview.service';
 @Component({
   selector: 'app-project-overview',
   standalone: true,
-  imports: [CommonModule, RouterModule],
+  imports: [CommonModule, RouterModule, PublicResourceLinkComponent],
   templateUrl: './project-overview.html',
   styleUrls: ['./project-overview.scss'],
 })

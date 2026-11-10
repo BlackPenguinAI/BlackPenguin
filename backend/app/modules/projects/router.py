@@ -118,14 +118,30 @@ def _file_upload_intents(raw: str, count: int) -> list[dict[str, Any]]:
 @router.get("/resources/{asset_id}/{signature}", include_in_schema=False)
 def view_property_resource(asset_id: str, signature: str, db: Session = Depends(get_db)):
     from .property_resource_service import resolve_resource, read_resource
-    source = resolve_resource(db, asset_id, signature)
-    content, mime, headers = read_resource(source)
+    try:
+        source = resolve_resource(db, asset_id, signature)
+        content, mime, headers = read_resource(source)
+    except HTTPException as exc:
+        if exc.status_code != 404:
+            raise
+        from .public_resource_page import unavailable_response
+        return unavailable_response()
     headers["Content-Disposition"] = f"inline; filename*=UTF-8''{quote(source.original_filename or source.name)}"
     return Response(content=content, media_type=mime, headers=headers)
 
 
 @router.get("/shared-assets/{token}", include_in_schema=False)
 def download_shared_sales_asset(token: str, request: Request, download: bool = False, db: Session = Depends(get_db)):
+    try:
+        return _read_shared_sales_asset(token, request, download, db)
+    except HTTPException as exc:
+        if exc.status_code != 404:
+            raise
+        from .public_resource_page import unavailable_response
+        return unavailable_response()
+
+
+def _read_shared_sales_asset(token: str, request: Request, download: bool, db: Session):
     source, share = asset_share_service.resolve(db, token)
     if share.target_url:
         parsed = urlparse(share.target_url)

@@ -23,6 +23,14 @@ describe('Project property editor and reviewed resource controls', () => {
   });
   afterEach(() => { http.verify(); TestBed.resetTestingModule(); });
 
+  it('opens an approved material directly without downloading its private source', () => {
+    const open = vi.spyOn(window, 'open').mockImplementation(() => null);
+    component.previewSalesAsset({...document(),approval_status:'approved',resource_url:'https://example.com/public-pdf'});
+    expect(open).toHaveBeenCalledWith('https://example.com/public-pdf','_blank','noopener,noreferrer');
+    http.expectNone(request => request.url.includes('/file'));
+    open.mockRestore();
+  });
+
   it('opens and closes the saved catalog without consuming the active question', () => {
     const load = vi.spyOn(component,'loadPropertyTypes').mockImplementation(() => undefined);
     vi.spyOn(component as any,'loadSalesAssets').mockImplementation(() => undefined);

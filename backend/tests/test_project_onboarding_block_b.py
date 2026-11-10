@@ -246,7 +246,9 @@ def test_gallery_escapes_property_names_and_detects_changed_file_bytes(api):
     asset = publish_gallery(client,project,item)
     response = client.get(path(asset['resource_url']))
     assert response.status_code == 200
-    assert '<script>' not in response.text and '&lt;script&gt;' in response.text
+    assert 'alert("not executable")</script>' not in response.text and '&lt;script&gt;' in response.text
+    from app.modules.projects.public_resource_page import SCRIPT_HASH
+    assert f"'sha256-{SCRIPT_HASH}'" in response.headers['content-security-policy']
     source = db.get(ProjectSalesAsset,asset['id']).source
     storage_service.resolve_project_file(source.storage_path).write_bytes(b'changed encrypted bytes')
     assert client.get(path(asset['resource_url'])).status_code == 404

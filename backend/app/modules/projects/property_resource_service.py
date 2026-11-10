@@ -8,6 +8,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
+import re
 from html import escape
 from datetime import datetime
 from uuid import uuid4
@@ -53,6 +54,8 @@ def resource_url(asset: ProjectSalesAsset) -> str | None:
 
 
 def resolve_resource(db: Session, asset_id: str, signature: str) -> ProjectOnboardingSource:
+    if not re.fullmatch(r'[0-9a-f]{64}', signature):
+        raise HTTPException(404, 'This property resource is unavailable.')
     asset = db.get(ProjectSalesAsset, asset_id)
     if not asset or not available(asset) or not hmac.compare_digest(_signature(asset), signature):
         raise HTTPException(404, 'This property resource is unavailable.')
@@ -66,11 +69,23 @@ def read_resource(source: ProjectOnboardingSource) -> tuple[bytes, str, dict[str
             raise ValueError('Integrity check failed')
     except (OSError, ValueError):
         raise HTTPException(404, 'This property resource is unavailable.')
-    headers = {'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer'}
+    headers = {'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff',
+        'Referrer-Policy': 'no-referrer', 'X-Robots-Tag': 'noindex, nofollow',
+        'Content-Security-Policy': "default-src 'none'; base-uri 'none'; form-action 'none'; sandbox"}
     mime = source.mime_type or 'application/octet-stream'
     if mime == GALLERY_MIME:
+        from .public_resource_page import render_gallery, PUBLIC_HEADERS
+        try:
+            # Render the approved snapshot, never the property's live image list.
+            # This upgrades existing galleries without republishing or changing links.
+            published = (source.project.profile.published_snapshot or {}) if source.project.profile else {}
+            project_name = published.get('project_name') or (published.get('data') or {}).get('project_name') or source.project.name
+            content = render_gallery(content, project_name=project_name,
+                property_name=(source.name or 'Property gallery').removesuffix(' gallery'))
+        except (UnicodeError, ValueError):
+            raise HTTPException(404, 'This property resource is unavailable.')
         mime = 'text/html'
-        headers['Content-Security-Policy'] = "default-src 'none'; img-src data:; style-src 'unsafe-inline'; sandbox"
+        headers.update(PUBLIC_HEADERS)
     return content, mime, headers
 
 

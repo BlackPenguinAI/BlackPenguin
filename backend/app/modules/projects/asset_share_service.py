@@ -119,8 +119,12 @@ def resolve(db: Session, token: str) -> tuple[ProjectOnboardingSource, SalesAsse
     if share.sales_asset_id:
         asset = db.get(ProjectSalesAsset, share.sales_asset_id)
         from .asset_coverage import valid,approved
+        from .property_resource_service import available
         now = datetime.utcnow()
-        if (not asset or not valid(asset) or not approved(asset)
+        if (not asset or (not share.target_url and not available(asset))
+                or not asset.project or not asset.project.is_active
+                or asset.project.company_id != share.company_id
+                or not valid(asset) or not approved(asset)
                 or asset.company_id != share.company_id or asset.project_id != share.project_id
                 or asset.source_id != share.source_id
                 or share.channel and share.channel not in (asset.allowed_channels or [])

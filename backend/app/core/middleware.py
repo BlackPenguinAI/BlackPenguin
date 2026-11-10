@@ -64,6 +64,11 @@ class MultiTenantMiddleware(BaseHTTPMiddleware):
             f"{settings.API_V1_STR}/projects/a/",
             f"{settings.API_V1_STR}/projects/shared-assets/",
         )
+        # Reusable public resources use a version-bound HMAC checked by the route.
+        # This bypass grants no access to source files or management endpoints.
+        is_public_property_resource = request.method == "GET" and bool(re.fullmatch(
+            re.escape(f"{settings.API_V1_STR}/projects/resources/") + r"[^/]+/[^/]+", path
+        ))
         is_public_sales_asset = request.method == "GET" and any(
             re.fullmatch(re.escape(prefix) + r"[^/]+", path)
             for prefix in asset_prefixes
@@ -93,6 +98,7 @@ class MultiTenantMiddleware(BaseHTTPMiddleware):
             or is_messaging_provider_webhook
             or is_public_calendar_invite
             or is_public_sales_asset
+            or is_public_property_resource
             or is_public_firebase_action
         ):
             return await call_next(request)
