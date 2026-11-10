@@ -69,7 +69,8 @@ def test_round_robin_function_works_with_fixture_sales(lab):
 
 
 @pytest.mark.parametrize('scenario',CASES)
-def test_scripted_driver_reaches_real_coordinator_booking(lab,monkeypatch,scenario):
+@pytest.mark.parametrize('omit_refs',[False,True])
+def test_scripted_driver_reaches_real_coordinator_booking(lab,monkeypatch,scenario,omit_refs):
     import asyncio,json,httpx
     from unittest.mock import patch
     from app.modules.ai_core.models import AIConfiguration,PromptVersion
@@ -80,23 +81,26 @@ def test_scripted_driver_reaches_real_coordinator_booking(lab,monkeypatch,scenar
     db,manifest=lab
     db.add(AIConfiguration(id='pilot-config',company_id=None,openrouter_api_key='OFFLINE-ONLY',agent_ventas={'model':'test/offline'}))
     db.add(PromptVersion(company_id=None,agent_key='sales',version_number=1,is_published=True,configuration={'model':'test/offline'}));db.commit()
+    seen={}
     def provider(request):
         payload=json.loads(request.content);name=payload['response_format']['json_schema']['name']
         ctx=json.loads(payload['messages'][1]['content'])
         if name=='sales_understanding':
-            text=ctx['current_message']
+            text=ctx['current_message'];seen[text]=seen.get(text,0)+1
             if text.startswith(('Yes','Understood')):
                 value=understanding(text,'other')
             elif 'first appointment:' in text or 'second appointment:' in text:
                 expression='second appointment' if 'second appointment:' in text else 'first appointment'
                 from test_sales_ai_group_d import typed,req,ref
-                value=typed(text,[req('slot','appointment',text,ref='s')],[ref('s','appointment',expression)])
+                value=understanding(text,'appointment') if omit_refs else typed(text,[req('slot','appointment',text,ref='s')],[ref('s','appointment',expression)])
             else:
                 value=understanding(text,'appointment')
                 data=value.model_dump();data['visit']={'action':'request','evidence':text,'timing':None}
+                if 'paying cash' in text:data['preferences']=[{'key':'financing','value':'cash','evidence':'paying cash','status':'declared'}]
                 if 'Bay Residence' in text:
                     data['references']=[{'id':'p','kind':'property','expression':'Bay Residence','evidence':'Bay Residence'}]
                     data['requests'][0]['reference_id']='p'
+                if omit_refs and seen[text]==1 and 'paying cash' in text:data['preferences']=[]
                 value=Understanding.model_validate(data)
             content=value.model_dump_json()
         elif name=='sales_commercial_composition':
@@ -113,6 +117,9 @@ def test_scripted_driver_reaches_real_coordinator_booking(lab,monkeypatch,scenar
         result=asyncio.run(evaluate_case(db,manifest,scenario,budget,6))
     assert (result['stop_reason']=='booked')==(scenario in BOOKING_CASES),[(r.get('lead_message'),r.get('reply'),r.get('error_code')) for r in result['turns']]
     assert len(result['meetings'])==(1 if scenario in BOOKING_CASES else 0)
+    if omit_refs:
+        attempts=result['turns'][0]['interpretation_attempts']
+        assert len(attempts)==2 and attempts[0]['validation_issues'][0]['type']=='payment_declaration_missing'
     assert not any(c['status']=='FAIL' for c in result['checks']),{'checks':result['checks'],'replies':[r.get('reply') for r in result['turns']]}
 
 

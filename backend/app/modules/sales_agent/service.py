@@ -88,6 +88,12 @@ def _requested_period(text: str, *, now: datetime, zone: ZoneInfo) -> tuple[date
     if re.search(r"\btomorrow\b", lowered):
         value = local_now.date() + timedelta(days=1)
         return value, value
+    relative = re.search(r"\bnext\s+(seven|7|three|3|five|5|ten|10|fourteen|14|\d{1,2})\s+days\b", lowered)
+    if relative:
+        numbers={'three':3,'five':5,'seven':7,'ten':10,'fourteen':14}
+        count=numbers.get(relative[1],int(relative[1]) if relative[1].isdigit() else 0)
+        if 1<=count<=30:
+            return local_now.date(),local_now.date()+timedelta(days=count-1)
     ordinal = re.search(r"\b(?:the\s+)?(\d{1,2})(?:st|nd|rd|th)\b", lowered)
     if ordinal:
         day = int(ordinal.group(1))

@@ -61,10 +61,11 @@ async def evaluate_case(db, manifest, scenario, budget, max_turns):
     from app.modules.sales_crm.models import Lead,Meeting
     from app.modules.sales_agent.models import SalesConversation,SalesMessage,AgentRun,OutboundMessage
     from app.modules.sales_agent.current_simulation import turn
+    from app.modules.sales_agent.dialogue_models import SalesDialogueEvent
     from app.modules.project_team.service import eligible_appointment_assignments
     from .evaluation_checks import check, error_details, internal_process_narration
     project=manifest['projects'][0]
-    clock=datetime.utcnow().replace(second=0,microsecond=0)
+    clock=datetime.utcnow()
     roster=team(db,manifest,scenario,clock)
     eligible={a.user_id for a in eligible_appointment_assignments(db,project['id'])}
     lead=Lead(company_id=manifest['company_id'],project_id=project['id'],full_name='Scripted '+scenario,
@@ -85,6 +86,8 @@ async def evaluate_case(db, manifest, scenario, budget, max_turns):
             message,action='Understood, thank you. I will keep an eye out for new availability. Please do not book anything or set up an alert now.','acknowledge_unavailable'
         else:message,action=next_message(last,rows,alternative=scenario=='alternative_slot')
         if not message:stop=action;break
+        if sum(r.get('lead_message')==message for r in rows)>=2:
+            stop='repeated_selection_without_progress';break
         if action=='confirm' and not selected:stop='confirmation_without_selection';break
         confirmed |= action=='confirm';selected |= action in {'select','reject_first'}
         if action in {'select','reject_first'}:
@@ -101,12 +104,18 @@ async def evaluate_case(db, manifest, scenario, budget, max_turns):
                 SalesMessage.direction=='outbound',~SalesMessage.id.in_(before_ids)).order_by(SalesMessage.created_at,SalesMessage.id).all()
             last='\n\n'.join(m.content for m in receipts)
             meetings=db.query(Meeting).filter_by(lead_id=lead.id).all()
-            rows.append({'turn':index+1,'action':action,'lead_message':message,'reply':last,
+            events=db.query(SalesDialogueEvent).filter_by(conversation_id=conversation.id,kind='understanding_preview').order_by(SalesDialogueEvent.revision).all()
+            attempts=next(((event.payload_json.get('metadata') or {}).get('interpretation_attempts',[]) for event in reversed(events)
+                if (event.payload_json.get('metadata') or {}).get('inbound_message_id')==(run.input_snapshot or {}).get('message_id')),[])
+            rows.append({'interpretation_attempts':attempts,'turn':index+1,'action':action,'lead_message':message,'reply':last,
                 'understanding':(run.input_snapshot or {}).get('understanding'),'output':run.output_snapshot,
                 'input_trace':run.input_snapshot,'error_code':run.error_code,
                 'checks':[check('reply_present',bool(last.strip())),check('interpretation_accepted',not run.error_code),
                     check('no_internal_narration',not internal_process_narration(last)),
                     check('no_booking_before_confirmation',not meetings or confirmed),
+                    check('selection_advances_to_confirmation',action not in {'select','reject_first'} or bool(re.search(r'Please confirm your visit',last,re.I))),
+                    check('no_identical_consecutive_reply',not rows or last!=rows[-1].get('reply')),
+                    check('no_invented_frustration',not ((run.input_snapshot or {}).get('understanding') or {}).get('empathy') if action=='acknowledge_unavailable' else True),
                     check('no_duplicate_booking',len(meetings)<=1)]})
             if meetings:
                 stop='booked';break

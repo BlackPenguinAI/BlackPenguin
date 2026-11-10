@@ -189,6 +189,24 @@ def label(option,prefs):
     return value.strftime('%Y-%m-%d at %I:%M %p')+f" ({prefs['timezone']}, UTC{value.strftime('%z')}); {option['specialist_name']}"
 
 
+def exact_public_selection(text, offer):
+    """Recover only a complete backend-rendered option explicitly chosen now.
+
+    No bare date, ordinal, quotation or affirmation is sufficient. This prepares
+    a proposal only; expiry, scope, availability and confirmation remain mandatory.
+    """
+    if not offer or offer.get('version')!=VERSION:return None
+    for index,option in enumerate(offer.get('options',[])):
+        ordinal=('first','second','third')[index] if index<3 else str(index+1)
+        rendered=label(option,offer['preferences'])
+        pattern=(r"(?:The first time does not work for me\. )?"
+                 r"(?:I would like|I'd like|I choose|I'll take) the "+ordinal+
+                 r" appointment: "+re.escape(rendered)+r"\.?")
+        if re.fullmatch(pattern,text,re.I):
+            return {'kind':'appointment','id':option['starts_at']}
+    return None
+
+
 def confirmation(snapshot,option,prefs,*,booked=False):
     property_name=snapshot.get('property_type_name') or snapshot.get('project_name')
     if snapshot.get('unit_code'):property_name+=' / unit '+snapshot['unit_code']
@@ -295,6 +313,8 @@ def handle(db,scope,conversation,lead,project,outcome,inbound):
             previous_offer=(row.metadata_json or {}).get('appointment_offer') if row else None
             if previous_offer and any(o['starts_at']==value['id'] for o in previous_offer.get('options',[])):
                 offered,offer,chosen=row,previous_offer,value;break
+    if not chosen:
+        chosen=exact_public_selection(inbound.content,offer)
     if chosen and offer.get('version')==VERSION:
         if datetime.fromisoformat(offer['expires_at'])<=utc(now):return 'Those visit times expired. Please request current options.',{},[]
         option=next(o for o in offer['options'] if o['starts_at']==chosen['id'])

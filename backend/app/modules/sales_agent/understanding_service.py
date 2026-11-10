@@ -135,6 +135,13 @@ async def preview(db, scope: Scope, *, inbound_message_id: str, expected_revisio
             raw = await asyncio.wait_for(pending, timeout=20) if active else await pending
             received = True
             interpreted = parse(raw, inbound.content)
+            if next_enabled and not injected_inference:
+                from .understanding_semantics import issues_for
+                latest=next((m for m in history if m.direction=='outbound'),None)
+                offer=(latest.metadata_json or {}).get('appointment_offer') if latest else None
+                from .first_booking import exact_public_selection
+                issues=issues_for(interpreted,inbound.content,appointment_offer=bool(offer and not exact_public_selection(inbound.content,offer)))
+                if issues:raise EvidenceError(issues)
             if (inbound.metadata_json or {}).get('resume_context'):
                 from .evidence import quotations
                 issues=[{'location':path,'type':'evidence_mismatch','message':'Quote one original pending message; never join evidence across messages.'}
@@ -153,7 +160,8 @@ async def preview(db, scope: Scope, *, inbound_message_id: str, expected_revisio
             # Provider errors must not be mistaken for a model contract error.
             outcome = 'invalid_model_contract' if received else 'provider_error'
             error_code = 'understanding_validation_failed' if received else type(exc).__name__
-            issues = [{'type': 'invalid_json_or_evidence'}] if received else []
+            issues = [{'location':[], 'type':'invalid_json' if isinstance(exc,json.JSONDecodeError) else 'contract_value_error',
+                       'message':str(exc)[:400] if received and type(exc) is ValueError else 'Invalid JSON or contract value.'}] if received else []
         except Exception as exc:
             outcome = 'provider_error'
             error_code = type(exc).__name__

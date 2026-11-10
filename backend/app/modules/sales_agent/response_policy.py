@@ -171,7 +171,12 @@ def render_channel_text(value, channel="sms"):
     if not text:
         return text
     # Repair inline numbering, without changing decimal prices or URLs.
-    text = re.sub(r"(?<=\S)[ \t]+(?=\d{1,4}[.)][ \t]+)", "\n\n", text)
+    original=text
+    def separate_number(match):
+        prefix=original[:match.start()]
+        if re.search(r'(?:quantity|count|units available):$',prefix,re.I):return match.group(0)
+        return '\n\n'
+    text = re.sub(r"(?<=\S)[ \t]+(?=\d{1,4}[.)][ \t]+)", separate_number, text)
     text = re.sub(r"(?<=\S)[ \t]+(?=•[ \t]+)", "\n", text)
     text = re.sub(r"(?<!\n)\n(?=\d{1,4}[.)][ \t]+)", "\n\n", text)
     return re.sub(r"\n{3,}", "\n\n", text).strip()
