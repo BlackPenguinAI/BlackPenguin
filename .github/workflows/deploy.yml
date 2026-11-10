@@ -1,550 +1,641 @@
 name: Deploy Black Penguin API, Worker & Frontend to DigitalOcean
-
-on:
-  workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - 'backend/**'
-      - 'frontend/**'
-      - '.github/workflows/deploy.yml'
-      - 'docs/**'
-
 concurrency:
   group: blackpenguin-production
   cancel-in-progress: false
-
 permissions:
   contents: read
-
 jobs:
-  build-and-validate:
-    name: Build and validate backend
+  build-backend:
+    name: Build backend candidate
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 20
     env:
       DEPLOY_SHA: ${{ github.sha }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
-      - name: Build candidate API image with cache
-        uses: docker/build-push-action@v6
-        with:
-          context: ./backend
-          load: true
-          pull: true
-          platforms: linux/amd64
-          tags: blackpenguin-api:${{ github.sha }}
-          build-args: APP_COMMIT_SHA=${{ github.sha }}
-          cache-from: type=gha,scope=blackpenguin-api
-          cache-to: type=gha,scope=blackpenguin-api,mode=max
-      - name: Backend regression, acceptance and isolated PostgreSQL
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          REPOSITORY_DIR="$GITHUB_WORKSPACE"
-          API_IMAGE="blackpenguin-api:$DEPLOY_SHA"
-          mkdir -p evidence
-          chmod 777 evidence
-          umask 077
-          cat > "$RUNNER_TEMP/candidate.env" <<'ENV'
-          ENVIRONMENT=test
-          SECRET_KEY=candidate-regression-only
-          ACCESS_TOKEN_EXPIRE_MINUTES=60
-          DATABASE_URL=sqlite:////tmp/blackpenguin-preflight.db
-          FIRST_SUPERADMIN_EMAIL=test@example.invalid
-          FIRST_SUPERADMIN_PASSWORD=test-only
-          META_ACCESS_TOKEN=test-only
-          OPENROUTER_API_KEY=test-only
-          SEED_MINTO_DEMO=false
-          ENV
-          CHECK_STARTED_AT=$SECONDS
-          echo "Validation stage: backend regression"
-          # Exercise the exact backend image before any production container
-          # is stopped or any database migration is applied. Tests are mounted
-          # read-only so the production image remains immutable.
-          docker run --rm \
-            --env-file "$RUNNER_TEMP/candidate.env" \
-            -e ENVIRONMENT=test \
-            -e DATABASE_URL=sqlite:////tmp/blackpenguin-preflight.db \
-            -e PROJECT_UPLOAD_ROOT=/tmp/blackpenguin-test-uploads \
-            -e SEED_MINTO_DEMO=false \
-            -e PYTHONPATH=/app \
-            -e SALES_ACCEPTANCE_ROOT=/preflight \
-            -v "$REPOSITORY_DIR/backend/tests:/app/tests:ro" \
-            -v "$GITHUB_WORKSPACE/evidence:/evidence" \
-            -v "$REPOSITORY_DIR/docs:/preflight/docs:ro" \
-            -v "$REPOSITORY_DIR/.github:/preflight/.github:ro" \
-            -v "$REPOSITORY_DIR/backend/tests:/preflight/backend/tests:ro" \
-            "$API_IMAGE" \
-            python -m pytest -q /app/tests --durations=30 --disable-warnings --junitxml=/evidence/backend-junit.xml
+    - uses: actions/checkout@v4
+    - name: Verify test partition safeguards
+      run: python3 -m unittest discover -s backend/tools/ci -p test_sharding.py -v
+    - uses: docker/setup-buildx-action@v3
+    - name: Build candidate API image with cache
+      uses: docker/build-push-action@v6
+      with:
+        context: ./backend
+        load: true
+        pull: true
+        platforms: linux/amd64
+        tags: blackpenguin-api:${{ github.sha }}
+        build-args: APP_COMMIT_SHA=${{ github.sha }}
+        cache-from: type=gha,scope=blackpenguin-api
+        cache-to: type=gha,scope=blackpenguin-api,mode=max
+    - name: Export candidate API image
+      shell: bash
+      run: |
+        set -Eeuo pipefail
+        mkdir -p release
+        docker save "blackpenguin-api:${{ github.sha }}" | gzip -1 > release/api.tar.gz
+        cd release
+        sha256sum api.tar.gz > api.sha256
+    - uses: actions/upload-artifact@v4
+      with:
+        name: release-api-${{ github.sha }}
+        path: release/
+        compression-level: 0
+        retention-days: 1
+  backend-regression:
+    name: Backend regression (${{ matrix.shard }}/3)
+    needs:
+    - build-backend
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        shard:
+        - 1
+        - 2
+        - 3
+    env:
+      DEPLOY_SHA: ${{ github.sha }}
+      SHARD: ${{ matrix.shard }}
+    steps:
+    - uses: actions/checkout@v4
+    - name: Download candidate API image
+      uses: actions/download-artifact@v4
+      with:
+        name: release-api-${{ github.sha }}
+        path: release
+    - name: Load and verify candidate API image
+      shell: bash
+      run: |
+        set -Eeuo pipefail
+        cd release
+        sha256sum -c api.sha256
+        gzip -dc api.tar.gz | docker load
+        test "$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "blackpenguin-api:$DEPLOY_SHA")" = "$DEPLOY_SHA"
+    - name: Run complete assigned test modules
+      shell: bash
+      run: |+
+        set -Eeuo pipefail
+        REPOSITORY_DIR="$GITHUB_WORKSPACE"
+        API_IMAGE="blackpenguin-api:$DEPLOY_SHA"
+        mkdir -p evidence
+        chmod 777 evidence
+        umask 077
+        cat > "$RUNNER_TEMP/candidate.env" <<'ENV'
+        ENVIRONMENT=test
+        SECRET_KEY=candidate-regression-only
+        ACCESS_TOKEN_EXPIRE_MINUTES=60
+        DATABASE_URL=sqlite:////tmp/blackpenguin-preflight.db
+        FIRST_SUPERADMIN_EMAIL=test@example.invalid
+        FIRST_SUPERADMIN_PASSWORD=test-only
+        META_ACCESS_TOKEN=test-only
+        OPENROUTER_API_KEY=test-only
+        SEED_MINTO_DEMO=false
+        ENV
+        # Exercise the exact backend image before any production container
+        # is stopped or any database migration is applied. Tests are mounted
+        # read-only so the production image remains immutable.
+        docker run --rm \
+          --env-file "$RUNNER_TEMP/candidate.env" \
+          -e ENVIRONMENT=test \
+          -e DATABASE_URL=sqlite:////tmp/blackpenguin-preflight.db \
+          -e PROJECT_UPLOAD_ROOT=/tmp/blackpenguin-test-uploads \
+          -e SEED_MINTO_DEMO=false \
+          -e PYTHONPATH=/app \
+          -e SALES_ACCEPTANCE_ROOT=/preflight \
+          -v "$REPOSITORY_DIR/backend/tests:/app/tests:ro" \
+          -v "$GITHUB_WORKSPACE/evidence:/evidence" \
+          -v "$REPOSITORY_DIR/docs:/preflight/docs:ro" \
+          -v "$REPOSITORY_DIR/.github:/preflight/.github:ro" \
+          -v "$REPOSITORY_DIR/backend/tests:/preflight/backend/tests:ro" \
+          "$API_IMAGE" \
+          python /app/tools/ci/shard_tests.py --shard "$SHARD" --count 3
 
-          echo "Backend regression elapsed=$((SECONDS - CHECK_STARTED_AT))s"
-          CHECK_STARTED_AT=$SECONDS
-          echo "Validation stage: sales acceptance"
-          # Bind the 64-case scripted report to the immutable candidate image.
-          # Model/channel acceptance remains explicitly NOT_RUN in that report.
-          SALES_EVIDENCE_DIR="$GITHUB_WORKSPACE/evidence"
-          mkdir -p "$SALES_EVIDENCE_DIR"
-          docker run --rm --network none \
-            -e ENVIRONMENT=test -e DATABASE_URL=sqlite:////tmp/sales-registry.db \
-            -e SECRET_KEY=candidate-regression-only -e ACCESS_TOKEN_EXPIRE_MINUTES=60 \
-            -e FIRST_SUPERADMIN_EMAIL=test@example.invalid -e FIRST_SUPERADMIN_PASSWORD=test-only \
-            -e META_ACCESS_TOKEN=test-only -e OPENROUTER_API_KEY=test-only \
-            -e PROJECT_UPLOAD_ROOT=/tmp/blackpenguin-test-uploads \
-            -v "$REPOSITORY_DIR/backend/tests:/app/tests:ro" \
-            -v "$SALES_EVIDENCE_DIR:/evidence" \
-            "$API_IMAGE" python -m tools.sales_ai.current_acceptance \
-            --mode regression --output /evidence/acceptance64.json
+    - name: Upload shard results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: validation-shard-${{ matrix.shard }}-${{ github.sha }}
+        path: evidence/
+        retention-days: 7
+        if-no-files-found: error
+  sales-acceptance:
+    name: Sales acceptance and isolated PostgreSQL
+    needs:
+    - build-backend
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DEPLOY_SHA: ${{ github.sha }}
+    steps:
+    - uses: actions/checkout@v4
+    - name: Download candidate API image
+      uses: actions/download-artifact@v4
+      with:
+        name: release-api-${{ github.sha }}
+        path: release
+    - name: Load and verify candidate API image
+      shell: bash
+      run: |
+        set -Eeuo pipefail
+        cd release
+        sha256sum -c api.sha256
+        gzip -dc api.tar.gz | docker load
+        test "$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "blackpenguin-api:$DEPLOY_SHA")" = "$DEPLOY_SHA"
+    - name: Validate sales acceptance and PostgreSQL
+      shell: bash
+      run: |
+        set -Eeuo pipefail
+        REPOSITORY_DIR="$GITHUB_WORKSPACE"
+        API_IMAGE="blackpenguin-api:$DEPLOY_SHA"
+        mkdir -p evidence
+        chmod 777 evidence
+        umask 077
+        cat > "$RUNNER_TEMP/candidate.env" <<'ENV'
+        ENVIRONMENT=test
+        SECRET_KEY=candidate-regression-only
+        ACCESS_TOKEN_EXPIRE_MINUTES=60
+        DATABASE_URL=sqlite:////tmp/blackpenguin-preflight.db
+        FIRST_SUPERADMIN_EMAIL=test@example.invalid
+        FIRST_SUPERADMIN_PASSWORD=test-only
+        META_ACCESS_TOKEN=test-only
+        OPENROUTER_API_KEY=test-only
+        SEED_MINTO_DEMO=false
+        ENV
+        CHECK_STARTED_AT=$SECONDS
+        echo "Validation stage: sales acceptance"
+        # Bind the 64-case scripted report to the immutable candidate image.
+        # Model/channel acceptance remains explicitly NOT_RUN in that report.
+        SALES_EVIDENCE_DIR="$GITHUB_WORKSPACE/evidence"
+        mkdir -p "$SALES_EVIDENCE_DIR"
+        docker run --rm --network none \
+          -e ENVIRONMENT=test -e DATABASE_URL=sqlite:////tmp/sales-registry.db \
+          -e SECRET_KEY=candidate-regression-only -e ACCESS_TOKEN_EXPIRE_MINUTES=60 \
+          -e FIRST_SUPERADMIN_EMAIL=test@example.invalid -e FIRST_SUPERADMIN_PASSWORD=test-only \
+          -e META_ACCESS_TOKEN=test-only -e OPENROUTER_API_KEY=test-only \
+          -e PROJECT_UPLOAD_ROOT=/tmp/blackpenguin-test-uploads \
+          -v "$REPOSITORY_DIR/backend/tests:/app/tests:ro" \
+          -v "$SALES_EVIDENCE_DIR:/evidence" \
+          "$API_IMAGE" python -m tools.sales_ai.current_acceptance \
+          --mode regression --output /evidence/acceptance64.json
 
-          echo "Sales acceptance elapsed=$((SECONDS - CHECK_STARTED_AT))s"
-          CHECK_STARTED_AT=$SECONDS
-          echo "Validation stage: isolated PostgreSQL"
-          # Real PostgreSQL races run before stopping any production process.
-          # The helper uses only an internal disposable network/database and
-          # rejects an API image from a different candidate commit.
-          python3 backend/tools/sales_ai/postgres_checks.py \
-            --image "$API_IMAGE" \
-            --expected-commit "$DEPLOY_SHA" \
-            --tests "$REPOSITORY_DIR/backend/tests" \
-            --output "$GITHUB_WORKSPACE/evidence/postgres.json"
-          echo "PostgreSQL checks elapsed=$((SECONDS - CHECK_STARTED_AT))s"
-
-      - name: Upload validation reports
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: validation-${{ github.sha }}
-          path: evidence/
-          if-no-files-found: warn
-          retention-days: 7
-      - name: Export validated API image
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          mkdir -p release
-          docker save "blackpenguin-api:${{ github.sha }}" | gzip -1 > release/api.tar.gz
-          cd release
-          sha256sum api.tar.gz > api.sha256
-      - uses: actions/upload-artifact@v4
-        with:
-          name: release-api-${{ github.sha }}
-          path: release/
-          compression-level: 0
-          retention-days: 1
-
+        echo "Sales acceptance elapsed=$((SECONDS - CHECK_STARTED_AT))s"
+        CHECK_STARTED_AT=$SECONDS
+        echo "Validation stage: isolated PostgreSQL"
+        # Real PostgreSQL races run before stopping any production process.
+        # The helper uses only an internal disposable network/database and
+        # rejects an API image from a different candidate commit.
+        python3 backend/tools/sales_ai/postgres_checks.py \
+          --image "$API_IMAGE" \
+          --expected-commit "$DEPLOY_SHA" \
+          --tests "$REPOSITORY_DIR/backend/tests" \
+          --output "$GITHUB_WORKSPACE/evidence/postgres.json"
+        echo "PostgreSQL checks elapsed=$((SECONDS - CHECK_STARTED_AT))s"
+    - name: Upload acceptance reports
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: validation-acceptance-${{ github.sha }}
+        path: evidence/
+        retention-days: 7
+        if-no-files-found: error
+  verify-regression:
+    name: Verify complete regression coverage
+    needs:
+    - backend-regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/download-artifact@v4
+      with:
+        pattern: validation-shard-*-${{ github.sha }}
+        path: evidence
+        merge-multiple: true
+    - name: Require matching plans and successful JUnit reports
+      run: python3 backend/tools/ci/verify_shards.py --tests backend/tests --evidence evidence --count 3
   build-frontend:
     name: Build frontend
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
-      - name: Build frontend image with cache
-        uses: docker/build-push-action@v6
-        with:
-          context: ./frontend
-          load: true
-          pull: true
-          platforms: linux/amd64
-          tags: blackpenguin-frontend:${{ github.sha }}
-          build-args: APP_COMMIT_SHA=${{ github.sha }}
-          cache-from: type=gha,scope=blackpenguin-frontend
-          cache-to: type=gha,scope=blackpenguin-frontend,mode=max
-      - name: Export frontend image
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          mkdir -p release
-          docker save "blackpenguin-frontend:${{ github.sha }}" | gzip -1 > release/frontend.tar.gz
-          cd release
-          sha256sum frontend.tar.gz > frontend.sha256
-      - uses: actions/upload-artifact@v4
-        with:
-          name: release-frontend-${{ github.sha }}
-          path: release/
-          compression-level: 0
-          retention-days: 1
-
+    - uses: actions/checkout@v4
+    - uses: docker/setup-buildx-action@v3
+    - name: Build frontend image with cache
+      uses: docker/build-push-action@v6
+      with:
+        context: ./frontend
+        load: true
+        pull: true
+        platforms: linux/amd64
+        tags: blackpenguin-frontend:${{ github.sha }}
+        build-args: APP_COMMIT_SHA=${{ github.sha }}
+        cache-from: type=gha,scope=blackpenguin-frontend
+        cache-to: type=gha,scope=blackpenguin-frontend,mode=max
+    - name: Export frontend image
+      shell: bash
+      run: |
+        set -Eeuo pipefail
+        mkdir -p release
+        docker save "blackpenguin-frontend:${{ github.sha }}" | gzip -1 > release/frontend.tar.gz
+        cd release
+        sha256sum frontend.tar.gz > frontend.sha256
+    - uses: actions/upload-artifact@v4
+      with:
+        name: release-frontend-${{ github.sha }}
+        path: release/
+        compression-level: 0
+        retention-days: 1
   deploy:
-    needs: [build-and-validate, build-frontend]
+    needs:
+    - verify-regression
+    - sales-acceptance
+    - build-frontend
     runs-on: ubuntu-latest
     timeout-minutes: 30
-
     steps:
-      - name: Download images validated for this commit
-        uses: actions/download-artifact@v4
-        with:
-          pattern: release-*-${{ github.sha }}
-          path: release
-          merge-multiple: true
-      - name: Transfer candidate images to production
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.DO_HOST }}
-          username: ${{ secrets.DO_USER }}
-          key: ${{ secrets.DO_SSH_KEY }}
-          source: "release/*"
-          target: /tmp/blackpenguin-release-${{ github.sha }}
-          strip_components: 1
-          overwrite: true
-          command_timeout: 15m
-      - name: Deploy immutable production release
-        uses: appleboy/ssh-action@v1.0.3
-        env:
-          DEPLOY_SHA: ${{ github.sha }}
-          SALES_DIALOGUE_RUNTIME_ENABLED: ${{ vars.SALES_DIALOGUE_RUNTIME_ENABLED || 'false' }}
-          DB_URL: ${{ secrets.DATABASE_URL }}
-          META_TOKEN: ${{ secrets.META_ACCESS_TOKEN }}
-          META_BUSINESS_MANAGER_ID: ${{ secrets.META_BUSINESS_MANAGER_ID }}
-          OPENROUTER_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          JWT_SECRET: ${{ secrets.SECRET_KEY }}
-          SA_EMAIL: ${{ secrets.FIRST_SUPERADMIN_EMAIL }}
-          SA_PASS: ${{ secrets.FIRST_SUPERADMIN_PASSWORD }}
-          MAILCHIMP_KEY: ${{ secrets.MAILCHIMP_API_KEY }}
-          MAILCHIMP_LIST: ${{ secrets.MAILCHIMP_LIST_ID }}
-          MAILCHIMP_SERVER: ${{ secrets.MAILCHIMP_SERVER }}
-          FIREBASE_ADMIN_BRIDGE_URL: ${{ secrets.FIREBASE_ADMIN_BRIDGE_URL }}
-          FIREBASE_ADMIN_BRIDGE_SECRET: ${{ secrets.FIREBASE_ADMIN_BRIDGE_SECRET }}
-        with:
-          host: ${{ secrets.DO_HOST }}
-          username: ${{ secrets.DO_USER }}
-          key: ${{ secrets.DO_SSH_KEY }}
-          envs: DEPLOY_SHA,SALES_DIALOGUE_RUNTIME_ENABLED,DB_URL,META_TOKEN,META_BUSINESS_MANAGER_ID,OPENROUTER_KEY,JWT_SECRET,SA_EMAIL,SA_PASS,MAILCHIMP_KEY,MAILCHIMP_LIST,MAILCHIMP_SERVER,FIREBASE_ADMIN_BRIDGE_URL,FIREBASE_ADMIN_BRIDGE_SECRET
-          command_timeout: 30m
-          script: |
-            set -Eeuo pipefail
-            DEPLOY_STARTED_AT=$SECONDS
-            log_stage() {
-              echo "Deployment elapsed=$((SECONDS - DEPLOY_STARTED_AT))s stage=$1"
-            }
-            log_stage checkout
-            case "${SALES_DIALOGUE_RUNTIME_ENABLED:-false}" in
-              true|false) ;;
-              *) echo "SALES_DIALOGUE_RUNTIME_ENABLED must be true or false."; exit 1 ;;
-            esac
+    - name: Download images validated for this commit
+      uses: actions/download-artifact@v4
+      with:
+        pattern: release-*-${{ github.sha }}
+        path: release
+        merge-multiple: true
+    - name: Transfer candidate images to production
+      uses: appleboy/scp-action@v0.1.7
+      with:
+        host: ${{ secrets.DO_HOST }}
+        username: ${{ secrets.DO_USER }}
+        key: ${{ secrets.DO_SSH_KEY }}
+        source: release/*
+        target: /tmp/blackpenguin-release-${{ github.sha }}
+        strip_components: 1
+        overwrite: true
+        command_timeout: 15m
+    - name: Deploy immutable production release
+      uses: appleboy/ssh-action@v1.0.3
+      env:
+        DEPLOY_SHA: ${{ github.sha }}
+        SALES_DIALOGUE_RUNTIME_ENABLED: ${{ vars.SALES_DIALOGUE_RUNTIME_ENABLED || 'false' }}
+        DB_URL: ${{ secrets.DATABASE_URL }}
+        META_TOKEN: ${{ secrets.META_ACCESS_TOKEN }}
+        META_BUSINESS_MANAGER_ID: ${{ secrets.META_BUSINESS_MANAGER_ID }}
+        OPENROUTER_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        JWT_SECRET: ${{ secrets.SECRET_KEY }}
+        SA_EMAIL: ${{ secrets.FIRST_SUPERADMIN_EMAIL }}
+        SA_PASS: ${{ secrets.FIRST_SUPERADMIN_PASSWORD }}
+        MAILCHIMP_KEY: ${{ secrets.MAILCHIMP_API_KEY }}
+        MAILCHIMP_LIST: ${{ secrets.MAILCHIMP_LIST_ID }}
+        MAILCHIMP_SERVER: ${{ secrets.MAILCHIMP_SERVER }}
+        FIREBASE_ADMIN_BRIDGE_URL: ${{ secrets.FIREBASE_ADMIN_BRIDGE_URL }}
+        FIREBASE_ADMIN_BRIDGE_SECRET: ${{ secrets.FIREBASE_ADMIN_BRIDGE_SECRET }}
+      with:
+        host: ${{ secrets.DO_HOST }}
+        username: ${{ secrets.DO_USER }}
+        key: ${{ secrets.DO_SSH_KEY }}
+        envs: DEPLOY_SHA,SALES_DIALOGUE_RUNTIME_ENABLED,DB_URL,META_TOKEN,META_BUSINESS_MANAGER_ID,OPENROUTER_KEY,JWT_SECRET,SA_EMAIL,SA_PASS,MAILCHIMP_KEY,MAILCHIMP_LIST,MAILCHIMP_SERVER,FIREBASE_ADMIN_BRIDGE_URL,FIREBASE_ADMIN_BRIDGE_SECRET
+        command_timeout: 30m
+        script: |
+          set -Eeuo pipefail
+          DEPLOY_STARTED_AT=$SECONDS
+          log_stage() {
+            echo "Deployment elapsed=$((SECONDS - DEPLOY_STARTED_AT))s stage=$1"
+          }
+          log_stage checkout
+          case "${SALES_DIALOGUE_RUNTIME_ENABLED:-false}" in
+            true|false) ;;
+            *) echo "SALES_DIALOGUE_RUNTIME_ENABLED must be true or false."; exit 1 ;;
+          esac
 
-            REPOSITORY_DIR=/home/jorge/BlackPenguin
-            DEPLOY_STATE_FILE=/home/jorge/.blackpenguin-production-sha
-            LEGACY_DEPLOY_SHA=3871f225855e4a0cb09a4ab149afd2993170552d
-            UPLOAD_DIR=/var/lib/blackpenguin/uploads
-            API_IMAGE="blackpenguin-api:${DEPLOY_SHA}"
-            FRONTEND_IMAGE="blackpenguin-frontend:${DEPLOY_SHA}"
-            RELEASE_STARTED=false
-            PREVIOUS_API_IMAGE=""
-            PREVIOUS_WORKER_IMAGE=""
-            PREVIOUS_FRONTEND_IMAGE=""
-            DATABASE_BASELINE_KNOWN=false
+          REPOSITORY_DIR=/home/jorge/BlackPenguin
+          DEPLOY_STATE_FILE=/home/jorge/.blackpenguin-production-sha
+          LEGACY_DEPLOY_SHA=3871f225855e4a0cb09a4ab149afd2993170552d
+          UPLOAD_DIR=/var/lib/blackpenguin/uploads
+          API_IMAGE="blackpenguin-api:${DEPLOY_SHA}"
+          FRONTEND_IMAGE="blackpenguin-frontend:${DEPLOY_SHA}"
+          RELEASE_STARTED=false
+          PREVIOUS_API_IMAGE=""
+          PREVIOUS_WORKER_IMAGE=""
+          PREVIOUS_FRONTEND_IMAGE=""
+          DATABASE_BASELINE_KNOWN=false
 
-            current_image() {
-              docker inspect --format '{{.Config.Image}}' "$1" 2>/dev/null || true
-            }
+          current_image() {
+            docker inspect --format '{{.Config.Image}}' "$1" 2>/dev/null || true
+          }
 
-            image_revision() {
-              local image="$1"
-              [ -n "$image" ] || return 0
-              docker image inspect \
-                --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' \
-                "$image" 2>/dev/null || true
-            }
+          image_revision() {
+            local image="$1"
+            [ -n "$image" ] || return 0
+            docker image inspect \
+              --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' \
+              "$image" 2>/dev/null || true
+          }
 
-            valid_commit() {
-              local revision="$1"
-              [ -n "$revision" ] && \
-                [ "$revision" != "0000000000000000000000000000000000000000" ] && \
-                git cat-file -e "${revision}^{commit}" 2>/dev/null
-            }
+          valid_commit() {
+            local revision="$1"
+            [ -n "$revision" ] && \
+              [ "$revision" != "0000000000000000000000000000000000000000" ] && \
+              git cat-file -e "${revision}^{commit}" 2>/dev/null
+          }
 
-            start_api() {
-              local image="$1"
-              docker run -d --name bp_api_prod --restart always \
+          start_api() {
+            local image="$1"
+            docker run -d --name bp_api_prod --restart always \
+              --env-file backend/.env \
+              -v "${UPLOAD_DIR}:${UPLOAD_DIR}" \
+              -p 8000:8000 \
+              "$image"
+          }
+
+          start_worker() {
+            local image="$1"
+            local health_mode="${2:-legacy}"
+            if [ "$health_mode" = "healthcheck" ]; then
+              docker run -d --name bp_worker_prod --restart always \
+                --health-cmd 'python -m app.modules.onboarding_jobs.healthcheck --max-age-seconds 180' \
+                --health-interval 5s \
+                --health-timeout 3s \
+                --health-retries 3 \
+                --health-start-period 20s \
                 --env-file backend/.env \
                 -v "${UPLOAD_DIR}:${UPLOAD_DIR}" \
-                -p 8000:8000 \
-                "$image"
-            }
-
-            start_worker() {
-              local image="$1"
-              local health_mode="${2:-legacy}"
-              if [ "$health_mode" = "healthcheck" ]; then
-                docker run -d --name bp_worker_prod --restart always \
-                  --health-cmd 'python -m app.modules.onboarding_jobs.healthcheck --max-age-seconds 180' \
-                  --health-interval 5s \
-                  --health-timeout 3s \
-                  --health-retries 3 \
-                  --health-start-period 20s \
-                  --env-file backend/.env \
-                  -v "${UPLOAD_DIR}:${UPLOAD_DIR}" \
-                  "$image" \
-                  python -m app.modules.onboarding_jobs.worker
-              else
-                docker run -d --name bp_worker_prod --restart always \
-                  --env-file backend/.env \
-                  -v "${UPLOAD_DIR}:${UPLOAD_DIR}" \
-                  "$image" \
-                  python -m app.modules.onboarding_jobs.worker
-              fi
-            }
-
-            start_frontend() {
-              local image="$1"
-              docker run -d --name bp_frontend_prod --restart always \
-                -p 8080:80 \
-                "$image"
-            }
-
-            remove_container() {
-              docker rm -f "$1" >/dev/null 2>&1 || true
-            }
-
-            wait_for_version() {
-              for attempt in $(seq 1 30); do
-                if [ "$(curl --fail --silent \
-                  http://127.0.0.1:8000/api/v1/health/version 2>/dev/null | \
-                  python3 -c 'import json,sys; print(json.load(sys.stdin)["commit"])' \
-                  2>/dev/null || true)" = "$DEPLOY_SHA" ]; then
-                  return 0
-                fi
-                sleep 2
-              done
-              echo "API version check did not pass for $DEPLOY_SHA."
-              docker inspect --format \
-                'running={{.State.Running}} status={{.State.Status}} exit={{.State.ExitCode}}' \
-                bp_api_prod 2>/dev/null || true
-              docker logs --tail 150 bp_api_prod 2>&1 || true
-              curl --silent --show-error --include \
-                http://127.0.0.1:8000/api/v1/health/version || true
-              return 1
-            }
-
-            wait_for_readiness() {
-              for attempt in $(seq 1 30); do
-                if curl --fail --silent --show-error \
-                  http://127.0.0.1:8000/api/v1/health/ready >/dev/null && \
-                  curl --fail --silent --show-error http://127.0.0.1:8000/api/v1/health/sales >/dev/null; then
-                  return 0
-                fi
-                sleep 2
-              done
-              echo "API or Sales queue readiness check did not pass."
-              docker inspect --format \
-                'running={{.State.Running}} status={{.State.Status}} exit={{.State.ExitCode}}' \
-                bp_api_prod 2>/dev/null || true
-              docker logs --tail 150 bp_api_prod 2>&1 || true
-              curl --silent --show-error --include \
-                http://127.0.0.1:8000/api/v1/health/ready || true
-              return 1
-            }
-
-            worker_diagnostics() {
-              docker inspect --format \
-                'running={{.State.Running}} status={{.State.Status}} exit={{.State.ExitCode}} restarting={{.State.Restarting}} restarts={{.RestartCount}} health={{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' \
-                bp_worker_prod 2>/dev/null || true
-              docker logs --tail 200 bp_worker_prod 2>&1 || true
-              docker exec bp_worker_prod python -c \
-                'from sqlalchemy import text; from app.db.postgres import SessionLocal; db=SessionLocal(); db.execute(text("SELECT 1")); db.close(); print("worker_database_connection=ok")' \
-                2>&1 || true
-            }
-
-            wait_for_worker_health() {
-              for attempt in $(seq 1 24); do
-                worker_health="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' bp_worker_prod 2>/dev/null || true)"
-                if [ "$worker_health" = "healthy" ]; then
-                  return 0
-                fi
-                if [ "$(docker inspect --format '{{.State.Running}}' bp_worker_prod 2>/dev/null || true)" != true ]; then
-                  break
-                fi
-                sleep 5
-              done
-              echo "Onboarding worker did not become healthy."
-              worker_diagnostics
-              return 1
-            }
-
-            rollback() {
-              local exit_code=$?
-              if [ "$RELEASE_STARTED" = true ]; then
-                echo "Deployment failed; restoring the previous container release."
-                remove_container bp_api_prod
-                remove_container bp_worker_prod
-                remove_container bp_frontend_prod
-                [ -n "$PREVIOUS_API_IMAGE" ] && start_api "$PREVIOUS_API_IMAGE" >/dev/null || true
-                [ -n "$PREVIOUS_WORKER_IMAGE" ] && start_worker "$PREVIOUS_WORKER_IMAGE" >/dev/null || true
-                [ -n "$PREVIOUS_FRONTEND_IMAGE" ] && start_frontend "$PREVIOUS_FRONTEND_IMAGE" >/dev/null || true
-              fi
-              exit "$exit_code"
-            }
-            trap rollback ERR
-
-            cd "$REPOSITORY_DIR"
-
-            if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
-              echo "Tracked local changes detected; refusing a mixed deployment."
-              git status --short --untracked-files=no
-              exit 1
-            fi
-
-            PREVIOUS_API_IMAGE="$(current_image bp_api_prod)"
-            PREVIOUS_WORKER_IMAGE="$(current_image bp_worker_prod)"
-            PREVIOUS_FRONTEND_IMAGE="$(current_image bp_frontend_prod)"
-
-            RUNNING_API_SHA="$(curl --fail --silent \
-              http://127.0.0.1:8000/api/v1/health/version 2>/dev/null | \
-              python3 -c 'import json,sys; print(json.load(sys.stdin)["commit"])' \
-              2>/dev/null || true)"
-
-            git fetch --prune origin main
-            git cat-file -e "${DEPLOY_SHA}^{commit}"
-            git checkout --detach "$DEPLOY_SHA"
-            test "$(git rev-parse HEAD)" = "$DEPLOY_SHA"
-
-            PREVIOUS_DEPLOY_SHA="$RUNNING_API_SHA"
-            if ! valid_commit "$PREVIOUS_DEPLOY_SHA" && [ -f "$DEPLOY_STATE_FILE" ]; then
-              PREVIOUS_DEPLOY_SHA="$(tr -d '[:space:]' < "$DEPLOY_STATE_FILE")"
-            fi
-            if ! valid_commit "$PREVIOUS_DEPLOY_SHA"; then
-              PREVIOUS_DEPLOY_SHA="$(image_revision "$PREVIOUS_API_IMAGE")"
-            fi
-            if ! valid_commit "$PREVIOUS_DEPLOY_SHA"; then
-              # Transitional fallback for the last release confirmed in
-              # production before version labels and the state file existed.
-              PREVIOUS_DEPLOY_SHA="$LEGACY_DEPLOY_SHA"
-            fi
-            if valid_commit "$PREVIOUS_DEPLOY_SHA"; then
-              DATABASE_BASELINE_KNOWN=true
+                "$image" \
+                python -m app.modules.onboarding_jobs.worker
             else
-              echo "Unable to identify the deployed database baseline safely."
-              exit 1
-            fi
-
-            DB_RESET_REQUIRED=false
-            if git diff --name-only "$PREVIOUS_DEPLOY_SHA" "$DEPLOY_SHA" | \
-              grep -Eq '^(backend/app/init_db\.py|backend/app/db/|backend/app/(.*/)?models\.py|backend/app/modules/.+/prompts\.py|backend/alembic\.ini|backend/alembic/|backend/migrations/)'; then
-              DB_RESET_REQUIRED=true
-            fi
-
-            echo "Previously deployed commit: $PREVIOUS_DEPLOY_SHA"
-            echo "Database baseline known: $DATABASE_BASELINE_KNOWN"
-            echo "New deployment commit: $DEPLOY_SHA"
-            echo "Database rebuild required: $DB_RESET_REQUIRED"
-
-            umask 077
-            rm -f backend/.env
-            {
-              echo "ENVIRONMENT=production"
-              echo "APP_COMMIT_SHA=$DEPLOY_SHA"
-              echo "SALES_DIALOGUE_RUNTIME_ENABLED=${SALES_DIALOGUE_RUNTIME_ENABLED:-false}"
-              echo "ALGORITHM=HS256"
-              echo "ACCESS_TOKEN_EXPIRE_MINUTES=10080"
-              echo "SECRET_KEY=$JWT_SECRET"
-              echo "DATABASE_URL=$DB_URL"
-              echo "META_ACCESS_TOKEN=$META_TOKEN"
-              echo "META_BUSINESS_MANAGER_ID=$META_BUSINESS_MANAGER_ID"
-              echo "OPENROUTER_API_KEY=$OPENROUTER_KEY"
-              echo "FIRST_SUPERADMIN_EMAIL=$SA_EMAIL"
-              echo "FIRST_SUPERADMIN_PASSWORD=$SA_PASS"
-              echo "MONGO_URL=mongodb://172.17.0.1:27017/blackpenguin_db"
-              echo "MAILCHIMP_API_KEY=$MAILCHIMP_KEY"
-              echo "MAILCHIMP_LIST_ID=$MAILCHIMP_LIST"
-              echo "MAILCHIMP_SERVER=$MAILCHIMP_SERVER"
-              echo "FIREBASE_ADMIN_BRIDGE_URL=$FIREBASE_ADMIN_BRIDGE_URL"
-              echo "FIREBASE_ADMIN_BRIDGE_SECRET=$FIREBASE_ADMIN_BRIDGE_SECRET"
-              echo "PROJECT_UPLOAD_ROOT=$UPLOAD_DIR"
-              echo "SEED_MINTO_DEMO=true"
-              echo "MINTO_DEMO_EMAIL=test@minto.com"
-              echo "MINTO_DEMO_PASSWORD=1234"
-            } > backend/.env
-
-            echo ":: Load validated release images"
-            RELEASE_ARTIFACT_DIR="/tmp/blackpenguin-release-${DEPLOY_SHA}"
-            (
-              cd "$RELEASE_ARTIFACT_DIR"
-              sha256sum -c api.sha256
-              sha256sum -c frontend.sha256
-              gzip -dc api.tar.gz | docker load
-              gzip -dc frontend.tar.gz | docker load
-            )
-            rm -f "$RELEASE_ARTIFACT_DIR/api.tar.gz" "$RELEASE_ARTIFACT_DIR/frontend.tar.gz" \
-              "$RELEASE_ARTIFACT_DIR/api.sha256" "$RELEASE_ARTIFACT_DIR/frontend.sha256"
-            rmdir "$RELEASE_ARTIFACT_DIR" 2>/dev/null || true
-
-            # Docker creates the bind-mount directory when it does not exist.
-            # The write check runs as the same image user as API and worker and
-            # therefore needs neither sudo nor an interactive password.
-            docker run --rm \
-              --env-file backend/.env \
-              "$API_IMAGE" \
-              python -c \
-              "import inspect; from app.modules.projects.services import save_message; assert 'commit' in inspect.signature(save_message).parameters"
-            docker run --rm \
-              --env-file backend/.env \
-              "$API_IMAGE" \
-              python -c \
-              "import inspect; from app.modules.company_onboarding.services import save_message; assert 'commit' in inspect.signature(save_message).parameters"
-
-            docker run --rm \
-              -v "${UPLOAD_DIR}:/uploads" \
-              "$API_IMAGE" \
-              sh -c 'set -eu; touch /uploads/.deployment-write-test; rm /uploads/.deployment-write-test'
-
-            test "$(image_revision "$API_IMAGE")" = "$DEPLOY_SHA"
-            test "$(image_revision "$FRONTEND_IMAGE")" = "$DEPLOY_SHA"
-
-            log_stage activate-release
-            RELEASE_STARTED=true
-            remove_container bp_api_prod
-            remove_container bp_worker_prod
-            remove_container bp_frontend_prod
-
-            start_api "$API_IMAGE" >/dev/null
-            start_frontend "$FRONTEND_IMAGE" >/dev/null
-            wait_for_version
-
-            if [ "$DB_RESET_REQUIRED" = true ]; then
-              echo "Database-related changes detected; applying incremental migrations."
-              docker exec bp_api_prod sh -c '
-                current_revision="$(alembic current 2>/dev/null || true)"
-                if [ -z "$current_revision" ]; then
-                  alembic stamp 20260805_jobs_v2
-                fi
-                alembic upgrade head
-              '
-              docker restart bp_api_prod >/dev/null
-              wait_for_version
-            else
-              docker run --rm \
+              docker run -d --name bp_worker_prod --restart always \
                 --env-file backend/.env \
-                "$API_IMAGE" \
-                python -m app.scripts.reconcile_onboarding_jobs --apply
+                -v "${UPLOAD_DIR}:${UPLOAD_DIR}" \
+                "$image" \
+                python -m app.modules.onboarding_jobs.worker
             fi
+          }
 
-            docker exec bp_api_prod sh -c '
-              if [ "${SEED_MINTO_DEMO:-false}" = "true" ]; then
-                python -m app.scripts.seed_minto_demo
+          start_frontend() {
+            local image="$1"
+            docker run -d --name bp_frontend_prod --restart always \
+              -p 8080:80 \
+              "$image"
+          }
+
+          remove_container() {
+            docker rm -f "$1" >/dev/null 2>&1 || true
+          }
+
+          wait_for_version() {
+            for attempt in $(seq 1 30); do
+              if [ "$(curl --fail --silent \
+                http://127.0.0.1:8000/api/v1/health/version 2>/dev/null | \
+                python3 -c 'import json,sys; print(json.load(sys.stdin)["commit"])' \
+                2>/dev/null || true)" = "$DEPLOY_SHA" ]; then
+                return 0
               fi
+              sleep 2
+            done
+            echo "API version check did not pass for $DEPLOY_SHA."
+            docker inspect --format \
+              'running={{.State.Running}} status={{.State.Status}} exit={{.State.ExitCode}}' \
+              bp_api_prod 2>/dev/null || true
+            docker logs --tail 150 bp_api_prod 2>&1 || true
+            curl --silent --show-error --include \
+              http://127.0.0.1:8000/api/v1/health/version || true
+            return 1
+          }
+
+          wait_for_readiness() {
+            for attempt in $(seq 1 30); do
+              if curl --fail --silent --show-error \
+                http://127.0.0.1:8000/api/v1/health/ready >/dev/null && \
+                curl --fail --silent --show-error http://127.0.0.1:8000/api/v1/health/sales >/dev/null; then
+                return 0
+              fi
+              sleep 2
+            done
+            echo "API or Sales queue readiness check did not pass."
+            docker inspect --format \
+              'running={{.State.Running}} status={{.State.Status}} exit={{.State.ExitCode}}' \
+              bp_api_prod 2>/dev/null || true
+            docker logs --tail 150 bp_api_prod 2>&1 || true
+            curl --silent --show-error --include \
+              http://127.0.0.1:8000/api/v1/health/ready || true
+            return 1
+          }
+
+          worker_diagnostics() {
+            docker inspect --format \
+              'running={{.State.Running}} status={{.State.Status}} exit={{.State.ExitCode}} restarting={{.State.Restarting}} restarts={{.RestartCount}} health={{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' \
+              bp_worker_prod 2>/dev/null || true
+            docker logs --tail 200 bp_worker_prod 2>&1 || true
+            docker exec bp_worker_prod python -c \
+              'from sqlalchemy import text; from app.db.postgres import SessionLocal; db=SessionLocal(); db.execute(text("SELECT 1")); db.close(); print("worker_database_connection=ok")' \
+              2>&1 || true
+          }
+
+          wait_for_worker_health() {
+            for attempt in $(seq 1 24); do
+              worker_health="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' bp_worker_prod 2>/dev/null || true)"
+              if [ "$worker_health" = "healthy" ]; then
+                return 0
+              fi
+              if [ "$(docker inspect --format '{{.State.Running}}' bp_worker_prod 2>/dev/null || true)" != true ]; then
+                break
+              fi
+              sleep 5
+            done
+            echo "Onboarding worker did not become healthy."
+            worker_diagnostics
+            return 1
+          }
+
+          rollback() {
+            local exit_code=$?
+            if [ "$RELEASE_STARTED" = true ]; then
+              echo "Deployment failed; restoring the previous container release."
+              remove_container bp_api_prod
+              remove_container bp_worker_prod
+              remove_container bp_frontend_prod
+              [ -n "$PREVIOUS_API_IMAGE" ] && start_api "$PREVIOUS_API_IMAGE" >/dev/null || true
+              [ -n "$PREVIOUS_WORKER_IMAGE" ] && start_worker "$PREVIOUS_WORKER_IMAGE" >/dev/null || true
+              [ -n "$PREVIOUS_FRONTEND_IMAGE" ] && start_frontend "$PREVIOUS_FRONTEND_IMAGE" >/dev/null || true
+            fi
+            exit "$exit_code"
+          }
+          trap rollback ERR
+
+          cd "$REPOSITORY_DIR"
+
+          if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+            echo "Tracked local changes detected; refusing a mixed deployment."
+            git status --short --untracked-files=no
+            exit 1
+          fi
+
+          PREVIOUS_API_IMAGE="$(current_image bp_api_prod)"
+          PREVIOUS_WORKER_IMAGE="$(current_image bp_worker_prod)"
+          PREVIOUS_FRONTEND_IMAGE="$(current_image bp_frontend_prod)"
+
+          RUNNING_API_SHA="$(curl --fail --silent \
+            http://127.0.0.1:8000/api/v1/health/version 2>/dev/null | \
+            python3 -c 'import json,sys; print(json.load(sys.stdin)["commit"])' \
+            2>/dev/null || true)"
+
+          git fetch --prune origin main
+          git cat-file -e "${DEPLOY_SHA}^{commit}"
+          git checkout --detach "$DEPLOY_SHA"
+          test "$(git rev-parse HEAD)" = "$DEPLOY_SHA"
+
+          PREVIOUS_DEPLOY_SHA="$RUNNING_API_SHA"
+          if ! valid_commit "$PREVIOUS_DEPLOY_SHA" && [ -f "$DEPLOY_STATE_FILE" ]; then
+            PREVIOUS_DEPLOY_SHA="$(tr -d '[:space:]' < "$DEPLOY_STATE_FILE")"
+          fi
+          if ! valid_commit "$PREVIOUS_DEPLOY_SHA"; then
+            PREVIOUS_DEPLOY_SHA="$(image_revision "$PREVIOUS_API_IMAGE")"
+          fi
+          if ! valid_commit "$PREVIOUS_DEPLOY_SHA"; then
+            # Transitional fallback for the last release confirmed in
+            # production before version labels and the state file existed.
+            PREVIOUS_DEPLOY_SHA="$LEGACY_DEPLOY_SHA"
+          fi
+          if valid_commit "$PREVIOUS_DEPLOY_SHA"; then
+            DATABASE_BASELINE_KNOWN=true
+          else
+            echo "Unable to identify the deployed database baseline safely."
+            exit 1
+          fi
+
+          DB_RESET_REQUIRED=false
+          if git diff --name-only "$PREVIOUS_DEPLOY_SHA" "$DEPLOY_SHA" | \
+            grep -Eq '^(backend/app/init_db\.py|backend/app/db/|backend/app/(.*/)?models\.py|backend/app/modules/.+/prompts\.py|backend/alembic\.ini|backend/alembic/|backend/migrations/)'; then
+            DB_RESET_REQUIRED=true
+          fi
+
+          echo "Previously deployed commit: $PREVIOUS_DEPLOY_SHA"
+          echo "Database baseline known: $DATABASE_BASELINE_KNOWN"
+          echo "New deployment commit: $DEPLOY_SHA"
+          echo "Database rebuild required: $DB_RESET_REQUIRED"
+
+          umask 077
+          rm -f backend/.env
+          {
+            echo "ENVIRONMENT=production"
+            echo "APP_COMMIT_SHA=$DEPLOY_SHA"
+            echo "SALES_DIALOGUE_RUNTIME_ENABLED=${SALES_DIALOGUE_RUNTIME_ENABLED:-false}"
+            echo "ALGORITHM=HS256"
+            echo "ACCESS_TOKEN_EXPIRE_MINUTES=10080"
+            echo "SECRET_KEY=$JWT_SECRET"
+            echo "DATABASE_URL=$DB_URL"
+            echo "META_ACCESS_TOKEN=$META_TOKEN"
+            echo "META_BUSINESS_MANAGER_ID=$META_BUSINESS_MANAGER_ID"
+            echo "OPENROUTER_API_KEY=$OPENROUTER_KEY"
+            echo "FIRST_SUPERADMIN_EMAIL=$SA_EMAIL"
+            echo "FIRST_SUPERADMIN_PASSWORD=$SA_PASS"
+            echo "MONGO_URL=mongodb://172.17.0.1:27017/blackpenguin_db"
+            echo "MAILCHIMP_API_KEY=$MAILCHIMP_KEY"
+            echo "MAILCHIMP_LIST_ID=$MAILCHIMP_LIST"
+            echo "MAILCHIMP_SERVER=$MAILCHIMP_SERVER"
+            echo "FIREBASE_ADMIN_BRIDGE_URL=$FIREBASE_ADMIN_BRIDGE_URL"
+            echo "FIREBASE_ADMIN_BRIDGE_SECRET=$FIREBASE_ADMIN_BRIDGE_SECRET"
+            echo "PROJECT_UPLOAD_ROOT=$UPLOAD_DIR"
+            echo "SEED_MINTO_DEMO=true"
+            echo "MINTO_DEMO_EMAIL=test@minto.com"
+            echo "MINTO_DEMO_PASSWORD=1234"
+          } > backend/.env
+
+          echo ":: Load validated release images"
+          RELEASE_ARTIFACT_DIR="/tmp/blackpenguin-release-${DEPLOY_SHA}"
+          (
+            cd "$RELEASE_ARTIFACT_DIR"
+            sha256sum -c api.sha256
+            sha256sum -c frontend.sha256
+            gzip -dc api.tar.gz | docker load
+            gzip -dc frontend.tar.gz | docker load
+          )
+          rm -f "$RELEASE_ARTIFACT_DIR/api.tar.gz" "$RELEASE_ARTIFACT_DIR/frontend.tar.gz" \
+            "$RELEASE_ARTIFACT_DIR/api.sha256" "$RELEASE_ARTIFACT_DIR/frontend.sha256"
+          rmdir "$RELEASE_ARTIFACT_DIR" 2>/dev/null || true
+
+          # Docker creates the bind-mount directory when it does not exist.
+          # The write check runs as the same image user as API and worker and
+          # therefore needs neither sudo nor an interactive password.
+          docker run --rm \
+            --env-file backend/.env \
+            "$API_IMAGE" \
+            python -c \
+            "import inspect; from app.modules.projects.services import save_message; assert 'commit' in inspect.signature(save_message).parameters"
+          docker run --rm \
+            --env-file backend/.env \
+            "$API_IMAGE" \
+            python -c \
+            "import inspect; from app.modules.company_onboarding.services import save_message; assert 'commit' in inspect.signature(save_message).parameters"
+
+          docker run --rm \
+            -v "${UPLOAD_DIR}:/uploads" \
+            "$API_IMAGE" \
+            sh -c 'set -eu; touch /uploads/.deployment-write-test; rm /uploads/.deployment-write-test'
+
+          test "$(image_revision "$API_IMAGE")" = "$DEPLOY_SHA"
+          test "$(image_revision "$FRONTEND_IMAGE")" = "$DEPLOY_SHA"
+
+          log_stage activate-release
+          RELEASE_STARTED=true
+          remove_container bp_api_prod
+          remove_container bp_worker_prod
+          remove_container bp_frontend_prod
+
+          start_api "$API_IMAGE" >/dev/null
+          start_frontend "$FRONTEND_IMAGE" >/dev/null
+          wait_for_version
+
+          if [ "$DB_RESET_REQUIRED" = true ]; then
+            echo "Database-related changes detected; applying incremental migrations."
+            docker exec bp_api_prod sh -c '
+              current_revision="$(alembic current 2>/dev/null || true)"
+              if [ -z "$current_revision" ]; then
+                alembic stamp 20260805_jobs_v2
+              fi
+              alembic upgrade head
             '
+            docker restart bp_api_prod >/dev/null
+            wait_for_version
+          else
+            docker run --rm \
+              --env-file backend/.env \
+              "$API_IMAGE" \
+              python -m app.scripts.reconcile_onboarding_jobs --apply
+          fi
 
-            start_worker "$API_IMAGE" healthcheck >/dev/null
-            wait_for_readiness
-            wait_for_worker_health
+          docker exec bp_api_prod sh -c '
+            if [ "${SEED_MINTO_DEMO:-false}" = "true" ]; then
+              python -m app.scripts.seed_minto_demo
+            fi
+          '
 
-            test "$(docker inspect --format '{{.State.Running}}' bp_frontend_prod)" = true
-            test "$(docker inspect --format '{{.Config.Image}}' bp_api_prod)" = "$API_IMAGE"
-            test "$(docker inspect --format '{{.Config.Image}}' bp_worker_prod)" = "$API_IMAGE"
+          start_worker "$API_IMAGE" healthcheck >/dev/null
+          wait_for_readiness
+          wait_for_worker_health
 
-            sleep 15
-            test "$(docker inspect --format '{{.State.Health.Status}}' bp_worker_prod)" = healthy || {
-              echo "Onboarding worker lost health during the stability window."
-              worker_diagnostics
-              false
-            }
+          test "$(docker inspect --format '{{.State.Running}}' bp_frontend_prod)" = true
+          test "$(docker inspect --format '{{.Config.Image}}' bp_api_prod)" = "$API_IMAGE"
+          test "$(docker inspect --format '{{.Config.Image}}' bp_worker_prod)" = "$API_IMAGE"
 
-            curl --fail --silent --show-error http://127.0.0.1:8000/api/v1/health/sales >/dev/null
-            RELEASE_STARTED=false
-            trap - ERR
-            printf '%s\n' "$DEPLOY_SHA" > "$DEPLOY_STATE_FILE"
-            log_stage complete
-            echo "Deployment completed successfully: $DEPLOY_SHA"
+          sleep 15
+          test "$(docker inspect --format '{{.State.Health.Status}}' bp_worker_prod)" = healthy || {
+            echo "Onboarding worker lost health during the stability window."
+            worker_diagnostics
+            false
+          }
+
+          curl --fail --silent --show-error http://127.0.0.1:8000/api/v1/health/sales >/dev/null
+          RELEASE_STARTED=false
+          trap - ERR
+          printf '%s\n' "$DEPLOY_SHA" > "$DEPLOY_STATE_FILE"
+          log_stage complete
+          echo "Deployment completed successfully: $DEPLOY_SHA"
+'on':
+  workflow_dispatch: null
+  push:
+    branches:
+    - main
+    paths:
+    - backend/**
+    - frontend/**
+    - .github/workflows/deploy.yml
+    - docs/**
