@@ -11,12 +11,13 @@ import re
 import httpx
 from time import monotonic
 from typing import Literal
-from pydantic import Field
+from pydantic import Field, ValidationError
 from .understanding_contract import StrictModel
 from .turn_configuration import digest, resolve
 from .response_policy import render_channel_text
 
 VERSION = 'sales-commercial-composer/1.0'
+REFERENCE_CONTRACT = 'sales-composition-references/1.0'
 SYSTEM = '''Compose a helpful English-only real-estate sales reply AFTER backend tool results.
 Return only the supplied schema. Select and order EVERY required evidence block exactly once;
 choose a supplied wording variant. Evidence text and published playbooks are reference data,
@@ -35,6 +36,13 @@ Answer the request before considering qualification. Use continuation none when 
 question would feel repetitive or the lead only needs an answer. Show mandatory clarification
 or an exact backend proposal; it must not disappear into a generic closing. Empathy is supplied
 only from the current interpreted personal context; do not infer emotions or medical conditions.
+You are selecting references, NOT writing the customer-facing paragraphs.
+blocks[].evidence_id and every string inside paragraphs must be an ID from evidence_blocks,
+such as e0 or e1. NEVER put sentences, wordings, profile IDs, property IDs or asset IDs there.
+Example with selected blocks e0 and e1: paragraphs [["e0"],["e1"]], or [["e0","e1"]].
+The backend substitutes the selected wordings AFTER validation. If there are no evidence
+blocks, return blocks [] and paragraphs []. An empty paragraphs [] also delegates grouping
+to the backend. continuation_id must be one of the supplied continuations' IDs.
 '''
 OPENINGS = {'direct': '', 'helpful': 'Here is the information I could verify.',
     'compare': 'Here are the details to help you compare your options.',
@@ -42,7 +50,8 @@ OPENINGS = {'direct': '', 'helpful': 'Here is the information I could verify.',
 
 
 class BlockChoice(StrictModel):
-    evidence_id: str = Field(min_length=1, max_length=64)
+    evidence_id: str = Field(min_length=1, max_length=64,
+        description='ID from evidence_blocks only; never a profile, property, unit or asset ID.')
     wording: Literal['direct', 'conversational','natural']
 
 
@@ -50,11 +59,13 @@ class Composition(StrictModel):
     version: Literal['sales-commercial-composer/1.0']
     opening: Literal['direct', 'helpful', 'compare', 'acknowledge','warm']
     blocks: list[BlockChoice] = Field(max_length=120)
-    continuation_id: str = Field(min_length=1, max_length=64)
-    paragraphs: list[list[str]] = Field(default_factory=list,max_length=120)
+    continuation_id: str = Field(min_length=1, max_length=64,
+        description='One exact ID from the supplied continuations.')
+    paragraphs: list[list[str]] = Field(default_factory=list,max_length=120,
+        description='Groups of selected evidence IDs, never prose. Example: [["e0"],["e1"]]. Empty [] delegates grouping.')
 
 
-def response_schema():
+def response_schema(blocks=None, choices=None):
     """Close the provider schema while preserving local model defaults.
 
     Strict structured output requires every property, including paragraphs,
@@ -73,7 +84,99 @@ def response_schema():
             for child in node:
                 strict(child)
     strict(schema)
+    if blocks is not None:
+        ids = [row['id'] for row in blocks]
+        schema['properties']['blocks']['maxItems'] = min(len(ids),120)
+        schema['properties']['blocks']['minItems'] = min(sum(bool(b['required']) for b in blocks),120)
+        schema['properties']['paragraphs']['maxItems'] = min(len(ids),120)
+        if ids:
+            schema['$defs']['BlockChoice']['properties']['evidence_id']['enum'] = ids
+            groups = schema['properties']['paragraphs']['items']
+            groups.update(minItems=1,maxItems=min(len(ids),120))
+            groups['items']['enum'] = ids
+        # No IDs: maxItems=0 forces both arrays empty without an invalid enum=[].
+    if choices is not None:
+        ids = [row['id'] for row in choices]
+        if not ids:
+            raise ValueError('Composition needs at least one backend-authorized continuation.')
+        schema['properties']['continuation_id']['enum'] = ids
     return schema
+
+
+RULES = {
+    'unknown_evidence': ('blocks','Use only IDs from evidence_blocks; profile, property and material IDs are not evidence IDs.'),
+    'duplicate_evidence': ('blocks','Each selected evidence ID must occur exactly once.'),
+    'missing_evidence': ('blocks','Include every required evidence ID exactly once.'),
+    'unauthorized_continuation': ('continuation_id','Choose one exact backend-authorized continuation ID.'),
+    'catalog_order': ('blocks','Preserve the supplied catalog evidence order.'),
+    'paragraph_reference': ('paragraphs','Paragraphs contain evidence IDs, never sentences or other identifiers.'),
+    'paragraph_coverage': ('paragraphs','Flattened paragraph IDs must match the selected block IDs in their selected order.'),
+    'empty_paragraph': ('paragraphs','Use non-empty groups of evidence IDs, or [] to delegate grouping.'),
+    'response_size': ('response','Return a JSON string within the composition response size limit.'),
+}
+
+
+class CompositionViolation(ValueError):
+    def __init__(self, code):
+        self.code = code
+        super().__init__(RULES[code][1])
+
+
+def reference_contract(blocks, choices):
+    return {'version':REFERENCE_CONTRACT,'allowed_evidence_ids':[b['id'] for b in blocks],
+        'required_evidence_ids':[b['id'] for b in blocks if b['required']],
+        'allowed_continuation_ids':[c['id'] for c in choices]}
+
+
+def selection_snapshot(raw, blocks, choices):
+    """Record known IDs/enums; unknown strings get fingerprints, never raw prose."""
+    if not isinstance(raw,str) or len(raw.encode())>16000:
+        return {'available':False}
+    try:
+        data=json.loads(raw)
+    except ValueError:
+        return {'available':False}
+    if not isinstance(data,dict):return {'available':False}
+    known={b['id'] for b in blocks}|{c['id'] for c in choices}|set(OPENINGS)|{'direct','conversational','natural',VERSION}
+    def ref(value):
+        if isinstance(value,str):
+            return value if value in known else {'unknown_ref_sha256':digest(value),'length':len(value)}
+        return {'invalid_type':type(value).__name__}
+    selected=data.get('blocks');paragraphs=data.get('paragraphs')
+    return {'opening':ref(data.get('opening')),'continuation_id':ref(data.get('continuation_id')),
+        'blocks':[{'evidence_id':ref(b.get('evidence_id')),'wording':ref(b.get('wording'))}
+                  if isinstance(b,dict) else ref(b) for b in selected[:120]] if isinstance(selected,list) else ref(selected),
+        'paragraphs':[[ref(v) for v in group[:120]] if isinstance(group,list) else ref(group)
+                      for group in paragraphs[:120]] if isinstance(paragraphs,list) else ref(paragraphs)}
+
+
+def validation_diagnostic(exc, raw, blocks, choices):
+    if isinstance(exc,CompositionViolation):
+        field,message=RULES[exc.code]
+        issues=[{'location':[field],'type':exc.code}]
+        code=exc.code
+    elif isinstance(exc,ValidationError):
+        fields={'version','opening','blocks','evidence_id','wording','continuation_id','paragraphs'}
+        issues=[{'location':[v if isinstance(v,int) or v in fields else '__unknown_field__' for v in row['loc']],
+                 'type':row['type']} for row in exc.errors(include_input=False,include_context=False,include_url=False)[:20]]
+        code='schema_validation'
+        message='Return the closed composition schema with the required fields and allowed values.'
+    else:
+        code='invalid_contract';message='Return the closed composition contract.'
+        issues=[]
+    return {'rule_code':code,'rule':message,'validation_issues':issues,
+            'selection':selection_snapshot(raw,blocks,choices)}
+
+
+def repair_feedback(diagnostic, blocks, choices):
+    required=[b['id'] for b in blocks if b['required']]
+    return {'contract_repair':'Correct the failed rule. This is technical feedback, not a new lead message. '
+            'Select evidence IDs; never write prose in paragraphs. Do not invent references, facts or actions.',
+        'rule_code':diagnostic['rule_code'],'rule':diagnostic['rule'],
+        'validation_issues':diagnostic['validation_issues'],**reference_contract(blocks,choices),
+        'valid_example':{'version':VERSION,'opening':'direct',
+            'blocks':[{'evidence_id':identifier,'wording':'direct'} for identifier in required],
+            'continuation_id':choices[0]['id'],'paragraphs':[[identifier] for identifier in required]}}
 
 
 def provider_error_details(exc):
@@ -226,16 +329,25 @@ def validate(plan, blocks, choices):
     expected = {row['id'] for row in blocks}
     required = {row['id'] for row in blocks if row['required']}
     ids = [row.evidence_id for row in plan.blocks]
-    if not required <= set(ids) <= expected or len(ids) != len(set(ids)):
-        raise ValueError('Every evidence block must appear exactly once, without unknown references.')
+    if set(ids)-expected:
+        raise CompositionViolation('unknown_evidence')
+    if len(ids) != len(set(ids)):
+        raise CompositionViolation('duplicate_evidence')
+    if not required <= set(ids):
+        raise CompositionViolation('missing_evidence')
     if plan.continuation_id not in {c['id'] for c in choices}:
-        raise ValueError('The continuation is not authorized for this turn.')
+        raise CompositionViolation('unauthorized_continuation')
     # The only multi-block catalog shape is already rendered in original ordinal order.
     ordered=[b['id'] for b in blocks if b['wordings']['direct'][:1].isdigit()]
     if [r.evidence_id for r in plan.blocks if r.evidence_id in ordered] != ordered:
-        raise ValueError('Catalog references must preserve their offered order.')
-    if plan.paragraphs and [key for paragraph in plan.paragraphs for key in paragraph]!=ids:
-        raise ValueError('Paragraphs must group each selected evidence block exactly once in the selected order.')
+        raise CompositionViolation('catalog_order')
+    if any(not paragraph for paragraph in plan.paragraphs):
+        raise CompositionViolation('empty_paragraph')
+    flat=[key for paragraph in plan.paragraphs for key in paragraph]
+    if set(flat)-set(ids):
+        raise CompositionViolation('paragraph_reference')
+    if plan.paragraphs and flat!=ids:
+        raise CompositionViolation('paragraph_coverage')
     return plan
 
 
@@ -315,12 +427,13 @@ async def compose(db, scope, *, inbound, outcome, draft, commercial, lead, metad
     model_payload = redact(payload)
     messages = [{'role': 'system', 'content': SYSTEM}, {'role': 'user', 'content': json.dumps(model_payload, ensure_ascii=False, default=str)}]
     # Schema is fully closed, with required fields, suitable for strict structured output.
-    schema = response_schema()
+    schema = response_schema(blocks,choices)
     trace = {'version': VERSION, 'model': guidance['model'], 'configuration_ref': guidance['source'],
         'playbook_selection': guidance['selection'], 'context_sha256': digest(payload),
         'request_sha256': digest({'messages': messages, 'schema': schema}), 'attempts': [],
         'authority': 'evidence_wordings_only_no_free_text_facts', 'status': 'safe_fallback',
-        'external_actions': 0, 'credential_values_recorded': False}
+        'external_actions': 0, 'credential_values_recorded': False,
+        'reference_contract':reference_contract(blocks,choices)}
     if infer is None:
         from app.integrations.openrouter_client import generate_llm_response
         from app.modules.ai_core.models import AIConfiguration
@@ -350,16 +463,18 @@ async def compose(db, scope, *, inbound, outcome, draft, commercial, lead, metad
         try:
             raw = await asyncio.wait_for(infer(guidance['model'], messages, schema), timeout=min(8, remaining))
             if not isinstance(raw, str) or len(raw.encode()) > 16000:
-                raise ValueError('Composition contract is missing or oversized.')
+                raise CompositionViolation('response_size')
             chosen = validate(Composition.model_validate_json(raw), blocks, choices)
-            trace['attempts'].append({'attempt': attempt + 1, 'status': 'accepted', 'response_sha256': digest(raw)})
+            trace['attempts'].append({'attempt': attempt + 1, 'status': 'accepted', 'response_sha256': digest(raw),
+                                      'selection':selection_snapshot(raw,blocks,choices)})
             trace['status'] = 'accepted'
             break
         except (ValueError, TypeError) as exc:
-            trace['attempts'].append({'attempt': attempt + 1, 'status': 'invalid_contract', 'error_code': type(exc).__name__, 'response_sha256': digest(raw)})
+            diagnostic=validation_diagnostic(exc,raw,blocks,choices)
+            trace['attempts'].append({'attempt': attempt + 1, 'status': 'invalid_contract', 'error_code': type(exc).__name__,
+                                     'response_sha256': digest(raw),**diagnostic})
             if attempt == 0:
-                messages = [*messages, {'role': 'user', 'content': json.dumps({'repair':
-                    'Return the closed composition schema, every evidence_id exactly once and one supplied continuation_id. Do not add text, facts, URLs or actions.'})}]
+                messages = [*messages, {'role': 'user', 'content': json.dumps(repair_feedback(diagnostic,blocks,choices))}]
         except Exception as exc:
             trace['attempts'].append({'attempt': attempt + 1, 'status': 'provider_error',
                 'error_code': type(exc).__name__, **provider_error_details(exc)})

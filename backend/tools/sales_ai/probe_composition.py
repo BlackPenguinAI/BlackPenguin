@@ -54,7 +54,8 @@ def main():
         results = []
         if args.compare_legacy:
             results.append(await probe(key, args.model, Composition.model_json_schema(), 'legacy'))
-        results.append(await probe(key, args.model, response_schema(), 'corrected'))
+        results.append(await probe(key, args.model, response_schema(
+            [{'id':'e0','required':True}], [{'id':'none'}]), 'corrected'))
         return results
     results = asyncio.run(run())
     print(json.dumps({'model': args.model, 'synthetic_only': True, 'database_writes': 0,
