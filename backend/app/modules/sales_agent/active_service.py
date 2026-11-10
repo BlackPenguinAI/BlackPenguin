@@ -718,6 +718,11 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
                     priority=priority,priority_meta=priority_meta)
                 if conversation.is_paused and not (metadata.get('meeting_id') and conversation.pause_reason=='Appointment confirmed'):
                     raise PermissionError('Manual control interrupted composition.')
+                # SessionLocal disables autoflush. Persist this turn's pending
+                # Lead changes inside the existing transaction before the fresh
+                # authorization read overwrites its identity-map attributes.
+                # This is not a commit: interruption still rolls the turn back.
+                db.flush([lead])
                 conversation,lead,project=_current(db,scope,control=bool(metadata.get('meeting_id')))
                 from .turn_configuration import digest
                 from app.modules.projects.models import ProjectPropertyType,ProjectUnit

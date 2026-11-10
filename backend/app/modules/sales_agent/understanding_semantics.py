@@ -18,6 +18,8 @@ def issues_for(value, text, *, appointment_offer=False):
     if budget and not re.search(r'\b(?:if|suppose|friend|said|not)\b',text,re.I) and not any(p.key=='budget' and p.status=='declared' for p in value.preferences):
         add(['preferences'],'budget_declaration_missing','Preserve the explicit own budget and currency as a budget preference, including during payment repair.')
     for i,r in enumerate(requests):
+        if r.topic.value=='financing' and re.fullmatch(r'\s*(?:paying cash|I (?:can|will) pay (?:in )?cash|I have cash(?: available)?)[.!]?\s*',r.evidence,re.I):
+            add(['requests',i],'payment_declaration_as_question','This pure declaration means buying without financing, not requesting project financing information or executing payment.')
         if r.topic.value in {'inventory','catalog','pricing','delivery','financing'} and re.fullmatch(r'\s*My budget(?: is|:)\s*[\d,.]+\s*(?:USD|EUR|GBP|PEN|MXN)(?:,?\s+paying cash)?[.!]?\s*',r.evidence,re.I):
             add(['requests',i],'budget_declaration_as_question','A pure budget/payment declaration is not a project-information question. Capture preferences without inventing a request.')
         if r.topic.value in {'inventory','catalog'} and re.fullmatch(r'\s*Any (?:available )?time in the next (?:seven|7) days works(?: for me)?[;.!]?\s*',r.evidence,re.I):

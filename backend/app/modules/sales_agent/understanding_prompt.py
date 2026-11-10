@@ -62,7 +62,7 @@ def prompt_snapshot(agent):
 
 
 def next_prompt_snapshot(guidance):
-    return {'version':'sales-understanding-prompt/2.16','system':SYSTEM_PROMPT+'''
+    return {'version':'sales-understanding-prompt/2.17','system':SYSTEM_PROMPT+'''
 SA-09: classify directed personal harassment semantically, including paraphrases and typos,
 with an exact current quotation. Criticizing prices, layouts or service and expressing
 frustration is not personal harassment. Quoted, reported, hypothetical and negated abuse
@@ -313,4 +313,15 @@ DECLARATION PRESERVATION:
 - "Any time in the next seven days works" is appointment timing, not inventory.
 - Report all applicable issues together; correcting quotation must also correct
   missing declarations and preserve valid appointment timing.
+"""
+
+TURN_RULES += """
+CURRENT EVIDENCE AND FUNDING:
+- Cash, paying cash, and buying outright describe the buyer's declared funding:
+  purchase without financing. They do not mean physical banknotes, a payment in
+  this chat, verified funds or a question about the project's financing policy.
+- Do not re-emit past budget or date quotes as current evidence. Saved preferences
+  are supplied separately. If a date/time is absent now, its *_evidence field is
+  null; the backend can use saved preferences. Repair enums also constrain nested
+  timing evidence. Do not fill a date field with an unrelated current quotation.
 """

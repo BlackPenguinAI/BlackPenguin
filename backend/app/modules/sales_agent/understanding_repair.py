@@ -10,23 +10,32 @@ def evidence_choices(text, raw=None):
         if isinstance(value,str) and value.strip() and value in text and len(value)<=2000 and value not in choices:
             choices.append(value)
     add(text)
-    for match in re.finditer(r'[^.!?;\n]+[.!?;]?',text):add(match.group().strip())
-    for match in re.finditer(r'[^,;.!?\n]+[,;.!?]?',text):add(match.group().strip())
     try:
         data=json.loads(raw) if isinstance(raw,str) else {}
-        for name in ('requests','preferences'):
-            for item in data.get(name,[]):add(item.get('evidence'))
-    except (ValueError,TypeError,AttributeError):pass
+        from .evidence import quotations
+        for item,key,path in quotations(data):add(item.get(key))
+    except (ValueError,TypeError,AttributeError,KeyError):pass
+    for match in re.finditer(r'[^.!?;\n]+[.!?;]?',text):add(match.group().strip())
+    for match in re.finditer(r'[^,;.!?\n]+[,;.!?]?',text):add(match.group().strip())
     return choices[:16]
 
 
 def constrained_repair_schema(schema, text, raw=None):
     result=copy.deepcopy(schema);choices=evidence_choices(text,raw)
-    # Shared definitions keep the extra schema small. Other fields retain their
-    # normal schema and all fields still pass the unchanged exact-source parser.
-    for name in ('Request','Preference'):
-        evidence=result.get('$defs',{}).get(name,{}).get('properties',{}).get('evidence')
-        if evidence is not None and choices:evidence['enum']=choices
+    def constrain(node):
+        if isinstance(node,dict):
+            for key,field in node.get('properties',{}).items():
+                if key=='evidence' or key.endswith('_evidence'):
+                    branches=field.get('anyOf',[field])
+                    for branch in branches:
+                        if branch.get('type')!='string':continue
+                        maximum=branch.get('maxLength',2000)
+                        allowed=[quote for quote in choices if len(quote)<=maximum]
+                        if allowed:branch['enum']=allowed
+            for child in node.values():constrain(child)
+        elif isinstance(node,list):
+            for child in node:constrain(child)
+    constrain(result)
     return result
 
 
@@ -71,7 +80,7 @@ def omit_declaration_questions(value, issues):
     cannot match the full-declaration diagnostics used here.
     """
     from .understanding_contract import Understanding
-    types={'budget_declaration_as_question','visit_timing_as_inventory'}
+    types={'budget_declaration_as_question','visit_timing_as_inventory','payment_declaration_as_question'}
     indexes={issue['location'][1] for issue in issues if issue['type'] in types and len(issue.get('location',[]))==2 and issue['location'][0]=='requests'}
     candidates=[r for i,r in enumerate(value.requests) if i in indexes and r.polarity=='request']
     ids={r.id for r in candidates}

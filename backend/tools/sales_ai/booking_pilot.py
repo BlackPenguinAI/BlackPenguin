@@ -122,8 +122,12 @@ async def evaluate_case(db, manifest, scenario, budget, max_turns):
             attempts=next(((event.payload_json.get('metadata') or {}).get('interpretation_attempts',[]) for event in reversed(events)
                 if (event.payload_json.get('metadata') or {}).get('inbound_message_id')==(run.input_snapshot or {}).get('message_id')),[])
             from app.modules.sales_agent.lead_profile import resolve as profile_for
-            db.refresh(lead)
-            profile=profile_for(lead)
+            # Read through a new ORM identity map after the workflow commits.
+            # A captured-in-memory receipt is not evidence of persistence.
+            from sqlalchemy.orm import Session
+            db.commit()
+            with Session(bind=db.get_bind(),autoflush=False) as reader:
+                profile=profile_for(reader.get(Lead,lead.id))
             rows.append({'profile':profile,'interpretation_attempts':attempts,'turn':index+1,'action':action,'lead_message':message,'reply':last,
                 'understanding':(run.input_snapshot or {}).get('understanding'),'output':run.output_snapshot,
                 'input_trace':run.input_snapshot,'error_code':run.error_code,
@@ -131,7 +135,7 @@ async def evaluate_case(db, manifest, scenario, budget, max_turns):
                     check('budget_preserved_in_interpretation',index!=0 or any(p.get('key')=='budget' and p.get('status')=='declared' for p in ((run.input_snapshot or {}).get('understanding') or {}).get('preferences',[]))),
                     check('cash_preserved_in_interpretation',index!=0 or any(p.get('key')=='financing' and p.get('status')=='declared' and p.get('value','').casefold()=='cash' for p in ((run.input_snapshot or {}).get('understanding') or {}).get('preferences',[]))),
                     check('budget_remains_in_saved_profile',(profile.get('current',{}).get('budget') or {}).get('status')=='declared' and bool(re.search(r'(?<!\d)900000(?:\.0+)?(?!\d)',str((profile.get('current',{}).get('budget') or {}).get('value','')).replace(',',''))) and 'USD' in str((profile.get('current',{}).get('budget') or {}).get('value','')).upper()),
-                    check('no_invented_question_from_declaration',not any(q['type'] in {'budget_declaration_as_question','declaration_as_question','visit_timing_as_inventory'} for q in issues_for(Understanding.model_validate((run.input_snapshot or {}).get('understanding')),message)) if (run.input_snapshot or {}).get('understanding') else False),check('interpretation_accepted',not run.error_code),
+                    check('no_invented_question_from_declaration',not any(q['type'] in {'budget_declaration_as_question','declaration_as_question','visit_timing_as_inventory','payment_declaration_as_question'} for q in issues_for(Understanding.model_validate((run.input_snapshot or {}).get('understanding')),message)) if (run.input_snapshot or {}).get('understanding') else False),check('interpretation_accepted',not run.error_code),
                     check('no_internal_narration',not internal_process_narration(last)),
                     check('no_booking_before_confirmation',not meetings or confirmed),
                     check('selection_advances_to_confirmation',action not in {'select','reject_first'} or bool(re.search(r'Please confirm your visit',last,re.I))),
@@ -168,7 +172,7 @@ async def evaluate_case(db, manifest, scenario, budget, max_turns):
         checks.append({'check':'appropriate_future_availability_wording','status':'BLOCKED','detail':'Human review required; no future notification automation is created.'})
     if scenario=='alternative_slot':checks.append(check('alternative_chosen',any(r['action']=='reject_first' for r in rows)))
     return {'case':scenario,'project_id':project['id'],'clock_utc':clock.isoformat(),'team':roster,
-        'eligible_sales_ids':sorted(eligible),'stop_reason':stop,'turns':rows,'checks':checks,
+        'session_autoflush':db.autoflush,'profile_read_mode':'new_session_after_commit','eligible_sales_ids':sorted(eligible),'stop_reason':stop,'turns':rows,'checks':checks,
         'meetings':[{'id':m.id,'project_id':m.project_id,'lead_id':m.lead_id,'sales_user_id':m.assigned_sales_user_id,
             'starts_at_utc':m.meeting_time.isoformat(),'duration_minutes':m.duration_minutes,
             'address':m.visit_address,'calendar_sync_status':m.calendar_sync_status} for m in meetings]}

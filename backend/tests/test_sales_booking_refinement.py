@@ -39,7 +39,7 @@ def test_semantic_feedback_distinguishes_cash_and_visit_timing():
     u=understanding(text,'appointment','financing','delivery')
     data=u.model_dump();data['requests'][1]['evidence']='paying cash';data['requests'][2]['evidence']='next seven days'
     issues=issues_for(Understanding.model_validate(data),text)
-    assert {i['type'] for i in issues}=={'payment_declaration_missing','declaration_as_question','visit_timing_as_delivery'}
+    assert {i['type'] for i in issues}=={'payment_declaration_missing','declaration_as_question','payment_declaration_as_question','visit_timing_as_delivery'}
     data['requests']=data['requests'][:1];data['all_of']=[data['requests'][0]['id']]
     data['preferences']=[{'key':'financing','value':'cash','evidence':'paying cash','status':'declared'}]
     assert issues_for(Understanding.model_validate(data),text)==[]

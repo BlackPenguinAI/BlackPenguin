@@ -14,11 +14,11 @@ from app.modules.sales_crm.models import Lead,Meeting
 from app.modules.sales_agent.models import SalesConversation
 from app.modules.sales_agent.execution import sandbox
 
-@pytest.fixture
-def lab(tmp_path,monkeypatch):
+@pytest.fixture(params=[False,True],ids=['production_autoflush_false','autoflush_true'])
+def lab(tmp_path,monkeypatch,request):
     monkeypatch.setattr(settings,'PROJECT_UPLOAD_ROOT',str(tmp_path/'uploads'))
     engine=create_engine('sqlite://');Base.metadata.create_all(engine)
-    with sessionmaker(bind=engine)() as db:
+    with sessionmaker(bind=engine,autoflush=request.param)() as db:
         yield db,seed(db,tmp_path/'materials')
     engine.dispose()
 
@@ -141,7 +141,7 @@ def test_worker_exports_all_six_cases_and_redacts_key(tmp_path,monkeypatch):
     from test_sales_synthetic_lab import mock_models
     engine=create_engine('sqlite:///'+str(tmp_path/'evaluation.db'))
     monkeypatch.setattr(postgres,'engine',engine)
-    monkeypatch.setattr(postgres,'SessionLocal',sessionmaker(bind=engine))
+    monkeypatch.setattr(postgres,'SessionLocal',sessionmaker(bind=engine,autoflush=False))
     monkeypatch.setattr(settings,'PROJECT_UPLOAD_ROOT',str(tmp_path/'uploads'))
     secret='NEVER-EXPORT-BOOKING-KEY'
     options={'prepare_only':False,'max_calls':120,'max_turns':4,
