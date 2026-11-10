@@ -33,7 +33,7 @@ def test_current_workflow_ignores_old_flags_lists_and_modes(agent, monkeypatch, 
     text = 'Show me property types'
     _, run = agent.turn(text, understanding(text, 'catalog'))
     assert run.status == 'completed' and run.graph_version == ENGINE
-    assert run.prompt_snapshot['version'] == 'sales-understanding-prompt/2.12'
+    assert run.prompt_snapshot['version'] == 'sales-understanding-prompt/2.13'
     assert 'Current approved home' in agent.reply()
     agent.legacy.assert_not_called()
 
@@ -146,17 +146,25 @@ def test_free_text_is_not_misread_as_permission_to_waive_restrictions(agent):
     assert policy['held_topics'] and policy['unresolved']
 
 
-def test_repeated_failure_is_reported_once_and_does_not_loop_replies(agent):
+def test_repeated_failure_alert_is_deduplicated_without_silencing_lead(agent):
     from app.modules.governance.models import NotificationOutbox
     text='Show me property types'
     bad=understanding(text,'catalog').model_dump()
     bad['requests'][0]['evidence']='A paraphrase that is not the current message'
-    for _ in range(4):agent.turn(text,json.dumps(bad))
-    assert agent.send.await_count==2
+    from tools.sales_ai.evaluation_checks import internal_process_narration
+    for index in range(4):
+        inbound,run=agent.turn(text,json.dumps(bad))
+        assert agent.send.await_count==index+1
+        assert not run.output_snapshot['suppress_duplicate_error_reply']
+        assert not internal_process_narration(agent.reply())
+    # Retrying the same inbound remains idempotent, unlike a fresh lead message.
+    agent.retry(inbound)
+    assert agent.send.await_count==4
     assert agent.db.query(NotificationOutbox).filter_by(event_type='sales_processing_issue').count()==1
     assert not agent.conversation.is_paused
     agent.turn(text,understanding(text,'catalog'))
-    assert agent.send.await_count==3
+    assert agent.send.await_count==5
+    assert agent.db.query(NotificationOutbox).filter_by(event_type='sales_processing_issue').count()==1
 
 
 def test_stop_works_before_any_model_has_been_configured(agent):
