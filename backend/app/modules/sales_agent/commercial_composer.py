@@ -8,6 +8,7 @@ import asyncio
 from dataclasses import dataclass
 import json
 import re
+import httpx
 from time import monotonic
 from typing import Literal
 from pydantic import Field
@@ -51,6 +52,61 @@ class Composition(StrictModel):
     blocks: list[BlockChoice] = Field(max_length=120)
     continuation_id: str = Field(min_length=1, max_length=64)
     paragraphs: list[list[str]] = Field(default_factory=list,max_length=120)
+
+
+def response_schema():
+    """Close the provider schema while preserving local model defaults.
+
+    Strict structured output requires every property, including paragraphs,
+    in required. Local callers may still omit paragraphs and get an empty list.
+    """
+    schema = Composition.model_json_schema()
+    def strict(node):
+        if isinstance(node, dict):
+            node.pop('default', None)
+            if node.get('type') == 'object' and 'properties' in node:
+                node['required'] = list(node['properties'])
+                node['additionalProperties'] = False
+            for child in node.values():
+                strict(child)
+        elif isinstance(node, list):
+            for child in node:
+                strict(child)
+    strict(schema)
+    return schema
+
+
+def provider_error_details(exc):
+    """Record HTTP status and fixed categories, never raw provider text.
+
+    Provider messages can echo prompts or credentials. Inspect bounded JSON
+    only for classification; do not persist its body, message or headers.
+    """
+    if not isinstance(exc, httpx.HTTPStatusError):
+        return {}
+    status = exc.response.status_code
+    category = {401: 'authentication', 402: 'insufficient_credit',
+                403: 'permission', 408: 'timeout', 429: 'rate_limit'}.get(status)
+    if category is None:
+        category = 'upstream_failure' if status >= 500 else 'request_rejected'
+    details = {'http_status': status, 'provider_error_category': category}
+    if status in (400, 422) and len(exc.response.content) <= 32768:
+        try:
+            payload = exc.response.json()
+        except ValueError:
+            payload = {}
+        error = payload.get('error') if isinstance(payload, dict) else None
+        if isinstance(error, dict):
+            message = error.get('message')
+            metadata = error.get('metadata')
+            raw = metadata.get('raw') if isinstance(metadata, dict) else None
+            diagnostic = ' '.join(v for v in (message, raw) if isinstance(v, str)).lower()
+            if 'schema' in diagnostic and any(word in diagnostic for word in
+                    ('invalid', 'required', 'unsupported', 'additionalproperties')):
+                details['provider_error_category'] = 'structured_output_schema'
+                details['schema_fields_mentioned'] = [name for name in
+                    Composition.model_fields if name.lower() in diagnostic]
+    return details
 
 
 @dataclass(frozen=True)
@@ -259,7 +315,7 @@ async def compose(db, scope, *, inbound, outcome, draft, commercial, lead, metad
     model_payload = redact(payload)
     messages = [{'role': 'system', 'content': SYSTEM}, {'role': 'user', 'content': json.dumps(model_payload, ensure_ascii=False, default=str)}]
     # Schema is fully closed, with required fields, suitable for strict structured output.
-    schema = Composition.model_json_schema()
+    schema = response_schema()
     trace = {'version': VERSION, 'model': guidance['model'], 'configuration_ref': guidance['source'],
         'playbook_selection': guidance['selection'], 'context_sha256': digest(payload),
         'request_sha256': digest({'messages': messages, 'schema': schema}), 'attempts': [],
@@ -305,7 +361,8 @@ async def compose(db, scope, *, inbound, outcome, draft, commercial, lead, metad
                 messages = [*messages, {'role': 'user', 'content': json.dumps({'repair':
                     'Return the closed composition schema, every evidence_id exactly once and one supplied continuation_id. Do not add text, facts, URLs or actions.'})}]
         except Exception as exc:
-            trace['attempts'].append({'attempt': attempt + 1, 'status': 'provider_error', 'error_code': type(exc).__name__})
+            trace['attempts'].append({'attempt': attempt + 1, 'status': 'provider_error',
+                'error_code': type(exc).__name__, **provider_error_details(exc)})
             break
     trace['elapsed_ms'] = round((monotonic() - started) * 1000)
     text, closing_metadata = render(chosen, blocks, choices, channel)
