@@ -59,7 +59,7 @@ def guidance(*,text,u,commercial,lead,selected=None,holds=()):
         result.update(decision='in_person_commercial_transaction',closing='Would you like to review visit options, or is there another question I can help with?')
     down=down_payment_only(own)
     if down and re.search(r'\d',own) and re.search(r'\b(?:I have|I can put|my|available)\b',own,re.I):
-        add('An amount for a down payment is different from the total purchase budget. The sales team can review the detailed down payment and financing conditions with you during a visit.')
+        add('An amount for a down payment is different from the total purchase budget.')
         result.update(decision='clarify_total_budget',closing='What total purchase budget and currency are you considering?')
     payments=_payment_information(commercial)
     finance_question='financing' in topics
@@ -102,7 +102,9 @@ def guidance(*,text,u,commercial,lead,selected=None,holds=()):
                 add('I do not have a listed option within your stated total budget in this project.')
                 financing=any(re.search(r'\b(?:financ\w*|mortgage|loan)\b',p,re.I) and not re.search(r'\b(?:no|not|without|unavailable)\b',p,re.I) for p in payments)
                 if financing and 'financing' not in holds and not outright:
-                    add('The published payment information is: '+'; '.join(payments)+'. Financing may be an option to discuss, but it does not guarantee approval or change the published property price. Detailed terms can be reviewed during a visit.')
+                    add('The published payment information is: '+'; '.join(payments)+'.')
+                    add('Financing may be an option to discuss, but it does not guarantee approval or change the published property price.')
+                    add('Detailed financing and down payment conditions can be reviewed with the sales team during an in-person visit. Financing eligibility and approval are not determined in this chat.')
                     result.update(decision='discuss_published_financing',closing='Would you like to review visit options to discuss those terms, or do you have another question?')
                 else:
                     result.update(decision='no_budget_match',closing='Is there another question I can help with? If not, thank you for your interest and have a good day. You are welcome to message again.')

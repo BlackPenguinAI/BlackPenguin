@@ -16,13 +16,17 @@ def test_commercial_scripts_use_shared_engine_and_scoped_facts(lab,scenario):
     db,manifest=lab;prepare(db,manifest)
     db.add(AIConfiguration(id='commercial-config',company_id=None,openrouter_api_key='OFFLINE',agent_ventas={'model':'test/offline'}))
     db.add(PromptVersion(company_id=None,agent_key='sales',version_number=1,is_published=True,configuration={'model':'test/offline'}));db.commit()
+    seen={}
     def provider(request):
         payload=json.loads(request.content);name=payload['response_format']['json_schema']['name']
         ctx=json.loads(payload['messages'][1]['content']);text=ctx['current_message']
         if name=='sales_understanding':
+            seen[text]=seen.get(text,0)+1
             topic='other' if text.startswith('No other') else 'financing' if re.search('financing|down payment|reserve',text,re.I) else 'pricing'
             data=understanding(text,topic).model_dump()
-            if text.startswith('No other'):data['courtesy']={'kind':'farewell','evidence':text}
+            if text.startswith('No other'):
+                data['courtesy']={'kind':'farewell','evidence':text}
+                data['empathy']={'kind':'frustrated','evidence':text}
             else:
                 match=re.search(r'(?:My budget is|My total purchase budget is) ([\d,]+) (USD|EUR)',text)
                 if match:data['preferences'].append(dict(key='budget',value=match[1]+' '+match[2],evidence=match[0],status='declared'))
@@ -31,6 +35,15 @@ def test_commercial_scripts_use_shared_engine_and_scoped_facts(lab,scenario):
                     data['preferences'].append(dict(key='financing',value='cash',evidence=quote,status='declared'))
                 elif 'I need financing' in text:data['preferences'].append(dict(key='financing',value='financing',evidence='I need financing',status='declared'))
                 if 'for a down payment' in text:data['preferences'].append(dict(key='budget',value='50000 USD',evidence=text,status='declared'))
+            if text.startswith('My total purchase budget'):
+                data['requests']=[dict(id='r0',topic='financing',polarity='request',evidence=text)]
+                data['all_of']=['r0']
+            if scenario=='cash_available' and seen[text]>1 and not text.startswith('No other'):
+                data['requests'][0]['topic']='inventory'
+            if scenario=='cash_available' and seen[text]==1 and not text.startswith('No other'):
+                data['preferences']=[p for p in data['preferences'] if p['key']!='financing']
+                data['requests'][0]['topic']='financing'
+                data['requests'][0]['evidence']='I have cash available and do not need financing.'
             content=Understanding.model_validate(data).model_dump_json()
         elif name=='sales_commercial_composition':
             blocks=[b['id'] for b in ctx['evidence_blocks'] if b['required']]

@@ -163,7 +163,7 @@ async def preview(db, scope: Scope, *, inbound_message_id: str, expected_revisio
                 if omitted:
                     normalizations.extend(omitted)
                     issues=issues_for(interpreted,inbound.content,appointment_offer=bool(offer and not exact_public_selection(inbound.content,offer)))
-                optional=[issue for issue in issues if issue['type']=='neutral_refusal_as_frustration']
+                optional=[issue for issue in issues if issue['type'] in {'neutral_refusal_as_frustration','neutral_courtesy_as_emotion'}]
                 if optional:
                     interpreted=interpreted.model_copy(update={'empathy':None})
                     normalizations.extend({'field':'empathy','action':'omit_unsupported_optional_affect','reason':issue['type']} for issue in optional)

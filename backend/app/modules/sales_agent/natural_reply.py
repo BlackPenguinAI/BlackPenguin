@@ -90,6 +90,8 @@ def naturalize(outcome,draft,*,channel):
 
 def empathy_text(u,state,commercial):
     if not u.empathy:return ''
+    from .financial_declarations import neutral_courtesy
+    if neutral_courtesy(u.empathy.evidence):return ''
     opening={'feeling_unwell':"I'm sorry you're not feeling well. We can take this at your pace.",
              'personal_setback':"I'm sorry you're having a difficult time. There's no rush.",
              'frustrated':"I understand this can feel frustrating. Let's keep things simple."}[u.empathy.kind]

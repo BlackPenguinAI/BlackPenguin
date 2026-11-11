@@ -15,6 +15,27 @@ SCENARIOS={
 CASES=tuple(SCENARIOS)
 
 
+def quality_checks(message,reply,frame):
+    """Deterministic checks of observed interpretation and public output."""
+    import re
+    from collections import Counter
+    from .evaluation_checks import check
+    from app.modules.sales_agent.financial_declarations import neutral_courtesy,pure_budget_quote,pure_cash_quote,cash_quotes,financing_question
+    frame=frame or {}
+    neutral=neutral_courtesy(message)
+    sentences=[re.sub(r'\s+',' ',s).strip().casefold() for s in re.split(r'(?<=[.!?])\s+|\n+',reply)]
+    repeated=[s for s,n in Counter(sentences).items() if n>1 and len(s.split())>=6]
+    invented=any(r.get('topic') in {'financing','pricing','catalog','inventory','delivery'} and
+        (pure_budget_quote(r.get('evidence','')) or (r.get('topic')=='financing' and pure_cash_quote(r.get('evidence',''))))
+        for r in frame.get('requests',[]))
+    return [check('no_emotion_invented_on_neutral_closure',not neutral or
+            (not frame.get('empathy') and not re.search(r'frustrat|you (?:feel|are feeling) (?:unwell|ill|upset)',reply,re.I))),
+        check('no_declaration_converted_to_question',not invented),
+        check('no_repeated_financial_sentences',not repeated),
+        check('no_unrequested_financing_pitch_after_cash',not cash_quotes(message) or financing_question(message) or not re.search(r'published payment information|financing eligibility|financing may be an option',reply,re.I)),
+        check('payment_information_stated_once',reply.casefold().count('the published payment information is:')<=1)]
+
+
 def prepare(db,manifest):
     """Change only the private synthetic approval, never a production project."""
     from app.modules.projects.models import Project
@@ -62,13 +83,17 @@ async def evaluate_case(db,manifest,scenario,budget,max_turns):
             check('no_unrequested_meeting',db.query(Meeting).filter_by(lead_id=lead.id).count()==0),
             check('no_payment_or_property_reservation_receipt',not bool(re.search(r'your (?:property|unit) (?:is|has been) (?:reserved|held)|payment (?:received|accepted)',reply,re.I))),
             check('no_provider_outbox',db.query(OutboundMessage).count()==0)]
+        checks.extend(quality_checks(message,reply,(run.input_snapshot or {}).get('understanding')))
         if index==0:
             decision=(metadata.get('commercial_policy') or {}).get('decision')
             if expected!='none':checks.append(check('expected_commercial_outcome',decision==expected))
             if scenario=='down_payment_only':checks.append(check('initial_is_not_total_budget',budget_cap(profile) is None))
             elif scenario!='property_reservation':checks.append(check('explicit_total_budget_persisted',budget_cap(profile) is not None))
             if scenario=='affordable_alternative':checks.append(check('only_affordable_option_suggested',(metadata.get('commercial_policy') or {}).get('alternative_ids')==[project['properties'][1]['id']] and '210,000.00 USD' in reply))
-            if scenario in {'cash_available','outright_purchase'}:checks.append(check('cash_is_without_financing',bool(re.search(r'outright purchase, without financing',reply,re.I))))
+            if scenario in {'cash_available','outright_purchase'}:
+                checks.append(check('cash_is_without_financing',bool(re.search(r'outright purchase, without financing',reply,re.I))))
+                row=profile['current']['financing']
+                checks.append(check('cash_declaration_persisted',row['status']=='declared' and bool(re.search(r'cash|outright',str(row.get('value') or ''),re.I))))
             if scenario=='lower_budget_financing':checks.append(check('published_financing_not_approval','Bank financing' in reply and 'does not guarantee approval' in reply))
             if scenario=='no_budget_match':checks.append(check('kind_close_without_financing_promise','good day' in reply and 'may be an option' not in reply))
             if scenario=='property_reservation':checks.append(check('property_hold_not_visit',not metadata.get('appointment_offer') and 'cannot take a payment or hold a property' in reply))

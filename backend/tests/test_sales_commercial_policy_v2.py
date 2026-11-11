@@ -52,7 +52,7 @@ def test_lower_budget_can_discuss_published_financing_without_guarantee(payment)
     result=advise(lead=buyer(100000),commercial=context([payment]))
     assert result['decision']=='discuss_published_financing'
     text=' '.join(result['blocks'])
-    assert payment in text and 'does not guarantee approval' in text and 'during a visit' in text
+    assert payment in text and 'does not guarantee approval' in text and 'during an in-person visit' in text
 
 
 @pytest.mark.parametrize('payment',[[],['Cash only'],['No financing available']])

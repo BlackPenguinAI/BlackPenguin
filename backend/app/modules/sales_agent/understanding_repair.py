@@ -46,11 +46,12 @@ def verified_preferences(value, text):
     carried forward. Ambiguous/negated/reported declarations are left to the model.
     """
     from decimal import Decimal,InvalidOperation
-    if re.search(r'\b(?:if|suppose|friend|said|says|told|forget|withdraw|not|don.t|cannot)\b',text,re.I):return []
-    budgets=list(re.finditer(r'\bmy budget(?: is|:)\s*([\d,]+(?:\.\d+)?)\s*(USD|EUR|GBP|PEN|MXN)\b',text,re.I))
+    from .financial_declarations import BUDGET,budget_quotes,cash_quotes,own_assertion,ambiguous_or_withdrawn,no_loan_removed
+    if ambiguous_or_withdrawn(text) or re.search(r"\b(?:not|don.t)\b",no_loan_removed(text),re.I):return []
+    budgets=[m for m in re.finditer(BUDGET,text,re.I) if m.group(0) in budget_quotes(text)]
     result=[]
     for pref in value.preferences:
-        if pref.status!='declared' or pref.evidence not in text:continue
+        if pref.status!='declared' or pref.evidence not in text or not own_assertion(pref.evidence):continue
         if pref.key=='budget' and len(budgets)==1:
             matched=re.fullmatch(r'\s*([\d,]+(?:\.\d+)?)\s*(USD|EUR|GBP|PEN|MXN)\s*',pref.value,re.I)
             if not matched or budgets[0].group(0) not in pref.evidence:continue
@@ -58,7 +59,7 @@ def verified_preferences(value, text):
             except InvalidOperation:equal=False
             if equal and matched[2].upper()==budgets[0][2].upper():result.append(pref)
         elif pref.key=='financing' and pref.value.casefold()=='cash':
-            if re.search(r'\bI (?:can|will) pay (?:in )?cash\b',pref.evidence,re.I) or (budgets and re.search(r'\bpaying cash\b',pref.evidence,re.I)):
+            if cash_quotes(pref.evidence):
                 result.append(pref)
     return result
 
