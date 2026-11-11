@@ -281,6 +281,14 @@
           "detail": ""
         }
       ],
+      "interpretation_attempts": [
+        {
+          "attempt": 1,
+          "outcome": "accepted",
+          "error_code": null,
+          "validation_issues": []
+        }
+      ],
       "composition": {
         "status": "accepted",
         "attempts": [
@@ -443,6 +451,14 @@
           "check": "material_request_delivered_this_turn",
           "status": "PASS",
           "detail": ""
+        }
+      ],
+      "interpretation_attempts": [
+        {
+          "attempt": 1,
+          "outcome": "accepted",
+          "error_code": null,
+          "validation_issues": []
         }
       ],
       "composition": {
@@ -626,6 +642,26 @@
           "detail": ""
         }
       ],
+      "interpretation_attempts": [
+        {
+          "attempt": 1,
+          "outcome": "invalid_model_contract",
+          "error_code": "understanding_validation_failed",
+          "validation_issues": [
+            {
+              "location": [],
+              "type": "contract_value_error",
+              "message": "Inline reference evidence must quote current_message."
+            }
+          ]
+        },
+        {
+          "attempt": 2,
+          "outcome": "accepted",
+          "error_code": null,
+          "validation_issues": []
+        }
+      ],
       "composition": {
         "status": "accepted",
         "attempts": [
@@ -768,6 +804,7 @@
           "detail": ""
         }
       ],
+      "interpretation_attempts": [],
       "composition": {
         "status": null,
         "attempts": []

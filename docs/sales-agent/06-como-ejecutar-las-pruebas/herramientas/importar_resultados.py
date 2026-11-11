@@ -48,7 +48,7 @@ def export(source,root):
                 metadata=turn.get('output',{}).get('metadata',{});composition=metadata.get('composition',{})
                 turns.append({'turn':turn.get('turn'),'action':turn.get('action'),'lead':turn.get('lead_message',turn.get('message',turn.get('inbound'))),'agent':turn.get('reply'),
                     'understanding':turn.get('input_trace',{}).get('understanding',turn.get('understanding')),'error_code':turn.get('error_code'),
-                    'checks':turn.get('checks',[]),'composition':{'status':composition.get('status'),'attempts':[{k:a[k] for k in ('status','error_code','rule_code','validation_issues') if k in a} for a in composition.get('attempts',[])]}})
+                    'checks':turn.get('checks',[]),'interpretation_attempts':[{k:a[k] for k in ('attempt','outcome','error_code','validation_issues') if k in a} for a in turn.get('interpretation_attempts',[])],'composition':{'status':composition.get('status'),'attempts':[{k:a[k] for k in ('status','error_code','rule_code','validation_issues') if k in a} for a in composition.get('attempts',[])]}})
             document={'synthetic_only':True,'execution_origin':'server_submitted_synthetic_run','source_archive':path.name,'source_sha256':hashlib.sha256(path.read_bytes()).hexdigest(),'commit':report.get('commit'),'sales_model':report.get('sales_model'),
                 'configuration_version':report.get('configuration_version'),'configuration_sha256':report.get('configuration_sha256'),'clock_utc':case.get('clock_utc'),'team':case.get('team',[]),'case':case['case'],'description':label,'persona':case.get('persona'),'original_case':case.get('original_case'),'project_name':case.get('project_name'),'lead_controller':case.get('lead_controller'),'lead_model':report.get('lead_model'),'company_id':report.get('company_id'),'project_id':case.get('project_id'),'property_type_id':case.get('property_type_id'),
                 'automatic_result':status,'human_review':review,'stop_reason':case.get('stop_reason'),
@@ -67,6 +67,8 @@ def export(source,root):
         (destination/'README.md').write_text(f'# {key}\n\n[Volver a resultados](../README.md) · [Ver resultado JSON](resultado.json)\n\nCommit `{entry["commit"]}`. Estado original: **{entry["status"]}**. Casos: {entry["approved_cases"]}/{entry["cases"]} aprobados automáticamente. Visitas: {entry["actual_bookings"]}/{entry["expected_bookings"]}.\n\nEl costo registrado puede estar incompleto; consultar `cost_complete`. Estos resultados corresponden a simulaciones en el servidor, no a entregas reales por WhatsApp/SMS.\n')
     def chronology(row):
         name=row['run']
+        # Battery 2 was executed after Repair 7, not before the repair series.
+        if name=='sales-compact-battery-2':return (5,7.5)
         stages=['synthetic-lab','booking-point','commercial-point','closing-point','compact-battery','compact-repair']
         return (next(i for i,label in enumerate(stages) if label in name),int(name.rsplit('-',1)[-1]))
     runs.sort(key=chronology)

@@ -1,0 +1,39 @@
+{
+  "source_commit": "e868be0b82178b558ebf0c25434be1de7ccdab0e",
+  "original_status_preserved": "FAIL",
+  "approved_cases": 13,
+  "cases": 16,
+  "actual_bookings": 7,
+  "expected_bookings": 8,
+  "checks": {
+    "PASS": 1602,
+    "FAIL": 6,
+    "BLOCKED": 0
+  },
+  "provider_usage": {
+    "prompt_tokens": 1575886,
+    "completion_tokens": 29601,
+    "cost_usd": 0.2150139,
+    "responses_with_cost": 139
+  },
+  "cost_reporting_complete": false,
+  "repair_turns": 26,
+  "turns": 71,
+  "confirmed_failures": [
+    {
+      "case": "move_up_A",
+      "issue": "Historical visit_readiness declaration invalidates current slot selection; bounded repair times out. Eventually books after repeated request."
+    },
+    {
+      "case": "downsizing_B",
+      "issue": "Historical optional preference invalidates first material frame; repair confidence 0 leads to generic clarification rather than explaining missing photos."
+    },
+    {
+      "case": "portfolio_A",
+      "issue": "Date phrase copied as local clock while time_relation any; repeated time clarification prevents booking."
+    }
+  ],
+  "repair8_implemented_locally": true,
+  "repair8_published_model_quality": "PENDING",
+  "evaluator_failures_removed": false
+}

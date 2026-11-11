@@ -1,0 +1,13 @@
+{
+  "validation_kind": "local_mocked_regression_not_live_quality",
+  "regression_passed": 3059,
+  "skipped": 7,
+  "modules_covered_once": 130,
+  "acceptance_passed": 63,
+  "acceptance_failed": 0,
+  "published_model_quality": "NOT_RUN",
+  "paid_local_model_calls": 0,
+  "native_packet_source": "sales-compact-battery-2.zip",
+  "readable_conversations": 141,
+  "original_lead_and_agent_quotations_verified": true
+}

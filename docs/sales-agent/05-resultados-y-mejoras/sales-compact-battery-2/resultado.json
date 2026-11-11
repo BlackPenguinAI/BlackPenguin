@@ -1,0 +1,163 @@
+{
+  "run": "sales-compact-battery-2",
+  "execution_origin": "server_submitted_synthetic_run",
+  "archive": "sales-compact-battery-2.zip",
+  "sha256": "f89e67a0c21c031404c80ea58792571e9a2e964dfe57550a86d6e7bc2d809d2b",
+  "commit": "e868be0b82178b558ebf0c25434be1de7ccdab0e",
+  "suite": "compact",
+  "cohort": "a3266781ee21",
+  "selected_cases": [
+    "downsizing_A",
+    "downsizing_B",
+    "first_time_A",
+    "first_time_B",
+    "move_up_A",
+    "move_up_B",
+    "portfolio_A",
+    "portfolio_B",
+    "relocation_A",
+    "relocation_B",
+    "rental_A",
+    "rental_B",
+    "resale_A",
+    "resale_B",
+    "unknown_A",
+    "unknown_B"
+  ],
+  "model": "openai/gpt-4o-mini",
+  "lead_model": null,
+  "lead_controller_metrics": null,
+  "configuration_version": 8,
+  "configuration_sha256": "51ff65376dad421328dab993a4fc71939489386f1ed173514cf13a244ac79f1c",
+  "status": "FAIL",
+  "cases": 16,
+  "approved_cases": 13,
+  "turns": 71,
+  "expected_bookings": 8,
+  "actual_bookings": 7,
+  "provider_calls": 140,
+  "prompt_tokens": 1575886,
+  "completion_tokens": 29601,
+  "responses_with_cost": 139,
+  "cost_usd_recorded": 0.2150139,
+  "cost_complete": false,
+  "checks_summary": {
+    "PASS": 1602,
+    "FAIL": 6,
+    "BLOCKED": 0
+  },
+  "case_results": [
+    {
+      "case": "first_time_A",
+      "status": "aprobado",
+      "meetings": 1,
+      "turns": 5,
+      "failures": 0
+    },
+    {
+      "case": "first_time_B",
+      "status": "aprobado",
+      "meetings": 0,
+      "turns": 4,
+      "failures": 0
+    },
+    {
+      "case": "move_up_A",
+      "status": "fallido",
+      "meetings": 1,
+      "turns": 7,
+      "failures": 2
+    },
+    {
+      "case": "move_up_B",
+      "status": "aprobado",
+      "meetings": 0,
+      "turns": 4,
+      "failures": 0
+    },
+    {
+      "case": "relocation_A",
+      "status": "aprobado",
+      "meetings": 1,
+      "turns": 4,
+      "failures": 0
+    },
+    {
+      "case": "relocation_B",
+      "status": "aprobado",
+      "meetings": 0,
+      "turns": 4,
+      "failures": 0
+    },
+    {
+      "case": "downsizing_A",
+      "status": "aprobado",
+      "meetings": 1,
+      "turns": 5,
+      "failures": 0
+    },
+    {
+      "case": "downsizing_B",
+      "status": "fallido",
+      "meetings": 0,
+      "turns": 5,
+      "failures": 1
+    },
+    {
+      "case": "rental_A",
+      "status": "aprobado",
+      "meetings": 1,
+      "turns": 4,
+      "failures": 0
+    },
+    {
+      "case": "rental_B",
+      "status": "aprobado",
+      "meetings": 0,
+      "turns": 5,
+      "failures": 0
+    },
+    {
+      "case": "resale_A",
+      "status": "aprobado",
+      "meetings": 1,
+      "turns": 4,
+      "failures": 0
+    },
+    {
+      "case": "resale_B",
+      "status": "aprobado",
+      "meetings": 0,
+      "turns": 4,
+      "failures": 0
+    },
+    {
+      "case": "portfolio_A",
+      "status": "fallido",
+      "meetings": 0,
+      "turns": 4,
+      "failures": 3
+    },
+    {
+      "case": "portfolio_B",
+      "status": "aprobado",
+      "meetings": 0,
+      "turns": 5,
+      "failures": 0
+    },
+    {
+      "case": "unknown_A",
+      "status": "aprobado",
+      "meetings": 1,
+      "turns": 4,
+      "failures": 0
+    },
+    {
+      "case": "unknown_B",
+      "status": "aprobado",
+      "meetings": 0,
+      "turns": 3,
+      "failures": 0
+    }
+  ]
+}

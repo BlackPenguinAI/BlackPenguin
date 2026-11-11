@@ -1,0 +1,858 @@
+{
+  "synthetic_only": true,
+  "execution_origin": "server_submitted_synthetic_run",
+  "source_archive": "sales-compact-battery-2.zip",
+  "source_sha256": "f89e67a0c21c031404c80ea58792571e9a2e964dfe57550a86d6e7bc2d809d2b",
+  "commit": "e868be0b82178b558ebf0c25434be1de7ccdab0e",
+  "sales_model": "openai/gpt-4o-mini",
+  "configuration_version": 8,
+  "configuration_sha256": "51ff65376dad421328dab993a4fc71939489386f1ed173514cf13a244ac79f1c",
+  "clock_utc": null,
+  "team": [
+    {
+      "id": "3dafca84-bba3-5492-a935-1145bc1702a4",
+      "company_id": "f0ebe3a5-6c04-5b8e-8cd8-423859aa39d7",
+      "role": "candidate",
+      "active": true,
+      "access_scope": "selected",
+      "project_ids": [],
+      "accepts_appointments": true,
+      "has_slots": true
+    },
+    {
+      "id": "20ec373f-fde9-5b51-a819-6efe6726d4a0",
+      "company_id": "f0ebe3a5-6c04-5b8e-8cd8-423859aa39d7",
+      "role": "other_project",
+      "active": true,
+      "access_scope": "selected",
+      "project_ids": [
+        "abf88941-5a70-5a06-a1ed-bca5b42bb90a"
+      ],
+      "accepts_appointments": true,
+      "has_slots": true
+    },
+    {
+      "id": "33aa09a7-780a-53f7-b8ea-a8a47fe836ab",
+      "company_id": "f0ebe3a5-6c04-5b8e-8cd8-423859aa39d7",
+      "role": "none",
+      "active": true,
+      "access_scope": "selected",
+      "project_ids": [],
+      "accepts_appointments": true,
+      "has_slots": true
+    },
+    {
+      "id": "cc97f847-8e62-55cb-829b-aabbd4c4445a",
+      "company_id": "f0ebe3a5-6c04-5b8e-8cd8-423859aa39d7",
+      "role": "inactive",
+      "active": false,
+      "access_scope": "selected",
+      "project_ids": [
+        "88e5563d-2f4e-5a11-9822-ec319f06f25e"
+      ],
+      "accepts_appointments": true,
+      "has_slots": true
+    },
+    {
+      "id": "67186f93-c897-5e9b-a53e-abc0bf4e3b83",
+      "company_id": "f0ebe3a5-6c04-5b8e-8cd8-423859aa39d7",
+      "role": "no_appointments",
+      "active": true,
+      "access_scope": "selected",
+      "project_ids": [
+        "88e5563d-2f4e-5a11-9822-ec319f06f25e"
+      ],
+      "accepts_appointments": false,
+      "has_slots": true
+    }
+  ],
+  "case": "relocation_B",
+  "description": "vendedor-sin-asignacion",
+  "persona": {
+    "key": "relocation",
+    "name": "Sofia Reed",
+    "segment": "relocation",
+    "motive": "I am relocating to this area for work and need a home here.",
+    "budget": 900000
+  },
+  "original_case": null,
+  "project_name": null,
+  "lead_controller": null,
+  "lead_model": null,
+  "company_id": "f0ebe3a5-6c04-5b8e-8cd8-423859aa39d7",
+  "project_id": "88e5563d-2f4e-5a11-9822-ec319f06f25e",
+  "property_type_id": "85511ae1-1733-5177-9282-422514a416ce",
+  "automatic_result": "aprobado",
+  "human_review": {
+    "status": "pending",
+    "note": "Automatic approval is not a human judgment of conversational quality."
+  },
+  "stop_reason": "closed",
+  "expected_outcome": "unavailable",
+  "topic_tags": [
+    "acknowledge_unavailable",
+    "farewell",
+    "information",
+    "request_visit"
+  ],
+  "turns": [
+    {
+      "turn": 1,
+      "action": "information",
+      "lead": "I am relocating to this area for work and need a home here. My budget is 900,000 USD, paying cash. Where is Bay Residence located?",
+      "agent": "Location: 1 Synthetic Avenue, Synthetic City, US.\n\nYou are considering an outright purchase, without financing.\n\nWhat would you like to know next about the property?",
+      "understanding": {
+        "version": "sales-understanding/1.0",
+        "requests": [
+          {
+            "id": "r0",
+            "topic": "location",
+            "subject": null,
+            "polarity": "request",
+            "evidence": "Where is Bay Residence located?",
+            "reference_id": "ref0",
+            "detail_fields": [],
+            "feature": null
+          }
+        ],
+        "all_of": [
+          "r0"
+        ],
+        "alternatives": [],
+        "constraints": [],
+        "references": [
+          {
+            "kind": "property",
+            "id": "ref0",
+            "expression": "Bay Residence",
+            "evidence": "Where is Bay Residence located?"
+          }
+        ],
+        "preferences": [
+          {
+            "key": "financing",
+            "value": "cash",
+            "evidence": "paying cash",
+            "status": "declared"
+          },
+          {
+            "key": "motivation",
+            "value": "relocation",
+            "evidence": "I am relocating to this area for work",
+            "status": "declared"
+          },
+          {
+            "key": "budget",
+            "value": "900000 USD",
+            "evidence": "My budget is 900,000 USD",
+            "status": "declared"
+          },
+          {
+            "key": "buyer_type",
+            "value": "relocation",
+            "evidence": "I am relocating to this area for work and need a home here.",
+            "status": "declared"
+          }
+        ],
+        "personal_facts": [],
+        "preference_withdrawals": [],
+        "comparison": null,
+        "source_purposes": [],
+        "objections": [],
+        "empathy": null,
+        "releases": [],
+        "visit": null,
+        "courtesy": null,
+        "reschedule": null,
+        "cancellation": null,
+        "wait": null,
+        "moderation": null,
+        "appointment_query": null,
+        "selected_reference_id": null,
+        "requires_clarification": false,
+        "clarification_question": null,
+        "confidence": 1.0
+      },
+      "error_code": null,
+      "checks": [
+        {
+          "check": "current_workflow",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "turn_completed",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "scripted_english_not_rejected",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "reply_present",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_internal_narration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "segment_matches_declared_motivation",
+          "status": "PASS",
+          "detail": "expected=relocation; actual=relocation; assigned=relocation"
+        },
+        {
+          "check": "no_booking_without_confirmation",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "at_most_one_booking",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_identical_consecutive_reply",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "composition_accepted",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_emotion_invented_on_neutral_closure",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_declaration_converted_to_question",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_repeated_financial_sentences",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_unrequested_financing_pitch_after_cash",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "payment_information_stated_once",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "segment_evidence_from_own_initial_declaration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "declared_budget_persists",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "known_budget_not_asked_again",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "cash_preference_persists",
+          "status": "PASS",
+          "detail": ""
+        }
+      ],
+      "interpretation_attempts": [
+        {
+          "attempt": 1,
+          "outcome": "accepted",
+          "error_code": null,
+          "validation_issues": []
+        }
+      ],
+      "composition": {
+        "status": "accepted",
+        "attempts": [
+          {
+            "status": "accepted"
+          }
+        ]
+      }
+    },
+    {
+      "turn": 2,
+      "action": "request_visit",
+      "lead": "I would like to arrange an in-person visit to Bay Residence. Any available time in the next seven days works for me. Please use the project timezone.",
+      "agent": "I couldn't find an available viewing time for SYNTHETIC Harbor Gardens / Bay Residence for 2026-11-11 through 2026-11-17 (America/New_York). Would you like me to save these dates for a 45-minute visit and notify you once if a matching time becomes available?",
+      "understanding": {
+        "version": "sales-understanding/1.0",
+        "requests": [
+          {
+            "id": "current_visit",
+            "topic": "appointment",
+            "subject": null,
+            "polarity": "request",
+            "evidence": "I would like to arrange an in-person visit to Bay Residence.",
+            "reference_id": "ref0",
+            "detail_fields": [],
+            "feature": null
+          }
+        ],
+        "all_of": [
+          "current_visit"
+        ],
+        "alternatives": [],
+        "constraints": [],
+        "references": [
+          {
+            "kind": "property",
+            "id": "ref0",
+            "expression": "Bay Residence",
+            "evidence": "I would like to arrange an in-person visit to Bay Residence."
+          }
+        ],
+        "preferences": [],
+        "personal_facts": [],
+        "preference_withdrawals": [],
+        "comparison": null,
+        "source_purposes": [],
+        "objections": [],
+        "empathy": null,
+        "releases": [],
+        "visit": {
+          "action": "request",
+          "evidence": "I would like to arrange an in-person visit to Bay Residence. Any available time in the next seven days works for me.",
+          "timing": {
+            "date_from_evidence": "next seven days",
+            "date_until_evidence": null,
+            "time_from_evidence": null,
+            "time_until_evidence": null,
+            "time_relation": "any",
+            "timezone_evidence": "project timezone",
+            "duration_evidence": null
+          }
+        },
+        "courtesy": null,
+        "reschedule": null,
+        "cancellation": null,
+        "wait": null,
+        "moderation": null,
+        "appointment_query": null,
+        "selected_reference_id": null,
+        "requires_clarification": false,
+        "clarification_question": null,
+        "confidence": 1.0
+      },
+      "error_code": null,
+      "checks": [
+        {
+          "check": "current_workflow",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "turn_completed",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "scripted_english_not_rejected",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "reply_present",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_internal_narration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "segment_matches_declared_motivation",
+          "status": "PASS",
+          "detail": "expected=relocation; actual=relocation; assigned=relocation"
+        },
+        {
+          "check": "no_booking_without_confirmation",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "at_most_one_booking",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_identical_consecutive_reply",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "composition_accepted",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_emotion_invented_on_neutral_closure",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_declaration_converted_to_question",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_repeated_financial_sentences",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_unrequested_financing_pitch_after_cash",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "payment_information_stated_once",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "segment_evidence_from_own_initial_declaration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "declared_budget_persists",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "known_budget_not_asked_again",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "cash_preference_persists",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_comparison_invented_for_action",
+          "status": "PASS",
+          "detail": ""
+        }
+      ],
+      "interpretation_attempts": [
+        {
+          "attempt": 1,
+          "outcome": "accepted",
+          "error_code": null,
+          "validation_issues": []
+        }
+      ],
+      "composition": {
+        "status": "accepted",
+        "attempts": [
+          {
+            "status": "accepted"
+          }
+        ]
+      }
+    },
+    {
+      "turn": 3,
+      "action": "acknowledge_unavailable",
+      "lead": "Understood, thank you. Please do not book anything or set up an alert now.",
+      "agent": "Thanks for sharing that information.\n\nIs there another property question I can help with?",
+      "understanding": {
+        "version": "sales-understanding/1.0",
+        "requests": [],
+        "all_of": [],
+        "alternatives": [],
+        "constraints": [
+          {
+            "topic": "appointment",
+            "subject": null,
+            "effect": "prohibit",
+            "scope": "until_explicit_change",
+            "evidence": "Understood, thank you. Please do not book anything or set up an alert now.",
+            "reference_id": null
+          }
+        ],
+        "references": [],
+        "preferences": [
+          {
+            "key": "visit_readiness",
+            "value": "Please do not book anything or set up an alert now.",
+            "evidence": "Please do not book anything or set up an alert now.",
+            "status": "declared"
+          }
+        ],
+        "personal_facts": [],
+        "preference_withdrawals": [],
+        "comparison": null,
+        "source_purposes": [],
+        "objections": [],
+        "empathy": null,
+        "releases": [],
+        "visit": null,
+        "courtesy": {
+          "kind": "acknowledgement",
+          "evidence": "Understood, thank you."
+        },
+        "reschedule": null,
+        "cancellation": null,
+        "wait": null,
+        "moderation": null,
+        "appointment_query": null,
+        "selected_reference_id": null,
+        "requires_clarification": false,
+        "clarification_question": null,
+        "confidence": 1.0
+      },
+      "error_code": null,
+      "checks": [
+        {
+          "check": "current_workflow",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "turn_completed",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "scripted_english_not_rejected",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "reply_present",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_internal_narration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "segment_matches_declared_motivation",
+          "status": "PASS",
+          "detail": "expected=relocation; actual=relocation; assigned=relocation"
+        },
+        {
+          "check": "no_booking_without_confirmation",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "at_most_one_booking",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_identical_consecutive_reply",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "composition_accepted",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_emotion_invented_on_neutral_closure",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_declaration_converted_to_question",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_repeated_financial_sentences",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_unrequested_financing_pitch_after_cash",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "payment_information_stated_once",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "segment_evidence_from_own_initial_declaration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "declared_budget_persists",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "known_budget_not_asked_again",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "cash_preference_persists",
+          "status": "PASS",
+          "detail": ""
+        }
+      ],
+      "interpretation_attempts": [
+        {
+          "attempt": 1,
+          "outcome": "invalid_model_contract",
+          "error_code": "understanding_validation_failed",
+          "validation_issues": [
+            {
+              "location": [
+                "preferences",
+                0,
+                "evidence"
+              ],
+              "type": "evidence_mismatch",
+              "message": "Copy an exact non-empty quote from current_message for this field. Do not paraphrase, correct spelling, or quote history."
+            }
+          ]
+        },
+        {
+          "attempt": 2,
+          "outcome": "accepted",
+          "error_code": null,
+          "validation_issues": []
+        }
+      ],
+      "composition": {
+        "status": "accepted",
+        "attempts": [
+          {
+            "status": "accepted"
+          }
+        ]
+      }
+    },
+    {
+      "turn": 4,
+      "action": "farewell",
+      "lead": "No other questions, thank you. Goodbye.",
+      "agent": "You're welcome. Thank you for your interest and have a good day. You can message again whenever another question comes up.",
+      "understanding": {
+        "version": "sales-understanding/1.0",
+        "requests": [],
+        "all_of": [],
+        "alternatives": [],
+        "constraints": [],
+        "references": [],
+        "preferences": [],
+        "personal_facts": [],
+        "preference_withdrawals": [],
+        "comparison": null,
+        "source_purposes": [],
+        "objections": [],
+        "empathy": null,
+        "releases": [],
+        "visit": null,
+        "courtesy": {
+          "kind": "farewell",
+          "evidence": "No other questions, thank you. Goodbye."
+        },
+        "reschedule": null,
+        "cancellation": null,
+        "wait": null,
+        "moderation": null,
+        "appointment_query": null,
+        "selected_reference_id": null,
+        "requires_clarification": false,
+        "clarification_question": null,
+        "confidence": 1.0
+      },
+      "error_code": null,
+      "checks": [
+        {
+          "check": "current_workflow",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "turn_completed",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "scripted_english_not_rejected",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "reply_present",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_internal_narration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "segment_matches_declared_motivation",
+          "status": "PASS",
+          "detail": "expected=relocation; actual=relocation; assigned=relocation"
+        },
+        {
+          "check": "no_booking_without_confirmation",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "at_most_one_booking",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_identical_consecutive_reply",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_emotion_invented_on_neutral_closure",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_declaration_converted_to_question",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_repeated_financial_sentences",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_unrequested_financing_pitch_after_cash",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "payment_information_stated_once",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "segment_evidence_from_own_initial_declaration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "declared_budget_persists",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "known_budget_not_asked_again",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "cash_preference_persists",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_question_after_goodbye",
+          "status": "PASS",
+          "detail": ""
+        }
+      ],
+      "interpretation_attempts": [],
+      "composition": {
+        "status": null,
+        "attempts": []
+      }
+    }
+  ],
+  "checks": [
+    {
+      "check": "segment_not_seeded",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "eligible_roster_matches_assignments",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "expected_booking_outcome",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "no_provider_outbox",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "dialogue_reached_terminal_outcome",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "only_registered_material_urls",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "no_unregistered_material_link",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "all_shares_bound_to_current_property",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "unavailability_explained",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "buyer_acknowledged_public_unavailability",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "last_event_replay_is_idempotent",
+      "status": "PASS",
+      "detail": ""
+    }
+  ],
+  "failures": [],
+  "blocked_checks": [],
+  "meetings": [],
+  "materials": []
+}

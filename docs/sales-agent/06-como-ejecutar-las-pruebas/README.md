@@ -2,28 +2,26 @@
 
 # Ejecutar y actualizar el laboratorio
 
-## Ejecutar los 16 casos de la batería compacta 2
+## Repetir solo los tres casos tras desplegar Repair 8
 
-El modelo se lee de la configuración publicada, no de un nombre escrito en el guion. En la última evidencia era `openai/gpt-4o-mini` versión de configuración 8; comprobar el modelo y digest exportados si cambian los settings. Lead simulado: guionado, sin modelo. Juez LLM: ninguno.
+La batería compacta 2 ya se ejecutó: 13/16 aprobados y 7/8 visitas. Ahora se repiten `move_up_A`, `downsizing_B` y `portfolio_A`, con el mismo modelo/configuración. No hay otro LLM para el lead ni juez.
 
 ```bash
 docker exec -i -w /app bp_api_prod python -m tools.sales_ai.synthetic_lab \
   --suite compact-battery \
   --configuration-id cbc8abfa-23d3-417c-97dd-fd12e3406ed4 \
-  --max-calls 320 --max-turns 8 \
-  --output /tmp/sales-compact-battery-2
+  --cases move_up_A downsizing_B portfolio_A \
+  --max-calls 80 --max-turns 8 --output /tmp/sales-compact-repair-8
 ```
 
-Repair 7 aprobó el subconjunto de tres. Ahora se esperan ocho visitas entre 16 escenarios; el resto puede cerrar correctamente sin cita. La ampliación no está ejecutada todavía. Copiar el ZIP incluso si termina en `FAIL`:
+Copiar el reporte incluso si falla; se esperan dos visitas, no tres:
 
 ```bash
-docker cp bp_api_prod:/tmp/sales-compact-battery-2/synthetic-sales-results.zip ~/sales-compact-battery-2.zip
+docker cp bp_api_prod:/tmp/sales-compact-repair-8/synthetic-sales-results.zip ~/sales-compact-repair-8.zip
 ```
 
-En PowerShell:
-
 ```powershell
-& "$env:WINDIR\System32\OpenSSH\scp.exe" jorge@206.189.118.99:~/sales-compact-battery-2.zip "$env:USERPROFILE\Downloads\sales-compact-battery-2.zip"
+& "$env:WINDIR\System32\OpenSSH\scp.exe" jorge@206.189.118.99:~/sales-compact-repair-8.zip "$env:USERPROFILE\Downloads\sales-compact-repair-8.zip"
 ```
 
 El worker usa SQLite privado, credenciales de configuración solo para inferencia y guardas de red/DB. No ejecutar seeds contra PostgreSQL productivo. No escribe leads, citas u outbox productivos ni llama Calendar externo. Usa primer vendedor elegible en la simulación, no el cursor round-robin productivo. Los enlaces locales no validan autenticación HTTP pública.
@@ -51,10 +49,14 @@ python docs/sales-agent/06-como-ejecutar-las-pruebas/herramientas/generar_grafic
 
 Para generar figuras se necesitan `numpy` y `matplotlib` en el entorno documental; no se añadieron dependencias al runtime del agente. Añadir anotaciones con clave `nombre-del-zip-sin-extension:caso`; el importador las conserva. Antes de publicar nuevos archivos, revisar que todos los datos sean ficticios y que la etiqueta humana no se confunda con una evaluación automática. Esta exportación no es un importador de datos reales de clientes. El importador actualiza JSON, CSV y resúmenes por corrida; al incorporar corridas nuevas también hay que actualizar el texto, las tablas e índices Markdown y su revisión humana. Los IDs de recursos pueden cambiar al regenerar fixtures; siempre usar las relaciones del mismo snapshot.
 
-## Trabajo siguiente
+## Conversaciones legibles y siguiente iteración
 
-1. Ejecutar una vez la batería compacta 2 y conservar el ZIP aunque reporte FAIL.
-2. Revisar los 16 desenlaces, llamadas, reparaciones y consumo completo/parcial; corregir y repetir solo los casos afectados.
-3. Ampliar luego variantes y longitud; transporte, Calendar, inactividad y cancelación/reagendamiento se evalúan por separado.
+Después de importar los ZIP originales, ejecutar:
 
-La explicación y los presupuestos completos están en la [guía principal](../README.md). El consumo estimado total de la batería es USD 0.32–0.43, reserva USD 0.64–0.86; el límite de llamadas no impone un techo monetario. Esta preparación no cambió el motor ni llamó a un modelo pagado.
+```bash
+python docs/sales-agent/06-como-ejecutar-las-pruebas/herramientas/generar_conversaciones_legibles.py
+```
+
+Genera una ficha Markdown por conversación registrada; no llama un modelo ni inventa interpretaciones. Los mensajes, campos y controles vienen del JSON y cada ficha enlaza al original. La guía principal conserva toda la explicación del experimento.
+
+Repair 8 todavía debe evaluarse con el modelo publicado. Corregir primero los casos que fallen antes de repetir los 16. El consumo estimado total del subconjunto es USD 0.04–0.09, reserva USD 0.08–0.18; no se suma al histórico ni es un techo garantizado.

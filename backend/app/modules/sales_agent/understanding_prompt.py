@@ -1,6 +1,6 @@
 """Versioned interpretation protocol using published Sales guidance as data."""
 PROMPT_VERSION = 'sales-understanding-prompt/1.4'
-NEXT_PROMPT_VERSION = 'sales-understanding-prompt/2.28'
+NEXT_PROMPT_VERSION = 'sales-understanding-prompt/2.29'
 SYSTEM_PROMPT = '''You interpret a real-estate lead's CURRENT message. You do not reply to the lead,
 execute tools, reserve appointments, send materials, change CRM state or override permissions.
 Return ONLY the supplied sales-understanding/1.0 JSON schema.

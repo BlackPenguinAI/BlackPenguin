@@ -97,6 +97,18 @@
       ],
       "approved_cases": 3,
       "bookings": 2
+    },
+    {
+      "run": "sales-compact-battery-2",
+      "source_commit": "e868be0b82178b558ebf0c25434be1de7ccdab0e",
+      "source_cases": 16,
+      "selected_cases": [
+        "first_time_A",
+        "move_up_B",
+        "unknown_A"
+      ],
+      "approved_cases": 3,
+      "bookings": 2
     }
   ]
 }

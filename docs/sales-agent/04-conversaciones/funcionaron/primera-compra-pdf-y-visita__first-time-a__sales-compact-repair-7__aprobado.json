@@ -274,6 +274,14 @@
           "detail": ""
         }
       ],
+      "interpretation_attempts": [
+        {
+          "attempt": 1,
+          "outcome": "accepted",
+          "error_code": null,
+          "validation_issues": []
+        }
+      ],
       "composition": {
         "status": "accepted",
         "attempts": [
@@ -456,6 +464,14 @@
           "detail": ""
         }
       ],
+      "interpretation_attempts": [
+        {
+          "attempt": 1,
+          "outcome": "accepted",
+          "error_code": null,
+          "validation_issues": []
+        }
+      ],
       "composition": {
         "status": "accepted",
         "attempts": [
@@ -632,6 +648,14 @@
           "detail": ""
         }
       ],
+      "interpretation_attempts": [
+        {
+          "attempt": 1,
+          "outcome": "accepted",
+          "error_code": null,
+          "validation_issues": []
+        }
+      ],
       "composition": {
         "status": "accepted",
         "attempts": [
@@ -805,6 +829,26 @@
           "detail": ""
         }
       ],
+      "interpretation_attempts": [
+        {
+          "attempt": 1,
+          "outcome": "invalid_model_contract",
+          "error_code": "understanding_validation_failed",
+          "validation_issues": [
+            {
+              "location": [],
+              "type": "contract_value_error",
+              "message": "Inline reference evidence must quote current_message."
+            }
+          ]
+        },
+        {
+          "attempt": 2,
+          "outcome": "accepted",
+          "error_code": null,
+          "validation_issues": []
+        }
+      ],
       "composition": {
         "status": "accepted",
         "attempts": [
@@ -967,6 +1011,26 @@
           "check": "cash_preference_persists",
           "status": "PASS",
           "detail": ""
+        }
+      ],
+      "interpretation_attempts": [
+        {
+          "attempt": 1,
+          "outcome": "invalid_model_contract",
+          "error_code": "understanding_validation_failed",
+          "validation_issues": [
+            {
+              "location": [],
+              "type": "contract_value_error",
+              "message": "Inline reference evidence must quote current_message."
+            }
+          ]
+        },
+        {
+          "attempt": 2,
+          "outcome": "accepted",
+          "error_code": null,
+          "validation_issues": []
         }
       ],
       "composition": {

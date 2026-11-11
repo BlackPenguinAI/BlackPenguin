@@ -1,3 +1,5 @@
+[Leer las 141 conversaciones con diálogo y explicación](lecturas.md)
+
 # Índice de conversaciones
 
 [Explicación y diálogos completos en la guía principal](../README.md#7-conversaciones-para-repetir)

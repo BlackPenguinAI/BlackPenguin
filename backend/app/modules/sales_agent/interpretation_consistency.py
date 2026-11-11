@@ -128,6 +128,18 @@ def normalize(value,text,commercial,*,appointment_offer=None):
                 data['visit']=dict(action='request',evidence=quote,timing=None);notes.append({'field':'visit','action':'preserve_explicit_new_visit_directive','evidence':quote})
             if data['visit'] and data['visit']['action']=='request':
                 timing=data['visit'].get('timing')
+                # A date phrase copied into a clock field is not a local hour.
+                # Recover only explicit flexibility with identical current date
+                # evidence and no actual clock restriction; keep all real times.
+                if (timing and timing.get('time_relation')=='any'
+                    and re.search(r'\bany (?:available )?time\b',own,re.I)
+                    and not re.search(r'\b\d{1,2}:\d{2}\b|\b\d{1,2}\s*(?:am|pm)\b|\b(?:after|before|between|morning|afternoon|evening)\b',own,re.I)):
+                    dates={timing.get(k) for k in ('date_from_evidence','date_until_evidence') if timing.get(k)}
+                    for key in ('time_from_evidence','time_until_evidence'):
+                        evidence=timing.get(key)
+                        if evidence in dates and evidence in own and re.fullmatch(r'(?:the )?next (?:seven|7) days',evidence,re.I):
+                            timing[key]=None
+                            notes.append({'field':'visit.timing.'+key,'action':'omit_date_phrase_from_flexible_clock','evidence':evidence})
                 if timing and re.search(r'\bany (?:available )?time\b',own,re.I) and not timing.get('time_from_evidence') and not timing.get('time_until_evidence') and timing.get('time_relation')!='any':
                     timing['time_relation']='any';notes.append({'field':'visit.timing.time_relation','action':'any_time_is_not_a_clock_range'})
     decline=DECLINE.search(own)

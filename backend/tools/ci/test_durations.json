@@ -112,6 +112,7 @@
     "test_sales_action_grounding.py": 12.0,
     "test_sales_scope_and_composer.py": 9.0,
     "test_sales_current_choice_materials.py": 9.0,
-    "test_sales_visit_history_receipt.py": 8.0
+    "test_sales_visit_history_receipt.py": 8.0,
+    "test_sales_battery2_recovery.py": 12.0
   }
 }
