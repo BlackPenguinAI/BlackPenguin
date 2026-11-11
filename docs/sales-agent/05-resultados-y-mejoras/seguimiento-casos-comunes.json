@@ -1,0 +1,78 @@
+{
+  "analysis_kind": "retrospective_subset_not_new_execution",
+  "note": "Original checks retained; validators evolved. Not equivalent to a controlled current-version reevaluation.",
+  "series": [
+    {
+      "run": "sales-compact-battery-1",
+      "source_commit": "1cd37eed349b15db0953cf0f52298ae27be353b0",
+      "source_cases": 16,
+      "selected_cases": [
+        "first_time_A",
+        "move_up_B",
+        "unknown_A"
+      ],
+      "approved_cases": 0,
+      "bookings": 0
+    },
+    {
+      "run": "sales-compact-repair-1",
+      "source_commit": "06271fd4a34da1543e73c2f567bb736309e7c844",
+      "source_cases": 8,
+      "selected_cases": [
+        "first_time_A",
+        "move_up_B",
+        "unknown_A"
+      ],
+      "approved_cases": 0,
+      "bookings": 1
+    },
+    {
+      "run": "sales-compact-repair-2",
+      "source_commit": "2d85c207292cc2e25edc796168317e9713f0e274",
+      "source_cases": 8,
+      "selected_cases": [
+        "first_time_A",
+        "move_up_B",
+        "unknown_A"
+      ],
+      "approved_cases": 1,
+      "bookings": 0
+    },
+    {
+      "run": "sales-compact-repair-3",
+      "source_commit": "6a61c35338f880c5ae9f2375844983ee74742ea9",
+      "source_cases": 3,
+      "selected_cases": [
+        "first_time_A",
+        "move_up_B",
+        "unknown_A"
+      ],
+      "approved_cases": 1,
+      "bookings": 0
+    },
+    {
+      "run": "sales-compact-repair-4",
+      "source_commit": "ffef47639bc01fdf776a8ee6b0fdbc17863b2d40",
+      "source_cases": 3,
+      "selected_cases": [
+        "first_time_A",
+        "move_up_B",
+        "unknown_A"
+      ],
+      "approved_cases": 2,
+      "bookings": 2
+    },
+    {
+      "run": "sales-compact-repair-5",
+      "source_commit": "4fb17071b617cc430698885fafdde8d209f1d562",
+      "source_cases": 3,
+      "selected_cases": [
+        "first_time_A",
+        "move_up_B",
+        "unknown_A"
+      ],
+      "approved_cases": 2,
+      "bookings": 2
+    }
+  ]
+}

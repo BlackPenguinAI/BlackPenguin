@@ -68,3 +68,16 @@ for i,r in enumerate(rows):
 axes[0].set(xticks=xx,xticklabels=labels,ylabel='USD registrados',title='Consumo por corrida (rayado = incompleto)');axes[0].tick_params(axis='x',rotation=45)
 axes[1].plot(xx,np.cumsum(costs),'o-',color='#176b87');axes[1].set(xticks=xx,xticklabels=labels,ylabel='USD registrados acumulados',title='Historial de consumo; faltan dos respuestas');axes[1].tick_params(axis='x',rotation=45)
 save(fig,'consumo-global.png')
+
+# A retrospective view of the same IDs, including when they were in larger suites.
+common={'first_time_A','move_up_B','unknown_A'};series=[]
+for r in rows:
+    chosen=[c for c in r['case_results'] if c['case'] in common]
+    if r['suite']=='compact' and len(chosen)==3:
+        series.append({'run':r['run'],'source_commit':r['commit'],'source_cases':r['cases'],'selected_cases':sorted(common),'approved_cases':sum(c['status']=='aprobado' for c in chosen),'bookings':sum(c['meetings'] for c in chosen)})
+(ROOT/'05-resultados-y-mejoras/seguimiento-casos-comunes.json').write_text(json.dumps({'analysis_kind':'retrospective_subset_not_new_execution','note':'Original checks retained; validators evolved. Not equivalent to a controlled current-version reevaluation.','series':series},indent=2)+'\n')
+fig,axes=plt.subplots(1,2,figsize=(11,3.6));xx=np.arange(len(series));names=[r['run'].replace('sales-compact-battery-','B').replace('sales-compact-repair-','R') for r in series]
+for ax,key,denominator,title in [(axes[0],'approved_cases',3,'Conversaciones aprobadas de los mismos tres IDs'),(axes[1],'bookings',2,'Visitas observadas de esos dos casos de agenda')]:
+    values=np.array([r[key] for r in series]);ax.plot(xx,values,'o-',color='#176b87');ax.set(xticks=xx,xticklabels=names,ylim=(-.1,denominator+.5),title=title,ylabel='Cantidad');ax.yaxis.set_major_locator(MaxNLocator(integer=True))
+    for i,value in enumerate(values):ax.annotate(f'{value}/{denominator}',(i,value),ha='center',xytext=(0,8),textcoords='offset points')
+fig.suptitle('Seguimiento retrospectivo: IDs comunes, checks originales de cada versión',y=1.05);save(fig,'casos-comunes-desde-la-bateria.png')

@@ -240,8 +240,7 @@ async def evaluate_case(db,manifest,key,budget,max_turns):
                 row_checks.append(check('no_comparison_invented_for_action',not frame.get('comparison')))
             if key=='move_up_B' and index==0:
                 initial=manifest['projects'][1]['properties'][1]
-                shown=(meta.get('property_catalog_offer') or {}).get('property_type_ids',[])
-                row_checks.append(check('initial_named_property_scope',shown==[initial['id']] and 'Cedar Loft' not in last))
+                row_checks.append(check('initial_named_property_scope',named_property_answered(last,meta,initial,manifest['projects'][1]['properties'])))
                 row_checks.append(check('information_does_not_request_visit',frame.get('visit') is None))
             if action=='select':row_checks.append(check('selection_advances_to_confirmation','Please confirm your visit' in last))
             if action=='decline' and not meetings:
@@ -324,3 +323,16 @@ def returns_gap_answered(reply):
     for sentence in re.split(r'[.!?\n]',reply):
         if re.search(r'\b(?:yield|occupancy|returns?)\b',sentence,re.I) and re.search(r"\b(?:not|no|cannot|unavailable|unconfirmed)\b|can.t|don.t",sentence,re.I):return True
     return False
+
+
+def named_property_answered(reply,metadata,expected,properties):
+    """Catalog offers and resolved details are both valid evidence of scope."""
+    offer=metadata.get('property_catalog_offer')
+    if offer is not None:
+        bound=offer.get('property_type_ids')==[expected['id']]
+    else:
+        refs=(metadata.get('planning') or {}).get('references',{}).values()
+        bound=metadata.get('selected_property_type_id')==expected['id'] and any(
+            r.get('status')=='resolved' and (r.get('value') or {}).get('property_id')==expected['id'] for r in refs)
+    contains=lambda name:bool(re.search(r'(?<!\w)'+re.escape(name)+r'(?!\w)',reply,re.I))
+    return bound and contains(expected['name']) and not any(contains(p['name']) for p in properties if p['id']!=expected['id'])

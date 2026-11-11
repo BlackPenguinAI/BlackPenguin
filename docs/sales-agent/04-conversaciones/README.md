@@ -1,6 +1,6 @@
 # Índice de conversaciones
 
-[Explicación y diálogos completos en la guía principal](../README.md#5-conversaciones-que-el-equipo-puede-repetir)
+[Explicación y diálogos completos en la guía principal](../README.md#7-conversaciones-para-repetir)
 
 Hay **119 conversaciones de 17 corridas**, incluidas 18 de la primera etapa con lead LLM y tres de Repair 5. Los resultados automáticos originales no se modifican tras revisión humana.
 

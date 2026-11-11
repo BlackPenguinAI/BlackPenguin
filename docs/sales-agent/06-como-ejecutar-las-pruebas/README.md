@@ -2,7 +2,7 @@
 
 # Ejecutar y actualizar el laboratorio
 
-## Reproducir Repair 5 si se necesita una nueva medición
+## Repetir los tres casos tras desplegar Repair 6
 
 El modelo se lee de la configuración publicada, no de un nombre escrito en el guion. En la última evidencia era `openai/gpt-4o-mini` versión de configuración 8; comprobar el modelo y digest exportados si cambian los settings. Lead simulado: guionado, sin modelo. Juez LLM: ninguno.
 
@@ -12,19 +12,19 @@ docker exec -i -w /app bp_api_prod python -m tools.sales_ai.synthetic_lab \
   --configuration-id cbc8abfa-23d3-417c-97dd-fd12e3406ed4 \
   --cases first_time_A move_up_B unknown_A \
   --max-calls 60 --max-turns 8 \
-  --output /tmp/sales-compact-repair-5
+  --output /tmp/sales-compact-repair-6
 ```
 
 Se esperan dos visitas. Copiar el ZIP incluso si termina en `FAIL`:
 
 ```bash
-docker cp bp_api_prod:/tmp/sales-compact-repair-5/synthetic-sales-results.zip ~/sales-compact-repair-5.zip
+docker cp bp_api_prod:/tmp/sales-compact-repair-6/synthetic-sales-results.zip ~/sales-compact-repair-6.zip
 ```
 
 En PowerShell:
 
 ```powershell
-& "$env:WINDIR\System32\OpenSSH\scp.exe" jorge@206.189.118.99:~/sales-compact-repair-5.zip "$env:USERPROFILE\Downloads\sales-compact-repair-5.zip"
+& "$env:WINDIR\System32\OpenSSH\scp.exe" jorge@206.189.118.99:~/sales-compact-repair-6.zip "$env:USERPROFILE\Downloads\sales-compact-repair-6.zip"
 ```
 
 El worker usa SQLite privado, credenciales de configuración solo para inferencia y guardas de red/DB. No ejecutar seeds contra PostgreSQL productivo. No escribe leads, citas u outbox productivos ni llama Calendar externo. Usa primer vendedor elegible en la simulación, no el cursor round-robin productivo. Los enlaces locales no validan autenticación HTTP pública.
@@ -54,7 +54,7 @@ Para generar figuras se necesitan `numpy` y `matplotlib` en el entorno documenta
 
 ## Qué falta tras recibir Repair 5
 
-1. Corregir el falso positivo del check de alcance y resolver el cambio explícito de propiedad con fotos; no está implementado en la entrega documental.
+1. Ejecutar Repair 6 con los mismos tres casos: el check de alcance y la referencia elección/fotos están corregidos localmente; falta confirmación con el modelo publicado.
 2. Añadir variantes y volver a ejecutar los tres casos tras esa corrección del motor.
 3. Ampliar escenarios solo cuando pasen y la revisión humana sea favorable.
 4. Evaluar transporte/calendario, inactividad prolongada, aviso de nuevos slots y cancelación/reagendamiento por separado.

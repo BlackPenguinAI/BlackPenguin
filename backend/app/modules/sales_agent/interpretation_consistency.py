@@ -25,6 +25,34 @@ def normalize(value,text,commercial,*,appointment_offer=None):
         key='current_subject';ids={r['id'] for r in data['references']}
         while key in ids:key+='x'
         data['references'].append(dict(id=key,kind='property',expression=name,evidence=name));return key
+    # A current explicit choice can own an anaphoric material request in the
+    # next clause. No historical subject, model ID or confidence is promoted.
+    switch=re.fullmatch(
+        r"\s*(?:Actually[, ]+)?(?:I (?:prefer|choose|want|would like)|I['’]d like|I['’]ll take) "
+        r"(?P<owner>.+?)(?: instead)?[.!]\s*"
+        r"(?P<request>(?:(?:Please|Could you|Can you) )?(?:send|show)(?: me)? "
+        r"(?:its|that property's|this property's|the property's) "
+        r"(?P<subject>photos?|pictures?|images?|brochure(?: PDF)?|PDF|floor plan)(?: please)?[.!?]?)\s*",own,re.I)
+    if (switch and own==text and not data['alternatives'] and not data['constraints']
+        and not data['comparison'] and not data['cancellation'] and not data['reschedule']
+        and not data['wait'] and not data['releases'] and not data['preference_withdrawals']
+        and not data['appointment_query'] and len(data['requests'])==1):
+        candidates=named(switch['owner']);row=data['requests'][0]
+        if (len(candidates)==1 and switch['owner'].casefold()==candidates[0].casefold()
+            and row['topic']=='materials' and row['polarity']=='request'):
+            key=reference(candidates[0]);tag=switch['subject'].casefold()
+            subject='brochure' if 'pdf' in tag or 'brochure' in tag else 'floor_plan' if 'floor' in tag else 'photos'
+            # A conflicting requested format must be repaired by the model.
+            if row['subject'] in {None,subject}:
+                row.update(reference_id=key,subject=subject,evidence=switch['request'])
+                data['references']=[r for r in data['references'] if r['id']==key]
+                data['selected_reference_id']=key
+                data['visit']=None
+                result=Understanding.model_validate(data).check_evidence(text)
+                if result==value:return value,[]
+                return result,[{'field':'references','action':'bind_anaphoric_material_to_explicit_current_choice',
+                    'choice_evidence':candidates[0],'request_evidence':switch['request'],
+                    'confidence_unchanged':value.confidence}]
     # Only a complete backend-rendered choice grants selection, never booking.
     from .first_booking import exact_public_selection
     chosen=exact_public_selection(own,appointment_offer)

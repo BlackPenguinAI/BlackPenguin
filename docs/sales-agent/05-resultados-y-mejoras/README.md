@@ -1,4 +1,4 @@
-[Volver a las métricas explicadas en la guía principal](../README.md#8-evolución-global-de-casos-y-consumos)
+[Volver a las métricas explicadas en la guía principal](../README.md#6-historia-y-evolución-medida)
 
 # Índice de resultados de servidor
 

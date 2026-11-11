@@ -18,5 +18,14 @@
     "confidence": 0.0,
     "gallery_delivered": false
   },
-  "next_work": "Correct the evaluator and resolve explicit property change plus anaphoric photo request without inferring scope from uncertainty."
+  "next_work": "Correct the evaluator and resolve explicit property change plus anaphoric photo request without inferring scope from uncertainty.",
+  "repair6_followup": {
+    "implemented_locally": true,
+    "production_model_evaluation": "PENDING",
+    "original_result_unchanged": true,
+    "changes": [
+      "Catalog or resolved property-details scope accepted by evaluator.",
+      "Current explicit choice may bind a following anaphoric material request; no confidence promotion or invented visit."
+    ]
+  }
 }
