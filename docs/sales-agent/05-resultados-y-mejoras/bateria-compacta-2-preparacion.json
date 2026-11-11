@@ -1,0 +1,30 @@
+{
+  "validation_kind": "prepare_only_no_model_quality",
+  "status": "PREPARED",
+  "scenarios": [
+    "first_time_A",
+    "first_time_B",
+    "move_up_A",
+    "move_up_B",
+    "relocation_A",
+    "relocation_B",
+    "downsizing_A",
+    "downsizing_B",
+    "rental_A",
+    "rental_B",
+    "resale_A",
+    "resale_B",
+    "portfolio_A",
+    "portfolio_B",
+    "unknown_A",
+    "unknown_B"
+  ],
+  "scenario_count": 16,
+  "expected_bookings": 8,
+  "provider_calls": 0,
+  "production_database_writes": 0,
+  "lead_contacts": 0,
+  "catalog_projects": 3,
+  "catalog_property_types": 6,
+  "note": "Confirms preparation and plan alignment only. Full 16-case model evaluation remains NOT_RUN."
+}

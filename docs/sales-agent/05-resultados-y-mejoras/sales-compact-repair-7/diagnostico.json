@@ -1,0 +1,78 @@
+{
+  "source_commit": "79e96a9abb33dc3a6e1630b9f724402c1b5b1023",
+  "original_status": "PASS",
+  "checks": {
+    "PASS": 309,
+    "FAIL": 0,
+    "BLOCKED": 0
+  },
+  "approved_cases": 3,
+  "expected_bookings": 2,
+  "actual_bookings": 2,
+  "provider_usage": {
+    "prompt_tokens": 309309,
+    "completion_tokens": 5295,
+    "cost_usd": 0.043573350000000004,
+    "responses_with_cost": 27
+  },
+  "cost_reporting_complete": true,
+  "recovered_interpretation_attempts": [
+    {
+      "case": "first_time_A",
+      "turn": 4,
+      "issues": [
+        {
+          "location": [],
+          "type": "contract_value_error",
+          "message": "Inline reference evidence must quote current_message."
+        }
+      ]
+    },
+    {
+      "case": "first_time_A",
+      "turn": 5,
+      "issues": [
+        {
+          "location": [],
+          "type": "contract_value_error",
+          "message": "Inline reference evidence must quote current_message."
+        }
+      ]
+    },
+    {
+      "case": "move_up_B",
+      "turn": 3,
+      "issues": [
+        {
+          "location": [],
+          "type": "contract_value_error",
+          "message": "Inline reference evidence must quote current_message."
+        }
+      ]
+    },
+    {
+      "case": "unknown_A",
+      "turn": 3,
+      "issues": [
+        {
+          "location": [],
+          "type": "contract_value_error",
+          "message": "Inline reference evidence must quote current_message."
+        }
+      ]
+    },
+    {
+      "case": "unknown_A",
+      "turn": 4,
+      "issues": [
+        {
+          "location": [],
+          "type": "contract_value_error",
+          "message": "Inline reference evidence must quote current_message."
+        }
+      ]
+    }
+  ],
+  "remaining_limitation": "Five turns required repair for inline evidence outside current message; all recovered. Single run does not establish broad consistency.",
+  "next_evaluation": "full compact battery: 16 cases, 8 expected bookings; not executed yet"
+}
