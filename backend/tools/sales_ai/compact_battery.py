@@ -210,6 +210,7 @@ async def evaluate_case(db,manifest,key,budget,max_turns):
             last='\n\n'.join(m.content for m in outgoing)
             events=db.query(SalesDialogueEvent).filter_by(conversation_id=conversation.id,kind='understanding_preview').order_by(SalesDialogueEvent.revision).all()
             attempts=next(((e.payload_json.get('metadata') or {}).get('interpretation_attempts',[]) for e in reversed(events) if (e.payload_json.get('metadata') or {}).get('inbound_message_id')==(run.input_snapshot or {}).get('message_id')),[])
+            if not attempts:attempts=((run.input_snapshot or {}).get('interpretation_failure') or {}).get('interpretation_attempts',[])
             db.commit()
             with Session(bind=db.get_bind(),autoflush=False) as reader:
                 fresh=reader.get(Lead,lead.id);profile=resolve(fresh);actual_segment=segment_for(fresh);assigned=fresh.assigned_segment;cap=budget_cap(profile)
@@ -234,6 +235,8 @@ async def evaluate_case(db,manifest,key,budget,max_turns):
             if spec['cash']:
                 funding=profile['current']['financing'];row_checks.append(check('cash_preference_persists',funding['status']=='declared' and bool(re.search(r'cash|outright',str(funding.get('value') or ''),re.I))))
             if action=='select':row_checks.append(check('selection_advances_to_confirmation','Please confirm your visit' in last))
+            if action=='decline' and not meetings:
+                row_checks.append(check('decline_not_misread_as_existing_visit_change',not re.search(r'cancel the current visit|request a different visit|which .*visit.*cancel',last,re.I)))
             if action=='farewell':row_checks.append(check('no_question_after_goodbye','?' not in last))
             if spec.get('human') and action in {'human_insist','farewell'}:
                 count=db.query(HumanInterventionCase).filter_by(company_id=lead.company_id,project_id=lead.project_id,lead_id=lead.id,conversation_id=conversation.id,reason='HUMAN_CONTACT_REQUEST',status='open').count()
@@ -241,6 +244,8 @@ async def evaluate_case(db,manifest,key,budget,max_turns):
             rows.append({'turn':index+1,'action':action,'lead_message':message,'reply':last,'profile':profile,'assigned_segment':assigned,
                 'understanding':frame,'interpretation_attempts':attempts,'input_trace':run.input_snapshot,'output':run.output_snapshot,'error_code':run.error_code,'checks':row_checks})
             if meetings:stop='booked';break
+            if action=='decline' and not meetings:
+                row_checks.append(check('decline_not_misread_as_existing_visit_change',not re.search(r'cancel the current visit|request a different visit|which .*visit.*cancel',last,re.I)))
             if action=='farewell':stop='closed';break
         except Exception as exc:
             db.rollback();rows.append({'turn':index+1,'action':action,'lead_message':message,**error_details(exc),'checks':[check('engine_turn_completed',False)]});stop='engine_error';break

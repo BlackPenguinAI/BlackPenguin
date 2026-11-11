@@ -21,7 +21,7 @@ class PreviewOutcome:
     declarations: tuple = ()
 
 
-async def preview(db, scope: Scope, *, inbound_message_id: str, expected_revision: int, event_key: str, infer=None, active=False):
+async def _preview(db, scope: Scope, *, inbound_message_id: str, expected_revision: int, event_key: str, infer=None, active=False, audit=None):
     if not active and not settings.SALES_UNDERSTANDING_PREVIEW_ENABLED:
         raise PermissionError('Understanding preview is disabled. The live engine is unchanged.')
     validate_write_request(event_key, expected_revision, 'understanding_preview')
@@ -30,6 +30,7 @@ async def preview(db, scope: Scope, *, inbound_message_id: str, expected_revisio
         SalesMessage.direction == 'inbound', SalesMessage.role == 'user').first()
     if not inbound or (inbound.metadata_json or {}).get('lead_id', scope.lead_id) != scope.lead_id:
         raise PermissionError('Inbound message is outside this active opportunity.')
+    audit=audit if audit is not None else {}
     from .dialogue_models import SalesDialogueEvent
     prior = scope.query(db, SalesDialogueEvent).filter_by(event_key=event_key).first()
     if prior:
@@ -120,11 +121,13 @@ async def preview(db, scope: Scope, *, inbound_message_id: str, expected_revisio
                 response_format={'type': 'json_schema', 'json_schema': {'name': 'sales_understanding', 'strict': True, 'schema': schema}},
                 temperature=0.2, raise_on_error=True,
                 usage_context=LLMUsageContext(company_id=scope.company_id, project_id=scope.project_id, feature='sales_understanding_preview'))
+    audit.update(model=model,prompt_snapshot=snapshot,prompt_configuration_id=config.id,inbound_message_id=inbound.id)
     raw = None
     outcome = 'accepted'
     error_code = None
     interpreted = None
     attempts = []
+    audit['interpretation_attempts']=attempts
     request_messages = messages
     if wire_mode:
         from .interpretation_input import schema
@@ -135,6 +138,7 @@ async def preview(db, scope: Scope, *, inbound_message_id: str, expected_revisio
     if wire_mode:
         from .current_declarations import extract
         validated_declarations=extract(inbound.content)
+        audit['validated_declarations']=[p.model_dump(mode='json') for p in validated_declarations]
     # One bounded repair in active mode only. No business effects occur until
     # the complete contract and current-message evidence have been validated.
     for attempt in range(2 if active else 1):
@@ -150,6 +154,7 @@ async def preview(db, scope: Scope, *, inbound_message_id: str, expected_revisio
             pending = infer(model, request_messages, request_schema)
             raw = await asyncio.wait_for(pending, timeout=20) if active else await pending
             received = True
+            audit['pending_raw_response']=raw.encode(errors='replace')[:16000].decode(errors='replace') if isinstance(raw,str) else None
             if wire_mode:
                 from .interpretation_input import compile_input
                 from .current_declarations import extract,merge
@@ -157,6 +162,7 @@ async def preview(db, scope: Scope, *, inbound_message_id: str, expected_revisio
                 by_key={p.key:p for p in validated_declarations}
                 for p in declarations:by_key.setdefault(p.key,p)
                 validated_declarations=list(by_key.values())
+                audit['validated_declarations']=[p.model_dump(mode='json') for p in validated_declarations]
                 draft,compiled_notes=compile_input(raw,inbound.content)
                 normalizations.extend(compiled_notes)
                 draft,declaration_notes=merge(draft,validated_declarations)
@@ -177,6 +183,9 @@ async def preview(db, scope: Scope, *, inbound_message_id: str, expected_revisio
                 interpreted,omitted_preferences=omit_unrelated_financial_preferences(interpreted,
                     appointment_confirmation=bool(latest and (latest.metadata_json or {}).get('booking_confirmation')))
                 normalizations.extend(omitted_preferences)
+                from .interpretation_consistency import normalize as normalize_consistency
+                interpreted,consistency_notes=normalize_consistency(interpreted,inbound.content,commercial)
+                normalizations.extend(consistency_notes)
                 from .understanding_completeness import scoped_subjects,completeness_issues
                 interpreted,subject_notes=scoped_subjects(interpreted,inbound.content,commercial)
                 normalizations.extend(subject_notes)
@@ -275,3 +284,16 @@ async def preview(db, scope: Scope, *, inbound_message_id: str, expected_revisio
     saved_revision, saved_state = save(db, scope, event_key=event_key, expected_revision=revision,
         state=state, kind='understanding_preview', metadata=metadata)
     return PreviewOutcome(saved_revision, saved_state, outcome,tuple(p.model_dump(mode='json') for p in validated_declarations))
+
+
+async def preview(db,scope,*,inbound_message_id,expected_revision,event_key,infer=None,active=False):
+    """Retain the attempt journal even when an unexpected later phase crashes."""
+    audit={}
+    try:
+        return await _preview(db,scope,inbound_message_id=inbound_message_id,expected_revision=expected_revision,event_key=event_key,infer=infer,active=active,audit=audit)
+    except Exception as exc:
+        # Do not serialize the exception body: it may contain SQL or credentials.
+        from .runtime_errors import diagnostic
+        audit['error_diagnostic']=diagnostic(exc)
+        exc.sales_interpretation_audit=audit
+        raise

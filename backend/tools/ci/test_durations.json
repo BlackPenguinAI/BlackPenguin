@@ -107,6 +107,7 @@
     "test_staff_monitor.py": 8.575,
     "test_team_meta_101112.py": 4.591,
     "test_telnyx_messaging.py": 1.507,
-    "test_user_project_access.py": 0.353
+    "test_user_project_access.py": 0.353,
+    "test_sales_interpretation_consistency.py": 39.68
   }
 }

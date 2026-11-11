@@ -432,6 +432,7 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
         run.graph_version=ENGINE;run.toolset_version='sales-actions/1.0'
         run.input_snapshot={**run.input_snapshot,'continuity_epoch':continuity.epoch(conversation)}
         db.commit()
+        interpretation_audit={}
         try:
             from .next_flow import selected as next_selected
             next_enabled=next_selected(scope)
@@ -494,6 +495,10 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
             else:
                 interpreted=await asyncio.wait_for(preview(db,scope,inbound_message_id=inbound.id,expected_revision=revision,
                     event_key='active-understanding:'+inbound.id,active=True),timeout=45)
+                preview_event=scope.query(db,SalesDialogueEvent).filter_by(event_key='active-understanding:'+inbound.id).first()
+                if preview_event:
+                    from copy import deepcopy
+                    interpretation_audit=deepcopy(preview_event.payload_json.get('metadata') or {})
                 if interpreted.status!='accepted' and next_enabled and interpreted.declarations:
                     conversation,lead,project=_current(db,scope)
                     continuity.check_epoch(conversation,run.input_snapshot.get('continuity_epoch'))
@@ -856,6 +861,27 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
             run=db.query(AgentRun).filter_by(event_id=event_id).one()
             interpretation=scope.query(db,SalesDialogueEvent).filter_by(event_key='active-understanding:'+inbound.id).first()
             trace=(interpretation.payload_json.get('metadata') or {}) if interpretation else {}
+            audit=getattr(exc,'sales_interpretation_audit',{}) or interpretation_audit
+            if not trace and audit:trace=audit
+            from .runtime_errors import diagnostic
+            error_diagnostic=diagnostic(exc)
+            if audit:
+                run.input_snapshot={**(run.input_snapshot or {}),'interpretation_failure':audit}
+                # The request path may have rolled back the preview event. Literal
+                # declarations can still be validated under fresh control checks.
+                from .current_declarations import extract,frame
+                declarations=extract(inbound.content)
+                if declarations:
+                    try:
+                        conversation,lead,project=_current(db,scope)
+                        continuity.check_epoch(conversation,run.input_snapshot.get('continuity_epoch'))
+                        from .lead_profile import capture as capture_profile
+                        capture_profile(db,scope,frame(declarations),inbound.id)
+                        from .profile_intelligence import segment_for
+                        lead.assigned_segment=segment_for(lead)
+                        db.flush([lead])
+                    except (PermissionError,DialogueConflict):
+                        db.rollback();return True
             if trace:
                 run.model=trace.get('model') or run.model
                 run.prompt_snapshot=trace.get('prompt_snapshot') or run.prompt_snapshot
@@ -867,6 +893,7 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
                 'suppress_duplicate_error_reply':suppress,'consecutive_processing_failures':consecutive,
                 'metadata':{'engine':ENGINE,'workflow_version':'sales-current/1.0','inbound_message_id':inbound.id},'error_code':type(exc).__name__,
                 'interpretation_outcome':trace.get('outcome'),'interpretation_attempt_count':len(trace.get('interpretation_attempts') or []),
+                'error_diagnostic':error_diagnostic,
                 'sales_asset_share_ids':[],'delivered_task_ids':[],'policy_violations':[]}
             run.status='prepared';db.commit()
     # Durable effect receipts precede provider sends. Retry dispatch does not

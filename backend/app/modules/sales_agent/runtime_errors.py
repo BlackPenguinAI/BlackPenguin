@@ -26,3 +26,10 @@ def response(db, conversation, run):
                  'conversation_id':conversation.id,'error_code':run.error_code},
         dedupe_key='sales-processing-issue:'+conversation.id+':'+(failed[-1].id if failed else run.id))
     return ("Would you prefer to continue here or speak with the sales team?", False, count)
+
+
+def diagnostic(exc):
+    """Code locations only; no exception message, SQL parameters or prompt text."""
+    import traceback
+    from pathlib import Path
+    return {'error_code':type(exc).__name__,'frames':[{'file':Path(f.filename).name,'function':f.name,'line':f.lineno} for f in traceback.extract_tb(exc.__traceback__)[-8:]]}
