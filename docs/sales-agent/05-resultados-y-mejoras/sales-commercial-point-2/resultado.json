@@ -1,0 +1,94 @@
+{
+  "run": "sales-commercial-point-2",
+  "execution_origin": "server_submitted_synthetic_run",
+  "archive": "sales-commercial-point-2.zip",
+  "sha256": "839caebfaf7c754d52f675e62986e68fd663cb4f7cf9688e163a7a09658b92b9",
+  "commit": "b672f9e9e509863dc015e183d9a66cae1b4dd8f3",
+  "suite": "commercial",
+  "cohort": "881bfe45102e",
+  "selected_cases": [
+    "affordable_alternative",
+    "cash_available",
+    "different_currency",
+    "down_payment_only",
+    "lower_budget_financing",
+    "no_budget_match",
+    "outright_purchase",
+    "property_reservation"
+  ],
+  "model": "openai/gpt-4o-mini",
+  "configuration_version": 8,
+  "configuration_sha256": "51ff65376dad421328dab993a4fc71939489386f1ed173514cf13a244ac79f1c",
+  "status": "PASS",
+  "cases": 8,
+  "approved_cases": 8,
+  "turns": 17,
+  "expected_bookings": 0,
+  "actual_bookings": 0,
+  "provider_calls": 35,
+  "cost_usd_recorded": 0.046071300000000016,
+  "cost_complete": true,
+  "checks_summary": {
+    "PASS": 217,
+    "FAIL": 0,
+    "BLOCKED": 0
+  },
+  "case_results": [
+    {
+      "case": "cash_available",
+      "status": "aprobado",
+      "meetings": 0,
+      "turns": 2,
+      "failures": 0
+    },
+    {
+      "case": "outright_purchase",
+      "status": "aprobado",
+      "meetings": 0,
+      "turns": 2,
+      "failures": 0
+    },
+    {
+      "case": "affordable_alternative",
+      "status": "aprobado",
+      "meetings": 0,
+      "turns": 2,
+      "failures": 0
+    },
+    {
+      "case": "lower_budget_financing",
+      "status": "aprobado",
+      "meetings": 0,
+      "turns": 2,
+      "failures": 0
+    },
+    {
+      "case": "no_budget_match",
+      "status": "aprobado",
+      "meetings": 0,
+      "turns": 2,
+      "failures": 0
+    },
+    {
+      "case": "down_payment_only",
+      "status": "aprobado",
+      "meetings": 0,
+      "turns": 3,
+      "failures": 0
+    },
+    {
+      "case": "different_currency",
+      "status": "aprobado",
+      "meetings": 0,
+      "turns": 2,
+      "failures": 0
+    },
+    {
+      "case": "property_reservation",
+      "status": "aprobado",
+      "meetings": 0,
+      "turns": 2,
+      "failures": 0
+    }
+  ]
+}

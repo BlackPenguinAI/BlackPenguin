@@ -1,0 +1,632 @@
+{
+  "synthetic_only": true,
+  "execution_origin": "server_submitted_synthetic_run",
+  "source_archive": "sales-compact-battery-1.zip",
+  "source_sha256": "c7ea67c3afb76b0d57ef306b6838ecf706eff8508647861c610eb1e70e16b430",
+  "commit": "1cd37eed349b15db0953cf0f52298ae27be353b0",
+  "sales_model": "openai/gpt-4o-mini",
+  "configuration_version": 8,
+  "configuration_sha256": "51ff65376dad421328dab993a4fc71939489386f1ed173514cf13a244ac79f1c",
+  "clock_utc": null,
+  "team": [
+    {
+      "id": "9705731b-5763-5cba-87a3-42bef9f197cd",
+      "company_id": "f0ebe3a5-6c04-5b8e-8cd8-423859aa39d7",
+      "role": "candidate",
+      "active": true,
+      "access_scope": "all",
+      "project_ids": [],
+      "accepts_appointments": true,
+      "has_slots": true
+    },
+    {
+      "id": "eb42ebc3-d646-5e27-81c9-e7f1a20ca375",
+      "company_id": "f0ebe3a5-6c04-5b8e-8cd8-423859aa39d7",
+      "role": "other_project",
+      "active": true,
+      "access_scope": "selected",
+      "project_ids": [
+        "88e5563d-2f4e-5a11-9822-ec319f06f25e"
+      ],
+      "accepts_appointments": true,
+      "has_slots": true
+    },
+    {
+      "id": "c7689b21-4620-51a8-b1a0-a6cc398c1ced",
+      "company_id": "f0ebe3a5-6c04-5b8e-8cd8-423859aa39d7",
+      "role": "none",
+      "active": true,
+      "access_scope": "selected",
+      "project_ids": [],
+      "accepts_appointments": true,
+      "has_slots": true
+    },
+    {
+      "id": "8a4d1972-5bab-52f9-a068-cc1f57af995b",
+      "company_id": "f0ebe3a5-6c04-5b8e-8cd8-423859aa39d7",
+      "role": "inactive",
+      "active": false,
+      "access_scope": "selected",
+      "project_ids": [
+        "fc14327b-d4de-50e6-b694-20c4897e3fa8"
+      ],
+      "accepts_appointments": true,
+      "has_slots": true
+    },
+    {
+      "id": "d813941c-f955-58c3-969f-faca62957a22",
+      "company_id": "f0ebe3a5-6c04-5b8e-8cd8-423859aa39d7",
+      "role": "no_appointments",
+      "active": true,
+      "access_scope": "selected",
+      "project_ids": [
+        "fc14327b-d4de-50e6-b694-20c4897e3fa8"
+      ],
+      "accepts_appointments": false,
+      "has_slots": true
+    }
+  ],
+  "case": "rental_A",
+  "description": "inversion-alquiler-y-visita",
+  "persona": {
+    "key": "rental",
+    "name": "Lucas Chen",
+    "segment": "rental_yield_investor",
+    "motive": "I am buying an investment property to earn rental income.",
+    "budget": 500000
+  },
+  "company_id": "f0ebe3a5-6c04-5b8e-8cd8-423859aa39d7",
+  "project_id": "fc14327b-d4de-50e6-b694-20c4897e3fa8",
+  "property_type_id": "9cca24ce-3d61-586c-a66a-37f992b5185d",
+  "automatic_result": "fallido",
+  "human_review": {
+    "status": "pending",
+    "note": "Automatic approval is not a human judgment of conversational quality."
+  },
+  "stop_reason": "repeated_message_without_progress",
+  "expected_outcome": "booked",
+  "topic_tags": [
+    "clarify_property",
+    "information",
+    "request_visit"
+  ],
+  "turns": [
+    {
+      "turn": 1,
+      "action": "information",
+      "lead": "I am buying an investment property to earn rental income. My budget is 500,000 USD, paying cash. What can you tell me about Ridge Townhome?",
+      "agent": "Here are the property options I can confirm:\n\n1. Ridge Townhome — 3 bedrooms, 2.5 bathrooms, 165 m². Published prices start at 460,000.00 USD. Last confirmed quantity: 4.\n\nYou are considering an outright purchase, without financing.\n\nRidge Townhome has a published starting price of 460,000.00 USD, within your stated total budget. The exact property price and current availability still need confirmation.\n\n2. Summit Villa — 4 bedrooms, 3 bathrooms, 220 m². Published prices start at 620,000.00 USD. Last confirmed quantity: 0.\n\n3. Valley Apartment — 2 bedrooms, 2 bathrooms, 95 m². Availability is not confirmed.\n\nWould you like more details about one of these options?",
+      "understanding": {
+        "version": "sales-understanding/1.0",
+        "requests": [
+          {
+            "id": "r1",
+            "topic": "inventory",
+            "subject": null,
+            "polarity": "request",
+            "evidence": "What can you tell me about Ridge Townhome?",
+            "reference_id": null,
+            "detail_fields": [],
+            "feature": null
+          }
+        ],
+        "all_of": [
+          "r1"
+        ],
+        "alternatives": [],
+        "constraints": [],
+        "references": [],
+        "preferences": [
+          {
+            "key": "budget",
+            "value": "500000 USD",
+            "evidence": "My budget is 500,000 USD",
+            "status": "declared"
+          },
+          {
+            "key": "financing",
+            "value": "cash",
+            "evidence": "paying cash",
+            "status": "declared"
+          },
+          {
+            "key": "buyer_type",
+            "value": "rental_yield_investor",
+            "evidence": "I am buying an investment property to earn rental income",
+            "status": "declared"
+          }
+        ],
+        "personal_facts": [],
+        "preference_withdrawals": [],
+        "comparison": null,
+        "source_purposes": [],
+        "objections": [],
+        "empathy": null,
+        "releases": [],
+        "visit": null,
+        "courtesy": null,
+        "reschedule": null,
+        "cancellation": null,
+        "wait": null,
+        "moderation": null,
+        "appointment_query": null,
+        "selected_reference_id": null,
+        "requires_clarification": false,
+        "clarification_question": null,
+        "confidence": 0.99
+      },
+      "error_code": null,
+      "checks": [
+        {
+          "check": "current_workflow",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "turn_completed",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "scripted_english_not_rejected",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "reply_present",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_internal_narration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "segment_matches_declared_motivation",
+          "status": "PASS",
+          "detail": "expected=rental_yield_investor; actual=rental_yield_investor; assigned=rental_yield_investor"
+        },
+        {
+          "check": "no_booking_without_confirmation",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "at_most_one_booking",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_identical_consecutive_reply",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "composition_accepted",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_emotion_invented_on_neutral_closure",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_declaration_converted_to_question",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_repeated_financial_sentences",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_unrequested_financing_pitch_after_cash",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "payment_information_stated_once",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "segment_evidence_from_own_initial_declaration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "declared_budget_persists",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "known_budget_not_asked_again",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "cash_preference_persists",
+          "status": "PASS",
+          "detail": ""
+        }
+      ],
+      "composition": {
+        "status": "accepted",
+        "attempts": [
+          {
+            "status": "accepted"
+          }
+        ]
+      }
+    },
+    {
+      "turn": 2,
+      "action": "request_visit",
+      "lead": "I would like to arrange an in-person visit to Ridge Townhome. Any available time in the next seven days works for me. Please use the project timezone.",
+      "agent": "Which property would you like to visit?\n\n1. Ridge Townhome\n\n2. Summit Villa\n\n3. Valley Apartment",
+      "understanding": {
+        "version": "sales-understanding/1.0",
+        "requests": [
+          {
+            "id": "r1",
+            "topic": "appointment",
+            "subject": null,
+            "polarity": "request",
+            "evidence": "I would like to arrange an in-person visit to Ridge Townhome. Any available time in the next seven days works for me. Please use the project timezone.",
+            "reference_id": null,
+            "detail_fields": [],
+            "feature": null
+          }
+        ],
+        "all_of": [
+          "r1"
+        ],
+        "alternatives": [],
+        "constraints": [],
+        "references": [],
+        "preferences": [],
+        "personal_facts": [],
+        "preference_withdrawals": [],
+        "comparison": null,
+        "source_purposes": [],
+        "objections": [],
+        "empathy": null,
+        "releases": [],
+        "visit": null,
+        "courtesy": null,
+        "reschedule": null,
+        "cancellation": null,
+        "wait": null,
+        "moderation": null,
+        "appointment_query": null,
+        "selected_reference_id": null,
+        "requires_clarification": false,
+        "clarification_question": null,
+        "confidence": 0.99
+      },
+      "error_code": null,
+      "checks": [
+        {
+          "check": "current_workflow",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "turn_completed",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "scripted_english_not_rejected",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "reply_present",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_internal_narration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "segment_matches_declared_motivation",
+          "status": "PASS",
+          "detail": "expected=rental_yield_investor; actual=rental_yield_investor; assigned=rental_yield_investor"
+        },
+        {
+          "check": "no_booking_without_confirmation",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "at_most_one_booking",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_identical_consecutive_reply",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "composition_accepted",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_emotion_invented_on_neutral_closure",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_declaration_converted_to_question",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_repeated_financial_sentences",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_unrequested_financing_pitch_after_cash",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "payment_information_stated_once",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "segment_evidence_from_own_initial_declaration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "declared_budget_persists",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "known_budget_not_asked_again",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "cash_preference_persists",
+          "status": "PASS",
+          "detail": ""
+        }
+      ],
+      "composition": {
+        "status": "accepted",
+        "attempts": [
+          {
+            "status": "accepted"
+          }
+        ]
+      }
+    },
+    {
+      "turn": 3,
+      "action": "clarify_property",
+      "lead": "I would like to arrange an in-person visit to Ridge Townhome. Any available time in the next seven days works for me. Please use the project timezone.",
+      "agent": "Which property would you like to visit?\n\n1. Ridge Townhome\n\n2. Summit Villa\n\n3. Valley Apartment",
+      "understanding": {
+        "version": "sales-understanding/1.0",
+        "requests": [
+          {
+            "id": "r1",
+            "topic": "appointment",
+            "subject": null,
+            "polarity": "request",
+            "evidence": "I would like to arrange an in-person visit to Ridge Townhome. Any available time in the next seven days works for me. Please use the project timezone.",
+            "reference_id": null,
+            "detail_fields": [],
+            "feature": null
+          }
+        ],
+        "all_of": [
+          "r1"
+        ],
+        "alternatives": [],
+        "constraints": [],
+        "references": [],
+        "preferences": [],
+        "personal_facts": [],
+        "preference_withdrawals": [],
+        "comparison": null,
+        "source_purposes": [],
+        "objections": [],
+        "empathy": null,
+        "releases": [],
+        "visit": null,
+        "courtesy": null,
+        "reschedule": null,
+        "cancellation": null,
+        "wait": null,
+        "moderation": null,
+        "appointment_query": null,
+        "selected_reference_id": null,
+        "requires_clarification": false,
+        "clarification_question": null,
+        "confidence": 0.99
+      },
+      "error_code": null,
+      "checks": [
+        {
+          "check": "current_workflow",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "turn_completed",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "scripted_english_not_rejected",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "reply_present",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_internal_narration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "segment_matches_declared_motivation",
+          "status": "PASS",
+          "detail": "expected=rental_yield_investor; actual=rental_yield_investor; assigned=rental_yield_investor"
+        },
+        {
+          "check": "no_booking_without_confirmation",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "at_most_one_booking",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_identical_consecutive_reply",
+          "status": "FAIL",
+          "detail": ""
+        },
+        {
+          "check": "composition_accepted",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_emotion_invented_on_neutral_closure",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_declaration_converted_to_question",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_repeated_financial_sentences",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_unrequested_financing_pitch_after_cash",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "payment_information_stated_once",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "segment_evidence_from_own_initial_declaration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "declared_budget_persists",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "known_budget_not_asked_again",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "cash_preference_persists",
+          "status": "PASS",
+          "detail": ""
+        }
+      ],
+      "composition": {
+        "status": "accepted",
+        "attempts": [
+          {
+            "status": "accepted"
+          }
+        ]
+      }
+    }
+  ],
+  "checks": [
+    {
+      "check": "segment_not_seeded",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "eligible_roster_matches_assignments",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "expected_booking_outcome",
+      "status": "FAIL",
+      "detail": ""
+    },
+    {
+      "check": "no_provider_outbox",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "dialogue_reached_terminal_outcome",
+      "status": "FAIL",
+      "detail": ""
+    },
+    {
+      "check": "only_registered_material_urls",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "no_unregistered_material_link",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "all_shares_bound_to_current_property",
+      "status": "PASS",
+      "detail": ""
+    }
+  ],
+  "failures": [
+    {
+      "check": "expected_booking_outcome",
+      "status": "FAIL",
+      "detail": ""
+    },
+    {
+      "check": "dialogue_reached_terminal_outcome",
+      "status": "FAIL",
+      "detail": ""
+    },
+    {
+      "check": "no_identical_consecutive_reply",
+      "status": "FAIL",
+      "detail": ""
+    }
+  ],
+  "blocked_checks": [],
+  "meetings": [],
+  "materials": []
+}

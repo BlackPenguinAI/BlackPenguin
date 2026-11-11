@@ -1,0 +1,793 @@
+{
+  "synthetic_only": true,
+  "execution_origin": "server_submitted_synthetic_run",
+  "source_archive": "sales-compact-repair-2.zip",
+  "source_sha256": "806f1e398d61a58d33f607a3a009efd1759e4448d76335db22c7ac49378a7e99",
+  "commit": "2d85c207292cc2e25edc796168317e9713f0e274",
+  "sales_model": "openai/gpt-4o-mini",
+  "configuration_version": 8,
+  "configuration_sha256": "51ff65376dad421328dab993a4fc71939489386f1ed173514cf13a244ac79f1c",
+  "clock_utc": null,
+  "team": [
+    {
+      "id": "919e8ff1-50c2-540e-92e0-dac4c05356fb",
+      "company_id": "f0ebe3a5-6c04-5b8e-8cd8-423859aa39d7",
+      "role": "candidate",
+      "active": true,
+      "access_scope": "selected",
+      "project_ids": [
+        "abf88941-5a70-5a06-a1ed-bca5b42bb90a"
+      ],
+      "accepts_appointments": true,
+      "has_slots": true
+    },
+    {
+      "id": "87809d28-22ee-5ad2-b2c0-f08cddac8b30",
+      "company_id": "f0ebe3a5-6c04-5b8e-8cd8-423859aa39d7",
+      "role": "other_project",
+      "active": true,
+      "access_scope": "selected",
+      "project_ids": [
+        "fc14327b-d4de-50e6-b694-20c4897e3fa8"
+      ],
+      "accepts_appointments": true,
+      "has_slots": true
+    },
+    {
+      "id": "ed3582dd-0b07-57bf-a7c5-b817001cf694",
+      "company_id": "f0ebe3a5-6c04-5b8e-8cd8-423859aa39d7",
+      "role": "none",
+      "active": true,
+      "access_scope": "selected",
+      "project_ids": [],
+      "accepts_appointments": true,
+      "has_slots": true
+    },
+    {
+      "id": "39faab93-3860-555a-840b-71c3e3001fe6",
+      "company_id": "f0ebe3a5-6c04-5b8e-8cd8-423859aa39d7",
+      "role": "inactive",
+      "active": false,
+      "access_scope": "selected",
+      "project_ids": [
+        "abf88941-5a70-5a06-a1ed-bca5b42bb90a"
+      ],
+      "accepts_appointments": true,
+      "has_slots": true
+    },
+    {
+      "id": "37070a20-89f3-5dc1-9951-0e905f282cd3",
+      "company_id": "f0ebe3a5-6c04-5b8e-8cd8-423859aa39d7",
+      "role": "no_appointments",
+      "active": true,
+      "access_scope": "selected",
+      "project_ids": [
+        "abf88941-5a70-5a06-a1ed-bca5b42bb90a"
+      ],
+      "accepts_appointments": false,
+      "has_slots": true
+    }
+  ],
+  "case": "first_time_A",
+  "description": "primera-compra-pdf-y-visita",
+  "persona": {
+    "key": "first_time",
+    "name": "Emma Torres",
+    "segment": "first_time_buyer",
+    "motive": "I am buying my first home.",
+    "budget": 300000
+  },
+  "company_id": "f0ebe3a5-6c04-5b8e-8cd8-423859aa39d7",
+  "project_id": "abf88941-5a70-5a06-a1ed-bca5b42bb90a",
+  "property_type_id": "bb1d7fba-2496-5256-a405-535cd3455066",
+  "automatic_result": "fallido",
+  "human_review": {
+    "status": "pending",
+    "note": "Automatic approval is not a human judgment of conversational quality."
+  },
+  "stop_reason": "repeated_message_without_progress",
+  "expected_outcome": "booked",
+  "topic_tags": [
+    "clarify_visit",
+    "information",
+    "material",
+    "request_visit"
+  ],
+  "turns": [
+    {
+      "turn": 1,
+      "action": "information",
+      "lead": "I am buying my first home. My budget is 300,000 USD, paying cash. What can you tell me about Cedar Studio?",
+      "agent": "Would you like me to connect you with the sales team to help with your question?",
+      "understanding": {},
+      "error_code": "TypeError",
+      "checks": [
+        {
+          "check": "current_workflow",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "turn_completed",
+          "status": "FAIL",
+          "detail": ""
+        },
+        {
+          "check": "scripted_english_not_rejected",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "reply_present",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_internal_narration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "segment_matches_declared_motivation",
+          "status": "FAIL",
+          "detail": "expected=first_time_buyer; actual=None; assigned=None"
+        },
+        {
+          "check": "no_booking_without_confirmation",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "at_most_one_booking",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_identical_consecutive_reply",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_emotion_invented_on_neutral_closure",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_declaration_converted_to_question",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_repeated_financial_sentences",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_unrequested_financing_pitch_after_cash",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "payment_information_stated_once",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "segment_evidence_from_own_initial_declaration",
+          "status": "FAIL",
+          "detail": ""
+        },
+        {
+          "check": "declared_budget_persists",
+          "status": "FAIL",
+          "detail": ""
+        },
+        {
+          "check": "known_budget_not_asked_again",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "cash_preference_persists",
+          "status": "FAIL",
+          "detail": ""
+        }
+      ],
+      "composition": {
+        "status": null,
+        "attempts": []
+      }
+    },
+    {
+      "turn": 2,
+      "action": "material",
+      "lead": "Please send the brochure PDF for Cedar Studio.",
+      "agent": "Which property option do you mean?\n\n1. Cedar Loft\n\n2. Cedar Studio",
+      "understanding": {
+        "version": "sales-understanding/1.0",
+        "requests": [
+          {
+            "id": "r0",
+            "topic": "materials",
+            "subject": "brochure",
+            "polarity": "request",
+            "evidence": "Please send the brochure PDF for Cedar Studio.",
+            "reference_id": "ref0",
+            "detail_fields": [],
+            "feature": null
+          }
+        ],
+        "all_of": [
+          "r0"
+        ],
+        "alternatives": [],
+        "constraints": [],
+        "references": [
+          {
+            "kind": "material",
+            "id": "ref0",
+            "expression": "Cedar Studio",
+            "evidence": "Cedar Studio"
+          }
+        ],
+        "preferences": [],
+        "personal_facts": [],
+        "preference_withdrawals": [],
+        "comparison": null,
+        "source_purposes": [],
+        "objections": [],
+        "empathy": null,
+        "releases": [],
+        "visit": null,
+        "courtesy": null,
+        "reschedule": null,
+        "cancellation": null,
+        "wait": null,
+        "moderation": null,
+        "appointment_query": null,
+        "selected_reference_id": null,
+        "requires_clarification": false,
+        "clarification_question": null,
+        "confidence": 1.0
+      },
+      "error_code": null,
+      "checks": [
+        {
+          "check": "current_workflow",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "turn_completed",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "scripted_english_not_rejected",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "reply_present",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_internal_narration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "segment_matches_declared_motivation",
+          "status": "FAIL",
+          "detail": "expected=first_time_buyer; actual=None; assigned=None"
+        },
+        {
+          "check": "no_booking_without_confirmation",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "at_most_one_booking",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_identical_consecutive_reply",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "composition_accepted",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_emotion_invented_on_neutral_closure",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_declaration_converted_to_question",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_repeated_financial_sentences",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_unrequested_financing_pitch_after_cash",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "payment_information_stated_once",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "segment_evidence_from_own_initial_declaration",
+          "status": "FAIL",
+          "detail": ""
+        },
+        {
+          "check": "declared_budget_persists",
+          "status": "FAIL",
+          "detail": ""
+        },
+        {
+          "check": "known_budget_not_asked_again",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "cash_preference_persists",
+          "status": "FAIL",
+          "detail": ""
+        }
+      ],
+      "composition": {
+        "status": "accepted",
+        "attempts": [
+          {
+            "status": "accepted"
+          }
+        ]
+      }
+    },
+    {
+      "turn": 3,
+      "action": "request_visit",
+      "lead": "I would like to arrange an in-person visit to Cedar Studio. Any available time in the next seven days works for me. Please use the project timezone.",
+      "agent": "Would you like me to connect you with the sales team to help with your question?",
+      "understanding": {},
+      "error_code": "TypeError",
+      "checks": [
+        {
+          "check": "current_workflow",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "turn_completed",
+          "status": "FAIL",
+          "detail": ""
+        },
+        {
+          "check": "scripted_english_not_rejected",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "reply_present",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_internal_narration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "segment_matches_declared_motivation",
+          "status": "FAIL",
+          "detail": "expected=first_time_buyer; actual=None; assigned=None"
+        },
+        {
+          "check": "no_booking_without_confirmation",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "at_most_one_booking",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_identical_consecutive_reply",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_emotion_invented_on_neutral_closure",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_declaration_converted_to_question",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_repeated_financial_sentences",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_unrequested_financing_pitch_after_cash",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "payment_information_stated_once",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "segment_evidence_from_own_initial_declaration",
+          "status": "FAIL",
+          "detail": ""
+        },
+        {
+          "check": "declared_budget_persists",
+          "status": "FAIL",
+          "detail": ""
+        },
+        {
+          "check": "known_budget_not_asked_again",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "cash_preference_persists",
+          "status": "FAIL",
+          "detail": ""
+        }
+      ],
+      "composition": {
+        "status": null,
+        "attempts": []
+      }
+    },
+    {
+      "turn": 4,
+      "action": "clarify_visit",
+      "lead": "I would like to arrange an in-person visit to Cedar Studio. Any available time in the next seven days works for me. Please use the project timezone.",
+      "agent": "Please specify the preferred local time, including AM or PM.",
+      "understanding": {
+        "version": "sales-understanding/1.0",
+        "requests": [
+          {
+            "id": "r0",
+            "topic": "appointment",
+            "subject": null,
+            "polarity": "request",
+            "evidence": "I would like to arrange an in-person visit to Cedar Studio. Any available time in the next seven days works for me. Please use the project timezone.",
+            "reference_id": "ref0",
+            "detail_fields": [],
+            "feature": null
+          }
+        ],
+        "all_of": [
+          "r0"
+        ],
+        "alternatives": [],
+        "constraints": [],
+        "references": [
+          {
+            "kind": "property",
+            "id": "ref0",
+            "expression": "Cedar Studio",
+            "evidence": "I would like to arrange an in-person visit to Cedar Studio."
+          }
+        ],
+        "preferences": [],
+        "personal_facts": [],
+        "preference_withdrawals": [],
+        "comparison": null,
+        "source_purposes": [],
+        "objections": [],
+        "empathy": null,
+        "releases": [],
+        "visit": {
+          "action": "request",
+          "evidence": "I would like to arrange an in-person visit to Cedar Studio. Any available time in the next seven days works for me. Please use the project timezone.",
+          "timing": {
+            "date_from_evidence": "next seven days",
+            "date_until_evidence": "next seven days",
+            "time_from_evidence": "next seven days",
+            "time_until_evidence": "next seven days",
+            "time_relation": "range",
+            "timezone_evidence": "project timezone",
+            "duration_evidence": null
+          }
+        },
+        "courtesy": null,
+        "reschedule": null,
+        "cancellation": null,
+        "wait": null,
+        "moderation": null,
+        "appointment_query": null,
+        "selected_reference_id": null,
+        "requires_clarification": false,
+        "clarification_question": null,
+        "confidence": 1.0
+      },
+      "error_code": null,
+      "checks": [
+        {
+          "check": "current_workflow",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "turn_completed",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "scripted_english_not_rejected",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "reply_present",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_internal_narration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "segment_matches_declared_motivation",
+          "status": "FAIL",
+          "detail": "expected=first_time_buyer; actual=None; assigned=None"
+        },
+        {
+          "check": "no_booking_without_confirmation",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "at_most_one_booking",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_identical_consecutive_reply",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "composition_accepted",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_emotion_invented_on_neutral_closure",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_declaration_converted_to_question",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_repeated_financial_sentences",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_unrequested_financing_pitch_after_cash",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "payment_information_stated_once",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "segment_evidence_from_own_initial_declaration",
+          "status": "FAIL",
+          "detail": ""
+        },
+        {
+          "check": "declared_budget_persists",
+          "status": "FAIL",
+          "detail": ""
+        },
+        {
+          "check": "known_budget_not_asked_again",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "cash_preference_persists",
+          "status": "FAIL",
+          "detail": ""
+        }
+      ],
+      "composition": {
+        "status": "accepted",
+        "attempts": [
+          {
+            "status": "accepted"
+          }
+        ]
+      }
+    }
+  ],
+  "checks": [
+    {
+      "check": "segment_not_seeded",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "eligible_roster_matches_assignments",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "expected_booking_outcome",
+      "status": "FAIL",
+      "detail": ""
+    },
+    {
+      "check": "no_provider_outbox",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "dialogue_reached_terminal_outcome",
+      "status": "FAIL",
+      "detail": ""
+    },
+    {
+      "check": "only_registered_material_urls",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "no_unregistered_material_link",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "all_shares_bound_to_current_property",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "requested_material_delivered",
+      "status": "FAIL",
+      "detail": ""
+    }
+  ],
+  "failures": [
+    {
+      "check": "expected_booking_outcome",
+      "status": "FAIL",
+      "detail": ""
+    },
+    {
+      "check": "dialogue_reached_terminal_outcome",
+      "status": "FAIL",
+      "detail": ""
+    },
+    {
+      "check": "requested_material_delivered",
+      "status": "FAIL",
+      "detail": ""
+    },
+    {
+      "check": "turn_completed",
+      "status": "FAIL",
+      "detail": ""
+    },
+    {
+      "check": "segment_matches_declared_motivation",
+      "status": "FAIL",
+      "detail": "expected=first_time_buyer; actual=None; assigned=None"
+    },
+    {
+      "check": "segment_evidence_from_own_initial_declaration",
+      "status": "FAIL",
+      "detail": ""
+    },
+    {
+      "check": "declared_budget_persists",
+      "status": "FAIL",
+      "detail": ""
+    },
+    {
+      "check": "cash_preference_persists",
+      "status": "FAIL",
+      "detail": ""
+    },
+    {
+      "check": "segment_matches_declared_motivation",
+      "status": "FAIL",
+      "detail": "expected=first_time_buyer; actual=None; assigned=None"
+    },
+    {
+      "check": "segment_evidence_from_own_initial_declaration",
+      "status": "FAIL",
+      "detail": ""
+    },
+    {
+      "check": "declared_budget_persists",
+      "status": "FAIL",
+      "detail": ""
+    },
+    {
+      "check": "cash_preference_persists",
+      "status": "FAIL",
+      "detail": ""
+    },
+    {
+      "check": "turn_completed",
+      "status": "FAIL",
+      "detail": ""
+    },
+    {
+      "check": "segment_matches_declared_motivation",
+      "status": "FAIL",
+      "detail": "expected=first_time_buyer; actual=None; assigned=None"
+    },
+    {
+      "check": "segment_evidence_from_own_initial_declaration",
+      "status": "FAIL",
+      "detail": ""
+    },
+    {
+      "check": "declared_budget_persists",
+      "status": "FAIL",
+      "detail": ""
+    },
+    {
+      "check": "cash_preference_persists",
+      "status": "FAIL",
+      "detail": ""
+    },
+    {
+      "check": "segment_matches_declared_motivation",
+      "status": "FAIL",
+      "detail": "expected=first_time_buyer; actual=None; assigned=None"
+    },
+    {
+      "check": "segment_evidence_from_own_initial_declaration",
+      "status": "FAIL",
+      "detail": ""
+    },
+    {
+      "check": "declared_budget_persists",
+      "status": "FAIL",
+      "detail": ""
+    },
+    {
+      "check": "cash_preference_persists",
+      "status": "FAIL",
+      "detail": ""
+    }
+  ],
+  "blocked_checks": [],
+  "meetings": [],
+  "materials": []
+}

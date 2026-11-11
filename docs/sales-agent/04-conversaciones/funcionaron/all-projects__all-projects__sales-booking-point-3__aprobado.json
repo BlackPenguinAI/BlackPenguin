@@ -1,0 +1,451 @@
+{
+  "synthetic_only": true,
+  "execution_origin": "server_submitted_synthetic_run",
+  "source_archive": "sales-booking-point-3.zip",
+  "source_sha256": "000e9cf558eb01362ae642f8e2c5faec2b715977976b92a5e688d312ae2a473b",
+  "commit": "93c1b298c566e89d0667cfc3f118abbf070a804f",
+  "sales_model": "openai/gpt-4o-mini",
+  "configuration_version": 8,
+  "configuration_sha256": "51ff65376dad421328dab993a4fc71939489386f1ed173514cf13a244ac79f1c",
+  "clock_utc": "2026-11-10T22:11:54.828791",
+  "team": [
+    {
+      "id": "db080434-8ba9-587c-a956-8207b9cccb62",
+      "scope": "all",
+      "assigned": true,
+      "active": true
+    },
+    {
+      "id": "2a6f1b62-2a61-5eb3-a75a-d75047fdbf42",
+      "scope": "specific",
+      "assigned": false,
+      "active": true
+    },
+    {
+      "id": "0dcec1b0-bd6c-5684-9a2e-3417567e8f98",
+      "scope": "none",
+      "assigned": false,
+      "active": true
+    },
+    {
+      "id": "25de2823-2da8-59b5-abf7-c049f64655c7",
+      "scope": "inactive",
+      "assigned": true,
+      "active": false
+    },
+    {
+      "id": "6077f47a-c0c9-5661-a11b-6cc446cea77d",
+      "scope": "no_appointments",
+      "assigned": true,
+      "active": true
+    }
+  ],
+  "case": "all_projects",
+  "description": "all-projects",
+  "persona": null,
+  "company_id": "f0ebe3a5-6c04-5b8e-8cd8-423859aa39d7",
+  "project_id": "88e5563d-2f4e-5a11-9822-ec319f06f25e",
+  "property_type_id": null,
+  "automatic_result": "aprobado",
+  "human_review": {
+    "status": "pending",
+    "note": "Automatic approval is not a human judgment of conversational quality."
+  },
+  "stop_reason": "booked",
+  "expected_outcome": null,
+  "topic_tags": [
+    "confirm",
+    "request",
+    "select"
+  ],
+  "turns": [
+    {
+      "turn": 1,
+      "action": "request",
+      "lead": "I am interested in Bay Residence at Harbor Gardens and would like to book an in-person visit. My budget is 900,000 USD, paying cash. Any time in the next seven days works; please use the project timezone.",
+      "agent": "Here are the property options I can confirm:\n\n1. Bay Residence — 4 bedrooms, 3 bathrooms, 240 m². Published prices start at 780,000.00 USD. Last confirmed quantity: 3. Synthetic property for testing. Only the listed features are confirmed. Features: Two covered parking spaces; Private garden.\n\nVerified visit options:\n\n1. 2026-11-12 at 10:00 AM (America/New_York, UTC-0500); Synthetic all\n\n2. 2026-11-12 at 10:30 AM (America/New_York, UTC-0500); Synthetic all\n\n3. 2026-11-12 at 11:00 AM (America/New_York, UTC-0500); Synthetic all\n\nWhich time would you like me to prepare for confirmation?",
+      "understanding": {
+        "version": "sales-understanding/1.0",
+        "requests": [
+          {
+            "id": "r1",
+            "topic": "appointment",
+            "subject": null,
+            "polarity": "request",
+            "evidence": "I am interested in Bay Residence at Harbor Gardens and would like to book an in-person visit.",
+            "reference_id": null,
+            "detail_fields": [],
+            "feature": null
+          },
+          {
+            "id": "r2",
+            "topic": "inventory",
+            "subject": null,
+            "polarity": "request",
+            "evidence": "My budget is 900,000 USD, paying cash.",
+            "reference_id": null,
+            "detail_fields": [],
+            "feature": null
+          }
+        ],
+        "all_of": [
+          "r1",
+          "r2"
+        ],
+        "alternatives": [],
+        "constraints": [],
+        "references": [],
+        "preferences": [
+          {
+            "key": "financing",
+            "value": "cash",
+            "evidence": "paying cash.",
+            "status": "declared"
+          }
+        ],
+        "personal_facts": [],
+        "preference_withdrawals": [],
+        "comparison": null,
+        "source_purposes": [],
+        "objections": [],
+        "empathy": null,
+        "releases": [],
+        "visit": {
+          "action": "request",
+          "evidence": "Any time in the next seven days works; please use the project timezone.",
+          "timing": {
+            "date_from_evidence": "next seven days",
+            "date_until_evidence": null,
+            "time_from_evidence": null,
+            "time_until_evidence": null,
+            "time_relation": "any",
+            "timezone_evidence": "project timezone",
+            "duration_evidence": null
+          }
+        },
+        "courtesy": null,
+        "reschedule": null,
+        "cancellation": null,
+        "wait": null,
+        "moderation": null,
+        "appointment_query": null,
+        "selected_reference_id": null,
+        "requires_clarification": false,
+        "clarification_question": null,
+        "confidence": 0.99
+      },
+      "error_code": null,
+      "checks": [
+        {
+          "check": "reply_present",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "interpretation_accepted",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_internal_narration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_booking_before_confirmation",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "selection_advances_to_confirmation",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_identical_consecutive_reply",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_invented_frustration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_duplicate_booking",
+          "status": "PASS",
+          "detail": ""
+        }
+      ],
+      "composition": {
+        "status": "accepted",
+        "attempts": [
+          {
+            "status": "accepted"
+          }
+        ]
+      }
+    },
+    {
+      "turn": 2,
+      "action": "select",
+      "lead": "I would like the first appointment: 2026-11-12 at 10:00 AM (America/New_York, UTC-0500); Synthetic all.",
+      "agent": "Please confirm your visit: Bay Residence; 2026-11-12 at 10:00 AM (America/New_York, UTC-0500); Synthetic all; 45 minutes; Primary location: 1 Synthetic Avenue. Shall I book this exact visit?",
+      "understanding": {
+        "version": "sales-understanding/1.0",
+        "requests": [
+          {
+            "id": "r1",
+            "topic": "appointment",
+            "subject": null,
+            "polarity": "request",
+            "evidence": "I would like the first appointment: 2026-11-12 at 10:00 AM (America/New_York, UTC-0500); Synthetic all.",
+            "reference_id": null,
+            "detail_fields": [],
+            "feature": null
+          }
+        ],
+        "all_of": [
+          "r1"
+        ],
+        "alternatives": [],
+        "constraints": [],
+        "references": [],
+        "preferences": [],
+        "personal_facts": [],
+        "preference_withdrawals": [],
+        "comparison": null,
+        "source_purposes": [],
+        "objections": [],
+        "empathy": null,
+        "releases": [],
+        "visit": null,
+        "courtesy": null,
+        "reschedule": null,
+        "cancellation": null,
+        "wait": null,
+        "moderation": null,
+        "appointment_query": null,
+        "selected_reference_id": null,
+        "requires_clarification": false,
+        "clarification_question": null,
+        "confidence": 0.99
+      },
+      "error_code": null,
+      "checks": [
+        {
+          "check": "reply_present",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "interpretation_accepted",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_internal_narration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_booking_before_confirmation",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "selection_advances_to_confirmation",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_identical_consecutive_reply",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_invented_frustration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_duplicate_booking",
+          "status": "PASS",
+          "detail": ""
+        }
+      ],
+      "composition": {
+        "status": "accepted",
+        "attempts": [
+          {
+            "status": "accepted"
+          }
+        ]
+      }
+    },
+    {
+      "turn": 3,
+      "action": "confirm",
+      "lead": "Yes",
+      "agent": "Your visit is confirmed: Bay Residence; 2026-11-12 at 10:00 AM (America/New_York, UTC-0500); Synthetic all; 45 minutes; Primary location: 1 Synthetic Avenue. What else would you like to know before your visit?",
+      "understanding": {
+        "version": "sales-understanding/1.0",
+        "requests": [
+          {
+            "id": "r1",
+            "topic": "appointment",
+            "subject": null,
+            "polarity": "request",
+            "evidence": "Yes",
+            "reference_id": null,
+            "detail_fields": [],
+            "feature": null
+          }
+        ],
+        "all_of": [
+          "r1"
+        ],
+        "alternatives": [],
+        "constraints": [],
+        "references": [],
+        "preferences": [],
+        "personal_facts": [],
+        "preference_withdrawals": [],
+        "comparison": null,
+        "source_purposes": [],
+        "objections": [],
+        "empathy": null,
+        "releases": [],
+        "visit": null,
+        "courtesy": null,
+        "reschedule": null,
+        "cancellation": null,
+        "wait": null,
+        "moderation": null,
+        "appointment_query": null,
+        "selected_reference_id": null,
+        "requires_clarification": false,
+        "clarification_question": null,
+        "confidence": 0.99
+      },
+      "error_code": null,
+      "checks": [
+        {
+          "check": "reply_present",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "interpretation_accepted",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_internal_narration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_booking_before_confirmation",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "selection_advances_to_confirmation",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_identical_consecutive_reply",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_invented_frustration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_duplicate_booking",
+          "status": "PASS",
+          "detail": ""
+        }
+      ],
+      "composition": {
+        "status": "accepted",
+        "attempts": [
+          {
+            "status": "accepted"
+          }
+        ]
+      }
+    }
+  ],
+  "checks": [
+    {
+      "check": "no_provider_outbox",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "expected_booking_outcome",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "confirmed_only_after_explicit_selection",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "eligible_sales_assigned",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "correct_project_and_lead",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "location_recorded",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "booked_time_matches_public_selection",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "public_confirmation_matches_booking",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "confirmed_status",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "duplicate_event_is_idempotent",
+      "status": "PASS",
+      "detail": ""
+    }
+  ],
+  "failures": [],
+  "blocked_checks": [],
+  "meetings": [
+    {
+      "id": "430135f2-be3c-4956-8d15-6799d5fd8d78",
+      "project_id": "88e5563d-2f4e-5a11-9822-ec319f06f25e",
+      "lead_id": "454fe903-0191-4c16-8fd0-2a15949a9ee4",
+      "sales_user_id": "db080434-8ba9-587c-a956-8207b9cccb62",
+      "starts_at_utc": "2026-11-12T15:00:00",
+      "duration_minutes": 45,
+      "address": "1 Synthetic Avenue",
+      "calendar_sync_status": "not_connected"
+    }
+  ],
+  "materials": []
+}

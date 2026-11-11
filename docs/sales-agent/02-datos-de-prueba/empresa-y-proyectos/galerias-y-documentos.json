@@ -1,0 +1,73 @@
+{
+  "synthetic_only": true,
+  "fixture_version": "sales-synthetic-company/1.0",
+  "clock_utc": "2026-11-11T06:34:00",
+  "data": [
+    {
+      "kind": "gallery",
+      "asset_id": "f70fddcd-59ad-4324-a787-4a2231cfbea9",
+      "path": "harbor/bay.html",
+      "mime_type": "text/html",
+      "sha256": "28834efbb4b1b642257a7d599c14f97299eae2119fa9604bdee380eaebac2bb4",
+      "project_id": "88e5563d-2f4e-5a11-9822-ec319f06f25e",
+      "property_type_id": "85511ae1-1733-5177-9282-422514a416ce",
+      "public_production_url": null,
+      "scope": "disposable_lab_only"
+    },
+    {
+      "kind": "pdf",
+      "asset_id": "434b8994-182f-4691-95b5-ba62d624ecf4",
+      "path": "harbor/bay.pdf",
+      "mime_type": "application/pdf",
+      "sha256": "6fcf418ca76a59088955c9f498fcfe17dc89d027f53d3f43249db71ff7f0ba6a",
+      "project_id": "88e5563d-2f4e-5a11-9822-ec319f06f25e",
+      "property_type_id": "85511ae1-1733-5177-9282-422514a416ce",
+      "public_production_url": null,
+      "scope": "disposable_lab_only"
+    },
+    {
+      "kind": "gallery",
+      "asset_id": "81bbed56-ef3f-4703-8f4e-954efdcd632a",
+      "path": "cedar/loft.html",
+      "mime_type": "text/html",
+      "sha256": "95aa6ac613c8e38cc568163753d576916aa9dfdc69c7630434520032e3d18841",
+      "project_id": "abf88941-5a70-5a06-a1ed-bca5b42bb90a",
+      "property_type_id": "8f7cedb7-5014-5d7b-ac40-ba5ee6f5f40c",
+      "public_production_url": null,
+      "scope": "disposable_lab_only"
+    },
+    {
+      "kind": "pdf",
+      "asset_id": "69672aca-8766-4ef3-aea5-eb1c676308c6",
+      "path": "cedar/studio.pdf",
+      "mime_type": "application/pdf",
+      "sha256": "bc0bd5e7903e2eb12f891118ec89bc01f56f7376009da65cb4e8be876f69b3ee",
+      "project_id": "abf88941-5a70-5a06-a1ed-bca5b42bb90a",
+      "property_type_id": "bb1d7fba-2496-5256-a405-535cd3455066",
+      "public_production_url": null,
+      "scope": "disposable_lab_only"
+    },
+    {
+      "kind": "gallery",
+      "asset_id": "e1351014-e151-4eea-9998-d06fafd5e3da",
+      "path": "sierra/summit.html",
+      "mime_type": "text/html",
+      "sha256": "475cb6c530f4390c668611b58b8a67acbaf4bd0232407704391dde20a9242896",
+      "project_id": "fc14327b-d4de-50e6-b694-20c4897e3fa8",
+      "property_type_id": "f6a0860f-3bf1-5abd-b1a2-f659e7bfead8",
+      "public_production_url": null,
+      "scope": "disposable_lab_only"
+    },
+    {
+      "kind": "pdf",
+      "asset_id": "98b2c91e-a1de-42a2-ae6c-d70d834206f1",
+      "path": "sierra/summit.pdf",
+      "mime_type": "application/pdf",
+      "sha256": "2e7a242fcbd1af9811271c20bd569d19ae83036f8e7f8175a2e0b58adac93d8d",
+      "project_id": "fc14327b-d4de-50e6-b694-20c4897e3fa8",
+      "property_type_id": "f6a0860f-3bf1-5abd-b1a2-f659e7bfead8",
+      "public_production_url": null,
+      "scope": "disposable_lab_only"
+    }
+  ]
+}

@@ -1,0 +1,205 @@
+{
+  "synthetic_only": true,
+  "fixture_version": "sales-synthetic-company/1.0",
+  "clock_utc": "2026-11-11T06:34:00",
+  "data": [
+    {
+      "key": "bay",
+      "name": "Bay Residence",
+      "bedrooms": 4,
+      "bathrooms": 3,
+      "area": 240,
+      "price": 780000,
+      "available": 3,
+      "gallery": true,
+      "pdf": true,
+      "features": [
+        "Two covered parking spaces",
+        "Private garden"
+      ],
+      "id": "85511ae1-1733-5177-9282-422514a416ce",
+      "project_id": "88e5563d-2f4e-5a11-9822-ec319f06f25e",
+      "company_id": "f0ebe3a5-6c04-5b8e-8cd8-423859aa39d7",
+      "facts": {
+        "key": "bay",
+        "name": "Bay Residence",
+        "bedrooms": 4,
+        "bathrooms": 3,
+        "area": 240,
+        "price": 780000,
+        "available": 3,
+        "gallery": true,
+        "pdf": true,
+        "features": [
+          "Two covered parking spaces",
+          "Private garden"
+        ]
+      },
+      "area_unit": "m²",
+      "currency": "USD"
+    },
+    {
+      "key": "loft",
+      "name": "Cedar Loft",
+      "bedrooms": 2,
+      "bathrooms": 2,
+      "area": 110,
+      "price": 325000,
+      "available": 5,
+      "gallery": true,
+      "pdf": false,
+      "features": [
+        "One parking space",
+        "Balcony"
+      ],
+      "id": "8f7cedb7-5014-5d7b-ac40-ba5ee6f5f40c",
+      "project_id": "abf88941-5a70-5a06-a1ed-bca5b42bb90a",
+      "company_id": "f0ebe3a5-6c04-5b8e-8cd8-423859aa39d7",
+      "facts": {
+        "key": "loft",
+        "name": "Cedar Loft",
+        "bedrooms": 2,
+        "bathrooms": 2,
+        "area": 110,
+        "price": 325000,
+        "available": 5,
+        "gallery": true,
+        "pdf": false,
+        "features": [
+          "One parking space",
+          "Balcony"
+        ]
+      },
+      "area_unit": "m²",
+      "currency": "USD"
+    },
+    {
+      "key": "studio",
+      "name": "Cedar Studio",
+      "bedrooms": 1,
+      "bathrooms": 1,
+      "area": 52,
+      "price": 210000,
+      "available": 2,
+      "gallery": false,
+      "pdf": true,
+      "features": [
+        "Shared rooftop terrace"
+      ],
+      "id": "bb1d7fba-2496-5256-a405-535cd3455066",
+      "project_id": "abf88941-5a70-5a06-a1ed-bca5b42bb90a",
+      "company_id": "f0ebe3a5-6c04-5b8e-8cd8-423859aa39d7",
+      "facts": {
+        "key": "studio",
+        "name": "Cedar Studio",
+        "bedrooms": 1,
+        "bathrooms": 1,
+        "area": 52,
+        "price": 210000,
+        "available": 2,
+        "gallery": false,
+        "pdf": true,
+        "features": [
+          "Shared rooftop terrace"
+        ]
+      },
+      "area_unit": "m²",
+      "currency": "USD"
+    },
+    {
+      "key": "ridge",
+      "name": "Ridge Townhome",
+      "bedrooms": 3,
+      "bathrooms": 2.5,
+      "area": 165,
+      "price": 460000,
+      "available": 4,
+      "gallery": false,
+      "pdf": false,
+      "features": [
+        "Private patio"
+      ],
+      "id": "9cca24ce-3d61-586c-a66a-37f992b5185d",
+      "project_id": "fc14327b-d4de-50e6-b694-20c4897e3fa8",
+      "company_id": "f0ebe3a5-6c04-5b8e-8cd8-423859aa39d7",
+      "facts": {
+        "key": "ridge",
+        "name": "Ridge Townhome",
+        "bedrooms": 3,
+        "bathrooms": 2.5,
+        "area": 165,
+        "price": 460000,
+        "available": 4,
+        "gallery": false,
+        "pdf": false,
+        "features": [
+          "Private patio"
+        ]
+      },
+      "area_unit": "m²",
+      "currency": "USD"
+    },
+    {
+      "key": "summit",
+      "name": "Summit Villa",
+      "bedrooms": 4,
+      "bathrooms": 3,
+      "area": 220,
+      "price": 620000,
+      "available": 0,
+      "gallery": true,
+      "pdf": true,
+      "features": [
+        "Two-car garage"
+      ],
+      "id": "f6a0860f-3bf1-5abd-b1a2-f659e7bfead8",
+      "project_id": "fc14327b-d4de-50e6-b694-20c4897e3fa8",
+      "company_id": "f0ebe3a5-6c04-5b8e-8cd8-423859aa39d7",
+      "facts": {
+        "key": "summit",
+        "name": "Summit Villa",
+        "bedrooms": 4,
+        "bathrooms": 3,
+        "area": 220,
+        "price": 620000,
+        "available": 0,
+        "gallery": true,
+        "pdf": true,
+        "features": [
+          "Two-car garage"
+        ]
+      },
+      "area_unit": "m²",
+      "currency": "USD"
+    },
+    {
+      "key": "valley",
+      "name": "Valley Apartment",
+      "bedrooms": 2,
+      "bathrooms": 2,
+      "area": 95,
+      "price": null,
+      "available": null,
+      "gallery": false,
+      "pdf": false,
+      "features": [],
+      "id": "e18aab4c-cd8d-5d07-92fb-beef92326722",
+      "project_id": "fc14327b-d4de-50e6-b694-20c4897e3fa8",
+      "company_id": "f0ebe3a5-6c04-5b8e-8cd8-423859aa39d7",
+      "facts": {
+        "key": "valley",
+        "name": "Valley Apartment",
+        "bedrooms": 2,
+        "bathrooms": 2,
+        "area": 95,
+        "price": null,
+        "available": null,
+        "gallery": false,
+        "pdf": false,
+        "features": []
+      },
+      "area_unit": "m²",
+      "currency": null
+    }
+  ]
+}

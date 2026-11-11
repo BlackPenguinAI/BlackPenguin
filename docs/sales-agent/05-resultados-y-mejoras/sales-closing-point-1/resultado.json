@@ -1,0 +1,94 @@
+{
+  "run": "sales-closing-point-1",
+  "execution_origin": "server_submitted_synthetic_run",
+  "archive": "sales-closing-point-1.zip",
+  "sha256": "2855d8276e310271bb317a7494c1b8160460f6923501dc11c0143c73e01d652c",
+  "commit": "d5ad9bca17092fcaf99aea25a79c4fa662b26ab3",
+  "suite": "closing",
+  "cohort": "e4b68a85bd03",
+  "selected_cases": [
+    "decline_visit_questions",
+    "farewell_then_reopen",
+    "human_insists",
+    "human_record_then_question",
+    "human_then_question",
+    "human_withdrawal",
+    "mixed_human_price",
+    "unavailable_then_close"
+  ],
+  "model": "openai/gpt-4o-mini",
+  "configuration_version": 8,
+  "configuration_sha256": "51ff65376dad421328dab993a4fc71939489386f1ed173514cf13a244ac79f1c",
+  "status": "PASS",
+  "cases": 8,
+  "approved_cases": 8,
+  "turns": 25,
+  "expected_bookings": 0,
+  "actual_bookings": 0,
+  "provider_calls": 15,
+  "cost_usd_recorded": 0.02099955,
+  "cost_complete": true,
+  "checks_summary": {
+    "PASS": 404,
+    "FAIL": 0,
+    "BLOCKED": 0
+  },
+  "case_results": [
+    {
+      "case": "decline_visit_questions",
+      "status": "aprobado",
+      "meetings": 0,
+      "turns": 2,
+      "failures": 0
+    },
+    {
+      "case": "human_then_question",
+      "status": "aprobado",
+      "meetings": 0,
+      "turns": 3,
+      "failures": 0
+    },
+    {
+      "case": "human_insists",
+      "status": "aprobado",
+      "meetings": 0,
+      "turns": 3,
+      "failures": 0
+    },
+    {
+      "case": "human_record_then_question",
+      "status": "aprobado",
+      "meetings": 0,
+      "turns": 4,
+      "failures": 0
+    },
+    {
+      "case": "human_withdrawal",
+      "status": "aprobado",
+      "meetings": 0,
+      "turns": 4,
+      "failures": 0
+    },
+    {
+      "case": "farewell_then_reopen",
+      "status": "aprobado",
+      "meetings": 0,
+      "turns": 3,
+      "failures": 0
+    },
+    {
+      "case": "unavailable_then_close",
+      "status": "aprobado",
+      "meetings": 0,
+      "turns": 3,
+      "failures": 0
+    },
+    {
+      "case": "mixed_human_price",
+      "status": "aprobado",
+      "meetings": 0,
+      "turns": 3,
+      "failures": 0
+    }
+  ]
+}

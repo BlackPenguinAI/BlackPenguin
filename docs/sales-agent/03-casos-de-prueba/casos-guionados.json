@@ -1,0 +1,499 @@
+{
+  "synthetic_only": true,
+  "fixture_version": "sales-synthetic-company/1.0",
+  "clock_utc": "2026-11-11T06:34:00",
+  "data": {
+    "first_time_A": {
+      "persona": {
+        "key": "first_time",
+        "name": "Emma Torres",
+        "segment": "first_time_buyer",
+        "motive": "I am buying my first home.",
+        "budget": 300000
+      },
+      "project": 1,
+      "type": 1,
+      "goal": "booked",
+      "access": "single",
+      "phases": [
+        [
+          "information",
+          "I am buying my first home. My budget is 300,000 USD, paying cash. What can you tell me about Cedar Studio?"
+        ],
+        [
+          "material",
+          "Please send the brochure PDF for Cedar Studio."
+        ],
+        [
+          "request_visit",
+          "I would like to arrange an in-person visit to Cedar Studio. Any available time in the next seven days works for me. Please use the project timezone."
+        ]
+      ],
+      "budget": 300000,
+      "cash": true,
+      "material": "pdf",
+      "choose": 1
+    },
+    "move_up_A": {
+      "persona": {
+        "key": "move_up",
+        "name": "Daniel Brooks",
+        "segment": "move_up_buyer",
+        "motive": "I want to move from my current small home to a larger home.",
+        "budget": 900000
+      },
+      "project": 0,
+      "type": 0,
+      "goal": "booked",
+      "access": "all",
+      "phases": [
+        [
+          "information",
+          "I want to move from my current small home to a larger home. My budget is 900,000 USD, paying cash. What can you tell me about Bay Residence?"
+        ],
+        [
+          "material",
+          "Please send the photos for Bay Residence."
+        ],
+        [
+          "request_visit",
+          "I would like to arrange an in-person visit to Bay Residence. Any available time in the next seven days works for me. Please use the project timezone."
+        ]
+      ],
+      "budget": 900000,
+      "cash": true,
+      "material": "gallery",
+      "choose": 1
+    },
+    "relocation_A": {
+      "persona": {
+        "key": "relocation",
+        "name": "Sofia Reed",
+        "segment": "relocation",
+        "motive": "I am relocating to this area for work and need a home here.",
+        "budget": 900000
+      },
+      "project": 0,
+      "type": 0,
+      "goal": "booked",
+      "access": "multi",
+      "phases": [
+        [
+          "information",
+          "I am relocating to this area for work and need a home here. My budget is 900,000 USD, paying cash. Where is Bay Residence located and when is delivery planned?"
+        ],
+        [
+          "request_visit",
+          "I would like to arrange an in-person visit to Bay Residence. Any available time in the next seven days works for me. Please use the project timezone."
+        ]
+      ],
+      "budget": 900000,
+      "cash": true,
+      "material": null,
+      "choose": 1
+    },
+    "downsizing_A": {
+      "persona": {
+        "key": "downsizing",
+        "name": "Martin Vega",
+        "segment": "downsizing",
+        "motive": "I want to downsize from my large home to a smaller home.",
+        "budget": 300000
+      },
+      "project": 1,
+      "type": 1,
+      "goal": "booked",
+      "access": "single",
+      "phases": [
+        [
+          "information",
+          "I want to downsize from my large home to a smaller home. My budget is 300,000 USD, paying cash. What can you tell me about Cedar Studio?"
+        ],
+        [
+          "material",
+          "Please send the brochure PDF for Cedar Studio."
+        ],
+        [
+          "request_visit",
+          "I would like to arrange an in-person visit to Cedar Studio. Any available time in the next seven days works for me. Please use the project timezone."
+        ]
+      ],
+      "budget": 300000,
+      "cash": true,
+      "material": "pdf",
+      "choose": 1
+    },
+    "rental_A": {
+      "persona": {
+        "key": "rental",
+        "name": "Lucas Chen",
+        "segment": "rental_yield_investor",
+        "motive": "I am buying an investment property to earn rental income.",
+        "budget": 500000
+      },
+      "project": 2,
+      "type": 0,
+      "goal": "booked",
+      "access": "all",
+      "phases": [
+        [
+          "information",
+          "I am buying an investment property to earn rental income. My budget is 500,000 USD, paying cash. What can you tell me about Ridge Townhome?"
+        ],
+        [
+          "request_visit",
+          "I would like to arrange an in-person visit to Ridge Townhome. Any available time in the next seven days works for me. Please use the project timezone."
+        ]
+      ],
+      "budget": 500000,
+      "cash": true,
+      "material": null,
+      "choose": 1
+    },
+    "resale_A": {
+      "persona": {
+        "key": "resale",
+        "name": "Valeria Cruz",
+        "segment": "appreciation_resale_investor",
+        "motive": "I am investing in a property for long-term appreciation and later resale.",
+        "budget": 900000
+      },
+      "project": 0,
+      "type": 0,
+      "goal": "booked",
+      "access": "multi",
+      "phases": [
+        [
+          "information",
+          "I am investing in a property for long-term appreciation and later resale. My budget is 900,000 USD, paying cash. What can you tell me about Bay Residence?"
+        ],
+        [
+          "request_visit",
+          "I would like to arrange an in-person visit to Bay Residence. Any available time in the next seven days works for me. Please use the project timezone."
+        ]
+      ],
+      "budget": 900000,
+      "cash": true,
+      "material": null,
+      "choose": 1
+    },
+    "portfolio_A": {
+      "persona": {
+        "key": "portfolio",
+        "name": "Adrian Park",
+        "segment": "portfolio_diversification",
+        "motive": "I want to diversify my investment portfolio by adding real estate.",
+        "budget": 400000
+      },
+      "project": 1,
+      "type": 0,
+      "goal": "booked",
+      "access": "single",
+      "phases": [
+        [
+          "information",
+          "I want to diversify my investment portfolio by adding real estate. My budget is 400,000 USD, paying cash. Please compare Cedar Loft and Cedar Studio."
+        ],
+        [
+          "material",
+          "Please send the photos for Cedar Loft."
+        ],
+        [
+          "request_visit",
+          "I would like to arrange an in-person visit to Cedar Loft. Any available time in the next seven days works for me. Please use the project timezone."
+        ]
+      ],
+      "budget": 400000,
+      "cash": true,
+      "material": "gallery",
+      "choose": 2
+    },
+    "unknown_A": {
+      "persona": {
+        "key": "unknown",
+        "name": "Alex Rivera",
+        "segment": null,
+        "motive": "",
+        "budget": 500000
+      },
+      "project": 2,
+      "type": 0,
+      "goal": "booked",
+      "access": "all",
+      "phases": [
+        [
+          "information",
+          "My budget is 500,000 USD, paying cash. What can you tell me about Ridge Townhome?"
+        ],
+        [
+          "request_visit",
+          "I would like to arrange an in-person visit to Ridge Townhome. Any available time in the next seven days works for me. Please use the project timezone."
+        ]
+      ],
+      "budget": 500000,
+      "cash": true,
+      "material": null,
+      "choose": 1
+    },
+    "first_time_B": {
+      "persona": {
+        "key": "first_time",
+        "name": "Emma Torres",
+        "segment": "first_time_buyer",
+        "motive": "I am buying my first home.",
+        "budget": 300000
+      },
+      "project": 1,
+      "type": 1,
+      "goal": "closed",
+      "access": "all",
+      "phases": [
+        [
+          "initial",
+          "I am buying my first home. I have 50,000 USD for a down payment. What financing options do you offer?"
+        ],
+        [
+          "material",
+          "My total purchase budget is 250,000 USD. Please send the brochure PDF for Cedar Studio."
+        ],
+        [
+          "decline",
+          "I do not want a visit yet."
+        ],
+        [
+          "farewell",
+          "No other questions, thank you. Goodbye."
+        ]
+      ],
+      "budget": 250000,
+      "cash": false,
+      "material": "pdf",
+      "initial_only": true
+    },
+    "move_up_B": {
+      "persona": {
+        "key": "move_up",
+        "name": "Daniel Brooks",
+        "segment": "move_up_buyer",
+        "motive": "I want to move from my current small home to a larger home.",
+        "budget": 900000
+      },
+      "project": 1,
+      "type": 0,
+      "goal": "closed",
+      "access": "all",
+      "phases": [
+        [
+          "information",
+          "I want to move from my current small home to a larger home. My budget is 400,000 USD, paying cash. Please show me Cedar Studio."
+        ],
+        [
+          "switch",
+          "Actually I prefer Cedar Loft instead. Please send its photos."
+        ],
+        [
+          "decline",
+          "I do not want a visit yet."
+        ],
+        [
+          "farewell",
+          "No other questions, thank you. Goodbye."
+        ]
+      ],
+      "budget": 400000,
+      "cash": true,
+      "material": "gallery",
+      "switch": true
+    },
+    "relocation_B": {
+      "persona": {
+        "key": "relocation",
+        "name": "Sofia Reed",
+        "segment": "relocation",
+        "motive": "I am relocating to this area for work and need a home here.",
+        "budget": 900000
+      },
+      "project": 0,
+      "type": 0,
+      "goal": "unavailable",
+      "access": "unassigned",
+      "phases": [
+        [
+          "information",
+          "I am relocating to this area for work and need a home here. My budget is 900,000 USD, paying cash. Where is Bay Residence located?"
+        ],
+        [
+          "request_visit",
+          "I would like to arrange an in-person visit to Bay Residence. Any available time in the next seven days works for me. Please use the project timezone."
+        ]
+      ],
+      "budget": 900000,
+      "cash": true
+    },
+    "downsizing_B": {
+      "persona": {
+        "key": "downsizing",
+        "name": "Martin Vega",
+        "segment": "downsizing",
+        "motive": "I want to downsize from my large home to a smaller home.",
+        "budget": 300000
+      },
+      "project": 2,
+      "type": 0,
+      "goal": "closed",
+      "access": "all",
+      "phases": [
+        [
+          "information",
+          "I want to downsize from my large home to a smaller home. My budget is 500,000 USD, paying cash. Show me Ridge Townhome."
+        ],
+        [
+          "missing_material",
+          "Please send the photos for Ridge Townhome."
+        ],
+        [
+          "sold_out",
+          "Is Summit Villa available?"
+        ],
+        [
+          "decline",
+          "I do not want a visit yet."
+        ],
+        [
+          "farewell",
+          "No other questions, thank you. Goodbye."
+        ]
+      ],
+      "budget": 500000,
+      "cash": true,
+      "missing_material": true
+    },
+    "rental_B": {
+      "persona": {
+        "key": "rental",
+        "name": "Lucas Chen",
+        "segment": "rental_yield_investor",
+        "motive": "I am buying an investment property to earn rental income.",
+        "budget": 500000
+      },
+      "project": 2,
+      "type": 0,
+      "goal": "closed",
+      "access": "all",
+      "phases": [
+        [
+          "information",
+          "I am buying an investment property to earn rental income. My budget is 500,000 USD, paying cash. Show me Ridge Townhome."
+        ],
+        [
+          "unknown_returns",
+          "What annual rental yield or occupancy can you guarantee?"
+        ],
+        [
+          "unknown_inventory",
+          "What price and availability can you confirm for Valley Apartment?"
+        ],
+        [
+          "decline",
+          "I do not want a visit yet."
+        ],
+        [
+          "farewell",
+          "No other questions, thank you. Goodbye."
+        ]
+      ],
+      "budget": 500000,
+      "cash": true,
+      "unknown_returns": true
+    },
+    "resale_B": {
+      "persona": {
+        "key": "resale",
+        "name": "Valeria Cruz",
+        "segment": "appreciation_resale_investor",
+        "motive": "I am investing in a property for long-term appreciation and later resale.",
+        "budget": 900000
+      },
+      "project": 0,
+      "type": 0,
+      "goal": "closed",
+      "access": "all",
+      "phases": [
+        [
+          "information",
+          "I am investing in a property for long-term appreciation and later resale. My budget is 500,000 USD and I need financing. What options can you offer?"
+        ],
+        [
+          "reservation",
+          "Can I reserve Bay Residence and pay the deposit here?"
+        ],
+        [
+          "decline",
+          "I do not want a visit yet."
+        ],
+        [
+          "farewell",
+          "No other questions, thank you. Goodbye."
+        ]
+      ],
+      "budget": 500000,
+      "cash": false,
+      "financing": true
+    },
+    "portfolio_B": {
+      "persona": {
+        "key": "portfolio",
+        "name": "Adrian Park",
+        "segment": "portfolio_diversification",
+        "motive": "I want to diversify my investment portfolio by adding real estate.",
+        "budget": 400000
+      },
+      "project": 1,
+      "type": 0,
+      "goal": "unavailable",
+      "access": "no_slots",
+      "phases": [
+        [
+          "information",
+          "I want to diversify my investment portfolio by adding real estate. My budget is 400,000 USD, paying cash. Please compare Cedar Loft and Cedar Studio."
+        ],
+        [
+          "request_visit",
+          "I would like to arrange an in-person visit to Cedar Loft. Any available time in the next seven days works for me. Please use the project timezone."
+        ]
+      ],
+      "budget": 400000,
+      "cash": true
+    },
+    "unknown_B": {
+      "persona": {
+        "key": "unknown",
+        "name": "Alex Rivera",
+        "segment": null,
+        "motive": "",
+        "budget": 500000
+      },
+      "project": 0,
+      "type": 0,
+      "goal": "closed",
+      "access": "all",
+      "phases": [
+        [
+          "human",
+          "I want to speak to a human"
+        ],
+        [
+          "human_insist",
+          "I still want to speak to a human"
+        ],
+        [
+          "farewell",
+          "No other questions, thank you. Goodbye."
+        ]
+      ],
+      "budget": null,
+      "cash": false,
+      "human": true
+    }
+  }
+}

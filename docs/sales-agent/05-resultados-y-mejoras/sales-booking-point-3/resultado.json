@@ -1,0 +1,78 @@
+{
+  "run": "sales-booking-point-3",
+  "execution_origin": "server_submitted_synthetic_run",
+  "archive": "sales-booking-point-3.zip",
+  "sha256": "000e9cf558eb01362ae642f8e2c5faec2b715977976b92a5e688d312ae2a473b",
+  "commit": "93c1b298c566e89d0667cfc3f118abbf070a804f",
+  "suite": "booking",
+  "cohort": "035333064ba9",
+  "selected_cases": [
+    "all_projects",
+    "alternative_slot",
+    "no_eligible_sales",
+    "no_slots",
+    "one_project",
+    "unassigned_with_slots"
+  ],
+  "model": "openai/gpt-4o-mini",
+  "configuration_version": 8,
+  "configuration_sha256": "51ff65376dad421328dab993a4fc71939489386f1ed173514cf13a244ac79f1c",
+  "status": "FAIL",
+  "cases": 6,
+  "approved_cases": 2,
+  "turns": 16,
+  "expected_bookings": 3,
+  "actual_bookings": 3,
+  "provider_calls": 37,
+  "cost_usd_recorded": 0.05101845,
+  "cost_complete": true,
+  "checks_summary": {
+    "PASS": 177,
+    "FAIL": 1,
+    "BLOCKED": 3
+  },
+  "case_results": [
+    {
+      "case": "all_projects",
+      "status": "aprobado",
+      "meetings": 1,
+      "turns": 3,
+      "failures": 0
+    },
+    {
+      "case": "one_project",
+      "status": "aprobado",
+      "meetings": 1,
+      "turns": 3,
+      "failures": 0
+    },
+    {
+      "case": "unassigned_with_slots",
+      "status": "incompleto",
+      "meetings": 0,
+      "turns": 2,
+      "failures": 0
+    },
+    {
+      "case": "no_eligible_sales",
+      "status": "incompleto",
+      "meetings": 0,
+      "turns": 2,
+      "failures": 0
+    },
+    {
+      "case": "no_slots",
+      "status": "incompleto",
+      "meetings": 0,
+      "turns": 2,
+      "failures": 0
+    },
+    {
+      "case": "alternative_slot",
+      "status": "fallido",
+      "meetings": 1,
+      "turns": 4,
+      "failures": 1
+    }
+  ]
+}

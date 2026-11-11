@@ -1,0 +1,1666 @@
+{
+  "synthetic_only": true,
+  "fixture_version": "sales-synthetic-company/1.0",
+  "clock_utc": "2026-11-11T06:34:00",
+  "data": [
+    {
+      "scenario": "first_time_A",
+      "user_id": "919e8ff1-50c2-540e-92e0-dac4c05356fb",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "first_time_A",
+      "user_id": "919e8ff1-50c2-540e-92e0-dac4c05356fb",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "first_time_A",
+      "user_id": "919e8ff1-50c2-540e-92e0-dac4c05356fb",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "first_time_A",
+      "user_id": "87809d28-22ee-5ad2-b2c0-f08cddac8b30",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "first_time_A",
+      "user_id": "87809d28-22ee-5ad2-b2c0-f08cddac8b30",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "first_time_A",
+      "user_id": "87809d28-22ee-5ad2-b2c0-f08cddac8b30",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "first_time_A",
+      "user_id": "ed3582dd-0b07-57bf-a7c5-b817001cf694",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "first_time_A",
+      "user_id": "ed3582dd-0b07-57bf-a7c5-b817001cf694",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "first_time_A",
+      "user_id": "ed3582dd-0b07-57bf-a7c5-b817001cf694",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "first_time_A",
+      "user_id": "39faab93-3860-555a-840b-71c3e3001fe6",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "first_time_A",
+      "user_id": "39faab93-3860-555a-840b-71c3e3001fe6",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "first_time_A",
+      "user_id": "39faab93-3860-555a-840b-71c3e3001fe6",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "first_time_A",
+      "user_id": "37070a20-89f3-5dc1-9951-0e905f282cd3",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "first_time_A",
+      "user_id": "37070a20-89f3-5dc1-9951-0e905f282cd3",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "first_time_A",
+      "user_id": "37070a20-89f3-5dc1-9951-0e905f282cd3",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "move_up_A",
+      "user_id": "f5463d64-7577-5d4b-8a83-596aeec1fb28",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "move_up_A",
+      "user_id": "f5463d64-7577-5d4b-8a83-596aeec1fb28",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "move_up_A",
+      "user_id": "f5463d64-7577-5d4b-8a83-596aeec1fb28",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "move_up_A",
+      "user_id": "e46275c1-8e74-52cc-98a8-2a1880f0188a",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "move_up_A",
+      "user_id": "e46275c1-8e74-52cc-98a8-2a1880f0188a",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "move_up_A",
+      "user_id": "e46275c1-8e74-52cc-98a8-2a1880f0188a",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "move_up_A",
+      "user_id": "e04eea21-8bff-535c-9648-5646815b62b8",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "move_up_A",
+      "user_id": "e04eea21-8bff-535c-9648-5646815b62b8",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "move_up_A",
+      "user_id": "e04eea21-8bff-535c-9648-5646815b62b8",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "move_up_A",
+      "user_id": "2cf065d1-ee81-58fd-b959-2750b39245a9",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "move_up_A",
+      "user_id": "2cf065d1-ee81-58fd-b959-2750b39245a9",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "move_up_A",
+      "user_id": "2cf065d1-ee81-58fd-b959-2750b39245a9",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "move_up_A",
+      "user_id": "65c78644-8f11-5476-95d1-d85c1e653ee9",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "move_up_A",
+      "user_id": "65c78644-8f11-5476-95d1-d85c1e653ee9",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "move_up_A",
+      "user_id": "65c78644-8f11-5476-95d1-d85c1e653ee9",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "relocation_A",
+      "user_id": "3f626237-d573-5728-b6cc-356418f7c2e0",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "relocation_A",
+      "user_id": "3f626237-d573-5728-b6cc-356418f7c2e0",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "relocation_A",
+      "user_id": "3f626237-d573-5728-b6cc-356418f7c2e0",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "relocation_A",
+      "user_id": "3ef70c24-0c8a-5e26-b25f-dd6618ef97ee",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "relocation_A",
+      "user_id": "3ef70c24-0c8a-5e26-b25f-dd6618ef97ee",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "relocation_A",
+      "user_id": "3ef70c24-0c8a-5e26-b25f-dd6618ef97ee",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "relocation_A",
+      "user_id": "19161b37-ced3-5d8a-af0a-9455495e1b67",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "relocation_A",
+      "user_id": "19161b37-ced3-5d8a-af0a-9455495e1b67",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "relocation_A",
+      "user_id": "19161b37-ced3-5d8a-af0a-9455495e1b67",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "relocation_A",
+      "user_id": "ac7ae415-0bcd-5983-bb39-80fa7e3d33ac",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "relocation_A",
+      "user_id": "ac7ae415-0bcd-5983-bb39-80fa7e3d33ac",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "relocation_A",
+      "user_id": "ac7ae415-0bcd-5983-bb39-80fa7e3d33ac",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "relocation_A",
+      "user_id": "dff53bd4-89ac-5d03-b943-8776da35326e",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "relocation_A",
+      "user_id": "dff53bd4-89ac-5d03-b943-8776da35326e",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "relocation_A",
+      "user_id": "dff53bd4-89ac-5d03-b943-8776da35326e",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "downsizing_A",
+      "user_id": "97e400da-9f54-5322-b581-5b6bd0ed3446",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "downsizing_A",
+      "user_id": "97e400da-9f54-5322-b581-5b6bd0ed3446",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "downsizing_A",
+      "user_id": "97e400da-9f54-5322-b581-5b6bd0ed3446",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "downsizing_A",
+      "user_id": "57e0aba2-f0d1-54a5-bc35-7aef330a3e88",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "downsizing_A",
+      "user_id": "57e0aba2-f0d1-54a5-bc35-7aef330a3e88",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "downsizing_A",
+      "user_id": "57e0aba2-f0d1-54a5-bc35-7aef330a3e88",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "downsizing_A",
+      "user_id": "c4a6d59a-be32-584d-99c1-9252e81ed1be",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "downsizing_A",
+      "user_id": "c4a6d59a-be32-584d-99c1-9252e81ed1be",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "downsizing_A",
+      "user_id": "c4a6d59a-be32-584d-99c1-9252e81ed1be",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "downsizing_A",
+      "user_id": "4ff13374-503f-5b29-9544-6bd09a193408",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "downsizing_A",
+      "user_id": "4ff13374-503f-5b29-9544-6bd09a193408",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "downsizing_A",
+      "user_id": "4ff13374-503f-5b29-9544-6bd09a193408",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "downsizing_A",
+      "user_id": "df7112a5-827b-52a5-bd70-b5b93b5eaca4",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "downsizing_A",
+      "user_id": "df7112a5-827b-52a5-bd70-b5b93b5eaca4",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "downsizing_A",
+      "user_id": "df7112a5-827b-52a5-bd70-b5b93b5eaca4",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "rental_A",
+      "user_id": "9705731b-5763-5cba-87a3-42bef9f197cd",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "rental_A",
+      "user_id": "9705731b-5763-5cba-87a3-42bef9f197cd",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "rental_A",
+      "user_id": "9705731b-5763-5cba-87a3-42bef9f197cd",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "rental_A",
+      "user_id": "eb42ebc3-d646-5e27-81c9-e7f1a20ca375",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "rental_A",
+      "user_id": "eb42ebc3-d646-5e27-81c9-e7f1a20ca375",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "rental_A",
+      "user_id": "eb42ebc3-d646-5e27-81c9-e7f1a20ca375",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "rental_A",
+      "user_id": "c7689b21-4620-51a8-b1a0-a6cc398c1ced",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "rental_A",
+      "user_id": "c7689b21-4620-51a8-b1a0-a6cc398c1ced",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "rental_A",
+      "user_id": "c7689b21-4620-51a8-b1a0-a6cc398c1ced",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "rental_A",
+      "user_id": "8a4d1972-5bab-52f9-a068-cc1f57af995b",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "rental_A",
+      "user_id": "8a4d1972-5bab-52f9-a068-cc1f57af995b",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "rental_A",
+      "user_id": "8a4d1972-5bab-52f9-a068-cc1f57af995b",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "rental_A",
+      "user_id": "d813941c-f955-58c3-969f-faca62957a22",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "rental_A",
+      "user_id": "d813941c-f955-58c3-969f-faca62957a22",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "rental_A",
+      "user_id": "d813941c-f955-58c3-969f-faca62957a22",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "resale_A",
+      "user_id": "078bf9d3-10e3-5951-a0f9-4f087394435c",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "resale_A",
+      "user_id": "078bf9d3-10e3-5951-a0f9-4f087394435c",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "resale_A",
+      "user_id": "078bf9d3-10e3-5951-a0f9-4f087394435c",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "resale_A",
+      "user_id": "e8cafc6e-5d89-558d-83ac-08437c46ab32",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "resale_A",
+      "user_id": "e8cafc6e-5d89-558d-83ac-08437c46ab32",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "resale_A",
+      "user_id": "e8cafc6e-5d89-558d-83ac-08437c46ab32",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "resale_A",
+      "user_id": "f01c26e1-7427-53a7-89fc-5378ee216107",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "resale_A",
+      "user_id": "f01c26e1-7427-53a7-89fc-5378ee216107",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "resale_A",
+      "user_id": "f01c26e1-7427-53a7-89fc-5378ee216107",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "resale_A",
+      "user_id": "aaa9d337-63b1-52fc-ad10-70b9f6722fdc",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "resale_A",
+      "user_id": "aaa9d337-63b1-52fc-ad10-70b9f6722fdc",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "resale_A",
+      "user_id": "aaa9d337-63b1-52fc-ad10-70b9f6722fdc",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "resale_A",
+      "user_id": "89f30948-1b63-5567-abdf-5e8673f6a9ff",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "resale_A",
+      "user_id": "89f30948-1b63-5567-abdf-5e8673f6a9ff",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "resale_A",
+      "user_id": "89f30948-1b63-5567-abdf-5e8673f6a9ff",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "portfolio_A",
+      "user_id": "591a65c7-cf9d-5eff-8551-2df8d405cd11",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "portfolio_A",
+      "user_id": "591a65c7-cf9d-5eff-8551-2df8d405cd11",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "portfolio_A",
+      "user_id": "591a65c7-cf9d-5eff-8551-2df8d405cd11",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "portfolio_A",
+      "user_id": "389914b8-ed3d-513e-a2b7-bc9c607bfebe",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "portfolio_A",
+      "user_id": "389914b8-ed3d-513e-a2b7-bc9c607bfebe",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "portfolio_A",
+      "user_id": "389914b8-ed3d-513e-a2b7-bc9c607bfebe",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "portfolio_A",
+      "user_id": "3cdf68c1-12b5-56c3-b997-37eee8952fae",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "portfolio_A",
+      "user_id": "3cdf68c1-12b5-56c3-b997-37eee8952fae",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "portfolio_A",
+      "user_id": "3cdf68c1-12b5-56c3-b997-37eee8952fae",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "portfolio_A",
+      "user_id": "614516a1-2d7c-5262-8142-2fc1ad70cba3",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "portfolio_A",
+      "user_id": "614516a1-2d7c-5262-8142-2fc1ad70cba3",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "portfolio_A",
+      "user_id": "614516a1-2d7c-5262-8142-2fc1ad70cba3",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "portfolio_A",
+      "user_id": "934ceb9e-c0bd-5dd7-a69c-ae8bf1325230",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "portfolio_A",
+      "user_id": "934ceb9e-c0bd-5dd7-a69c-ae8bf1325230",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "portfolio_A",
+      "user_id": "934ceb9e-c0bd-5dd7-a69c-ae8bf1325230",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "unknown_A",
+      "user_id": "afda0c92-3ad8-59bd-a445-ce6522689d31",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "unknown_A",
+      "user_id": "afda0c92-3ad8-59bd-a445-ce6522689d31",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "unknown_A",
+      "user_id": "afda0c92-3ad8-59bd-a445-ce6522689d31",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "unknown_A",
+      "user_id": "59557589-456d-56be-ac01-a54f68ed3198",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "unknown_A",
+      "user_id": "59557589-456d-56be-ac01-a54f68ed3198",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "unknown_A",
+      "user_id": "59557589-456d-56be-ac01-a54f68ed3198",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "unknown_A",
+      "user_id": "7a1e83b6-ce1e-5be9-aa17-ba7549b5b057",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "unknown_A",
+      "user_id": "7a1e83b6-ce1e-5be9-aa17-ba7549b5b057",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "unknown_A",
+      "user_id": "7a1e83b6-ce1e-5be9-aa17-ba7549b5b057",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "unknown_A",
+      "user_id": "a34e0501-4e9f-5ee1-895e-67ccbd6ae2d5",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "unknown_A",
+      "user_id": "a34e0501-4e9f-5ee1-895e-67ccbd6ae2d5",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "unknown_A",
+      "user_id": "a34e0501-4e9f-5ee1-895e-67ccbd6ae2d5",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "unknown_A",
+      "user_id": "ae6dc930-ac93-5433-91b4-91ec1fea7150",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "unknown_A",
+      "user_id": "ae6dc930-ac93-5433-91b4-91ec1fea7150",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "unknown_A",
+      "user_id": "ae6dc930-ac93-5433-91b4-91ec1fea7150",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "first_time_B",
+      "user_id": "bbd43196-400c-56a2-9220-12ec1927c398",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "first_time_B",
+      "user_id": "bbd43196-400c-56a2-9220-12ec1927c398",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "first_time_B",
+      "user_id": "bbd43196-400c-56a2-9220-12ec1927c398",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "first_time_B",
+      "user_id": "ab8f206c-8c3b-5d73-abee-747d8d617688",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "first_time_B",
+      "user_id": "ab8f206c-8c3b-5d73-abee-747d8d617688",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "first_time_B",
+      "user_id": "ab8f206c-8c3b-5d73-abee-747d8d617688",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "first_time_B",
+      "user_id": "88fce797-6732-5faf-993c-d005059739f0",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "first_time_B",
+      "user_id": "88fce797-6732-5faf-993c-d005059739f0",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "first_time_B",
+      "user_id": "88fce797-6732-5faf-993c-d005059739f0",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "first_time_B",
+      "user_id": "54181421-e050-5ab1-8509-d6fd46f37c82",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "first_time_B",
+      "user_id": "54181421-e050-5ab1-8509-d6fd46f37c82",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "first_time_B",
+      "user_id": "54181421-e050-5ab1-8509-d6fd46f37c82",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "first_time_B",
+      "user_id": "09ca5f54-f5ee-548b-8927-5ee31c2998dd",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "first_time_B",
+      "user_id": "09ca5f54-f5ee-548b-8927-5ee31c2998dd",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "first_time_B",
+      "user_id": "09ca5f54-f5ee-548b-8927-5ee31c2998dd",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "move_up_B",
+      "user_id": "7522371e-2ad0-5ffb-b1e7-091840da6b70",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "move_up_B",
+      "user_id": "7522371e-2ad0-5ffb-b1e7-091840da6b70",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "move_up_B",
+      "user_id": "7522371e-2ad0-5ffb-b1e7-091840da6b70",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "move_up_B",
+      "user_id": "deca8b15-085d-5bdd-8121-5df6e740bdd1",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "move_up_B",
+      "user_id": "deca8b15-085d-5bdd-8121-5df6e740bdd1",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "move_up_B",
+      "user_id": "deca8b15-085d-5bdd-8121-5df6e740bdd1",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "move_up_B",
+      "user_id": "a9072bf0-6fb2-51f3-84da-32d2e5cd2276",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "move_up_B",
+      "user_id": "a9072bf0-6fb2-51f3-84da-32d2e5cd2276",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "move_up_B",
+      "user_id": "a9072bf0-6fb2-51f3-84da-32d2e5cd2276",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "move_up_B",
+      "user_id": "ac52032a-b783-5f66-9fcf-853972d9fa45",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "move_up_B",
+      "user_id": "ac52032a-b783-5f66-9fcf-853972d9fa45",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "move_up_B",
+      "user_id": "ac52032a-b783-5f66-9fcf-853972d9fa45",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "move_up_B",
+      "user_id": "423690ed-94bf-5d02-834c-058abcd08e36",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "move_up_B",
+      "user_id": "423690ed-94bf-5d02-834c-058abcd08e36",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "move_up_B",
+      "user_id": "423690ed-94bf-5d02-834c-058abcd08e36",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "relocation_B",
+      "user_id": "3dafca84-bba3-5492-a935-1145bc1702a4",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "relocation_B",
+      "user_id": "3dafca84-bba3-5492-a935-1145bc1702a4",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "relocation_B",
+      "user_id": "3dafca84-bba3-5492-a935-1145bc1702a4",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "relocation_B",
+      "user_id": "20ec373f-fde9-5b51-a819-6efe6726d4a0",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "relocation_B",
+      "user_id": "20ec373f-fde9-5b51-a819-6efe6726d4a0",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "relocation_B",
+      "user_id": "20ec373f-fde9-5b51-a819-6efe6726d4a0",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "relocation_B",
+      "user_id": "33aa09a7-780a-53f7-b8ea-a8a47fe836ab",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "relocation_B",
+      "user_id": "33aa09a7-780a-53f7-b8ea-a8a47fe836ab",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "relocation_B",
+      "user_id": "33aa09a7-780a-53f7-b8ea-a8a47fe836ab",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "relocation_B",
+      "user_id": "cc97f847-8e62-55cb-829b-aabbd4c4445a",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "relocation_B",
+      "user_id": "cc97f847-8e62-55cb-829b-aabbd4c4445a",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "relocation_B",
+      "user_id": "cc97f847-8e62-55cb-829b-aabbd4c4445a",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "relocation_B",
+      "user_id": "67186f93-c897-5e9b-a53e-abc0bf4e3b83",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "relocation_B",
+      "user_id": "67186f93-c897-5e9b-a53e-abc0bf4e3b83",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "relocation_B",
+      "user_id": "67186f93-c897-5e9b-a53e-abc0bf4e3b83",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "downsizing_B",
+      "user_id": "cb64e079-1ecb-5bda-a7db-3de6b717dbc1",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "downsizing_B",
+      "user_id": "cb64e079-1ecb-5bda-a7db-3de6b717dbc1",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "downsizing_B",
+      "user_id": "cb64e079-1ecb-5bda-a7db-3de6b717dbc1",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "downsizing_B",
+      "user_id": "19ac169f-f8e4-5039-9f7f-e0ad0eb75e7d",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "downsizing_B",
+      "user_id": "19ac169f-f8e4-5039-9f7f-e0ad0eb75e7d",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "downsizing_B",
+      "user_id": "19ac169f-f8e4-5039-9f7f-e0ad0eb75e7d",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "downsizing_B",
+      "user_id": "0c996e8a-f13a-54e0-8530-f0a42f003699",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "downsizing_B",
+      "user_id": "0c996e8a-f13a-54e0-8530-f0a42f003699",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "downsizing_B",
+      "user_id": "0c996e8a-f13a-54e0-8530-f0a42f003699",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "downsizing_B",
+      "user_id": "b6788519-2792-5083-af09-30060b951885",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "downsizing_B",
+      "user_id": "b6788519-2792-5083-af09-30060b951885",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "downsizing_B",
+      "user_id": "b6788519-2792-5083-af09-30060b951885",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "downsizing_B",
+      "user_id": "57179e3c-d060-5488-8723-c6a133491cbf",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "downsizing_B",
+      "user_id": "57179e3c-d060-5488-8723-c6a133491cbf",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "downsizing_B",
+      "user_id": "57179e3c-d060-5488-8723-c6a133491cbf",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "rental_B",
+      "user_id": "652238bb-9e38-5411-a7c8-3542211ada88",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "rental_B",
+      "user_id": "652238bb-9e38-5411-a7c8-3542211ada88",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "rental_B",
+      "user_id": "652238bb-9e38-5411-a7c8-3542211ada88",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "rental_B",
+      "user_id": "606b8bd1-0cfd-541d-b74e-7b7b9bded505",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "rental_B",
+      "user_id": "606b8bd1-0cfd-541d-b74e-7b7b9bded505",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "rental_B",
+      "user_id": "606b8bd1-0cfd-541d-b74e-7b7b9bded505",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "rental_B",
+      "user_id": "de1ca50e-7f90-5dfa-90e5-90fd1efc47ae",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "rental_B",
+      "user_id": "de1ca50e-7f90-5dfa-90e5-90fd1efc47ae",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "rental_B",
+      "user_id": "de1ca50e-7f90-5dfa-90e5-90fd1efc47ae",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "rental_B",
+      "user_id": "5c1035b3-54ff-5b3a-8024-988ef94a9477",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "rental_B",
+      "user_id": "5c1035b3-54ff-5b3a-8024-988ef94a9477",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "rental_B",
+      "user_id": "5c1035b3-54ff-5b3a-8024-988ef94a9477",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "rental_B",
+      "user_id": "1933b750-6141-5c0c-a78d-7c634e17d973",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "rental_B",
+      "user_id": "1933b750-6141-5c0c-a78d-7c634e17d973",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "rental_B",
+      "user_id": "1933b750-6141-5c0c-a78d-7c634e17d973",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "resale_B",
+      "user_id": "c581184d-1c5d-5e25-96be-ec213b9b5982",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "resale_B",
+      "user_id": "c581184d-1c5d-5e25-96be-ec213b9b5982",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "resale_B",
+      "user_id": "c581184d-1c5d-5e25-96be-ec213b9b5982",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "resale_B",
+      "user_id": "214a1bde-24db-589a-b923-3abe0def3c68",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "resale_B",
+      "user_id": "214a1bde-24db-589a-b923-3abe0def3c68",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "resale_B",
+      "user_id": "214a1bde-24db-589a-b923-3abe0def3c68",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "resale_B",
+      "user_id": "f8c97274-67c7-5718-badb-a6a112f33a25",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "resale_B",
+      "user_id": "f8c97274-67c7-5718-badb-a6a112f33a25",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "resale_B",
+      "user_id": "f8c97274-67c7-5718-badb-a6a112f33a25",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "resale_B",
+      "user_id": "6ddc3bbd-cd89-54ca-8975-59be0060c8f0",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "resale_B",
+      "user_id": "6ddc3bbd-cd89-54ca-8975-59be0060c8f0",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "resale_B",
+      "user_id": "6ddc3bbd-cd89-54ca-8975-59be0060c8f0",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "resale_B",
+      "user_id": "488f5e8d-efe7-52fb-9e2a-dfaa0213642d",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "resale_B",
+      "user_id": "488f5e8d-efe7-52fb-9e2a-dfaa0213642d",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "resale_B",
+      "user_id": "488f5e8d-efe7-52fb-9e2a-dfaa0213642d",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "portfolio_B",
+      "user_id": "11b9707f-d89f-5ab5-abed-149325acf2de",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "portfolio_B",
+      "user_id": "11b9707f-d89f-5ab5-abed-149325acf2de",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "portfolio_B",
+      "user_id": "11b9707f-d89f-5ab5-abed-149325acf2de",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "portfolio_B",
+      "user_id": "75f6b0b9-b7d6-525c-a839-cdc342e57b5a",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "portfolio_B",
+      "user_id": "75f6b0b9-b7d6-525c-a839-cdc342e57b5a",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "portfolio_B",
+      "user_id": "75f6b0b9-b7d6-525c-a839-cdc342e57b5a",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "portfolio_B",
+      "user_id": "1ce9737e-8681-5dd2-837e-12a39b939d1a",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "portfolio_B",
+      "user_id": "1ce9737e-8681-5dd2-837e-12a39b939d1a",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "portfolio_B",
+      "user_id": "1ce9737e-8681-5dd2-837e-12a39b939d1a",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "portfolio_B",
+      "user_id": "ac79c137-108e-5674-8801-7a2d270fe694",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "portfolio_B",
+      "user_id": "ac79c137-108e-5674-8801-7a2d270fe694",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "portfolio_B",
+      "user_id": "ac79c137-108e-5674-8801-7a2d270fe694",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "unknown_B",
+      "user_id": "ec9e785a-6f0d-55a4-a147-b8ead51cb6c8",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "unknown_B",
+      "user_id": "ec9e785a-6f0d-55a4-a147-b8ead51cb6c8",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "unknown_B",
+      "user_id": "ec9e785a-6f0d-55a4-a147-b8ead51cb6c8",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "unknown_B",
+      "user_id": "01747ccc-f36e-5483-91ac-f621d6676a63",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "unknown_B",
+      "user_id": "01747ccc-f36e-5483-91ac-f621d6676a63",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "unknown_B",
+      "user_id": "01747ccc-f36e-5483-91ac-f621d6676a63",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "unknown_B",
+      "user_id": "6eeff620-1d80-5e72-8c17-3866a8af8f4a",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "unknown_B",
+      "user_id": "6eeff620-1d80-5e72-8c17-3866a8af8f4a",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "unknown_B",
+      "user_id": "6eeff620-1d80-5e72-8c17-3866a8af8f4a",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "unknown_B",
+      "user_id": "87bf912f-8df3-5c1e-bb9b-48676824de76",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "unknown_B",
+      "user_id": "87bf912f-8df3-5c1e-bb9b-48676824de76",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "unknown_B",
+      "user_id": "87bf912f-8df3-5c1e-bb9b-48676824de76",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "unknown_B",
+      "user_id": "b96d7c92-90b9-5111-a714-0f4254852ef7",
+      "starts_at_utc": "2026-11-13 15:00:00",
+      "ends_at_utc": "2026-11-13 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "unknown_B",
+      "user_id": "b96d7c92-90b9-5111-a714-0f4254852ef7",
+      "starts_at_utc": "2026-11-14 15:00:00",
+      "ends_at_utc": "2026-11-14 18:00:00",
+      "timezone": "UTC"
+    },
+    {
+      "scenario": "unknown_B",
+      "user_id": "b96d7c92-90b9-5111-a714-0f4254852ef7",
+      "starts_at_utc": "2026-11-15 15:00:00",
+      "ends_at_utc": "2026-11-15 18:00:00",
+      "timezone": "UTC"
+    }
+  ]
+}

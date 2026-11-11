@@ -1,0 +1,12 @@
+{
+  "synthetic_only": true,
+  "fixture_version": "sales-synthetic-company/1.0",
+  "clock_utc": "2026-11-11T06:34:00",
+  "data": {
+    "id": "f0ebe3a5-6c04-5b8e-8cd8-423859aa39d7",
+    "name": "SYNTHETIC - Penguin Sales Laboratory",
+    "country": "US",
+    "timezone": "UTC",
+    "fictional": true
+  }
+}

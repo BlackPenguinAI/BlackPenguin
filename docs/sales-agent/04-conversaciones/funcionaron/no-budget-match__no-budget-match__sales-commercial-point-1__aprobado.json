@@ -1,0 +1,234 @@
+{
+  "synthetic_only": true,
+  "execution_origin": "server_submitted_synthetic_run",
+  "source_archive": "sales-commercial-point-1.zip",
+  "source_sha256": "8ee444e9fcafaea9699a0d2afe79ac180ad7de3062512642774f6091e484592a",
+  "commit": "bf5bd88dbefd6a5532593c5e4873699bf6a5a443",
+  "sales_model": "openai/gpt-4o-mini",
+  "configuration_version": 8,
+  "configuration_sha256": "51ff65376dad421328dab993a4fc71939489386f1ed173514cf13a244ac79f1c",
+  "clock_utc": null,
+  "team": [],
+  "case": "no_budget_match",
+  "description": "no-budget-match",
+  "persona": null,
+  "company_id": "f0ebe3a5-6c04-5b8e-8cd8-423859aa39d7",
+  "project_id": "fc14327b-d4de-50e6-b694-20c4897e3fa8",
+  "property_type_id": null,
+  "automatic_result": "aprobado",
+  "human_review": {
+    "status": "pending",
+    "note": "Automatic approval is not a human judgment of conversational quality."
+  },
+  "stop_reason": "script_completed",
+  "expected_outcome": null,
+  "topic_tags": [],
+  "turns": [
+    {
+      "turn": 1,
+      "action": null,
+      "lead": "My budget is 100,000 USD and I will pay cash. What property options fit my budget?",
+      "agent": "Here are the property options I can confirm:\n\nI do not have a listed option within your stated total budget in this project.\n\nYou are considering an outright purchase, without financing.\n\n1. Ridge Townhome — 3 bedrooms, 2.5 bathrooms, 165 m². Published prices start at 460,000.00 USD. Last confirmed quantity: 4.\n\n2. Summit Villa — 4 bedrooms, 3 bathrooms, 220 m². Published prices start at 620,000.00 USD. Last confirmed quantity: 0.\n\n3. Valley Apartment — 2 bedrooms, 2 bathrooms, 95 m². Availability is not confirmed.\n\nIs there another question I can help with? If not, thank you for your interest and have a good day. You are welcome to message again.",
+      "understanding": {
+        "version": "sales-understanding/1.0",
+        "requests": [
+          {
+            "id": "r1",
+            "topic": "inventory",
+            "subject": null,
+            "polarity": "request",
+            "evidence": "What property options fit my budget?",
+            "reference_id": null,
+            "detail_fields": [],
+            "feature": null
+          }
+        ],
+        "all_of": [
+          "r1"
+        ],
+        "alternatives": [],
+        "constraints": [],
+        "references": [],
+        "preferences": [
+          {
+            "key": "budget",
+            "value": "100000 USD",
+            "evidence": "My budget is 100,000 USD",
+            "status": "declared"
+          },
+          {
+            "key": "financing",
+            "value": "cash",
+            "evidence": "I will pay cash",
+            "status": "declared"
+          }
+        ],
+        "personal_facts": [],
+        "preference_withdrawals": [],
+        "comparison": null,
+        "source_purposes": [],
+        "objections": [],
+        "empathy": null,
+        "releases": [],
+        "visit": null,
+        "courtesy": null,
+        "reschedule": null,
+        "cancellation": null,
+        "wait": null,
+        "moderation": null,
+        "appointment_query": null,
+        "selected_reference_id": null,
+        "requires_clarification": false,
+        "clarification_question": null,
+        "confidence": 0.99
+      },
+      "error_code": null,
+      "checks": [
+        {
+          "check": "interpretation_accepted",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "reply_present",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_internal_narration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_unrequested_meeting",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_payment_or_property_reservation_receipt",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_provider_outbox",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "expected_commercial_outcome",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "explicit_total_budget_persisted",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "kind_close_without_financing_promise",
+          "status": "PASS",
+          "detail": ""
+        }
+      ],
+      "composition": {
+        "status": "accepted",
+        "attempts": [
+          {
+            "status": "accepted"
+          }
+        ]
+      }
+    },
+    {
+      "turn": 2,
+      "action": null,
+      "lead": "No other questions, thank you. Goodbye.",
+      "agent": "I understand this can feel frustrating. Let's keep things simple. When you feel ready, we can pick up with availability.\n\nYou're welcome. Feel free to message again whenever you have another question.",
+      "understanding": {
+        "version": "sales-understanding/1.0",
+        "requests": [],
+        "all_of": [],
+        "alternatives": [],
+        "constraints": [],
+        "references": [],
+        "preferences": [],
+        "personal_facts": [],
+        "preference_withdrawals": [],
+        "comparison": null,
+        "source_purposes": [],
+        "objections": [],
+        "empathy": {
+          "kind": "frustrated",
+          "evidence": "No other questions, thank you. Goodbye."
+        },
+        "releases": [],
+        "visit": null,
+        "courtesy": {
+          "kind": "farewell",
+          "evidence": "Goodbye."
+        },
+        "reschedule": null,
+        "cancellation": null,
+        "wait": null,
+        "moderation": null,
+        "appointment_query": null,
+        "selected_reference_id": null,
+        "requires_clarification": false,
+        "clarification_question": null,
+        "confidence": 0.99
+      },
+      "error_code": null,
+      "checks": [
+        {
+          "check": "interpretation_accepted",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "reply_present",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_internal_narration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_unrequested_meeting",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_payment_or_property_reservation_receipt",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_provider_outbox",
+          "status": "PASS",
+          "detail": ""
+        }
+      ],
+      "composition": {
+        "status": "accepted",
+        "attempts": [
+          {
+            "status": "accepted"
+          }
+        ]
+      }
+    }
+  ],
+  "checks": [
+    {
+      "check": "script_completed",
+      "status": "PASS",
+      "detail": ""
+    }
+  ],
+  "failures": [],
+  "blocked_checks": [],
+  "meetings": [],
+  "materials": []
+}

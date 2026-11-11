@@ -1,0 +1,936 @@
+{
+  "synthetic_only": true,
+  "execution_origin": "server_submitted_synthetic_run",
+  "source_archive": "sales-compact-repair-1.zip",
+  "source_sha256": "b39f5766039b5a31d9dee217520f43dc9daee8e5ccbc09b670b85e73efb89669",
+  "commit": "06271fd4a34da1543e73c2f567bb736309e7c844",
+  "sales_model": "openai/gpt-4o-mini",
+  "configuration_version": 8,
+  "configuration_sha256": "51ff65376dad421328dab993a4fc71939489386f1ed173514cf13a244ac79f1c",
+  "clock_utc": null,
+  "team": [
+    {
+      "id": "652238bb-9e38-5411-a7c8-3542211ada88",
+      "company_id": "f0ebe3a5-6c04-5b8e-8cd8-423859aa39d7",
+      "role": "candidate",
+      "active": true,
+      "access_scope": "all",
+      "project_ids": [],
+      "accepts_appointments": true,
+      "has_slots": true
+    },
+    {
+      "id": "606b8bd1-0cfd-541d-b74e-7b7b9bded505",
+      "company_id": "f0ebe3a5-6c04-5b8e-8cd8-423859aa39d7",
+      "role": "other_project",
+      "active": true,
+      "access_scope": "selected",
+      "project_ids": [
+        "88e5563d-2f4e-5a11-9822-ec319f06f25e"
+      ],
+      "accepts_appointments": true,
+      "has_slots": true
+    },
+    {
+      "id": "de1ca50e-7f90-5dfa-90e5-90fd1efc47ae",
+      "company_id": "f0ebe3a5-6c04-5b8e-8cd8-423859aa39d7",
+      "role": "none",
+      "active": true,
+      "access_scope": "selected",
+      "project_ids": [],
+      "accepts_appointments": true,
+      "has_slots": true
+    },
+    {
+      "id": "5c1035b3-54ff-5b3a-8024-988ef94a9477",
+      "company_id": "f0ebe3a5-6c04-5b8e-8cd8-423859aa39d7",
+      "role": "inactive",
+      "active": false,
+      "access_scope": "selected",
+      "project_ids": [
+        "fc14327b-d4de-50e6-b694-20c4897e3fa8"
+      ],
+      "accepts_appointments": true,
+      "has_slots": true
+    },
+    {
+      "id": "1933b750-6141-5c0c-a78d-7c634e17d973",
+      "company_id": "f0ebe3a5-6c04-5b8e-8cd8-423859aa39d7",
+      "role": "no_appointments",
+      "active": true,
+      "access_scope": "selected",
+      "project_ids": [
+        "fc14327b-d4de-50e6-b694-20c4897e3fa8"
+      ],
+      "accepts_appointments": false,
+      "has_slots": true
+    }
+  ],
+  "case": "rental_B",
+  "description": "rentabilidad-e-inventario-desconocidos",
+  "persona": {
+    "key": "rental",
+    "name": "Lucas Chen",
+    "segment": "rental_yield_investor",
+    "motive": "I am buying an investment property to earn rental income.",
+    "budget": 500000
+  },
+  "company_id": "f0ebe3a5-6c04-5b8e-8cd8-423859aa39d7",
+  "project_id": "fc14327b-d4de-50e6-b694-20c4897e3fa8",
+  "property_type_id": "9cca24ce-3d61-586c-a66a-37f992b5185d",
+  "automatic_result": "fallido",
+  "human_review": {
+    "status": "pending",
+    "note": "Automatic approval is not a human judgment of conversational quality."
+  },
+  "stop_reason": "closed",
+  "expected_outcome": "closed",
+  "topic_tags": [
+    "decline",
+    "farewell",
+    "information",
+    "unknown_inventory",
+    "unknown_returns"
+  ],
+  "turns": [
+    {
+      "turn": 1,
+      "action": "information",
+      "lead": "I am buying an investment property to earn rental income. My budget is 500,000 USD, paying cash. Show me Ridge Townhome.",
+      "agent": "Would you like me to connect you with the sales team to help with your question?",
+      "understanding": {},
+      "error_code": "understanding_validation_failed",
+      "checks": [
+        {
+          "check": "current_workflow",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "turn_completed",
+          "status": "FAIL",
+          "detail": ""
+        },
+        {
+          "check": "scripted_english_not_rejected",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "reply_present",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_internal_narration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "segment_matches_declared_motivation",
+          "status": "FAIL",
+          "detail": "expected=rental_yield_investor; actual=None; assigned=None"
+        },
+        {
+          "check": "no_booking_without_confirmation",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "at_most_one_booking",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_identical_consecutive_reply",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_emotion_invented_on_neutral_closure",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_declaration_converted_to_question",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_repeated_financial_sentences",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_unrequested_financing_pitch_after_cash",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "payment_information_stated_once",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "segment_evidence_from_own_initial_declaration",
+          "status": "FAIL",
+          "detail": ""
+        },
+        {
+          "check": "declared_budget_persists",
+          "status": "FAIL",
+          "detail": ""
+        },
+        {
+          "check": "known_budget_not_asked_again",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "cash_preference_persists",
+          "status": "FAIL",
+          "detail": ""
+        }
+      ],
+      "composition": {
+        "status": null,
+        "attempts": []
+      }
+    },
+    {
+      "turn": 2,
+      "action": "unknown_returns",
+      "lead": "What annual rental yield or occupancy can you guarantee?",
+      "agent": "Thanks for sharing that information.\n\nI do not have published rental yield or occupancy figures for this project, and I cannot guarantee investment returns.\n\nThe sales team can review investment details during a visit. Is there another property question I can help with?",
+      "understanding": {
+        "version": "sales-understanding/1.0",
+        "requests": [],
+        "all_of": [],
+        "alternatives": [],
+        "constraints": [],
+        "references": [],
+        "preferences": [
+          {
+            "key": "needs",
+            "value": "annual rental yield",
+            "evidence": "What annual rental yield or occupancy can you guarantee?",
+            "status": "declared"
+          },
+          {
+            "key": "needs",
+            "value": "occupancy",
+            "evidence": "What annual rental yield or occupancy can you guarantee?",
+            "status": "declared"
+          }
+        ],
+        "personal_facts": [],
+        "preference_withdrawals": [],
+        "comparison": null,
+        "source_purposes": [],
+        "objections": [],
+        "empathy": null,
+        "releases": [],
+        "visit": null,
+        "courtesy": null,
+        "reschedule": null,
+        "cancellation": null,
+        "wait": null,
+        "moderation": null,
+        "appointment_query": null,
+        "selected_reference_id": null,
+        "requires_clarification": false,
+        "clarification_question": null,
+        "confidence": 0.99
+      },
+      "error_code": null,
+      "checks": [
+        {
+          "check": "current_workflow",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "turn_completed",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "scripted_english_not_rejected",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "reply_present",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_internal_narration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "segment_matches_declared_motivation",
+          "status": "FAIL",
+          "detail": "expected=rental_yield_investor; actual=None; assigned=None"
+        },
+        {
+          "check": "no_booking_without_confirmation",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "at_most_one_booking",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_identical_consecutive_reply",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "composition_accepted",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_emotion_invented_on_neutral_closure",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_declaration_converted_to_question",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_repeated_financial_sentences",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_unrequested_financing_pitch_after_cash",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "payment_information_stated_once",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "segment_evidence_from_own_initial_declaration",
+          "status": "FAIL",
+          "detail": ""
+        },
+        {
+          "check": "declared_budget_persists",
+          "status": "FAIL",
+          "detail": ""
+        },
+        {
+          "check": "known_budget_not_asked_again",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "cash_preference_persists",
+          "status": "FAIL",
+          "detail": ""
+        }
+      ],
+      "composition": {
+        "status": "accepted",
+        "attempts": [
+          {
+            "status": "accepted"
+          }
+        ]
+      }
+    },
+    {
+      "turn": 3,
+      "action": "unknown_inventory",
+      "lead": "What price and availability can you confirm for Valley Apartment?",
+      "agent": "Would you like me to connect you with the sales team to help with your question?",
+      "understanding": {},
+      "error_code": "understanding_validation_failed",
+      "checks": [
+        {
+          "check": "current_workflow",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "turn_completed",
+          "status": "FAIL",
+          "detail": ""
+        },
+        {
+          "check": "scripted_english_not_rejected",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "reply_present",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_internal_narration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "segment_matches_declared_motivation",
+          "status": "FAIL",
+          "detail": "expected=rental_yield_investor; actual=None; assigned=None"
+        },
+        {
+          "check": "no_booking_without_confirmation",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "at_most_one_booking",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_identical_consecutive_reply",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_emotion_invented_on_neutral_closure",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_declaration_converted_to_question",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_repeated_financial_sentences",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_unrequested_financing_pitch_after_cash",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "payment_information_stated_once",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "segment_evidence_from_own_initial_declaration",
+          "status": "FAIL",
+          "detail": ""
+        },
+        {
+          "check": "declared_budget_persists",
+          "status": "FAIL",
+          "detail": ""
+        },
+        {
+          "check": "known_budget_not_asked_again",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "cash_preference_persists",
+          "status": "FAIL",
+          "detail": ""
+        }
+      ],
+      "composition": {
+        "status": null,
+        "attempts": []
+      }
+    },
+    {
+      "turn": 4,
+      "action": "decline",
+      "lead": "I do not want a visit yet.",
+      "agent": "Is there another property question I can help with?",
+      "understanding": {
+        "version": "sales-understanding/1.0",
+        "requests": [
+          {
+            "id": "r1",
+            "topic": "appointment",
+            "subject": null,
+            "polarity": "exclude",
+            "evidence": "I do not want a visit yet.",
+            "reference_id": null,
+            "detail_fields": [],
+            "feature": null
+          }
+        ],
+        "all_of": [],
+        "alternatives": [],
+        "constraints": [
+          {
+            "topic": "appointment",
+            "subject": null,
+            "effect": "prohibit",
+            "scope": "until_explicit_change",
+            "evidence": "I do not want a visit yet.",
+            "reference_id": null
+          }
+        ],
+        "references": [],
+        "preferences": [],
+        "personal_facts": [],
+        "preference_withdrawals": [],
+        "comparison": null,
+        "source_purposes": [],
+        "objections": [],
+        "empathy": null,
+        "releases": [],
+        "visit": null,
+        "courtesy": null,
+        "reschedule": null,
+        "cancellation": null,
+        "wait": null,
+        "moderation": null,
+        "appointment_query": null,
+        "selected_reference_id": null,
+        "requires_clarification": false,
+        "clarification_question": null,
+        "confidence": 0.99
+      },
+      "error_code": null,
+      "checks": [
+        {
+          "check": "current_workflow",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "turn_completed",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "scripted_english_not_rejected",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "reply_present",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_internal_narration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "segment_matches_declared_motivation",
+          "status": "FAIL",
+          "detail": "expected=rental_yield_investor; actual=None; assigned=None"
+        },
+        {
+          "check": "no_booking_without_confirmation",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "at_most_one_booking",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_identical_consecutive_reply",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "composition_accepted",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_emotion_invented_on_neutral_closure",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_declaration_converted_to_question",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_repeated_financial_sentences",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_unrequested_financing_pitch_after_cash",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "payment_information_stated_once",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "segment_evidence_from_own_initial_declaration",
+          "status": "FAIL",
+          "detail": ""
+        },
+        {
+          "check": "declared_budget_persists",
+          "status": "FAIL",
+          "detail": ""
+        },
+        {
+          "check": "known_budget_not_asked_again",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "cash_preference_persists",
+          "status": "FAIL",
+          "detail": ""
+        }
+      ],
+      "composition": {
+        "status": "accepted",
+        "attempts": [
+          {
+            "status": "accepted"
+          }
+        ]
+      }
+    },
+    {
+      "turn": 5,
+      "action": "farewell",
+      "lead": "No other questions, thank you. Goodbye.",
+      "agent": "You're welcome. Thank you for your interest and have a good day. You can message again whenever another question comes up.",
+      "understanding": {
+        "version": "sales-understanding/1.0",
+        "requests": [],
+        "all_of": [],
+        "alternatives": [],
+        "constraints": [],
+        "references": [],
+        "preferences": [],
+        "personal_facts": [],
+        "preference_withdrawals": [],
+        "comparison": null,
+        "source_purposes": [],
+        "objections": [],
+        "empathy": null,
+        "releases": [],
+        "visit": null,
+        "courtesy": {
+          "kind": "farewell",
+          "evidence": "No other questions, thank you. Goodbye."
+        },
+        "reschedule": null,
+        "cancellation": null,
+        "wait": null,
+        "moderation": null,
+        "appointment_query": null,
+        "selected_reference_id": null,
+        "requires_clarification": false,
+        "clarification_question": null,
+        "confidence": 1.0
+      },
+      "error_code": null,
+      "checks": [
+        {
+          "check": "current_workflow",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "turn_completed",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "scripted_english_not_rejected",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "reply_present",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_internal_narration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "segment_matches_declared_motivation",
+          "status": "FAIL",
+          "detail": "expected=rental_yield_investor; actual=None; assigned=None"
+        },
+        {
+          "check": "no_booking_without_confirmation",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "at_most_one_booking",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_identical_consecutive_reply",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_emotion_invented_on_neutral_closure",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_declaration_converted_to_question",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_repeated_financial_sentences",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_unrequested_financing_pitch_after_cash",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "payment_information_stated_once",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "segment_evidence_from_own_initial_declaration",
+          "status": "FAIL",
+          "detail": ""
+        },
+        {
+          "check": "declared_budget_persists",
+          "status": "FAIL",
+          "detail": ""
+        },
+        {
+          "check": "known_budget_not_asked_again",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "cash_preference_persists",
+          "status": "FAIL",
+          "detail": ""
+        },
+        {
+          "check": "no_question_after_goodbye",
+          "status": "PASS",
+          "detail": ""
+        }
+      ],
+      "composition": {
+        "status": null,
+        "attempts": []
+      }
+    }
+  ],
+  "checks": [
+    {
+      "check": "segment_not_seeded",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "eligible_roster_matches_assignments",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "expected_booking_outcome",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "no_provider_outbox",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "dialogue_reached_terminal_outcome",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "only_registered_material_urls",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "no_unregistered_material_link",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "all_shares_bound_to_current_property",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "no_invented_yield_percentage",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "unpublished_return_gap_explained",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "unknown_price_and_inventory_explicit",
+      "status": "FAIL",
+      "detail": ""
+    },
+    {
+      "check": "last_event_replay_is_idempotent",
+      "status": "PASS",
+      "detail": ""
+    }
+  ],
+  "failures": [
+    {
+      "check": "unknown_price_and_inventory_explicit",
+      "status": "FAIL",
+      "detail": ""
+    },
+    {
+      "check": "turn_completed",
+      "status": "FAIL",
+      "detail": ""
+    },
+    {
+      "check": "segment_matches_declared_motivation",
+      "status": "FAIL",
+      "detail": "expected=rental_yield_investor; actual=None; assigned=None"
+    },
+    {
+      "check": "segment_evidence_from_own_initial_declaration",
+      "status": "FAIL",
+      "detail": ""
+    },
+    {
+      "check": "declared_budget_persists",
+      "status": "FAIL",
+      "detail": ""
+    },
+    {
+      "check": "cash_preference_persists",
+      "status": "FAIL",
+      "detail": ""
+    },
+    {
+      "check": "segment_matches_declared_motivation",
+      "status": "FAIL",
+      "detail": "expected=rental_yield_investor; actual=None; assigned=None"
+    },
+    {
+      "check": "segment_evidence_from_own_initial_declaration",
+      "status": "FAIL",
+      "detail": ""
+    },
+    {
+      "check": "declared_budget_persists",
+      "status": "FAIL",
+      "detail": ""
+    },
+    {
+      "check": "cash_preference_persists",
+      "status": "FAIL",
+      "detail": ""
+    },
+    {
+      "check": "turn_completed",
+      "status": "FAIL",
+      "detail": ""
+    },
+    {
+      "check": "segment_matches_declared_motivation",
+      "status": "FAIL",
+      "detail": "expected=rental_yield_investor; actual=None; assigned=None"
+    },
+    {
+      "check": "segment_evidence_from_own_initial_declaration",
+      "status": "FAIL",
+      "detail": ""
+    },
+    {
+      "check": "declared_budget_persists",
+      "status": "FAIL",
+      "detail": ""
+    },
+    {
+      "check": "cash_preference_persists",
+      "status": "FAIL",
+      "detail": ""
+    },
+    {
+      "check": "segment_matches_declared_motivation",
+      "status": "FAIL",
+      "detail": "expected=rental_yield_investor; actual=None; assigned=None"
+    },
+    {
+      "check": "segment_evidence_from_own_initial_declaration",
+      "status": "FAIL",
+      "detail": ""
+    },
+    {
+      "check": "declared_budget_persists",
+      "status": "FAIL",
+      "detail": ""
+    },
+    {
+      "check": "cash_preference_persists",
+      "status": "FAIL",
+      "detail": ""
+    },
+    {
+      "check": "segment_matches_declared_motivation",
+      "status": "FAIL",
+      "detail": "expected=rental_yield_investor; actual=None; assigned=None"
+    },
+    {
+      "check": "segment_evidence_from_own_initial_declaration",
+      "status": "FAIL",
+      "detail": ""
+    },
+    {
+      "check": "declared_budget_persists",
+      "status": "FAIL",
+      "detail": ""
+    },
+    {
+      "check": "cash_preference_persists",
+      "status": "FAIL",
+      "detail": ""
+    }
+  ],
+  "blocked_checks": [],
+  "meetings": [],
+  "materials": []
+}

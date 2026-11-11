@@ -1,0 +1,581 @@
+{
+  "synthetic_only": true,
+  "execution_origin": "server_submitted_synthetic_run",
+  "source_archive": "sales-closing-point-1.zip",
+  "source_sha256": "2855d8276e310271bb317a7494c1b8160460f6923501dc11c0143c73e01d652c",
+  "commit": "d5ad9bca17092fcaf99aea25a79c4fa662b26ab3",
+  "sales_model": "openai/gpt-4o-mini",
+  "configuration_version": 8,
+  "configuration_sha256": "51ff65376dad421328dab993a4fc71939489386f1ed173514cf13a244ac79f1c",
+  "clock_utc": null,
+  "team": [],
+  "case": "human_record_then_question",
+  "description": "peticion-humana-y-pregunta-posterior",
+  "persona": null,
+  "company_id": "f0ebe3a5-6c04-5b8e-8cd8-423859aa39d7",
+  "project_id": "88e5563d-2f4e-5a11-9822-ec319f06f25e",
+  "property_type_id": null,
+  "automatic_result": "aprobado",
+  "human_review": {
+    "status": "revisado-favorable",
+    "note": "Registra petición humana, mantiene preguntas disponibles y responde financiación sin prometer aprobación.",
+    "scope": "Revisión de esta transcripción sintética; no certifica otros escenarios ni entrega por operador."
+  },
+  "stop_reason": "script_completed",
+  "expected_outcome": null,
+  "topic_tags": [],
+  "turns": [
+    {
+      "turn": 1,
+      "action": null,
+      "lead": "I want to speak to a human",
+      "agent": "I can help with questions about the property, pricing and visits. What would you like to ask?",
+      "understanding": {
+        "version": "sales-understanding/1.0",
+        "requests": [
+          {
+            "id": "protected",
+            "topic": "human",
+            "subject": null,
+            "polarity": "request",
+            "evidence": "I want to speak to a human",
+            "reference_id": null,
+            "detail_fields": [],
+            "feature": null
+          }
+        ],
+        "all_of": [
+          "protected"
+        ],
+        "alternatives": [],
+        "constraints": [],
+        "references": [],
+        "preferences": [],
+        "personal_facts": [],
+        "preference_withdrawals": [],
+        "comparison": null,
+        "source_purposes": [],
+        "objections": [],
+        "empathy": null,
+        "releases": [],
+        "visit": null,
+        "courtesy": null,
+        "reschedule": null,
+        "cancellation": null,
+        "wait": null,
+        "moderation": null,
+        "appointment_query": null,
+        "selected_reference_id": null,
+        "requires_clarification": false,
+        "clarification_question": null,
+        "confidence": 1.0
+      },
+      "error_code": null,
+      "checks": [
+        {
+          "check": "interpretation_accepted",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "reply_present",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_internal_narration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_unrequested_meeting",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_payment_or_property_reservation_receipt",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_provider_outbox",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_emotion_invented_on_neutral_closure",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_declaration_converted_to_question",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_repeated_financial_sentences",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_unrequested_financing_pitch_after_cash",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "payment_information_stated_once",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "contact_request_count_matches_consent",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "chat_remains_available",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_callback_or_transfer_promise",
+          "status": "PASS",
+          "detail": ""
+        }
+      ],
+      "composition": {
+        "status": null,
+        "attempts": []
+      }
+    },
+    {
+      "turn": 2,
+      "action": null,
+      "lead": "I still want to speak to a human",
+      "agent": "I've saved your request to speak with the Sales team. Is there another property question I can help with? If not, thank you for your interest and have a good day.",
+      "understanding": {
+        "version": "sales-understanding/1.0",
+        "requests": [
+          {
+            "id": "protected",
+            "topic": "human",
+            "subject": null,
+            "polarity": "request",
+            "evidence": "I still want to speak to a human",
+            "reference_id": null,
+            "detail_fields": [],
+            "feature": null
+          }
+        ],
+        "all_of": [
+          "protected"
+        ],
+        "alternatives": [],
+        "constraints": [],
+        "references": [],
+        "preferences": [],
+        "personal_facts": [],
+        "preference_withdrawals": [],
+        "comparison": null,
+        "source_purposes": [],
+        "objections": [],
+        "empathy": null,
+        "releases": [],
+        "visit": null,
+        "courtesy": null,
+        "reschedule": null,
+        "cancellation": null,
+        "wait": null,
+        "moderation": null,
+        "appointment_query": null,
+        "selected_reference_id": null,
+        "requires_clarification": false,
+        "clarification_question": null,
+        "confidence": 1.0
+      },
+      "error_code": null,
+      "checks": [
+        {
+          "check": "interpretation_accepted",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "reply_present",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_internal_narration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_unrequested_meeting",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_payment_or_property_reservation_receipt",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_provider_outbox",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_emotion_invented_on_neutral_closure",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_declaration_converted_to_question",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_repeated_financial_sentences",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_unrequested_financing_pitch_after_cash",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "payment_information_stated_once",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "contact_request_count_matches_consent",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "chat_remains_available",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_callback_or_transfer_promise",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "request_visible_to_staff",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "request_status",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_marketing_or_inactivity_after_insistence",
+          "status": "PASS",
+          "detail": ""
+        }
+      ],
+      "composition": {
+        "status": null,
+        "attempts": []
+      }
+    },
+    {
+      "turn": 3,
+      "action": null,
+      "lead": "What financing options do you offer?",
+      "agent": "The published payment information is: Cash; Bank financing.\n\nDetailed financing and down payment conditions can be reviewed with the sales team during an in-person visit. Financing eligibility and approval are not determined in this chat.\n\nIs there another property question I can help with?",
+      "understanding": {
+        "version": "sales-understanding/1.0",
+        "requests": [
+          {
+            "id": "r1",
+            "topic": "financing",
+            "subject": null,
+            "polarity": "request",
+            "evidence": "What financing options do you offer?",
+            "reference_id": null,
+            "detail_fields": [],
+            "feature": null
+          }
+        ],
+        "all_of": [
+          "r1"
+        ],
+        "alternatives": [],
+        "constraints": [],
+        "references": [],
+        "preferences": [],
+        "personal_facts": [],
+        "preference_withdrawals": [],
+        "comparison": null,
+        "source_purposes": [],
+        "objections": [],
+        "empathy": null,
+        "releases": [],
+        "visit": null,
+        "courtesy": null,
+        "reschedule": null,
+        "cancellation": null,
+        "wait": null,
+        "moderation": null,
+        "appointment_query": null,
+        "selected_reference_id": null,
+        "requires_clarification": false,
+        "clarification_question": null,
+        "confidence": 0.99
+      },
+      "error_code": null,
+      "checks": [
+        {
+          "check": "interpretation_accepted",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "reply_present",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_internal_narration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_unrequested_meeting",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_payment_or_property_reservation_receipt",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_provider_outbox",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_emotion_invented_on_neutral_closure",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_declaration_converted_to_question",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_repeated_financial_sentences",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_unrequested_financing_pitch_after_cash",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "payment_information_stated_once",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "contact_request_count_matches_consent",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "chat_remains_available",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_callback_or_transfer_promise",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "request_visible_to_staff",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "request_status",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_marketing_or_inactivity_after_insistence",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "actual_question_answered",
+          "status": "PASS",
+          "detail": ""
+        }
+      ],
+      "composition": {
+        "status": "accepted",
+        "attempts": [
+          {
+            "status": "accepted"
+          }
+        ]
+      }
+    },
+    {
+      "turn": 4,
+      "action": null,
+      "lead": "No other questions, thank you. Goodbye.",
+      "agent": "You're welcome. Thank you for your interest and have a good day. You can message again whenever another question comes up.",
+      "understanding": {
+        "version": "sales-understanding/1.0",
+        "requests": [],
+        "all_of": [],
+        "alternatives": [],
+        "constraints": [],
+        "references": [],
+        "preferences": [],
+        "personal_facts": [],
+        "preference_withdrawals": [],
+        "comparison": null,
+        "source_purposes": [],
+        "objections": [],
+        "empathy": null,
+        "releases": [],
+        "visit": null,
+        "courtesy": {
+          "kind": "farewell",
+          "evidence": "No other questions, thank you. Goodbye."
+        },
+        "reschedule": null,
+        "cancellation": null,
+        "wait": null,
+        "moderation": null,
+        "appointment_query": null,
+        "selected_reference_id": null,
+        "requires_clarification": false,
+        "clarification_question": null,
+        "confidence": 1.0
+      },
+      "error_code": null,
+      "checks": [
+        {
+          "check": "interpretation_accepted",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "reply_present",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_internal_narration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_unrequested_meeting",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_payment_or_property_reservation_receipt",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_provider_outbox",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_emotion_invented_on_neutral_closure",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_declaration_converted_to_question",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_repeated_financial_sentences",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_unrequested_financing_pitch_after_cash",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "payment_information_stated_once",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "contact_request_count_matches_consent",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "chat_remains_available",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_callback_or_transfer_promise",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "request_visible_to_staff",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "request_status",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_marketing_or_inactivity_after_insistence",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "farewell_does_not_ask_another_question",
+          "status": "PASS",
+          "detail": ""
+        }
+      ],
+      "composition": {
+        "status": null,
+        "attempts": []
+      }
+    }
+  ],
+  "checks": [
+    {
+      "check": "script_completed",
+      "status": "PASS",
+      "detail": ""
+    }
+  ],
+  "failures": [],
+  "blocked_checks": [],
+  "meetings": [],
+  "materials": []
+}

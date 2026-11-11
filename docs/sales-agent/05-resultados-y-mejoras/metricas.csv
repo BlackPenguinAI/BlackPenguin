@@ -1,0 +1,15 @@
+run,suite,cohort,cases,approved_cases,turns,expected_bookings,actual_bookings,provider_calls,cost_usd_recorded,cost_complete
+sales-booking-point-1,booking,035333064ba9,6,0,30,3,0,61,0.08159204999999997,True
+sales-booking-point-2,booking,035333064ba9,6,0,18,3,3,37,0.04804425000000001,True
+sales-booking-point-3,booking,035333064ba9,6,2,16,3,3,37,0.05101845,True
+sales-booking-point-4,booking,035333064ba9,6,0,20,3,3,41,0.061804799999999986,True
+sales-booking-point-5,booking,035333064ba9,6,2,15,3,3,33,0.046687799999999995,True
+sales-booking-point-6,booking,035333064ba9,6,3,15,3,3,35,0.051616949999999995,True
+sales-closing-point-1,closing,e4b68a85bd03,8,8,25,0,0,15,0.02099955,True
+sales-commercial-point-1,commercial,881bfe45102e,8,7,17,0,0,34,0.04402260000000001,True
+sales-commercial-point-2,commercial,881bfe45102e,8,8,17,0,0,35,0.046071300000000016,True
+sales-compact-battery-1,compact,a3266781ee21,16,2,63,8,3,110,0.15877664999999994,True
+sales-compact-repair-1,compact,88baa75f44ef,8,0,36,4,3,72,0.12409320000000003,True
+sales-compact-repair-2,compact,88baa75f44ef,8,1,31,4,0,57,0.08193824999999996,True
+sales-compact-repair-3,compact,34c48f5a33f0,3,1,15,2,0,36,0.059251800000000014,True
+sales-compact-repair-4,compact,34c48f5a33f0,3,2,13,2,2,31,0.0480819,False

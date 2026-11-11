@@ -1,0 +1,94 @@
+{
+  "run": "sales-compact-repair-1",
+  "execution_origin": "server_submitted_synthetic_run",
+  "archive": "sales-compact-repair-1.zip",
+  "sha256": "b39f5766039b5a31d9dee217520f43dc9daee8e5ccbc09b670b85e73efb89669",
+  "commit": "06271fd4a34da1543e73c2f567bb736309e7c844",
+  "suite": "compact",
+  "cohort": "88baa75f44ef",
+  "selected_cases": [
+    "downsizing_B",
+    "first_time_A",
+    "move_up_B",
+    "portfolio_A",
+    "portfolio_B",
+    "rental_B",
+    "resale_A",
+    "unknown_A"
+  ],
+  "model": "openai/gpt-4o-mini",
+  "configuration_version": 8,
+  "configuration_sha256": "51ff65376dad421328dab993a4fc71939489386f1ed173514cf13a244ac79f1c",
+  "status": "FAIL",
+  "cases": 8,
+  "approved_cases": 0,
+  "turns": 36,
+  "expected_bookings": 4,
+  "actual_bookings": 3,
+  "provider_calls": 72,
+  "cost_usd_recorded": 0.12409320000000003,
+  "cost_complete": true,
+  "checks_summary": {
+    "PASS": 656,
+    "FAIL": 130,
+    "BLOCKED": 0
+  },
+  "case_results": [
+    {
+      "case": "first_time_A",
+      "status": "fallido",
+      "meetings": 1,
+      "turns": 6,
+      "failures": 26
+    },
+    {
+      "case": "move_up_B",
+      "status": "fallido",
+      "meetings": 0,
+      "turns": 4,
+      "failures": 20
+    },
+    {
+      "case": "downsizing_B",
+      "status": "fallido",
+      "meetings": 0,
+      "turns": 5,
+      "failures": 2
+    },
+    {
+      "case": "rental_B",
+      "status": "fallido",
+      "meetings": 0,
+      "turns": 5,
+      "failures": 23
+    },
+    {
+      "case": "resale_A",
+      "status": "fallido",
+      "meetings": 1,
+      "turns": 4,
+      "failures": 17
+    },
+    {
+      "case": "portfolio_A",
+      "status": "fallido",
+      "meetings": 1,
+      "turns": 5,
+      "failures": 21
+    },
+    {
+      "case": "portfolio_B",
+      "status": "fallido",
+      "meetings": 0,
+      "turns": 4,
+      "failures": 17
+    },
+    {
+      "case": "unknown_A",
+      "status": "fallido",
+      "meetings": 0,
+      "turns": 3,
+      "failures": 4
+    }
+  ]
+}

@@ -1,0 +1,849 @@
+{
+  "synthetic_only": true,
+  "execution_origin": "server_submitted_synthetic_run",
+  "source_archive": "sales-compact-repair-2.zip",
+  "source_sha256": "806f1e398d61a58d33f607a3a009efd1759e4448d76335db22c7ac49378a7e99",
+  "commit": "2d85c207292cc2e25edc796168317e9713f0e274",
+  "sales_model": "openai/gpt-4o-mini",
+  "configuration_version": 8,
+  "configuration_sha256": "51ff65376dad421328dab993a4fc71939489386f1ed173514cf13a244ac79f1c",
+  "clock_utc": null,
+  "team": [
+    {
+      "id": "7522371e-2ad0-5ffb-b1e7-091840da6b70",
+      "company_id": "f0ebe3a5-6c04-5b8e-8cd8-423859aa39d7",
+      "role": "candidate",
+      "active": true,
+      "access_scope": "all",
+      "project_ids": [],
+      "accepts_appointments": true,
+      "has_slots": true
+    },
+    {
+      "id": "deca8b15-085d-5bdd-8121-5df6e740bdd1",
+      "company_id": "f0ebe3a5-6c04-5b8e-8cd8-423859aa39d7",
+      "role": "other_project",
+      "active": true,
+      "access_scope": "selected",
+      "project_ids": [
+        "fc14327b-d4de-50e6-b694-20c4897e3fa8"
+      ],
+      "accepts_appointments": true,
+      "has_slots": true
+    },
+    {
+      "id": "a9072bf0-6fb2-51f3-84da-32d2e5cd2276",
+      "company_id": "f0ebe3a5-6c04-5b8e-8cd8-423859aa39d7",
+      "role": "none",
+      "active": true,
+      "access_scope": "selected",
+      "project_ids": [],
+      "accepts_appointments": true,
+      "has_slots": true
+    },
+    {
+      "id": "ac52032a-b783-5f66-9fcf-853972d9fa45",
+      "company_id": "f0ebe3a5-6c04-5b8e-8cd8-423859aa39d7",
+      "role": "inactive",
+      "active": false,
+      "access_scope": "selected",
+      "project_ids": [
+        "abf88941-5a70-5a06-a1ed-bca5b42bb90a"
+      ],
+      "accepts_appointments": true,
+      "has_slots": true
+    },
+    {
+      "id": "423690ed-94bf-5d02-834c-058abcd08e36",
+      "company_id": "f0ebe3a5-6c04-5b8e-8cd8-423859aa39d7",
+      "role": "no_appointments",
+      "active": true,
+      "access_scope": "selected",
+      "project_ids": [
+        "abf88941-5a70-5a06-a1ed-bca5b42bb90a"
+      ],
+      "accepts_appointments": false,
+      "has_slots": true
+    }
+  ],
+  "case": "move_up_B",
+  "description": "cambio-de-propiedad-fotos-y-despedida",
+  "persona": {
+    "key": "move_up",
+    "name": "Daniel Brooks",
+    "segment": "move_up_buyer",
+    "motive": "I want to move from my current small home to a larger home.",
+    "budget": 900000
+  },
+  "company_id": "f0ebe3a5-6c04-5b8e-8cd8-423859aa39d7",
+  "project_id": "abf88941-5a70-5a06-a1ed-bca5b42bb90a",
+  "property_type_id": "8f7cedb7-5014-5d7b-ac40-ba5ee6f5f40c",
+  "automatic_result": "aprobado",
+  "human_review": {
+    "status": "pending",
+    "note": "Automatic approval is not a human judgment of conversational quality."
+  },
+  "stop_reason": "closed",
+  "expected_outcome": "closed",
+  "topic_tags": [
+    "decline",
+    "farewell",
+    "information",
+    "switch"
+  ],
+  "turns": [
+    {
+      "turn": 1,
+      "action": "information",
+      "lead": "I want to move from my current small home to a larger home. My budget is 400,000 USD, paying cash. Please show me Cedar Studio.",
+      "agent": "Here are the property options I can confirm:\n\n1. Cedar Loft — 2 bedrooms, 2 bathrooms, 110 m². Published prices start at 325,000.00 USD.\n\n2. Cedar Studio — 1 bedroom, 1 bathroom, 52 m². Published prices start at 210,000.00 USD.\n\nYou are considering an outright purchase, without financing.\n\nWhat would you like to know next about the property?",
+      "understanding": {
+        "version": "sales-understanding/1.0",
+        "requests": [
+          {
+            "id": "r0",
+            "topic": "catalog",
+            "subject": null,
+            "polarity": "request",
+            "evidence": "Please show me Cedar Studio.",
+            "reference_id": "ref0",
+            "detail_fields": [],
+            "feature": null
+          }
+        ],
+        "all_of": [
+          "r0"
+        ],
+        "alternatives": [],
+        "constraints": [],
+        "references": [
+          {
+            "kind": "property",
+            "id": "ref0",
+            "expression": "Cedar Studio",
+            "evidence": "Cedar Studio"
+          }
+        ],
+        "preferences": [
+          {
+            "key": "financing",
+            "value": "cash",
+            "evidence": "paying cash",
+            "status": "declared"
+          },
+          {
+            "key": "motivation",
+            "value": "move_up_buyer",
+            "evidence": "I want to move from my current small home to a larger home.",
+            "status": "declared"
+          },
+          {
+            "key": "budget",
+            "value": "400000 USD",
+            "evidence": "My budget is 400,000 USD",
+            "status": "declared"
+          },
+          {
+            "key": "buyer_type",
+            "value": "move_up_buyer",
+            "evidence": "I want to move from my current small home to a larger home.",
+            "status": "declared"
+          }
+        ],
+        "personal_facts": [],
+        "preference_withdrawals": [],
+        "comparison": null,
+        "source_purposes": [],
+        "objections": [],
+        "empathy": null,
+        "releases": [],
+        "visit": {
+          "action": "request",
+          "evidence": "Please show me Cedar Studio.",
+          "timing": null
+        },
+        "courtesy": null,
+        "reschedule": null,
+        "cancellation": null,
+        "wait": null,
+        "moderation": null,
+        "appointment_query": null,
+        "selected_reference_id": null,
+        "requires_clarification": false,
+        "clarification_question": null,
+        "confidence": 1.0
+      },
+      "error_code": null,
+      "checks": [
+        {
+          "check": "current_workflow",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "turn_completed",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "scripted_english_not_rejected",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "reply_present",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_internal_narration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "segment_matches_declared_motivation",
+          "status": "PASS",
+          "detail": "expected=move_up_buyer; actual=move_up_buyer; assigned=move_up_buyer"
+        },
+        {
+          "check": "no_booking_without_confirmation",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "at_most_one_booking",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_identical_consecutive_reply",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "composition_accepted",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_emotion_invented_on_neutral_closure",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_declaration_converted_to_question",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_repeated_financial_sentences",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_unrequested_financing_pitch_after_cash",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "payment_information_stated_once",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "segment_evidence_from_own_initial_declaration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "declared_budget_persists",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "known_budget_not_asked_again",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "cash_preference_persists",
+          "status": "PASS",
+          "detail": ""
+        }
+      ],
+      "composition": {
+        "status": "accepted",
+        "attempts": [
+          {
+            "status": "invalid_contract",
+            "error_code": "CompositionViolation",
+            "rule_code": "catalog_order",
+            "validation_issues": [
+              {
+                "location": [
+                  "blocks"
+                ],
+                "type": "catalog_order"
+              }
+            ]
+          },
+          {
+            "status": "accepted"
+          }
+        ]
+      }
+    },
+    {
+      "turn": 2,
+      "action": "switch",
+      "lead": "Actually I prefer Cedar Loft instead. Please send its photos.",
+      "agent": "Cedar Loft gallery: [sandbox-material-link]",
+      "understanding": {
+        "version": "sales-understanding/1.0",
+        "requests": [
+          {
+            "id": "r0",
+            "topic": "materials",
+            "subject": "photos",
+            "polarity": "request",
+            "evidence": "Please send its photos.",
+            "reference_id": "ref0",
+            "detail_fields": [],
+            "feature": null
+          }
+        ],
+        "all_of": [
+          "r0"
+        ],
+        "alternatives": [],
+        "constraints": [],
+        "references": [
+          {
+            "kind": "property",
+            "id": "ref0",
+            "expression": "Cedar Loft",
+            "evidence": "Cedar Loft"
+          }
+        ],
+        "preferences": [
+          {
+            "key": "property",
+            "value": "Cedar Loft",
+            "evidence": "Actually I prefer Cedar Loft instead.",
+            "status": "declared"
+          }
+        ],
+        "personal_facts": [],
+        "preference_withdrawals": [],
+        "comparison": null,
+        "source_purposes": [],
+        "objections": [],
+        "empathy": null,
+        "releases": [],
+        "visit": {
+          "action": "request",
+          "evidence": "Please send its photos.",
+          "timing": null
+        },
+        "courtesy": null,
+        "reschedule": null,
+        "cancellation": null,
+        "wait": null,
+        "moderation": null,
+        "appointment_query": null,
+        "selected_reference_id": null,
+        "requires_clarification": false,
+        "clarification_question": null,
+        "confidence": 1.0
+      },
+      "error_code": null,
+      "checks": [
+        {
+          "check": "current_workflow",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "turn_completed",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "scripted_english_not_rejected",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "reply_present",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_internal_narration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "segment_matches_declared_motivation",
+          "status": "PASS",
+          "detail": "expected=move_up_buyer; actual=move_up_buyer; assigned=move_up_buyer"
+        },
+        {
+          "check": "no_booking_without_confirmation",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "at_most_one_booking",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_identical_consecutive_reply",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "composition_accepted",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_emotion_invented_on_neutral_closure",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_declaration_converted_to_question",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_repeated_financial_sentences",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_unrequested_financing_pitch_after_cash",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "payment_information_stated_once",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "segment_evidence_from_own_initial_declaration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "declared_budget_persists",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "known_budget_not_asked_again",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "cash_preference_persists",
+          "status": "PASS",
+          "detail": ""
+        }
+      ],
+      "composition": {
+        "status": "accepted",
+        "attempts": [
+          {
+            "status": "accepted"
+          }
+        ]
+      }
+    },
+    {
+      "turn": 3,
+      "action": "decline",
+      "lead": "I do not want a visit yet.",
+      "agent": "Please clarify whether you want to cancel the current visit or request a different visit. Nothing has been changed.",
+      "understanding": {
+        "version": "sales-understanding/1.0",
+        "requests": [],
+        "all_of": [],
+        "alternatives": [],
+        "constraints": [
+          {
+            "topic": "appointment",
+            "subject": null,
+            "effect": "prohibit",
+            "scope": "until_explicit_change",
+            "evidence": "I do not want a visit yet.",
+            "reference_id": null
+          }
+        ],
+        "references": [],
+        "preferences": [],
+        "personal_facts": [],
+        "preference_withdrawals": [],
+        "comparison": null,
+        "source_purposes": [],
+        "objections": [],
+        "empathy": null,
+        "releases": [],
+        "visit": {
+          "action": "decline",
+          "evidence": "I do not want a visit yet.",
+          "timing": null
+        },
+        "courtesy": null,
+        "reschedule": null,
+        "cancellation": {
+          "action": "request",
+          "evidence": "I do not want a visit yet.",
+          "meeting_reference": null,
+          "reason": null
+        },
+        "wait": null,
+        "moderation": null,
+        "appointment_query": null,
+        "selected_reference_id": null,
+        "requires_clarification": false,
+        "clarification_question": null,
+        "confidence": 1.0
+      },
+      "error_code": null,
+      "checks": [
+        {
+          "check": "current_workflow",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "turn_completed",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "scripted_english_not_rejected",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "reply_present",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_internal_narration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "segment_matches_declared_motivation",
+          "status": "PASS",
+          "detail": "expected=move_up_buyer; actual=move_up_buyer; assigned=move_up_buyer"
+        },
+        {
+          "check": "no_booking_without_confirmation",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "at_most_one_booking",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_identical_consecutive_reply",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "composition_accepted",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_emotion_invented_on_neutral_closure",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_declaration_converted_to_question",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_repeated_financial_sentences",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_unrequested_financing_pitch_after_cash",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "payment_information_stated_once",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "segment_evidence_from_own_initial_declaration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "declared_budget_persists",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "known_budget_not_asked_again",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "cash_preference_persists",
+          "status": "PASS",
+          "detail": ""
+        }
+      ],
+      "composition": {
+        "status": "accepted",
+        "attempts": [
+          {
+            "status": "accepted"
+          }
+        ]
+      }
+    },
+    {
+      "turn": 4,
+      "action": "farewell",
+      "lead": "No other questions, thank you. Goodbye.",
+      "agent": "You're welcome. Thank you for your interest and have a good day. You can message again whenever another question comes up.",
+      "understanding": {
+        "version": "sales-understanding/1.0",
+        "requests": [],
+        "all_of": [],
+        "alternatives": [],
+        "constraints": [],
+        "references": [],
+        "preferences": [],
+        "personal_facts": [],
+        "preference_withdrawals": [],
+        "comparison": null,
+        "source_purposes": [],
+        "objections": [],
+        "empathy": null,
+        "releases": [],
+        "visit": null,
+        "courtesy": {
+          "kind": "farewell",
+          "evidence": "No other questions, thank you. Goodbye."
+        },
+        "reschedule": null,
+        "cancellation": null,
+        "wait": null,
+        "moderation": null,
+        "appointment_query": null,
+        "selected_reference_id": null,
+        "requires_clarification": false,
+        "clarification_question": null,
+        "confidence": 1.0
+      },
+      "error_code": null,
+      "checks": [
+        {
+          "check": "current_workflow",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "turn_completed",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "scripted_english_not_rejected",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "reply_present",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_internal_narration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "segment_matches_declared_motivation",
+          "status": "PASS",
+          "detail": "expected=move_up_buyer; actual=move_up_buyer; assigned=move_up_buyer"
+        },
+        {
+          "check": "no_booking_without_confirmation",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "at_most_one_booking",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_identical_consecutive_reply",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_emotion_invented_on_neutral_closure",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_declaration_converted_to_question",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_repeated_financial_sentences",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_unrequested_financing_pitch_after_cash",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "payment_information_stated_once",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "segment_evidence_from_own_initial_declaration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "declared_budget_persists",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "known_budget_not_asked_again",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "cash_preference_persists",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_question_after_goodbye",
+          "status": "PASS",
+          "detail": ""
+        }
+      ],
+      "composition": {
+        "status": null,
+        "attempts": []
+      }
+    }
+  ],
+  "checks": [
+    {
+      "check": "segment_not_seeded",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "eligible_roster_matches_assignments",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "expected_booking_outcome",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "no_provider_outbox",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "dialogue_reached_terminal_outcome",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "only_registered_material_urls",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "material_link_scope",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "material_link_property",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "material_bytes_readable",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "no_unregistered_material_link",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "all_shares_bound_to_current_property",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "requested_material_delivered",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "property_switch_reflected",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "last_event_replay_is_idempotent",
+      "status": "PASS",
+      "detail": ""
+    }
+  ],
+  "failures": [],
+  "blocked_checks": [],
+  "meetings": [],
+  "materials": [
+    {
+      "share_id": "62d5e32d-1240-4501-abc9-19998261211b",
+      "asset_id": "5bc83021-b933-4536-a132-5602f64a797b",
+      "property_type_id": "8f7cedb7-5014-5d7b-ac40-ba5ee6f5f40c",
+      "mime_type": "text/html",
+      "sha256": "95aa6ac613c8e38cc568163753d576916aa9dfdc69c7630434520032e3d18841",
+      "bytes": 23681,
+      "laboratory_only": true,
+      "local_material_path": "cedar/loft.html"
+    }
+  ]
+}

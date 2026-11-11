@@ -1,0 +1,87 @@
+{
+  "synthetic_only": true,
+  "fixture_version": "sales-synthetic-company/1.0",
+  "clock_utc": "2026-11-11T06:34:00",
+  "data": [
+    {
+      "key": "first_time",
+      "name": "Emma Torres",
+      "segment": "first_time_buyer",
+      "motive": "I am buying my first home.",
+      "budget": 300000,
+      "age": null,
+      "occupation": null,
+      "note": "Age and occupation are not defined or used to infer a segment."
+    },
+    {
+      "key": "move_up",
+      "name": "Daniel Brooks",
+      "segment": "move_up_buyer",
+      "motive": "I want to move from my current small home to a larger home.",
+      "budget": 900000,
+      "age": null,
+      "occupation": null,
+      "note": "Age and occupation are not defined or used to infer a segment."
+    },
+    {
+      "key": "relocation",
+      "name": "Sofia Reed",
+      "segment": "relocation",
+      "motive": "I am relocating to this area for work and need a home here.",
+      "budget": 900000,
+      "age": null,
+      "occupation": null,
+      "note": "Age and occupation are not defined or used to infer a segment."
+    },
+    {
+      "key": "downsizing",
+      "name": "Martin Vega",
+      "segment": "downsizing",
+      "motive": "I want to downsize from my large home to a smaller home.",
+      "budget": 300000,
+      "age": null,
+      "occupation": null,
+      "note": "Age and occupation are not defined or used to infer a segment."
+    },
+    {
+      "key": "rental",
+      "name": "Lucas Chen",
+      "segment": "rental_yield_investor",
+      "motive": "I am buying an investment property to earn rental income.",
+      "budget": 500000,
+      "age": null,
+      "occupation": null,
+      "note": "Age and occupation are not defined or used to infer a segment."
+    },
+    {
+      "key": "resale",
+      "name": "Valeria Cruz",
+      "segment": "appreciation_resale_investor",
+      "motive": "I am investing in a property for long-term appreciation and later resale.",
+      "budget": 900000,
+      "age": null,
+      "occupation": null,
+      "note": "Age and occupation are not defined or used to infer a segment."
+    },
+    {
+      "key": "portfolio",
+      "name": "Adrian Park",
+      "segment": "portfolio_diversification",
+      "motive": "I want to diversify my investment portfolio by adding real estate.",
+      "budget": 400000,
+      "age": null,
+      "occupation": null,
+      "note": "Age and occupation are not defined or used to infer a segment."
+    },
+    {
+      "key": "unknown",
+      "name": "Alex Rivera",
+      "segment": null,
+      "motive": "",
+      "budget": 500000,
+      "age": null,
+      "occupation": null,
+      "note": "Age and occupation are not defined or used to infer a segment."
+    }
+  ]
+}

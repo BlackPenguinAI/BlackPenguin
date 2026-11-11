@@ -1,0 +1,41 @@
+{
+  "sales-compact-repair-4:first_time_A": {
+    "status": "revisado-favorable",
+    "note": "Entrega el PDF y completa selección, resumen y confirmación de visita sin reserva anticipada.",
+    "scope": "Revisión de esta transcripción sintética; no certifica otros escenarios ni entrega por operador."
+  },
+  "sales-compact-repair-4:unknown_A": {
+    "status": "revisado-favorable",
+    "note": "Conserva el segmento desconocido y confirma la visita solo después de la aceptación explícita.",
+    "scope": "Revisión de esta transcripción sintética; no certifica otros escenarios ni entrega por operador."
+  },
+  "sales-compact-repair-3:move_up_B": {
+    "status": "revisado-favorable",
+    "note": "Cambia a la propiedad pedida, entrega galería, respeta rechazo y cierra sin insistencia.",
+    "scope": "Revisión de esta transcripción sintética; no certifica otros escenarios ni entrega por operador."
+  },
+  "sales-closing-point-1:human_record_then_question": {
+    "status": "revisado-favorable",
+    "note": "Registra petición humana, mantiene preguntas disponibles y responde financiación sin prometer aprobación.",
+    "scope": "Revisión de esta transcripción sintética; no certifica otros escenarios ni entrega por operador."
+  },
+  "sales-closing-point-1:farewell_then_reopen": {
+    "status": "revisado-favorable",
+    "note": "Permite retomar con una pregunta después de despedirse, en la misma corrida; no prueba días de inactividad ni transporte real.",
+    "scope": "Revisión de esta transcripción sintética; no certifica otros escenarios ni entrega por operador."
+  },
+  "sales-commercial-point-2:lower_budget_financing": {
+    "status": "revisado-favorable",
+    "note": "Explica financiación publicada y falta de opción dentro del presupuesto sin prometer crédito; invita a visita y respeta cierre.",
+    "scope": "Revisión de esta transcripción sintética; no certifica otros escenarios ni entrega por operador."
+  },
+  "sales-commercial-point-2:property_reservation": {
+    "status": "revisado-favorable",
+    "note": "Aclara que el chat no acepta pagos ni separa inmuebles; informa y ofrece ayuda.",
+    "scope": "Revisión de esta transcripción sintética; no certifica otros escenarios ni entrega por operador."
+  },
+  "sales-commercial-point-1:lower_budget_financing": {
+    "status": "necesita-mejoras",
+    "note": "Aprobó controles antiguos, pero repite información financiera y atribuye frustración a una despedida neutral."
+  }
+}

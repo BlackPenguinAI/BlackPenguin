@@ -1,0 +1,397 @@
+{
+  "synthetic_only": true,
+  "execution_origin": "server_submitted_synthetic_run",
+  "source_archive": "sales-booking-point-4.zip",
+  "source_sha256": "8c5cf0bc01ebb8ce859cda2683c247e7b7454d6729a417b75279e36cd274d5be",
+  "commit": "6b8cc900678d3a7c1f11f01562c689783cfd6cbb",
+  "sales_model": "openai/gpt-4o-mini",
+  "configuration_version": 8,
+  "configuration_sha256": "51ff65376dad421328dab993a4fc71939489386f1ed173514cf13a244ac79f1c",
+  "clock_utc": "2026-11-10T22:47:26.884306",
+  "team": [
+    {
+      "id": "712d00e0-b077-5428-9dd0-e9954e6327e9",
+      "scope": "all",
+      "assigned": false,
+      "active": true
+    },
+    {
+      "id": "095232a4-8e20-5aba-aa34-2362c7ff0989",
+      "scope": "specific",
+      "assigned": false,
+      "active": true
+    },
+    {
+      "id": "87dc6176-b59c-57b7-b38f-12b21d22f2c7",
+      "scope": "none",
+      "assigned": false,
+      "active": true
+    },
+    {
+      "id": "29d915ef-8fb1-5db2-828d-1d7be1c72d76",
+      "scope": "inactive",
+      "assigned": true,
+      "active": false
+    },
+    {
+      "id": "5feff323-9a29-53d6-9efd-1681967af07d",
+      "scope": "no_appointments",
+      "assigned": true,
+      "active": true
+    }
+  ],
+  "case": "no_eligible_sales",
+  "description": "no-eligible-sales",
+  "persona": null,
+  "company_id": "f0ebe3a5-6c04-5b8e-8cd8-423859aa39d7",
+  "project_id": "88e5563d-2f4e-5a11-9822-ec319f06f25e",
+  "property_type_id": null,
+  "automatic_result": "fallido",
+  "human_review": {
+    "status": "pending",
+    "note": "Automatic approval is not a human judgment of conversational quality."
+  },
+  "stop_reason": "repeated_selection_without_progress",
+  "expected_outcome": null,
+  "topic_tags": [
+    "clarify_visit_request",
+    "request"
+  ],
+  "turns": [
+    {
+      "turn": 1,
+      "action": "request",
+      "lead": "I am interested in Bay Residence at Harbor Gardens and would like to book an in-person visit. My budget is 900,000 USD, paying cash. Any time in the next seven days works; please use the project timezone.",
+      "agent": "Would you like me to connect you with the sales team to help with your question?",
+      "understanding": null,
+      "error_code": "understanding_validation_failed",
+      "checks": [
+        {
+          "check": "reply_present",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "budget_preserved_in_interpretation",
+          "status": "FAIL",
+          "detail": ""
+        },
+        {
+          "check": "cash_preserved_in_interpretation",
+          "status": "FAIL",
+          "detail": ""
+        },
+        {
+          "check": "budget_remains_in_saved_profile",
+          "status": "FAIL",
+          "detail": ""
+        },
+        {
+          "check": "no_invented_question_from_declaration",
+          "status": "FAIL",
+          "detail": ""
+        },
+        {
+          "check": "interpretation_accepted",
+          "status": "FAIL",
+          "detail": ""
+        },
+        {
+          "check": "no_internal_narration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_booking_before_confirmation",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "selection_advances_to_confirmation",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_identical_consecutive_reply",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_invented_frustration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_duplicate_booking",
+          "status": "PASS",
+          "detail": ""
+        }
+      ],
+      "composition": {
+        "status": null,
+        "attempts": []
+      }
+    },
+    {
+      "turn": 2,
+      "action": "clarify_visit_request",
+      "lead": "I would like to arrange an in-person visit to Bay Residence. Please use the project timezone and check whether any viewing times are available.",
+      "agent": "Would you prefer to continue here or speak with the sales team?",
+      "understanding": null,
+      "error_code": "understanding_validation_failed",
+      "checks": [
+        {
+          "check": "reply_present",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "budget_preserved_in_interpretation",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "cash_preserved_in_interpretation",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "budget_remains_in_saved_profile",
+          "status": "FAIL",
+          "detail": ""
+        },
+        {
+          "check": "no_invented_question_from_declaration",
+          "status": "FAIL",
+          "detail": ""
+        },
+        {
+          "check": "interpretation_accepted",
+          "status": "FAIL",
+          "detail": ""
+        },
+        {
+          "check": "no_internal_narration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_booking_before_confirmation",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "selection_advances_to_confirmation",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_identical_consecutive_reply",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_invented_frustration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_duplicate_booking",
+          "status": "PASS",
+          "detail": ""
+        }
+      ],
+      "composition": {
+        "status": null,
+        "attempts": []
+      }
+    },
+    {
+      "turn": 3,
+      "action": "clarify_visit_request",
+      "lead": "I would like to arrange an in-person visit to Bay Residence. Please use the project timezone and check whether any viewing times are available.",
+      "agent": "Would you prefer to continue here or speak with the sales team?",
+      "understanding": null,
+      "error_code": "understanding_validation_failed",
+      "checks": [
+        {
+          "check": "reply_present",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "budget_preserved_in_interpretation",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "cash_preserved_in_interpretation",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "budget_remains_in_saved_profile",
+          "status": "FAIL",
+          "detail": ""
+        },
+        {
+          "check": "no_invented_question_from_declaration",
+          "status": "FAIL",
+          "detail": ""
+        },
+        {
+          "check": "interpretation_accepted",
+          "status": "FAIL",
+          "detail": ""
+        },
+        {
+          "check": "no_internal_narration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_booking_before_confirmation",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "selection_advances_to_confirmation",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_identical_consecutive_reply",
+          "status": "FAIL",
+          "detail": ""
+        },
+        {
+          "check": "no_invented_frustration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_duplicate_booking",
+          "status": "PASS",
+          "detail": ""
+        }
+      ],
+      "composition": {
+        "status": null,
+        "attempts": []
+      }
+    }
+  ],
+  "checks": [
+    {
+      "check": "no_provider_outbox",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "expected_booking_outcome",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "confirmed_only_after_explicit_selection",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "unavailability_explained",
+      "status": "FAIL",
+      "detail": ""
+    },
+    {
+      "check": "buyer_acknowledges_only_explained_unavailability",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "no_visit_options_offered",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "appropriate_future_availability_wording",
+      "status": "BLOCKED",
+      "detail": "Human review required; no future notification automation is created."
+    }
+  ],
+  "failures": [
+    {
+      "check": "unavailability_explained",
+      "status": "FAIL",
+      "detail": ""
+    },
+    {
+      "check": "budget_preserved_in_interpretation",
+      "status": "FAIL",
+      "detail": ""
+    },
+    {
+      "check": "cash_preserved_in_interpretation",
+      "status": "FAIL",
+      "detail": ""
+    },
+    {
+      "check": "budget_remains_in_saved_profile",
+      "status": "FAIL",
+      "detail": ""
+    },
+    {
+      "check": "no_invented_question_from_declaration",
+      "status": "FAIL",
+      "detail": ""
+    },
+    {
+      "check": "interpretation_accepted",
+      "status": "FAIL",
+      "detail": ""
+    },
+    {
+      "check": "budget_remains_in_saved_profile",
+      "status": "FAIL",
+      "detail": ""
+    },
+    {
+      "check": "no_invented_question_from_declaration",
+      "status": "FAIL",
+      "detail": ""
+    },
+    {
+      "check": "interpretation_accepted",
+      "status": "FAIL",
+      "detail": ""
+    },
+    {
+      "check": "budget_remains_in_saved_profile",
+      "status": "FAIL",
+      "detail": ""
+    },
+    {
+      "check": "no_invented_question_from_declaration",
+      "status": "FAIL",
+      "detail": ""
+    },
+    {
+      "check": "interpretation_accepted",
+      "status": "FAIL",
+      "detail": ""
+    },
+    {
+      "check": "no_identical_consecutive_reply",
+      "status": "FAIL",
+      "detail": ""
+    }
+  ],
+  "blocked_checks": [
+    {
+      "check": "appropriate_future_availability_wording",
+      "status": "BLOCKED",
+      "detail": "Human review required; no future notification automation is created."
+    }
+  ],
+  "meetings": [],
+  "materials": []
+}

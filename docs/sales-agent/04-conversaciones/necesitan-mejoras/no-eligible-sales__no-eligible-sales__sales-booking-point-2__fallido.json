@@ -1,0 +1,302 @@
+{
+  "synthetic_only": true,
+  "execution_origin": "server_submitted_synthetic_run",
+  "source_archive": "sales-booking-point-2.zip",
+  "source_sha256": "3e716be65e1e495ab6260e58c08140c4ff01228eab054cbee23fb84653a4b193",
+  "commit": "7872e7d9a76ad9c1a045d32b294e2792a2a98cb1",
+  "sales_model": "openai/gpt-4o-mini",
+  "configuration_version": 8,
+  "configuration_sha256": "51ff65376dad421328dab993a4fc71939489386f1ed173514cf13a244ac79f1c",
+  "clock_utc": "2026-11-10T21:42:25.475176",
+  "team": [
+    {
+      "id": "712d00e0-b077-5428-9dd0-e9954e6327e9",
+      "scope": "all",
+      "assigned": false,
+      "active": true
+    },
+    {
+      "id": "095232a4-8e20-5aba-aa34-2362c7ff0989",
+      "scope": "specific",
+      "assigned": false,
+      "active": true
+    },
+    {
+      "id": "87dc6176-b59c-57b7-b38f-12b21d22f2c7",
+      "scope": "none",
+      "assigned": false,
+      "active": true
+    },
+    {
+      "id": "29d915ef-8fb1-5db2-828d-1d7be1c72d76",
+      "scope": "inactive",
+      "assigned": true,
+      "active": false
+    },
+    {
+      "id": "5feff323-9a29-53d6-9efd-1681967af07d",
+      "scope": "no_appointments",
+      "assigned": true,
+      "active": true
+    }
+  ],
+  "case": "no_eligible_sales",
+  "description": "no-eligible-sales",
+  "persona": null,
+  "company_id": "f0ebe3a5-6c04-5b8e-8cd8-423859aa39d7",
+  "project_id": "88e5563d-2f4e-5a11-9822-ec319f06f25e",
+  "property_type_id": null,
+  "automatic_result": "fallido",
+  "human_review": {
+    "status": "pending",
+    "note": "Automatic approval is not a human judgment of conversational quality."
+  },
+  "stop_reason": "unavailable_dialogue_observed",
+  "expected_outcome": null,
+  "topic_tags": [
+    "acknowledge_unavailable",
+    "request"
+  ],
+  "turns": [
+    {
+      "turn": 1,
+      "action": "request",
+      "lead": "I am interested in Bay Residence at Harbor Gardens and would like to book an in-person visit. My budget is 900,000 USD, paying cash. Any time in the next seven days works; please use the project timezone.",
+      "agent": "Financing: Cash; Bank financing.\n\nPlease specify a valid IANA timezone, such as America/Chicago.\n\nWhat would you like to know next about the property?",
+      "understanding": {
+        "version": "sales-understanding/1.0",
+        "requests": [
+          {
+            "id": "r1",
+            "topic": "appointment",
+            "subject": null,
+            "polarity": "request",
+            "evidence": "would like to book an in-person visit.",
+            "reference_id": null,
+            "detail_fields": [],
+            "feature": null
+          },
+          {
+            "id": "r2",
+            "topic": "financing",
+            "subject": null,
+            "polarity": "request",
+            "evidence": "My budget is 900,000 USD, paying cash.",
+            "reference_id": null,
+            "detail_fields": [],
+            "feature": null
+          }
+        ],
+        "all_of": [
+          "r1",
+          "r2"
+        ],
+        "alternatives": [],
+        "constraints": [],
+        "references": [],
+        "preferences": [
+          {
+            "key": "budget",
+            "value": "900000 USD",
+            "evidence": "My budget is 900,000 USD, paying cash.",
+            "status": "declared"
+          },
+          {
+            "key": "financing",
+            "value": "cash",
+            "evidence": "paying cash",
+            "status": "declared"
+          }
+        ],
+        "personal_facts": [],
+        "preference_withdrawals": [],
+        "comparison": null,
+        "source_purposes": [],
+        "objections": [],
+        "empathy": null,
+        "releases": [],
+        "visit": {
+          "action": "request",
+          "evidence": "Any time in the next seven days works; please use the project timezone.",
+          "timing": {
+            "date_from_evidence": "next seven days",
+            "date_until_evidence": null,
+            "time_from_evidence": null,
+            "time_until_evidence": null,
+            "time_relation": "any",
+            "timezone_evidence": "project timezone",
+            "duration_evidence": null
+          }
+        },
+        "courtesy": null,
+        "reschedule": null,
+        "cancellation": null,
+        "wait": null,
+        "moderation": null,
+        "appointment_query": null,
+        "selected_reference_id": null,
+        "requires_clarification": false,
+        "clarification_question": null,
+        "confidence": 0.99
+      },
+      "error_code": null,
+      "checks": [
+        {
+          "check": "reply_present",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "interpretation_accepted",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_internal_narration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_booking_before_confirmation",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "selection_advances_to_confirmation",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_identical_consecutive_reply",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_invented_frustration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_duplicate_booking",
+          "status": "PASS",
+          "detail": ""
+        }
+      ],
+      "composition": {
+        "status": "accepted",
+        "attempts": [
+          {
+            "status": "accepted"
+          }
+        ]
+      }
+    },
+    {
+      "turn": 2,
+      "action": "acknowledge_unavailable",
+      "lead": "Understood, thank you. I will keep an eye out for new availability. Please do not book anything or set up an alert now.",
+      "agent": "Would you like me to connect you with the sales team to help with your question?",
+      "understanding": null,
+      "error_code": "understanding_validation_failed",
+      "checks": [
+        {
+          "check": "reply_present",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "interpretation_accepted",
+          "status": "FAIL",
+          "detail": ""
+        },
+        {
+          "check": "no_internal_narration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_booking_before_confirmation",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "selection_advances_to_confirmation",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_identical_consecutive_reply",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_invented_frustration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_duplicate_booking",
+          "status": "PASS",
+          "detail": ""
+        }
+      ],
+      "composition": {
+        "status": null,
+        "attempts": []
+      }
+    }
+  ],
+  "checks": [
+    {
+      "check": "no_provider_outbox",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "expected_booking_outcome",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "confirmed_only_after_explicit_selection",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "unavailability_explained",
+      "status": "FAIL",
+      "detail": ""
+    },
+    {
+      "check": "no_visit_options_offered",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "appropriate_future_availability_wording",
+      "status": "BLOCKED",
+      "detail": "Human review required; no future notification automation is created."
+    }
+  ],
+  "failures": [
+    {
+      "check": "unavailability_explained",
+      "status": "FAIL",
+      "detail": ""
+    },
+    {
+      "check": "interpretation_accepted",
+      "status": "FAIL",
+      "detail": ""
+    }
+  ],
+  "blocked_checks": [
+    {
+      "check": "appropriate_future_availability_wording",
+      "status": "BLOCKED",
+      "detail": "Human review required; no future notification automation is created."
+    }
+  ],
+  "meetings": [],
+  "materials": []
+}

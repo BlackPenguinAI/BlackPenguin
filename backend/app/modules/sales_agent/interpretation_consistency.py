@@ -38,6 +38,13 @@ def normalize(value,text,commercial,*,appointment_offer=None):
         data['preferences']=[p for p in data['preferences'] if p['key']!='visit_readiness']
         result=Understanding.model_validate(data).check_evidence(text)
         return result,[{'field':'visit','action':'select_exact_backend_public_option','evidence':text}]
+    # Looking at a named property is information consent, not visit consent.
+    if data['visit'] and data['visit']['action']=='request':
+        quote=data['visit']['evidence']
+        show=re.fullmatch(r'(?:Please )?(?:show|tell) me (?:about )?(.+?)[.!]?',quote,re.I)
+        if show and quote in own and len(named(show[1]))==1 and show[1].rstrip('.!').casefold()==named(show[1])[0].casefold():
+            data['visit']=None
+            notes.append({'field':'visit','action':'property_information_is_not_visit_consent','evidence':quote})
     # Recover only a single, literal material instruction, not a mixed question.
     material=re.fullmatch(r"\s*(?:Please )?(?:send|show)(?: me)? (?:the )?(brochure(?: PDF)?|PDF|photos?|pictures?|images?|floor plan) (?:for|of) (.+?)[.!]?\s*",own,re.I)
     if material and own==text and not data['alternatives'] and not data['constraints']:

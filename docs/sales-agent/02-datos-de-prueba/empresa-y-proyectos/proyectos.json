@@ -1,0 +1,58 @@
+{
+  "synthetic_only": true,
+  "fixture_version": "sales-synthetic-company/1.0",
+  "clock_utc": "2026-11-11T06:34:00",
+  "data": [
+    {
+      "key": "harbor",
+      "name": "SYNTHETIC Harbor Gardens",
+      "timezone": "America/New_York",
+      "id": "88e5563d-2f4e-5a11-9822-ec319f06f25e",
+      "approved_revision": 1,
+      "company_id": "f0ebe3a5-6c04-5b8e-8cd8-423859aa39d7",
+      "address": "1 Synthetic Avenue",
+      "approved": true,
+      "payment_methods": [
+        "Cash",
+        "Bank financing"
+      ],
+      "delivery": "December 2027",
+      "down_payment_terms": null,
+      "guaranteed_returns": null
+    },
+    {
+      "key": "cedar",
+      "name": "SYNTHETIC Cedar Heights",
+      "timezone": "America/Chicago",
+      "id": "abf88941-5a70-5a06-a1ed-bca5b42bb90a",
+      "approved_revision": 1,
+      "company_id": "f0ebe3a5-6c04-5b8e-8cd8-423859aa39d7",
+      "address": "2 Synthetic Avenue",
+      "approved": true,
+      "payment_methods": [
+        "Cash",
+        "Bank financing"
+      ],
+      "delivery": "December 2027",
+      "down_payment_terms": null,
+      "guaranteed_returns": null
+    },
+    {
+      "key": "sierra",
+      "name": "SYNTHETIC Sierra Commons",
+      "timezone": "America/Denver",
+      "id": "fc14327b-d4de-50e6-b694-20c4897e3fa8",
+      "approved_revision": 1,
+      "company_id": "f0ebe3a5-6c04-5b8e-8cd8-423859aa39d7",
+      "address": "3 Synthetic Avenue",
+      "approved": true,
+      "payment_methods": [
+        "Cash",
+        "Bank financing"
+      ],
+      "delivery": "December 2027",
+      "down_payment_terms": null,
+      "guaranteed_returns": null
+    }
+  ]
+}

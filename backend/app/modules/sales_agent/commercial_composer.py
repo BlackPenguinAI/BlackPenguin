@@ -374,6 +374,24 @@ def validate(plan, blocks, choices):
     return plan
 
 
+def validate_ordered(plan,blocks,choices):
+    """Repair a pure permutation of authorized evidence, never missing facts."""
+    try:return validate(plan,blocks,choices),[]
+    except CompositionViolation as exc:
+        if exc.code!='catalog_order':raise
+    ids=[b.evidence_id for b in plan.blocks]
+    if any(not p for p in plan.paragraphs) or plan.paragraphs and [i for p in plan.paragraphs for i in p]!=ids:
+        # Do not mask another contract failure while correcting presentation.
+        raise CompositionViolation('paragraph_coverage')
+    rank={b['id']:i for i,b in enumerate(blocks)}
+    ordered=sorted(plan.blocks,key=lambda b:rank[b.evidence_id])
+    new_ids=[b.evidence_id for b in ordered];paragraphs=[];offset=0
+    for paragraph in plan.paragraphs:
+        paragraphs.append(new_ids[offset:offset+len(paragraph)]);offset+=len(paragraph)
+    fixed=plan.model_copy(update={'blocks':ordered,'paragraphs':paragraphs})
+    return validate(fixed,blocks,choices),[{'rule_code':'catalog_order','action':'restore_backend_evidence_order','original_ids':ids,'executed_ids':new_ids}]
+
+
 def render(plan, blocks, choices, channel):
     by_id = {row['id']: row for row in blocks}
     closing = next(c for c in choices if c['id'] == plan.continuation_id)
@@ -501,9 +519,10 @@ async def compose(db, scope, *, inbound, outcome, draft, commercial, lead, metad
             raw = await asyncio.wait_for(infer(guidance['model'], messages, schema), timeout=min(8, remaining))
             if not isinstance(raw, str) or len(raw.encode()) > 16000:
                 raise CompositionViolation('response_size')
-            chosen = validate(Composition.model_validate_json(raw), blocks, choices)
+            chosen,normalizations = validate_ordered(Composition.model_validate_json(raw), blocks, choices)
             trace['attempts'].append({'attempt': attempt + 1, 'status': 'accepted', 'response_sha256': digest(raw),
-                                      'selection':selection_snapshot(raw,blocks,choices)})
+                                      'selection':selection_snapshot(raw,blocks,choices),'normalizations':normalizations,
+                                      'executed_selection':chosen.model_dump(mode='json')})
             trace['status'] = 'accepted'
             break
         except (ValueError, TypeError) as exc:

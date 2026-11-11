@@ -1,0 +1,384 @@
+{
+  "synthetic_only": true,
+  "execution_origin": "server_submitted_synthetic_run",
+  "source_archive": "sales-booking-point-6.zip",
+  "source_sha256": "1ea471877f4024ae09cc77a732ffdd65c26104fcd6b7a139e8feaa1c77e0ea40",
+  "commit": "4b807110d3a8d60d3a2b2b88bc7a7873b6eb3f68",
+  "sales_model": "openai/gpt-4o-mini",
+  "configuration_version": 8,
+  "configuration_sha256": "51ff65376dad421328dab993a4fc71939489386f1ed173514cf13a244ac79f1c",
+  "clock_utc": "2026-11-11T00:34:42.444385",
+  "team": [
+    {
+      "id": "5b142f54-c105-5df3-8483-db04a7ed116d",
+      "scope": "all",
+      "assigned": false,
+      "active": true
+    },
+    {
+      "id": "d189b75b-4809-50b1-92ba-17d0727f7c86",
+      "scope": "specific",
+      "assigned": false,
+      "active": true
+    },
+    {
+      "id": "8e360a71-11c2-5ccc-b298-fbf92a3b5ff2",
+      "scope": "none",
+      "assigned": false,
+      "active": true
+    },
+    {
+      "id": "91f1429c-7082-5c32-b083-8639010b09b5",
+      "scope": "inactive",
+      "assigned": true,
+      "active": false
+    },
+    {
+      "id": "158870f9-1a0d-5e98-a654-84f6ecf2bdf2",
+      "scope": "no_appointments",
+      "assigned": true,
+      "active": true
+    }
+  ],
+  "case": "unassigned_with_slots",
+  "description": "unassigned-with-slots",
+  "persona": null,
+  "company_id": "f0ebe3a5-6c04-5b8e-8cd8-423859aa39d7",
+  "project_id": "88e5563d-2f4e-5a11-9822-ec319f06f25e",
+  "property_type_id": null,
+  "automatic_result": "incompleto",
+  "human_review": {
+    "status": "pending",
+    "note": "Automatic approval is not a human judgment of conversational quality."
+  },
+  "stop_reason": "unavailable_dialogue_observed",
+  "expected_outcome": null,
+  "topic_tags": [
+    "acknowledge_unavailable",
+    "request"
+  ],
+  "turns": [
+    {
+      "turn": 1,
+      "action": "request",
+      "lead": "I am interested in Bay Residence at Harbor Gardens and would like to book an in-person visit. My budget is 900,000 USD, paying cash. Any time in the next seven days works; please use the project timezone.",
+      "agent": "Here are the property options I can confirm:\n\n1. Bay Residence — 4 bedrooms, 3 bathrooms, 240 m². Published prices start at 780,000.00 USD. Last confirmed quantity: 3. Synthetic property for testing. Only the listed features are confirmed. Features: Two covered parking spaces; Private garden.\n\nI couldn't find an available viewing time for SYNTHETIC Harbor Gardens / Bay Residence for 2026-11-10 through 2026-11-16 (America/New_York). Would you like me to save these dates for a 45-minute visit and notify you once if a matching time becomes available?",
+      "understanding": {
+        "version": "sales-understanding/1.0",
+        "requests": [
+          {
+            "id": "r1",
+            "topic": "appointment",
+            "subject": null,
+            "polarity": "request",
+            "evidence": "I am interested in Bay Residence at Harbor Gardens and would like to book an in-person visit.",
+            "reference_id": null,
+            "detail_fields": [],
+            "feature": null
+          },
+          {
+            "id": "r2",
+            "topic": "inventory",
+            "subject": null,
+            "polarity": "request",
+            "evidence": "Any time in the next seven days works; please use the project timezone.",
+            "reference_id": null,
+            "detail_fields": [],
+            "feature": null
+          }
+        ],
+        "all_of": [
+          "r1",
+          "r2"
+        ],
+        "alternatives": [],
+        "constraints": [],
+        "references": [],
+        "preferences": [
+          {
+            "key": "budget",
+            "value": "900000 USD",
+            "evidence": "My budget is 900,000 USD, paying cash.",
+            "status": "declared"
+          },
+          {
+            "key": "financing",
+            "value": "cash",
+            "evidence": "paying cash.",
+            "status": "declared"
+          }
+        ],
+        "personal_facts": [],
+        "preference_withdrawals": [],
+        "comparison": null,
+        "source_purposes": [],
+        "objections": [],
+        "empathy": null,
+        "releases": [],
+        "visit": null,
+        "courtesy": null,
+        "reschedule": null,
+        "cancellation": null,
+        "wait": null,
+        "moderation": null,
+        "appointment_query": null,
+        "selected_reference_id": null,
+        "requires_clarification": false,
+        "clarification_question": null,
+        "confidence": 0.99
+      },
+      "error_code": null,
+      "checks": [
+        {
+          "check": "reply_present",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "budget_preserved_in_interpretation",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "cash_preserved_in_interpretation",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "cash_remains_in_saved_profile",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "budget_remains_in_saved_profile",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_invented_question_from_declaration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "interpretation_accepted",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_internal_narration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_booking_before_confirmation",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "selection_advances_to_confirmation",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_identical_consecutive_reply",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_invented_frustration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_duplicate_booking",
+          "status": "PASS",
+          "detail": ""
+        }
+      ],
+      "composition": {
+        "status": "accepted",
+        "attempts": [
+          {
+            "status": "accepted"
+          }
+        ]
+      }
+    },
+    {
+      "turn": 2,
+      "action": "acknowledge_unavailable",
+      "lead": "Understood, thank you. I will keep an eye out for new availability. Please do not book anything or set up an alert now.",
+      "agent": "You can ask me to check for new viewing times later.",
+      "understanding": {
+        "version": "sales-understanding/1.0",
+        "requests": [],
+        "all_of": [],
+        "alternatives": [],
+        "constraints": [
+          {
+            "topic": "appointment",
+            "subject": null,
+            "effect": "prohibit",
+            "scope": "until_explicit_change",
+            "evidence": "Please do not book anything or set up an alert now.",
+            "reference_id": null
+          },
+          {
+            "topic": "appointment",
+            "subject": null,
+            "effect": "prohibit",
+            "scope": "until_explicit_change",
+            "evidence": "Understood, thank you. I will keep an eye out for new availability. Please do not book anything or set up an alert now.",
+            "reference_id": null
+          }
+        ],
+        "references": [],
+        "preferences": [],
+        "personal_facts": [],
+        "preference_withdrawals": [],
+        "comparison": null,
+        "source_purposes": [],
+        "objections": [],
+        "empathy": null,
+        "releases": [],
+        "visit": null,
+        "courtesy": {
+          "kind": "acknowledgement",
+          "evidence": "Understood, thank you."
+        },
+        "reschedule": null,
+        "cancellation": null,
+        "wait": null,
+        "moderation": null,
+        "appointment_query": null,
+        "selected_reference_id": null,
+        "requires_clarification": false,
+        "clarification_question": null,
+        "confidence": 0.99
+      },
+      "error_code": null,
+      "checks": [
+        {
+          "check": "reply_present",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "budget_preserved_in_interpretation",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "cash_preserved_in_interpretation",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "cash_remains_in_saved_profile",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "budget_remains_in_saved_profile",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_invented_question_from_declaration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "interpretation_accepted",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_internal_narration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_booking_before_confirmation",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "selection_advances_to_confirmation",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_identical_consecutive_reply",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_invented_frustration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_duplicate_booking",
+          "status": "PASS",
+          "detail": ""
+        }
+      ],
+      "composition": {
+        "status": "accepted",
+        "attempts": [
+          {
+            "status": "accepted"
+          }
+        ]
+      }
+    }
+  ],
+  "checks": [
+    {
+      "check": "no_provider_outbox",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "expected_booking_outcome",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "confirmed_only_after_explicit_selection",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "unavailability_explained",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "buyer_acknowledges_only_explained_unavailability",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "no_visit_options_offered",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "appropriate_future_availability_wording",
+      "status": "BLOCKED",
+      "detail": "Human review required; no future notification automation is created."
+    }
+  ],
+  "failures": [],
+  "blocked_checks": [
+    {
+      "check": "appropriate_future_availability_wording",
+      "status": "BLOCKED",
+      "detail": "Human review required; no future notification automation is created."
+    }
+  ],
+  "meetings": [],
+  "materials": []
+}

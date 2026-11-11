@@ -1,5 +1,7 @@
 # # Black Penguin - Documentación de Avances (Semanas 1 a 17)
 
+> **[Agente de ventas IA: funcionamiento, datos de prueba, conversaciones y resultados](docs/sales-agent/README.md)**
+
 Este repositorio contiene el código fuente, la arquitectura técnica y la documentación del proyecto **Black Penguin**, una plataforma SaaS Multi-tenant impulsada por Inteligencia Artificial y diseñada bajo un esquema de Monorepositorio (Frontend + Backend)
 
 ---

@@ -126,8 +126,8 @@ def run(db,scope,*,message_id,understanding,expected_revision,event_key,max_step
         unresolved=bool(linked and linked['status']!='resolved') or not r.reference_id and r.topic.value in BOUND_TOPICS and len(subjects)>1
         task=Task(id=task_id(message.id,r.id),topic=r.topic,subject=r.subject,request_ids=[r.id],source_message_id=message.id,
             status='awaiting_user' if u.requires_clarification or unresolved else 'pending',alternative_group=groups.get(r.id),
-            property_id=value.get('property_id',state.selected_property_type_id) if r.topic.value in BOUND_TOPICS else None,
-            unit_id=value.get('unit_id',state.selected_unit_id) if r.topic.value in BOUND_TOPICS else None,
+            property_id=(value.get('property_id') if r.topic.value=='catalog' and r.reference_id else value.get('property_id',state.selected_property_type_id) if r.topic.value in BOUND_TOPICS else None),
+            unit_id=(value.get('unit_id') if r.topic.value=='catalog' and r.reference_id else value.get('unit_id',state.selected_unit_id) if r.topic.value in BOUND_TOPICS else None),
             binding_status='unresolved' if unresolved else 'resolved' if value or state.selected_property_type_id or state.selected_unit_id else 'unspecified',
             blocked_reason='reference_clarification' if unresolved else None)
         if u.comparison and u.comparison.request_id==r.id:
