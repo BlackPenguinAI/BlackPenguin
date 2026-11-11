@@ -1,0 +1,37 @@
+{
+  "source_commit": "a5c7b6d670a59d6b1f3663eb2d492f1cb155e1d3",
+  "automatic_result_preserved": "FAIL",
+  "approved_cases": 2,
+  "executed_cases": 3,
+  "bookings_expected": 2,
+  "bookings_observed": 2,
+  "confirmed_improvement": {
+    "case": "move_up_B",
+    "gallery_delivered": true,
+    "property_switch_reflected": true
+  },
+  "confirmed_failures": [
+    {
+      "case": "first_time_A",
+      "turn": 3,
+      "initial_issue": "evidence_mismatch: historical questions replayed as current requests",
+      "repair_error": "TimeoutError",
+      "public_effect": "Lead repeated visit request after sales-team fallback"
+    },
+    {
+      "case": "first_time_A",
+      "turn": 6,
+      "composition_error": "TimeoutError",
+      "elapsed_ms": 8010,
+      "meeting_recorded": true,
+      "public_confirmation_correct": true,
+      "check": "composition_accepted"
+    }
+  ],
+  "provider_cost_usd_recorded": 0.04528275000000001,
+  "cost_reporting_complete": false,
+  "costed_calls": 28,
+  "all_calls": 30,
+  "runtime_changes_in_this_documentation_update": false,
+  "next_work": "Replay captured failures, prevent history request replay, review bounded timeout/recovery, repeat selected three before expansion."
+}

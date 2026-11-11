@@ -66,7 +66,7 @@ costs=np.array([r['cost_usd_recorded'] or 0 for r in rows]);bars=axes[0].bar(xx,
 for i,r in enumerate(rows):
     if not r['cost_complete']:bars[i].set_hatch('//')
 axes[0].set(xticks=xx,xticklabels=labels,ylabel='USD registrados',title='Consumo por corrida (rayado = incompleto)');axes[0].tick_params(axis='x',rotation=45)
-axes[1].plot(xx,np.cumsum(costs),'o-',color='#176b87');axes[1].set(xticks=xx,xticklabels=labels,ylabel='USD registrados acumulados',title='Historial de consumo; faltan dos respuestas');axes[1].tick_params(axis='x',rotation=45)
+axes[1].plot(xx,np.cumsum(costs),'o-',color='#176b87');axes[1].set(xticks=xx,xticklabels=labels,ylabel='USD registrados acumulados',title=f'Acumulado parcial: {sum(r["provider_calls"]-r["responses_with_cost"] for r in rows)} llamadas sin costo informado');axes[1].tick_params(axis='x',rotation=45)
 save(fig,'consumo-global.png')
 
 # A retrospective view of the same IDs, including when they were in larger suites.

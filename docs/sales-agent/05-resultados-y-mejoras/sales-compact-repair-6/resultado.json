@@ -1,0 +1,59 @@
+{
+  "run": "sales-compact-repair-6",
+  "execution_origin": "server_submitted_synthetic_run",
+  "archive": "sales-compact-repair-6.zip",
+  "sha256": "1b0c2684379c3b44bd57081e0dbd7a0716d45106a7041d8259bb58740644b368",
+  "commit": "a5c7b6d670a59d6b1f3663eb2d492f1cb155e1d3",
+  "suite": "compact",
+  "cohort": "34c48f5a33f0",
+  "selected_cases": [
+    "first_time_A",
+    "move_up_B",
+    "unknown_A"
+  ],
+  "model": "openai/gpt-4o-mini",
+  "lead_model": null,
+  "lead_controller_metrics": null,
+  "configuration_version": 8,
+  "configuration_sha256": "51ff65376dad421328dab993a4fc71939489386f1ed173514cf13a244ac79f1c",
+  "status": "FAIL",
+  "cases": 3,
+  "approved_cases": 2,
+  "turns": 14,
+  "expected_bookings": 2,
+  "actual_bookings": 2,
+  "provider_calls": 30,
+  "prompt_tokens": 318729,
+  "completion_tokens": 5901,
+  "responses_with_cost": 28,
+  "cost_usd_recorded": 0.04528275000000001,
+  "cost_complete": false,
+  "checks_summary": {
+    "PASS": 325,
+    "FAIL": 2,
+    "BLOCKED": 0
+  },
+  "case_results": [
+    {
+      "case": "first_time_A",
+      "status": "fallido",
+      "meetings": 1,
+      "turns": 6,
+      "failures": 2
+    },
+    {
+      "case": "move_up_B",
+      "status": "aprobado",
+      "meetings": 0,
+      "turns": 4,
+      "failures": 0
+    },
+    {
+      "case": "unknown_A",
+      "status": "aprobado",
+      "meetings": 1,
+      "turns": 4,
+      "failures": 0
+    }
+  ]
+}

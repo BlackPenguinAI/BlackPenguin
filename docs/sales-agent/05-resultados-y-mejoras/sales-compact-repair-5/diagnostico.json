@@ -21,7 +21,7 @@
   "next_work": "Correct the evaluator and resolve explicit property change plus anaphoric photo request without inferring scope from uncertainty.",
   "repair6_followup": {
     "implemented_locally": true,
-    "production_model_evaluation": "PENDING",
+    "production_model_evaluation": "EXECUTED: move_up_B PASS; full suite 2/3 PASS with first_time_A failures",
     "original_result_unchanged": true,
     "changes": [
       "Catalog or resolved property-details scope accepted by evaluator.",

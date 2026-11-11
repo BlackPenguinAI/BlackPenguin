@@ -2,7 +2,7 @@
 
 [Inicio del repositorio](../../README.md) · [Datos JSON](02-datos-de-prueba/) · [Conversaciones](04-conversaciones/) · [Evidencia de corridas](05-resultados-y-mejoras/)
 
-**Corte documental: 11/11/2026.** Se reúne el trabajo del ciclo reciente con data sintética: **17 corridas del servidor, 119 conversaciones ejecutadas y 47 IDs de escenario distintos por suite**. Las repeticiones son parte del trabajo, no escenarios adicionales. El último resultado real es Repair 5: **2/3 conversaciones aprobadas y 2/2 visitas confirmadas**. Repair 6 contiene una corrección local y queda pendiente de evaluación publicada.
+**Corte documental: 11/11/2026.** Se reúne el trabajo del ciclo reciente con data sintética: **18 corridas del servidor, 122 conversaciones ejecutadas y 47 IDs de escenario distintos por suite**. Las repeticiones son parte del trabajo, no escenarios adicionales. El último resultado real es Repair 6: **2/3 conversaciones aprobadas y 2/2 visitas confirmadas**. El cambio de propiedad y su galería ya aprobaron; primera compra falló por evidencia histórica reutilizada y tiempos de espera. Todavía no se considera estable.
 
 La guía usa bloques con el mismo propósito: **qué se hizo → cómo funciona → qué evidencia hay → dónde están sus archivos**. Toda la explicación está aquí; los enlaces internos abren datos, código o carpetas de respaldo. Las referencias externas justifican la metodología, no sustituyen la evidencia del proyecto.
 
@@ -80,7 +80,20 @@ sequenceDiagram
 | Sierra Commons / Denver | Summit Villa | 620.000 | **0** | Ambos |
 | Sierra Commons / Denver | Valley Apartment | **Desconocido** | **Desconocido** | Ninguno |
 
-**Leads actuales: siete segmentos y uno desconocido.** Emma Torres (primera compra), Daniel Brooks (vivienda mayor), Sofia Reed (reubicación), Martin Vega (vivienda menor), Lucas Chen (alquiler), Valeria Cruz (reventa), Adrian Park (diversificación) y Alex Rivera (sin segmento). Edad/ocupación no se inventaron. Cada variante define su presupuesto y restricciones; el segmento se verifica desde lo dicho, no se precarga como respuesta correcta.
+**Leads actuales: siete segmentos y uno desconocido.** Son perfiles ficticios con una guía de motivación y objetivos, no personas contactadas. En las corridas actuales sus mensajes los conduce un guion; no se paga otro LLM para representar al lead.
+
+| Lead sintético | Segmento / motivación | Qué permite comprobar |
+|---|---|---|
+| Emma Torres | Primera vivienda | Explicar la propiedad, entregar PDF y guiar hacia una visita. |
+| Daniel Brooks | Cambiar a una vivienda mayor | Respetar cambios de propiedad, fotos y rechazo temporal de visita. |
+| Sofia Reed | Reubicación por trabajo | Responder ubicación y ofrecer solo vendedores habilitados. |
+| Martin Vega | Cambiar a una vivienda menor | Entregar material correcto y reconocer recursos ausentes o propiedades agotadas. |
+| Lucas Chen | Inversión para alquiler | Informar sin inventar rentabilidad, precios o inventario. |
+| Valeria Cruz | Valorización y posterior reventa | Explicar condiciones publicadas sin cobrar ni reservar por chat. |
+| Adrian Park | Diversificación de inversiones | Comparar opciones y gestionar disponibilidad de visitas. |
+| Alex Rivera | Motivación desconocida, sin segmento | Ayudar y agendar sin atribuir una motivación no declarada. |
+
+**Total: ocho perfiles**, con variantes A/B que conforman 16 escenarios. Edad y ocupación no están definidas. Cada variante fija presupuesto, restricciones y resultado esperado; el segmento se verifica desde lo dicho, no se precarga como respuesta correcta.
 
 **Vendedores.** Cinco roles por escenario: candidato, asignado a otro project, ninguno, inactivo y no acepta citas. El candidato puede abarcar todos, dos, uno o ningún project de su company y puede no tener slots. Son 80 identidades para 16 escenarios, no 80 elegibles a la vez. Se reconstruyen asignaciones activas por caso. El snapshot documental tiene bloques 15:00–18:00 UTC a +2/+3/+4 días; las corridas calculan sus propias fechas.
 
@@ -126,57 +139,59 @@ flowchart TD
 
 **Afinar aquí significa cambiar instrucciones y código versionados; los pesos del modelo se conservan.** Se localiza un fallo observado, se modifica su causa y se repite la misma conversación más variantes. No se considera mejora únicamente que el texto suene más amable.
 
-| Pieza modificada | Problema observado | Beneficio buscado |
-|---|---|---|
-| Prompt/esquema | Rechazo HTTP o intención estructurada incorrecta | Obtener una salida procesable y explicitar las reglas. |
-| Validación semántica | Material como visita o selección como comparación | Asegurar que la evidencia respalde la acción. |
-| Referencias y planificación | Propiedad marcada como material; catálogo demasiado amplio | Responder y compartir sobre la propiedad realmente solicitada. |
-| Estado/persistencia | Perder presupuesto/contado al hacer rollback | Recordar lo ya dicho y evitar preguntas repetidas. |
-| Composición | Orden inválido de bloques y reintento innecesario | Reordenar solo evidencia completa y autorizada, conservando hechos. |
-| Controlador del comprador | Repetición o rol de vendedor del lead LLM | Hacer la prueba válida, acotada y comparable. |
-| Evaluador/regresiones | Falso fallo por exigir metadata de catálogo a detalles | Medir el comportamiento correcto y no ocultar fallos reales. |
+| Pieza modificada | Problema observado | Qué se actualizó y cómo | Beneficio buscado |
+|---|---|---|---|
+| Prompt y esquema de salida | El proveedor rechazaba el formato JSON; después hubo interpretaciones incorrectas. | Se corrigió el esquema aceptado por el proveedor y se versionaron instrucciones con ejemplos de contado, selección, materiales y visita. Se exige citar el mensaje actual como evidencia. | Obtener respuestas procesables y distinguir información, preferencias y consentimiento. |
+| Validación semántica | Pedir fotos se interpretaba como pedir una visita; una selección, como comparación. | Se añadieron comprobaciones que contrastan la acción con su cita y rechazan visitas sin petición explícita, acciones incompatibles y evidencia ajena al turno. La reparación recibe la regla concreta incumplida. | Evitar acciones no pedidas y corregir errores sin ocultarlos. |
+| Referencias y planificación | Se confundía el nombre de una propiedad con un material o se mostraba un catálogo demasiado amplio. | El backend resuelve nombres solo dentro del project. En Repair 6 vincula una elección explícita única con «sus fotos» en el mismo mensaje, conserva la confianza y elimina la visita inventada; ambigüedades y restricciones siguen bloqueando la acción. | Responder y compartir el recurso de la propiedad elegida. |
+| Estado y persistencia | Se perdían presupuesto y preferencia de contado tras un rollback. | Se ajustó la conservación y recuperación de declaraciones verificadas al restaurar el estado de la conversación. Los tests comprueban que sobrevivan errores y no se vuelvan a preguntar datos conocidos. | Recordar lo ya dicho y mantener continuidad. |
+| Composición de respuesta | Bloques de evidencia en orden inválido provocaban rechazo y reintentos. | Se ajustaron las reglas de selección y orden de bloques completos autorizados. El LLM elige variantes de esa evidencia; el backend valida los enlaces y hechos y mantiene un respaldo seguro. | Dar respuestas claras sin inventar condiciones ni perder confirmaciones reales. |
+| Controlador del lead sintético | El comprador LLM repetía objetivos o respondía como vendedor. | Se limitaron intentos por objetivo y se añadieron condiciones de terminación; después se adoptaron guiones A/B con elección de horarios basada en opciones públicas del agente. | Repetir pruebas válidas con menos consumo, sin escribir manualmente cada diálogo por WhatsApp. |
+| Evaluador y regresiones | Se marcaba como fallo una respuesta correcta por no llevar metadata de catálogo. | En Repair 6 el check acepta catálogo acotado o detalle con referencia resuelta a la propiedad esperada. Rechaza referencias erróneas, respuestas vagas o varias propiedades. Se conservaron paquetes reales y variantes negativas como pruebas repetibles. | Medir el comportamiento correcto sin borrar fallos históricos ni relajar el ámbito. |
 
 **Ejemplo de esta entrega.** “Actually I prefer Cedar Loft instead. Please send its photos.” se vincula a la elección explícita del mismo mensaje cuando es única y del ámbito permitido. Se elimina una visita no solicitada, sin elevar la confianza del modelo. Una negación, hipótesis, tercero, varios candidatos o una restricción siguen bloqueando esa recuperación.
 
-**Qué no se cambió para esta comparación:** modelo de ventas, configuración publicada 8, compañía y selección de tres casos. La corrección local se valida con paquetes reales grabados y con negativos; el resultado live sigue pendiente. Los tests de infraestructura y transporte son otra cobertura, no sustituyen calidad conversacional.
+**Qué no se cambió para esta comparación:** modelo de ventas, configuración publicada 8, compañía y selección de tres casos. La corrección local se valida con paquetes reales grabados y con negativos; Repair 6 confirmó el cambio y la galería, aunque el conjunto completo sigue con un caso fallido. Los tests de infraestructura y transporte son otra cobertura, no sustituyen calidad conversacional.
 
 [Normalización](../../backend/app/modules/sales_agent/interpretation_consistency.py) · [Planner](../../backend/app/modules/sales_agent/turn_planner.py) · [Compositor](../../backend/app/modules/sales_agent/commercial_composer.py) · [Regresiones nuevas](../../backend/tests/test_sales_current_choice_materials.py).
 
 ## 6. Historia y evolución medida
 
-**Qué se conserva.** Desde la primera preparación de fixtures hasta Repair 5 se guardan avances y retrocesos. No hay un ZIP de ejecución “Lab 1” disponible; preparar sin inferencia no es una medición. Los números siguientes son del servidor; no se incluyen tests locales como conversaciones LLM.
+**Qué se conserva.** Desde la primera preparación de fixtures hasta Repair 6 se guardan avances y retrocesos. No hay un ZIP de ejecución “Lab 1” disponible; preparar sin inferencia no es una medición. Los números siguientes son del servidor; no se incluyen tests locales como conversaciones LLM.
 
-| Corrida | Casos aprobados / ejecutados | Visitas / esperadas | USD registrados |
-|---|---|---|---|
-| synthetic-lab-2 | 1/9 | No evaluadas | 0.156203 |
-| synthetic-lab-3 | 4/9 | No evaluadas | 0.074915* |
-| booking-point-1 | 0/6 | 0/3 | 0.081592 |
-| booking-point-2 | 0/6 | 3/3 | 0.048044 |
-| booking-point-3 | 2/6 | 3/3 | 0.051018 |
-| booking-point-4 | 0/6 | 3/3 | 0.061805 |
-| booking-point-5 | 2/6 | 3/3 | 0.046688 |
-| booking-point-6 | 3/6 | 3/3 | 0.051617 |
-| commercial-point-1 | 7/8 | 0/0 | 0.044023 |
-| commercial-point-2 | 8/8 | 0/0 | 0.046071 |
-| closing-point-1 | 8/8 | 0/0 | 0.021000 |
-| compact-battery-1 | 2/16 | 3/8 | 0.158777 |
-| compact-repair-1 | 0/8 | 3/4 | 0.124093 |
-| compact-repair-2 | 1/8 | 0/4 | 0.081938 |
-| compact-repair-3 | 1/3 | 0/2 | 0.059252 |
-| compact-repair-4 | 2/3 | 2/2 | 0.048082* |
-| compact-repair-5 | 2/3 | 2/2 | 0.045846 |
+| Corrida | Casos aprobados / ejecutados | Visitas / esperadas | Costo total de la corrida (USD) | Acumulado registrado (USD) |
+|---|---|---|---:|---:|
+| synthetic-lab-2 | 1/9 | No evaluadas | 0.15620250 | 0.15620250 |
+| synthetic-lab-3 | 4/9 | No evaluadas | 0.07491450* | 0.23111700 |
+| booking-point-1 | 0/6 | 0/3 | 0.08159205 | 0.31270905 |
+| booking-point-2 | 0/6 | 3/3 | 0.04804425 | 0.36075330 |
+| booking-point-3 | 2/6 | 3/3 | 0.05101845 | 0.41177175 |
+| booking-point-4 | 0/6 | 3/3 | 0.06180480 | 0.47357655 |
+| booking-point-5 | 2/6 | 3/3 | 0.04668780 | 0.52026435 |
+| booking-point-6 | 3/6 | 3/3 | 0.05161695 | 0.57188130 |
+| commercial-point-1 | 7/8 | 0/0 | 0.04402260 | 0.61590390 |
+| commercial-point-2 | 8/8 | 0/0 | 0.04607130 | 0.66197520 |
+| closing-point-1 | 8/8 | 0/0 | 0.02099955 | 0.68297475 |
+| compact-battery-1 | 2/16 | 3/8 | 0.15877665 | 0.84175140 |
+| compact-repair-1 | 0/8 | 3/4 | 0.12409320 | 0.96584460 |
+| compact-repair-2 | 1/8 | 0/4 | 0.08193825 | 1.04778285 |
+| compact-repair-3 | 1/3 | 0/2 | 0.05925180 | 1.10703465 |
+| compact-repair-4 | 2/3 | 2/2 | 0.04808190* | 1.15511655 |
+| compact-repair-5 | 2/3 | 2/2 | 0.04584570 | 1.20096225 |
+| compact-repair-6 | 2/3 | 2/2 | 0.04528275* | 1.24624500 |
+| **TOTAL HISTÓRICO · 18 corridas** | **45/122 ejecuciones** | **No sumar como conversión** | **1.24624500*** | **1.24624500*** |
 
-\* Costo incompleto. `0/0` en comercial/cierres significa que no se esperaba agendar. En agenda hubo checks bloqueados incluso después de obtener tres citas; las definiciones del evaluador también evolucionaron.
+\* Suma de costos informados, **parcial**, porque faltan importes de cuatro llamadas. Cada fila contiene el total de esa corrida, no un precio por conversación. El acumulado ya incluye las anteriores: **no se suman entre sí los acumulados**. Se usan ocho decimales y punto decimal para poder comprobar las sumas. `0/0` en comercial/cierres significa que no se esperaba agendar. En agenda hubo checks bloqueados incluso después de obtener tres citas; las definiciones del evaluador también evolucionaron.
 
 **Mejoras observadas:** Lab 2→3 subió de **1/9 a 4/9**, con cambio del simulador; comercial 1→2, de **7/8 a 8/8**; la selección reciente, de **1/3 a 2/3** y de **0/2 a 2/2 visitas**. Cierres aprobó **8/8**. Se reconoce también la regresión de tres a cero visitas entre Repair 1 y 2. No se extrapola una tasa de conversión de clientes reales.
 
 ![Historia global y cobertura](05-resultados-y-mejoras/figuras/panorama-global.png)
 
-**Lectura correcta:** las 119 ejecuciones incluyen repeticiones; hay 47 IDs por suite. La subida acumulada mide cobertura y trabajo evaluado, no una curva única de calidad. Las 43 aprobaciones históricas pertenecen a sus controles originales: no se interpreta 43/119 como calidad actual. Para observar la mejora de los mismos casos se reconstruyó su subconjunto en las baterías anteriores, conservando los checks originales.
+**Lectura correcta:** las 122 ejecuciones incluyen repeticiones; hay 47 IDs por suite. La subida acumulada mide cobertura y trabajo evaluado, no una curva única de calidad. Las 45 aprobaciones históricas pertenecen a sus controles originales: no se interpreta 45/122 como calidad actual. Para observar la mejora de los mismos casos se reconstruyó su subconjunto en las baterías anteriores, conservando los checks originales.
 
 ![Los mismos tres IDs desde la batería inicial](05-resultados-y-mejoras/figuras/casos-comunes-desde-la-bateria.png)
 
-[Datos retrospectivos](05-resultados-y-mejoras/seguimiento-casos-comunes.json) · [17 corridas con commit/modelo/denominadores](05-resultados-y-mejoras/corridas.json). Esta reconstrucción no es una nueva ejecución ni una reevaluación uniforme de versiones pasadas.
+[Datos retrospectivos](05-resultados-y-mejoras/seguimiento-casos-comunes.json) · [18 corridas con commit/modelo/denominadores](05-resultados-y-mejoras/corridas.json). Esta reconstrucción no es una nueva ejecución ni una reevaluación uniforme de versiones pasadas.
 
 ## 7. Conversaciones para repetir
 
@@ -185,7 +200,7 @@ flowchart TD
 | Caso y fuente | Qué dijo el lead | Qué hizo/responde el agente | Cómo repetirlo |
 |---|---|---|---|
 | [Información → PDF → visita](04-conversaciones/funcionaron/primera-compra-pdf-y-visita__first-time-a__sales-compact-repair-5__aprobado.json) | I am buying my first home. My budget is 300,000 USD, paying cash. What can you tell me about Cedar Studio? | Respondió Cedar Studio, entregó el PDF y confirmó solo después de elegir y aceptar el resumen. | Declarar preferencias, pedir material, solicitar visita, seleccionar una opción pública y confirmar. |
-| [Cambio y fotos (histórico)](04-conversaciones/funcionaron/cambio-de-propiedad-fotos-y-despedida__move-up-b__sales-compact-repair-3__aprobado.json) | Actually I prefer Cedar Loft instead. Please send its photos. | Cedar Loft gallery: [sandbox-material-link] | Elegir otra propiedad y pedir sus fotos. Funcionó en esa corrida, pero regresó en Repair 5; no está estable. |
+| [Cambio y fotos (histórico)](04-conversaciones/funcionaron/cambio-de-propiedad-fotos-y-despedida__move-up-b__sales-compact-repair-3__aprobado.json) | Actually I prefer Cedar Loft instead. Please send its photos. | Cedar Loft gallery: [sandbox-material-link] | Elegir otra propiedad y pedir sus fotos. Regresó en Repair 5 y volvió a aprobar en Repair 6; falta comprobar consistencia. |
 | [Sin pago/reserva](04-conversaciones/funcionaron/sin-pago-ni-separacion-en-chat__property-reservation__sales-commercial-point-2__aprobado.json) | Can I reserve Bay Residence and pay the deposit here? | Aclaró que pagos y reservas se atienden en persona; siguió ofreciendo ayuda. | Pedir separar/pagar por chat y verificar que no ejecute ni prometa la operación. |
 | [Despedida y retoma](04-conversaciones/funcionaron/despedida-y-retoma__farewell-then-reopen__sales-closing-point-1__aprobado.json) | No other questions, thank you. Goodbye. / What financing options do you offer? | Se despidió y después respondió contado/financiación publicada sin inventar frustración. | Cerrar y enviar una nueva consulta. Esto prueba retoma en la misma corrida, no días de inactividad. |
 
@@ -196,21 +211,26 @@ flowchart TD
 - Lead elige el primero → agente: “Please confirm your visit: Cedar Studio; 2026-11-13 at 09:00 AM … Shall I book this exact visit?” (extracto).
 - Lead: “Yes” → agente: “Your visit is confirmed … What else would you like to know before your visit?” (extracto).
 
-**Caso pendiente real.** En Repair 5 el cambio a Cedar Loft con fotos terminó en “Which property option do you mean?” y no entregó galería. Además, el primer check de alcance era un falso positivo: sí respondió solo Cedar Studio con `property_details`. Se mantienen el FAIL original y la revisión separada; no son cuatro causas independientes por aparecer cuatro checks fallidos.
+**Avance y bloqueo actual.** Repair 6 entregó la galería de Cedar Loft, respetó el rechazo de visita y cerró amablemente. El caso `move_up_B` pasó de FAIL a PASS. El conjunto permanece en 2/3 porque `first_time_A`, antes aprobado, reutilizó preguntas históricas como si fueran actuales; el validador las rechazó y el reintento agotó su tiempo. El lead tuvo que repetir su solicitud de visita. Al confirmar, otro timeout activó el texto seguro del backend; la cita sí quedó registrada. No es un fallo de entrega WhatsApp ni un nuevo rechazo HTTP 400 demostrado.
 
-[119 diálogos completos](04-conversaciones/) · [Índice JSON](04-conversaciones/indice.json) · [Revisiones humanas](04-conversaciones/revisiones-humanas.json) · [Diagnóstico Repair 5](05-resultados-y-mejoras/sales-compact-repair-5/diagnostico.json). Un PASS histórico puede contener una limitación no detectada por los checks de entonces.
+**Antecedente conservado.** En Repair 5 el cambio a Cedar Loft con fotos terminó en “Which property option do you mean?” y no entregó galería. Además, el primer check de alcance era un falso positivo: sí respondió solo Cedar Studio con `property_details`. Se mantienen el FAIL original y la revisión separada; no son cuatro causas independientes por aparecer cuatro checks fallidos.
+
+[122 diálogos completos](04-conversaciones/) · [Índice JSON](04-conversaciones/indice.json) · [Revisiones humanas](04-conversaciones/revisiones-humanas.json) · [Diagnóstico Repair 5](05-resultados-y-mejoras/sales-compact-repair-5/diagnostico.json). Un PASS histórico puede contener una limitación no detectada por los checks de entonces.
 
 ## 8. Consumo real y saldo de OpenRouter
 
-**Registrado en las 17 corridas:** 913 llamadas, 9.944.999 tokens de entrada, 143.194 de salida y **USD 1,20096225**. Dos respuestas carecen de costo informado (911/913). Es costo reportado de inferencia, no una consulta del saldo de la cuenta ni una factura completa; no incluye desarrollo, revisión humana, hosting ni mensajería real.
+**Total general registrado de las 18 corridas: USD 1.24624500** (aproximadamente **USD 1.25**). Son 943 llamadas, 10.263.728 tokens de entrada y 149.095 de salida. Hay costo informado para 939/943 llamadas: **es una suma parcial**, no el saldo consultado ni una factura completa. No incluye desarrollo, revisión humana, hosting o mensajería real.
 
-| Etapa | Diálogos | Llamadas | Tokens entrada / salida | USD registrados |
-|---|---|---|---|---|
-| Lead LLM inicial | 18 | 250 | 2,009,248 / 28,579 | 0.231117* |
-| Agenda | 36 | 244 | 2,953,110 / 42,111 | 0.340764 |
-| Comercial | 16 | 69 | 770,886 / 8,539 | 0.090094 |
-| Cierres/retoma | 8 | 15 | 173,013 / 2,114 | 0.021000 |
-| Baterías/repairs | 41 | 335 | 4,038,742 / 61,851 | 0.517987* |
+| Etapa | Diálogos | Llamadas | Tokens entrada / salida | Costo total registrado de la etapa (USD) |
+|---|---:|---:|---:|---:|
+| Lead LLM inicial | 18 | 250 | 2,009,248 / 28,579 | 0.23111700* |
+| Agenda | 36 | 244 | 2,953,110 / 42,111 | 0.34076430 |
+| Comercial | 16 | 69 | 770,886 / 8,539 | 0.09009390 |
+| Cierres/retoma | 8 | 15 | 173,013 / 2,114 | 0.02099955 |
+| Baterías/repairs | 44 | 365 | 4,357,471 / 67,752 | 0.56327025* |
+| **TOTAL GENERAL REGISTRADO** | **122** | **943** | **10,263,728 / 149,095** | **1.24624500*** |
+
+\* Etapa con costos faltantes. Esta tabla agrupa las mismas corridas del bloque 6: **es el mismo gasto, no un gasto adicional**. Repair 6 aportó USD 0.04528275 informados (28/30 llamadas), no un total final confirmado de USD 0.04528275. No se atribuye un costo por caso cuando el reporte solo lo agrega por corrida.
 
 ![Consumo por corrida y acumulado](05-resultados-y-mejoras/figuras/consumo-global.png)
 
@@ -239,42 +259,36 @@ Las gráficas se generan con NumPy y Matplotlib, sin suavizado ni valores invent
 
 ## 10. Trabajo actual
 
-**Actual — Repair 6, pendiente de corrida del servidor.** Se corrige la unión de elección explícita de propiedad + “sus fotos” sin visita inventada, y el falso positivo que solo aceptaba metadata de catálogo. Se conservan ambigüedad, restricciones, ámbito y confianza; no se eleva esta última para forzar una acción. Modelo/configuración y tres casos se mantienen para comparar.
+**Actual — Repair 6 ejecutado en el servidor.** Commit `a5c7b6d`, modelo `openai/gpt-4o-mini`, configuración publicada 8. Resultado original **FAIL: 2/3 casos aprobados; 2/2 visitas registradas**. La corrección de elección + fotos funcionó; la fiabilidad ante salidas inválidas y demoras aún requiere trabajo.
 
-| Evidencia actual | Estado / costo |
-|---|---|
-| Reproducción local con paquetes Repair 5, variantes y negativos | 20 pruebas específicas y 3.023 pruebas de regresión aprobadas; siete omitidas. No es una medición del LLM real. |
-| Nueva corrida publicada de tres casos | **No ejecutada**. Objetivo: tres diálogos válidos y dos visitas, sin efectos antes de confirmar. |
-| Consumo planeado de esa corrida | Aproximadamente USD 0,04–0,09; reserva orientativa USD 0,08–0,17. No es un tope garantizado. |
+| Caso | Resultado observado | Estado |
+|---|---|---|
+| Primera compra (`first_time_A`) | PDF entregado y visita registrada; petición de visita repetida tras rechazo de evidencia histórica y timeout. Otro timeout de composición al confirmar. | FAIL, dos checks fallidos. |
+| Cambio de propiedad (`move_up_B`) | Cambió a Cedar Loft, entregó su galería y respetó rechazo/despedida. | PASS. |
+| Sin segmento (`unknown_A`) | Informó Ridge Townhome y registró la visita con confirmación. | PASS. |
+| **TOTAL DE REPAIR 6** | **14 turnos, 30 llamadas; USD 0.04528275 registrados de 28/30 llamadas.** | **2/3 aprobados; costo parcial.** |
 
-**Para ejecutar tras desplegar**, sin tocar datos productivos:
+**Diagnóstico.** En primera compra, turno 3, el intento inicial incluyó como solicitudes actuales dos citas de mensajes anteriores: el validador marcó `evidence_mismatch`. La reparación terminó en `TimeoutError`. El respaldo ofreció contacto con ventas en vez de avanzar con la visita. En el turno 6 el compositor agotó su ventana de unos ocho segundos; el backend conservó la confirmación real, pero el check de composición falló. No se puede distinguir latencia de red/proveedor o presupuesto de tiempo insuficiente con esta traza solamente.
 
-```bash
-docker exec -i -w /app bp_api_prod python -m tools.sales_ai.synthetic_lab \
-  --suite compact-battery \
-  --configuration-id cbc8abfa-23d3-417c-97dd-fd12e3406ed4 \
-  --cases first_time_A move_up_B unknown_A \
-  --max-calls 60 --max-turns 8 --output /tmp/sales-compact-repair-6
-```
+**Siguiente paso propuesto.** Reproducir esos paquetes, impedir el replay de solicitudes históricas sin perder preferencias, y revisar tiempos/reintentos y respaldo de agenda. Después repetir estos tres casos antes de ampliar. Aún **no se implementó esa siguiente corrección**. Una repetición de este conjunto se estima en USD 0.04–0.09 en total, con reserva orientativa USD 0.08–0.17; no se suma al gasto ejecutado.
 
-Copiar aun si termina en FAIL: `docker cp bp_api_prod:/tmp/sales-compact-repair-6/synthetic-sales-results.zip ~/sales-compact-repair-6.zip`. En PowerShell:
+Las 20 pruebas específicas y 3.023 pruebas locales aprobadas (siete omitidas) de Repair 6 fueron cobertura de código, no certificación del modelo. El archivo recibido acredita ejecución del core aislado en servidor; hubo **cero escrituras en la base productiva y cero contactos con leads reales**. Tampoco acredita entrega por operador, Calendar externo o concurrencia real.
 
-```powershell
-& "$env:WINDIR\System32\OpenSSH\scp.exe" jorge@206.189.118.99:~/sales-compact-repair-6.zip "$env:USERPROFILE\Downloads\sales-compact-repair-6.zip"
-```
-
-**Registro y siguiente decisión:** guardar commit, modelo/configuración, diálogos, checks, consumo real y revisión humana. Si el bloqueo pasa, ejecutar la batería base; si falla, corregir la causa y mantener la selección. El laboratorio no acredita Google Calendar externo, entrega por operador, round-robin real, concurrencia PostgreSQL ni días de inactividad. [Herramientas de importación, gráficas y estimación](06-como-ejecutar-las-pruebas/herramientas/).
+[Resultado JSON](05-resultados-y-mejoras/sales-compact-repair-6/resultado.json) · [Diagnóstico y checks](05-resultados-y-mejoras/sales-compact-repair-6/diagnostico.json) · [Conversaciones completas](04-conversaciones/).
 
 ## 11. Trabajo futuro
 
 **Más casos y conversaciones más largas, no nuevas funciones de canal.** Se avanza por etapas, corrigiendo y repitiendo antes de ampliar. Se incluyen compradores que rechazan o abandonan: no toda conversación correcta termina con cita [R4–R6].
 
-| Etapa propuesta | Conversaciones × turnos de lead | Beneficio / criterio de avance | USD extrapolados | Reserva 2× |
+| Etapa propuesta | Conversaciones × turnos de lead | Beneficio / criterio de avance | Costo total estimado de la etapa (USD) | Reserva total 2× (USD) |
 |---|---|---|---|---|
 | Batería base | 16 × 6–8 | Cubrir los 16 escenarios sin checks obligatorios fallidos. | 0.34–0.45 | 0.68–0.90 |
 | Variantes | 32 × 8–12 | Dos variantes por escenario: negación, pronombres y consultas múltiples. | 0.90–1.35 | 1.81–2.71 |
 | Diálogos largos | 16 × 12–16 | Interrumpir/retomar temas y cambiar datos sin olvidar preferencias ni entrar en bucles. | 0.68–0.90 | 1.35–1.81 |
 | Consistencia | 48 × 8–12 | 16 escenarios repetidos tres veces; revelar inestabilidad, no solo un PASS. | 1.35–2.03 | 2.71–4.06 |
+| **TOTAL DE LAS CUATRO ETAPAS** | **112 conversaciones** | **Una ejecución de cada etapa; solo planificación.** | **3.27–4.73** | **6.55–9.48** |
+
+**Totales futuros:** se sumaron los importes mostrados por fila; la reserva es una alternativa de presupuesto y **no se añade al estimado base**. Tampoco se suman estos USD al histórico ya ejecutado.
 
 **Cálculo y límites.** Base Repair 5: 13 turnos, 29 llamadas, 331.131 tokens y USD 0,0458457 completos: ≈2,23 llamadas y USD 0,00353 por turno. Se extrapola linealmente manteniendo guiones, sin juez y con el mismo modelo. La reserva 2× es planificación, no intervalo estadístico ni garantía: historia más larga, precios/proveedor o reparaciones pueden superarla. Límites de llamadas no son límites en dólares. [Tokens, llamadas y supuestos por etapa](05-resultados-y-mejoras/propuesta-ampliacion.json).
 
