@@ -489,6 +489,21 @@ async def compose(db, scope, *, inbound, outcome, draft, commercial, lead, metad
         'authority': 'evidence_wordings_only_no_free_text_facts', 'status': 'safe_fallback',
         'external_actions': 0, 'credential_values_recorded': False,
         'reference_contract':reference_contract(blocks,choices)}
+    # A recorded booking with one complete receipt and no continuation choice
+    # has no model decision left. Render the verified receipt without another
+    # provider round trip. Mixed questions/extra evidence keep normal composition.
+    if (metadata.get('meeting_id') and metadata.get('booking_operation_id')
+        and len(blocks)==1 and blocks[0]['required']
+        and len(choices)==1 and choices[0]['id']=='none'
+        and blocks[0].get('source')=='backend_prepared_operation'
+        and blocks[0]['wordings'].get('direct','').startswith('Your visit is confirmed:')):
+        plan=Composition.model_construct(version=VERSION,opening='direct',paragraphs=[],
+            blocks=[BlockChoice(evidence_id=blocks[0]['id'],wording='direct')],continuation_id='none')
+        text,closing_metadata=render(plan,blocks,choices,channel)
+        trace.update(status='backend_rendered',inference_mode='single_verified_booking_receipt',model_called=False,
+            elapsed_ms=0,selected_continuation='none',evidence_ids=[blocks[0]['id']],
+            response_sha256=digest(text),closing_metadata=closing_metadata)
+        return CommercialDraft(text,trace)
     if infer is None:
         from app.integrations.openrouter_client import generate_llm_response
         from app.modules.ai_core.models import AIConfiguration

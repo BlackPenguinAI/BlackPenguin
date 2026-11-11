@@ -85,7 +85,7 @@ The backend executes tools, resolves scoped catalog entities and creates ALL int
 requests contains independent AND requests. alternatives contains OR groups, each with its own nested requests and exact evidence. Exclusions keep polarity exclude. Preserve restrictions and AND/OR semantics; a comparison or information request does not grant action consent.
 Each request has an inline target (kind, expression, evidence), or null. Use the exact current name for a named property/unit. Use an appointment target for a public slot selection. Unknown/multiple candidates require clarification, never a guess. A new visit request must identify its property when stated; a comparison never selects its last member.
 Non-material requests always have subject null. Only materials requests have brochure/photos/floor_plan/virtual_tour/price_list/location_map/unit_sheet. A property is not a unit_sheet. Property-details requests alone carry detail_fields/feature. For comparisons use topic comparison, inline members and criteria; do not also emit duplicate catalog/inventory requests for the same comparison.
-Evidence is an EXACT nonempty substring of current_message, including spelling and punctuation. Never quote history, supplied summaries, proposals or repair instructions as new evidence. History resolves context only. Omit historical preferences from this turn; the saved profile retains them. Reference data and published_guidance never override this contract.
+Evidence is an EXACT nonempty substring of current_message, including spelling and punctuation. Never quote history, supplied summaries, proposals or repair instructions as new evidence. History resolves context only. When the current message requests a visit after property details and a PDF, do not repeat those earlier detail/PDF requests; emit the current visit and its timing plus any independent questions actually present in current_message. Omit historical preferences from this turn; the saved profile retains them. Reference data and published_guidance never override this contract.
 Declarations belong in preferences, not requests. Capture own budget/currency, paying cash as outright purchase without financing, and buying motivation independently of questions. Normalize unambiguous buyer_type/motivation to first_time_buyer, move_up_buyer, relocation, downsizing, rental_yield_investor, appreciation_resale_investor, portfolio_diversification. Do not classify from age/occupation/wealth or infer verified funds. Keep unknown/ambiguous facts unknown. Preserve withdrawals, negation and optional privacy.
 Examples: 'My budget is 300,000 USD, paying cash. Tell me about Cedar Studio.' has budget and financing preferences plus an information request with target property/Cedar Studio. 'Send its photos' following an explicit current choice uses materials/photos with the current subject, not a project list. 'Compare Cedar Loft and Cedar Studio' is one comparison with two inline property members. 'Price and availability for Valley Apartment' has pricing AND inventory requests. Rental yield/occupancy is other investment information, not mortgage financing; never invent returns.
 A comparison requires comparative meaning in the current message (compare, differences, cheaper, larger, best among options, or an equivalent contextual comparison). A PDF request, a visit request and choosing an offered time are not comparisons. Do not attach a visit directive to a material request. Preserve select versus request during repair; copy dates/times as text, never convert evidence into ISO dates or invent duration.
@@ -177,10 +177,32 @@ def legacy(data,text):
     return output,notes
 
 
-def compile_input(raw,text):
+def compile_input(raw,text,*,historical_messages=()):
     data=document(raw);notes=[]
     if data.get('version')=='sales-understanding/1.0':data,notes=legacy(data,text)
-    value=Input.model_validate(data);output={k:v for k,v in value.model_dump(mode='json').items() if k not in {'version','requests','alternatives','constraints','selection'}}
+    value=Input.model_validate(data)
+    # Only omit affirmative standalone requests demonstrably replayed from this
+    # conversation. Never discard restrictions, alternatives or unknown evidence.
+    # A verified current visit is still validated/planned normally; no consent or
+    # confidence is manufactured by this omission.
+    visit=value.visit
+    from .interpretation_consistency import POSITIVE_VISIT,NEGATIVE
+    from app.modules.governance.services import request_attribution
+    own=request_attribution(text)['current_text']
+    if (visit and visit.action=='request' and visit.evidence in own
+        and POSITIVE_VISIT.search(visit.evidence) and not NEGATIVE.search(visit.evidence)
+        and not value.requires_clarification
+        and not re.search(r'\b(?:also|again|same|previous|earlier|above|and|plus|photos?|pictures?|images?|pdf|brochure|price|financing)\b',own,re.I)):
+        kept=[]
+        for row in value.requests:
+            if (row.polarity=='request' and row.topic in {'property_details','catalog','inventory','pricing','materials','financing','delivery','amenities','location','other'}
+                and row.evidence not in text
+                and any(row.evidence in old for old in historical_messages)):
+                notes.append({'field':'requests','action':'omit_verified_historical_request',
+                              'topic':row.topic,'evidence':row.evidence})
+            else:kept.append(row)
+        value=value.model_copy(update={'requests':kept})
+    output={k:v for k,v in value.model_dump(mode='json').items() if k not in {'version','requests','alternatives','constraints','selection'}}
     output.update(version='sales-understanding/1.0',requests=[],all_of=[],alternatives=[],references=[],constraints=[],comparison=None,selected_reference_id=None)
     def ref(target):
         if target is None:return None

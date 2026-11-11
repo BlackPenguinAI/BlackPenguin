@@ -1,0 +1,40 @@
+{
+  "shards": [
+    {
+      "shard": "backend-junit-1.xml",
+      "tests": 925,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 2
+    },
+    {
+      "shard": "backend-junit-2.xml",
+      "tests": 916,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 3
+    },
+    {
+      "shard": "backend-junit-3.xml",
+      "tests": 1207,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 2
+    }
+  ],
+  "regression_passed": 3041,
+  "skipped": 7,
+  "focused_passed": 22,
+  "focused_overlap_with_regression": 18,
+  "acceptance_passed": 63,
+  "acceptance_failed": 0,
+  "live_model_quality": "NOT_RUN",
+  "paid_local_model_calls": 0,
+  "module_coverage_verified": 129,
+  "local_junit_prefix": "backend.tests (compared as tests without editing reports)",
+  "evidence_kind": "local_mocked_regression_not_published_model_evaluation",
+  "base_commit": "1e561fb",
+  "source_packets": "sales-compact-repair-6.zip",
+  "published_model_quality": "PENDING",
+  "recorded_server_run_count_unchanged": 18
+}

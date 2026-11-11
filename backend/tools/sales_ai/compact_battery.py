@@ -222,7 +222,7 @@ async def evaluate_case(db,manifest,key,budget,max_turns):
                 check('no_booking_without_confirmation',not meetings or (confirmed and selected_start is not None and visit_requested)),
                 check('at_most_one_booking',len(meetings)<=1),check('no_identical_consecutive_reply',not rows or last!=rows[-1]['reply'])]
             composition=meta.get('composition') or {}
-            if composition:row_checks.append(check('composition_accepted',composition.get('status')=='accepted'))
+            if composition:row_checks.append(check('composition_accepted',(composition.get('status')=='accepted' or (composition.get('status')=='backend_rendered' and composition.get('inference_mode')=='single_verified_booking_receipt' and not composition.get('attempts') and bool(meta.get('meeting_id') and meta.get('booking_operation_id'))))))
             row_checks+=quality_checks(message,last,frame)
             if persona['segment']:
                 classified=[r for f,r in profile['current'].items() if f in {'buyer_type','motivation'} and (r.get('normalized_segment') or r.get('value'))==persona['segment']]
