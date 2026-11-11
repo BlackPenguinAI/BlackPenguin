@@ -1,5 +1,6 @@
 """Versioned interpretation protocol using published Sales guidance as data."""
 PROMPT_VERSION = 'sales-understanding-prompt/1.4'
+NEXT_PROMPT_VERSION = 'sales-understanding-prompt/2.22'
 SYSTEM_PROMPT = '''You interpret a real-estate lead's CURRENT message. You do not reply to the lead,
 execute tools, reserve appointments, send materials, change CRM state or override permissions.
 Return ONLY the supplied sales-understanding/1.0 JSON schema.
@@ -62,7 +63,22 @@ def prompt_snapshot(agent):
 
 
 def next_prompt_snapshot(guidance):
-    return {'version':'sales-understanding-prompt/2.21','system':SYSTEM_PROMPT+'''
+    return {'version':NEXT_PROMPT_VERSION,'system':'''Completeness rules for the CURRENT message (before the general protocol):
+A named property is never a generic catalog question. Define an exact local property reference,
+link each relevant request through reference_id, and preserve a clear single-property focus.
+Example: "Please send photos for Cedar Studio" needs a materials/photos request linked
+to a property reference whose expression and evidence are "Cedar Studio".
+"I would like a visit to Cedar Studio next week" needs an appointment request linked
+to that property, visit.action=request and exact timing evidence; never final confirmation.
+"I am buying my first home. What financing is offered?" needs BOTH the own buying-purpose
+preference and the independent financing request. Do not drop one because another is present.
+"Compare Cedar Loft and Cedar Studio" needs two local property references and comparison,
+not merely inventory. "Price and availability for Cedar Studio" needs pricing AND inventory.
+Rental yield, occupancy and investment returns are not mortgages or financing. Use other
+for those information questions; do not promise returns or invent approved figures.
+Unused nullable fields remain null, but explicitly requested subjects/actions are not unused.
+
+'''+SYSTEM_PROMPT+'''
 SA-09: classify directed personal harassment semantically, including paraphrases and typos,
 with an exact current quotation. Criticizing prices, layouts or service and expressing
 frustration is not personal harassment. Quoted, reported, hypothetical and negated abuse

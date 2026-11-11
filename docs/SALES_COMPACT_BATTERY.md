@@ -1,5 +1,7 @@
 # Primera batería compacta del agente de ventas
 
+La corrección posterior al primer experimento se documenta en [SALES_COMPACT_REPAIR1.md](SALES_COMPACT_REPAIR1.md). Los hallazgos de preflight al final de este documento describen la versión inicial del evaluador.
+
 Base: `d5ad9bca17092fcaf99aea25a79c4fa662b26ab3`. Esta entrega añade un instrumento de evaluación; no modifica el modelo publicado, los prompts ni el motor comercial.
 
 ## Alcance y ejecución

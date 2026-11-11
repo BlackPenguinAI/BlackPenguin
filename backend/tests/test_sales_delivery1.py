@@ -1,5 +1,6 @@
 """Delivery 1: current routing, evidence anchoring and isolated shared simulation."""
 import asyncio
+from app.modules.sales_agent.understanding_prompt import NEXT_PROMPT_VERSION
 import json
 from dataclasses import replace
 from unittest.mock import patch
@@ -33,7 +34,7 @@ def test_current_workflow_ignores_old_flags_lists_and_modes(agent, monkeypatch, 
     text = 'Show me property types'
     _, run = agent.turn(text, understanding(text, 'catalog'))
     assert run.status == 'completed' and run.graph_version == ENGINE
-    assert run.prompt_snapshot['version'] == 'sales-understanding-prompt/2.21'
+    assert run.prompt_snapshot['version'] == NEXT_PROMPT_VERSION
     assert 'Current approved home' in agent.reply()
     agent.legacy.assert_not_called()
 

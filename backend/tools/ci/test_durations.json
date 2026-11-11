@@ -99,6 +99,7 @@
     "test_sales_request_attribution.py": 1.224,
     "test_sales_runtime_456.py": 8.248,
     "test_sales_runtime_postgres.py": 0.001,
+    "test_sales_subject_completeness.py": 45.0,
     "test_sales_turn_1720.py": 3.832,
     "test_sales_understanding_recovery.py": 1.354,
     "test_sales_workspace.py": 1.562,

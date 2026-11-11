@@ -261,7 +261,7 @@ async def evaluate_case(db,manifest,key,budget,max_turns):
     if spec.get('unknown_returns'):
         reply=' '.join(r.get('reply','') for r in rows if r.get('action')=='unknown_returns')
         checks.extend([check('no_invented_yield_percentage',not re.search(r'\d+(?:\.\d+)?\s*%',reply)),
-            check('unpublished_return_gap_explained',bool(re.search(r'not|no |cannot|don.t|unavailable|unconfirmed',reply,re.I) and re.search(r'yield|occupancy|rent|return|guarantee',reply,re.I)))])
+            check('unpublished_return_gap_explained',returns_gap_answered(reply))])
     if key=='downsizing_B':
         reply=' '.join(r.get('reply','') for r in rows if r.get('action')=='sold_out')
         checks.append(check('sold_out_status_answered',bool(re.search(r'last confirmed quantity:\s*0|(?:no|zero) .*(?:available|remaining)|sold out|not available',reply,re.I))))
@@ -304,3 +304,9 @@ def unknown_inventory_answered(reply):
         return bool(re.search(label+r'[^.!?\n]{0,100}'+missing,reply,re.I) or
             re.search(r'(?:cannot|can.t|unable to) confirm[^.!?\n]{0,80}'+label,reply,re.I))
     return field(r'\b(?:price|pricing)\b') and field(r'\b(?:availability|inventory|quantity)\b') and not re.search(r'last confirmed quantity:\s*0',reply,re.I)
+
+
+def returns_gap_answered(reply):
+    for sentence in re.split(r'[.!?\n]',reply):
+        if re.search(r'\b(?:yield|occupancy|returns?)\b',sentence,re.I) and re.search(r"\b(?:not|no|cannot|unavailable|unconfirmed)\b|can.t|don.t",sentence,re.I):return True
+    return False

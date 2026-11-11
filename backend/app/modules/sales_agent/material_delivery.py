@@ -250,6 +250,9 @@ def deliver(db, scope, conversation, lead, run, outcome, previous_meta):
     # Offered alternatives are exact file/resource snapshots, not a list rediscovered on yes.
     offered = {}
     for asset, binding, tids, coverage in pending:
+        if not coverage.startswith('complement_'):
+            tids=set(tids)-fulfilled
+            if not tids:continue
         if binding['sha256'] not in unique:
             row=offered.setdefault(binding['sha256'],{'binding':binding,'coverage':coverage,
                 'property_id':asset.property_type_id,'task_ids':[],'targets':[],'content_types':[]})

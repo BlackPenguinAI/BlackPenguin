@@ -77,7 +77,9 @@ def detect(text,*,names=(),contextual_answer=False,output=False):
     if contextual_answer and text.casefold() in {'sí','si','oui','sim'}:
         return Decision('neutral',None,'bounded_contextual_assent',False)
     sample=re.sub(r'https?://\S+',' ',text)
-    if output:
+    # Entity names are scoped data, not evidence of a foreign language. Strip
+    # them for input and output classification; genuine surrounding clauses remain.
+    if names:
         for name in sorted({str(n) for n in names if n and len(str(n))>=2},key=len,reverse=True):
             sample=re.sub(r'(?<!\w)'+re.escape(name)+r'(?!\w)',' ',sample,flags=re.I)
     tokens=re.findall(r'[^\W\d_]+',sample.casefold().replace('’',"'"),flags=re.UNICODE)

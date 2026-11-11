@@ -154,6 +154,9 @@ async def preview(db, scope: Scope, *, inbound_message_id: str, expected_revisio
                 interpreted,omitted_preferences=omit_unrelated_financial_preferences(interpreted,
                     appointment_confirmation=bool(latest and (latest.metadata_json or {}).get('booking_confirmation')))
                 normalizations.extend(omitted_preferences)
+                from .understanding_completeness import scoped_subjects,completeness_issues
+                interpreted,subject_notes=scoped_subjects(interpreted,inbound.content,commercial)
+                normalizations.extend(subject_notes)
                 from .understanding_semantics import issues_for
                 offer=(latest.metadata_json or {}).get('appointment_offer') if latest else None
                 from .first_booking import exact_public_selection
@@ -163,6 +166,7 @@ async def preview(db, scope: Scope, *, inbound_message_id: str, expected_revisio
                 if omitted:
                     normalizations.extend(omitted)
                     issues=issues_for(interpreted,inbound.content,appointment_offer=bool(offer and not exact_public_selection(inbound.content,offer)))
+                issues.extend(completeness_issues(interpreted,inbound.content))
                 optional=[issue for issue in issues if issue['type'] in {'neutral_refusal_as_frustration','neutral_courtesy_as_emotion'}]
                 if optional:
                     interpreted=interpreted.model_copy(update={'empathy':None})

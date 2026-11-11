@@ -63,15 +63,7 @@ def test_compact_scripts_exercise_real_core_and_assert_observable_outcomes(lab,s
         result=asyncio.run(evaluate_case(db,manifest,scenario,budget,8))
     failures=[(t.get('action'),t.get('reply'),[c for c in t.get('checks',[]) if c['status']!='PASS']) for t in result['turns'] if any(c['status']!='PASS' for c in t.get('checks',[]))]
     final=[c for c in result['checks'] if c['status']!='PASS']
-    # Known diagnostic findings are allowed here, but never erased from the
-    # exported evaluation. This test must also accept future core improvements.
-    allowed_final={'rental_B':{'unpublished_return_gap_explained'},'downsizing_B':{'sold_out_status_answered'}}.get(scenario,set())
-    assert {c['check'] for c in final}<=allowed_final,final
-    allowed_rows={('portfolio_A','information'):{'no_repeated_financial_sentences'},
-                  ('portfolio_B','information'):{'no_repeated_financial_sentences'},
-                  ('downsizing_B','sold_out'):{'scripted_english_not_rejected'}}
-    for action,reply,checks in failures:
-        assert {c['check'] for c in checks}<=allowed_rows.get((scenario,action),set()),(action,reply,checks)
+    assert not failures and not final,{'turns':failures,'final':final}
     assert 3<=len(result['turns'])<=8
     if scenario=='first_time_A':
         from app.core.config import settings

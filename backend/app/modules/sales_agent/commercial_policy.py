@@ -50,10 +50,18 @@ def guidance(*,text,u,commercial,lead,selected=None,holds=()):
     topics={r.topic.value for r in u.requests if r.polarity=='request'}
     current_financial=any(p.key in {'budget','financing'} and p.status=='declared' for p in u.preferences)
     commercial_turn=bool(topics & {'catalog','property_details','pricing','inventory','financing'} or current_financial or any(o.kind=='price' for o in u.objections))
+    from .understanding_completeness import returns_question
+    investment_question=returns_question(own)
     separation=property_transaction_requested(own)
     result={'version':VERSION,'blocks':[],'closing':'','decision':'none','alternative_ids':[]}
     def add(value):
         if value not in result['blocks']:result['blocks'].append(value)
+    if investment_question:
+        # No investment KPI is currently part of the typed public project facts.
+        # Do not substitute loan terms or use a target ROI as a guaranteed return.
+        has_figures=any(v not in (None,'',[],{}) for k,v in commercial['confirmed_project_facts'].items() if re.search(r'yield|occupancy|roi|return',k,re.I))
+        add('I cannot guarantee rental yield, occupancy or investment returns.' if has_figures else 'I do not have published rental yield or occupancy figures for this project, and I cannot guarantee investment returns.')
+        result.update(decision='investment_information',closing='The sales team can review investment details during a visit. Is there another property question I can help with?')
     if separation:
         add('I can help with property information and arrange a visit. Payments and reservations of a property are handled in person by the sales team; I cannot take a payment or hold a property in this chat.')
         result.update(decision='in_person_commercial_transaction',closing='Would you like to review visit options, or is there another question I can help with?')
@@ -62,7 +70,7 @@ def guidance(*,text,u,commercial,lead,selected=None,holds=()):
         add('An amount for a down payment is different from the total purchase budget.')
         result.update(decision='clarify_total_budget',closing='What total purchase budget and currency are you considering?')
     payments=_payment_information(commercial)
-    finance_question='financing' in topics
+    finance_question='financing' in topics and not (investment_question and not re.search(r'\b(?:financing|mortgage|loan|down payment)\b',own,re.I))
     if finance_question and 'financing' not in holds:
         if payments:add('The published payment information is: '+'; '.join(payments)+'.')
         else:add('I do not have published financing or down payment terms to quote for this project.')
@@ -73,8 +81,8 @@ def guidance(*,text,u,commercial,lead,selected=None,holds=()):
     outright &= not bool(re.search(r'\b(?:if|suppose|or)\b|\b(?:not|no) cash\b|\b(?:cannot|can.t|don.t|do not) (?:pay|have) (?:in )?cash\b',cash_text,re.I))
     if current_financial and outright:
         add('You are considering an outright purchase, without financing.')
-    cap=budget_cap(profile) if commercial_turn and not down and not {'pricing','catalog','inventory','property_details'} & set(holds) else None
-    if commercial_turn and not cap and not down and (profile['current'].get('budget') or {}).get('status') in {'declared','confirmed'} and not {'pricing','catalog','inventory','property_details'} & set(holds):
+    cap=budget_cap(profile) if commercial_turn and not investment_question and not down and not {'pricing','catalog','inventory','property_details'} & set(holds) else None
+    if commercial_turn and not investment_question and not cap and not down and (profile['current'].get('budget') or {}).get('status') in {'declared','confirmed'} and not {'pricing','catalog','inventory','property_details'} & set(holds):
         result.update(decision='clarify_budget_currency',closing='What maximum total purchase budget and currency should I use when comparing options?')
     if cap:
         amount,currency=cap;amount=Decimal(str(amount))
@@ -96,7 +104,8 @@ def guidance(*,text,u,commercial,lead,selected=None,holds=()):
                 for row in alternatives[:3]:
                     name=row.get('unit_code') or row.get('property_type')
                     price=_number(row.get('price') if individual else row.get('starting_price'))
-                    add(f"{name} {'has a listed price of' if individual else 'has a published starting price of'} {price:,.2f} {currency}, within your stated total budget. The exact property price and current availability still need confirmation.")
+                    add(f"{name} {'has a listed price of' if individual else 'has a published starting price of'} {price:,.2f} {currency}, within your stated total budget.")
+                add('The exact property price and current availability still need confirmation.')
                 result.update(decision='within_budget_alternative',closing='Would you like more details about one of these options?')
             elif comparable:
                 add('I do not have a listed option within your stated total budget in this project.')
