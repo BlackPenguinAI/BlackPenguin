@@ -184,7 +184,7 @@ async def _preview(db, scope: Scope, *, inbound_message_id: str, expected_revisi
                     appointment_confirmation=bool(latest and (latest.metadata_json or {}).get('booking_confirmation')))
                 normalizations.extend(omitted_preferences)
                 from .interpretation_consistency import normalize as normalize_consistency
-                interpreted,consistency_notes=normalize_consistency(interpreted,inbound.content,commercial)
+                interpreted,consistency_notes=normalize_consistency(interpreted,inbound.content,commercial,appointment_offer=(latest.metadata_json or {}).get('appointment_offer') if latest else None)
                 normalizations.extend(consistency_notes)
                 from .understanding_completeness import scoped_subjects,completeness_issues
                 interpreted,subject_notes=scoped_subjects(interpreted,inbound.content,commercial)

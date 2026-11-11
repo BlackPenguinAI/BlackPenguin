@@ -159,8 +159,11 @@ def test_worker_exports_all_six_cases_and_redacts_key(tmp_path,monkeypatch):
         'credential':{'id':'global-config','key':secret,'pack':{'model':'test/offline'},
             'version_id':'published-version','version_number':1,'published_at':None}}
     path=tmp_path/'options.json';path.write_text(json.dumps(options));output=tmp_path/'results';output.mkdir()
-    # This provider does not understand appointments: the worker must export
-    # failures rather than manufacture reservations or mark the run successful.
+    # A deficient model may still progress through exact public slot recovery.
+    # Inject an actual interpretation failure so the export failure contract is
+    # deterministic and never relies on weak model output remaining unusable.
+    async def broken_preview(*args,**kwargs):raise ValueError('Deliberate offline interpretation failure')
+    monkeypatch.setattr('app.modules.sales_agent.active_service.preview',broken_preview)
     with mock_models():status=run(path,output)
     data=json.loads((output/'summary.json').read_text())
     assert status==2 and data['status']=='FAIL'

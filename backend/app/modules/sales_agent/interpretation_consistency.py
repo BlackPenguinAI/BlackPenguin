@@ -8,7 +8,7 @@ EXISTING_QUERY=re.compile(r'\b(?:do I have|my (?:current|existing|upcoming|past)
 DECLINE=re.compile(r"\b(?:I do not want a visit yet|I don['’]t want a visit yet|I['’]m not ready for a visit|no visit for now)\b",re.I)
 
 
-def normalize(value,text,commercial):
+def normalize(value,text,commercial,*,appointment_offer=None):
     from app.modules.governance.services import request_attribution
     own=request_attribution(text)['current_text'];data=value.model_dump(mode='json');notes=[]
     names=[r.get('property_type') for r in commercial.get('property_types',[])]
@@ -25,6 +25,32 @@ def normalize(value,text,commercial):
         key='current_subject';ids={r['id'] for r in data['references']}
         while key in ids:key+='x'
         data['references'].append(dict(id=key,kind='property',expression=name,evidence=name));return key
+    # Only a complete backend-rendered choice grants selection, never booking.
+    from .first_booking import exact_public_selection
+    chosen=exact_public_selection(own,appointment_offer)
+    if chosen and own==text and not data['alternatives']:
+        index=next(i for i,o in enumerate(appointment_offer['options']) if o['starts_at']==chosen['id'])
+        expression=('first','second','third')[index]+' appointment'
+        data.update(requests=[dict(id='public_slot',topic='appointment',subject=None,polarity='request',evidence=text,reference_id='public_slot_ref')],
+            all_of=['public_slot'],references=[dict(id='public_slot_ref',kind='appointment',expression=expression,evidence=text)],
+            comparison=None,visit=dict(action='select',evidence=text,timing=None),appointment_query=None,
+            selected_reference_id=None,requires_clarification=False,clarification_question=None,cancellation=None,reschedule=None)
+        data['preferences']=[p for p in data['preferences'] if p['key']!='visit_readiness']
+        result=Understanding.model_validate(data).check_evidence(text)
+        return result,[{'field':'visit','action':'select_exact_backend_public_option','evidence':text}]
+    # Recover only a single, literal material instruction, not a mixed question.
+    material=re.fullmatch(r"\s*(?:Please )?(?:send|show)(?: me)? (?:the )?(brochure(?: PDF)?|PDF|photos?|pictures?|images?|floor plan) (?:for|of) (.+?)[.!]?\s*",own,re.I)
+    if material and own==text and not data['alternatives'] and not data['constraints']:
+        candidates=named(material[2])
+        if len(candidates)==1 and material[2].rstrip('.!').casefold()==candidates[0].casefold():
+            tag=material[1].casefold()
+            subject='brochure' if 'pdf' in tag or 'brochure' in tag else 'floor_plan' if 'floor' in tag else 'photos'
+            data.update(requests=[dict(id='explicit_material',topic='materials',subject=subject,polarity='request',evidence=text,reference_id=reference(candidates[0]))],
+                all_of=['explicit_material'],comparison=None,visit=None,appointment_query=None,selected_reference_id=None,
+                requires_clarification=False,clarification_question=None,cancellation=None,reschedule=None)
+            result=Understanding.model_validate(data).check_evidence(text)
+            if result==value:return value,[]
+            return result,[{'field':'requests','action':'preserve_literal_single_material_request','evidence':text}]
     for row in data['requests']:
         if row['topic']!='materials' or row['polarity']!='request' or row['evidence'] not in own or NEGATIVE.search(row['evidence']):continue
         candidates=named(row['evidence'])
@@ -45,6 +71,15 @@ def normalize(value,text,commercial):
     changes=re.search(r'\b(?:cancel|reschedul\w*|change my|move my)\b',own,re.I)
     if quote and not DECLINE.search(own) and len(named(quote))<=1 and not data['alternatives'] and not changes and not EXISTING_QUERY.search(own) and not value.requires_clarification:
         if not data['cancellation'] and not data['reschedule']:
+            comparison=data['comparison']
+            pure_visit=all(POSITIVE_VISIT.search(q) or re.fullmatch(r'Any (?:available )?time in the next (?:seven|7) days works for me[.!]?',q,re.I) or re.fullmatch(r'Please use the project timezone[.!]?',q,re.I) for q in clauses)
+            from .understanding_semantics import COMPARATIVE_SIGNAL
+            if comparison and pure_visit and not re.search(COMPARATIVE_SIGNAL,own,re.I):
+                key=comparison['request_id']
+                data['requests']=[r for r in data['requests'] if r['id']!=key]
+                data['all_of']=[k for k in data['all_of'] if k!=key]
+                data['comparison']=None
+                notes.append({'field':'comparison','action':'omit_comparison_invented_from_pure_visit','evidence':quote})
             if data['appointment_query'] is not None:
                 data['appointment_query']=None;notes.append({'field':'appointment_query','action':'new_visit_is_not_existing_appointment_query','evidence':quote})
             rows=[r for r in data['requests'] if r['topic']=='appointment' and r['polarity']=='request']

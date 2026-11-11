@@ -1,6 +1,8 @@
 """Bounded semantic feedback. Never grants consent or rewrites model output."""
 import re
 
+COMPARATIVE_SIGNAL=r"\b(?:compar\w*|differences?|similarities|cheaper|larger|smaller|bigger|better|best|worst|versus|vs|between|highest|lowest|most|least|more|less|other|alternatives?|which (?:one|property|option))\b"
+
 
 def unrelated_financial_evidence(pref, *, appointment_confirmation=False):
     """Recognize appointment text substituted for a financial declaration.
@@ -35,6 +37,11 @@ def issues_for(value, text, *, appointment_offer=False):
             from .commercial_policy import down_payment_only
             add(['preferences',i],'down_payment_as_total_budget' if pref.key=='budget' and down_payment_only(pref.evidence) else 'financial_preference_unrelated_evidence',
                 'Appointment selection/confirmation does not declare budget or financing. Omit this preference and retain the saved financial facts.')
+    pure_action=re.search(r'\b(?:send|show)\b.*\b(?:PDF|brochure|photos?|images?|floor plan)\b|\b(?:arrange|book|schedule)\b.*\b(?:visit|viewing|appointment)\b|\bthe (?:first|second|third) appointment:',text,re.I)
+    if value.comparison and pure_action and not re.search(COMPARATIVE_SIGNAL,text,re.I):
+        add(['comparison'],'comparison_not_supported_by_action','This message requests material, a visit, or selects a time, not a comparison. Preserve the explicit action and omit the invented comparison. Never infer booking confirmation from a selection.')
+    if value.visit and re.search(r'\b(?:send|show)\b.*\b(?:PDF|brochure|photos?|images?|floor plan)\b',value.visit.evidence,re.I) and not re.search(r'\b(?:visit|appointment|viewing|schedule|book)\b',value.visit.evidence,re.I):
+        add(['visit'],'material_request_is_not_visit_consent','A request for material does not request, select or confirm a visit. Omit this unsupported directive.')
     requests=value.requests
     # Only unambiguous first-person declarations, not questions or hypotheticals.
     from .financial_declarations import cash_quotes,budget_quotes,pure_cash_quote,pure_budget_quote,neutral_courtesy,financing_question

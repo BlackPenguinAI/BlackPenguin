@@ -234,6 +234,10 @@ async def evaluate_case(db,manifest,key,budget,max_turns):
                 row_checks.append(check('known_budget_not_asked_again',not re.search(r'What budget range and currency',last,re.I)))
             if spec['cash']:
                 funding=profile['current']['financing'];row_checks.append(check('cash_preference_persists',funding['status']=='declared' and bool(re.search(r'cash|outright',str(funding.get('value') or ''),re.I))))
+            if action in {'material','switch'} and spec.get('material'):
+                row_checks.append(check('material_request_delivered_this_turn',bool(meta.get('sales_asset_share_ids') or (run.output_snapshot or {}).get('sales_asset_share_ids'))))
+            if action in {'material','request_visit','select'}:
+                row_checks.append(check('no_comparison_invented_for_action',not frame.get('comparison')))
             if action=='select':row_checks.append(check('selection_advances_to_confirmation','Please confirm your visit' in last))
             if action=='decline' and not meetings:
                 row_checks.append(check('decline_not_misread_as_existing_visit_change',not re.search(r'cancel the current visit|request a different visit|which .*visit.*cancel',last,re.I)))
