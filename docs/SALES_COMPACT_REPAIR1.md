@@ -1,5 +1,7 @@
 # Corrección 1 de la batería compacta
 
+La siguiente revisión del contrato y de la captura independiente se documenta en [SALES_COMPACT_REPAIR2.md](SALES_COMPACT_REPAIR2.md).
+
 Base desplegada: `1cd37eed349b15db0953cf0f52298ae27be353b0`.
 
 El experimento recibido ejecutó 63 turnos del flujo `sales-current/1.0`, usando `openai/gpt-4o-mini`, configuración publicada 8. Se crearon 3 de 8 visitas esperadas. Ninguna de las cinco solicitudes de visita en proyectos con varios tipos de propiedad logró avanzar. En las interpretaciones aceptadas faltaban referencias a propiedades nombradas explícitamente; las tres visitas exitosas correspondían al proyecto con un solo tipo. No se observaron errores HTTP finales y las 53 composiciones fueron aceptadas, pero interpretar un JSON válido no garantizó responder correctamente.

@@ -494,6 +494,18 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
             else:
                 interpreted=await asyncio.wait_for(preview(db,scope,inbound_message_id=inbound.id,expected_revision=revision,
                     event_key='active-understanding:'+inbound.id,active=True),timeout=45)
+                if interpreted.status!='accepted' and next_enabled and interpreted.declarations:
+                    conversation,lead,project=_current(db,scope)
+                    continuity.check_epoch(conversation,run.input_snapshot.get('continuity_epoch'))
+                    from .current_declarations import frame
+                    from .lead_profile import capture as capture_profile
+                    capture_profile(db,scope,frame(list(interpreted.declarations)),inbound.id)
+                    from .profile_intelligence import update as update_profile
+                    from .turn_configuration import published_configuration
+                    scoring_pack,_=published_configuration(db,scope.company_id)
+                    count=scoped_messages_query(db,conversation).filter_by(direction='inbound').count()
+                    update_profile(db,lead,commercial=commercial,message_count=count,scoring_config=scoring_pack.get('scoring_config',{}))
+                    db.flush([lead])
                 if interpreted.status!='accepted' and not human_step:
                     # Keep the rejected response and request evidence, not just
                     # a generic error snapshot, before composing a safe reply.

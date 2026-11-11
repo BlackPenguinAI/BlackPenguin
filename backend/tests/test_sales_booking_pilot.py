@@ -111,7 +111,7 @@ def test_scripted_driver_reaches_real_coordinator_booking(lab,monkeypatch,scenar
                 data=value.model_dump();data['empathy']={'kind':'frustrated','evidence':text}
                 value=Understanding.model_validate(data)
             if seen[text]>1:
-                assert payload['response_format']['json_schema']['schema']['$defs']['Request']['properties']['evidence']['enum']
+                assert any(v.get('properties',{}).get('evidence',{}).get('enum') for v in payload['response_format']['json_schema']['schema']['$defs'].values())
             content=value.model_dump_json()
         elif name=='sales_commercial_composition':
             rows=ctx['evidence_blocks'];content=json.dumps({'version':'sales-commercial-composer/1.0','opening':'direct',
@@ -129,7 +129,8 @@ def test_scripted_driver_reaches_real_coordinator_booking(lab,monkeypatch,scenar
     assert len(result['meetings'])==(1 if scenario in BOOKING_CASES else 0)
     if omit_refs:
         attempts=result['turns'][0]['interpretation_attempts']
-        assert len(attempts)==2 and attempts[0]['validation_issues'][0]['type']=='payment_declaration_missing'
+        assert len(attempts)==1 and attempts[0]['outcome']=='accepted'
+        assert any(n['field']=='financing' and n['action']=='preserve_independently_validated_current_declaration' for n in attempts[0]['normalizations'])
         if scenario in BOOKING_CASES:
             selection=next(r for r in result['turns'] if r['action'] in {'select','reject_first'})
             assert selection['understanding']['preferences']==[]

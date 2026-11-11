@@ -96,6 +96,7 @@
     "test_sales_dialogue_postgres.py": 0.002,
     "test_sales_gaps_1719.py": 0.915,
     "test_sales_global_rollout.py": 2.451,
+    "test_sales_interpretation_input.py": 58.0,
     "test_sales_request_attribution.py": 1.224,
     "test_sales_runtime_456.py": 8.248,
     "test_sales_runtime_postgres.py": 0.001,

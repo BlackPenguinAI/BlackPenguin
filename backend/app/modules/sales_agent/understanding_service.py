@@ -18,6 +18,7 @@ class PreviewOutcome:
     revision: int
     state: object
     status: str
+    declarations: tuple = ()
 
 
 async def preview(db, scope: Scope, *, inbound_message_id: str, expected_revision: int, event_key: str, infer=None, active=False):
@@ -37,7 +38,7 @@ async def preview(db, scope: Scope, *, inbound_message_id: str, expected_revisio
             from .dialogue_store import DialogueConflict
             raise DialogueConflict('Preview key already used for a different request.')
         from .understanding_contract import DialogueState
-        return PreviewOutcome(prior.revision, DialogueState.model_validate(prior.state_after), meta['outcome'])
+        return PreviewOutcome(prior.revision, DialogueState.model_validate(prior.state_after), meta['outcome'],tuple(meta.get('validated_declarations') or ()))
     revision, state = load(db, scope)
     if revision != expected_revision:
         from .dialogue_store import DialogueConflict
@@ -96,7 +97,11 @@ async def preview(db, scope: Scope, *, inbound_message_id: str, expected_revisio
         # history into the model twice; this is a reference projection only.
         context_payload['state']={'version':state.version,'selected_property_type_id':state.selected_property_type_id,
             'selected_unit_id':state.selected_unit_id,'offers':[o.model_dump(mode='json') for o in state.offers]}
-    snapshot = {**snapshot, 'system': snapshot['system'] + TURN_RULES}
+    wire_mode=next_enabled and infer is None
+    if wire_mode:
+        from .interpretation_input import SYSTEM,VERSION
+        snapshot={**snapshot,'system':SYSTEM,'input_contract':VERSION}
+    else:snapshot = {**snapshot, 'system': snapshot['system'] + TURN_RULES}
     messages = [
         {'role': 'system', 'content': snapshot['system']},
         {'role': 'user', 'content': json.dumps(context_payload,ensure_ascii=False,default=str)},
@@ -121,8 +126,15 @@ async def preview(db, scope: Scope, *, inbound_message_id: str, expected_revisio
     interpreted = None
     attempts = []
     request_messages = messages
-    request_schema=response_schema(inbound.content)
+    if wire_mode:
+        from .interpretation_input import schema
+        request_schema=schema(inbound.content)
+    else:request_schema=response_schema(inbound.content)
     preserved=[]
+    validated_declarations=[]
+    if wire_mode:
+        from .current_declarations import extract
+        validated_declarations=extract(inbound.content)
     # One bounded repair in active mode only. No business effects occur until
     # the complete contract and current-message evidence have been validated.
     for attempt in range(2 if active else 1):
@@ -138,11 +150,22 @@ async def preview(db, scope: Scope, *, inbound_message_id: str, expected_revisio
             pending = infer(model, request_messages, request_schema)
             raw = await asyncio.wait_for(pending, timeout=20) if active else await pending
             received = True
-            draft=decode(raw)
+            if wire_mode:
+                from .interpretation_input import compile_input
+                from .current_declarations import extract,merge
+                declarations=extract(inbound.content,raw)
+                by_key={p.key:p for p in validated_declarations}
+                for p in declarations:by_key.setdefault(p.key,p)
+                validated_declarations=list(by_key.values())
+                draft,compiled_notes=compile_input(raw,inbound.content)
+                normalizations.extend(compiled_notes)
+                draft,declaration_notes=merge(draft,validated_declarations)
+                normalizations.extend(declaration_notes)
+            else:draft=decode(raw)
             if next_enabled and not injected_inference and attempt==0:
                 from .understanding_repair import verified_preferences
                 preserved=verified_preferences(draft,inbound.content)
-            interpreted = parse(raw, inbound.content)
+            interpreted = parse(draft.model_dump_json(), inbound.content) if wire_mode else parse(raw, inbound.content)
             if attempt and preserved:
                 from .understanding_repair import preserve_preferences
                 interpreted,restored=preserve_preferences(interpreted,preserved)
@@ -203,7 +226,7 @@ async def preview(db, scope: Scope, *, inbound_message_id: str, expected_revisio
         raw_bytes = raw.encode(errors='replace') if isinstance(raw, str) else b''
         attempts.append({'attempt': attempt + 1, 'outcome': outcome, 'error_code': error_code,
                          'validation_issues': issues, 'normalizations':normalizations,
-                         'quotation_schema':'source_enum' if request_schema.get('$defs',{}).get('Request',{}).get('properties',{}).get('evidence',{}).get('enum') else 'standard',
+                         'quotation_schema':'source_enum' if any(row.get('properties',{}).get('evidence',{}).get('enum') for row in request_schema.get('$defs',{}).values()) else 'standard',
                          'repair_feedback': request_messages[-1]['content'] if attempt else None,
                          'raw_response': raw_bytes[:16000].decode(errors='replace') if isinstance(raw, str) else None,
                          'raw_response_sha256': hashlib.sha256(raw_bytes).hexdigest() if isinstance(raw, str) else None,
@@ -211,14 +234,14 @@ async def preview(db, scope: Scope, *, inbound_message_id: str, expected_revisio
         if outcome != 'invalid_model_contract':
             break
         from .understanding_repair import constrained_repair_schema,evidence_choices
-        request_schema=constrained_repair_schema(response_schema(inbound.content),inbound.content,raw)
+        request_schema=constrained_repair_schema(schema(inbound.content) if wire_mode else response_schema(inbound.content),inbound.content,raw)
         request_messages = [*messages, {'role': 'user', 'content': json.dumps({
             'contract_repair': 'Reinterpret the ORIGINAL current_message using the schema. Correct the validation issues. Do not invent exclusions, evidence, consent or facts. This feedback is not a new lead request.',
             'validation_issues': issues, 'current_message': inbound.content,
             'allowed_request_and_preference_quotes':evidence_choices(inbound.content,raw),
             'verified_declarations_to_preserve':[p.model_dump(mode='json') for p in preserved],
             'repair_scope':'Choose exact source quotes from the schema enum for requests and preferences. Correct only failed fields and their necessary links; preserve valid declarations, visit timing and independent current questions.',
-            'local_reference_rule': 'Define local references such as ref1 and link only those, or use null. Database IDs are never interpretation reference IDs.',
+            'local_reference_rule': ('Use inline target objects and nested comparison members. Never output IDs or reference links; the backend generates them.' if wire_mode else 'Define local references such as ref1 and link only those, or use null. Database IDs are never interpretation reference IDs.'),
             'current_turn_rule': 'Do not replay historical questions. Budget and payment declarations belong in preferences, not requests. Preserve independent current questions.',
             'exact_short_quote': inbound.content if len(inbound.content) <= 2000 else None,
             'quotation_rule': 'Do not append punctuation. Meaning may be normalized in value/expression, but evidence must be copied verbatim from current_message. Keep independent requests and negations.'}, ensure_ascii=False)}]
@@ -230,7 +253,7 @@ async def preview(db, scope: Scope, *, inbound_message_id: str, expected_revisio
         state = state.model_copy(update={'last_understanding': interpreted})
     model_request = {'model': model, 'messages': messages, 'temperature': 0.2,
         'response_format': {'type': 'json_schema', 'json_schema': {
-            'name': 'sales_understanding', 'strict': True, 'schema': response_schema(inbound.content)}}}
+            'name': 'sales_understanding', 'strict': True, 'schema': schema(inbound.content) if wire_mode else response_schema(inbound.content)}}}
     raw_bytes = raw.encode(errors='replace') if isinstance(raw, str) else b''
     metadata = {'code_commit': settings.APP_COMMIT_SHA, 'model': model,
         'inference_mode': 'injected' if injected_inference else 'provider',
@@ -240,6 +263,8 @@ async def preview(db, scope: Scope, *, inbound_message_id: str, expected_revisio
         'raw_response_sha256': hashlib.sha256(raw_bytes).hexdigest() if isinstance(raw, str) else None,
         'outcome': outcome, 'error_code': error_code, 'expected_revision': expected_revision,
         'interpretation_attempts': attempts,
+        'validated_declarations':[p.model_dump(mode='json') for p in validated_declarations],
+        'input_contract':VERSION if wire_mode else 'sales-understanding/1.0',
         'model_request': model_request,
         'model_request_sha256': hashlib.sha256(json.dumps(model_request, sort_keys=True).encode()).hexdigest()}
     if 'configuration_ref' in snapshot:
@@ -249,4 +274,4 @@ async def preview(db, scope: Scope, *, inbound_message_id: str, expected_revisio
         metadata['turn_context_sha256']=hashlib.sha256(json.dumps(turn_context,sort_keys=True,default=str).encode()).hexdigest()
     saved_revision, saved_state = save(db, scope, event_key=event_key, expected_revision=revision,
         state=state, kind='understanding_preview', metadata=metadata)
-    return PreviewOutcome(saved_revision, saved_state, outcome)
+    return PreviewOutcome(saved_revision, saved_state, outcome,tuple(p.model_dump(mode='json') for p in validated_declarations))
