@@ -985,5 +985,26 @@
     "status": "aprobado",
     "human_review": "pending",
     "file": "04-conversaciones/funcionaron/visita-sin-segmento__unknown-a__sales-compact-repair-7__aprobado.json"
+  },
+  {
+    "run": "sales-compact-repair-8",
+    "case": "move_up_A",
+    "status": "aprobado",
+    "human_review": "pending",
+    "file": "04-conversaciones/funcionaron/vivienda-mayor-galeria-y-visita__move-up-a__sales-compact-repair-8__aprobado.json"
+  },
+  {
+    "run": "sales-compact-repair-8",
+    "case": "downsizing_B",
+    "status": "aprobado",
+    "human_review": "pending",
+    "file": "04-conversaciones/funcionaron/fotos-ausentes-y-propiedad-agotada__downsizing-b__sales-compact-repair-8__aprobado.json"
+  },
+  {
+    "run": "sales-compact-repair-8",
+    "case": "portfolio_A",
+    "status": "fallido",
+    "human_review": "pending",
+    "file": "04-conversaciones/necesitan-mejoras/comparacion-y-eleccion-de-horario__portfolio-a__sales-compact-repair-8__fallido.json"
   }
 ]

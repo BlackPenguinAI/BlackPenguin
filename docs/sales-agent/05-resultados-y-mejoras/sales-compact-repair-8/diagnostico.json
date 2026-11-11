@@ -1,0 +1,70 @@
+{
+  "source_commit": "e6b31c5013d74725143507562cf309b64e47c2b4",
+  "original_status_preserved": "FAIL",
+  "cases": [
+    {
+      "case": "move_up_A",
+      "expected_outcome": "booked",
+      "turns": 5,
+      "bookings": 1,
+      "stop_reason": "booked",
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "case": "downsizing_B",
+      "expected_outcome": "closed",
+      "turns": 5,
+      "bookings": 0,
+      "stop_reason": "closed",
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "case": "portfolio_A",
+      "expected_outcome": "booked",
+      "turns": 4,
+      "bookings": 0,
+      "stop_reason": "repeated_message_without_progress",
+      "status": "FAIL",
+      "failures": [
+        {
+          "turn": null,
+          "check": "expected_booking_outcome",
+          "detail": ""
+        },
+        {
+          "turn": null,
+          "check": "dialogue_reached_terminal_outcome",
+          "detail": ""
+        },
+        {
+          "turn": 1,
+          "check": "turn_completed",
+          "detail": ""
+        },
+        {
+          "turn": 3,
+          "check": "turn_completed",
+          "detail": ""
+        },
+        {
+          "turn": 4,
+          "check": "turn_completed",
+          "detail": ""
+        }
+      ]
+    }
+  ],
+  "provider_usage": {
+    "prompt_tokens": 224718,
+    "completion_tokens": 4113,
+    "cost_usd": 0.0315099,
+    "responses_with_cost": 21
+  },
+  "cost_reporting_complete": false,
+  "confirmed_blocker": "portfolio_A: provider timeouts on turns 1, 3 repair and 4; invalid inline evidence before turn 3 repair.",
+  "runtime_modified_in_this_documentation_update": false,
+  "date_normalization_retested_successfully_in_portfolio_A": false,
+  "root_cause_of_provider_latency": "not established by this trace"
+}

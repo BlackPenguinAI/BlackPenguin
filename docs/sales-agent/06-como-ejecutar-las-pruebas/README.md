@@ -2,9 +2,9 @@
 
 # Ejecutar y actualizar el laboratorio
 
-## Repetir solo los tres casos tras desplegar Repair 8
+## Comando de reproducción de Repair 8 (corrida ya recibida)
 
-La batería compacta 2 ya se ejecutó: 13/16 aprobados y 7/8 visitas. Ahora se repiten `move_up_A`, `downsizing_B` y `portfolio_A`, con el mismo modelo/configuración. No hay otro LLM para el lead ni juez.
+La batería compacta 2 ya se ejecutó: 13/16 aprobados y 7/8 visitas. Repair 8 repitió `move_up_A`, `downsizing_B` y `portfolio_A`, con el mismo modelo/configuración. No hay otro LLM para el lead ni juez.
 
 ```bash
 docker exec -i -w /app bp_api_prod python -m tools.sales_ai.synthetic_lab \
@@ -59,4 +59,4 @@ python docs/sales-agent/06-como-ejecutar-las-pruebas/herramientas/generar_conver
 
 Genera una ficha Markdown por conversación registrada; no llama un modelo ni inventa interpretaciones. Los mensajes, campos y controles vienen del JSON y cada ficha enlaza al original. La guía principal conserva toda la explicación del experimento.
 
-Repair 8 todavía debe evaluarse con el modelo publicado. Corregir primero los casos que fallen antes de repetir los 16. El consumo estimado total del subconjunto es USD 0.04–0.09, reserva USD 0.08–0.18; no se suma al histórico ni es un techo garantizado.
+Repair 8 se evaluó: 2/3 casos aprobados y 1/2 visitas. Diversificación sigue bloqueada con timeouts. El comando anterior se conserva como referencia; no relanzarlo automáticamente. Revisar esa causa antes de preparar otra repetición y después volver a los 16. El consumo estimado total del subconjunto es USD 0.04–0.09, reserva USD 0.08–0.18; no se suma al histórico ni es un techo garantizado.

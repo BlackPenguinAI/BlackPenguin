@@ -2,7 +2,7 @@
 
 [Volver a la guía](../README.md)
 
-141 conversaciones históricas. Cada ficha conserva su resultado original; no es una lista de 141 éxitos. El diálogo es sintético y los recursos/fechas no son una oferta real. Los JSON siguen disponibles al entrar en cada ficha.
+144 conversaciones históricas. Cada ficha conserva su resultado original; no son 144 éxitos. Los JSON están disponibles dentro de cada ficha.
 
 | Corrida / caso | Resultado automático | Leer diálogo |
 |---|---|---|
@@ -128,9 +128,6 @@
 | sales-compact-repair-6 / first_time_A | fallido | [Conversación](necesitan-mejoras/primera-compra-pdf-y-visita__first-time-a__sales-compact-repair-6__fallido.md) |
 | sales-compact-repair-6 / move_up_B | aprobado | [Conversación](funcionaron/cambio-de-propiedad-fotos-y-despedida__move-up-b__sales-compact-repair-6__aprobado.md) |
 | sales-compact-repair-6 / unknown_A | aprobado | [Conversación](funcionaron/visita-sin-segmento__unknown-a__sales-compact-repair-6__aprobado.md) |
-| sales-compact-repair-7 / first_time_A | aprobado | [Conversación](funcionaron/primera-compra-pdf-y-visita__first-time-a__sales-compact-repair-7__aprobado.md) |
-| sales-compact-repair-7 / move_up_B | aprobado | [Conversación](funcionaron/cambio-de-propiedad-fotos-y-despedida__move-up-b__sales-compact-repair-7__aprobado.md) |
-| sales-compact-repair-7 / unknown_A | aprobado | [Conversación](funcionaron/visita-sin-segmento__unknown-a__sales-compact-repair-7__aprobado.md) |
 | sales-compact-battery-2 / first_time_A | aprobado | [Conversación](funcionaron/primera-compra-pdf-y-visita__first-time-a__sales-compact-battery-2__aprobado.md) |
 | sales-compact-battery-2 / first_time_B | aprobado | [Conversación](funcionaron/inicial-financiacion-y-rechazo__first-time-b__sales-compact-battery-2__aprobado.md) |
 | sales-compact-battery-2 / move_up_A | fallido | [Conversación](necesitan-mejoras/vivienda-mayor-galeria-y-visita__move-up-a__sales-compact-battery-2__fallido.md) |
@@ -147,3 +144,9 @@
 | sales-compact-battery-2 / portfolio_B | aprobado | [Conversación](funcionaron/comparacion-sin-horarios__portfolio-b__sales-compact-battery-2__aprobado.md) |
 | sales-compact-battery-2 / unknown_A | aprobado | [Conversación](funcionaron/visita-sin-segmento__unknown-a__sales-compact-battery-2__aprobado.md) |
 | sales-compact-battery-2 / unknown_B | aprobado | [Conversación](funcionaron/peticion-humana-y-cierre__unknown-b__sales-compact-battery-2__aprobado.md) |
+| sales-compact-repair-7 / first_time_A | aprobado | [Conversación](funcionaron/primera-compra-pdf-y-visita__first-time-a__sales-compact-repair-7__aprobado.md) |
+| sales-compact-repair-7 / move_up_B | aprobado | [Conversación](funcionaron/cambio-de-propiedad-fotos-y-despedida__move-up-b__sales-compact-repair-7__aprobado.md) |
+| sales-compact-repair-7 / unknown_A | aprobado | [Conversación](funcionaron/visita-sin-segmento__unknown-a__sales-compact-repair-7__aprobado.md) |
+| sales-compact-repair-8 / move_up_A | aprobado | [Conversación](funcionaron/vivienda-mayor-galeria-y-visita__move-up-a__sales-compact-repair-8__aprobado.md) |
+| sales-compact-repair-8 / downsizing_B | aprobado | [Conversación](funcionaron/fotos-ausentes-y-propiedad-agotada__downsizing-b__sales-compact-repair-8__aprobado.md) |
+| sales-compact-repair-8 / portfolio_A | fallido | [Conversación](necesitan-mejoras/comparacion-y-eleccion-de-horario__portfolio-a__sales-compact-repair-8__fallido.md) |
