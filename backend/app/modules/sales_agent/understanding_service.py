@@ -149,8 +149,12 @@ async def preview(db, scope: Scope, *, inbound_message_id: str, expected_revisio
                 normalizations.extend(restored)
                 interpreted.check_evidence(inbound.content)
             if next_enabled and not injected_inference:
-                from .understanding_semantics import issues_for
+                from .understanding_repair import omit_unrelated_financial_preferences
                 latest=next((m for m in history if m.direction=='outbound'),None)
+                interpreted,omitted_preferences=omit_unrelated_financial_preferences(interpreted,
+                    appointment_confirmation=bool(latest and (latest.metadata_json or {}).get('booking_confirmation')))
+                normalizations.extend(omitted_preferences)
+                from .understanding_semantics import issues_for
                 offer=(latest.metadata_json or {}).get('appointment_offer') if latest else None
                 from .first_booking import exact_public_selection
                 issues=issues_for(interpreted,inbound.content,appointment_offer=bool(offer and not exact_public_selection(inbound.content,offer)))

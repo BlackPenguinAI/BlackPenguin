@@ -62,7 +62,7 @@ def prompt_snapshot(agent):
 
 
 def next_prompt_snapshot(guidance):
-    return {'version':'sales-understanding-prompt/2.17','system':SYSTEM_PROMPT+'''
+    return {'version':'sales-understanding-prompt/2.18','system':SYSTEM_PROMPT+'''
 SA-09: classify directed personal harassment semantically, including paraphrases and typos,
 with an exact current quotation. Criticizing prices, layouts or service and expressing
 frustration is not personal harassment. Quoted, reported, hypothetical and negated abuse
@@ -188,6 +188,10 @@ time_from_evidence/time_until_evidence (clock text), time_relation (any/exact/af
 range/morning/afternoon/evening), timezone_evidence (explicit IANA zone), duration_evidence
 (explicit minute duration). The backend normalizes and validates these against its current time.
 No timing fields are implied by history; persisted preferences are supplied separately.
+A slot selection or booking confirmation does not repeat or change budget/financing.
+Never attach an appointment quote to a historical financial value. Omit unchanged preferences;
+the backend retains them. For explicit financial changes in a mixed message, quote the
+financial clause itself, separately from the appointment selection.
 Use courtesy with exact evidence for greeting, farewell, acknowledgement or a contextual
 polite decline. A farewell or 'no more questions' stops sales cadence, never responses,
 cancellation or opt-out. A 'no' declines only the immediately preceding question/proposal.

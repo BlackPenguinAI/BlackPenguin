@@ -2,9 +2,36 @@
 import re
 
 
+def unrelated_financial_evidence(pref, *, appointment_confirmation=False):
+    """Recognize appointment text substituted for a financial declaration.
+
+    This is deliberately bounded: short contextual answers and unfamiliar money
+    wording are not rejected. Mixed messages retain genuine financial clauses.
+    """
+    if pref.key not in {'budget', 'financing'}:
+        return False
+    quote=pref.evidence
+    if appointment_confirmation and re.fullmatch(r"\s*(?:yes|yes please|confirmed|confirm|please do|go ahead|book it)[.!]?\s*",quote,re.I):
+        return True
+    appointment=re.search(r"\b(?:appointment|viewing|visit)\b",quote,re.I)
+    selection=re.search(r"\b(?:I (?:would like|choose|prefer|confirm|will take)|I[’'](?:d like|ll take)|book|confirm|schedule|works for me)\b",quote,re.I)
+    if not (appointment and selection):
+        return False
+    # The quote itself, rather than the model's value or historical profile,
+    # must carry the financial meaning before it can replace a saved fact.
+    signals=(r'\b(?:budget|USD|EUR|GBP|PEN|MXN|dollars?|soles|euros?|afford|spend|price|cost)\b|[$€£]'
+             if pref.key=='budget' else
+             r'\b(?:cash|financ\w*|mortgage|loan|credit|payment|pay|paying|paid|outright|contado)\b')
+    return not re.search(signals,quote,re.I)
+
+
 def issues_for(value, text, *, appointment_offer=False):
     issues=[]
     def add(path,code,message):issues.append({'location':path,'type':code,'message':message})
+    for i,pref in enumerate(value.preferences):
+        if unrelated_financial_evidence(pref):
+            add(['preferences',i],'financial_preference_unrelated_evidence',
+                'Appointment selection/confirmation does not declare budget or financing. Omit this preference and retain the saved financial facts.')
     requests=value.requests
     # Only unambiguous first-person declarations, not questions or hypotheticals.
     cash=re.search(r'\b(?:I (?:can|will) pay (?:in )?cash|paying cash|I have cash available)\b',text,re.I)

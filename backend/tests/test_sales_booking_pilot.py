@@ -102,6 +102,11 @@ def test_scripted_driver_reaches_real_coordinator_booking(lab,monkeypatch,scenar
                     data['requests'][0]['reference_id']='p'
                 if omit_refs and 'paying cash' in text:data['preferences']=[p for p in data['preferences'] if p['key']==('budget' if seen[text]==1 else 'financing')]
                 value=Understanding.model_validate(data)
+            if omit_refs and ('first appointment:' in text or 'second appointment:' in text or text=='Yes'):
+                data=value.model_dump()
+                data['preferences']=[{'key':'budget','value':'900000 USD','evidence':text,'status':'declared'},
+                    {'key':'financing','value':'cash','evidence':text,'status':'declared'}]
+                value=Understanding.model_validate(data)
             if text.startswith('Understood') and omit_refs:
                 data=value.model_dump();data['empathy']={'kind':'frustrated','evidence':text}
                 value=Understanding.model_validate(data)
@@ -125,6 +130,11 @@ def test_scripted_driver_reaches_real_coordinator_booking(lab,monkeypatch,scenar
     if omit_refs:
         attempts=result['turns'][0]['interpretation_attempts']
         assert len(attempts)==2 and attempts[0]['validation_issues'][0]['type']=='payment_declaration_missing'
+        if scenario in BOOKING_CASES:
+            selection=next(r for r in result['turns'] if r['action'] in {'select','reject_first'})
+            assert selection['understanding']['preferences']==[]
+            normalizations=selection['interpretation_attempts'][-1]['normalizations']
+            assert {n['field'] for n in normalizations if n['action']=='omit_unrelated_financial_preference'}=={'budget','financing'}
         if scenario not in BOOKING_CASES:
             acknowledgement=next(r for r in result['turns'] if r['action']=='acknowledge_unavailable')
             assert acknowledgement['understanding']['empathy'] is None

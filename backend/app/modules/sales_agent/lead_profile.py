@@ -210,7 +210,13 @@ def capture(db,scope,understanding,message_id,*,selected_property=None,selected_
         if previous.get('status')!='unknown' and previous.get('id') not in {r.get('id') for r in history}:history.append(previous)
         item['supersedes']=previous.get('id') if previous.get('status')!='unknown' else None
         current[field]=item
+    from .understanding_semantics import unrelated_financial_evidence
+    latest=scoped_messages_query(db,conversation).filter(SalesMessage.direction=='outbound',
+        SalesMessage.created_at<=message.created_at).order_by(SalesMessage.created_at.desc(),SalesMessage.id.desc()).first()
+    confirming=bool(latest and (latest.metadata_json or {}).get('booking_confirmation'))
     for pref in understanding.preferences:
+        # Defense at the write boundary, including direct/injected callers.
+        if unrelated_financial_evidence(pref,appointment_confirmation=confirming):continue
         # Exact evidence is authoritative; model-normalized values never replace it.
         put(PREFERENCE_KEYS[pref.key],pref.evidence,pref.evidence,status=pref.status)
         if pref.key in {'buyer_type','motivation'} and pref.value in BUYER_SEGMENTS and pref.status=='declared' and own_statement(pref.evidence,own):
