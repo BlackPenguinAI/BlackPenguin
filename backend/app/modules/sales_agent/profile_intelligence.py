@@ -53,7 +53,10 @@ def budget_cap(profile):
     if isinstance(raw,dict):
         amount=numeric(raw.get('maximum',raw.get('max',raw.get('amount'))))
         currency=raw.get('currency')
-    elif isinstance(raw,str) and not NEGATIVE.search(raw):
+    elif isinstance(raw,str) and not NEGATIVE.search(re.sub(
+        r"\b(?:I\s+)?(?:do not|don't|no)\s+(?:need|require)\s+(?:any\s+)?financing\b",'',raw,flags=re.I)):
+        from .commercial_policy import down_payment_only
+        if down_payment_only(raw):return None
         matches=list(re.finditer(r'\b([A-Z]{3})\s*([0-9][0-9,]*(?:\.[0-9]+)?)\b|\b([0-9][0-9,]*(?:\.[0-9]+)?)\s*([A-Z]{3})\b',raw,re.I))
         if len(matches)==1 and len(re.findall(r'\d[\d,]*(?:\.\d+)?',raw))==1:
             match=matches[0];currency=(match[1] or match[4]);amount=numeric(match[2] or match[3])

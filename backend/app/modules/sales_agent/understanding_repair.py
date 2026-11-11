@@ -99,8 +99,9 @@ def omit_declaration_questions(value, issues):
 def omit_unrelated_financial_preferences(value, *, appointment_confirmation=False):
     """Remove only appointment-backed financial claims, with an audit receipt."""
     from .understanding_semantics import unrelated_financial_evidence
+    from .commercial_policy import down_payment_only
     bad=[p for p in value.preferences if unrelated_financial_evidence(p,appointment_confirmation=appointment_confirmation)]
     if not bad:return value,[]
     return value.model_copy(update={'preferences':[p for p in value.preferences if p not in bad]}),[
         {'field':p.key,'action':'omit_unrelated_financial_preference',
-         'reason':'financial_preference_unrelated_evidence'} for p in bad]
+         'reason':'down_payment_as_total_budget' if p.key=='budget' and down_payment_only(p.evidence) else 'financial_preference_unrelated_evidence'} for p in bad]

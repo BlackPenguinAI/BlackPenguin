@@ -11,6 +11,8 @@ def unrelated_financial_evidence(pref, *, appointment_confirmation=False):
     if pref.key not in {'budget', 'financing'}:
         return False
     quote=pref.evidence
+    from .commercial_policy import down_payment_only
+    if pref.key=='budget' and down_payment_only(quote):return True
     if appointment_confirmation and re.fullmatch(r"\s*(?:yes|yes please|confirmed|confirm|please do|go ahead|book it)[.!]?\s*",quote,re.I):
         return True
     appointment=re.search(r"\b(?:appointment|viewing|visit)\b",quote,re.I)
@@ -30,7 +32,8 @@ def issues_for(value, text, *, appointment_offer=False):
     def add(path,code,message):issues.append({'location':path,'type':code,'message':message})
     for i,pref in enumerate(value.preferences):
         if unrelated_financial_evidence(pref):
-            add(['preferences',i],'financial_preference_unrelated_evidence',
+            from .commercial_policy import down_payment_only
+            add(['preferences',i],'down_payment_as_total_budget' if pref.key=='budget' and down_payment_only(pref.evidence) else 'financial_preference_unrelated_evidence',
                 'Appointment selection/confirmation does not declare budget or financing. Omit this preference and retain the saved financial facts.')
     requests=value.requests
     # Only unambiguous first-person declarations, not questions or hypotheticals.

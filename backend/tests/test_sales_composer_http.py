@@ -52,10 +52,13 @@ def compose(monkeypatch, infer):
     monkeypatch.setattr(composer, 'resolve', lambda *a: {'model':'openai/gpt-4o-mini','source':{},'selection':{}})
     monkeypatch.setattr(turn_memory, 'build', lambda *a, **kw: {'appointments':{'active':{'count':0}}})
     monkeypatch.setattr(composer, 'select_continuations', lambda **kw: [{'id':'none','text':'','metadata':{}}])
+    from app.modules.sales_agent.understanding_contract import DialogueState
+    from test_sales_active_integration import understanding
+    from app.modules.sales_crm.models import Lead
     return asyncio.run(composer.compose(None, None, inbound=NS(id='synthetic',content='Listed price?'),
-        outcome=NS(state=NS(last_understanding=NS(requests=[],empathy=None)),results=[],plan={}),
+        outcome=NS(state=DialogueState(last_understanding=understanding('Listed price?')),results=[],plan={}),
         draft=NS(text='Listed price: 1,394,900 USD.'),commercial={'confirmed_project_facts':{},'property_types':[]},
-        lead=None,metadata={},previous_meta={},holds=[],channel='whatsapp',infer=infer))
+        lead=Lead(meta_form_data={},lead_profile_data={}),metadata={},previous_meta={},holds=[],channel='whatsapp',infer=infer))
 
 
 def test_real_http_boundary_rejects_legacy_schema_and_accepts_fixed_composition(monkeypatch):

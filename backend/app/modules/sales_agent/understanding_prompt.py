@@ -62,7 +62,7 @@ def prompt_snapshot(agent):
 
 
 def next_prompt_snapshot(guidance):
-    return {'version':'sales-understanding-prompt/2.18','system':SYSTEM_PROMPT+'''
+    return {'version':'sales-understanding-prompt/2.19','system':SYSTEM_PROMPT+'''
 SA-09: classify directed personal harassment semantically, including paraphrases and typos,
 with an exact current quotation. Criticizing prices, layouts or service and expressing
 frustration is not personal harassment. Quoted, reported, hypothetical and negated abuse
@@ -188,6 +188,15 @@ time_from_evidence/time_until_evidence (clock text), time_relation (any/exact/af
 range/morning/afternoon/evening), timezone_evidence (explicit IANA zone), duration_evidence
 (explicit minute duration). The backend normalizes and validates these against its current time.
 No timing fields are implied by history; persisted preferences are supplied separately.
+Commercial intent: this agent provides approved information and schedules in-person visits;
+it never takes payments, reserves/holds a property for purchase, or approves financing.
+Cash, paying cash, cash available and buying outright mean declared purchase without financing,
+not physical banknotes, verified funds or a payment transaction. Never invent a financing question
+from that declaration. A financing policy question remains a request about financing.
+A down payment, deposit or initial contribution is NOT the total purchase budget. Do not put
+that amount in a budget preference. If total budget is absent, leave it absent. Do not classify
+a request to reserve a property or pay for it as an appointment request; use financing/pricing
+for the informational answer unless an in-person visit is independently requested.
 A slot selection or booking confirmation does not repeat or change budget/financing.
 Never attach an appointment quote to a historical financial value. Omit unchanged preferences;
 the backend retains them. For explicit financial changes in a mixed message, quote the

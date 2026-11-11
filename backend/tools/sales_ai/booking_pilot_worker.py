@@ -22,28 +22,34 @@ def run(options_path, output):
     from .evaluation_worker import save_reports
     from .booking_pilot import CASES, evaluate_case, team
     path=Path(options_path);output=Path(output);options=json.loads(path.read_text())
+    commercial=options.get('suite')=='commercial-point'
+    if commercial:
+        from .commercial_pilot import CASES,evaluate_case,prepare
+
     if engine.dialect.name!='sqlite' or not engine.url.database or Path(engine.url.database).parent!=path.parent:
         raise PermissionError('Booking iteration requires its private SQLite database.')
     Base.metadata.create_all(engine)
     credential=options['credential'];budget=Budget(options['max_calls'])
-    report={'version':'sales-booking-point/1.0','synthetic_only':True,'production_database_writes':0,
+    report={'version':'sales-commercial-point/1.0' if commercial else 'sales-booking-point/1.0','synthetic_only':True,'production_database_writes':0,
         'lead_contacts':0,'provider_calls':0,'lead_model':None,'judge_model':None,'commit':settings.APP_COMMIT_SHA,'cases':[],
         'limitations':['Google Calendar integration and transport delivery are not exercised.',
             'Simulation selects the first eligible seller, not the production round-robin cursor.',
             'SQLite does not verify PostgreSQL concurrent-booking locks.',
             'Public availability wording requires human review. No notification is scheduled.',
-            'The six focused cases do not represent all eight buyer segments.']}
+            'Focused cases do not represent all eight buyer segments.']}
     def only_local(connection,*args):
         if connection.engine is not engine:raise PermissionError('Non-lab database access blocked.')
     event.listen(Engine,'before_cursor_execute',only_local)
     try:
         with SessionLocal() as db:
-            with guard(Budget(0)):manifest=seed(db,output/'materials')
+            with guard(Budget(0)):
+                manifest=seed(db,output/'materials')
+                if commercial:prepare(db,manifest)
             report.update(company_name=manifest['company_name'],company_id=manifest['company_id'],project_count=3,property_count=6,
                 project_name=manifest['projects'][0]['name'])
             if options['prepare_only']:
                 report['team']=team(db,manifest,'all_projects',datetime.utcnow())
-                report.update(status='PREPARED',model_quality_evaluated=False,scenario_count=6,scenarios=list(CASES))
+                report.update(status='PREPARED',model_quality_evaluated=False,scenario_count=len(CASES),scenarios=list(CASES))
             else:
                 db.add(AIConfiguration(id=credential['id'],company_id=None,openrouter_api_key=credential['key'],agent_ventas=credential['pack']))
                 db.add(PromptVersion(id=credential['version_id'],company_id=None,agent_key='sales',version_number=credential['version_number'],

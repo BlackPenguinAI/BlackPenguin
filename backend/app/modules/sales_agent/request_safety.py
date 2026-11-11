@@ -28,6 +28,9 @@ def explicit_reversal(evidence):
 def apply_vetoes(understanding, text):
     from .understanding_contract import Constraint
     constraints=list(understanding.constraints)
+    from .commercial_policy import only_property_transaction
+    if only_property_transaction(text):
+        constraints.append(Constraint(topic='appointment',subject=None,scope='turn',evidence=text[:2000]))
     for topic,subject,key in [('appointment',None,'appointment'),('materials','photos','photos'),('materials','brochure','brochure')]:
         if prohibited(text,key):
             constraint=Constraint(topic=topic,subject=subject,scope='until_explicit_change' if topic=='appointment' else 'turn',evidence=text[:2000])

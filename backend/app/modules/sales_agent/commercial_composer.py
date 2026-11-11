@@ -279,6 +279,14 @@ def select_continuations(*, outcome, commercial, metadata, previous_meta, lead, 
     if metadata.get('appointment_offer') or metadata.get('location_offer') or metadata.get('meeting_id') or metadata.get('appointment_query') or metadata.get('booking_confirmation') or metadata.get('booking_property_question') or metadata.get('reschedule_confirmation') or metadata.get('reschedule_meeting_offer') or metadata.get('reschedule_context_question'):
         add('none', '')  # Backend operation details include their own continuation, if any.
         return choices
+    commercial_policy=metadata.get('commercial_policy') or {}
+    if commercial_policy.get('closing'):
+        closing=commercial_policy['closing']
+        blocked='appointment' in holds or booked or any(c.topic.value=='appointment' for c in outcome.state.constraints)
+        blocked |= any(c.topic.value=='appointment' and (c.binding_status=='unresolved' or not c.property_id or c.property_id==outcome.state.selected_property_type_id) for c in outcome.state.property_constraints)
+        if blocked and 'visit options' in closing:closing='Is there another property question I can help with?'
+        add('commercial_next',closing)
+        return choices
     types = commercial['property_types']
     selected = outcome.state.selected_property_type_id
     topics = {r.topic.value for r in u.requests if r.polarity == 'request'}
@@ -412,6 +420,17 @@ async def compose(db, scope, *, inbound, outcome, draft, commercial, lead, metad
                 text='The approved project information highlights: '+item.strip()
                 blocks.append({'id':'e'+str(len(blocks)),'required':False,
                     'wordings':{'direct':text,'conversational':text},'source':'confirmed_project_facts.'+field})
+    from .commercial_policy import guidance as commercial_guidance
+    commercial_policy=commercial_guidance(text=inbound.content,u=outcome.state.last_understanding,
+        commercial=commercial,lead=lead,selected=outcome.state.selected_unit_id or outcome.state.selected_property_type_id,
+        holds=set(holds)|{c.topic.value for c in outcome.state.constraints}|{
+            c.topic.value for c in outcome.state.property_constraints if c.binding_status=='unresolved' or not c.property_id or c.property_id==outcome.state.selected_property_type_id})
+    metadata['commercial_policy']={k:v for k,v in commercial_policy.items() if k!='blocks'}
+    if any(r.topic.value=='financing' and r.polarity=='request' for r in outcome.state.last_understanding.requests) and 'financing' not in holds:
+        blocks=[b for b in blocks if not b['wordings']['direct'].startswith('Financing:')]
+    for statement in commercial_policy['blocks']:
+        blocks.append({'id':'commercial'+str(len(blocks)),'required':True,
+            'wordings':dict.fromkeys(('direct','conversational','natural'),statement),'source':commercial_policy['version']})
     memory = build(db, scope, inbound_message_id=inbound.id)
     choices = select_continuations(outcome=outcome, commercial=commercial, metadata=metadata,
         previous_meta=previous_meta, lead=lead, holds=holds, priority=priority, priority_meta=priority_meta,
