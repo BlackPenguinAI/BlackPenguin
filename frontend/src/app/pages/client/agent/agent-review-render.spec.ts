@@ -50,4 +50,23 @@ describe('Agent review template',()=>{
     expect(element.textContent).toContain('false_positive');
     expect(element.textContent).toContain('Reviewed with lead');
   });
+
+  it('shows a pending contact request without claiming the AI is paused',async()=>{
+    const template=readFileSync('src/app/pages/client/agent/agent.html','utf8');
+    await resolveComponentResources(url=>Promise.resolve(url.includes('agent-context')&&url.endsWith('.html')?readFileSync('src/app/shared/ui/agent-context/agent-context.html','utf8'):url.endsWith('.html')?template:''));
+    await TestBed.configureTestingModule({imports:[AgentComponent],providers:[
+      {provide:HttpClient,useValue:{get:()=>of({chat:{status:'open'},scope_limited:false})}},
+      {provide:ActivatedRoute,useValue:{snapshot:{queryParamMap:{get:()=>null}}}},
+    ]}).overrideComponent(AgentComponent,{set:{template,templateUrl:undefined,styles:[],styleUrls:[]}}).compileComponents();
+    vi.spyOn(AgentComponent.prototype,'ngOnInit').mockImplementation(()=>undefined);
+    const fixture=TestBed.createComponent(AgentComponent),component=fixture.componentInstance;
+    component.role='admin';component.setupOpen=false;component.loading=false;
+    component.selected={id:'conversation',lead_name:'Test',phone:'+15550100001',channel:'sms',is_paused:false,
+      intervention_cases:[{id:'request',reason:'HUMAN_CONTACT_REQUEST',reason_label:'Human contact requested',status:'open',evidence:'I still want a human'}]};
+    fixture.detectChanges();await fixture.whenStable();
+    expect(fixture.nativeElement.textContent).toContain('Human contact requested');
+    expect(fixture.nativeElement.querySelector('[aria-label="Conversation pause review"]')).toBeNull();
+    expect(component.openIncident).toBeUndefined();
+  });
+
 });

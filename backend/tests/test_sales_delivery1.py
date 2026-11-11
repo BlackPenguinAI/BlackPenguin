@@ -33,7 +33,7 @@ def test_current_workflow_ignores_old_flags_lists_and_modes(agent, monkeypatch, 
     text = 'Show me property types'
     _, run = agent.turn(text, understanding(text, 'catalog'))
     assert run.status == 'completed' and run.graph_version == ENGINE
-    assert run.prompt_snapshot['version'] == 'sales-understanding-prompt/2.20'
+    assert run.prompt_snapshot['version'] == 'sales-understanding-prompt/2.21'
     assert 'Current approved home' in agent.reply()
     agent.legacy.assert_not_called()
 

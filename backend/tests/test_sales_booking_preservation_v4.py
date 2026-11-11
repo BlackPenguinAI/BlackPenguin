@@ -57,7 +57,7 @@ def test_budget_is_not_an_inventory_question():
 def test_waiting_for_availability_is_not_lack_of_lead_readiness():
     state=NS(wait_context={'id':'wait'},last_understanding=understanding('Thanks','other'))
     text,_=continuation(NS(plan={'pending_topics':['appointment']},state=state,stop_reason='complete'),set())
-    assert 'new viewing times' in text and "when you're ready" not in text
+    assert 'another property question' in text and "when you're ready" not in text
 
 
 

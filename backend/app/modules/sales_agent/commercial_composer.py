@@ -270,6 +270,10 @@ def select_continuations(*, outcome, commercial, metadata, previous_meta, lead, 
     if metadata.get('material_offer'):
         # The caller supplies this as priority; never make an offer invisible.
         raise ValueError('Material proposal needs an explicit continuation.')
+    if metadata.get('wait_result') and u.wait and u.wait.action in {'decline','cancel'}:
+        from .conversation_closing import OTHER_QUESTION
+        add('other_question',OTHER_QUESTION)
+        return choices
     if metadata.get('wait_offer') or metadata.get('wait_result'):
         add('none','')
         return choices
@@ -278,6 +282,15 @@ def select_continuations(*, outcome, commercial, metadata, previous_meta, lead, 
         return choices
     if metadata.get('appointment_offer') or metadata.get('location_offer') or metadata.get('meeting_id') or metadata.get('appointment_query') or metadata.get('booking_confirmation') or metadata.get('booking_property_question') or metadata.get('reschedule_confirmation') or metadata.get('reschedule_meeting_offer') or metadata.get('reschedule_context_question'):
         add('none', '')  # Backend operation details include their own continuation, if any.
+        return choices
+    from .conversation_closing import closing as conversation_closing
+    terminal=conversation_closing(u)
+    if terminal:
+        add('conversation_closing',terminal)
+        return choices
+    if metadata.get('human_contact_pending') and not u.permits('appointment'):
+        from .conversation_closing import OTHER_QUESTION
+        add('additional_help',OTHER_QUESTION)
         return choices
     commercial_policy=metadata.get('commercial_policy') or {}
     if commercial_policy.get('closing'):
@@ -420,6 +433,9 @@ async def compose(db, scope, *, inbound, outcome, draft, commercial, lead, metad
                 text='The approved project information highlights: '+item.strip()
                 blocks.append({'id':'e'+str(len(blocks)),'required':False,
                     'wordings':{'direct':text,'conversational':text},'source':'confirmed_project_facts.'+field})
+    from .human_contact import cases as contact_cases
+    pending_contact=contact_cases(db,scope).filter_by(status='open').first() if db is not None and scope is not None else None
+    if pending_contact:metadata.update(human_contact_pending=True,human_contact_request_id=pending_contact.id)
     from .commercial_policy import guidance as commercial_guidance
     commercial_policy=commercial_guidance(text=inbound.content,u=outcome.state.last_understanding,
         commercial=commercial,lead=lead,selected=outcome.state.selected_unit_id or outcome.state.selected_property_type_id,

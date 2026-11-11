@@ -49,7 +49,7 @@ def prepare(db,manifest):
         entry['published_payment_methods']=db.get(Project,entry['id']).profile.published_snapshot['data']['payment_methods']
 
 
-async def evaluate_case(db,manifest,scenario,budget,max_turns):
+async def evaluate_case(db,manifest,scenario,budget,max_turns,*,scenarios=None,extra_checks=None):
     import re
     from sqlalchemy.orm import Session
     from app.modules.sales_crm.models import Lead,Meeting
@@ -59,10 +59,11 @@ async def evaluate_case(db,manifest,scenario,budget,max_turns):
     from app.modules.sales_agent.lead_profile import resolve
     from app.modules.sales_agent.profile_intelligence import budget_cap
     from .evaluation_checks import check,internal_process_narration
-    project_index,script,expected=SCENARIOS[scenario]
+    scripts=scenarios or SCENARIOS
+    project_index,script,expected=scripts[scenario]
     project=manifest['projects'][project_index]
     lead=Lead(company_id=manifest['company_id'],project_id=project['id'],full_name='Scripted '+scenario,
-        phone='+1555020'+str(CASES.index(scenario)+1000),platform='evaluation',is_demo=True,is_test=True,
+        phone='+1555020'+str(list(scripts).index(scenario)+1000),platform='evaluation',is_demo=True,is_test=True,
         consent_status='granted_simulation',preferred_channel='simulation',agent_status='simulation',pipeline_stage='S01_RESEARCH')
     db.add(lead);db.commit();rows=[];clock=datetime.utcnow()
     for index,message in enumerate(script[:max_turns]):
@@ -84,7 +85,7 @@ async def evaluate_case(db,manifest,scenario,budget,max_turns):
             check('no_payment_or_property_reservation_receipt',not bool(re.search(r'your (?:property|unit) (?:is|has been) (?:reserved|held)|payment (?:received|accepted)',reply,re.I))),
             check('no_provider_outbox',db.query(OutboundMessage).count()==0)]
         checks.extend(quality_checks(message,reply,(run.input_snapshot or {}).get('understanding')))
-        if index==0:
+        if index==0 and scenario in SCENARIOS:
             decision=(metadata.get('commercial_policy') or {}).get('decision')
             if expected!='none':checks.append(check('expected_commercial_outcome',decision==expected))
             if scenario=='down_payment_only':checks.append(check('initial_is_not_total_budget',budget_cap(profile) is None))
@@ -100,6 +101,7 @@ async def evaluate_case(db,manifest,scenario,budget,max_turns):
         rows.append({'turn':index+1,'lead_message':message,'reply':reply,'profile':profile,
             'error_code':run.error_code,'understanding':(run.input_snapshot or {}).get('understanding'),
             'input_trace':run.input_snapshot,'output':run.output_snapshot,'interpretation_attempts':attempts,'checks':checks})
-    return {'case':scenario,'project_id':project['id'],'session_autoflush':db.autoflush,
+        if extra_checks:rows[-1]['checks'].extend(extra_checks(db,lead,rows[-1],index,scenario))
+    return {'case':scenario,'lead_id':lead.id,'project_id':project['id'],'session_autoflush':db.autoflush,
         'profile_read_mode':'new_session_after_commit','turns':rows,
         'checks':[check('script_completed',len(rows)==len(script))],'stop_reason':'script_completed' if len(rows)==len(script) else 'call_or_turn_limit'}

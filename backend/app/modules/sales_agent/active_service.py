@@ -456,11 +456,22 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
             revision,state=save(db,scope,event_key='active-context:'+inbound.id,expected_revision=revision,state=state,
                 metadata={'engine':ENGINE,'workflow_version':'sales-current/1.0','message_id':inbound.id})
             protected=evidenced_pause_reason(inbound.content)
-            if next_enabled and not protected:
+            if next_enabled and protected in {None,'HUMAN_REQUESTED'}:
                 from .language_policy import credential_request
                 if credential_request(inbound.content):protected='SECURITY'
             if previous_meta.get('control_confirmation')=='human' and live._affirmative_slot_reply(inbound.content):
                 protected='HUMAN_REQUESTED'
+            if next_enabled and protected=='HUMAN_REQUESTED':
+                from app.modules.governance.services import request_attribution
+                import re
+                if any(evidenced_pause_reason(clause)=='SECURITY' for clause in re.split(r'[.!?;\n]',request_attribution(inbound.content)['current_text'])):protected='SECURITY'
+            human_step=None;pure_human=False;human_fallback=False
+            if next_enabled and not exact_stop and protected in {None,'HUMAN_REQUESTED'} and not hard_moderation:
+                from .human_contact import stage,mixed_question
+                human_step=stage(db,scope,conversation,inbound.content,previous_meta)
+                if human_step:
+                    protected=None
+                    pure_human=not mixed_question(inbound.content)
             if hard_moderation:protected=hard_moderation['reason']
             if protected and not next_enabled and dismissed_trigger(lead,conversation.id,protected,inbound.content):
                 protected=None
@@ -468,21 +479,30 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
             commercial=build_commercial_context(db,project=project,company_id=scope.company_id,lead_id=scope.lead_id,channel=conversation.channel)
             approved_policy=policy_context(db,scope,commercial['confirmed_project_facts'])
             action_holds=compliance_action_holds(approved_policy)
-            if protected or exact_stop:
+            from .conversation_closing import terminal_text
+            operation_context=any(previous_meta.get(k) for k in ('booking_confirmation','reschedule_confirmation','reschedule_meeting_offer','cancellation_confirmation','cancellation_meeting_offer','cancellation_followup'))
+            terminal_only=next_enabled and not protected and not human_step and not operation_context and terminal_text(inbound.content)
+            if protected or exact_stop or (human_step and pure_human) or terminal_only:
                 u=Understanding.model_validate(dict(version='sales-understanding/1.0',requests=[dict(id='protected',
-                    topic='opt_out' if exact_stop else 'human',polarity='request',evidence=inbound.content[:2000])],
+                    topic='opt_out' if exact_stop else 'other' if terminal_only else 'human',polarity='request',evidence=inbound.content[:2000])],
                     all_of=['protected'],alternatives=[],constraints=[],references=[],preferences=[],
                     requires_clarification=False,clarification_question=None,confidence=1.0))
+                if terminal_only:
+                    from .conversation_closing import terminal_understanding
+                    u=terminal_understanding(u,inbound.content)
                 interpreted_revision=revision
             else:
                 interpreted=await asyncio.wait_for(preview(db,scope,inbound_message_id=inbound.id,expected_revision=revision,
                     event_key='active-understanding:'+inbound.id,active=True),timeout=45)
-                if interpreted.status!='accepted':
+                if interpreted.status!='accepted' and not human_step:
                     # Keep the rejected response and request evidence, not just
                     # a generic error snapshot, before composing a safe reply.
                     db.commit()
                     raise ValueError('Understanding could not be validated.')
-                u=_confirmed_offer_understanding(interpreted.state.last_understanding,previous_meta,inbound.content)
+                if interpreted.status!='accepted':
+                    human_fallback=True
+                    u=Understanding.model_validate(dict(version='sales-understanding/1.0',requests=[dict(id='contact',topic='human',polarity='request',evidence=inbound.content[:2000])],all_of=['contact'],alternatives=[],constraints=[],references=[],preferences=[],requires_clarification=False,clarification_question=None,confidence=1.0))
+                else:u=_confirmed_offer_understanding(interpreted.state.last_understanding,previous_meta,inbound.content)
                 if next_enabled:
                     from .first_booking import enrich_understanding
                     u=enrich_understanding(u,previous_meta,inbound.content)
@@ -492,7 +512,9 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
                     u=enrich_cancellation(u,previous_meta,inbound.content)
                     from .wait_service import enrich as enrich_wait
                     u=enrich_wait(u,previous_meta,inbound.content)
-                u=confirmed_controls(u,inbound.content,pause_reason=protected)
+                from .conversation_closing import terminal_understanding
+                u=terminal_understanding(u,inbound.content) if next_enabled and not operation_context else u
+                u=confirmed_controls(u,inbound.content,pause_reason='HUMAN_REQUESTED' if human_step else protected)
                 interpreted_revision=interpreted.revision
             moderation_decision=None
             db.refresh(conversation)
@@ -518,6 +540,12 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
             if next_enabled:
                 from .first_booking import apply_courtesy
                 apply_courtesy(db,conversation,lead,outcome.state)
+                if terminal_text(inbound.content):
+                    from .first_booking import stop_cadence
+                    stop_cadence(db,conversation,lead,outcome.state,'farewell')
+                # Preserve the stopped follow-up date before the fresh permission read
+                # under production autoflush=False; this remains rollbackable.
+                db.flush([lead])
             conversation,lead,project=_current(db,scope,control=exact_stop)  # Manual takeover/consent/permissions win after inference.
             continuity.check_epoch(conversation,run.input_snapshot.get('continuity_epoch'))
             draft=compose(outcome,channel=conversation.channel,style=policy.composition_style)
@@ -534,12 +562,13 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
             text='\n\n'.join(b for b in text.split('\n\n') if not b.startswith('Available material:'))
             metadata={'engine':ENGINE,'workflow_version':'sales-current/1.0','inbound_message_id':inbound.id,'selected_property_type_id':outcome.state.selected_property_type_id}
             if next_enabled:metadata['selected_unit_id']=outcome.state.selected_unit_id
+            if human_fallback:metadata['human_contact_interpretation_fallback']=True
             if moderation_decision:metadata['moderation']=moderation_decision
             metadata['requested_topics']=sorted({r.topic.value for r in u.requests if r.polarity=='request'})
             metadata['policy_holds_at_prepare']=sorted(action_holds)
             if next_enabled:metadata['action_policy']=approved_policy.get('action_policy')
             if next_enabled:metadata['planning']=getattr(outcome,'plan',None)
-            if u.requires_clarification and any(r.topic.value=='human' and r.polarity=='request' for r in u.requests):
+            if not human_step and u.requires_clarification and any(r.topic.value=='human' and r.polarity=='request' for r in u.requests):
                 metadata['control_confirmation']='human'
             actions=[];share_ids=[];delivered=set();extra=[];links=[]
             safe_u=outcome.state.last_understanding
@@ -561,6 +590,15 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
                     from .moderation_models import SalesModerationIncident
                     db.get(SalesModerationIncident,moderation_decision['id']).intervention_case_id=case.id
                 metadata.update(human_intervention_case_id=case.id,control_outcome='handoff',reason=protected,reason_source='verified_current_request')
+            elif terminal_only:
+                from .conversation_closing import GOODBYE
+                text=GOODBYE
+                metadata['conversation_closing']='farewell'
+            elif human_step:
+                from .human_contact import apply as apply_human_contact
+                contact_text,contact_meta=apply_human_contact(db,scope,conversation,lead,outcome,inbound,human_step)
+                metadata.update(contact_meta)
+                text=contact_text
             elif not safe_u.requires_clarification:
                 for task in outcome.state.tasks:
                     if task.source_message_id==inbound.id and restricted(outcome.state,task) and safe_u.permits(task.topic,task.subject):
@@ -671,11 +709,11 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
             if moderation_boundary:
                 from .moderation import WARNING,BOUNDARY,USE_WARNING
                 text=(USE_WARNING if moderation_decision['category']=='unauthorized_use' else WARNING) if moderation_decision['disposition']=='warn' else BOUNDARY
-            if next_enabled and not exact_stop and not protected and not moderation_boundary:
+            if next_enabled and not exact_stop and not protected and not moderation_boundary and not (human_step and pure_human) and not terminal_only:
                 from .commercial_composer import compose as compose_commercial
                 # Replace stacked catalog/material/qualification questions with
                 # one continuation authorized against the current results.
-                priority=reference_question or material_question
+                priority=contact_text if human_step else reference_question or material_question
                 priority_meta=reference_metadata if reference_question else {}
                 if reference_question and metadata.get('material_offer'):
                     metadata.pop('material_offer',None)

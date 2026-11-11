@@ -900,7 +900,7 @@ export class AgentComponent implements OnInit, OnDestroy {
   }
 
   get openIncident(): any {
-    return this.selected?.intervention_cases?.find((item: any) => item.status === 'open');
+    return this.selected?.intervention_cases?.find((item: any) => item.status === 'open' && item.reason !== 'HUMAN_CONTACT_REQUEST');
   }
 
   get canResume(): boolean {

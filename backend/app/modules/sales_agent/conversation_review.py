@@ -40,7 +40,7 @@ def review_snapshot(db, conversation):
     notice = (output.get('metadata') or {}).get('review_notice')
     from .monitor import redact
     return redact({
-        'intervention_cases':[{'id':c.id,'reason':c.reason,'evidence':c.evidence,'confidence':c.confidence,
+        'intervention_cases':[{'id':c.id,'reason':c.reason,'reason_label':'Human contact requested' if c.reason=='HUMAN_CONTACT_REQUEST' else c.reason,'evidence':c.evidence,'confidence':c.confidence,
             'status':c.status,'created_at':c.created_at,'resolved_at':c.resolved_at,
             'resolved_by_user_id':c.resolved_by_user_id,'resolution':resolutions.get(c.id)} for c in cases],
         'processing_issue':issue,'review_notice':notice,

@@ -2,6 +2,9 @@
 
 
 def continuation(outcome,holds):
+    u=outcome.state.last_understanding
+    if u and ((u.visit and u.visit.action=='decline') or (u.courtesy and u.courtesy.kind=='decline') or (any(c.topic.value=='appointment' for c in u.constraints) and not any(r.polarity=='request' and r.topic.value not in {'other','appointment'} for r in u.requests))):return '',{}
+    if u and u.courtesy and u.courtesy.kind=='farewell' and not any(r.polarity=='request' and r.topic.value!='other' for r in u.requests):return '',{}
     plan=getattr(outcome,'plan',None) or {}
     questions=plan.get('questions') or []
     if questions:
@@ -26,6 +29,6 @@ def continuation(outcome,holds):
         return text,{}
     if 'appointment' in plan.get('pending_topics',[]) and not outcome.state.last_understanding.permits('appointment'):
         if getattr(outcome.state,"wait_context",None):
-            return "You can ask me to check for new viewing times later.",{}
+            return "Is there another property question I can help with? If not, thank you for your interest and have a good day.",{}
         return "We can return to arranging your visit when you're ready.",{}
     return '',{}

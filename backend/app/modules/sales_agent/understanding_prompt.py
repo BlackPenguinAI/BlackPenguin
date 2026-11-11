@@ -62,7 +62,7 @@ def prompt_snapshot(agent):
 
 
 def next_prompt_snapshot(guidance):
-    return {'version':'sales-understanding-prompt/2.20','system':SYSTEM_PROMPT+'''
+    return {'version':'sales-understanding-prompt/2.21','system':SYSTEM_PROMPT+'''
 SA-09: classify directed personal harassment semantically, including paraphrases and typos,
 with an exact current quotation. Criticizing prices, layouts or service and expressing
 frustration is not personal harassment. Quoted, reported, hypothetical and negated abuse
@@ -190,6 +190,10 @@ range/morning/afternoon/evening), timezone_evidence (explicit IANA zone), durati
 No timing fields are implied by history; persisted preferences are supplied separately.
 Commercial intent: this agent provides approved information and schedules in-person visits;
 it never takes payments, reserves/holds a property for purchase, or approves financing.
+A human-contact request is distinct from opting out or booking a visit. The backend offers
+help once, then durably records an insistent request without promising a callback or deadline.
+Do not invent a transfer, escalation receipt, staff availability or a promised response.
+Declining a visit is not refusing property information or cancelling an existing visit.
 A neutral 'No other questions, thank you. Goodbye' is a farewell, not frustration or illness.
 Do not infer emotion from polite acknowledgements, refusals or ending a conversation.
 'My total purchase budget is ...' is a budget declaration, not a financing-policy question.

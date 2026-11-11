@@ -22,15 +22,18 @@ def run(options_path, output):
     from .evaluation_worker import save_reports
     from .booking_pilot import CASES, evaluate_case, team
     path=Path(options_path);output=Path(output);options=json.loads(path.read_text())
+    closing=options.get('suite')=='closing-point'
     commercial=options.get('suite')=='commercial-point'
     if commercial:
         from .commercial_pilot import CASES,evaluate_case,prepare
 
+    if closing:
+        from .closing_pilot import CASES,evaluate_case
     if engine.dialect.name!='sqlite' or not engine.url.database or Path(engine.url.database).parent!=path.parent:
         raise PermissionError('Booking iteration requires its private SQLite database.')
     Base.metadata.create_all(engine)
     credential=options['credential'];budget=Budget(options['max_calls'])
-    report={'version':'sales-commercial-point/1.0' if commercial else 'sales-booking-point/1.0','synthetic_only':True,'production_database_writes':0,
+    report={'version':'sales-closing-point/1.0' if closing else 'sales-commercial-point/1.0' if commercial else 'sales-booking-point/1.0','synthetic_only':True,'production_database_writes':0,
         'lead_contacts':0,'provider_calls':0,'lead_model':None,'judge_model':None,'commit':settings.APP_COMMIT_SHA,'cases':[],
         'limitations':['Google Calendar integration and transport delivery are not exercised.',
             'Simulation selects the first eligible seller, not the production round-robin cursor.',
@@ -48,7 +51,7 @@ def run(options_path, output):
             report.update(company_name=manifest['company_name'],company_id=manifest['company_id'],project_count=3,property_count=6,
                 project_name=manifest['projects'][0]['name'])
             if options['prepare_only']:
-                report['team']=team(db,manifest,'all_projects',datetime.utcnow())
+                report['team']=[] if closing else team(db,manifest,'all_projects',datetime.utcnow())
                 report.update(status='PREPARED',model_quality_evaluated=False,scenario_count=len(CASES),scenarios=list(CASES))
             else:
                 db.add(AIConfiguration(id=credential['id'],company_id=None,openrouter_api_key=credential['key'],agent_ventas=credential['pack']))
