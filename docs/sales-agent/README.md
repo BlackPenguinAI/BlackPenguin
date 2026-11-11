@@ -69,8 +69,6 @@ sequenceDiagram
 
 ### Estructura de orquestación: qué está fijo y qué afinamos
 
-**Precisión de nombres.** El código importa **LangGraph**, del ecosistema LangChain, y fija `langgraph==1.2.11`. No se encontró una cadena de ventas implementada mediante llamadas directas a LangChain: las llamadas al modelo pasan por nuestro cliente HTTP de OpenRouter. No son nombres intercambiables del modelo ni del motor.
-
 **Grafo conservado en el repositorio.** `graph.py` construye `StateGraph(SalesAgentState)`, versión `sales-turns-v5`, con estos nodos y conexiones. La rama corta el flujo cuando la validación inicial registra una infracción:
 
 ```mermaid
