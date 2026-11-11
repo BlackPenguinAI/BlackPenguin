@@ -1,5 +1,5 @@
 {
-  "source": "backend-junit.xml, production pipeline b84dda7, 2026-11-10",
+  "source": "backend-junit.xml, production pipeline b84dda7, 2026-11-10; compact battery local timing, 2026-11-11",
   "durations_seconds": {
     "company_onboarding/test_completion_and_contract.py": 0.153,
     "company_onboarding/test_multifield_answers.py": 0.094,
@@ -82,6 +82,7 @@
     "test_sales_ai_group_l.py": 2.78,
     "test_sales_assets.py": 1.151,
     "test_sales_booking_postgres.py": 0.002,
+    "test_sales_compact_battery.py": 57.0,
     "test_sales_continuity_gaps.py": 4.183,
     "test_sales_conversation_review.py": 6.708,
     "test_sales_corrections_continuity_2122.py": 5.03,

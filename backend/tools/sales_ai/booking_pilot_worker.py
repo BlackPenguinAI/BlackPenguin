@@ -22,6 +22,7 @@ def run(options_path, output):
     from .evaluation_worker import save_reports
     from .booking_pilot import CASES, evaluate_case, team
     path=Path(options_path);output=Path(output);options=json.loads(path.read_text())
+    compact=options.get('suite')=='compact-battery'
     closing=options.get('suite')=='closing-point'
     commercial=options.get('suite')=='commercial-point'
     if commercial:
@@ -29,17 +30,29 @@ def run(options_path, output):
 
     if closing:
         from .closing_pilot import CASES,evaluate_case
+    if compact:
+        from .compact_battery import CASES,evaluate_case,PERSONAS,SPECS,VERSION,summarize
+        all_cases=CASES
+        selection=options.get('case_selection')
+        if selection and (len(set(selection))!=len(selection) or set(selection)-set(CASES)):
+            raise ValueError('Invalid compact case selection.')
+        CASES=tuple(selection or CASES)
     if engine.dialect.name!='sqlite' or not engine.url.database or Path(engine.url.database).parent!=path.parent:
         raise PermissionError('Booking iteration requires its private SQLite database.')
     Base.metadata.create_all(engine)
     credential=options['credential'];budget=Budget(options['max_calls'])
-    report={'version':'sales-closing-point/1.0' if closing else 'sales-commercial-point/1.0' if commercial else 'sales-booking-point/1.0','synthetic_only':True,'production_database_writes':0,
+    report={'version':VERSION if compact else 'sales-closing-point/1.0' if closing else 'sales-commercial-point/1.0' if commercial else 'sales-booking-point/1.0','synthetic_only':True,'production_database_writes':0,
         'lead_contacts':0,'provider_calls':0,'lead_model':None,'judge_model':None,'commit':settings.APP_COMMIT_SHA,'cases':[],
         'limitations':['Google Calendar integration and transport delivery are not exercised.',
             'Simulation selects the first eligible seller, not the production round-robin cursor.',
             'SQLite does not verify PostgreSQL concurrent-booking locks.',
             'Public availability wording requires human review. No notification is scheduled.',
             'Focused cases do not represent all eight buyer segments.']}
+    if compact:
+        report.update(defined_scenario_count=len(all_cases),selected_cases=list(CASES),is_full_battery=len(CASES)==len(all_cases),
+            expected_bookings=sum(SPECS[k]['goal']=='booked' for k in CASES))
+        report['limitations'][-1]='One explicit-motivation persona per segment plus one unknown; this is not exhaustive segment coverage.'
+        report['limitations'].append('Material links resolve only inside the disposable database. Public HTTP/auth middleware is not exercised; exported links expire with the laboratory.')
     def only_local(connection,*args):
         if connection.engine is not engine:raise PermissionError('Non-lab database access blocked.')
     event.listen(Engine,'before_cursor_execute',only_local)
@@ -51,7 +64,7 @@ def run(options_path, output):
             report.update(company_name=manifest['company_name'],company_id=manifest['company_id'],project_count=3,property_count=6,
                 project_name=manifest['projects'][0]['name'])
             if options['prepare_only']:
-                report['team']=[] if closing else team(db,manifest,'all_projects',datetime.utcnow())
+                report['team']=[] if closing or compact else team(db,manifest,'all_projects',datetime.utcnow())
                 report.update(status='PREPARED',model_quality_evaluated=False,scenario_count=len(CASES),scenarios=list(CASES))
             else:
                 db.add(AIConfiguration(id=credential['id'],company_id=None,openrouter_api_key=credential['key'],agent_ventas=credential['pack']))
@@ -68,9 +81,15 @@ def run(options_path, output):
                         report['cases'].append(case)
                     except Exception as exc:
                         db.rollback();report['cases'].append({'case':scenario,'turns':[],'checks':[check('case_completed',False)],**error_details(exc)})
+                if compact:
+                    report['actual_bookings']=sum(len(c.get('meetings',[])) for c in report['cases'])
+                    report['case_results']=summarize(report['cases'])
+                    report['cost_reporting_complete']=budget.usage['responses_with_cost']==budget.calls
                 report.update(provider_calls=budget.calls,provider_usage=budget.usage,scenario_count=len(report['cases']),
                     checks=[check('no_forbidden_network_attempts',budget.blocked==0)])
                 report=save_reports(output,report,[credential.get('key')])
+            if compact:
+                (output/'scenario-plan.json').write_text(json.dumps({'version':VERSION,'personas':PERSONAS,'scenarios':{k:SPECS[k] for k in CASES}},indent=2,default=encode)+'\n')
             (output/'catalog.json').write_text(json.dumps(manifest,indent=2,default=encode)+'\n')
     except Exception as exc:report.update(status='ERROR',**error_details(exc))
     finally:event.remove(Engine,'before_cursor_execute',only_local)

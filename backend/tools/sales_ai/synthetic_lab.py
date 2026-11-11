@@ -38,13 +38,21 @@ def main():
     parser.add_argument('--output',type=Path,required=True)
     parser.add_argument('--prepare-only',action='store_true',help='No database reads or model calls.')
     parser.add_argument('--configuration-id')
-    parser.add_argument('--suite',choices=['adaptive','booking-point','commercial-point','closing-point'],default='adaptive')
+    parser.add_argument('--suite',choices=['adaptive','booking-point','commercial-point','closing-point','compact-battery'],default='adaptive')
+    parser.add_argument('--cases',nargs='+',help='Compact-battery case IDs for a focused rerun; omitted runs all 16.')
     parser.add_argument('--lead-model',help='Optional OpenRouter model for the synthetic buyer; sales model stays published.')
     parser.add_argument('--max-calls',type=int,default=180,help='Global inference-call cap, not a currency cap.')
     parser.add_argument('--max-turns',type=int,default=6)
     parser.add_argument('--judge',action='store_true',help='Optional advisory LLM judge; also consumes call budget.')
     args=parser.parse_args()
-    if args.suite in {'booking-point','commercial-point','closing-point'} and (args.judge or args.lead_model):parser.error('Focused suites use scripted leads and no judge.')
+    if args.suite in {'booking-point','commercial-point','closing-point','compact-battery'} and (args.judge or args.lead_model):parser.error('Focused suites use scripted leads and no judge.')
+    if args.cases and args.suite!='compact-battery':parser.error('--cases is available only for compact-battery.')
+    if args.suite=='compact-battery':
+        from .compact_battery import CASES
+        if args.cases and (len(set(args.cases))!=len(args.cases) or set(args.cases)-set(CASES)):
+            parser.error('Use distinct compact case IDs: '+', '.join(CASES))
+        if args.max_calls<len(args.cases or CASES) or not 6<=args.max_turns<=8:
+            parser.error('Compact-battery requires at least one call per selected case and 6..8 turns.')
     if args.suite=='booking-point' and (args.max_calls<6 or args.max_turns<4):parser.error('Booking-point requires at least 6 calls and 4 turns.')
     if args.suite=='commercial-point' and args.max_calls<8:parser.error('Commercial-point requires at least 8 calls.')
     if args.suite=='closing-point' and (args.max_calls<8 or args.max_turns<4):parser.error('Closing-point requires at least 8 calls and 4 turns.')
@@ -57,16 +65,16 @@ def main():
         if not args.prepare_only:
             from app.db.postgres import engine
             credential=configuration(engine,args.configuration_id)
-        data={'suite':args.suite,'credential':credential,'prepare_only':args.prepare_only,'lead_model':args.lead_model,
+        data={'suite':args.suite,'case_selection':args.cases,'credential':credential,'prepare_only':args.prepare_only,'lead_model':args.lead_model,
               'max_calls':args.max_calls,'max_turns':args.max_turns,'judge':args.judge}
         path=Path(temporary)/'lab-options.json';path.write_text(json.dumps(data,default=encode));path.chmod(0o600)
         env=child_environment(temporary)
-        completed=subprocess.run([sys.executable,'-m',('tools.sales_ai.booking_pilot_worker' if args.suite in {'booking-point','commercial-point','closing-point'} else 'tools.sales_ai.synthetic_lab_worker'),str(path),str(output)],
+        completed=subprocess.run([sys.executable,'-m',('tools.sales_ai.booking_pilot_worker' if args.suite in {'booking-point','commercial-point','closing-point','compact-battery'} else 'tools.sales_ai.synthetic_lab_worker'),str(path),str(output)],
             cwd=temporary,env=env,timeout=1800,stderr=subprocess.PIPE,text=True)
         summary=output/'summary.json'
         if summary.is_file():
             result=json.loads(summary.read_text())
-            print(json.dumps({k:result.get(k) for k in ('status','company_name','project_count','property_count','scenario_count','provider_calls','summary')},indent=2))
+            print(json.dumps({k:result.get(k) for k in ('status','company_name','project_count','property_count','scenario_count','provider_calls','is_full_battery','expected_bookings','actual_bookings','summary')},indent=2))
             print('Bundle:',str(output/'synthetic-sales-results.zip'))
         else:print(json.dumps({'status':'ERROR','detail':'Worker failed before producing a summary. No raw stderr exposed.'}))
         return completed.returncode if summary.is_file() else 2
