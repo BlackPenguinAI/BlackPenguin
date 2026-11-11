@@ -77,6 +77,10 @@
     "motive": "I want to diversify my investment portfolio by adding real estate.",
     "budget": 400000
   },
+  "original_case": null,
+  "project_name": null,
+  "lead_controller": null,
+  "lead_model": null,
   "company_id": "f0ebe3a5-6c04-5b8e-8cd8-423859aa39d7",
   "project_id": "abf88941-5a70-5a06-a1ed-bca5b42bb90a",
   "property_type_id": "8f7cedb7-5014-5d7b-ac40-ba5ee6f5f40c",

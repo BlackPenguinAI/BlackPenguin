@@ -1,0 +1,118 @@
+{
+  "run": "sales-synthetic-lab-3",
+  "execution_origin": "server_submitted_synthetic_run",
+  "archive": "sales-synthetic-lab-3.zip",
+  "sha256": "2f2228558cb46b490bed6cc9b6d9b214aca8a5db3ff7f36c03e566c4bd438798",
+  "commit": "2943c65c11125786736bf47e1e95bc790410975e",
+  "suite": "adaptive",
+  "cohort": "cdf7ca4454a2",
+  "selected_cases": [
+    "cedar_continuity",
+    "cedar_new_buyer",
+    "cedar_targeted_materials",
+    "harbor_continuity",
+    "harbor_new_buyer",
+    "harbor_targeted_materials",
+    "sierra_continuity",
+    "sierra_new_buyer",
+    "sierra_targeted_materials"
+  ],
+  "model": "openai/gpt-4o-mini",
+  "lead_model": "openai/gpt-4o-mini",
+  "lead_controller_metrics": {
+    "version": "sales-lead-controller/2.0",
+    "cases": 9,
+    "finished": 9,
+    "perceived_resolved_cases": 4,
+    "unresolved_goals": 5,
+    "unassessed_goals": 0,
+    "seller_drafts_rejected": 0,
+    "repeat_drafts_rejected": 5,
+    "goal_drift_drafts_rejected": 0,
+    "fallback_messages": 13,
+    "max_goal_attempts_observed": 2,
+    "role_violations_delivered": 0,
+    "note": "Controller completion and buyer perception do not override existing sales-agent assertions."
+  },
+  "configuration_version": 8,
+  "configuration_sha256": null,
+  "status": "FAIL",
+  "cases": 9,
+  "approved_cases": 4,
+  "turns": 26,
+  "expected_bookings": 0,
+  "actual_bookings": 0,
+  "provider_calls": 91,
+  "cost_usd_recorded": 0.07491450000000001,
+  "cost_complete": false,
+  "checks_summary": {
+    "PASS": 282,
+    "FAIL": 16,
+    "BLOCKED": 0
+  },
+  "case_results": [
+    {
+      "case": "harbor_new_buyer",
+      "status": "aprobado",
+      "meetings": 0,
+      "turns": 2,
+      "failures": 0
+    },
+    {
+      "case": "harbor_targeted_materials",
+      "status": "aprobado",
+      "meetings": 0,
+      "turns": 2,
+      "failures": 0
+    },
+    {
+      "case": "harbor_continuity",
+      "status": "fallido",
+      "meetings": 0,
+      "turns": 4,
+      "failures": 4
+    },
+    {
+      "case": "cedar_new_buyer",
+      "status": "aprobado",
+      "meetings": 0,
+      "turns": 2,
+      "failures": 0
+    },
+    {
+      "case": "cedar_targeted_materials",
+      "status": "fallido",
+      "meetings": 0,
+      "turns": 3,
+      "failures": 3
+    },
+    {
+      "case": "cedar_continuity",
+      "status": "fallido",
+      "meetings": 0,
+      "turns": 4,
+      "failures": 4
+    },
+    {
+      "case": "sierra_new_buyer",
+      "status": "aprobado",
+      "meetings": 0,
+      "turns": 2,
+      "failures": 0
+    },
+    {
+      "case": "sierra_targeted_materials",
+      "status": "fallido",
+      "meetings": 0,
+      "turns": 3,
+      "failures": 2
+    },
+    {
+      "case": "sierra_continuity",
+      "status": "fallido",
+      "meetings": 0,
+      "turns": 4,
+      "failures": 3
+    }
+  ]
+}

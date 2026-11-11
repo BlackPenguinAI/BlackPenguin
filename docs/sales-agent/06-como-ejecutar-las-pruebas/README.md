@@ -2,7 +2,7 @@
 
 # Ejecutar y actualizar el laboratorio
 
-## Repetición puntual tras desplegar Repair 5
+## Reproducir Repair 5 si se necesita una nueva medición
 
 El modelo se lee de la configuración publicada, no de un nombre escrito en el guion. En la última evidencia era `openai/gpt-4o-mini` versión de configuración 8; comprobar el modelo y digest exportados si cambian los settings. Lead simulado: guionado, sin modelo. Juez LLM: ninguno.
 
@@ -52,9 +52,11 @@ python docs/sales-agent/06-como-ejecutar-las-pruebas/herramientas/generar_grafic
 
 Para generar figuras se necesitan `numpy` y `matplotlib` en el entorno documental; no se añadieron dependencias al runtime del agente. Añadir anotaciones con clave `nombre-del-zip-sin-extension:caso`; el importador las conserva. Antes de publicar nuevos archivos, revisar que todos los datos sean ficticios y que la etiqueta humana no se confunda con una evaluación automática. Esta exportación no es un importador de datos reales de clientes. El importador actualiza JSON, CSV y resúmenes por corrida; al incorporar corridas nuevas también hay que actualizar el texto, las tablas e índices Markdown y su revisión humana. Los IDs de recursos pueden cambiar al regenerar fixtures; siempre usar las relaciones del mismo snapshot.
 
-## Qué falta después de esta iteración
+## Qué falta tras recibir Repair 5
 
-1. Repetir los tres casos con el mismo modelo/configuración para comprobar el alcance y el compositor.
-2. Si pasan y la lectura humana es favorable, ampliar a los otros escenarios conservando denominadores.
-3. Probar transporte real y calendario por separado, con su autorización y configuración correspondientes.
-4. Diseñar evaluación de inactividad prolongada, notificación de nuevos slots y cancelación/reagendamiento antes de afirmar cobertura sobre ellos.
+1. Corregir el falso positivo del check de alcance y resolver el cambio explícito de propiedad con fotos; no está implementado en la entrega documental.
+2. Añadir variantes y volver a ejecutar los tres casos tras esa corrección del motor.
+3. Ampliar escenarios solo cuando pasen y la revisión humana sea favorable.
+4. Evaluar transporte/calendario, inactividad prolongada, aviso de nuevos slots y cancelación/reagendamiento por separado.
+
+La guía completa y el diagnóstico de la última corrida están [en el README principal](../README.md). Una consolidación de documentación no requiere una llamada pagada al modelo.

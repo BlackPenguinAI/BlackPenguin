@@ -1,8 +1,8 @@
-[Volver a conversaciones](../README.md)
+[Volver a la guía completa](../../README.md#conversaciones-ejecutadas-en-el-servidor) · [Índice de conversaciones](../README.md)
 
 # Funcionaron
 
-La etiqueta automática corresponde a los controles vigentes en la corrida original; revisión humana se muestra por separado.
+La etiqueta automática corresponde a los controles originales de cada corrida; la revisión humana se muestra por separado. No se reetiquetan los resultados históricos.
 
 | Caso | Corrida | Automático | Revisión humana | JSON |
 |---|---|---|---|---|
@@ -41,3 +41,10 @@ La etiqueta automática corresponde a los controles vigentes en la corrida origi
 | move_up_B | sales-compact-repair-3 | aprobado | revisado-favorable | [Abrir](cambio-de-propiedad-fotos-y-despedida__move-up-b__sales-compact-repair-3__aprobado.json) |
 | first_time_A | sales-compact-repair-4 | aprobado | revisado-favorable | [Abrir](primera-compra-pdf-y-visita__first-time-a__sales-compact-repair-4__aprobado.json) |
 | unknown_A | sales-compact-repair-4 | aprobado | revisado-favorable | [Abrir](visita-sin-segmento__unknown-a__sales-compact-repair-4__aprobado.json) |
+| first_time_A | sales-compact-repair-5 | aprobado | revisado-favorable | [Abrir](primera-compra-pdf-y-visita__first-time-a__sales-compact-repair-5__aprobado.json) |
+| unknown_A | sales-compact-repair-5 | aprobado | revisado-favorable | [Abrir](visita-sin-segmento__unknown-a__sales-compact-repair-5__aprobado.json) |
+| harbor_targeted_materials | sales-synthetic-lab-2 | aprobado | pending | [Abrir](harbor-targeted-materials__harbor-targeted-materials__sales-synthetic-lab-2__aprobado.json) |
+| harbor_new_buyer | sales-synthetic-lab-3 | aprobado | pending | [Abrir](harbor-new-buyer__harbor-new-buyer__sales-synthetic-lab-3__aprobado.json) |
+| harbor_targeted_materials | sales-synthetic-lab-3 | aprobado | pending | [Abrir](harbor-targeted-materials__harbor-targeted-materials__sales-synthetic-lab-3__aprobado.json) |
+| cedar_new_buyer | sales-synthetic-lab-3 | aprobado | pending | [Abrir](cedar-new-buyer__cedar-new-buyer__sales-synthetic-lab-3__aprobado.json) |
+| sierra_new_buyer | sales-synthetic-lab-3 | aprobado | pending | [Abrir](sierra-new-buyer__sierra-new-buyer__sales-synthetic-lab-3__aprobado.json) |

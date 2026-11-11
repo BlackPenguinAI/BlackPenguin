@@ -77,6 +77,10 @@
     "motive": "I want to downsize from my large home to a smaller home.",
     "budget": 300000
   },
+  "original_case": null,
+  "project_name": null,
+  "lead_controller": null,
+  "lead_model": null,
   "company_id": "f0ebe3a5-6c04-5b8e-8cd8-423859aa39d7",
   "project_id": "abf88941-5a70-5a06-a1ed-bca5b42bb90a",
   "property_type_id": "bb1d7fba-2496-5256-a405-535cd3455066",

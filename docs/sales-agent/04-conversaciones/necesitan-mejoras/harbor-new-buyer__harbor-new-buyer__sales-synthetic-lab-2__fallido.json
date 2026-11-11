@@ -1,0 +1,728 @@
+{
+  "synthetic_only": true,
+  "execution_origin": "server_submitted_synthetic_run",
+  "source_archive": "sales-synthetic-lab-2.zip",
+  "source_sha256": "584692e966ee6e332645b4932fdd9289cfbb02b96bc1444d720270b72d66634b",
+  "commit": "aa9b1bd6ccf73fcec7d1d15866cf3691230c149a",
+  "sales_model": "openai/gpt-4o-mini",
+  "configuration_version": 8,
+  "configuration_sha256": null,
+  "clock_utc": null,
+  "team": [],
+  "case": "harbor_new_buyer",
+  "description": "harbor-new-buyer",
+  "persona": {
+    "project": "SYNTHETIC Harbor Gardens",
+    "buying_purpose": "primary residence",
+    "budget_currency": "USD",
+    "budget_amount": 900000,
+    "payment": "cash",
+    "boundaries": "Do not book, pay, give a real phone number, or consent to external contact.",
+    "goals": [
+      "Ask which property types are available and their prices.",
+      "Ask about bedrooms and area of Bay Residence.",
+      "Disclose your budget and cash payment if asked; do not repeat already answered questions."
+    ]
+  },
+  "original_case": "new_buyer",
+  "project_name": "SYNTHETIC Harbor Gardens",
+  "lead_controller": null,
+  "lead_model": "openai/gpt-4o-mini",
+  "company_id": "f0ebe3a5-6c04-5b8e-8cd8-423859aa39d7",
+  "project_id": "88e5563d-2f4e-5a11-9822-ec319f06f25e",
+  "property_type_id": null,
+  "automatic_result": "fallido",
+  "human_review": {
+    "status": "pending",
+    "note": "Automatic approval is not a human judgment of conversational quality."
+  },
+  "stop_reason": null,
+  "expected_outcome": null,
+  "topic_tags": [],
+  "turns": [
+    {
+      "turn": 1,
+      "action": null,
+      "lead": "I'm interested in knowing which property types are available and their prices. Can you provide that information?",
+      "agent": "Here are the property options I can confirm:\n\n1. Bay Residence — 4 bedrooms, 3 bathrooms, 240 m². Published prices start at 780,000.00 USD. Last confirmed quantity:\n\n3. Synthetic property for testing. Only the listed features are confirmed. Features: Two covered parking spaces; Private garden.\n\nWhat would you like to know next about the property?",
+      "understanding": {
+        "version": "sales-understanding/1.0",
+        "requests": [
+          {
+            "id": "r1",
+            "topic": "inventory",
+            "subject": null,
+            "polarity": "request",
+            "evidence": "I'm interested in knowing which property types are available and their prices.",
+            "reference_id": null,
+            "detail_fields": [],
+            "feature": null
+          }
+        ],
+        "all_of": [
+          "r1"
+        ],
+        "alternatives": [],
+        "constraints": [],
+        "references": [],
+        "preferences": [],
+        "personal_facts": [],
+        "preference_withdrawals": [],
+        "comparison": null,
+        "source_purposes": [],
+        "objections": [],
+        "empathy": null,
+        "releases": [],
+        "visit": null,
+        "courtesy": null,
+        "reschedule": null,
+        "cancellation": null,
+        "wait": null,
+        "moderation": null,
+        "appointment_query": null,
+        "selected_reference_id": null,
+        "requires_clarification": false,
+        "clarification_question": null,
+        "confidence": 0.99
+      },
+      "error_code": null,
+      "checks": [
+        {
+          "check": "current_workflow",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "interpretation",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "reply_present",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_internal_process_narration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "composition_accepted",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_provider_outbox",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "in_app_receipts",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_calendar_connections",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_unrequested_booking",
+          "status": "PASS",
+          "detail": ""
+        }
+      ],
+      "composition": {
+        "status": "accepted",
+        "attempts": [
+          {
+            "status": "accepted"
+          }
+        ]
+      }
+    },
+    {
+      "turn": 2,
+      "action": null,
+      "lead": "Can you tell me more about the Bay Residence specifically? I'm curious about the area and any additional details you have.",
+      "agent": "Here are the property options I can confirm:\n\n1. Bay Residence — 4 bedrooms, 3 bathrooms, 240 m². Published prices start at 780,000.00 USD. Synthetic property for testing. Only the listed features are confirmed. Features: Two covered parking spaces; Private garden.\n\nWhat would you like to know next about the property?",
+      "understanding": {
+        "version": "sales-understanding/1.0",
+        "requests": [
+          {
+            "id": "r1",
+            "topic": "property_details",
+            "subject": null,
+            "polarity": "request",
+            "evidence": "Can you tell me more about the Bay Residence specifically? I'm curious about the area and any additional details you have.",
+            "reference_id": null,
+            "detail_fields": [],
+            "feature": null
+          }
+        ],
+        "all_of": [
+          "r1"
+        ],
+        "alternatives": [],
+        "constraints": [],
+        "references": [],
+        "preferences": [],
+        "personal_facts": [],
+        "preference_withdrawals": [],
+        "comparison": null,
+        "source_purposes": [],
+        "objections": [],
+        "empathy": null,
+        "releases": [],
+        "visit": null,
+        "courtesy": null,
+        "reschedule": null,
+        "cancellation": null,
+        "wait": null,
+        "moderation": null,
+        "appointment_query": null,
+        "selected_reference_id": null,
+        "requires_clarification": false,
+        "clarification_question": null,
+        "confidence": 0.99
+      },
+      "error_code": null,
+      "checks": [
+        {
+          "check": "current_workflow",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "interpretation",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "reply_present",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_internal_process_narration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "composition_accepted",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_provider_outbox",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "in_app_receipts",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_calendar_connections",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_unrequested_booking",
+          "status": "PASS",
+          "detail": ""
+        }
+      ],
+      "composition": {
+        "status": "accepted",
+        "attempts": [
+          {
+            "status": "accepted"
+          }
+        ]
+      }
+    },
+    {
+      "turn": 3,
+      "action": null,
+      "lead": "I see that the Bay Residence has 4 bedrooms, 3 bathrooms, and is 240 m² in size, with prices starting at 780,000.00 USD. Can you provide more details about the area surrounding the Bay Residence?",
+      "agent": "Here are the property options I can confirm:\n\n1. Bay Residence — 4 bedrooms, 3 bathrooms, 240 m². Published prices start at 780,000.00 USD. Synthetic property for testing. Only the listed features are confirmed. Features: Two covered parking spaces; Private garden.\n\nWhat would you like to know next about the property?",
+      "understanding": {
+        "version": "sales-understanding/1.0",
+        "requests": [
+          {
+            "id": "r1",
+            "topic": "property_details",
+            "subject": null,
+            "polarity": "request",
+            "evidence": "Can you provide more details about the area surrounding the Bay Residence?",
+            "reference_id": null,
+            "detail_fields": [],
+            "feature": null
+          }
+        ],
+        "all_of": [
+          "r1"
+        ],
+        "alternatives": [],
+        "constraints": [],
+        "references": [],
+        "preferences": [],
+        "personal_facts": [],
+        "preference_withdrawals": [],
+        "comparison": null,
+        "source_purposes": [],
+        "objections": [],
+        "empathy": null,
+        "releases": [],
+        "visit": null,
+        "courtesy": null,
+        "reschedule": null,
+        "cancellation": null,
+        "wait": null,
+        "moderation": null,
+        "appointment_query": null,
+        "selected_reference_id": null,
+        "requires_clarification": false,
+        "clarification_question": null,
+        "confidence": 0.99
+      },
+      "error_code": null,
+      "checks": [
+        {
+          "check": "current_workflow",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "interpretation",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "reply_present",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_internal_process_narration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "composition_accepted",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_identical_consecutive_reply",
+          "status": "FAIL",
+          "detail": ""
+        },
+        {
+          "check": "no_provider_outbox",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "in_app_receipts",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_calendar_connections",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_unrequested_booking",
+          "status": "PASS",
+          "detail": ""
+        }
+      ],
+      "composition": {
+        "status": "accepted",
+        "attempts": [
+          {
+            "status": "accepted"
+          }
+        ]
+      }
+    },
+    {
+      "turn": 4,
+      "action": null,
+      "lead": "Could you provide more information about the area surrounding the Bay Residence? I'm interested in knowing more about the neighborhood and amenities available.",
+      "agent": "The property location is: 1 Synthetic Avenue, Synthetic City, US.\n\nWhat would you like to know next about the property?",
+      "understanding": {
+        "version": "sales-understanding/1.0",
+        "requests": [
+          {
+            "id": "r1",
+            "topic": "location",
+            "subject": null,
+            "polarity": "request",
+            "evidence": "Could you provide more information about the area surrounding the Bay Residence?",
+            "reference_id": null,
+            "detail_fields": [],
+            "feature": null
+          }
+        ],
+        "all_of": [
+          "r1"
+        ],
+        "alternatives": [],
+        "constraints": [],
+        "references": [],
+        "preferences": [],
+        "personal_facts": [],
+        "preference_withdrawals": [],
+        "comparison": null,
+        "source_purposes": [],
+        "objections": [],
+        "empathy": null,
+        "releases": [],
+        "visit": null,
+        "courtesy": null,
+        "reschedule": null,
+        "cancellation": null,
+        "wait": null,
+        "moderation": null,
+        "appointment_query": null,
+        "selected_reference_id": null,
+        "requires_clarification": false,
+        "clarification_question": null,
+        "confidence": 0.99
+      },
+      "error_code": null,
+      "checks": [
+        {
+          "check": "current_workflow",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "interpretation",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "reply_present",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_internal_process_narration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "composition_accepted",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_provider_outbox",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "in_app_receipts",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_calendar_connections",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_unrequested_booking",
+          "status": "PASS",
+          "detail": ""
+        }
+      ],
+      "composition": {
+        "status": "accepted",
+        "attempts": [
+          {
+            "status": "accepted"
+          }
+        ]
+      }
+    },
+    {
+      "turn": 5,
+      "action": null,
+      "lead": "I'm looking for more details about the neighborhood and amenities around the Bay Residence. Can you share what makes the area appealing?",
+      "agent": "The property location is: 1 Synthetic Avenue, Synthetic City, US.\n\nWhat would you like to know next about the property?",
+      "understanding": {
+        "version": "sales-understanding/1.0",
+        "requests": [
+          {
+            "id": "r1",
+            "topic": "location",
+            "subject": null,
+            "polarity": "request",
+            "evidence": "I'm looking for more details about the neighborhood and amenities around the Bay Residence. Can you share what makes the area appealing?",
+            "reference_id": null,
+            "detail_fields": [],
+            "feature": null
+          }
+        ],
+        "all_of": [
+          "r1"
+        ],
+        "alternatives": [],
+        "constraints": [],
+        "references": [],
+        "preferences": [],
+        "personal_facts": [],
+        "preference_withdrawals": [],
+        "comparison": null,
+        "source_purposes": [],
+        "objections": [],
+        "empathy": null,
+        "releases": [],
+        "visit": null,
+        "courtesy": null,
+        "reschedule": null,
+        "cancellation": null,
+        "wait": null,
+        "moderation": null,
+        "appointment_query": null,
+        "selected_reference_id": null,
+        "requires_clarification": false,
+        "clarification_question": null,
+        "confidence": 0.99
+      },
+      "error_code": null,
+      "checks": [
+        {
+          "check": "current_workflow",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "interpretation",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "reply_present",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_internal_process_narration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "composition_accepted",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_identical_consecutive_reply",
+          "status": "FAIL",
+          "detail": ""
+        },
+        {
+          "check": "no_provider_outbox",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "in_app_receipts",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_calendar_connections",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_unrequested_booking",
+          "status": "PASS",
+          "detail": ""
+        }
+      ],
+      "composition": {
+        "status": "accepted",
+        "attempts": [
+          {
+            "status": "accepted"
+          }
+        ]
+      }
+    },
+    {
+      "turn": 6,
+      "action": null,
+      "lead": "I appreciate the property details. However, I'm specifically looking for information about the neighborhood and amenities around the Bay Residence. Can you provide insights on what makes the area appealing?",
+      "agent": "The property location is: 1 Synthetic Avenue, Synthetic City, US.\n\nWhat would you like to know next about the property?",
+      "understanding": {
+        "version": "sales-understanding/1.0",
+        "requests": [
+          {
+            "id": "r1",
+            "topic": "location",
+            "subject": null,
+            "polarity": "request",
+            "evidence": "I'm specifically looking for information about the neighborhood and amenities around the Bay Residence. Can you provide insights on what makes the area appealing?",
+            "reference_id": null,
+            "detail_fields": [],
+            "feature": null
+          }
+        ],
+        "all_of": [
+          "r1"
+        ],
+        "alternatives": [],
+        "constraints": [],
+        "references": [],
+        "preferences": [],
+        "personal_facts": [],
+        "preference_withdrawals": [],
+        "comparison": null,
+        "source_purposes": [],
+        "objections": [],
+        "empathy": null,
+        "releases": [],
+        "visit": null,
+        "courtesy": null,
+        "reschedule": null,
+        "cancellation": null,
+        "wait": null,
+        "moderation": null,
+        "appointment_query": null,
+        "selected_reference_id": null,
+        "requires_clarification": false,
+        "clarification_question": null,
+        "confidence": 0.99
+      },
+      "error_code": null,
+      "checks": [
+        {
+          "check": "current_workflow",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "interpretation",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "reply_present",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_internal_process_narration",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "composition_accepted",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_identical_consecutive_reply",
+          "status": "FAIL",
+          "detail": ""
+        },
+        {
+          "check": "no_provider_outbox",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "in_app_receipts",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_calendar_connections",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_unrequested_booking",
+          "status": "PASS",
+          "detail": ""
+        }
+      ],
+      "composition": {
+        "status": "accepted",
+        "attempts": [
+          {
+            "status": "accepted"
+          }
+        ]
+      }
+    }
+  ],
+  "checks": [
+    {
+      "check": "scenario_completed",
+      "status": "FAIL",
+      "detail": ""
+    },
+    {
+      "check": "scenario_has_turns",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "adaptive_minimum_turns",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "shared_resources_belong_to_active_project",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "inventory_goal_exercised",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "property_detail_goal_exercised",
+      "status": "PASS",
+      "detail": ""
+    }
+  ],
+  "failures": [
+    {
+      "check": "scenario_completed",
+      "status": "FAIL",
+      "detail": ""
+    },
+    {
+      "check": "no_identical_consecutive_reply",
+      "status": "FAIL",
+      "detail": ""
+    },
+    {
+      "check": "no_identical_consecutive_reply",
+      "status": "FAIL",
+      "detail": ""
+    },
+    {
+      "check": "no_identical_consecutive_reply",
+      "status": "FAIL",
+      "detail": ""
+    }
+  ],
+  "blocked_checks": [],
+  "meetings": [],
+  "materials": []
+}

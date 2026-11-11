@@ -1,8 +1,8 @@
-[Volver a conversaciones](../README.md)
+[Volver a la guía completa](../../README.md#conversaciones-ejecutadas-en-el-servidor) · [Índice de conversaciones](../README.md)
 
 # Pendientes de revision
 
-La etiqueta automática corresponde a los controles vigentes en la corrida original; revisión humana se muestra por separado.
+La etiqueta automática corresponde a los controles originales de cada corrida; la revisión humana se muestra por separado. No se reetiquetan los resultados históricos.
 
 | Caso | Corrida | Automático | Revisión humana | JSON |
 |---|---|---|---|---|

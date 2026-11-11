@@ -1,0 +1,22 @@
+{
+  "source_commit": "4fb17071b617cc430698885fafdde8d209f1d562",
+  "automatic_result_preserved": "FAIL",
+  "bookings_expected": 2,
+  "bookings_observed": 2,
+  "case": "move_up_B",
+  "false_positive": {
+    "check": "initial_named_property_scope",
+    "observed": "Only Cedar Studio was answered; selected_property_type_id matches it.",
+    "cause": "Evaluator required property_catalog_offer, absent for property_details.",
+    "runtime_change_made": false
+  },
+  "confirmed_failure": {
+    "action": "switch",
+    "reference_kind": "material",
+    "expression": "Cedar Loft",
+    "requires_clarification": true,
+    "confidence": 0.0,
+    "gallery_delivered": false
+  },
+  "next_work": "Correct the evaluator and resolve explicit property change plus anaphoric photo request without inferring scope from uncertainty."
+}

@@ -1,0 +1,104 @@
+{
+  "run": "sales-synthetic-lab-2",
+  "execution_origin": "server_submitted_synthetic_run",
+  "archive": "sales-synthetic-lab-2.zip",
+  "sha256": "584692e966ee6e332645b4932fdd9289cfbb02b96bc1444d720270b72d66634b",
+  "commit": "aa9b1bd6ccf73fcec7d1d15866cf3691230c149a",
+  "suite": "adaptive",
+  "cohort": "cdf7ca4454a2",
+  "selected_cases": [
+    "cedar_continuity",
+    "cedar_new_buyer",
+    "cedar_targeted_materials",
+    "harbor_continuity",
+    "harbor_new_buyer",
+    "harbor_targeted_materials",
+    "sierra_continuity",
+    "sierra_new_buyer",
+    "sierra_targeted_materials"
+  ],
+  "model": "openai/gpt-4o-mini",
+  "lead_model": "openai/gpt-4o-mini",
+  "lead_controller_metrics": null,
+  "configuration_version": 8,
+  "configuration_sha256": null,
+  "status": "FAIL",
+  "cases": 9,
+  "approved_cases": 1,
+  "turns": 51,
+  "expected_bookings": 0,
+  "actual_bookings": 0,
+  "provider_calls": 159,
+  "cost_usd_recorded": 0.15620250000000008,
+  "cost_complete": true,
+  "checks_summary": {
+    "PASS": 495,
+    "FAIL": 42,
+    "BLOCKED": 0
+  },
+  "case_results": [
+    {
+      "case": "harbor_new_buyer",
+      "status": "fallido",
+      "meetings": 0,
+      "turns": 6,
+      "failures": 4
+    },
+    {
+      "case": "harbor_targeted_materials",
+      "status": "aprobado",
+      "meetings": 0,
+      "turns": 3,
+      "failures": 0
+    },
+    {
+      "case": "harbor_continuity",
+      "status": "fallido",
+      "meetings": 0,
+      "turns": 6,
+      "failures": 10
+    },
+    {
+      "case": "cedar_new_buyer",
+      "status": "fallido",
+      "meetings": 0,
+      "turns": 6,
+      "failures": 6
+    },
+    {
+      "case": "cedar_targeted_materials",
+      "status": "fallido",
+      "meetings": 0,
+      "turns": 6,
+      "failures": 6
+    },
+    {
+      "case": "cedar_continuity",
+      "status": "fallido",
+      "meetings": 0,
+      "turns": 6,
+      "failures": 4
+    },
+    {
+      "case": "sierra_new_buyer",
+      "status": "fallido",
+      "meetings": 0,
+      "turns": 6,
+      "failures": 4
+    },
+    {
+      "case": "sierra_targeted_materials",
+      "status": "fallido",
+      "meetings": 0,
+      "turns": 6,
+      "failures": 6
+    },
+    {
+      "case": "sierra_continuity",
+      "status": "fallido",
+      "meetings": 0,
+      "turns": 6,
+      "failures": 2
+    }
+  ]
+}

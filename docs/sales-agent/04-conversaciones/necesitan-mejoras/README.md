@@ -1,8 +1,8 @@
-[Volver a conversaciones](../README.md)
+[Volver a la guía completa](../../README.md#conversaciones-ejecutadas-en-el-servidor) · [Índice de conversaciones](../README.md)
 
 # Necesitan mejoras
 
-La etiqueta automática corresponde a los controles vigentes en la corrida original; revisión humana se muestra por separado.
+La etiqueta automática corresponde a los controles originales de cada corrida; la revisión humana se muestra por separado. No se reetiquetan los resultados históricos.
 
 | Caso | Corrida | Automático | Revisión humana | JSON |
 |---|---|---|---|---|
@@ -58,3 +58,17 @@ La etiqueta automática corresponde a los controles vigentes en la corrida origi
 | first_time_A | sales-compact-repair-3 | fallido | pending | [Abrir](primera-compra-pdf-y-visita__first-time-a__sales-compact-repair-3__fallido.json) |
 | unknown_A | sales-compact-repair-3 | fallido | pending | [Abrir](visita-sin-segmento__unknown-a__sales-compact-repair-3__fallido.json) |
 | move_up_B | sales-compact-repair-4 | fallido | pending | [Abrir](cambio-de-propiedad-fotos-y-despedida__move-up-b__sales-compact-repair-4__fallido.json) |
+| move_up_B | sales-compact-repair-5 | fallido | necesita-mejoras | [Abrir](cambio-de-propiedad-fotos-y-despedida__move-up-b__sales-compact-repair-5__fallido__revision-necesita-mejoras.json) |
+| harbor_new_buyer | sales-synthetic-lab-2 | fallido | pending | [Abrir](harbor-new-buyer__harbor-new-buyer__sales-synthetic-lab-2__fallido.json) |
+| harbor_continuity | sales-synthetic-lab-2 | fallido | pending | [Abrir](harbor-continuity__harbor-continuity__sales-synthetic-lab-2__fallido.json) |
+| cedar_new_buyer | sales-synthetic-lab-2 | fallido | pending | [Abrir](cedar-new-buyer__cedar-new-buyer__sales-synthetic-lab-2__fallido.json) |
+| cedar_targeted_materials | sales-synthetic-lab-2 | fallido | pending | [Abrir](cedar-targeted-materials__cedar-targeted-materials__sales-synthetic-lab-2__fallido.json) |
+| cedar_continuity | sales-synthetic-lab-2 | fallido | pending | [Abrir](cedar-continuity__cedar-continuity__sales-synthetic-lab-2__fallido.json) |
+| sierra_new_buyer | sales-synthetic-lab-2 | fallido | pending | [Abrir](sierra-new-buyer__sierra-new-buyer__sales-synthetic-lab-2__fallido.json) |
+| sierra_targeted_materials | sales-synthetic-lab-2 | fallido | pending | [Abrir](sierra-targeted-materials__sierra-targeted-materials__sales-synthetic-lab-2__fallido.json) |
+| sierra_continuity | sales-synthetic-lab-2 | fallido | pending | [Abrir](sierra-continuity__sierra-continuity__sales-synthetic-lab-2__fallido.json) |
+| harbor_continuity | sales-synthetic-lab-3 | fallido | pending | [Abrir](harbor-continuity__harbor-continuity__sales-synthetic-lab-3__fallido.json) |
+| cedar_targeted_materials | sales-synthetic-lab-3 | fallido | pending | [Abrir](cedar-targeted-materials__cedar-targeted-materials__sales-synthetic-lab-3__fallido.json) |
+| cedar_continuity | sales-synthetic-lab-3 | fallido | pending | [Abrir](cedar-continuity__cedar-continuity__sales-synthetic-lab-3__fallido.json) |
+| sierra_targeted_materials | sales-synthetic-lab-3 | fallido | pending | [Abrir](sierra-targeted-materials__sierra-targeted-materials__sales-synthetic-lab-3__fallido.json) |
+| sierra_continuity | sales-synthetic-lab-3 | fallido | pending | [Abrir](sierra-continuity__sierra-continuity__sales-synthetic-lab-3__fallido.json) |

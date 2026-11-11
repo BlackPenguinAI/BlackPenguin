@@ -15,6 +15,8 @@
     "unassigned_with_slots"
   ],
   "model": "openai/gpt-4o-mini",
+  "lead_model": null,
+  "lead_controller_metrics": null,
   "configuration_version": 8,
   "configuration_sha256": "51ff65376dad421328dab993a4fc71939489386f1ed173514cf13a244ac79f1c",
   "status": "INCOMPLETE",

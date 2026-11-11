@@ -38,3 +38,14 @@ for ax,(suite,count) in zip(axes.flat,groups):
     ax.plot(xx,yy,'o-',label='Visitas observadas');ax.plot(xx,np.array([r['expected_bookings'] for r in group],float),'--o',label='Visitas esperadas')
     ax.set(title=f'{suite}: {count} casos (sin mezclar conjuntos)',xticks=xx,xticklabels=[r['run'].replace('sales-','').replace('compact-','').replace('booking-','') for r in group],ylabel='Visitas');ax.set_ylim(0,max(r['expected_bookings'] for r in group)+.5);ax.yaxis.set_major_locator(MaxNLocator(integer=True));ax.tick_params(axis='x',rotation=25);ax.grid(axis='y',alpha=.2);ax.legend(fontsize=8)
 fig.suptitle('El historial también contiene regresiones; criterios de evaluación evolucionaron',y=1.02);save(fig,'evolucion-por-conjunto.png')
+
+# Adaptive LLM buyers are a separate experimental stage, never pooled with scripts.
+early=[r for r in rows if r['suite']=='adaptive']
+if early:
+    xx=np.arange(len(early));names=[r['run'].replace('sales-synthetic-lab-','Lab ') for r in early]
+    fig,axes=plt.subplots(1,3,figsize=(13,3.7))
+    for ax,key,title in [(axes[0],'approved_cases','Casos aprobados (de nueve)'),(axes[1],'turns','Mensajes del lead'),(axes[2],'provider_calls','Llamadas: lead + agente')]:
+        vals=np.array([r[key] for r in early],dtype=float);ax.plot(xx,vals,'o-',color='#176b87');ax.set(xticks=xx,xticklabels=names,title=title,ylim=(0,max(vals)*1.25));ax.yaxis.set_major_locator(MaxNLocator(integer=True))
+        for i,v in enumerate(vals):ax.annotate(str(int(v)),(i,v),ha='center',xytext=(0,6),textcoords='offset points')
+    fig.suptitle('Primer laboratorio: cambio del controlador del lead, no mejora causal del agente',y=1.05)
+    save(fig,'primer-laboratorio-adaptativo.png')

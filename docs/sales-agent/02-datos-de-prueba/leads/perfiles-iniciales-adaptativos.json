@@ -1,0 +1,413 @@
+{
+  "synthetic_only": true,
+  "data": [
+    {
+      "source_run": "sales-synthetic-lab-2",
+      "project": "SYNTHETIC Harbor Gardens",
+      "scenario": "new_buyer",
+      "persona": {
+        "project": "SYNTHETIC Harbor Gardens",
+        "buying_purpose": "primary residence",
+        "budget_currency": "USD",
+        "budget_amount": 900000,
+        "payment": "cash",
+        "boundaries": "Do not book, pay, give a real phone number, or consent to external contact.",
+        "goals": [
+          "Ask which property types are available and their prices.",
+          "Ask about bedrooms and area of Bay Residence.",
+          "Disclose your budget and cash payment if asked; do not repeat already answered questions."
+        ]
+      },
+      "lead_model": "openai/gpt-4o-mini",
+      "max_turns": 6,
+      "judge_enabled": false
+    },
+    {
+      "source_run": "sales-synthetic-lab-2",
+      "project": "SYNTHETIC Harbor Gardens",
+      "scenario": "targeted_materials",
+      "persona": {
+        "project": "SYNTHETIC Harbor Gardens",
+        "buying_purpose": "primary residence",
+        "budget_currency": "USD",
+        "budget_amount": 900000,
+        "payment": "cash",
+        "boundaries": "Do not book, pay, give a real phone number, or consent to external contact.",
+        "property_interest": "Bay Residence",
+        "goals": [
+          "Ask for photos and a PDF brochure specifically for Bay Residence.",
+          "Accept an offered exact requested resource; if unavailable accept the answer without requesting substitutes.",
+          "Ask whether parking is confirmed for this property. Do not switch properties."
+        ]
+      },
+      "lead_model": "openai/gpt-4o-mini",
+      "max_turns": 6,
+      "judge_enabled": false
+    },
+    {
+      "source_run": "sales-synthetic-lab-2",
+      "project": "SYNTHETIC Harbor Gardens",
+      "scenario": "continuity",
+      "persona": {
+        "project": "SYNTHETIC Harbor Gardens",
+        "buying_purpose": "primary residence",
+        "budget_currency": "USD",
+        "budget_amount": 900000,
+        "payment": "cash",
+        "boundaries": "Do not book, pay, give a real phone number, or consent to external contact.",
+        "property_interest": "Bay Residence",
+        "goals": [
+          "Ask price and current availability of Bay Residence.",
+          "Explain you have cash; if misunderstood correct the misunderstanding naturally.",
+          "Then explicitly change payment preference to bank financing and ask about bedrooms in the SAME message.",
+          "Do not accept a substitute property unless you explicitly choose it."
+        ]
+      },
+      "lead_model": "openai/gpt-4o-mini",
+      "max_turns": 6,
+      "judge_enabled": false
+    },
+    {
+      "source_run": "sales-synthetic-lab-2",
+      "project": "SYNTHETIC Cedar Heights",
+      "scenario": "new_buyer",
+      "persona": {
+        "project": "SYNTHETIC Cedar Heights",
+        "buying_purpose": "primary residence",
+        "budget_currency": "USD",
+        "budget_amount": 900000,
+        "payment": "cash",
+        "boundaries": "Do not book, pay, give a real phone number, or consent to external contact.",
+        "goals": [
+          "Ask which property types are available and their prices.",
+          "Ask about bedrooms and area of Cedar Loft.",
+          "Disclose your budget and cash payment if asked; do not repeat already answered questions."
+        ]
+      },
+      "lead_model": "openai/gpt-4o-mini",
+      "max_turns": 6,
+      "judge_enabled": false
+    },
+    {
+      "source_run": "sales-synthetic-lab-2",
+      "project": "SYNTHETIC Cedar Heights",
+      "scenario": "targeted_materials",
+      "persona": {
+        "project": "SYNTHETIC Cedar Heights",
+        "buying_purpose": "primary residence",
+        "budget_currency": "USD",
+        "budget_amount": 900000,
+        "payment": "cash",
+        "boundaries": "Do not book, pay, give a real phone number, or consent to external contact.",
+        "property_interest": "Cedar Studio",
+        "goals": [
+          "Ask for photos and a PDF brochure specifically for Cedar Studio.",
+          "Accept an offered exact requested resource; if unavailable accept the answer without requesting substitutes.",
+          "Ask whether parking is confirmed for this property. Do not switch properties."
+        ]
+      },
+      "lead_model": "openai/gpt-4o-mini",
+      "max_turns": 6,
+      "judge_enabled": false
+    },
+    {
+      "source_run": "sales-synthetic-lab-2",
+      "project": "SYNTHETIC Cedar Heights",
+      "scenario": "continuity",
+      "persona": {
+        "project": "SYNTHETIC Cedar Heights",
+        "buying_purpose": "primary residence",
+        "budget_currency": "USD",
+        "budget_amount": 900000,
+        "payment": "cash",
+        "boundaries": "Do not book, pay, give a real phone number, or consent to external contact.",
+        "property_interest": "Cedar Loft",
+        "goals": [
+          "Ask price and current availability of Cedar Loft.",
+          "Explain you have cash; if misunderstood correct the misunderstanding naturally.",
+          "Then explicitly change payment preference to bank financing and ask about bedrooms in the SAME message.",
+          "Do not accept a substitute property unless you explicitly choose it."
+        ]
+      },
+      "lead_model": "openai/gpt-4o-mini",
+      "max_turns": 6,
+      "judge_enabled": false
+    },
+    {
+      "source_run": "sales-synthetic-lab-2",
+      "project": "SYNTHETIC Sierra Commons",
+      "scenario": "new_buyer",
+      "persona": {
+        "project": "SYNTHETIC Sierra Commons",
+        "buying_purpose": "primary residence",
+        "budget_currency": "USD",
+        "budget_amount": 900000,
+        "payment": "cash",
+        "boundaries": "Do not book, pay, give a real phone number, or consent to external contact.",
+        "goals": [
+          "Ask which property types are available and their prices.",
+          "Ask about bedrooms and area of Ridge Townhome.",
+          "Disclose your budget and cash payment if asked; do not repeat already answered questions."
+        ]
+      },
+      "lead_model": "openai/gpt-4o-mini",
+      "max_turns": 6,
+      "judge_enabled": false
+    },
+    {
+      "source_run": "sales-synthetic-lab-2",
+      "project": "SYNTHETIC Sierra Commons",
+      "scenario": "targeted_materials",
+      "persona": {
+        "project": "SYNTHETIC Sierra Commons",
+        "buying_purpose": "primary residence",
+        "budget_currency": "USD",
+        "budget_amount": 900000,
+        "payment": "cash",
+        "boundaries": "Do not book, pay, give a real phone number, or consent to external contact.",
+        "property_interest": "Ridge Townhome",
+        "goals": [
+          "Ask for photos and a PDF brochure specifically for Ridge Townhome.",
+          "Accept an offered exact requested resource; if unavailable accept the answer without requesting substitutes.",
+          "Ask whether parking is confirmed for this property. Do not switch properties."
+        ]
+      },
+      "lead_model": "openai/gpt-4o-mini",
+      "max_turns": 6,
+      "judge_enabled": false
+    },
+    {
+      "source_run": "sales-synthetic-lab-2",
+      "project": "SYNTHETIC Sierra Commons",
+      "scenario": "continuity",
+      "persona": {
+        "project": "SYNTHETIC Sierra Commons",
+        "buying_purpose": "primary residence",
+        "budget_currency": "USD",
+        "budget_amount": 900000,
+        "payment": "cash",
+        "boundaries": "Do not book, pay, give a real phone number, or consent to external contact.",
+        "property_interest": "Summit Villa",
+        "goals": [
+          "Ask price and current availability of Summit Villa.",
+          "Explain you have cash; if misunderstood correct the misunderstanding naturally.",
+          "Then explicitly change payment preference to bank financing and ask about bedrooms in the SAME message.",
+          "Do not accept a substitute property unless you explicitly choose it."
+        ]
+      },
+      "lead_model": "openai/gpt-4o-mini",
+      "max_turns": 6,
+      "judge_enabled": false
+    },
+    {
+      "source_run": "sales-synthetic-lab-3",
+      "project": "SYNTHETIC Harbor Gardens",
+      "scenario": "new_buyer",
+      "persona": {
+        "project": "SYNTHETIC Harbor Gardens",
+        "buying_purpose": "primary residence",
+        "budget_currency": "USD",
+        "budget_amount": 900000,
+        "payment": "cash",
+        "boundaries": "Do not book, pay, give a real phone number, or consent to external contact.",
+        "scenario": "new_buyer",
+        "detail_property": "Bay Residence",
+        "goals": [
+          "Ask which property types are available and their prices.",
+          "Ask about bedrooms and area of Bay Residence.",
+          "Disclose your budget and cash payment if asked; do not repeat already answered questions."
+        ]
+      },
+      "lead_model": "openai/gpt-4o-mini",
+      "max_turns": 6,
+      "judge_enabled": false
+    },
+    {
+      "source_run": "sales-synthetic-lab-3",
+      "project": "SYNTHETIC Harbor Gardens",
+      "scenario": "targeted_materials",
+      "persona": {
+        "project": "SYNTHETIC Harbor Gardens",
+        "buying_purpose": "primary residence",
+        "budget_currency": "USD",
+        "budget_amount": 900000,
+        "payment": "cash",
+        "boundaries": "Do not book, pay, give a real phone number, or consent to external contact.",
+        "scenario": "targeted_materials",
+        "property_interest": "Bay Residence",
+        "goals": [
+          "Ask for photos and a PDF brochure specifically for Bay Residence.",
+          "Accept an offered exact requested resource; if unavailable accept the answer without requesting substitutes.",
+          "Ask whether parking is confirmed for this property. Do not switch properties."
+        ]
+      },
+      "lead_model": "openai/gpt-4o-mini",
+      "max_turns": 6,
+      "judge_enabled": false
+    },
+    {
+      "source_run": "sales-synthetic-lab-3",
+      "project": "SYNTHETIC Harbor Gardens",
+      "scenario": "continuity",
+      "persona": {
+        "project": "SYNTHETIC Harbor Gardens",
+        "buying_purpose": "primary residence",
+        "budget_currency": "USD",
+        "budget_amount": 900000,
+        "payment": "cash",
+        "boundaries": "Do not book, pay, give a real phone number, or consent to external contact.",
+        "scenario": "continuity",
+        "property_interest": "Bay Residence",
+        "goals": [
+          "Ask price and current availability of Bay Residence.",
+          "Explain you have cash; if misunderstood correct the misunderstanding naturally.",
+          "Then explicitly change payment preference to bank financing and ask about bedrooms in the SAME message.",
+          "Do not accept a substitute property unless you explicitly choose it."
+        ]
+      },
+      "lead_model": "openai/gpt-4o-mini",
+      "max_turns": 6,
+      "judge_enabled": false
+    },
+    {
+      "source_run": "sales-synthetic-lab-3",
+      "project": "SYNTHETIC Cedar Heights",
+      "scenario": "new_buyer",
+      "persona": {
+        "project": "SYNTHETIC Cedar Heights",
+        "buying_purpose": "primary residence",
+        "budget_currency": "USD",
+        "budget_amount": 900000,
+        "payment": "cash",
+        "boundaries": "Do not book, pay, give a real phone number, or consent to external contact.",
+        "scenario": "new_buyer",
+        "detail_property": "Cedar Loft",
+        "goals": [
+          "Ask which property types are available and their prices.",
+          "Ask about bedrooms and area of Cedar Loft.",
+          "Disclose your budget and cash payment if asked; do not repeat already answered questions."
+        ]
+      },
+      "lead_model": "openai/gpt-4o-mini",
+      "max_turns": 6,
+      "judge_enabled": false
+    },
+    {
+      "source_run": "sales-synthetic-lab-3",
+      "project": "SYNTHETIC Cedar Heights",
+      "scenario": "targeted_materials",
+      "persona": {
+        "project": "SYNTHETIC Cedar Heights",
+        "buying_purpose": "primary residence",
+        "budget_currency": "USD",
+        "budget_amount": 900000,
+        "payment": "cash",
+        "boundaries": "Do not book, pay, give a real phone number, or consent to external contact.",
+        "scenario": "targeted_materials",
+        "property_interest": "Cedar Studio",
+        "goals": [
+          "Ask for photos and a PDF brochure specifically for Cedar Studio.",
+          "Accept an offered exact requested resource; if unavailable accept the answer without requesting substitutes.",
+          "Ask whether parking is confirmed for this property. Do not switch properties."
+        ]
+      },
+      "lead_model": "openai/gpt-4o-mini",
+      "max_turns": 6,
+      "judge_enabled": false
+    },
+    {
+      "source_run": "sales-synthetic-lab-3",
+      "project": "SYNTHETIC Cedar Heights",
+      "scenario": "continuity",
+      "persona": {
+        "project": "SYNTHETIC Cedar Heights",
+        "buying_purpose": "primary residence",
+        "budget_currency": "USD",
+        "budget_amount": 900000,
+        "payment": "cash",
+        "boundaries": "Do not book, pay, give a real phone number, or consent to external contact.",
+        "scenario": "continuity",
+        "property_interest": "Cedar Loft",
+        "goals": [
+          "Ask price and current availability of Cedar Loft.",
+          "Explain you have cash; if misunderstood correct the misunderstanding naturally.",
+          "Then explicitly change payment preference to bank financing and ask about bedrooms in the SAME message.",
+          "Do not accept a substitute property unless you explicitly choose it."
+        ]
+      },
+      "lead_model": "openai/gpt-4o-mini",
+      "max_turns": 6,
+      "judge_enabled": false
+    },
+    {
+      "source_run": "sales-synthetic-lab-3",
+      "project": "SYNTHETIC Sierra Commons",
+      "scenario": "new_buyer",
+      "persona": {
+        "project": "SYNTHETIC Sierra Commons",
+        "buying_purpose": "primary residence",
+        "budget_currency": "USD",
+        "budget_amount": 900000,
+        "payment": "cash",
+        "boundaries": "Do not book, pay, give a real phone number, or consent to external contact.",
+        "scenario": "new_buyer",
+        "detail_property": "Ridge Townhome",
+        "goals": [
+          "Ask which property types are available and their prices.",
+          "Ask about bedrooms and area of Ridge Townhome.",
+          "Disclose your budget and cash payment if asked; do not repeat already answered questions."
+        ]
+      },
+      "lead_model": "openai/gpt-4o-mini",
+      "max_turns": 6,
+      "judge_enabled": false
+    },
+    {
+      "source_run": "sales-synthetic-lab-3",
+      "project": "SYNTHETIC Sierra Commons",
+      "scenario": "targeted_materials",
+      "persona": {
+        "project": "SYNTHETIC Sierra Commons",
+        "buying_purpose": "primary residence",
+        "budget_currency": "USD",
+        "budget_amount": 900000,
+        "payment": "cash",
+        "boundaries": "Do not book, pay, give a real phone number, or consent to external contact.",
+        "scenario": "targeted_materials",
+        "property_interest": "Ridge Townhome",
+        "goals": [
+          "Ask for photos and a PDF brochure specifically for Ridge Townhome.",
+          "Accept an offered exact requested resource; if unavailable accept the answer without requesting substitutes.",
+          "Ask whether parking is confirmed for this property. Do not switch properties."
+        ]
+      },
+      "lead_model": "openai/gpt-4o-mini",
+      "max_turns": 6,
+      "judge_enabled": false
+    },
+    {
+      "source_run": "sales-synthetic-lab-3",
+      "project": "SYNTHETIC Sierra Commons",
+      "scenario": "continuity",
+      "persona": {
+        "project": "SYNTHETIC Sierra Commons",
+        "buying_purpose": "primary residence",
+        "budget_currency": "USD",
+        "budget_amount": 900000,
+        "payment": "cash",
+        "boundaries": "Do not book, pay, give a real phone number, or consent to external contact.",
+        "scenario": "continuity",
+        "property_interest": "Summit Villa",
+        "goals": [
+          "Ask price and current availability of Summit Villa.",
+          "Explain you have cash; if misunderstood correct the misunderstanding naturally.",
+          "Then explicitly change payment preference to bank financing and ask about bedrooms in the SAME message.",
+          "Do not accept a substitute property unless you explicitly choose it."
+        ]
+      },
+      "lead_model": "openai/gpt-4o-mini",
+      "max_turns": 6,
+      "judge_enabled": false
+    }
+  ]
+}

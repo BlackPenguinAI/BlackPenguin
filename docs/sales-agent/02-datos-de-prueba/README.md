@@ -10,6 +10,7 @@ El laboratorio actual contiene **una company, tres projects y seis tipos de prop
 | Projects | [Proyectos](empresa-y-proyectos/proyectos.json) |
 | Propiedades e inventario | [Propiedades](empresa-y-proyectos/propiedades.json) |
 | Galerías y PDFs | [Recursos](empresa-y-proyectos/galerias-y-documentos.json) |
+| Leads iniciales con LLM | [Perfiles y objetivos adaptativos](leads/perfiles-iniciales-adaptativos.json) |
 | Leads | [Perfiles](leads/perfiles-de-leads.json) |
 | Usuarios sales | [Vendedores](vendedores-y-horarios/vendedores.json) |
 | Alcance de cada vendedor | [Asignaciones](vendedores-y-horarios/asignaciones-a-proyectos.json) |

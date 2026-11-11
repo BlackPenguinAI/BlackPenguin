@@ -37,5 +37,19 @@
   "sales-commercial-point-1:lower_budget_financing": {
     "status": "necesita-mejoras",
     "note": "Aprobó controles antiguos, pero repite información financiera y atribuye frustración a una despedida neutral."
+  },
+  "sales-compact-repair-5:first_time_A": {
+    "status": "revisado-favorable",
+    "note": "Corrida Repair 5: propiedad correcta y visita persistida únicamente después de selección, resumen y confirmación explícita.",
+    "scope": "Transcripción sintética del servidor; no valida entrega por operador ni calendario externo."
+  },
+  "sales-compact-repair-5:unknown_A": {
+    "status": "revisado-favorable",
+    "note": "Corrida Repair 5: propiedad correcta y visita persistida únicamente después de selección, resumen y confirmación explícita.",
+    "scope": "Transcripción sintética del servidor; no valida entrega por operador ni calendario externo."
+  },
+  "sales-compact-repair-5:move_up_B": {
+    "status": "necesita-mejoras",
+    "note": "Primera respuesta sí respeta Cedar Studio; initial_named_property_scope es un falso positivo por exigir metadata de catálogo a property_details. El cambio a Cedar Loft sí falla: referencia material en vez de propiedad, aclaración genérica y galería no entregada. No se modifica el resultado automático original."
   }
 }
