@@ -49,3 +49,22 @@ if early:
         for i,v in enumerate(vals):ax.annotate(str(int(v)),(i,v),ha='center',xytext=(0,6),textcoords='offset points')
     fig.suptitle('Primer laboratorio: cambio del controlador del lead, no mejora causal del agente',y=1.05)
     save(fig,'primer-laboratorio-adaptativo.png')
+
+# Global history: executions and spending, not a pooled quality score.
+labels=[r['run'].replace('sales-synthetic-lab-','L').replace('sales-booking-point-','A').replace('sales-commercial-point-','C').replace('sales-closing-point-','D').replace('sales-compact-battery-','B').replace('sales-compact-repair-','R') for r in rows]
+xx=np.arange(len(rows));approved=np.array([r['approved_cases'] for r in rows]);failed=np.array([sum(c['status']=='fallido' for c in r['case_results']) for r in rows]);blocked=np.array([sum(c['status']=='incompleto' for c in r['case_results']) for r in rows])
+fig,axes=plt.subplots(2,1,figsize=(13,7))
+axes[0].bar(xx,approved,label='Aprobadas por sus controles',color='#24775e');axes[0].bar(xx,failed,bottom=approved,label='Fallidas',color='#bd604c');axes[0].bar(xx,blocked,bottom=approved+failed,label='Incompletas',color='#bd933d')
+axes[0].set(xticks=xx,xticklabels=labels,ylabel='Conversaciones ejecutadas',title='Estado de los casos por corrida (criterios y tamaños distintos)');axes[0].yaxis.set_major_locator(MaxNLocator(integer=True));axes[0].legend(fontsize=9,ncols=3)
+axes[1].plot(xx,np.cumsum(np.array([r['cases'] for r in rows])),'o-',label='Ejecuciones acumuladas (incluye repeticiones)');unique=set();coverage=[]
+for r in rows:
+    unique.update((r['suite'],c['case']) for c in r['case_results']);coverage.append(len(unique))
+axes[1].plot(xx,np.array(coverage),'s--',label='IDs de escenario distintos por suite');axes[1].set(xticks=xx,xticklabels=labels,ylabel='Cantidad acumulada',title='Cobertura e iteraciones; no es una curva única de calidad');axes[1].legend(fontsize=9)
+fig.suptitle('L: lead LLM · A: agenda · C: comercial · D: despedidas · B: batería · R: reparación',y=1.02);save(fig,'panorama-global.png')
+fig,axes=plt.subplots(1,2,figsize=(13,4))
+costs=np.array([r['cost_usd_recorded'] or 0 for r in rows]);bars=axes[0].bar(xx,costs,color='#176b87')
+for i,r in enumerate(rows):
+    if not r['cost_complete']:bars[i].set_hatch('//')
+axes[0].set(xticks=xx,xticklabels=labels,ylabel='USD registrados',title='Consumo por corrida (rayado = incompleto)');axes[0].tick_params(axis='x',rotation=45)
+axes[1].plot(xx,np.cumsum(costs),'o-',color='#176b87');axes[1].set(xticks=xx,xticklabels=labels,ylabel='USD registrados acumulados',title='Historial de consumo; faltan dos respuestas');axes[1].tick_params(axis='x',rotation=45)
+save(fig,'consumo-global.png')

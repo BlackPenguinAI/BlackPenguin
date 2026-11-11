@@ -30,6 +30,9 @@
     "expected_bookings": 0,
     "actual_bookings": 0,
     "provider_calls": 159,
+    "prompt_tokens": 1362218,
+    "completion_tokens": 20263,
+    "responses_with_cost": 159,
     "cost_usd_recorded": 0.15620250000000008,
     "cost_complete": true,
     "checks_summary": {
@@ -148,6 +151,9 @@
     "expected_bookings": 0,
     "actual_bookings": 0,
     "provider_calls": 91,
+    "prompt_tokens": 647030,
+    "completion_tokens": 8316,
+    "responses_with_cost": 90,
     "cost_usd_recorded": 0.07491450000000001,
     "cost_complete": false,
     "checks_summary": {
@@ -249,6 +255,9 @@
     "expected_bookings": 3,
     "actual_bookings": 0,
     "provider_calls": 61,
+    "prompt_tokens": 716551,
+    "completion_tokens": 9393,
+    "responses_with_cost": 61,
     "cost_usd_recorded": 0.08159204999999997,
     "cost_complete": true,
     "checks_summary": {
@@ -329,6 +338,9 @@
     "expected_bookings": 3,
     "actual_bookings": 3,
     "provider_calls": 37,
+    "prompt_tokens": 441791,
+    "completion_tokens": 6266,
+    "responses_with_cost": 37,
     "cost_usd_recorded": 0.04804425000000001,
     "cost_complete": true,
     "checks_summary": {
@@ -409,6 +421,9 @@
     "expected_bookings": 3,
     "actual_bookings": 3,
     "provider_calls": 37,
+    "prompt_tokens": 439783,
+    "completion_tokens": 6349,
+    "responses_with_cost": 37,
     "cost_usd_recorded": 0.05101845,
     "cost_complete": true,
     "checks_summary": {
@@ -489,6 +504,9 @@
     "expected_bookings": 3,
     "actual_bookings": 3,
     "provider_calls": 41,
+    "prompt_tokens": 530000,
+    "completion_tokens": 9148,
+    "responses_with_cost": 41,
     "cost_usd_recorded": 0.061804799999999986,
     "cost_complete": true,
     "checks_summary": {
@@ -569,6 +587,9 @@
     "expected_bookings": 3,
     "actual_bookings": 3,
     "provider_calls": 33,
+    "prompt_tokens": 394572,
+    "completion_tokens": 5298,
+    "responses_with_cost": 33,
     "cost_usd_recorded": 0.046687799999999995,
     "cost_complete": true,
     "checks_summary": {
@@ -649,6 +670,9 @@
     "expected_bookings": 3,
     "actual_bookings": 3,
     "provider_calls": 35,
+    "prompt_tokens": 430413,
+    "completion_tokens": 5657,
+    "responses_with_cost": 35,
     "cost_usd_recorded": 0.051616949999999995,
     "cost_complete": true,
     "checks_summary": {
@@ -731,6 +755,9 @@
     "expected_bookings": 0,
     "actual_bookings": 0,
     "provider_calls": 34,
+    "prompt_tokens": 376672,
+    "completion_tokens": 4243,
+    "responses_with_cost": 34,
     "cost_usd_recorded": 0.04402260000000001,
     "cost_complete": true,
     "checks_summary": {
@@ -827,6 +854,9 @@
     "expected_bookings": 0,
     "actual_bookings": 0,
     "provider_calls": 35,
+    "prompt_tokens": 394214,
+    "completion_tokens": 4296,
+    "responses_with_cost": 35,
     "cost_usd_recorded": 0.046071300000000016,
     "cost_complete": true,
     "checks_summary": {
@@ -923,6 +953,9 @@
     "expected_bookings": 0,
     "actual_bookings": 0,
     "provider_calls": 15,
+    "prompt_tokens": 173013,
+    "completion_tokens": 2114,
+    "responses_with_cost": 15,
     "cost_usd_recorded": 0.02099955,
     "cost_complete": true,
     "checks_summary": {
@@ -1027,6 +1060,9 @@
     "expected_bookings": 8,
     "actual_bookings": 3,
     "provider_calls": 110,
+    "prompt_tokens": 1319987,
+    "completion_tokens": 15287,
+    "responses_with_cost": 110,
     "cost_usd_recorded": 0.15877664999999994,
     "cost_complete": true,
     "checks_summary": {
@@ -1179,6 +1215,9 @@
     "expected_bookings": 4,
     "actual_bookings": 3,
     "provider_calls": 72,
+    "prompt_tokens": 1031648,
+    "completion_tokens": 15070,
+    "responses_with_cost": 72,
     "cost_usd_recorded": 0.12409320000000003,
     "cost_complete": true,
     "checks_summary": {
@@ -1275,6 +1314,9 @@
     "expected_bookings": 4,
     "actual_bookings": 0,
     "provider_calls": 57,
+    "prompt_tokens": 605031,
+    "completion_tokens": 11690,
+    "responses_with_cost": 57,
     "cost_usd_recorded": 0.08193824999999996,
     "cost_complete": true,
     "checks_summary": {
@@ -1366,6 +1408,9 @@
     "expected_bookings": 2,
     "actual_bookings": 0,
     "provider_calls": 36,
+    "prompt_tokens": 417784,
+    "completion_tokens": 8099,
+    "responses_with_cost": 36,
     "cost_usd_recorded": 0.059251800000000014,
     "cost_complete": true,
     "checks_summary": {
@@ -1422,6 +1467,9 @@
     "expected_bookings": 2,
     "actual_bookings": 2,
     "provider_calls": 31,
+    "prompt_tokens": 338978,
+    "completion_tokens": 5888,
+    "responses_with_cost": 30,
     "cost_usd_recorded": 0.0480819,
     "cost_complete": false,
     "checks_summary": {
@@ -1478,6 +1526,9 @@
     "expected_bookings": 2,
     "actual_bookings": 2,
     "provider_calls": 29,
+    "prompt_tokens": 325314,
+    "completion_tokens": 5817,
+    "responses_with_cost": 29,
     "cost_usd_recorded": 0.04584569999999999,
     "cost_complete": true,
     "checks_summary": {

@@ -1,413 +1,180 @@
-# Agente de ventas IA: flujo, datos sintéticos, experimentos y evolución
+# Sales Agent: qué hace, cómo se afina y qué falta
 
-[Volver al README principal del repositorio](../../README.md)
+[README del repositorio](../../README.md) · [Datos JSON](02-datos-de-prueba/) · [119 conversaciones](04-conversaciones/) · [Resultados completos](05-resultados-y-mejoras/)
 
-Este es el documento principal y autocontenido del afinamiento del Sales Agent. Explica el recorrido completo, cómo se creó y utilizó la data sintética, qué conversaciones se ejecutaron, qué se corrigió y cómo cambiaron las métricas. Las carpetas enlazadas guardan los archivos completos y material técnico adicional; no es necesario abrir otros README para entender el trabajo.
+**Objetivo:** responder consultas inmobiliarias con información aprobada y cerrar con una **visita**, que el personal humano atenderá. El agente no cobra, no separa propiedades ni aprueba créditos. El nuevo flujo es el actual por defecto (`sales-current/1.0`); conserva permisos y límites por company/project.
 
-**Corte de evidencia: 11 de noviembre de 2026.** Última corrida recibida: **Repair 5**, commit `4fb17071b617cc430698885fafdde8d209f1d562`, modelo `openai/gpt-4o-mini`, configuración publicada 8. Se conserva el resultado original **FAIL**: dos de tres conversaciones aprobadas, dos de dos visitas confirmadas en laboratorio y un cambio de propiedad con fotos todavía fallido. Esta entrega consolida documentación y analiza esa evidencia; **no modifica el motor ni corrige aún el fallo pendiente**.
+**Estado al 11/11/2026:** Repair 5, commit `4fb1707`, logró **2/2 visitas y 2/3 conversaciones aprobadas**. Sigue fallando el cambio a Cedar Loft con solicitud de fotos. Hay también un falso positivo del evaluador. Esta guía actualiza documentación, **no corrige aún esos pendientes**.
 
-## Contenido
+[Flujo y rutas](#1-flujo-y-rutas-disponibles) · [LLM y backend](#2-cuándo-intervienen-el-llm-y-el-backend) · [Afinamiento real](#3-qué-modificamos-para-afinarlo) · [Datos](#4-datos-sintéticos-y-experimentos) · [Ejemplos repetibles](#5-conversaciones-que-el-equipo-puede-repetir) · [Trabajo futuro y costo](#6-trabajo-futuro-más-casos-y-conversaciones-más-largas) · [Referencias](#7-base-del-diseño-y-referencias) · [Evolución y consumos](#8-evolución-global-de-casos-y-consumos)
 
-1. [Objetivo y flujo actual](#objetivo-y-flujo-actual)
-2. [Desde el inicio de la data sintética](#desde-el-inicio-de-la-data-sintética)
-3. [Empresa, proyectos, propiedades, leads y vendedores](#datos-sintéticos-y-su-organización)
-4. [Diseño de experimentos e iteración](#diseño-de-experimentos-e-iteración)
-5. [Conversaciones reales del laboratorio](#conversaciones-ejecutadas-en-el-servidor)
-6. [Hallazgos de Repair 5 y siguiente trabajo](#hallazgos-de-repair-5-y-siguiente-trabajo)
-7. [Reproducir y mantener la evidencia](#reproducir-y-mantener-la-evidencia)
-8. [Métricas y evolución histórica](#métricas-y-evolución-histórica)
-
-## Objetivo y flujo actual
-
-El agente informa sobre el conocimiento aprobado, resuelve dudas y anima al lead a conocer presencialmente la propiedad. La venta la cierra el personal humano durante/después de la visita. El chat no cobra, no separa inmuebles y no aprueba créditos. “Tengo cash” significa capacidad/intención de comprar de contado, sin necesidad de financiación; no prueba dinero físico ni fondos verificados.
-
-El nuevo flujo ya es el flujo actual para todos los scopes: el selector de compatibilidad `next_flow.selected` devuelve `True`. Los flags históricos no eligen otro motor. Esto no elimina permisos, requisitos de aprobación del project ni controles de disponibilidad. La etiqueta registrada del recorrido es `sales-current/1.0`.
-
-El canal real recibe WhatsApp/SMS por el proveedor; el laboratorio sustituye únicamente ese transporte por una entrada directa al mismo core. El mensaje pertenece siempre a una company, project, lead y conversación. La autorización y continuidad se revalidan antes de efectos.
+## 1. Flujo y rutas disponibles
 
 ```mermaid
-flowchart TD
-    M["Mensaje del lead"] --> I["Interpretación estructurada"]
-    I --> V{"Contrato, evidencia e intención"}
-    V -->|Válidos| P["Plan y contexto aprobado"]
-    V -->|Inválidos| R["Una reparación acotada"]
-    R --> V
-    P --> T["Lecturas y propuestas autorizadas"]
-    T --> C["Composición con evidencias permitidas"]
-    C --> G["Validación y envío por el canal"]
+sequenceDiagram
+    participant Lead
+    participant Backend
+    participant LLM
+    participant Datos as Datos y herramientas
+    Lead->>Backend: Mensaje en conversación de un project
+    Backend->>Backend: Comprueba acceso, canal y continuidad
+    Backend->>LLM: Interpreta mensaje y contexto
+    LLM-->>Backend: Solicitudes y evidencia estructuradas
+    Backend->>Backend: Valida intención, sujeto y consentimiento
+    Backend->>Datos: Consulta hechos, recursos u horarios autorizados
+    Datos-->>Backend: Resultados verificados
+    Backend->>LLM: Elige bloques y continuación permitidos
+    LLM-->>Backend: Selección estructurada
+    Backend->>Backend: Valida, registra y ejecuta efectos autorizados
+    Backend-->>Lead: Respuesta y recursos aprobados
 ```
 
-El diagrama muestra el recorrido lógico; la reparación tiene límite de un intento y no repite indefinidamente. Un fallo agotado se registra y usa el recorrido de respuesta segura, sin narrar problemas internos al lead.
+La respuesta automática requiere permisos/consentimiento y un project utilizable. Si la conversación está pausada o bajo control humano, no se supone que todo mensaje deba activar al agente.
 
-1. **Interpretar:** el modelo devuelve solicitudes, preferencias, restricciones y evidencia literal del mensaje actual. No recibe autoridad para escribir datos o inventar IDs.
-2. **Validar:** estructura, citas textuales, intención y sujeto deben ser coherentes. Copiar una frase no prueba que esa frase autorice una visita. Información histórica no se convierte en consentimiento nuevo.
-3. **Conservar datos independientes:** presupuesto, moneda, pago de contado y motivación propia verificables se conservan sin inferir fondos disponibles o aprobación crediticia. “Cash” significa compra sin financiación, no billetes físicos ni pago dentro del chat.
-4. **Consultar y planificar:** catálogo publicado, precios, disponibilidad, documentos y asignaciones se resuelven dentro del tenant y project. Desconocido no significa cero; un material no publicado no se inventa.
-5. **Responder:** el compositor elige IDs y variantes de bloques redactados con evidencia del backend. No escribe hechos libres, enlaces arbitrarios ni promesas. Se validan bloques obligatorios, orden, agrupación y continuación.
-6. **Ejecutar:** compartir recursos y agendar requieren autorización del backend. La continuidad evita que un turno antiguo actúe después de una intervención humana.
+Si una interpretación no cumple el contrato se permite una reparación acotada. Algunas respuestas se construyen directamente en backend; no todos los turnos consumen exactamente dos llamadas. Los mensajes de error técnico no deben narrarse al lead.
 
-### Agendar una visita
+### Recorridos comerciales
+
+| Recorrido | Qué puede hacer | Evidencia y límite actual |
+|---|---|---|
+| Información y presupuesto | Propiedad, precio, disponibilidad, contado y financiación publicada | Probado; desconocido no se transforma en cero ni en un precio inventado. |
+| Documentos y galería | Compartir material aprobado de la propiedad pedida | PDF funciona en Repair 5; cambio de propiedad + fotos sigue fallando. |
+| Visita | Ofrecer horario, preparar resumen y confirmar | Dos recorridos completos en Repair 4 y 5; no es validación exhaustiva. |
+| Rechazo, humano y cierre | Permitir consultas, registrar insistencia y despedirse | Probado en la suite de cierres; la petición humana no equivale a transferencia inmediata. |
+| Retomar conversación | Responder después de una despedida | Probado en la misma corrida; no demuestra días de inactividad. |
+| Sin vendedores/horarios | Explicar falta de disponibilidad sin inventar reserva o alerta | Casos definidos; no se automatiza aquí el aviso de nuevos slots. |
+| Cancelación/reagendamiento | Hay código y regresiones relacionados en el repositorio | Fuera de esta batería de afinamiento; no se presenta como cobertura live lograda. |
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Consultando
-    Consultando --> Horarios: pide visita y hay disponibilidad
-    Consultando --> SinHorarios: no hay vendedor u horarios elegibles
-    Horarios --> Propuesta: selecciona una opción vigente
-    Propuesta --> Confirmada: confirma el resumen y se revalida disponibilidad
-    Propuesta --> Consultando: rechaza o cambian los datos
-    SinHorarios --> Consultando: continúa preguntando
-    Confirmada --> [*]
+    [*] --> Consulta
+    Consulta --> Horarios: solicita visita y hay disponibilidad
+    Horarios --> Resumen: elige una opción vigente
+    Resumen --> Cita: confirma y el backend revalida
+    Resumen --> Consulta: rechaza o cambian los datos
+    Cita --> [*]
 ```
 
-**Solicitar** busca disponibilidad; **seleccionar** prepara un resumen con propiedad, fecha, timezone, vendedor, duración y dirección; **confirmar** crea la cita tras otra validación. Un ordinal de propiedad no equivale a elegir un horario. La recuperación añadida usa la opción pública completa que acaba de mostrarse, no IDs privados generados por el modelo.
+**Elegir un horario no reserva.** El backend crea la cita únicamente después de la confirmación del resumen y de comprobar elegibilidad, propiedad, dirección, vigencia y disponibilidad.
 
-Si no hay disponibilidad, se explica que no hay horarios y que podrá comunicarse disponibilidad futura, sin afirmar que se creó una alerta o que alguien ya fue notificado. Automatizar ese aviso sigue fuera de este experimento. Cancelar y reagendar no forman parte de esta batería, aunque existen recorridos y regresiones técnicas relacionados en el repositorio.
+### Dónde se usa en el producto
 
-### Reglas comerciales y de cierre
-
-| Situación | Comportamiento esperado |
-|---|---|
-| Presupuesto suficiente / contado | Informar y conservar la preferencia; no ofrecer crédito de forma repetitiva. |
-| Presupuesto inferior | Mostrar alternativa del mismo alcance si existe, o financiación publicada sin prometer aprobación ni cambiar el precio. |
-| Inicial conocida pero presupuesto total desconocido | Conservar la inicial; no tratarla como presupuesto total. |
-| Financiación detallada | Solo condiciones publicadas; aclaraciones específicas durante visita. |
-| Reserva o pago en chat | Aclarar que no se puede cobrar ni separar; sí coordinar visita. |
-| Rechaza visita | Permitir otras consultas; si no hay más, despedirse sin presión. |
-| Pide humano | Ofrecer responder su consulta; ante insistencia registrar la petición sin prometer una transferencia inmediata. |
-| Despedida / retoma | Cerrar amablemente y permitir nuevas preguntas; no inventar frustración. |
-
-Estas reglas se apoyan en información aprobada. No se cruzan compañías, no se inventan retornos de inversión y no se trata la intención del comprador como una operación financiera.
-
-## Desde el inicio de la data sintética
-
-### Por qué se creó el laboratorio
-
-Las pruebas manuales por WhatsApp mostraron respuestas de respaldo, pérdida de preferencias, mensajes que explicaban procesos internos y diálogos poco comerciales. Se separaron dos problemas: la calidad del motor y los fallos del canal/proveedor. Antes de medir el diálogo había que corregir bloqueos de esquema/HTTP y registrar reglas de validación concretas, no únicamente hashes o nombres genéricos de excepción.
-
-El laboratorio se diseñó para ejercitar **el mismo core del agente**, usando contexto aprobado y servicios reales de lectura, recursos y persistencia contra una base SQLite desechable. No es otro agente simplificado. La preparación de fixtures sin inferencia no es un resultado de calidad. No hay un ZIP de ejecución “lab 1” disponible en esta evidencia: la primera corrida cuantificable conservada aquí es `sales-synthetic-lab-2.zip`. No se inventa una medición anterior.
-
-### Primera etapa: lead LLM adaptativo
-
-Se creó una company ficticia con tres projects y seis propiedades, galerías/PDFs legibles y hechos aprobados. Se probaron tres conversaciones por project: **nueve casos**, hasta seis mensajes de lead por caso. Tanto el agente como el lead utilizaron `openai/gpt-4o-mini` en las dos primeras corridas conservadas. El juez LLM estaba desactivado.
-
-| Perfil inicial | Qué buscaba | Qué no debía hacer |
+| Ruta o canal | Función | Acceso / condición |
 |---|---|---|
-| `new_buyer` | Tipos/precios, dormitorios/área de una propiedad y presupuesto si se lo preguntaban | Cambiar a investigación de barrio o repetir lo ya respondido |
-| `targeted_materials` | Fotos y PDF de una propiedad concreta, luego parking | Aceptar otra propiedad o pedir sustitutos no deseados |
-| `continuity` | Precio/disponibilidad, declarar contado y después cambiar explícitamente a financiación junto con una pregunta | Repetir indefinidamente la declaración o adoptar el rol del vendedor |
+| `/app/agent` | Conversaciones, alta de lead y control humano | Roles `admin`, `assistant`, `mkt`; respetando company/project. |
+| WhatsApp/SMS entrante | El webhook deriva al coordinador actual | Sender/canal configurado, lead autorizado y flujo activo. No se prueba el operador con el laboratorio. |
+| `/app/schedule` | Horarios y citas | `admin`, `assistant`, `sales`; un sales conserva el alcance permitido. |
+| `/app/projects/:id/onboarding` | Preparar/aprobar el conocimiento | `admin`, `assistant`; alimenta al agente, no es el chat comercial del lead. |
+| `/admin/ai-settings` | Modelo y configuración publicados | `superadmin`; no modifica automáticamente los pesos del modelo. |
+| `/admin/messaging-settings` | Sender, WABA y permisos de mensajería | `superadmin`; tener una ruta implementada no prueba entrega efectiva. |
+| Laboratorio por CLI | Ejecutar el mismo core con datos desechables | SQLite aislado, sin SMS/WhatsApp ni Google Calendar externo. |
 
-El lead veía su perfil/objetivos y la conversación pública, no el catálogo verdadero, las respuestas esperadas, los IDs privados ni las trazas internas. [Perfiles iniciales y objetivos en JSON](02-datos-de-prueba/leads/perfiles-iniciales-adaptativos.json) · [JSON de las primeras conversaciones](04-conversaciones/) · [Diseño técnico original](synthetic-company-laboratory.md).
+Para desarrollo: `POST /api/v1/sales-agent/live-leads` registra el lead; `GET /api/v1/sales-agent/conversations` consulta conversaciones; los webhooks son `POST /api/v1/webhooks/telnyx/messaging` y `POST /api/v1/webhooks/twilio/sms`. La simulación y el tráfico live delegan al core actual; las rutas de prueba no habilitan permisos de producción. [Rutas UI](../../frontend/src/app/app.routes.ts) · [API](../../backend/app/modules/sales_agent/router.py) · [Coordinador live](../../backend/app/modules/sales_agent/live_service.py).
 
-Se observó que el propio simulador podía repetir preguntas, desviarse del objetivo o generar mensajes con papel de vendedor. En la segunda corrida conservada (`lab 3`) se cambió **el controlador del lead**, sin cambiar en esa entrega el motor de ventas: el backend pasó a decidir avance y terminación, con dos intentos máximos por objetivo, rechazo de repeticiones/desvíos/rol y mensajes de respaldo observables. Una declaración de “terminé” del LLM dejó de ser suficiente para aprobar.
+## 2. Cuándo intervienen el LLM y el backend
 
-En Lab 3 terminaron los nueve controladores; solo cuatro casos tuvieron resolución percibida de todos sus objetivos. Se registraron cinco objetivos no resueltos, cinco borradores repetidos rechazados y trece mensajes de respaldo. **Que el controlador termine no significa que el agente haya vendido bien.** Esa percepción tampoco sustituye las verificaciones de hechos/recursos. [Métricas de esa etapa](05-resultados-y-mejoras/sales-synthetic-lab-3/resultado.json) · [Controlador v2](lead-controller-v2.md).
+| Etapa | Responsable | Qué recibe / devuelve | Qué evita |
+|---|---|---|---|
+| Entender lo que pide el lead | **LLM**, con salida estructurada | Mensaje actual, contexto y memoria → solicitudes, restricciones, preferencias y citas textuales | Convertir declaraciones o información histórica en consentimiento nuevo. |
+| Validar y conservar hechos | **Backend** | Comprueba esquema, evidencia, ámbito y datos literales independientes | Perder presupuesto por un fallo o tratar una inicial como presupuesto total. |
+| Resolver y planificar | **Backend** | Identifica propiedad/unidad/recurso y consulta datos aprobados | Inventario, IDs, URLs o financiación inventados; cruces de company. |
+| Componer respuesta | **LLM** | Selecciona IDs y variantes de bloques autorizados y una continuación | Introducir hechos libres, acciones no ejecutadas o preguntas repetidas. |
+| Compartir, agendar y enviar | **Backend** | Valida el resultado, aplica permisos y registra efectos | Reservar por una simple selección, duplicar citas o afirmar una entrega inexistente. |
 
-### Segunda etapa: guiones para ahorrar y atribuir los cambios
+**Modelo observado:** `openai/gpt-4o-mini` vía OpenRouter. **Configuración publicada:** versión 8; no es una versión de los pesos. **Contratos del código:** interpretación `sales-interpretation-input/2.0`, prompt nuevo `sales-understanding-prompt/2.26`, composición `sales-commercial-composer/1.0`. El alias de modelo no demuestra un snapshot fechado del proveedor. El modelo efectivo y el digest de configuración se exportan en cada corrida.
 
-Por costo y necesidad de iterar se pasó a leads guionados, sin otro modelo ni juez LLM. Se mantuvo el modelo publicado del agente. El comprador simulado expresa objetivos concretos y solo usa la respuesta pública para elegir horarios y confirmar. Primero se trabajaron bloques puntuales de agendamiento, luego políticas comerciales y cierres/retoma, y finalmente una batería compacta de ocho perfiles por dos variantes.
+El agente recuerda presupuesto, contado, motivación, propiedad y restricciones. “Cash” significa compra de contado, no billetes físicos ni fondos verificados. Los detalles de crédito solo se afirman si están publicados; de otro modo se aclaran durante una visita. [Interpretación](../../backend/app/modules/sales_agent/understanding_service.py) · [Planner](../../backend/app/modules/sales_agent/turn_planner.py) · [Compositor](../../backend/app/modules/sales_agent/commercial_composer.py).
 
-Esto hizo más barato repetir exactamente el mismo estímulo después de una corrección. No prueba que el agente comprenda cualquier paráfrasis: por eso se guardan paquetes reales de interpretación, se añaden variantes y se hace revisión humana del diálogo. Las métricas finales de este documento separan esta etapa de la etapa con lead LLM.
+## 3. Qué modificamos para afinarlo
 
-### Registro de hitos y retrocesos
+Se conservan los pesos del modelo. El afinamiento realizado es **ingeniería del flujo y evaluación**: cambiar instrucciones, contratos y código, desplegar y medir nuevamente.
 
-| Etapa | Qué se intentó mejorar y qué se aprendió |
-|---|---|
-| Preparación sintética | Fichas publicadas, recursos legibles y aislamiento; preparar datos no mide calidad. |
-| Lab 2–3 adaptativo | Separamos fallos del vendedor y del comprador simulado; acotamos objetivos y repeticiones. |
-| Booking point 1–6 | Persistencia de presupuesto/contado, evidencia y selección/resumen/confirmación; se obtuvieron citas, pero hubo fallos de diálogo y checks bloqueados. |
-| Commercial point 1–2 | Contado versus crédito, inicial versus presupuesto total, alternativas asequibles y límites de pago/reserva. Se detectó que un PASS antiguo podía incluir frustración inventada y financiación repetida. |
-| Closing point 1 | Rechazo de visita, petición humana insistente, despedida y retoma en la misma corrida. |
-| Compact battery 1 | Los 16 casos descubrieron errores no visibles en pruebas puntuales. |
-| Repair 1–2 | Contrato y reparación de interpretación; hubo regresión de tres a cero visitas entre estas dos corridas y siete TypeError sin traza conservada en Repair 2. |
-| Repair 3 | Trazas supervivientes al rollback y datos literales independientes. Aparecieron comparaciones inventadas y selecciones que no avanzaban. No reapareció TypeError en esa selección, sin demostrar su eliminación universal. |
-| Repair 4 | Se completaron dos visitas, se entregó PDF y se respetó rechazo; quedó composición/orden y catálogo amplio. |
-| Repair 5 | Se mantuvieron las dos visitas; mejoró la primera respuesta de propiedad. Se detectó un falso positivo del evaluador y un fallo real al cambiar a Cedar Loft y pedir sus fotos. |
-
-## Datos sintéticos y su organización
-
-El laboratorio actual contiene **una company, tres projects y seis tipos de propiedad**. No hay varias empresas sintéticas en esta fixture. El aislamiento entre compañías también cuenta con pruebas técnicas separadas, pero esta batería no demuestra por sí sola una matriz multicompañía.
-
-| Conjunto | JSON completo |
-|---|---|
-| Empresa | [Empresa](02-datos-de-prueba/empresa-y-proyectos/empresa.json) |
-| Projects | [Proyectos](02-datos-de-prueba/empresa-y-proyectos/proyectos.json) |
-| Propiedades e inventario | [Propiedades](02-datos-de-prueba/empresa-y-proyectos/propiedades.json) |
-| Galerías y PDFs | [Recursos](02-datos-de-prueba/empresa-y-proyectos/galerias-y-documentos.json) |
-| Leads | [Perfiles](02-datos-de-prueba/leads/perfiles-de-leads.json) |
-| Usuarios sales | [Vendedores](02-datos-de-prueba/vendedores-y-horarios/vendedores.json) |
-| Alcance de cada vendedor | [Asignaciones](02-datos-de-prueba/vendedores-y-horarios/asignaciones-a-proyectos.json) |
-| Horarios | [Disponibilidad](02-datos-de-prueba/vendedores-y-horarios/horarios-disponibles.json) |
-
-```mermaid
-flowchart TD
-    C["Company ficticia"] --> P["Tres projects"]
-    P --> U["Seis propiedades y recursos"]
-    C --> S["Usuarios sales"]
-    S --> A["Asignaciones: todos, algunos o ninguno"]
-    A --> P
-    S --> H["Bloques de disponibilidad"]
-    L["Lead de un caso"] --> P
-    L --> V["Visita confirmada"]
-    H --> V
-```
-
-### Empresa y proyectos
-
-Empresa: **SYNTHETIC - Penguin Sales Laboratory**, país US, timezone corporativo UTC. Los proyectos tienen timezones propios. Sus fichas están aprobadas para aislar la calidad del diálogo de problemas del onboarding. Dirección, recursos y datos son ficticios.
-
-| Project | Zona horaria | Dirección |
+| Cambio real | Ejemplo observado | Por qué mejora el diálogo |
 |---|---|---|
-| SYNTHETIC Harbor Gardens | `America/New_York` | 1 Synthetic Avenue |
-| SYNTHETIC Cedar Heights | `America/Chicago` | 2 Synthetic Avenue |
-| SYNTHETIC Sierra Commons | `America/Denver` | 3 Synthetic Avenue |
+| Prompt y esquema estructurado | Esquema rechazado por HTTP; confusión entre pedir material y comparar | Hace interpretable la salida y explicita las diferencias de intención. |
+| Validación de significado y evidencia | Selección de horario reparada como nueva petición; consentimiento inventado | Una frase copiada correctamente debe respaldar la acción que se le atribuye. |
+| Resolución de referencias | Propiedad marcada como `material`; “its photos” perdió el dueño | Vincula la pregunta al objeto correcto, sin pedir al lead que repita lo ya claro. |
+| Estado y persistencia | Presupuesto/contado perdidos al hacer rollback | Conserva lo dicho por el comprador y evita volver a preguntar. |
+| Planificación y consultas | Cedar Studio pedida, pero consulta de todo el catálogo | Conserva el alcance de la propiedad y mantiene consultas amplias cuando sí se piden. |
+| Composición limitada | Reordenar bloques autorizados provocó rechazo y otro intento | Restaura una permutación segura sin otra llamada; otros errores siguen rechazados. |
+| Evaluador y regresiones | Un check exigió metadata de catálogo a una respuesta de detalles | Evita falsos fallos y conserva los fallos reales como pruebas reproducibles. |
 
-Todos publican pago de contado y financiación bancaria, entrega diciembre de 2027 y amenidades de prueba. No se publican tasa, porcentaje de inicial, elegibilidad ni retornos garantizados.
+**Ciclo:** guardar el diálogo y los paquetes → localizar la regla que falla → corregir esa pieza → probar variantes y regresiones localmente → desplegar → repetir los mismos casos con el modelo publicado. Aprobar tests con HTTP simulado no demuestra calidad del LLM real. [Ejemplos técnicos de correcciones](../SALES_COMPACT_REPAIR5.md) · [Diagnóstico pendiente](05-resultados-y-mejoras/sales-compact-repair-5/diagnostico.json).
 
-| Propiedad | Dormitorios / baños | Área | Precio USD | Disponibles | Galería | PDF |
-|---|---|---|---|---|---|---|
-| Bay Residence | 4 / 3 | 240 m² | 780000 | 3 | Sí | Sí |
-| Cedar Loft | 2 / 2 | 110 m² | 325000 | 5 | Sí | No |
-| Cedar Studio | 1 / 1 | 52 m² | 210000 | 2 | No | Sí |
-| Ridge Townhome | 3 / 2.5 | 165 m² | 460000 | 4 | No | No |
-| Summit Villa | 4 / 3 | 220 m² | 620000 | 0 | Sí | Sí |
-| Valley Apartment | 2 / 2 | 95 m² | Desconocido | Desconocido | No | No |
+## 4. Datos sintéticos y experimentos
 
-Los PDFs son archivos legibles generados para pruebas. Las galerías contienen ilustraciones sintéticas, no fotografías de inmuebles reales. Un PDF no prueba que existan fotos o planos: sus etiquetas de cobertura importan. Los enlaces exportados solo tienen sentido dentro del laboratorio; no son URLs públicas operativas de producción.
+### Cómo empezó y por qué cambió
 
-### Leads guionados: siete segmentos y uno desconocido
-
-| Persona | Segmento | Presupuesto base USD |
+| Etapa | Diseño | Qué aprendimos |
 |---|---|---|
-| Emma Torres | `first_time_buyer` | 300000 |
-| Daniel Brooks | `move_up_buyer` | 900000 |
-| Sofia Reed | `relocation` | 900000 |
-| Martin Vega | `downsizing` | 300000 |
-| Lucas Chen | `rental_yield_investor` | 500000 |
-| Valeria Cruz | `appreciation_resale_investor` | 900000 |
-| Adrian Park | `portfolio_diversification` | 400000 |
-| Alex Rivera | `sin segmento` | 500000 |
+| Preparación | Company, tres projects y seis propiedades aprobadas con recursos legibles | Preparar fixtures sin inferencia no es medir calidad. La primera corrida cuantificable disponible es Lab 2; no se inventan métricas de Lab 1. |
+| Lab 2–3 | Nueve diálogos: tres perfiles por project, lead LLM y agente `gpt-4o-mini`, hasta seis turnos de lead | El simulador repetía o se desviaba. Se acotó el controlador a dos intentos por objetivo; terminar no equivalía a resolver. |
+| Pruebas puntuales | Agenda, política comercial y cierres con leads guionados | Ahorrar llamadas y aislar el efecto de cada cambio. |
+| Batería compacta | Siete segmentos + uno desconocido, dos variantes por perfil: 16 escenarios | Descubrir fallos que los ejemplos cortos no mostraban. |
+| Repairs 1–5 | Repeticiones acotadas y paquetes grabados | Hubo avances y regresiones. Se pasó de 0/2 a 2/2 visitas en la selección reciente; cambio de propiedad/fotos sigue pendiente. |
 
-Los guiones A/B pueden cambiar el presupuesto o las condiciones respecto del perfil base: el valor exacto está en cada caso. No se fijaron edades ni ocupaciones; aparecen como `null`, no como hechos inventados. El segmento se deriva de la motivación expresada por el comprador, nunca de edad, ocupación o riqueza. No hay un LLM de lead: los mensajes iniciales y decisiones se guionan; el controlador solo lee opciones públicas del agente para seleccionar y confirmar.
+**Ahora:** el agente usa el modelo publicado; el lead es guionado y el juez LLM está desactivado. El controlador elige usando solo opciones públicas, no IDs privados ni respuestas esperadas. [Perfiles iniciales LLM](02-datos-de-prueba/leads/perfiles-iniciales-adaptativos.json) · [Guiones actuales](03-casos-de-prueba/casos-guionados.json).
 
-### Vendedores y horarios
+### Empresa, propiedades y recursos
 
-[Ver la matriz legible de los 80 vendedores y sus proyectos](02-datos-de-prueba/vendedores-y-horarios/README.md)
+Una company: **SYNTHETIC - Penguin Sales Laboratory**. Datos ficticios, país US. Pago publicado: contado y financiación bancaria; sin tasa, aprobación ni porcentaje de inicial inventados.
 
-La batería define **cinco usuarios por escenario**, 80 identidades sintéticas para 16 escenarios. No son 80 vendedores disponibles simultáneamente: antes de cada caso se reconstruyen las asignaciones y slots activos. Todos pertenecen a la misma company. IDs, emails `.invalid` y nombre real de fixture están en los JSON; las cuentas no sirven para iniciar sesión. No se exportan contraseñas ni credenciales.
+| Project / timezone | Propiedad | Precio USD | Disponibles | Galería / PDF |
+|---|---|---|---|---|
+| Harbor Gardens / New York | Bay Residence | 780.000 | 3 | Ambos |
+| Cedar Heights / Chicago | Cedar Loft | 325.000 | 5 | Galería |
+| Cedar Heights / Chicago | Cedar Studio | 210.000 | 2 | PDF |
+| Sierra Commons / Denver | Ridge Townhome | 460.000 | 4 | Ninguno |
+| Sierra Commons / Denver | Summit Villa | 620.000 | **0** | Ambos |
+| Sierra Commons / Denver | Valley Apartment | **Desconocido** | **Desconocido** | Ninguno |
 
-| Rol del escenario | Alcance y elegibilidad |
-|---|---|
-| `candidate` | Candidato del project; todos, uno, dos projects o ninguno según el caso. Puede carecer de slots. |
-| `other_project` | Tiene horarios, pero está asignado a otro project. |
-| `none` | Ningún project asignado, aunque tenga horarios. |
-| `inactive` | Asignado, pero usuario inactivo. |
-| `no_appointments` | Asignado, pero no acepta citas. |
+Los PDFs son legibles y las galerías contienen ilustraciones sintéticas. Su cobertura se aprueba por etiqueta: un PDF no prueba que haya fotos o planos. Los enlaces del laboratorio no funcionan como URLs productivas. [Empresa y projects JSON](02-datos-de-prueba/empresa-y-proyectos/) · [Propiedades](02-datos-de-prueba/empresa-y-proyectos/propiedades.json) · [Recursos](02-datos-de-prueba/empresa-y-proyectos/galerias-y-documentos.json).
 
-La disponibilidad documental usa un reloj fijo `2026-11-11T06:34:00` UTC: bloques 15:00–18:00 UTC a +2, +3 y +4 días para quienes tengan slots. Las corridas reales generan esos días desde su propio reloj; no son horarios permanentes ni promesas comerciales. Las visitas de prueba duran 45 minutos. Los JSON de asignaciones indican `scenario`, `user_id`, `company_id`, `access_scope`, `project_ids` y `target_project_id`.
+### Leads y vendedores
 
-El snapshot se genera desde las funciones reales `seed` y `team`, en SQLite desechable. El script de regeneración está en la sección técnica.
+| Perfil | Persona | Qué se prueba, entre otras variantes |
+|---|---|---|
+| Primera compra | Emma Torres | Inicial, financiación, PDF y visita |
+| Vivienda mayor | Daniel Brooks | Cambio de propiedad, fotos y rechazo |
+| Reubicación | Sofia Reed | Ubicación, entrega y asignación de vendedor |
+| Vivienda menor | Martin Vega | Propiedad agotada y material ausente |
+| Inversión para alquiler | Lucas Chen | Retorno no publicado e inventario desconocido |
+| Reventa | Valeria Cruz | Financiación sin cobrar ni separar |
+| Diversificación | Adrian Park | Comparación y elección de otro horario |
+| Sin segmento | Alex Rivera | Visita sin inferir motivación; petición humana |
 
-### Ejemplo de empresa, project y propiedad
+Edad/ocupación están sin definir; no se infieren segmentos por demografía. Los presupuestos y restricciones exactos pertenecen a cada variante. [Perfiles JSON](02-datos-de-prueba/leads/perfiles-de-leads.json).
 
-Estos son campos reales del snapshot documental; `null` conserva un desconocido, no equivale a cero. Los recursos pertenecen a la propiedad y al project del mismo snapshot.
+Por escenario hay cinco roles de vendedor: **candidato**, asignado a **otro project**, **sin asignación**, **inactivo** y **no acepta citas**. El candidato puede cubrir todos, dos, uno o ningún project de su company, y puede no tener slots. Son 80 identidades para 16 escenarios, **no 80 vendedores elegibles simultáneos**: se reconstruyen las asignaciones activas por caso. El snapshot usa bloques UTC 15:00–18:00 a +2/+3/+4 días; las corridas recalculan las fechas desde su reloj.
+
+[Tabla legible de vendedores y projects](02-datos-de-prueba/vendedores-y-horarios/README.md) · [Usuarios JSON](02-datos-de-prueba/vendedores-y-horarios/vendedores.json) · [Asignaciones](02-datos-de-prueba/vendedores-y-horarios/asignaciones-a-proyectos.json) · [Slots](02-datos-de-prueba/vendedores-y-horarios/horarios-disponibles.json).
+
+Ejemplo de los datos utilizados (vista resumida; los archivos enlazados conservan sus IDs y relaciones):
 
 ```json
 {
-  "company": {
-    "id": "f0ebe3a5-6c04-5b8e-8cd8-423859aa39d7",
-    "name": "SYNTHETIC - Penguin Sales Laboratory",
-    "country": "US",
-    "timezone": "UTC",
-    "fictional": true
-  },
-  "project": {
-    "id": "abf88941-5a70-5a06-a1ed-bca5b42bb90a",
-    "company_id": "f0ebe3a5-6c04-5b8e-8cd8-423859aa39d7",
-    "name": "SYNTHETIC Cedar Heights",
-    "timezone": "America/Chicago",
-    "address": "2 Synthetic Avenue",
-    "payment_methods": [
-      "Cash",
-      "Bank financing"
-    ]
-  },
-  "property": {
-    "id": "bb1d7fba-2496-5256-a405-535cd3455066",
-    "project_id": "abf88941-5a70-5a06-a1ed-bca5b42bb90a",
-    "name": "Cedar Studio",
-    "facts": {
-      "key": "studio",
-      "name": "Cedar Studio",
-      "bedrooms": 1,
-      "bathrooms": 1,
-      "area": 52,
-      "price": 210000,
-      "available": 2,
-      "gallery": false,
-      "pdf": true,
-      "features": [
-        "Shared rooftop terrace"
-      ]
-    },
-    "area_unit": "m²",
-    "currency": "USD"
-  }
+  "lead": {"name": "Emma Torres", "segment": "first_time_buyer", "budget": 300000},
+  "property": {"name": "Cedar Studio", "bedrooms": 1, "area_m2": 52, "price_usd": 210000},
+  "resources": {"gallery": false, "pdf": true},
+  "sales_assignment": {"scenario": "first_time_A", "company": "Penguin Sales Laboratory", "project": "Cedar Heights", "access": "single"}
 }
 ```
 
-### Ejemplo de lead y de guion
-
-El perfil base no se introduce como segmento ya asignado en el Lead de la base: se verifica que la declaración propia lo permita inferir. La variante puede cambiar presupuesto u objetivos sin cambiar arbitrariamente otros hechos.
+Ejemplo de organización del guion:
 
 ```json
-{
-  "key": "first_time",
-  "name": "Emma Torres",
-  "segment": "first_time_buyer",
-  "motive": "I am buying my first home.",
-  "budget": 300000,
-  "age": null,
-  "occupation": null,
-  "note": "Age and occupation are not defined or used to infer a segment."
-}
-```
-```json
-{
-  "goal": "booked",
-  "access": "single",
-  "budget": 300000,
-  "cash": true,
-  "material": "pdf",
-  "phases": [
-    [
-      "information",
-      "I am buying my first home. My budget is 300,000 USD, paying cash. What can you tell me about Cedar Studio?"
-    ],
-    [
-      "material",
-      "Please send the brochure PDF for Cedar Studio."
-    ],
-    [
-      "request_visit",
-      "I would like to arrange an in-person visit to Cedar Studio. Any available time in the next seven days works for me. Please use the project timezone."
-    ]
-  ]
-}
+{"case":"first_time_A","goal":"booked","access":"single","budget":300000,"cash":true,"material":"pdf"}
 ```
 
-[Todos los perfiles actuales](02-datos-de-prueba/leads/) · [Guiones completos](03-casos-de-prueba/casos-guionados.json)
+[Todos los datos y sus relaciones](02-datos-de-prueba/). Los escenarios no contienen datos reales de clientes. Las simulaciones usan SQLite desechable; no prueban entrega SMS/WhatsApp ni sincronización externa de calendario.
 
-### Ejemplo de asignación de vendedor
+## 5. Conversaciones que el equipo puede repetir
 
-```json
-{
-  "sales_user": {
-    "id": "919e8ff1-50c2-540e-92e0-dac4c05356fb",
-    "company_id": "f0ebe3a5-6c04-5b8e-8cd8-423859aa39d7",
-    "role": "candidate",
-    "active": true,
-    "accepts_appointments": true,
-    "has_slots": true,
-    "scenario": "first_time_A",
-    "user_role": "sales",
-    "name": "Synthetic candidate",
-    "email": "first_time_A-candidate@compact.synthetic.invalid",
-    "login_enabled": false
-  },
-  "assignment": {
-    "scenario": "first_time_A",
-    "user_id": "919e8ff1-50c2-540e-92e0-dac4c05356fb",
-    "company_id": "f0ebe3a5-6c04-5b8e-8cd8-423859aa39d7",
-    "access_scope": "selected",
-    "project_ids": [
-      "abf88941-5a70-5a06-a1ed-bca5b42bb90a"
-    ],
-    "target_project_id": "abf88941-5a70-5a06-a1ed-bca5b42bb90a"
-  },
-  "availability_block": {
-    "scenario": "first_time_A",
-    "user_id": "919e8ff1-50c2-540e-92e0-dac4c05356fb",
-    "starts_at_utc": "2026-11-13 15:00:00",
-    "ends_at_utc": "2026-11-13 18:00:00",
-    "timezone": "UTC"
-  }
-}
-```
+Estos fragmentos son **evidencia ejecutada en el servidor**. La columna “para repetir” es una instrucción de prueba, no otra transcripción. En un project real hay que sustituir nombres y condiciones por sus datos aprobados; no copiar fechas, URLs ni identidad de un vendedor ficticio. Un LLM puede variar la redacción: se evalúa intención, datos y resultado, no texto idéntico.
 
-El vendedor de ejemplo pertenece a la única company ficticia y al project Cedar Heights. En otros escenarios el candidato está habilitado para todos, para dos, para uno o para ninguno. Tener horarios no compensa una asignación incorrecta. [Matriz legible por escenario de todos los vendedores](02-datos-de-prueba/vendedores-y-horarios/README.md) · [Carpeta de JSON](02-datos-de-prueba/vendedores-y-horarios/).
+### first_time_A · sales-compact-repair-5
 
-## Diseño de experimentos e iteración
-
-[Ver los 16 guiones completos en JSON](03-casos-de-prueba/casos-guionados.json)
-
-Hay ocho perfiles (siete segmentos y uno sin segmento), con dos variantes por perfil: **16 conversaciones independientes**. No se asigna anticipadamente el segmento al Lead de prueba; se comprueba después de interpretar su declaración. Los objetivos esperados no se pasan al modelo ni al controlador como hechos del cliente.
-
-| Perfil | Variante A | Variante B |
-|---|---|---|
-| Primera compra | Información, PDF y visita | Inicial versus presupuesto total, financiación, PDF y rechazo |
-| Cambio a vivienda mayor | Información, galería y visita | Elegir otra propiedad, fotos, rechazo y despedida |
-| Reubicación | Ubicación, entrega y visita | Vendedor con horarios pero sin asignación al project |
-| Vivienda menor | Información, PDF y visita | Material faltante y otra propiedad agotada |
-| Inversión para alquiler | Información y visita | Retorno no publicado e inventario/precio desconocidos |
-| Revalorización y reventa | Información y visita | Presupuesto inferior, financiación y rechazo de pago/reserva |
-| Diversificación | Comparación, galería y otro slot | Comparación y ausencia de slots |
-| Sin segmento | Información y visita | Petición humana insistente y cierre |
-
-### Cómo ahorramos tokens
-
-Solo el agente de ventas usa el modelo publicado. El lead y el juez no consumen llamadas LLM. Los guiones contienen intenciones y decisiones de un comprador; el controlador de disponibilidad observa la respuesta pública y nunca lee IDs privados de slots, la lista de vendedores o el resultado esperado. Se limita la repetición y se detiene si no hay avance. No se mantiene un role-play libre durante horas.
-
-En la iteración actual se ejecutan tres casos (`first_time_A`, `move_up_B`, `unknown_A`), como máximo ocho turnos de lead por caso y sesenta llamadas globales. Un turno puede requerir interpretación, reparación y composición: no equivale a una llamada. Son límites operativos, no una estimación científica de duración media de conversaciones reales ni un límite monetario. Las dos visitas necesitan normalmente cuatro o cinco mensajes del lead en esta selección.
-
-### Ciclo de mejora
-
-```mermaid
-flowchart TD
-    G["Datos y guiones versionados"] --> E["Ejecutar core aislado en servidor"]
-    E --> M["Checks, trazas y consumo"]
-    M --> R["Revisión de conversaciones"]
-    R --> F["Corrección acotada"]
-    F --> T["Regresiones con paquetes grabados"]
-    T --> D["Desplegar y repetir los mismos casos"]
-    D --> E
-```
-
-Se empieza por una iteración puntual para resolver un bloqueo; después se amplía a batería compacta. No se aumentan casos ni se cambia de modelo mientras eso impida atribuir un cambio a la corrección del controlador. Las regresiones locales no simulan calidad del modelo: prueban que paquetes ya observados no vuelvan a romper el recorrido.
-
-### Qué medimos
-
-- Fidelidad de presupuesto, moneda, contado y motivación; ausencia de preguntas financieras repetidas.
-- Respuesta a la propiedad solicitada, cambio de propiedad y comparación legítima.
-- Entrega de recursos aprobados o explicación de ausencia; sin inventar cobertura.
-- Asignación correcta por company/project y exclusión de usuarios inactivos/no elegibles/sin slots.
-- Selección, resumen, confirmación y persistencia de exactamente una cita; ninguna antes de confirmar.
-- Despedida, rechazo, petición humana y continuidad sin emociones inventadas ni narración técnica.
-- Idempotencia, aislamiento, ausencia de outbox, llamadas, tokens y costo reportado.
-
-Los checks no sustituyen una revisión comercial. Sus denominadores y reglas han cambiado históricamente; los resultados guardan la versión aplicada. Fuera de alcance: entrega efectiva SMS/WhatsApp, Google Calendar externo, round-robin real, concurrencia PostgreSQL, cancelación/reagendamiento y aviso automático de nuevos horarios.
-
-### Criterios de aceptación y de lectura humana
-
-No basta con que no haya excepciones. Se inspeccionan intención/sujeto, preferencias persistidas, recursos efectivamente compartidos, consentimiento, respuesta pública y recepción/persistencia de efectos. El mismo presupuesto no debe preguntarse de nuevo. Un material no disponible debe explicarse. Una visita solo se crea después de confirmar el resumen.
-
-Hay tres niveles distintos: **regresión local con HTTP simulado**, **corrida del servidor con modelo publicado y transporte simulado**, y **prueba real de canal/calendario**. Las dos primeras no demuestran entrega por operador. Los 3.003 tests técnicos reportados en la entrega anterior no son 3.003 conversaciones con LLM; el historial de corridas es otra evidencia.
-
-## Conversaciones ejecutadas en el servidor
-
-Se conservan **119 conversaciones de 17 corridas** al corte de esta guía, incluidas 18 de los primeros experimentos con lead LLM. Los ejemplos siguientes provienen de esos archivos ejecutados; no se redactaron respuestas ideales para ilustrar la arquitectura. Se mantienen en inglés porque es el idioma de salida del agente evaluado.
-
-[Carpeta completa](04-conversaciones/) · [Índice JSON](04-conversaciones/indice.json) · [Aprobadas automáticamente](04-conversaciones/funcionaron/) · [Necesitan mejoras](04-conversaciones/necesitan-mejoras/) · [Anotaciones humanas](04-conversaciones/revisiones-humanas.json)
-
-**La etiqueta del nombre del archivo es el resultado automático original.** La revisión humana se guarda aparte. Un PASS antiguo puede tener limitaciones no cubiertas por sus checks; hay un ejemplo de financiación repetida y frustración inventada en la carpeta de mejoras, sin borrar que aprobó sus controles de entonces.
-
-### Primera compra: información, PDF y visita completa
-
-Evidencia: `sales-compact-repair-5`, commit `4fb1707`. Resultado automático **aprobado**. [JSON completo](04-conversaciones/funcionaron/primera-compra-pdf-y-visita__first-time-a__sales-compact-repair-5__aprobado.json) · [Carpeta de conversaciones](04-conversaciones/).
-
-**Lead:** I am buying my first home. My budget is 300,000 USD, paying cash. What can you tell me about Cedar Studio?
-
-**Agente:**
+**Información y contado — lead:** I am buying my first home. My budget is 300,000 USD, paying cash. What can you tell me about Cedar Studio?
 
 > Here are the property options I can confirm:
 >
@@ -417,195 +184,23 @@ Evidencia: `sales-compact-repair-5`, commit `4fb1707`. Resultado automático **a
 >
 > What would you like to know next about the property?
 
-**Lead:** Please send the brochure PDF for Cedar Studio.
-
-**Agente:**
+**PDF — lead:** Please send the brochure PDF for Cedar Studio.
 
 > Cedar Studio synthetic brochure: [sandbox-material-link]
 
-**Lead:** I would like to arrange an in-person visit to Cedar Studio. Any available time in the next seven days works for me. Please use the project timezone.
-
-**Agente:**
-
-> Verified visit options:
->
-> 1. 2026-11-13 at 09:00 AM (America/Chicago, UTC-0600); Synthetic candidate
->
-> 2. 2026-11-13 at 09:30 AM (America/Chicago, UTC-0600); Synthetic candidate
->
-> 3. 2026-11-13 at 10:00 AM (America/Chicago, UTC-0600); Synthetic candidate
->
-> Which time would you like me to prepare for confirmation?
-
-**Lead:** I would like the first appointment: 2026-11-13 at 09:00 AM (America/Chicago, UTC-0600); Synthetic candidate.
-
-**Agente:**
-
-> Please confirm your visit: Cedar Studio; 2026-11-13 at 09:00 AM (America/Chicago, UTC-0600); Synthetic candidate; 45 minutes; Primary location: 2 Synthetic Avenue. Shall I book this exact visit?
-
-**Lead:** Yes
-
-**Agente:**
+**Visita confirmada — lead:** Yes
 
 > Your visit is confirmed: Cedar Studio; 2026-11-13 at 09:00 AM (America/Chicago, UTC-0600); Synthetic candidate; 45 minutes; Primary location: 2 Synthetic Avenue. What else would you like to know before your visit?
 
-Se observan los pasos separados: la solicitud de material entrega el PDF, elegir el horario solo prepara la propuesta, y el “Yes” posterior confirma. [Más conversaciones de primera compra](04-conversaciones/funcionaron/).
+[Diálogo completo y comprobaciones](04-conversaciones/funcionaron/primera-compra-pdf-y-visita__first-time-a__sales-compact-repair-5__aprobado.json)
 
-### Lead sin segmento: visita sin inventar una motivación
+### farewell_then_reopen · sales-closing-point-1
 
-Evidencia: `sales-compact-repair-5`, commit `4fb1707`. Resultado automático **aprobado**. [JSON completo](04-conversaciones/funcionaron/visita-sin-segmento__unknown-a__sales-compact-repair-5__aprobado.json) · [Carpeta de conversaciones](04-conversaciones/).
-
-**Lead:** My budget is 500,000 USD, paying cash. What can you tell me about Ridge Townhome?
-
-**Agente:**
-
-> Here are the property options I can confirm:
->
-> 1. Ridge Townhome — 3 bedrooms, 2.5 bathrooms, 165 m². Synthetic property for testing. Only the listed features are confirmed. Features: Private patio.
->
-> You are considering an outright purchase, without financing.
->
-> What would you like to know next about the property?
-
-**Lead:** I would like to arrange an in-person visit to Ridge Townhome. Any available time in the next seven days works for me. Please use the project timezone.
-
-**Agente:**
-
-> Verified visit options:
->
-> 1. 2026-11-13 at 08:00 AM (America/Denver, UTC-0700); Synthetic candidate
->
-> 2. 2026-11-13 at 08:30 AM (America/Denver, UTC-0700); Synthetic candidate
->
-> 3. 2026-11-13 at 09:00 AM (America/Denver, UTC-0700); Synthetic candidate
->
-> Which time would you like me to prepare for confirmation?
-
-**Lead:** I would like the first appointment: 2026-11-13 at 08:00 AM (America/Denver, UTC-0700); Synthetic candidate.
-
-**Agente:**
-
-> Please confirm your visit: Ridge Townhome; 2026-11-13 at 08:00 AM (America/Denver, UTC-0700); Synthetic candidate; 45 minutes; Primary location: 3 Synthetic Avenue. Shall I book this exact visit?
-
-**Lead:** Yes
-
-**Agente:**
-
-> Your visit is confirmed: Ridge Townhome; 2026-11-13 at 08:00 AM (America/Denver, UTC-0700); Synthetic candidate; 45 minutes; Primary location: 3 Synthetic Avenue. What else would you like to know before your visit?
-
-La falta de segmento no impide resolver consultas o agendar; no se inventa una motivación para completar el perfil.
-
-### Cambio de propiedad, galería, rechazo y despedida que sí funcionaron
-
-Evidencia: `sales-compact-repair-3`, commit `6a61c35`. Resultado automático **aprobado**. [JSON completo](04-conversaciones/funcionaron/cambio-de-propiedad-fotos-y-despedida__move-up-b__sales-compact-repair-3__aprobado.json) · [Carpeta de conversaciones](04-conversaciones/).
-
-**Lead:** I want to move from my current small home to a larger home. My budget is 400,000 USD, paying cash. Please show me Cedar Studio.
-
-**Agente:**
-
-> Here are the property options I can confirm:
->
-> 1. Cedar Loft — 2 bedrooms, 2 bathrooms, 110 m². Published prices start at 325,000.00 USD.
->
-> 2. Cedar Studio — 1 bedroom, 1 bathroom, 52 m². Published prices start at 210,000.00 USD.
->
-> You are considering an outright purchase, without financing.
->
-> What would you like to know next about the property?
-
-**Lead:** Actually I prefer Cedar Loft instead. Please send its photos.
-
-**Agente:**
-
-> Cedar Loft gallery: [sandbox-material-link]
-
-**Lead:** I do not want a visit yet.
-
-**Agente:**
-
-> No visit has been booked. You can continue asking about the property.
->
-> Is there another property question I can help with?
-
-**Lead:** No other questions, thank you. Goodbye.
-
-**Agente:**
+**Despedida — lead:** No other questions, thank you. Goodbye.
 
 > You're welcome. Thank you for your interest and have a good day. You can message again whenever another question comes up.
 
-Este ejemplo anterior funcionó; la regresión del mismo tipo de solicitud en Repair 5 se documenta abajo. No se presume estabilidad de una sola ejecución favorable.
-
-### Presupuesto inferior: financiación informativa sin promesa de aprobación
-
-Evidencia: `sales-commercial-point-2`, commit `b672f9e`. Resultado automático **aprobado**. [JSON completo](04-conversaciones/funcionaron/presupuesto-inferior-y-financiacion__lower-budget-financing__sales-commercial-point-2__aprobado.json) · [Carpeta de conversaciones](04-conversaciones/).
-
-**Lead:** My budget is 500,000 USD and I need financing. What options can you offer?
-
-**Agente:**
-
-> The published payment information is: Cash; Bank financing.
->
-> Detailed financing and down payment conditions can be reviewed with the sales team during an in-person visit. Financing eligibility and approval are not determined in this chat.
->
-> Financing may be an option to discuss, but it does not guarantee approval or change the published property price.
->
-> I do not have a listed option within your stated total budget in this project.
->
-> Would you like to review visit options to discuss those terms, or do you have another question?
-
-**Lead:** No other questions, thank you. Goodbye.
-
-**Agente:**
-
-> You're welcome. Feel free to message again whenever you have another question.
-
-
-### Petición humana: registro y continuación de preguntas
-
-Evidencia: `sales-closing-point-1`, commit `d5ad9bc`. Resultado automático **aprobado**. [JSON completo](04-conversaciones/funcionaron/peticion-humana-y-pregunta-posterior__human-record-then-question__sales-closing-point-1__aprobado.json) · [Carpeta de conversaciones](04-conversaciones/).
-
-**Lead:** I want to speak to a human
-
-**Agente:**
-
-> I can help with questions about the property, pricing and visits. What would you like to ask?
-
-**Lead:** I still want to speak to a human
-
-**Agente:**
-
-> I've saved your request to speak with the Sales team. Is there another property question I can help with? If not, thank you for your interest and have a good day.
-
-**Lead:** What financing options do you offer?
-
-**Agente:**
-
-> The published payment information is: Cash; Bank financing.
->
-> Detailed financing and down payment conditions can be reviewed with the sales team during an in-person visit. Financing eligibility and approval are not determined in this chat.
->
-> Is there another property question I can help with?
-
-**Lead:** No other questions, thank you. Goodbye.
-
-**Agente:**
-
-> You're welcome. Thank you for your interest and have a good day. You can message again whenever another question comes up.
-
-
-### Retomar después de despedirse
-
-Evidencia: `sales-closing-point-1`, commit `d5ad9bc`. Resultado automático **aprobado**. [JSON completo](04-conversaciones/funcionaron/despedida-y-retoma__farewell-then-reopen__sales-closing-point-1__aprobado.json) · [Carpeta de conversaciones](04-conversaciones/).
-
-**Lead:** No other questions, thank you. Goodbye.
-
-**Agente:**
-
-> You're welcome. Thank you for your interest and have a good day. You can message again whenever another question comes up.
-
-**Lead:** What financing options do you offer?
-
-**Agente:**
+**Retoma — lead:** What financing options do you offer?
 
 > The published payment information is: Cash; Bank financing.
 >
@@ -613,177 +208,117 @@ Evidencia: `sales-closing-point-1`, commit `d5ad9bc`. Resultado automático **ap
 >
 > Would you like to review visit options to discuss those details, or is there another question I can help with?
 
-**Lead:** No other questions, thank you. Goodbye.
+[Diálogo completo y comprobaciones](04-conversaciones/funcionaron/despedida-y-retoma__farewell-then-reopen__sales-closing-point-1__aprobado.json)
 
-**Agente:**
+### property_reservation · sales-commercial-point-2
 
-> You're welcome. Thank you for your interest and have a good day. You can message again whenever another question comes up.
-
-La retoma fue en la misma corrida. No demuestra persistencia tras días de inactividad, recuperación de procesos ni transporte real.
-
-## Hallazgos de Repair 5 y siguiente trabajo
-
-Los dos casos de visita completaron el recorrido. El caso `move_up_B` mantiene **FAIL** por cuatro checks originales, que no son cuatro causas independientes:
-
-| Comprobación | Lectura de la evidencia |
-|---|---|
-| `initial_named_property_scope` | Falso positivo: respondió solo Cedar Studio, la referencia y el ID seleccionado son correctos. La petición fue `property_details`, que no publica necesariamente `property_catalog_offer`. |
-| `material_request_delivered_this_turn` | Fallo real: no se entregaron las fotos al pedir cambiar a Cedar Loft. |
-| `requested_material_delivered` | Consecuencia del mismo fallo de galería en la evaluación de todo el caso. |
-| `property_switch_reflected` | Consecuencia adicional: no cambió el ID de propiedad seleccionado. |
-
-El primer turno ya no inventa consentimiento de visita y la composición fue aceptada en los turnos observados. Eso no convierte toda la conversación en correcta.
-
-### Fragmento pendiente: el cambio explícito sigue sin resolverse
-
-Evidencia: `sales-compact-repair-5`, commit `4fb1707`. Resultado automático **fallido**. [JSON completo](04-conversaciones/necesitan-mejoras/cambio-de-propiedad-fotos-y-despedida__move-up-b__sales-compact-repair-5__fallido__revision-necesita-mejoras.json) · [Carpeta de conversaciones](04-conversaciones/).
-
-**Lead:** I want to move from my current small home to a larger home. My budget is 400,000 USD, paying cash. Please show me Cedar Studio.
-
-**Agente:**
+**Límite de pago/reserva — lead:** Can I reserve Bay Residence and pay the deposit here?
 
 > Here are the property options I can confirm:
 >
-> 1. Cedar Studio — 1 bedroom, 1 bathroom, 52 m². Synthetic property for testing. Only the listed features are confirmed. Features: Shared rooftop terrace.
+> 1. Bay Residence — 4 bedrooms, 3 bathrooms, 240 m². Published prices start at 780,000.00 USD. Synthetic property for testing. Only the listed features are confirmed. Features: Two covered parking spaces; Private garden.
 >
-> You are considering an outright purchase, without financing.
+> I can help with property information and arrange a visit. Payments and reservations of a property are handled in person by the sales team; I cannot take a payment or hold a property in this chat.
 >
-> What would you like to know next about the property?
+> Is the […]
 
-**Lead:** Actually I prefer Cedar Loft instead. Please send its photos.
+[Diálogo completo y comprobaciones](04-conversaciones/funcionaron/sin-pago-ni-separacion-en-chat__property-reservation__sales-commercial-point-2__aprobado.json)
 
-**Agente:**
+| Para repetir con un lead nuevo | Qué debería ocurrir |
+|---|---|
+| Declarar presupuesto/contado → preguntar por propiedad → pedir PDF → solicitar visita | Recordar las preferencias, compartir el recurso correcto y ofrecer horarios reales. Elegir uno y confirmar el resumen debe crear una sola cita. |
+| Despedirse → volver con una pregunta sobre financiación | Responder la pregunta conservando contexto; sin inventar frustración ni insistir en una visita. |
+| Pedir reservar/pagar aquí | Aclarar el límite, responder consultas y ofrecer coordinar una visita. |
+| Cambiar de propiedad y pedir sus fotos | Es el caso **pendiente**: debe resolver la nueva propiedad y compartir su galería, pero Repair 5 pidió aclaración y no la entregó. |
 
-> Which property option do you mean?
->
-> 1. Cedar Loft
->
-> 2. Cedar Studio
+[119 conversaciones](04-conversaciones/) · [Índice JSON](04-conversaciones/indice.json) · [Revisiones humanas](04-conversaciones/revisiones-humanas.json). Un PASS histórico refleja los controles de entonces, no una certificación actual. En Repair 5 el primer check de alcance fue un falso positivo: respondió solo Cedar Studio mediante `property_details`, pero el check exigía metadata de catálogo. Los otros fallos derivan del cambio de propiedad y galería realmente fallido. [Diagnóstico](05-resultados-y-mejoras/sales-compact-repair-5/diagnostico.json).
 
+## 6. Trabajo futuro: más casos y conversaciones más largas
 
-La traza del segundo turno contiene `kind: material`, expresión `Cedar Loft`, evidencia “Actually I prefer Cedar Loft instead.”, `requires_clarification: true` y confianza `0.0`. La petición de fotos usa “its” en otra frase. El sujeto no se resuelve como la propiedad explícitamente elegida y el agente pregunta de nuevo cuál propiedad.
+El siguiente paso es **seguir afinando el diálogo**, no agregar funciones de canal. Al aumentar casos, turnos y repeticiones aumentan tokens y costo de OpenRouter: el contexto se reenvía y puede haber reparaciones. Se mantiene el mismo modelo para atribuir los cambios al flujo.
 
-El trabajo siguiente es corregir el check para aceptar metadata de detalles y de catálogo, y resolver el cambio explícito con petición anafórica sin inferir un sujeto ante ambigüedad real. Se deben conservar ambos paquetes de interpretación y probar variantes, exclusiones, varios candidatos y referencias a otra company. **No se cambia el agente en esta entrega documental ni se marca el fallo como resuelto.** [Diagnóstico estructurado](05-resultados-y-mejoras/sales-compact-repair-5/diagnostico.json).
-
-## Reproducir y mantener la evidencia
-
-Los siguientes accesos son herramientas complementarias; los conceptos y ejemplos ya están en este documento. Para repetir una medición se debe conservar la selección de casos, modelo/configuración y límites, y guardar el commit ejecutado. Una entrega solo documental no requiere pagar otra corrida para validar cambios de texto.
-
-### Reproducir Repair 5 si se necesita una nueva medición
-
-El modelo se lee de la configuración publicada, no de un nombre escrito en el guion. En la última evidencia era `openai/gpt-4o-mini` versión de configuración 8; comprobar el modelo y digest exportados si cambian los settings. Lead simulado: guionado, sin modelo. Juez LLM: ninguno.
-
-```bash
-docker exec -i -w /app bp_api_prod python -m tools.sales_ai.synthetic_lab \
-  --suite compact-battery \
-  --configuration-id cbc8abfa-23d3-417c-97dd-fd12e3406ed4 \
-  --cases first_time_A move_up_B unknown_A \
-  --max-calls 60 --max-turns 8 \
-  --output /tmp/sales-compact-repair-5
-```
-
-Se esperan dos visitas. Copiar el ZIP incluso si termina en `FAIL`:
-
-```bash
-docker cp bp_api_prod:/tmp/sales-compact-repair-5/synthetic-sales-results.zip ~/sales-compact-repair-5.zip
-```
-
-En PowerShell:
-
-```powershell
-& "$env:WINDIR\System32\OpenSSH\scp.exe" jorge@206.189.118.99:~/sales-compact-repair-5.zip "$env:USERPROFILE\Downloads\sales-compact-repair-5.zip"
-```
-
-El worker usa SQLite privado, credenciales de configuración solo para inferencia y guardas de red/DB. No ejecutar seeds contra PostgreSQL productivo. No escribe leads, citas u outbox productivos ni llama Calendar externo. Usa primer vendedor elegible en la simulación, no el cursor round-robin productivo. Los enlaces locales no validan autenticación HTTP pública.
-
-### Regenerar el snapshot de datos
-
-Desde la raíz, con las dependencias y variables de test habituales del backend:
-
-```bash
-PYTHONPATH=backend python -m tools.sales_ai.export_documentation --output docs/sales-agent --clock 2026-11-11T06:34:00
-```
-
-[Exportador de fixtures](../../backend/tools/sales_ai/export_documentation.py). Crea SQLite en memoria, archivos temporales y exporta campos permitidos; no consulta la base de producción ni llama un modelo. Los horarios son un snapshot fijo para lectura, no disponibilidad vigente.
-
-### Incorporar resultados y regenerar figuras
-
-Mantener los ZIP originales fuera de Git. El importador acepta únicamente nombres de suites sintéticas conocidas, exige `synthetic_only` y rechaza escrituras/contactos productivos. Publica campos seleccionados, no prompts completos ni credenciales.
-
-```bash
-python docs/sales-agent/06-como-ejecutar-las-pruebas/herramientas/importar_resultados.py --source /ruta/a/zips --output docs/sales-agent
-python docs/sales-agent/06-como-ejecutar-las-pruebas/herramientas/generar_graficas.py
-```
-
-[Importador](06-como-ejecutar-las-pruebas/herramientas/importar_resultados.py) · [Generador NumPy/Matplotlib](06-como-ejecutar-las-pruebas/herramientas/generar_graficas.py) · [Anotaciones humanas](04-conversaciones/revisiones-humanas.json)
-
-Para generar figuras se necesitan `numpy` y `matplotlib` en el entorno documental; no se añadieron dependencias al runtime del agente. Añadir anotaciones con clave `nombre-del-zip-sin-extension:caso`; el importador las conserva. Antes de publicar nuevos archivos, revisar que todos los datos sean ficticios y que la etiqueta humana no se confunda con una evaluación automática. Esta exportación no es un importador de datos reales de clientes. El importador actualiza JSON, CSV y resúmenes por corrida; al incorporar corridas nuevas también hay que actualizar el texto, las tablas e índices Markdown y su revisión humana. Los IDs de recursos pueden cambiar al regenerar fixtures; siempre usar las relaciones del mismo snapshot.
-
-### Qué falta tras recibir Repair 5
-
-1. Corregir el falso positivo del check de alcance y el cambio explícito a otra propiedad con fotos; esta entrega no cambia el agente.
-2. Agregar variantes y repetir los tres casos después de esa corrección del motor.
-3. Ampliar escenarios cuando pasen y la lectura humana sea favorable.
-4. Evaluar transporte/calendario, inactividad prolongada, aviso de nuevos slots y cancelación/reagendamiento por separado.
-
-## Métricas y evolución histórica
-
-Esta sección cierra la guía con los resultados observados. La fuente es el ZIP entregado del servidor en cada corrida; los JSON guardan nombre y SHA-256 del archivo, commit, modelo/configuración, denominadores y estado original. No se incluyen ejecuciones locales simuladas como evidencia live, no se rellenan corridas ausentes y no se reetiquetan resultados antiguos con criterios nuevos.
-
-### Primer laboratorio con leads LLM
-
-| Corrida | Casos aprobados / ejecutados | Turnos de lead | Llamadas de lead + agente | Checks FAIL | Costo registrado | Cobertura de costo |
-|---|---|---|---|---|---|---|
-| sales-synthetic-lab-2 | 1/9 | 51 | 159 | 42 | USD 0.156203 | Completa |
-| sales-synthetic-lab-3 | 4/9 | 26 | 91 | 16 | USD 0.074915 | Incompleta |
-
-![Primer laboratorio con leads LLM](05-resultados-y-mejoras/figuras/primer-laboratorio-adaptativo.png)
-
-Los mensajes bajaron de 51 a 26 y las llamadas de 159 a 91 al acotar el controlador del comprador. No puede atribuirse toda esa diferencia a una mejora del vendedor: se cambió el experimento. Las percepciones del lead y la finalización del controlador no son una evaluación factual independiente. No se ejercitaba agendamiento en esa suite.
-
-### Historial de baterías guionadas
-
-| Corrida | Casos aprobados / ejecutados | Visitas / esperadas | Llamadas | Estado original | Evidencia |
-|---|---|---|---|---|---|
-| sales-booking-point-1 | 0/6 | 0/3 | 61 | FAIL | [JSON](05-resultados-y-mejoras/sales-booking-point-1/resultado.json) |
-| sales-booking-point-2 | 0/6 | 3/3 | 37 | FAIL | [JSON](05-resultados-y-mejoras/sales-booking-point-2/resultado.json) |
-| sales-booking-point-3 | 2/6 | 3/3 | 37 | FAIL | [JSON](05-resultados-y-mejoras/sales-booking-point-3/resultado.json) |
-| sales-booking-point-4 | 0/6 | 3/3 | 41 | FAIL | [JSON](05-resultados-y-mejoras/sales-booking-point-4/resultado.json) |
-| sales-booking-point-5 | 2/6 | 3/3 | 33 | FAIL | [JSON](05-resultados-y-mejoras/sales-booking-point-5/resultado.json) |
-| sales-booking-point-6 | 3/6 | 3/3 | 35 | INCOMPLETE | [JSON](05-resultados-y-mejoras/sales-booking-point-6/resultado.json) |
-| sales-commercial-point-1 | 7/8 | 0/0 | 34 | FAIL | [JSON](05-resultados-y-mejoras/sales-commercial-point-1/resultado.json) |
-| sales-commercial-point-2 | 8/8 | 0/0 | 35 | PASS | [JSON](05-resultados-y-mejoras/sales-commercial-point-2/resultado.json) |
-| sales-closing-point-1 | 8/8 | 0/0 | 15 | PASS | [JSON](05-resultados-y-mejoras/sales-closing-point-1/resultado.json) |
-| sales-compact-battery-1 | 2/16 | 3/8 | 110 | FAIL | [JSON](05-resultados-y-mejoras/sales-compact-battery-1/resultado.json) |
-| sales-compact-repair-1 | 0/8 | 3/4 | 72 | FAIL | [JSON](05-resultados-y-mejoras/sales-compact-repair-1/resultado.json) |
-| sales-compact-repair-2 | 1/8 | 0/4 | 57 | FAIL | [JSON](05-resultados-y-mejoras/sales-compact-repair-2/resultado.json) |
-| sales-compact-repair-3 | 1/3 | 0/2 | 36 | FAIL | [JSON](05-resultados-y-mejoras/sales-compact-repair-3/resultado.json) |
-| sales-compact-repair-4 | 2/3 | 2/2 | 31 | FAIL | [JSON](05-resultados-y-mejoras/sales-compact-repair-4/resultado.json) |
-| sales-compact-repair-5 | 2/3 | 2/2 | 29 | FAIL | [JSON](05-resultados-y-mejoras/sales-compact-repair-5/resultado.json) |
-
-`0/0` en comercial/cierres significa que no se esperaba una cita, no un fracaso de conversión. Los estados `INCOMPLETE` conservan checks bloqueados. Los conteos PASS/FAIL de assertions cambian con las reglas y longitud del diálogo; no son un puntaje universal de calidad ni equivalen a cantidad de conversaciones.
-
-![Evolución por conjunto](05-resultados-y-mejoras/figuras/evolucion-por-conjunto.png)
-
-Cada panel agrupa la misma selección de casos y muestra los puntos reales, incluidas regresiones. La suite de 16 no se mezcla con la selección de ocho ni con la de tres. Aun dentro de un panel las reglas del evaluador evolucionaron: no es un estudio estadístico controlado ni una estimación de conversión de clientes.
-
-### Mismos tres casos: Repair 3, 4 y 5
-
-| Métrica | Repair 3 | Repair 4 | Repair 5 |
+| Etapa propuesta | Conversaciones y longitud | Qué agrega | Criterio para avanzar |
 |---|---|---|---|
-| Casos aprobados | 1/3 | 2/3 | 2/3 |
+| 0. Cerrar el bloqueo | 3 casos, 4–8 turnos de lead | Corregir el evaluador y el cambio explícito + “sus fotos” | Resolver el caso pendiente, sin romper las dos visitas. |
+| 1. Batería base | 16 casos, 6–8 turnos | Todos los segmentos y disponibilidad conocida/ausente | Sin errores obligatorios ni acciones sin consentimiento; revisión comercial favorable. |
+| 2. Variantes | 32 casos, 8–12 turnos | Dos formas de preguntar, negación, correcciones, varias consultas y pronombres | Mismo resultado para variantes equivalentes; ambigüedad real se aclara. |
+| 3. Diálogos largos | 16 casos, 12–16 turnos | Interrumpir y retomar temas, cambiar presupuesto/propiedad, rechazar y preguntar después | Mantener preferencias y foco hasta la visita o el cierre, sin bucles ni presión. |
+| 4. Consistencia | 16 casos × 3 corridas, 8–12 turnos | Repetir para detectar variabilidad del modelo | Informar fallos por escenario y repetición; un único PASS no basta. |
+
+Un turno aquí es **un mensaje del lead más la respuesta**, no una llamada. Se modelarán también compradores que abandonan o rechazan: cerrar sin cita puede ser el resultado correcto. No se alargan diálogos artificialmente para gastar turnos.
+
+### Consumo estimado para esta ampliación
+
+Base empírica: Repair 5, **13 turnos**, **29 llamadas**, **331.131 tokens registrados** y **USD 0,0458457**. Equivale aproximadamente a 2,23 llamadas, 25.472 tokens y USD 0,00353 por turno de lead. Es una extrapolación de tres diálogos cortos, **no una tarifa fija ni una medición de diálogos largos**.
+
+| Etapa | Llamadas estimadas | Tokens totales estimados | USD extrapolados | Reserva orientativa 2× |
+|---|---|---|---|---|
+| 0. Bloqueo | 27–54 | 0.31–0.61 M | 0.04–0.08 | 0.08–0.17 |
+| 1. Base | 214–286 | 2.45–3.26 M | 0.34–0.45 | 0.68–0.90 |
+| 2. Variantes | 571–857 | 6.52–9.78 M | 0.90–1.35 | 1.81–2.71 |
+| 3. Largos | 428–571 | 4.89–6.52 M | 0.68–0.90 | 1.35–1.81 |
+| 4. Consistencia | 857–1285 | 9.78–14.67 M | 1.35–2.03 | 2.71–4.06 |
+
+Se conserva lead guionado y juez LLM desactivado. La reserva 2× es una decisión de planificación, no un tope garantizado: historias más largas, reintentos o cambios del proveedor pueden superarla. Los límites de llamadas no son límites en dólares. Las etapas aún **no se ejecutaron**. [Supuestos y cálculo JSON](05-resultados-y-mejoras/propuesta-ampliacion.json) · [Script reproducible](06-como-ejecutar-las-pruebas/herramientas/estimar_ampliacion.py).
+
+### Cuánto suele invertirse: referencia y presupuesto propio
+
+Las fuentes revisadas no aportan un promedio comparable de presupuesto total para afinar un vendedor inmobiliario como este. Hay que separar **inferencia**, **desarrollo/análisis/revisión humana** e **infraestructura**; aquí solo medimos inferencia.
+
+Como referencia histórica, τ-bench reportó en 2024 **USD 0,38 del agente GPT-4o + USD 0,23 del usuario GPT-4 por tarea**. Escalar aritméticamente ese ejemplo a 100–500 tareas da USD 61–305 por repetición, sin trabajo humano. No es un promedio de mercado, una cotización actual ni una comparación equivalente con nuestros guiones y `gpt-4o-mini` [R4]. Justifica por qué otros protocolos pueden gastar decenas o cientos de dólares mientras esta batería acotada consume centavos por corrida.
+
+Para Black Penguin proponemos una bolsa inicial de **USD 5** para las primeras ampliaciones o **USD 10** si se incluyen diálogos largos y repeticiones, liberada por bloques y revisada con el consumo real. Es una propuesta propia, no una cifra “normal” del sector ni garantía de estabilización. Si se incorpora un lead LLM, juez u otro modelo, hay que recalcular. Las referencias de evaluación recomiendan empezar por casos concretos, revisar trazas y repetir para medir consistencia [R4, R6].
+
+## 7. Base del diseño y referencias
+
+La base operativa son las **reglas de negocio acordadas**, el conocimiento publicado del project y el código del backend. Estas referencias explican técnicas relacionadas y ayudan a contrastar el diseño; no implican que hubieran sido citadas desde la primera implementación, que se use su benchmark o que nuestros resultados sean comparables a los suyos.
+
+| Ref. primaria | Relación concreta | Límite |
+|---|---|---|
+| **R1.** Anthropic, [Building effective agents](https://www.anthropic.com/research/building-effective-agents), 2024 | Distingue workflows orquestados por código de agentes con más autonomía; encaja con separar interpretación, herramientas y validación. | No significa usar Claude ni adoptar su implementación. |
+| **R2.** OpenRouter, [Structured Outputs](https://openrouter.ai/docs/guides/features/structured-outputs) | JSON Schema para recibir salidas que el backend pueda analizar. | Un JSON válido no garantiza intención ni hechos correctos; se valida también semántica. |
+| **R3.** Pydantic, [Models](https://docs.pydantic.dev/latest/concepts/models/) | Contratos y validación de modelos de datos en runtime. El repositorio fija Pydantic 2.13.4. | No evalúa por sí solo la calidad comercial de una respuesta. |
+| **R4.** Yao et al., [τ-bench](https://arxiv.org/abs/2406.12045), 2024, [análisis de costo §5.1](https://arxiv.org/html/2406.12045v1#S5.SS1) | Conversaciones, herramientas, reglas y estado final; consistencia sobre varios intentos. | Nuestro laboratorio es propio; no reporta una puntuación τ-bench ni su costo actual. |
+| **R5.** Ribeiro et al., [CheckList](https://aclanthology.org/2020.acl-main.442/), ACL 2020 | Pruebas de comportamiento y variantes para descubrir fallos que un promedio no muestra. | No se afirma que usemos la librería CheckList. |
+| **R6.** Anthropic, [Demystifying evals for AI agents](https://www.anthropic.com/research/demystifying-evals-for-ai-agents), 2026 | Separar tarea, intento, checks, traza y resultado; calibrar evaluación y revisar casos fallidos. | Guía técnica, no evidencia de la inversión media de la industria. |
+
+Consultadas el **11/11/2026**. La fuente ejecutable del flujo es [active_service.py](../../backend/app/modules/sales_agent/active_service.py), [turn_planner.py](../../backend/app/modules/sales_agent/turn_planner.py) y [first_booking.py](../../backend/app/modules/sales_agent/first_booking.py). Las cifras son de [nuestros reportes](05-resultados-y-mejoras/corridas.json), no de los artículos.
+
+## 8. Evolución global de casos y consumos
+
+**17 corridas · 119 ejecuciones de conversación · 47 IDs de escenario distintos por suite.** Las 119 incluyen repeticiones; no son 119 escenarios únicos ni clientes reales. Hay 43 ejecuciones aprobadas por sus controles originales; no se presenta 43/119 como una tasa actual de calidad, porque se mezclan versiones, objetivos y tamaños de batería.
+
+![Panorama de todas las corridas y cobertura acumulada](05-resultados-y-mejoras/figuras/panorama-global.png)
+
+L = lead LLM; A = agenda; C = comercial; D = despedidas; B = batería; R = reparación. El gráfico muestra dónde se ampliaron casos y dónde hubo regresiones. La línea acumulada mide **trabajo evaluado**, no mejora de calidad.
+
+### Progreso comparable reciente
+
+| Mismos tres casos / configuración 8 | Repair 3 | Repair 4 | Repair 5 |
+|---|---|---|---|
+| Conversaciones aprobadas | 1/3 | 2/3 | 2/3 |
 | Visitas confirmadas | 0/2 | 2/2 | 2/2 |
-| Turnos del lead | 15 | 13 | 13 |
-| Llamadas al proveedor | 36 | 31 | 29 |
-| Costo registrado USD | 0,0592518 | 0,0480819 | 0,0458457 |
-| Consumo informado | 36/36 | 30/31 | 29/29 |
+| Llamadas | 36 | 31 | 29 |
+| Costo registrado USD | 0,0592518 | 0,0480819* | 0,0458457 |
 
-![Tres casos a través de las correcciones](05-resultados-y-mejoras/figuras/recorrido-compacto.png)
+\* Repair 4 carece del consumo de una respuesta. Repair 5 mantiene el avance en citas, pero no resuelve toda la conversación de cambio de propiedad. Una comprobación de esa última corrida es un falso positivo; se conserva el FAIL original.
 
-![Llamadas y costos registrados](05-resultados-y-mejoras/figuras/llamadas-y-costos.png)
+![Conversaciones y visitas de la misma selección](05-resultados-y-mejoras/figuras/recorrido-compacto.png)
 
-Se mantuvo `openai/gpt-4o-mini`, configuración publicada 8 y digest `51ff65376dad421328dab993a4fc71939489386f1ed173514cf13a244ac79f1c`. Repair 5 registra todas sus 29 llamadas; el costo de Repair 4 es **parcial**, por lo que no afirmamos un ahorro total exacto frente a esa corrida. No hay extrapolación a un costo medio de clientes reales.
+### Consumo total registrado
 
-Las figuras se generan con NumPy y Matplotlib a partir de los JSON versionados, sin suavizado, puntos inventados, intervalos de confianza artificiales ni proyecciones. [Todas las figuras](05-resultados-y-mejoras/figuras/) · [Datos de las 17 corridas](05-resultados-y-mejoras/corridas.json) · [CSV](05-resultados-y-mejoras/metricas.csv) · [Script de generación](06-como-ejecutar-las-pruebas/herramientas/generar_graficas.py).
+**913 llamadas · 9.944.999 tokens de entrada · 143.194 de salida · USD 1,20096225 registrados.** Falta información de dos respuestas (911/913 con costo): los totales no son una factura completa. Incluyen inferencia del lead LLM en las dos primeras corridas y solo del agente en las guionadas; no incluyen desarrollo, revisión, infraestructura o mensajería real.
 
-**Conclusión del corte:** el recorrido de visita probado se sostiene en dos casos; el cambio de propiedad con fotos continúa pendiente. La evidencia permite acotar la próxima corrección, no declarar estable todo el agente ni extrapolar estos porcentajes a leads reales por WhatsApp/SMS.
+| Etapa | Diálogos | Llamadas | Tokens entrada / salida | USD registrados | Cobertura |
+|---|---|---|---|---|---|
+| Lead LLM inicial | 18 | 250 | 2,009,248 / 28,579 | 0.231117 | Parcial |
+| Agenda puntual | 36 | 244 | 2,953,110 / 42,111 | 0.340764 | Completa |
+| Política comercial | 16 | 69 | 770,886 / 8,539 | 0.090094 | Completa |
+| Cierres y retoma | 8 | 15 | 173,013 / 2,114 | 0.021000 | Completa |
+| Baterías y repairs | 41 | 335 | 4,038,742 / 61,851 | 0.517987 | Parcial |
+
+![Consumo por corrida y acumulado](05-resultados-y-mejoras/figuras/consumo-global.png)
+
+En la primera etapa, acotar el lead simulado redujo sus mensajes de 51 a 26 y las llamadas conjuntas de 159 a 91. Cambió el controlador de prueba; no puede atribuirse toda esa reducción al agente. Después los guiones eliminaron el costo de otro LLM. Al pasar a conversaciones más largas volverá a crecer el consumo de OpenRouter, a cambio de probar memoria, coherencia y cierre bajo más interrupciones.
+
+[17 corridas con commit/modelo/consumo](05-resultados-y-mejoras/corridas.json) · [CSV](05-resultados-y-mejoras/metricas.csv) · [Todas las gráficas NumPy/Matplotlib](05-resultados-y-mejoras/figuras/) · [Datos separados por conjunto](05-resultados-y-mejoras/figuras/evolucion-por-conjunto.png) · [Cómo reproducir y actualizar](06-como-ejecutar-las-pruebas/README.md).

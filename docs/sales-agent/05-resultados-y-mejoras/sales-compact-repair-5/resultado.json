@@ -23,6 +23,9 @@
   "expected_bookings": 2,
   "actual_bookings": 2,
   "provider_calls": 29,
+  "prompt_tokens": 325314,
+  "completion_tokens": 5817,
+  "responses_with_cost": 29,
   "cost_usd_recorded": 0.04584569999999999,
   "cost_complete": true,
   "checks_summary": {

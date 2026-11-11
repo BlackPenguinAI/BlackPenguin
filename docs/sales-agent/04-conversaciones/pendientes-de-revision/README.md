@@ -1,4 +1,4 @@
-[Volver a la guía completa](../../README.md#conversaciones-ejecutadas-en-el-servidor) · [Índice de conversaciones](../README.md)
+[Volver a la guía completa](../../README.md#5-conversaciones-que-el-equipo-puede-repetir) · [Índice de conversaciones](../README.md)
 
 # Pendientes de revision
 

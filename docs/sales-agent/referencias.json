@@ -1,0 +1,68 @@
+{
+  "checked_on": "2026-11-11",
+  "implementation_source": "../../backend/app/modules/sales_agent/",
+  "note": "References contextualize the design; no claim of historical adoption or equivalent benchmark results.",
+  "references": [
+    {
+      "id": "R1",
+      "title": "Building effective agents",
+      "publisher": "Anthropic",
+      "year": 2024,
+      "url": "https://www.anthropic.com/research/building-effective-agents",
+      "role": "Conceptual workflow reference; not the implemented code."
+    },
+    {
+      "id": "R2",
+      "title": "Structured Outputs",
+      "publisher": "OpenRouter",
+      "url": "https://openrouter.ai/docs/guides/features/structured-outputs",
+      "role": "Provider-facing schema documentation."
+    },
+    {
+      "id": "R3",
+      "title": "Models",
+      "publisher": "Pydantic",
+      "url": "https://docs.pydantic.dev/latest/concepts/models/",
+      "role": "Backend data validation documentation; repository pins 2.13.4."
+    },
+    {
+      "id": "R4",
+      "title": "tau-bench: A Benchmark for Tool-Agent-User Interaction in Real-World Domains",
+      "authors": [
+        "Shunyu Yao",
+        "Noah Shinn",
+        "Pedram Razavi",
+        "Karthik Narasimhan"
+      ],
+      "year": 2024,
+      "url": "https://arxiv.org/abs/2406.12045",
+      "cost_source": "https://arxiv.org/html/2406.12045v1#S5.SS1",
+      "historical_cost_usd_per_task": {
+        "agent_gpt4o": 0.38,
+        "user_gpt4": 0.23
+      },
+      "role": "Related evaluation design and historical cost example, not an industry budget average or our benchmark score."
+    },
+    {
+      "id": "R5",
+      "title": "Beyond Accuracy: Behavioral Testing of NLP Models with CheckList",
+      "authors": [
+        "Marco Tulio Ribeiro",
+        "Tongshuang Wu",
+        "Carlos Guestrin",
+        "Sameer Singh"
+      ],
+      "year": 2020,
+      "url": "https://aclanthology.org/2020.acl-main.442/",
+      "role": "Behavioral testing and variants; no claim of using the library."
+    },
+    {
+      "id": "R6",
+      "title": "Demystifying evals for AI agents",
+      "publisher": "Anthropic",
+      "year": 2026,
+      "url": "https://www.anthropic.com/research/demystifying-evals-for-ai-agents",
+      "role": "Trace/outcome distinction, trials and evaluation workflow."
+    }
+  ]
+}

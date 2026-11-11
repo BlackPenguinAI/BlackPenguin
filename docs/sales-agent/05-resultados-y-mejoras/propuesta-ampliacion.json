@@ -1,0 +1,162 @@
+{
+  "status": "PROPOSAL_NOT_EXECUTED",
+  "basis": "sales-compact-repair-5",
+  "model": "openai/gpt-4o-mini",
+  "configuration_version": 8,
+  "observed_turns": 13,
+  "per_lead_turn": {
+    "calls": 2.230769230769231,
+    "tokens": 25471.615384615383,
+    "usd": 0.003526592307692307
+  },
+  "reserve_factor": 2,
+  "assumptions": [
+    "Scripted leads; no lead LLM or judge.",
+    "Same sales model/configuration as baseline.",
+    "Linear planning extrapolation, not a measured long-dialogue tariff or confidence interval.",
+    "Longer histories, repairs, provider changes and token prices can exceed this reserve.",
+    "Costs exclude labor, infrastructure and transport."
+  ],
+  "stages": [
+    {
+      "stage": "cerrar_bloqueo",
+      "conversations": 3,
+      "lead_turns_per_conversation": [
+        4,
+        8
+      ],
+      "total_lead_turns": [
+        12,
+        24
+      ],
+      "estimated_calls": [
+        26.76923076923077,
+        53.53846153846154
+      ],
+      "estimated_total_tokens": [
+        305659.3846153846,
+        611318.7692307692
+      ],
+      "estimated_usd": [
+        0.04231910769230768,
+        0.08463821538461536
+      ],
+      "planning_reserve_usd": [
+        0.08463821538461536,
+        0.1692764307692307
+      ]
+    },
+    {
+      "stage": "bateria_base",
+      "conversations": 16,
+      "lead_turns_per_conversation": [
+        6,
+        8
+      ],
+      "total_lead_turns": [
+        96,
+        128
+      ],
+      "estimated_calls": [
+        214.15384615384616,
+        285.53846153846155
+      ],
+      "estimated_total_tokens": [
+        2445275.076923077,
+        3260366.769230769
+      ],
+      "estimated_usd": [
+        0.3385528615384614,
+        0.45140381538461527
+      ],
+      "planning_reserve_usd": [
+        0.6771057230769228,
+        0.9028076307692305
+      ]
+    },
+    {
+      "stage": "variantes",
+      "conversations": 32,
+      "lead_turns_per_conversation": [
+        8,
+        12
+      ],
+      "total_lead_turns": [
+        256,
+        384
+      ],
+      "estimated_calls": [
+        571.0769230769231,
+        856.6153846153846
+      ],
+      "estimated_total_tokens": [
+        6520733.538461538,
+        9781100.307692308
+      ],
+      "estimated_usd": [
+        0.9028076307692305,
+        1.3542114461538457
+      ],
+      "planning_reserve_usd": [
+        1.805615261538461,
+        2.7084228923076914
+      ]
+    },
+    {
+      "stage": "dialogos_largos",
+      "conversations": 16,
+      "lead_turns_per_conversation": [
+        12,
+        16
+      ],
+      "total_lead_turns": [
+        192,
+        256
+      ],
+      "estimated_calls": [
+        428.3076923076923,
+        571.0769230769231
+      ],
+      "estimated_total_tokens": [
+        4890550.153846154,
+        6520733.538461538
+      ],
+      "estimated_usd": [
+        0.6771057230769228,
+        0.9028076307692305
+      ],
+      "planning_reserve_usd": [
+        1.3542114461538457,
+        1.805615261538461
+      ]
+    },
+    {
+      "stage": "consistencia_tres_repeticiones",
+      "conversations": 48,
+      "lead_turns_per_conversation": [
+        8,
+        12
+      ],
+      "total_lead_turns": [
+        384,
+        576
+      ],
+      "estimated_calls": [
+        856.6153846153846,
+        1284.923076923077
+      ],
+      "estimated_total_tokens": [
+        9781100.307692308,
+        14671650.46153846
+      ],
+      "estimated_usd": [
+        1.3542114461538457,
+        2.0313171692307685
+      ],
+      "planning_reserve_usd": [
+        2.7084228923076914,
+        4.062634338461537
+      ]
+    }
+  ]
+}

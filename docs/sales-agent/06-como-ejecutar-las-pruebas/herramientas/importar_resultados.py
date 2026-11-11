@@ -61,7 +61,7 @@ def export(source,root):
         entry={'run':key,'execution_origin':'server_submitted_synthetic_run','archive':path.name,'sha256':hashlib.sha256(path.read_bytes()).hexdigest(),'commit':report.get('commit'),'suite':suite,'cohort':cohort,'selected_cases':case_ids,
             'model':report.get('sales_model'),'lead_model':report.get('lead_model'),'lead_controller_metrics':report.get('lead_controller_metrics'),'configuration_version':report.get('configuration_version'),'configuration_sha256':report.get('configuration_sha256'),'status':report.get('status'),'cases':len(cases),'approved_cases':sum(c['status']=='aprobado' for c in cases),
             'turns':sum(c['turns'] for c in cases),'expected_bookings':expected,'actual_bookings':sum(c['meetings'] for c in cases),'provider_calls':report.get('provider_calls'),
-            'cost_usd_recorded':usage.get('cost_usd'),'cost_complete':report.get('cost_reporting_complete',usage.get('responses_with_cost')==report.get('provider_calls')),'checks_summary':report.get('summary'),'case_results':cases}
+            'prompt_tokens':usage.get('prompt_tokens'),'completion_tokens':usage.get('completion_tokens'),'responses_with_cost':usage.get('responses_with_cost'),'cost_usd_recorded':usage.get('cost_usd'),'cost_complete':report.get('cost_reporting_complete',usage.get('responses_with_cost')==report.get('provider_calls')),'checks_summary':report.get('summary'),'case_results':cases}
         runs.append(entry)
         destination=root/'05-resultados-y-mejoras'/key;destination.mkdir(parents=True,exist_ok=True);(destination/'resultado.json').write_text(json.dumps(entry,indent=2,ensure_ascii=False)+'\n')
         (destination/'README.md').write_text(f'# {key}\n\n[Volver a resultados](../README.md) · [Ver resultado JSON](resultado.json)\n\nCommit `{entry["commit"]}`. Estado original: **{entry["status"]}**. Casos: {entry["approved_cases"]}/{entry["cases"]} aprobados automáticamente. Visitas: {entry["actual_bookings"]}/{entry["expected_bookings"]}.\n\nEl costo registrado puede estar incompleto; consultar `cost_complete`. Estos resultados corresponden a simulaciones en el servidor, no a entregas reales por WhatsApp/SMS.\n')
@@ -73,7 +73,7 @@ def export(source,root):
     result=root/'05-resultados-y-mejoras';result.mkdir(parents=True,exist_ok=True)
     (result/'corridas.json').write_text(json.dumps(runs,indent=2,ensure_ascii=False)+'\n')
     (root/'04-conversaciones/indice.json').write_text(json.dumps(index,indent=2,ensure_ascii=False)+'\n')
-    columns=['run','suite','cohort','cases','approved_cases','turns','expected_bookings','actual_bookings','provider_calls','cost_usd_recorded','cost_complete']
+    columns=['run','suite','cohort','cases','approved_cases','turns','expected_bookings','actual_bookings','provider_calls','prompt_tokens','completion_tokens','responses_with_cost','cost_usd_recorded','cost_complete']
     with (result/'metricas.csv').open('w',newline='') as handle:
         writer=csv.DictWriter(handle,fieldnames=columns,lineterminator='\n');writer.writeheader();writer.writerows({k:r[k] for k in columns} for r in runs)
     return runs,index
