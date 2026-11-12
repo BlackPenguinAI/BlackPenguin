@@ -896,7 +896,20 @@ async def send_chat_message(
         if not bound:
             raise HTTPException(422, 'This selection does not reference a question in this Company onboarding.')
     from app.modules.projects.editor_tasks import detect_task, question
-    task = detect_task(payload.message) if payload.selected_values is None else None
+    # Card responses take precedence over editor navigation. In particular,
+    # "Approve profile" is an application action, not a request to open review.
+    task = detect_task(payload.message) if payload.selected_values is None and not payload.in_reply_to_message_id else None
+    if task == "review":
+        candidate = services.get_active_question(db, session.id)
+        ui = (candidate.ui_payload or {}) if candidate else {}
+        actions = ui.get("answer_actions", {})
+        bound_action = isinstance(actions, dict) and any(
+            str(label).strip().casefold() == payload.message.strip().casefold() for label in actions)
+        legacy_approval = (candidate is not None and ui.get("field") is None
+                           and ui.get("input_type") in {"boolean", "final_approval"}
+                           and payload.message.strip().casefold() == "approve profile")
+        if bound_action or legacy_approval:
+            task = None
     if task in {"team", "documents", "location", "review"}:
         user_message = services.save_message(db, session.id, SenderType.USER, payload.message, commit=False)
         services.supersede_unanswered_questions(db, session.id)
@@ -909,8 +922,9 @@ async def send_chat_message(
     active_question = services.get_active_question(
         db, session.id, payload.in_reply_to_message_id,
     )
-    resolved_question_id = (payload.in_reply_to_message_id if payload.selected_values is not None
-                            else active_question.id if active_question else payload.in_reply_to_message_id)
+    # Never silently move an explicitly bound stale/foreign reply to a newer card.
+    resolved_question_id = (payload.in_reply_to_message_id
+                            or (active_question.id if active_question else None))
     user_message = services.save_message(
         db, session.id, SenderType.USER, payload.message,
         in_reply_to_message_id=resolved_question_id,

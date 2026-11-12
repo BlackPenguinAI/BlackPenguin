@@ -97,7 +97,7 @@ export class ChatComponent implements OnInit, OnDestroy {
   private restoredTeamDraft=false;
   private restoredPresenceDraft=false;
   private restoredLogoDraft=false;
-  openCompanyTask(task:string):void {if(this.isAnalyzing)return;this.prompt=({team:'I want to update Company users',documents:'I want to upload documents',location:'I want to update city and country',review:'I want to review profile'} as Record<string,string>)[task] || '';this.sendMessage();}
+  openCompanyTask(task:string):void {if(this.isAnalyzing)return;this.prompt=({team:'I want to update Company users',documents:'I want to upload documents',location:'I want to update city and country',review:'I want to review profile'} as Record<string,string>)[task] || '';this.sendMessage(true);}
   companyLocationSaved():void {this.syncState('bottom');}
   showWelcome = false;
   initialState: 'loading' | 'ready' | 'error' = 'loading';
@@ -707,7 +707,7 @@ export class ChatComponent implements OnInit, OnDestroy {
     }
   }
 
-  sendMessage(): void {
+  sendMessage(asNavigation = false): void {
     if (!this.canSend) return;
     this.renderGeneration++;
     if (this.isRecording) this.speech.stop();
@@ -719,7 +719,7 @@ export class ChatComponent implements OnInit, OnDestroy {
     this.scrollToBottom();
 
     this.errorMessage = '';
-    const replyTo = this.replyToMessageId || this.activeQuestionMessageId();
+    const replyTo = asNavigation ? null : this.replyToMessageId || this.activeQuestionMessageId();
     const selection=this.pendingSelection?.text.trim()===content && this.pendingSelection.questionId===replyTo ? this.pendingSelection : null;
     this.replyToMessageId = null;
     const request=selection ? this.onboarding.sendMessage(content, replyTo, selection.values) : this.onboarding.sendMessage(content, replyTo);

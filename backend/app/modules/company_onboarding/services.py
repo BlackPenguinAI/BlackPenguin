@@ -414,10 +414,12 @@ def resolve_answer_to_question(
     if field is None:
         # Keep approval deterministic for questions persisted before typed
         # answer actions were introduced.
-        if text.casefold() == "approve profile":
+        if text.casefold() == "approve profile" and question.ui_payload.get("input_type") in {"boolean", "final_approval"}:
             return QuestionResolution(
                 True, "accepted", [], question=question, action="approve_profile",
             )
+        if text.casefold() == "approve profile":
+            return QuestionResolution(True, "rejected", [], "invalid_question", question)
         return QuestionResolution(False, "not_applicable", [], question=question)
 
     input_type = str(question.ui_payload.get("input_type") or "text")
