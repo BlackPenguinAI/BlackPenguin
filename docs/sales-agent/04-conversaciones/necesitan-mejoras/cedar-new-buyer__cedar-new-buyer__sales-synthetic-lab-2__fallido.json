@@ -658,5 +658,29 @@
   ],
   "blocked_checks": [],
   "meetings": [],
-  "materials": []
+  "materials": [],
+  "evaluation_labels": {
+    "version": "sales-evidence-labels/2.0",
+    "recorded_checks": "fallido",
+    "dialogue_quality": "NEEDS_IMPROVEMENT",
+    "integral_dialogue_approval": false,
+    "retrospective_findings": [
+      {
+        "turn": 2,
+        "code": "unresolved_details_and_internal_wording",
+        "reason": "La respuesta no resuelve los detalles solicitados y muestra una etiqueta interna."
+      },
+      {
+        "turn": 3,
+        "code": "unresolved_details_and_internal_wording",
+        "reason": "La respuesta no resuelve los detalles solicitados y muestra una etiqueta interna."
+      },
+      {
+        "turn": 6,
+        "code": "unresolved_details_and_internal_wording",
+        "reason": "La respuesta no resuelve los detalles solicitados y muestra una etiqueta interna."
+      }
+    ],
+    "scope": "Los checks originales y nombres de archivo son históricos. Aprobarlos no certifica relevancia, fluidez ni todo el diálogo. Una revisión favorable solo cubre los comportamientos que describe."
+  }
 }

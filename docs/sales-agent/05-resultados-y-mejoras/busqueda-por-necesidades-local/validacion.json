@@ -1,0 +1,35 @@
+{
+  "base_commit": "391e88530da44a654ffc4f5557c5f04355fb9b6c",
+  "local_regression": {
+    "passed": 3111,
+    "failed": 0,
+    "postgresql_skipped_in_sqlite": 10,
+    "modules_verified": 134
+  },
+  "postgresql": {
+    "version": "16.2",
+    "passed": 10,
+    "failed": 0
+  },
+  "acceptance": {
+    "PASS": 63,
+    "FAIL": 0,
+    "NOT_RUN": 1
+  },
+  "needs_experiment": {
+    "origin": "local_offline_provider",
+    "scenarios": 12,
+    "turns": 14,
+    "passed_needs_checks": 12,
+    "real_model_quality_evaluated": false,
+    "openrouter_cost_usd": 0
+  },
+  "history_review": {
+    "unchanged_original_conversations": 144,
+    "NOT_EVALUATED": 121,
+    "SCOPED_FAVORABLE_REVIEW": 9,
+    "NEEDS_IMPROVEMENT": 14,
+    "integrally_approved": 0
+  },
+  "production_model_run": "PENDING_DEPLOYMENT"
+}

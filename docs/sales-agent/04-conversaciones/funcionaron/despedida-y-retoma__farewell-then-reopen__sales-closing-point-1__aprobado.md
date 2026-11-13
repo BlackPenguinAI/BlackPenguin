@@ -7,12 +7,14 @@
 | Dato | Evidencia |
 |---|---|
 | Caso / corrida | `farewell_then_reopen` / `sales-closing-point-1` |
-| Resultado automático original | Aprobada por los controles de esa corrida |
+| Resultado automático original | Checks originales aprobados; no equivale a diálogo aprobado |
 | Modelo / configuración | `openai/gpt-4o-mini` / 8 |
 | Visitas registradas / turnos | 0 / 3 |
 | Costo | El reporte lo agrega por corrida; no se inventa un importe por conversación. |
 
 **Cómo repetirla:** usar una company y un project de prueba con información aprobada coherente; sustituir nombres, recursos y horarios por los vigentes. Una aprobación histórica no garantiza estabilidad con nuevos mensajes o entrega por WhatsApp/SMS. Las fechas y recursos de este laboratorio no son una oferta real.
+
+**Calidad del diálogo:** SCOPED_FAVORABLE_REVIEW. **No hay aprobación integral del diálogo.** Los checks originales y nombres de archivo son históricos. Aprobarlos no certifica relevancia, fluidez ni todo el diálogo. Una revisión favorable solo cubre los comportamientos que describe.
 
 **Revisión posterior:** Permite retomar con una pregunta después de despedirse, en la misma corrida; no prueba días de inactividad ni transporte real.
 

@@ -4,7 +4,7 @@
 
 [Explicación y diálogos completos en la guía principal](../README.md#7-conversaciones-para-repetir)
 
-Hay **119 conversaciones de 17 corridas**, incluidas 18 de la primera etapa con lead LLM y tres de Repair 5. Los resultados automáticos originales no se modifican tras revisión humana.
+Hay **144 conversaciones históricas de 21 corridas**. La revisión posterior clasifica 121 sin evaluación integral, nueve con revisión favorable limitada y 14 que necesitan mejoras. Ninguna tiene aprobación integral. Los resultados automáticos originales no se modifican tras revisión humana.
 
 - [Aprobadas por sus checks originales](funcionaron/README.md)
 - [Fallidas o con revisión desfavorable](necesitan-mejoras/README.md)

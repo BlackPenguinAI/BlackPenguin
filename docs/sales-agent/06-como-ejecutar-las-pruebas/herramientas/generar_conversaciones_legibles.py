@@ -4,7 +4,7 @@ from pathlib import Path
 ROOT=Path(__file__).resolve().parents[2]
 TOPICS={'catalog':'opciones de propiedad','property_details':'características de la propiedad','inventory':'disponibilidad','pricing':'precio','financing':'formas de pago/financiación','materials':'materiales','appointment':'visita','location':'ubicación','delivery':'entrega','human':'contacto humano','opt_out':'no recibir contacto','other':'otra consulta'}
 VISIT={'request':'solicitar una visita','select':'elegir un horario (todavía no confirmar)','confirm':'confirmar una propuesta','decline':'rechazar por ahora una visita'}
-STATUS={'aprobado':'Aprobada por los controles de esa corrida','fallido':'Fallida: revisar los puntos señalados','incompleto':'Incompleta o bloqueada'}
+STATUS={'aprobado':'Checks originales aprobados; no equivale a diálogo aprobado','fallido':'Fallida: revisar los puntos señalados','incompleto':'Incompleta o bloqueada'}
 
 def quote(text):
     return '\n'.join('> '+line for line in str(text or 'No exportado.').splitlines())
@@ -30,6 +30,10 @@ def interpretation(u):
 def render(path):
     d=json.loads(path.read_text());title=d['description'].replace('-',' ').capitalize();turns=d.get('turns',[])
     lines=[f'# {title}', '', '[Volver a la guía del agente](../../README.md) · [Abrir evidencia técnica JSON]('+path.name+')', '', '**Conversación sintética ejecutada en el servidor.** Los mensajes se conservan en su idioma original. La explicación resume campos estructurados y controles exportados; no representa razonamiento privado del modelo ni una explicación generada posteriormente por otro LLM.', '', '| Dato | Evidencia |','|---|---|',f"| Caso / corrida | `{d['case']}` / `{d['source_archive'].removesuffix('.zip')}` |",f"| Resultado automático original | {STATUS.get(d.get('automatic_result'),d.get('automatic_result'))} |",f"| Modelo / configuración | `{d.get('sales_model') or 'No exportado'}` / {d.get('configuration_version') or 'No exportada'} |",f"| Visitas registradas / turnos | {len(d.get('meetings',[]))} / {len(turns)} |", '| Costo | El reporte lo agrega por corrida; no se inventa un importe por conversación. |', '', '**Cómo repetirla:** usar una company y un project de prueba con información aprobada coherente; sustituir nombres, recursos y horarios por los vigentes. Una aprobación histórica no garantiza estabilidad con nuevos mensajes o entrega por WhatsApp/SMS. Las fechas y recursos de este laboratorio no son una oferta real.', '']
+    labels=d.get('evaluation_labels') or {}
+    lines += ['**Calidad del diálogo:** '+str(labels.get('dialogue_quality','NOT_EVALUATED'))+'. **No hay aprobación integral del diálogo.** '+str(labels.get('scope','Los controles de esta corrida tienen alcance limitado.')), '']
+    if labels.get('retrospective_findings'):
+        lines += ['**Hallazgos de revisión posterior:** '+ '; '.join('Turno '+str(f['turn'])+': '+f['reason'] for f in labels['retrospective_findings']), '']
     failures=d.get('failures',[])
     if failures:
         lines+=['**Qué falló en esta corrida:** '+', '.join(sorted({f.get('check','control sin nombre') for f in failures}))+'. El estado original se conserva, incluso si se corrigió después.', '']

@@ -1112,5 +1112,13 @@
       "laboratory_only": true,
       "local_material_path": "cedar/studio.pdf"
     }
-  ]
+  ],
+  "evaluation_labels": {
+    "version": "sales-evidence-labels/2.0",
+    "recorded_checks": "aprobado",
+    "dialogue_quality": "SCOPED_FAVORABLE_REVIEW",
+    "integral_dialogue_approval": false,
+    "retrospective_findings": [],
+    "scope": "Los checks originales y nombres de archivo son históricos. Aprobarlos no certifica relevancia, fluidez ni todo el diálogo. Una revisión favorable solo cubre los comportamientos que describe."
+  }
 }

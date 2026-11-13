@@ -121,6 +121,19 @@ class ReadTools:
             if call.topic == Topic.property_details and not call.property_id and not unit:
                 return result('uncertain', safe_message='Select a property before requesting its details.')
             rows = [p for p in types if p['id'] == call.property_id] if call.property_id else [] if unit else types
+            if call.topic == Topic.catalog and not call.property_id and not unit:
+                from .needs_search import search
+                from .understanding_contract import Task
+                safe_types=[]
+                for original in types:
+                    row=dict(original)
+                    for topic,fields in [('pricing',('starting_price','currency')),('inventory',('available_units','inventory_updated_at'))]:
+                        if topic in holds or restricted(state,Task(id='needs',topic=topic,status='pending',property_id=row['id'])):
+                            row.update(dict.fromkeys(fields,None))
+                    safe_types.append(row)
+                needs = search(state.last_understanding, safe_types, context['catalog_coverage'])
+                if needs is not None:
+                    return result('success', evidence_ids=needs['matching_property_ids'], data={'property_types':needs['matches'], 'coverage':context['catalog_coverage'], 'needs_search':needs})
             return result('partial' if rows or unit else 'empty', evidence_ids=[p['id'] for p in rows]+([unit['id']] if unit else []),
                 data={'property_types':rows, 'coverage':context['catalog_coverage'],
                       'inventory':[unit] if unit else context['inventory'] if call.topic == Topic.inventory else [],

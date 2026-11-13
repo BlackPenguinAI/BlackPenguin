@@ -407,6 +407,8 @@ async def compose(db, scope, *, inbound, outcome, draft, commercial, lead, metad
     from .turn_memory import build
     guidance = resolve(db, scope)
     blocks = evidence_blocks(draft.text)
+    needs_result=next((r.data['needs_search'] for r in outcome.results if r.data.get('needs_search')),None)
+    if needs_result:metadata['needs_search']={k:v for k,v in needs_result.items() if k not in {'matches','sold_out'}}
     from .natural_reply import empathy_text
     empathy=empathy_text(outcome.state.last_understanding,outcome.state,commercial)
     if empathy:
@@ -422,7 +424,7 @@ async def compose(db, scope, *, inbound, outcome, draft, commercial, lead, metad
                 row['namespace']=='optional' for row in metadata['profile_capture']) else 'Thanks for sharing that information.'
             blocks.append({'id':'e'+str(len(blocks)), 'required':True,
                 'wordings':{'direct':text,'conversational':text},'source':'scoped_profile_capture'})
-    if not draft.text.startswith('Here are the property options') and any(r.data.get('property_types') and len(r.data['property_types']) == 1 for r in outcome.results):
+    if not needs_result and not draft.text.startswith('Here are the property options') and any(r.data.get('property_types') and len(r.data['property_types']) == 1 for r in outcome.results):
         for result in outcome.results:
             if len(result.data.get('property_types', [])) != 1:
                 continue
@@ -437,18 +439,19 @@ async def compose(db, scope, *, inbound, outcome, draft, commercial, lead, metad
                         'wordings': {'direct': value, 'conversational': value}, 'source': 'approved_single_property_details'})
     # Action results and prepared links are backend-only blocks; the model cannot fabricate receipts.
     for text in extra:
+        if needs_result and text=='Which property option would you like to explore in more detail?':continue
         if text:
             blocks.append({'id': 'e' + str(len(blocks)), 'required': True,
                 'wordings': {'direct': text, 'conversational': text}, 'source': 'backend_prepared_operation'})
     # Benefits are optional evidence, never model-generated investment or suitability claims.
-    if any(r.topic.value in {'catalog','property_details','pricing','amenities'} and r.polarity=='request'
+    if not needs_result and any(r.topic.value in {'catalog','property_details','pricing','amenities'} and r.polarity=='request'
            for r in outcome.state.last_understanding.requests):
         for field in ('value_proposition','key_differentiators'):
             value=commercial['confirmed_project_facts'].get(field)
             values=[value] if isinstance(value,str) else value if isinstance(value,list) else []
             for item in values[:3]:
                 if not isinstance(item,str) or not item.strip() or len(item)>600 or re.search(r'https?://|\bwww\.|guarantee|risk.free|\b(?:profit|yield|appreciation|returns?)\b',item,re.I):continue
-                text='The approved project information highlights: '+item.strip()
+                text=item.strip()
                 blocks.append({'id':'e'+str(len(blocks)),'required':False,
                     'wordings':{'direct':text,'conversational':text},'source':'confirmed_project_facts.'+field})
     from .human_contact import cases as contact_cases
@@ -469,6 +472,9 @@ async def compose(db, scope, *, inbound, outcome, draft, commercial, lead, metad
     choices = select_continuations(outcome=outcome, commercial=commercial, metadata=metadata,
         previous_meta=previous_meta, lead=lead, holds=holds, priority=priority, priority_meta=priority_meta,
         booked=bool(memory['appointments']['active']['count']))
+    if needs_result and not any(r.polarity=='request' and r.topic.value not in {'catalog','inventory','property_details'} for r in outcome.state.last_understanding.requests):
+        from .needs_search import closing
+        choices=[{'id':'needs_next','text':closing(needs_result),'metadata':{}}]
     payload = {'version': VERSION, 'published_guidance': guidance, 'current_message': inbound.content,
         'turn_context': memory, 'validated_results': [r.model_dump(mode='json') for r in outcome.results],
         'planning': outcome.plan, 'evidence_blocks': blocks, 'continuations': choices,

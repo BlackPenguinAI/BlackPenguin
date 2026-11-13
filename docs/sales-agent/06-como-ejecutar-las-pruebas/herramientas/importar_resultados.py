@@ -1,5 +1,6 @@
 """Import only explicit synthetic server archives, with whitelisted conversation fields."""
 import argparse,csv,hashlib,json,re,zipfile
+from clasificar_resultados import classify
 from pathlib import Path
 
 
@@ -12,7 +13,7 @@ def export(source,root):
     index=json.loads(prior_index.read_text()) if prior_index.exists() else []
     review_path=root/'04-conversaciones/revisiones-humanas.json'
     reviews=json.loads(review_path.read_text()) if review_path.exists() else {}
-    files=sorted(p for p in Path(source).glob('sales-*.zip') if re.fullmatch(r'sales-(?:booking-point-\d+|commercial-point-\d+|closing-point-\d+|compact-battery-\d+|compact-repair-\d+|synthetic-lab-\d+)\.zip',p.name))
+    files=sorted(p for p in Path(source).glob('sales-*.zip') if re.fullmatch(r'sales-(?:booking-point-\d+|commercial-point-\d+|closing-point-\d+|compact-battery-\d+|compact-repair-\d+|needs-discovery-[0-9TZ]+|synthetic-lab-\d+)\.zip',p.name))
     for order,path in enumerate(files):
         with zipfile.ZipFile(path) as archive:
             report=json.loads(archive.read('summary.json' if 'summary.json' in archive.namelist() else 'report.json'))
@@ -27,7 +28,7 @@ def export(source,root):
         key=path.stem
         runs=[r for r in runs if r['run']!=key]
         index=[i for i in index if i['run']!=key]
-        compact=key.startswith('sales-compact');suite='adaptive' if key.startswith('sales-synthetic-lab-') else 'compact' if compact else 'booking' if 'booking' in key else 'commercial' if 'commercial' in key else 'closing'
+        compact=key.startswith('sales-compact');suite='adaptive' if key.startswith('sales-synthetic-lab-') else 'compact' if compact else 'booking' if 'booking' in key else 'needs' if 'needs-discovery' in key else 'commercial' if 'commercial' in key else 'closing'
         case_ids=sorted(c['case'] for c in report['cases']);cohort=hashlib.sha256(json.dumps(case_ids).encode()).hexdigest()[:12]
         cases=[]
         for case in report['cases']:
@@ -47,17 +48,18 @@ def export(source,root):
             for turn in case.get('turns',[]):
                 metadata=turn.get('output',{}).get('metadata',{});composition=metadata.get('composition',{})
                 turns.append({'turn':turn.get('turn'),'action':turn.get('action'),'lead':turn.get('lead_message',turn.get('message',turn.get('inbound'))),'agent':turn.get('reply'),
-                    'understanding':turn.get('input_trace',{}).get('understanding',turn.get('understanding')),'error_code':turn.get('error_code'),
+                    'understanding':turn.get('input_trace',{}).get('understanding',turn.get('understanding')),'error_code':turn.get('error_code'),'needs_search':turn.get('needs_search'),
                     'checks':turn.get('checks',[]),'interpretation_attempts':[{k:a[k] for k in ('attempt','outcome','error_code','validation_issues') if k in a} for a in turn.get('interpretation_attempts',[])],'composition':{'status':composition.get('status'),'attempts':[{k:a[k] for k in ('status','error_code','rule_code','validation_issues') if k in a} for a in composition.get('attempts',[])]}})
             document={'synthetic_only':True,'execution_origin':'server_submitted_synthetic_run','source_archive':path.name,'source_sha256':hashlib.sha256(path.read_bytes()).hexdigest(),'commit':report.get('commit'),'sales_model':report.get('sales_model'),
                 'configuration_version':report.get('configuration_version'),'configuration_sha256':report.get('configuration_sha256'),'clock_utc':case.get('clock_utc'),'team':case.get('team',[]),'case':case['case'],'description':label,'persona':case.get('persona'),'original_case':case.get('original_case'),'project_name':case.get('project_name'),'lead_controller':case.get('lead_controller'),'lead_model':report.get('lead_model'),'company_id':report.get('company_id'),'project_id':case.get('project_id'),'property_type_id':case.get('property_type_id'),
                 'automatic_result':status,'human_review':review,'stop_reason':case.get('stop_reason'),
                 'expected_outcome':case.get('expected_outcome'),'topic_tags':sorted({t['action'] for t in turns if t['action']}),'turns':turns,'checks':case.get('checks',[]),'failures':failures,'blocked_checks':blocked,'meetings':case.get('meetings',[]),'materials':case.get('materials',[])}
+            document['evaluation_labels']=classify(document)
             target=root/relative;target.parent.mkdir(parents=True,exist_ok=True);target.write_text(json.dumps(document,indent=2,ensure_ascii=False)+'\n')
             cases.append({'case':case['case'],'status':status,'meetings':len(case.get('meetings',[])),'turns':len(turns),'failures':len(failures)})
-            index.append({'run':key,'case':case['case'],'status':status,'human_review':review['status'],'file':relative.as_posix()})
+            index.append({'run':key,'case':case['case'],'status':status,'human_review':review['status'],'dialogue_quality':document['evaluation_labels']['dialogue_quality'],'integral_dialogue_approval':False,'file':relative.as_posix()})
         usage=report.get('provider_usage',{});expected=report.get('expected_bookings')
-        if expected is None:expected=3 if suite=='booking' else 0 if suite in {'commercial','closing'} else sum(c.get('expected_outcome')=='booked' for c in report['cases'])
+        if expected is None:expected=3 if suite=='booking' else 0 if suite in {'commercial','closing','needs'} else sum(c.get('expected_outcome')=='booked' for c in report['cases'])
         entry={'run':key,'execution_origin':'server_submitted_synthetic_run','archive':path.name,'sha256':hashlib.sha256(path.read_bytes()).hexdigest(),'commit':report.get('commit'),'suite':suite,'cohort':cohort,'selected_cases':case_ids,
             'model':report.get('sales_model'),'lead_model':report.get('lead_model'),'lead_controller_metrics':report.get('lead_controller_metrics'),'configuration_version':report.get('configuration_version'),'configuration_sha256':report.get('configuration_sha256'),'status':report.get('status'),'cases':len(cases),'approved_cases':sum(c['status']=='aprobado' for c in cases),
             'turns':sum(c['turns'] for c in cases),'expected_bookings':expected,'actual_bookings':sum(c['meetings'] for c in cases),'provider_calls':report.get('provider_calls'),

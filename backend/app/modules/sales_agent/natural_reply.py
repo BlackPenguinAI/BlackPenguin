@@ -8,6 +8,16 @@ from .response_policy import render_channel_text,split_channel_text
 
 
 def naturalize(outcome,draft,*,channel):
+    needs_results=[r for r in outcome.results if r.data.get('needs_search')]
+    if needs_results:
+        from .needs_search import answer
+        handled={r.operation_id for r in needs_results}
+        remaining=replace(outcome,state=outcome.state.model_copy(update={'tasks':[t for t in outcome.state.tasks if t.id not in handled]}),results=[r for r in outcome.results if r.operation_id not in handled])
+        rest=naturalize(remaining,compose(remaining,channel=channel),channel=channel) if remaining.results else None
+        blocks=[answer(r.data['needs_search']) for r in needs_results]
+        if rest and rest.text!='I need clarification or verified information to answer this request.':blocks.append(rest.text)
+        text=render_channel_text('\n\n'.join(blocks),channel)
+        return replace(draft,text=text,parts=tuple(split_channel_text(text,channel)))
     tasks={t.id:t for t in outcome.state.tasks}
     rows={};units={};topics=set();handled=set();focus={};general=set();features_wanted={}
     requests={r.id:r for r in outcome.state.last_understanding.requests}

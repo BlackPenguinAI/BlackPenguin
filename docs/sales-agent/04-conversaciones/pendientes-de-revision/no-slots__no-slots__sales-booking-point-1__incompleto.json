@@ -310,5 +310,13 @@
     }
   ],
   "meetings": [],
-  "materials": []
+  "materials": [],
+  "evaluation_labels": {
+    "version": "sales-evidence-labels/2.0",
+    "recorded_checks": "incompleto",
+    "dialogue_quality": "NOT_EVALUATED",
+    "integral_dialogue_approval": false,
+    "retrospective_findings": [],
+    "scope": "Los checks originales y nombres de archivo son históricos. Aprobarlos no certifica relevancia, fluidez ni todo el diálogo. Una revisión favorable solo cubre los comportamientos que describe."
+  }
 }

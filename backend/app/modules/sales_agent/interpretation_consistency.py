@@ -10,7 +10,10 @@ DECLINE=re.compile(r"\b(?:I do not want a visit yet|I don['’]t want a visit ye
 
 def normalize(value,text,commercial,*,appointment_offer=None):
     from app.modules.governance.services import request_attribution
-    own=request_attribution(text)['current_text'];data=value.model_dump(mode='json');notes=[]
+    own=request_attribution(text)['current_text']
+    from .needs_search import normalize as normalize_needs
+    value,notes=normalize_needs(value,text,commercial)
+    data=value.model_dump(mode='json')
     names=[r.get('property_type') for r in commercial.get('property_types',[])]
     def named(quote):
         matches=[]

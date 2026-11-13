@@ -17,7 +17,7 @@ def save(fig,name):
 three=[r for r in rows if r['suite']=='compact' and set(r['selected_cases'])=={'first_time_A','move_up_B','unknown_A'}]
 x=np.arange(len(three));labels=[r['run'].replace('sales-compact-repair-','Repair ') for r in three]
 fig,axes=plt.subplots(1,2,figsize=(10,3.6))
-for ax,field,total,title in [(axes[0],'approved_cases','cases','Conversaciones aprobadas automáticamente'),(axes[1],'actual_bookings','expected_bookings','Visitas confirmadas en laboratorio')]:
+for ax,field,total,title in [(axes[0],'approved_cases','cases','Conversaciones con checks originales aprobados'),(axes[1],'actual_bookings','expected_bookings','Visitas confirmadas en laboratorio')]:
     y=np.array([100*r[field]/r[total] for r in three],dtype=float);ax.plot(x,y,'o-',color='#176b87',linewidth=2);ax.set(xticks=x,xticklabels=labels,ylim=(-5,110),ylabel='Porcentaje',title=title);ax.grid(axis='y',alpha=.2)
     for i,r in enumerate(three):ax.annotate(f'{r[field]}/{r[total]}',(i,y[i]),xytext=(0,9),textcoords='offset points',ha='center')
 fig.suptitle('Mismos tres casos · resultados observados del servidor',y=1.05)
@@ -44,7 +44,7 @@ early=[r for r in rows if r['suite']=='adaptive']
 if early:
     xx=np.arange(len(early));names=[r['run'].replace('sales-synthetic-lab-','Lab ') for r in early]
     fig,axes=plt.subplots(1,3,figsize=(13,3.7))
-    for ax,key,title in [(axes[0],'approved_cases','Casos aprobados (de nueve)'),(axes[1],'turns','Mensajes del lead'),(axes[2],'provider_calls','Llamadas: lead + agente')]:
+    for ax,key,title in [(axes[0],'approved_cases','Checks originales aprobados (de nueve)'),(axes[1],'turns','Mensajes del lead'),(axes[2],'provider_calls','Llamadas: lead + agente')]:
         vals=np.array([r[key] for r in early],dtype=float);ax.plot(xx,vals,'o-',color='#176b87');ax.set(xticks=xx,xticklabels=names,title=title,ylim=(0,max(vals)*1.25));ax.yaxis.set_major_locator(MaxNLocator(integer=True))
         for i,v in enumerate(vals):ax.annotate(str(int(v)),(i,v),ha='center',xytext=(0,6),textcoords='offset points')
     fig.suptitle('Primer laboratorio: cambio del controlador del lead, no mejora causal del agente',y=1.05)

@@ -14,6 +14,8 @@
 
 **Cómo repetirla:** usar una company y un project de prueba con información aprobada coherente; sustituir nombres, recursos y horarios por los vigentes. Una aprobación histórica no garantiza estabilidad con nuevos mensajes o entrega por WhatsApp/SMS. Las fechas y recursos de este laboratorio no son una oferta real.
 
+**Calidad del diálogo:** NOT_EVALUATED. **No hay aprobación integral del diálogo.** Los checks originales y nombres de archivo son históricos. Aprobarlos no certifica relevancia, fluidez ni todo el diálogo. Una revisión favorable solo cubre los comportamientos que describe.
+
 **Qué falló en esta corrida:** no_repeated_financial_sentences, property_switch_reflected, requested_material_delivered, segment_evidence_from_own_initial_declaration, segment_matches_declared_motivation. El estado original se conserva, incluso si se corrigió después.
 
 ## Turno 1

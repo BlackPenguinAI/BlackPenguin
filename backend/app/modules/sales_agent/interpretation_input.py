@@ -236,3 +236,5 @@ def compile_input(raw,text,*,historical_messages=()):
         prefs.append(p)
     output['preferences']=prefs
     return Understanding.model_validate(output),notes
+
+SYSTEM += "\nA request such as I am looking for a 2 bedroom home is catalog discovery: topic catalog, target null, preference bedrooms=2 with exact evidence. A bedroom count is not a property name. Do not ask which model the buyer means before searching. Preserve other independent requests. Negative, hypothetical, ranged and quoted statements are not exact positive needs.\n"

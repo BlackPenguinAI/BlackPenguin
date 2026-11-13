@@ -2,11 +2,13 @@
 
 [Inicio del repositorio](../../README.md) · [Datos JSON](02-datos-de-prueba/) · [Conversaciones](04-conversaciones/) · [Evidencia de corridas](05-resultados-y-mejoras/)
 
-**Corte documental: 11/11/2026.** Se reúne el trabajo del ciclo reciente con data sintética: **21 corridas del servidor, 144 conversaciones ejecutadas y 47 IDs de escenario distintos por suite**. Las repeticiones son parte del trabajo, no escenarios adicionales. La batería compacta 2 aprobó **13/16 conversaciones y 7/8 visitas**. El último subconjunto, Repair 8, aprobó **2/3 conversaciones y 1/2 visitas**: vivienda mayor y fotos ausentes se recuperaron; diversificación falló con tiempos de espera del modelo. No se mezclan ambos conjuntos como si fueran una nueva batería completa.
+**Métricas históricas del modelo: corte 11/11/2026. Revisión de criterios: 13/11/2026.** Se reúne el trabajo del ciclo reciente con data sintética: **21 corridas del servidor, 144 conversaciones ejecutadas y 47 IDs de escenario distintos por suite**. Las repeticiones son parte del trabajo, no escenarios adicionales. En la batería compacta 2, **13/16 conversaciones cumplieron los checks originales y se registraron 7/8 visitas esperadas**; eso no certifica la calidad integral de esos diálogos. En el último subconjunto, Repair 8, **2/3 conversaciones cumplieron sus checks y se registró 1/2 visitas**: vivienda mayor y fotos ausentes se recuperaron; diversificación falló con tiempos de espera del modelo. No se mezclan ambos conjuntos como si fueran una nueva batería completa.
 
 La guía usa bloques con el mismo propósito: **qué se hizo → cómo funciona → qué evidencia hay → dónde están sus archivos**. Toda la explicación está aquí; los enlaces internos abren datos, código o carpetas de respaldo. Las referencias externas justifican la metodología, no sustituyen la evidencia del proyecto.
 
 [1. Producto](#1-producto-y-rutas) · [2. LLM/backend](#2-llm-y-backend) · [3. Datos](#3-datos-sintéticos) · [4. Experimentos](#4-diseño-de-los-experimentos) · [5. Afinamiento](#5-qué-se-modifica-al-afinar) · [6. Evolución](#6-historia-y-evolución-medida) · [7. Diálogos](#7-conversaciones-para-repetir) · [8. Consumos](#8-consumo-real-y-saldo-de-openrouter) · [9. Referencias](#9-referencias-y-fundamento) · [10. Trabajo actual](#10-trabajo-actual) · [11. Trabajo futuro](#11-trabajo-futuro)
+
+**Cómo leer «éxito».** Las etiquetas antiguas `aprobado` y la carpeta `funcionaron` conservan los checks y rutas históricos. No equivalen a una aprobación integral del diálogo. Tras revisar 144 conversaciones: **121 no tienen evaluación integral, nueve tienen revisión favorable de alcance limitado y 14 necesitan mejoras**. Los mensajes, costos y checks originales se conservaron; se añadieron etiquetas y hallazgos visibles en cada ficha. No se convierten resultados locales en resultados del servidor.
 
 ## 1. Producto y rutas
 
@@ -337,6 +339,41 @@ Las gráficas se generan con NumPy y Matplotlib, sin suavizado ni valores invent
 **Qué se corrige.** Los webhooks procesan sus consultas en hilos y los trabajos de ventas usan un bucle independiente para que una espera en la base de datos no impida terminar la llamada al modelo. Las transacciones de ventas tienen esperas por bloqueo de hasta 2 segundos y un límite de inactividad de 120 segundos. Ante un bloqueo agotado, el webhook revierte y devuelve 503 para permitir un reintento. Se conservan la deduplicación y la atomicidad de las operaciones; no se cambia el modelo, el grafo ni el diálogo comercial.
 
 **Evidencia y alcance.** Pasaron 10 pruebas locales con PostgreSQL 16.2, incluidas API responsiva durante un bloqueo, reversión sin registros parciales y recepción única al repetir un evento. La regresión final aprobó 3.076 pruebas en 133 módulos; las 10 de PostgreSQL se omitieron en SQLite y se aprobaron aparte. La aceptación técnica aprobó 63 controles, con una evaluación en vivo pendiente. CI repite los controles antes del despliegue. [Resultado técnico JSON](05-resultados-y-mejoras/concurrencia-api-2026-11-13.json). No son conversaciones nuevas del servidor ni una mejora medida de calidad comercial. **Consumo OpenRouter de esta corrección: USD 0.00.** La comprobación en producción requiere desplegar, verificar salud e iniciar una conversación controlada de prueba. La cadencia de reintentos del proveedor sigue siendo externa.
+
+### Búsqueda por necesidades · corrección del 13/11/2026
+
+**Problema.** «I am looking for a 2 bedroom» expresa una búsqueda, no el nombre de un modelo de vivienda. Los guiones anteriores solían proporcionar el nombre de la propiedad. El H06 histórico no demostraba calidad de esta búsqueda: su prueba local era de seguridad y su conversación original falló. Una composición aceptada tampoco garantiza que responda a la necesidad.
+
+**Qué cambia realmente.** Se ajustan las instrucciones de interpretación, la normalización de peticiones literales, el filtro del catálogo y la composición. El backend busca coincidencias de dormitorios en los datos aprobados, respeta restricciones de precio/inventario y no selecciona ni agenda una propiedad por coincidir. La respuesta presenta las coincidencias y una pregunta pertinente, o explica ausencia/agotamiento e información incompleta. Se elimina la fórmula «The approved project information highlights». **No se reconecta el grafo LangGraph ni se cambia el modelo publicado.** Esta etapa cubre dormitorios exactos; rangos, negaciones y necesidades combinadas no se convierten silenciosamente en un filtro exacto.
+
+| Grupo | Casos incluidos | Exigencia para aprobar los checks |
+|---|---|---|
+| Entrada sin modelo conocido | Frase original, «Im», número escrito, «show me», «do you have» | Buscar por dormitorios; no pedir primero un nombre desconocido. |
+| Una o varias coincidencias | Dos dormitorios y tres dormitorios; múltiples opciones | Mostrar todas las coincidencias de este catálogo con datos pertinentes, sin incluir propiedades que no cumplen. |
+| Sin coincidencia o datos incompletos | Ninguna, dormitorios desconocidos, cantidad cero, inventario no confirmado | Explicar el límite; no inventar disponibilidad ni afirmar exhaustividad. |
+| Continuidad | Cambiar de dos a un dormitorio en el siguiente turno | Cambiar el filtro y conservar que el lead todavía no ha seleccionado una vivienda. |
+
+**Datos y ejecución local.** Se reutilizan la company sintética, tres projects y seis propiedades. La variante de múltiples coincidencias agrega temporalmente **Cedar Garden Home**, de dos dormitorios, 90 m², USD 285.000 y sin materiales: no transforma Cedar Studio ni sus documentos. Son **12 escenarios y 14 turnos guionados**, sin lead LLM ni juez. El experimento local usa el core real con **proveedor del modelo simulado (`test/offline`)**: los 12 cumplieron sus checks. Esto verifica el comportamiento del software ante las interpretaciones probadas, **no la calidad del modelo publicado**. OpenRouter consumido localmente: **USD 0.00 total**. [Casos JSON](03-casos-de-prueba/busqueda-por-necesidades.json) · [Diálogos locales y sus respuestas](05-resultados-y-mejoras/busqueda-por-necesidades-local/conversaciones.md) · [Resultado JSON local](05-resultados-y-mejoras/busqueda-por-necesidades-local/resultado.json).
+
+**Ejemplo observado localmente — no una corrida del servidor:**
+
+> **Lead:** I am looking for a 2 bedroom
+>
+> **Agente:** Here is a 2-bedroom option in this project: Cedar Loft — 2 bedrooms, 110 m², from 325,000.00 USD. The remaining catalog information is incomplete, so these may not be all the matching options. Would you like to know more about Cedar Loft?
+
+**Criterios y etiquetas.** Se comprueban IDs y nombres coincidentes, mención de dormitorios, incertidumbre de inventario, ausencia de texto interno y ausencia de selección/cita automática. Una respuesta genérica falla aunque la composición haya sido aceptada. Cada resultado distingue ejecución, checks de búsqueda y `overall_dialogue_quality: NOT_EVALUATED`. En el histórico, `NEEDS_IMPROVEMENT` señala hallazgos; `SCOPED_FAVORABLE_REVIEW` solo respalda lo revisado; `NOT_EVALUATED` no equivale a fallo ni éxito integral.
+
+**Validación del cambio.** 3.111 pruebas de regresión aprobadas en 134 módulos; 10 pruebas de PostgreSQL omitidas en SQLite y aprobadas aparte con PostgreSQL 16.2. Aceptación: 63 controles aprobados y una evaluación en vivo pendiente. Se repitieron las 35 pruebas específicas de búsqueda tras el ajuste final. [Validación JSON](05-resultados-y-mejoras/busqueda-por-necesidades-local/validacion.json).
+
+**Paso siguiente: evidencia con el modelo publicado en el servidor.** Después de desplegar, ejecutar la suite `needs-discovery` del laboratorio existente. Lee únicamente la configuración global publicada; crea los datos y conversaciones en SQLite temporal y bloquea contactos externos. Exporta transcripciones, checks, commit, modelo, configuración, llamadas, tokens y costo reportado. No certifica WhatsApp/SMS ni Calendar. El [script de ejecución](06-como-ejecutar-las-pruebas/ejecutar-busqueda-necesidades.sh) recoge el ZIP incluso si los checks fallan. La siguiente corrida debe revisarse antes de afirmar mejora del modelo.
+
+| Corrida | Turnos | Consumo total OpenRouter (USD) | Estado |
+|---|---|---|---|
+| Experimento local, proveedor simulado | 14 | **0.00 consumido** | 12/12 con checks de búsqueda satisfechos. |
+| Primera corrida en servidor con modelo publicado | 14 previstos | **≈0.05 estimado; reserva 0.10** | Pendiente. |
+| **TOTAL CONSUMIDO** | **14 ejecutados localmente** | **0.00** | No incluye estimaciones. |
+
+El estimado del servidor usa la referencia histórica de Repair 7, ≈USD 0.00335 por turno, no una nueva tarifa de OpenRouter. El límite de 96 llamadas controla intentos, no dólares; el reporte debe confirmar el consumo y si el proveedor informó costo en todas las respuestas. Conversaciones largas, búsqueda por presupuesto/ubicación/rangos, selección posterior, materiales y visita tras descubrir una opción quedan para ampliar esta suite; las baterías anteriores los prueban por separado, no como garantía de esta combinación.
 
 ## 11. Trabajo futuro
 

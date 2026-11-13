@@ -14,6 +14,8 @@
 
 **Cómo repetirla:** usar una company y un project de prueba con información aprobada coherente; sustituir nombres, recursos y horarios por los vigentes. Una aprobación histórica no garantiza estabilidad con nuevos mensajes o entrega por WhatsApp/SMS. Las fechas y recursos de este laboratorio no son una oferta real.
 
+**Calidad del diálogo:** NEEDS_IMPROVEMENT. **No hay aprobación integral del diálogo.** Los checks originales y nombres de archivo son históricos. Aprobarlos no certifica relevancia, fluidez ni todo el diálogo. Una revisión favorable solo cubre los comportamientos que describe.
+
 **Qué falló en esta corrida:** initial_named_property_scope, material_request_delivered_this_turn, property_switch_reflected, requested_material_delivered. El estado original se conserva, incluso si se corrigió después.
 
 **Revisión posterior:** Primera respuesta sí respeta Cedar Studio; initial_named_property_scope es un falso positivo por exigir metadata de catálogo a property_details. El cambio a Cedar Loft sí falla: referencia material en vez de propiedad, aclaración genérica y galería no entregada. No se modifica el resultado automático original.
