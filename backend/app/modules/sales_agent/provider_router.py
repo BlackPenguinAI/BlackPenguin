@@ -175,10 +175,30 @@ def _validate_twilio(request: Request, params: dict[str, str], signature: str | 
     return config
 
 
-@twilio_router.post("/sms")
-async def twilio_inbound_sms(request: Request, background_tasks: BackgroundTasks, x_twilio_signature: str | None = Header(None), db: Session = Depends(get_db)):
+async def _form_params(request: Request):
     form = await request.form()
-    params = {str(key): str(value) for key, value in form.items()}
+    return {str(key): str(value) for key, value in form.items()}
+
+
+async def _body_bytes(request: Request):
+    return await request.body()
+
+
+def _provider_db(db: Session = Depends(get_db)):
+    from .concurrency import bounded
+    from sqlalchemy.exc import DBAPIError
+    bounded(db)
+    try:
+        yield db
+    except DBAPIError as exc:
+        db.rollback()
+        if getattr(exc.orig, 'pgcode', None) == '55P03':
+            raise HTTPException(503, 'Messaging is busy; retry this event.', headers={'Retry-After': '2'}) from exc
+        raise
+
+
+@twilio_router.post("/sms")
+def twilio_inbound_sms(request: Request, background_tasks: BackgroundTasks, x_twilio_signature: str | None = Header(None), db: Session = Depends(_provider_db), params: dict = Depends(_form_params)):
     config = _validate_twilio(request, params, x_twilio_signature, db)
     sid = params.get("MessageSid")
     if not sid or params.get("To") != config.from_phone_number:
@@ -188,9 +208,7 @@ async def twilio_inbound_sms(request: Request, background_tasks: BackgroundTasks
 
 
 @twilio_router.post("/status")
-async def twilio_message_status(request: Request, x_twilio_signature: str | None = Header(None), db: Session = Depends(get_db)):
-    form = await request.form()
-    params = {str(key): str(value) for key, value in form.items()}
+def twilio_message_status(request: Request, x_twilio_signature: str | None = Header(None), db: Session = Depends(_provider_db), params: dict = Depends(_form_params)):
     _validate_twilio(request, params, x_twilio_signature, db)
     if params.get("MessageSid"):
         _apply_status(db, provider="twilio", message_id=params["MessageSid"], status=params.get("MessageStatus") or "queued", error=params.get("ErrorCode"))
@@ -198,9 +216,8 @@ async def twilio_message_status(request: Request, x_twilio_signature: str | None
 
 
 @telnyx_router.post("/messaging")
-async def telnyx_messaging_webhook(request: Request, background_tasks: BackgroundTasks, telnyx_signature_ed25519: str | None = Header(None), telnyx_timestamp: str | None = Header(None), db: Session = Depends(get_db)):
+def telnyx_messaging_webhook(request: Request, background_tasks: BackgroundTasks, telnyx_signature_ed25519: str | None = Header(None), telnyx_timestamp: str | None = Header(None), db: Session = Depends(_provider_db), body: bytes = Depends(_body_bytes)):
     platform, _ = telnyx_credentials(db)
-    body = await request.body()
     try:
         timestamp = int(telnyx_timestamp or "")
     except ValueError as exc:

@@ -7,7 +7,7 @@ import argparse,json,re,secrets,subprocess,tempfile,time,uuid
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
-TESTS=['test_sales_booking_postgres.py','test_sales_dialogue_postgres.py','test_sales_runtime_postgres.py']
+TESTS=['test_sales_booking_postgres.py','test_sales_dialogue_postgres.py','test_sales_runtime_postgres.py','test_sales_concurrency_postgres.py']
 
 
 def run(image,expected_commit,tests,output):
@@ -44,7 +44,7 @@ def run(image,expected_commit,tests,output):
             cases=list(ET.parse(xml).iter('testcase')) if xml.exists() else []
             skipped=sum(c.find('skipped') is not None for c in cases);failed=sum(c.find('failure') is not None or c.find('error') is not None for c in cases)
             result.update(exit_code=completed.returncode,total=len(cases),failed=failed,skipped=skipped,
-                status='PASS' if completed.returncode==0 and len(cases)==7 and not failed and not skipped else 'FAIL')
+                status='PASS' if completed.returncode==0 and len(cases)==10 and not failed and not skipped else 'FAIL')
     finally:
         if started_container:subprocess.run(['docker','rm','-f',container],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
         if created_network:subprocess.run(['docker','network','rm',network],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)

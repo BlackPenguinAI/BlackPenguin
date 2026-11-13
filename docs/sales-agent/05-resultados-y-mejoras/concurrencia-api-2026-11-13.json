@@ -1,0 +1,30 @@
+{
+  "change": "Sales API concurrency fix",
+  "base_commit": "84b3a8767bdb8d716319caf7d3a6acdc620cbcf7",
+  "backend_regression": {
+    "passed": 3076,
+    "skipped": 10,
+    "failed": 0,
+    "source_modules_verified": 133
+  },
+  "isolated_postgresql": {
+    "version": "16.2",
+    "passed": 10,
+    "failed": 0,
+    "duration_seconds": 9.79
+  },
+  "acceptance": {
+    "passed": 63,
+    "failed": 0,
+    "not_run": 1,
+    "model_quality_evaluated": false
+  },
+  "production_validation": "pending deployment",
+  "openrouter_cost_usd": 0,
+  "provider_calls": 0,
+  "notes": [
+    "The 10 PostgreSQL tests are skipped in the SQLite shards and executed separately against disposable PostgreSQL.",
+    "No production database or lead was used.",
+    "No new real-model conversation quality claim."
+  ]
+}

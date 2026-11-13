@@ -1312,7 +1312,8 @@ def _execute_classified_appointment_request(
 
 async def process_live_inbound(conversation_id: str, inbound_message_id: str) -> None:
     """Only the deployed coordinator can process live inbound work."""
-    db = SessionLocal()
+    from .concurrency import bounded
+    db = bounded(SessionLocal())
     try:
         conversation = db.query(SalesConversation).filter_by(id=conversation_id).with_for_update().first()
         inbound = db.query(SalesMessage).filter_by(id=inbound_message_id, conversation_id=conversation_id).first()
@@ -1610,15 +1611,19 @@ async def _legacy_process_live_inbound(conversation_id: str, inbound_message_id:
 
 async def process_live_inbound_job(job_id: str) -> None:
     """Process one durable inbound turn and expose bounded retry state to operators."""
-    db = SessionLocal()
+    from .concurrency import bounded
+    db = bounded(SessionLocal())
     try:
         job = db.query(SalesInboundJob).filter(SalesInboundJob.id == job_id).first()
         if not job or job.status != "processing":
             return
         message = db.query(SalesMessage).filter(SalesMessage.id == job.message_id).one()
         message.metadata_json = {**(message.metadata_json or {}), "agent_turn_status": "processing"}
+        # Capture IDs before commit expires the ORM object. Reading job attributes
+        # afterwards would open another transaction throughout the model await.
+        conversation_id, message_id = job.conversation_id, job.message_id
         db.commit()
-        await process_live_inbound(job.conversation_id, job.message_id)
+        await process_live_inbound(conversation_id, message_id)
         db.expire_all()
         job = db.query(SalesInboundJob).filter(SalesInboundJob.id == job_id).one()
         message = db.query(SalesMessage).filter(SalesMessage.id == job.message_id).one()
@@ -1765,7 +1770,8 @@ async def send_manual_message(db: Session, *, conversation_id: str, company_id: 
 
 async def process_live_followup_job(job_id: str) -> None:
     """Generate one durable cadence message; safe to retry without duplicate SMS."""
-    db = SessionLocal()
+    from .concurrency import bounded
+    db = bounded(SessionLocal())
     try:
         job = db.query(SalesFollowUpJob).filter(SalesFollowUpJob.id == job_id).first()
         if not job or job.status != "processing":

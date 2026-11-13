@@ -14,6 +14,7 @@ from alembic.migration import MigrationContext
 from alembic.operations import Operations
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
 import app.db.base  # noqa: F401 - register every model
 from app.core.secret_store import decrypt_secret
@@ -52,7 +53,7 @@ TEST_ACCOUNT_SID = "AC" + ("1" * 32)
 
 
 def _db():
-    engine = create_engine("sqlite://")
+    engine = create_engine("sqlite://", poolclass=StaticPool, connect_args={"check_same_thread": False})
     Base.metadata.create_all(engine)
     return sessionmaker(bind=engine)()
 
