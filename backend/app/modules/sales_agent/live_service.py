@@ -184,6 +184,8 @@ def get_or_create_live_conversation(db: Session, lead: Lead, *, provider: str | 
         SalesConversation.channel == channel,
     ).first()
     if pinned:
+        from .provider_routes import assert_dispatchable
+        assert_dispatchable(db,pinned)
         return pinned, False
     provider = provider or default_provider(db)
     sender = channel_sender(db, provider=provider, company_id=lead.company_id, channel=channel)
@@ -192,9 +194,8 @@ def get_or_create_live_conversation(db: Session, lead: Lead, *, provider: str | 
         if channel == "sms" else
         f"{provider}:{channel}:{normalize_phone(sender)}:{normalize_phone(lead.phone)}"
     )
-    existing = db.query(SalesConversation).filter(
-        SalesConversation.provider_thread_key == thread_key,
-    ).first()
+    from .provider_routes import release_stale_conflict
+    existing=release_stale_conflict(db,thread_key=thread_key,company_id=lead.company_id,provider=provider,channel=channel)
     if existing:
         if existing.company_id != lead.company_id:
             raise HTTPException(
@@ -379,6 +380,8 @@ async def _dispatch_part(
             from .active_service import authorize_part
             authorize_part(db,conversation,lead,metadata or {})
         return _simulation_message(db, conversation, content, role, agent_run_id, metadata, idempotency_key)
+    from .provider_routes import assert_dispatchable
+    assert_dispatchable(db,conversation)
     message_metadata = dict(metadata or {})
     from .continuity import epoch,check_epoch
     db.refresh(conversation)
@@ -538,6 +541,7 @@ async def _dispatch_part(
             outbound.status='failed';message.status='failed';db.commit();raise
     conversation=db.query(SalesConversation).filter_by(id=conversation.id).populate_existing().with_for_update().one()
     check_epoch(conversation,message_metadata.get('continuity_epoch'))
+    assert_dispatchable(db,conversation)
     if role=='assistant' and not uses_whatsapp_template:
         db.refresh(lead)
         if (lead.is_opt_out and message_metadata.get('control_outcome')!='opt_out') or (conversation.is_paused and not message_metadata.get('control_outcome') and not message_metadata.get('meeting_id')):
@@ -1617,6 +1621,9 @@ async def process_live_inbound_job(job_id: str) -> None:
         job = db.query(SalesInboundJob).filter(SalesInboundJob.id == job_id).first()
         if not job or job.status != "processing":
             return
+        from .provider_routes import retired
+        if retired(db.get(SalesConversation,job.conversation_id)):
+            job.status="cancelled";job.processed_at=workflow_now(datetime);db.commit();return
         message = db.query(SalesMessage).filter(SalesMessage.id == job.message_id).one()
         message.metadata_json = {**(message.metadata_json or {}), "agent_turn_status": "processing"}
         # Capture IDs before commit expires the ORM object. Reading job attributes

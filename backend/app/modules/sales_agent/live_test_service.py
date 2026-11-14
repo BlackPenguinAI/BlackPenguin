@@ -184,11 +184,9 @@ async def create_live_lead(
         if channel == "sms" else
         f"{provider}:{channel}:{sender}:{normalize_phone(lead_form['phone'])}"
     )
-    foreign_thread = db.query(SalesConversation).filter(
-        SalesConversation.provider_thread_key == thread_key,
-        SalesConversation.company_id != company_id,
-    ).first()
-    if foreign_thread:
+    from .provider_routes import release_stale_conflict
+    foreign_thread=release_stale_conflict(db,thread_key=thread_key,company_id=company_id,provider=provider,channel=channel)
+    if foreign_thread and foreign_thread.company_id!=company_id:
         raise HTTPException(
             status_code=409,
             detail="This phone already has a conversation for another Company on the shared sender.",

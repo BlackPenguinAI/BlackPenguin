@@ -593,14 +593,14 @@ def disconnect_telnyx_company_config(
         SalesConversation.company_id == company_id,
         SalesConversation.provider == "telnyx",
         SalesConversation.channel.in_(channels),
-    ).all()
+    ).with_for_update().all()
     conversation_ids = [item.id for item in conversations]
     lead_ids = {item.lead_id for item in conversations}
     pause_reason = f"Telnyx {scope} resources disconnected by a platform administrator."
     now = datetime.utcnow()
+    from app.modules.sales_agent.provider_routes import retire
     for conversation in conversations:
-        conversation.is_paused = True
-        conversation.pause_reason = pause_reason
+        retire(db,conversation,pause_reason)
     if conversation_ids:
         db.query(SalesFollowUpJob).filter(
             SalesFollowUpJob.conversation_id.in_(conversation_ids),

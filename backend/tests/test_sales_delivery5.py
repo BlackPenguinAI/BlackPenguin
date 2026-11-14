@@ -192,11 +192,11 @@ def test_postgres_runner_refuses_unrelated_image_revision_before_starting_any_da
         if '--junitxml=/evidence/junit.xml' in command:
             mount=next(v for v in command if v.endswith(':/evidence'))
             directory=Path(mount[:-len(':/evidence')])
-            (directory/'junit.xml').write_text('<testsuites><testsuite>'+''.join('<testcase name="synthetic"/>' for _ in range(10))+'</testsuite></testsuites>')
+            (directory/'junit.xml').write_text('<testsuites><testsuite>'+''.join('<testcase name="synthetic"/>' for _ in range(11))+'</testsuite></testsuites>')
         return SimpleNamespace(returncode=0)
     with patch('tools.sales_ai.postgres_checks.subprocess.check_output',return_value='a'*40+'\n'),patch('tools.sales_ai.postgres_checks.subprocess.run',side_effect=isolated):
         result=run('candidate-image','a'*40,Path(__file__).parent,tmp_path/'isolated.json')
-    assert result['status']=='PASS' and result['total']==10 and result['production_database_used'] is False
+    assert result['status']=='PASS' and result['total']==11 and result['production_database_used'] is False
     assert any(c[:4]==['docker','network','create','--internal'] for c in commands)
     assert not any('backend/.env' in arg or 'bp_api_prod' in arg for command in commands for arg in command)
     assert any(c[:3]==['docker','rm','-f'] for c in commands) and commands[-1][:3]==['docker','network','rm']

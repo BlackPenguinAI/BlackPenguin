@@ -7,7 +7,7 @@ silently converted into an exact bedroom constraint.
 import re
 from .understanding_contract import Understanding
 
-VERSION = 'sales-needs-search/1.2'
+VERSION = 'sales-needs-search/1.3'
 WORDS = {'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5, 'six': 6}
 NEED = re.compile(r"\b(?:I(?: am|'m|’m|m)? (?:looking for|want|need|prefer)|(?:please )?(?:show|find)(?: me)?|do you have|are there)\s+(?:(?:a|an|any)\s+)?(?P<count>[1-6]|one|two|three|four|five|six)[ -]?(?:bedrooms?|beds?|br)\b(?:\s+(?:homes?|houses?|apartments?|properties))?", re.I)
 UNSAFE = re.compile(r"\b(?:not|don't|don’t|do not|never|friend|said|says|told|if|suppose|at least|at most|minimum|maximum|or more|or fewer|between)\b|[\"“”]", re.I)
@@ -177,3 +177,16 @@ def unknown_options(db,scope,text,types):
     return {'version':VERSION,'bedrooms':offer['bedrooms'],'matches':[],'sold_out':[],
         'unknown_bedrooms':sum(p.get('bedrooms') is None for p in rows),'unknown_property_ids':[],
         'exhaustive':False,'matching_property_ids':[],'exploring_unknown':True,'unknown_options':rows}
+
+
+def contextual_read(db,scope,value,text):
+    """Exact assent to a delivered current listing offer permits only a read.
+
+    Keep the model's confidence unchanged. Tool execution still enforces saved
+    restrictions and revalidates the offered IDs against the approved catalog.
+    """
+    if not (len(value.requests)==1 and value.requests[0].id=='confirmed_unknown_catalog'
+        and value.requests[0].topic.value=='catalog' and value.requests[0].polarity=='request' and value.requests[0].reference_id is None and not value.references and not value.comparison
+        and not value.alternatives and not value.constraints and not value.releases
+        and not any(getattr(value,k) for k in ('visit','reschedule','cancellation','wait','moderation','appointment_query','selected_reference_id','personal_facts','preference_withdrawals','source_purposes','objections','empathy'))):return False
+    return unknown_options(db,scope,text,[]) is not None

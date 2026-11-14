@@ -585,9 +585,13 @@ def set_conversation_action(
     if false_positive and action != 'resume':
         raise HTTPException(status_code=422, detail='False-positive review must resume the conversation.')
     if action == "resume":
+        from .provider_routes import assert_dispatchable
+        assert_dispatchable(db,conversation)
         lead = db.query(Lead).filter(Lead.id == conversation.lead_id).first()
         if conversation.pause_reason == "Appointment confirmed":
             raise HTTPException(status_code=409, detail="This conversation is closed because the appointment is confirmed.")
+        if lead and lead.deleted_at:
+            raise HTTPException(status_code=409,detail="A deleted lead cannot be resumed.")
         if lead and lead.is_opt_out:
             raise HTTPException(status_code=409, detail="An opted-out lead cannot be resumed.")
         if lead and lead.consent_status != "granted":

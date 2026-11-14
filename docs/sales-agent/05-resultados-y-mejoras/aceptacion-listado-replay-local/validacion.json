@@ -1,0 +1,60 @@
+{
+  "base_commit": "7c320ca285edaa9e0aa126a73ca08a26c29fbfda",
+  "execution_origin": "local_offline_regression_and_disposable_real_postgres",
+  "paid_model_inference": false,
+  "openrouter_cost_usd": 0,
+  "production_writes": 0,
+  "lead_contacts": 0,
+  "shards": [
+    {
+      "shard": 1,
+      "passed": 1114,
+      "skipped": 4,
+      "failed": 0
+    },
+    {
+      "shard": 2,
+      "passed": 1078,
+      "skipped": 5,
+      "failed": 0
+    },
+    {
+      "shard": 3,
+      "passed": 1009,
+      "skipped": 2,
+      "failed": 0
+    }
+  ],
+  "module_coverage": {
+    "status": "PASS",
+    "modules": 139,
+    "shards": 3,
+    "each_module_once": true
+  },
+  "postgres": {
+    "status": "PASS",
+    "passed": 11,
+    "version": "16.2",
+    "production_database_used": false
+  },
+  "acceptance": {
+    "PASS": 63,
+    "FAIL": 0,
+    "NOT_RUN": 1,
+    "real_model_acceptance_pending": true
+  },
+  "recorded_frame_replay": {
+    "cases_passed": 14,
+    "cases_total": 14,
+    "turns_passed": 18,
+    "turns_total": 18,
+    "model_quality_evaluated": false
+  },
+  "final_focused_checks": {
+    "passed": 78
+  },
+  "notes": [
+    "The 11 PostgreSQL tests are skipped in SQLite and executed separately.",
+    "A successful replay or contract check does not certify an integral production dialogue."
+  ]
+}

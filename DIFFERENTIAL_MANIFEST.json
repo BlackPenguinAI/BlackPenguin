@@ -1,0 +1,94 @@
+{
+  "base_commit": "7c320ca285edaa9e0aa126a73ca08a26c29fbfda",
+  "files": [
+    {
+      "path": "backend/app/modules/sales_agent/active_service.py",
+      "sha256": "cb2e3069030ce3b82404c73781bcd6f1936e5c0b899a614c588e7d5604500b9f"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/live_service.py",
+      "sha256": "52fbbc0b7fde745f48d97379a59481f0b047445cc98a66b6e3921a07013eb233"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/live_test_service.py",
+      "sha256": "e6cbca63d341f1d389a8597cddf210da2ac87767a88385397896db759404f919"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/needs_search.py",
+      "sha256": "f35fc7801ef9884dbe16dd8bf5ceecb7686bcf99f8315d87d7da94ef886a66c2"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/provider_routes.py",
+      "sha256": "625e918a23457c374a4da0785e0069f68de750dc42d50da173791d2e72027fc8"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/service.py",
+      "sha256": "2abb8e8c2c7917ffe3530e8df9026e1fc9bffd1faa2e4e90fe4b1d9654431d03"
+    },
+    {
+      "path": "backend/app/modules/system_settings/services.py",
+      "sha256": "7561dfe4ebe8c2df135dc2fc58abffbab3378b04176777b9cfedc75447371d0f"
+    },
+    {
+      "path": "backend/tests/fixtures/sales_ai/needs_wording_1_interpretations.json",
+      "sha256": "5abd26a90180dc713ec8909778b80a220825f65703872c8d3d57207301d70ec8"
+    },
+    {
+      "path": "backend/tests/test_sales_delivery5.py",
+      "sha256": "180e2471deca8df20051cab7b4c1dfb8104385342d5d84d11945eec14d986985"
+    },
+    {
+      "path": "backend/tests/test_sales_route_postgres.py",
+      "sha256": "903dcf0250771de5de28bb10ed9b1c0750240fd63a1ff60c6c351a32982d0829"
+    },
+    {
+      "path": "backend/tests/test_sales_sender_reassignment.py",
+      "sha256": "becdd2576b6335565d869f36853f765ef27e637ae79537e568c55c7b189f6bfa"
+    },
+    {
+      "path": "backend/tests/test_sales_unknown_assent_replay.py",
+      "sha256": "e6880985253a53f676e65596c37e287d15bd1a9ef11ae396467b60975060d11b"
+    },
+    {
+      "path": "backend/tools/sales_ai/inspect_sender_route.py",
+      "sha256": "084618c6183c4d1b872d87f2f26e5928ce15bb38491cdd76c7e184831be0d899"
+    },
+    {
+      "path": "backend/tools/sales_ai/postgres_checks.py",
+      "sha256": "e3f040901b3da1309f69be5f948e2e2e9ef3811d0123f1ea0cb71d766fd844b1"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/aceptacion-listado-replay-local/conversaciones.md",
+      "sha256": "c28a7ba89ada7e8ac3c63c1d4cfd45c22583717ba8722bf45dd13558c78b1763"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/aceptacion-listado-replay-local/resultado.json",
+      "sha256": "07ff3e085240eabfc5a5d4f37263977bfa418c8f6d36a609831e523752490152"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/aceptacion-listado-replay-local/validacion.json",
+      "sha256": "72fb7f5d81a9b44650ede328ec192fc893cbea4b6ece5b3a75ae05a3ce1125cf"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/busqueda-redaccion-servidor-1/conversaciones.md",
+      "sha256": "774c06502255c55317b9801f7abed3465691c57c3bdef2c06d8410ec8ba26323"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/busqueda-redaccion-servidor-1/resultado.json",
+      "sha256": "5873999947a62308aa8ea98587af5c6121f45796183bf22c322378a4bae6e4d9"
+    },
+    {
+      "path": "docs/sales-agent/06-como-ejecutar-las-pruebas/ejecutar-aceptacion-listado.sh",
+      "sha256": "d47ebfc62037030329c4e38b4af88e8cf30e78dc3ed82708ce79a77c27986661"
+    },
+    {
+      "path": "docs/sales-agent/README.md",
+      "sha256": "5496ea5c9f334b35ab66e5e76a167e7771d03a6d24f57d1850bcd5a672a55e42"
+    }
+  ],
+  "notes": [
+    "Differential files only; no commit or push performed.",
+    "No migrations or manual production SQL writes.",
+    "Real-model validation after deployment is pending."
+  ]
+}

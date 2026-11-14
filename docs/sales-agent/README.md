@@ -414,6 +414,34 @@ El estimado del servidor usa la referencia histórica de Repair 7, ≈USD 0.0033
 
 **Consumo:** las dos corridas reales ya ejecutadas suman **USD 0.0681933**. Esta corrección local añade USD 0.00. Para 18 turnos futuros, usando la segunda corrida como referencia (USD 0.0345396/14), se estima **≈USD 0.045 total**, reserva orientativa USD 0.10. Es una proyección, no gasto ejecutado ni tarifa garantizada. El límite propuesto es 112 llamadas, no dólares. Se sigue exportando el costo real y su completitud.
 
+### Aceptar el listado ofrecido: resultado y corrección actual
+
+**Resultado real recibido (`sales-needs-wording.zip`, revisión `7c320ca`).** La redacción comercial aprobó **13/14 escenarios y 17/18 turnos**, con **277 checks PASS y dos FAIL**. El único turno fallido fue «Yes» después de ofrecer mostrar viviendas cuyos dormitorios no estaban informados. No se presenta esa corrida como aprobación integral. [Conversaciones legibles del servidor](05-resultados-y-mejoras/busqueda-redaccion-servidor-1/conversaciones.md) · [JSON original](05-resultados-y-mejoras/busqueda-redaccion-servidor-1/resultado.json).
+
+**Causa y ajuste.** La interpretación reparada conservaba confianza 0.0 y pedía aclaración; el filtro de baja confianza descartaba la aceptación de la oferta. El backend ahora permite **solo leer ese listado** si «Yes» responde a la oferta inmediata, entregada y completa de esa conversación. Conserva la confianza original, vuelve a comprobar los IDs en el catálogo aprobado y registra el fundamento de lectura. No autoriza seleccionar propiedad, compartir material ni reservar una visita. Una oferta interrumpida, fallida o de otra conversación no obtiene esta excepción. El modelo `openai/gpt-4o-mini`, su configuración publicada y el grafo permanecen iguales.
+
+| Ejemplo reproducido localmente | Resultado esperado y comprobado en replay |
+|---|---|
+| Lead: “I am looking for a 2 bedroom home.” | Agente: “I don't have bedroom details for some homes, so I can't confirm a 2-bedroom option in this project. Would you like to see those homes?” |
+| Lead: “Yes” | Agente: “Here are the homes you asked to explore: Bay Residence — bedroom details are not available, from 780,000.00 USD. Which home would you like to know more about?” |
+
+**Validación y límite.** El replay de las 18 interpretaciones finales registradas pasa **14/14 escenarios y 18/18 turnos** con core real y proveedor simulado, sin consumo de OpenRouter. No reproduce íntegramente los intentos HTTP originales y no sustituye otra corrida con el modelo publicado. [Conversaciones locales](05-resultados-y-mejoras/aceptacion-listado-replay-local/conversaciones.md) · [JSON local](05-resultados-y-mejoras/aceptacion-listado-replay-local/resultado.json). La siguiente ejecución en servidor queda pendiente del despliegue. [Comandos para ejecutar y copiar el ZIP](06-como-ejecutar-las-pruebas/ejecutar-aceptacion-listado.sh).
+
+| Corrida de necesidades | Costo total observado (USD) | Llamadas con costo / total |
+|---|---:|---:|
+| Descubrimiento inicial | 0.03365370 | 29/29 |
+| Reparación del filtro | 0.03453960 | 29/29 |
+| Redacción comercial | 0.04519425 | 38/38 |
+| **Total de estas tres corridas reales** | **0.11338755** | **96/96** |
+| Corrección contextual: replay local | 0.00000000 | 0/0 |
+| Próxima repetición de 14 escenarios / 18 turnos, pendiente | **≈0.045 estimado; reserva 0.10** | Límite de 112 llamadas; no es límite monetario |
+
+El estimado toma la última corrida real y no se suma al gasto observado. Esta tabla corresponde a necesidades; las baterías anteriores mantienen su historial y costos propios.
+
+**Validación técnica de esta entrega:** 3.201 pruebas aprobadas en 139 módulos; 11 pruebas PostgreSQL omitidas en SQLite y aprobadas aparte con PostgreSQL 16.2; 63 controles de aceptación aprobados y uno de evaluación real pendiente. Se repitieron 78 pruebas específicas con el código final. [Validación JSON](05-resultados-y-mejoras/aceptacion-listado-replay-local/validacion.json).
+
+**Integridad del canal al reutilizar un remitente.** También se corrige un bloqueo independiente de calidad: la clave activa de una conversación antigua impedía registrar el mismo teléfono en otra compañía después de transferir el remitente. La desconexión retirará esa ruta, conservará el historial en su compañía y cancelará trabajo pendiente. Para desvinculaciones anteriores al arreglo, el nuevo registro podrá retirar la clave obsoleta únicamente si el nuevo dueño tiene el remitente verificado y habilitado y el anterior ya no lo posee. No se trasladan mensajes, leads ni projects entre compañías; se impiden reanudaciones y nuevos envíos desde la ruta retirada. Los recibos de envíos ya iniciados conservan su conversación original: retirar la ruta no puede revocar una solicitud que el proveedor ya recibió. No requiere migración ni borrado manual de datos. Tras desplegar, se reintenta el registro en la compañía nueva; la comprobación de solo lectura [inspect_sender_route.py](../../backend/tools/sales_ai/inspect_sender_route.py) muestra el dueño configurado, las conversaciones históricas, la ruta activa y el trabajo pendiente. `active_route_matches_current_owner=true` confirma la correspondencia de la ruta con su dueño, no la entrega del mensaje.
+
 ## 11. Trabajo futuro
 
 **Más casos y conversaciones más largas, no nuevas funciones de canal.** Se avanza por etapas, corrigiendo y repitiendo antes de ampliar. Se incluyen compradores que rechazan o abandonan: no toda conversación correcta termina con cita [R4–R6].
