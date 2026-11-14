@@ -1,9 +1,11 @@
 {
-  "version": "sales-needs-discovery/1.0",
+  "version": "sales-needs-discovery/1.1",
   "synthetic_only": true,
   "baseline_projects": 3,
   "baseline_properties": 6,
-  "variant": "multiple_two añade Cedar Garden Home, una tercera propiedad de dos dormitorios sin materiales; no cambia Cedar Studio ni sus PDFs.",
+  "scenario_count": 14,
+  "scripted_turns": 18,
+  "variant": "multiple_two añade una tercera propiedad de dos dormitorios sin materiales. unknown crea un hueco de datos de dormitorios para evaluar exploración opcional.",
   "cases": {
     "exact_two": {
       "project_index": 1,
@@ -90,6 +92,22 @@
         "I am looking for a 1 bedroom home."
       ],
       "variant": null
+    },
+    "unknown_bedrooms_accept": {
+      "project_index": 0,
+      "messages": [
+        "I am looking for a 2 bedroom home.",
+        "Yes"
+      ],
+      "variant": "unknown"
+    },
+    "unknown_bedrooms_decline": {
+      "project_index": 0,
+      "messages": [
+        "I am looking for a 2 bedroom home.",
+        "No, thank you."
+      ],
+      "variant": "unknown"
     }
   }
 }

@@ -14,7 +14,7 @@ from tools.sales_ai.evaluation_guard import Budget,guard
 
 CAPTURE=json.loads((Path(__file__).parent/'fixtures/sales_ai/needs_discovery_1_interpretations.json').read_text())['rows']
 
-@pytest.mark.parametrize('scenario',CASES)
+@pytest.mark.parametrize('scenario',[k for k in CASES if any(r['case']==k for r in CAPTURE)])
 def test_recorded_failed_interpretations_now_meet_needs_checks(lab,scenario):
     db,manifest=lab
     db.add(AIConfiguration(id='replay-needs',company_id=None,openrouter_api_key='OFFLINE',agent_ventas={'model':'test/offline'}))

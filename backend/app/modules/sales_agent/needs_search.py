@@ -7,7 +7,7 @@ silently converted into an exact bedroom constraint.
 import re
 from .understanding_contract import Understanding
 
-VERSION = 'sales-needs-search/1.1'
+VERSION = 'sales-needs-search/1.2'
 WORDS = {'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5, 'six': 6}
 NEED = re.compile(r"\b(?:I(?: am|'m|’m|m)? (?:looking for|want|need|prefer)|(?:please )?(?:show|find)(?: me)?|do you have|are there)\s+(?:(?:a|an|any)\s+)?(?P<count>[1-6]|one|two|three|four|five|six)[ -]?(?:bedrooms?|beds?|br)\b(?:\s+(?:homes?|houses?|apartments?|properties))?", re.I)
 UNSAFE = re.compile(r"\b(?:not|don't|don’t|do not|never|friend|said|says|told|if|suppose|at least|at most|minimum|maximum|or more|or fewer|between)\b|[\"“”]", re.I)
@@ -95,12 +95,25 @@ def search(understanding, types, coverage):
     sold = [p for p in types if p.get('bedrooms') == number and p.get('available_units') == 0]
     unknown = [p for p in types if p.get('bedrooms') is None]
     return {'version':VERSION, 'bedrooms':number, 'matches':matching, 'sold_out':sold,
-            'unknown_bedrooms':len(unknown), 'exhaustive':coverage.get('exhaustive') is True,
+            'unknown_bedrooms':len(unknown), 'unknown_property_ids':[p['id'] for p in unknown], 'exhaustive':coverage.get('exhaustive') is True,
             'matching_property_ids':[p['id'] for p in matching]}
 
 
 def answer(result):
     n = result['bedrooms']
+    if result.get('exploring_unknown'):
+        options=result['unknown_options']
+        if not options:return 'Those homes are no longer listed among the options I can show you.'
+        blocks=['Here are the homes you asked to explore:']
+        for row in options:
+            details=[]
+            if row.get('bedrooms') is None:details.append('bedroom details are not available')
+            else:details.append(f"{row['bedrooms']:g} bedroom"+('s' if row['bedrooms']!=1 else ''))
+            if row.get('starting_price') is not None and row.get('currency'):details.append(f"from {row['starting_price']:,.2f} {row['currency']}")
+            blocks.append(row['property_type']+' — '+', '.join(details)+'.')
+            if row.get('available_units')==0:blocks.append('This home is listed as unavailable.')
+            elif row.get('available_units') is None or not row.get('inventory_updated_at'):blocks.append('Availability for this home still needs confirmation.')
+        return '\n\n'.join(blocks)
     rows = result['matches']
     if rows:
         blocks = [f"Here {'is a' if len(rows)==1 else 'are the'} {n}-bedroom {'option' if len(rows)==1 else 'options'} in this project:"]
@@ -114,21 +127,53 @@ def answer(result):
             blocks.append(row['property_type']+' — '+', '.join(details)+'.')
             if row.get('available_units') is None or not row.get('inventory_updated_at'):
                 blocks.append('Current availability for '+row['property_type']+' still needs confirmation.')
-        if result['unknown_bedrooms'] or not result['exhaustive']:
-            blocks.append('The remaining catalog information is incomplete, so these may not be all the matching options.')
         return '\n\n'.join(blocks)
     if result['sold_out']:
-        base = f'The {n}-bedroom options listed here have a last confirmed quantity of zero.'
+        base = f'The {n}-bedroom homes I have details for are listed as unavailable.'
+    elif result['unknown_bedrooms']:
+        return f"I don't have bedroom details for some homes, so I can't confirm a {n}-bedroom option in this project."
     else:
-        base = f'I do not have a confirmed {n}-bedroom option to show you in this project.'
-    if result['unknown_bedrooms'] or not result['exhaustive']:
-        base += ' Some catalog or bedroom details are missing, so I cannot rule out other matching options.'
+        base = f"I don't have a {n}-bedroom option to show you in this project."
+    if result['unknown_bedrooms']:
+        base += " I don't have bedroom details for some other homes in this project."
     return base
 
 
 def closing(result):
+    if result.get('exploring_unknown'):return 'Which home would you like to know more about?' if result['unknown_options'] else 'Would you like to explore the other homes in this project?'
     if len(result['matches']) == 1:
         return 'Would you like to know more about '+result['matches'][0]['property_type']+'?'
     if result['matches']:
         return 'Which of these options would you like to explore?'
+    if result['unknown_bedrooms']:return 'Would you like to see those homes?'
     return f'Are {result["bedrooms"]} bedrooms essential, or would you consider another bedroom count?'
+
+
+def accepts_unknown_offer(text):
+    return bool(re.fullmatch(r"\s*(?:yes(?:[, ]+(?:please|show me(?: those (?:other )?homes)?))?|please show me those homes|show me those homes)[.!]?\s*",text,re.I))
+
+
+def unknown_options(db,scope,text,types):
+    """Read only the latest accepted, complete offer in this conversation.
+
+    IDs are revalidated against the current approved catalog. Acceptance permits
+    listing, never selecting a property or performing another action.
+    """
+    from .turn_context import latest_outbound
+    from .reference_resolution import accepted
+    from .conversation_scope import scoped_messages_query
+    message=latest_outbound(db,scope.conversation_id)
+    if not message or not accepted(message) or not accepts_unknown_offer(text):return None
+    meta=message.metadata_json or {};offer=meta.get('needs_unknown_offer')
+    if not offer or not offer.get('property_ids'):return None
+    group=meta.get('delivery_group') or {}
+    if group.get('total',1)>1:
+        from .dialogue_store import check_scope
+        conversation=check_scope(db,scope)
+        parts=scoped_messages_query(db,conversation).filter_by(direction='outbound').all()
+        indexes={((p.metadata_json or {}).get('delivery_group') or {}).get('part') for p in parts if (p.metadata_json or {}).get('delivery_group',{}).get('key')==group.get('key') and accepted(p)}
+        if indexes!=set(range(1,group['total']+1)):return None
+    rows=[p for p in types if p['id'] in set(offer['property_ids'])]
+    return {'version':VERSION,'bedrooms':offer['bedrooms'],'matches':[],'sold_out':[],
+        'unknown_bedrooms':sum(p.get('bedrooms') is None for p in rows),'unknown_property_ids':[],
+        'exhaustive':False,'matching_property_ids':[],'exploring_unknown':True,'unknown_options':rows}

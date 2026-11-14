@@ -408,7 +408,8 @@ async def compose(db, scope, *, inbound, outcome, draft, commercial, lead, metad
     guidance = resolve(db, scope)
     blocks = evidence_blocks(draft.text)
     needs_result=next((r.data['needs_search'] for r in outcome.results if r.data.get('needs_search')),None)
-    if needs_result:metadata['needs_search']={k:v for k,v in needs_result.items() if k not in {'matches','sold_out'}}
+    if needs_result:
+        metadata['needs_search']={k:v for k,v in needs_result.items() if k not in {'matches','sold_out','unknown_options'}}
     from .natural_reply import empathy_text
     empathy=empathy_text(outcome.state.last_understanding,outcome.state,commercial)
     if empathy:
@@ -475,6 +476,8 @@ async def compose(db, scope, *, inbound, outcome, draft, commercial, lead, metad
     if needs_result and not any(r.polarity=='request' and r.topic.value not in {'catalog','inventory','property_details'} for r in outcome.state.last_understanding.requests):
         from .needs_search import closing
         choices=[{'id':'needs_next','text':closing(needs_result),'metadata':{}}]
+        if not needs_result['matches'] and needs_result.get('unknown_property_ids'):
+            metadata['needs_unknown_offer']={'bedrooms':needs_result['bedrooms'],'property_ids':needs_result['unknown_property_ids']}
     payload = {'version': VERSION, 'published_guidance': guidance, 'current_message': inbound.content,
         'turn_context': memory, 'validated_results': [r.model_dump(mode='json') for r in outcome.results],
         'planning': outcome.plan, 'evidence_blocks': blocks, 'continuations': choices,

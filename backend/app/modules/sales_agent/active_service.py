@@ -2,6 +2,7 @@
 from .execution import now as workflow_now
 
 import asyncio
+import re
 from dataclasses import asdict
 from datetime import datetime, timezone, timedelta
 from fastapi import HTTPException
@@ -122,6 +123,15 @@ def _confirmed_offer_understanding(u,meta,text):
     from .service import _affirmative_slot_reply
     # Exact assent has meaning only against the immediately preceding server
     # offer. It is not a generic material/appointment intent classifier.
+    if meta.get('needs_unknown_offer') and re.fullmatch(r'\s*(?:no(?:[, ]+thank you)?|no thanks)[.!]?\s*',text,re.I):
+        payload=u.model_dump(mode='json')
+        payload.update(requests=[],all_of=[],alternatives=[],references=[],selected_reference_id=None,comparison=None,visit=None,reschedule=None,cancellation=None,wait=None,appointment_query=None,courtesy=dict(kind='decline',evidence=text))
+        return Understanding.model_validate(payload)
+    from .needs_search import accepts_unknown_offer
+    if meta.get('needs_unknown_offer') and accepts_unknown_offer(text) and not u.requires_clarification and not u.constraints:
+        payload=u.model_dump(mode='json')
+        payload.update(requests=[dict(id='confirmed_unknown_catalog',topic='catalog',subject=None,polarity='request',evidence=text)],all_of=['confirmed_unknown_catalog'],alternatives=[],references=[],selected_reference_id=None,comparison=None,visit=None,reschedule=None,cancellation=None,wait=None,appointment_query=None)
+        return Understanding.model_validate(payload)
     if _affirmative_slot_reply(text) and not u.requires_clarification:
         positive=[r for r in u.requests if r.polarity=='request' and r.topic.value!='other']
         if not positive and meta.get('material_offer'):

@@ -369,9 +369,10 @@ Las gráficas se generan con NumPy y Matplotlib, sin suavizado ni valores invent
 
 | Corrida | Turnos | Consumo total OpenRouter (USD) | Estado |
 |---|---|---|---|
-| Experimentos locales, proveedor simulado: inicial y replay | 28 | **0.00 consumido** | 12 escenarios repetidos en dos iteraciones locales; no son 24 escenarios distintos. |
+| Experimentos locales, proveedor simulado: inicial, replay y redacción | 46 | **0.00 consumido** | Dos iteraciones de los 12 casos iniciales y una ampliación a 14; no se cuentan repeticiones como escenarios distintos. |
 | Primera corrida en servidor con modelo publicado | 14 | **0.0336537 consumido** | FAIL: 0/12 escenarios con todos los checks satisfechos. |
-| **TOTAL CONSUMIDO EN ESTA ETAPA** | **28 locales + 14 en servidor** | **0.0336537** | No incluye estimaciones ni corridas históricas anteriores. |
+| Segunda corrida en servidor con modelo publicado | 14 | **0.0345396 consumido** | PASS en filtro: 12/12 escenarios y 205/205 checks originales. |
+| **TOTAL CONSUMIDO EN ESTA ETAPA** | **46 locales + 28 en servidor** | **0.0681933** | No incluye estimaciones ni corridas históricas anteriores. |
 
 El estimado del servidor usa la referencia histórica de Repair 7, ≈USD 0.00335 por turno, no una nueva tarifa de OpenRouter. El límite de 96 llamadas controla intentos, no dólares; el reporte debe confirmar el consumo y si el proveedor informó costo en todas las respuestas. Conversaciones largas, búsqueda por presupuesto/ubicación/rangos, selección posterior, materiales y visita tras descubrir una opción quedan para ampliar esta suite; las baterías anteriores los prueban por separado, no como garantía de esta combinación.
 
@@ -386,6 +387,32 @@ El estimado del servidor usa la referencia histórica de Repair 7, ≈USD 0.0033
 **Validación técnica de esta reparación:** 3.141 pruebas aprobadas en 135 módulos; 10 pruebas de PostgreSQL omitidas en SQLite y aprobadas aparte con PostgreSQL 16.2; 63 controles de aceptación aprobados y una evaluación en vivo pendiente. Las 65 pruebas específicas de búsqueda y replay se repitieron al final. [Validación JSON](05-resultados-y-mejoras/busqueda-necesidades-reparacion-1-local/validacion.json).
 
 **Costo de la reparación:** replay local USD 0.00; repetición propuesta en servidor ≈USD 0.05, reserva orientativa USD 0.10. **Total consumido en necesidades hasta esta corrida: USD 0.0336537.** La estimación futura no se suma al gasto. El grafo LangGraph y el modelo publicado permanecen iguales.
+
+### Redacción comercial y exploración opcional de otras viviendas
+
+**Qué demostró el servidor.** Needs Repair 1, revisión `b476735`, aprobó los 12 escenarios y los 14 turnos de filtro con `openai/gpt-4o-mini`, configuración 8: 205 checks aprobados, ninguno fallido. El backend eliminó una comparación no solicitada en 13 turnos; el modelo no cambió. Costo total de esa corrida: **USD 0.0345396**, 29/29 llamadas con costo. Sumada a la primera: **USD 0.0681933 total consumido en necesidades**. [Transcripciones del servidor](05-resultados-y-mejoras/busqueda-necesidades-servidor-2/conversaciones.md) · [JSON original](05-resultados-y-mejoras/busqueda-necesidades-servidor-2/resultado.json).
+
+**Qué aún no era adecuado.** La frase «The remaining catalog information is incomplete…» aparecía incluso cuando había coincidencias útiles. Los checks anteriores exigían advertir cobertura parcial; aprobarlos no certificaba una buena redacción. Esos resultados originales se conservan. La nueva regla exige aclarar únicamente la incertidumbre que afecta a la respuesta.
+
+| Situación | Respuesta y siguiente paso |
+|---|---|
+| Una o varias coincidencias | Presentarlas con sus datos, sin advertencia general sobre las demás viviendas. |
+| Coincidencias con disponibilidad desconocida | Aclarar la disponibilidad de esa vivienda, sin inventar inventario. |
+| Sin coincidencia y con dormitorios desconocidos | Explicar que faltan los dormitorios de algunas viviendas y ofrecer mostrarlas. No listar ni afirmar que cumplen todavía. |
+| El lead acepta verlas | Revalidar la oferta más reciente entregada y el catálogo actual; listar esas viviendas con los datos conocidos y la falta de dormitorios explícita. No seleccionar ni agendar. |
+| El lead rechaza | No enviar el listado; continuar con una respuesta amable. No interpretar el rechazo como baja de contacto. |
+| Ninguna coincidencia entre los datos conocidos | Decir que no hay una opción para mostrar, sin afirmar que no existen otras fuera de lo conocido. |
+| Viviendas listadas sin disponibilidad | Decir «listed as unavailable», evitando «last confirmed quantity of zero». |
+
+**Qué se modifica.** La composición de los bloques de búsqueda y sus continuaciones; la aceptación/rechazo de la oferta de explorar; y los checks de la suite. Se mantiene el filtro, las restricciones, el modelo y la topología LangGraph. La aceptación solo se usa ante una oferta inmediata aceptada y completa en esa conversación; se revalida el catálogo antes de mostrar nombres. Una oferta que ya no es la más reciente, que fue interrumpida, fallida o parcialmente enviada no autoriza el listado.
+
+**Experimento ampliado.** Los 12 casos originales se conservan y se agregan dos: aceptación y rechazo de la lista con dormitorios desconocidos. Ahora son **14 escenarios y 18 turnos**. Se prueban también ofertas interrumpidas, envíos parciales y propiedades retiradas. La evaluación local usa proveedor simulado y no consume OpenRouter; la próxima corrida del servidor aún debe comprobar el modelo publicado con estos checks nuevos. El PASS de filtro anterior no se presenta como aprobación de esta ampliación.
+
+**Resultado local de redacción:** 14/14 escenarios y 18/18 turnos cumplieron los checks nuevos, con proveedor simulado. Se conservaron los 12 casos y se probó aceptación/rechazo en dos más. [Diálogos locales](05-resultados-y-mejoras/busqueda-redaccion-local/conversaciones.md) · [JSON local](05-resultados-y-mejoras/busqueda-redaccion-local/resultado.json). No es evidencia de calidad del modelo publicado para esta ampliación.
+
+**Validación del ajuste de redacción:** 3.153 pruebas de regresión aprobadas en 136 módulos; 10 pruebas de PostgreSQL omitidas en SQLite y aprobadas aparte con PostgreSQL 16.2; 63 controles de aceptación aprobados y una evaluación en vivo pendiente. Las 77 pruebas específicas se repitieron con el texto final. [Validación JSON](05-resultados-y-mejoras/busqueda-redaccion-local/validacion.json).
+
+**Consumo:** las dos corridas reales ya ejecutadas suman **USD 0.0681933**. Esta corrección local añade USD 0.00. Para 18 turnos futuros, usando la segunda corrida como referencia (USD 0.0345396/14), se estima **≈USD 0.045 total**, reserva orientativa USD 0.10. Es una proyección, no gasto ejecutado ni tarifa garantizada. El límite propuesto es 112 llamadas, no dólares. Se sigue exportando el costo real y su completitud.
 
 ## 11. Trabajo futuro
 

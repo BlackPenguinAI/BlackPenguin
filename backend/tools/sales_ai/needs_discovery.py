@@ -6,7 +6,7 @@ The provider is real in the server CLI and simulated only in offline tests.
 from datetime import datetime, timedelta
 from app.modules.sales_agent.needs_search import criterion
 
-VERSION='sales-needs-discovery/1.0'
+VERSION='sales-needs-discovery/1.1'
 SPECS={
  'exact_two':(1,['I am looking for a 2 bedroom'],None),
  'house_two':(1,['Im looking for a 2 bedroom house'],None),
@@ -21,6 +21,7 @@ SPECS={
  'change_need':(1,['I am looking for a 2 bedroom home.','Actually, I need a 1 bedroom home.'],None),
  'no_premature_selection':(1,['I am looking for a 2 bedroom home.','I am looking for a 1 bedroom home.'],None),
 }
+SPECS.update(unknown_bedrooms_accept=(0,['I am looking for a 2 bedroom home.','Yes'],'unknown'),unknown_bedrooms_decline=(0,['I am looking for a 2 bedroom home.','No, thank you.'],'unknown'))
 CASES=tuple(SPECS)
 
 
@@ -60,7 +61,9 @@ def assertions(text,reply,metadata,context,selected):
         check('no_internal_provenance_or_processing',not internal_process_narration(reply) and not any(s in reply.lower() for s in ['approved project information highlights','property_details:','in this query'])),
         check('no_automatic_property_selection',selected is None),
         check('uncertain_inventory_not_claimed_available',all('availability' in reply.lower() and 'confirmation' in reply.lower() for p in expected if p.get('available_units') is None or not p.get('inventory_updated_at'))),
-        check('incomplete_catalog_not_exhaustive',not (any(p.get('bedrooms') is None for p in context['property_types']) or not context['catalog_coverage'].get('exhaustive')) or ('incomplete' in reply.lower() or 'missing' in reply.lower()))]
+        check('no_general_catalog_warning','catalog' not in reply.lower() and 'last confirmed quantity' not in reply.lower()),
+        check('unknown_bedroom_gap_explained_when_needed',bool(expected) or not any(p.get('bedrooms') is None for p in context['property_types']) or 'bedroom details' in reply.lower()),
+        check('unknown_homes_offered_not_listed',bool(expected) or not any(p.get('bedrooms') is None for p in context['property_types']) or ('would you like to see those homes' in reply.lower() and all(p['property_type'] not in reply for p in context['property_types'] if p.get('bedrooms') is None)))]
 
 
 async def evaluate_case(db,manifest,scenario,budget,max_turns):
@@ -84,7 +87,11 @@ async def evaluate_case(db,manifest,scenario,budget,max_turns):
         context=build_commercial_context(db,project=project,company_id=project.company_id,lead_id=lead.id,channel='simulation')
         _,state=load(db,Scope(company_id=project.company_id,project_id=project.id,conversation_id=conversation.id,lead_id=lead.id))
         meta=(run.output_snapshot or {}).get('metadata') or {}
-        checks=assertions(text,reply,meta,context,state.selected_property_type_id)
+        if criterion(text):checks=assertions(text,reply,meta,context,state.selected_property_type_id)
+        else:
+            expected_unknown=[p for p in context['property_types'] if p.get('bedrooms') is None]
+            accepted=text=='Yes'
+            checks=[check('accepted_unknowns_listed',not accepted or all(p['property_type'] in reply for p in expected_unknown)),check('unknowns_never_claimed_matching',not accepted or ('bedroom details are not available' in reply and not (meta.get('needs_search') or {}).get('matching_property_ids'))),check('declined_unknowns_not_listed',accepted or all(p['property_type'] not in reply for p in expected_unknown)),check('no_auto_selection',state.selected_property_type_id is None)]
         checks += [check('turn_completed',not run.error_code),check('composition_accepted',(meta.get('composition') or {}).get('status')=='accepted')]
         from app.modules.sales_agent.dialogue_models import SalesDialogueEvent
         event_row=db.query(SalesDialogueEvent).filter_by(conversation_id=conversation.id,kind='understanding_preview').order_by(SalesDialogueEvent.revision.desc()).first()

@@ -1,0 +1,3273 @@
+{
+  "version": "sales-needs-discovery/1.0",
+  "synthetic_only": true,
+  "production_database_writes": 0,
+  "lead_contacts": 0,
+  "provider_calls": 29,
+  "lead_model": null,
+  "judge_model": null,
+  "commit": "b47673596d5cbdd9fc62de1836ddcdb71b7eaf88",
+  "cases": [
+    {
+      "case": "exact_two",
+      "project_id": "abf88941-5a70-5a06-a1ed-bca5b42bb90a",
+      "lead_id": "811ffe04-eb9f-49a8-88bc-4f4dad3a74cf",
+      "conversation_id": "312337e3-ed21-4345-8ead-12d5e12c1e50",
+      "turns": [
+        {
+          "turn": 1,
+          "lead_message": "I am looking for a 2 bedroom",
+          "reply": "Here is a 2-bedroom option in this project:\n\nCedar Loft — 2 bedrooms, 110 m², from 325,000.00 USD.\n\nThe remaining catalog information is incomplete, so these may not be all the matching options.\n\nWould you like to know more about Cedar Loft?",
+          "understanding": {
+            "version": "sales-understanding/1.0",
+            "requests": [
+              {
+                "id": "r0",
+                "topic": "catalog",
+                "subject": null,
+                "polarity": "request",
+                "evidence": "I am looking for a 2 bedroom",
+                "reference_id": null,
+                "detail_fields": [],
+                "feature": null
+              }
+            ],
+            "all_of": [
+              "r0"
+            ],
+            "alternatives": [],
+            "constraints": [],
+            "references": [],
+            "preferences": [
+              {
+                "key": "bedrooms",
+                "value": "2",
+                "evidence": "I am looking for a 2 bedroom",
+                "status": "declared"
+              }
+            ],
+            "personal_facts": [],
+            "preference_withdrawals": [],
+            "comparison": null,
+            "source_purposes": [],
+            "objections": [],
+            "empathy": null,
+            "releases": [],
+            "visit": null,
+            "courtesy": null,
+            "reschedule": null,
+            "cancellation": null,
+            "wait": null,
+            "moderation": null,
+            "appointment_query": null,
+            "selected_reference_id": null,
+            "requires_clarification": false,
+            "clarification_question": null,
+            "confidence": 1.0
+          },
+          "needs_search": {
+            "version": "sales-needs-search/1.1",
+            "bedrooms": 2,
+            "unknown_bedrooms": 0,
+            "exhaustive": false,
+            "matching_property_ids": [
+              "8f7cedb7-5014-5d7b-ac40-ba5ee6f5f40c"
+            ]
+          },
+          "read_authorization": {
+            "version": "sales-needs-search/1.1",
+            "basis": "validated_current_literal_catalog_request",
+            "model_confidence": 1.0,
+            "effect_authorization": false
+          },
+          "interpretation_attempts": [
+            {
+              "attempt": 1,
+              "outcome": "accepted",
+              "error_code": null,
+              "validation_issues": [],
+              "normalizations": [
+                {
+                  "field": "requests",
+                  "action": "literal_bedroom_need_is_catalog_search",
+                  "removed_unrequested_comparison": true,
+                  "model_confidence_preserved": 1.0,
+                  "bedrooms": 2,
+                  "evidence": "I am looking for a 2 bedroom"
+                }
+              ],
+              "raw_response_sha256": "a29729bc9c0234b608df5a8a12e1de390094423d835c1cc69361153688c27034"
+            }
+          ],
+          "catalog_used": {
+            "property_types": [
+              {
+                "id": "8f7cedb7-5014-5d7b-ac40-ba5ee6f5f40c",
+                "property_type": "Cedar Loft",
+                "description": "Synthetic property for testing. Only the listed features are confirmed.",
+                "bedrooms": 2,
+                "bathrooms": 2.0,
+                "area_min": 110.0,
+                "area_max": 110.0,
+                "area_unit": "m²",
+                "total_units": null,
+                "available_units": 5,
+                "starting_price": 325000.0,
+                "maximum_price": null,
+                "currency": "USD",
+                "features": [
+                  "One parking space",
+                  "Balcony"
+                ],
+                "inventory_updated_at": "2026-11-14T01:15:41.045970+00:00",
+                "inventory_confirmed_by_user_id": null
+              },
+              {
+                "id": "bb1d7fba-2496-5256-a405-535cd3455066",
+                "property_type": "Cedar Studio",
+                "description": "Synthetic property for testing. Only the listed features are confirmed.",
+                "bedrooms": 1,
+                "bathrooms": 1.0,
+                "area_min": 52.0,
+                "area_max": 52.0,
+                "area_unit": "m²",
+                "total_units": null,
+                "available_units": 2,
+                "starting_price": 210000.0,
+                "maximum_price": null,
+                "currency": "USD",
+                "features": [
+                  "Shared rooftop terrace"
+                ],
+                "inventory_updated_at": "2026-11-14T01:15:41.091713+00:00",
+                "inventory_confirmed_by_user_id": null
+              }
+            ],
+            "coverage": {
+              "exhaustive": false,
+              "known_type_ids": [
+                "8f7cedb7-5014-5d7b-ac40-ba5ee6f5f40c",
+                "bb1d7fba-2496-5256-a405-535cd3455066"
+              ],
+              "rule": "Missing types are unknown, not proof of nonexistence. Only dated inventory quantities establish availability."
+            },
+            "approved_revision": 1
+          },
+          "checks": [
+            {
+              "check": "needs_filter_executed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "exact_matching_ids",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "matches_explained",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "unmatched_names_not_presented",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "bedroom_need_acknowledged",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_generic_model_clarification",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_internal_provenance_or_processing",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_automatic_property_selection",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "uncertain_inventory_not_claimed_available",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "incomplete_catalog_not_exhaustive",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "turn_completed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "composition_accepted",
+              "status": "PASS",
+              "detail": ""
+            }
+          ]
+        }
+      ],
+      "checks": [
+        {
+          "check": "all_script_turns_completed",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_booking",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_provider_outbox",
+          "status": "PASS",
+          "detail": ""
+        }
+      ],
+      "technical_execution": "PASS",
+      "needs_dialogue_checks": "PASS",
+      "overall_dialogue_quality": "NOT_EVALUATED",
+      "meetings": []
+    },
+    {
+      "case": "house_two",
+      "project_id": "abf88941-5a70-5a06-a1ed-bca5b42bb90a",
+      "lead_id": "e3ded54d-18ed-46f4-aac0-055f5bdbf2f9",
+      "conversation_id": "9cc151fa-0e73-42a4-b76e-44d2f6ecd741",
+      "turns": [
+        {
+          "turn": 1,
+          "lead_message": "Im looking for a 2 bedroom house",
+          "reply": "Here is a 2-bedroom option in this project:\n\nCedar Loft — 2 bedrooms, 110 m², from 325,000.00 USD.\n\nThe remaining catalog information is incomplete, so these may not be all the matching options.\n\nWould you like to know more about Cedar Loft?",
+          "understanding": {
+            "version": "sales-understanding/1.0",
+            "requests": [
+              {
+                "id": "r0",
+                "topic": "catalog",
+                "subject": null,
+                "polarity": "request",
+                "evidence": "Im looking for a 2 bedroom house",
+                "reference_id": null,
+                "detail_fields": [],
+                "feature": null
+              }
+            ],
+            "all_of": [
+              "r0"
+            ],
+            "alternatives": [],
+            "constraints": [],
+            "references": [],
+            "preferences": [
+              {
+                "key": "bedrooms",
+                "value": "2",
+                "evidence": "Im looking for a 2 bedroom house",
+                "status": "declared"
+              }
+            ],
+            "personal_facts": [],
+            "preference_withdrawals": [],
+            "comparison": null,
+            "source_purposes": [],
+            "objections": [],
+            "empathy": null,
+            "releases": [],
+            "visit": null,
+            "courtesy": null,
+            "reschedule": null,
+            "cancellation": null,
+            "wait": null,
+            "moderation": null,
+            "appointment_query": null,
+            "selected_reference_id": null,
+            "requires_clarification": false,
+            "clarification_question": null,
+            "confidence": 1.0
+          },
+          "needs_search": {
+            "version": "sales-needs-search/1.1",
+            "bedrooms": 2,
+            "unknown_bedrooms": 0,
+            "exhaustive": false,
+            "matching_property_ids": [
+              "8f7cedb7-5014-5d7b-ac40-ba5ee6f5f40c"
+            ]
+          },
+          "read_authorization": {
+            "version": "sales-needs-search/1.1",
+            "basis": "validated_current_literal_catalog_request",
+            "model_confidence": 1.0,
+            "effect_authorization": false
+          },
+          "interpretation_attempts": [
+            {
+              "attempt": 1,
+              "outcome": "accepted",
+              "error_code": null,
+              "validation_issues": [],
+              "normalizations": [
+                {
+                  "field": "requests",
+                  "action": "literal_bedroom_need_is_catalog_search",
+                  "removed_unrequested_comparison": true,
+                  "model_confidence_preserved": 1.0,
+                  "bedrooms": 2,
+                  "evidence": "Im looking for a 2 bedroom house"
+                }
+              ],
+              "raw_response_sha256": "1a31d0bd78bf180a23113b853f754efe7c342d42de42fa4a55b4410bedf535f7"
+            }
+          ],
+          "catalog_used": {
+            "property_types": [
+              {
+                "id": "8f7cedb7-5014-5d7b-ac40-ba5ee6f5f40c",
+                "property_type": "Cedar Loft",
+                "description": "Synthetic property for testing. Only the listed features are confirmed.",
+                "bedrooms": 2,
+                "bathrooms": 2.0,
+                "area_min": 110.0,
+                "area_max": 110.0,
+                "area_unit": "m²",
+                "total_units": null,
+                "available_units": 5,
+                "starting_price": 325000.0,
+                "maximum_price": null,
+                "currency": "USD",
+                "features": [
+                  "One parking space",
+                  "Balcony"
+                ],
+                "inventory_updated_at": "2026-11-14T01:15:41.045970+00:00",
+                "inventory_confirmed_by_user_id": null
+              },
+              {
+                "id": "bb1d7fba-2496-5256-a405-535cd3455066",
+                "property_type": "Cedar Studio",
+                "description": "Synthetic property for testing. Only the listed features are confirmed.",
+                "bedrooms": 1,
+                "bathrooms": 1.0,
+                "area_min": 52.0,
+                "area_max": 52.0,
+                "area_unit": "m²",
+                "total_units": null,
+                "available_units": 2,
+                "starting_price": 210000.0,
+                "maximum_price": null,
+                "currency": "USD",
+                "features": [
+                  "Shared rooftop terrace"
+                ],
+                "inventory_updated_at": "2026-11-14T01:15:41.091713+00:00",
+                "inventory_confirmed_by_user_id": null
+              }
+            ],
+            "coverage": {
+              "exhaustive": false,
+              "known_type_ids": [
+                "8f7cedb7-5014-5d7b-ac40-ba5ee6f5f40c",
+                "bb1d7fba-2496-5256-a405-535cd3455066"
+              ],
+              "rule": "Missing types are unknown, not proof of nonexistence. Only dated inventory quantities establish availability."
+            },
+            "approved_revision": 1
+          },
+          "checks": [
+            {
+              "check": "needs_filter_executed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "exact_matching_ids",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "matches_explained",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "unmatched_names_not_presented",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "bedroom_need_acknowledged",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_generic_model_clarification",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_internal_provenance_or_processing",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_automatic_property_selection",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "uncertain_inventory_not_claimed_available",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "incomplete_catalog_not_exhaustive",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "turn_completed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "composition_accepted",
+              "status": "PASS",
+              "detail": ""
+            }
+          ]
+        }
+      ],
+      "checks": [
+        {
+          "check": "all_script_turns_completed",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_booking",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_provider_outbox",
+          "status": "PASS",
+          "detail": ""
+        }
+      ],
+      "technical_execution": "PASS",
+      "needs_dialogue_checks": "PASS",
+      "overall_dialogue_quality": "NOT_EVALUATED",
+      "meetings": []
+    },
+    {
+      "case": "word_two",
+      "project_id": "abf88941-5a70-5a06-a1ed-bca5b42bb90a",
+      "lead_id": "20a28d83-d546-4a75-934d-2ecd8502eb82",
+      "conversation_id": "19d8b742-c1e8-4b3b-97e1-38146e352068",
+      "turns": [
+        {
+          "turn": 1,
+          "lead_message": "I'm looking for a two-bedroom home.",
+          "reply": "Here is a 2-bedroom option in this project:\n\nCedar Loft — 2 bedrooms, 110 m², from 325,000.00 USD.\n\nThe remaining catalog information is incomplete, so these may not be all the matching options.\n\nWould you like to know more about Cedar Loft?",
+          "understanding": {
+            "version": "sales-understanding/1.0",
+            "requests": [
+              {
+                "id": "r0",
+                "topic": "catalog",
+                "subject": null,
+                "polarity": "request",
+                "evidence": "I'm looking for a two-bedroom home.",
+                "reference_id": null,
+                "detail_fields": [],
+                "feature": null
+              }
+            ],
+            "all_of": [
+              "r0"
+            ],
+            "alternatives": [],
+            "constraints": [],
+            "references": [],
+            "preferences": [
+              {
+                "key": "bedrooms",
+                "value": "2",
+                "evidence": "I'm looking for a two-bedroom home",
+                "status": "declared"
+              }
+            ],
+            "personal_facts": [],
+            "preference_withdrawals": [],
+            "comparison": null,
+            "source_purposes": [],
+            "objections": [],
+            "empathy": null,
+            "releases": [],
+            "visit": null,
+            "courtesy": null,
+            "reschedule": null,
+            "cancellation": null,
+            "wait": null,
+            "moderation": null,
+            "appointment_query": null,
+            "selected_reference_id": null,
+            "requires_clarification": false,
+            "clarification_question": null,
+            "confidence": 1.0
+          },
+          "needs_search": {
+            "version": "sales-needs-search/1.1",
+            "bedrooms": 2,
+            "unknown_bedrooms": 0,
+            "exhaustive": false,
+            "matching_property_ids": [
+              "8f7cedb7-5014-5d7b-ac40-ba5ee6f5f40c"
+            ]
+          },
+          "read_authorization": {
+            "version": "sales-needs-search/1.1",
+            "basis": "validated_current_literal_catalog_request",
+            "model_confidence": 1.0,
+            "effect_authorization": false
+          },
+          "interpretation_attempts": [
+            {
+              "attempt": 1,
+              "outcome": "accepted",
+              "error_code": null,
+              "validation_issues": [],
+              "normalizations": [
+                {
+                  "field": "requests",
+                  "action": "literal_bedroom_need_is_catalog_search",
+                  "removed_unrequested_comparison": true,
+                  "model_confidence_preserved": 1.0,
+                  "bedrooms": 2,
+                  "evidence": "I'm looking for a two-bedroom home"
+                }
+              ],
+              "raw_response_sha256": "a8224ca2ba17e048f01e376d4edd2725a91b307e1f10db3f383493597fcea1de"
+            }
+          ],
+          "catalog_used": {
+            "property_types": [
+              {
+                "id": "8f7cedb7-5014-5d7b-ac40-ba5ee6f5f40c",
+                "property_type": "Cedar Loft",
+                "description": "Synthetic property for testing. Only the listed features are confirmed.",
+                "bedrooms": 2,
+                "bathrooms": 2.0,
+                "area_min": 110.0,
+                "area_max": 110.0,
+                "area_unit": "m²",
+                "total_units": null,
+                "available_units": 5,
+                "starting_price": 325000.0,
+                "maximum_price": null,
+                "currency": "USD",
+                "features": [
+                  "One parking space",
+                  "Balcony"
+                ],
+                "inventory_updated_at": "2026-11-14T01:15:41.045970+00:00",
+                "inventory_confirmed_by_user_id": null
+              },
+              {
+                "id": "bb1d7fba-2496-5256-a405-535cd3455066",
+                "property_type": "Cedar Studio",
+                "description": "Synthetic property for testing. Only the listed features are confirmed.",
+                "bedrooms": 1,
+                "bathrooms": 1.0,
+                "area_min": 52.0,
+                "area_max": 52.0,
+                "area_unit": "m²",
+                "total_units": null,
+                "available_units": 2,
+                "starting_price": 210000.0,
+                "maximum_price": null,
+                "currency": "USD",
+                "features": [
+                  "Shared rooftop terrace"
+                ],
+                "inventory_updated_at": "2026-11-14T01:15:41.091713+00:00",
+                "inventory_confirmed_by_user_id": null
+              }
+            ],
+            "coverage": {
+              "exhaustive": false,
+              "known_type_ids": [
+                "8f7cedb7-5014-5d7b-ac40-ba5ee6f5f40c",
+                "bb1d7fba-2496-5256-a405-535cd3455066"
+              ],
+              "rule": "Missing types are unknown, not proof of nonexistence. Only dated inventory quantities establish availability."
+            },
+            "approved_revision": 1
+          },
+          "checks": [
+            {
+              "check": "needs_filter_executed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "exact_matching_ids",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "matches_explained",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "unmatched_names_not_presented",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "bedroom_need_acknowledged",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_generic_model_clarification",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_internal_provenance_or_processing",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_automatic_property_selection",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "uncertain_inventory_not_claimed_available",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "incomplete_catalog_not_exhaustive",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "turn_completed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "composition_accepted",
+              "status": "PASS",
+              "detail": ""
+            }
+          ]
+        }
+      ],
+      "checks": [
+        {
+          "check": "all_script_turns_completed",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_booking",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_provider_outbox",
+          "status": "PASS",
+          "detail": ""
+        }
+      ],
+      "technical_execution": "PASS",
+      "needs_dialogue_checks": "PASS",
+      "overall_dialogue_quality": "NOT_EVALUATED",
+      "meetings": []
+    },
+    {
+      "case": "show_two",
+      "project_id": "abf88941-5a70-5a06-a1ed-bca5b42bb90a",
+      "lead_id": "5f061090-5704-48c1-b6ff-b54d44d490fe",
+      "conversation_id": "9cb54ef6-9c4b-4ae2-a42f-c74a69cec96c",
+      "turns": [
+        {
+          "turn": 1,
+          "lead_message": "Please show me 2 bedroom homes.",
+          "reply": "Here is a 2-bedroom option in this project:\n\nCedar Loft — 2 bedrooms, 110 m², from 325,000.00 USD.\n\nThe remaining catalog information is incomplete, so these may not be all the matching options.\n\nWould you like to know more about Cedar Loft?",
+          "understanding": {
+            "version": "sales-understanding/1.0",
+            "requests": [
+              {
+                "id": "r0",
+                "topic": "catalog",
+                "subject": null,
+                "polarity": "request",
+                "evidence": "2 bedroom homes",
+                "reference_id": null,
+                "detail_fields": [],
+                "feature": null
+              }
+            ],
+            "all_of": [
+              "r0"
+            ],
+            "alternatives": [],
+            "constraints": [],
+            "references": [],
+            "preferences": [
+              {
+                "key": "bedrooms",
+                "value": "2",
+                "evidence": "Please show me 2 bedroom homes",
+                "status": "declared"
+              }
+            ],
+            "personal_facts": [],
+            "preference_withdrawals": [],
+            "comparison": null,
+            "source_purposes": [],
+            "objections": [],
+            "empathy": null,
+            "releases": [],
+            "visit": null,
+            "courtesy": null,
+            "reschedule": null,
+            "cancellation": null,
+            "wait": null,
+            "moderation": null,
+            "appointment_query": null,
+            "selected_reference_id": null,
+            "requires_clarification": false,
+            "clarification_question": null,
+            "confidence": 1.0
+          },
+          "needs_search": {
+            "version": "sales-needs-search/1.1",
+            "bedrooms": 2,
+            "unknown_bedrooms": 0,
+            "exhaustive": false,
+            "matching_property_ids": [
+              "8f7cedb7-5014-5d7b-ac40-ba5ee6f5f40c"
+            ]
+          },
+          "read_authorization": {
+            "version": "sales-needs-search/1.1",
+            "basis": "validated_current_literal_catalog_request",
+            "model_confidence": 1.0,
+            "effect_authorization": false
+          },
+          "interpretation_attempts": [
+            {
+              "attempt": 1,
+              "outcome": "accepted",
+              "error_code": null,
+              "validation_issues": [],
+              "normalizations": [
+                {
+                  "field": "requests",
+                  "action": "literal_bedroom_need_is_catalog_search",
+                  "removed_unrequested_comparison": true,
+                  "model_confidence_preserved": 1.0,
+                  "bedrooms": 2,
+                  "evidence": "Please show me 2 bedroom homes"
+                }
+              ],
+              "raw_response_sha256": "7d218f358aed5857052e86ad5114e4f319135a2a1f0cf3786c250f8d4b446850"
+            }
+          ],
+          "catalog_used": {
+            "property_types": [
+              {
+                "id": "8f7cedb7-5014-5d7b-ac40-ba5ee6f5f40c",
+                "property_type": "Cedar Loft",
+                "description": "Synthetic property for testing. Only the listed features are confirmed.",
+                "bedrooms": 2,
+                "bathrooms": 2.0,
+                "area_min": 110.0,
+                "area_max": 110.0,
+                "area_unit": "m²",
+                "total_units": null,
+                "available_units": 5,
+                "starting_price": 325000.0,
+                "maximum_price": null,
+                "currency": "USD",
+                "features": [
+                  "One parking space",
+                  "Balcony"
+                ],
+                "inventory_updated_at": "2026-11-14T01:15:41.045970+00:00",
+                "inventory_confirmed_by_user_id": null
+              },
+              {
+                "id": "bb1d7fba-2496-5256-a405-535cd3455066",
+                "property_type": "Cedar Studio",
+                "description": "Synthetic property for testing. Only the listed features are confirmed.",
+                "bedrooms": 1,
+                "bathrooms": 1.0,
+                "area_min": 52.0,
+                "area_max": 52.0,
+                "area_unit": "m²",
+                "total_units": null,
+                "available_units": 2,
+                "starting_price": 210000.0,
+                "maximum_price": null,
+                "currency": "USD",
+                "features": [
+                  "Shared rooftop terrace"
+                ],
+                "inventory_updated_at": "2026-11-14T01:15:41.091713+00:00",
+                "inventory_confirmed_by_user_id": null
+              }
+            ],
+            "coverage": {
+              "exhaustive": false,
+              "known_type_ids": [
+                "8f7cedb7-5014-5d7b-ac40-ba5ee6f5f40c",
+                "bb1d7fba-2496-5256-a405-535cd3455066"
+              ],
+              "rule": "Missing types are unknown, not proof of nonexistence. Only dated inventory quantities establish availability."
+            },
+            "approved_revision": 1
+          },
+          "checks": [
+            {
+              "check": "needs_filter_executed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "exact_matching_ids",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "matches_explained",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "unmatched_names_not_presented",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "bedroom_need_acknowledged",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_generic_model_clarification",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_internal_provenance_or_processing",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_automatic_property_selection",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "uncertain_inventory_not_claimed_available",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "incomplete_catalog_not_exhaustive",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "turn_completed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "composition_accepted",
+              "status": "PASS",
+              "detail": ""
+            }
+          ]
+        }
+      ],
+      "checks": [
+        {
+          "check": "all_script_turns_completed",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_booking",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_provider_outbox",
+          "status": "PASS",
+          "detail": ""
+        }
+      ],
+      "technical_execution": "PASS",
+      "needs_dialogue_checks": "PASS",
+      "overall_dialogue_quality": "NOT_EVALUATED",
+      "meetings": []
+    },
+    {
+      "case": "need_three",
+      "project_id": "fc14327b-d4de-50e6-b694-20c4897e3fa8",
+      "lead_id": "6935c620-ff86-4812-9a02-3f52f5068092",
+      "conversation_id": "d8cbc1aa-cc24-4a66-a95f-a7932d0f5637",
+      "turns": [
+        {
+          "turn": 1,
+          "lead_message": "I need a 3 bedroom home.",
+          "reply": "Here is a 3-bedroom option in this project:\n\nRidge Townhome — 3 bedrooms, 165 m², from 460,000.00 USD.\n\nThe remaining catalog information is incomplete, so these may not be all the matching options.\n\nWould you like to know more about Ridge Townhome?",
+          "understanding": {
+            "version": "sales-understanding/1.0",
+            "requests": [
+              {
+                "id": "r0",
+                "topic": "catalog",
+                "subject": null,
+                "polarity": "request",
+                "evidence": "I need a 3 bedroom home.",
+                "reference_id": null,
+                "detail_fields": [],
+                "feature": null
+              }
+            ],
+            "all_of": [
+              "r0"
+            ],
+            "alternatives": [],
+            "constraints": [],
+            "references": [],
+            "preferences": [
+              {
+                "key": "bedrooms",
+                "value": "3",
+                "evidence": "I need a 3 bedroom home",
+                "status": "declared"
+              }
+            ],
+            "personal_facts": [],
+            "preference_withdrawals": [],
+            "comparison": null,
+            "source_purposes": [],
+            "objections": [],
+            "empathy": null,
+            "releases": [],
+            "visit": null,
+            "courtesy": null,
+            "reschedule": null,
+            "cancellation": null,
+            "wait": null,
+            "moderation": null,
+            "appointment_query": null,
+            "selected_reference_id": null,
+            "requires_clarification": false,
+            "clarification_question": null,
+            "confidence": 1.0
+          },
+          "needs_search": {
+            "version": "sales-needs-search/1.1",
+            "bedrooms": 3,
+            "unknown_bedrooms": 0,
+            "exhaustive": false,
+            "matching_property_ids": [
+              "9cca24ce-3d61-586c-a66a-37f992b5185d"
+            ]
+          },
+          "read_authorization": {
+            "version": "sales-needs-search/1.1",
+            "basis": "validated_current_literal_catalog_request",
+            "model_confidence": 1.0,
+            "effect_authorization": false
+          },
+          "interpretation_attempts": [
+            {
+              "attempt": 1,
+              "outcome": "accepted",
+              "error_code": null,
+              "validation_issues": [],
+              "normalizations": [
+                {
+                  "field": "requests",
+                  "action": "literal_bedroom_need_is_catalog_search",
+                  "removed_unrequested_comparison": true,
+                  "model_confidence_preserved": 1.0,
+                  "bedrooms": 3,
+                  "evidence": "I need a 3 bedroom home"
+                }
+              ],
+              "raw_response_sha256": "0e96da319e39fa53eecf7728488f9a21ef8ffeffbf19339f3ae7a1a5d8dcba02"
+            }
+          ],
+          "catalog_used": {
+            "property_types": [
+              {
+                "id": "9cca24ce-3d61-586c-a66a-37f992b5185d",
+                "property_type": "Ridge Townhome",
+                "description": "Synthetic property for testing. Only the listed features are confirmed.",
+                "bedrooms": 3,
+                "bathrooms": 2.5,
+                "area_min": 165.0,
+                "area_max": 165.0,
+                "area_unit": "m²",
+                "total_units": null,
+                "available_units": 4,
+                "starting_price": 460000.0,
+                "maximum_price": null,
+                "currency": "USD",
+                "features": [
+                  "Private patio"
+                ],
+                "inventory_updated_at": "2026-11-14T01:15:41.121065+00:00",
+                "inventory_confirmed_by_user_id": null
+              },
+              {
+                "id": "f6a0860f-3bf1-5abd-b1a2-f659e7bfead8",
+                "property_type": "Summit Villa",
+                "description": "Synthetic property for testing. Only the listed features are confirmed.",
+                "bedrooms": 4,
+                "bathrooms": 3.0,
+                "area_min": 220.0,
+                "area_max": 220.0,
+                "area_unit": "m²",
+                "total_units": null,
+                "available_units": 0,
+                "starting_price": 620000.0,
+                "maximum_price": null,
+                "currency": "USD",
+                "features": [
+                  "Two-car garage"
+                ],
+                "inventory_updated_at": "2026-11-14T01:15:41.123217+00:00",
+                "inventory_confirmed_by_user_id": null
+              },
+              {
+                "id": "e18aab4c-cd8d-5d07-92fb-beef92326722",
+                "property_type": "Valley Apartment",
+                "description": "Synthetic property for testing. Only the listed features are confirmed.",
+                "bedrooms": 2,
+                "bathrooms": 2.0,
+                "area_min": 95.0,
+                "area_max": 95.0,
+                "area_unit": "m²",
+                "total_units": null,
+                "available_units": null,
+                "starting_price": null,
+                "maximum_price": null,
+                "currency": null,
+                "features": [],
+                "inventory_updated_at": "2026-11-14T01:15:41.175252+00:00",
+                "inventory_confirmed_by_user_id": null
+              }
+            ],
+            "coverage": {
+              "exhaustive": false,
+              "known_type_ids": [
+                "9cca24ce-3d61-586c-a66a-37f992b5185d",
+                "f6a0860f-3bf1-5abd-b1a2-f659e7bfead8",
+                "e18aab4c-cd8d-5d07-92fb-beef92326722"
+              ],
+              "rule": "Missing types are unknown, not proof of nonexistence. Only dated inventory quantities establish availability."
+            },
+            "approved_revision": 1
+          },
+          "checks": [
+            {
+              "check": "needs_filter_executed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "exact_matching_ids",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "matches_explained",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "unmatched_names_not_presented",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "bedroom_need_acknowledged",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_generic_model_clarification",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_internal_provenance_or_processing",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_automatic_property_selection",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "uncertain_inventory_not_claimed_available",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "incomplete_catalog_not_exhaustive",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "turn_completed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "composition_accepted",
+              "status": "PASS",
+              "detail": ""
+            }
+          ]
+        }
+      ],
+      "checks": [
+        {
+          "check": "all_script_turns_completed",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_booking",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_provider_outbox",
+          "status": "PASS",
+          "detail": ""
+        }
+      ],
+      "technical_execution": "PASS",
+      "needs_dialogue_checks": "PASS",
+      "overall_dialogue_quality": "NOT_EVALUATED",
+      "meetings": []
+    },
+    {
+      "case": "multiple_two",
+      "project_id": "abf88941-5a70-5a06-a1ed-bca5b42bb90a",
+      "lead_id": "7c1a13c1-12d9-4e41-8f12-cddf31ff30ef",
+      "conversation_id": "a1936da2-089c-407e-8637-d0d279fc3e0a",
+      "turns": [
+        {
+          "turn": 1,
+          "lead_message": "Do you have any 2 bedroom homes?",
+          "reply": "Here are the 2-bedroom options in this project:\n\nCedar Loft — 2 bedrooms, 110 m², from 325,000.00 USD.\n\nCedar Garden Home — 2 bedrooms, 90 m², from 285,000.00 USD.\n\nThe remaining catalog information is incomplete, so these may not be all the matching options.\n\nWhich of these options would you like to explore?",
+          "understanding": {
+            "version": "sales-understanding/1.0",
+            "requests": [
+              {
+                "id": "r0",
+                "topic": "catalog",
+                "subject": null,
+                "polarity": "request",
+                "evidence": "Do you have any 2 bedroom homes?",
+                "reference_id": null,
+                "detail_fields": [],
+                "feature": null
+              }
+            ],
+            "all_of": [
+              "r0"
+            ],
+            "alternatives": [],
+            "constraints": [],
+            "references": [],
+            "preferences": [
+              {
+                "key": "bedrooms",
+                "value": "2",
+                "evidence": "Do you have any 2 bedroom homes",
+                "status": "declared"
+              }
+            ],
+            "personal_facts": [],
+            "preference_withdrawals": [],
+            "comparison": null,
+            "source_purposes": [],
+            "objections": [],
+            "empathy": null,
+            "releases": [],
+            "visit": null,
+            "courtesy": null,
+            "reschedule": null,
+            "cancellation": null,
+            "wait": null,
+            "moderation": null,
+            "appointment_query": null,
+            "selected_reference_id": null,
+            "requires_clarification": false,
+            "clarification_question": null,
+            "confidence": 1.0
+          },
+          "needs_search": {
+            "version": "sales-needs-search/1.1",
+            "bedrooms": 2,
+            "unknown_bedrooms": 0,
+            "exhaustive": false,
+            "matching_property_ids": [
+              "8f7cedb7-5014-5d7b-ac40-ba5ee6f5f40c",
+              "ff4b8922-d454-568c-b08b-5ba243888caa"
+            ]
+          },
+          "read_authorization": {
+            "version": "sales-needs-search/1.1",
+            "basis": "validated_current_literal_catalog_request",
+            "model_confidence": 1.0,
+            "effect_authorization": false
+          },
+          "interpretation_attempts": [
+            {
+              "attempt": 1,
+              "outcome": "accepted",
+              "error_code": null,
+              "validation_issues": [],
+              "normalizations": [
+                {
+                  "field": "requests",
+                  "action": "literal_bedroom_need_is_catalog_search",
+                  "removed_unrequested_comparison": true,
+                  "model_confidence_preserved": 1.0,
+                  "bedrooms": 2,
+                  "evidence": "Do you have any 2 bedroom homes"
+                }
+              ],
+              "raw_response_sha256": "850073b869e227d0e4f5c40c4f73b43b0564b9f5b11d5fbef4acb5a679551a53"
+            }
+          ],
+          "catalog_used": {
+            "property_types": [
+              {
+                "id": "8f7cedb7-5014-5d7b-ac40-ba5ee6f5f40c",
+                "property_type": "Cedar Loft",
+                "description": "Synthetic property for testing. Only the listed features are confirmed.",
+                "bedrooms": 2,
+                "bathrooms": 2.0,
+                "area_min": 110.0,
+                "area_max": 110.0,
+                "area_unit": "m²",
+                "total_units": null,
+                "available_units": 5,
+                "starting_price": 325000.0,
+                "maximum_price": null,
+                "currency": "USD",
+                "features": [
+                  "One parking space",
+                  "Balcony"
+                ],
+                "inventory_updated_at": "2026-11-14T01:15:41.045970+00:00",
+                "inventory_confirmed_by_user_id": null
+              },
+              {
+                "id": "bb1d7fba-2496-5256-a405-535cd3455066",
+                "property_type": "Cedar Studio",
+                "description": "Synthetic property for testing. Only the listed features are confirmed.",
+                "bedrooms": 1,
+                "bathrooms": 1.0,
+                "area_min": 52.0,
+                "area_max": 52.0,
+                "area_unit": "m²",
+                "total_units": null,
+                "available_units": 2,
+                "starting_price": 210000.0,
+                "maximum_price": null,
+                "currency": "USD",
+                "features": [
+                  "Shared rooftop terrace"
+                ],
+                "inventory_updated_at": "2026-11-14T01:15:41.091713+00:00",
+                "inventory_confirmed_by_user_id": null
+              },
+              {
+                "id": "ff4b8922-d454-568c-b08b-5ba243888caa",
+                "property_type": "Cedar Garden Home",
+                "description": "Two-bedroom garden home for isolated discovery tests.",
+                "bedrooms": 2,
+                "bathrooms": 2.0,
+                "area_min": 90.0,
+                "area_max": 90.0,
+                "area_unit": "m²",
+                "total_units": null,
+                "available_units": 2,
+                "starting_price": 285000.0,
+                "maximum_price": null,
+                "currency": "USD",
+                "features": [
+                  "Private patio"
+                ],
+                "inventory_updated_at": "2026-11-14T01:17:13.084417+00:00",
+                "inventory_confirmed_by_user_id": null
+              }
+            ],
+            "coverage": {
+              "exhaustive": false,
+              "known_type_ids": [
+                "8f7cedb7-5014-5d7b-ac40-ba5ee6f5f40c",
+                "bb1d7fba-2496-5256-a405-535cd3455066",
+                "ff4b8922-d454-568c-b08b-5ba243888caa"
+              ],
+              "rule": "Missing types are unknown, not proof of nonexistence. Only dated inventory quantities establish availability."
+            },
+            "approved_revision": 2
+          },
+          "checks": [
+            {
+              "check": "needs_filter_executed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "exact_matching_ids",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "matches_explained",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "unmatched_names_not_presented",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "bedroom_need_acknowledged",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_generic_model_clarification",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_internal_provenance_or_processing",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_automatic_property_selection",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "uncertain_inventory_not_claimed_available",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "incomplete_catalog_not_exhaustive",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "turn_completed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "composition_accepted",
+              "status": "PASS",
+              "detail": ""
+            }
+          ]
+        }
+      ],
+      "checks": [
+        {
+          "check": "all_script_turns_completed",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_booking",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_provider_outbox",
+          "status": "PASS",
+          "detail": ""
+        }
+      ],
+      "technical_execution": "PASS",
+      "needs_dialogue_checks": "PASS",
+      "overall_dialogue_quality": "NOT_EVALUATED",
+      "meetings": []
+    },
+    {
+      "case": "no_two",
+      "project_id": "88e5563d-2f4e-5a11-9822-ec319f06f25e",
+      "lead_id": "3cc306a4-146b-4d10-96dc-1cfca53a1b72",
+      "conversation_id": "94684b7d-90e6-4919-92a8-ed3d92f547fa",
+      "turns": [
+        {
+          "turn": 1,
+          "lead_message": "I am looking for a 2 bedroom home.",
+          "reply": "I do not have a confirmed 2-bedroom option to show you in this project. Some catalog or bedroom details are missing, so I cannot rule out other matching options.\n\nAre 2 bedrooms essential, or would you consider another bedroom count?",
+          "understanding": {
+            "version": "sales-understanding/1.0",
+            "requests": [
+              {
+                "id": "r0",
+                "topic": "catalog",
+                "subject": null,
+                "polarity": "request",
+                "evidence": "I am looking for a 2 bedroom home.",
+                "reference_id": null,
+                "detail_fields": [],
+                "feature": null
+              }
+            ],
+            "all_of": [
+              "r0"
+            ],
+            "alternatives": [],
+            "constraints": [],
+            "references": [],
+            "preferences": [
+              {
+                "key": "bedrooms",
+                "value": "2",
+                "evidence": "I am looking for a 2 bedroom home",
+                "status": "declared"
+              }
+            ],
+            "personal_facts": [],
+            "preference_withdrawals": [],
+            "comparison": null,
+            "source_purposes": [],
+            "objections": [],
+            "empathy": null,
+            "releases": [],
+            "visit": null,
+            "courtesy": null,
+            "reschedule": null,
+            "cancellation": null,
+            "wait": null,
+            "moderation": null,
+            "appointment_query": null,
+            "selected_reference_id": null,
+            "requires_clarification": false,
+            "clarification_question": null,
+            "confidence": 1.0
+          },
+          "needs_search": {
+            "version": "sales-needs-search/1.1",
+            "bedrooms": 2,
+            "unknown_bedrooms": 0,
+            "exhaustive": false,
+            "matching_property_ids": []
+          },
+          "read_authorization": {
+            "version": "sales-needs-search/1.1",
+            "basis": "validated_current_literal_catalog_request",
+            "model_confidence": 1.0,
+            "effect_authorization": false
+          },
+          "interpretation_attempts": [
+            {
+              "attempt": 1,
+              "outcome": "accepted",
+              "error_code": null,
+              "validation_issues": [],
+              "normalizations": [
+                {
+                  "field": "requests",
+                  "action": "literal_bedroom_need_is_catalog_search",
+                  "removed_unrequested_comparison": true,
+                  "model_confidence_preserved": 1.0,
+                  "bedrooms": 2,
+                  "evidence": "I am looking for a 2 bedroom home"
+                }
+              ],
+              "raw_response_sha256": "15ab135e89df3e05c5a5b43802ea1aedf8d58d71a31853e9265b6262245b7dee"
+            }
+          ],
+          "catalog_used": {
+            "property_types": [
+              {
+                "id": "85511ae1-1733-5177-9282-422514a416ce",
+                "property_type": "Bay Residence",
+                "description": "Synthetic property for testing. Only the listed features are confirmed.",
+                "bedrooms": 4,
+                "bathrooms": 3.0,
+                "area_min": 240.0,
+                "area_max": 240.0,
+                "area_unit": "m²",
+                "total_units": null,
+                "available_units": 3,
+                "starting_price": 780000.0,
+                "maximum_price": null,
+                "currency": "USD",
+                "features": [
+                  "Two covered parking spaces",
+                  "Private garden"
+                ],
+                "inventory_updated_at": "2026-11-14T01:15:40.882475+00:00",
+                "inventory_confirmed_by_user_id": null
+              }
+            ],
+            "coverage": {
+              "exhaustive": false,
+              "known_type_ids": [
+                "85511ae1-1733-5177-9282-422514a416ce"
+              ],
+              "rule": "Missing types are unknown, not proof of nonexistence. Only dated inventory quantities establish availability."
+            },
+            "approved_revision": 1
+          },
+          "checks": [
+            {
+              "check": "needs_filter_executed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "exact_matching_ids",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "matches_explained",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "unmatched_names_not_presented",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "bedroom_need_acknowledged",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_generic_model_clarification",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_internal_provenance_or_processing",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_automatic_property_selection",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "uncertain_inventory_not_claimed_available",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "incomplete_catalog_not_exhaustive",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "turn_completed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "composition_accepted",
+              "status": "PASS",
+              "detail": ""
+            }
+          ]
+        }
+      ],
+      "checks": [
+        {
+          "check": "all_script_turns_completed",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_booking",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_provider_outbox",
+          "status": "PASS",
+          "detail": ""
+        }
+      ],
+      "technical_execution": "PASS",
+      "needs_dialogue_checks": "PASS",
+      "overall_dialogue_quality": "NOT_EVALUATED",
+      "meetings": []
+    },
+    {
+      "case": "unknown_bedrooms",
+      "project_id": "88e5563d-2f4e-5a11-9822-ec319f06f25e",
+      "lead_id": "f8de626c-bbd4-4706-ae1a-0fde915adbc0",
+      "conversation_id": "7e1f4e16-18ed-4d7d-92bf-65a7b41362d6",
+      "turns": [
+        {
+          "turn": 1,
+          "lead_message": "I am looking for a 2 bedroom home.",
+          "reply": "I do not have a confirmed 2-bedroom option to show you in this project. Some catalog or bedroom details are missing, so I cannot rule out other matching options.\n\nAre 2 bedrooms essential, or would you consider another bedroom count?",
+          "understanding": {
+            "version": "sales-understanding/1.0",
+            "requests": [
+              {
+                "id": "r0",
+                "topic": "catalog",
+                "subject": null,
+                "polarity": "request",
+                "evidence": "I am looking for a 2 bedroom home.",
+                "reference_id": null,
+                "detail_fields": [],
+                "feature": null
+              }
+            ],
+            "all_of": [
+              "r0"
+            ],
+            "alternatives": [],
+            "constraints": [],
+            "references": [],
+            "preferences": [
+              {
+                "key": "bedrooms",
+                "value": "2",
+                "evidence": "I am looking for a 2 bedroom home",
+                "status": "declared"
+              }
+            ],
+            "personal_facts": [],
+            "preference_withdrawals": [],
+            "comparison": null,
+            "source_purposes": [],
+            "objections": [],
+            "empathy": null,
+            "releases": [],
+            "visit": null,
+            "courtesy": null,
+            "reschedule": null,
+            "cancellation": null,
+            "wait": null,
+            "moderation": null,
+            "appointment_query": null,
+            "selected_reference_id": null,
+            "requires_clarification": false,
+            "clarification_question": null,
+            "confidence": 1.0
+          },
+          "needs_search": {
+            "version": "sales-needs-search/1.1",
+            "bedrooms": 2,
+            "unknown_bedrooms": 1,
+            "exhaustive": false,
+            "matching_property_ids": []
+          },
+          "read_authorization": {
+            "version": "sales-needs-search/1.1",
+            "basis": "validated_current_literal_catalog_request",
+            "model_confidence": 1.0,
+            "effect_authorization": false
+          },
+          "interpretation_attempts": [
+            {
+              "attempt": 1,
+              "outcome": "accepted",
+              "error_code": null,
+              "validation_issues": [],
+              "normalizations": [
+                {
+                  "field": "requests",
+                  "action": "literal_bedroom_need_is_catalog_search",
+                  "removed_unrequested_comparison": true,
+                  "model_confidence_preserved": 1.0,
+                  "bedrooms": 2,
+                  "evidence": "I am looking for a 2 bedroom home"
+                }
+              ],
+              "raw_response_sha256": "15ab135e89df3e05c5a5b43802ea1aedf8d58d71a31853e9265b6262245b7dee"
+            }
+          ],
+          "catalog_used": {
+            "property_types": [
+              {
+                "id": "85511ae1-1733-5177-9282-422514a416ce",
+                "property_type": "Bay Residence",
+                "description": "Synthetic property for testing. Only the listed features are confirmed.",
+                "bedrooms": null,
+                "bathrooms": 3.0,
+                "area_min": 240.0,
+                "area_max": 240.0,
+                "area_unit": "m²",
+                "total_units": null,
+                "available_units": 3,
+                "starting_price": 780000.0,
+                "maximum_price": null,
+                "currency": "USD",
+                "features": [
+                  "Two covered parking spaces",
+                  "Private garden"
+                ],
+                "inventory_updated_at": "2026-11-14T01:15:40.882475+00:00",
+                "inventory_confirmed_by_user_id": null
+              }
+            ],
+            "coverage": {
+              "exhaustive": false,
+              "known_type_ids": [
+                "85511ae1-1733-5177-9282-422514a416ce"
+              ],
+              "rule": "Missing types are unknown, not proof of nonexistence. Only dated inventory quantities establish availability."
+            },
+            "approved_revision": 2
+          },
+          "checks": [
+            {
+              "check": "needs_filter_executed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "exact_matching_ids",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "matches_explained",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "unmatched_names_not_presented",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "bedroom_need_acknowledged",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_generic_model_clarification",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_internal_provenance_or_processing",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_automatic_property_selection",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "uncertain_inventory_not_claimed_available",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "incomplete_catalog_not_exhaustive",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "turn_completed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "composition_accepted",
+              "status": "PASS",
+              "detail": ""
+            }
+          ]
+        }
+      ],
+      "checks": [
+        {
+          "check": "all_script_turns_completed",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_booking",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_provider_outbox",
+          "status": "PASS",
+          "detail": ""
+        }
+      ],
+      "technical_execution": "PASS",
+      "needs_dialogue_checks": "PASS",
+      "overall_dialogue_quality": "NOT_EVALUATED",
+      "meetings": []
+    },
+    {
+      "case": "sold_out_four",
+      "project_id": "fc14327b-d4de-50e6-b694-20c4897e3fa8",
+      "lead_id": "35224cf8-7412-4d48-81b7-fd160d2a6a74",
+      "conversation_id": "cf307f6d-52e0-4958-aec4-0653c5a8cdc1",
+      "turns": [
+        {
+          "turn": 1,
+          "lead_message": "I am looking for a 4 bedroom home.",
+          "reply": "The 4-bedroom options listed here have a last confirmed quantity of zero. Some catalog or bedroom details are missing, so I cannot rule out other matching options.\n\nAre 4 bedrooms essential, or would you consider another bedroom count?",
+          "understanding": {
+            "version": "sales-understanding/1.0",
+            "requests": [
+              {
+                "id": "r0",
+                "topic": "catalog",
+                "subject": null,
+                "polarity": "request",
+                "evidence": "I am looking for a 4 bedroom home.",
+                "reference_id": null,
+                "detail_fields": [],
+                "feature": null
+              }
+            ],
+            "all_of": [
+              "r0"
+            ],
+            "alternatives": [],
+            "constraints": [],
+            "references": [],
+            "preferences": [
+              {
+                "key": "bedrooms",
+                "value": "4",
+                "evidence": "I am looking for a 4 bedroom home",
+                "status": "declared"
+              }
+            ],
+            "personal_facts": [],
+            "preference_withdrawals": [],
+            "comparison": null,
+            "source_purposes": [],
+            "objections": [],
+            "empathy": null,
+            "releases": [],
+            "visit": null,
+            "courtesy": null,
+            "reschedule": null,
+            "cancellation": null,
+            "wait": null,
+            "moderation": null,
+            "appointment_query": null,
+            "selected_reference_id": null,
+            "requires_clarification": false,
+            "clarification_question": null,
+            "confidence": 1.0
+          },
+          "needs_search": {
+            "version": "sales-needs-search/1.1",
+            "bedrooms": 4,
+            "unknown_bedrooms": 0,
+            "exhaustive": false,
+            "matching_property_ids": []
+          },
+          "read_authorization": {
+            "version": "sales-needs-search/1.1",
+            "basis": "validated_current_literal_catalog_request",
+            "model_confidence": 1.0,
+            "effect_authorization": false
+          },
+          "interpretation_attempts": [
+            {
+              "attempt": 1,
+              "outcome": "accepted",
+              "error_code": null,
+              "validation_issues": [],
+              "normalizations": [
+                {
+                  "field": "requests",
+                  "action": "literal_bedroom_need_is_catalog_search",
+                  "removed_unrequested_comparison": true,
+                  "model_confidence_preserved": 1.0,
+                  "bedrooms": 4,
+                  "evidence": "I am looking for a 4 bedroom home"
+                }
+              ],
+              "raw_response_sha256": "9062812b36f42a917ceea02ff13f6af2351f4990e86583c63ef1887388a17580"
+            }
+          ],
+          "catalog_used": {
+            "property_types": [
+              {
+                "id": "9cca24ce-3d61-586c-a66a-37f992b5185d",
+                "property_type": "Ridge Townhome",
+                "description": "Synthetic property for testing. Only the listed features are confirmed.",
+                "bedrooms": 3,
+                "bathrooms": 2.5,
+                "area_min": 165.0,
+                "area_max": 165.0,
+                "area_unit": "m²",
+                "total_units": null,
+                "available_units": 4,
+                "starting_price": 460000.0,
+                "maximum_price": null,
+                "currency": "USD",
+                "features": [
+                  "Private patio"
+                ],
+                "inventory_updated_at": "2026-11-14T01:15:41.121065+00:00",
+                "inventory_confirmed_by_user_id": null
+              },
+              {
+                "id": "f6a0860f-3bf1-5abd-b1a2-f659e7bfead8",
+                "property_type": "Summit Villa",
+                "description": "Synthetic property for testing. Only the listed features are confirmed.",
+                "bedrooms": 4,
+                "bathrooms": 3.0,
+                "area_min": 220.0,
+                "area_max": 220.0,
+                "area_unit": "m²",
+                "total_units": null,
+                "available_units": 0,
+                "starting_price": 620000.0,
+                "maximum_price": null,
+                "currency": "USD",
+                "features": [
+                  "Two-car garage"
+                ],
+                "inventory_updated_at": "2026-11-14T01:15:41.123217+00:00",
+                "inventory_confirmed_by_user_id": null
+              },
+              {
+                "id": "e18aab4c-cd8d-5d07-92fb-beef92326722",
+                "property_type": "Valley Apartment",
+                "description": "Synthetic property for testing. Only the listed features are confirmed.",
+                "bedrooms": 2,
+                "bathrooms": 2.0,
+                "area_min": 95.0,
+                "area_max": 95.0,
+                "area_unit": "m²",
+                "total_units": null,
+                "available_units": null,
+                "starting_price": null,
+                "maximum_price": null,
+                "currency": null,
+                "features": [],
+                "inventory_updated_at": "2026-11-14T01:15:41.175252+00:00",
+                "inventory_confirmed_by_user_id": null
+              }
+            ],
+            "coverage": {
+              "exhaustive": false,
+              "known_type_ids": [
+                "9cca24ce-3d61-586c-a66a-37f992b5185d",
+                "f6a0860f-3bf1-5abd-b1a2-f659e7bfead8",
+                "e18aab4c-cd8d-5d07-92fb-beef92326722"
+              ],
+              "rule": "Missing types are unknown, not proof of nonexistence. Only dated inventory quantities establish availability."
+            },
+            "approved_revision": 1
+          },
+          "checks": [
+            {
+              "check": "needs_filter_executed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "exact_matching_ids",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "matches_explained",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "unmatched_names_not_presented",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "bedroom_need_acknowledged",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_generic_model_clarification",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_internal_provenance_or_processing",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_automatic_property_selection",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "uncertain_inventory_not_claimed_available",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "incomplete_catalog_not_exhaustive",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "turn_completed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "composition_accepted",
+              "status": "PASS",
+              "detail": ""
+            }
+          ]
+        }
+      ],
+      "checks": [
+        {
+          "check": "all_script_turns_completed",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_booking",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_provider_outbox",
+          "status": "PASS",
+          "detail": ""
+        }
+      ],
+      "technical_execution": "PASS",
+      "needs_dialogue_checks": "PASS",
+      "overall_dialogue_quality": "NOT_EVALUATED",
+      "meetings": []
+    },
+    {
+      "case": "unconfirmed_inventory",
+      "project_id": "fc14327b-d4de-50e6-b694-20c4897e3fa8",
+      "lead_id": "462930d6-bc9a-4264-9678-bae2e24637df",
+      "conversation_id": "efab4964-ddf3-46c8-8c72-7490a932ca4d",
+      "turns": [
+        {
+          "turn": 1,
+          "lead_message": "I am looking for a 2 bedroom home.",
+          "reply": "Here is a 2-bedroom option in this project:\n\nValley Apartment — 2 bedrooms, 95 m².\n\nCurrent availability for Valley Apartment still needs confirmation.\n\nThe remaining catalog information is incomplete, so these may not be all the matching options.\n\nWould you like to know more about Valley Apartment?",
+          "understanding": {
+            "version": "sales-understanding/1.0",
+            "requests": [
+              {
+                "id": "r0",
+                "topic": "catalog",
+                "subject": null,
+                "polarity": "request",
+                "evidence": "I am looking for a 2 bedroom home.",
+                "reference_id": null,
+                "detail_fields": [],
+                "feature": null
+              }
+            ],
+            "all_of": [
+              "r0"
+            ],
+            "alternatives": [],
+            "constraints": [],
+            "references": [],
+            "preferences": [
+              {
+                "key": "bedrooms",
+                "value": "2",
+                "evidence": "I am looking for a 2 bedroom home",
+                "status": "declared"
+              }
+            ],
+            "personal_facts": [],
+            "preference_withdrawals": [],
+            "comparison": null,
+            "source_purposes": [],
+            "objections": [],
+            "empathy": null,
+            "releases": [],
+            "visit": null,
+            "courtesy": null,
+            "reschedule": null,
+            "cancellation": null,
+            "wait": null,
+            "moderation": null,
+            "appointment_query": null,
+            "selected_reference_id": null,
+            "requires_clarification": false,
+            "clarification_question": null,
+            "confidence": 1.0
+          },
+          "needs_search": {
+            "version": "sales-needs-search/1.1",
+            "bedrooms": 2,
+            "unknown_bedrooms": 0,
+            "exhaustive": false,
+            "matching_property_ids": [
+              "e18aab4c-cd8d-5d07-92fb-beef92326722"
+            ]
+          },
+          "read_authorization": {
+            "version": "sales-needs-search/1.1",
+            "basis": "validated_current_literal_catalog_request",
+            "model_confidence": 1.0,
+            "effect_authorization": false
+          },
+          "interpretation_attempts": [
+            {
+              "attempt": 1,
+              "outcome": "accepted",
+              "error_code": null,
+              "validation_issues": [],
+              "normalizations": [
+                {
+                  "field": "requests",
+                  "action": "literal_bedroom_need_is_catalog_search",
+                  "removed_unrequested_comparison": true,
+                  "model_confidence_preserved": 1.0,
+                  "bedrooms": 2,
+                  "evidence": "I am looking for a 2 bedroom home"
+                }
+              ],
+              "raw_response_sha256": "6056fbbc41657f715a82763de6af871bcec34b9b4a557612a7388b0612fa7681"
+            }
+          ],
+          "catalog_used": {
+            "property_types": [
+              {
+                "id": "9cca24ce-3d61-586c-a66a-37f992b5185d",
+                "property_type": "Ridge Townhome",
+                "description": "Synthetic property for testing. Only the listed features are confirmed.",
+                "bedrooms": 3,
+                "bathrooms": 2.5,
+                "area_min": 165.0,
+                "area_max": 165.0,
+                "area_unit": "m²",
+                "total_units": null,
+                "available_units": 4,
+                "starting_price": 460000.0,
+                "maximum_price": null,
+                "currency": "USD",
+                "features": [
+                  "Private patio"
+                ],
+                "inventory_updated_at": "2026-11-14T01:15:41.121065+00:00",
+                "inventory_confirmed_by_user_id": null
+              },
+              {
+                "id": "f6a0860f-3bf1-5abd-b1a2-f659e7bfead8",
+                "property_type": "Summit Villa",
+                "description": "Synthetic property for testing. Only the listed features are confirmed.",
+                "bedrooms": 4,
+                "bathrooms": 3.0,
+                "area_min": 220.0,
+                "area_max": 220.0,
+                "area_unit": "m²",
+                "total_units": null,
+                "available_units": 0,
+                "starting_price": 620000.0,
+                "maximum_price": null,
+                "currency": "USD",
+                "features": [
+                  "Two-car garage"
+                ],
+                "inventory_updated_at": "2026-11-14T01:15:41.123217+00:00",
+                "inventory_confirmed_by_user_id": null
+              },
+              {
+                "id": "e18aab4c-cd8d-5d07-92fb-beef92326722",
+                "property_type": "Valley Apartment",
+                "description": "Synthetic property for testing. Only the listed features are confirmed.",
+                "bedrooms": 2,
+                "bathrooms": 2.0,
+                "area_min": 95.0,
+                "area_max": 95.0,
+                "area_unit": "m²",
+                "total_units": null,
+                "available_units": null,
+                "starting_price": null,
+                "maximum_price": null,
+                "currency": null,
+                "features": [],
+                "inventory_updated_at": "2026-11-14T01:15:41.175252+00:00",
+                "inventory_confirmed_by_user_id": null
+              }
+            ],
+            "coverage": {
+              "exhaustive": false,
+              "known_type_ids": [
+                "9cca24ce-3d61-586c-a66a-37f992b5185d",
+                "f6a0860f-3bf1-5abd-b1a2-f659e7bfead8",
+                "e18aab4c-cd8d-5d07-92fb-beef92326722"
+              ],
+              "rule": "Missing types are unknown, not proof of nonexistence. Only dated inventory quantities establish availability."
+            },
+            "approved_revision": 1
+          },
+          "checks": [
+            {
+              "check": "needs_filter_executed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "exact_matching_ids",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "matches_explained",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "unmatched_names_not_presented",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "bedroom_need_acknowledged",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_generic_model_clarification",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_internal_provenance_or_processing",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_automatic_property_selection",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "uncertain_inventory_not_claimed_available",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "incomplete_catalog_not_exhaustive",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "turn_completed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "composition_accepted",
+              "status": "PASS",
+              "detail": ""
+            }
+          ]
+        }
+      ],
+      "checks": [
+        {
+          "check": "all_script_turns_completed",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_booking",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_provider_outbox",
+          "status": "PASS",
+          "detail": ""
+        }
+      ],
+      "technical_execution": "PASS",
+      "needs_dialogue_checks": "PASS",
+      "overall_dialogue_quality": "NOT_EVALUATED",
+      "meetings": []
+    },
+    {
+      "case": "change_need",
+      "project_id": "abf88941-5a70-5a06-a1ed-bca5b42bb90a",
+      "lead_id": "0a51cfc4-8f85-4031-ba8b-b990a47f3486",
+      "conversation_id": "ed4b950a-0341-485d-b31c-1116c3d1b8da",
+      "turns": [
+        {
+          "turn": 1,
+          "lead_message": "I am looking for a 2 bedroom home.",
+          "reply": "Here is a 2-bedroom option in this project:\n\nCedar Loft — 2 bedrooms, 110 m², from 325,000.00 USD.\n\nThe remaining catalog information is incomplete, so these may not be all the matching options.\n\nWould you like to know more about Cedar Loft?",
+          "understanding": {
+            "version": "sales-understanding/1.0",
+            "requests": [
+              {
+                "id": "r0",
+                "topic": "catalog",
+                "subject": null,
+                "polarity": "request",
+                "evidence": "I am looking for a 2 bedroom home.",
+                "reference_id": null,
+                "detail_fields": [],
+                "feature": null
+              }
+            ],
+            "all_of": [
+              "r0"
+            ],
+            "alternatives": [],
+            "constraints": [],
+            "references": [],
+            "preferences": [
+              {
+                "key": "bedrooms",
+                "value": "2",
+                "evidence": "I am looking for a 2 bedroom home",
+                "status": "declared"
+              }
+            ],
+            "personal_facts": [],
+            "preference_withdrawals": [],
+            "comparison": null,
+            "source_purposes": [],
+            "objections": [],
+            "empathy": null,
+            "releases": [],
+            "visit": null,
+            "courtesy": null,
+            "reschedule": null,
+            "cancellation": null,
+            "wait": null,
+            "moderation": null,
+            "appointment_query": null,
+            "selected_reference_id": null,
+            "requires_clarification": false,
+            "clarification_question": null,
+            "confidence": 1.0
+          },
+          "needs_search": {
+            "version": "sales-needs-search/1.1",
+            "bedrooms": 2,
+            "unknown_bedrooms": 0,
+            "exhaustive": false,
+            "matching_property_ids": [
+              "8f7cedb7-5014-5d7b-ac40-ba5ee6f5f40c"
+            ]
+          },
+          "read_authorization": {
+            "version": "sales-needs-search/1.1",
+            "basis": "validated_current_literal_catalog_request",
+            "model_confidence": 1.0,
+            "effect_authorization": false
+          },
+          "interpretation_attempts": [
+            {
+              "attempt": 1,
+              "outcome": "accepted",
+              "error_code": null,
+              "validation_issues": [],
+              "normalizations": [
+                {
+                  "field": "requests",
+                  "action": "literal_bedroom_need_is_catalog_search",
+                  "removed_unrequested_comparison": true,
+                  "model_confidence_preserved": 1.0,
+                  "bedrooms": 2,
+                  "evidence": "I am looking for a 2 bedroom home"
+                }
+              ],
+              "raw_response_sha256": "4e62d06d7f6b68b959f36bd6a7156397e68483aeea0a4a738ac603dd257ed5c2"
+            }
+          ],
+          "catalog_used": {
+            "property_types": [
+              {
+                "id": "8f7cedb7-5014-5d7b-ac40-ba5ee6f5f40c",
+                "property_type": "Cedar Loft",
+                "description": "Synthetic property for testing. Only the listed features are confirmed.",
+                "bedrooms": 2,
+                "bathrooms": 2.0,
+                "area_min": 110.0,
+                "area_max": 110.0,
+                "area_unit": "m²",
+                "total_units": null,
+                "available_units": 5,
+                "starting_price": 325000.0,
+                "maximum_price": null,
+                "currency": "USD",
+                "features": [
+                  "One parking space",
+                  "Balcony"
+                ],
+                "inventory_updated_at": "2026-11-14T01:15:41.045970+00:00",
+                "inventory_confirmed_by_user_id": null
+              },
+              {
+                "id": "bb1d7fba-2496-5256-a405-535cd3455066",
+                "property_type": "Cedar Studio",
+                "description": "Synthetic property for testing. Only the listed features are confirmed.",
+                "bedrooms": 1,
+                "bathrooms": 1.0,
+                "area_min": 52.0,
+                "area_max": 52.0,
+                "area_unit": "m²",
+                "total_units": null,
+                "available_units": 2,
+                "starting_price": 210000.0,
+                "maximum_price": null,
+                "currency": "USD",
+                "features": [
+                  "Shared rooftop terrace"
+                ],
+                "inventory_updated_at": "2026-11-14T01:15:41.091713+00:00",
+                "inventory_confirmed_by_user_id": null
+              }
+            ],
+            "coverage": {
+              "exhaustive": false,
+              "known_type_ids": [
+                "8f7cedb7-5014-5d7b-ac40-ba5ee6f5f40c",
+                "bb1d7fba-2496-5256-a405-535cd3455066"
+              ],
+              "rule": "Missing types are unknown, not proof of nonexistence. Only dated inventory quantities establish availability."
+            },
+            "approved_revision": 3
+          },
+          "checks": [
+            {
+              "check": "needs_filter_executed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "exact_matching_ids",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "matches_explained",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "unmatched_names_not_presented",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "bedroom_need_acknowledged",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_generic_model_clarification",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_internal_provenance_or_processing",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_automatic_property_selection",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "uncertain_inventory_not_claimed_available",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "incomplete_catalog_not_exhaustive",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "turn_completed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "composition_accepted",
+              "status": "PASS",
+              "detail": ""
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "lead_message": "Actually, I need a 1 bedroom home.",
+          "reply": "Here is a 1-bedroom option in this project:\n\nCedar Studio — 1 bedroom, 52 m², from 210,000.00 USD.\n\nThe remaining catalog information is incomplete, so these may not be all the matching options.\n\nWould you like to know more about Cedar Studio?",
+          "understanding": {
+            "version": "sales-understanding/1.0",
+            "requests": [
+              {
+                "id": "r0",
+                "topic": "catalog",
+                "subject": null,
+                "polarity": "request",
+                "evidence": "Actually, I need a 1 bedroom home.",
+                "reference_id": null,
+                "detail_fields": [],
+                "feature": null
+              }
+            ],
+            "all_of": [
+              "r0"
+            ],
+            "alternatives": [],
+            "constraints": [],
+            "references": [],
+            "preferences": [
+              {
+                "key": "bedrooms",
+                "value": "1",
+                "evidence": "I need a 1 bedroom home",
+                "status": "declared"
+              }
+            ],
+            "personal_facts": [],
+            "preference_withdrawals": [],
+            "comparison": null,
+            "source_purposes": [],
+            "objections": [],
+            "empathy": null,
+            "releases": [],
+            "visit": null,
+            "courtesy": null,
+            "reschedule": null,
+            "cancellation": null,
+            "wait": null,
+            "moderation": null,
+            "appointment_query": null,
+            "selected_reference_id": null,
+            "requires_clarification": false,
+            "clarification_question": null,
+            "confidence": 1.0
+          },
+          "needs_search": {
+            "version": "sales-needs-search/1.1",
+            "bedrooms": 1,
+            "unknown_bedrooms": 0,
+            "exhaustive": false,
+            "matching_property_ids": [
+              "bb1d7fba-2496-5256-a405-535cd3455066"
+            ]
+          },
+          "read_authorization": {
+            "version": "sales-needs-search/1.1",
+            "basis": "validated_current_literal_catalog_request",
+            "model_confidence": 1.0,
+            "effect_authorization": false
+          },
+          "interpretation_attempts": [
+            {
+              "attempt": 1,
+              "outcome": "invalid_model_contract",
+              "error_code": "understanding_validation_failed",
+              "validation_issues": [
+                {
+                  "location": [],
+                  "type": "contract_value_error",
+                  "message": "Inline reference evidence must quote current_message."
+                }
+              ],
+              "normalizations": [],
+              "raw_response_sha256": "f1c5aa622e98845c32b2304194f312731c2c33bfbc518325e96d825e0fa5a82f"
+            },
+            {
+              "attempt": 2,
+              "outcome": "accepted",
+              "error_code": null,
+              "validation_issues": [],
+              "normalizations": [
+                {
+                  "field": "requests",
+                  "action": "literal_bedroom_need_is_catalog_search",
+                  "removed_unrequested_comparison": false,
+                  "model_confidence_preserved": 1.0,
+                  "bedrooms": 1,
+                  "evidence": "I need a 1 bedroom home"
+                }
+              ],
+              "raw_response_sha256": "2bdff0212f3b1cd9c11003cadd88de41c00159c69de19a95d258f562327d0529"
+            }
+          ],
+          "catalog_used": {
+            "property_types": [
+              {
+                "id": "8f7cedb7-5014-5d7b-ac40-ba5ee6f5f40c",
+                "property_type": "Cedar Loft",
+                "description": "Synthetic property for testing. Only the listed features are confirmed.",
+                "bedrooms": 2,
+                "bathrooms": 2.0,
+                "area_min": 110.0,
+                "area_max": 110.0,
+                "area_unit": "m²",
+                "total_units": null,
+                "available_units": 5,
+                "starting_price": 325000.0,
+                "maximum_price": null,
+                "currency": "USD",
+                "features": [
+                  "One parking space",
+                  "Balcony"
+                ],
+                "inventory_updated_at": "2026-11-14T01:15:41.045970+00:00",
+                "inventory_confirmed_by_user_id": null
+              },
+              {
+                "id": "bb1d7fba-2496-5256-a405-535cd3455066",
+                "property_type": "Cedar Studio",
+                "description": "Synthetic property for testing. Only the listed features are confirmed.",
+                "bedrooms": 1,
+                "bathrooms": 1.0,
+                "area_min": 52.0,
+                "area_max": 52.0,
+                "area_unit": "m²",
+                "total_units": null,
+                "available_units": 2,
+                "starting_price": 210000.0,
+                "maximum_price": null,
+                "currency": "USD",
+                "features": [
+                  "Shared rooftop terrace"
+                ],
+                "inventory_updated_at": "2026-11-14T01:15:41.091713+00:00",
+                "inventory_confirmed_by_user_id": null
+              }
+            ],
+            "coverage": {
+              "exhaustive": false,
+              "known_type_ids": [
+                "8f7cedb7-5014-5d7b-ac40-ba5ee6f5f40c",
+                "bb1d7fba-2496-5256-a405-535cd3455066"
+              ],
+              "rule": "Missing types are unknown, not proof of nonexistence. Only dated inventory quantities establish availability."
+            },
+            "approved_revision": 3
+          },
+          "checks": [
+            {
+              "check": "needs_filter_executed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "exact_matching_ids",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "matches_explained",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "unmatched_names_not_presented",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "bedroom_need_acknowledged",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_generic_model_clarification",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_internal_provenance_or_processing",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_automatic_property_selection",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "uncertain_inventory_not_claimed_available",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "incomplete_catalog_not_exhaustive",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "turn_completed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "composition_accepted",
+              "status": "PASS",
+              "detail": ""
+            }
+          ]
+        }
+      ],
+      "checks": [
+        {
+          "check": "all_script_turns_completed",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_booking",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_provider_outbox",
+          "status": "PASS",
+          "detail": ""
+        }
+      ],
+      "technical_execution": "PASS",
+      "needs_dialogue_checks": "PASS",
+      "overall_dialogue_quality": "NOT_EVALUATED",
+      "meetings": []
+    },
+    {
+      "case": "no_premature_selection",
+      "project_id": "abf88941-5a70-5a06-a1ed-bca5b42bb90a",
+      "lead_id": "448eac5f-c4ab-4331-8769-1129dc5e21a5",
+      "conversation_id": "91b58dce-97bd-4217-b205-e9cec1c2a0b4",
+      "turns": [
+        {
+          "turn": 1,
+          "lead_message": "I am looking for a 2 bedroom home.",
+          "reply": "Here is a 2-bedroom option in this project:\n\nCedar Loft — 2 bedrooms, 110 m², from 325,000.00 USD.\n\nThe remaining catalog information is incomplete, so these may not be all the matching options.\n\nWould you like to know more about Cedar Loft?",
+          "understanding": {
+            "version": "sales-understanding/1.0",
+            "requests": [
+              {
+                "id": "r0",
+                "topic": "catalog",
+                "subject": null,
+                "polarity": "request",
+                "evidence": "I am looking for a 2 bedroom home.",
+                "reference_id": null,
+                "detail_fields": [],
+                "feature": null
+              }
+            ],
+            "all_of": [
+              "r0"
+            ],
+            "alternatives": [],
+            "constraints": [],
+            "references": [],
+            "preferences": [
+              {
+                "key": "bedrooms",
+                "value": "2",
+                "evidence": "I am looking for a 2 bedroom home",
+                "status": "declared"
+              }
+            ],
+            "personal_facts": [],
+            "preference_withdrawals": [],
+            "comparison": null,
+            "source_purposes": [],
+            "objections": [],
+            "empathy": null,
+            "releases": [],
+            "visit": null,
+            "courtesy": null,
+            "reschedule": null,
+            "cancellation": null,
+            "wait": null,
+            "moderation": null,
+            "appointment_query": null,
+            "selected_reference_id": null,
+            "requires_clarification": false,
+            "clarification_question": null,
+            "confidence": 1.0
+          },
+          "needs_search": {
+            "version": "sales-needs-search/1.1",
+            "bedrooms": 2,
+            "unknown_bedrooms": 0,
+            "exhaustive": false,
+            "matching_property_ids": [
+              "8f7cedb7-5014-5d7b-ac40-ba5ee6f5f40c"
+            ]
+          },
+          "read_authorization": {
+            "version": "sales-needs-search/1.1",
+            "basis": "validated_current_literal_catalog_request",
+            "model_confidence": 1.0,
+            "effect_authorization": false
+          },
+          "interpretation_attempts": [
+            {
+              "attempt": 1,
+              "outcome": "accepted",
+              "error_code": null,
+              "validation_issues": [],
+              "normalizations": [
+                {
+                  "field": "requests",
+                  "action": "literal_bedroom_need_is_catalog_search",
+                  "removed_unrequested_comparison": true,
+                  "model_confidence_preserved": 1.0,
+                  "bedrooms": 2,
+                  "evidence": "I am looking for a 2 bedroom home"
+                }
+              ],
+              "raw_response_sha256": "4e62d06d7f6b68b959f36bd6a7156397e68483aeea0a4a738ac603dd257ed5c2"
+            }
+          ],
+          "catalog_used": {
+            "property_types": [
+              {
+                "id": "8f7cedb7-5014-5d7b-ac40-ba5ee6f5f40c",
+                "property_type": "Cedar Loft",
+                "description": "Synthetic property for testing. Only the listed features are confirmed.",
+                "bedrooms": 2,
+                "bathrooms": 2.0,
+                "area_min": 110.0,
+                "area_max": 110.0,
+                "area_unit": "m²",
+                "total_units": null,
+                "available_units": 5,
+                "starting_price": 325000.0,
+                "maximum_price": null,
+                "currency": "USD",
+                "features": [
+                  "One parking space",
+                  "Balcony"
+                ],
+                "inventory_updated_at": "2026-11-14T01:15:41.045970+00:00",
+                "inventory_confirmed_by_user_id": null
+              },
+              {
+                "id": "bb1d7fba-2496-5256-a405-535cd3455066",
+                "property_type": "Cedar Studio",
+                "description": "Synthetic property for testing. Only the listed features are confirmed.",
+                "bedrooms": 1,
+                "bathrooms": 1.0,
+                "area_min": 52.0,
+                "area_max": 52.0,
+                "area_unit": "m²",
+                "total_units": null,
+                "available_units": 2,
+                "starting_price": 210000.0,
+                "maximum_price": null,
+                "currency": "USD",
+                "features": [
+                  "Shared rooftop terrace"
+                ],
+                "inventory_updated_at": "2026-11-14T01:15:41.091713+00:00",
+                "inventory_confirmed_by_user_id": null
+              }
+            ],
+            "coverage": {
+              "exhaustive": false,
+              "known_type_ids": [
+                "8f7cedb7-5014-5d7b-ac40-ba5ee6f5f40c",
+                "bb1d7fba-2496-5256-a405-535cd3455066"
+              ],
+              "rule": "Missing types are unknown, not proof of nonexistence. Only dated inventory quantities establish availability."
+            },
+            "approved_revision": 3
+          },
+          "checks": [
+            {
+              "check": "needs_filter_executed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "exact_matching_ids",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "matches_explained",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "unmatched_names_not_presented",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "bedroom_need_acknowledged",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_generic_model_clarification",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_internal_provenance_or_processing",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_automatic_property_selection",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "uncertain_inventory_not_claimed_available",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "incomplete_catalog_not_exhaustive",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "turn_completed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "composition_accepted",
+              "status": "PASS",
+              "detail": ""
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "lead_message": "I am looking for a 1 bedroom home.",
+          "reply": "Here is a 1-bedroom option in this project:\n\nCedar Studio — 1 bedroom, 52 m², from 210,000.00 USD.\n\nThe remaining catalog information is incomplete, so these may not be all the matching options.\n\nWould you like to know more about Cedar Studio?",
+          "understanding": {
+            "version": "sales-understanding/1.0",
+            "requests": [
+              {
+                "id": "r0",
+                "topic": "catalog",
+                "subject": null,
+                "polarity": "request",
+                "evidence": "I am looking for a 1 bedroom home.",
+                "reference_id": null,
+                "detail_fields": [],
+                "feature": null
+              }
+            ],
+            "all_of": [
+              "r0"
+            ],
+            "alternatives": [],
+            "constraints": [],
+            "references": [],
+            "preferences": [
+              {
+                "key": "bedrooms",
+                "value": "1",
+                "evidence": "I am looking for a 1 bedroom home",
+                "status": "declared"
+              }
+            ],
+            "personal_facts": [],
+            "preference_withdrawals": [],
+            "comparison": null,
+            "source_purposes": [],
+            "objections": [],
+            "empathy": null,
+            "releases": [],
+            "visit": null,
+            "courtesy": null,
+            "reschedule": null,
+            "cancellation": null,
+            "wait": null,
+            "moderation": null,
+            "appointment_query": null,
+            "selected_reference_id": null,
+            "requires_clarification": false,
+            "clarification_question": null,
+            "confidence": 1.0
+          },
+          "needs_search": {
+            "version": "sales-needs-search/1.1",
+            "bedrooms": 1,
+            "unknown_bedrooms": 0,
+            "exhaustive": false,
+            "matching_property_ids": [
+              "bb1d7fba-2496-5256-a405-535cd3455066"
+            ]
+          },
+          "read_authorization": {
+            "version": "sales-needs-search/1.1",
+            "basis": "validated_current_literal_catalog_request",
+            "model_confidence": 1.0,
+            "effect_authorization": false
+          },
+          "interpretation_attempts": [
+            {
+              "attempt": 1,
+              "outcome": "accepted",
+              "error_code": null,
+              "validation_issues": [],
+              "normalizations": [
+                {
+                  "field": "requests",
+                  "action": "literal_bedroom_need_is_catalog_search",
+                  "removed_unrequested_comparison": true,
+                  "model_confidence_preserved": 1.0,
+                  "bedrooms": 1,
+                  "evidence": "I am looking for a 1 bedroom home"
+                }
+              ],
+              "raw_response_sha256": "a2c5e4ef24e8f2671b15651b5d3cb3ba7cd23a4ea9ab3f6984697e5388095266"
+            }
+          ],
+          "catalog_used": {
+            "property_types": [
+              {
+                "id": "8f7cedb7-5014-5d7b-ac40-ba5ee6f5f40c",
+                "property_type": "Cedar Loft",
+                "description": "Synthetic property for testing. Only the listed features are confirmed.",
+                "bedrooms": 2,
+                "bathrooms": 2.0,
+                "area_min": 110.0,
+                "area_max": 110.0,
+                "area_unit": "m²",
+                "total_units": null,
+                "available_units": 5,
+                "starting_price": 325000.0,
+                "maximum_price": null,
+                "currency": "USD",
+                "features": [
+                  "One parking space",
+                  "Balcony"
+                ],
+                "inventory_updated_at": "2026-11-14T01:15:41.045970+00:00",
+                "inventory_confirmed_by_user_id": null
+              },
+              {
+                "id": "bb1d7fba-2496-5256-a405-535cd3455066",
+                "property_type": "Cedar Studio",
+                "description": "Synthetic property for testing. Only the listed features are confirmed.",
+                "bedrooms": 1,
+                "bathrooms": 1.0,
+                "area_min": 52.0,
+                "area_max": 52.0,
+                "area_unit": "m²",
+                "total_units": null,
+                "available_units": 2,
+                "starting_price": 210000.0,
+                "maximum_price": null,
+                "currency": "USD",
+                "features": [
+                  "Shared rooftop terrace"
+                ],
+                "inventory_updated_at": "2026-11-14T01:15:41.091713+00:00",
+                "inventory_confirmed_by_user_id": null
+              }
+            ],
+            "coverage": {
+              "exhaustive": false,
+              "known_type_ids": [
+                "8f7cedb7-5014-5d7b-ac40-ba5ee6f5f40c",
+                "bb1d7fba-2496-5256-a405-535cd3455066"
+              ],
+              "rule": "Missing types are unknown, not proof of nonexistence. Only dated inventory quantities establish availability."
+            },
+            "approved_revision": 3
+          },
+          "checks": [
+            {
+              "check": "needs_filter_executed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "exact_matching_ids",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "matches_explained",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "unmatched_names_not_presented",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "bedroom_need_acknowledged",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_generic_model_clarification",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_internal_provenance_or_processing",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_automatic_property_selection",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "uncertain_inventory_not_claimed_available",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "incomplete_catalog_not_exhaustive",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "turn_completed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "composition_accepted",
+              "status": "PASS",
+              "detail": ""
+            }
+          ]
+        }
+      ],
+      "checks": [
+        {
+          "check": "all_script_turns_completed",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_booking",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_provider_outbox",
+          "status": "PASS",
+          "detail": ""
+        }
+      ],
+      "technical_execution": "PASS",
+      "needs_dialogue_checks": "PASS",
+      "overall_dialogue_quality": "NOT_EVALUATED",
+      "meetings": []
+    }
+  ],
+  "limitations": [
+    "Google Calendar integration and transport delivery are not exercised.",
+    "Simulation selects the first eligible seller, not the production round-robin cursor.",
+    "SQLite does not verify PostgreSQL concurrent-booking locks.",
+    "Public availability wording requires human review. No notification is scheduled.",
+    "Focused cases do not represent all eight buyer segments."
+  ],
+  "company_name": "SYNTHETIC - Penguin Sales Laboratory",
+  "company_id": "f0ebe3a5-6c04-5b8e-8cd8-423859aa39d7",
+  "project_count": 3,
+  "property_count": 6,
+  "project_name": "SYNTHETIC Harbor Gardens",
+  "sales_model": "openai/gpt-4o-mini",
+  "configuration_version": 8,
+  "configuration_sha256": "51ff65376dad421328dab993a4fc71939489386f1ed173514cf13a244ac79f1c",
+  "overall_dialogue_quality": "NOT_EVALUATED",
+  "quality_scope": "Needs-first checks only; no integral dialogue certification.",
+  "cost_reporting_complete": true,
+  "provider_usage": {
+    "prompt_tokens": 277088,
+    "completion_tokens": 4438,
+    "cost_usd": 0.0345396,
+    "responses_with_cost": 29
+  },
+  "scenario_count": 12,
+  "checks": [
+    {
+      "check": "no_forbidden_network_attempts",
+      "status": "PASS",
+      "detail": ""
+    }
+  ],
+  "summary": {
+    "PASS": 205,
+    "FAIL": 0,
+    "BLOCKED": 0
+  },
+  "judge_summary": {
+    "PASS": 0,
+    "FAIL": 0,
+    "NOT_APPLICABLE": 0
+  },
+  "status": "PASS"
+}

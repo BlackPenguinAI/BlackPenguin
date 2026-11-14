@@ -132,8 +132,12 @@ class ReadTools:
                             row.update(dict.fromkeys(fields,None))
                     safe_types.append(row)
                 needs = search(state.last_understanding, safe_types, context['catalog_coverage'])
+                if any(r.id=='confirmed_unknown_catalog' for r in state.last_understanding.requests):
+                    from .needs_search import unknown_options
+                    needs=unknown_options(self.db,self.scope,state.last_understanding.requests[0].evidence,safe_types)
+                    if needs is None:return result('uncertain',safe_message='Please tell me which homes you would like to explore.')
                 if needs is not None:
-                    return result('success', evidence_ids=needs['matching_property_ids'], data={'property_types':needs['matches'], 'coverage':context['catalog_coverage'], 'needs_search':needs})
+                    return result('success', evidence_ids=[p['id'] for p in needs['unknown_options']] if needs.get('exploring_unknown') else needs['matching_property_ids'], data={'property_types':needs.get('unknown_options',needs['matches']), 'coverage':context['catalog_coverage'], 'needs_search':needs})
             return result('partial' if rows or unit else 'empty', evidence_ids=[p['id'] for p in rows]+([unit['id']] if unit else []),
                 data={'property_types':rows, 'coverage':context['catalog_coverage'],
                       'inventory':[unit] if unit else context['inventory'] if call.topic == Topic.inventory else [],
