@@ -86,7 +86,11 @@ async def evaluate_case(db,manifest,scenario,budget,max_turns):
         meta=(run.output_snapshot or {}).get('metadata') or {}
         checks=assertions(text,reply,meta,context,state.selected_property_type_id)
         checks += [check('turn_completed',not run.error_code),check('composition_accepted',(meta.get('composition') or {}).get('status')=='accepted')]
-        rows.append({'turn':i+1,'lead_message':text,'reply':reply,'understanding':(run.input_snapshot or {}).get('understanding'),'needs_search':meta.get('needs_search'),'checks':checks})
+        from app.modules.sales_agent.dialogue_models import SalesDialogueEvent
+        event_row=db.query(SalesDialogueEvent).filter_by(conversation_id=conversation.id,kind='understanding_preview').order_by(SalesDialogueEvent.revision.desc()).first()
+        attempts=(event_row.payload_json.get('metadata') or {}).get('interpretation_attempts',[]) if event_row else []
+        audit=[{k:a[k] for k in ('attempt','outcome','error_code','validation_issues','normalizations','raw_response_sha256') if k in a} for a in attempts]
+        rows.append({'turn':i+1,'lead_message':text,'reply':reply,'understanding':(run.input_snapshot or {}).get('understanding'),'needs_search':meta.get('needs_search'),'read_authorization':(run.input_snapshot or {}).get('needs_read_authorization'),'interpretation_attempts':audit,'catalog_used':{'property_types':context['property_types'],'coverage':context['catalog_coverage'],'approved_revision':context.get('approved_revision')},'checks':checks})
     checks=[check('all_script_turns_completed',len(rows)==len(script)),check('no_booking',db.query(Meeting).filter_by(lead_id=lead.id).count()==0),check('no_provider_outbox',db.query(OutboundMessage).filter_by(conversation_id=conversation.id).count()==0)]
     passed=all(c['status']=='PASS' for r in rows for c in r['checks']) and all(c['status']=='PASS' for c in checks)
     return {'case':scenario,'project_id':project.id,'lead_id':lead.id,'conversation_id':conversation.id,'turns':rows,'checks':checks,'technical_execution':'PASS' if all(c['status']=='PASS' for r in rows for c in r['checks'] if c['check']=='turn_completed') else 'FAIL','needs_dialogue_checks':'PASS' if passed else 'FAIL','overall_dialogue_quality':'NOT_EVALUATED','meetings':[]}

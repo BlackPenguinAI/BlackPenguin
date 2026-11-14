@@ -1,0 +1,2315 @@
+{
+  "version": "sales-needs-discovery/1.0",
+  "synthetic_only": true,
+  "production_database_writes": 0,
+  "lead_contacts": 0,
+  "provider_calls": 29,
+  "lead_model": null,
+  "judge_model": null,
+  "commit": "3e26f648364f18889d9240da575db0c5bb9b4ad1",
+  "cases": [
+    {
+      "case": "exact_two",
+      "project_id": "abf88941-5a70-5a06-a1ed-bca5b42bb90a",
+      "lead_id": "d559d616-e2cb-42de-93cc-ff810a12b75f",
+      "conversation_id": "660e5d88-5fcc-4a47-8177-87223d26c630",
+      "turns": [
+        {
+          "turn": 1,
+          "lead_message": "I am looking for a 2 bedroom",
+          "reply": "1. Cedar Loft: bedrooms: 2.\n\n2. Cedar Studio: bedrooms: 1.\nThis compares approved records; unconfirmed values do not mean zero or unavailable.\n\nWhich option would you like to explore further?",
+          "understanding": {
+            "version": "sales-understanding/1.0",
+            "requests": [
+              {
+                "id": "r0",
+                "topic": "catalog",
+                "subject": null,
+                "polarity": "request",
+                "evidence": "I am looking for a 2 bedroom",
+                "reference_id": null,
+                "detail_fields": [],
+                "feature": null
+              }
+            ],
+            "all_of": [
+              "r0"
+            ],
+            "alternatives": [],
+            "constraints": [],
+            "references": [
+              {
+                "kind": "property",
+                "id": "ref0",
+                "expression": "Cedar Loft",
+                "evidence": "I am looking for a 2 bedroom"
+              },
+              {
+                "kind": "property",
+                "id": "ref1",
+                "expression": "Cedar Studio",
+                "evidence": "I am looking for a 2 bedroom"
+              }
+            ],
+            "preferences": [
+              {
+                "key": "bedrooms",
+                "value": "2",
+                "evidence": "I am looking for a 2 bedroom",
+                "status": "declared"
+              }
+            ],
+            "personal_facts": [],
+            "preference_withdrawals": [],
+            "comparison": {
+              "request_id": "r0",
+              "reference_ids": [
+                "ref0",
+                "ref1"
+              ],
+              "include_current": false,
+              "include_all": false,
+              "all_kind": "property",
+              "criteria": [
+                "bedrooms"
+              ],
+              "feature": null,
+              "operation": "compare",
+              "evidence": "I am looking for a 2 bedroom"
+            },
+            "source_purposes": [],
+            "objections": [],
+            "empathy": null,
+            "releases": [],
+            "visit": null,
+            "courtesy": null,
+            "reschedule": null,
+            "cancellation": null,
+            "wait": null,
+            "moderation": null,
+            "appointment_query": null,
+            "selected_reference_id": null,
+            "requires_clarification": false,
+            "clarification_question": null,
+            "confidence": 1.0
+          },
+          "needs_search": null,
+          "checks": [
+            {
+              "check": "needs_filter_executed",
+              "status": "FAIL",
+              "detail": ""
+            },
+            {
+              "check": "exact_matching_ids",
+              "status": "FAIL",
+              "detail": ""
+            },
+            {
+              "check": "matches_explained",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "unmatched_names_not_presented",
+              "status": "FAIL",
+              "detail": ""
+            },
+            {
+              "check": "bedroom_need_acknowledged",
+              "status": "FAIL",
+              "detail": ""
+            },
+            {
+              "check": "no_generic_model_clarification",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_internal_provenance_or_processing",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_automatic_property_selection",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "uncertain_inventory_not_claimed_available",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "incomplete_catalog_not_exhaustive",
+              "status": "FAIL",
+              "detail": ""
+            },
+            {
+              "check": "turn_completed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "composition_accepted",
+              "status": "PASS",
+              "detail": ""
+            }
+          ]
+        }
+      ],
+      "checks": [
+        {
+          "check": "all_script_turns_completed",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_booking",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_provider_outbox",
+          "status": "PASS",
+          "detail": ""
+        }
+      ],
+      "technical_execution": "PASS",
+      "needs_dialogue_checks": "FAIL",
+      "overall_dialogue_quality": "NOT_EVALUATED",
+      "meetings": []
+    },
+    {
+      "case": "house_two",
+      "project_id": "abf88941-5a70-5a06-a1ed-bca5b42bb90a",
+      "lead_id": "fa13c09b-0cc0-45f9-9874-66c5a6b3132f",
+      "conversation_id": "c2882ad6-fda1-4531-aaeb-b97b62c7c18c",
+      "turns": [
+        {
+          "turn": 1,
+          "lead_message": "Im looking for a 2 bedroom house",
+          "reply": "1. Cedar Loft: bedrooms: 2.\n\n2. Cedar Studio: bedrooms: 1.\nThis compares approved records; unconfirmed values do not mean zero or unavailable.\n\nWhich option would you like to explore further?",
+          "understanding": {
+            "version": "sales-understanding/1.0",
+            "requests": [
+              {
+                "id": "r0",
+                "topic": "catalog",
+                "subject": null,
+                "polarity": "request",
+                "evidence": "Im looking for a 2 bedroom house",
+                "reference_id": null,
+                "detail_fields": [],
+                "feature": null
+              }
+            ],
+            "all_of": [
+              "r0"
+            ],
+            "alternatives": [],
+            "constraints": [],
+            "references": [
+              {
+                "kind": "property",
+                "id": "ref0",
+                "expression": "Cedar Loft",
+                "evidence": "Im looking for a 2 bedroom house"
+              },
+              {
+                "kind": "property",
+                "id": "ref1",
+                "expression": "Cedar Studio",
+                "evidence": "Im looking for a 2 bedroom house"
+              }
+            ],
+            "preferences": [
+              {
+                "key": "bedrooms",
+                "value": "2",
+                "evidence": "Im looking for a 2 bedroom house",
+                "status": "declared"
+              }
+            ],
+            "personal_facts": [],
+            "preference_withdrawals": [],
+            "comparison": {
+              "request_id": "r0",
+              "reference_ids": [
+                "ref0",
+                "ref1"
+              ],
+              "include_current": false,
+              "include_all": false,
+              "all_kind": "property",
+              "criteria": [
+                "bedrooms"
+              ],
+              "feature": null,
+              "operation": "compare",
+              "evidence": "Im looking for a 2 bedroom house"
+            },
+            "source_purposes": [],
+            "objections": [],
+            "empathy": null,
+            "releases": [],
+            "visit": null,
+            "courtesy": null,
+            "reschedule": null,
+            "cancellation": null,
+            "wait": null,
+            "moderation": null,
+            "appointment_query": null,
+            "selected_reference_id": null,
+            "requires_clarification": false,
+            "clarification_question": null,
+            "confidence": 1.0
+          },
+          "needs_search": null,
+          "checks": [
+            {
+              "check": "needs_filter_executed",
+              "status": "FAIL",
+              "detail": ""
+            },
+            {
+              "check": "exact_matching_ids",
+              "status": "FAIL",
+              "detail": ""
+            },
+            {
+              "check": "matches_explained",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "unmatched_names_not_presented",
+              "status": "FAIL",
+              "detail": ""
+            },
+            {
+              "check": "bedroom_need_acknowledged",
+              "status": "FAIL",
+              "detail": ""
+            },
+            {
+              "check": "no_generic_model_clarification",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_internal_provenance_or_processing",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_automatic_property_selection",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "uncertain_inventory_not_claimed_available",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "incomplete_catalog_not_exhaustive",
+              "status": "FAIL",
+              "detail": ""
+            },
+            {
+              "check": "turn_completed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "composition_accepted",
+              "status": "PASS",
+              "detail": ""
+            }
+          ]
+        }
+      ],
+      "checks": [
+        {
+          "check": "all_script_turns_completed",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_booking",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_provider_outbox",
+          "status": "PASS",
+          "detail": ""
+        }
+      ],
+      "technical_execution": "PASS",
+      "needs_dialogue_checks": "FAIL",
+      "overall_dialogue_quality": "NOT_EVALUATED",
+      "meetings": []
+    },
+    {
+      "case": "word_two",
+      "project_id": "abf88941-5a70-5a06-a1ed-bca5b42bb90a",
+      "lead_id": "544fcf32-c5ba-4eb0-8404-e600d0134fdd",
+      "conversation_id": "7712b8a4-a0d3-4db8-bc16-247470615bf9",
+      "turns": [
+        {
+          "turn": 1,
+          "lead_message": "I'm looking for a two-bedroom home.",
+          "reply": "1. Cedar Loft: bedrooms: 2.\n\n2. Cedar Studio: bedrooms: 1.\nThis compares approved records; unconfirmed values do not mean zero or unavailable.\n\nWhich option would you like to explore further?",
+          "understanding": {
+            "version": "sales-understanding/1.0",
+            "requests": [
+              {
+                "id": "r0",
+                "topic": "catalog",
+                "subject": null,
+                "polarity": "request",
+                "evidence": "I'm looking for a two-bedroom home.",
+                "reference_id": null,
+                "detail_fields": [],
+                "feature": null
+              }
+            ],
+            "all_of": [
+              "r0"
+            ],
+            "alternatives": [],
+            "constraints": [],
+            "references": [
+              {
+                "kind": "property",
+                "id": "ref0",
+                "expression": "Cedar Loft",
+                "evidence": "I'm looking for a two-bedroom home."
+              },
+              {
+                "kind": "property",
+                "id": "ref1",
+                "expression": "Cedar Studio",
+                "evidence": "I'm looking for a two-bedroom home."
+              }
+            ],
+            "preferences": [
+              {
+                "key": "bedrooms",
+                "value": "2",
+                "evidence": "I'm looking for a two-bedroom home.",
+                "status": "declared"
+              }
+            ],
+            "personal_facts": [],
+            "preference_withdrawals": [],
+            "comparison": {
+              "request_id": "r0",
+              "reference_ids": [
+                "ref0",
+                "ref1"
+              ],
+              "include_current": false,
+              "include_all": false,
+              "all_kind": "property",
+              "criteria": [
+                "bedrooms"
+              ],
+              "feature": null,
+              "operation": "compare",
+              "evidence": "I'm looking for a two-bedroom home."
+            },
+            "source_purposes": [],
+            "objections": [],
+            "empathy": null,
+            "releases": [],
+            "visit": null,
+            "courtesy": null,
+            "reschedule": null,
+            "cancellation": null,
+            "wait": null,
+            "moderation": null,
+            "appointment_query": null,
+            "selected_reference_id": null,
+            "requires_clarification": false,
+            "clarification_question": null,
+            "confidence": 1.0
+          },
+          "needs_search": null,
+          "checks": [
+            {
+              "check": "needs_filter_executed",
+              "status": "FAIL",
+              "detail": ""
+            },
+            {
+              "check": "exact_matching_ids",
+              "status": "FAIL",
+              "detail": ""
+            },
+            {
+              "check": "matches_explained",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "unmatched_names_not_presented",
+              "status": "FAIL",
+              "detail": ""
+            },
+            {
+              "check": "bedroom_need_acknowledged",
+              "status": "FAIL",
+              "detail": ""
+            },
+            {
+              "check": "no_generic_model_clarification",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_internal_provenance_or_processing",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_automatic_property_selection",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "uncertain_inventory_not_claimed_available",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "incomplete_catalog_not_exhaustive",
+              "status": "FAIL",
+              "detail": ""
+            },
+            {
+              "check": "turn_completed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "composition_accepted",
+              "status": "PASS",
+              "detail": ""
+            }
+          ]
+        }
+      ],
+      "checks": [
+        {
+          "check": "all_script_turns_completed",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_booking",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_provider_outbox",
+          "status": "PASS",
+          "detail": ""
+        }
+      ],
+      "technical_execution": "PASS",
+      "needs_dialogue_checks": "FAIL",
+      "overall_dialogue_quality": "NOT_EVALUATED",
+      "meetings": []
+    },
+    {
+      "case": "show_two",
+      "project_id": "abf88941-5a70-5a06-a1ed-bca5b42bb90a",
+      "lead_id": "9dfaa5ab-3b2f-4000-94e2-f6416c7e0ccf",
+      "conversation_id": "e328fa1f-be82-4f1e-a777-2f77e4844a17",
+      "turns": [
+        {
+          "turn": 1,
+          "lead_message": "Please show me 2 bedroom homes.",
+          "reply": "1. Cedar Loft: bedrooms: 2.\n\n2. Cedar Studio: bedrooms: 1.\nThis compares approved records; unconfirmed values do not mean zero or unavailable.\n\nWhich option would you like to explore further?",
+          "understanding": {
+            "version": "sales-understanding/1.0",
+            "requests": [
+              {
+                "id": "r0",
+                "topic": "catalog",
+                "subject": null,
+                "polarity": "request",
+                "evidence": "2 bedroom homes",
+                "reference_id": null,
+                "detail_fields": [],
+                "feature": null
+              }
+            ],
+            "all_of": [
+              "r0"
+            ],
+            "alternatives": [],
+            "constraints": [],
+            "references": [
+              {
+                "kind": "property",
+                "id": "ref0",
+                "expression": "Cedar Loft",
+                "evidence": "2 bedroom homes"
+              },
+              {
+                "kind": "property",
+                "id": "ref1",
+                "expression": "Cedar Studio",
+                "evidence": "2 bedroom homes"
+              }
+            ],
+            "preferences": [],
+            "personal_facts": [],
+            "preference_withdrawals": [],
+            "comparison": {
+              "request_id": "r0",
+              "reference_ids": [
+                "ref0",
+                "ref1"
+              ],
+              "include_current": false,
+              "include_all": false,
+              "all_kind": "property",
+              "criteria": [
+                "bedrooms"
+              ],
+              "feature": null,
+              "operation": "compare",
+              "evidence": "2 bedroom homes"
+            },
+            "source_purposes": [],
+            "objections": [],
+            "empathy": null,
+            "releases": [],
+            "visit": null,
+            "courtesy": null,
+            "reschedule": null,
+            "cancellation": null,
+            "wait": null,
+            "moderation": null,
+            "appointment_query": null,
+            "selected_reference_id": null,
+            "requires_clarification": false,
+            "clarification_question": null,
+            "confidence": 1.0
+          },
+          "needs_search": null,
+          "checks": [
+            {
+              "check": "needs_filter_executed",
+              "status": "FAIL",
+              "detail": ""
+            },
+            {
+              "check": "exact_matching_ids",
+              "status": "FAIL",
+              "detail": ""
+            },
+            {
+              "check": "matches_explained",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "unmatched_names_not_presented",
+              "status": "FAIL",
+              "detail": ""
+            },
+            {
+              "check": "bedroom_need_acknowledged",
+              "status": "FAIL",
+              "detail": ""
+            },
+            {
+              "check": "no_generic_model_clarification",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_internal_provenance_or_processing",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_automatic_property_selection",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "uncertain_inventory_not_claimed_available",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "incomplete_catalog_not_exhaustive",
+              "status": "FAIL",
+              "detail": ""
+            },
+            {
+              "check": "turn_completed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "composition_accepted",
+              "status": "PASS",
+              "detail": ""
+            }
+          ]
+        }
+      ],
+      "checks": [
+        {
+          "check": "all_script_turns_completed",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_booking",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_provider_outbox",
+          "status": "PASS",
+          "detail": ""
+        }
+      ],
+      "technical_execution": "PASS",
+      "needs_dialogue_checks": "FAIL",
+      "overall_dialogue_quality": "NOT_EVALUATED",
+      "meetings": []
+    },
+    {
+      "case": "need_three",
+      "project_id": "fc14327b-d4de-50e6-b694-20c4897e3fa8",
+      "lead_id": "d5ca1a96-8d6e-496e-aa4f-01d3166b782f",
+      "conversation_id": "35572e29-61f4-44d4-8eb6-27a06ff2dbb8",
+      "turns": [
+        {
+          "turn": 1,
+          "lead_message": "I need a 3 bedroom home.",
+          "reply": "I need the property options to make this comparison.\n\nWhich property options would you like to compare?",
+          "understanding": {
+            "version": "sales-understanding/1.0",
+            "requests": [
+              {
+                "id": "r0",
+                "topic": "catalog",
+                "subject": null,
+                "polarity": "request",
+                "evidence": "I need a 3 bedroom home.",
+                "reference_id": null,
+                "detail_fields": [],
+                "feature": null
+              }
+            ],
+            "all_of": [
+              "r0"
+            ],
+            "alternatives": [],
+            "constraints": [],
+            "references": [
+              {
+                "kind": "property",
+                "id": "ref0",
+                "expression": "Ridge Townhome",
+                "evidence": "3 bedroom home"
+              },
+              {
+                "kind": "property",
+                "id": "ref1",
+                "expression": "Summit Villa",
+                "evidence": "3 bedroom home"
+              },
+              {
+                "kind": "property",
+                "id": "ref2",
+                "expression": "Valley Apartment",
+                "evidence": "3 bedroom home"
+              }
+            ],
+            "preferences": [],
+            "personal_facts": [],
+            "preference_withdrawals": [],
+            "comparison": {
+              "request_id": "r0",
+              "reference_ids": [
+                "ref0",
+                "ref1",
+                "ref2"
+              ],
+              "include_current": true,
+              "include_all": false,
+              "all_kind": "property",
+              "criteria": [
+                "bedrooms"
+              ],
+              "feature": null,
+              "operation": "compare",
+              "evidence": "I need a 3 bedroom home."
+            },
+            "source_purposes": [],
+            "objections": [],
+            "empathy": null,
+            "releases": [],
+            "visit": null,
+            "courtesy": null,
+            "reschedule": null,
+            "cancellation": null,
+            "wait": null,
+            "moderation": null,
+            "appointment_query": null,
+            "selected_reference_id": null,
+            "requires_clarification": false,
+            "clarification_question": null,
+            "confidence": 1.0
+          },
+          "needs_search": null,
+          "checks": [
+            {
+              "check": "needs_filter_executed",
+              "status": "FAIL",
+              "detail": ""
+            },
+            {
+              "check": "exact_matching_ids",
+              "status": "FAIL",
+              "detail": ""
+            },
+            {
+              "check": "matches_explained",
+              "status": "FAIL",
+              "detail": ""
+            },
+            {
+              "check": "unmatched_names_not_presented",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "bedroom_need_acknowledged",
+              "status": "FAIL",
+              "detail": ""
+            },
+            {
+              "check": "no_generic_model_clarification",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_internal_provenance_or_processing",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_automatic_property_selection",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "uncertain_inventory_not_claimed_available",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "incomplete_catalog_not_exhaustive",
+              "status": "FAIL",
+              "detail": ""
+            },
+            {
+              "check": "turn_completed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "composition_accepted",
+              "status": "PASS",
+              "detail": ""
+            }
+          ]
+        }
+      ],
+      "checks": [
+        {
+          "check": "all_script_turns_completed",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_booking",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_provider_outbox",
+          "status": "PASS",
+          "detail": ""
+        }
+      ],
+      "technical_execution": "PASS",
+      "needs_dialogue_checks": "FAIL",
+      "overall_dialogue_quality": "NOT_EVALUATED",
+      "meetings": []
+    },
+    {
+      "case": "multiple_two",
+      "project_id": "abf88941-5a70-5a06-a1ed-bca5b42bb90a",
+      "lead_id": "6653933f-f356-42dc-be3d-8d67de025453",
+      "conversation_id": "9b1851ca-407f-4607-8cdf-814d0a14d4dd",
+      "turns": [
+        {
+          "turn": 1,
+          "lead_message": "Do you have any 2 bedroom homes?",
+          "reply": "1. Cedar Loft: bedrooms: 2.\n\n2. Cedar Garden Home: bedrooms: 2.\nThis compares approved records; unconfirmed values do not mean zero or unavailable.\n\nWhich option would you like to explore further?",
+          "understanding": {
+            "version": "sales-understanding/1.0",
+            "requests": [
+              {
+                "id": "r0",
+                "topic": "catalog",
+                "subject": null,
+                "polarity": "request",
+                "evidence": "Do you have any 2 bedroom homes?",
+                "reference_id": null,
+                "detail_fields": [],
+                "feature": null
+              }
+            ],
+            "all_of": [
+              "r0"
+            ],
+            "alternatives": [],
+            "constraints": [],
+            "references": [
+              {
+                "kind": "property",
+                "id": "ref0",
+                "expression": "Cedar Loft",
+                "evidence": "2 bedroom"
+              },
+              {
+                "kind": "property",
+                "id": "ref1",
+                "expression": "Cedar Garden Home",
+                "evidence": "2 bedroom"
+              }
+            ],
+            "preferences": [],
+            "personal_facts": [],
+            "preference_withdrawals": [],
+            "comparison": {
+              "request_id": "r0",
+              "reference_ids": [
+                "ref0",
+                "ref1"
+              ],
+              "include_current": false,
+              "include_all": false,
+              "all_kind": "property",
+              "criteria": [
+                "bedrooms"
+              ],
+              "feature": null,
+              "operation": "compare",
+              "evidence": "Do you have any 2 bedroom homes?"
+            },
+            "source_purposes": [],
+            "objections": [],
+            "empathy": null,
+            "releases": [],
+            "visit": null,
+            "courtesy": null,
+            "reschedule": null,
+            "cancellation": null,
+            "wait": null,
+            "moderation": null,
+            "appointment_query": null,
+            "selected_reference_id": null,
+            "requires_clarification": false,
+            "clarification_question": null,
+            "confidence": 1.0
+          },
+          "needs_search": null,
+          "checks": [
+            {
+              "check": "needs_filter_executed",
+              "status": "FAIL",
+              "detail": ""
+            },
+            {
+              "check": "exact_matching_ids",
+              "status": "FAIL",
+              "detail": ""
+            },
+            {
+              "check": "matches_explained",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "unmatched_names_not_presented",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "bedroom_need_acknowledged",
+              "status": "FAIL",
+              "detail": ""
+            },
+            {
+              "check": "no_generic_model_clarification",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_internal_provenance_or_processing",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_automatic_property_selection",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "uncertain_inventory_not_claimed_available",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "incomplete_catalog_not_exhaustive",
+              "status": "FAIL",
+              "detail": ""
+            },
+            {
+              "check": "turn_completed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "composition_accepted",
+              "status": "PASS",
+              "detail": ""
+            }
+          ]
+        }
+      ],
+      "checks": [
+        {
+          "check": "all_script_turns_completed",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_booking",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_provider_outbox",
+          "status": "PASS",
+          "detail": ""
+        }
+      ],
+      "technical_execution": "PASS",
+      "needs_dialogue_checks": "FAIL",
+      "overall_dialogue_quality": "NOT_EVALUATED",
+      "meetings": []
+    },
+    {
+      "case": "no_two",
+      "project_id": "88e5563d-2f4e-5a11-9822-ec319f06f25e",
+      "lead_id": "6b04413a-095d-4b9c-827b-acc4612d1046",
+      "conversation_id": "13726635-67eb-413e-8160-a31d294c9302",
+      "turns": [
+        {
+          "turn": 1,
+          "lead_message": "I am looking for a 2 bedroom home.",
+          "reply": "I need the property options to make this comparison.\n\nWhich property options would you like to compare?",
+          "understanding": {
+            "version": "sales-understanding/1.0",
+            "requests": [
+              {
+                "id": "r0",
+                "topic": "catalog",
+                "subject": null,
+                "polarity": "request",
+                "evidence": "I am looking for a 2 bedroom home.",
+                "reference_id": null,
+                "detail_fields": [],
+                "feature": null
+              }
+            ],
+            "all_of": [
+              "r0"
+            ],
+            "alternatives": [],
+            "constraints": [],
+            "references": [
+              {
+                "kind": "property",
+                "id": "ref0",
+                "expression": "Bay Residence",
+                "evidence": "I am looking for a 2 bedroom home."
+              }
+            ],
+            "preferences": [
+              {
+                "key": "bedrooms",
+                "value": "2",
+                "evidence": "I am looking for a 2 bedroom home.",
+                "status": "declared"
+              }
+            ],
+            "personal_facts": [],
+            "preference_withdrawals": [],
+            "comparison": {
+              "request_id": "r0",
+              "reference_ids": [
+                "ref0"
+              ],
+              "include_current": true,
+              "include_all": false,
+              "all_kind": "property",
+              "criteria": [
+                "bedrooms"
+              ],
+              "feature": null,
+              "operation": "compare",
+              "evidence": "I am looking for a 2 bedroom home."
+            },
+            "source_purposes": [],
+            "objections": [],
+            "empathy": null,
+            "releases": [],
+            "visit": null,
+            "courtesy": null,
+            "reschedule": null,
+            "cancellation": null,
+            "wait": null,
+            "moderation": null,
+            "appointment_query": null,
+            "selected_reference_id": null,
+            "requires_clarification": false,
+            "clarification_question": null,
+            "confidence": 1.0
+          },
+          "needs_search": null,
+          "checks": [
+            {
+              "check": "needs_filter_executed",
+              "status": "FAIL",
+              "detail": ""
+            },
+            {
+              "check": "exact_matching_ids",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "matches_explained",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "unmatched_names_not_presented",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "bedroom_need_acknowledged",
+              "status": "FAIL",
+              "detail": ""
+            },
+            {
+              "check": "no_generic_model_clarification",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_internal_provenance_or_processing",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_automatic_property_selection",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "uncertain_inventory_not_claimed_available",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "incomplete_catalog_not_exhaustive",
+              "status": "FAIL",
+              "detail": ""
+            },
+            {
+              "check": "turn_completed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "composition_accepted",
+              "status": "PASS",
+              "detail": ""
+            }
+          ]
+        }
+      ],
+      "checks": [
+        {
+          "check": "all_script_turns_completed",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_booking",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_provider_outbox",
+          "status": "PASS",
+          "detail": ""
+        }
+      ],
+      "technical_execution": "PASS",
+      "needs_dialogue_checks": "FAIL",
+      "overall_dialogue_quality": "NOT_EVALUATED",
+      "meetings": []
+    },
+    {
+      "case": "unknown_bedrooms",
+      "project_id": "88e5563d-2f4e-5a11-9822-ec319f06f25e",
+      "lead_id": "4e4dd6cc-cc1c-4450-897d-522fd2212195",
+      "conversation_id": "a904825d-3aa0-464d-95e5-0267b037e8d9",
+      "turns": [
+        {
+          "turn": 1,
+          "lead_message": "I am looking for a 2 bedroom home.",
+          "reply": "I need the property options to make this comparison.\n\nWhich property options would you like to compare?",
+          "understanding": {
+            "version": "sales-understanding/1.0",
+            "requests": [
+              {
+                "id": "r0",
+                "topic": "catalog",
+                "subject": null,
+                "polarity": "request",
+                "evidence": "I am looking for a 2 bedroom home.",
+                "reference_id": null,
+                "detail_fields": [],
+                "feature": null
+              }
+            ],
+            "all_of": [
+              "r0"
+            ],
+            "alternatives": [],
+            "constraints": [],
+            "references": [
+              {
+                "kind": "property",
+                "id": "ref0",
+                "expression": "Bay Residence",
+                "evidence": "I am looking for a 2 bedroom home."
+              }
+            ],
+            "preferences": [
+              {
+                "key": "bedrooms",
+                "value": "2",
+                "evidence": "I am looking for a 2 bedroom home.",
+                "status": "declared"
+              }
+            ],
+            "personal_facts": [],
+            "preference_withdrawals": [],
+            "comparison": {
+              "request_id": "r0",
+              "reference_ids": [
+                "ref0"
+              ],
+              "include_current": false,
+              "include_all": false,
+              "all_kind": "property",
+              "criteria": [
+                "bedrooms"
+              ],
+              "feature": null,
+              "operation": "compare",
+              "evidence": "I am looking for a 2 bedroom home."
+            },
+            "source_purposes": [],
+            "objections": [],
+            "empathy": null,
+            "releases": [],
+            "visit": null,
+            "courtesy": null,
+            "reschedule": null,
+            "cancellation": null,
+            "wait": null,
+            "moderation": null,
+            "appointment_query": null,
+            "selected_reference_id": null,
+            "requires_clarification": false,
+            "clarification_question": null,
+            "confidence": 1.0
+          },
+          "needs_search": null,
+          "checks": [
+            {
+              "check": "needs_filter_executed",
+              "status": "FAIL",
+              "detail": ""
+            },
+            {
+              "check": "exact_matching_ids",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "matches_explained",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "unmatched_names_not_presented",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "bedroom_need_acknowledged",
+              "status": "FAIL",
+              "detail": ""
+            },
+            {
+              "check": "no_generic_model_clarification",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_internal_provenance_or_processing",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_automatic_property_selection",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "uncertain_inventory_not_claimed_available",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "incomplete_catalog_not_exhaustive",
+              "status": "FAIL",
+              "detail": ""
+            },
+            {
+              "check": "turn_completed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "composition_accepted",
+              "status": "PASS",
+              "detail": ""
+            }
+          ]
+        }
+      ],
+      "checks": [
+        {
+          "check": "all_script_turns_completed",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_booking",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_provider_outbox",
+          "status": "PASS",
+          "detail": ""
+        }
+      ],
+      "technical_execution": "PASS",
+      "needs_dialogue_checks": "FAIL",
+      "overall_dialogue_quality": "NOT_EVALUATED",
+      "meetings": []
+    },
+    {
+      "case": "sold_out_four",
+      "project_id": "fc14327b-d4de-50e6-b694-20c4897e3fa8",
+      "lead_id": "0c3f2c4c-8e33-4b98-bb8b-3ed9123fa4cb",
+      "conversation_id": "b39567ef-a26d-4fce-98fe-4e87413fb17b",
+      "turns": [
+        {
+          "turn": 1,
+          "lead_message": "I am looking for a 4 bedroom home.",
+          "reply": "1. Summit Villa: bedrooms: 4.\n\n2. Ridge Townhome: bedrooms: 3.\nThis compares approved records; unconfirmed values do not mean zero or unavailable.\n\nWhich option would you like to explore further?",
+          "understanding": {
+            "version": "sales-understanding/1.0",
+            "requests": [
+              {
+                "id": "r0",
+                "topic": "catalog",
+                "subject": null,
+                "polarity": "request",
+                "evidence": "I am looking for a 4 bedroom home.",
+                "reference_id": null,
+                "detail_fields": [],
+                "feature": null
+              }
+            ],
+            "all_of": [
+              "r0"
+            ],
+            "alternatives": [],
+            "constraints": [],
+            "references": [
+              {
+                "kind": "property",
+                "id": "ref0",
+                "expression": "Summit Villa",
+                "evidence": "4 bedroom home"
+              },
+              {
+                "kind": "property",
+                "id": "ref1",
+                "expression": "Ridge Townhome",
+                "evidence": "4 bedroom home"
+              }
+            ],
+            "preferences": [],
+            "personal_facts": [],
+            "preference_withdrawals": [],
+            "comparison": {
+              "request_id": "r0",
+              "reference_ids": [
+                "ref0",
+                "ref1"
+              ],
+              "include_current": false,
+              "include_all": false,
+              "all_kind": "property",
+              "criteria": [
+                "bedrooms"
+              ],
+              "feature": null,
+              "operation": "compare",
+              "evidence": "I am looking for a 4 bedroom home."
+            },
+            "source_purposes": [],
+            "objections": [],
+            "empathy": null,
+            "releases": [],
+            "visit": null,
+            "courtesy": null,
+            "reschedule": null,
+            "cancellation": null,
+            "wait": null,
+            "moderation": null,
+            "appointment_query": null,
+            "selected_reference_id": null,
+            "requires_clarification": false,
+            "clarification_question": null,
+            "confidence": 1.0
+          },
+          "needs_search": null,
+          "checks": [
+            {
+              "check": "needs_filter_executed",
+              "status": "FAIL",
+              "detail": ""
+            },
+            {
+              "check": "exact_matching_ids",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "matches_explained",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "unmatched_names_not_presented",
+              "status": "FAIL",
+              "detail": ""
+            },
+            {
+              "check": "bedroom_need_acknowledged",
+              "status": "FAIL",
+              "detail": ""
+            },
+            {
+              "check": "no_generic_model_clarification",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_internal_provenance_or_processing",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_automatic_property_selection",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "uncertain_inventory_not_claimed_available",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "incomplete_catalog_not_exhaustive",
+              "status": "FAIL",
+              "detail": ""
+            },
+            {
+              "check": "turn_completed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "composition_accepted",
+              "status": "PASS",
+              "detail": ""
+            }
+          ]
+        }
+      ],
+      "checks": [
+        {
+          "check": "all_script_turns_completed",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_booking",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_provider_outbox",
+          "status": "PASS",
+          "detail": ""
+        }
+      ],
+      "technical_execution": "PASS",
+      "needs_dialogue_checks": "FAIL",
+      "overall_dialogue_quality": "NOT_EVALUATED",
+      "meetings": []
+    },
+    {
+      "case": "unconfirmed_inventory",
+      "project_id": "fc14327b-d4de-50e6-b694-20c4897e3fa8",
+      "lead_id": "a1d250b4-118c-4d4e-bd1b-90133cf04e6b",
+      "conversation_id": "630e5104-b7ff-48a8-853a-ed2c4898f8e9",
+      "turns": [
+        {
+          "turn": 1,
+          "lead_message": "I am looking for a 2 bedroom home.",
+          "reply": "1. Ridge Townhome: bedrooms:\n\n3.\n\n2. Valley Apartment: bedrooms: 2.\nThis compares approved records; unconfirmed values do not mean zero or unavailable.\n\nWhich option would you like to explore further?",
+          "understanding": {
+            "version": "sales-understanding/1.0",
+            "requests": [
+              {
+                "id": "r0",
+                "topic": "catalog",
+                "subject": null,
+                "polarity": "request",
+                "evidence": "I am looking for a 2 bedroom home.",
+                "reference_id": null,
+                "detail_fields": [],
+                "feature": null
+              }
+            ],
+            "all_of": [
+              "r0"
+            ],
+            "alternatives": [],
+            "constraints": [],
+            "references": [
+              {
+                "kind": "property",
+                "id": "ref0",
+                "expression": "Ridge Townhome",
+                "evidence": "2 bedroom home"
+              },
+              {
+                "kind": "property",
+                "id": "ref1",
+                "expression": "Valley Apartment",
+                "evidence": "2 bedroom home"
+              }
+            ],
+            "preferences": [],
+            "personal_facts": [],
+            "preference_withdrawals": [],
+            "comparison": {
+              "request_id": "r0",
+              "reference_ids": [
+                "ref0",
+                "ref1"
+              ],
+              "include_current": false,
+              "include_all": false,
+              "all_kind": "property",
+              "criteria": [
+                "bedrooms"
+              ],
+              "feature": null,
+              "operation": "compare",
+              "evidence": "I am looking for a 2 bedroom home."
+            },
+            "source_purposes": [],
+            "objections": [],
+            "empathy": null,
+            "releases": [],
+            "visit": null,
+            "courtesy": null,
+            "reschedule": null,
+            "cancellation": null,
+            "wait": null,
+            "moderation": null,
+            "appointment_query": null,
+            "selected_reference_id": null,
+            "requires_clarification": false,
+            "clarification_question": null,
+            "confidence": 1.0
+          },
+          "needs_search": null,
+          "checks": [
+            {
+              "check": "needs_filter_executed",
+              "status": "FAIL",
+              "detail": ""
+            },
+            {
+              "check": "exact_matching_ids",
+              "status": "FAIL",
+              "detail": ""
+            },
+            {
+              "check": "matches_explained",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "unmatched_names_not_presented",
+              "status": "FAIL",
+              "detail": ""
+            },
+            {
+              "check": "bedroom_need_acknowledged",
+              "status": "FAIL",
+              "detail": ""
+            },
+            {
+              "check": "no_generic_model_clarification",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_internal_provenance_or_processing",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_automatic_property_selection",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "uncertain_inventory_not_claimed_available",
+              "status": "FAIL",
+              "detail": ""
+            },
+            {
+              "check": "incomplete_catalog_not_exhaustive",
+              "status": "FAIL",
+              "detail": ""
+            },
+            {
+              "check": "turn_completed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "composition_accepted",
+              "status": "PASS",
+              "detail": ""
+            }
+          ]
+        }
+      ],
+      "checks": [
+        {
+          "check": "all_script_turns_completed",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_booking",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_provider_outbox",
+          "status": "PASS",
+          "detail": ""
+        }
+      ],
+      "technical_execution": "PASS",
+      "needs_dialogue_checks": "FAIL",
+      "overall_dialogue_quality": "NOT_EVALUATED",
+      "meetings": []
+    },
+    {
+      "case": "change_need",
+      "project_id": "abf88941-5a70-5a06-a1ed-bca5b42bb90a",
+      "lead_id": "70c559d7-31bb-40b8-b075-1e774cf63632",
+      "conversation_id": "abc21cf1-af50-43cb-95f2-f91035108a8d",
+      "turns": [
+        {
+          "turn": 1,
+          "lead_message": "I am looking for a 2 bedroom home.",
+          "reply": "1. Cedar Loft: bedrooms: 2.\n\n2. Cedar Studio: bedrooms: 1.\nThis compares approved records; unconfirmed values do not mean zero or unavailable.\n\nWhich option would you like to explore further?",
+          "understanding": {
+            "version": "sales-understanding/1.0",
+            "requests": [
+              {
+                "id": "r0",
+                "topic": "catalog",
+                "subject": null,
+                "polarity": "request",
+                "evidence": "I am looking for a 2 bedroom home.",
+                "reference_id": null,
+                "detail_fields": [],
+                "feature": null
+              }
+            ],
+            "all_of": [
+              "r0"
+            ],
+            "alternatives": [],
+            "constraints": [],
+            "references": [
+              {
+                "kind": "property",
+                "id": "ref0",
+                "expression": "Cedar Loft",
+                "evidence": "I am looking for a 2 bedroom home."
+              },
+              {
+                "kind": "property",
+                "id": "ref1",
+                "expression": "Cedar Studio",
+                "evidence": "I am looking for a 2 bedroom home."
+              }
+            ],
+            "preferences": [
+              {
+                "key": "bedrooms",
+                "value": "2",
+                "evidence": "I am looking for a 2 bedroom home.",
+                "status": "declared"
+              }
+            ],
+            "personal_facts": [],
+            "preference_withdrawals": [],
+            "comparison": {
+              "request_id": "r0",
+              "reference_ids": [
+                "ref0",
+                "ref1"
+              ],
+              "include_current": false,
+              "include_all": false,
+              "all_kind": "property",
+              "criteria": [
+                "bedrooms"
+              ],
+              "feature": null,
+              "operation": "compare",
+              "evidence": "I am looking for a 2 bedroom home."
+            },
+            "source_purposes": [],
+            "objections": [],
+            "empathy": null,
+            "releases": [],
+            "visit": null,
+            "courtesy": null,
+            "reschedule": null,
+            "cancellation": null,
+            "wait": null,
+            "moderation": null,
+            "appointment_query": null,
+            "selected_reference_id": null,
+            "requires_clarification": false,
+            "clarification_question": null,
+            "confidence": 1.0
+          },
+          "needs_search": null,
+          "checks": [
+            {
+              "check": "needs_filter_executed",
+              "status": "FAIL",
+              "detail": ""
+            },
+            {
+              "check": "exact_matching_ids",
+              "status": "FAIL",
+              "detail": ""
+            },
+            {
+              "check": "matches_explained",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "unmatched_names_not_presented",
+              "status": "FAIL",
+              "detail": ""
+            },
+            {
+              "check": "bedroom_need_acknowledged",
+              "status": "FAIL",
+              "detail": ""
+            },
+            {
+              "check": "no_generic_model_clarification",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_internal_provenance_or_processing",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_automatic_property_selection",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "uncertain_inventory_not_claimed_available",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "incomplete_catalog_not_exhaustive",
+              "status": "FAIL",
+              "detail": ""
+            },
+            {
+              "check": "turn_completed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "composition_accepted",
+              "status": "PASS",
+              "detail": ""
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "lead_message": "Actually, I need a 1 bedroom home.",
+          "reply": "Here is a 1-bedroom option in this project:\n\nCedar Studio — 1 bedrooms, 52 m², from 210,000.00 USD.\n\nThe remaining catalog information is incomplete, so these may not be all the matching options.\n\nWould you like to know more about Cedar Studio?",
+          "understanding": {
+            "version": "sales-understanding/1.0",
+            "requests": [
+              {
+                "id": "r0",
+                "topic": "catalog",
+                "subject": null,
+                "polarity": "request",
+                "evidence": "Actually, I need a 1 bedroom home.",
+                "reference_id": null,
+                "detail_fields": [],
+                "feature": null
+              }
+            ],
+            "all_of": [
+              "r0"
+            ],
+            "alternatives": [],
+            "constraints": [],
+            "references": [],
+            "preferences": [
+              {
+                "key": "bedrooms",
+                "value": "1",
+                "evidence": "I need a 1 bedroom home",
+                "status": "declared"
+              }
+            ],
+            "personal_facts": [],
+            "preference_withdrawals": [],
+            "comparison": null,
+            "source_purposes": [],
+            "objections": [],
+            "empathy": null,
+            "releases": [],
+            "visit": null,
+            "courtesy": null,
+            "reschedule": null,
+            "cancellation": null,
+            "wait": null,
+            "moderation": null,
+            "appointment_query": null,
+            "selected_reference_id": null,
+            "requires_clarification": false,
+            "clarification_question": null,
+            "confidence": 1.0
+          },
+          "needs_search": {
+            "version": "sales-needs-search/1.0",
+            "bedrooms": 1,
+            "unknown_bedrooms": 0,
+            "exhaustive": false,
+            "matching_property_ids": [
+              "bb1d7fba-2496-5256-a405-535cd3455066"
+            ]
+          },
+          "checks": [
+            {
+              "check": "needs_filter_executed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "exact_matching_ids",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "matches_explained",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "unmatched_names_not_presented",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "bedroom_need_acknowledged",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_generic_model_clarification",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_internal_provenance_or_processing",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_automatic_property_selection",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "uncertain_inventory_not_claimed_available",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "incomplete_catalog_not_exhaustive",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "turn_completed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "composition_accepted",
+              "status": "PASS",
+              "detail": ""
+            }
+          ]
+        }
+      ],
+      "checks": [
+        {
+          "check": "all_script_turns_completed",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_booking",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_provider_outbox",
+          "status": "PASS",
+          "detail": ""
+        }
+      ],
+      "technical_execution": "PASS",
+      "needs_dialogue_checks": "FAIL",
+      "overall_dialogue_quality": "NOT_EVALUATED",
+      "meetings": []
+    },
+    {
+      "case": "no_premature_selection",
+      "project_id": "abf88941-5a70-5a06-a1ed-bca5b42bb90a",
+      "lead_id": "78ad160e-9f85-40d3-b655-457a133126b2",
+      "conversation_id": "2d02fd6d-aa71-4ae9-a2a0-85961313746e",
+      "turns": [
+        {
+          "turn": 1,
+          "lead_message": "I am looking for a 2 bedroom home.",
+          "reply": "1. Cedar Loft: bedrooms: 2.\n\n2. Cedar Studio: bedrooms: 1.\nThis compares approved records; unconfirmed values do not mean zero or unavailable.\n\nWhich option would you like to explore further?",
+          "understanding": {
+            "version": "sales-understanding/1.0",
+            "requests": [
+              {
+                "id": "r0",
+                "topic": "catalog",
+                "subject": null,
+                "polarity": "request",
+                "evidence": "I am looking for a 2 bedroom home.",
+                "reference_id": null,
+                "detail_fields": [],
+                "feature": null
+              }
+            ],
+            "all_of": [
+              "r0"
+            ],
+            "alternatives": [],
+            "constraints": [],
+            "references": [
+              {
+                "kind": "property",
+                "id": "ref0",
+                "expression": "Cedar Loft",
+                "evidence": "I am looking for a 2 bedroom home."
+              },
+              {
+                "kind": "property",
+                "id": "ref1",
+                "expression": "Cedar Studio",
+                "evidence": "I am looking for a 2 bedroom home."
+              }
+            ],
+            "preferences": [
+              {
+                "key": "bedrooms",
+                "value": "2",
+                "evidence": "I am looking for a 2 bedroom home.",
+                "status": "declared"
+              }
+            ],
+            "personal_facts": [],
+            "preference_withdrawals": [],
+            "comparison": {
+              "request_id": "r0",
+              "reference_ids": [
+                "ref0",
+                "ref1"
+              ],
+              "include_current": false,
+              "include_all": false,
+              "all_kind": "property",
+              "criteria": [
+                "bedrooms"
+              ],
+              "feature": null,
+              "operation": "compare",
+              "evidence": "I am looking for a 2 bedroom home."
+            },
+            "source_purposes": [],
+            "objections": [],
+            "empathy": null,
+            "releases": [],
+            "visit": null,
+            "courtesy": null,
+            "reschedule": null,
+            "cancellation": null,
+            "wait": null,
+            "moderation": null,
+            "appointment_query": null,
+            "selected_reference_id": null,
+            "requires_clarification": false,
+            "clarification_question": null,
+            "confidence": 1.0
+          },
+          "needs_search": null,
+          "checks": [
+            {
+              "check": "needs_filter_executed",
+              "status": "FAIL",
+              "detail": ""
+            },
+            {
+              "check": "exact_matching_ids",
+              "status": "FAIL",
+              "detail": ""
+            },
+            {
+              "check": "matches_explained",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "unmatched_names_not_presented",
+              "status": "FAIL",
+              "detail": ""
+            },
+            {
+              "check": "bedroom_need_acknowledged",
+              "status": "FAIL",
+              "detail": ""
+            },
+            {
+              "check": "no_generic_model_clarification",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_internal_provenance_or_processing",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_automatic_property_selection",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "uncertain_inventory_not_claimed_available",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "incomplete_catalog_not_exhaustive",
+              "status": "FAIL",
+              "detail": ""
+            },
+            {
+              "check": "turn_completed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "composition_accepted",
+              "status": "PASS",
+              "detail": ""
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "lead_message": "I am looking for a 1 bedroom home.",
+          "reply": "Could you clarify whether you want property details, materials, financing, or a visit?",
+          "understanding": {
+            "version": "sales-understanding/1.0",
+            "requests": [
+              {
+                "id": "r0",
+                "topic": "catalog",
+                "subject": null,
+                "polarity": "request",
+                "evidence": "I am looking for a 1 bedroom home.",
+                "reference_id": null,
+                "detail_fields": [],
+                "feature": null
+              }
+            ],
+            "all_of": [
+              "r0"
+            ],
+            "alternatives": [],
+            "constraints": [],
+            "references": [],
+            "preferences": [
+              {
+                "key": "bedrooms",
+                "value": "1",
+                "evidence": "I am looking for a 1 bedroom home",
+                "status": "declared"
+              }
+            ],
+            "personal_facts": [],
+            "preference_withdrawals": [],
+            "comparison": null,
+            "source_purposes": [],
+            "objections": [],
+            "empathy": null,
+            "releases": [],
+            "visit": null,
+            "courtesy": null,
+            "reschedule": null,
+            "cancellation": null,
+            "wait": null,
+            "moderation": null,
+            "appointment_query": null,
+            "selected_reference_id": null,
+            "requires_clarification": true,
+            "clarification_question": "Could you clarify whether you want property details, materials, financing, or a visit?",
+            "confidence": 0.0
+          },
+          "needs_search": null,
+          "checks": [
+            {
+              "check": "needs_filter_executed",
+              "status": "FAIL",
+              "detail": ""
+            },
+            {
+              "check": "exact_matching_ids",
+              "status": "FAIL",
+              "detail": ""
+            },
+            {
+              "check": "matches_explained",
+              "status": "FAIL",
+              "detail": ""
+            },
+            {
+              "check": "unmatched_names_not_presented",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "bedroom_need_acknowledged",
+              "status": "FAIL",
+              "detail": ""
+            },
+            {
+              "check": "no_generic_model_clarification",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_internal_provenance_or_processing",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_automatic_property_selection",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "uncertain_inventory_not_claimed_available",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "incomplete_catalog_not_exhaustive",
+              "status": "FAIL",
+              "detail": ""
+            },
+            {
+              "check": "turn_completed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "composition_accepted",
+              "status": "PASS",
+              "detail": ""
+            }
+          ]
+        }
+      ],
+      "checks": [
+        {
+          "check": "all_script_turns_completed",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_booking",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_provider_outbox",
+          "status": "PASS",
+          "detail": ""
+        }
+      ],
+      "technical_execution": "PASS",
+      "needs_dialogue_checks": "FAIL",
+      "overall_dialogue_quality": "NOT_EVALUATED",
+      "meetings": []
+    }
+  ],
+  "limitations": [
+    "Google Calendar integration and transport delivery are not exercised.",
+    "Simulation selects the first eligible seller, not the production round-robin cursor.",
+    "SQLite does not verify PostgreSQL concurrent-booking locks.",
+    "Public availability wording requires human review. No notification is scheduled.",
+    "Focused cases do not represent all eight buyer segments."
+  ],
+  "company_name": "SYNTHETIC - Penguin Sales Laboratory",
+  "company_id": "f0ebe3a5-6c04-5b8e-8cd8-423859aa39d7",
+  "project_count": 3,
+  "property_count": 6,
+  "project_name": "SYNTHETIC Harbor Gardens",
+  "sales_model": "openai/gpt-4o-mini",
+  "configuration_version": 8,
+  "configuration_sha256": "51ff65376dad421328dab993a4fc71939489386f1ed173514cf13a244ac79f1c",
+  "overall_dialogue_quality": "NOT_EVALUATED",
+  "quality_scope": "Needs-first checks only; no integral dialogue certification.",
+  "cost_reporting_complete": true,
+  "provider_usage": {
+    "prompt_tokens": 272334,
+    "completion_tokens": 4022,
+    "cost_usd": 0.0336537,
+    "responses_with_cost": 29
+  },
+  "scenario_count": 12,
+  "checks": [
+    {
+      "check": "no_forbidden_network_attempts",
+      "status": "PASS",
+      "detail": ""
+    }
+  ],
+  "summary": {
+    "PASS": 145,
+    "FAIL": 60,
+    "BLOCKED": 0
+  },
+  "judge_summary": {
+    "PASS": 0,
+    "FAIL": 0,
+    "NOT_APPLICABLE": 0
+  },
+  "status": "FAIL"
+}

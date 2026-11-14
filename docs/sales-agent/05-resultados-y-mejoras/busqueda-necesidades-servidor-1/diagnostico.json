@@ -1,0 +1,15 @@
+{
+  "origin": "server_submitted_synthetic_run",
+  "source_sha256": "db1c1579ef2a18378f5ed220049158c293460e11f8e3e3bb27a21afed9f04b6e",
+  "commit": "3e26f648364f18889d9240da575db0c5bb9b4ad1",
+  "model": "openai/gpt-4o-mini",
+  "configuration_version": 8,
+  "scenarios_passed": 0,
+  "scenarios": 12,
+  "turns_passed": 1,
+  "turns": 14,
+  "cost_usd": 0.0336537,
+  "failed_checks": 60,
+  "cause": "All 12 initial turns reached a comparison interpretation; needs normalizer skipped comparisons. One later turn was read correctly, another received generic clarification at confidence zero.",
+  "new_production_success_claimed": false
+}

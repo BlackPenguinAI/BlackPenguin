@@ -238,3 +238,5 @@ def compile_input(raw,text,*,historical_messages=()):
     return Understanding.model_validate(output),notes
 
 SYSTEM += "\nA request such as I am looking for a 2 bedroom home is catalog discovery: topic catalog, target null, preference bedrooms=2 with exact evidence. A bedroom count is not a property name. Do not ask which model the buyer means before searching. Preserve other independent requests. Negative, hypothetical, ranged and quoted statements are not exact positive needs.\n"
+
+SYSTEM += "\nNever use comparison merely to filter homes by bedroom count. Comparison requires a comparison actually requested by the lead. Do not insert catalog names as comparison members when those names were not mentioned or referred to by the lead.\n"

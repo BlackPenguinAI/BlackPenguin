@@ -545,7 +545,11 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
                         'all_of':['moderation_boundary'],'alternatives':[],'references':[],'constraints':[],'releases':[],'preferences':[],
                         'visit':None,'reschedule':None,'cancellation':None,'wait':None,'courtesy':None,'comparison':None,
                         'personal_facts':[],'preference_withdrawals':[],'source_purposes':[],'objections':[],'empathy':None,'selected_reference_id':None,'appointment_query':None,'requires_clarification':False,'clarification_question':None,'confidence':1.0})
-            if u.confidence < .8 and not u.requires_clarification:
+            from .needs_search import literal_read, VERSION as NEEDS_VERSION
+            literal_needs_read=bool(next_enabled and literal_read(u,inbound.content))
+            if literal_needs_read:
+                run.input_snapshot={**run.input_snapshot,'needs_read_authorization':{'version':NEEDS_VERSION,'basis':'validated_current_literal_catalog_request','model_confidence':u.confidence,'effect_authorization':False}}
+            if u.confidence < .8 and not u.requires_clarification and not literal_needs_read:
                 u=u.model_copy(update={'requires_clarification':True,'clarification_question':'Could you clarify whether you want property details, materials, financing, or a visit?'})
             # Legal/commercial approvals hold the action, not the conversation.
             advisory=escalation_reason(inbound.content)

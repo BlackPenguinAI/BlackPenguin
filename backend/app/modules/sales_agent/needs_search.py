@@ -7,7 +7,7 @@ silently converted into an exact bedroom constraint.
 import re
 from .understanding_contract import Understanding
 
-VERSION = 'sales-needs-search/1.0'
+VERSION = 'sales-needs-search/1.1'
 WORDS = {'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5, 'six': 6}
 NEED = re.compile(r"\b(?:I(?: am|'m|’m|m)? (?:looking for|want|need|prefer)|(?:please )?(?:show|find)(?: me)?|do you have|are there)\s+(?:(?:a|an|any)\s+)?(?P<count>[1-6]|one|two|three|four|five|six)[ -]?(?:bedrooms?|beds?|br)\b(?:\s+(?:homes?|houses?|apartments?|properties))?", re.I)
 UNSAFE = re.compile(r"\b(?:not|don't|don’t|do not|never|friend|said|says|told|if|suppose|at least|at most|minimum|maximum|or more|or fewer|between)\b|[\"“”]", re.I)
@@ -26,15 +26,36 @@ def criterion(text):
     return {'bedrooms': WORDS[token] if token in WORDS else int(token), 'evidence': matches[0].group()}
 
 
+def literal_statement(text):
+    need=criterion(text)
+    return bool(need and re.fullmatch(r"\s*(?:Actually[, ]+)?"+re.escape(need['evidence'])+r"[.!?]?\s*",text,re.I))
+
+
+def literal_read(value,text):
+    """Read-only authorization from a complete literal command, not model confidence.
+
+    Never extends to effects, ambiguous/ranged/mixed requests or rejected inference.
+    Caller must already have an accepted interpretation and enforce saved holds.
+    """
+    return bool(literal_statement(text) and len(value.requests)==1 and value.permits('catalog')
+        and value.requests[0].reference_id is None and not value.references and not value.comparison
+        and not value.alternatives and not value.constraints and not value.releases
+        and not any(getattr(value,k) for k in ('visit','reschedule','cancellation','wait','moderation','appointment_query','selected_reference_id','personal_facts','preference_withdrawals','source_purposes','objections','empathy','courtesy'))
+        and all(p.key=='bedrooms' for p in value.preferences)
+        and search(value,[],{'exhaustive':False}) is not None)
+
+
 def normalize(value, text, commercial):
     need = criterion(text)
-    if not need or value.comparison or value.alternatives or value.constraints:
+    if not need or (value.comparison and not literal_statement(text)) or value.alternatives or value.constraints:
         return value, []
     # A named home or a pronoun keeps its own explicit reference semantics.
     if any(re.search(r'(?<!\w)'+re.escape(p['property_type'])+r'(?!\w)', text, re.I)
            for p in commercial.get('property_types', []) if p.get('property_type')):
         return value, []
     data = value.model_dump(mode='json')
+    comparison_removed=bool(data['comparison'] and literal_statement(text))
+    if comparison_removed:data['comparison']=None
     affected = [r for r in data['requests'] if r['polarity'] == 'request' and r['topic'] in {'catalog', 'inventory', 'property_details', 'other'} and (need['evidence'].lower() in r['evidence'].lower() or r['evidence'].lower() in need['evidence'].lower())]
     if not affected:
         # This narrow literal statement is itself an information request.
@@ -57,7 +78,7 @@ def normalize(value, text, commercial):
     # merely because its bedroom count matches the need.
     data['preferences'] = [p for p in data['preferences'] if p['key'] != 'bedrooms'] + [dict(key='bedrooms', value=str(need['bedrooms']), evidence=need['evidence'], status='declared')]
     result = Understanding.model_validate(data).check_evidence(text)
-    return result, [{'field':'requests', 'action':'literal_bedroom_need_is_catalog_search', **need}]
+    return result, [{'field':'requests', 'action':'literal_bedroom_need_is_catalog_search', 'removed_unrequested_comparison':comparison_removed, 'model_confidence_preserved':value.confidence, **need}]
 
 
 def search(understanding, types, coverage):
@@ -84,7 +105,7 @@ def answer(result):
     if rows:
         blocks = [f"Here {'is a' if len(rows)==1 else 'are the'} {n}-bedroom {'option' if len(rows)==1 else 'options'} in this project:"]
         for row in rows:
-            details = [f"{n} bedrooms"]
+            details = [f"{n} bedroom"+("s" if n!=1 else "")]
             if row.get('area_min') is not None:
                 low, high = row['area_min'], row.get('area_max')
                 details.append(f'{low:g}'+(f'–{high:g}' if high is not None and high != low else '')+' '+str(row.get('area_unit') or '(area unit unconfirmed)'))

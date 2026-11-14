@@ -365,15 +365,27 @@ Las gráficas se generan con NumPy y Matplotlib, sin suavizado ni valores invent
 
 **Validación del cambio.** 3.111 pruebas de regresión aprobadas en 134 módulos; 10 pruebas de PostgreSQL omitidas en SQLite y aprobadas aparte con PostgreSQL 16.2. Aceptación: 63 controles aprobados y una evaluación en vivo pendiente. Se repitieron las 35 pruebas específicas de búsqueda tras el ajuste final. [Validación JSON](05-resultados-y-mejoras/busqueda-por-necesidades-local/validacion.json).
 
-**Paso siguiente: evidencia con el modelo publicado en el servidor.** Después de desplegar, ejecutar la suite `needs-discovery` del laboratorio existente. Lee únicamente la configuración global publicada; crea los datos y conversaciones en SQLite temporal y bloquea contactos externos. Exporta transcripciones, checks, commit, modelo, configuración, llamadas, tokens y costo reportado. No certifica WhatsApp/SMS ni Calendar. El [script de ejecución](06-como-ejecutar-las-pruebas/ejecutar-busqueda-necesidades.sh) recoge el ZIP incluso si los checks fallan. La siguiente corrida debe revisarse antes de afirmar mejora del modelo.
+**Procedimiento de evaluación con el modelo publicado en el servidor.** Después de desplegar, ejecutar la suite `needs-discovery` del laboratorio existente. Lee únicamente la configuración global publicada; crea los datos y conversaciones en SQLite temporal y bloquea contactos externos. Exporta transcripciones, checks, commit, modelo, configuración, llamadas, tokens y costo reportado. No certifica WhatsApp/SMS ni Calendar. El [script de ejecución](06-como-ejecutar-las-pruebas/ejecutar-busqueda-necesidades.sh) recoge el ZIP incluso si los checks fallan. La siguiente corrida debe revisarse antes de afirmar mejora del modelo.
 
 | Corrida | Turnos | Consumo total OpenRouter (USD) | Estado |
 |---|---|---|---|
-| Experimento local, proveedor simulado | 14 | **0.00 consumido** | 12/12 con checks de búsqueda satisfechos. |
-| Primera corrida en servidor con modelo publicado | 14 previstos | **≈0.05 estimado; reserva 0.10** | Pendiente. |
-| **TOTAL CONSUMIDO** | **14 ejecutados localmente** | **0.00** | No incluye estimaciones. |
+| Experimentos locales, proveedor simulado: inicial y replay | 28 | **0.00 consumido** | 12 escenarios repetidos en dos iteraciones locales; no son 24 escenarios distintos. |
+| Primera corrida en servidor con modelo publicado | 14 | **0.0336537 consumido** | FAIL: 0/12 escenarios con todos los checks satisfechos. |
+| **TOTAL CONSUMIDO EN ESTA ETAPA** | **28 locales + 14 en servidor** | **0.0336537** | No incluye estimaciones ni corridas históricas anteriores. |
 
 El estimado del servidor usa la referencia histórica de Repair 7, ≈USD 0.00335 por turno, no una nueva tarifa de OpenRouter. El límite de 96 llamadas controla intentos, no dólares; el reporte debe confirmar el consumo y si el proveedor informó costo en todas las respuestas. Conversaciones largas, búsqueda por presupuesto/ubicación/rangos, selección posterior, materiales y visita tras descubrir una opción quedan para ampliar esta suite; las baterías anteriores los prueban por separado, no como garantía de esta combinación.
+
+### Reparación de la primera corrida de necesidades · 13/11/2026
+
+**Evidencia real, sin ocultar el fallo.** La revisión `3e26f64` ejecutó los 12 escenarios con `openai/gpt-4o-mini`, configuración 8. Resultado: **0/12 escenarios con todos los checks satisfechos**, 1/14 turnos sin checks fallidos, 145 checks aprobados y 60 fallidos. Las 29 llamadas consumieron **USD 0.0336537 total**, con costo informado en todas. Son fallos de respuesta observables, no solo ausencia de etiquetas: se mostró Cedar Studio de un dormitorio ante una petición de dos. [Diálogos observados](05-resultados-y-mejoras/busqueda-necesidades-servidor-1/conversaciones.md) · [Resultado original](05-resultados-y-mejoras/busqueda-necesidades-servidor-1/resultado.json).
+
+**Causa y ajuste.** Las 12 primeras interpretaciones quedaron como comparación. El normalizador anterior conservaba cualquier comparación y por ello no aplicaba el filtro. Ahora, una frase completa y literal de búsqueda se normaliza como catálogo, quitando únicamente la comparación no solicitada y sus referencias. Una comparación expresamente solicitada, una propiedad nombrada, una restricción o una petición mixta conservan su tratamiento. La confianza original no se aumenta. Para una petición literal validada, se permite solo leer el catálogo aprobado aunque la confianza sea baja; no habilita visitas, materiales, pagos, liberaciones ni excepciones a restricciones guardadas. La traza registra el fundamento y la confianza original. También se corrigió el singular «1 bedroom».
+
+**Qué significa la validación local.** Se reproducen las 14 interpretaciones estructuradas finales del servidor con el core real y proveedor simulado: no son los paquetes originales completos del proveedor ni una nueva inferencia de GPT. **Resultado del replay local: 12/12 escenarios y 14/14 turnos con sus checks satisfechos.** [Diálogos corregidos en replay](05-resultados-y-mejoras/busqueda-necesidades-reparacion-1-local/conversaciones.md) · [JSON local](05-resultados-y-mejoras/busqueda-necesidades-reparacion-1-local/resultado.json). Las pruebas exigen coincidencias pertinentes, incertidumbre y ausencia de selección/cita, y cubren que solicitudes mixtas o de visita no obtengan la excepción de lectura. La siguiente corrida exportará también normalizaciones, errores de validación, huellas de respuestas y catálogo usado para facilitar el diagnóstico. El éxito con el modelo publicado sigue pendiente de repetir en el servidor.
+
+**Validación técnica de esta reparación:** 3.141 pruebas aprobadas en 135 módulos; 10 pruebas de PostgreSQL omitidas en SQLite y aprobadas aparte con PostgreSQL 16.2; 63 controles de aceptación aprobados y una evaluación en vivo pendiente. Las 65 pruebas específicas de búsqueda y replay se repitieron al final. [Validación JSON](05-resultados-y-mejoras/busqueda-necesidades-reparacion-1-local/validacion.json).
+
+**Costo de la reparación:** replay local USD 0.00; repetición propuesta en servidor ≈USD 0.05, reserva orientativa USD 0.10. **Total consumido en necesidades hasta esta corrida: USD 0.0336537.** La estimación futura no se suma al gasto. El grafo LangGraph y el modelo publicado permanecen iguales.
 
 ## 11. Trabajo futuro
 
