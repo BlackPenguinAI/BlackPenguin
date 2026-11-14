@@ -1,0 +1,52 @@
+{
+  "base_commit": "45fa08e5b6bf5ee0f52944fd57287a4e1927edbd",
+  "origin": "local_offline_regression_and_disposable_real_postgres",
+  "shards": [
+    {
+      "shard": 1,
+      "passed": 1177,
+      "skipped": 5,
+      "failed": 0
+    },
+    {
+      "shard": 2,
+      "passed": 1137,
+      "skipped": 5,
+      "failed": 0
+    },
+    {
+      "shard": 3,
+      "passed": 1004,
+      "skipped": 1,
+      "failed": 0
+    }
+  ],
+  "module_coverage": {
+    "modules": 143,
+    "status": "PASS",
+    "each_module_once": true
+  },
+  "postgres": {
+    "version": "16.2",
+    "passed": 11,
+    "production_database_used": false
+  },
+  "acceptance": {
+    "PASS": 63,
+    "FAIL": 0,
+    "NOT_RUN": 1
+  },
+  "final_focused_tests_passed": 38,
+  "replay": {
+    "scenarios": 6,
+    "turns": 36,
+    "bookings": 5,
+    "unavailable": 1,
+    "status": "PASS",
+    "model_quality_evaluated": false
+  },
+  "openrouter_cost_usd": 0,
+  "production_writes": 0,
+  "lead_contacts": 0,
+  "pending": "Repeat the six cases with the published model after deployment."
+}

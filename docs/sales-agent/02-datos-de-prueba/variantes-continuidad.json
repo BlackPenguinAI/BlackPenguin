@@ -145,5 +145,33 @@
       "Show me the property blueprints",
       "Can we schedule a visit to Ridge Townhome?"
     ]
+  },
+  "repair1_free_regression_variants": {
+    "property_names": [
+      "Alder Cottage",
+      "Orion Duplex",
+      "Maple Terrace"
+    ],
+    "switch_phrases": [
+      "Actually I prefer {property} instead.",
+      "I choose {property}.",
+      "I would like {property} instead.",
+      "I'd prefer {property}.",
+      "I'll take {property}."
+    ],
+    "summary_acceptances": [
+      "Yes",
+      "Yes please",
+      "Confirmed",
+      "That works"
+    ],
+    "closed_cases": [
+      "Conditional or reported preference",
+      "Alternative or mixed cancellation request",
+      "Yes to material or permission release offer",
+      "Comparison with unresolved foreign subject",
+      "Comparison combined with visit request"
+    ],
+    "execution": "Offline regression only; not additional paid conversations or a blind holdout."
   }
 }

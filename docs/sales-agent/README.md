@@ -4,7 +4,7 @@
 
 **Métricas históricas del modelo: corte 11/11/2026. Revisión de criterios: 13/11/2026.** Se reúne el trabajo del ciclo reciente con data sintética: **21 corridas del servidor, 144 conversaciones ejecutadas y 47 IDs de escenario distintos por suite**. Las repeticiones son parte del trabajo, no escenarios adicionales. En la batería compacta 2, **13/16 conversaciones cumplieron los checks originales y se registraron 7/8 visitas esperadas**; eso no certifica la calidad integral de esos diálogos. En el último subconjunto, Repair 8, **2/3 conversaciones cumplieron sus checks y se registró 1/2 visitas**: vivienda mayor y fotos ausentes se recuperaron; diversificación falló con tiempos de espera del modelo. No se mezclan ambos conjuntos como si fueran una nueva batería completa.
 
-**Estado actual.** La última corrida de búsqueda y aceptación pasó 14/14 escenarios en el servidor. La nueva batería de continuidad pasó seis conversaciones y 36 turnos localmente con proveedor simulado; su evaluación con el modelo publicado está pendiente. Son alcances distintos, detallados en el bloque 10.
+**Estado actual.** Búsqueda y aceptación: 14/14 escenarios en el servidor. Primera batería de continuidad con modelo real: 4/6 conversaciones cumplieron los checks, con cuatro visitas de cinco esperadas. La reparación posterior pasa seis conversaciones y 36 turnos en replay local; su repetición con el modelo publicado está pendiente. Los alcances se separan en el bloque 10.
 
 La guía usa bloques con el mismo propósito: **qué se hizo → cómo funciona → qué evidencia hay → dónde están sus archivos**. Toda la explicación está aquí; los enlaces internos abren datos, código o carpetas de respaldo. Las referencias externas justifican la metodología, no sustituyen la evidencia del proyecto.
 
@@ -493,6 +493,34 @@ La fecha de selección se deriva del horario publicado por el agente en la simul
 La gráfica conserva las regresiones y el cambio de criterios; no mezcla esta ampliación local con resultados del modelo real.
 
 El estimado se basa en los costos observados anteriores y contempla más historia por conversación; no es una tarifa garantizada ni se suma al gasto real. Para el servidor se ejecutará primero esta batería de seis casos; se revisarán los fallos antes de abrir los guiones reservados o ampliar longitud y segmentos. [Comandos de ejecución y extracción](06-como-ejecutar-las-pruebas/ejecutar-continuidad.sh).
+
+### Primera corrida de continuidad en servidor y reparación 1
+
+**Resultado observado, no reinterpretado.** La revisión `45fa08e` ejecutó seis conversaciones y 36 turnos con `openai/gpt-4o-mini`, configuración 8. **4/6 conversaciones cumplieron todos los checks** (2/3 de desarrollo y 2/3 de transferencia), con **cuatro visitas de cinco esperadas**, 260 checks PASS y cuatro FAIL. El caso sin vendedores terminó correctamente sin reservar. [Diálogos reales del laboratorio en servidor](05-resultados-y-mejoras/continuidad-servidor-1/conversaciones.md) · [JSON original](05-resultados-y-mejoras/continuidad-servidor-1/resultado.json). No son diálogos con leads reales ni certifican transporte WhatsApp/SMS.
+
+| Punto fallido | Evidencia del servidor | Ajuste aplicado |
+|---|---|---|
+| Comparación de la propiedad activa con las demás | Cedar Loft y Cedar Studio estaban identificadas, pero la interpretación final quedó con confianza 0 y el filtro pidió aclaración genérica. | Permitir solo la lectura de una comparación explícita si todos los sujetos se resuelven en el contexto autorizado. Mantener confianza 0, restricciones y límites; registrar `effect_authorization=false`. No concede selección, visita ni otro efecto. |
+| Cambio de preferencia | «Actually I prefer Cedar Studio instead» produjo otra comparación y mantuvo Cedar Loft para el material siguiente. | Resolver una preferencia propia y completa hacia un único nombre del catálogo como selección del nuevo sujeto. Se prueban otros nombres y cinco formulaciones; no se aplica a alternativas, condiciones o mensajes mixtos. |
+| Aceptación del resumen final | Después del resumen de Ridge Townhome, «Yes» generó una referencia de cita «/» y volvió a preguntar qué propiedad quería. | Vincular la aceptación simple al resumen vigente, sin referencia artificial ni nueva fecha. El coordinador conserva comprobaciones de entrega, alcance, integridad, caducidad, disponibilidad y consentimiento antes de reservar. |
+
+**El evaluador también se vuelve más exigente.** El turno de confirmación ahora debe registrar la reserva y su recibo, además de conservar la propiedad. Así se detecta inmediatamente el fallo de Ridge Townhome; antes aparecía solamente como objetivo final incumplido. Se exportan intentos de interpretación y el fundamento de las autorizaciones de lectura para explicar fallos futuros. Los cuatro FAIL originales se conservan sin cambiar sus etiquetas.
+
+**Pruebas y variantes.** El replay local de las interpretaciones finales registradas pasa **6/6 conversaciones, 36 turnos y cinco visitas simuladas**. La composición y las respuestas temporales no coincidentes se simulan: no es otra inferencia del modelo real ni una reproducción exacta de sus paquetes HTTP. Se prueban tres nombres ficticios distintos, cinco frases de preferencia, cuatro aceptaciones de resumen y rechazos ante condiciones, alternativas, ofertas de material, solicitudes mixtas y referencias ajenas al catálogo. Estas son regresiones gratuitas, no casos pagados adicionales ni un conjunto ciego. Se mantiene el modelo, la configuración publicada y la topología LangGraph; el protocolo pasa a `sales-understanding-prompt/2.31`. [Diálogos corregidos del replay](05-resultados-y-mejoras/continuidad-reparacion-1-local/conversaciones.md) · [JSON local](05-resultados-y-mejoras/continuidad-reparacion-1-local/resultado.json) · [Datos y variantes](02-datos-de-prueba/variantes-continuidad.json).
+
+| Consumo por grupo de ejecuciones | Total observado (USD) | Llamadas con costo / total |
+|---|---:|---:|
+| Cuatro corridas anteriores de necesidades | 0.15756165 | 134/134 |
+| Primera corrida de continuidad | 0.12972465 | 88/88 |
+| **Total real de estos cinco experimentos** | **0.28728630** | **222/222** |
+| Reparación 1: pruebas y replay locales | **0.00000000** | Sin inferencia pagada |
+| Próxima corrida de continuidad, pendiente | **≈0.13–0.20 estimado; reserva 0.30** | Hasta 240 llamadas; no es límite monetario |
+
+La primera corrida de continuidad registró 1.007.379 tokens de entrada y 13.803 de salida. El estimado futuro usa ese consumo observado con más margen por reparaciones; no se suma al gasto real ni garantiza el precio final. Los costos del historial anterior a necesidades permanecen en sus tablas originales.
+
+**Validación técnica:** 3.318 pruebas de regresión aprobadas en 143 módulos; 11 pruebas omitidas en SQLite y aprobadas aparte con PostgreSQL 16.2; 63 controles de aceptación aprobados. Las 38 pruebas nuevas de replay/variantes se repitieron con el código final. [Validación JSON](05-resultados-y-mejoras/continuidad-reparacion-1-local/validacion.json).
+
+**Siguiente ejecución.** Repetir los mismos seis casos con el modelo publicado y el control de confirmación reforzado. Solo después de revisar el resultado se abrirán los guiones reservados y se ampliarán longitud o segmentos; no se declara estabilidad por aprobar el replay. [Comandos de servidor y extracción](06-como-ejecutar-las-pruebas/ejecutar-continuidad-reparacion-1.sh).
 
 ## 11. Trabajo futuro
 

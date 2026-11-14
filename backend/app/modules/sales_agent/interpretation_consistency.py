@@ -38,6 +38,14 @@ def normalize(value,text,commercial,*,appointment_offer=None):
             comparison=None,visit=None,appointment_query=None)
         value=Understanding.model_validate(data).check_evidence(text)
         notes.append({'field':'requests','action':'named_property_is_selection_not_comparison'})
+    choice=re.fullmatch(r"\s*(?:Actually[, ]+)?(?:I (?:prefer|choose|want|would like)|I['’]d (?:like|prefer)|I['’]ll take) (.+?)(?: instead)?[.!]?\s*",own,re.I)
+    if (choice and own==text and len(named(choice[1]))==1 and choice[1].strip().rstrip('.!').casefold()==named(choice[1])[0].casefold()
+        and not data['constraints'] and not data['alternatives'] and not data['releases'] and not data['preference_withdrawals']
+        and not data['visit'] and not data['cancellation'] and not data['reschedule'] and not data['wait'] and not data['appointment_query']):
+        name=named(choice[1])[0];key=reference(name)
+        data.update(requests=[dict(id='explicit_property_choice',topic='catalog',subject=None,polarity='request',evidence=text,reference_id=key)],all_of=['explicit_property_choice'],
+            references=[r for r in data['references'] if r['id']==key],selected_reference_id=key,comparison=None)
+        notes.append({'field':'requests','action':'explicit_preference_changes_active_subject','evidence':name})
     # A current explicit choice can own an anaphoric material request in the
     # next clause. No historical subject, model ID or confidence is promoted.
     switch=re.fullmatch(

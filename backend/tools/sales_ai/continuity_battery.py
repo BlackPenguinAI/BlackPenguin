@@ -70,7 +70,11 @@ async def evaluate_case(db,manifest,key,budget,max_turns):
             checks.append(check('requested_photos_or_truthful_absence',('http' in reply) if has_gallery else not 'http' in reply and ('not' in reply.lower() or "don't" in reply.lower())))
         if action=='visit':checks.append(check('visit_reaches_options_or_unavailability',bool(meta.get('appointment_offer')) or explains_unavailability(reply)))
         if action=='select':checks.append(check('selection_prepares_summary',bool(meta.get('booking_confirmation')) and not meetings))
-        rows.append({'turn':i+1,'action':action,'lead_message':message,'reply':reply,'understanding':(run.input_snapshot or {}).get('understanding'),'metadata':meta,'checks':checks})
+        if action=='confirm':checks.append(check('confirmation_books_current_summary',len(meetings)==1 and bool(meta.get('meeting_id'))))
+        from app.modules.sales_agent.dialogue_models import SalesDialogueEvent
+        trace=db.query(SalesDialogueEvent).filter_by(conversation_id=conversation.id,event_key='active-understanding:'+str((run.input_snapshot or {}).get('message_id'))).first()
+        attempts=(trace.payload_json.get('metadata') or {}).get('interpretation_attempts',[]) if trace else []
+        rows.append({'interpretation_attempts':attempts,'read_authorization':(run.input_snapshot or {}).get('dialogue_read_authorization'),'turn':i+1,'action':action,'lead_message':message,'reply':reply,'understanding':(run.input_snapshot or {}).get('understanding'),'metadata':meta,'checks':checks})
         if meetings:stop='booked';break
         if spec['access']=='unassigned' and action=='visit':stop='unavailable';break
     meetings=db.query(Meeting).filter_by(lead_id=lead.id).all()

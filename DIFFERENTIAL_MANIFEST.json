@@ -1,118 +1,82 @@
 {
-  "base_commit": "923083d8e3a0db94a0574ccf74de5a315a19f0c1",
+  "base_commit": "45fa08e5b6bf5ee0f52944fd57287a4e1927edbd",
   "files": [
     {
       "path": "backend/app/modules/sales_agent/active_service.py",
-      "sha256": "54d1fb9055ab619521618570f0f9348a4b7e4e31ef0d025705246d2520e789c0"
+      "sha256": "06d7c1cb6a2625115d0f27ea47170513795056e8148461a4f8fe20fffed4ec59"
     },
     {
       "path": "backend/app/modules/sales_agent/dialogue_continuity.py",
-      "sha256": "977df118e9dd16cda675fe66da6292cb4ca6185991f73508ffec1e496700529b"
+      "sha256": "1958a630c92c21757622c929dda67d88a0bf9d53cab4afbfbc6987a23630dfd5"
     },
     {
       "path": "backend/app/modules/sales_agent/first_booking.py",
-      "sha256": "c49ca08f2dd4ce897972b9e2a3401928b1116d9026255e75108a511dfa9be524"
+      "sha256": "48b7c01b8867b918def198e416027f918861e0716bfde53a02a246267bbd7999"
     },
     {
       "path": "backend/app/modules/sales_agent/interpretation_consistency.py",
-      "sha256": "6ae0092a517a31b7fd117b9a819cc6e64594528f51b54e07a648b70cb77e18cc"
+      "sha256": "cadaf0ef62b55c696042b41e0348937b2c5bd039fc0f7429738c15f702126969"
     },
     {
       "path": "backend/app/modules/sales_agent/interpretation_input.py",
-      "sha256": "63587dc80ff808363c00dee1c2b8726d7796013fd1ba64c0486905c0c004b75e"
-    },
-    {
-      "path": "backend/app/modules/sales_agent/language_policy.py",
-      "sha256": "79b4ceb58bf8d00477b98aeb4ac7d2891df9be9f13fbc04d2650068bf6743214"
-    },
-    {
-      "path": "backend/app/modules/sales_agent/material_delivery.py",
-      "sha256": "7fde14ac5b1f959af84f3fd9239ac2b6e5343458b7987799a29b72cee0666663"
-    },
-    {
-      "path": "backend/app/modules/sales_agent/property_comparison.py",
-      "sha256": "72cb3477a0df2a8dc79c58439a267cdced207d7f08067d149aca2b8142651c3f"
-    },
-    {
-      "path": "backend/app/modules/sales_agent/reference_resolution.py",
-      "sha256": "54d8aed1d868ee387bb3edd5ae77ada359a4f97daaf9f08ae6707b2663505b70"
+      "sha256": "bc83476ff196b4491cf9e616d5403db96091b3a2af568e4c340cdceb37e37832"
     },
     {
       "path": "backend/app/modules/sales_agent/understanding_prompt.py",
-      "sha256": "0aab2e2cf7f9057cc02c18e6e44be9ecaa3f73b3ee634e4225f1f3a96a3e025d"
+      "sha256": "4d504b1c758c8c41130ddd0904527a887a8dbedf8c2f89d40af166fd0f4deb75"
     },
     {
-      "path": "backend/app/modules/sales_agent/understanding_semantics.py",
-      "sha256": "7b528638c8197b6bfbc878b0af4a676e02feaefbfcd64ea5abf15e18a9233651"
+      "path": "backend/tests/fixtures/sales_ai/continuity_server1_frames.json",
+      "sha256": "ee7ffca056aef27672cd61d2f92c7180f60e3f3c3fbbe1bf1c68355810543f4a"
     },
     {
-      "path": "backend/app/modules/sales_agent/understanding_service.py",
-      "sha256": "93294a12969488cf0bd9427383cf71193bf460ebcb70f171bac5d6203d75fa5c"
+      "path": "backend/tests/test_sales_continuity_repair1.py",
+      "sha256": "aced8c76843ec784f75a3da93c82edc972cbafcf061c85e79b5436e003f75ae7"
     },
     {
-      "path": "backend/tests/test_sales_ai_group_e.py",
-      "sha256": "f2ad37a9438727126a4ab90dee394cb3cbf4f5d3b570323a57550721de0e4665"
-    },
-    {
-      "path": "backend/tests/test_sales_continuity_battery.py",
-      "sha256": "15afabead0390429ea8708142c4c53baf3973908469e74d1142d8337e93e17c4"
-    },
-    {
-      "path": "backend/tests/test_sales_dialogue_continuity_variants.py",
-      "sha256": "d1f789fe11926d23e7b09685f4764ac2e03fda06ec27114305641f144e16e7ab"
-    },
-    {
-      "path": "backend/tools/sales_ai/booking_pilot_worker.py",
-      "sha256": "0b3d9e301c661339e98135fd3b48c50eb9959fdab39978fcc96adbcc810a8988"
+      "path": "backend/tests/test_sales_continuity_repair1_variants.py",
+      "sha256": "106f7f0fbd7ac49acd0e1358a95a25f4764f31dddfe94254372eb8143041ca7a"
     },
     {
       "path": "backend/tools/sales_ai/continuity_battery.py",
-      "sha256": "1cdb39342ad354bdf9d9812621e9ff09412c25d40f40ed5a5de9b3aed222c585"
-    },
-    {
-      "path": "backend/tools/sales_ai/synthetic_lab.py",
-      "sha256": "56f093fadae961342c80947b1c617e52b5c708e680b18a1184189622d31fa737"
+      "sha256": "c34811a4888a0217297cd81ddcdb90c5f5a910a2a2b251d30fe8b9a06fda18ad"
     },
     {
       "path": "docs/sales-agent/02-datos-de-prueba/variantes-continuidad.json",
-      "sha256": "feed7e0b3325a3ce29860df1df8e59091c2c33b15274d48829ef638d12c8ed40"
+      "sha256": "248df18e0aa1e3095844737ec14a091bf51e257dee3150ecb33e187c8d45337b"
     },
     {
-      "path": "docs/sales-agent/05-resultados-y-mejoras/busqueda-aceptacion-servidor/resultado.json",
-      "sha256": "bed595553d408c9704e0fbc9be1b6e8e162085c0ffe49d855f12b4aded6264ec"
+      "path": "docs/sales-agent/05-resultados-y-mejoras/continuidad-reparacion-1-local/conversaciones.md",
+      "sha256": "933757b79cb82b024e5ef9eca2e737671bfba2de5b53d93d534d33c642a5076b"
     },
     {
-      "path": "docs/sales-agent/05-resultados-y-mejoras/continuidad-local/conversaciones.md",
-      "sha256": "3d822aadae5e564ad19bf5254e28cae62580ee3cf597631b6750f103701648bb"
+      "path": "docs/sales-agent/05-resultados-y-mejoras/continuidad-reparacion-1-local/resultado.json",
+      "sha256": "ac62254752d8c147dec1500973b96d7be74cd60c7efacc59a60b697a760c8dc3"
     },
     {
-      "path": "docs/sales-agent/05-resultados-y-mejoras/continuidad-local/resultado.json",
-      "sha256": "af1727cbc31e10ea2af4d4e5c94f667bcfe2a79b6c02eae631c0ed2346217240"
+      "path": "docs/sales-agent/05-resultados-y-mejoras/continuidad-reparacion-1-local/validacion.json",
+      "sha256": "61405f23208e387a0933c21014109b45536d2ee0e3ce493dab0a28ad26ba517b"
     },
     {
-      "path": "docs/sales-agent/05-resultados-y-mejoras/continuidad-local/validacion.json",
-      "sha256": "d73cd34b71f1782c18866bdb5b31e7ff5572f573548955b65ce8c1bac0f22ce9"
+      "path": "docs/sales-agent/05-resultados-y-mejoras/continuidad-servidor-1/conversaciones.md",
+      "sha256": "0b0a5400f7b49033d779f07f4b4ad0983cf794c05ad8f6fd790d30fede457f25"
     },
     {
-      "path": "docs/sales-agent/05-resultados-y-mejoras/figuras/necesidades-observadas.png",
-      "sha256": "3f2dc4892fbd20d8debf5f2acd1640522a1e19f6d9d00ae91acd84d43b17ad42"
+      "path": "docs/sales-agent/05-resultados-y-mejoras/continuidad-servidor-1/resultado.json",
+      "sha256": "bce72d29bec6485b3e58b10cece641e1699becd69d844e8c545f155381e85798"
     },
     {
-      "path": "docs/sales-agent/06-como-ejecutar-las-pruebas/ejecutar-continuidad.sh",
-      "sha256": "f30d8811b64561a13b25d50778b65cf009f0a504a7d48ee4c6cb0642a0357a48"
-    },
-    {
-      "path": "docs/sales-agent/06-como-ejecutar-las-pruebas/herramientas/generar_necesidades_observadas.py",
-      "sha256": "0f0d4a969f0d8b8eb5be218ed3705cc4773d7f097d4536e606963222fd092b79"
+      "path": "docs/sales-agent/06-como-ejecutar-las-pruebas/ejecutar-continuidad-reparacion-1.sh",
+      "sha256": "610264efb5fe07c874b87e312d4a9055fe52c9813363b1196950519a86fefdda"
     },
     {
       "path": "docs/sales-agent/README.md",
-      "sha256": "aa85002e8334fb8238f85d7e852b90151a64046f7a79521e7ec3af2eccccc0e3"
+      "sha256": "5913c7b7a15e343a04bbe1023a03fe1ffb62f60424c377b5eb1bed7e8f8dc7f8"
     }
   ],
   "notes": [
     "Differential release; no git commit or push performed.",
-    "No migrations. Model and graph topology unchanged.",
-    "Server real-model evaluation pending. Local provider simulations are explicitly labeled."
+    "No migrations, model change or graph topology change.",
+    "Replay and offline variants pass; real-model rerun after deployment is pending."
   ]
 }

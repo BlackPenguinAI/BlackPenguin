@@ -454,6 +454,18 @@ def enrich_understanding(u,previous_meta,text):
             visit=None,appointment_query=None,courtesy={'kind':'decline' if previous_meta.get('booking_confirmation') else 'farewell','evidence':text})
         from .understanding_contract import Understanding
         return Understanding.model_validate(payload)
+    if (previous_meta.get('booking_confirmation') and _affirmative_slot_reply(text)
+        and not previous_meta.get('material_offer') and not previous_meta.get('release_offer')
+        and not u.constraints and not u.alternatives and not u.releases
+        and not u.cancellation and not u.reschedule and not u.wait and not u.moderation
+        and all(r.polarity=='request' and r.topic.value in {'appointment','other'} for r in u.requests)):
+        # Canonicalize only semantic assent to the current full summary. The
+        # coordinator still verifies receipt, scope, hash, expiry and availability.
+        payload=u.model_dump(mode='json')
+        payload.update(requests=[dict(id='backend_summary_acceptance',topic='appointment',polarity='request',evidence=text)],all_of=['backend_summary_acceptance'],
+            references=[],selected_reference_id=None,comparison=None,appointment_query=None,visit=dict(action='confirm',evidence=text,timing=None))
+        from .understanding_contract import Understanding
+        return Understanding.model_validate(payload)
     if u.requires_clarification or u.permits('appointment'):return u
     resume=(previous_meta.get('booking_confirmation') and _affirmative_slot_reply(text)) or (
         previous_meta.get('booking_property_question') and any(r.kind in {'property','unit'} for r in u.references) and
