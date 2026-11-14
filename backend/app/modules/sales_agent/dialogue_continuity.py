@@ -97,3 +97,14 @@ def comparison_read(db,scope,value,text):
         if not resolver.bound('property',state.selected_property_type_id):return False
         subjects.add(state.selected_property_type_id)
     return 2<=len(subjects)<=20
+
+
+def literal_greeting(value,text):
+    """Only social acknowledgement; no confidence promotion or action permission."""
+    return bool(re.fullmatch(r"\s*(?:hi|hello|hey|good morning|good afternoon|good evening)[!.?]*\s*",text,re.I)
+        and value.courtesy and value.courtesy.kind=='greeting'
+        and all(r.topic.value=='other' and r.polarity=='request' for r in value.requests)
+        and not any((value.visit,value.comparison,value.appointment_query,value.cancellation,value.reschedule,
+                     value.wait,value.moderation,value.constraints,value.alternatives,value.releases,
+                     value.preferences,value.personal_facts,value.preference_withdrawals,value.source_purposes,
+                     value.references,value.selected_reference_id,value.objections,value.empathy)))

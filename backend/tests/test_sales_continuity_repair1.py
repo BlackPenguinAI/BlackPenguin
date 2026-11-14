@@ -9,9 +9,12 @@ from app.modules.ai_core.models import AIConfiguration,PromptVersion
 from tools.sales_ai.continuity_battery import CASES,evaluate_case
 from tools.sales_ai.evaluation_guard import Budget,guard
 CAPTURE=json.loads((Path(__file__).parent/'fixtures/sales_ai/continuity_server1_frames.json').read_text())['rows']
+RECENT=json.loads((Path(__file__).parent/'fixtures/sales_ai/retoma_server3_packets.json').read_text())['rows']
 
 def replay_provider(scenario):
     packets={r['message']:r['understanding'] for r in CAPTURE if r['case']==scenario}
+    source='resume_bay_see' if scenario=='context_material_see' else scenario
+    packets.update({r['message']:r['packet'] for r in RECENT if r['case']==source})
     def replay(request):
         payload=json.loads(request.content);ctx=json.loads(payload['messages'][1]['content'])
         if payload['response_format']['json_schema']['name']=='sales_understanding':

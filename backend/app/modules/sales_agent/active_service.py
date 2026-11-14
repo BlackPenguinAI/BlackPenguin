@@ -558,17 +558,20 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
             from .needs_search import literal_read,contextual_read, VERSION as NEEDS_VERSION
             literal_needs_read=bool(next_enabled and literal_read(u,inbound.content))
             contextual_needs_read=bool(next_enabled and contextual_read(db,scope,u,inbound.content))
-            from .dialogue_continuity import catalog_choice_read,comparison_read
+            from .dialogue_continuity import catalog_choice_read,comparison_read,literal_greeting
+            greeting_read=bool(next_enabled and literal_greeting(u,inbound.content))
+            if greeting_read:
+                run.input_snapshot={**run.input_snapshot,'dialogue_read_authorization':{'basis':'literal_greeting_no_actions','model_confidence':u.confidence,'effect_authorization':False}}
             choice_read=bool(next_enabled and catalog_choice_read(u,inbound.content,latest_outbound(db,conversation.id),commercial))
             compare_read=bool(next_enabled and comparison_read(db,scope,u,inbound.content))
             if compare_read:
                 run.input_snapshot={**run.input_snapshot,'dialogue_read_authorization':{'basis':'explicit_scoped_comparison','model_confidence':u.confidence,'effect_authorization':False}}
             if choice_read:
                 run.input_snapshot={**run.input_snapshot,'dialogue_read_authorization':{'basis':'current_numbered_catalog_choice','model_confidence':u.confidence,'effect_authorization':False}}
-            if contextual_needs_read or choice_read or compare_read:u=u.model_copy(update={'requires_clarification':False,'clarification_question':None})
+            if contextual_needs_read or choice_read or compare_read or greeting_read:u=u.model_copy(update={'requires_clarification':False,'clarification_question':None})
             if literal_needs_read or contextual_needs_read:
                 run.input_snapshot={**run.input_snapshot,'needs_read_authorization':{'version':NEEDS_VERSION,'basis':'accepted_current_unknown_listing_offer' if contextual_needs_read else 'validated_current_literal_catalog_request','model_confidence':u.confidence,'effect_authorization':False}}
-            if u.confidence < .8 and not u.requires_clarification and not (literal_needs_read or contextual_needs_read or choice_read or compare_read):
+            if u.confidence < .8 and not u.requires_clarification and not (literal_needs_read or contextual_needs_read or choice_read or compare_read or greeting_read):
                 u=u.model_copy(update={'requires_clarification':True,'clarification_question':'Could you clarify whether you want property details, materials, financing, or a visit?'})
             # Legal/commercial approvals hold the action, not the conversation.
             advisory=escalation_reason(inbound.content)
@@ -651,10 +654,11 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
                 metadata.update(appointment_meta)
                 if appointment:extra.append(appointment)
                 if next_enabled and 'materials' not in action_holds:
-                    from .material_delivery import deliver,VERSION as MATERIAL_VERSION
+                    from .material_delivery import deliver,request_context,VERSION as MATERIAL_VERSION
                     links,share_ids,offer,question,delivered,material_bindings=deliver(db,scope,conversation,lead,run,outcome,previous_meta)
                     metadata['material_delivery_version']=MATERIAL_VERSION
                     metadata['material_bindings']=material_bindings
+                    metadata['material_request_context']=request_context(outcome,inbound.id)
                 else:
                     links,share_ids,offer,question,delivered=([],[],{},None,set()) if 'materials' in action_holds else _materials(db,scope,conversation,lead,run,outcome,previous_meta)
                 material_question=question or ''

@@ -36,7 +36,8 @@
         ]
       },
       "area_unit": "m²",
-      "currency": "USD"
+      "currency": "USD",
+      "description": "A four-bedroom home with a private garden and two covered parking spaces."
     },
     {
       "key": "loft",
@@ -71,7 +72,8 @@
         ]
       },
       "area_unit": "m²",
-      "currency": "USD"
+      "currency": "USD",
+      "description": "A two-bedroom home with a balcony and one parking space."
     },
     {
       "key": "studio",
@@ -104,7 +106,8 @@
         ]
       },
       "area_unit": "m²",
-      "currency": "USD"
+      "currency": "USD",
+      "description": "A one-bedroom studio with access to a shared rooftop terrace."
     },
     {
       "key": "ridge",
@@ -137,7 +140,8 @@
         ]
       },
       "area_unit": "m²",
-      "currency": "USD"
+      "currency": "USD",
+      "description": "A three-bedroom townhome with a private patio."
     },
     {
       "key": "summit",
@@ -170,7 +174,8 @@
         ]
       },
       "area_unit": "m²",
-      "currency": "USD"
+      "currency": "USD",
+      "description": "A four-bedroom villa with a two-car garage."
     },
     {
       "key": "valley",
@@ -199,7 +204,10 @@
         "features": []
       },
       "area_unit": "m²",
-      "currency": null
+      "currency": null,
+      "description": "A two-bedroom apartment."
     }
-  ]
+  ],
+  "commercial_copy_version": "sales-lab-commercial-copy/2",
+  "documentation_note": "Descriptions updated for subsequent isolated runs; IDs and numerical facts retained. clock_utc identifies the original exported catalog."
 }

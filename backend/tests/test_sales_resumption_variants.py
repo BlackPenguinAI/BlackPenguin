@@ -69,3 +69,39 @@ def test_an_explicit_new_subject_invalidates_old_proposal_even_with_confirmation
         booking_proposal={'id':'old'})
     reconcile_subject(state,('old-home',None),confirming_delivered_proposal=True)
     assert not state.booking_search and state.booking_proposal is None
+
+@pytest.mark.parametrize('text',['Hi','Hello!','Good morning','Hey'])
+def test_zero_confidence_literal_greeting_only_authorizes_social_reply(text):
+    from app.modules.sales_agent.dialogue_continuity import literal_greeting
+    from app.modules.sales_agent.understanding_contract import Courtesy
+    u=understanding(text,confidence=0).model_copy(update={'courtesy':Courtesy(kind='greeting',evidence=text)})
+    assert literal_greeting(u,text) and u.confidence==0
+    assert not u.permits('appointment') and not u.requests
+
+@pytest.mark.parametrize('text,topic',[('Hi, book a visit','appointment'),('Hi, send photos','materials'),('Hi','appointment')])
+def test_greeting_cannot_bypass_action_interpretation(text,topic):
+    from app.modules.sales_agent.dialogue_continuity import literal_greeting
+    from app.modules.sales_agent.understanding_contract import Courtesy
+    u=understanding(text,topic,confidence=0).model_copy(update={'courtesy':Courtesy(kind='greeting',evidence='Hi')})
+    assert not literal_greeting(u,text)
+
+
+def test_material_repeat_context_is_bound_to_property_unit_and_format():
+    from app.modules.sales_agent.material_delivery import request_context
+    from app.modules.sales_agent.understanding_contract import Task
+    state=DialogueState(tasks=[Task(id='a',topic='materials',status='blocked',source_message_id='inbound',
+        property_id='home-a',unit_id='unit-a',subject='floor_plan')])
+    outcome=SimpleNamespace(state=state)
+    before=request_context(outcome,'inbound')
+    assert before==[{'property_id':'home-a','unit_id':'unit-a','subject':'floor_plan'}]
+    state.tasks[0].property_id='home-b'
+    assert request_context(outcome,'inbound')!=before
+    assert request_context(outcome,'other-message')==[]
+
+
+def test_greeting_read_never_promotes_a_model_property_reference():
+    from app.modules.sales_agent.dialogue_continuity import literal_greeting
+    from app.modules.sales_agent.understanding_contract import Courtesy,Reference
+    u=understanding('Hi',confidence=0).model_copy(update={'courtesy':Courtesy(kind='greeting',evidence='Hi'),
+        'references':[Reference(id='p',kind='property',expression='A home',evidence='Hi')],'selected_reference_id':'p'})
+    assert not literal_greeting(u,'Hi')

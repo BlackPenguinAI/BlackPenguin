@@ -107,6 +107,14 @@ def accepted_proposal(db, conversation, previous_meta, text, outcome):
     return proposal, None
 
 
+def request_context(outcome,message_id):
+    """Exact scope-owned target and format, without raw text or credentials."""
+    return sorted([{'property_id':t.property_id,'unit_id':t.unit_id,'subject':t.subject}
+        for t in outcome.state.tasks if t.source_message_id==message_id and t.topic.value=='materials'
+        and t.subject and t.status not in {'cancelled','completed'} and not restricted(outcome.state,t)],
+        key=lambda row:(row['property_id'] or '',row['unit_id'] or '',row['subject']))
+
+
 def deliver(db, scope, conversation, lead, run, outcome, previous_meta):
     from app.modules.projects.asset_coverage import matches as covered, unrestricted
     from .sales_policy import policy_context,compliance_action_holds
@@ -125,6 +133,8 @@ def deliver(db, scope, conversation, lead, run, outcome, previous_meta):
         return [], [], None, error, set(), bindings
     material_tasks = [t for t in tasks.values() if t.source_message_id == inbound.id and t.topic.value == 'materials'
         and t.status not in {'cancelled', 'completed'} and not restricted(outcome.state, t)]
+    current_context=request_context(outcome,inbound.id)
+    repeated=bool(current_context and current_context==previous_meta.get('material_request_context'))
     refs=outcome.plan.get('references') or {}
     def named_assets(task):
         request_ids=set(task.request_ids)
@@ -279,12 +289,15 @@ def deliver(db, scope, conversation, lead, run, outcome, previous_meta):
             f'I also have {kind} for this option. Would you like me to share them?' if complementary else
             f'I have {names} as related Project or property type material. Coverage for the specific unit is not confirmed. Would you like those materials?'
             if unit else f'I have {names}. It may contain useful related information, but the requested photo coverage is not confirmed. Would you like that file?')
+        if repeated and alternatives:
+            question=f"I understand you're looking for the {missing}. I still don't have it available to share for this property. I can offer {names} instead. Would you like me to share it?"
         if gap_subjects and not alternatives:question='I could not confirm the requested '+', '.join(sorted(gap_subjects))+' for this option. '+question
     elif links and gap_subjects:
         question='I could not verify an approved '+', '.join(sorted(gap_subjects))+' resource for this option.'
     elif unavailable or material_tasks and not links:
         subjects=', '.join(dict.fromkeys((t.subject or 'material').replace('_',' ') for t in material_tasks))
-        question = f"I don't have {subjects} available for this property. What would you like to know about it?"
+        question = (f"I understand you'd like to see the {subjects}. I still don't have {subjects} available to share for this property. Is there another detail about the property I can help with?" if repeated else
+            f"I don't have {subjects} available for this property. What would you like to know about it?")
     for tid in fulfilled:
         tasks[tid].status = 'awaiting_user'  # Completion follows the durable provider receipt.
     return links, share_ids, offer, question, fulfilled, bindings

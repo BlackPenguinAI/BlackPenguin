@@ -1,0 +1,49 @@
+{
+  "base_commit": "6621241e22f676104c245e3b3eacc8e023db240a",
+  "protocol": "sales-understanding-prompt/2.33",
+  "script_version": "sales-continuity-battery/1.1",
+  "commercial_copy_version": "sales-lab-commercial-copy/2",
+  "focused_battery": {
+    "passed": 69,
+    "failed": 0
+  },
+  "observed_packet_replay": {
+    "passed": 22,
+    "failed": 0,
+    "model_quality_evaluated": false
+  },
+  "full_regression": {
+    "status": "PASS",
+    "modules": 144,
+    "complete_module_coverage_verified": true,
+    "shards": [
+      {
+        "shard": 1,
+        "passed": 1095,
+        "skipped": 2,
+        "failed": 0
+      },
+      {
+        "shard": 2,
+        "passed": 1186,
+        "skipped": 6,
+        "failed": 0
+      },
+      {
+        "shard": 3,
+        "passed": 1103,
+        "skipped": 3,
+        "failed": 0
+      }
+    ],
+    "passed": 3384,
+    "skipped": 11,
+    "failed": 0,
+    "runtime": "Python 3.12.14 with SQLite; not the GitHub candidate Docker image"
+  },
+  "paid_local_calls": 0,
+  "local_cost_usd": 0,
+  "production_database_writes": 0,
+  "known_regression_fixed": "Additional prompt text exceeded the existing 64000-byte probe cap by 37 bytes. Instructions shortened; cap unchanged; focused injection test passed.",
+  "partition_tests_passed": 8
+}

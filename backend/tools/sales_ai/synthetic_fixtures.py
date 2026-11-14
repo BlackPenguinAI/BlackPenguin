@@ -86,7 +86,7 @@ def seed(db, export_root):
     user=User(id=identifier('reviewer'),company_id=company.id,email='reviewer@synthetic.invalid',
         hashed_password='DISABLED-SYNTHETIC-NOT-A-LOGIN',role=UserRole.ADMIN,is_active=False)
     db.add(user);db.flush()
-    manifest={'version':VERSION,'synthetic_only':True,'company_id':company.id,'company_name':COMPANY_NAME,'projects':[]}
+    manifest={'version':VERSION,'commercial_copy_version':'sales-lab-commercial-copy/2','synthetic_only':True,'company_id':company.id,'company_name':COMPANY_NAME,'projects':[]}
     root=Path(export_root);root.mkdir(parents=True,exist_ok=True)
     def source(project,name,content,mime,kind):
         sid=identifier(project.id+name)
@@ -101,7 +101,7 @@ def seed(db, export_root):
             address=f'{number} Synthetic Avenue',onboarding_status='in_progress')
         db.add(project);db.flush()
         facts={'project_name':spec['name'],'project_type':'Synthetic residential development',
-            'short_description':'Fictional residential catalog for isolated sales-agent evaluation.',
+            'short_description':'A residential community with a shared garden and residents lounge.',
             'country':'US','city':'Synthetic City','timezone':spec['timezone'],'exact_address':project.address,
             'sales_authorization':True,'payment_methods':['Cash','Bank financing'],
             'amenities':['Shared garden','Residents lounge'],'delivery_dates':'December 2027'}
@@ -117,7 +117,13 @@ def seed(db, export_root):
                 starting_price=item['price'],currency='USD' if item['price'] is not None else None,
                 available_units=item['available'],features=item['features'],review_status='confirmed',sort_order=order,
                 inventory_updated_at=datetime.utcnow(),images_status='provided' if item['gallery'] else 'not_available',
-                description='Synthetic property for testing. Only the listed features are confirmed.')
+                description={
+                    'bay':'A four-bedroom home with a private garden and two covered parking spaces.',
+                    'loft':'A two-bedroom home with a balcony and one parking space.',
+                    'studio':'A one-bedroom studio with access to a shared rooftop terrace.',
+                    'ridge':'A three-bedroom townhome with a private patio.',
+                    'summit':'A four-bedroom villa with a two-car garage.',
+                    'valley':'A two-bedroom apartment.'}[item['key']])
             db.add(prop);db.flush();resources=[]
             if item['gallery']:
                 for index in (1,2):
@@ -130,7 +136,7 @@ def seed(db, export_root):
             if item['pdf']:
                 pdf=source(project,item['key']+'.pdf',brochure(spec,item),'application/pdf',ProjectSourceKind.UPLOADED_FILE)
                 asset=ProjectSalesAsset(company_id=company.id,project_id=project.id,property_type_id=prop.id,
-                    source_id=pdf.id,asset_type='brochure',content_tags=['brochure'],display_name=item['name']+' synthetic brochure',
+                    source_id=pdf.id,asset_type='brochure',content_tags=['brochure'],display_name=item['name']+' brochure',
                     allowed_channels=['sms','whatsapp'],approval_status='draft')
                 db.add(asset);db.flush();approve(db,asset,user_id=user.id);resources.append(('pdf',asset))
             card={**item,'id':prop.id,'resources':[]}

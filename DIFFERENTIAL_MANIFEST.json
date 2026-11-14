@@ -1,36 +1,103 @@
 {
-  "base_commit": "e7b751fba8d6d4d26de7df5544012571e657ee38",
-  "description": "Preserve accepted immutable booking confirmation and fix short-message recorded provider frames",
+  "base_commit": "6621241e22f676104c245e3b3eacc8e023db240a",
+  "description": "Contextual file acceptance versus visits, safe greeting replies, repeated material requests and realistic synthetic copy",
   "migrations": false,
   "deletions": [],
   "validation": {
-    "passed": 3363,
+    "passed": 3384,
     "skipped": 11,
     "failed": 0,
     "modules": 144,
-    "partition_tests_passed": 8,
-    "paid_provider_calls": 0
+    "paid_local_calls": 0
   },
   "files": [
     {
-      "path": "backend/app/modules/sales_agent/turn_planner.py",
-      "sha256": "0c9c871368eee79a5e47fff9080dccc608fb0f2f4726744ad5333a1a1cf35517"
+      "path": "backend/app/modules/sales_agent/active_service.py",
+      "sha256": "05cef1e3c257915fad70c26e8238fb8aa427b57ce3c0f8553602e8999759bdd4"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/dialogue_continuity.py",
+      "sha256": "46d6bc59f4cf0c3bd33a17a494a7e94ef42f93e40d410846ea27cc111016b217"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/material_delivery.py",
+      "sha256": "aff65401e549df6d445f1d56b61247d25cdb2d75dea39d243cc660abc0c89682"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/understanding_prompt.py",
+      "sha256": "696a65142ddd2afefeee48ced76a4ca847e1fad1b157f74b23a93bcc4ae6d45b"
+    },
+    {
+      "path": "backend/tests/fixtures/sales_ai/retoma_server3_packets.json",
+      "sha256": "31ab3c333121fbc20dcd9054c9816c233b2a877036779d09f63e16b51f2a86ea"
     },
     {
       "path": "backend/tests/test_sales_continuity_battery.py",
-      "sha256": "01fd70e102bff0320acb536f54e9de233084d34996a5ff585fa7de662ef05297"
+      "sha256": "5382ae7651e79069e4dca30ceabc13010e87c44cd2cddbd5e42a796f6c7ed3c9"
+    },
+    {
+      "path": "backend/tests/test_sales_continuity_repair1.py",
+      "sha256": "e0543d1388f7d765199fc5a9b1a986d570d403dd6cbe8cddfed9cc950b0232db"
     },
     {
       "path": "backend/tests/test_sales_resumption_variants.py",
-      "sha256": "25e0948ea6ef63463891e9cc60db5d6a7acbb86c810ddfd7b3f7ad8aa934789d"
+      "sha256": "29fabe333f68c348b580e2e346375843c6e5a36527540bf33928880e3bcfaefd"
     },
     {
-      "path": "docs/sales-agent/05-resultados-y-mejoras/retoma-correccion-ci/validacion.json",
-      "sha256": "3befe7472c10e9ce1a5f98cc19d01d7ba41d44b66861b9979f2571b5b9bbb069"
+      "path": "backend/tools/sales_ai/booking_pilot_worker.py",
+      "sha256": "0087c5b7d527bf05b0087cdc9ad4282fa307bbe19775bac9e5a35efe94d622f3"
+    },
+    {
+      "path": "backend/tools/sales_ai/continuity_battery.py",
+      "sha256": "711e3540813c0a95a8edb00875bad93b5a64e639d3cafafa1366a5bf4d5d1313"
+    },
+    {
+      "path": "backend/tools/sales_ai/synthetic_fixtures.py",
+      "sha256": "0e060e73047830e93d44f1e8cfc83c18935a82afe3ed81893e52d294d840bdac"
+    },
+    {
+      "path": "docs/sales-agent/02-datos-de-prueba/empresa-y-proyectos/propiedades.json",
+      "sha256": "59eee3e5c085cb8cd32035feaafc0889bd3f3bdcac42f36faa4652c88041141a"
+    },
+    {
+      "path": "docs/sales-agent/02-datos-de-prueba/variantes-retoma.json",
+      "sha256": "9b5586758903be3a4c35ffad0d3b3fb1be3719b9250d103ea39a49e1b69cd6fe"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/retoma-contextual-local/consumo-observado.png",
+      "sha256": "750d9579f8f72c89fff00cdb534466438156d25dd86aaf52936107b222ade9c0"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/retoma-contextual-local/conversaciones.md",
+      "sha256": "6d11d610d8bf6c1a47ea5a9b635955e89675738ffec94cae19dc087f6ceb4ff5"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/retoma-contextual-local/generar_consumo.py",
+      "sha256": "4e40a08f7b9f52b7223166e1bee726d6060ce4006a0c9b71dc0c37355c1b6336"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/retoma-contextual-local/resultado.json",
+      "sha256": "b95b3851f5e7e2ad6f76c5c34b6b30b721fc5d175e48e8573cb6f6362b9de2a0"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/retoma-contextual-local/validacion.json",
+      "sha256": "23493a9a0115e3cda91d09b2e0782c986c5e7dadac5adeab5362565dc9036410"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/retoma-servidor-3/conversaciones.md",
+      "sha256": "302508040d4c36e63522db9ed16f5f5bebd99eb95494e602de9995481a19adab"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/retoma-servidor-3/resumen.json",
+      "sha256": "76d501325e2f0a0849439324ba156981a71817c62198dfb8a5f547284772e521"
+    },
+    {
+      "path": "docs/sales-agent/06-como-ejecutar-las-pruebas/ejecutar-retoma-contextual.sh",
+      "sha256": "0df6cab169842c6c194bb185305ef51863412bac3cd2894932d25c02cce51479"
     },
     {
       "path": "docs/sales-agent/README.md",
-      "sha256": "427d565945c3219e43f5faf1b9f4048bac131986f4195423f40a2ba2ced6f836"
+      "sha256": "eaac978ecaeca911fc3b95bdb0482dbd913161b74429685739ead8f705f83307"
     }
   ]
 }

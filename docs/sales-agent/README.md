@@ -563,6 +563,48 @@ La entrega de retoma quedó bloqueada antes de desplegarse: dos shards fallaron 
 
 Se añaden variantes que distinguen una búsqueda antigua de una confirmación válida y comprueban que un cambio de propiedad en el mensaje actual invalida el contexto anterior. No se elimina ningún caso ni se rebajan las etiquetas de éxito. Estas son pruebas gratuitas con proveedores simulados: el costo adicional de OpenRouter es **USD 0.00** y no hay nueva evidencia de calidad del modelo real. La evaluación pagada de las tres retomas continúa pendiente del despliegue correcto. [Validación de esta corrección](05-resultados-y-mejoras/retoma-correccion-ci/validacion.json).
 
+## 10.3. Retoma contextual: archivos, visita y saludo
+
+**Corrida observada con el modelo publicado (`6621241`).** Se completaron dos citas en tres guiones, con 208 controles PASS y dos FAIL, 56 llamadas y **USD 0.08616360**. La tercera conversación compartió una galería ante «Can I see it?» después de ofrecer archivos: esa lectura era razonable. El guion esperaba una visita sin expresarlo con claridad. Los dos FAIL originales se conservan; no se cambia su etiqueta para aparentar una mejora del agente. [Resultado original](05-resultados-y-mejoras/retoma-servidor-3/resumen.json) · [Conversaciones originales legibles](05-resultados-y-mejoras/retoma-servidor-3/conversaciones.md).
+
+| Hallazgo | Qué se ajusta y cómo | Qué se exige ahora |
+|---|---|---|
+| Un «Hi» interpretado con confianza cero recibía una aclaración comercial | Una comprobación limitada autoriza solo el saludo literal cuando la interpretación contiene únicamente cortesía, sin solicitudes de negocio. Se conserva la confianza original y se registra que no hay autorización de acciones. | Saludar sin pedir que el lead declare todavía una intención; negar el atajo en mensajes mixtos. |
+| Repetición de una petición de planos/fotos ausentes | Se compara el formato y la propiedad/unidad con el turno anterior; se vuelve a consultar la disponibilidad real y se reconoce la insistencia. | Explicar que el material sigue sin estar disponible y ofrecer solo alternativas aprobadas del objetivo correcto. |
+| Etiquetas técnicas dentro de descripciones comerciales sintéticas | Se sustituyen las frases de prueba por descripciones coherentes con dormitorios y características ya existentes. Los identificadores, aislamiento, marcas de los archivos y naturaleza sintética permanecen. Versión de texto comercial `sales-lab-commercial-copy/2`. | No mostrar instrucciones internas como descripción de una vivienda. No se cambian datos de compañías reales. |
+| «Can I see it?» asumía siempre visita en el guion | Batería 1.1: se separan oferta de archivos e invitación presencial. El protocolo 2.33 explica el contexto sin imponer la intención. | Compartir un archivo ofrecido o aclarar su identidad; consultar horarios cuando se trata de una visita, sin reservar antes de la confirmación. |
+
+| Próxima conversación | Contexto / respuesta esperada | Turnos de lead previstos |
+|---|---|---:|
+| `resume_missing_visit` | Fotos ausentes, reiteración, «Visit?», horarios, resumen y confirmación. | 8 |
+| `resume_cedar_viewing` | Fotos disponibles, reiteración, «A viewing?», horarios y confirmación. | 8 |
+| `resume_bay_see` (guion revisado) | Planos ausentes, alternativas y solicitud explícita «Can I visit the property?». | 8 |
+| `context_material_see` | Tras ofrecer archivos, «Can I see it?» acepta material o pide aclaración concreta. Después solicita expresamente visita. | 9 |
+| `context_visit_see` | Tras una invitación presencial sembrada en el contexto sintético, la misma frase pide horarios o una aclaración. La invitación no contiene horarios ni autoriza reservar. | 6–7 |
+| **TOTAL** | **Cinco conversaciones; máximo diez turnos por caso.** | **39–40** |
+
+No se elimina la variante ambigua: se prueba en ambos contextos. El controlador solo responde a una aclaración pública sobre la visita; no lee razonamiento privado para decidir qué debe decir el lead. Los seis recorridos anteriores continúan como regresión. El laboratorio completo contiene once guiones. [Guiones y expectativas](02-datos-de-prueba/variantes-retoma.json) · [Replay local legible](05-resultados-y-mejoras/retoma-contextual-local/conversaciones.md) · [JSON local](05-resultados-y-mejoras/retoma-contextual-local/resultado.json).
+
+**Validación técnica del código final:** 3.384 pruebas aprobadas en los tres shards, 11 omitidas por condiciones de entorno y cero fallos. Se verificó que los 144 módulos aparezcan exactamente una vez; ocho controles de partición también aprobaron. GitHub volverá a validar la imagen candidata y PostgreSQL aislado. [Reporte de validación](05-resultados-y-mejoras/retoma-contextual-local/validacion.json).
+
+**Evidencia local, no calidad del modelo real.** El replay usa 22 respuestas de interpretación registradas y proveedores simulados para el resto y la composición. Los once guiones completaron 75 turnos, diez citas simuladas y 650 controles correctos. El caso restante termina sin cita por falta de vendedores elegibles. No se consumió OpenRouter. El core, modelo publicado, configuración 8 y topología LangGraph se mantienen; se ajustan el protocolo, las continuaciones del backend, los guiones y el texto comercial de las fixtures. La nueva corrida con el modelo publicado sigue pendiente de despliegue.
+
+| Consumo rastreado desde necesidades | Total USD | Llamadas con costo |
+|---|---:|---:|
+| Cuatro corridas de necesidades | 0.15756165 | 134 |
+| Primera continuidad | 0.12972465 | 88 |
+| Segunda continuidad | 0.12658365 | 86 |
+| Primera retoma de tres guiones | 0.08616360 | 56 |
+| **TOTAL OBSERVADO** | **0.50003355** | **364** |
+| Ajuste contextual y regresiones locales | **0.00000000** | 0 pagadas |
+| Próximos cinco guiones, pendientes | **≈0.12–0.22 estimado; reserva 0.35** | Hasta 200 llamadas; no es un límite en dólares |
+
+El estimado escala los USD 0.08616360 de 22 turnos a 39–40 turnos y añade margen por reparaciones. No se suma al gasto observado; puede variar con la longitud del contexto. Este acumulado no reemplaza los costos de experimentos anteriores a necesidades documentados en sus tablas.
+
+![Consumo observado de OpenRouter desde necesidades](05-resultados-y-mejoras/retoma-contextual-local/consumo-observado.png)
+
+La curva muestra gasto, no calidad: las corridas tienen distinto número de casos y criterios. [Reproducir figura con NumPy y Matplotlib](05-resultados-y-mejoras/retoma-contextual-local/generar_consumo.py) · [Comandos de la próxima evaluación](06-como-ejecutar-las-pruebas/ejecutar-retoma-contextual.sh).
+
 ## 11. Trabajo futuro
 
 **Más casos y conversaciones más largas, no nuevas funciones de canal.** Se avanza por etapas, corrigiendo y repitiendo antes de ampliar. Se incluyen compradores que rechazan o abandonan: no toda conversación correcta termina con cita [R4–R6].

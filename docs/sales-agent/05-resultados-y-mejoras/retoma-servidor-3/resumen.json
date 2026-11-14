@@ -1,0 +1,167 @@
+{
+  "version": "sales-continuity-battery/1.0",
+  "synthetic_only": true,
+  "production_database_writes": 0,
+  "lead_contacts": 0,
+  "provider_calls": 56,
+  "lead_model": null,
+  "judge_model": null,
+  "commit": "6621241e22f676104c245e3b3eacc8e023db240a",
+  "limitations": [
+    "Google Calendar integration and transport delivery are not exercised.",
+    "Simulation selects the first eligible seller, not the production round-robin cursor.",
+    "SQLite does not verify PostgreSQL concurrent-booking locks.",
+    "Public availability wording requires human review. No notification is scheduled.",
+    "Focused cases do not represent all eight buyer segments."
+  ],
+  "company_name": "SYNTHETIC - Penguin Sales Laboratory",
+  "company_id": "f0ebe3a5-6c04-5b8e-8cd8-423859aa39d7",
+  "project_count": 3,
+  "property_count": 6,
+  "project_name": "SYNTHETIC Harbor Gardens",
+  "sales_model": "openai/gpt-4o-mini",
+  "configuration_version": 8,
+  "configuration_sha256": "51ff65376dad421328dab993a4fc71939489386f1ed173514cf13a244ac79f1c",
+  "overall_dialogue_quality": "NOT_EVALUATED",
+  "quality_scope": "Continuity, material ownership and first-booking checks only; human review remains necessary.",
+  "cost_reporting_complete": true,
+  "split_results": {
+    "development": {
+      "cases": 0,
+      "passed": 0
+    },
+    "transfer": {
+      "cases": 0,
+      "passed": 0
+    },
+    "resumption": {
+      "cases": 3,
+      "passed": 2
+    }
+  },
+  "provider_usage": {
+    "prompt_tokens": 652500,
+    "completion_tokens": 7761,
+    "cost_usd": 0.08616359999999998,
+    "responses_with_cost": 56
+  },
+  "scenario_count": 3,
+  "checks": [
+    {
+      "check": "no_forbidden_network_attempts",
+      "status": "PASS",
+      "detail": ""
+    }
+  ],
+  "summary": {
+    "PASS": 208,
+    "FAIL": 2,
+    "BLOCKED": 0
+  },
+  "judge_summary": {
+    "PASS": 0,
+    "FAIL": 0,
+    "NOT_APPLICABLE": 0
+  },
+  "status": "FAIL",
+  "cases": [
+    {
+      "case": "resume_missing_visit",
+      "stop_reason": "booked",
+      "checks": [
+        {
+          "check": "goal_reached",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "at_most_one_booking",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_live_outbox",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "correct_property_booked",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "time_matches_selected_offer",
+          "status": "PASS",
+          "detail": ""
+        }
+      ],
+      "meetings": [
+        {
+          "id": "5e55256e-290e-43f8-a7f5-c8a0062785ac",
+          "time": "2026-11-16T15:00:00",
+          "property_id": "9cca24ce-3d61-586c-a66a-37f992b5185d"
+        }
+      ]
+    },
+    {
+      "case": "resume_cedar_viewing",
+      "stop_reason": "booked",
+      "checks": [
+        {
+          "check": "goal_reached",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "at_most_one_booking",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_live_outbox",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "correct_property_booked",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "time_matches_selected_offer",
+          "status": "PASS",
+          "detail": ""
+        }
+      ],
+      "meetings": [
+        {
+          "id": "dd91c173-6153-48cb-a0e3-394dc645315e",
+          "time": "2026-11-16T15:00:00",
+          "property_id": "8f7cedb7-5014-5d7b-ac40-ba5ee6f5f40c"
+        }
+      ]
+    },
+    {
+      "case": "resume_bay_see",
+      "stop_reason": "missing_public_next_step",
+      "checks": [
+        {
+          "check": "goal_reached",
+          "status": "FAIL",
+          "detail": ""
+        },
+        {
+          "check": "at_most_one_booking",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_live_outbox",
+          "status": "PASS",
+          "detail": ""
+        }
+      ],
+      "meetings": []
+    }
+  ]
+}

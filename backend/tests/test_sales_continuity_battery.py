@@ -23,6 +23,15 @@ def provider(request):
             data['references'].append(dict(id='owner',kind='property',expression=name,evidence=name));data['requests'][0]['reference_id']='owner';break
     if topic=='appointment' and text!='Yes':data['visit']=dict(action='request',evidence=text,timing=None)
     if text in {'Visit?','A viewing?','Can I see it?'}:data['requests']=[];data['all_of']=[]
+    history=ctx.get('history') or []
+    previous=next((m['content'] for m in reversed(history) if m.get('role')=='assistant'),'')
+    if text=='Can I see it?' and 'share' in previous.lower() and 'visit' not in previous.lower():
+        data=understanding(text,'materials').model_dump(mode='json')
+        data['references']=[dict(id='material',kind='material',expression=names[0]+' gallery',evidence=text)]
+        data['requests'][0]['reference_id']='material'
+    if text=='Hi':
+        data=understanding(text,confidence=0).model_dump(mode='json')
+        data['courtesy']=dict(kind='greeting',evidence=text)
     return httpx.Response(200,json={'choices':[{'message':{'content':json.dumps(data)}}]})
 
 def recorded_failure_provider(request):
