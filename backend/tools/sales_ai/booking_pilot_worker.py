@@ -99,7 +99,7 @@ def run(options_path, output):
                     report['cost_reporting_complete']=budget.usage['responses_with_cost']==budget.calls
                 if continuity:
                     report.update(overall_dialogue_quality='NOT_EVALUATED',quality_scope='Continuity, material ownership and first-booking checks only; human review remains necessary.',cost_reporting_complete=budget.usage['responses_with_cost']==budget.calls)
-                    report['split_results']={split:{'cases':sum(c.get('split')==split for c in report['cases']),'passed':sum(c.get('split')==split and all(k['status']=='PASS' for t in c.get('turns',[]) for k in t.get('checks',[])) and all(k['status']=='PASS' for k in c.get('checks',[])) for c in report['cases'])} for split in ('development','transfer')}
+                    report['split_results']={split:{'cases':sum(c.get('split')==split for c in report['cases']),'passed':sum(c.get('split')==split and all(k['status']=='PASS' for t in c.get('turns',[]) for k in t.get('checks',[])) and all(k['status']=='PASS' for k in c.get('checks',[])) for c in report['cases'])} for split in ('development','transfer','resumption')}
                 if needs:
                     report.update(overall_dialogue_quality='NOT_EVALUATED',quality_scope='Needs-first checks only; no integral dialogue certification.',cost_reporting_complete=budget.usage['responses_with_cost']==budget.calls)
                 report.update(provider_calls=budget.calls,provider_usage=budget.usage,scenario_count=len(report['cases']),

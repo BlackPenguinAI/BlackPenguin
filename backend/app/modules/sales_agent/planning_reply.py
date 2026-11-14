@@ -27,8 +27,10 @@ def continuation(outcome,holds):
         topics=plan.get('pending_topics') or []
         text='I still have requests to review'+(': '+', '.join(t.replace('_',' ') for t in topics[:4]) if topics else '')+'. Which would you like me to handle next?'
         return text,{}
-    if 'appointment' in plan.get('pending_topics',[]) and not outcome.state.last_understanding.permits('appointment'):
-        if getattr(outcome.state,"wait_context",None):
-            return "Is there another property question I can help with? If not, thank you for your interest and have a good day.",{}
-        return "We can return to arranging your visit when you're ready.",{}
+    if (getattr(outcome.state,'wait_context',None) and u
+        and all(r.topic.value=='other' for r in u.requests)
+        and not u.permits('appointment')):
+        return "Is there another property question I can help with? If not, thank you for your interest and have a good day.",{}
+    # Historical pending work is memory, not a current user request.
+    # Current reference questions above remain authoritative.
     return '',{}

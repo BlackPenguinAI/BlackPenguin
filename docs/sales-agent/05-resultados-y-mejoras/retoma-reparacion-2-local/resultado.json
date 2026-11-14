@@ -1,0 +1,2465 @@
+{
+  "scope": "offline_core_simulated_provider",
+  "model_quality_evaluated": false,
+  "paid_calls": 0,
+  "cost_usd": 0,
+  "cases": [
+    {
+      "case": "resume_bay_see",
+      "split": "resumption",
+      "lead_id": "904d4dcf-6e9f-4af1-9698-2e29f0171abd",
+      "conversation_id": "31d02faa-5aa8-4428-ad1d-83822442eca0",
+      "stop_reason": "booked",
+      "checks": [
+        {
+          "check": "goal_reached",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "at_most_one_booking",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_live_outbox",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "correct_property_booked",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "time_matches_selected_offer",
+          "status": "PASS",
+          "detail": ""
+        }
+      ],
+      "meetings": [
+        {
+          "id": "ab4cccef-032f-43ff-958a-ec7df6e19772",
+          "time": "2026-11-16 15:00:00",
+          "property_id": "85511ae1-1733-5177-9282-422514a416ce"
+        }
+      ],
+      "overall_dialogue_quality": "NOT_EVALUATED",
+      "turns": [
+        {
+          "action": "greeting",
+          "lead_message": "Hi",
+          "reply": "Here are the property options I can confirm:\n\n1. Bay Residence — 4 bedrooms, 3 bathrooms, 240 m². Published prices start at 780,000.00 USD. Synthetic property for testing. Only the listed features are confirmed. Features: Two covered parking spaces; Private garden.\n\nWhat would you like to know next about the property?",
+          "understanding": {
+            "version": "sales-understanding/1.0",
+            "requests": [
+              {
+                "id": "r0",
+                "topic": "catalog",
+                "subject": null,
+                "polarity": "request",
+                "evidence": "Hi",
+                "reference_id": null,
+                "detail_fields": [],
+                "feature": null
+              }
+            ],
+            "all_of": [
+              "r0"
+            ],
+            "alternatives": [],
+            "constraints": [],
+            "references": [],
+            "preferences": [],
+            "personal_facts": [],
+            "preference_withdrawals": [],
+            "comparison": null,
+            "source_purposes": [],
+            "objections": [],
+            "empathy": null,
+            "releases": [],
+            "visit": null,
+            "courtesy": null,
+            "reschedule": null,
+            "cancellation": null,
+            "wait": null,
+            "moderation": null,
+            "appointment_query": null,
+            "selected_reference_id": null,
+            "requires_clarification": false,
+            "clarification_question": null,
+            "confidence": 0.99
+          },
+          "checks": [
+            {
+              "check": "turn_completed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "reply_present",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "english_reply_not_rejected",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_internal_narration",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_booking_before_selection_and_final_confirmation",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_stale_visit_refrain",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "saved_search_matches_current_property",
+              "status": "PASS",
+              "detail": ""
+            }
+          ]
+        },
+        {
+          "action": "discover",
+          "lead_message": "I am looking for a 4 bedroom home.",
+          "reply": "Here is a 4-bedroom option in this project:\n\nBay Residence — 4 bedrooms, 240 m², from 780,000.00 USD.\n\nWould you like to know more about Bay Residence?",
+          "understanding": {
+            "version": "sales-understanding/1.0",
+            "requests": [
+              {
+                "id": "r0",
+                "topic": "catalog",
+                "subject": null,
+                "polarity": "request",
+                "evidence": "I am looking for a 4 bedroom home.",
+                "reference_id": null,
+                "detail_fields": [],
+                "feature": null
+              }
+            ],
+            "all_of": [
+              "r0"
+            ],
+            "alternatives": [],
+            "constraints": [],
+            "references": [],
+            "preferences": [
+              {
+                "key": "bedrooms",
+                "value": "4",
+                "evidence": "I am looking for a 4 bedroom home",
+                "status": "declared"
+              }
+            ],
+            "personal_facts": [],
+            "preference_withdrawals": [],
+            "comparison": null,
+            "source_purposes": [],
+            "objections": [],
+            "empathy": null,
+            "releases": [],
+            "visit": null,
+            "courtesy": null,
+            "reschedule": null,
+            "cancellation": null,
+            "wait": null,
+            "moderation": null,
+            "appointment_query": null,
+            "selected_reference_id": null,
+            "requires_clarification": false,
+            "clarification_question": null,
+            "confidence": 0.99
+          },
+          "checks": [
+            {
+              "check": "turn_completed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "reply_present",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "english_reply_not_rejected",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_internal_narration",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_booking_before_selection_and_final_confirmation",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_stale_visit_refrain",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "saved_search_matches_current_property",
+              "status": "PASS",
+              "detail": ""
+            }
+          ]
+        },
+        {
+          "action": "choose",
+          "lead_message": "Bay Residence",
+          "reply": "Here are the property options I can confirm:\n\n1. Bay Residence — 4 bedrooms, 3 bathrooms, 240 m². Published prices start at 780,000.00 USD. Synthetic property for testing. Only the listed features are confirmed. Features: Two covered parking spaces; Private garden.\n\nWhat would you like to know next about the property?",
+          "understanding": {
+            "version": "sales-understanding/1.0",
+            "requests": [
+              {
+                "id": "named_information",
+                "topic": "catalog",
+                "subject": null,
+                "polarity": "request",
+                "evidence": "Bay Residence",
+                "reference_id": "ref0",
+                "detail_fields": [],
+                "feature": null
+              }
+            ],
+            "all_of": [
+              "named_information"
+            ],
+            "alternatives": [],
+            "constraints": [],
+            "references": [
+              {
+                "kind": "property",
+                "id": "ref0",
+                "expression": "Bay Residence",
+                "evidence": "Bay Residence"
+              }
+            ],
+            "preferences": [],
+            "personal_facts": [],
+            "preference_withdrawals": [],
+            "comparison": null,
+            "source_purposes": [],
+            "objections": [],
+            "empathy": null,
+            "releases": [],
+            "visit": null,
+            "courtesy": null,
+            "reschedule": null,
+            "cancellation": null,
+            "wait": null,
+            "moderation": null,
+            "appointment_query": null,
+            "selected_reference_id": "ref0",
+            "requires_clarification": false,
+            "clarification_question": null,
+            "confidence": 0.99
+          },
+          "checks": [
+            {
+              "check": "turn_completed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "reply_present",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "english_reply_not_rejected",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_internal_narration",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_booking_before_selection_and_final_confirmation",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "active_property_retained",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_stale_visit_refrain",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "saved_search_matches_current_property",
+              "status": "PASS",
+              "detail": ""
+            }
+          ]
+        },
+        {
+          "action": "material",
+          "lead_message": "Show me the property blueprints",
+          "reply": "The requested floor plan is not available for this property. I can offer Bay Residence gallery (photos), Bay Residence synthetic brochure (brochure) as related material. Would you like me to share it?",
+          "understanding": {
+            "version": "sales-understanding/1.0",
+            "requests": [
+              {
+                "id": "current_material",
+                "topic": "materials",
+                "subject": "floor_plan",
+                "polarity": "request",
+                "evidence": "Show me the property blueprints",
+                "reference_id": "current_owner",
+                "detail_fields": [],
+                "feature": null
+              }
+            ],
+            "all_of": [
+              "current_material"
+            ],
+            "alternatives": [],
+            "constraints": [],
+            "references": [
+              {
+                "kind": "property",
+                "id": "current_owner",
+                "expression": "this property",
+                "evidence": "Show me the property blueprints"
+              }
+            ],
+            "preferences": [],
+            "personal_facts": [],
+            "preference_withdrawals": [],
+            "comparison": null,
+            "source_purposes": [],
+            "objections": [],
+            "empathy": null,
+            "releases": [],
+            "visit": null,
+            "courtesy": null,
+            "reschedule": null,
+            "cancellation": null,
+            "wait": null,
+            "moderation": null,
+            "appointment_query": null,
+            "selected_reference_id": null,
+            "requires_clarification": false,
+            "clarification_question": null,
+            "confidence": 0.99
+          },
+          "checks": [
+            {
+              "check": "turn_completed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "reply_present",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "english_reply_not_rejected",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_internal_narration",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_booking_before_selection_and_final_confirmation",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "active_property_retained",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_property_requestion",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "material_not_comparison",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_stale_visit_refrain",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "saved_search_matches_current_property",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "material_question_answered",
+              "status": "PASS",
+              "detail": ""
+            }
+          ]
+        },
+        {
+          "action": "material_repeat",
+          "lead_message": "I want to check blueprints",
+          "reply": "The requested floor plan is not available for this property. I can offer Bay Residence gallery (photos), Bay Residence synthetic brochure (brochure) as related material. Would you like me to share it?",
+          "understanding": {
+            "version": "sales-understanding/1.0",
+            "requests": [
+              {
+                "id": "current_material",
+                "topic": "materials",
+                "subject": "floor_plan",
+                "polarity": "request",
+                "evidence": "I want to check blueprints",
+                "reference_id": "current_owner",
+                "detail_fields": [],
+                "feature": null
+              }
+            ],
+            "all_of": [
+              "current_material"
+            ],
+            "alternatives": [],
+            "constraints": [],
+            "references": [
+              {
+                "kind": "property",
+                "id": "current_owner",
+                "expression": "this property",
+                "evidence": "I want to check blueprints"
+              }
+            ],
+            "preferences": [],
+            "personal_facts": [],
+            "preference_withdrawals": [],
+            "comparison": null,
+            "source_purposes": [],
+            "objections": [],
+            "empathy": null,
+            "releases": [],
+            "visit": null,
+            "courtesy": null,
+            "reschedule": null,
+            "cancellation": null,
+            "wait": null,
+            "moderation": null,
+            "appointment_query": null,
+            "selected_reference_id": null,
+            "requires_clarification": false,
+            "clarification_question": null,
+            "confidence": 0.99
+          },
+          "checks": [
+            {
+              "check": "turn_completed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "reply_present",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "english_reply_not_rejected",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_internal_narration",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_booking_before_selection_and_final_confirmation",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_property_requestion",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "material_not_comparison",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_stale_visit_refrain",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "saved_search_matches_current_property",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "material_question_answered",
+              "status": "PASS",
+              "detail": ""
+            }
+          ]
+        },
+        {
+          "action": "visit",
+          "lead_message": "Can I see it?",
+          "reply": "Verified visit options:\n\n1. 2026-11-16 at 09:00 AM (America/Chicago, UTC-0600); Synthetic candidate\n\n2. 2026-11-16 at 09:30 AM (America/Chicago, UTC-0600); Synthetic candidate\n\n3. 2026-11-16 at 10:00 AM (America/Chicago, UTC-0600); Synthetic candidate\n\nWhich time would you like me to prepare for confirmation?",
+          "understanding": {
+            "version": "sales-understanding/1.0",
+            "requests": [
+              {
+                "id": "current_visit",
+                "topic": "appointment",
+                "subject": null,
+                "polarity": "request",
+                "evidence": "Can I see it?",
+                "reference_id": null,
+                "detail_fields": [],
+                "feature": null
+              }
+            ],
+            "all_of": [
+              "current_visit"
+            ],
+            "alternatives": [],
+            "constraints": [],
+            "references": [],
+            "preferences": [],
+            "personal_facts": [],
+            "preference_withdrawals": [],
+            "comparison": null,
+            "source_purposes": [],
+            "objections": [],
+            "empathy": null,
+            "releases": [],
+            "visit": {
+              "action": "request",
+              "evidence": "Can I see it?",
+              "timing": null
+            },
+            "courtesy": null,
+            "reschedule": null,
+            "cancellation": null,
+            "wait": null,
+            "moderation": null,
+            "appointment_query": null,
+            "selected_reference_id": null,
+            "requires_clarification": false,
+            "clarification_question": null,
+            "confidence": 0.99
+          },
+          "checks": [
+            {
+              "check": "turn_completed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "reply_present",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "english_reply_not_rejected",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_internal_narration",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_booking_before_selection_and_final_confirmation",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "active_property_retained",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_stale_visit_refrain",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "saved_search_matches_current_property",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "visit_reaches_options_or_unavailability",
+              "status": "PASS",
+              "detail": ""
+            }
+          ]
+        },
+        {
+          "action": "select",
+          "lead_message": "November 16, 9:00AM",
+          "reply": "Please confirm your visit: Bay Residence; 2026-11-16 at 09:00 AM (America/Chicago, UTC-0600); Synthetic candidate; 45 minutes; Primary location: 1 Synthetic Avenue. Shall I book this exact visit?",
+          "understanding": {
+            "version": "sales-understanding/1.0",
+            "requests": [
+              {
+                "id": "public_slot",
+                "topic": "appointment",
+                "subject": null,
+                "polarity": "request",
+                "evidence": "November 16, 9:00AM",
+                "reference_id": "public_slot_ref",
+                "detail_fields": [],
+                "feature": null
+              }
+            ],
+            "all_of": [
+              "public_slot"
+            ],
+            "alternatives": [],
+            "constraints": [],
+            "references": [
+              {
+                "kind": "appointment",
+                "id": "public_slot_ref",
+                "expression": "first appointment",
+                "evidence": "November 16, 9:00AM"
+              }
+            ],
+            "preferences": [],
+            "personal_facts": [],
+            "preference_withdrawals": [],
+            "comparison": null,
+            "source_purposes": [],
+            "objections": [],
+            "empathy": null,
+            "releases": [],
+            "visit": {
+              "action": "select",
+              "evidence": "November 16, 9:00AM",
+              "timing": null
+            },
+            "courtesy": null,
+            "reschedule": null,
+            "cancellation": null,
+            "wait": null,
+            "moderation": null,
+            "appointment_query": null,
+            "selected_reference_id": null,
+            "requires_clarification": false,
+            "clarification_question": null,
+            "confidence": 0.99
+          },
+          "checks": [
+            {
+              "check": "turn_completed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "reply_present",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "english_reply_not_rejected",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_internal_narration",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_booking_before_selection_and_final_confirmation",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "active_property_retained",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_stale_visit_refrain",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "saved_search_matches_current_property",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "selection_prepares_summary",
+              "status": "PASS",
+              "detail": ""
+            }
+          ]
+        },
+        {
+          "action": "confirm",
+          "lead_message": "Yes",
+          "reply": "Your visit is confirmed: Bay Residence; 2026-11-16 at 09:00 AM (America/Chicago, UTC-0600); Synthetic candidate; 45 minutes; Primary location: 1 Synthetic Avenue. What else would you like to know before your visit?",
+          "understanding": {
+            "version": "sales-understanding/1.0",
+            "requests": [
+              {
+                "id": "backend_summary_acceptance",
+                "topic": "appointment",
+                "subject": null,
+                "polarity": "request",
+                "evidence": "Yes",
+                "reference_id": null,
+                "detail_fields": [],
+                "feature": null
+              }
+            ],
+            "all_of": [
+              "backend_summary_acceptance"
+            ],
+            "alternatives": [],
+            "constraints": [],
+            "references": [],
+            "preferences": [],
+            "personal_facts": [],
+            "preference_withdrawals": [],
+            "comparison": null,
+            "source_purposes": [],
+            "objections": [],
+            "empathy": null,
+            "releases": [],
+            "visit": {
+              "action": "confirm",
+              "evidence": "Yes",
+              "timing": null
+            },
+            "courtesy": null,
+            "reschedule": null,
+            "cancellation": null,
+            "wait": null,
+            "moderation": null,
+            "appointment_query": null,
+            "selected_reference_id": null,
+            "requires_clarification": false,
+            "clarification_question": null,
+            "confidence": 0.99
+          },
+          "checks": [
+            {
+              "check": "turn_completed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "reply_present",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "english_reply_not_rejected",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_internal_narration",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_booking_before_selection_and_final_confirmation",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "active_property_retained",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_stale_visit_refrain",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "saved_search_matches_current_property",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "confirmation_books_current_summary",
+              "status": "PASS",
+              "detail": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "resume_cedar_viewing",
+      "split": "resumption",
+      "lead_id": "2d4cb3aa-8f3d-4469-8932-f33c05e4cd2b",
+      "conversation_id": "0a2869f0-77e4-4a6a-bfcb-8f46f8382835",
+      "stop_reason": "booked",
+      "checks": [
+        {
+          "check": "goal_reached",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "at_most_one_booking",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_live_outbox",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "correct_property_booked",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "time_matches_selected_offer",
+          "status": "PASS",
+          "detail": ""
+        }
+      ],
+      "meetings": [
+        {
+          "id": "fc5e4d99-31cd-4d56-861d-09dc88bd1fdc",
+          "time": "2026-11-16 15:00:00",
+          "property_id": "8f7cedb7-5014-5d7b-ac40-ba5ee6f5f40c"
+        }
+      ],
+      "overall_dialogue_quality": "NOT_EVALUATED",
+      "turns": [
+        {
+          "action": "greeting",
+          "lead_message": "Hi",
+          "reply": "Here are the property options I can confirm:\n\n1. Cedar Loft — 2 bedrooms, 2 bathrooms, 110 m². Published prices start at 325,000.00 USD.\n\n2. Cedar Studio — 1 bedroom, 1 bathroom, 52 m². Published prices start at 210,000.00 USD.\n\nWhat would you like to know next about the property?",
+          "understanding": {
+            "version": "sales-understanding/1.0",
+            "requests": [
+              {
+                "id": "r0",
+                "topic": "catalog",
+                "subject": null,
+                "polarity": "request",
+                "evidence": "Hi",
+                "reference_id": null,
+                "detail_fields": [],
+                "feature": null
+              }
+            ],
+            "all_of": [
+              "r0"
+            ],
+            "alternatives": [],
+            "constraints": [],
+            "references": [],
+            "preferences": [],
+            "personal_facts": [],
+            "preference_withdrawals": [],
+            "comparison": null,
+            "source_purposes": [],
+            "objections": [],
+            "empathy": null,
+            "releases": [],
+            "visit": null,
+            "courtesy": null,
+            "reschedule": null,
+            "cancellation": null,
+            "wait": null,
+            "moderation": null,
+            "appointment_query": null,
+            "selected_reference_id": null,
+            "requires_clarification": false,
+            "clarification_question": null,
+            "confidence": 0.99
+          },
+          "checks": [
+            {
+              "check": "turn_completed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "reply_present",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "english_reply_not_rejected",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_internal_narration",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_booking_before_selection_and_final_confirmation",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_stale_visit_refrain",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "saved_search_matches_current_property",
+              "status": "PASS",
+              "detail": ""
+            }
+          ]
+        },
+        {
+          "action": "discover",
+          "lead_message": "I am looking for a 2 bedroom home.",
+          "reply": "Here is a 2-bedroom option in this project:\n\nCedar Loft — 2 bedrooms, 110 m², from 325,000.00 USD.\n\nWould you like to know more about Cedar Loft?",
+          "understanding": {
+            "version": "sales-understanding/1.0",
+            "requests": [
+              {
+                "id": "r0",
+                "topic": "catalog",
+                "subject": null,
+                "polarity": "request",
+                "evidence": "I am looking for a 2 bedroom home.",
+                "reference_id": null,
+                "detail_fields": [],
+                "feature": null
+              }
+            ],
+            "all_of": [
+              "r0"
+            ],
+            "alternatives": [],
+            "constraints": [],
+            "references": [],
+            "preferences": [
+              {
+                "key": "bedrooms",
+                "value": "2",
+                "evidence": "I am looking for a 2 bedroom home",
+                "status": "declared"
+              }
+            ],
+            "personal_facts": [],
+            "preference_withdrawals": [],
+            "comparison": null,
+            "source_purposes": [],
+            "objections": [],
+            "empathy": null,
+            "releases": [],
+            "visit": null,
+            "courtesy": null,
+            "reschedule": null,
+            "cancellation": null,
+            "wait": null,
+            "moderation": null,
+            "appointment_query": null,
+            "selected_reference_id": null,
+            "requires_clarification": false,
+            "clarification_question": null,
+            "confidence": 0.99
+          },
+          "checks": [
+            {
+              "check": "turn_completed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "reply_present",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "english_reply_not_rejected",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_internal_narration",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_booking_before_selection_and_final_confirmation",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_stale_visit_refrain",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "saved_search_matches_current_property",
+              "status": "PASS",
+              "detail": ""
+            }
+          ]
+        },
+        {
+          "action": "choose",
+          "lead_message": "Cedar Loft",
+          "reply": "Here are the property options I can confirm:\n\n1. Cedar Loft — 2 bedrooms, 2 bathrooms, 110 m². Published prices start at 325,000.00 USD. Synthetic property for testing. Only the listed features are confirmed. Features: One parking space; Balcony.\n\nWhat would you like to know next about the property?",
+          "understanding": {
+            "version": "sales-understanding/1.0",
+            "requests": [
+              {
+                "id": "named_information",
+                "topic": "catalog",
+                "subject": null,
+                "polarity": "request",
+                "evidence": "Cedar Loft",
+                "reference_id": "ref0",
+                "detail_fields": [],
+                "feature": null
+              }
+            ],
+            "all_of": [
+              "named_information"
+            ],
+            "alternatives": [],
+            "constraints": [],
+            "references": [
+              {
+                "kind": "property",
+                "id": "ref0",
+                "expression": "Cedar Loft",
+                "evidence": "Cedar Loft"
+              }
+            ],
+            "preferences": [],
+            "personal_facts": [],
+            "preference_withdrawals": [],
+            "comparison": null,
+            "source_purposes": [],
+            "objections": [],
+            "empathy": null,
+            "releases": [],
+            "visit": null,
+            "courtesy": null,
+            "reschedule": null,
+            "cancellation": null,
+            "wait": null,
+            "moderation": null,
+            "appointment_query": null,
+            "selected_reference_id": "ref0",
+            "requires_clarification": false,
+            "clarification_question": null,
+            "confidence": 0.99
+          },
+          "checks": [
+            {
+              "check": "turn_completed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "reply_present",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "english_reply_not_rejected",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_internal_narration",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_booking_before_selection_and_final_confirmation",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "active_property_retained",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_stale_visit_refrain",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "saved_search_matches_current_property",
+              "status": "PASS",
+              "detail": ""
+            }
+          ]
+        },
+        {
+          "action": "material",
+          "lead_message": "Do you have photos of the property?",
+          "reply": "Cedar Loft gallery: https://blackpenguin.ai/api/v1/projects/a/NyWDdZ6bQUFWDzeeYCF4Qlao",
+          "understanding": {
+            "version": "sales-understanding/1.0",
+            "requests": [
+              {
+                "id": "current_material",
+                "topic": "materials",
+                "subject": "photos",
+                "polarity": "request",
+                "evidence": "Do you have photos of the property?",
+                "reference_id": "current_owner",
+                "detail_fields": [],
+                "feature": null
+              }
+            ],
+            "all_of": [
+              "current_material"
+            ],
+            "alternatives": [],
+            "constraints": [],
+            "references": [
+              {
+                "kind": "property",
+                "id": "current_owner",
+                "expression": "this property",
+                "evidence": "Do you have photos of the property?"
+              }
+            ],
+            "preferences": [],
+            "personal_facts": [],
+            "preference_withdrawals": [],
+            "comparison": null,
+            "source_purposes": [],
+            "objections": [],
+            "empathy": null,
+            "releases": [],
+            "visit": null,
+            "courtesy": null,
+            "reschedule": null,
+            "cancellation": null,
+            "wait": null,
+            "moderation": null,
+            "appointment_query": null,
+            "selected_reference_id": null,
+            "requires_clarification": false,
+            "clarification_question": null,
+            "confidence": 0.99
+          },
+          "checks": [
+            {
+              "check": "turn_completed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "reply_present",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "english_reply_not_rejected",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_internal_narration",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_booking_before_selection_and_final_confirmation",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "active_property_retained",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_property_requestion",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "material_not_comparison",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "requested_photos_or_truthful_absence",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_stale_visit_refrain",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "saved_search_matches_current_property",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "material_question_answered",
+              "status": "PASS",
+              "detail": ""
+            }
+          ]
+        },
+        {
+          "action": "material_repeat",
+          "lead_message": "Can you show me pictures?",
+          "reply": "Cedar Loft gallery: https://blackpenguin.ai/api/v1/projects/a/BmPVRqjtir0LWLidoYEBKrI3",
+          "understanding": {
+            "version": "sales-understanding/1.0",
+            "requests": [
+              {
+                "id": "r0",
+                "topic": "materials",
+                "subject": "photos",
+                "polarity": "request",
+                "evidence": "Can you show me pictures?",
+                "reference_id": null,
+                "detail_fields": [],
+                "feature": null
+              }
+            ],
+            "all_of": [
+              "r0"
+            ],
+            "alternatives": [],
+            "constraints": [],
+            "references": [],
+            "preferences": [],
+            "personal_facts": [],
+            "preference_withdrawals": [],
+            "comparison": null,
+            "source_purposes": [],
+            "objections": [],
+            "empathy": null,
+            "releases": [],
+            "visit": null,
+            "courtesy": null,
+            "reschedule": null,
+            "cancellation": null,
+            "wait": null,
+            "moderation": null,
+            "appointment_query": null,
+            "selected_reference_id": null,
+            "requires_clarification": false,
+            "clarification_question": null,
+            "confidence": 0.99
+          },
+          "checks": [
+            {
+              "check": "turn_completed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "reply_present",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "english_reply_not_rejected",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_internal_narration",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_booking_before_selection_and_final_confirmation",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_property_requestion",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "material_not_comparison",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "requested_photos_or_truthful_absence",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_stale_visit_refrain",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "saved_search_matches_current_property",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "material_question_answered",
+              "status": "PASS",
+              "detail": ""
+            }
+          ]
+        },
+        {
+          "action": "visit",
+          "lead_message": "A viewing?",
+          "reply": "Verified visit options:\n\n1. 2026-11-16 at 09:00 AM (America/Chicago, UTC-0600); Synthetic candidate\n\n2. 2026-11-16 at 09:30 AM (America/Chicago, UTC-0600); Synthetic candidate\n\n3. 2026-11-16 at 10:00 AM (America/Chicago, UTC-0600); Synthetic candidate\n\nWhich time would you like me to prepare for confirmation?",
+          "understanding": {
+            "version": "sales-understanding/1.0",
+            "requests": [
+              {
+                "id": "current_visit",
+                "topic": "appointment",
+                "subject": null,
+                "polarity": "request",
+                "evidence": "A viewing?",
+                "reference_id": null,
+                "detail_fields": [],
+                "feature": null
+              }
+            ],
+            "all_of": [
+              "current_visit"
+            ],
+            "alternatives": [],
+            "constraints": [],
+            "references": [],
+            "preferences": [],
+            "personal_facts": [],
+            "preference_withdrawals": [],
+            "comparison": null,
+            "source_purposes": [],
+            "objections": [],
+            "empathy": null,
+            "releases": [],
+            "visit": {
+              "action": "request",
+              "evidence": "A viewing?",
+              "timing": null
+            },
+            "courtesy": null,
+            "reschedule": null,
+            "cancellation": null,
+            "wait": null,
+            "moderation": null,
+            "appointment_query": null,
+            "selected_reference_id": null,
+            "requires_clarification": false,
+            "clarification_question": null,
+            "confidence": 0.99
+          },
+          "checks": [
+            {
+              "check": "turn_completed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "reply_present",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "english_reply_not_rejected",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_internal_narration",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_booking_before_selection_and_final_confirmation",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "active_property_retained",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_stale_visit_refrain",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "saved_search_matches_current_property",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "visit_reaches_options_or_unavailability",
+              "status": "PASS",
+              "detail": ""
+            }
+          ]
+        },
+        {
+          "action": "select",
+          "lead_message": "16/11, 9:00AM",
+          "reply": "Please confirm your visit: Cedar Loft; 2026-11-16 at 09:00 AM (America/Chicago, UTC-0600); Synthetic candidate; 45 minutes; Primary location: 2 Synthetic Avenue. Shall I book this exact visit?",
+          "understanding": {
+            "version": "sales-understanding/1.0",
+            "requests": [
+              {
+                "id": "public_slot",
+                "topic": "appointment",
+                "subject": null,
+                "polarity": "request",
+                "evidence": "16/11, 9:00AM",
+                "reference_id": "public_slot_ref",
+                "detail_fields": [],
+                "feature": null
+              }
+            ],
+            "all_of": [
+              "public_slot"
+            ],
+            "alternatives": [],
+            "constraints": [],
+            "references": [
+              {
+                "kind": "appointment",
+                "id": "public_slot_ref",
+                "expression": "first appointment",
+                "evidence": "16/11, 9:00AM"
+              }
+            ],
+            "preferences": [],
+            "personal_facts": [],
+            "preference_withdrawals": [],
+            "comparison": null,
+            "source_purposes": [],
+            "objections": [],
+            "empathy": null,
+            "releases": [],
+            "visit": {
+              "action": "select",
+              "evidence": "16/11, 9:00AM",
+              "timing": null
+            },
+            "courtesy": null,
+            "reschedule": null,
+            "cancellation": null,
+            "wait": null,
+            "moderation": null,
+            "appointment_query": null,
+            "selected_reference_id": null,
+            "requires_clarification": false,
+            "clarification_question": null,
+            "confidence": 0.99
+          },
+          "checks": [
+            {
+              "check": "turn_completed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "reply_present",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "english_reply_not_rejected",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_internal_narration",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_booking_before_selection_and_final_confirmation",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "active_property_retained",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_stale_visit_refrain",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "saved_search_matches_current_property",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "selection_prepares_summary",
+              "status": "PASS",
+              "detail": ""
+            }
+          ]
+        },
+        {
+          "action": "confirm",
+          "lead_message": "Yes",
+          "reply": "Your visit is confirmed: Cedar Loft; 2026-11-16 at 09:00 AM (America/Chicago, UTC-0600); Synthetic candidate; 45 minutes; Primary location: 2 Synthetic Avenue. What else would you like to know before your visit?",
+          "understanding": {
+            "version": "sales-understanding/1.0",
+            "requests": [
+              {
+                "id": "backend_summary_acceptance",
+                "topic": "appointment",
+                "subject": null,
+                "polarity": "request",
+                "evidence": "Yes",
+                "reference_id": null,
+                "detail_fields": [],
+                "feature": null
+              }
+            ],
+            "all_of": [
+              "backend_summary_acceptance"
+            ],
+            "alternatives": [],
+            "constraints": [],
+            "references": [],
+            "preferences": [],
+            "personal_facts": [],
+            "preference_withdrawals": [],
+            "comparison": null,
+            "source_purposes": [],
+            "objections": [],
+            "empathy": null,
+            "releases": [],
+            "visit": {
+              "action": "confirm",
+              "evidence": "Yes",
+              "timing": null
+            },
+            "courtesy": null,
+            "reschedule": null,
+            "cancellation": null,
+            "wait": null,
+            "moderation": null,
+            "appointment_query": null,
+            "selected_reference_id": null,
+            "requires_clarification": false,
+            "clarification_question": null,
+            "confidence": 0.99
+          },
+          "checks": [
+            {
+              "check": "turn_completed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "reply_present",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "english_reply_not_rejected",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_internal_narration",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_booking_before_selection_and_final_confirmation",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "active_property_retained",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_stale_visit_refrain",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "saved_search_matches_current_property",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "confirmation_books_current_summary",
+              "status": "PASS",
+              "detail": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "resume_missing_visit",
+      "split": "resumption",
+      "lead_id": "6e1ef85e-215f-46db-a34e-3a8c03e58401",
+      "conversation_id": "1fa8ff8b-c1df-400f-95ac-bd3484096430",
+      "stop_reason": "booked",
+      "checks": [
+        {
+          "check": "goal_reached",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "at_most_one_booking",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "no_live_outbox",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "correct_property_booked",
+          "status": "PASS",
+          "detail": ""
+        },
+        {
+          "check": "time_matches_selected_offer",
+          "status": "PASS",
+          "detail": ""
+        }
+      ],
+      "meetings": [
+        {
+          "id": "a900d16a-ae67-43d7-9fc1-d3469cb19cc5",
+          "time": "2026-11-16 15:00:00",
+          "property_id": "9cca24ce-3d61-586c-a66a-37f992b5185d"
+        }
+      ],
+      "overall_dialogue_quality": "NOT_EVALUATED",
+      "turns": [
+        {
+          "action": "greeting",
+          "lead_message": "Hi",
+          "reply": "Here are the property options I can confirm:\n\n1. Ridge Townhome — 3 bedrooms, 2.5 bathrooms, 165 m². Published prices start at 460,000.00 USD.\n\n2. Summit Villa — 4 bedrooms, 3 bathrooms, 220 m². Published prices start at 620,000.00 USD.\n\n3. Valley Apartment — 2 bedrooms, 2 bathrooms, 95 m².\n\nWhat would you like to know next about the property?",
+          "understanding": {
+            "version": "sales-understanding/1.0",
+            "requests": [
+              {
+                "id": "r0",
+                "topic": "catalog",
+                "subject": null,
+                "polarity": "request",
+                "evidence": "Hi",
+                "reference_id": null,
+                "detail_fields": [],
+                "feature": null
+              }
+            ],
+            "all_of": [
+              "r0"
+            ],
+            "alternatives": [],
+            "constraints": [],
+            "references": [],
+            "preferences": [],
+            "personal_facts": [],
+            "preference_withdrawals": [],
+            "comparison": null,
+            "source_purposes": [],
+            "objections": [],
+            "empathy": null,
+            "releases": [],
+            "visit": null,
+            "courtesy": null,
+            "reschedule": null,
+            "cancellation": null,
+            "wait": null,
+            "moderation": null,
+            "appointment_query": null,
+            "selected_reference_id": null,
+            "requires_clarification": false,
+            "clarification_question": null,
+            "confidence": 0.99
+          },
+          "checks": [
+            {
+              "check": "turn_completed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "reply_present",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "english_reply_not_rejected",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_internal_narration",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_booking_before_selection_and_final_confirmation",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_stale_visit_refrain",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "saved_search_matches_current_property",
+              "status": "PASS",
+              "detail": ""
+            }
+          ]
+        },
+        {
+          "action": "discover",
+          "lead_message": "I am looking for a 3 bedroom home.",
+          "reply": "Here is a 3-bedroom option in this project:\n\nRidge Townhome — 3 bedrooms, 165 m², from 460,000.00 USD.\n\nWould you like to know more about Ridge Townhome?",
+          "understanding": {
+            "version": "sales-understanding/1.0",
+            "requests": [
+              {
+                "id": "r0",
+                "topic": "catalog",
+                "subject": null,
+                "polarity": "request",
+                "evidence": "I am looking for a 3 bedroom home.",
+                "reference_id": null,
+                "detail_fields": [],
+                "feature": null
+              }
+            ],
+            "all_of": [
+              "r0"
+            ],
+            "alternatives": [],
+            "constraints": [],
+            "references": [],
+            "preferences": [
+              {
+                "key": "bedrooms",
+                "value": "3",
+                "evidence": "I am looking for a 3 bedroom home",
+                "status": "declared"
+              }
+            ],
+            "personal_facts": [],
+            "preference_withdrawals": [],
+            "comparison": null,
+            "source_purposes": [],
+            "objections": [],
+            "empathy": null,
+            "releases": [],
+            "visit": null,
+            "courtesy": null,
+            "reschedule": null,
+            "cancellation": null,
+            "wait": null,
+            "moderation": null,
+            "appointment_query": null,
+            "selected_reference_id": null,
+            "requires_clarification": false,
+            "clarification_question": null,
+            "confidence": 0.99
+          },
+          "checks": [
+            {
+              "check": "turn_completed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "reply_present",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "english_reply_not_rejected",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_internal_narration",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_booking_before_selection_and_final_confirmation",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_stale_visit_refrain",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "saved_search_matches_current_property",
+              "status": "PASS",
+              "detail": ""
+            }
+          ]
+        },
+        {
+          "action": "choose",
+          "lead_message": "Ridge Townhome",
+          "reply": "Here are the property options I can confirm:\n\n1. Ridge Townhome — 3 bedrooms, 2.5 bathrooms, 165 m². Published prices start at 460,000.00 USD. Synthetic property for testing. Only the listed features are confirmed. Features: Private patio.\n\nWhat would you like to know next about the property?",
+          "understanding": {
+            "version": "sales-understanding/1.0",
+            "requests": [
+              {
+                "id": "named_information",
+                "topic": "catalog",
+                "subject": null,
+                "polarity": "request",
+                "evidence": "Ridge Townhome",
+                "reference_id": "ref0",
+                "detail_fields": [],
+                "feature": null
+              }
+            ],
+            "all_of": [
+              "named_information"
+            ],
+            "alternatives": [],
+            "constraints": [],
+            "references": [
+              {
+                "kind": "property",
+                "id": "ref0",
+                "expression": "Ridge Townhome",
+                "evidence": "Ridge Townhome"
+              }
+            ],
+            "preferences": [],
+            "personal_facts": [],
+            "preference_withdrawals": [],
+            "comparison": null,
+            "source_purposes": [],
+            "objections": [],
+            "empathy": null,
+            "releases": [],
+            "visit": null,
+            "courtesy": null,
+            "reschedule": null,
+            "cancellation": null,
+            "wait": null,
+            "moderation": null,
+            "appointment_query": null,
+            "selected_reference_id": "ref0",
+            "requires_clarification": false,
+            "clarification_question": null,
+            "confidence": 0.99
+          },
+          "checks": [
+            {
+              "check": "turn_completed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "reply_present",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "english_reply_not_rejected",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_internal_narration",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_booking_before_selection_and_final_confirmation",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "active_property_retained",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_stale_visit_refrain",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "saved_search_matches_current_property",
+              "status": "PASS",
+              "detail": ""
+            }
+          ]
+        },
+        {
+          "action": "material",
+          "lead_message": "Do you have photos of the property?",
+          "reply": "I don't have photos available for this property. What would you like to know about it?",
+          "understanding": {
+            "version": "sales-understanding/1.0",
+            "requests": [
+              {
+                "id": "current_material",
+                "topic": "materials",
+                "subject": "photos",
+                "polarity": "request",
+                "evidence": "Do you have photos of the property?",
+                "reference_id": "current_owner",
+                "detail_fields": [],
+                "feature": null
+              }
+            ],
+            "all_of": [
+              "current_material"
+            ],
+            "alternatives": [],
+            "constraints": [],
+            "references": [
+              {
+                "kind": "property",
+                "id": "current_owner",
+                "expression": "this property",
+                "evidence": "Do you have photos of the property?"
+              }
+            ],
+            "preferences": [],
+            "personal_facts": [],
+            "preference_withdrawals": [],
+            "comparison": null,
+            "source_purposes": [],
+            "objections": [],
+            "empathy": null,
+            "releases": [],
+            "visit": null,
+            "courtesy": null,
+            "reschedule": null,
+            "cancellation": null,
+            "wait": null,
+            "moderation": null,
+            "appointment_query": null,
+            "selected_reference_id": null,
+            "requires_clarification": false,
+            "clarification_question": null,
+            "confidence": 0.99
+          },
+          "checks": [
+            {
+              "check": "turn_completed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "reply_present",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "english_reply_not_rejected",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_internal_narration",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_booking_before_selection_and_final_confirmation",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "active_property_retained",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_property_requestion",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "material_not_comparison",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "requested_photos_or_truthful_absence",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_stale_visit_refrain",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "saved_search_matches_current_property",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "material_question_answered",
+              "status": "PASS",
+              "detail": ""
+            }
+          ]
+        },
+        {
+          "action": "material_repeat",
+          "lead_message": "Can you show me pictures?",
+          "reply": "I don't have photos available for this property. What would you like to know about it?",
+          "understanding": {
+            "version": "sales-understanding/1.0",
+            "requests": [
+              {
+                "id": "r0",
+                "topic": "materials",
+                "subject": "photos",
+                "polarity": "request",
+                "evidence": "Can you show me pictures?",
+                "reference_id": null,
+                "detail_fields": [],
+                "feature": null
+              }
+            ],
+            "all_of": [
+              "r0"
+            ],
+            "alternatives": [],
+            "constraints": [],
+            "references": [],
+            "preferences": [],
+            "personal_facts": [],
+            "preference_withdrawals": [],
+            "comparison": null,
+            "source_purposes": [],
+            "objections": [],
+            "empathy": null,
+            "releases": [],
+            "visit": null,
+            "courtesy": null,
+            "reschedule": null,
+            "cancellation": null,
+            "wait": null,
+            "moderation": null,
+            "appointment_query": null,
+            "selected_reference_id": null,
+            "requires_clarification": false,
+            "clarification_question": null,
+            "confidence": 0.99
+          },
+          "checks": [
+            {
+              "check": "turn_completed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "reply_present",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "english_reply_not_rejected",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_internal_narration",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_booking_before_selection_and_final_confirmation",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_property_requestion",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "material_not_comparison",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "requested_photos_or_truthful_absence",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_stale_visit_refrain",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "saved_search_matches_current_property",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "material_question_answered",
+              "status": "PASS",
+              "detail": ""
+            }
+          ]
+        },
+        {
+          "action": "visit",
+          "lead_message": "Visit?",
+          "reply": "Verified visit options:\n\n1. 2026-11-16 at 08:00 AM (America/Denver, UTC-0700); Synthetic candidate\n\n2. 2026-11-16 at 08:30 AM (America/Denver, UTC-0700); Synthetic candidate\n\n3. 2026-11-16 at 09:00 AM (America/Denver, UTC-0700); Synthetic candidate\n\nWhich time would you like me to prepare for confirmation?",
+          "understanding": {
+            "version": "sales-understanding/1.0",
+            "requests": [
+              {
+                "id": "current_visit",
+                "topic": "appointment",
+                "subject": null,
+                "polarity": "request",
+                "evidence": "Visit?",
+                "reference_id": null,
+                "detail_fields": [],
+                "feature": null
+              }
+            ],
+            "all_of": [
+              "current_visit"
+            ],
+            "alternatives": [],
+            "constraints": [],
+            "references": [],
+            "preferences": [],
+            "personal_facts": [],
+            "preference_withdrawals": [],
+            "comparison": null,
+            "source_purposes": [],
+            "objections": [],
+            "empathy": null,
+            "releases": [],
+            "visit": {
+              "action": "request",
+              "evidence": "Visit?",
+              "timing": null
+            },
+            "courtesy": null,
+            "reschedule": null,
+            "cancellation": null,
+            "wait": null,
+            "moderation": null,
+            "appointment_query": null,
+            "selected_reference_id": null,
+            "requires_clarification": false,
+            "clarification_question": null,
+            "confidence": 0.99
+          },
+          "checks": [
+            {
+              "check": "turn_completed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "reply_present",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "english_reply_not_rejected",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_internal_narration",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_booking_before_selection_and_final_confirmation",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "active_property_retained",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_stale_visit_refrain",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "saved_search_matches_current_property",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "visit_reaches_options_or_unavailability",
+              "status": "PASS",
+              "detail": ""
+            }
+          ]
+        },
+        {
+          "action": "select",
+          "lead_message": "November 16, 8:00AM",
+          "reply": "Please confirm your visit: Ridge Townhome; 2026-11-16 at 08:00 AM (America/Denver, UTC-0700); Synthetic candidate; 45 minutes; Primary location: 3 Synthetic Avenue. Shall I book this exact visit?",
+          "understanding": {
+            "version": "sales-understanding/1.0",
+            "requests": [
+              {
+                "id": "public_slot",
+                "topic": "appointment",
+                "subject": null,
+                "polarity": "request",
+                "evidence": "November 16, 8:00AM",
+                "reference_id": "public_slot_ref",
+                "detail_fields": [],
+                "feature": null
+              }
+            ],
+            "all_of": [
+              "public_slot"
+            ],
+            "alternatives": [],
+            "constraints": [],
+            "references": [
+              {
+                "kind": "appointment",
+                "id": "public_slot_ref",
+                "expression": "first appointment",
+                "evidence": "November 16, 8:00AM"
+              }
+            ],
+            "preferences": [],
+            "personal_facts": [],
+            "preference_withdrawals": [],
+            "comparison": null,
+            "source_purposes": [],
+            "objections": [],
+            "empathy": null,
+            "releases": [],
+            "visit": {
+              "action": "select",
+              "evidence": "November 16, 8:00AM",
+              "timing": null
+            },
+            "courtesy": null,
+            "reschedule": null,
+            "cancellation": null,
+            "wait": null,
+            "moderation": null,
+            "appointment_query": null,
+            "selected_reference_id": null,
+            "requires_clarification": false,
+            "clarification_question": null,
+            "confidence": 0.99
+          },
+          "checks": [
+            {
+              "check": "turn_completed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "reply_present",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "english_reply_not_rejected",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_internal_narration",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_booking_before_selection_and_final_confirmation",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "active_property_retained",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_stale_visit_refrain",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "saved_search_matches_current_property",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "selection_prepares_summary",
+              "status": "PASS",
+              "detail": ""
+            }
+          ]
+        },
+        {
+          "action": "confirm",
+          "lead_message": "Yes",
+          "reply": "Your visit is confirmed: Ridge Townhome; 2026-11-16 at 08:00 AM (America/Denver, UTC-0700); Synthetic candidate; 45 minutes; Primary location: 3 Synthetic Avenue. What else would you like to know before your visit?",
+          "understanding": {
+            "version": "sales-understanding/1.0",
+            "requests": [
+              {
+                "id": "backend_summary_acceptance",
+                "topic": "appointment",
+                "subject": null,
+                "polarity": "request",
+                "evidence": "Yes",
+                "reference_id": null,
+                "detail_fields": [],
+                "feature": null
+              }
+            ],
+            "all_of": [
+              "backend_summary_acceptance"
+            ],
+            "alternatives": [],
+            "constraints": [],
+            "references": [],
+            "preferences": [],
+            "personal_facts": [],
+            "preference_withdrawals": [],
+            "comparison": null,
+            "source_purposes": [],
+            "objections": [],
+            "empathy": null,
+            "releases": [],
+            "visit": {
+              "action": "confirm",
+              "evidence": "Yes",
+              "timing": null
+            },
+            "courtesy": null,
+            "reschedule": null,
+            "cancellation": null,
+            "wait": null,
+            "moderation": null,
+            "appointment_query": null,
+            "selected_reference_id": null,
+            "requires_clarification": false,
+            "clarification_question": null,
+            "confidence": 0.99
+          },
+          "checks": [
+            {
+              "check": "turn_completed",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "reply_present",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "english_reply_not_rejected",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_internal_narration",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_booking_before_selection_and_final_confirmation",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "active_property_retained",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "no_stale_visit_refrain",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "saved_search_matches_current_property",
+              "status": "PASS",
+              "detail": ""
+            },
+            {
+              "check": "confirmation_books_current_summary",
+              "status": "PASS",
+              "detail": ""
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

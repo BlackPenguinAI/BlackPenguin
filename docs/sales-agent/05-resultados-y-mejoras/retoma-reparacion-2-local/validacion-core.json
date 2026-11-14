@@ -1,0 +1,17 @@
+{
+  "scope": "offline_core_with_simulated_provider",
+  "model_quality_evaluated": false,
+  "conversations": 9,
+  "lead_turns": 60,
+  "simulated_bookings": 8,
+  "check_summary": {
+    "PASS": 499,
+    "FAIL": 0
+  },
+  "paid_calls": 0,
+  "cost_usd": 0,
+  "targeted_tests_passed": 168,
+  "full_ci_run": false,
+  "protocol": "sales-understanding-prompt/2.32",
+  "production_database_writes": 0
+}

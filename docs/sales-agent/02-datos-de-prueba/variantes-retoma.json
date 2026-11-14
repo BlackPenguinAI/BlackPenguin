@@ -1,0 +1,47 @@
+{
+  "version": "sales-resumption/1.0",
+  "synthetic_only": true,
+  "lead_controller": "scripted",
+  "lead_model": null,
+  "judge_model": null,
+  "sales_model": "published configuration, currently openai/gpt-4o-mini",
+  "cases": [
+    {
+      "id": "resume_missing_visit",
+      "project_index": 2,
+      "material": "photos",
+      "visit_phrase": "Visit?",
+      "prior_state": "unresolved appointment and saved search",
+      "expected": "truthful material absence, availability and confirmed booking"
+    },
+    {
+      "id": "resume_cedar_viewing",
+      "project_index": 1,
+      "material": "photos",
+      "visit_phrase": "A viewing?",
+      "prior_state": "other property selected with unresolved appointment",
+      "expected": "current property photos, English acceptance, availability and confirmed booking"
+    },
+    {
+      "id": "resume_bay_see",
+      "project_index": 0,
+      "material": "floor_plan",
+      "visit_phrase": "Can I see it?",
+      "prior_state": "unresolved appointment",
+      "expected": "material answer then visit only when interpreted as visit request"
+    }
+  ],
+  "negative_variants": [
+    "No visit",
+    "My friend said Visit?",
+    "If I visit?",
+    "Cancel my visit",
+    "Do I have a visit?",
+    "Can I see it? interpreted as materials"
+  ],
+  "limits": {
+    "max_lead_turns_per_case": 10,
+    "planned_lead_turns_if_booked": 8,
+    "max_provider_calls_total": 120
+  }
+}

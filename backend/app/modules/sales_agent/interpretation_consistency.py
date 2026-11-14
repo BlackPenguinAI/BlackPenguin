@@ -2,7 +2,8 @@
 import re
 from .understanding_contract import Understanding
 
-POSITIVE_VISIT=re.compile(r"\b(?:I (?:would like|want|need)(?: to)?|I['’]d like to|please|(?:can|could) (?:I|we))[^.!?\n]{0,80}\b(?:(?:arrange|book|schedule|organize|have)[^.!?\n]{0,60}\b(?:in[ -]person )?(?:visit|viewing|appointment)|visit)\b",re.I)
+POSITIVE_VISIT=re.compile(r"(?:^\s*(?:Visit|Viewing|A viewing|Can I see it|Can we see it|Can I visit|Can we visit)[?!]?\s*$)|\b(?:I (?:would like|want|need)(?: to)?|I['’]d like to|please|(?:can|could) (?:I|we))[^.!?\n]{0,80}\b(?:(?:arrange|book|schedule|organize|have)[^.!?\n]{0,60}\b(?:in[ -]person )?(?:visit|viewing|appointment)|visit)\b",re.I)
+SHORT_VISIT=re.compile(r"\s*(?:Visit|Viewing|A viewing|Can I see it|Can we see it|Can I visit|Can we visit)[?!]?\s*",re.I)
 NEGATIVE=re.compile(r"\b(?:not|never|don't|don’t|do not|if|suppose|friend|said|says|told|he|she|they)\b",re.I)
 EXISTING_QUERY=re.compile(r'\b(?:do I have|my (?:current|existing|upcoming|past) (?:visits|appointments)|what (?:visits|appointments) (?:do I|have I)|show (?:me )?my (?:visits|appointments))\b',re.I)
 DECLINE=re.compile(r"\b(?:I do not want a visit yet|I don['’]t want a visit yet|I['’]m not ready for a visit|no visit for now)\b",re.I)
@@ -123,7 +124,7 @@ def normalize(value,text,commercial,*,appointment_offer=None):
     # Restrict recovery to a literal affirmative NEW visit. Existing changes,
     # reported speech and mixed existing-appointment questions remain untouched.
     clauses=[m.group().strip() for m in re.finditer(r'[^.!?\n]+[.!?]?',own)]
-    quote=next((q for q in clauses if POSITIVE_VISIT.search(q) and not NEGATIVE.search(q)),None)
+    quote=next((q for q in clauses if POSITIVE_VISIT.search(q) and not NEGATIVE.search(q) and (not SHORT_VISIT.fullmatch(q) or value.visit and value.visit.action=='request')),None)
     changes=re.search(r'\b(?:cancel|reschedul\w*|change my|move my)\b',own,re.I)
     if quote and not DECLINE.search(own) and len(named(quote))<=1 and not data['alternatives'] and not changes and not EXISTING_QUERY.search(own) and not value.requires_clarification:
         if not data['cancellation'] and not data['reschedule']:

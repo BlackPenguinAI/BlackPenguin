@@ -25,6 +25,25 @@ class PlannedOutcome(TurnOutcome):
     plan:dict|None=None
 
 
+def reconcile_subject(state,original_interest):
+    """Invalidate only uncommitted cross-property booking context, including legacy state."""
+    current=(state.selected_property_type_id,state.selected_unit_id)
+    saved=state.booking_search or {}
+    mismatched=bool(current[0] and saved.get('property_type_id') and
+        (saved.get('property_type_id'),saved.get('unit_id'))!=current)
+    if current!=original_interest or mismatched:
+        state.booking_search={}
+        state.booking_proposal=None
+        state.pending_comparison=None
+        state.pending_comparison_references=[]
+    if current[0]:
+        for old in state.tasks:
+            if (old.topic.value=='appointment' and old.status in LIVE and old.property_id
+                and (old.property_id,old.unit_id)!=current):
+                old.status='cancelled'
+                old.blocked_reason='property_selection_changed'
+
+
 def run(db,scope,*,message_id,understanding,expected_revision,event_key,max_steps,max_seconds,max_rounds,max_read_units,clock):
     conversation=check_scope(db,scope)
     message=scoped_messages_query(db,conversation).filter_by(id=message_id,direction='inbound',role='user').one()
@@ -50,6 +69,7 @@ def run(db,scope,*,message_id,understanding,expected_revision,event_key,max_step
     if selection:
         state.selected_property_type_id=selection.get('property_id')
         state.selected_unit_id=selection.get('unit_id')
+    reconcile_subject(state,original_interest)
     from .turn_context import latest_outbound
     latest=latest_outbound(db,conversation.id,skip_language_holds=True)
     question_meta=(latest.metadata_json or {}) if latest else {}

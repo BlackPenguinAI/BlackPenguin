@@ -44,6 +44,7 @@ ENGLISH.update('feel feeling felt bad sad happy unhappy stressed stressful stres
 ENGLISH.update('alert alerts notify notification notifications request requests wait waiting waitlist nearby'.split())
 ENGLISH.update('active past cancelled canceled recorded specialist specialists showroom status duration progress'.split())
 ENGLISH.update('january february march april may june july august september october november december jan feb mar apr jun jul aug sep sept oct nov dec'.split())
+ENGLISH.update('viewing viewings blueprint blueprints'.split())
 ENGLISH.update('contains content contents coverage file files arrange arranging prepared prepare expired expires preferences matching'.split())
 
 

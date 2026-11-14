@@ -522,6 +522,32 @@ La primera corrida de continuidad registró 1.007.379 tokens de entrada y 13.803
 
 **Siguiente ejecución.** Repetir los mismos seis casos con el modelo publicado y el control de confirmación reforzado. Solo después de revisar el resultado se abrirán los guiones reservados y se ampliarán longitud o segmentos; no se declara estabilidad por aprobar el replay. [Comandos de servidor y extracción](06-como-ejecutar-las-pruebas/ejecutar-continuidad-reparacion-1.sh).
 
+## 10.1. Retoma real: corrección de tareas antiguas y respuestas repetidas
+
+**Evidencia de servidor.** La segunda corrida sintética (`cd3134e`, `openai/gpt-4o-mini`, configuración 8) aprobó los seis casos, 271 controles y cinco citas esperadas. La primera había aprobado 4/6 conversaciones y cuatro citas. Esto muestra progreso dentro del alcance medido, no calidad integral: una conversación real retomada después conservó una tarea de cita antigua y repitió un cierre genérico ante preguntas nuevas. [Resumen de servidor](05-resultados-y-mejoras/continuidad-servidor-2/resumen.json) · [Conversaciones legibles](05-resultados-y-mejoras/continuidad-servidor-2/conversaciones.md).
+
+| Situación observada | Ajuste concreto | Criterio de aceptación |
+|---|---|---|
+| Un saludo, listado o pedido de planos termina con el mismo recordatorio de visita | La existencia de una tarea antigua deja de imponer una continuación prioritaria. Las aclaraciones actuales y las restricciones siguen vigentes. | Responder a la petición actual; no repetir el recordatorio genérico. |
+| Planos sin resultado de búsqueda | Se permite que llegue al lead la respuesta de ausencia y las alternativas ya autorizadas; antes la desplazaba el cierre de agenda. | Compartir el material correcto u ofrecer una explicación útil de su ausencia; nunca inventar archivos. |
+| “Visit?”, “A viewing?” o “Can I see it?” tras elegir propiedad | Se completa la solicitud de consulta de disponibilidad; se reconoce vocabulario inglés breve. Protocolo 2.32. | Ofrecer horarios o explicar indisponibilidad, sin reservar antes del resumen y la confirmación. |
+| Cambiar de propiedad con búsqueda de cita anterior | Se invalidan búsqueda y propuesta no confirmadas de la propiedad previa y tareas de cita vinculadas a ella. Las reuniones existentes no se cancelan. | La nueva visita corresponde a la propiedad actual. |
+
+**Diseño de la nueva iteración.** Tres conversaciones sintéticas comienzan con selección y tarea de cita pendientes de una sesión previa. Luego saludan, consultan dormitorios, eligen una propiedad, piden materiales, repiten la petición y solicitan una visita con frases breves. Se usan tres proyectos, materiales presentes/ausentes y ocho turnos de lead por conversación si se completa el recorrido. Dos casos ofrecen cambio entre propiedades y uno retoma la misma. Los seis casos anteriores permanecen como regresión. [Guiones y variantes](02-datos-de-prueba/variantes-retoma.json) · [Diálogos locales legibles](05-resultados-y-mejoras/retoma-reparacion-2-local/conversaciones.md) · [JSON local](05-resultados-y-mejoras/retoma-reparacion-2-local/resultado.json). Los leads siguen guiones: no hay modelo lead ni juez adicional. El core interpreta con el modelo publicado solamente en las corridas de servidor; localmente se usan respuestas simuladas y replay. El laboratorio no contacta leads reales ni genera citas en producción ni prueba transporte/Google Calendar.
+
+| Consumo de experimentos desde necesidades | Total USD | Llamadas con costo |
+|---|---:|---:|
+| Cuatro corridas de necesidades | 0.15756165 | 134 |
+| Primera continuidad | 0.12972465 | 88 |
+| Segunda continuidad | 0.12658365 | 86 |
+| **TOTAL OBSERVADO** | **0.41386995** | **308** |
+| Reparación de retoma: pruebas locales | **0.00000000** | 0 pagadas |
+| Próxima corrida de tres retomas | **≈0.06–0.12 estimado; reserva 0.20** | Máximo 120; no equivale a límite monetario |
+
+**Validación local del código final:** 168 pruebas específicas aprobadas. El core recorrió nueve conversaciones con proveedor simulado: 60 turnos, ocho citas simuladas y 499 controles correctos, sin fallos. Las tres retomas nuevas completaron 24 turnos y tres citas; no hubo consumo pagado. [Resumen de validación](05-resultados-y-mejoras/retoma-reparacion-2-local/validacion-core.json). La suite completa de CI se ejecutará al subir el cambio.
+
+El estimado utiliza las 86 llamadas y USD 0.12658365 de la segunda continuidad, ajustando el número de turnos y con margen para reparaciones. No se suma al gasto observado. La reparación también reconcilia una búsqueda antigua que ya no coincide con la propiedad guardada, sin exigir borrar el chat ni volver a elegirla. Se aplica al procesar un nuevo mensaje, sin modificar el historial. La nueva evaluación con el modelo real queda pendiente de despliegue; no se etiqueta como aprobada por los resultados locales. [Comandos de evaluación y extracción](06-como-ejecutar-las-pruebas/ejecutar-retoma-reparacion-2.sh).
+
 ## 11. Trabajo futuro
 
 **Más casos y conversaciones más largas, no nuevas funciones de canal.** Se avanza por etapas, corrigiendo y repitiendo antes de ampliar. Se incluyen compradores que rechazan o abandonan: no toda conversación correcta termina con cita [R4–R6].

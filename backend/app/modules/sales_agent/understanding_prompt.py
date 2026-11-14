@@ -1,6 +1,6 @@
 """Versioned interpretation protocol using published Sales guidance as data."""
 PROMPT_VERSION = 'sales-understanding-prompt/1.4'
-NEXT_PROMPT_VERSION = 'sales-understanding-prompt/2.31'
+NEXT_PROMPT_VERSION = 'sales-understanding-prompt/2.32'
 SYSTEM_PROMPT = '''You interpret a real-estate lead's CURRENT message. You do not reply to the lead,
 execute tools, reserve appointments, send materials, change CRM state or override permissions.
 Return ONLY the supplied sales-understanding/1.0 JSON schema.
@@ -64,6 +64,11 @@ def prompt_snapshot(agent):
 
 def next_prompt_snapshot(guidance):
     return {'version':NEXT_PROMPT_VERSION,'system':'''Completeness rules for the CURRENT message (before the general protocol):
+After selecting a property, short own questions such as "Visit?", "A viewing?" or
+"Can I see it?" can request a first visit: include a topic appointment request and
+visit.action=request. This only requests availability, never booking confirmation.
+Answer the current request even when old appointment or comparison tasks remain.
+A missing material does not mean the lead declined a visit or changed property.
 A named property is never a generic catalog question. Define an exact local property reference,
 link each relevant request through reference_id, and preserve a clear single-property focus.
 Example: "Please send photos for Cedar Studio" needs a materials/photos request linked

@@ -16,6 +16,12 @@ SPECS={
  'transfer_cedar':{'compare_switch':True,'split':'transfer','project':1,'property':1,'access':'all','material':'floor_plan','date_style':'day_month','visit':"I'd like to book a visit to {name}."},
  'transfer_no_sellers':{'split':'transfer','project':2,'property':0,'access':'unassigned','material':'floor_plan','date_style':'numeric','visit':'Can we schedule a visit to {name}?'},
 }
+for key,base,phrase in [
+    ('resume_missing_visit','development_missing','Visit?'),
+    ('resume_cedar_viewing','development_cedar','A viewing?'),
+    ('resume_bay_see','transfer_bay','Can I see it?'),
+]:
+    SPECS[key]={**SPECS[base],'split':'resumption','resume':True,'visit':phrase}
 CASES=tuple(SPECS)
 
 async def evaluate_case(db,manifest,key,budget,max_turns):
@@ -41,6 +47,19 @@ async def evaluate_case(db,manifest,key,budget,max_turns):
     initial=[('discover',f"I am looking for a {first['bedrooms']} bedroom home."),('choose',first['name']),('material','Do you have photos of the property?' if spec['material']=='photos' else 'Show me the property blueprints'),('visit',spec['visit'].format(name=prop['name']))]
     if spec.get('compare_switch'):
         initial[2:2]=[('compare','How does this property differ from the others?'),('switch',f"Actually I prefer {prop['name']} instead.")]
+    if spec.get('resume'):
+        from app.modules.sales_agent.dialogue_store import save
+        from app.modules.sales_agent.understanding_contract import DialogueState,Task
+        old=next((p for p in project['properties'] if p['id']!=prop['id']),prop)
+        state=DialogueState(selected_property_type_id=old['id'],tasks=[Task(
+            id='old-unresolved-visit',topic='appointment',status='awaiting_user',
+            property_id=old['id'],binding_status='unresolved',blocked_reason='reference_clarification')],
+            booking_search={'property_type_id':old['id'],'timezone':'America/Chicago'})
+        save(db,Scope(lead.company_id,lead.project_id,conversation.id,lead.id),event_key='synthetic-prior-session',expected_revision=0,state=state)
+        db.commit()
+        initial.insert(0,('greeting','Hi'))
+        index=next(i for i,(action,_) in enumerate(initial) if action=='material')
+        initial.insert(index+1,('material_repeat','I want to check blueprints' if spec['material']=='floor_plan' else 'Can you show me pictures?'))
     rows=[];latest_meta={};selected=False;confirmed=False;stop='turn_limit';expected_start=None
     for i in range(max_turns):
         if budget.calls>=budget.maximum:stop='call_budget';break
@@ -64,10 +83,15 @@ async def evaluate_case(db,manifest,key,budget,max_turns):
             expected_property=first['id'] if action in {'choose','compare'} else prop['id']
             checks.append(check('active_property_retained',state.selected_property_type_id==expected_property))
         if action=='compare':checks.append(check('comparison_has_both_properties',all(p['name'] in reply for p in project['properties'])))
-        if action=='material':checks.extend([check('no_property_requestion','which property' not in reply.lower()),check('material_not_comparison','make this comparison' not in reply.lower())])
-        if action=='material' and spec['material']=='photos':
+        if action in {'material','material_repeat'}:checks.extend([check('no_property_requestion','which property' not in reply.lower()),check('material_not_comparison','make this comparison' not in reply.lower())])
+        if action in {'material','material_repeat'} and spec['material']=='photos':
             has_gallery=any(r['kind']=='gallery' for r in prop['resources'])
             checks.append(check('requested_photos_or_truthful_absence',('http' in reply) if has_gallery else not 'http' in reply and ('not' in reply.lower() or "don't" in reply.lower())))
+        if spec.get('resume'):
+            checks.append(check('no_stale_visit_refrain',"we can return to arranging your visit" not in reply.lower()))
+            checks.append(check('saved_search_matches_current_property',not state.booking_search or state.booking_search.get('property_type_id')==state.selected_property_type_id))
+            if action in {'material','material_repeat'}:
+                checks.append(check('material_question_answered',bool(meta.get('material_offer')) or 'http' in reply or any(word in reply.lower() for word in ["don't have",'not available','not confirm','not verify'])))
         if action=='visit':checks.append(check('visit_reaches_options_or_unavailability',bool(meta.get('appointment_offer')) or explains_unavailability(reply)))
         if action=='select':checks.append(check('selection_prepares_summary',bool(meta.get('booking_confirmation')) and not meetings))
         if action=='confirm':checks.append(check('confirmation_books_current_summary',len(meetings)==1 and bool(meta.get('meeting_id'))))

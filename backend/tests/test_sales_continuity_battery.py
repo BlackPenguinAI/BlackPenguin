@@ -15,11 +15,14 @@ def provider(request):
     if payload['response_format']['json_schema']['name']!='sales_understanding':return base_provider(request)
     names=[p['property_type'] for p in ctx['approved_context']['property_types']]
     topic='appointment' if re.search(r'\b(?:visit|viewing)\b',text,re.I) or text=='Yes' else 'catalog'
-    data=understanding(text,topic).model_dump(mode='json')
+    if text in {'Visit?','A viewing?','Can I see it?'}:topic='appointment'
+    if re.search(r'\b(?:blueprints|pictures|photos)\b',text,re.I):topic='materials'
+    data=understanding(text,topic,subjects={0:'floor_plan' if 'blueprints' in text.lower() else 'photos'} if topic=='materials' else None).model_dump(mode='json')
     for name in names:
         if name.casefold() in text.casefold():
             data['references'].append(dict(id='owner',kind='property',expression=name,evidence=name));data['requests'][0]['reference_id']='owner';break
     if topic=='appointment' and text!='Yes':data['visit']=dict(action='request',evidence=text,timing=None)
+    if text in {'Visit?','A viewing?','Can I see it?'}:data['requests']=[];data['all_of']=[]
     return httpx.Response(200,json={'choices':[{'message':{'content':json.dumps(data)}}]})
 
 def recorded_failure_provider(request):

@@ -21,7 +21,7 @@ def replay_provider(scenario):
     return replay
 
 @pytest.mark.parametrize('scenario',CASES)
-def test_server_frames_pass_continuity_and_booking_checks(lab,scenario):
+def test_server_frames_pass_continuity_and_booking_checks(lab,scenario,tmp_path):
     db,manifest=lab
     db.add(AIConfiguration(id='repair1-replay',company_id=None,openrouter_api_key='OFFLINE',agent_ventas={'model':'test/offline'}))
     db.add(PromptVersion(company_id=None,agent_key='sales',version_number=1,is_published=True,configuration={'model':'test/offline'}));db.commit()
@@ -30,6 +30,7 @@ def test_server_frames_pass_continuity_and_booking_checks(lab,scenario):
         def __init__(self,**kwargs):super().__init__(transport=httpx.MockTransport(replay_provider(scenario)),trust_env=False,**kwargs)
     budget=Budget(60)
     with patch.object(httpx,'AsyncClient',Client),guard(budget),patch('app.integrations.openrouter_client.record_openrouter_usage',lambda **kw:None):r=asyncio.run(evaluate_case(db,manifest,scenario,budget,10))
+    (tmp_path/'result.json').write_text(json.dumps(r,default=str,ensure_ascii=False))
     bad=[(t['action'],t['reply'],c) for t in r['turns'] for c in t['checks'] if c['status']!='PASS']+[c for c in r['checks'] if c['status']!='PASS']
     assert not bad,bad
     if scenario=='transfer_cedar':
