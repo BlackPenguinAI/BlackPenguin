@@ -183,6 +183,9 @@ async def _preview(db, scope: Scope, *, inbound_message_id: str, expected_revisi
                 interpreted,omitted_preferences=omit_unrelated_financial_preferences(interpreted,
                     appointment_confirmation=bool(latest and (latest.metadata_json or {}).get('booking_confirmation')))
                 normalizations.extend(omitted_preferences)
+                from .dialogue_continuity import normalize as normalize_continuity
+                interpreted,continuity_notes=normalize_continuity(interpreted,inbound.content,state,latest)
+                normalizations.extend(continuity_notes)
                 from .interpretation_consistency import normalize as normalize_consistency
                 interpreted,consistency_notes=normalize_consistency(interpreted,inbound.content,commercial,appointment_offer=(latest.metadata_json or {}).get('appointment_offer') if latest else None)
                 normalizations.extend(consistency_notes)
@@ -191,7 +194,7 @@ async def _preview(db, scope: Scope, *, inbound_message_id: str, expected_revisi
                 normalizations.extend(subject_notes)
                 from .understanding_semantics import issues_for
                 offer=(latest.metadata_json or {}).get('appointment_offer') if latest else None
-                from .first_booking import exact_public_selection
+                from .first_booking import contextual_public_selection as exact_public_selection
                 issues=issues_for(interpreted,inbound.content,appointment_offer=bool(offer and not exact_public_selection(inbound.content,offer)))
                 from .understanding_repair import omit_declaration_questions
                 interpreted,omitted=omit_declaration_questions(interpreted,issues)

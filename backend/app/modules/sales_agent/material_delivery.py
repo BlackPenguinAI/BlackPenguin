@@ -275,8 +275,8 @@ def deliver(db, scope, conversation, lead, run, outcome, previous_meta):
         alternatives=all(i.get('coverage','').startswith('alternative_') for i in items)
         missing=', '.join(dict.fromkeys(i['coverage'].removeprefix('alternative_').replace('_',' ') for i in items))
         kind='floor plans' if all(i.get('coverage')=='complement_floor_plan' for i in items) else 'photos' if all(i.get('coverage')=='complement_photos' for i in items) else 'related materials'
-        question = (f'The requested {missing} is not available in an approved resource for this option. I can offer {names} as related material. Would you like me to share it?' if alternatives else
-            f'I also have approved {kind} for this option. Would you like me to share them?' if complementary else
+        question = (f'The requested {missing} is not available for this property. I can offer {names} as related material. Would you like me to share it?' if alternatives else
+            f'I also have {kind} for this option. Would you like me to share them?' if complementary else
             f'I have {names} as related Project or property type material. Coverage for the specific unit is not confirmed. Would you like those materials?'
             if unit else f'I have {names}. It may contain useful related information, but the requested photo coverage is not confirmed. Would you like that file?')
         if gap_subjects and not alternatives:question='I could not confirm the requested '+', '.join(sorted(gap_subjects))+' for this option. '+question
@@ -284,7 +284,7 @@ def deliver(db, scope, conversation, lead, run, outcome, previous_meta):
         question='I could not verify an approved '+', '.join(sorted(gap_subjects))+' resource for this option.'
     elif unavailable or material_tasks and not links:
         subjects=', '.join(dict.fromkeys((t.subject or 'material').replace('_',' ') for t in material_tasks))
-        question = f'I could not verify an approved, accessible {subjects} resource for this option. What property detail would help you next?'
+        question = f"I don't have {subjects} available for this property. What would you like to know about it?"
     for tid in fulfilled:
         tasks[tid].status = 'awaiting_user'  # Completion follows the durable provider receipt.
     return links, share_ids, offer, question, fulfilled, bindings

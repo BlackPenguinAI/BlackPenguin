@@ -2,7 +2,7 @@
 import re
 from .understanding_contract import Understanding
 
-POSITIVE_VISIT=re.compile(r"\b(?:I (?:would like|want|need)(?: to)?|I['’]d like to|please|can (?:I|we))[^.!?\n]{0,80}\b(?:arrange|book|schedule|organize|have)[^.!?\n]{0,60}\b(?:in[ -]person )?(?:visit|viewing|appointment)\b",re.I)
+POSITIVE_VISIT=re.compile(r"\b(?:I (?:would like|want|need)(?: to)?|I['’]d like to|please|(?:can|could) (?:I|we))[^.!?\n]{0,80}\b(?:(?:arrange|book|schedule|organize|have)[^.!?\n]{0,60}\b(?:in[ -]person )?(?:visit|viewing|appointment)|visit)\b",re.I)
 NEGATIVE=re.compile(r"\b(?:not|never|don't|don’t|do not|if|suppose|friend|said|says|told|he|she|they)\b",re.I)
 EXISTING_QUERY=re.compile(r'\b(?:do I have|my (?:current|existing|upcoming|past) (?:visits|appointments)|what (?:visits|appointments) (?:do I|have I)|show (?:me )?my (?:visits|appointments))\b',re.I)
 DECLINE=re.compile(r"\b(?:I do not want a visit yet|I don['’]t want a visit yet|I['’]m not ready for a visit|no visit for now)\b",re.I)
@@ -28,6 +28,16 @@ def normalize(value,text,commercial,*,appointment_offer=None):
         key='current_subject';ids={r['id'] for r in data['references']}
         while key in ids:key+='x'
         data['references'].append(dict(id=key,kind='property',expression=name,evidence=name));return key
+    literal_names=named(own)
+    if (len(literal_names)==1 and own.strip().rstrip('.!').casefold()==literal_names[0].casefold()
+        and not data['constraints'] and not data['alternatives'] and not data['releases']
+        and not data['cancellation'] and not data['reschedule'] and not data['wait']):
+        key=reference(literal_names[0])
+        data.update(requests=[dict(id='named_information',topic='catalog',subject=None,polarity='request',evidence=text,reference_id=key)],all_of=['named_information'],
+            references=[r for r in data['references'] if r['id']==key],selected_reference_id=key,
+            comparison=None,visit=None,appointment_query=None)
+        value=Understanding.model_validate(data).check_evidence(text)
+        notes.append({'field':'requests','action':'named_property_is_selection_not_comparison'})
     # A current explicit choice can own an anaphoric material request in the
     # next clause. No historical subject, model ID or confidence is promoted.
     switch=re.fullmatch(
@@ -57,8 +67,8 @@ def normalize(value,text,commercial,*,appointment_offer=None):
                     'choice_evidence':candidates[0],'request_evidence':switch['request'],
                     'confidence_unchanged':value.confidence}]
     # Only a complete backend-rendered choice grants selection, never booking.
-    from .first_booking import exact_public_selection
-    chosen=exact_public_selection(own,appointment_offer)
+    from .first_booking import contextual_public_selection
+    chosen=contextual_public_selection(own,appointment_offer)
     if chosen and own==text and not data['alternatives']:
         index=next(i for i,o in enumerate(appointment_offer['options']) if o['starts_at']==chosen['id'])
         expression=('first','second','third')[index]+' appointment'
@@ -110,7 +120,7 @@ def normalize(value,text,commercial,*,appointment_offer=None):
     if quote and not DECLINE.search(own) and len(named(quote))<=1 and not data['alternatives'] and not changes and not EXISTING_QUERY.search(own) and not value.requires_clarification:
         if not data['cancellation'] and not data['reschedule']:
             comparison=data['comparison']
-            pure_visit=all(POSITIVE_VISIT.search(q) or re.fullmatch(r'Any (?:available )?time in the next (?:seven|7) days works for me[.!]?',q,re.I) or re.fullmatch(r'Please use the project timezone[.!]?',q,re.I) for q in clauses)
+            pure_visit=bool(POSITIVE_VISIT.match(own.strip())) or all(POSITIVE_VISIT.search(q) or re.fullmatch(r'Any (?:available )?time in the next (?:seven|7) days works for me[.!]?',q,re.I) or re.fullmatch(r'Please use the project timezone[.!]?',q,re.I) for q in clauses)
             from .understanding_semantics import COMPARATIVE_SIGNAL
             if comparison and pure_visit and not re.search(COMPARATIVE_SIGNAL,own,re.I):
                 key=comparison['request_id']

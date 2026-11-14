@@ -4,6 +4,8 @@
 
 **Métricas históricas del modelo: corte 11/11/2026. Revisión de criterios: 13/11/2026.** Se reúne el trabajo del ciclo reciente con data sintética: **21 corridas del servidor, 144 conversaciones ejecutadas y 47 IDs de escenario distintos por suite**. Las repeticiones son parte del trabajo, no escenarios adicionales. En la batería compacta 2, **13/16 conversaciones cumplieron los checks originales y se registraron 7/8 visitas esperadas**; eso no certifica la calidad integral de esos diálogos. En el último subconjunto, Repair 8, **2/3 conversaciones cumplieron sus checks y se registró 1/2 visitas**: vivienda mayor y fotos ausentes se recuperaron; diversificación falló con tiempos de espera del modelo. No se mezclan ambos conjuntos como si fueran una nueva batería completa.
 
+**Estado actual.** La última corrida de búsqueda y aceptación pasó 14/14 escenarios en el servidor. La nueva batería de continuidad pasó seis conversaciones y 36 turnos localmente con proveedor simulado; su evaluación con el modelo publicado está pendiente. Son alcances distintos, detallados en el bloque 10.
+
 La guía usa bloques con el mismo propósito: **qué se hizo → cómo funciona → qué evidencia hay → dónde están sus archivos**. Toda la explicación está aquí; los enlaces internos abren datos, código o carpetas de respaldo. Las referencias externas justifican la metodología, no sustituyen la evidencia del proyecto.
 
 [1. Producto](#1-producto-y-rutas) · [2. LLM/backend](#2-llm-y-backend) · [3. Datos](#3-datos-sintéticos) · [4. Experimentos](#4-diseño-de-los-experimentos) · [5. Afinamiento](#5-qué-se-modifica-al-afinar) · [6. Evolución](#6-historia-y-evolución-medida) · [7. Diálogos](#7-conversaciones-para-repetir) · [8. Consumos](#8-consumo-real-y-saldo-de-openrouter) · [9. Referencias](#9-referencias-y-fundamento) · [10. Trabajo actual](#10-trabajo-actual) · [11. Trabajo futuro](#11-trabajo-futuro)
@@ -441,6 +443,56 @@ El estimado toma la última corrida real y no se suma al gasto observado. Esta t
 **Validación técnica de esta entrega:** 3.201 pruebas aprobadas en 139 módulos; 11 pruebas PostgreSQL omitidas en SQLite y aprobadas aparte con PostgreSQL 16.2; 63 controles de aceptación aprobados y uno de evaluación real pendiente. Se repitieron 78 pruebas específicas con el código final. [Validación JSON](05-resultados-y-mejoras/aceptacion-listado-replay-local/validacion.json).
 
 **Integridad del canal al reutilizar un remitente.** También se corrige un bloqueo independiente de calidad: la clave activa de una conversación antigua impedía registrar el mismo teléfono en otra compañía después de transferir el remitente. La desconexión retirará esa ruta, conservará el historial en su compañía y cancelará trabajo pendiente. Para desvinculaciones anteriores al arreglo, el nuevo registro podrá retirar la clave obsoleta únicamente si el nuevo dueño tiene el remitente verificado y habilitado y el anterior ya no lo posee. No se trasladan mensajes, leads ni projects entre compañías; se impiden reanudaciones y nuevos envíos desde la ruta retirada. Los recibos de envíos ya iniciados conservan su conversación original: retirar la ruta no puede revocar una solicitud que el proveedor ya recibió. No requiere migración ni borrado manual de datos. Tras desplegar, se reintenta el registro en la compañía nueva; la comprobación de solo lectura [inspect_sender_route.py](../../backend/tools/sales_ai/inspect_sender_route.py) muestra el dueño configurado, las conversaciones históricas, la ruta activa y el trabajo pendiente. `active_route_matches_current_owner=true` confirma la correspondencia de la ruta con su dueño, no la entrega del mensaje.
+
+### Continuidad y visita: ampliación a partir de una conversación real
+
+**Qué motivó esta etapa.** Una conversación real de 67 mensajes permitió localizar comparaciones inventadas, referencias mal resueltas y fechas que no llegaban a una propuesta. Las trazas mostraron que Madison/Cleveland seguían guardadas en varios turnos: el fallo era de utilización del contexto, no siempre de almacenamiento. También se encontró una fecha inglesa clasificada como sueco y frases completas colocadas en campos de zona horaria. Los datos personales del lead y sus tokens no se incorporan a las reglas ni a las fixtures del repositorio.
+
+**Qué se ajusta y cómo se comprueba.** Se conserva `openai/gpt-4o-mini`, la configuración publicada 8 y la topología del grafo; el protocolo de interpretación pasa a `sales-understanding-prompt/2.30`. Se modifican instrucciones de extracción, normalizaciones acotadas, resolución de referencias, validación de intención y composición. No se entrena ni cambia el peso del modelo.
+
+| Parte del flujo | Ajuste concreto | Control requerido |
+|---|---|---|
+| Requisitos y selección | Distinguir «3 dormitorios» de «opción 3» según la última pregunta/lista entregada. Una selección numérica validada permite solo leer detalles, manteniendo la confianza original. | No convertir búsqueda en comparación ni reservar por seleccionar una propiedad. |
+| Propiedad activa y materiales | Resolver «the property» y una petición de fotos/planos contra el sujeto activo; elegir otro nombre cambia el sujeto sin inventar una comparación. | La referencia sigue dentro del proyecto. No enviar galería como si fuera un plano; explicar la ausencia y ofrecer alternativas. |
+| Visita | Conservar «I want to visit…» y variantes como una solicitud ejecutable de agenda. | Sin fechas inventadas, sin comparación espuria y sin saltarse la confirmación. |
+| Fecha y zona | Reconocer meses ingleses; aceptar fecha/hora que identifica de forma única una opción vigente. Omitir frases que no expresan zona/duración; heredar el contexto verificado. | Una fecha numérica ambigua no selecciona. Zona explícita desconocida requiere aclaración natural, no un código IANA obligatorio. |
+| Selección y reserva | Aceptar un horario único prepara el resumen; el siguiente consentimiento explícito permite reservar tras revalidar. | Cero reservas antes de selección + confirmación; como máximo una reserva, para la propiedad y el horario elegidos. |
+| Presentación | Eliminar diagnósticos de materiales y la advertencia genérica sobre «approved records» de la respuesta comercial. | No explicar al lead contratos, consultas internas o fallos de procesamiento. |
+
+**Diseño para evitar ajustar todo a una sola conversación.** La batería usa los tres projects y seis propiedades ficticias existentes, nombres distintos del caso real, materiales presentes y ausentes y vendedores con acceso a todos, solo al proyecto o a ninguno. Los leads siguen guiones: no consumen un segundo LLM. Hay tres casos de desarrollo y tres de transferencia, evaluados por separado. Estos últimos ya se revisaron localmente: **no constituyen un conjunto ciego ni una estimación estadística de generalización**. Se dejan otras tres familias reservadas sin ejecutar; sus ejemplos están etiquetados como plan, no como éxito.
+
+| Caso sintético | Propiedad final | Variación principal | Objetivo |
+|---|---|---|---|
+| development_bay | Bay Residence | Fotos referidas a la propiedad activa; fecha con mes escrito | Visita confirmada tras resumen |
+| development_cedar | Cedar Loft | Vendedor asignado al proyecto; fecha numérica inequívoca | Visita confirmada tras resumen |
+| development_missing | Ridge Townhome | Fotos inexistentes; continuar sin bloquear el diálogo | Visita confirmada tras resumen |
+| transfer_bay | Bay Residence | Solicitud de plano no disponible y otra formulación de visita | Ofrecer alternativa sin enviarla por cuenta propia; agendar |
+| transfer_cedar | Cedar Studio | Comparar, cambiar de Cedar Loft a Cedar Studio y pedir plano | Conservar el nuevo sujeto hasta la reserva |
+| transfer_no_sellers | Ridge Townhome | Ningún vendedor elegible aunque existan otros usuarios con horarios | Explicar falta de disponibilidad, sin reserva ni promesa de notificación efectiva |
+
+La fecha de selección se deriva del horario publicado por el agente en la simulación; no se fija al 16 de noviembre. Los IDs de la oferta ayudan a verificar el resultado, pero el lead envía una fecha/hora normal. La selección solo se considera correcta si coincide con la reserva. Las variantes negativas cubren opciones inexistentes, respuestas ambiguas, negaciones y mensajes condicionales. También se prueban formas de fallo observadas —comparación añadida a una visita, referencia «/» y frase usada como zona— con proveedor simulado; no es una reproducción exacta de todas las llamadas del incidente.
+
+**Resultado local.** Seis conversaciones, **36 turnos**, cinco visitas simuladas y un caso sin vendedores, con sus checks satisfechos. Core real, SQLite temporal y proveedor simulado: **USD 0.00**, sin contactos ni escrituras en producción. Los enlaces de materiales pertenecen al laboratorio temporal; su HTTP público y Calendar no quedan certificados. [Diálogos legibles](05-resultados-y-mejoras/continuidad-local/conversaciones.md) · [JSON local](05-resultados-y-mejoras/continuidad-local/resultado.json) · [Casos, variantes y reservas no ejecutadas](02-datos-de-prueba/variantes-continuidad.json).
+
+**Validación técnica:** 3.279 pruebas de regresión aprobadas en 141 módulos, con 11 pruebas PostgreSQL omitidas en SQLite y aprobadas aparte con PostgreSQL 16.2. Los 63 controles de aceptación pasaron; se repitieron 79 pruebas focales con el código final. La evaluación real permanece pendiente. Las pruebas de continuidad se ejecutan con y sin autoflush y con respuestas ordinarias o formas de fallo similares a las observadas. [Validación JSON](05-resultados-y-mejoras/continuidad-local/validacion.json).
+
+**Evidencia del servidor anterior a esta ampliación.** La aceptación de listados pasó **14/14 escenarios y 18/18 turnos**, 279 checks sin fallos, commit `923083d`, con el modelo publicado. Costo total USD **0.04417410**, informado en 38/38 llamadas. Esa corrida acredita búsqueda y aceptación, no las conversaciones largas de esta nueva batería. [Resultado original del servidor](05-resultados-y-mejoras/busqueda-aceptacion-servidor/resultado.json).
+
+| Consumo de necesidades | Total observado (USD) | Llamadas con costo / total |
+|---|---:|---:|
+| Descubrimiento | 0.03365370 | 29/29 |
+| Reparación del filtro | 0.03453960 | 29/29 |
+| Redacción | 0.04519425 | 38/38 |
+| Aceptación contextual | 0.04417410 | 38/38 |
+| **Total real de estas cuatro corridas** | **0.15756165** | **134/134** |
+| Ampliación de continuidad: ejecución local | **0.00000000** | Sin inferencia pagada |
+| Continuidad en servidor: seis casos, pendiente | **≈0.10–0.20 estimado; reserva 0.30** | Hasta 240 llamadas, no un límite en dólares |
+
+![Ejecuciones observadas de necesidades y costo total por corrida](05-resultados-y-mejoras/figuras/necesidades-observadas.png)
+
+La gráfica conserva las regresiones y el cambio de criterios; no mezcla esta ampliación local con resultados del modelo real.
+
+El estimado se basa en los costos observados anteriores y contempla más historia por conversación; no es una tarifa garantizada ni se suma al gasto real. Para el servidor se ejecutará primero esta batería de seis casos; se revisarán los fallos antes de abrir los guiones reservados o ampliar longitud y segmentos. [Comandos de ejecución y extracción](06-como-ejecutar-las-pruebas/ejecutar-continuidad.sh).
 
 ## 11. Trabajo futuro
 

@@ -558,10 +558,14 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
             from .needs_search import literal_read,contextual_read, VERSION as NEEDS_VERSION
             literal_needs_read=bool(next_enabled and literal_read(u,inbound.content))
             contextual_needs_read=bool(next_enabled and contextual_read(db,scope,u,inbound.content))
-            if contextual_needs_read:u=u.model_copy(update={'requires_clarification':False,'clarification_question':None})
+            from .dialogue_continuity import catalog_choice_read
+            choice_read=bool(next_enabled and catalog_choice_read(u,inbound.content,latest_outbound(db,conversation.id),commercial))
+            if choice_read:
+                run.input_snapshot={**run.input_snapshot,'dialogue_read_authorization':{'basis':'current_numbered_catalog_choice','model_confidence':u.confidence,'effect_authorization':False}}
+            if contextual_needs_read or choice_read:u=u.model_copy(update={'requires_clarification':False,'clarification_question':None})
             if literal_needs_read or contextual_needs_read:
                 run.input_snapshot={**run.input_snapshot,'needs_read_authorization':{'version':NEEDS_VERSION,'basis':'accepted_current_unknown_listing_offer' if contextual_needs_read else 'validated_current_literal_catalog_request','model_confidence':u.confidence,'effect_authorization':False}}
-            if u.confidence < .8 and not u.requires_clarification and not (literal_needs_read or contextual_needs_read):
+            if u.confidence < .8 and not u.requires_clarification and not (literal_needs_read or contextual_needs_read or choice_read):
                 u=u.model_copy(update={'requires_clarification':True,'clarification_question':'Could you clarify whether you want property details, materials, financing, or a visit?'})
             # Legal/commercial approvals hold the action, not the conversation.
             advisory=escalation_reason(inbound.content)
@@ -592,7 +596,10 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
             # Material discovery blocks are replaced by verified live links or
             # a specific fallback question; never send "not sent yet" diagnostics.
             text=draft.text
-            text='\n\n'.join(b for b in text.split('\n\n') if not b.startswith('Available material:'))
+            text='\n\n'.join(b for b in text.split('\n\n') if not b.startswith(('Available material:', 'Materials: verified information is not available in this query.')))
+            if next_enabled:
+                from dataclasses import replace
+                draft=replace(draft,text=text)
             metadata={'engine':ENGINE,'workflow_version':'sales-current/1.0','inbound_message_id':inbound.id,'selected_property_type_id':outcome.state.selected_property_type_id}
             if next_enabled:metadata['selected_unit_id']=outcome.state.selected_unit_id
             if human_fallback:metadata['human_contact_interpretation_fallback']=True

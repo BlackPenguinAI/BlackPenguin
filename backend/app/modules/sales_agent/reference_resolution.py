@@ -85,7 +85,7 @@ class Resolver:
             label='unit_code' if kind=='unit' else 'property_type'
             names=[key for key,row in rows.items() if normalized(str(row[label]))==expression]
             if len(names)==1:return {'status':'resolved','value':self.bound(kind,names[0])}
-            if expression in {'it','this one','that one','this property','that property','this unit','that unit','the same one'}:
+            if expression in {'it','this one','that one','this property','that property','the property','this unit','that unit','the unit','the same one'}:
                 chosen=self.state.selected_unit_id if kind=='unit' else self.state.selected_property_type_id
                 value=self.bound(kind,chosen) if chosen else None
                 return {'status':'resolved','value':value} if value else question('no_selected_subject')

@@ -92,7 +92,7 @@ def normalize_timing(u,text,project,now,previous):
     project_zone=bool(zone_evidence and re.fullmatch(r"(?:(?:the|this)\s+)?(?:project(?:['’]s)?|property(?:['’]s)?)\s+(?:time\s*zone|timezone|local\s+time)",zone_evidence.strip(),re.I))
     zone_name=(project.timezone or 'UTC') if project_zone else (zone_evidence or previous.get('timezone') or project.timezone or 'UTC')
     try:zone=ZoneInfo(zone_name)
-    except (ZoneInfoNotFoundError,ValueError):raise ValueError('Please specify a valid IANA timezone, such as America/Chicago.')
+    except (ZoneInfoNotFoundError,ValueError):raise ValueError('Should I use the property’s local timezone, or the time in another city?')
     def period(evidence):
         if not evidence:return None
         result=_requested_period(evidence,now=now,zone=zone)
@@ -209,6 +209,29 @@ def exact_public_selection(text, offer):
     return None
 
 
+def contextual_public_selection(text,offer):
+    """Select a unique currently offered time; never final booking consent."""
+    original=exact_public_selection(text,offer)
+    if original:return original
+    if not offer or offer.get('version')!=VERSION:return None
+    options=offer.get('options',[])
+    if len(options)==1 and re.fullmatch(r"\s*(?:yes(?:[, ]+(?:please|that time works for me))?|that time works for me)[.!]?\s*",text,re.I):
+        return {'kind':'appointment','id':options[0]['starts_at']}
+    months='January February March April May June July August September October November December'.split()
+    match=re.fullmatch(r'\s*(?:(\d{1,2})[ /-]('+ '|'.join(months)+r'|\d{1,2})|('+'|'.join(months)+r') (\d{1,2})(?:st|nd|rd|th)?)[, ]+(?:at )?(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)[.!]?\s*',text,re.I)
+    if not match:return None
+    day=int(match[1] or match[4]);month=match[2] or match[3]
+    if month.isdigit() and day<=12 and int(month)<=12:return None
+    month=int(month) if month.isdigit() else next(i for i,m in enumerate(months,1) if m.casefold()==month.casefold())
+    hour=int(match[5]);minute=int(match[6] or 0)
+    if not 1<=hour<=12 or not 0<=minute<60:return None
+    hour=hour%12+(12 if match[7].lower().startswith('p') else 0)
+    zone=ZoneInfo(offer['preferences']['timezone'])
+    matches=[o for o in options if (lambda dt:(dt.month,dt.day,dt.hour,dt.minute)==(month,day,hour,minute))(datetime.fromisoformat(o['starts_at']).astimezone(zone))]
+    if len(matches)==1:return {'kind':'appointment','id':matches[0]['starts_at']}
+    return None
+
+
 def confirmation(snapshot,option,prefs,*,booked=False):
     property_name=snapshot.get('property_type_name') or snapshot.get('project_name')
     if snapshot.get('unit_code'):property_name+=' / unit '+snapshot['unit_code']
@@ -316,7 +339,7 @@ def handle(db,scope,conversation,lead,project,outcome,inbound):
             if previous_offer and any(o['starts_at']==value['id'] for o in previous_offer.get('options',[])):
                 offered,offer,chosen=row,previous_offer,value;break
     if not chosen:
-        chosen=exact_public_selection(inbound.content,offer)
+        chosen=contextual_public_selection(inbound.content,offer)
     if chosen and offer.get('version')==VERSION:
         if datetime.fromisoformat(offer['expires_at'])<=utc(now):return 'Those visit times expired. Please request current options.',{},[]
         option=next(o for o in offer['options'] if o['starts_at']==chosen['id'])

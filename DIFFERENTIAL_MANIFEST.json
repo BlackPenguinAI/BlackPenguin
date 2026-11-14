@@ -1,94 +1,118 @@
 {
-  "base_commit": "7c320ca285edaa9e0aa126a73ca08a26c29fbfda",
+  "base_commit": "923083d8e3a0db94a0574ccf74de5a315a19f0c1",
   "files": [
     {
       "path": "backend/app/modules/sales_agent/active_service.py",
-      "sha256": "cb2e3069030ce3b82404c73781bcd6f1936e5c0b899a614c588e7d5604500b9f"
+      "sha256": "54d1fb9055ab619521618570f0f9348a4b7e4e31ef0d025705246d2520e789c0"
     },
     {
-      "path": "backend/app/modules/sales_agent/live_service.py",
-      "sha256": "52fbbc0b7fde745f48d97379a59481f0b047445cc98a66b6e3921a07013eb233"
+      "path": "backend/app/modules/sales_agent/dialogue_continuity.py",
+      "sha256": "977df118e9dd16cda675fe66da6292cb4ca6185991f73508ffec1e496700529b"
     },
     {
-      "path": "backend/app/modules/sales_agent/live_test_service.py",
-      "sha256": "e6cbca63d341f1d389a8597cddf210da2ac87767a88385397896db759404f919"
+      "path": "backend/app/modules/sales_agent/first_booking.py",
+      "sha256": "c49ca08f2dd4ce897972b9e2a3401928b1116d9026255e75108a511dfa9be524"
     },
     {
-      "path": "backend/app/modules/sales_agent/needs_search.py",
-      "sha256": "f35fc7801ef9884dbe16dd8bf5ceecb7686bcf99f8315d87d7da94ef886a66c2"
+      "path": "backend/app/modules/sales_agent/interpretation_consistency.py",
+      "sha256": "6ae0092a517a31b7fd117b9a819cc6e64594528f51b54e07a648b70cb77e18cc"
     },
     {
-      "path": "backend/app/modules/sales_agent/provider_routes.py",
-      "sha256": "625e918a23457c374a4da0785e0069f68de750dc42d50da173791d2e72027fc8"
+      "path": "backend/app/modules/sales_agent/interpretation_input.py",
+      "sha256": "63587dc80ff808363c00dee1c2b8726d7796013fd1ba64c0486905c0c004b75e"
     },
     {
-      "path": "backend/app/modules/sales_agent/service.py",
-      "sha256": "2abb8e8c2c7917ffe3530e8df9026e1fc9bffd1faa2e4e90fe4b1d9654431d03"
+      "path": "backend/app/modules/sales_agent/language_policy.py",
+      "sha256": "79b4ceb58bf8d00477b98aeb4ac7d2891df9be9f13fbc04d2650068bf6743214"
     },
     {
-      "path": "backend/app/modules/system_settings/services.py",
-      "sha256": "7561dfe4ebe8c2df135dc2fc58abffbab3378b04176777b9cfedc75447371d0f"
+      "path": "backend/app/modules/sales_agent/material_delivery.py",
+      "sha256": "7fde14ac5b1f959af84f3fd9239ac2b6e5343458b7987799a29b72cee0666663"
     },
     {
-      "path": "backend/tests/fixtures/sales_ai/needs_wording_1_interpretations.json",
-      "sha256": "5abd26a90180dc713ec8909778b80a220825f65703872c8d3d57207301d70ec8"
+      "path": "backend/app/modules/sales_agent/property_comparison.py",
+      "sha256": "72cb3477a0df2a8dc79c58439a267cdced207d7f08067d149aca2b8142651c3f"
     },
     {
-      "path": "backend/tests/test_sales_delivery5.py",
-      "sha256": "180e2471deca8df20051cab7b4c1dfb8104385342d5d84d11945eec14d986985"
+      "path": "backend/app/modules/sales_agent/reference_resolution.py",
+      "sha256": "54d8aed1d868ee387bb3edd5ae77ada359a4f97daaf9f08ae6707b2663505b70"
     },
     {
-      "path": "backend/tests/test_sales_route_postgres.py",
-      "sha256": "903dcf0250771de5de28bb10ed9b1c0750240fd63a1ff60c6c351a32982d0829"
+      "path": "backend/app/modules/sales_agent/understanding_prompt.py",
+      "sha256": "0aab2e2cf7f9057cc02c18e6e44be9ecaa3f73b3ee634e4225f1f3a96a3e025d"
     },
     {
-      "path": "backend/tests/test_sales_sender_reassignment.py",
-      "sha256": "becdd2576b6335565d869f36853f765ef27e637ae79537e568c55c7b189f6bfa"
+      "path": "backend/app/modules/sales_agent/understanding_semantics.py",
+      "sha256": "7b528638c8197b6bfbc878b0af4a676e02feaefbfcd64ea5abf15e18a9233651"
     },
     {
-      "path": "backend/tests/test_sales_unknown_assent_replay.py",
-      "sha256": "e6880985253a53f676e65596c37e287d15bd1a9ef11ae396467b60975060d11b"
+      "path": "backend/app/modules/sales_agent/understanding_service.py",
+      "sha256": "93294a12969488cf0bd9427383cf71193bf460ebcb70f171bac5d6203d75fa5c"
     },
     {
-      "path": "backend/tools/sales_ai/inspect_sender_route.py",
-      "sha256": "084618c6183c4d1b872d87f2f26e5928ce15bb38491cdd76c7e184831be0d899"
+      "path": "backend/tests/test_sales_ai_group_e.py",
+      "sha256": "f2ad37a9438727126a4ab90dee394cb3cbf4f5d3b570323a57550721de0e4665"
     },
     {
-      "path": "backend/tools/sales_ai/postgres_checks.py",
-      "sha256": "e3f040901b3da1309f69be5f948e2e2e9ef3811d0123f1ea0cb71d766fd844b1"
+      "path": "backend/tests/test_sales_continuity_battery.py",
+      "sha256": "15afabead0390429ea8708142c4c53baf3973908469e74d1142d8337e93e17c4"
     },
     {
-      "path": "docs/sales-agent/05-resultados-y-mejoras/aceptacion-listado-replay-local/conversaciones.md",
-      "sha256": "c28a7ba89ada7e8ac3c63c1d4cfd45c22583717ba8722bf45dd13558c78b1763"
+      "path": "backend/tests/test_sales_dialogue_continuity_variants.py",
+      "sha256": "d1f789fe11926d23e7b09685f4764ac2e03fda06ec27114305641f144e16e7ab"
     },
     {
-      "path": "docs/sales-agent/05-resultados-y-mejoras/aceptacion-listado-replay-local/resultado.json",
-      "sha256": "07ff3e085240eabfc5a5d4f37263977bfa418c8f6d36a609831e523752490152"
+      "path": "backend/tools/sales_ai/booking_pilot_worker.py",
+      "sha256": "0b3d9e301c661339e98135fd3b48c50eb9959fdab39978fcc96adbcc810a8988"
     },
     {
-      "path": "docs/sales-agent/05-resultados-y-mejoras/aceptacion-listado-replay-local/validacion.json",
-      "sha256": "72fb7f5d81a9b44650ede328ec192fc893cbea4b6ece5b3a75ae05a3ce1125cf"
+      "path": "backend/tools/sales_ai/continuity_battery.py",
+      "sha256": "1cdb39342ad354bdf9d9812621e9ff09412c25d40f40ed5a5de9b3aed222c585"
     },
     {
-      "path": "docs/sales-agent/05-resultados-y-mejoras/busqueda-redaccion-servidor-1/conversaciones.md",
-      "sha256": "774c06502255c55317b9801f7abed3465691c57c3bdef2c06d8410ec8ba26323"
+      "path": "backend/tools/sales_ai/synthetic_lab.py",
+      "sha256": "56f093fadae961342c80947b1c617e52b5c708e680b18a1184189622d31fa737"
     },
     {
-      "path": "docs/sales-agent/05-resultados-y-mejoras/busqueda-redaccion-servidor-1/resultado.json",
-      "sha256": "5873999947a62308aa8ea98587af5c6121f45796183bf22c322378a4bae6e4d9"
+      "path": "docs/sales-agent/02-datos-de-prueba/variantes-continuidad.json",
+      "sha256": "feed7e0b3325a3ce29860df1df8e59091c2c33b15274d48829ef638d12c8ed40"
     },
     {
-      "path": "docs/sales-agent/06-como-ejecutar-las-pruebas/ejecutar-aceptacion-listado.sh",
-      "sha256": "d47ebfc62037030329c4e38b4af88e8cf30e78dc3ed82708ce79a77c27986661"
+      "path": "docs/sales-agent/05-resultados-y-mejoras/busqueda-aceptacion-servidor/resultado.json",
+      "sha256": "bed595553d408c9704e0fbc9be1b6e8e162085c0ffe49d855f12b4aded6264ec"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/continuidad-local/conversaciones.md",
+      "sha256": "3d822aadae5e564ad19bf5254e28cae62580ee3cf597631b6750f103701648bb"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/continuidad-local/resultado.json",
+      "sha256": "af1727cbc31e10ea2af4d4e5c94f667bcfe2a79b6c02eae631c0ed2346217240"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/continuidad-local/validacion.json",
+      "sha256": "d73cd34b71f1782c18866bdb5b31e7ff5572f573548955b65ce8c1bac0f22ce9"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/figuras/necesidades-observadas.png",
+      "sha256": "3f2dc4892fbd20d8debf5f2acd1640522a1e19f6d9d00ae91acd84d43b17ad42"
+    },
+    {
+      "path": "docs/sales-agent/06-como-ejecutar-las-pruebas/ejecutar-continuidad.sh",
+      "sha256": "f30d8811b64561a13b25d50778b65cf009f0a504a7d48ee4c6cb0642a0357a48"
+    },
+    {
+      "path": "docs/sales-agent/06-como-ejecutar-las-pruebas/herramientas/generar_necesidades_observadas.py",
+      "sha256": "0f0d4a969f0d8b8eb5be218ed3705cc4773d7f097d4536e606963222fd092b79"
     },
     {
       "path": "docs/sales-agent/README.md",
-      "sha256": "5496ea5c9f334b35ab66e5e76a167e7771d03a6d24f57d1850bcd5a672a55e42"
+      "sha256": "aa85002e8334fb8238f85d7e852b90151a64046f7a79521e7ec3af2eccccc0e3"
     }
   ],
   "notes": [
-    "Differential files only; no commit or push performed.",
-    "No migrations or manual production SQL writes.",
-    "Real-model validation after deployment is pending."
+    "Differential release; no git commit or push performed.",
+    "No migrations. Model and graph topology unchanged.",
+    "Server real-model evaluation pending. Local provider simulations are explicitly labeled."
   ]
 }

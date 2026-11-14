@@ -1,0 +1,53 @@
+{
+  "base_commit": "923083d8e3a0db94a0574ccf74de5a315a19f0c1",
+  "origin": "local_offline_regression_plus_isolated_real_postgres",
+  "shards": [
+    {
+      "shard": 1,
+      "passed": 1068,
+      "skipped": 2,
+      "failed": 0
+    },
+    {
+      "shard": 2,
+      "passed": 1127,
+      "skipped": 6,
+      "failed": 0
+    },
+    {
+      "shard": 3,
+      "passed": 1084,
+      "skipped": 3,
+      "failed": 0
+    }
+  ],
+  "module_coverage": {
+    "modules": 141,
+    "status": "PASS",
+    "each_module_once": true
+  },
+  "postgres": {
+    "version": "16.2",
+    "passed": 11,
+    "production_database_used": false
+  },
+  "acceptance": {
+    "PASS": 63,
+    "FAIL": 0,
+    "NOT_RUN": 1
+  },
+  "scenario_report": {
+    "cases": 6,
+    "turns": 36,
+    "bookings": 5,
+    "unavailable": 1,
+    "provider": "simulated",
+    "model_quality_evaluated": false
+  },
+  "paid_provider_calls": 0,
+  "openrouter_cost_usd": 0,
+  "production_writes": 0,
+  "lead_contacts": 0,
+  "pending": "Run continuity-battery with the published model after deployment.",
+  "final_focused_tests_passed": 79
+}

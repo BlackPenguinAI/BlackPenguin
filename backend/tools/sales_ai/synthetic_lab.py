@@ -38,15 +38,19 @@ def main():
     parser.add_argument('--output',type=Path,required=True)
     parser.add_argument('--prepare-only',action='store_true',help='No database reads or model calls.')
     parser.add_argument('--configuration-id')
-    parser.add_argument('--suite',choices=['adaptive','booking-point','commercial-point','closing-point','compact-battery','needs-discovery'],default='adaptive')
-    parser.add_argument('--cases',nargs='+',help='Compact-battery case IDs for a focused rerun; omitted runs all 16.')
+    parser.add_argument('--suite',choices=['adaptive','booking-point','commercial-point','closing-point','compact-battery','needs-discovery','continuity-battery'],default='adaptive')
+    parser.add_argument('--cases',nargs='+',help='Case IDs for compact, needs or continuity suites; omitted runs the suite defaults.')
     parser.add_argument('--lead-model',help='Optional OpenRouter model for the synthetic buyer; sales model stays published.')
     parser.add_argument('--max-calls',type=int,default=180,help='Global inference-call cap, not a currency cap.')
     parser.add_argument('--max-turns',type=int,default=6)
     parser.add_argument('--judge',action='store_true',help='Optional advisory LLM judge; also consumes call budget.')
     args=parser.parse_args()
-    if args.suite in {'booking-point','commercial-point','closing-point','compact-battery','needs-discovery'} and (args.judge or args.lead_model):parser.error('Focused suites use scripted leads and no judge.')
-    if args.cases and args.suite not in {'compact-battery','needs-discovery'}:parser.error('--cases is available only for compact-battery and needs-discovery.')
+    if args.suite in {'booking-point','commercial-point','closing-point','compact-battery','needs-discovery','continuity-battery'} and (args.judge or args.lead_model):parser.error('Focused suites use scripted leads and no judge.')
+    if args.cases and args.suite not in {'compact-battery','needs-discovery','continuity-battery'}:parser.error('--cases is available only for compact-battery, needs-discovery and continuity-battery.')
+    if args.suite=='continuity-battery':
+        from .continuity_battery import CASES
+        if args.cases and (len(set(args.cases))!=len(args.cases) or set(args.cases)-set(CASES)):parser.error('Invalid continuity cases.')
+        if args.max_turns<6:parser.error('Continuity requires at least six turns.')
     if args.suite=='needs-discovery':
         from .needs_discovery import CASES
         if args.cases and (len(set(args.cases))!=len(args.cases) or set(args.cases)-set(CASES)):parser.error('Invalid needs-discovery cases.')
@@ -73,7 +77,7 @@ def main():
               'max_calls':args.max_calls,'max_turns':args.max_turns,'judge':args.judge}
         path=Path(temporary)/'lab-options.json';path.write_text(json.dumps(data,default=encode));path.chmod(0o600)
         env=child_environment(temporary)
-        completed=subprocess.run([sys.executable,'-m',('tools.sales_ai.booking_pilot_worker' if args.suite in {'booking-point','commercial-point','closing-point','compact-battery','needs-discovery'} else 'tools.sales_ai.synthetic_lab_worker'),str(path),str(output)],
+        completed=subprocess.run([sys.executable,'-m',('tools.sales_ai.booking_pilot_worker' if args.suite in {'booking-point','commercial-point','closing-point','compact-battery','needs-discovery','continuity-battery'} else 'tools.sales_ai.synthetic_lab_worker'),str(path),str(output)],
             cwd=temporary,env=env,timeout=1800,stderr=subprocess.PIPE,text=True)
         summary=output/'summary.json'
         if summary.is_file():

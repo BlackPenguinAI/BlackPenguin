@@ -38,6 +38,10 @@ def issues_for(value, text, *, appointment_offer=False):
             add(['preferences',i],'down_payment_as_total_budget' if pref.key=='budget' and down_payment_only(pref.evidence) else 'financial_preference_unrelated_evidence',
                 'Appointment selection/confirmation does not declare budget or financing. Omit this preference and retain the saved financial facts.')
     pure_action=re.search(r'\b(?:send|show)\b.*\b(?:PDF|brochure|photos?|images?|floor plan)\b|\b(?:arrange|book|schedule)\b.*\b(?:visit|viewing|appointment)\b|\bthe (?:first|second|third) appointment:',text,re.I)
+    from .interpretation_consistency import POSITIVE_VISIT
+    pure_action=pure_action or POSITIVE_VISIT.search(text)
+    if value.visit and value.visit.action=='request' and POSITIVE_VISIT.search(text) and not value.requires_clarification and not any(r.topic.value=='appointment' and r.polarity=='request' for r in value.requests):
+        add(['requests'],'visit_missing_executable_request','A visit request, selection or confirmation also needs a topic appointment request. Preserve its current evidence; do not infer final booking consent.')
     if value.comparison and pure_action and not re.search(COMPARATIVE_SIGNAL,text,re.I):
         add(['comparison'],'comparison_not_supported_by_action','This message requests material, a visit, or selects a time, not a comparison. Preserve the explicit action and omit the invented comparison. Never infer booking confirmation from a selection.')
     if value.visit and re.search(r'\b(?:send|show)\b.*\b(?:PDF|brochure|photos?|images?|floor plan)\b',value.visit.evidence,re.I) and not re.search(r'\b(?:visit|appointment|viewing|schedule|book)\b',value.visit.evidence,re.I):

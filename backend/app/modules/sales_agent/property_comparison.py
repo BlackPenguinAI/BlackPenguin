@@ -115,5 +115,4 @@ def render(query, context, state, holds):
             lines.append(('Tie for ' if len(names)>1 else '')+('highest' if d.operation=='maximum' else 'lowest')+' '+c+' among these approved records: '+', '.join(names)+'.')
         else:lines.append('I cannot reliably rank these options: values, exact ranges or comparable currencies/area units are missing or restricted.')
     # Query coverage isn't an assertion that unsupplied inventory is unavailable.
-    lines.append('This compares approved records; unconfirmed values do not mean zero or unavailable.')
     return '\n'.join(lines),[t.property_id for t,_ in shown if t.kind=='property'],[t.unit_id for t,_ in shown if t.kind=='unit']

@@ -241,7 +241,7 @@ def test_unreadable_material_never_offered_or_sent(agent,model,bad):
     agent.db.commit()
     agent.turn('Send photos',understanding('Send photos','materials',subjects={0:'photos'}))
     assert not agent.db.query(SalesAssetShare).count() and not latest(agent).metadata_json.get('material_offer')
-    assert 'could not verify' in latest(agent).content.lower() and not agent.conversation.is_paused
+    assert "don't have photos" in latest(agent).content.lower() and not agent.conversation.is_paused
 
 
 def test_approved_encrypted_file_decrypts_and_integrity_is_bound(agent,model):

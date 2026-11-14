@@ -1,0 +1,149 @@
+{
+  "version": "sales-continuity-battery/1.0",
+  "executed_locally_with_simulated_provider": {
+    "development_bay": {
+      "split": "development",
+      "project": 0,
+      "property": 0,
+      "access": "all",
+      "material": "photos",
+      "date_style": "day_month",
+      "visit": "I want to visit {name}"
+    },
+    "development_cedar": {
+      "split": "development",
+      "project": 1,
+      "property": 0,
+      "access": "selected",
+      "material": "photos",
+      "date_style": "numeric",
+      "visit": "I would like to visit {name}"
+    },
+    "development_missing": {
+      "split": "development",
+      "project": 2,
+      "property": 0,
+      "access": "all",
+      "material": "photos",
+      "date_style": "month_day",
+      "visit": "Please schedule a visit to {name}"
+    },
+    "transfer_bay": {
+      "split": "transfer",
+      "project": 0,
+      "property": 0,
+      "access": "selected",
+      "material": "floor_plan",
+      "date_style": "month_day",
+      "visit": "Could I arrange a viewing of {name}?"
+    },
+    "transfer_cedar": {
+      "compare_switch": true,
+      "split": "transfer",
+      "project": 1,
+      "property": 1,
+      "access": "all",
+      "material": "floor_plan",
+      "date_style": "day_month",
+      "visit": "I'd like to book a visit to {name}."
+    },
+    "transfer_no_sellers": {
+      "split": "transfer",
+      "project": 2,
+      "property": 0,
+      "access": "unassigned",
+      "material": "floor_plan",
+      "date_style": "numeric",
+      "visit": "Can we schedule a visit to {name}?"
+    }
+  },
+  "reserved_not_executed": [
+    {
+      "case": "reserve_short_return",
+      "project": 2,
+      "script": [
+        "Tell me about Ridge Townhome.",
+        "Do you have its layout?",
+        "Before we schedule, how big is it?",
+        "Can we go there on Saturday morning?"
+      ],
+      "purpose": "Retoma y cambio de tema; requiere comprobar disponibilidad real antes de proponer."
+    },
+    {
+      "case": "reserve_ambiguous_clock",
+      "project": 1,
+      "script": [
+        "Cedar Studio",
+        "I can come at 10.",
+        "Is that your local time or mine?"
+      ],
+      "purpose": "Hora sin AM/PM y zona ambigua: pedir aclaración natural; no reservar."
+    },
+    {
+      "case": "reserve_context_switch",
+      "project": 1,
+      "script": [
+        "Show Cedar Loft and Cedar Studio.",
+        "The smaller one.",
+        "Now the other one.",
+        "Send just its pictures."
+      ],
+      "purpose": "Comparativo, cambio de referencia y material exacto."
+    }
+  ],
+  "limits": [
+    "Transfer cases are reviewed and not a statistically blind holdout.",
+    "Reserved scripts are a plan, not passing tests.",
+    "No names or IDs from the real lead are used as routing rules."
+  ],
+  "executed_scripts": {
+    "development_bay": [
+      "I am looking for a 4 bedroom home.",
+      "Bay Residence",
+      "Do you have photos of the property?",
+      "I want to visit Bay Residence",
+      "16 November, 10:00AM",
+      "Yes"
+    ],
+    "development_cedar": [
+      "I am looking for a 2 bedroom home.",
+      "Cedar Loft",
+      "Do you have photos of the property?",
+      "I would like to visit Cedar Loft",
+      "16/11, 9:00AM",
+      "Yes"
+    ],
+    "development_missing": [
+      "I am looking for a 3 bedroom home.",
+      "Ridge Townhome",
+      "Do you have photos of the property?",
+      "Please schedule a visit to Ridge Townhome",
+      "November 16, 8:00AM",
+      "Yes"
+    ],
+    "transfer_bay": [
+      "I am looking for a 4 bedroom home.",
+      "Bay Residence",
+      "Show me the property blueprints",
+      "Could I arrange a viewing of Bay Residence?",
+      "November 16, 10:00AM",
+      "Yes"
+    ],
+    "transfer_cedar": [
+      "I am looking for a 2 bedroom home.",
+      "Cedar Loft",
+      "How does this property differ from the others?",
+      "Actually I prefer Cedar Studio instead.",
+      "Show me the property blueprints",
+      "I'd like to book a visit to Cedar Studio.",
+      "16 November, 9:00AM",
+      "Yes"
+    ],
+    "transfer_no_sellers": [
+      "I am looking for a 3 bedroom home.",
+      "Ridge Townhome",
+      "Show me the property blueprints",
+      "Can we schedule a visit to Ridge Townhome?"
+    ]
+  }
+}

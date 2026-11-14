@@ -22,6 +22,7 @@ def run(options_path, output):
     from .evaluation_worker import save_reports
     from .booking_pilot import CASES, evaluate_case, team
     path=Path(options_path);output=Path(output);options=json.loads(path.read_text())
+    continuity=options.get('suite')=='continuity-battery'
     needs=options.get('suite')=='needs-discovery'
     compact=options.get('suite')=='compact-battery'
     closing=options.get('suite')=='closing-point'
@@ -43,11 +44,16 @@ def run(options_path, output):
         selection=options.get('case_selection')
         if selection and (len(set(selection))!=len(selection) or set(selection)-set(CASES)):raise ValueError('Invalid needs discovery selection.')
         CASES=tuple(selection or CASES)
+    if continuity:
+        from .continuity_battery import CASES,evaluate_case,VERSION,SPECS
+        selection=options.get('case_selection')
+        if selection and (len(set(selection))!=len(selection) or set(selection)-set(CASES)):raise ValueError('Invalid continuity selection.')
+        CASES=tuple(selection or CASES)
     if engine.dialect.name!='sqlite' or not engine.url.database or Path(engine.url.database).parent!=path.parent:
         raise PermissionError('Booking iteration requires its private SQLite database.')
     Base.metadata.create_all(engine)
     credential=options['credential'];budget=Budget(options['max_calls'])
-    report={'version':VERSION if compact or needs else 'sales-closing-point/1.0' if closing else 'sales-commercial-point/1.0' if commercial else 'sales-booking-point/1.0','synthetic_only':True,'production_database_writes':0,
+    report={'version':VERSION if compact or needs or continuity else 'sales-closing-point/1.0' if closing else 'sales-commercial-point/1.0' if commercial else 'sales-booking-point/1.0','synthetic_only':True,'production_database_writes':0,
         'lead_contacts':0,'provider_calls':0,'lead_model':None,'judge_model':None,'commit':settings.APP_COMMIT_SHA,'cases':[],
         'limitations':['Google Calendar integration and transport delivery are not exercised.',
             'Simulation selects the first eligible seller, not the production round-robin cursor.',
@@ -70,7 +76,7 @@ def run(options_path, output):
             report.update(company_name=manifest['company_name'],company_id=manifest['company_id'],project_count=3,property_count=6,
                 project_name=manifest['projects'][0]['name'])
             if options['prepare_only']:
-                report['team']=[] if closing or compact or needs else team(db,manifest,'all_projects',datetime.utcnow())
+                report['team']=[] if closing or compact or needs or continuity else team(db,manifest,'all_projects',datetime.utcnow())
                 report.update(status='PREPARED',model_quality_evaluated=False,scenario_count=len(CASES),scenarios=list(CASES))
             else:
                 db.add(AIConfiguration(id=credential['id'],company_id=None,openrouter_api_key=credential['key'],agent_ventas=credential['pack']))
@@ -91,6 +97,9 @@ def run(options_path, output):
                     report['actual_bookings']=sum(len(c.get('meetings',[])) for c in report['cases'])
                     report['case_results']=summarize(report['cases'])
                     report['cost_reporting_complete']=budget.usage['responses_with_cost']==budget.calls
+                if continuity:
+                    report.update(overall_dialogue_quality='NOT_EVALUATED',quality_scope='Continuity, material ownership and first-booking checks only; human review remains necessary.',cost_reporting_complete=budget.usage['responses_with_cost']==budget.calls)
+                    report['split_results']={split:{'cases':sum(c.get('split')==split for c in report['cases']),'passed':sum(c.get('split')==split and all(k['status']=='PASS' for t in c.get('turns',[]) for k in t.get('checks',[])) and all(k['status']=='PASS' for k in c.get('checks',[])) for c in report['cases'])} for split in ('development','transfer')}
                 if needs:
                     report.update(overall_dialogue_quality='NOT_EVALUATED',quality_scope='Needs-first checks only; no integral dialogue certification.',cost_reporting_complete=budget.usage['responses_with_cost']==budget.calls)
                 report.update(provider_calls=budget.calls,provider_usage=budget.usage,scenario_count=len(report['cases']),
@@ -98,6 +107,8 @@ def run(options_path, output):
                 report=save_reports(output,report,[credential.get('key')])
             if compact:
                 (output/'scenario-plan.json').write_text(json.dumps({'version':VERSION,'personas':PERSONAS,'scenarios':{k:SPECS[k] for k in CASES}},indent=2,default=encode)+'\n')
+            if continuity:
+                (output/'scenario-plan.json').write_text(json.dumps({'version':VERSION,'cases':{k:SPECS[k] for k in CASES}},indent=2)+'\n')
             if needs:
                 from .needs_discovery import SPECS
                 (output/'scenario-plan.json').write_text(json.dumps({'version':VERSION,'cases':{k:{'project_index':SPECS[k][0],'lead_messages':SPECS[k][1],'variant':SPECS[k][2]} for k in CASES}},indent=2)+'\n')
