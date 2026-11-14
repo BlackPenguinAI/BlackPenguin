@@ -1,0 +1,41 @@
+{
+  "base_commit": "c087cf7b729e165100d359968c1d7d3421f26d60",
+  "general_protocol": "sales-understanding-prompt/2.35",
+  "wire_system": "sales-interpretation-system/2.1",
+  "wire_schema": "sales-interpretation-input/2.0",
+  "focused_tests_passed": 172,
+  "recorded_message_sequences": 38,
+  "model_quality_evaluated": false,
+  "paid_local_calls": 0,
+  "local_cost_usd": 0,
+  "full_regression": {
+    "status": "PASS",
+    "modules": 144,
+    "complete_module_coverage_verified": true,
+    "shards": [
+      {
+        "shard": 1,
+        "passed": 1104,
+        "skipped": 2,
+        "failed": 0
+      },
+      {
+        "shard": 2,
+        "passed": 1219,
+        "skipped": 6,
+        "failed": 0
+      },
+      {
+        "shard": 3,
+        "passed": 1118,
+        "skipped": 3,
+        "failed": 0
+      }
+    ],
+    "passed": 3441,
+    "skipped": 11,
+    "failed": 0,
+    "runtime": "Python 3.12.14 with SQLite; not the GitHub candidate Docker image"
+  },
+  "partition_tests_passed": 8
+}

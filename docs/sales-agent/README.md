@@ -572,7 +572,7 @@ Se añaden variantes que distinguen una búsqueda antigua de una confirmación v
 | Un «Hi» interpretado con confianza cero recibía una aclaración comercial | Una comprobación limitada autoriza solo el saludo literal cuando la interpretación contiene únicamente cortesía, sin solicitudes de negocio. Se conserva la confianza original y se registra que no hay autorización de acciones. | Saludar sin pedir que el lead declare todavía una intención; negar el atajo en mensajes mixtos. |
 | Repetición de una petición de planos/fotos ausentes | Se compara el formato y la propiedad/unidad con el turno anterior; se vuelve a consultar la disponibilidad real y se reconoce la insistencia. | Explicar que el material sigue sin estar disponible y ofrecer solo alternativas aprobadas del objetivo correcto. |
 | Etiquetas técnicas dentro de descripciones comerciales sintéticas | Se sustituyen las frases de prueba por descripciones coherentes con dormitorios y características ya existentes. Los identificadores, aislamiento, marcas de los archivos y naturaleza sintética permanecen. Versión de texto comercial `sales-lab-commercial-copy/2`. | No mostrar instrucciones internas como descripción de una vivienda. No se cambian datos de compañías reales. |
-| «Can I see it?» asumía siempre visita en el guion | Batería 1.1: se separan oferta de archivos e invitación presencial. El protocolo 2.33 explica el contexto sin imponer la intención. | Compartir un archivo ofrecido o aclarar su identidad; consultar horarios cuando se trata de una visita, sin reservar antes de la confirmación. |
+| «Can I see it?» asumía siempre visita en el guion | Batería 1.1: se separan oferta de archivos e invitación presencial. La plantilla general 2.33 describe el contexto (ver instrucción efectiva en 10.5) sin imponer la intención. | Compartir un archivo ofrecido o aclarar su identidad; consultar horarios cuando se trata de una visita, sin reservar antes de la confirmación. |
 
 | Próxima conversación | Contexto / respuesta esperada | Turnos de lead previstos |
 |---|---|---:|
@@ -614,7 +614,7 @@ La curva muestra gasto, no calidad: las corridas tienen distinto número de caso
 | Referencia inválida en una visita nueva | Con intención de visita nueva y evidencia propia, «the property/this unit» puede vincular el marcador inválido «/» al sujeto actual. Un nombre explícito solo se usa si pertenece al catálogo aprobado del proyecto. | No se cambia una referencia real de horario, una confirmación, cancelación ni consulta de una cita existente; la confianza no aumenta. |
 | Respuesta corta contradictoria con una invitación | Después de una invitación presencial entregada, si «Can I see it?» se interpreta como lectura de material, se pregunta si quiere visita o fotos. | No comparte archivos ni consulta horarios por ese supuesto. Una oferta actual de archivos conserva su significado. |
 | Interpretación de visita coherente con la invitación | Si el modelo sí solicita una visita nueva, una referencia inválida puede enlazarse al sujeto de esa invitación. | Solo consulta disponibilidad; seleccionar horario y confirmar resumen siguen siendo pasos distintos. |
-| Protocolo del modelo | Versión 2.34: una visita nueva tiene como objetivo una propiedad/unidad, no una cita «/»; las citas anteriores se resuelven por separado. | Se mantiene `openai/gpt-4o-mini`, configuración 8 y topología LangGraph. No se modifican pesos del modelo ni datos reales. |
+| Protocolo del modelo | Plantilla general 2.34 (ver instrucción efectiva en 10.5): una visita nueva tiene como objetivo una propiedad/unidad, no una cita «/»; las citas anteriores se resuelven por separado. | Se mantiene `openai/gpt-4o-mini`, configuración 8 y topología LangGraph. No se modifican pesos del modelo ni datos reales. |
 
 **Cómo se prueba.** El replay conserva 33 secuencias de mensajes de la corrida, incluidos los primeros intentos inválidos y los paquetes de reparación. Se añaden variaciones de nombre, pronombres, viviendas/unidades, formas de pedir visita, ofertas de archivos e invitaciones fallidas. También se comprueba que no se sustituyan horarios reales, confirmaciones ni referencias a otra propiedad. La versión del guion sigue siendo 1.1: no se suavizan los objetivos ni se cambia el texto del lead para evitar el fallo.
 
@@ -638,6 +638,40 @@ La última corrida se interrumpió tras 33 turnos. Escalar USD 0.12500070 a los 
 ![Consumo rastreado de OpenRouter](05-resultados-y-mejoras/visita-contexto-local/consumo-observado.png)
 
 La curva representa gasto acumulado, no calidad integral. [Reproducir figura](05-resultados-y-mejoras/visita-contexto-local/generar_consumo.py) · [Comandos de evaluación](06-como-ejecutar-las-pruebas/ejecutar-visita-contexto.sh).
+
+## 10.5. Coherencia entre material, propietario e intención ejecutable
+
+**Última evidencia con modelo publicado (`c087cf7`).** Se generaron cuatro citas de cinco, frente a dos en la corrida anterior de estos cinco guiones. Tres conversaciones cumplieron todos los controles: Cedar Loft llegó a cita pero repreguntó innecesariamente por la propiedad al reiterar fotos, y la visita aclarada explícitamente no avanzó. Se conservan **365 PASS y seis FAIL**: cuatro corresponden al turno de fotos y dos al recorrido de aclaración interrumpido. No equivalen a seis defectos independientes ni a una aprobación integral del diálogo. [Resumen original](05-resultados-y-mejoras/retoma-servidor-5/resumen.json) · [Conversaciones originales legibles](05-resultados-y-mejoras/retoma-servidor-5/conversaciones.md).
+
+| Regla general | Qué se ajusta y cómo | Qué sigue protegiendo el backend |
+|---|---|---|
+| El propietario de las fotos no es un archivo | Si una petición explícita de fotos/PDF/planos clasifica el nombre del propietario actual como material, se corrige su tipo usando el catálogo aprobado y la selección vigente. | No se adivinan otros propietarios, no se convierten archivos reales con ese nombre ni se colapsa una unidad dentro de otra tipología. Las restricciones y cobertura siguen vigentes. |
+| Una intención de visita no puede quedar sin tarea | La validación exige que `visit.action=request` tenga una solicitud de cita o una aclaración justificada, después de cualquier reparación. Una declaración propia y actual de visita presencial puede completar esa solicitud faltante, conservando evidencia y confianza. | No se completa a partir de citas pasadas, negaciones, discurso de terceros ni mensajes sin evidencia suficiente. Reservar exige todavía elegir y confirmar un resumen válido. |
+| Verificar las instrucciones realmente enviadas | La ruta actual sustituye la plantilla general por `interpretation_input.SYSTEM`. Se actualiza esa instrucción efectiva y se registra `input_system_version=sales-interpretation-system/2.1` en la traza. Una prueba comprueba el contenido del mensaje HTTP y su versión guardada. | El formato de entrada continúa en `sales-interpretation-input/2.0`; el protocolo general/UI pasa a 2.35. No se cambia LangGraph, el modelo ni la configuración publicada 8. |
+
+**Aclaración de auditoría:** las versiones 2.33/2.34 de la plantilla general registradas en secciones anteriores no identifican por sí solas el texto del system de la ruta wire. Los cambios de backend de esas entregas sí se ejecutaban. Desde esta corrección, la instrucción efectiva tiene una versión propia comprobada en la solicitud y en el snapshot; no se presume su aplicación por actualizar otra plantilla.
+
+**Validación del código final:** 3.441 pruebas aprobadas, 11 omitidas por condiciones de entorno y cero fallos en los tres shards; 144 módulos cubiertos exactamente una vez y ocho controles de partición aprobados. La imagen candidata y PostgreSQL aislado se verificarán en GitHub. [Validación JSON](05-resultados-y-mejoras/coherencia-material-visita-local/validacion.json).
+
+**Diseño de pruebas.** Se conservan 38 secuencias de la última corrida, incluidos los intentos inválidos y reparaciones. Hay variantes de nombres, formatos de material, unidades, referencias a archivos reales y declaraciones propias, históricas o negadas. El replay local completa **once recorridos, 76 turnos, diez citas simuladas y 659 controles correctos**. La composición y las respuestas posteriores no registradas se simulan, por lo que estos resultados no prueban otra inferencia del modelo publicado. [Replay legible](05-resultados-y-mejoras/coherencia-material-visita-local/conversaciones.md) · [JSON local](05-resultados-y-mejoras/coherencia-material-visita-local/resultado.json).
+
+| Consumo rastreado desde necesidades | Total USD | Llamadas con costo |
+|---|---:|---:|
+| Cuatro corridas de necesidades | 0.15756165 | 134 |
+| Primera continuidad | 0.12972465 | 88 |
+| Segunda continuidad | 0.12658365 | 86 |
+| Primera retoma | 0.08616360 | 56 |
+| Segunda retoma | 0.12500070 | 85 |
+| Tercera retoma | 0.15285525 | 101 |
+| **TOTAL OBSERVADO** | **0.77788950** | **550** |
+| Corrección y regresiones locales de coherencia | **0.00000000** | 0 pagadas |
+| Próxima repetición de los mismos cinco guiones | **≈0.12–0.22 estimado; reserva 0.35** | Hasta 200 llamadas; no es límite monetario |
+
+La última corrida tuvo 38 turnos. Escalar USD 0.15285525 a los 39–40 previstos da aproximadamente USD 0.16, con variaciones por contexto y reparaciones. El estimado no se añade al consumo observado; este acumulado no incluye etapas anteriores a necesidades. La siguiente corrida real sigue pendiente de despliegue y mantiene los mismos cinco objetivos, sin borrar fallos ni debilitar criterios.
+
+![Consumo rastreado de OpenRouter](05-resultados-y-mejoras/coherencia-material-visita-local/consumo-observado.png)
+
+La curva representa consumo, no calidad integral. [Reproducir figura](05-resultados-y-mejoras/coherencia-material-visita-local/generar_consumo.py) · [Comandos de servidor y extracción](06-como-ejecutar-las-pruebas/ejecutar-coherencia-material-visita.sh).
 
 ## 11. Trabajo futuro
 

@@ -9,6 +9,7 @@ from pydantic import Field,create_model,StrictBool
 from .understanding_contract import (Understanding,StrictModel,Reference,Request,Constraint,Comparison,Subject)
 
 VERSION='sales-interpretation-input/2.0'
+SYSTEM_VERSION='sales-interpretation-system/2.1'
 class Target(StrictModel):
     kind:Literal['property','unit','appointment','location','material','ambiguous']
     expression:str=Field(min_length=1,max_length=300)
@@ -243,3 +244,5 @@ def compile_input(raw,text,*,historical_messages=()):
 SYSTEM += "\nA request such as I am looking for a 2 bedroom home is catalog discovery: topic catalog, target null, preference bedrooms=2 with exact evidence. A bedroom count is not a property name. Do not ask which model the buyer means before searching. Preserve other independent requests. Negative, hypothetical, ranged and quoted statements are not exact positive needs.\n"
 
 SYSTEM += "\nNever use comparison merely to filter homes by bedroom count. Comparison requires a comparison actually requested by the lead. Do not insert catalog names as comparison members when those names were not mentioned or referred to by the lead.\n"
+
+SYSTEM += "\nKeep intent and requests consistent: visit.action=request requires an appointment request or a focused clarification, even after repair. A current own in-person visit declaration is not a comparison. A property's name is the owner of its photos, not a material name. Preserve the current owner on repeated photo requests. After a visit-or-photos question, interpret the lead's explicit in-person answer as a visit request, never a generic information question.\n"

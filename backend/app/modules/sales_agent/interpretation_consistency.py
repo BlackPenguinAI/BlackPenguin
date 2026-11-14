@@ -139,11 +139,21 @@ def normalize(value,text,commercial,*,appointment_offer=None):
     # reported speech and mixed existing-appointment questions remain untouched.
     clauses=[m.group().strip() for m in re.finditer(r'[^.!?\n]+[.!?]?',own)]
     quote=next((q for q in clauses if POSITIVE_VISIT.search(q) and not NEGATIVE.search(q) and (not SHORT_VISIT.fullmatch(q) or value.visit and value.visit.action=='request')),None)
+    # A direct, current in-person declaration can clarify an earlier question.
+    # The typed directive alone never completes consent: require own literal
+    # visit evidence and reject historical, negative and existing-visit wording.
+    if not quote and value.visit and value.visit.action=='request':
+        candidate=value.visit.evidence
+        historical=re.search(r"\b(?:already|existing|previous|past|yesterday|ago|had|discussed|booked|confirmed|my appointment)\b",candidate,re.I)
+        if (candidate in own and not NEGATIVE.search(candidate) and not historical and not EXISTING_QUERY.search(own)
+            and re.search(r'\b(?:I|we)\b',candidate,re.I)
+            and re.search(r'\bin[ -]person (?:visit|viewing)\b',candidate,re.I)):
+            quote=candidate
     changes=re.search(r'\b(?:cancel|reschedul\w*|change my|move my)\b',own,re.I)
     if quote and not DECLINE.search(own) and len(named(quote))<=1 and not data['alternatives'] and not changes and not EXISTING_QUERY.search(own) and not value.requires_clarification:
         if not data['cancellation'] and not data['reschedule']:
             comparison=data['comparison']
-            pure_visit=bool(POSITIVE_VISIT.match(own.strip())) or all(POSITIVE_VISIT.search(q) or re.fullmatch(r'Any (?:available )?time in the next (?:seven|7) days works for me[.!]?',q,re.I) or re.fullmatch(r'Please use the project timezone[.!]?',q,re.I) for q in clauses)
+            pure_visit=bool(POSITIVE_VISIT.match(own.strip())) or bool(value.visit and value.visit.action=='request' and quote==own.strip() and re.search(r'\bin[ -]person (?:visit|viewing)\b',quote,re.I)) or all(POSITIVE_VISIT.search(q) or re.fullmatch(r'Any (?:available )?time in the next (?:seven|7) days works for me[.!]?',q,re.I) or re.fullmatch(r'Please use the project timezone[.!]?',q,re.I) for q in clauses)
             from .understanding_semantics import COMPARATIVE_SIGNAL
             if comparison and pure_visit and not re.search(COMPARATIVE_SIGNAL,own,re.I):
                 key=comparison['request_id']

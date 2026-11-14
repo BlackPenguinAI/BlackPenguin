@@ -71,3 +71,35 @@ def completeness_issues(value,text):
     if re.search(r'\bcompare\b',text,re.I) and not value.comparison and any(r.polarity=='request' and 'compare' in r.evidence.lower() for r in value.requests):
         add('comparison','comparison_missing','Preserve the explicit comparison: define local property references for the exact names and comparison.reference_ids. A comparison does not select either property.')
     return issues
+
+
+def material_owner(value,text,commercial,state):
+    """Retype only the active approved owner's name, never a named file or another owner."""
+    from app.modules.governance.services import request_attribution
+    own=request_attribution(text)['current_text']
+    if own!=text or value.comparison or value.alternatives or value.requires_clarification:return value,[]
+    if REPORTED.search(own):return value,[]
+    if state.selected_unit_id:
+        owners=[(r.get('unit_code'),'unit') for r in commercial.get('inventory',[]) if r.get('id')==state.selected_unit_id]
+    else:
+        owners=[(r.get('property_type'),'property') for r in commercial.get('property_types',[]) if r.get('id')==state.selected_property_type_id]
+    owners=[(name,kind) for name,kind in owners if isinstance(name,str) and name]
+    files={str(r.get('name') or '').strip().casefold() for r in commercial.get('available_assets',[])}
+    data=value.model_dump(mode='json');notes=[]
+    formats={'photos':r'photos?|pictures?|images?', 'floor_plan':r'floor plans?|blueprints?',
+             'brochure':r'brochures?|PDF', 'unit_sheet':r'unit sheet'}
+    for row in data['requests']:
+        if row['topic']!='materials' or row['polarity']!='request' or row['subject'] not in formats:continue
+        if not re.search(r'\b(?:'+formats[row['subject']]+r')\b',row['evidence'],re.I):continue
+        ref=next((r for r in data['references'] if r['id']==row['reference_id']),None)
+        if not ref or ref['kind']!='material' or ref['expression'].strip().casefold() in files:continue
+        matches=[(name,kind) for name,kind in owners if name.casefold()==ref['expression'].strip().casefold()]
+        if len(matches)!=1:continue
+        # Explicit names of other scoped properties/units must remain unresolved.
+        names=[r.get('property_type') for r in commercial.get('property_types',[])]+[r.get('unit_code') for r in commercial.get('inventory',[])]
+        if any(isinstance(name,str) and name and name.casefold()!=matches[0][0].casefold() and
+               re.search(r'(?<!\w)'+re.escape(name)+r'(?!\w)',own,re.I) for name in names):continue
+        ref.update(kind=matches[0][1],expression=matches[0][0],evidence=row['evidence'])
+        notes.append({'field':'references','action':'material_target_is_active_approved_owner','request_id':row['id'],
+                      'confidence_unchanged':value.confidence})
+    return (Understanding.model_validate(data).check_evidence(text),notes) if notes else (value,[])

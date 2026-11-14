@@ -1,10 +1,10 @@
 {
-  "base_commit": "1569573c6c2aa8034ff106bb650e0255dddef0c2",
-  "description": "Current property references for new visits and focused clarification after delivered visit invitation",
+  "base_commit": "c087cf7b729e165100d359968c1d7d3421f26d60",
+  "description": "Separate material owners from files and enforce executable visit coherence on actual provider input",
   "migrations": false,
   "deletions": [],
   "validation": {
-    "passed": 3417,
+    "passed": 3441,
     "skipped": 11,
     "failed": 0,
     "modules": 144,
@@ -12,64 +12,80 @@
   },
   "files": [
     {
-      "path": "backend/app/modules/sales_agent/dialogue_continuity.py",
-      "sha256": "6a5ed6ebec85b0c8c08b5b4605b0590ae7342e8d1f69ecdf34bfd162b9a4f9bf"
+      "path": "backend/app/modules/sales_agent/interpretation_consistency.py",
+      "sha256": "d2aae2efa946fb08e2feeb510aadb82532886eea333d9a5ad5765f25b23823ff"
     },
     {
-      "path": "backend/app/modules/sales_agent/interpretation_consistency.py",
-      "sha256": "441287c5972d200489bba117497ae753977d1e8eb447fd5f47f69a7ecdf51cbf"
+      "path": "backend/app/modules/sales_agent/interpretation_input.py",
+      "sha256": "afc00562bc4b40ab70d14101566eeb47dd48d0133ffc84e2d7d3ac70e2a24fd8"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/understanding_completeness.py",
+      "sha256": "ff808edaac3613523db7ecddc7dfc6ae89ec8c71e766660ed913c23f7407356a"
     },
     {
       "path": "backend/app/modules/sales_agent/understanding_prompt.py",
-      "sha256": "a3d5450844c17f3d85390bfdcdda05c1a531574b116f14561096fa7227ecfe44"
+      "sha256": "65116ddf586197c9c411668f53cef94aa7dea8a6a01ffac2fe76b1ecc9749b2d"
     },
     {
-      "path": "backend/tests/fixtures/sales_ai/contextual_server4_packets.json",
-      "sha256": "a42be0434fdf6dbca80874bc55f1e9fac8ded205442870dc6fb99d130bc53906"
+      "path": "backend/app/modules/sales_agent/understanding_semantics.py",
+      "sha256": "7acda10c831919907abcb9eb06896df84e8ae3db3aab748f23e4b58a79695809"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/understanding_service.py",
+      "sha256": "7fe9519699e711814b9d78fa14ffff9ee622503527a9a002e9f97a114f163532"
+    },
+    {
+      "path": "backend/tests/fixtures/sales_ai/visit_server5_packets.json",
+      "sha256": "ccc3cbafb7650660a266571820118d7bc0da0ef4358b7ada536dd4a21dd8c665"
     },
     {
       "path": "backend/tests/test_sales_continuity_repair1.py",
-      "sha256": "3ca3671ac858207c4bf0f3c94cc5c9609a99855cdbd6aa52d54ffbf9090ab419"
+      "sha256": "9e09f6161cc5f2401f2bb3bb0dab5b1068d24a4835ca405aa9d30f4ab49ece29"
     },
     {
-      "path": "backend/tests/test_sales_dialogue_continuity_variants.py",
-      "sha256": "81e3f95c24347ee17ebc195509a112bc5624d524163ae160c903eab84c5c30e5"
+      "path": "backend/tests/test_sales_interpretation_consistency.py",
+      "sha256": "51b262e806394adfa8dcf95c4a47a4aa8b1397a055958435c04453fc6777efb9"
     },
     {
-      "path": "docs/sales-agent/05-resultados-y-mejoras/retoma-servidor-4/conversaciones.md",
-      "sha256": "d387de04fe9ead78f6bc019561c5987973e7052037754e0cf09b52b42da833d3"
+      "path": "backend/tests/test_sales_subject_completeness.py",
+      "sha256": "001ee49d9e3ab7e4991f09f44683443f12d56002f548f38594f006a028fedb6b"
     },
     {
-      "path": "docs/sales-agent/05-resultados-y-mejoras/retoma-servidor-4/resumen.json",
-      "sha256": "1468700024e1ef08bce2b3f41905691f13a3cc6f7c6314ff1b6b2ddd472bcd72"
+      "path": "docs/sales-agent/05-resultados-y-mejoras/coherencia-material-visita-local/consumo-observado.png",
+      "sha256": "b1afe8cf0dc961f7615a5182f81e0c800149206c6c2257531c98b50dcc477b18"
     },
     {
-      "path": "docs/sales-agent/05-resultados-y-mejoras/visita-contexto-local/consumo-observado.png",
-      "sha256": "32a52cda8a247989f5221428a61168db279dfc9b7aa177162a3e262f82d07e55"
+      "path": "docs/sales-agent/05-resultados-y-mejoras/coherencia-material-visita-local/conversaciones.md",
+      "sha256": "c290e31e9ba6731b0c3b7ac55e00a515e6e8f903c1c7faf7a5cd8daf451b0ae4"
     },
     {
-      "path": "docs/sales-agent/05-resultados-y-mejoras/visita-contexto-local/conversaciones.md",
-      "sha256": "e6e7468e0f3a4b9e40b668fe377b26ecd36cc48c097e6a8be002afa3acb54a2d"
+      "path": "docs/sales-agent/05-resultados-y-mejoras/coherencia-material-visita-local/generar_consumo.py",
+      "sha256": "92ed94527cb36edbea362447746d35a887321eff86fb5e3197336634476f2d23"
     },
     {
-      "path": "docs/sales-agent/05-resultados-y-mejoras/visita-contexto-local/generar_consumo.py",
-      "sha256": "cd69b175d33b65fa336d1900e733c7dd870932b09c075733468f6b852c3ba5bf"
+      "path": "docs/sales-agent/05-resultados-y-mejoras/coherencia-material-visita-local/resultado.json",
+      "sha256": "3c51dc7b9ef2b0ce45147c692c6ae727db6d567813d1d781b2bd39f8d7abf515"
     },
     {
-      "path": "docs/sales-agent/05-resultados-y-mejoras/visita-contexto-local/resultado.json",
-      "sha256": "a5b145c9b18859002eaaf1d6832ae6d895e24a3f34d395e42bd142ad5ab87360"
+      "path": "docs/sales-agent/05-resultados-y-mejoras/coherencia-material-visita-local/validacion.json",
+      "sha256": "22f5378287ac7ded6e85d8ccce2992e19e84cff05e4f050c3ea9d9f3c768d345"
     },
     {
-      "path": "docs/sales-agent/05-resultados-y-mejoras/visita-contexto-local/validacion.json",
-      "sha256": "1e7bcea407083b6eda79ce7cf6618166a94edae4320135d576b536d53c34ac70"
+      "path": "docs/sales-agent/05-resultados-y-mejoras/retoma-servidor-5/conversaciones.md",
+      "sha256": "038f6544450ef47aa4c4a7dd3ac63dcca0abc4050e5c95bb4f31e57d89e835f7"
     },
     {
-      "path": "docs/sales-agent/06-como-ejecutar-las-pruebas/ejecutar-visita-contexto.sh",
-      "sha256": "b84b50a61680d30c4caf3578d2d17779e1462f3c25bf86c5aa79c0f95abd3d5c"
+      "path": "docs/sales-agent/05-resultados-y-mejoras/retoma-servidor-5/resumen.json",
+      "sha256": "0649bfd4b1dad8b5782f2fac679e79f7e8e7cb36c1e00718d829ffeee8d53410"
+    },
+    {
+      "path": "docs/sales-agent/06-como-ejecutar-las-pruebas/ejecutar-coherencia-material-visita.sh",
+      "sha256": "803507eedd82ef904053d91214af63b8264d3807ce3e7e313f7826826bf8463d"
     },
     {
       "path": "docs/sales-agent/README.md",
-      "sha256": "91f4d992a58ae348a39b94d89b58b0b1b65ea509c865d275f8631cbe03847134"
+      "sha256": "9614ebaba693fc2a14f3921cd22af513cceb2333cf2406154a2a9776e9e9ba63"
     }
   ]
 }

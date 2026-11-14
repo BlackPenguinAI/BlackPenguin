@@ -107,3 +107,30 @@ def test_multiple_owners_or_conflicting_visit_intent_are_not_recovered(text):
     value=understanding(text,'other')
     result,notes=normalize(value,text,CONTEXT)
     assert result==value and not notes
+
+@pytest.mark.parametrize('text',['I mean an in-person visit to Alder Home.','We are asking for an in-person viewing of Alder Home.','I am interested in an in-person visit to Alder Home.'])
+def test_current_in_person_directive_cannot_lose_its_executable_request(text):
+    from app.modules.sales_agent.understanding_contract import VisitDirective
+    from app.modules.sales_agent.understanding_semantics import issues_for
+    from test_sales_active_integration import understanding
+    u=understanding(text).model_copy(update={'visit':VisitDirective(action='request',evidence=text)})
+    fixed,notes=normalize(u,text,{'property_types':[{'property_type':'Alder Home'}]})
+    assert fixed.permits('appointment') and fixed.visit.action=='request'
+    assert fixed.confidence==u.confidence and not issues_for(fixed,text)
+
+@pytest.mark.parametrize('text',['Could you help?','That one, please.','I mean an in-person visit to Alder Home.'])
+def test_visit_request_cross_field_invariant_does_not_depend_on_phrase_whitelist(text):
+    from app.modules.sales_agent.understanding_contract import VisitDirective
+    from app.modules.sales_agent.understanding_semantics import issues_for
+    from test_sales_active_integration import understanding
+    u=understanding(text).model_copy(update={'visit':VisitDirective(action='request',evidence=text)})
+    assert 'visit_missing_executable_request' in {v['type'] for v in issues_for(u,text)}
+    assert 'visit_missing_executable_request' not in {v['type'] for v in issues_for(u.model_copy(update={'requires_clarification':True,'clarification_question':'Do you want an in-person visit?'}),text)}
+
+@pytest.mark.parametrize('text',['We discussed an in-person visit yesterday.','I do not want an in-person visit.','My friend said I want an in-person visit.'])
+def test_past_negative_or_reported_directive_does_not_create_a_request(text):
+    from app.modules.sales_agent.understanding_contract import VisitDirective
+    from test_sales_active_integration import understanding
+    u=understanding(text).model_copy(update={'visit':VisitDirective(action='request',evidence=text)})
+    fixed,_=normalize(u,text,{'property_types':[{'property_type':'Alder Home'}]})
+    assert not fixed.permits('appointment')

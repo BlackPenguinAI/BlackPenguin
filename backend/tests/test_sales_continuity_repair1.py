@@ -9,6 +9,7 @@ from app.modules.ai_core.models import AIConfiguration,PromptVersion
 from tools.sales_ai.continuity_battery import CASES,evaluate_case
 from tools.sales_ai.evaluation_guard import Budget,guard
 CAPTURE=json.loads((Path(__file__).parent/'fixtures/sales_ai/continuity_server1_frames.json').read_text())['rows']
+LATEST=json.loads((Path(__file__).parent/'fixtures/sales_ai/visit_server5_packets.json').read_text())['rows']
 CURRENT=json.loads((Path(__file__).parent/'fixtures/sales_ai/contextual_server4_packets.json').read_text())['rows']
 RECENT=json.loads((Path(__file__).parent/'fixtures/sales_ai/retoma_server3_packets.json').read_text())['rows']
 
@@ -19,7 +20,10 @@ def replay_provider(scenario):
     def replay(request):
         payload=json.loads(request.content);ctx=json.loads(payload['messages'][1]['content'])
         if payload['response_format']['json_schema']['name']=='sales_understanding':
-            observed=next((r for r in CURRENT if r['case']==scenario and r['message']==ctx['current_message']),None)
+            from app.modules.sales_agent.interpretation_input import SYSTEM
+            assert payload['messages'][0]['content']==SYSTEM
+            assert 'visit.action=request requires an appointment request' in SYSTEM
+            observed=next((r for r in [*LATEST,*CURRENT] if r['case']==scenario and r['message']==ctx['current_message']),None)
             if observed:
                 attempt=1 if len(payload['messages'])>2 else 0
                 packet=observed['sequence'][min(attempt,len(observed['sequence'])-1)]
@@ -40,6 +44,10 @@ def test_server_frames_pass_continuity_and_booking_checks(lab,scenario,tmp_path)
     budget=Budget(60)
     with patch.object(httpx,'AsyncClient',Client),guard(budget),patch('app.integrations.openrouter_client.record_openrouter_usage',lambda **kw:None):r=asyncio.run(evaluate_case(db,manifest,scenario,budget,10))
     (tmp_path/'result.json').write_text(json.dumps(r,default=str,ensure_ascii=False))
+    from app.modules.sales_agent.dialogue_models import SalesDialogueEvent
+    from app.modules.sales_agent.interpretation_input import SYSTEM_VERSION
+    for event in db.query(SalesDialogueEvent).filter(SalesDialogueEvent.conversation_id==r['conversation_id'],SalesDialogueEvent.event_key.like('active-understanding:%')):
+        assert event.payload_json['metadata']['prompt_snapshot']['input_system_version']==SYSTEM_VERSION
     bad=[(t['action'],t['reply'],c) for t in r['turns'] for c in t['checks'] if c['status']!='PASS']+[c for c in r['checks'] if c['status']!='PASS']
     assert not bad,bad
     if scenario=='transfer_cedar':

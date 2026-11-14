@@ -93,3 +93,42 @@ def test_reported_catalog_name_and_individual_unit_are_not_promoted_to_typology(
                          ("Show me Cedar Studio-A1.",{**CONTEXT,'inventory':[{'unit_code':'Cedar Studio-A1'}]})]:
         value=understanding(text,'inventory')
         assert scoped_subjects(value,text,context)==(value,[])
+
+@pytest.mark.parametrize('name',['Alder Home','Orion Loft','Maple Villa'])
+@pytest.mark.parametrize('text,subject',[('Can you show me pictures?','photos'),('Could you send the PDF?','brochure'),('Please share the blueprints.','floor_plan')])
+def test_material_name_matching_active_owner_is_not_a_file(name,text,subject):
+    from app.modules.sales_agent.understanding_completeness import material_owner
+    from app.modules.sales_agent.understanding_contract import DialogueState,Understanding
+    from test_sales_active_integration import understanding
+    data=understanding(text,'materials',subjects={0:subject}).model_dump(mode='json')
+    data['references']=[dict(id='owner',kind='material',expression=name,evidence=text)];data['requests'][0]['reference_id']='owner'
+    u=Understanding.model_validate(data)
+    context={'property_types':[{'id':'active','property_type':name}], 'available_assets':[{'name':name+' gallery'}]}
+    fixed,notes=material_owner(u,text,context,DialogueState(selected_property_type_id='active'))
+    assert fixed.references[0].kind=='property' and fixed.references[0].expression==name
+    assert fixed.confidence==u.confidence and fixed.visit is None and notes
+
+@pytest.mark.parametrize('scenario',['real_file','other_owner','explicit_other','negative','bare_acceptance'])
+def test_material_owner_repair_does_not_guess_an_unapproved_or_conflicting_target(scenario):
+    from app.modules.sales_agent.understanding_completeness import material_owner
+    from app.modules.sales_agent.understanding_contract import DialogueState,Understanding
+    from test_sales_active_integration import understanding
+    text={'explicit_other':'Show photos of Other Home','negative':'Do not send photos','bare_acceptance':'Can I see it?'}.get(scenario,'Show photos')
+    data=understanding(text,'materials',subjects={0:None if scenario=='bare_acceptance' else 'photos'}).model_dump(mode='json')
+    data['references']=[dict(id='owner',kind='material',expression='Active Home',evidence=text)];data['requests'][0]['reference_id']='owner'
+    u=Understanding.model_validate(data)
+    context={'property_types':[{'id':'active','property_type':'Active Home'},{'id':'other','property_type':'Other Home'}],
+        'available_assets':[{'name':'Active Home'}] if scenario=='real_file' else []}
+    fixed,notes=material_owner(u,text,context,DialogueState(selected_property_type_id='other' if scenario=='other_owner' else 'active'))
+    assert fixed==u and not notes
+
+
+def test_material_owner_preserves_a_scoped_unit_instead_of_collapsing_into_a_type():
+    from app.modules.sales_agent.understanding_completeness import material_owner
+    from app.modules.sales_agent.understanding_contract import DialogueState,Understanding
+    from test_sales_active_integration import understanding
+    text='Show photos';data=understanding(text,'materials',subjects={0:'photos'}).model_dump(mode='json')
+    data['references']=[dict(id='u',kind='material',expression='A-12',evidence=text)];data['requests'][0]['reference_id']='u'
+    u=Understanding.model_validate(data)
+    fixed,notes=material_owner(u,text,{'inventory':[{'id':'unit','unit_code':'A-12'}]},DialogueState(selected_property_type_id='home',selected_unit_id='unit'))
+    assert fixed.references[0].kind=='unit' and notes

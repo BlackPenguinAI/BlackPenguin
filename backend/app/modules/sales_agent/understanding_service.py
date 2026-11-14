@@ -100,8 +100,8 @@ async def _preview(db, scope: Scope, *, inbound_message_id: str, expected_revisi
             'selected_unit_id':state.selected_unit_id,'offers':[o.model_dump(mode='json') for o in state.offers]}
     wire_mode=next_enabled and infer is None
     if wire_mode:
-        from .interpretation_input import SYSTEM,VERSION
-        snapshot={**snapshot,'system':SYSTEM,'input_contract':VERSION}
+        from .interpretation_input import SYSTEM,VERSION,SYSTEM_VERSION
+        snapshot={**snapshot,'system':SYSTEM,'input_contract':VERSION,'input_system_version':SYSTEM_VERSION}
     else:snapshot = {**snapshot, 'system': snapshot['system'] + TURN_RULES}
     messages = [
         {'role': 'system', 'content': snapshot['system']},
@@ -189,9 +189,11 @@ async def _preview(db, scope: Scope, *, inbound_message_id: str, expected_revisi
                 from .interpretation_consistency import normalize as normalize_consistency
                 interpreted,consistency_notes=normalize_consistency(interpreted,inbound.content,commercial,appointment_offer=(latest.metadata_json or {}).get('appointment_offer') if latest else None)
                 normalizations.extend(consistency_notes)
-                from .understanding_completeness import scoped_subjects,completeness_issues
+                from .understanding_completeness import scoped_subjects,material_owner,completeness_issues
                 interpreted,subject_notes=scoped_subjects(interpreted,inbound.content,commercial)
                 normalizations.extend(subject_notes)
+                interpreted,owner_notes=material_owner(interpreted,inbound.content,commercial,state)
+                normalizations.extend(owner_notes)
                 from .understanding_semantics import issues_for
                 offer=(latest.metadata_json or {}).get('appointment_offer') if latest else None
                 from .first_booking import contextual_public_selection as exact_public_selection
