@@ -9,6 +9,7 @@ from app.modules.ai_core.models import AIConfiguration,PromptVersion
 from tools.sales_ai.continuity_battery import CASES,evaluate_case
 from tools.sales_ai.evaluation_guard import Budget,guard
 CAPTURE=json.loads((Path(__file__).parent/'fixtures/sales_ai/continuity_server1_frames.json').read_text())['rows']
+CURRENT=json.loads((Path(__file__).parent/'fixtures/sales_ai/contextual_server4_packets.json').read_text())['rows']
 RECENT=json.loads((Path(__file__).parent/'fixtures/sales_ai/retoma_server3_packets.json').read_text())['rows']
 
 def replay_provider(scenario):
@@ -18,6 +19,11 @@ def replay_provider(scenario):
     def replay(request):
         payload=json.loads(request.content);ctx=json.loads(payload['messages'][1]['content'])
         if payload['response_format']['json_schema']['name']=='sales_understanding':
+            observed=next((r for r in CURRENT if r['case']==scenario and r['message']==ctx['current_message']),None)
+            if observed:
+                attempt=1 if len(payload['messages'])>2 else 0
+                packet=observed['sequence'][min(attempt,len(observed['sequence'])-1)]
+                return httpx.Response(200,json={'choices':[{'message':{'content':json.dumps(packet)}}]})
             packet=packets.get(ctx['current_message'])
             if packet:return httpx.Response(200,json={'choices':[{'message':{'content':json.dumps(packet)}}]})
         return ordinary_provider(request)

@@ -1,6 +1,6 @@
 """Versioned interpretation protocol using published Sales guidance as data."""
 PROMPT_VERSION = 'sales-understanding-prompt/1.4'
-NEXT_PROMPT_VERSION = 'sales-understanding-prompt/2.33'
+NEXT_PROMPT_VERSION = 'sales-understanding-prompt/2.34'
 SYSTEM_PROMPT = '''You interpret a real-estate lead's CURRENT message. You do not reply to the lead,
 execute tools, reserve appointments, send materials, change CRM state or override permissions.
 Return ONLY the supplied sales-understanding/1.0 JSON schema.
@@ -64,13 +64,12 @@ def prompt_snapshot(agent):
 
 def next_prompt_snapshot(guidance):
     return {'version':NEXT_PROMPT_VERSION,'system':'''Completeness rules for the CURRENT message (before the general protocol):
-After selecting a property, short own questions such as "Visit?", "A viewing?" or
-"Can I see it?" can request a first visit: include a topic appointment request and
-visit.action=request. This only requests availability, never booking confirmation.
-Answer the current request even when old appointment or comparison tasks remain.
-A missing material does not mean the lead declined a visit or changed property.
-For "Can I see it?", use the last exchange: a file offer can mean materials; an in-person
-invitation can mean availability. If unclear, ask file or visit. Never infer booking consent.
+A new visit targets a property/unit, never an appointment "/". "The property" refers to
+the selected property; quote those words, not a name copied from history. "Visit?" or
+"A viewing?" can request availability, never booking confirmation. Answer current requests,
+not old pending tasks. Missing material does not decline visits or change property.
+For "Can I see it?", use the last exchange: files or an in-person invitation. If unclear,
+ask file or visit. Do not guess a material request after a visit invitation.
 A named property is never a generic catalog question. Define an exact local property reference,
 link each relevant request through reference_id, and preserve a clear single-property focus.
 Example: "Please send photos for Cedar Studio" needs a materials/photos request linked

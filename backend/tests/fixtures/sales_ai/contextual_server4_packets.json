@@ -1,0 +1,2570 @@
+{
+  "source_commit": "1569573c6c2aa8034ff106bb650e0255dddef0c2",
+  "version": "recorded-provider-attempts/1.0",
+  "rows": [
+    {
+      "case": "resume_missing_visit",
+      "message": "Hi",
+      "sequence": [
+        {
+          "preferences": [],
+          "personal_facts": [],
+          "preference_withdrawals": [],
+          "source_purposes": [],
+          "objections": [],
+          "empathy": null,
+          "releases": [],
+          "visit": null,
+          "courtesy": {
+            "kind": "greeting",
+            "evidence": "Hi"
+          },
+          "reschedule": null,
+          "cancellation": null,
+          "wait": null,
+          "moderation": null,
+          "appointment_query": null,
+          "requires_clarification": false,
+          "clarification_question": null,
+          "confidence": 1,
+          "version": "sales-interpretation-input/2.0",
+          "requests": [],
+          "alternatives": [],
+          "constraints": [],
+          "selection": null
+        }
+      ]
+    },
+    {
+      "case": "resume_missing_visit",
+      "message": "I am looking for a 3 bedroom home.",
+      "sequence": [
+        {
+          "preferences": [],
+          "personal_facts": [],
+          "preference_withdrawals": [],
+          "source_purposes": [],
+          "objections": [],
+          "empathy": null,
+          "releases": [],
+          "visit": null,
+          "courtesy": null,
+          "reschedule": null,
+          "cancellation": null,
+          "wait": null,
+          "moderation": null,
+          "appointment_query": null,
+          "requires_clarification": false,
+          "clarification_question": null,
+          "confidence": 1,
+          "version": "sales-interpretation-input/2.0",
+          "requests": [
+            {
+              "topic": "comparison",
+              "polarity": "request",
+              "evidence": "I am looking for a 3 bedroom home.",
+              "members": [
+                {
+                  "kind": "property",
+                  "expression": "Ridge Townhome",
+                  "evidence": "3 bedroom home"
+                },
+                {
+                  "kind": "property",
+                  "expression": "Summit Villa",
+                  "evidence": "3 bedroom home"
+                }
+              ],
+              "include_current": false,
+              "include_all": false,
+              "all_kind": "property",
+              "criteria": [
+                "bedrooms"
+              ],
+              "feature": null,
+              "operation": "compare"
+            }
+          ],
+          "alternatives": [],
+          "constraints": [],
+          "selection": null
+        }
+      ]
+    },
+    {
+      "case": "resume_missing_visit",
+      "message": "Ridge Townhome",
+      "sequence": [
+        {
+          "preferences": [
+            {
+              "key": "bedrooms",
+              "value": "3",
+              "evidence": "I am looking 3",
+              "status": "declared"
+            }
+          ],
+          "personal_facts": [],
+          "preference_withdrawals": [],
+          "source_purposes": [],
+          "objections": [],
+          "empathy": null,
+          "releases": [],
+          "visit": null,
+          "courtesy": {
+            "kind": "greeting",
+            "evidence": "Hi"
+          },
+          "reschedule": null,
+          "cancellation": null,
+          "wait": null,
+          "moderation": null,
+          "appointment_query": null,
+          "requires_clarification": false,
+          "clarification_question": null,
+          "confidence": 1,
+          "version": "sales-interpretation-input/2.0",
+          "requests": [
+            {
+              "topic": "comparison",
+              "polarity": "request",
+              "evidence": "Ridge Townhome",
+              "members": [
+                {
+                  "kind": "property",
+                  "expression": "Ridge Townhome",
+                  "evidence": "Ridge Townhome"
+                }
+              ],
+              "include_current": true,
+              "include_all": false,
+              "all_kind": "property",
+              "criteria": [
+                "general"
+              ],
+              "feature": null,
+              "operation": "compare"
+            }
+          ],
+          "alternatives": [],
+          "constraints": [],
+          "selection": null
+        },
+        {
+          "preferences": [],
+          "personal_facts": [],
+          "preference_withdrawals": [],
+          "source_purposes": [],
+          "objections": [],
+          "empathy": null,
+          "releases": [],
+          "visit": null,
+          "courtesy": {
+            "kind": "acknowledgement",
+            "evidence": "Ridge Townhome"
+          },
+          "reschedule": null,
+          "cancellation": null,
+          "wait": null,
+          "moderation": null,
+          "appointment_query": null,
+          "requires_clarification": false,
+          "clarification_question": null,
+          "confidence": 1,
+          "version": "sales-interpretation-input/2.0",
+          "requests": [
+            {
+              "polarity": "request",
+              "evidence": "Ridge Townhome",
+              "target": {
+                "kind": "property",
+                "expression": "Ridge Townhome",
+                "evidence": "Ridge Townhome"
+              },
+              "topic": "catalog",
+              "subject": null
+            }
+          ],
+          "alternatives": [],
+          "constraints": [],
+          "selection": null
+        }
+      ]
+    },
+    {
+      "case": "resume_missing_visit",
+      "message": "Do you have photos of the property?",
+      "sequence": [
+        {
+          "preferences": [],
+          "personal_facts": [],
+          "preference_withdrawals": [],
+          "source_purposes": [],
+          "objections": [],
+          "empathy": null,
+          "releases": [],
+          "visit": null,
+          "courtesy": null,
+          "reschedule": null,
+          "cancellation": null,
+          "wait": null,
+          "moderation": null,
+          "appointment_query": null,
+          "requires_clarification": false,
+          "clarification_question": null,
+          "confidence": 1,
+          "version": "sales-interpretation-input/2.0",
+          "requests": [
+            {
+              "polarity": "request",
+              "evidence": "Do you have photos of the property?",
+              "target": {
+                "kind": "property",
+                "expression": "Ridge Townhome",
+                "evidence": "Ridge Townhome"
+              },
+              "topic": "materials",
+              "subject": "photos"
+            }
+          ],
+          "alternatives": [],
+          "constraints": [],
+          "selection": {
+            "kind": "property",
+            "expression": "Ridge Townhome",
+            "evidence": "Ridge Townhome"
+          }
+        },
+        {
+          "preferences": [],
+          "personal_facts": [],
+          "preference_withdrawals": [],
+          "source_purposes": [],
+          "objections": [],
+          "empathy": null,
+          "releases": [],
+          "visit": null,
+          "courtesy": null,
+          "reschedule": null,
+          "cancellation": null,
+          "wait": null,
+          "moderation": null,
+          "appointment_query": null,
+          "requires_clarification": false,
+          "clarification_question": null,
+          "confidence": 1,
+          "version": "sales-interpretation-input/2.0",
+          "requests": [
+            {
+              "polarity": "request",
+              "evidence": "Do you have photos of the property?",
+              "target": {
+                "kind": "property",
+                "expression": "the property",
+                "evidence": "Do you have photos of the property?"
+              },
+              "topic": "materials",
+              "subject": null
+            }
+          ],
+          "alternatives": [],
+          "constraints": [],
+          "selection": null
+        }
+      ]
+    },
+    {
+      "case": "resume_missing_visit",
+      "message": "Can you show me pictures?",
+      "sequence": [
+        {
+          "preferences": [],
+          "personal_facts": [],
+          "preference_withdrawals": [],
+          "source_purposes": [],
+          "objections": [],
+          "empathy": null,
+          "releases": [],
+          "visit": null,
+          "courtesy": null,
+          "reschedule": null,
+          "cancellation": null,
+          "wait": null,
+          "moderation": null,
+          "appointment_query": null,
+          "requires_clarification": false,
+          "clarification_question": null,
+          "confidence": 1,
+          "version": "sales-interpretation-input/2.0",
+          "requests": [
+            {
+              "polarity": "request",
+              "evidence": "Can you show me pictures?",
+              "target": {
+                "kind": "property",
+                "expression": "Ridge Townhome",
+                "evidence": "Ridge Townhome"
+              },
+              "topic": "materials",
+              "subject": "photos"
+            }
+          ],
+          "alternatives": [],
+          "constraints": [],
+          "selection": {
+            "kind": "property",
+            "expression": "Ridge Townhome",
+            "evidence": "Ridge Townhome"
+          }
+        },
+        {
+          "preferences": [],
+          "personal_facts": [],
+          "preference_withdrawals": [],
+          "source_purposes": [],
+          "objections": [],
+          "empathy": null,
+          "releases": [],
+          "visit": null,
+          "courtesy": null,
+          "reschedule": null,
+          "cancellation": null,
+          "wait": null,
+          "moderation": null,
+          "appointment_query": null,
+          "requires_clarification": false,
+          "clarification_question": null,
+          "confidence": 1,
+          "version": "sales-interpretation-input/2.0",
+          "requests": [
+            {
+              "polarity": "request",
+              "evidence": "Can you show me pictures?",
+              "target": null,
+              "topic": "materials",
+              "subject": "photos"
+            }
+          ],
+          "alternatives": [],
+          "constraints": [],
+          "selection": null
+        }
+      ]
+    },
+    {
+      "case": "resume_missing_visit",
+      "message": "Visit?",
+      "sequence": [
+        {
+          "preferences": [],
+          "personal_facts": [],
+          "preference_withdrawals": [],
+          "source_purposes": [],
+          "objections": [],
+          "empathy": null,
+          "releases": [],
+          "visit": {
+            "action": "request",
+            "evidence": "Visit?",
+            "timing": null
+          },
+          "courtesy": null,
+          "reschedule": null,
+          "cancellation": null,
+          "wait": null,
+          "moderation": null,
+          "appointment_query": null,
+          "requires_clarification": false,
+          "clarification_question": null,
+          "confidence": 0,
+          "version": "sales-interpretation-input/2.0",
+          "requests": [
+            {
+              "topic": "comparison",
+              "polarity": "request",
+              "evidence": "Visit?",
+              "members": [
+                {
+                  "kind": "property",
+                  "expression": "Ridge Townhome",
+                  "evidence": "Ridge "
+                }
+              ],
+              "include_current": false,
+              "include_all": false,
+              "all_kind": "property",
+              "criteria": [
+                "general"
+              ],
+              "feature": null,
+              "operation": "compare"
+            }
+          ],
+          "alternatives": [],
+          "constraints": [],
+          "selection": null
+        },
+        {
+          "preferences": [],
+          "personal_facts": [],
+          "preference_withdrawals": [],
+          "source_purposes": [],
+          "objections": [],
+          "empathy": null,
+          "releases": [],
+          "visit": {
+            "action": "request",
+            "evidence": "Visit?",
+            "timing": null
+          },
+          "courtesy": null,
+          "reschedule": null,
+          "cancellation": null,
+          "wait": null,
+          "moderation": null,
+          "appointment_query": null,
+          "requires_clarification": false,
+          "clarification_question": null,
+          "confidence": 1,
+          "version": "sales-interpretation-input/2.0",
+          "requests": [],
+          "alternatives": [],
+          "constraints": [],
+          "selection": null
+        }
+      ]
+    },
+    {
+      "case": "resume_missing_visit",
+      "message": "November 16, 8:00AM",
+      "sequence": [
+        {
+          "preferences": [
+            {
+              "key": "visit_readiness",
+              "value": "Visit?",
+              "evidence": "Visit?",
+              "status": "declared"
+            }
+          ],
+          "personal_facts": [],
+          "preference_withdrawals": [],
+          "source_purposes": [],
+          "objections": [],
+          "empathy": null,
+          "releases": [],
+          "visit": {
+            "action": "select",
+            "evidence": "November 16, 8:00AM",
+            "timing": {
+              "date_from_evidence": "2026-11-16T08:00:00-07:00",
+              "date_until_evidence": "2026-11-16T08:00:00-07:00",
+              "time_from_evidence": "8:00AM",
+              "time_until_evidence": "8:00AM",
+              "time_relation": "exact",
+              "timezone_evidence": "America/Denver",
+              "duration_evidence": "45 minutes"
+            }
+          },
+          "courtesy": null,
+          "reschedule": null,
+          "cancellation": null,
+          "wait": null,
+          "moderation": null,
+          "appointment_query": null,
+          "requires_clarification": false,
+          "clarification_question": null,
+          "confidence": 1,
+          "version": "sales-interpretation-input/2.0",
+          "requests": [
+            {
+              "topic": "comparison",
+              "polarity": "request",
+              "evidence": "I am looking for a ",
+              "members": [
+                {
+                  "kind": "property",
+                  "expression": "Ridge Townhome",
+                  "evidence": "Ridge Townhome"
+                },
+                {
+                  "kind": "property",
+                  "expression": "Summit Villa",
+                  "evidence": "Summit Villa"
+                }
+              ],
+              "include_current": true,
+              "include_all": false,
+              "all_kind": "property",
+              "criteria": [
+                "general",
+                "price",
+                "availability"
+              ],
+              "feature": null,
+              "operation": "compare"
+            }
+          ],
+          "alternatives": [],
+          "constraints": [],
+          "selection": null
+        },
+        {
+          "preferences": [],
+          "personal_facts": [],
+          "preference_withdrawals": [],
+          "source_purposes": [],
+          "objections": [],
+          "empathy": null,
+          "releases": [],
+          "visit": {
+            "action": "select",
+            "evidence": "November 16, 8:00AM",
+            "timing": {
+              "date_from_evidence": "November 16, 8:00AM",
+              "date_until_evidence": null,
+              "time_from_evidence": "8:00AM",
+              "time_until_evidence": null,
+              "time_relation": "exact",
+              "timezone_evidence": null,
+              "duration_evidence": null
+            }
+          },
+          "courtesy": null,
+          "reschedule": null,
+          "cancellation": null,
+          "wait": null,
+          "moderation": null,
+          "appointment_query": null,
+          "requires_clarification": false,
+          "clarification_question": null,
+          "confidence": 1,
+          "version": "sales-interpretation-input/2.0",
+          "requests": [
+            {
+              "topic": "comparison",
+              "polarity": "request",
+              "evidence": "November 16, 8:00AM",
+              "members": [],
+              "include_current": false,
+              "include_all": false,
+              "all_kind": "property",
+              "criteria": [
+                "general"
+              ],
+              "feature": null,
+              "operation": "compare"
+            }
+          ],
+          "alternatives": [],
+          "constraints": [],
+          "selection": null
+        }
+      ]
+    },
+    {
+      "case": "resume_missing_visit",
+      "message": "Yes",
+      "sequence": [
+        {
+          "preferences": [
+            {
+              "key": "property",
+              "value": "Ridge Townhome",
+              "evidence": "RId",
+              "status": "declared"
+            },
+            {
+              "key": "visit_readiness",
+              "value": "November 16, 8:00AM",
+              "evidence": "Yes",
+              "status": "declared"
+            }
+          ],
+          "personal_facts": [],
+          "preference_withdrawals": [],
+          "source_purposes": [],
+          "objections": [],
+          "empathy": null,
+          "releases": [],
+          "visit": {
+            "action": "confirm",
+            "evidence": "Yes",
+            "timing": {
+              "date_from_evidence": "2026-11-16T08:00:00",
+              "date_until_evidence": "2026-11-16T08:45:00",
+              "time_from_evidence": "08:00 AM",
+              "time_until_evidence": "08:45 AM",
+              "time_relation": "exact",
+              "timezone_evidence": "America/Denver",
+              "duration_evidence": "45 minutes"
+            }
+          },
+          "courtesy": null,
+          "reschedule": null,
+          "cancellation": null,
+          "wait": null,
+          "moderation": null,
+          "appointment_query": null,
+          "requires_clarification": false,
+          "clarification_question": null,
+          "confidence": 1,
+          "version": "sales-interpretation-input/2.0",
+          "requests": [
+            {
+              "topic": "comparison",
+              "polarity": "request",
+              "evidence": "Yes",
+              "members": [
+                {
+                  "kind": "property",
+                  "expression": "Ridge Townhome",
+                  "evidence": "RId"
+                },
+                {
+                  "kind": "property",
+                  "expression": "Summit Villa",
+                  "evidence": "RId"
+                }
+              ],
+              "include_current": true,
+              "include_all": false,
+              "all_kind": "property",
+              "criteria": [
+                "general",
+                "price"
+              ],
+              "feature": null,
+              "operation": "compare"
+            }
+          ],
+          "alternatives": [],
+          "constraints": [],
+          "selection": null
+        },
+        {
+          "preferences": [],
+          "personal_facts": [],
+          "preference_withdrawals": [],
+          "source_purposes": [],
+          "objections": [],
+          "empathy": null,
+          "releases": [],
+          "visit": {
+            "action": "confirm",
+            "evidence": "Yes",
+            "timing": {
+              "date_from_evidence": "Yes",
+              "date_until_evidence": "Yes",
+              "time_from_evidence": "Yes",
+              "time_until_evidence": "Yes",
+              "time_relation": "exact",
+              "timezone_evidence": "Yes",
+              "duration_evidence": "Yes"
+            }
+          },
+          "courtesy": null,
+          "reschedule": null,
+          "cancellation": null,
+          "wait": null,
+          "moderation": null,
+          "appointment_query": null,
+          "requires_clarification": false,
+          "clarification_question": null,
+          "confidence": 1,
+          "version": "sales-interpretation-input/2.0",
+          "requests": [],
+          "alternatives": [],
+          "constraints": [],
+          "selection": null
+        }
+      ]
+    },
+    {
+      "case": "resume_cedar_viewing",
+      "message": "Hi",
+      "sequence": [
+        {
+          "preferences": [],
+          "personal_facts": [],
+          "preference_withdrawals": [],
+          "source_purposes": [],
+          "objections": [],
+          "empathy": null,
+          "releases": [],
+          "visit": null,
+          "courtesy": {
+            "kind": "greeting",
+            "evidence": "Hi"
+          },
+          "reschedule": null,
+          "cancellation": null,
+          "wait": null,
+          "moderation": null,
+          "appointment_query": null,
+          "requires_clarification": false,
+          "clarification_question": null,
+          "confidence": 1,
+          "version": "sales-interpretation-input/2.0",
+          "requests": [],
+          "alternatives": [],
+          "constraints": [],
+          "selection": null
+        }
+      ]
+    },
+    {
+      "case": "resume_cedar_viewing",
+      "message": "I am looking for a 2 bedroom home.",
+      "sequence": [
+        {
+          "preferences": [
+            {
+              "key": "bedrooms",
+              "value": "2",
+              "evidence": "I am looking for a 2 bedroom home.",
+              "status": "declared"
+            }
+          ],
+          "personal_facts": [],
+          "preference_withdrawals": [],
+          "source_purposes": [],
+          "objections": [],
+          "empathy": null,
+          "releases": [],
+          "visit": null,
+          "courtesy": null,
+          "reschedule": null,
+          "cancellation": null,
+          "wait": null,
+          "moderation": null,
+          "appointment_query": null,
+          "requires_clarification": false,
+          "clarification_question": null,
+          "confidence": 1,
+          "version": "sales-interpretation-input/2.0",
+          "requests": [
+            {
+              "topic": "comparison",
+              "polarity": "request",
+              "evidence": "I am looking for a 2 bedroom home.",
+              "members": [
+                {
+                  "kind": "property",
+                  "expression": "Cedar Loft",
+                  "evidence": "I am looking for a 2 bedroom home."
+                },
+                {
+                  "kind": "property",
+                  "expression": "Cedar Studio",
+                  "evidence": "I am looking for a 2 bedroom home."
+                }
+              ],
+              "include_current": false,
+              "include_all": false,
+              "all_kind": "property",
+              "criteria": [
+                "bedrooms"
+              ],
+              "feature": null,
+              "operation": "compare"
+            }
+          ],
+          "alternatives": [],
+          "constraints": [],
+          "selection": null
+        }
+      ]
+    },
+    {
+      "case": "resume_cedar_viewing",
+      "message": "Cedar Loft",
+      "sequence": [
+        {
+          "preferences": [],
+          "personal_facts": [],
+          "preference_withdrawals": [],
+          "source_purposes": [],
+          "objections": [],
+          "empathy": null,
+          "releases": [],
+          "visit": null,
+          "courtesy": null,
+          "reschedule": null,
+          "cancellation": null,
+          "wait": null,
+          "moderation": null,
+          "appointment_query": null,
+          "requires_clarification": false,
+          "clarification_question": null,
+          "confidence": 1,
+          "version": "sales-interpretation-input/2.0",
+          "requests": [
+            {
+              "topic": "comparison",
+              "polarity": "request",
+              "evidence": "Cedar Loft",
+              "members": [
+                {
+                  "kind": "property",
+                  "expression": "Cedar Loft",
+                  "evidence": "Cedar Loft"
+                }
+              ],
+              "include_current": true,
+              "include_all": false,
+              "all_kind": "property",
+              "criteria": [
+                "general"
+              ],
+              "feature": null,
+              "operation": "compare"
+            }
+          ],
+          "alternatives": [],
+          "constraints": [],
+          "selection": {
+            "kind": "property",
+            "expression": "Cedar Loft",
+            "evidence": "Cedar Loft"
+          }
+        }
+      ]
+    },
+    {
+      "case": "resume_cedar_viewing",
+      "message": "Do you have photos of the property?",
+      "sequence": [
+        {
+          "preferences": [],
+          "personal_facts": [],
+          "preference_withdrawals": [],
+          "source_purposes": [],
+          "objections": [],
+          "empathy": null,
+          "releases": [],
+          "visit": null,
+          "courtesy": null,
+          "reschedule": null,
+          "cancellation": null,
+          "wait": null,
+          "moderation": null,
+          "appointment_query": null,
+          "requires_clarification": false,
+          "clarification_question": null,
+          "confidence": 1,
+          "version": "sales-interpretation-input/2.0",
+          "requests": [
+            {
+              "polarity": "request",
+              "evidence": "Do you have photos of the property?",
+              "target": {
+                "kind": "property",
+                "expression": "Cedar Loft",
+                "evidence": "Cedar Loft"
+              },
+              "topic": "materials",
+              "subject": "photos"
+            }
+          ],
+          "alternatives": [],
+          "constraints": [],
+          "selection": null
+        },
+        {
+          "preferences": [],
+          "personal_facts": [],
+          "preference_withdrawals": [],
+          "source_purposes": [],
+          "objections": [],
+          "empathy": null,
+          "releases": [],
+          "visit": null,
+          "courtesy": null,
+          "reschedule": null,
+          "cancellation": null,
+          "wait": null,
+          "moderation": null,
+          "appointment_query": null,
+          "requires_clarification": false,
+          "clarification_question": null,
+          "confidence": 1,
+          "version": "sales-interpretation-input/2.0",
+          "requests": [
+            {
+              "polarity": "request",
+              "evidence": "Do you have photos of the property?",
+              "target": {
+                "kind": "property",
+                "expression": "the property",
+                "evidence": "Do you have photos of the property?"
+              },
+              "topic": "materials",
+              "subject": null
+            }
+          ],
+          "alternatives": [],
+          "constraints": [],
+          "selection": null
+        }
+      ]
+    },
+    {
+      "case": "resume_cedar_viewing",
+      "message": "Can you show me pictures?",
+      "sequence": [
+        {
+          "preferences": [
+            {
+              "key": "property",
+              "value": "Cedar Loft",
+              "evidence": "Cedar Loft",
+              "status": "declared"
+            },
+            {
+              "key": "bedrooms",
+              "value": "2",
+              "evidence": "I am looking for a 2 room",
+              "status": "declared"
+            }
+          ],
+          "personal_facts": [],
+          "preference_withdrawals": [],
+          "source_purposes": [],
+          "objections": [],
+          "empathy": null,
+          "releases": [],
+          "visit": null,
+          "courtesy": null,
+          "reschedule": null,
+          "cancellation": null,
+          "wait": null,
+          "moderation": null,
+          "appointment_query": null,
+          "requires_clarification": false,
+          "clarification_question": null,
+          "confidence": 1,
+          "version": "sales-interpretation-input/2.0",
+          "requests": [
+            {
+              "polarity": "request",
+              "evidence": "Can you show me pictures?",
+              "target": {
+                "kind": "property",
+                "expression": "Cedar Loft",
+                "evidence": "Cedar Loft"
+              },
+              "topic": "materials",
+              "subject": "photos"
+            }
+          ],
+          "alternatives": [],
+          "constraints": [],
+          "selection": {
+            "kind": "property",
+            "expression": "Cedar Loft",
+            "evidence": "Cedar Loft"
+          }
+        },
+        {
+          "preferences": [],
+          "personal_facts": [],
+          "preference_withdrawals": [],
+          "source_purposes": [],
+          "objections": [],
+          "empathy": null,
+          "releases": [],
+          "visit": null,
+          "courtesy": null,
+          "reschedule": null,
+          "cancellation": null,
+          "wait": null,
+          "moderation": null,
+          "appointment_query": null,
+          "requires_clarification": false,
+          "clarification_question": null,
+          "confidence": 1,
+          "version": "sales-interpretation-input/2.0",
+          "requests": [
+            {
+              "polarity": "request",
+              "evidence": "Can you show me pictures?",
+              "target": null,
+              "topic": "materials",
+              "subject": "photos"
+            }
+          ],
+          "alternatives": [],
+          "constraints": [],
+          "selection": null
+        }
+      ]
+    },
+    {
+      "case": "resume_cedar_viewing",
+      "message": "A viewing?",
+      "sequence": [
+        {
+          "preferences": [],
+          "personal_facts": [],
+          "preference_withdrawals": [],
+          "source_purposes": [],
+          "objections": [],
+          "empathy": null,
+          "releases": [],
+          "visit": {
+            "action": "request",
+            "evidence": "A viewing?",
+            "timing": null
+          },
+          "courtesy": null,
+          "reschedule": null,
+          "cancellation": null,
+          "wait": null,
+          "moderation": null,
+          "appointment_query": null,
+          "requires_clarification": false,
+          "clarification_question": null,
+          "confidence": 0,
+          "version": "sales-interpretation-input/2.0",
+          "requests": [
+            {
+              "topic": "comparison",
+              "polarity": "request",
+              "evidence": "A viewing?",
+              "members": [
+                {
+                  "kind": "property",
+                  "expression": "Cedar Loft",
+                  "evidence": "Cedar Loft"
+                },
+                {
+                  "kind": "property",
+                  "expression": "Cedar Studio",
+                  "evidence": "Cedar Loft"
+                }
+              ],
+              "include_current": true,
+              "include_all": false,
+              "all_kind": "property",
+              "criteria": [
+                "general"
+              ],
+              "feature": null,
+              "operation": "compare"
+            }
+          ],
+          "alternatives": [],
+          "constraints": [],
+          "selection": null
+        },
+        {
+          "preferences": [],
+          "personal_facts": [],
+          "preference_withdrawals": [],
+          "source_purposes": [],
+          "objections": [],
+          "empathy": null,
+          "releases": [],
+          "visit": {
+            "action": "request",
+            "evidence": "A viewing?",
+            "timing": null
+          },
+          "courtesy": null,
+          "reschedule": null,
+          "cancellation": null,
+          "wait": null,
+          "moderation": null,
+          "appointment_query": null,
+          "requires_clarification": false,
+          "clarification_question": null,
+          "confidence": 1,
+          "version": "sales-interpretation-input/2.0",
+          "requests": [],
+          "alternatives": [],
+          "constraints": [],
+          "selection": null
+        }
+      ]
+    },
+    {
+      "case": "resume_cedar_viewing",
+      "message": "16/11, 9:00AM",
+      "sequence": [
+        {
+          "preferences": [
+            {
+              "key": "visit_readiness",
+              "value": "A viewing?",
+              "evidence": "A viewing?",
+              "status": "declared"
+            },
+            {
+              "key": "property",
+              "value": "Cedar Loft",
+              "evidence": "Cedar Loft",
+              "status": "declared"
+            }
+          ],
+          "personal_facts": [],
+          "preference_withdrawals": [],
+          "source_purposes": [],
+          "objections": [],
+          "empathy": null,
+          "releases": [],
+          "visit": {
+            "action": "select",
+            "evidence": "16/11, 9:00AM",
+            "timing": {
+              "date_from_evidence": "2026-11-16T09:00:00-06:00",
+              "date_until_evidence": null,
+              "time_from_evidence": "09:00 AM",
+              "time_until_evidence": null,
+              "time_relation": "exact",
+              "timezone_evidence": "America/Chicago",
+              "duration_evidence": null
+            }
+          },
+          "courtesy": null,
+          "reschedule": null,
+          "cancellation": null,
+          "wait": null,
+          "moderation": null,
+          "appointment_query": null,
+          "requires_clarification": false,
+          "clarification_question": null,
+          "confidence": 1,
+          "version": "sales-interpretation-input/2.0",
+          "requests": [
+            {
+              "topic": "comparison",
+              "polarity": "request",
+              "evidence": "Cedar Loft",
+              "members": [
+                {
+                  "kind": "property",
+                  "expression": "Cedar Loft",
+                  "evidence": "Cedar Loft"
+                }
+              ],
+              "include_current": false,
+              "include_all": false,
+              "all_kind": "property",
+              "criteria": [
+                "general"
+              ],
+              "feature": null,
+              "operation": "compare"
+            }
+          ],
+          "alternatives": [],
+          "constraints": [],
+          "selection": null
+        },
+        {
+          "preferences": [],
+          "personal_facts": [],
+          "preference_withdrawals": [],
+          "source_purposes": [],
+          "objections": [],
+          "empathy": null,
+          "releases": [],
+          "visit": {
+            "action": "select",
+            "evidence": "16/11, 9:00AM",
+            "timing": {
+              "date_from_evidence": "16/11, 9:00AM",
+              "date_until_evidence": null,
+              "time_from_evidence": "9:00AM",
+              "time_until_evidence": null,
+              "time_relation": "exact",
+              "timezone_evidence": null,
+              "duration_evidence": null
+            }
+          },
+          "courtesy": null,
+          "reschedule": null,
+          "cancellation": null,
+          "wait": null,
+          "moderation": null,
+          "appointment_query": null,
+          "requires_clarification": false,
+          "clarification_question": null,
+          "confidence": 1,
+          "version": "sales-interpretation-input/2.0",
+          "requests": [],
+          "alternatives": [],
+          "constraints": [],
+          "selection": null
+        }
+      ]
+    },
+    {
+      "case": "resume_cedar_viewing",
+      "message": "Yes",
+      "sequence": [
+        {
+          "preferences": [
+            {
+              "key": "visit_readiness",
+              "value": "16/11, 9:00AM",
+              "evidence": "16/",
+              "status": "declared"
+            }
+          ],
+          "personal_facts": [],
+          "preference_withdrawals": [],
+          "source_purposes": [],
+          "objections": [],
+          "empathy": null,
+          "releases": [],
+          "visit": {
+            "action": "confirm",
+            "evidence": "Yes",
+            "timing": {
+              "date_from_evidence": "2026-11-16T15:00:00+00:00",
+              "date_until_evidence": null,
+              "time_from_evidence": null,
+              "time_until_evidence": null,
+              "time_relation": "exact",
+              "timezone_evidence": "America/Chicago",
+              "duration_evidence": "45 minutes"
+            }
+          },
+          "courtesy": null,
+          "reschedule": null,
+          "cancellation": null,
+          "wait": null,
+          "moderation": null,
+          "appointment_query": null,
+          "requires_clarification": false,
+          "clarification_question": null,
+          "confidence": 1,
+          "version": "sales-interpretation-input/2.0",
+          "requests": [
+            {
+              "polarity": "request",
+              "evidence": "Ced",
+              "target": {
+                "kind": "property",
+                "expression": "Cedar Loft",
+                "evidence": "Ced"
+              },
+              "topic": "property_details",
+              "subject": null,
+              "detail_fields": [
+                "bedrooms",
+                "bathrooms",
+                "area",
+                "kitchen",
+                "features",
+                "description"
+              ],
+              "feature": null
+            }
+          ],
+          "alternatives": [],
+          "constraints": [],
+          "selection": {
+            "kind": "property",
+            "expression": "Cedar Loft",
+            "evidence": "Ced"
+          }
+        },
+        {
+          "preferences": [],
+          "personal_facts": [],
+          "preference_withdrawals": [],
+          "source_purposes": [],
+          "objections": [],
+          "empathy": null,
+          "releases": [],
+          "visit": {
+            "action": "confirm",
+            "evidence": "Yes",
+            "timing": {
+              "date_from_evidence": "Yes",
+              "date_until_evidence": "Yes",
+              "time_from_evidence": "Yes",
+              "time_until_evidence": "Yes",
+              "time_relation": "exact",
+              "timezone_evidence": "Yes",
+              "duration_evidence": "Yes"
+            }
+          },
+          "courtesy": null,
+          "reschedule": null,
+          "cancellation": null,
+          "wait": null,
+          "moderation": null,
+          "appointment_query": null,
+          "requires_clarification": false,
+          "clarification_question": null,
+          "confidence": 1,
+          "version": "sales-interpretation-input/2.0",
+          "requests": [],
+          "alternatives": [],
+          "constraints": [],
+          "selection": null
+        }
+      ]
+    },
+    {
+      "case": "resume_bay_see",
+      "message": "Hi",
+      "sequence": [
+        {
+          "preferences": [],
+          "personal_facts": [],
+          "preference_withdrawals": [],
+          "source_purposes": [],
+          "objections": [],
+          "empathy": null,
+          "releases": [],
+          "visit": null,
+          "courtesy": {
+            "kind": "greeting",
+            "evidence": "Hi"
+          },
+          "reschedule": null,
+          "cancellation": null,
+          "wait": null,
+          "moderation": null,
+          "appointment_query": null,
+          "requires_clarification": false,
+          "clarification_question": null,
+          "confidence": 0.9,
+          "version": "sales-interpretation-input/2.0",
+          "requests": [],
+          "alternatives": [],
+          "constraints": [],
+          "selection": null
+        }
+      ]
+    },
+    {
+      "case": "resume_bay_see",
+      "message": "I am looking for a 4 bedroom home.",
+      "sequence": [
+        {
+          "preferences": [],
+          "personal_facts": [],
+          "preference_withdrawals": [],
+          "source_purposes": [],
+          "objections": [],
+          "empathy": null,
+          "releases": [],
+          "visit": null,
+          "courtesy": null,
+          "reschedule": null,
+          "cancellation": null,
+          "wait": null,
+          "moderation": null,
+          "appointment_query": null,
+          "requires_clarification": false,
+          "clarification_question": null,
+          "confidence": 1,
+          "version": "sales-interpretation-input/2.0",
+          "requests": [
+            {
+              "topic": "comparison",
+              "polarity": "request",
+              "evidence": "I am looking for a 4 bedroom home.",
+              "members": [
+                {
+                  "kind": "property",
+                  "expression": "Bay Residence",
+                  "evidence": "I am looking for a 4 bedroom home."
+                }
+              ],
+              "include_current": true,
+              "include_all": false,
+              "all_kind": "property",
+              "criteria": [
+                "bedrooms"
+              ],
+              "feature": null,
+              "operation": "compare"
+            }
+          ],
+          "alternatives": [],
+          "constraints": [],
+          "selection": null
+        }
+      ]
+    },
+    {
+      "case": "resume_bay_see",
+      "message": "Bay Residence",
+      "sequence": [
+        {
+          "preferences": [
+            {
+              "key": "bedrooms",
+              "value": "4",
+              "evidence": "I am looking ",
+              "status": "declared"
+            }
+          ],
+          "personal_facts": [],
+          "preference_withdrawals": [],
+          "source_purposes": [],
+          "objections": [],
+          "empathy": null,
+          "releases": [],
+          "visit": null,
+          "courtesy": null,
+          "reschedule": null,
+          "cancellation": null,
+          "wait": null,
+          "moderation": null,
+          "appointment_query": null,
+          "requires_clarification": false,
+          "clarification_question": null,
+          "confidence": 1,
+          "version": "sales-interpretation-input/2.0",
+          "requests": [
+            {
+              "topic": "comparison",
+              "polarity": "request",
+              "evidence": "Bay Residence",
+              "members": [
+                {
+                  "kind": "property",
+                  "expression": "Bay Residence",
+                  "evidence": "Bay Residence"
+                }
+              ],
+              "include_current": true,
+              "include_all": false,
+              "all_kind": "property",
+              "criteria": [
+                "general"
+              ],
+              "feature": null,
+              "operation": "compare"
+            }
+          ],
+          "alternatives": [],
+          "constraints": [],
+          "selection": {
+            "kind": "property",
+            "expression": "Bay Residence",
+            "evidence": "Bay Residence"
+          }
+        },
+        {
+          "preferences": [],
+          "personal_facts": [],
+          "preference_withdrawals": [],
+          "source_purposes": [],
+          "objections": [],
+          "empathy": null,
+          "releases": [],
+          "visit": null,
+          "courtesy": null,
+          "reschedule": null,
+          "cancellation": null,
+          "wait": null,
+          "moderation": null,
+          "appointment_query": null,
+          "requires_clarification": false,
+          "clarification_question": null,
+          "confidence": 1,
+          "version": "sales-interpretation-input/2.0",
+          "requests": [
+            {
+              "polarity": "request",
+              "evidence": "Bay Residence",
+              "target": {
+                "kind": "property",
+                "expression": "Bay Residence",
+                "evidence": "Bay Residence"
+              },
+              "topic": "catalog",
+              "subject": null
+            }
+          ],
+          "alternatives": [],
+          "constraints": [],
+          "selection": null
+        }
+      ]
+    },
+    {
+      "case": "resume_bay_see",
+      "message": "Show me the property blueprints",
+      "sequence": [
+        {
+          "preferences": [],
+          "personal_facts": [],
+          "preference_withdrawals": [],
+          "source_purposes": [],
+          "objections": [],
+          "empathy": null,
+          "releases": [],
+          "visit": null,
+          "courtesy": null,
+          "reschedule": null,
+          "cancellation": null,
+          "wait": null,
+          "moderation": null,
+          "appointment_query": null,
+          "requires_clarification": false,
+          "clarification_question": null,
+          "confidence": 1,
+          "version": "sales-interpretation-input/2.0",
+          "requests": [
+            {
+              "topic": "comparison",
+              "polarity": "request",
+              "evidence": "Show me the property blueprints",
+              "members": [
+                {
+                  "kind": "property",
+                  "expression": "Bay Residence",
+                  "evidence": "Bay Residence"
+                }
+              ],
+              "include_current": true,
+              "include_all": false,
+              "all_kind": "property",
+              "criteria": [
+                "general"
+              ],
+              "feature": null,
+              "operation": "compare"
+            }
+          ],
+          "alternatives": [],
+          "constraints": [],
+          "selection": null
+        },
+        {
+          "preferences": [],
+          "personal_facts": [],
+          "preference_withdrawals": [],
+          "source_purposes": [],
+          "objections": [],
+          "empathy": null,
+          "releases": [],
+          "visit": null,
+          "courtesy": null,
+          "reschedule": null,
+          "cancellation": null,
+          "wait": null,
+          "moderation": null,
+          "appointment_query": null,
+          "requires_clarification": false,
+          "clarification_question": null,
+          "confidence": 1,
+          "version": "sales-interpretation-input/2.0",
+          "requests": [
+            {
+              "polarity": "request",
+              "evidence": "Show me the property blueprints",
+              "target": {
+                "kind": "material",
+                "expression": "blueprints",
+                "evidence": "Show me the property blueprints"
+              },
+              "topic": "materials",
+              "subject": null
+            }
+          ],
+          "alternatives": [],
+          "constraints": [],
+          "selection": null
+        }
+      ]
+    },
+    {
+      "case": "resume_bay_see",
+      "message": "I want to check blueprints",
+      "sequence": [
+        {
+          "preferences": [],
+          "personal_facts": [],
+          "preference_withdrawals": [],
+          "source_purposes": [],
+          "objections": [],
+          "empathy": null,
+          "releases": [],
+          "visit": null,
+          "courtesy": null,
+          "reschedule": null,
+          "cancellation": null,
+          "wait": null,
+          "moderation": null,
+          "appointment_query": null,
+          "requires_clarification": true,
+          "clarification_question": "Could you clarify what you mean by 'blueprints'? Are you looking for a floor plan or something else?",
+          "confidence": 0.9,
+          "version": "sales-interpretation-input/2.0",
+          "requests": [
+            {
+              "topic": "comparison",
+              "polarity": "request",
+              "evidence": "I want to check blueprints",
+              "members": [
+                {
+                  "kind": "property",
+                  "expression": "Bay Residence",
+                  "evidence": "Bay Residence"
+                },
+                {
+                  "kind": "property",
+                  "expression": "floor plan",
+                  "evidence": "blueprints"
+                }
+              ],
+              "include_current": false,
+              "include_all": false,
+              "all_kind": "property",
+              "criteria": [
+                "general"
+              ],
+              "feature": null,
+              "operation": "compare"
+            }
+          ],
+          "alternatives": [],
+          "constraints": [],
+          "selection": null
+        },
+        {
+          "preferences": [],
+          "personal_facts": [],
+          "preference_withdrawals": [],
+          "source_purposes": [],
+          "objections": [],
+          "empathy": null,
+          "releases": [],
+          "visit": null,
+          "courtesy": null,
+          "reschedule": null,
+          "cancellation": null,
+          "wait": null,
+          "moderation": null,
+          "appointment_query": null,
+          "requires_clarification": false,
+          "clarification_question": null,
+          "confidence": 1,
+          "version": "sales-interpretation-input/2.0",
+          "requests": [
+            {
+              "polarity": "request",
+              "evidence": "I want to check blueprints",
+              "target": {
+                "kind": "material",
+                "expression": "blueprints",
+                "evidence": "I want to check blueprints"
+              },
+              "topic": "materials",
+              "subject": null
+            }
+          ],
+          "alternatives": [],
+          "constraints": [],
+          "selection": null
+        }
+      ]
+    },
+    {
+      "case": "resume_bay_see",
+      "message": "Can I visit the property?",
+      "sequence": [
+        {
+          "preferences": [],
+          "personal_facts": [],
+          "preference_withdrawals": [],
+          "source_purposes": [],
+          "objections": [],
+          "empathy": null,
+          "releases": [],
+          "visit": {
+            "action": "request",
+            "evidence": "Can I visit the property?",
+            "timing": null
+          },
+          "courtesy": null,
+          "reschedule": null,
+          "cancellation": null,
+          "wait": null,
+          "moderation": null,
+          "appointment_query": null,
+          "requires_clarification": false,
+          "clarification_question": null,
+          "confidence": 1,
+          "version": "sales-interpretation-input/2.0",
+          "requests": [
+            {
+              "topic": "comparison",
+              "polarity": "request",
+              "evidence": "Can I visit the property?",
+              "members": [
+                {
+                  "kind": "property",
+                  "expression": "Bay Residence",
+                  "evidence": "Bay Residence"
+                },
+                {
+                  "kind": "property",
+                  "expression": "the property",
+                  "evidence": "Can I visit the property?"
+                }
+              ],
+              "include_current": true,
+              "include_all": false,
+              "all_kind": "property",
+              "criteria": [
+                "general"
+              ],
+              "feature": null,
+              "operation": "compare"
+            }
+          ],
+          "alternatives": [],
+          "constraints": [],
+          "selection": null
+        },
+        {
+          "preferences": [],
+          "personal_facts": [],
+          "preference_withdrawals": [],
+          "source_purposes": [],
+          "objections": [],
+          "empathy": null,
+          "releases": [],
+          "visit": {
+            "action": "request",
+            "evidence": "Can I visit the property?",
+            "timing": null
+          },
+          "courtesy": null,
+          "reschedule": null,
+          "cancellation": null,
+          "wait": null,
+          "moderation": null,
+          "appointment_query": null,
+          "requires_clarification": false,
+          "clarification_question": null,
+          "confidence": 1,
+          "version": "sales-interpretation-input/2.0",
+          "requests": [
+            {
+              "polarity": "request",
+              "evidence": "Can I visit the property?",
+              "target": {
+                "kind": "appointment",
+                "expression": "/",
+                "evidence": "Can I visit the property?"
+              },
+              "topic": "appointment",
+              "subject": null
+            }
+          ],
+          "alternatives": [],
+          "constraints": [],
+          "selection": null
+        }
+      ]
+    },
+    {
+      "case": "context_material_see",
+      "message": "Hi",
+      "sequence": [
+        {
+          "preferences": [],
+          "personal_facts": [],
+          "preference_withdrawals": [],
+          "source_purposes": [],
+          "objections": [],
+          "empathy": null,
+          "releases": [],
+          "visit": null,
+          "courtesy": {
+            "kind": "greeting",
+            "evidence": "Hi"
+          },
+          "reschedule": null,
+          "cancellation": null,
+          "wait": null,
+          "moderation": null,
+          "appointment_query": null,
+          "requires_clarification": false,
+          "clarification_question": null,
+          "confidence": 0.9,
+          "version": "sales-interpretation-input/2.0",
+          "requests": [],
+          "alternatives": [],
+          "constraints": [],
+          "selection": null
+        }
+      ]
+    },
+    {
+      "case": "context_material_see",
+      "message": "I am looking for a 4 bedroom home.",
+      "sequence": [
+        {
+          "preferences": [],
+          "personal_facts": [],
+          "preference_withdrawals": [],
+          "source_purposes": [],
+          "objections": [],
+          "empathy": null,
+          "releases": [],
+          "visit": null,
+          "courtesy": null,
+          "reschedule": null,
+          "cancellation": null,
+          "wait": null,
+          "moderation": null,
+          "appointment_query": null,
+          "requires_clarification": false,
+          "clarification_question": null,
+          "confidence": 1,
+          "version": "sales-interpretation-input/2.0",
+          "requests": [
+            {
+              "topic": "comparison",
+              "polarity": "request",
+              "evidence": "I am looking for a 4 bedroom home.",
+              "members": [
+                {
+                  "kind": "property",
+                  "expression": "Bay Residence",
+                  "evidence": "4 bedroom home"
+                }
+              ],
+              "include_current": true,
+              "include_all": false,
+              "all_kind": "property",
+              "criteria": [
+                "bedrooms"
+              ],
+              "feature": null,
+              "operation": "compare"
+            }
+          ],
+          "alternatives": [],
+          "constraints": [],
+          "selection": null
+        }
+      ]
+    },
+    {
+      "case": "context_material_see",
+      "message": "Bay Residence",
+      "sequence": [
+        {
+          "preferences": [],
+          "personal_facts": [],
+          "preference_withdrawals": [],
+          "source_purposes": [],
+          "objections": [],
+          "empathy": null,
+          "releases": [],
+          "visit": null,
+          "courtesy": null,
+          "reschedule": null,
+          "cancellation": null,
+          "wait": null,
+          "moderation": null,
+          "appointment_query": null,
+          "requires_clarification": false,
+          "clarification_question": null,
+          "confidence": 1,
+          "version": "sales-interpretation-input/2.0",
+          "requests": [
+            {
+              "topic": "comparison",
+              "polarity": "request",
+              "evidence": "Bay Residence",
+              "members": [
+                {
+                  "kind": "property",
+                  "expression": "Bay Residence",
+                  "evidence": "Bay Residence"
+                }
+              ],
+              "include_current": true,
+              "include_all": false,
+              "all_kind": "property",
+              "criteria": [
+                "general"
+              ],
+              "feature": null,
+              "operation": "compare"
+            }
+          ],
+          "alternatives": [],
+          "constraints": [],
+          "selection": {
+            "kind": "property",
+            "expression": "Bay Residence",
+            "evidence": "Bay Residence"
+          }
+        }
+      ]
+    },
+    {
+      "case": "context_material_see",
+      "message": "Show me the property blueprints",
+      "sequence": [
+        {
+          "preferences": [],
+          "personal_facts": [],
+          "preference_withdrawals": [],
+          "source_purposes": [],
+          "objections": [],
+          "empathy": null,
+          "releases": [],
+          "visit": null,
+          "courtesy": null,
+          "reschedule": null,
+          "cancellation": null,
+          "wait": null,
+          "moderation": null,
+          "appointment_query": null,
+          "requires_clarification": false,
+          "clarification_question": null,
+          "confidence": 1,
+          "version": "sales-interpretation-input/2.0",
+          "requests": [
+            {
+              "topic": "comparison",
+              "polarity": "request",
+              "evidence": "Show me the property blueprints",
+              "members": [
+                {
+                  "kind": "property",
+                  "expression": "Bay Residence",
+                  "evidence": "Bay Residence"
+                }
+              ],
+              "include_current": true,
+              "include_all": false,
+              "all_kind": "property",
+              "criteria": [
+                "general"
+              ],
+              "feature": null,
+              "operation": "compare"
+            }
+          ],
+          "alternatives": [],
+          "constraints": [],
+          "selection": null
+        },
+        {
+          "preferences": [],
+          "personal_facts": [],
+          "preference_withdrawals": [],
+          "source_purposes": [],
+          "objections": [],
+          "empathy": null,
+          "releases": [],
+          "visit": null,
+          "courtesy": null,
+          "reschedule": null,
+          "cancellation": null,
+          "wait": null,
+          "moderation": null,
+          "appointment_query": null,
+          "requires_clarification": false,
+          "clarification_question": null,
+          "confidence": 1,
+          "version": "sales-interpretation-input/2.0",
+          "requests": [
+            {
+              "polarity": "request",
+              "evidence": "Show me the property blueprints",
+              "target": {
+                "kind": "material",
+                "expression": "blueprints",
+                "evidence": "Show me the property blueprints"
+              },
+              "topic": "materials",
+              "subject": null
+            }
+          ],
+          "alternatives": [],
+          "constraints": [],
+          "selection": null
+        }
+      ]
+    },
+    {
+      "case": "context_material_see",
+      "message": "I want to check blueprints",
+      "sequence": [
+        {
+          "preferences": [],
+          "personal_facts": [],
+          "preference_withdrawals": [],
+          "source_purposes": [],
+          "objections": [],
+          "empathy": null,
+          "releases": [],
+          "visit": null,
+          "courtesy": null,
+          "reschedule": null,
+          "cancellation": null,
+          "wait": null,
+          "moderation": null,
+          "appointment_query": null,
+          "requires_clarification": true,
+          "clarification_question": "Could you clarify what you mean by 'blueprints'? Are you looking for floor plans or something else?",
+          "confidence": 0.9,
+          "version": "sales-interpretation-input/2.0",
+          "requests": [
+            {
+              "topic": "comparison",
+              "polarity": "request",
+              "evidence": "I want to check blueprints",
+              "members": [
+                {
+                  "kind": "property",
+                  "expression": "Bay Residence",
+                  "evidence": "Bay Residence"
+                },
+                {
+                  "kind": "property",
+                  "expression": "floor plan",
+                  "evidence": "blueprints"
+                }
+              ],
+              "include_current": false,
+              "include_all": false,
+              "all_kind": "property",
+              "criteria": [
+                "general"
+              ],
+              "feature": null,
+              "operation": "compare"
+            }
+          ],
+          "alternatives": [],
+          "constraints": [],
+          "selection": null
+        },
+        {
+          "preferences": [],
+          "personal_facts": [],
+          "preference_withdrawals": [],
+          "source_purposes": [],
+          "objections": [],
+          "empathy": null,
+          "releases": [],
+          "visit": null,
+          "courtesy": null,
+          "reschedule": null,
+          "cancellation": null,
+          "wait": null,
+          "moderation": null,
+          "appointment_query": null,
+          "requires_clarification": false,
+          "clarification_question": null,
+          "confidence": 1,
+          "version": "sales-interpretation-input/2.0",
+          "requests": [
+            {
+              "polarity": "request",
+              "evidence": "I want to check blueprints",
+              "target": {
+                "kind": "material",
+                "expression": "blueprints",
+                "evidence": "I want to check blueprints"
+              },
+              "topic": "materials",
+              "subject": null
+            }
+          ],
+          "alternatives": [],
+          "constraints": [],
+          "selection": null
+        }
+      ]
+    },
+    {
+      "case": "context_material_see",
+      "message": "Can I see it?",
+      "sequence": [
+        {
+          "preferences": [],
+          "personal_facts": [],
+          "preference_withdrawals": [],
+          "source_purposes": [],
+          "objections": [],
+          "empathy": null,
+          "releases": [],
+          "visit": null,
+          "courtesy": null,
+          "reschedule": null,
+          "cancellation": null,
+          "wait": null,
+          "moderation": null,
+          "appointment_query": null,
+          "requires_clarification": true,
+          "clarification_question": "What would you like to see specifically?",
+          "confidence": 0.9,
+          "version": "sales-interpretation-input/2.0",
+          "requests": [
+            {
+              "topic": "comparison",
+              "polarity": "request",
+              "evidence": "Can I see it?",
+              "members": [
+                {
+                  "kind": "property",
+                  "expression": "Bay Residence",
+                  "evidence": "Bay Residence"
+                },
+                {
+                  "kind": "property",
+                  "expression": "Bay Residence gallery",
+                  "evidence": "Bay Residence"
+                },
+                {
+                  "kind": "property",
+                  "expression": "Bay Residence brochure",
+                  "evidence": "Bay Residence"
+                }
+              ],
+              "include_current": true,
+              "include_all": false,
+              "all_kind": "property",
+              "criteria": [
+                "general"
+              ],
+              "feature": null,
+              "operation": "compare"
+            }
+          ],
+          "alternatives": [],
+          "constraints": [],
+          "selection": null
+        },
+        {
+          "preferences": [],
+          "personal_facts": [],
+          "preference_withdrawals": [],
+          "source_purposes": [],
+          "objections": [],
+          "empathy": null,
+          "releases": [],
+          "visit": null,
+          "courtesy": null,
+          "reschedule": null,
+          "cancellation": null,
+          "wait": null,
+          "moderation": null,
+          "appointment_query": null,
+          "requires_clarification": false,
+          "clarification_question": null,
+          "confidence": 1,
+          "version": "sales-interpretation-input/2.0",
+          "requests": [
+            {
+              "polarity": "request",
+              "evidence": "Can I see it?",
+              "target": {
+                "kind": "material",
+                "expression": "Bay Residence gallery",
+                "evidence": "Can I see it?"
+              },
+              "topic": "materials",
+              "subject": null
+            },
+            {
+              "polarity": "request",
+              "evidence": "Can I see it?",
+              "target": {
+                "kind": "material",
+                "expression": "Bay Residence brochure",
+                "evidence": "Can I see it?"
+              },
+              "topic": "materials",
+              "subject": null
+            }
+          ],
+          "alternatives": [],
+          "constraints": [],
+          "selection": null
+        }
+      ]
+    },
+    {
+      "case": "context_material_see",
+      "message": "Can I visit the property?",
+      "sequence": [
+        {
+          "preferences": [],
+          "personal_facts": [],
+          "preference_withdrawals": [],
+          "source_purposes": [],
+          "objections": [],
+          "empathy": null,
+          "releases": [],
+          "visit": {
+            "action": "request",
+            "evidence": "Can I visit the property?",
+            "timing": null
+          },
+          "courtesy": null,
+          "reschedule": null,
+          "cancellation": null,
+          "wait": null,
+          "moderation": null,
+          "appointment_query": null,
+          "requires_clarification": false,
+          "clarification_question": null,
+          "confidence": 1,
+          "version": "sales-interpretation-input/2.0",
+          "requests": [
+            {
+              "topic": "comparison",
+              "polarity": "request",
+              "evidence": "Can I visit the property?",
+              "members": [
+                {
+                  "kind": "property",
+                  "expression": "Bay Residence",
+                  "evidence": "Bay Residence"
+                },
+                {
+                  "kind": "property",
+                  "expression": "Bay Residence",
+                  "evidence": "Bay Residence"
+                }
+              ],
+              "include_current": true,
+              "include_all": false,
+              "all_kind": "property",
+              "criteria": [
+                "general"
+              ],
+              "feature": null,
+              "operation": "compare"
+            }
+          ],
+          "alternatives": [],
+          "constraints": [],
+          "selection": null
+        },
+        {
+          "preferences": [],
+          "personal_facts": [],
+          "preference_withdrawals": [],
+          "source_purposes": [],
+          "objections": [],
+          "empathy": null,
+          "releases": [],
+          "visit": {
+            "action": "request",
+            "evidence": "Can I visit the property?",
+            "timing": null
+          },
+          "courtesy": null,
+          "reschedule": null,
+          "cancellation": null,
+          "wait": null,
+          "moderation": null,
+          "appointment_query": null,
+          "requires_clarification": false,
+          "clarification_question": null,
+          "confidence": 1,
+          "version": "sales-interpretation-input/2.0",
+          "requests": [
+            {
+              "polarity": "request",
+              "evidence": "Can I visit the property?",
+              "target": {
+                "kind": "appointment",
+                "expression": "/",
+                "evidence": "Can I visit the property?"
+              },
+              "topic": "appointment",
+              "subject": null
+            }
+          ],
+          "alternatives": [],
+          "constraints": [],
+          "selection": null
+        }
+      ]
+    },
+    {
+      "case": "context_visit_see",
+      "message": "Hi",
+      "sequence": [
+        {
+          "preferences": [],
+          "personal_facts": [],
+          "preference_withdrawals": [],
+          "source_purposes": [],
+          "objections": [],
+          "empathy": null,
+          "releases": [],
+          "visit": null,
+          "courtesy": {
+            "kind": "greeting",
+            "evidence": "Hi"
+          },
+          "reschedule": null,
+          "cancellation": null,
+          "wait": null,
+          "moderation": null,
+          "appointment_query": null,
+          "requires_clarification": false,
+          "clarification_question": null,
+          "confidence": 0,
+          "version": "sales-interpretation-input/2.0",
+          "requests": [],
+          "alternatives": [],
+          "constraints": [],
+          "selection": null
+        }
+      ]
+    },
+    {
+      "case": "context_visit_see",
+      "message": "I am looking for a 4 bedroom home.",
+      "sequence": [
+        {
+          "preferences": [],
+          "personal_facts": [],
+          "preference_withdrawals": [],
+          "source_purposes": [],
+          "objections": [],
+          "empathy": null,
+          "releases": [],
+          "visit": null,
+          "courtesy": null,
+          "reschedule": null,
+          "cancellation": null,
+          "wait": null,
+          "moderation": null,
+          "appointment_query": null,
+          "requires_clarification": false,
+          "clarification_question": null,
+          "confidence": 1,
+          "version": "sales-interpretation-input/2.0",
+          "requests": [
+            {
+              "topic": "comparison",
+              "polarity": "request",
+              "evidence": "I am looking for a 4 bedroom home.",
+              "members": [
+                {
+                  "kind": "property",
+                  "expression": "Bay Residence",
+                  "evidence": "4 bedroom home"
+                }
+              ],
+              "include_current": true,
+              "include_all": false,
+              "all_kind": "property",
+              "criteria": [
+                "bedrooms"
+              ],
+              "feature": null,
+              "operation": "compare"
+            }
+          ],
+          "alternatives": [],
+          "constraints": [],
+          "selection": null
+        }
+      ]
+    },
+    {
+      "case": "context_visit_see",
+      "message": "Bay Residence",
+      "sequence": [
+        {
+          "preferences": [
+            {
+              "key": "bedrooms",
+              "value": "4",
+              "evidence": "I am looking ",
+              "status": "declared"
+            }
+          ],
+          "personal_facts": [],
+          "preference_withdrawals": [],
+          "source_purposes": [],
+          "objections": [],
+          "empathy": null,
+          "releases": [],
+          "visit": null,
+          "courtesy": null,
+          "reschedule": null,
+          "cancellation": null,
+          "wait": null,
+          "moderation": null,
+          "appointment_query": null,
+          "requires_clarification": false,
+          "clarification_question": null,
+          "confidence": 1,
+          "version": "sales-interpretation-input/2.0",
+          "requests": [
+            {
+              "topic": "comparison",
+              "polarity": "request",
+              "evidence": "Bay Residence",
+              "members": [
+                {
+                  "kind": "property",
+                  "expression": "Bay Residence",
+                  "evidence": "Bay Residence"
+                }
+              ],
+              "include_current": true,
+              "include_all": false,
+              "all_kind": "property",
+              "criteria": [
+                "general"
+              ],
+              "feature": null,
+              "operation": "compare"
+            }
+          ],
+          "alternatives": [],
+          "constraints": [],
+          "selection": {
+            "kind": "property",
+            "expression": "Bay Residence",
+            "evidence": "Bay Residence"
+          }
+        },
+        {
+          "preferences": [],
+          "personal_facts": [],
+          "preference_withdrawals": [],
+          "source_purposes": [],
+          "objections": [],
+          "empathy": null,
+          "releases": [],
+          "visit": null,
+          "courtesy": null,
+          "reschedule": null,
+          "cancellation": null,
+          "wait": null,
+          "moderation": null,
+          "appointment_query": null,
+          "requires_clarification": false,
+          "clarification_question": null,
+          "confidence": 1,
+          "version": "sales-interpretation-input/2.0",
+          "requests": [
+            {
+              "polarity": "request",
+              "evidence": "Bay Residence",
+              "target": {
+                "kind": "property",
+                "expression": "Bay Residence",
+                "evidence": "Bay Residence"
+              },
+              "topic": "catalog",
+              "subject": null
+            }
+          ],
+          "alternatives": [],
+          "constraints": [],
+          "selection": null
+        }
+      ]
+    },
+    {
+      "case": "context_visit_see",
+      "message": "Can I see it?",
+      "sequence": [
+        {
+          "preferences": [],
+          "personal_facts": [],
+          "preference_withdrawals": [],
+          "source_purposes": [],
+          "objections": [],
+          "empathy": null,
+          "releases": [],
+          "visit": null,
+          "courtesy": null,
+          "reschedule": null,
+          "cancellation": null,
+          "wait": null,
+          "moderation": null,
+          "appointment_query": null,
+          "requires_clarification": true,
+          "clarification_question": "What would you like to see about the Bay Residence?",
+          "confidence": 0.9,
+          "version": "sales-interpretation-input/2.0",
+          "requests": [
+            {
+              "topic": "comparison",
+              "polarity": "request",
+              "evidence": "Can I see it?",
+              "members": [
+                {
+                  "kind": "property",
+                  "expression": "Bay Residence",
+                  "evidence": "Bay Residence"
+                }
+              ],
+              "include_current": true,
+              "include_all": false,
+              "all_kind": "property",
+              "criteria": [
+                "general"
+              ],
+              "feature": null,
+              "operation": "compare"
+            }
+          ],
+          "alternatives": [],
+          "constraints": [],
+          "selection": null
+        },
+        {
+          "preferences": [],
+          "personal_facts": [],
+          "preference_withdrawals": [],
+          "source_purposes": [],
+          "objections": [],
+          "empathy": null,
+          "releases": [],
+          "visit": null,
+          "courtesy": null,
+          "reschedule": null,
+          "cancellation": null,
+          "wait": null,
+          "moderation": null,
+          "appointment_query": null,
+          "requires_clarification": false,
+          "clarification_question": null,
+          "confidence": 1,
+          "version": "sales-interpretation-input/2.0",
+          "requests": [
+            {
+              "polarity": "request",
+              "evidence": "Can I see it?",
+              "target": {
+                "kind": "property",
+                "expression": "Bay Residence",
+                "evidence": "Can I see it?"
+              },
+              "topic": "materials",
+              "subject": null
+            }
+          ],
+          "alternatives": [],
+          "constraints": [],
+          "selection": null
+        }
+      ]
+    }
+  ]
+}

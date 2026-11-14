@@ -10,6 +10,38 @@ def normalize(value,text,state,latest):
     # Never override exclusions, multiple choices, third-party or conditional speech.
     if data['constraints'] or data['alternatives'] or data['releases'] or data['cancellation'] or data['reschedule'] or data['wait'] or data['moderation'] or any(r['polarity']=='exclude' for r in data['requests']):return value,[]
     if re.search(r"\b(?:not|never|don't|do not|if|suppose|friend|said|told)\b",text,re.I):return value,[]
+    from .interpretation_consistency import POSITIVE_VISIT,EXISTING_QUERY
+    from app.modules.governance.services import request_attribution
+    own=request_attribution(text)['current_text']
+    # A new visit has a property subject; '/' cannot select an appointment.
+    # Rebind only this invalid marker, never a real slot or booking confirmation.
+    invitation=bool(meta.get('visit_invitation') and not any(meta.get(k) for k in
+        ('material_offer','appointment_offer','booking_confirmation','release_offer','location_offer')))
+    short_reply=re.fullmatch(r"\s*(?:can|could) (?:I|we) (?:see|view) (it|this|that)(?: please)?[?! .]*",own,re.I)
+    anaphor=re.search(r'\b(?:the|this|that) (property|home|house|unit)\b',own,re.I)
+    target_evidence=anaphor.group() if anaphor else short_reply[1] if invitation and short_reply else None
+    if (own==text and target_evidence and data['visit'] and data['visit']['action']=='request'
+        and (POSITIVE_VISIT.search(own) or invitation and short_reply) and not EXISTING_QUERY.search(own)
+        and not data['appointment_query'] and not data['comparison']):
+        unit=bool(anaphor and anaphor[1].lower()=='unit')
+        selected=state.selected_unit_id if unit else state.selected_property_type_id
+        ids={r['reference_id'] for r in data['requests'] if r['topic']=='appointment' and r['polarity']=='request'}
+        if selected:
+            for ref in data['references']:
+                if ref['id'] in ids and ref['kind']=='appointment' and ref['expression']=='/':
+                    ref.update(kind='unit' if unit else 'property',expression='this unit' if unit else 'this property',evidence=target_evidence)
+                    notes.append({'field':'references','action':'new_visit_placeholder_is_current_property_not_slot','evidence':target_evidence})
+    # Conflicting read interpretations after a delivered in-person invitation
+    # ask the lead; they never gain availability, sharing or booking authority.
+    ambiguous=re.fullmatch(r"\s*(?:can|could) (?:I|we) (?:see|view) (?:it|this|that)(?: please)?[?! .]*",own,re.I)
+    if (own==text and ambiguous and meta.get('visit_invitation')
+        and not any(meta.get(k) for k in ('material_offer','appointment_offer','booking_confirmation','release_offer','location_offer'))
+        and not data['visit'] and not data['appointment_query'] and not data['selected_reference_id']
+        and all(r['topic'] in {'materials','catalog','property_details','other'} for r in data['requests'])):
+        data.update(requests=[],all_of=[],references=[],selected_reference_id=None,comparison=None,
+            requires_clarification=True,clarification_question='Do you mean viewing the property in person or seeing its photos?')
+        notes.append({'field':'requests','action':'clarify_file_or_visit_after_delivered_visit_invitation','effect_authorization':False})
+        return Understanding.model_validate(data).check_evidence(text),notes
     bedroom=re.fullmatch(r'\s*([1-6])(?:\s+bedrooms?)?[?.!]?\s*',text,re.I)
     if bedroom and ('bedroom' in text.lower() or meta.get('needs_search') and not meta.get('property_catalog_offer')) and not meta.get('appointment_offer'):
         data.update(requests=[dict(id='bedroom_continuation',topic='catalog',polarity='request',evidence=text)],all_of=['bedroom_continuation'],

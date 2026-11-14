@@ -113,3 +113,67 @@ def test_comparison_recovery_preserves_independent_visit_request():
     u=understanding(text,'catalog','appointment').model_copy(update={'visit':None})
     fixed,notes=normalize(u,text,DialogueState(selected_property_type_id='alder'),previous({}))
     assert len(fixed.requests)==2 and any(r.topic.value=='appointment' for r in fixed.requests)
+
+
+def visit_frame(text):
+    data=understanding(text,'appointment').model_dump(mode='json')
+    data.update(visit={'action':'request','evidence':text,'timing':None},
+        references=[{'id':'bad','kind':'appointment','expression':'/','evidence':text}])
+    data['requests'][0]['reference_id']='bad'
+    return Understanding.model_validate(data)
+
+@pytest.mark.parametrize('owner',['alder-home','orion-home','maple-home'])
+@pytest.mark.parametrize('text',['Can I visit the property?','Could we visit this house?','I want to visit that home.','Please arrange a visit to the property.'])
+def test_new_visit_placeholder_retains_current_property_without_slot_consent(owner,text):
+    u=visit_frame(text)
+    fixed,notes=normalize(u,text,DialogueState(selected_property_type_id=owner),previous({}))
+    assert fixed.references[0].kind=='property' and fixed.references[0].expression=='this property'
+    assert fixed.visit.action=='request' and fixed.confidence==u.confidence
+    assert notes and fixed.requests[0].topic.value=='appointment'
+
+@pytest.mark.parametrize('name',['Alder Cottage','Orion Duplex','Maple Terrace'])
+@pytest.mark.parametrize('prefix',['Can I visit ','I want to visit ','I mean an in-person visit to '])
+def test_named_new_visit_placeholder_becomes_only_approved_named_subject(name,prefix):
+    text=prefix+name+'?';u=visit_frame(text)
+    fixed,notes=consistent(u,text,{'property_types':[{'property_type':name}]})
+    assert fixed.references[0].kind=='property' and fixed.references[0].expression==name
+    assert fixed.visit.action=='request' and fixed.confidence==u.confidence
+
+@pytest.mark.parametrize('text',['16/11, 10am','Yes','Cancel my visit','My friend said can I visit the property?','Can I visit the other property?'])
+def test_no_slot_confirmation_or_other_property_is_rebound(text):
+    u=visit_frame(text)
+    fixed,_=normalize(u,text,DialogueState(selected_property_type_id='home'),previous({}))
+    assert fixed.references[0].kind=='appointment'
+
+@pytest.mark.parametrize('text',['Can I see it?','Could we view that?','Can we see this please?'])
+def test_conflicting_material_read_after_visit_invitation_asks_without_effects(text):
+    u=understanding(text,'materials')
+    fixed,notes=normalize(u,text,DialogueState(selected_property_type_id='home'),previous({'visit_invitation':True}))
+    assert fixed.requires_clarification and 'in person' in fixed.clarification_question
+    assert not fixed.requests and not fixed.references and fixed.visit is None
+    assert fixed.confidence==u.confidence and notes[-1]['effect_authorization'] is False
+    # A current material offer keeps its interpretation; it is not visit consent.
+    assert normalize(u,text,DialogueState(selected_property_type_id='home'),previous({'material_offer':{'asset_ids':['file']}}))[0]==u
+    assert normalize(u,text,DialogueState(selected_property_type_id='home'),previous({'visit_invitation':True},'failed'))[0]==u
+
+
+def test_matching_visit_intent_after_invitation_can_bind_it_but_never_confirm():
+    u=visit_frame('Can I see it?')
+    fixed,_=normalize(u,'Can I see it?',DialogueState(selected_property_type_id='home'),previous({'visit_invitation':True}))
+    assert not fixed.requires_clarification and fixed.references[0].kind=='property'
+    assert fixed.visit.action=='request'
+
+@pytest.mark.parametrize('text',['Can I visit this unit?','Please arrange a viewing of the unit.'])
+def test_new_unit_visit_uses_current_unit_and_preserves_type(text):
+    u=visit_frame(text)
+    fixed,_=normalize(u,text,DialogueState(selected_property_type_id='home',selected_unit_id='unit-a'),previous({}))
+    assert fixed.references[0].kind=='unit' and fixed.references[0].expression=='this unit'
+    assert fixed.visit.action=='request'
+
+
+def test_missing_subject_or_real_slot_reference_is_never_replaced():
+    from app.modules.sales_agent.understanding_contract import Reference
+    text='Can I visit the property?';u=visit_frame(text)
+    assert normalize(u,text,DialogueState(),previous({}))[0].references[0].kind=='appointment'
+    real=u.model_copy(update={'references':[Reference(id='bad',kind='appointment',expression='first appointment',evidence=text)]})
+    assert normalize(real,text,DialogueState(selected_property_type_id='home'),previous({'appointment_offer':{'options':[]}}))[0].references[0].expression=='first appointment'

@@ -1,0 +1,42 @@
+{
+  "base_commit": "1569573c6c2aa8034ff106bb650e0255dddef0c2",
+  "protocol": "sales-understanding-prompt/2.34",
+  "script_version": "sales-continuity-battery/1.1",
+  "focused_battery_passed": 69,
+  "replay_and_variants_passed": 110,
+  "recorded_message_sequences": 33,
+  "local_model_quality_evaluated": false,
+  "full_regression": {
+    "status": "PASS",
+    "modules": 144,
+    "complete_module_coverage_verified": true,
+    "shards": [
+      {
+        "shard": 1,
+        "passed": 1095,
+        "skipped": 2,
+        "failed": 0
+      },
+      {
+        "shard": 2,
+        "passed": 1219,
+        "skipped": 6,
+        "failed": 0
+      },
+      {
+        "shard": 3,
+        "passed": 1103,
+        "skipped": 3,
+        "failed": 0
+      }
+    ],
+    "passed": 3417,
+    "skipped": 11,
+    "failed": 0,
+    "runtime": "Python 3.12.14 with SQLite; not the GitHub candidate Docker image"
+  },
+  "paid_local_calls": 0,
+  "local_cost_usd": 0,
+  "production_database_writes": 0,
+  "partition_tests_passed": 8
+}

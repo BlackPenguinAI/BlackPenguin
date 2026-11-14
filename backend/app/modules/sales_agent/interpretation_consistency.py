@@ -29,6 +29,20 @@ def normalize(value,text,commercial,*,appointment_offer=None):
         key='current_subject';ids={r['id'] for r in data['references']}
         while key in ids:key+='x'
         data['references'].append(dict(id=key,kind='property',expression=name,evidence=name));return key
+    # A model placeholder is not a time reference when the lead explicitly
+    # requests a NEW visit to a single approved, currently named property.
+    direct_visit=bool(POSITIVE_VISIT.search(own) or re.fullmatch(r"I mean an? in-person visit to .+[.!?]?",own,re.I))
+    if (own==text and data['visit'] and data['visit']['action']=='request' and direct_visit
+        and not data['cancellation'] and not data['reschedule'] and not data['appointment_query']
+        and not data['alternatives'] and not data['constraints'] and not data['releases']
+        and not NEGATIVE.search(own) and not EXISTING_QUERY.search(own)):
+        candidates=named(own)
+        ids={r['reference_id'] for r in data['requests'] if r['topic']=='appointment' and r['polarity']=='request'}
+        if len(candidates)==1:
+            for ref in data['references']:
+                if ref['id'] in ids and ref['kind']=='appointment' and ref['expression']=='/':
+                    ref.update(kind='property',expression=candidates[0],evidence=candidates[0])
+                    notes.append({'field':'references','action':'new_visit_placeholder_is_named_property','evidence':candidates[0]})
     literal_names=named(own)
     if (len(literal_names)==1 and own.strip().rstrip('.!').casefold()==literal_names[0].casefold()
         and not data['constraints'] and not data['alternatives'] and not data['releases']

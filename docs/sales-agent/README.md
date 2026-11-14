@@ -605,6 +605,40 @@ El estimado escala los USD 0.08616360 de 22 turnos a 39–40 turnos y añade mar
 
 La curva muestra gasto, no calidad: las corridas tienen distinto número de casos y criterios. [Reproducir figura con NumPy y Matplotlib](05-resultados-y-mejoras/retoma-contextual-local/generar_consumo.py) · [Comandos de la próxima evaluación](06-como-ejecutar-las-pruebas/ejecutar-retoma-contextual.sh).
 
+## 10.4. Visita nueva: propiedad conocida y reparación semántica
+
+**Evidencia del servidor (`1569573`).** Los cinco guiones registraron 315 PASS, seis FAIL y dos citas. No hubo pérdida general de todas las mejoras: el saludo y la reiteración de materiales funcionaron. Dos solicitudes explícitas de visita generaron una referencia de cita «/» en vez de apuntar a la propiedad ya elegida; otra respuesta pidió material después de una invitación presencial. El JSON reparado era válido, pero esas interpretaciones no resolvían la petición actual. [Resumen original sin cambiar etiquetas](05-resultados-y-mejoras/retoma-servidor-4/resumen.json) · [Diálogos originales legibles](05-resultados-y-mejoras/retoma-servidor-4/conversaciones.md).
+
+| Qué se modifica | Ajuste concreto | Límite conservado |
+|---|---|---|
+| Referencia inválida en una visita nueva | Con intención de visita nueva y evidencia propia, «the property/this unit» puede vincular el marcador inválido «/» al sujeto actual. Un nombre explícito solo se usa si pertenece al catálogo aprobado del proyecto. | No se cambia una referencia real de horario, una confirmación, cancelación ni consulta de una cita existente; la confianza no aumenta. |
+| Respuesta corta contradictoria con una invitación | Después de una invitación presencial entregada, si «Can I see it?» se interpreta como lectura de material, se pregunta si quiere visita o fotos. | No comparte archivos ni consulta horarios por ese supuesto. Una oferta actual de archivos conserva su significado. |
+| Interpretación de visita coherente con la invitación | Si el modelo sí solicita una visita nueva, una referencia inválida puede enlazarse al sujeto de esa invitación. | Solo consulta disponibilidad; seleccionar horario y confirmar resumen siguen siendo pasos distintos. |
+| Protocolo del modelo | Versión 2.34: una visita nueva tiene como objetivo una propiedad/unidad, no una cita «/»; las citas anteriores se resuelven por separado. | Se mantiene `openai/gpt-4o-mini`, configuración 8 y topología LangGraph. No se modifican pesos del modelo ni datos reales. |
+
+**Cómo se prueba.** El replay conserva 33 secuencias de mensajes de la corrida, incluidos los primeros intentos inválidos y los paquetes de reparación. Se añaden variaciones de nombre, pronombres, viviendas/unidades, formas de pedir visita, ofertas de archivos e invitaciones fallidas. También se comprueba que no se sustituyan horarios reales, confirmaciones ni referencias a otra propiedad. La versión del guion sigue siendo 1.1: no se suavizan los objetivos ni se cambia el texto del lead para evitar el fallo.
+
+**Validación del código final:** 3.417 pruebas aprobadas, 11 omitidas por condiciones de entorno y cero fallos en los tres shards; los 144 módulos quedaron cubiertos exactamente una vez. Ocho controles de partición también aprobaron. La imagen candidata y PostgreSQL aislado se verificarán nuevamente en GitHub. [Validación JSON](05-resultados-y-mejoras/visita-contexto-local/validacion.json).
+
+En local, los once recorridos completaron **76 turnos, diez citas simuladas y 659 controles correctos**; el caso sin vendedor elegible termina sin cita. La variante ambigua ahora pregunta «Do you mean viewing the property in person or seeing its photos?», el lead responde «I mean an in-person visit to Bay Residence» y recién se ofrecen horarios. La composición y respuestas no registradas se simulan: esto no sustituye otra corrida del modelo publicado. [Conversaciones corregidas legibles](05-resultados-y-mejoras/visita-contexto-local/conversaciones.md) · [JSON local](05-resultados-y-mejoras/visita-contexto-local/resultado.json).
+
+| Consumo rastreado desde necesidades | Total USD | Llamadas con costo |
+|---|---:|---:|
+| Cuatro corridas de necesidades | 0.15756165 | 134 |
+| Primera continuidad | 0.12972465 | 88 |
+| Segunda continuidad | 0.12658365 | 86 |
+| Primera retoma | 0.08616360 | 56 |
+| Segunda retoma, cinco guiones | 0.12500070 | 85 |
+| **TOTAL OBSERVADO** | **0.62503425** | **449** |
+| Corrección y pruebas locales de referencia/contexto | **0.00000000** | 0 pagadas |
+| Próxima repetición de los mismos cinco guiones | **≈0.12–0.22 estimado; reserva 0.35** | Hasta 200 llamadas; no equivale a límite monetario |
+
+La última corrida se interrumpió tras 33 turnos. Escalar USD 0.12500070 a los 39–40 turnos completos previstos da aproximadamente USD 0.15, antes de variaciones por contexto y reparación. Los estimados no se suman al consumo real. La evaluación con modelo publicado sigue pendiente de despliegue; se compararán estos mismos cinco objetivos.
+
+![Consumo rastreado de OpenRouter](05-resultados-y-mejoras/visita-contexto-local/consumo-observado.png)
+
+La curva representa gasto acumulado, no calidad integral. [Reproducir figura](05-resultados-y-mejoras/visita-contexto-local/generar_consumo.py) · [Comandos de evaluación](06-como-ejecutar-las-pruebas/ejecutar-visita-contexto.sh).
+
 ## 11. Trabajo futuro
 
 **Más casos y conversaciones más largas, no nuevas funciones de canal.** Se avanza por etapas, corrigiendo y repitiendo antes de ampliar. Se incluyen compradores que rechazan o abandonan: no toda conversación correcta termina con cita [R4–R6].
