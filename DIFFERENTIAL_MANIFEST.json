@@ -1,82 +1,36 @@
 {
-  "base_commit": "cd3134e037ae5454fa04a6a2d2611313edf49130",
-  "description": "Current request priority, legacy booking-state reconciliation and contextual short visit requests",
+  "base_commit": "e7b751fba8d6d4d26de7df5544012571e657ee38",
+  "description": "Preserve accepted immutable booking confirmation and fix short-message recorded provider frames",
+  "migrations": false,
   "deletions": [],
-  "database_migrations": false,
-  "paid_local_calls": 0,
-  "targeted_tests_passed": 168,
+  "validation": {
+    "passed": 3363,
+    "skipped": 11,
+    "failed": 0,
+    "modules": 144,
+    "partition_tests_passed": 8,
+    "paid_provider_calls": 0
+  },
   "files": [
     {
-      "path": "backend/app/modules/sales_agent/interpretation_consistency.py",
-      "sha256": "88f09aee72d34c392c8d9cfd6432f13b65561a5fd878fc25be7fa5376f509e86"
-    },
-    {
-      "path": "backend/app/modules/sales_agent/language_policy.py",
-      "sha256": "deea229ddf118150da902745b82e463e4d4eb28cb6d972c74b53e46219e39c7b"
-    },
-    {
-      "path": "backend/app/modules/sales_agent/planning_reply.py",
-      "sha256": "1ddfb28f564374881c2ebf693d8adcbd28edbe2e15474c02739e284739457564"
-    },
-    {
       "path": "backend/app/modules/sales_agent/turn_planner.py",
-      "sha256": "eeb099d3667f63acba8e39729ff147bb4d8326c68ee7d008cb144ab8515f7b4e"
-    },
-    {
-      "path": "backend/app/modules/sales_agent/understanding_prompt.py",
-      "sha256": "af5daafe3fdb58ba68ab9007674b16e8bc24321129a5ee7353db9785afda0a48"
+      "sha256": "0c9c871368eee79a5e47fff9080dccc608fb0f2f4726744ad5333a1a1cf35517"
     },
     {
       "path": "backend/tests/test_sales_continuity_battery.py",
-      "sha256": "137810c389efb89898e5fe06b2e1464aecf1b2001b2afe12517bcd734dd9f4d7"
-    },
-    {
-      "path": "backend/tests/test_sales_continuity_repair1.py",
-      "sha256": "dbfb7c2bf1ad9c3a8f3e5de8a87be5d438732474ae0f4239078d2263e310248a"
+      "sha256": "01fd70e102bff0320acb536f54e9de233084d34996a5ff585fa7de662ef05297"
     },
     {
       "path": "backend/tests/test_sales_resumption_variants.py",
-      "sha256": "151d42c9456138b59cce699fe5a4a09ce13bc85ec5064e20a6d8e832ffee3a45"
+      "sha256": "25e0948ea6ef63463891e9cc60db5d6a7acbb86c810ddfd7b3f7ad8aa934789d"
     },
     {
-      "path": "backend/tools/sales_ai/booking_pilot_worker.py",
-      "sha256": "e9f48c605d349f8132ddeb8118ada1c9c5ac778215111df45abfb979f40d9e4c"
-    },
-    {
-      "path": "backend/tools/sales_ai/continuity_battery.py",
-      "sha256": "bc0243eb1314ebad94f591d9d0c84bef1fe55ac8c6447ef8c8801d91b2eabd49"
-    },
-    {
-      "path": "docs/sales-agent/02-datos-de-prueba/variantes-retoma.json",
-      "sha256": "202f7b92de1a63436b92b79411e080dfcd7384a7d59386fbece78c31fd71785f"
-    },
-    {
-      "path": "docs/sales-agent/05-resultados-y-mejoras/continuidad-servidor-2/conversaciones.md",
-      "sha256": "1662d41ac35cd62624d233e15c03bf970001c670fc2c40898ca9c007c12700a4"
-    },
-    {
-      "path": "docs/sales-agent/05-resultados-y-mejoras/continuidad-servidor-2/resumen.json",
-      "sha256": "da187594e5e473b7aaebd64ba20f6cb6d1049d38013bd063aad9b6b861a29344"
-    },
-    {
-      "path": "docs/sales-agent/05-resultados-y-mejoras/retoma-reparacion-2-local/conversaciones.md",
-      "sha256": "79eb3128bb99a4a9f29999d1c29b42dcd85af45519ec5684786ee651ee37e307"
-    },
-    {
-      "path": "docs/sales-agent/05-resultados-y-mejoras/retoma-reparacion-2-local/resultado.json",
-      "sha256": "e75324697ef82b037787e68b55111f5289f9b007fb8b205e2f9f26d1dd02da56"
-    },
-    {
-      "path": "docs/sales-agent/05-resultados-y-mejoras/retoma-reparacion-2-local/validacion-core.json",
-      "sha256": "7eff1b1263505d8fe559d587238a3fa84f183d895d9b11807f2b0d68bdf88a91"
-    },
-    {
-      "path": "docs/sales-agent/06-como-ejecutar-las-pruebas/ejecutar-retoma-reparacion-2.sh",
-      "sha256": "8847e07478308233b3db681a51e608cae85216a5c0f8e357eb39b71054cf4bf0"
+      "path": "docs/sales-agent/05-resultados-y-mejoras/retoma-correccion-ci/validacion.json",
+      "sha256": "3befe7472c10e9ce1a5f98cc19d01d7ba41d44b66861b9979f2571b5b9bbb069"
     },
     {
       "path": "docs/sales-agent/README.md",
-      "sha256": "d635d056d74b6a22ccc053c5b74de9626ba3a1ce96a5114efb1084c5a2edcfca"
+      "sha256": "427d565945c3219e43f5faf1b9f4048bac131986f4195423f40a2ba2ced6f836"
     }
   ]
 }

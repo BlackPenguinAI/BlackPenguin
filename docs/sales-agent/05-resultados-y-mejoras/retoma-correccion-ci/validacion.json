@@ -1,0 +1,48 @@
+{
+  "base_commit": "e7b751fba8d6d4d26de7df5544012571e657ee38",
+  "github_run": 43609644336,
+  "reproduced_failures": 7,
+  "focused_recheck": {
+    "passed": 7,
+    "failed": 0
+  },
+  "full_regression": {
+    "status": "PASS",
+    "modules": 144,
+    "complete_module_coverage_verified": true,
+    "shards": [
+      {
+        "shard": 1,
+        "passed": 1087,
+        "skipped": 2,
+        "failed": 0
+      },
+      {
+        "shard": 2,
+        "passed": 1186,
+        "skipped": 6,
+        "failed": 0
+      },
+      {
+        "shard": 3,
+        "passed": 1090,
+        "skipped": 3,
+        "failed": 0
+      }
+    ],
+    "passed": 3363,
+    "skipped": 11,
+    "failed": 0,
+    "runtime": "local Python 3.12.14 with SQLite; not the GitHub candidate Docker image"
+  },
+  "new_tests": [
+    "three short-message faulty provider frames",
+    "delivered proposal preserved only for matching confirmation",
+    "current explicit property change invalidates prior context"
+  ],
+  "model_quality_evaluated": false,
+  "provider_calls": 0,
+  "cost_usd": 0,
+  "production_database_writes": 0,
+  "partition_safeguard_tests_passed": 8
+}

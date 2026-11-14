@@ -25,13 +25,13 @@ class PlannedOutcome(TurnOutcome):
     plan:dict|None=None
 
 
-def reconcile_subject(state,original_interest):
+def reconcile_subject(state,original_interest,*,confirming_delivered_proposal=False):
     """Invalidate only uncommitted cross-property booking context, including legacy state."""
     current=(state.selected_property_type_id,state.selected_unit_id)
     saved=state.booking_search or {}
     mismatched=bool(current[0] and saved.get('property_type_id') and
         (saved.get('property_type_id'),saved.get('unit_id'))!=current)
-    if current!=original_interest or mismatched:
+    if current!=original_interest or (mismatched and not confirming_delivered_proposal):
         state.booking_search={}
         state.booking_proposal=None
         state.pending_comparison=None
@@ -69,10 +69,19 @@ def run(db,scope,*,message_id,understanding,expected_revision,event_key,max_step
     if selection:
         state.selected_property_type_id=selection.get('property_id')
         state.selected_unit_id=selection.get('unit_id')
-    reconcile_subject(state,original_interest)
     from .turn_context import latest_outbound
     latest=latest_outbound(db,conversation.id,skip_language_holds=True)
     question_meta=(latest.metadata_json or {}) if latest else {}
+    # Commercial interest may change after an offer. An explicit acceptance of
+    # the latest delivered full summary still belongs to that immutable offer.
+    # The booking coordinator revalidates hash, expiry, scope and availability.
+    from .first_booking import accepted_outbound
+    proposal_prompt=accepted_outbound(db,conversation,'booking_confirmation') if (
+        u.visit and u.visit.action=='confirm' and u.permits('appointment') and not u.requires_clarification
+    ) else None
+    confirming_proposal=bool(state.booking_proposal and proposal_prompt and
+        (proposal_prompt.metadata_json or {}).get('booking_confirmation',{}).get('id')==state.booking_proposal.get('id'))
+    reconcile_subject(state,original_interest,confirming_delivered_proposal=confirming_proposal)
     resumed=[]
     if selection and question_meta.get('reference_question') and not u.requires_clarification:
         hashes=question_meta.get('clarification_restrictions') or []

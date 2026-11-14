@@ -48,3 +48,24 @@ def test_legacy_search_is_reconciled_without_reselection(old,current):
         assert not state.booking_search and state.tasks[0].status=='cancelled'
     else:
         assert state.booking_search and state.tasks[0].status=='awaiting_user'
+
+@pytest.mark.parametrize('confirming',[False,True])
+def test_mismatched_search_preserves_only_a_delivered_proposal_confirmation(confirming):
+    from app.modules.sales_agent.turn_planner import reconcile_subject
+    state=DialogueState(selected_property_type_id='new-home',
+        booking_search={'property_type_id':'old-home','duration_minutes':45},
+        booking_proposal={'id':'original-summary','context':{'property_type_id':'old-home'}})
+    reconcile_subject(state,('new-home',None),confirming_delivered_proposal=confirming)
+    if confirming:
+        assert state.booking_search['property_type_id']=='old-home'
+        assert state.booking_proposal['id']=='original-summary'
+    else:
+        assert not state.booking_search and state.booking_proposal is None
+
+
+def test_an_explicit_new_subject_invalidates_old_proposal_even_with_confirmation_flag():
+    from app.modules.sales_agent.turn_planner import reconcile_subject
+    state=DialogueState(selected_property_type_id='new-home',booking_search={'property_type_id':'old-home'},
+        booking_proposal={'id':'old'})
+    reconcile_subject(state,('old-home',None),confirming_delivered_proposal=True)
+    assert not state.booking_search and state.booking_proposal is None

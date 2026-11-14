@@ -32,6 +32,12 @@ def recorded_failure_provider(request):
     ctx=json.loads(payload['messages'][1]['content']);text=ctx['current_message']
     data=json.loads(response.json()['choices'][0]['message']['content'])
     if data.get('visit') and data['visit']['action']=='request':
+        # Short directives deliberately have no executable request in the base
+        # frame. Build the misleading catalog frame explicitly, never index []
+        # and mistake a test-double IndexError for a model/provider failure.
+        if not data['requests']:
+            data['requests']=[dict(id='r0',topic='catalog',subject=None,polarity='request',evidence=text)]
+            data['all_of']=['r0']
         data['requests'][0]['topic']='catalog'
         data['comparison']=dict(request_id='r0',reference_ids=[r['id'] for r in data['references']],include_current=True,include_all=False,all_kind='property',criteria=['general'],operation='compare',evidence=text)
         data['visit']['timing']=dict(timezone_evidence=text)
@@ -54,3 +60,14 @@ def test_multiturn_variants_keep_property_and_reach_verified_goal(lab,scenario,r
     with patch.object(httpx,'AsyncClient',Client),guard(budget),patch('app.integrations.openrouter_client.record_openrouter_usage',lambda **kw:None):result=asyncio.run(evaluate_case(db,manifest,scenario,budget,10))
     errors=[(r['action'],r['reply'],c) for r in result['turns'] for c in r['checks'] if c['status']!='PASS']+[c for c in result['checks'] if c['status']!='PASS']
     assert not errors,errors
+
+@pytest.mark.parametrize('text',['Visit?','A viewing?','Can I see it?'])
+def test_recorded_failure_double_returns_a_frame_for_empty_request_variants(text):
+    from app.modules.sales_agent.understanding_contract import Understanding
+    request=httpx.Request('POST','https://offline.invalid',json={
+        'response_format':{'json_schema':{'name':'sales_understanding'}},
+        'messages':[{}, {'content':json.dumps({'current_message':text,'approved_context':{'property_types':[]}})}]})
+    payload=recorded_failure_provider(request).json()
+    frame=Understanding.model_validate(json.loads(payload['choices'][0]['message']['content'])).check_evidence(text)
+    assert frame.visit.action=='request' and frame.comparison is not None
+    assert frame.requests[0].topic.value=='catalog' and frame.all_of==['r0']

@@ -548,6 +548,21 @@ La primera corrida de continuidad registró 1.007.379 tokens de entrada y 13.803
 
 El estimado utiliza las 86 llamadas y USD 0.12658365 de la segunda continuidad, ajustando el número de turnos y con margen para reparaciones. No se suma al gasto observado. La reparación también reconcilia una búsqueda antigua que ya no coincide con la propiedad guardada, sin exigir borrar el chat ni volver a elegirla. Se aplica al procesar un nuevo mensaje, sin modificar el historial. La nueva evaluación con el modelo real queda pendiente de despliegue; no se etiqueta como aprobada por los resultados locales. [Comandos de evaluación y extracción](06-como-ejecutar-las-pruebas/ejecutar-retoma-reparacion-2.sh).
 
+## 10.2. Corrección del bloqueo de GitHub Actions
+
+La entrega de retoma quedó bloqueada antes de desplegarse: dos shards fallaron y el job `deploy` se omitió. Se reprodujeron localmente los siete fallos del [run 43609644336](https://github.com/BlackPenguinAI/BlackPenguin/actions/runs/43609644336) y se corrigieron sus dos causas, manteniendo todos los controles.
+
+| Fallo | Causa comprobada | Ajuste |
+|---|---|---|
+| Una visita no se reserva tras aceptar su resumen | La limpieza de contexto descartaba una propuesta válida cuando el interés comercial guardado apuntaba a otra propiedad. | Conservarla únicamente ante la aceptación del último resumen entregado con el mismo identificador; el coordinador vuelve a validar alcance, integridad, caducidad y disponibilidad. Un nuevo cambio explícito de propiedad sigue invalidando el contexto anterior. |
+| Seis variantes breves terminan en respuesta de respaldo durante las pruebas | El proveedor simulado intentaba acceder a `requests[0]` cuando la variante generaba `requests=[]`, y lanzaba `IndexError` antes de devolver la respuesta simulada. | Construir explícitamente la interpretación errónea de catálogo que se quiere probar, manteniendo la comparación y zona horaria incorrectas como entradas de reparación. Añadir controles directos sobre los tres mensajes breves. |
+
+**Ejemplo del criterio conservado:** si el lead está mirando Loft, pero selecciona una oferta todavía válida para Studio y acepta el resumen que nombra Studio, la cita debe corresponder a Studio. Preguntar por otra propiedad no autoriza a cambiar silenciosamente la propiedad de una oferta confirmada. Si solicita una visita nueva para Loft, se consulta disponibilidad para Loft.
+
+**Validación local final:** los tres shards completos aprobaron **3.363 pruebas**, con 11 omisiones por condiciones de entorno y cero fallos. El verificador confirmó que los **144 módulos** aparecen exactamente una vez. También pasaron ocho controles de partición. Esta ejecución usó Python local y SQLite; GitHub vuelve a validar la imagen candidata y las pruebas aisladas de PostgreSQL antes de desplegar.
+
+Se añaden variantes que distinguen una búsqueda antigua de una confirmación válida y comprueban que un cambio de propiedad en el mensaje actual invalida el contexto anterior. No se elimina ningún caso ni se rebajan las etiquetas de éxito. Estas son pruebas gratuitas con proveedores simulados: el costo adicional de OpenRouter es **USD 0.00** y no hay nueva evidencia de calidad del modelo real. La evaluación pagada de las tres retomas continúa pendiente del despliegue correcto. [Validación de esta corrección](05-resultados-y-mejoras/retoma-correccion-ci/validacion.json).
+
 ## 11. Trabajo futuro
 
 **Más casos y conversaciones más largas, no nuevas funciones de canal.** Se avanza por etapas, corrigiendo y repitiendo antes de ampliar. Se incluyen compradores que rechazan o abandonan: no toda conversación correcta termina con cita [R4–R6].
