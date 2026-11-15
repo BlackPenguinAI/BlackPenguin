@@ -132,3 +132,58 @@ def test_material_owner_preserves_a_scoped_unit_instead_of_collapsing_into_a_typ
     u=Understanding.model_validate(data)
     fixed,notes=material_owner(u,text,{'inventory':[{'id':'unit','unit_code':'A-12'}]},DialogueState(selected_property_type_id='home',selected_unit_id='unit'))
     assert fixed.references[0].kind=='unit' and notes
+
+
+@pytest.mark.parametrize('name',['Cedar Loft','Ridge Townhome','Bay Residence'])
+@pytest.mark.parametrize('subject,expression,text',[
+    ('photos','photos','Can you show me pictures?'),
+    ('floor_plan','floor_plan','I want to check blueprints'),
+    ('brochure','brochure','Please send me the PDF.'),
+])
+def test_format_target_uses_active_owner_without_inventing_file_identity(name,subject,expression,text):
+    from app.modules.sales_agent.understanding_completeness import material_owner
+    from app.modules.sales_agent.understanding_contract import DialogueState
+    data=understanding(text,'materials',subjects={0:subject}).model_dump(mode='json')
+    data['references']=[dict(id='format',kind='material',expression=expression,evidence=text)]
+    data['requests'][0]['reference_id']='format';u=Understanding.model_validate(data)
+    context={'property_types':[{'id':'home','property_type':name}]}
+    fixed,notes=material_owner(u,text,context,DialogueState(selected_property_type_id='home'))
+    assert notes and fixed.references[0].kind=='property' and fixed.references[0].expression==name
+    assert fixed.confidence==u.confidence and fixed.references[0].evidence==text
+    # Same-named approved file and missing active owner are never guessed.
+    assert material_owner(u,text,{**context,'available_assets':[{'name':expression}]},DialogueState(selected_property_type_id='home'))[0]==u
+    assert material_owner(u,text,context,DialogueState())[0]==u
+
+
+@pytest.mark.parametrize('text',['I want to check blueprints','We would like to see photos.','Could you show me pictures?','Please send me the PDF.'])
+def test_literal_positive_material_does_not_create_a_prohibition(text):
+    from app.modules.sales_agent.understanding_completeness import affirmative_material
+    data=understanding(text,'materials').model_dump(mode='json')
+    data['requests'][0]['polarity']='exclude';data['all_of']=[];data['confidence']=0.4
+    u=Understanding.model_validate(data);fixed,notes=affirmative_material(u,text)
+    assert fixed.permits('materials') and not u.permits('materials') and notes
+    assert fixed.confidence==0.4 and fixed.requests[0].evidence==text
+    assert affirmative_material(fixed,text)[0]==fixed
+
+
+@pytest.mark.parametrize('text',[
+    'I do not want to see photos.','Please do not send photos.',
+    'I want to see photos, not blueprints.','My friend said I want to check blueprints.',
+    'If I want to check blueprints, what happens?','Never send pictures.',
+    'I want to see no photos.','Please send me the PDF instead of photos.',
+])
+def test_negative_reported_hypothetical_and_mixed_materials_keep_their_restrictions(text):
+    from app.modules.sales_agent.understanding_completeness import affirmative_material
+    data=understanding(text,'materials').model_dump(mode='json')
+    data['requests'][0]['polarity']='exclude';data['all_of']=[]
+    u=Understanding.model_validate(data)
+    assert affirmative_material(u,text)==(u,[])
+
+
+def test_affirmative_material_never_removes_a_saved_or_current_constraint():
+    from app.modules.sales_agent.understanding_completeness import affirmative_material
+    data=understanding('I want to check blueprints','materials').model_dump(mode='json')
+    data['requests'][0]['polarity']='exclude';data['all_of']=[]
+    data['constraints']=[dict(topic='materials',subject='floor_plan',scope='until_explicit_change',evidence='blueprints')]
+    u=Understanding.model_validate(data)
+    assert affirmative_material(u,'I want to check blueprints')==(u,[])

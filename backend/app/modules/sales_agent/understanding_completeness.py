@@ -73,8 +73,27 @@ def completeness_issues(value,text):
     return issues
 
 
+def affirmative_material(value,text):
+    """Correct only a literal, own format request; preserve genuine restrictions.
+
+    No constraints, alternatives, reported speech, negation, mixed questions or
+    effects can be authorized here. The evidence and confidence are unchanged.
+    """
+    from app.modules.governance.services import request_attribution
+    own=request_attribution(text)['current_text']
+    pattern=r"\s*(?:(?:I|we) (?:want|would like|need) to (?:check|see|view)|(?:can|could|would) you (?:show|send)(?: me| us)?|(?:please )?(?:show|send)(?: me| us)?) (?:the )?(?:photos?|pictures?|images?|blueprints?|floor plans?|brochure|PDF)[?!. ]*"
+    if own!=text or not re.fullmatch(pattern,own,re.I):return value,[]
+    if value.constraints or value.alternatives or value.comparison or value.releases or value.requires_clarification:return value,[]
+    if any(getattr(value,k) for k in ('visit','reschedule','cancellation','wait','moderation','appointment_query')):return value,[]
+    if len(value.requests)!=1:return value,[]
+    row=value.requests[0]
+    if row.topic.value!='materials' or row.polarity!='exclude' or row.evidence not in own:return value,[]
+    data=value.model_dump(mode='json');data['requests'][0]['polarity']='request';data['all_of']=[row.id]
+    return Understanding.model_validate(data).check_evidence(text),[{'field':'requests','action':'literal_affirmative_material_not_exclusion','evidence':row.evidence,'confidence_unchanged':value.confidence}]
+
+
 def material_owner(value,text,commercial,state):
-    """Retype only the active approved owner's name, never a named file or another owner."""
+    """Bind a format or owner name to its active approved owner, never another named file."""
     from app.modules.governance.services import request_attribution
     own=request_attribution(text)['current_text']
     if own!=text or value.comparison or value.alternatives or value.requires_clarification:return value,[]
@@ -93,7 +112,12 @@ def material_owner(value,text,commercial,state):
         if not re.search(r'\b(?:'+formats[row['subject']]+r')\b',row['evidence'],re.I):continue
         ref=next((r for r in data['references'] if r['id']==row['reference_id']),None)
         if not ref or ref['kind']!='material' or ref['expression'].strip().casefold() in files:continue
+        if any(r['reference_id']==ref['id'] and r['topic']!='materials' for r in data['requests']):continue
         matches=[(name,kind) for name,kind in owners if name.casefold()==ref['expression'].strip().casefold()]
+        # A bare format is a request subject, not an asset identity. Only the
+        # active approved owner is eligible; explicit other names still block.
+        generic=re.fullmatch(r'(?:the )?(?:'+formats[row['subject']]+r'|'+re.escape(row['subject'])+r')',ref['expression'].strip(),re.I)
+        if not matches and generic:matches=owners
         if len(matches)!=1:continue
         # Explicit names of other scoped properties/units must remain unresolved.
         names=[r.get('property_type') for r in commercial.get('property_types',[])]+[r.get('unit_code') for r in commercial.get('inventory',[])]

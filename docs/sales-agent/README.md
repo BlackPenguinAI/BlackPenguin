@@ -4,7 +4,7 @@
 
 **Métricas históricas del modelo: corte 11/11/2026. Revisión de criterios: 13/11/2026.** Se reúne el trabajo del ciclo reciente con data sintética: **21 corridas del servidor, 144 conversaciones ejecutadas y 47 IDs de escenario distintos por suite**. Las repeticiones son parte del trabajo, no escenarios adicionales. En la batería compacta 2, **13/16 conversaciones cumplieron los checks originales y se registraron 7/8 visitas esperadas**; eso no certifica la calidad integral de esos diálogos. En el último subconjunto, Repair 8, **2/3 conversaciones cumplieron sus checks y se registró 1/2 visitas**: vivienda mayor y fotos ausentes se recuperaron; diversificación falló con tiempos de espera del modelo. No se mezclan ambos conjuntos como si fueran una nueva batería completa.
 
-**Estado actual.** Búsqueda y aceptación: 14/14 escenarios en el servidor. Primera batería de continuidad con modelo real: 4/6 conversaciones cumplieron los checks, con cuatro visitas de cinco esperadas. La reparación posterior pasa seis conversaciones y 36 turnos en replay local; su repetición con el modelo publicado está pendiente. Los alcances se separan en el bloque 10.
+**Estado actual (revisión 15/11/2026; última corrida recibida: 14/11).** Búsqueda y aceptación: 14/14 escenarios en su corrida del servidor. En los cinco recorridos recientes de continuidad, el último modelo real agendó 4/5 visitas, pero solo 2/5 conversaciones cumplieron todos sus controles (antes: 3/5). Persisten repreguntas de materiales y una visita bloqueada por baja confianza. La reparación de esta entrega se valida localmente y todavía requiere repetición con el modelo publicado. No se declara estabilidad ni calidad integral; el detalle y los consumos están en 10.6.
 
 La guía usa bloques con el mismo propósito: **qué se hizo → cómo funciona → qué evidencia hay → dónde están sus archivos**. Toda la explicación está aquí; los enlaces internos abren datos, código o carpetas de respaldo. Las referencias externas justifican la metodología, no sustituyen la evidencia del proyecto.
 
@@ -101,6 +101,23 @@ flowchart TD
 **Ejemplo:** evitar que «next seven days» se interprete como una hora fue un cambio de normalización; presentar una confirmación ya registrada sin otra llamada al LLM fue un cambio de composición. Ninguno exigió reconectar el grafo LangGraph. Los ajustes concretos están explicados en el bloque 5.
 
 [Dependencias fijadas](../../backend/requirements.txt) · [Nodos y conexiones](../../backend/app/modules/sales_agent/graph.py) · [Estado del grafo histórico](../../backend/app/modules/sales_agent/state.py) · [Entrada real](../../backend/app/modules/sales_agent/live_service.py) · [Simulación actual](../../backend/app/modules/sales_agent/current_simulation.py) · [Cliente OpenRouter](../../backend/app/integrations/openrouter_client.py).
+
+### Correspondencia con la propuesta original del flujo híbrido
+
+Se contrastó el código con [Cambio de funcionamiento del agente](https://docs.google.com/document/d/1-jzaKu5pbvZNgXh9ey9O7EWvxQlHHJ5ztupjZBn0Bew/edit), leído el 15/11/2026. El documento primero describe el antiguo commit `8f362e2` y después propone una arquitectura; esa descripción inicial no identifica el motor actual. **El propósito híbrido está implementado en buena parte, pero no toda la propuesta es una función ya disponible ni una calidad demostrada.**
+
+| Propuesta | Implementación actual | Límite real |
+|---|---|---|
+| Interpretar cada mensaje y descomponer solicitudes | Contrato estructurado con solicitudes AND/OR, preferencias, restricciones y referencias. | Un JSON válido puede representar mal la intención; se valida y repara de forma acotada. |
+| Conservar contexto y permitir interrupciones | Estado persistido con propiedad/unidad, tareas pendientes y propuestas. | Hay casos observados que conservan el dato pero no lo utilizan correctamente; no se declara continuidad perfecta. |
+| Consultar antes de responder | El plan consulta herramientas y la composición posterior recibe evidencia y opciones permitidas. | El LLM selecciona bloques/redacciones autorizados; no redacta libremente cualquier hecho. |
+| Reconsiderar resultados mediante ciclos | `turn_planner` ejecuta rondas acotadas y se detiene sin información nueva o por límites. | La planificación es por código; registra `additional_model_calls=0`. No hay un loop general LLM→herramienta→LLM que seleccione herramientas arbitrarias. |
+| Corregir salidas incumplidas | Interpretación y composición admiten una reparación acotada con feedback verificable. | No hay una red de críticos ni una revisión semántica ilimitada. |
+| Backend controla efectos | Alcance, permisos, consentimiento, cobertura, integridad y confirmación se vuelven a verificar. | El modelo propone; no reserva, cancela ni comparte por su cuenta. |
+| Estrategias configurables | Se usa la configuración publicada y el playbook. | Varias reglas de interpretación, aclaración y redacción siguen fijadas/versionadas en código; no todo se cambia desde settings. |
+| Conservar LangGraph | El grafo histórico sigue presente. | El coordinador actual es Python; no se implementó literalmente el diagrama propuesto como nuevo `StateGraph`. |
+
+Por tanto, los ajustes recientes afinan un motor híbrido existente: no están añadiendo todavía el ciclo general de replanteamiento por LLM del documento. Las trazas y pruebas permiten separar un fallo de interpretación, referencia, planificación o presentación antes de atribuirlo al modelo o prometer una solución arquitectónica completa.
 
 ## 3. Datos sintéticos
 
@@ -672,6 +689,58 @@ La última corrida tuvo 38 turnos. Escalar USD 0.15285525 a los 39–40 previsto
 ![Consumo rastreado de OpenRouter](05-resultados-y-mejoras/coherencia-material-visita-local/consumo-observado.png)
 
 La curva representa consumo, no calidad integral. [Reproducir figura](05-resultados-y-mejoras/coherencia-material-visita-local/generar_consumo.py) · [Comandos de servidor y extracción](06-como-ejecutar-las-pruebas/ejecutar-coherencia-material-visita.sh).
+
+## 10.6. Materiales, exclusiones y aclaraciones útiles
+
+**Qué mostró el servidor (`b9e3ceb`).** El modelo sigue siendo `openai/gpt-4o-mini`, configuración publicada 8. Se registraron **360 PASS y 10 FAIL**, 95 llamadas, 1.107.091 tokens de entrada, 13.661 de salida y **USD 0.14232105 total**. Cedar Loft dejó de repreguntar al reiterar fotos y logró cita; otros recorridos volvieron a fallar. La propiedad permanecía guardada: el bloqueo ocurría al interpretar y resolver referencias o al aplicar el umbral de confianza. [Resumen original](05-resultados-y-mejoras/retoma-servidor-6/resumen.json) · [Diálogos originales](05-resultados-y-mejoras/retoma-servidor-6/conversaciones.md).
+
+| Cinco guiones comparables | Conversaciones sin controles fallidos | Visitas simuladas | Total USD por corrida |
+|---|---:|---:|---:|
+| Retoma 2 (`1569573`) | 2/5 | 2/5 | 0.12500070 |
+| Retoma 3 (`c087cf7`) | 3/5 | 4/5 | 0.15285525 |
+| Retoma 4 (`b9e3ceb`) | 2/5 | 4/5 | 0.14232105 |
+| **TOTAL de estas tres corridas** | **7/15 ejecuciones; no casos únicos ni calidad integral** | **10/15** | **0.42017700** |
+
+![Evolución de los cinco recorridos comparables](05-resultados-y-mejoras/materiales-aclaraciones-local/evolucion-casos.png)
+
+**Lectura honesta:** no hay mejora global en la última repetición; agendar no basta si el recorrido tiene preguntas innecesarias. Las curvas comparan controles de esas ejecuciones, no tasas de conversión de leads reales. Los nuevos controles de fluidez se aplican desde la siguiente corrida, sin alterar las etiquetas históricas.
+
+| Problema | Qué se actualiza y cómo | Protección conservada |
+|---|---|---|
+| «photos/floor_plan» se interpreta como nombre de archivo | Se distingue formato de identidad: un formato genérico se vincula al propietario activo aprobado; el nombre de un archivo real no se reinterpreta. | No adivinar otra propiedad ni sustituir unidades; revalidar alcance, permiso y cobertura del material antes de compartir. |
+| Petición afirmativa marcada como exclusión | Un normalizador reconoce solo una petición literal, propia y única de material, sin negación ni restricciones. Otros casos contradictorios reciben feedback concreto para la reparación acotada. | Conservar restricciones, alternativas, discurso de terceros y mensajes mixtos; no aumentar confianza ni autorizar reservas. |
+| «Can I see it?» después de ofrecer archivos | Con una oferta entregada, un archivo único se resuelve contra esa oferta. Si hay varios, se pregunta cuál material desea. | El backend vuelve a validar vigencia e integridad; no convertir aceptación de material en visita. |
+| Seleccionar «Ridge Townhome» provoca otra pregunta comercial | El nombre exacto de una vivienda en la última lista completa permite leer sus detalles, incluso con baja confianza. Se registra autorización de lectura, separada de acciones. | No usar nombres fuera del catálogo/oferta ni listas incompletamente entregadas; no reservar por seleccionar una propiedad. |
+| Visita clara, confianza cero y aclaración genérica | Se pregunta **«Would you like me to check available visit times for Bay Residence?»**. No se eleva la confianza ni se consulta agenda en ese turno. | Pedir una respuesta nueva antes de seguir; selección y confirmación final de cita continúan siendo obligatorias. |
+
+**Ejemplo local del recorrido reparado.** Lead: «I mean an in-person visit to Bay Residence.» → backend: propiedad aprobada e intención de visita identificadas, confianza del modelo 0 → agente: «Would you like me to check available visit times for Bay Residence?» → lead guionado: «Yes, please check available visit times for Bay Residence.» → agente: horarios verificados → lead: elige uno → agente: resumen exacto → lead: confirma → backend: crea una sola cita simulada. **Este ejemplo incorpora continuación simulada: aún no es una nueva conversación del modelo real en el servidor.**
+
+**Diseño para no ajustar una sola frase.** Se conservan 38 secuencias reales de interpretación, con intentos iniciales y reparaciones, y se añaden variantes de tres nombres, fotos/planos/PDF, formas de pedirlos, selección nominal con confianza cero y aclaración de visita. Las negativas comprueban que no se cambien exclusiones reales, mensajes hipotéticos o de terceros, ofertas no entregadas, ofertas mixtas ni archivos con el mismo nombre. Se ejecuta con `autoflush=False` (producción) y `True`. El modelo, los tres projects, seis propiedades, vendedores y topología LangGraph permanecen; cambia la instrucción efectiva a **`sales-interpretation-system/2.2`**, el protocolo general a **2.36** y el guion a **1.2**.
+
+**Evaluación más exigente.** Elegir una propiedad debe producir sus detalles sin preguntar nuevamente qué tipo de consulta quiere. Si el agente pregunta específicamente por permiso para buscar horarios, el lead guionado responde a ese texto público; no accede a interpretaciones privadas para escoger su respuesta. Esto suma hasta un turno al recorrido, pero **no sustituye seleccionar horario ni confirmar el resumen**. Los controles locales no rebajan un FAIL del servidor ni certifican la calidad integral. [Guiones documentados](02-datos-de-prueba/variantes-retoma.json).
+
+**Validación local final:** 3.479 pruebas aprobadas, 11 omitidas por condiciones de entorno y cero fallos en los tres shards; 144 módulos cubiertos exactamente una vez y ocho controles de partición aprobados. La aceptación técnica registra 63 PASS y un control real pendiente. La regresión detectó tres incompatibilidades con ofertas sin archivos; se corrigió el código conservando esas pruebas. GitHub volverá a validar la imagen candidata y PostgreSQL aislado. [Validación JSON](05-resultados-y-mejoras/materiales-aclaraciones-local/validacion.json).
+
+**Replay local:** once recorridos, **77 turnos, diez citas simuladas y 680 controles PASS**. Un caso finaliza sin cita por falta de vendedores elegibles. Se usa el core real, datos temporales, secuencias registradas y proveedores simulados para composición y continuaciones no observadas. **Costo total local: USD 0.00; calidad del modelo publicado todavía no evaluada en esta entrega.** [Conversaciones legibles](05-resultados-y-mejoras/materiales-aclaraciones-local/conversaciones.md) · [JSON local](05-resultados-y-mejoras/materiales-aclaraciones-local/resultado.json).
+
+| Consumo rastreado desde necesidades | Total USD | Llamadas con costo |
+|---|---:|---:|
+| Cuatro corridas de necesidades | 0.15756165 | 134 |
+| Primera continuidad | 0.12972465 | 88 |
+| Segunda continuidad | 0.12658365 | 86 |
+| Primera retoma | 0.08616360 | 56 |
+| Segunda retoma | 0.12500070 | 85 |
+| Tercera retoma | 0.15285525 | 101 |
+| Cuarta retoma, recibida en esta entrega | 0.14232105 | 95 |
+| **TOTAL OBSERVADO desde necesidades** | **0.92021055** | **645** |
+| Correcciones y pruebas locales de esta entrega | **0.00000000** | **0 pagadas** |
+| Próxima corrida de los mismos cinco objetivos | **≈0.12–0.23 estimado; reserva 0.35** | Hasta 200; no equivale a límite monetario |
+
+El acumulado excluye las fases anteriores a necesidades y no suma estimaciones futuras. La última ejecución costó USD 0.14232105 por 38 turnos: escalar a aproximadamente 39–41 da USD 0.15–0.16; el intervalo permite variaciones por contexto y reparaciones. Se conserva el máximo de diez turnos por caso. La próxima corrida decidirá si disminuyen las repreguntas y si la visita aclarada llega a confirmación; no se amplía la batería pagada hasta revisarla.
+
+![Consumo acumulado observado](05-resultados-y-mejoras/materiales-aclaraciones-local/consumo-observado.png)
+
+[Reproducir figuras con NumPy/Matplotlib](05-resultados-y-mejoras/materiales-aclaraciones-local/generar_figuras.py) · [Comandos de evaluación y descarga](06-como-ejecutar-las-pruebas/ejecutar-materiales-aclaraciones.sh).
 
 ## 11. Trabajo futuro
 

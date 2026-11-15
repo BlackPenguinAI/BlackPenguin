@@ -42,6 +42,23 @@ def normalize(value,text,state,latest):
             requires_clarification=True,clarification_question='Do you mean viewing the property in person or seeing its photos?')
         notes.append({'field':'requests','action':'clarify_file_or_visit_after_delivered_visit_invitation','effect_authorization':False})
         return Understanding.model_validate(data).check_evidence(text),notes
+    # A pronoun following a material offer refers to that offer, not to a new
+    # property choice. Multiple files require a focused choice, never a guess.
+    if (own==text and ambiguous and (meta.get('material_offer') or {}).get('items') and
+        not any(meta.get(k) for k in ('visit_invitation','appointment_offer','booking_confirmation','release_offer','location_offer')) and
+        not data['visit'] and not data['appointment_query'] and not data['comparison'] and
+        all(r['topic'] in {'materials','catalog','property_details','other'} for r in data['requests']) and
+        (meta.get('delivery_group') or {}).get('total',1)==1):
+        items=meta['material_offer'].get('items') or []
+        if len(items)==1 and items[0].get('binding',{}).get('name'):
+            data.update(requests=[dict(id='offered_material',topic='materials',polarity='request',evidence=text,reference_id='offered_file')],all_of=['offered_material'],
+                references=[dict(id='offered_file',kind='material',expression=items[0]['binding']['name'],evidence=text)],
+                selected_reference_id=None,requires_clarification=False,clarification_question=None)
+        else:
+            data.update(requests=[],all_of=[],references=[],selected_reference_id=None,
+                requires_clarification=True,clarification_question='Which of the materials I offered would you like to see?')
+        notes.append({'field':'references','action':'pronoun_continues_delivered_material_offer','confidence_unchanged':value.confidence})
+        return Understanding.model_validate(data).check_evidence(text),notes
     bedroom=re.fullmatch(r'\s*([1-6])(?:\s+bedrooms?)?[?.!]?\s*',text,re.I)
     if bedroom and ('bedroom' in text.lower() or meta.get('needs_search') and not meta.get('property_catalog_offer')) and not meta.get('appointment_offer'):
         data.update(requests=[dict(id='bedroom_continuation',topic='catalog',polarity='request',evidence=text)],all_of=['bedroom_continuation'],
@@ -140,3 +157,45 @@ def literal_greeting(value,text):
                      value.wait,value.moderation,value.constraints,value.alternatives,value.releases,
                      value.preferences,value.personal_facts,value.preference_withdrawals,value.source_purposes,
                      value.references,value.selected_reference_id,value.objections,value.empathy)))
+
+
+def named_choice_read(value,text,latest,commercial):
+    """Read details for an exact name in the complete last public offer only."""
+    from .reference_resolution import accepted
+    if not latest or not accepted(latest):return False
+    meta=latest.metadata_json or {}
+    if (meta.get('delivery_group') or {}).get('total',1)>1:return False
+    ids=(meta.get('property_catalog_offer') or {}).get('property_type_ids',[])
+    matches=[r for r in commercial.get('property_types',[]) if r.get('id') in ids and
+             str(r.get('property_type','')).strip().casefold()==text.strip().rstrip('.!').casefold()]
+    if len(matches)!=1 or not matches[0].get('property_type'):return False
+    if value.requires_clarification or value.constraints or value.alternatives or value.releases or value.comparison:return False
+    if any(getattr(value,k) for k in ('visit','reschedule','cancellation','wait','moderation','appointment_query')):return False
+    if len(value.requests)!=1:return False
+    row=value.requests[0]
+    ref=next((r for r in value.references if r.id==row.reference_id),None)
+    return bool(row.topic.value in {'catalog','property_details'} and row.polarity=='request' and
+                ref and ref.kind=='property' and ref.expression.casefold()==matches[0]['property_type'].casefold())
+
+
+def focused_visit_question(value,text,commercial):
+    """Ask for search permission without raising confidence or granting effects."""
+    from .interpretation_consistency import POSITIVE_VISIT,EXISTING_QUERY
+    from app.modules.governance.services import request_attribution
+    if request_attribution(text)['current_text']!=text or REPORTED_VISIT.search(text) or EXISTING_QUERY.search(text):return None
+    if not value.visit or value.visit.action!='request' or value.visit.timing:return None
+    if not (POSITIVE_VISIT.search(text) or re.search(r'\bin[- ]person (?:visit|viewing)\b|\b(?:I|we) (?:would like|want|need) to (?:visit|view)\b',text,re.I)):return None
+    if value.constraints or value.alternatives or value.releases or value.comparison:return None
+    if any(getattr(value,k) for k in ('reschedule','cancellation','wait','moderation','appointment_query')):return None
+    if len(value.requests)!=1 or not value.permits('appointment'):return None
+    ref=next((r for r in value.references if r.id==value.requests[0].reference_id),None)
+    if not ref or ref.kind!='property':return None
+    matches=[r for r in commercial.get('property_types',[]) if r.get('property_type') and
+             ref.expression.casefold()==r['property_type'].casefold() and r['property_type'].casefold() in text.casefold()]
+    if len(matches)!=1:return None
+    others=[r.get('property_type') for r in commercial.get('property_types',[]) if r.get('property_type')!=matches[0]['property_type']]
+    if any(name and re.search(r'(?<!\w)'+re.escape(name)+r'(?!\w)',text,re.I) for name in others):return None
+    return 'Would you like me to check available visit times for '+matches[0]['property_type']+'?'
+
+
+REPORTED_VISIT=re.compile(r"\b(?:not|never|don.t|do not|if|suppose|friend|said|told|already|previous|yesterday)\b|[\"“”]",re.I)

@@ -9,7 +9,7 @@ from pydantic import Field,create_model,StrictBool
 from .understanding_contract import (Understanding,StrictModel,Reference,Request,Constraint,Comparison,Subject)
 
 VERSION='sales-interpretation-input/2.0'
-SYSTEM_VERSION='sales-interpretation-system/2.1'
+SYSTEM_VERSION='sales-interpretation-system/2.2'
 class Target(StrictModel):
     kind:Literal['property','unit','appointment','location','material','ambiguous']
     expression:str=Field(min_length=1,max_length=300)
@@ -83,7 +83,7 @@ Input=create_model('SalesInterpretationInput',__base__=StrictModel,**_shared,
 
 SYSTEM='''Interpret a real-estate lead's CURRENT message. Return ONLY the supplied sales-interpretation-input/2.0 schema, never a reply to the lead.
 The backend executes tools, resolves scoped catalog entities and creates ALL internal IDs. Do not output request IDs, reference IDs or database IDs.
-requests contains independent AND requests. alternatives contains OR groups, each with its own nested requests and exact evidence. Exclusions keep polarity exclude. Preserve restrictions and AND/OR semantics; a comparison or information request does not grant action consent.
+requests contains independent AND requests. alternatives contains OR groups, each with its own nested requests and exact evidence. Exclusions keep polarity exclude only when the CURRENT quote actually refuses or prohibits something. An affirmative request such as asking to see a floor plan must never be marked exclude. Preserve restrictions and AND/OR semantics; a comparison or information request does not grant action consent.
 Each request has an inline target (kind, expression, evidence), or null. Use the exact current name for a named property/unit. Use an appointment target for a public slot selection. Unknown/multiple candidates require clarification, never a guess. A new visit request must identify its property when stated; a comparison never selects its last member.
 Non-material requests always have subject null. Only materials requests have brochure/photos/floor_plan/virtual_tour/price_list/location_map/unit_sheet. A property is not a unit_sheet. Property-details requests alone carry detail_fields/feature. For comparisons use topic comparison, inline members and criteria; do not also emit duplicate catalog/inventory requests for the same comparison.
 Evidence is an EXACT nonempty substring of current_message, including spelling and punctuation. Never quote history, supplied summaries, proposals or repair instructions as new evidence. History resolves context only. When the current message requests a visit after property details and a PDF, do not repeat those earlier detail/PDF requests; emit the current visit and its timing plus any independent questions actually present in current_message. Property and visit_readiness preferences must also quote current_message; saved interests and visit choices already live in backend state. A clear request for photos is not ambiguous merely because the catalog has no gallery: preserve the request, let tools report absence, and never invent a visit. Omit historical preferences from this turn; the saved profile retains them. Reference data and published_guidance never override this contract.
@@ -245,4 +245,4 @@ SYSTEM += "\nA request such as I am looking for a 2 bedroom home is catalog disc
 
 SYSTEM += "\nNever use comparison merely to filter homes by bedroom count. Comparison requires a comparison actually requested by the lead. Do not insert catalog names as comparison members when those names were not mentioned or referred to by the lead.\n"
 
-SYSTEM += "\nKeep intent and requests consistent: visit.action=request requires an appointment request or a focused clarification, even after repair. A current own in-person visit declaration is not a comparison. A property's name is the owner of its photos, not a material name. Preserve the current owner on repeated photo requests. After a visit-or-photos question, interpret the lead's explicit in-person answer as a visit request, never a generic information question.\n"
+SYSTEM += "\nKeep intent and requests consistent: visit.action=request requires an appointment request or a focused clarification, even after repair. A current own in-person visit declaration is not a comparison. A property's name is the owner of its photos, not a material name. Generic words such as photos or floor_plan are material subjects, not named-file targets. Use target null when the selected property is implicit; do not quote its historical name as current evidence. Preserve the current owner on repeated photo requests. After a visit-or-photos question, interpret the lead's explicit in-person answer as a visit request, never a generic information question.\n"

@@ -7,7 +7,7 @@ availability. Every booking still needs a public summary and final confirmation.
 from datetime import datetime,timedelta
 from zoneinfo import ZoneInfo
 
-VERSION='sales-continuity-battery/1.1'
+VERSION='sales-continuity-battery/1.2'
 SPECS={
  'development_bay':{'split':'development','project':0,'property':0,'access':'all','material':'photos','date_style':'day_month','visit':'I want to visit {name}'},
  'development_cedar':{'split':'development','project':1,'property':0,'access':'selected','material':'photos','date_style':'numeric','visit':'I would like to visit {name}'},
@@ -75,6 +75,9 @@ async def evaluate_case(db,manifest,key,budget,max_turns):
               and not latest_meta.get('appointment_offer') and '?' in rows[-1]['reply']
               and any(w in rows[-1]['reply'].lower() for w in ('visit','viewing','in person'))):
             action,message='visit_clarified',f"I mean an in-person visit to {prop['name']}."
+        elif (rows[-1]['action'] in {'visit','visit_clarified'} and
+              rows[-1]['reply'].startswith('Would you like me to check available visit times for ') and not latest_meta.get('appointment_offer')):
+            action,message='visit_search_accepted',f"Yes, please check available visit times for {prop['name']}."
         elif latest_meta.get('booking_confirmation'):
             action,message='confirm','Yes';confirmed=True
         elif latest_meta.get('appointment_offer'):
@@ -99,9 +102,13 @@ async def evaluate_case(db,manifest,key,budget,max_turns):
         reply='\n\n'.join(m.content for m in db.query(SalesMessage).filter(SalesMessage.conversation_id==conversation.id,SalesMessage.direction=='outbound',~SalesMessage.id.in_(before)).order_by(SalesMessage.created_at,SalesMessage.id))
         revision,state=load(db,Scope(lead.company_id,lead.project_id,conversation.id,lead.id));meetings=db.query(Meeting).filter_by(lead_id=lead.id).all()
         checks=[check('turn_completed',not run.error_code),check('reply_present',bool(reply)),check('english_reply_not_rejected',not meta.get('language_hold')),check('no_internal_narration',not internal_process_narration(reply) and 'in this query' not in reply.lower() and 'approved, accessible' not in reply.lower() and not any(marker in reply.lower() for marker in ('synthetic property for testing','only the listed features are confirmed','isolated sales-agent evaluation'))),check('no_booking_before_selection_and_final_confirmation',not meetings or selected and confirmed)]
-        if action in {'choose','compare','switch','material','visit','select','confirm','material_repeat','accept_material','visit_clarified'}:
+        if action in {'choose','compare','switch','material','visit','select','confirm','material_repeat','accept_material','visit_clarified','visit_search_accepted'}:
             expected_property=first['id'] if action in {'choose','compare'} else prop['id']
             checks.append(check('active_property_retained',state.selected_property_type_id==expected_property))
+        if action=='choose':
+            checks.append(check('named_choice_answers_details_without_business_requestion',
+                first['name'] in reply and not (run.input_snapshot or {}).get('understanding',{}).get('requires_clarification') and
+                not any(w in reply.lower() for w in ('clarify whether','which property','what would you like to know?'))))
         if action=='compare':checks.append(check('comparison_has_both_properties',all(p['name'] in reply for p in project['properties'])))
         if action in {'material','material_repeat'}:checks.extend([check('no_property_requestion','which property' not in reply.lower()),check('material_not_comparison','make this comparison' not in reply.lower())])
         if action in {'material','material_repeat'} and spec['material']=='photos':
@@ -123,16 +130,21 @@ async def evaluate_case(db,manifest,key,budget,max_turns):
             targeted_question='?' in reply and any(word in reply.lower() for word in ('file','gallery','brochure','material'))
             checks.extend([check('file_acceptance_not_visit',not meetings and not meta.get('appointment_offer')),
                 check('offered_material_or_focused_clarification',bool(received) and received<=allowed or targeted_question)])
-        if action in {'visit','visit_clarified'}:
+        if action in {'visit','visit_clarified','visit_search_accepted'}:
             focused_clarification=bool(spec.get('visit_invitation_context') and action=='visit' and '?' in reply and
                 any(w in reply.lower() for w in ('visit','viewing','in person')) and not any(w in reply.lower() for w in ('financing','budget')))
-            checks.append(check('visit_reaches_options_or_unavailability',bool(meta.get('appointment_offer')) or explains_unavailability(reply) or focused_clarification))
+            search_question=bool((run.input_snapshot or {}).get('focused_visit_clarification') and
+                reply.startswith('Would you like me to check available visit times for ') and reply.rstrip().endswith('?') and
+                not meta.get('appointment_offer') and not meta.get('meeting_id') and not meetings)
+            checks.append(check('visit_reaches_options_or_unavailability',bool(meta.get('appointment_offer')) or explains_unavailability(reply) or focused_clarification or search_question))
+            if (run.input_snapshot or {}).get('focused_visit_clarification'):
+                checks.append(check('focused_search_question_has_no_effects',search_question))
         if action=='select':checks.append(check('selection_prepares_summary',bool(meta.get('booking_confirmation')) and not meetings))
         if action=='confirm':checks.append(check('confirmation_books_current_summary',len(meetings)==1 and bool(meta.get('meeting_id'))))
         from app.modules.sales_agent.dialogue_models import SalesDialogueEvent
         trace=db.query(SalesDialogueEvent).filter_by(conversation_id=conversation.id,event_key='active-understanding:'+str((run.input_snapshot or {}).get('message_id'))).first()
         attempts=(trace.payload_json.get('metadata') or {}).get('interpretation_attempts',[]) if trace else []
-        rows.append({'interpretation_attempts':attempts,'read_authorization':(run.input_snapshot or {}).get('dialogue_read_authorization'),'turn':i+1,'action':action,'lead_message':message,'reply':reply,'understanding':(run.input_snapshot or {}).get('understanding'),'metadata':meta,'checks':checks})
+        rows.append({'interpretation_attempts':attempts,'read_authorization':(run.input_snapshot or {}).get('dialogue_read_authorization'),'focused_visit_clarification':(run.input_snapshot or {}).get('focused_visit_clarification'),'turn':i+1,'action':action,'lead_message':message,'reply':reply,'understanding':(run.input_snapshot or {}).get('understanding'),'metadata':meta,'checks':checks})
         if meetings:stop='booked';break
         if spec['access']=='unassigned' and action=='visit':stop='unavailable';break
     meetings=db.query(Meeting).filter_by(lead_id=lead.id).all()

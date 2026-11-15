@@ -1,5 +1,5 @@
 {
-  "version": "sales-continuity-battery/1.1",
+  "version": "sales-continuity-battery/1.2",
   "lead_controller": "scripted",
   "lead_model": null,
   "judge_model": null,
@@ -28,7 +28,7 @@
     },
     {
       "id": "context_visit_see",
-      "turns": "6-7",
+      "turns": "6-8",
       "meaning": "Can I see it? after seeded explicit in-person invitation; availability or focused clarification before explicit follow-up"
     }
   ],
@@ -38,5 +38,9 @@
     "No live SMS, WhatsApp or Calendar effects",
     "Contextual visit case seeds an assistant invitation only, not an availability offer or booking consent",
     "Historical FAIL controls remain unchanged in the original evidence"
-  ]
+  ],
+  "new_checks": [
+    "named_choice_answers_details_without_business_requestion"
+  ],
+  "focused_visit_followup": "Only after the public question Would you like me to check available visit times for <name>?, the scripted lead answers Yes, please check available visit times for <name>. It never treats this as final booking consent."
 }

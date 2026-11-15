@@ -134,3 +134,73 @@ def test_past_negative_or_reported_directive_does_not_create_a_request(text):
     u=understanding(text).model_copy(update={'visit':VisitDirective(action='request',evidence=text)})
     fixed,_=normalize(u,text,{'property_types':[{'property_type':'Alder Home'}]})
     assert not fixed.permits('appointment')
+
+
+@pytest.mark.parametrize('name',['Cedar Loft','Ridge Townhome','Bay Residence'])
+@pytest.mark.parametrize('phrase',['I mean an in-person visit to {name}.','We would like to visit {name}.'])
+def test_low_confidence_current_visit_gets_a_scoped_search_question_only(name,phrase):
+    from app.modules.sales_agent.dialogue_continuity import focused_visit_question
+    from app.modules.sales_agent.understanding_contract import VisitDirective
+    text=phrase.format(name=name)
+    data=understanding(text,'appointment',confidence=0).model_dump(mode='json')
+    data['visit']=dict(action='request',evidence=text)
+    data['references']=[dict(id='p',kind='property',expression=name,evidence=name)]
+    data['requests'][0]['reference_id']='p';u=Understanding.model_validate(data)
+    question=focused_visit_question(u,text,{'property_types':[{'property_type':name}]})
+    assert question=='Would you like me to check available visit times for '+name+'?'
+    assert u.confidence==0 and not u.requires_clarification
+    assert not focused_visit_question(u,text,{'property_types':[{'property_type':'Other Home'}]})
+
+
+@pytest.mark.parametrize('text',['I do not want to visit Bay Residence.','My friend said visit Bay Residence.','We already booked a visit to Bay Residence.','If I visit Bay Residence, what then?'])
+def test_focused_visit_question_cannot_convert_negation_history_or_reporting(text):
+    from app.modules.sales_agent.dialogue_continuity import focused_visit_question
+    data=understanding(text,'appointment',confidence=0).model_dump(mode='json')
+    data['visit']=dict(action='request',evidence=text)
+    data['references']=[dict(id='p',kind='property',expression='Bay Residence',evidence='Bay Residence')]
+    data['requests'][0]['reference_id']='p'
+    assert focused_visit_question(Understanding.model_validate(data),text,{'property_types':[{'property_type':'Bay Residence'}]}) is None
+
+
+def test_low_confidence_exact_name_reads_only_a_complete_current_public_offer():
+    from types import SimpleNamespace
+    from app.modules.sales_agent.dialogue_continuity import named_choice_read
+    text='Ridge Townhome';data=understanding(text,'catalog',confidence=0).model_dump(mode='json')
+    data['references']=[dict(id='p',kind='property',expression=text,evidence=text)];data['requests'][0]['reference_id']='p'
+    u=Understanding.model_validate(data)
+    context={'property_types':[{'id':'p1','property_type':text}]}
+    latest=SimpleNamespace(role='assistant',status='delivered',metadata_json={'property_catalog_offer':{'property_type_ids':['p1']}})
+    assert named_choice_read(u,text,latest,context)
+    assert u.confidence==0
+    latest.metadata_json['delivery_group']={'total':2}
+    assert not named_choice_read(u,text,latest,context)
+    latest.metadata_json={}
+    assert not named_choice_read(u,text,latest,context)
+
+
+def test_unhandled_affirmative_exclusion_is_rejected_with_concrete_feedback():
+    from app.modules.sales_agent.understanding_semantics import issues_for
+    text='I want to see the blueprints for Bay Residence.'
+    data=understanding(text,'materials').model_dump(mode='json')
+    data['requests'][0]['polarity']='exclude';data['all_of']=[]
+    assert 'affirmative_material_as_exclusion' in {i['type'] for i in issues_for(Understanding.model_validate(data),text)}
+
+
+@pytest.mark.parametrize('count',[1,2])
+@pytest.mark.parametrize('text',['Can I see it?','Could we view that please?'])
+def test_delivered_material_pronoun_uses_offer_or_asks_which_file(count,text):
+    from types import SimpleNamespace
+    from app.modules.sales_agent.dialogue_continuity import normalize as continue_turn
+    from app.modules.sales_agent.understanding_contract import DialogueState
+    u=understanding(text,'materials',confidence=0.5)
+    meta={'material_offer':{'items':[{'binding':{'name':'Gallery '+str(i)}} for i in range(count)]}}
+    latest=SimpleNamespace(role='assistant',status='delivered',metadata_json=meta)
+    fixed,notes=continue_turn(u,text,DialogueState(),latest)
+    assert notes and fixed.confidence==0.5 and fixed.visit is None
+    if count==1:assert fixed.references[0].expression=='Gallery 0' and fixed.references[0].kind=='material'
+    else:assert fixed.requires_clarification and 'materials' in fixed.clarification_question
+    # Unsent or conflicting proposals cannot authorize this continuation.
+    latest.status='pending'
+    assert continue_turn(u,text,DialogueState(),latest)==(u,[])
+    latest.status='delivered';latest.metadata_json['appointment_offer']={'options':[]}
+    assert continue_turn(u,text,DialogueState(),latest)==(u,[])

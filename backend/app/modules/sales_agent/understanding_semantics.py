@@ -58,6 +58,8 @@ def issues_for(value, text, *, appointment_offer=False):
     if budget_quotes(text) and not any(p.key=='budget' and p.status=='declared' for p in value.preferences):
         add(['preferences'],'budget_declaration_missing','Preserve the explicit own budget and currency as a budget preference, including during payment repair.')
     for i,r in enumerate(requests):
+        if r.topic.value=='materials' and r.polarity=='exclude' and re.fullmatch(r'\s*(?:I|we) (?:want|would like|need) to (?:see|check|view) [a-zA-Z _?!.]+',r.evidence,re.I) and not re.search(r"\b(?:not|never|without|no|except|stop|avoid|skip|instead)\b",r.evidence,re.I):
+            add(['requests',i],'affirmative_material_as_exclusion','The current quote affirmatively requests material. Do not turn it into an exclusion. Preserve genuine negative clauses and restrictions; ask focused clarification if uncertain.')
         if r.topic.value=='financing' and pure_cash_quote(r.evidence):
             add(['requests',i],'payment_declaration_as_question','This pure declaration means buying without financing, not requesting project financing information or executing payment.')
         if r.topic.value in {'inventory','catalog','pricing','delivery','financing'} and pure_budget_quote(r.evidence):

@@ -183,6 +183,9 @@ async def _preview(db, scope: Scope, *, inbound_message_id: str, expected_revisi
                 interpreted,omitted_preferences=omit_unrelated_financial_preferences(interpreted,
                     appointment_confirmation=bool(latest and (latest.metadata_json or {}).get('booking_confirmation')))
                 normalizations.extend(omitted_preferences)
+                from .understanding_completeness import affirmative_material
+                interpreted,polarity_notes=affirmative_material(interpreted,inbound.content)
+                normalizations.extend(polarity_notes)
                 from .dialogue_continuity import normalize as normalize_continuity
                 interpreted,continuity_notes=normalize_continuity(interpreted,inbound.content,state,latest)
                 normalizations.extend(continuity_notes)

@@ -1,0 +1,69 @@
+{
+  "base_commit": "b9e3ceb4ea358527a2ff30ab650030c94f1df727",
+  "runtime": "Python 3.12.14 with SQLite, not the GitHub candidate Docker image",
+  "wire_schema": "sales-interpretation-input/2.0",
+  "wire_system": "sales-interpretation-system/2.2",
+  "general_protocol": "sales-understanding-prompt/2.36",
+  "script_version": "sales-continuity-battery/1.2",
+  "full_regression": {
+    "status": "PASS",
+    "modules": 144,
+    "complete_module_coverage_verified": true,
+    "shards": [
+      {
+        "shard": 1,
+        "passed": 1120,
+        "skipped": 2,
+        "failed": 0
+      },
+      {
+        "shard": 2,
+        "passed": 1219,
+        "skipped": 6,
+        "failed": 0
+      },
+      {
+        "shard": 3,
+        "passed": 1140,
+        "skipped": 3,
+        "failed": 0
+      }
+    ],
+    "passed": 3479,
+    "skipped": 11,
+    "failed": 0
+  },
+  "junit_namespace_adapter": "Raw local backend.tests.* names mapped to tests.* in separate copies for the release verifier; raw XML and outcomes preserved.",
+  "partition_tests_passed": 8,
+  "acceptance": {
+    "summary": {
+      "PASS": 63,
+      "FAIL": 0,
+      "NOT_RUN": 1
+    },
+    "status": "REGRESSION_COMPLETE_LIVE_ACCEPTANCE_PENDING"
+  },
+  "local_replay": {
+    "cases": 11,
+    "lead_turns": 77,
+    "simulated_bookings": 10,
+    "checks_passed": 680,
+    "checks_failed": 0,
+    "replayed_sequences": 38,
+    "unrecorded_continuations_and_composition": "mocked"
+  },
+  "model_quality_evaluated": false,
+  "paid_local_calls": 0,
+  "local_cost_usd": 0,
+  "production_database_writes": 0,
+  "lead_contacts": 0,
+  "prevalidation": {
+    "compatibility_failures": 3,
+    "resolution": "Only a material offer with nonempty items can activate the new pronoun continuation; original tests preserved."
+  },
+  "limitations": [
+    "Live model evaluation remains pending deployment.",
+    "GitHub validates the built image and isolated PostgreSQL.",
+    "Transport delivery and Google Calendar are not evaluated here."
+  ]
+}
