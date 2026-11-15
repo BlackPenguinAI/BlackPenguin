@@ -1,0 +1,64 @@
+{
+  "base_commit": "ba5c4c52cfbee55a715c5ca8ef52833e09c3bee8",
+  "date_utc": "2026-11-15",
+  "paid_calls": 0,
+  "model_quality_evaluated": false,
+  "production_default": "classic",
+  "candidate": "graph-observe sandbox only",
+  "regression": {
+    "passed": 3749,
+    "skipped": 11,
+    "failed": 0,
+    "modules": 148,
+    "shards": [
+      {
+        "shard": 1,
+        "passed": 1227,
+        "skipped": 2,
+        "raw_sha256": "b1dd7c096884186b7d9c6198795ebe29a47313e2f232fe16d326d2f09f642079"
+      },
+      {
+        "shard": 2,
+        "passed": 1399,
+        "skipped": 5,
+        "raw_sha256": "d0d0be82f1e0714825bda8aff06517b1f6dd06180b7957a61865049be3f4905f"
+      },
+      {
+        "shard": 3,
+        "passed": 1123,
+        "skipped": 4,
+        "raw_sha256": "f24df7b85de98f83e6aac6ae92539ef9979b4b7aa3c4d0c90b8be1ef510afe52"
+      }
+    ],
+    "junit_adapter": "Canonical copies remove only initial backend. in local classname; raw outcome XML unchanged."
+  },
+  "new_module": {
+    "passed": 106,
+    "replay_dialogues": 48,
+    "positive_and_negative_variants": 58,
+    "recorded_sources": 2,
+    "cases_per_source": 6,
+    "modes": 2,
+    "autoflush_modes": 2
+  },
+  "acceptance": {
+    "PASS": 63,
+    "FAIL": 0,
+    "NOT_RUN": 1
+  },
+  "sharding_unit_tests": 8,
+  "exported_examples": {
+    "cases": 24,
+    "turns": 140,
+    "meetings": 20,
+    "checks": 1240,
+    "autoflush": false
+  },
+  "limits": [
+    "Local interpretation replay, not real model quality.",
+    "All composition and observation decision providers mocked.",
+    "No live transport, Calendar or PostgreSQL concurrency proof.",
+    "No activation of experimental loop in real lead conversations.",
+    "Same six server cases must be repeated after deployment."
+  ]
+}

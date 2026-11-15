@@ -582,7 +582,11 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
                 if material_read or contextual_needs_read or choice_read or compare_read or greeting_read:u=u.model_copy(update={'requires_clarification':False,'clarification_question':None})
                 if literal_needs_read or contextual_needs_read:
                     run.input_snapshot={**run.input_snapshot,'needs_read_authorization':{'version':NEEDS_VERSION,'basis':'accepted_current_unknown_listing_offer' if contextual_needs_read else 'validated_current_literal_catalog_request','model_confidence':u.confidence,'effect_authorization':False}}
-                if u.confidence < .8 and not u.requires_clarification and not (literal_needs_read or contextual_needs_read or choice_read or compare_read or greeting_read or material_read):
+                from .first_booking import contextual_confirmation_ready
+                confirmation_ready=bool(next_enabled and contextual_confirmation_ready(db,scope,u,inbound.content))
+                if confirmation_ready:
+                    run.input_snapshot={**run.input_snapshot,'booking_confirmation_authorization':{'basis':'current_complete_accepted_backend_summary','model_confidence':u.confidence,'effect_authorization':False,'transaction_revalidation_required':True}}
+                if u.confidence < .8 and not u.requires_clarification and not (literal_needs_read or contextual_needs_read or choice_read or compare_read or greeting_read or material_read or confirmation_ready):
                     visit_question=focused_visit_question(u,inbound.content,commercial) if next_enabled else None
                     focused=visit_question or (focused_material_question(u,inbound.content,state,commercial) if next_enabled else None)
                     u=u.model_copy(update={'requires_clarification':True,'clarification_question':focused or 'Could you clarify whether you want property details, materials, financing, or a visit?'})

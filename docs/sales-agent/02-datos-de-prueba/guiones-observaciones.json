@@ -1,5 +1,5 @@
 {
-  "version": "sales-observation-battery/1.1",
+  "version": "sales-observation-battery/1.2",
   "lead_model": null,
   "judge_model": null,
   "sales_model": "published company configuration; observed openai/gpt-4o-mini version 8",

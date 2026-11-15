@@ -16,7 +16,7 @@ from .execution import simulated,now
 
 class DecisionError(ValueError):pass
 
-VERSION='sales-observation-loop/1.1'
+VERSION='sales-observation-loop/1.2'
 READS={'catalog','property_details','materials','financing','pricing','inventory','location','delivery','amenities'}
 
 class Decision(BaseModel):
@@ -123,8 +123,8 @@ async def run(db,scope,*,inbound,outcome,commercial,infer=None,authorize=None):
                 project=db.get(Project,scope.project_id)
                 try:
                     prefs=normalize_timing(u,inbound.content,project,now(datetime),state.booking_search or {})
-                    slots=search_slots(db,scope,prefs,now(datetime));result=ToolResult(operation_id=key,status='success' if slots else 'empty',data={'visit_availability':slots,'timezone':prefs['timezone'],'booked':False})
-                except ValueError:result=ToolResult(operation_id=key,status='uncertain',data={'visit_availability':[],'needs_temporal_clarification':True,'booked':False})
+                    slots=search_slots(db,scope,prefs,now(datetime));result=ToolResult(operation_id=key,status='success' if slots else 'empty',data={'visit_availability':slots,'timezone':prefs['timezone'],'normalized_preferences':prefs,'booked':False})
+                except ValueError:result=ToolResult(operation_id=key,status='uncertain',data={'visit_availability':[],'needs_temporal_clarification':True,'clarification_reason_code':'invalid_temporal_evidence','booked':False})
                 availability_seen=True
             else:
                 target_state=state;subject=task.subject;task_id=task.id;operation_id=task.id

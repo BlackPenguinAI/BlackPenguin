@@ -9,7 +9,7 @@ from pydantic import Field,create_model,StrictBool
 from .understanding_contract import (Understanding,StrictModel,Reference,Request,Constraint,Comparison,Subject)
 
 VERSION='sales-interpretation-input/2.0'
-SYSTEM_VERSION='sales-interpretation-system/2.4'
+SYSTEM_VERSION='sales-interpretation-system/2.5'
 class Target(StrictModel):
     kind:Literal['property','unit','appointment','location','material','ambiguous']
     expression:str=Field(min_length=1,max_length=300)
@@ -185,6 +185,9 @@ def compile_input(raw,text,*,historical_messages=()):
     data=document(raw);notes=[]
     if data.get('version')=='sales-understanding/1.0':data,notes=legacy(data,text)
     value=Input.model_validate(data)
+    from .interpretation_wire_repairs import literal_material
+    fixed,read_notes=literal_material(value.model_dump(mode='json'),text)
+    if read_notes:value=Input.model_validate(fixed);notes.extend(read_notes)
     # Only omit affirmative standalone requests demonstrably replayed from this
     # conversation. Never discard restrictions, alternatives or unknown evidence.
     # A verified current visit is still validated/planned normally; no consent or
@@ -248,3 +251,5 @@ SYSTEM += "\nNever use comparison merely to filter homes by bedroom count. Compa
 SYSTEM += "\nKeep intent and requests consistent: visit.action=request requires an appointment request or a focused clarification, even after repair. A current own in-person visit declaration is not a comparison. A property's name is the owner of its photos, not a material name. An interrogative request for pictures or blueprints is a materials request, never a comparison unless the current message actually asks to compare. Generic words such as photos or floor_plan are material subjects, not named-file targets. Use target null when the selected property is implicit; do not quote its historical name as current evidence. Preserve the current owner on repeated photo requests. After a visit-or-photos question, interpret the lead's explicit in-person answer as a visit request, never a generic information question.\n"
 
 SYSTEM += "\nDecompose formats and independent questions: 'send photos or a brochure and explain financing' means alternatives=[photos OR brochure] AND a separate financing request. Set material subject photos/brochure and target null for generic format words; financing options is not a property target. Inherit the selected owner through backend context, without fabricating current quotations of its name. AND formats remain independent; exclusions remain exclusions. For 'any morning/afternoon/evening in the next seven days', use time_relation morning/afternoon/evening, no literal clock in time_from_evidence, and the current date-range quotation. 'Use the property\'s timezone' means the approved project timezone, not a request for an IANA code. Preserve explicit clock limits and alternative or negative timing.\n"
+
+SYSTEM += "\nA missing target must be null; never emit punctuation such as '.', '/', '_' or '-' as a reference or financing preference. Do not use a material target for a financing question. 'Before choosing a time, can you show me photos?' is only materials/photos for the active subject: no comparison, visit or historical declarations. A bare acceptance of the latest complete booking summary has timing null and no clarification. Named unknown files or owners must remain unknown; never replace them with the active property.\n"

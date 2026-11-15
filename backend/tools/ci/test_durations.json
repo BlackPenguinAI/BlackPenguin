@@ -117,6 +117,7 @@
     "test_company_approval_http.py": 6.0,
     "test_sales_coordinator_graph.py": 25.0,
     "test_sales_observation_loop.py": 55.0,
-    "test_sales_observation_repair.py": 95.0
+    "test_sales_observation_repair.py": 95.0,
+    "test_sales_observation_repair2.py": 110.0
   }
 }

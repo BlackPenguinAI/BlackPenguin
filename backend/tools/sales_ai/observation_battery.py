@@ -1,6 +1,6 @@
 """Six short scripted journeys exercising result-driven decisions, no buyer LLM."""
 from . import continuity_battery as base
-VERSION='sales-observation-battery/1.1'
+VERSION='sales-observation-battery/1.2'
 SPECS={
  'obs_alternative':dict(project=1,property=1,access='selected',material='photos',date_style='numeric',visit='Can I visit {name}?',dialogue=[('discover','I am looking for a 1 bedroom home.'),('choose','{name}'),('material','Do you have photos of the property?'),('accept_material','Please send the brochure instead.'),('visit','Can I visit {name}?')]),
  'obs_mixed':dict(project=0,property=0,access='all',material='photos',date_style='month_day',visit='Can I visit {name}?',dialogue=[('discover','I am looking for a 4 bedroom home.'),('choose','{name}'),('material','Could you send photos or a brochure and explain the financing options?'),('visit','Can I visit {name}?')]),

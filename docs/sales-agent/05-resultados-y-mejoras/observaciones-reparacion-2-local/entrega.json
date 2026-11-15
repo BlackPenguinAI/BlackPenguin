@@ -1,0 +1,90 @@
+{
+  "base_commit": "ba5c4c52cfbee55a715c5ca8ef52833e09c3bee8",
+  "apply": "Extract in repository root. No migrations or deletions. Shared fixes affect classic; candidate stays sandbox only.",
+  "files": [
+    {
+      "path": "backend/app/modules/sales_agent/interpretation_wire_repairs.py",
+      "sha256": "55f258b1670bcef5072d69652fff5bba2d8501c26c8402ca3a6ed46480c141f3"
+    },
+    {
+      "path": "backend/tests/fixtures/sales_observation_repair2/server_frames.json",
+      "sha256": "5d1516a672d94c1f76b93693956919e1700c8c47ec94b257c23575c94cd2a34d"
+    },
+    {
+      "path": "backend/tests/test_sales_observation_repair2.py",
+      "sha256": "0438bd503d542521c68a7d46c43e2290657e42d1b5715cff43ac56a439e945a9"
+    },
+    {
+      "path": "docs/sales-agent/02-datos-de-prueba/variantes-observaciones-reparacion-2.json",
+      "sha256": "e24729cbd0cd45d2f890f376f5eca25a08dcaaec346ea707771b7cd9757982f7"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/observaciones-reparacion-2-local/conversaciones-locales.json",
+      "sha256": "b729d8deb566863d4a60081d1e966632554b11588b47e6e0a712ef792174bee4"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/observaciones-reparacion-2-local/conversaciones.md",
+      "sha256": "f6ac20d0b3421fc7ce9ccaeca46f1d4980e13b59c9d6f9d2a550cd9981252c39"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/observaciones-reparacion-2-local/evolucion-casos.png",
+      "sha256": "2f6c274456198bed44f463688f129d1beba354b95c7d6a6c9d597dcc744163f3"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/observaciones-reparacion-2-local/generar-curva.py",
+      "sha256": "01cd7239f1a42d91be25e41547b40eaffbc1c449c164b963f26931f6f8b52764"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/observaciones-reparacion-2-local/resultado-servidor-anterior.json",
+      "sha256": "f06e8ac329ce709532504d593df628dc2e656015222ff91b16a3cc3b951e3c43"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/observaciones-reparacion-2-local/validacion.json",
+      "sha256": "97a9c4379ab64b4f9fa5bf1fbdce99e58df2f9743a20650b71024bb8690f212f"
+    },
+    {
+      "path": "docs/sales-agent/06-como-ejecutar-las-pruebas/ejecutar-observaciones-reparacion-2.sh",
+      "sha256": "217764ca3e7b1a2f40f7d78b178610ffd0a860aa522ec3361f7ae94faeb7a360"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/active_service.py",
+      "sha256": "736996b88faae008926c744d852d78c6ca36c1bf60b4e2e92923b7ab8fc7e875"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/current_request_repairs.py",
+      "sha256": "99c627e2589d9ee25f3d3edfe5fdcd06be11e575f9db7cfe85bc3ef343126c21"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/first_booking.py",
+      "sha256": "4bc74c514eef534aba0c3439ded8dfd76dc2729ea93f8a1d3d3340fb09a0d1d5"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/interpretation_input.py",
+      "sha256": "3f16e16c4168fa67020da482567edd5c3706935d5f96360120ca8b162cc9960d"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/observation_loop.py",
+      "sha256": "caa362b43c9a4ceeb58d6d14f762327d6b51fe49a823e7df06bad8cd0a08c91a"
+    },
+    {
+      "path": "backend/tools/ci/test_durations.json",
+      "sha256": "4727498d89f71a023a23b1dad9b63485e5ae16df9759e83d6dff4ff53302a543"
+    },
+    {
+      "path": "backend/tools/sales_ai/continuity_battery.py",
+      "sha256": "662fb13f6d630c19c6e160ff2f620431c428b7e382afc603cb656300aafea095"
+    },
+    {
+      "path": "backend/tools/sales_ai/observation_battery.py",
+      "sha256": "a4b43b4d02dff0f43ebd34eb0d774696408f9573f583e030157f3363f914283f"
+    },
+    {
+      "path": "docs/sales-agent/02-datos-de-prueba/guiones-observaciones.json",
+      "sha256": "4c272178835868c24e9eda6113ff7a0cd5adc790cf5d902fc14dd1c85b536b76"
+    },
+    {
+      "path": "docs/sales-agent/README.md",
+      "sha256": "09fd68f96a882503cfcd9a9011f7c8fe0796b86498fdc6c6a76856120973584d"
+    }
+  ]
+}

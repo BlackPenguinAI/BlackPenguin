@@ -1,0 +1,61 @@
+{
+  "scope": "Same six paid scenarios. Additional local regression variants only; no new paid suite or buyer model.",
+  "source": "sales-observation-repair-1-comparison.zip",
+  "variants": {
+    "invalid_read_markers": [
+      ".",
+      "/",
+      "...",
+      "___",
+      "—"
+    ],
+    "formats": [
+      "pictures",
+      "PDF",
+      "blueprints"
+    ],
+    "preserved_unknown_or_named_targets": [
+      "Unknown Penthouse",
+      "Cedar report.pdf",
+      "123",
+      "photos of Atlantis"
+    ],
+    "dayparts": [
+      "morning",
+      "afternoon",
+      "evening"
+    ],
+    "clock_field_errors": [
+      "same daypart in both fields, relation=any",
+      "same daypart in both fields, relation=daypart"
+    ],
+    "material_interruptions": [
+      "Before choosing a time, can you show me photos?",
+      "Before picking a slot, could you send us images?",
+      "First, please share the brochure.",
+      "Could you show me blueprints?"
+    ],
+    "protected_messages": [
+      "Do not show me photos.",
+      "If I ask for photos, will you compare them?",
+      "My friend said show me photos.",
+      "Compare the photos and the brochure."
+    ],
+    "summary_acceptance": [
+      "Yes",
+      "Yes please",
+      "Confirm",
+      "Yes, that time works for me"
+    ],
+    "summary_negative_states": [
+      "expired",
+      "foreign scope",
+      "tampered proposal",
+      "wrong receipt",
+      "interrupted summary",
+      "incomplete delivery",
+      "mixed material offer",
+      "conditional assent"
+    ]
+  }
+}

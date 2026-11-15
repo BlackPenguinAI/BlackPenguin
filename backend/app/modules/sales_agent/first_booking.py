@@ -118,12 +118,14 @@ def normalize_timing(u,text,project,now,previous):
     period_words={'morning':'morning','afternoon':'afternoon','evening':'evening'}
     lower_evidence=supplied.get('time_from_evidence')
     part=next((name for name in period_words if lower_evidence and re.fullmatch(r'(?:(?:any|the|in the) )?'+name+r's?',lower_evidence.strip(),re.I)),None)
-    if part and relation=='any' and not supplied.get('time_until_evidence') and not re.search(r'\b(?:after|before|between|or|not|never|except)\b|\b\d{1,2}:\d{2}\b|\b\d{1,2}\s*(?:am|pm)\b',text,re.I):
+    if part and relation=='any' and (not supplied.get('time_until_evidence') or re.fullmatch(r'(?:(?:any|the|in the) )?'+part+r's?',supplied['time_until_evidence'].strip(),re.I)) and not re.search(r'\b(?:after|before|between|or|not|never|except)\b|\b\d{1,2}:\d{2}\b|\b\d{1,2}\s*(?:am|pm)\b',text,re.I):
         relation=part
     if part==relation and re.search(r'\b'+part+r's?\b',text,re.I):lower_evidence=None
     explicit_part=relation in period_words and re.search(r'\b'+relation+r's?\b',text,re.I)
     lower=clock(lower_evidence) or (None if explicit_part else previous.get('time_from'))
-    upper=clock(supplied.get('time_until_evidence')) or (None if explicit_part else previous.get('time_until'))
+    upper_evidence=supplied.get('time_until_evidence')
+    if explicit_part and upper_evidence and re.fullmatch(r'(?:(?:any|the|in the) )?'+relation+r's?',upper_evidence.strip(),re.I):upper_evidence=None
+    upper=clock(upper_evidence) or (None if explicit_part else previous.get('time_until'))
     if not timing and _selected_time(text):lower=_selected_time(text).strftime('%H:%M');relation='exact'
     if relation=='morning':lower,upper=lower or '06:00',upper or '12:00'
     elif relation=='afternoon':lower,upper=lower or '12:00',upper or '18:00'
@@ -256,7 +258,7 @@ def handle(db,scope,conversation,lead,project,outcome,inbound):
         state.booking_proposal=None;stop_cadence(db,conversation,lead,state,'cancelled' if state.cadence_stop_reason=='cancelled' else 'declined')
         message='Your existing visit is unchanged. You can continue asking about the property.' if active_meetings(db,scope,now) else 'No visit has been booked. You can continue asking about the property.'
         return message,{'booking_declined':True},[]
-    if not u.permits('appointment') or u.confidence<.8:return '',{},[]
+    if not u.permits('appointment') or u.confidence<.8 and not contextual_confirmation_ready(db,scope,u,inbound.content):return '',{},[]
     candidates={t.id for t in state.tasks if t.source_message_id==inbound.id and t.topic.value=='appointment' and not restricted(state,t)}
     if not candidates & set(outcome.plan.get('write_candidates_require_backend_authorization',[])):return '',{},[]
     from app.modules.onboarding_versions import require_capability
@@ -273,7 +275,7 @@ def handle(db,scope,conversation,lead,project,outcome,inbound):
         return 'No visit has been booked. You can continue asking about the property.',{'booking_declined':True},[]
     proposal=state.booking_proposal
     prompt=accepted_outbound(db,conversation,'booking_confirmation')
-    assent=_affirmative_slot_reply(inbound.content)
+    assent=_affirmative_slot_reply(inbound.content) or contextual_confirmation_ready(db,scope,u,inbound.content)
     if not assent and u.visit and u.visit.action=='confirm':
         from app.modules.governance.services import request_attribution
         own=request_attribution(inbound.content)['current_text'].lstrip()
@@ -461,16 +463,17 @@ def enrich_understanding(u,previous_meta,text):
             visit=None,appointment_query=None,courtesy={'kind':'decline' if previous_meta.get('booking_confirmation') else 'farewell','evidence':text})
         from .understanding_contract import Understanding
         return Understanding.model_validate(payload)
-    if (previous_meta.get('booking_confirmation') and _affirmative_slot_reply(text)
+    if (previous_meta.get('booking_confirmation') and (_affirmative_slot_reply(text) or _plain_summary_assent(text))
         and not previous_meta.get('material_offer') and not previous_meta.get('release_offer')
         and not u.constraints and not u.alternatives and not u.releases
         and not u.cancellation and not u.reschedule and not u.wait and not u.moderation
         and all(r.polarity=='request' and r.topic.value in {'appointment','other'} for r in u.requests)):
+        plain_assent=_plain_summary_assent(text)
         # Canonicalize only semantic assent to the current full summary. The
         # coordinator still verifies receipt, scope, hash, expiry and availability.
         payload=u.model_dump(mode='json')
         payload.update(requests=[dict(id='backend_summary_acceptance',topic='appointment',polarity='request',evidence=text)],all_of=['backend_summary_acceptance'],
-            references=[],selected_reference_id=None,comparison=None,appointment_query=None,visit=dict(action='confirm',evidence=text,timing=None))
+            references=[],selected_reference_id=None,comparison=None,appointment_query=None,visit=dict(action='confirm',evidence=text,timing=None),requires_clarification=False if plain_assent else u.requires_clarification,clarification_question=None if plain_assent else u.clarification_question)
         from .understanding_contract import Understanding
         return Understanding.model_validate(payload)
     if u.requires_clarification or u.permits('appointment'):return u
@@ -496,3 +499,25 @@ def apply_courtesy(db,conversation,lead,state):
     elif u.courtesy.kind=='decline' and not substantive:
         state.booking_proposal=None
         stop_cadence(db,conversation,lead,state,'cancelled' if state.cadence_stop_reason=='cancelled' else 'declined')
+
+
+def contextual_confirmation_ready(db,scope,u,text):
+    """Authorize interpretation continuity only; transaction still owns booking."""
+    if not u.visit or u.visit.action!='confirm' or u.requires_clarification:return False
+    if u.constraints or u.alternatives or u.releases or u.cancellation or u.reschedule or u.wait or u.moderation:return False
+    if not _plain_summary_assent(text):return False
+    if any(r.polarity!='request' or r.topic.value not in {'appointment','other'} for r in u.requests):return False
+    conversation=check_scope(db,scope)
+    row=accepted_outbound(db,conversation,'booking_confirmation')
+    if not row or any((row.metadata_json or {}).get(k) for k in ('material_offer','release_offer','appointment_offer','location_offer','reschedule_confirmation','cancellation_confirmation')):return False
+    from .dialogue_store import load
+    proposal=load(db,scope)[1].booking_proposal
+    if not proposal or not {'id','scope','option','preferences','context','expires_at'}<=proposal.keys():return False
+    if proposal['scope']!=scope.__dict__ or proposal['id']!=digest({k:v for k,v in proposal.items() if k!='id'}):return False
+    try:expired=datetime.fromisoformat(proposal['expires_at'])<=utc(workflow_now(datetime))
+    except (ValueError,TypeError):return False
+    return not expired and (row.metadata_json or {}).get('booking_confirmation',{}).get('id')==proposal['id']
+
+
+def _plain_summary_assent(text):
+    return bool(re.fullmatch(r'\s*(?:yes(?: please)?|confirm(?:ed)?|please do|go ahead|book it|yes[, ]+that (?:time|visit) works(?: for me)?)[.!]?\s*',text,re.I))
