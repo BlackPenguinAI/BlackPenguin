@@ -4,7 +4,7 @@
 
 **Métricas históricas del modelo: corte 11/11/2026. Revisión de criterios: 13/11/2026.** Se reúne el trabajo del ciclo reciente con data sintética: **21 corridas del servidor, 144 conversaciones ejecutadas y 47 IDs de escenario distintos por suite**. Las repeticiones son parte del trabajo, no escenarios adicionales. En la batería compacta 2, **13/16 conversaciones cumplieron los checks originales y se registraron 7/8 visitas esperadas**; eso no certifica la calidad integral de esos diálogos. En el último subconjunto, Repair 8, **2/3 conversaciones cumplieron sus checks y se registró 1/2 visitas**: vivienda mayor y fotos ausentes se recuperaron; diversificación falló con tiempos de espera del modelo. No se mezclan ambos conjuntos como si fueran una nueva batería completa.
 
-**Estado actual (15/11/2026).** La pareja del servidor consumió USD **0.27384345**. El candidato anterior completó 5/5 casos; a la referencia le falta la evidencia de un caso por un error del evaluador. Cuatro diálogos completos coinciden y ninguna reconsideración fue aceptada: **no hay mejora atribuible al grafo acreditada**. Esta entrega incorpora un ciclo real de decisiones posteriores a herramientas y seis guiones breves para contrastarlo. Producción sigue en `classic`; `graph-observe` solo funciona en el laboratorio. Detalles y costos en 10.8.
+**Estado actual (15/11/2026).** La primera comparación del ciclo posterior a herramientas es válida: ambos modos cumplen los controles en 4/6 casos; el candidato registra cuatro de las cinco citas esperadas y la referencia tres, con un timeout en esta última. No se acredita todavía mejora causal. Esta reparación corrige solicitudes mixtas, franjas horarias y estados internos engañosos, usando interpretaciones registradas y variantes. Producción conserva `classic`; `graph-observe` sigue limitado al laboratorio. Resultados, límites y consumos en 10.9.
 
 La guía usa bloques con el mismo propósito: **qué se hizo → cómo funciona → qué evidencia hay → dónde están sus archivos**. Toda la explicación está aquí; los enlaces internos abren datos, código o carpetas de respaldo. Las referencias externas justifican la metodología, no sustituyen la evidencia del proyecto.
 
@@ -811,7 +811,7 @@ Este estimado histórico partía de la corrida de 40 turnos y USD 0.15659055; no
 
 ## 10.8. Decisiones después de consultar herramientas: nueva iteración
 
-**Qué cambia.** Antes, el backend elegía las consultas y el modelo componía después. El candidato `graph-observe` ahora permite que el mismo modelo seleccione consultas autorizadas, vea sus resultados y decida otra consulta o pasar a responder. El backend sigue resolviendo identidades, restricciones y acciones. Es un ciclo LangGraph ejecutable; no se limita a envolver las mismas etapas ni a repetir la interpretación inicial. La documentación oficial diferencia precisamente los recorridos prefijados de las decisiones dinámicas sobre herramientas ([LangGraph](https://docs.langchain.com/oss/python/langgraph/workflows-agents)).
+**Diseño incorporado en la entrega anterior.** Antes, el backend elegía las consultas y el modelo componía después. El candidato `graph-observe` ahora permite que el mismo modelo seleccione consultas autorizadas, vea sus resultados y decida otra consulta o pasar a responder. El backend sigue resolviendo identidades, restricciones y acciones. Es un ciclo LangGraph ejecutable; no se limita a envolver las mismas etapas ni a repetir la interpretación inicial. La documentación oficial diferencia precisamente los recorridos prefijados de las decisiones dinámicas sobre herramientas ([LangGraph](https://docs.langchain.com/oss/python/langgraph/workflows-agents)).
 
 ```mermaid
 flowchart TD
@@ -852,9 +852,9 @@ flowchart TD
 | **TOTAL OBSERVADO desde necesidades** | **Excluye fases anteriores sin detalle de consumo aquí** | — | **939** | **1.35064455** |
 | Pruebas locales de esta entrega | Proveedores simulados; no miden calidad real | Solo simuladas | 0 pagadas | 0.00000000 |
 
-Cuatro conversaciones completas tuvieron los mismos textos públicos en ambos modos. Hubo una reconsideración previa, pero cero aceptadas. Los 5/5 del candidato anterior no acreditan una mejora causal. No se mezcla este resultado con `graph-observe`, que todavía no tiene corrida del modelo publicado.
+Cuatro conversaciones completas tuvieron los mismos textos públicos en ambos modos. Hubo una reconsideración previa, pero cero aceptadas. Los 5/5 del candidato anterior no acreditan una mejora causal. No se mezcla este resultado con `graph-observe`; su primera corrida recibida se analiza en 10.9.
 
-| Próxima pareja, aún no ejecutada | Conversaciones / límite por conversación | Total USD estimado por fila |
+| Estimación anterior; ejecución recibida en 10.9 | Conversaciones / límite por conversación | Total USD estimado por fila |
 |---|---|---:|
 | Referencia `classic` | 6 / hasta 10 turnos de lead | 0.15–0.30 |
 | Candidato `graph-observe` | 6 / hasta 10 turnos; decisiones adicionales | 0.25–0.50 |
@@ -866,6 +866,56 @@ Estimación propia a partir de la pareja recibida y del contexto compacto adicio
 ![Consumo rastreado, con la última comparación](05-resultados-y-mejoras/flujo-observaciones-local/consumo-acumulado.png)
 
 **Validación local y lectura humana.** 3.554 pruebas de regresión aprobadas. 11 omisiones por condiciones de entorno y cero fallos; 146 módulos cubiertos exactamente una vez. El nuevo módulo aporta 43 pruebas. incluidos seis recorridos en dos modos y dos configuraciones de autoflush. decisiones inválidas. restricciones. comparación y límite de rondas. Además. ocho pruebas del particionado y 63 controles de aceptación aprobaron; uno de aceptación real sigue pendiente. Los ejemplos exportados de autoflush de producción reúnen 12 diálogos. 70 turnos. diez citas simuladas y 618 controles PASS. sin llamadas pagadas. Los ejemplos locales permiten inspeccionar lead, respuesta, observación y próxima consulta, pero no sustituyen el comportamiento del modelo publicado. [Conversaciones legibles](05-resultados-y-mejoras/flujo-observaciones-local/conversaciones.md) · [Datos locales](05-resultados-y-mejoras/flujo-observaciones-local/conversaciones-locales.json) · [Validación](05-resultados-y-mejoras/flujo-observaciones-local/validacion.json) · [Comandos de despliegue, comparación y descarga](06-como-ejecutar-las-pruebas/ejecutar-observaciones-comparacion.sh).
+
+## 10.9. Reparación de solicitudes mixtas y horarios naturales
+
+**Qué mostró el servidor.** Ambos modos usaron el commit `31023e0`, `openai/gpt-4o-mini`, configuración publicada 8 y el mismo catálogo. El ciclo nuevo ejecutó 50 decisiones y 26 rondas, pero ambos quedaron en **4/6 casos sin controles fallidos**. El candidato registró 4/5 citas esperadas; la referencia 3/5, afectada por un timeout al interpretar una hora elegida. Esta diferencia no prueba mejora del grafo. La falta de vendedor es un sexto caso correcto sin cita. Se conserva la evidencia original, sin cambiar sus etiquetas ni convertir fallos en éxitos.
+
+| Guion | Referencia del servidor | Candidato del servidor | Lectura objetiva |
+|---|---|---|---|
+| Fotos ausentes → ofrecer PDF | Cumple controles | Cumple controles; consulta alternativas tras leer | Hay ciclo real, pero la respuesta pública fue igual. |
+| Fotos **o** PDF **y** financiación | Repregunta la propiedad; luego timeout de interpretación | Misma repregunta, aunque después agenda | El fallo de interpretación es compartido; más citas no significa diálogo aprobado. |
+| Cambio de propiedad | Cumple controles | Cumple controles | Material y cita corresponden a la nueva propiedad. |
+| Agenda interrumpida por fotos | Cumple controles | Cumple controles | Resuelve material y retoma la agenda. |
+| Cualquier mañana en los próximos siete días | Pide otra vez zona horaria | Pide una hora exacta y rechaza aclaración de su herramienta | Franja mal normalizada; no se llega a ofrecer horarios. |
+| Sin vendedor elegible | Cumple controles | Cumple controles | No reserva; ofrece una espera que requiere consentimiento. |
+
+**Qué se corrigió y cómo.** Son cambios de código e instrucciones, no entrenamiento de pesos ni cambio del modelo.
+
+| Pieza | Ajuste concreto | Protección que conserva |
+|---|---|---|
+| Interpretación de materiales | Los formatos genéricos se guardan como `subject`, no como propiedad/archivo inventado; “financing options” deja de ser una propiedad. Se recupera OR literal entre dos solicitudes ya existentes y se mantiene financiación como solicitud independiente. | No crea nuevos pedidos, no eleva confianza, conserva nombres de archivos conocidos, nombres desconocidos y restricciones. Negaciones, terceros e hipótesis quedan fuera de la recuperación literal. |
+| Instrucción efectiva | Pasa a `sales-interpretation-system/2.4`: ejemplos de OR/AND, propiedad implícita, periodos del día y zona del proyecto. | Misma configuración publicada 8 y modelo; el backend mantiene la autoridad sobre referencias y acciones. |
+| Fechas y horas | “Morning/afternoon/evening” se transforma en franja, no en reloj. Se reconocen formas como “use the property's timezone.”; una franja nueva reemplaza horas históricas y conserva límites explícitos actuales. | No cambia una zona IANA explícita; una zona desconocida o ambigua sigue necesitando aclaración. No selecciona ni confirma citas por el lead. |
+| Decisión posterior a herramientas | La herramienta puede justificar una aclaración temporal. El resultado queda `CLARIFICATION_REQUIRED`, no como decisión rechazada ni PASS. | Una aclaración sin tarea ambigua ni evidencia de herramienta sigue siendo inválida. |
+| Medición del trabajo pendiente | Tareas pendientes, bloqueadas o esperando aclaración ya no desaparecen de la auditoría por no tener herramienta elegible. | PASS no equivale a “no se ejecutó nada”; los diálogos mantienen controles funcionales independientes. |
+| Ausencia de vendedor | Se añadió un control que exige cero esperas creadas antes del consentimiento. | Se auditó el código existente: `wait_service` sí implementa espera/aviso con aceptación. Ofrecerla no demuestra que se guardó ni que se notificó. |
+
+**Cómo probamos sin ajustar una sola frase.** Se guardaron las interpretaciones y fallos de los dos recorridos recibidos. Se reproducen sobre el core actual los seis guiones, en ambos modos y con autoflush de producción y alternativo. Además se varían verbos, formatos y orden del OR, tres franjas del día y formas de expresar la zona del proyecto. Los negativos conservan exclusiones, terceros, hipótesis, archivos conocidos, destinos desconocidos y zonas explícitas/ambiguas. Las decisiones posteriores a herramientas y la composición se simulan localmente; las continuaciones sin interpretación registrada —incluido el turno que originalmente agotó tiempo— también se simulan. **No se afirma haber eliminado el timeout del proveedor ni haber medido nueva calidad del modelo real.** [Interpretaciones originales](../../backend/tests/fixtures/sales_observation_repair/server_frames.json) · [Pruebas](../../backend/tests/test_sales_observation_repair.py) · [Guía JSON de variantes](02-datos-de-prueba/variantes-observaciones-reparacion-1.json).
+
+**Validación local.** La regresión de 147 módulos terminó con 3.638 pruebas aprobadas. 11 omisiones por condiciones de entorno y cero fallos. Después de las últimas protecciones se repitieron 132 pruebas específicas (89 de esta reparación y 43 del ciclo anterior). todas aprobadas; se solapan con la regresión y no se suman. También aprobaron ocho pruebas del particionado y 63 controles técnicos de aceptación; uno de aceptación real sigue pendiente. La matriz reproduce 48 diálogos (seis guiones × dos fuentes registradas × dos modos × dos configuraciones de autoflush). Los ejemplos exportados muestran 12 diálogos. 70 turnos. 10 citas simuladas y 620 controles PASS. no resultados nuevos de calidad del modelo. [Conversaciones legibles del replay](05-resultados-y-mejoras/observaciones-reparacion-1-local/conversaciones.md) · [JSON local](05-resultados-y-mejoras/observaciones-reparacion-1-local/conversaciones-locales.json) · [Validación](05-resultados-y-mejoras/observaciones-reparacion-1-local/validacion.json) · [Resultado anterior del servidor](05-resultados-y-mejoras/observaciones-reparacion-1-local/resultado-servidor-anterior.json).
+
+| Consumo de la pareja recibida | Llamadas | Cargos informados (USD), total por fila | Completitud |
+|---|---:|---:|---|
+| `classic` | 75 | 0.10905435 | Parcial: 74 respuestas con costo de 75 llamadas. |
+| `graph-observe` | 127 | 0.11234655 | Completo: 127/127. |
+| **SUBTOTAL INFORMADO de esta pareja** | **202** | **0.22140090** | **Total definitivo desconocido.** |
+| Histórico completo anterior desde necesidades | 939 | 1.35064455 | Excluye fases anteriores sin detalle aquí. |
+| **SUMA HISTÓRICA DE IMPORTES INFORMADOS** | **1.141** | **1.57204545** | **Parcial; no es un total auditado completo.** |
+| Reparación y pruebas locales | 0 pagadas | 0.00000000 | No se llamó a OpenRouter. |
+
+La referencia tuvo media de 9,79 segundos por turno y el candidato 10,04; el candidato hizo 127 llamadas frente a 75. Los costos incompletos impiden calcular un ahorro exacto. La media incluye diálogos de distinta longitud y fallos: no permite atribuir rendimiento a la arquitectura por sí sola.
+
+![Importes observados; último tramo parcial](05-resultados-y-mejoras/observaciones-reparacion-1-local/consumo-reportado.png)
+
+| Próxima repetición, aún no ejecutada | Casos / límite | Total USD estimado por fila |
+|---|---|---:|
+| Referencia reparada `classic` | Mismos seis guiones / hasta 10 turnos cada uno | 0.12–0.20 |
+| Candidato reparado `graph-observe` | Mismos seis guiones / hasta 10 turnos cada uno | 0.13–0.25 |
+| **TOTAL ESTIMADO** | **12 conversaciones** | **0.25–0.45** |
+| **Reserva sugerida, alternativa al estimado** | No se suma al total base | **0.60** |
+
+Estimación propia basada en los importes de esta pareja y un margen para las nuevas instrucciones/reparaciones; no garantiza precio, costo ni éxito. El límite de 300 llamadas por recorrido no es un límite en dólares. Se conserva el modelo publicado, el lead guionado, sin juez LLM y sin contactos reales. La comparación debe repetir los seis casos antes de ampliar. El candidato continúa aislado; las correcciones compartidas sí se aplican al core de producción al desplegar. [Comandos de Git, servidor y PowerShell](06-como-ejecutar-las-pruebas/ejecutar-observaciones-reparacion-1.sh).
 
 ## 11. Trabajo futuro
 

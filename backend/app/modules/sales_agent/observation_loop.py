@@ -16,7 +16,7 @@ from .execution import simulated,now
 
 class DecisionError(ValueError):pass
 
-VERSION='sales-observation-loop/1.0'
+VERSION='sales-observation-loop/1.1'
 READS={'catalog','property_details','materials','financing','pricing','inventory','location','delivery','amenities'}
 
 class Decision(BaseModel):
@@ -49,7 +49,7 @@ async def run(db,scope,*,inbound,outcome,commercial,infer=None,authorize=None):
     current=[t for t in state.tasks if t.source_message_id==inbound.id]
     # Transactional services still require the current explicit intent and final
     # confirmation; the loop never creates or executes a write candidate itself.
-    plan['write_candidates_require_backend_authorization']=[t.id for t in current if t.topic.value in {'appointment','human','opt_out'} and t.status=='pending' and not restricted(state,t)]
+    plan['write_candidates_require_backend_authorization']=[t.id for t in current if t.topic.value in {'appointment','human','opt_out'} and t.status in {'pending','blocked','suspended','awaiting_user'} and not restricted(state,t)]
     if infer is None:
         from .turn_configuration import resolve
         from app.modules.ai_core.models import AIConfiguration
@@ -99,7 +99,7 @@ async def run(db,scope,*,inbound,outcome,commercial,infer=None,authorize=None):
             if choice.action!='read' and choice.tool_ids or choice.action=='read' and not choice.tool_ids:raise DecisionError('action_tool_mismatch')
             if choice.action=='read' and s['rounds']>=2:raise DecisionError('tool_round_limit')
             pending_and=[k for k,v in options.items() if v[0]=='availability' or v[0]=='task']
-            if choice.action=='clarify' and not any(t.binding_status=='unresolved' or t.status=='awaiting_user' for t in current):raise DecisionError('unnecessary_clarification')
+            if choice.action=='clarify' and not (any(t.binding_status=='unresolved' or t.status=='awaiting_user' for t in current) or any(r.status=='uncertain' and r.data.get('needs_temporal_clarification') for r in results)):raise DecisionError('unnecessary_clarification')
             if choice.action=='respond' and pending_and and s['rounds']<2:raise DecisionError('required_requests_unread')
             decisions.append({'status':'accepted','action':choice.action,'tool_ids':choice.tool_ids,'observed_operations':[r.operation_id for r in results]})
             return {'done':choice.action!='read','selected':choice.tool_ids}
@@ -164,9 +164,10 @@ async def run(db,scope,*,inbound,outcome,commercial,infer=None,authorize=None):
     for task in current:
         if task.topic.value=='other':task.status='completed'
     plan.update(tool_calls=len(trace),read_units=len(trace)*2,additional_model_calls=sum(d['status'] in {'accepted','decision_rejected'} for d in decisions),rounds=[{'round':i+1} for i in range(rounds)])
-    unread=[t.id for t in current if t.topic.value in READS and 'read_'+t.id not in attempted and t.status=='pending' and not restricted(state,t)]
-    audit={'unread_required_tasks':unread,'observations':[compact(r) for r in results],'version':VERSION,'rounds':rounds,'max_rounds':2,'decisions':decisions,'tools':trace,'external_writes':0,
-           'status':'FAIL' if any(d['status']!='accepted' for d in decisions) else 'PARTIAL' if unread else 'PASS'}
+    unread=[t.id for t in current if t.topic.value in READS and 'read_'+t.id not in attempted and t.status in {'pending','blocked','suspended','awaiting_user'} and not restricted(state,t)]
+    clarification_needed=u.requires_clarification or any(t.binding_status=='unresolved' and t.status in {'pending','blocked','suspended','awaiting_user'} and not restricted(state,t) for t in current) or any(r.status=='uncertain' and r.data.get('needs_temporal_clarification') for r in results)
+    audit={'clarification_required':clarification_needed,'unread_required_tasks':unread,'observations':[compact(r) for r in results],'version':VERSION,'rounds':rounds,'max_rounds':2,'decisions':decisions,'tools':trace,'external_writes':0,
+           'status':'FAIL' if any(d['status']!='accepted' for d in decisions) else 'CLARIFICATION_REQUIRED' if clarification_needed else 'PARTIAL' if unread else 'PASS'}
     revision,state=save(db,scope,event_key='active-observations:'+inbound.id,expected_revision=outcome.revision,state=state,
         metadata={'observation_loop':audit,'results':[r.model_dump(mode='json') for r in results],'message_id':inbound.id})
-    return replace(outcome,revision=revision,state=state,results=tuple(results),plan=plan,stop_reason='finished' if audit['status']=='PASS' else 'observation_decision_failed'),audit
+    return replace(outcome,revision=revision,state=state,results=tuple(results),plan=plan,stop_reason='finished' if audit['status']=='PASS' else 'clarification_required' if audit['status']=='CLARIFICATION_REQUIRED' else 'observation_decision_failed'),audit

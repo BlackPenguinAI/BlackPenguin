@@ -1,0 +1,45 @@
+{
+  "scope": "Local regression variants; no additional paid scenarios in the six-case server battery.",
+  "sales_model": "Published configuration unchanged; local providers mocked.",
+  "positive_mixed": [
+    "Could you send photos or a brochure and explain the financing options?",
+    "Could you send pictures or a PDF and explain the financing options?",
+    "Could you send brochure or a images and explain the financing options?",
+    "Could you send blueprints or a brochure and explain the financing options?",
+    "Please show me photos or a brochure and explain the financing options?",
+    "Please show me pictures or a PDF and explain the financing options?",
+    "Please show me brochure or a images and explain the financing options?",
+    "Please show me blueprints or a brochure and explain the financing options?",
+    "Can you share photos or a brochure and explain the financing options?",
+    "Can you share pictures or a PDF and explain the financing options?",
+    "Can you share brochure or a images and explain the financing options?",
+    "Can you share blueprints or a brochure and explain the financing options?"
+  ],
+  "positive_timing": [
+    "I would like a visit any morning in the next seven days; use the property's timezone.",
+    "I would like a visit any morning in the next seven days; Please use the project timezone",
+    "I would like a visit any morning in the next seven days; the property’s local time",
+    "I would like a visit any afternoon in the next seven days; use the property's timezone.",
+    "I would like a visit any afternoon in the next seven days; Please use the project timezone",
+    "I would like a visit any afternoon in the next seven days; the property’s local time",
+    "I would like a visit any evening in the next seven days; use the property's timezone.",
+    "I would like a visit any evening in the next seven days; Please use the project timezone",
+    "I would like a visit any evening in the next seven days; the property’s local time"
+  ],
+  "negative_prefixes": [
+    "Do not ",
+    "If I asked you to ",
+    "My friend said: ",
+    "They want you to "
+  ],
+  "negative_or_preservation_cases": [
+    "AND formats remain independent",
+    "Known asset named photos stays a named target",
+    "Unknown material owner is not replaced",
+    "America/Lima and America/Chicago are retained",
+    "Unknown/ambiguous timezones require clarification",
+    "Explicit morning after 10 AM keeps 10 AM and replaces old 3 PM limit",
+    "Unresolved pending/blocked/awaiting_user tasks are not PASS",
+    "Tool uncertainty can justify clarification without a new business action"
+  ]
+}

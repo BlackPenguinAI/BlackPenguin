@@ -1,0 +1,69 @@
+{
+  "base_commit": "31023e00ab56f196e2954025491bda77adf69da1",
+  "paid_calls": 0,
+  "model_quality_evaluated": false,
+  "production_default": "classic",
+  "regression": {
+    "passed": 3638,
+    "skipped": 11,
+    "failed": 0,
+    "modules": 147,
+    "shards": [
+      {
+        "shard": 1,
+        "passed": 1271,
+        "skipped": 2,
+        "raw_sha256": "abd42d410cdec27f51240eee0401caf35ff24d2c91b2394a5d59ce8bae5a06ab"
+      },
+      {
+        "shard": 2,
+        "passed": 1308,
+        "skipped": 3,
+        "raw_sha256": "bc86d725db5040b36797b10084054043f73eca7f5fbe1b170e4313750fe5c8b4"
+      },
+      {
+        "shard": 3,
+        "passed": 1059,
+        "skipped": 6,
+        "raw_sha256": "b208544d8d8f1fc96bedfbe48ecdeaa07100085550814edca5a7f33430cc9c58"
+      }
+    ],
+    "junit_adapter": "Canonical copies remove initial backend. from local classnames only. Raw outcomes unchanged."
+  },
+  "final_focused": {
+    "passed": 132,
+    "new_repair_module": 89,
+    "prior_observation_module": 43,
+    "final_variants_recheck": 41,
+    "note": "Re-run after final named-file, unresolved-state and stop-reason safeguards; overlaps regression, do not sum counts.",
+    "junit_sha256": "3aaa69b7ed1b95b45f736de2697ad5301c8b29814aaed7cdf86a94e253bda0c4"
+  },
+  "acceptance": {
+    "PASS": 63,
+    "FAIL": 0,
+    "NOT_RUN": 1,
+    "live_model_quality": false
+  },
+  "sharding_unit_tests": 8,
+  "examples": {
+    "cases": 12,
+    "turns": 70,
+    "meetings": 10,
+    "checks": 620,
+    "source_recording": "candidate",
+    "autoflush": false
+  },
+  "replay_matrix": {
+    "cases": 6,
+    "source_recordings": 2,
+    "modes": 2,
+    "autoflush_modes": 2,
+    "dialogues": 48
+  },
+  "limitations": [
+    "Recorded interpretation replay; all composition/decision calls mocked.",
+    "Unrecorded continuations simulated, not a cure for provider timeout.",
+    "SQLite does not verify PostgreSQL concurrency, Calendar or delivery.",
+    "No new real model quality results; repeat six cases on deployed image."
+  ]
+}

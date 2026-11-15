@@ -14,6 +14,9 @@ def normalize(value,text,commercial,*,appointment_offer=None):
     own=request_attribution(text)['current_text']
     from .needs_search import normalize as normalize_needs
     value,notes=normalize_needs(value,text,commercial)
+    from .current_request_repairs import normalize as repair_requests
+    value,repaired=repair_requests(value,text,commercial)
+    notes.extend(repaired)
     data=value.model_dump(mode='json')
     names=[r.get('property_type') for r in commercial.get('property_types',[])]
     def named(quote):

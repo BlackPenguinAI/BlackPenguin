@@ -36,7 +36,7 @@ def compare(reference,candidate):
             'accepted_reconsiderations':sum(bool((t.get('bounded_reconsideration') or {}).get('accepted')) for t in turns),
             'observation_decisions':sum(len((t.get('observation_loop') or {}).get('decisions',[])) for t in turns),
             'observation_rounds':sum((t.get('observation_loop') or {}).get('rounds',0) for t in turns),
-            'observation_turns_incomplete':sum((t.get('observation_loop') or {}).get('status') in {'FAIL','PARTIAL'} for t in turns)}
+            'observation_turns_incomplete':sum((t.get('observation_loop') or {}).get('status') in {'FAIL','PARTIAL','CLARIFICATION_REQUIRED'} for t in turns)}
     sa,sb=summary(a),summary(b)
     complete=all(c.get('turns') and not c.get('instrumentation_error') for r in (a,b) for c in r.get('cases',[]))
     costs=[s['cost_usd'] for s in (sa,sb)]
