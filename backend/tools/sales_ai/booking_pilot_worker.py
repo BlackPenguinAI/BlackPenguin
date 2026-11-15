@@ -53,7 +53,9 @@ def run(options_path, output):
         raise PermissionError('Booking iteration requires its private SQLite database.')
     Base.metadata.create_all(engine)
     credential=options['credential'];budget=Budget(options['max_calls'])
-    report={'version':VERSION if compact or needs or continuity else 'sales-closing-point/1.0' if closing else 'sales-commercial-point/1.0' if commercial else 'sales-booking-point/1.0','synthetic_only':True,'production_database_writes':0,
+    mode=options.get('orchestrator','classic')
+    if mode!='classic' and not continuity:raise ValueError('Candidate orchestration requires continuity.')
+    report={'coordinator_mode':mode,'version':VERSION if compact or needs or continuity else 'sales-closing-point/1.0' if closing else 'sales-commercial-point/1.0' if commercial else 'sales-booking-point/1.0','synthetic_only':True,'production_database_writes':0,
         'lead_contacts':0,'provider_calls':0,'lead_model':None,'judge_model':None,'commit':settings.APP_COMMIT_SHA,'cases':[],
         'limitations':['Google Calendar integration and transport delivery are not exercised.',
             'Simulation selects the first eligible seller, not the production round-robin cursor.',
@@ -88,8 +90,11 @@ def run(options_path, output):
                 for scenario in CASES:
                     budget.maximum=budget.calls+options['max_calls']//len(CASES)
                     try:
-                        with guard(budget),patch('app.integrations.openrouter_client.record_openrouter_usage',lambda **kw:None):
+                        from app.modules.sales_agent.coordinator_graph import experiment
+                        with experiment(mode),guard(budget),patch('app.integrations.openrouter_client.record_openrouter_usage',lambda **kw:None):
                             case=asyncio.run(evaluate_case(db,manifest,scenario,budget,options['max_turns']))
+                        if continuity:
+                            case['checks'].append(check('requested_orchestrator_executed',all(t.get('coordinator_graph',{}).get('mode')==mode for t in case['turns'])))
                         report['cases'].append(case)
                     except Exception as exc:
                         db.rollback();report['cases'].append({'case':scenario,'turns':[],'checks':[check('case_completed',False)],**error_details(exc)})
@@ -98,6 +103,8 @@ def run(options_path, output):
                     report['case_results']=summarize(report['cases'])
                     report['cost_reporting_complete']=budget.usage['responses_with_cost']==budget.calls
                 if continuity:
+                    turns=[t for c in report['cases'] for t in c.get('turns',[])]
+                    report['coordinator_summary']={'mode':mode,'turns':len(turns),'reconsiderations':sum((t.get('coordinator_graph') or {}).get('reconsiderations',0) for t in turns),'accepted_reconsiderations':sum(bool((t.get('bounded_reconsideration') or {}).get('accepted')) for t in turns),'elapsed_ms_total':sum(t.get('elapsed_ms',0) for t in turns)}
                     report.update(overall_dialogue_quality='NOT_EVALUATED',quality_scope='Continuity, material ownership and first-booking checks only; human review remains necessary.',cost_reporting_complete=budget.usage['responses_with_cost']==budget.calls)
                     report['split_results']={split:{'cases':sum(c.get('split')==split for c in report['cases']),'passed':sum(c.get('split')==split and all(k['status']=='PASS' for t in c.get('turns',[]) for k in t.get('checks',[])) and all(k['status']=='PASS' for k in c.get('checks',[])) for c in report['cases'])} for split in ('development','transfer','resumption','contextual')}
                 if needs:

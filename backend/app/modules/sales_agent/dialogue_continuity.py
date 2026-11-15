@@ -75,7 +75,7 @@ def normalize(value,text,state,latest):
             notes.append({'field':'requests','action':'details_for_current_numbered_property'})
     # Scoped state owns the subject; the quote remains the current message.
     if state.selected_property_type_id:
-        material=re.fullmatch(r'\s*(?:(?:do you have|(?:please )?(?:show|send)(?: me)?|I want to (?:check|see))\s+)(?:the (?:property )?)?(photos?|pictures?|images?|blueprints?|floor plans?)(?: of (?:the|this|that) property)?[?.!]?\s*',text,re.I)
+        material=re.fullmatch(r'\s*(?:(?:do you have|(?:can|could|would) you (?:show|send)(?: me| us)?|(?:please )?(?:show|send)(?: me| us)?|(?:I|we) (?:want|would like|need) to (?:check|see|view))\s+)(?:the (?:property )?)?(photos?|pictures?|images?|blueprints?|floor plans?)(?: of (?:the|this|that) property)?[?.!]?\s*',text,re.I)
         anaphor=re.search(r'\b(?:the|this|that) property\b',text,re.I)
         if material:
             subject='floor_plan' if re.search(r'blueprint|floor',material[1],re.I) else 'photos'
@@ -199,3 +199,45 @@ def focused_visit_question(value,text,commercial):
 
 
 REPORTED_VISIT=re.compile(r"\b(?:not|never|don.t|do not|if|suppose|friend|said|told|already|previous|yesterday)\b|[\"“”]",re.I)
+
+
+def literal_material_read(db,scope,value,text):
+    """A literal request + approved current owner allows discovery, not booking.
+
+    Sharing still passes material approval, coverage, restrictions and delivery
+    checks. Model confidence remains untouched; this is a scoped capability.
+    """
+    from .dialogue_store import load
+    from .reference_resolution import Resolver
+    from app.modules.governance.services import request_attribution
+    if request_attribution(text)['current_text']!=text:return False
+    if value.comparison or value.constraints or value.alternatives or value.releases:return False
+    if any(getattr(value,k) for k in ('visit','reschedule','cancellation','wait','moderation','appointment_query','preferences','personal_facts','preference_withdrawals','source_purposes','objections')):return False
+    if len(value.requests)!=1:return False
+    row=value.requests[0]
+    if row.id!='current_material' or row.topic.value!='materials' or row.polarity!='request':return False
+    if row.evidence!=text or row.subject not in {'photos','floor_plan'}:return False
+    ref=next((r for r in value.references if r.id==row.reference_id),None)
+    if not ref or ref.kind!='property' or ref.expression!='this property':return False
+    _,state=load(db,scope)
+    if not state.selected_property_type_id or state.selected_unit_id:return False
+    resolver=Resolver(db,scope,state);result=resolver.resolve(ref)
+    return bool(result.get('status')=='resolved' and result['value'].get('property_id')==state.selected_property_type_id)
+
+
+def focused_material_question(value,text,state,commercial):
+    """A request-shaped material frame may ask a focused question, never share."""
+    from app.modules.governance.services import request_attribution
+    if request_attribution(text)['current_text']!=text or REPORTED_VISIT.search(text):return None
+    if value.comparison or value.constraints or value.alternatives or value.releases:return None
+    if any(getattr(value,k) for k in ('visit','reschedule','cancellation','wait','moderation','appointment_query')):return None
+    if len(value.requests)!=1 or not value.permits('materials'):return None
+    subject=value.requests[0].subject
+    labels={'photos':'photos','floor_plan':'the floor plan','brochure':'the brochure'}
+    owners=[p for p in commercial.get('property_types',[]) if p.get('id')==state.selected_property_type_id]
+    if subject not in labels or len(owners)!=1 or state.selected_unit_id:return None
+    name=owners[0]['property_type']
+    # A conflicting named reference needs reference resolution, not a presumed owner.
+    if any(ref.kind not in {'property','material'} or ref.kind=='property' and
+           ref.expression.casefold() not in {name.casefold(),'this property','the property','that property'} for ref in value.references):return None
+    return 'Would you like '+labels[subject]+' of '+name+'?'

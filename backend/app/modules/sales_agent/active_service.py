@@ -444,419 +444,462 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
         db.commit()
         interpretation_audit={}
         try:
-            from .next_flow import selected as next_selected
-            next_enabled=next_selected(scope)
-            from .moderation import precheck as moderation_precheck
-            hard_moderation=moderation_precheck(inbound.content) if next_enabled and not exact_stop else None
-            if next_enabled and not exact_stop and not hard_moderation and not evidenced_pause_reason(inbound.content):
-                from .language_policy import detect,scoped_names,credential_request
-                if not credential_request(inbound.content):
-                    language_context=build_commercial_context(db,project=project,company_id=scope.company_id,lead_id=scope.lead_id,channel=conversation.channel)
-                    previous=latest_outbound(db,conversation.id,skip_language_holds=True)
-                    previous_data=(previous.metadata_json or {}) if previous else {}
-                    contextual=any(previous_data.get(k) for k in ('qualification_offer','material_offer','appointment_offer','control_confirmation','release_offer','property_catalog_offer'))
-                    decision=detect(inbound.content,names=scoped_names(project,lead,language_context),contextual_answer=contextual)
-                    if decision.needs_reentry:raise LanguageHold(decision)
-            revision,state=load(db,scope)
-            state,previous_meta=_references(db,conversation,state,inbound)
-            # A bounded explicit assent can release a prohibition only when the
-            # immediately preceding server message asked that precise question.
-            release_offer=previous_meta.get('release_offer')
-            if release_offer and live._affirmative_slot_reply(inbound.content):
-                state.constraints=[c for c in state.constraints if not (c.topic.value==release_offer['topic'] and c.subject==release_offer.get('subject'))]
-            revision,state=save(db,scope,event_key='active-context:'+inbound.id,expected_revision=revision,state=state,
-                metadata={'engine':ENGINE,'workflow_version':'sales-current/1.0','message_id':inbound.id})
-            protected=evidenced_pause_reason(inbound.content)
-            if next_enabled and protected in {None,'HUMAN_REQUESTED'}:
-                from .language_policy import credential_request
-                if credential_request(inbound.content):protected='SECURITY'
-            if previous_meta.get('control_confirmation')=='human' and live._affirmative_slot_reply(inbound.content):
-                protected='HUMAN_REQUESTED'
-            if next_enabled and protected=='HUMAN_REQUESTED':
-                from app.modules.governance.services import request_attribution
-                import re
-                if any(evidenced_pause_reason(clause)=='SECURITY' for clause in re.split(r'[.!?;\n]',request_attribution(inbound.content)['current_text'])):protected='SECURITY'
-            human_step=None;pure_human=False;human_fallback=False
-            if next_enabled and not exact_stop and protected in {None,'HUMAN_REQUESTED'} and not hard_moderation:
-                from .human_contact import stage,mixed_question
-                human_step=stage(db,scope,conversation,inbound.content,previous_meta)
-                if human_step:
+            action_holds = advisory = approved_policy = capture_profile = case = commercial = count = decision = detect = frame = human_fallback = human_step = interpretation = interpreted_revision = metadata = moderation_decision = next_enabled = next_selected = outcome = p = previous_meta = protected = published_configuration = pure_human = result = revision = row = scoped_names = scoring_pack = state = t = task = terminal_only = terminal_text = trace = u = v = None
+            async def interpret_phase():
+                nonlocal action_holds, approved_policy, capture_profile, commercial, conversation, count, decision, detect, frame, human_fallback, human_step, interpretation_audit, interpreted_revision, lead, next_enabled, next_selected, previous_meta, project, protected, published_configuration, pure_human, revision, scoped_names, scoring_pack, state, terminal_only, terminal_text, u
+                from .next_flow import selected as next_selected
+                next_enabled=next_selected(scope)
+                from .moderation import precheck as moderation_precheck
+                hard_moderation=moderation_precheck(inbound.content) if next_enabled and not exact_stop else None
+                if next_enabled and not exact_stop and not hard_moderation and not evidenced_pause_reason(inbound.content):
+                    from .language_policy import detect,scoped_names,credential_request
+                    if not credential_request(inbound.content):
+                        language_context=build_commercial_context(db,project=project,company_id=scope.company_id,lead_id=scope.lead_id,channel=conversation.channel)
+                        previous=latest_outbound(db,conversation.id,skip_language_holds=True)
+                        previous_data=(previous.metadata_json or {}) if previous else {}
+                        contextual=any(previous_data.get(k) for k in ('qualification_offer','material_offer','appointment_offer','control_confirmation','release_offer','property_catalog_offer'))
+                        decision=detect(inbound.content,names=scoped_names(project,lead,language_context),contextual_answer=contextual)
+                        if decision.needs_reentry:raise LanguageHold(decision)
+                revision,state=load(db,scope)
+                state,previous_meta=_references(db,conversation,state,inbound)
+                # A bounded explicit assent can release a prohibition only when the
+                # immediately preceding server message asked that precise question.
+                release_offer=previous_meta.get('release_offer')
+                if release_offer and live._affirmative_slot_reply(inbound.content):
+                    state.constraints=[c for c in state.constraints if not (c.topic.value==release_offer['topic'] and c.subject==release_offer.get('subject'))]
+                revision,state=save(db,scope,event_key='active-context:'+inbound.id,expected_revision=revision,state=state,
+                    metadata={'engine':ENGINE,'workflow_version':'sales-current/1.0','message_id':inbound.id})
+                protected=evidenced_pause_reason(inbound.content)
+                if next_enabled and protected in {None,'HUMAN_REQUESTED'}:
+                    from .language_policy import credential_request
+                    if credential_request(inbound.content):protected='SECURITY'
+                if previous_meta.get('control_confirmation')=='human' and live._affirmative_slot_reply(inbound.content):
+                    protected='HUMAN_REQUESTED'
+                if next_enabled and protected=='HUMAN_REQUESTED':
+                    from app.modules.governance.services import request_attribution
+                    import re
+                    if any(evidenced_pause_reason(clause)=='SECURITY' for clause in re.split(r'[.!?;\n]',request_attribution(inbound.content)['current_text'])):protected='SECURITY'
+                human_step=None;pure_human=False;human_fallback=False
+                if next_enabled and not exact_stop and protected in {None,'HUMAN_REQUESTED'} and not hard_moderation:
+                    from .human_contact import stage,mixed_question
+                    human_step=stage(db,scope,conversation,inbound.content,previous_meta)
+                    if human_step:
+                        protected=None
+                        pure_human=not mixed_question(inbound.content)
+                if hard_moderation:protected=hard_moderation['reason']
+                if protected and not next_enabled and dismissed_trigger(lead,conversation.id,protected,inbound.content):
                     protected=None
-                    pure_human=not mixed_question(inbound.content)
-            if hard_moderation:protected=hard_moderation['reason']
-            if protected and not next_enabled and dismissed_trigger(lead,conversation.id,protected,inbound.content):
-                protected=None
-            from .sales_policy import policy_context, compliance_action_holds
-            commercial=build_commercial_context(db,project=project,company_id=scope.company_id,lead_id=scope.lead_id,channel=conversation.channel)
-            approved_policy=policy_context(db,scope,commercial['confirmed_project_facts'])
-            action_holds=compliance_action_holds(approved_policy)
-            from .conversation_closing import terminal_text
-            operation_context=any(previous_meta.get(k) for k in ('booking_confirmation','reschedule_confirmation','reschedule_meeting_offer','cancellation_confirmation','cancellation_meeting_offer','cancellation_followup'))
-            terminal_only=next_enabled and not protected and not human_step and not operation_context and terminal_text(inbound.content)
-            if protected or exact_stop or (human_step and pure_human) or terminal_only:
-                u=Understanding.model_validate(dict(version='sales-understanding/1.0',requests=[dict(id='protected',
-                    topic='opt_out' if exact_stop else 'other' if terminal_only else 'human',polarity='request',evidence=inbound.content[:2000])],
-                    all_of=['protected'],alternatives=[],constraints=[],references=[],preferences=[],
-                    requires_clarification=False,clarification_question=None,confidence=1.0))
-                if terminal_only:
-                    from .conversation_closing import terminal_understanding
-                    u=terminal_understanding(u,inbound.content)
-                interpreted_revision=revision
-            else:
-                interpreted=await asyncio.wait_for(preview(db,scope,inbound_message_id=inbound.id,expected_revision=revision,
-                    event_key='active-understanding:'+inbound.id,active=True),timeout=45)
-                preview_event=scope.query(db,SalesDialogueEvent).filter_by(event_key='active-understanding:'+inbound.id).first()
-                if preview_event:
-                    from copy import deepcopy
-                    interpretation_audit=deepcopy(preview_event.payload_json.get('metadata') or {})
-                if interpreted.status!='accepted' and next_enabled and interpreted.declarations:
-                    conversation,lead,project=_current(db,scope)
-                    continuity.check_epoch(conversation,run.input_snapshot.get('continuity_epoch'))
-                    from .current_declarations import frame
-                    from .lead_profile import capture as capture_profile
-                    capture_profile(db,scope,frame(list(interpreted.declarations)),inbound.id)
-                    from .profile_intelligence import update as update_profile
-                    from .turn_configuration import published_configuration
-                    scoring_pack,_=published_configuration(db,scope.company_id)
-                    count=scoped_messages_query(db,conversation).filter_by(direction='inbound').count()
-                    update_profile(db,lead,commercial=commercial,message_count=count,scoring_config=scoring_pack.get('scoring_config',{}))
-                    db.flush([lead])
-                if interpreted.status!='accepted' and not human_step:
-                    # Keep the rejected response and request evidence, not just
-                    # a generic error snapshot, before composing a safe reply.
-                    db.commit()
-                    raise ValueError('Understanding could not be validated.')
-                if interpreted.status!='accepted':
-                    human_fallback=True
-                    u=Understanding.model_validate(dict(version='sales-understanding/1.0',requests=[dict(id='contact',topic='human',polarity='request',evidence=inbound.content[:2000])],all_of=['contact'],alternatives=[],constraints=[],references=[],preferences=[],requires_clarification=False,clarification_question=None,confidence=1.0))
-                else:u=_confirmed_offer_understanding(interpreted.state.last_understanding,previous_meta,inbound.content)
-                if next_enabled:
-                    from .first_booking import enrich_understanding
-                    u=enrich_understanding(u,previous_meta,inbound.content)
-                    from .reschedule_service import enrich as enrich_reschedule
-                    u=enrich_reschedule(u,previous_meta,inbound.content)
-                    from .cancellation_service import enrich as enrich_cancellation
-                    u=enrich_cancellation(u,previous_meta,inbound.content)
-                    from .wait_service import enrich as enrich_wait
-                    u=enrich_wait(u,previous_meta,inbound.content)
-                from .conversation_closing import terminal_understanding
-                u=terminal_understanding(u,inbound.content) if next_enabled and not operation_context else u
-                u=confirmed_controls(u,inbound.content,pause_reason='HUMAN_REQUESTED' if human_step else protected)
-                interpreted_revision=interpreted.revision
-            moderation_decision=None
-            db.refresh(conversation)
-            continuity.check_epoch(conversation,run.input_snapshot.get('continuity_epoch'))
-            if next_enabled and not exact_stop:
-                from .moderation import assess
-                moderation_decision=assess(db,scope,inbound,u,event_id)
-                if moderation_decision and moderation_decision['disposition']=='pause':protected=moderation_decision['reason']
-                if moderation_decision and moderation_decision['disposition'] in {'warn','boundary'}:
-                    u=Understanding.model_validate({**u.model_dump(),'requests':[{'id':'moderation_boundary','topic':'other','subject':None,'polarity':'request','evidence':inbound.content[:2000]}],
-                        'all_of':['moderation_boundary'],'alternatives':[],'references':[],'constraints':[],'releases':[],'preferences':[],
-                        'visit':None,'reschedule':None,'cancellation':None,'wait':None,'courtesy':None,'comparison':None,
-                        'personal_facts':[],'preference_withdrawals':[],'source_purposes':[],'objections':[],'empathy':None,'selected_reference_id':None,'appointment_query':None,'requires_clarification':False,'clarification_question':None,'confidence':1.0})
-            from .needs_search import literal_read,contextual_read, VERSION as NEEDS_VERSION
-            literal_needs_read=bool(next_enabled and literal_read(u,inbound.content))
-            contextual_needs_read=bool(next_enabled and contextual_read(db,scope,u,inbound.content))
-            from .dialogue_continuity import catalog_choice_read,comparison_read,literal_greeting,named_choice_read,focused_visit_question
-            greeting_read=bool(next_enabled and literal_greeting(u,inbound.content))
-            if greeting_read:
-                run.input_snapshot={**run.input_snapshot,'dialogue_read_authorization':{'basis':'literal_greeting_no_actions','model_confidence':u.confidence,'effect_authorization':False}}
-            named_read=bool(next_enabled and named_choice_read(u,inbound.content,latest_outbound(db,conversation.id),commercial))
-            choice_read=bool(named_read or next_enabled and catalog_choice_read(u,inbound.content,latest_outbound(db,conversation.id),commercial))
-            compare_read=bool(next_enabled and comparison_read(db,scope,u,inbound.content))
-            if compare_read:
-                run.input_snapshot={**run.input_snapshot,'dialogue_read_authorization':{'basis':'explicit_scoped_comparison','model_confidence':u.confidence,'effect_authorization':False}}
-            if choice_read:
-                run.input_snapshot={**run.input_snapshot,'dialogue_read_authorization':{'basis':'current_named_catalog_choice' if named_read else 'current_numbered_catalog_choice','model_confidence':u.confidence,'effect_authorization':False}}
-            if contextual_needs_read or choice_read or compare_read or greeting_read:u=u.model_copy(update={'requires_clarification':False,'clarification_question':None})
-            if literal_needs_read or contextual_needs_read:
-                run.input_snapshot={**run.input_snapshot,'needs_read_authorization':{'version':NEEDS_VERSION,'basis':'accepted_current_unknown_listing_offer' if contextual_needs_read else 'validated_current_literal_catalog_request','model_confidence':u.confidence,'effect_authorization':False}}
-            if u.confidence < .8 and not u.requires_clarification and not (literal_needs_read or contextual_needs_read or choice_read or compare_read or greeting_read):
-                focused=focused_visit_question(u,inbound.content,commercial) if next_enabled else None
-                u=u.model_copy(update={'requires_clarification':True,'clarification_question':focused or 'Could you clarify whether you want property details, materials, financing, or a visit?'})
-                if focused:run.input_snapshot={**run.input_snapshot,'focused_visit_clarification':{'model_confidence':u.confidence,'effect_authorization':False}}
-            # Legal/commercial approvals hold the action, not the conversation.
-            advisory=escalation_reason(inbound.content)
-            if not protected and not exact_stop and advisory in {'LEGAL_QUESTION','COMPLEX_NEGOTIATION'}:
-                u=u.model_copy(update={'requires_clarification':True,'clarification_question':'The Sales team needs to review that legal or commercial exception. I can continue helping with approved property information.'})
-            outcome=run_turn(db,scope,message_id=inbound.id,understanding=u,expected_revision=interpreted_revision,
-                event_key='active-runtime:'+inbound.id,max_steps=policy.max_steps,max_seconds=policy.max_seconds,
-                **({'max_rounds':policy.max_rounds,'max_read_units':policy.max_read_units} if next_enabled else {}))
-            if next_enabled:
-                from .first_booking import apply_courtesy
-                apply_courtesy(db,conversation,lead,outcome.state)
-                if terminal_text(inbound.content):
-                    from .first_booking import stop_cadence
-                    stop_cadence(db,conversation,lead,outcome.state,'farewell')
-                # Preserve the stopped follow-up date before the fresh permission read
-                # under production autoflush=False; this remains rollbackable.
-                db.flush([lead])
-            conversation,lead,project=_current(db,scope,control=exact_stop)  # Manual takeover/consent/permissions win after inference.
-            continuity.check_epoch(conversation,run.input_snapshot.get('continuity_epoch'))
-            draft=compose(outcome,channel=conversation.channel,style=policy.composition_style)
-            if next_enabled:
-                from .natural_reply import naturalize
-                draft=naturalize(outcome,draft,channel=conversation.channel)
-            material_question=''
-            reference_question=''
-            reference_metadata={}
-            appointment=''
-            # Material discovery blocks are replaced by verified live links or
-            # a specific fallback question; never send "not sent yet" diagnostics.
-            text=draft.text
-            text='\n\n'.join(b for b in text.split('\n\n') if not b.startswith(('Available material:', 'Materials: verified information is not available in this query.')))
-            if next_enabled:
-                from dataclasses import replace
-                draft=replace(draft,text=text)
-            metadata={'engine':ENGINE,'workflow_version':'sales-current/1.0','inbound_message_id':inbound.id,'selected_property_type_id':outcome.state.selected_property_type_id}
-            if next_enabled:metadata['selected_unit_id']=outcome.state.selected_unit_id
-            if human_fallback:metadata['human_contact_interpretation_fallback']=True
-            if moderation_decision:metadata['moderation']=moderation_decision
-            metadata['requested_topics']=sorted({r.topic.value for r in u.requests if r.polarity=='request'})
-            metadata['policy_holds_at_prepare']=sorted(action_holds)
-            if next_enabled:metadata['action_policy']=approved_policy.get('action_policy')
-            if next_enabled:metadata['planning']=getattr(outcome,'plan',None)
-            if not human_step and u.requires_clarification and any(r.topic.value=='human' and r.polarity=='request' for r in u.requests):
-                metadata['control_confirmation']='human'
-            actions=[];share_ids=[];delivered=set();extra=[];links=[]
-            safe_u=outcome.state.last_understanding
-            if exact_stop:
-                lead.is_opt_out=True;lead.consent_status='opted_out';lead.agent_status='paused';lead.next_action_at=None
-                conversation.is_paused=True;conversation.pause_reason='Lead opted out'
-                text='You have been unsubscribed and will not receive further messages.'
-                metadata['control_outcome']='opt_out'
-            elif protected:
-                case=create_intervention_case(db,conversation=conversation,lead=lead,reason=protected,evidence=inbound.content)
-                text="Your request and this conversation have been recorded for the Sales team to review."
-                if next_enabled and protected=='SECURITY':
-                    text="I cannot share private credentials or access another company's data. Your request has been recorded for the Sales team to review."
-                if protected in {'THREAT','REPEATED_ABUSE'}:
-                    text='This conversation needs the Sales team to review the '+('threatening message.' if protected=='THREAT' else 'continued personal abuse after the warning.')
-                if protected=='REPEATED_UNAUTHORIZED_USE':
-                    text='Continued requests outside property assistance after the warning have been recorded for the Sales team to review.'
-                if moderation_decision and moderation_decision.get('id'):
-                    from .moderation_models import SalesModerationIncident
-                    db.get(SalesModerationIncident,moderation_decision['id']).intervention_case_id=case.id
-                metadata.update(human_intervention_case_id=case.id,control_outcome='handoff',reason=protected,reason_source='verified_current_request')
-            elif terminal_only:
-                from .conversation_closing import GOODBYE
-                text=GOODBYE
-                metadata['conversation_closing']='farewell'
-            elif human_step:
-                from .human_contact import apply as apply_human_contact
-                contact_text,contact_meta=apply_human_contact(db,scope,conversation,lead,outcome,inbound,human_step)
-                metadata.update(contact_meta)
-                text=contact_text
-            elif not safe_u.requires_clarification:
-                for task in outcome.state.tasks:
-                    if task.source_message_id==inbound.id and restricted(outcome.state,task) and safe_u.permits(task.topic,task.subject):
-                        extra.append('You previously asked not to receive this. Do you want to allow it now?')
-                        metadata['release_offer']={'topic':task.topic.value,'subject':task.subject}
-                appointment,appointment_meta,actions=(None,{},[]) if 'appointment' in action_holds and not (safe_u.wait and safe_u.wait.action in {'cancel','decline'}) else _appointment(db,scope,conversation,lead,project,outcome,inbound)
-                metadata.update(appointment_meta)
-                if appointment:extra.append(appointment)
-                if next_enabled and 'materials' not in action_holds:
-                    from .material_delivery import deliver,request_context,VERSION as MATERIAL_VERSION
-                    links,share_ids,offer,question,delivered,material_bindings=deliver(db,scope,conversation,lead,run,outcome,previous_meta)
-                    metadata['material_delivery_version']=MATERIAL_VERSION
-                    metadata['material_bindings']=material_bindings
-                    metadata['material_request_context']=request_context(outcome,inbound.id)
+                from .sales_policy import policy_context, compliance_action_holds
+                commercial=build_commercial_context(db,project=project,company_id=scope.company_id,lead_id=scope.lead_id,channel=conversation.channel)
+                approved_policy=policy_context(db,scope,commercial['confirmed_project_facts'])
+                action_holds=compliance_action_holds(approved_policy)
+                from .conversation_closing import terminal_text
+                operation_context=any(previous_meta.get(k) for k in ('booking_confirmation','reschedule_confirmation','reschedule_meeting_offer','cancellation_confirmation','cancellation_meeting_offer','cancellation_followup'))
+                terminal_only=next_enabled and not protected and not human_step and not operation_context and terminal_text(inbound.content)
+                if protected or exact_stop or (human_step and pure_human) or terminal_only:
+                    u=Understanding.model_validate(dict(version='sales-understanding/1.0',requests=[dict(id='protected',
+                        topic='opt_out' if exact_stop else 'other' if terminal_only else 'human',polarity='request',evidence=inbound.content[:2000])],
+                        all_of=['protected'],alternatives=[],constraints=[],references=[],preferences=[],
+                        requires_clarification=False,clarification_question=None,confidence=1.0))
+                    if terminal_only:
+                        from .conversation_closing import terminal_understanding
+                        u=terminal_understanding(u,inbound.content)
+                    interpreted_revision=revision
                 else:
-                    links,share_ids,offer,question,delivered=([],[],{},None,set()) if 'materials' in action_holds else _materials(db,scope,conversation,lead,run,outcome,previous_meta)
-                material_question=question or ''
-                if offer:metadata['material_offer']=offer
-                if question:extra.append(question)
-                if any(t.topic.value in {'catalog','inventory','pricing'} and t.source_message_id==inbound.id and t.status=='completed' for t in outcome.state.tasks):
-                    context=build_commercial_context(db,project=project,company_id=scope.company_id,lead_id=scope.lead_id,channel=conversation.channel)
-                    selected=outcome.state.selected_property_type_id
-                    broad=safe_u.permits('catalog')
-                    comparison=next((r.data for r in outcome.results if r.data.get('comparison_text')),None)
-                    if comparison is not None:
-                        ids=comparison['comparison_property_ids']
-                        if ids:metadata['property_catalog_offer']={'property_type_ids':ids}
-                        if comparison['comparison_unit_ids']:metadata['unit_catalog_offer']={'unit_ids':comparison['comparison_unit_ids']}
-                    else:
-                        shown=list(dict.fromkeys(p['id'] for result in outcome.results for p in result.data.get('property_types',[])))
-                        unit_ids=list(dict.fromkeys(p['id'] for result in outcome.results for p in result.data.get('units',[])))
-                        if shown:metadata['property_catalog_offer']={'property_type_ids':shown}
-                        if unit_ids:metadata['unit_catalog_offer']={'unit_ids':unit_ids}
-                    extra.append('Which property option would you like to explore in more detail?')
-            affected=sorted({t.topic.value for t in outcome.state.tasks if t.source_message_id==inbound.id} & action_holds)
-            if (affected or advisory in {'LEGAL_QUESTION','COMPLEX_NEGOTIATION'}) and not conversation.is_paused:
-                from .escalation_policy import notify_sales
-                decision={'reason':advisory if advisory in {'LEGAL_QUESTION','COMPLEX_NEGOTIATION'} else 'ACTION_POLICY_REVIEW','disposition':'notify_sales','held_topics':affected,'conversation_paused':False}
-                notify_sales(db,conversation=conversation,lead=lead,decision=decision,event_id=inbound.id,evidence=inbound.content)
-                metadata['review_notice']=decision
-                extra.append('The Sales team needs to verify that part of your request. I can continue helping with other approved information. What else would you like to know?')
-            if next_enabled:
-                from .wait_service import reconcile
-                reconcile(db,scope,outcome.state,metadata)
-            if conversation.is_paused:
-                metadata['expected_pause_reason']=conversation.pause_reason
-                db.query(SalesFollowUpJob).filter(SalesFollowUpJob.conversation_id==conversation.id,SalesFollowUpJob.status.in_(['pending','processing'])).update({'status':'cancelled'},synchronize_session=False)
-            if safe_u.requests and all(r.topic.value=='other' for r in safe_u.requests) and not safe_u.requires_clarification and not protected and not exact_stop:
-                text='How can I help: property options, materials, pricing, financing, or delivery timing?'
-            if (extra or links) and text=='I need clarification or verified information to answer this request.':
-                text=''
-            if next_enabled:
-                from .planning_reply import continuation
-                question,offer_metadata=continuation(outcome,action_holds)
-                if question:extra.append(question)
-                reference_question=question
-                reference_metadata=offer_metadata
-                metadata.update(offer_metadata)
-            text='\n\n'.join(v for v in [text,*extra,*links] if v)
-            if not text:text='Which property or approved material would you like to review?'
-            if not conversation.is_paused and not lead.is_opt_out and not safe_u.requires_clarification:
-                from .sales_policy import capture, next_question, missing_fields
-                from app.modules.sales_crm.intelligence import update_lead_intelligence
-                chosen=next((p for p in commercial['property_types'] if p['id']==outcome.state.selected_property_type_id),None)
-                if next_enabled:
-                    from .lead_profile import capture as capture_profile
-                    plan=getattr(outcome,'plan',None) or {}
-                    interest=plan.get('interest_reference')
-                    refs=[r for i,r in enumerate(safe_u.references) if (r.id or 'legacy-'+str(i))==interest]
-                    capture_u=safe_u.model_copy(update={'references':refs})
-                    chosen_unit=next((v for v in commercial['inventory'] if v['id']==outcome.state.selected_unit_id and v.get('unit_code')),None)
-                    captured=capture_profile(db,scope,capture_u,inbound.id,
-                        selected_property={**chosen,'unit_id':outcome.state.selected_unit_id} if interest and chosen else None,
-                        selected_unit=chosen_unit if interest else None)
-                    from .lead_profile import optional_profile
-                    metadata['profile_capture']=[{'namespace':namespace,'field':field,'status':row['status']}
-                        for namespace,values in (('commercial',captured['current']),('optional',optional_profile(lead)['current']))
-                        for field,row in values.items() if (row.get('source_ref') or {}).get('message_id')==inbound.id]
-                else:capture(lead,safe_u,inbound.id,selected_property=chosen)
-                history=scoped_messages_query(db,conversation).filter(SalesMessage.created_at<=inbound.created_at).order_by(SalesMessage.created_at,SalesMessage.id).all()
-                lead_text,count=live._lead_intelligence_input(history)
-                config=db.query(AIConfiguration).filter_by(company_id=None).first()
-                if next_enabled:
-                    # Reporting scores do not assign a persona or reinterpret
-                    # workflow state from a bag of form/history keywords.
-                    from .profile_intelligence import update as update_declared_intelligence
-                    from .lead_profile import qualification
-                    from .turn_configuration import published_configuration
-                    scoring_pack,_=published_configuration(db,scope.company_id)
-                    update_declared_intelligence(db,lead,commercial=commercial,message_count=count,scoring_config=scoring_pack.get('scoring_config',{}))
-                    metadata['qualification_missing']=qualification(lead,commercial['confirmed_project_facts'])[0]
-                else:
-                    update_lead_intelligence(db,lead,inbound_text=inbound.content,conversation_text=lead_text,message_count=count,
-                        scoring_config=(config.agent_ventas or {}).get('scoring_config',{}) if config else {})
-                    metadata['qualification_missing']=missing_fields(lead,commercial['confirmed_project_facts'])
-                if not safe_u.requests and safe_u.preferences:
-                    text='Thanks, I have recorded that information. What would you like to explore next?'
-                if not next_enabled and safe_u.confidence>=.8 and not safe_u.permits('appointment') and not previous_meta.get('material_offer') and not links and not (
-                    next_enabled and (getattr(outcome,'plan',{}).get('questions') or outcome.stop_reason in {'step_limit','time_limit','round_limit','read_cost_limit','capacity_limit'})):
+                    interpreted=await asyncio.wait_for(preview(db,scope,inbound_message_id=inbound.id,expected_revision=revision,
+                        event_key='active-understanding:'+inbound.id,active=True),timeout=45)
+                    preview_event=scope.query(db,SalesDialogueEvent).filter_by(event_key='active-understanding:'+inbound.id).first()
+                    if preview_event:
+                        from copy import deepcopy
+                        interpretation_audit=deepcopy(preview_event.payload_json.get('metadata') or {})
+                    if interpreted.status!='accepted' and next_enabled and interpreted.declarations:
+                        conversation,lead,project=_current(db,scope)
+                        continuity.check_epoch(conversation,run.input_snapshot.get('continuity_epoch'))
+                        from .current_declarations import frame
+                        from .lead_profile import capture as capture_profile
+                        capture_profile(db,scope,frame(list(interpreted.declarations)),inbound.id)
+                        from .profile_intelligence import update as update_profile
+                        from .turn_configuration import published_configuration
+                        scoring_pack,_=published_configuration(db,scope.company_id)
+                        count=scoped_messages_query(db,conversation).filter_by(direction='inbound').count()
+                        update_profile(db,lead,commercial=commercial,message_count=count,scoring_config=scoring_pack.get('scoring_config',{}))
+                        db.flush([lead])
+                    if interpreted.status!='accepted' and not human_step:
+                        # Keep the rejected response and request evidence, not just
+                        # a generic error snapshot, before composing a safe reply.
+                        db.commit()
+                        raise ValueError('Understanding could not be validated.')
+                    if interpreted.status!='accepted':
+                        human_fallback=True
+                        u=Understanding.model_validate(dict(version='sales-understanding/1.0',requests=[dict(id='contact',topic='human',polarity='request',evidence=inbound.content[:2000])],all_of=['contact'],alternatives=[],constraints=[],references=[],preferences=[],requires_clarification=False,clarification_question=None,confidence=1.0))
+                    else:u=_confirmed_offer_understanding(interpreted.state.last_understanding,previous_meta,inbound.content)
                     if next_enabled:
-                        _,field,question=qualification(lead,commercial['confirmed_project_facts'],record_asked=True)
-                    else:field,question=next_question(lead,commercial['confirmed_project_facts'],record=True)
-                    if question:
-                        if not safe_u.requests and safe_u.preferences:
-                            text='Thanks, I have recorded that information.'
-                        text+='\n\n'+question
-                        metadata['qualification_offer']={'field':field,'question':question}
-            moderation_boundary=bool(moderation_decision and moderation_decision['disposition'] in {'warn','boundary'})
-            if moderation_boundary:
-                from .moderation import WARNING,BOUNDARY,USE_WARNING
-                text=(USE_WARNING if moderation_decision['category']=='unauthorized_use' else WARNING) if moderation_decision['disposition']=='warn' else BOUNDARY
-            if next_enabled and not exact_stop and not protected and not moderation_boundary and not (human_step and pure_human) and not terminal_only:
-                from .commercial_composer import compose as compose_commercial
-                # Replace stacked catalog/material/qualification questions with
-                # one continuation authorized against the current results.
-                priority=contact_text if human_step else reference_question or material_question
-                priority_meta=reference_metadata if reference_question else {}
-                if reference_question and metadata.get('material_offer'):
-                    metadata.pop('material_offer',None)
-                release=next((v for v in extra if v.startswith('You previously asked')),None)
-                if release and not priority:priority=release
-                if safe_u.requires_clarification:
+                        from .first_booking import enrich_understanding
+                        u=enrich_understanding(u,previous_meta,inbound.content)
+                        from .reschedule_service import enrich as enrich_reschedule
+                        u=enrich_reschedule(u,previous_meta,inbound.content)
+                        from .cancellation_service import enrich as enrich_cancellation
+                        u=enrich_cancellation(u,previous_meta,inbound.content)
+                        from .wait_service import enrich as enrich_wait
+                        u=enrich_wait(u,previous_meta,inbound.content)
+                    from .conversation_closing import terminal_understanding
+                    u=terminal_understanding(u,inbound.content) if next_enabled and not operation_context else u
+                    u=confirmed_controls(u,inbound.content,pause_reason='HUMAN_REQUESTED' if human_step else protected)
+                    interpreted_revision=interpreted.revision
+            async def plan_phase():
+                nonlocal advisory, moderation_decision, outcome, protected, u
+                moderation_decision=None
+                db.refresh(conversation)
+                continuity.check_epoch(conversation,run.input_snapshot.get('continuity_epoch'))
+                if next_enabled and not exact_stop:
+                    from .moderation import assess
+                    moderation_decision=assess(db,scope,inbound,u,event_id)
+                    if moderation_decision and moderation_decision['disposition']=='pause':protected=moderation_decision['reason']
+                    if moderation_decision and moderation_decision['disposition'] in {'warn','boundary'}:
+                        u=Understanding.model_validate({**u.model_dump(),'requests':[{'id':'moderation_boundary','topic':'other','subject':None,'polarity':'request','evidence':inbound.content[:2000]}],
+                            'all_of':['moderation_boundary'],'alternatives':[],'references':[],'constraints':[],'releases':[],'preferences':[],
+                            'visit':None,'reschedule':None,'cancellation':None,'wait':None,'courtesy':None,'comparison':None,
+                            'personal_facts':[],'preference_withdrawals':[],'source_purposes':[],'objections':[],'empathy':None,'selected_reference_id':None,'appointment_query':None,'requires_clarification':False,'clarification_question':None,'confidence':1.0})
+                from .needs_search import literal_read,contextual_read, VERSION as NEEDS_VERSION
+                literal_needs_read=bool(next_enabled and literal_read(u,inbound.content))
+                contextual_needs_read=bool(next_enabled and contextual_read(db,scope,u,inbound.content))
+                from .dialogue_continuity import catalog_choice_read,comparison_read,literal_greeting,named_choice_read,focused_visit_question,literal_material_read,focused_material_question
+                material_read=bool(next_enabled and literal_material_read(db,scope,u,inbound.content))
+                if material_read:
+                    run.input_snapshot={**run.input_snapshot,'dialogue_read_authorization':{'basis':'literal_scoped_material_request','model_confidence':u.confidence,'effect_authorization':False,'share_requires_backend_validation':True}}
+                greeting_read=bool(next_enabled and literal_greeting(u,inbound.content))
+                if greeting_read:
+                    run.input_snapshot={**run.input_snapshot,'dialogue_read_authorization':{'basis':'literal_greeting_no_actions','model_confidence':u.confidence,'effect_authorization':False}}
+                named_read=bool(next_enabled and named_choice_read(u,inbound.content,latest_outbound(db,conversation.id),commercial))
+                choice_read=bool(named_read or next_enabled and catalog_choice_read(u,inbound.content,latest_outbound(db,conversation.id),commercial))
+                compare_read=bool(next_enabled and comparison_read(db,scope,u,inbound.content))
+                if compare_read:
+                    run.input_snapshot={**run.input_snapshot,'dialogue_read_authorization':{'basis':'explicit_scoped_comparison','model_confidence':u.confidence,'effect_authorization':False}}
+                if choice_read:
+                    run.input_snapshot={**run.input_snapshot,'dialogue_read_authorization':{'basis':'current_named_catalog_choice' if named_read else 'current_numbered_catalog_choice','model_confidence':u.confidence,'effect_authorization':False}}
+                if material_read or contextual_needs_read or choice_read or compare_read or greeting_read:u=u.model_copy(update={'requires_clarification':False,'clarification_question':None})
+                if literal_needs_read or contextual_needs_read:
+                    run.input_snapshot={**run.input_snapshot,'needs_read_authorization':{'version':NEEDS_VERSION,'basis':'accepted_current_unknown_listing_offer' if contextual_needs_read else 'validated_current_literal_catalog_request','model_confidence':u.confidence,'effect_authorization':False}}
+                if u.confidence < .8 and not u.requires_clarification and not (literal_needs_read or contextual_needs_read or choice_read or compare_read or greeting_read or material_read):
+                    visit_question=focused_visit_question(u,inbound.content,commercial) if next_enabled else None
+                    focused=visit_question or (focused_material_question(u,inbound.content,state,commercial) if next_enabled else None)
+                    u=u.model_copy(update={'requires_clarification':True,'clarification_question':focused or 'Could you clarify whether you want property details, materials, financing, or a visit?'})
+                    if focused:run.input_snapshot={**run.input_snapshot,('focused_visit_clarification' if visit_question else 'focused_material_clarification'):{'model_confidence':u.confidence,'effect_authorization':False}}
+                # Legal/commercial approvals hold the action, not the conversation.
+                advisory=escalation_reason(inbound.content)
+                if not protected and not exact_stop and advisory in {'LEGAL_QUESTION','COMPLEX_NEGOTIATION'}:
+                    u=u.model_copy(update={'requires_clarification':True,'clarification_question':'The Sales team needs to review that legal or commercial exception. I can continue helping with approved property information.'})
+                outcome=run_turn(db,scope,message_id=inbound.id,understanding=u,expected_revision=interpreted_revision,
+                    event_key='active-runtime:'+inbound.id,max_steps=policy.max_steps,max_seconds=policy.max_seconds,
+                    **({'max_rounds':policy.max_rounds,'max_read_units':policy.max_read_units} if next_enabled else {}))
+            async def fulfill_phase():
+                nonlocal capture_profile, case, conversation, count, decision, detect, interpretation, lead, metadata, p, project, published_configuration, result, row, scoped_names, scoring_pack, state, t, task, trace, v
+                if next_enabled:
+                    from .first_booking import apply_courtesy
+                    apply_courtesy(db,conversation,lead,outcome.state)
+                    if terminal_text(inbound.content):
+                        from .first_booking import stop_cadence
+                        stop_cadence(db,conversation,lead,outcome.state,'farewell')
+                    # Preserve the stopped follow-up date before the fresh permission read
+                    # under production autoflush=False; this remains rollbackable.
+                    db.flush([lead])
+                conversation,lead,project=_current(db,scope,control=exact_stop)  # Manual takeover/consent/permissions win after inference.
+                continuity.check_epoch(conversation,run.input_snapshot.get('continuity_epoch'))
+                draft=compose(outcome,channel=conversation.channel,style=policy.composition_style)
+                if next_enabled:
+                    from .natural_reply import naturalize
+                    draft=naturalize(outcome,draft,channel=conversation.channel)
+                material_question=''
+                reference_question=''
+                reference_metadata={}
+                appointment=''
+                # Material discovery blocks are replaced by verified live links or
+                # a specific fallback question; never send "not sent yet" diagnostics.
+                text=draft.text
+                text='\n\n'.join(b for b in text.split('\n\n') if not b.startswith(('Available material:', 'Materials: verified information is not available in this query.')))
+                if next_enabled:
                     from dataclasses import replace
-                    draft=replace(draft,text=draft.text.replace(safe_u.clarification_question or '', '').strip())
-                details=[]
-                if priority and appointment and '?' in appointment:
-                    # Keep a mixed request pending without putting two competing
-                    # acceptance questions/offers into the same outbound message.
-                    if metadata.get('cancellation_operation_id'):
-                        from .cancellation_service import OPTIONAL_REASON
-                        details.append(appointment.removesuffix(OPTIONAL_REASON))
-                        metadata.pop('cancellation_followup',None)
-                    elif metadata.get('booking_operation_id'):
-                        closing=' What else would you like to know?' if metadata.get('reschedule_operation_id') else ' What else would you like to know before your visit?'
-                        details.append(appointment.removesuffix(closing))
-                        metadata.pop('post_booking_question',None)
+                    draft=replace(draft,text=text)
+                metadata={'engine':ENGINE,'workflow_version':'sales-current/1.0','inbound_message_id':inbound.id,'selected_property_type_id':outcome.state.selected_property_type_id}
+                if next_enabled:metadata['selected_unit_id']=outcome.state.selected_unit_id
+                if human_fallback:metadata['human_contact_interpretation_fallback']=True
+                if moderation_decision:metadata['moderation']=moderation_decision
+                metadata['requested_topics']=sorted({r.topic.value for r in u.requests if r.polarity=='request'})
+                metadata['policy_holds_at_prepare']=sorted(action_holds)
+                if next_enabled:metadata['action_policy']=approved_policy.get('action_policy')
+                if next_enabled:metadata['planning']=getattr(outcome,'plan',None)
+                if not human_step and u.requires_clarification and any(r.topic.value=='human' and r.polarity=='request' for r in u.requests):
+                    metadata['control_confirmation']='human'
+                actions=[];share_ids=[];delivered=set();extra=[];links=[]
+                safe_u=outcome.state.last_understanding
+                if exact_stop:
+                    lead.is_opt_out=True;lead.consent_status='opted_out';lead.agent_status='paused';lead.next_action_at=None
+                    conversation.is_paused=True;conversation.pause_reason='Lead opted out'
+                    text='You have been unsubscribed and will not receive further messages.'
+                    metadata['control_outcome']='opt_out'
+                elif protected:
+                    case=create_intervention_case(db,conversation=conversation,lead=lead,reason=protected,evidence=inbound.content)
+                    text="Your request and this conversation have been recorded for the Sales team to review."
+                    if next_enabled and protected=='SECURITY':
+                        text="I cannot share private credentials or access another company's data. Your request has been recorded for the Sales team to review."
+                    if protected in {'THREAT','REPEATED_ABUSE'}:
+                        text='This conversation needs the Sales team to review the '+('threatening message.' if protected=='THREAT' else 'continued personal abuse after the warning.')
+                    if protected=='REPEATED_UNAUTHORIZED_USE':
+                        text='Continued requests outside property assistance after the warning have been recorded for the Sales team to review.'
+                    if moderation_decision and moderation_decision.get('id'):
+                        from .moderation_models import SalesModerationIncident
+                        db.get(SalesModerationIncident,moderation_decision['id']).intervention_case_id=case.id
+                    metadata.update(human_intervention_case_id=case.id,control_outcome='handoff',reason=protected,reason_source='verified_current_request')
+                elif terminal_only:
+                    from .conversation_closing import GOODBYE
+                    text=GOODBYE
+                    metadata['conversation_closing']='farewell'
+                elif human_step:
+                    from .human_contact import apply as apply_human_contact
+                    contact_text,contact_meta=apply_human_contact(db,scope,conversation,lead,outcome,inbound,human_step)
+                    metadata.update(contact_meta)
+                    text=contact_text
+                elif not safe_u.requires_clarification:
+                    for task in outcome.state.tasks:
+                        if task.source_message_id==inbound.id and restricted(outcome.state,task) and safe_u.permits(task.topic,task.subject):
+                            extra.append('You previously asked not to receive this. Do you want to allow it now?')
+                            metadata['release_offer']={'topic':task.topic.value,'subject':task.subject}
+                    appointment,appointment_meta,actions=(None,{},[]) if 'appointment' in action_holds and not (safe_u.wait and safe_u.wait.action in {'cancel','decline'}) else _appointment(db,scope,conversation,lead,project,outcome,inbound)
+                    metadata.update(appointment_meta)
+                    if appointment:extra.append(appointment)
+                    if next_enabled and 'materials' not in action_holds:
+                        from .material_delivery import deliver,request_context,VERSION as MATERIAL_VERSION
+                        links,share_ids,offer,question,delivered,material_bindings=deliver(db,scope,conversation,lead,run,outcome,previous_meta)
+                        metadata['material_delivery_version']=MATERIAL_VERSION
+                        metadata['material_bindings']=material_bindings
+                        metadata['material_request_context']=request_context(outcome,inbound.id)
                     else:
-                        metadata.pop('appointment_offer',None)
-                        metadata.pop('location_offer',None)
-                        metadata.pop('booking_confirmation',None)
-                        metadata.pop('reschedule_confirmation',None)
-                        metadata.pop('reschedule_offer',None)
-                        metadata.pop('reschedule_meeting_offer',None)
-                        metadata.pop('cancellation_confirmation',None)
-                        metadata.pop('cancellation_meeting_offer',None)
-                        metadata.pop('wait_offer',None)
-                        if metadata.pop('booking_property_question',None):metadata.pop('property_catalog_offer',None)
-                        details.append('Your visit request remains pending while we review the information request.')
-                elif appointment:details.append(appointment)
-                if metadata.get('review_notice'):
-                    details.append('The Sales team needs to verify the restricted part of your request. I can continue helping with other approved information.')
-                details.extend(links)
-                commercial_draft=await compose_commercial(db,scope,inbound=inbound,outcome=outcome,draft=draft,
-                    commercial=commercial,lead=lead,metadata=metadata,previous_meta=previous_meta,
-                    holds=action_holds,channel=conversation.channel,extra=details,
-                    priority=priority,priority_meta=priority_meta)
-                if conversation.is_paused and not (metadata.get('meeting_id') and conversation.pause_reason=='Appointment confirmed'):
-                    raise PermissionError('Manual control interrupted composition.')
-                # SessionLocal disables autoflush. Persist this turn's pending
-                # Lead changes inside the existing transaction before the fresh
-                # authorization read overwrites its identity-map attributes.
-                # This is not a commit: interruption still rolls the turn back.
-                db.flush([lead])
-                conversation,lead,project=_current(db,scope,control=bool(metadata.get('meeting_id')))
-                from .turn_configuration import digest
-                from app.modules.projects.models import ProjectPropertyType,ProjectUnit
-                for record_type in (ProjectPropertyType,ProjectUnit):
-                    db.query(record_type).filter_by(project_id=scope.project_id).populate_existing().all()
-                refreshed=build_commercial_context(db,project=project,company_id=scope.company_id,
-                    lead_id=scope.lead_id,channel=conversation.channel)
-                if digest(refreshed)!=digest(commercial):
-                    raise ValueError('Approved commercial information changed during composition.')
-                from .reschedule_service import validate_prepared
-                validate_prepared(db,scope,metadata)
-                from .cancellation_service import validate_prepared as validate_cancellation
-                validate_cancellation(db,scope,metadata)
-                from .wait_service import validate_saved
-                validate_saved(db,scope,metadata)
-                text=commercial_draft.text
-                metadata['composition']=commercial_draft.trace
-                metadata.update(commercial_draft.trace['closing_metadata'])
-                if metadata.get('qualification_offer'):
-                    from .lead_profile import qualification
-                    qualification(lead,commercial['confirmed_project_facts'],record_asked=True)
-            if draft.violations:
-                text+='\n\nSome information could not be verified; no unsupported facts have been added.'
-            if next_enabled:
-                from .language_policy import detect,scoped_names
-                decision=detect(text,names=scoped_names(project,lead,commercial),output=True)
-                if decision.needs_reentry:raise LanguageHold(decision,output=True)
-                metadata['language_policy']={'version':decision.version,'output_language':'en'}
-            final_revision,state=save(db,scope,event_key='active-prepared:'+inbound.id,expected_revision=outcome.revision,state=outcome.state,
-                metadata={'engine':ENGINE,'workflow_version':'sales-current/1.0','message_id':inbound.id,'draft':asdict(draft),'actions':actions,
-                    'share_ids':share_ids,'delivery_state':'prepared_not_delivered'})
-            interpretation=scope.query(db,SalesDialogueEvent).filter_by(event_key='active-understanding:'+inbound.id).first()
-            trace=interpretation.payload_json['metadata'] if interpretation else {
-                'model':'deterministic-control','prompt_snapshot':{},'prompt_configuration_id':None}
-            run.model=trace['model'];run.prompt_snapshot=trace['prompt_snapshot'];run.prompt_configuration_id=trace['prompt_configuration_id']
-            if next_enabled:
-                metadata['configuration_ref']=trace.get('configuration_ref')
-                metadata['playbook_selection']=trace.get('playbook_selection')
-                metadata['turn_context_version']=trace.get('turn_context_version')
-                metadata['turn_context_sha256']=trace.get('turn_context_sha256')
-            run.input_snapshot={**run.input_snapshot,'understanding':safe_u.model_dump(mode='json'),'runtime_policy':policy.model_dump()}
-            run.output_snapshot={'engine':ENGINE,'workflow_version':'sales-current/1.0','reply_ready':True,'reply':text,'metadata':metadata,'proposed_actions':actions,
-                'sales_asset_share_ids':share_ids,'delivered_task_ids':list(delivered),'state_revision':final_revision,
-                'requires_human':metadata.get('control_outcome')=='handoff','policy_violations':[]}
-            run.status='prepared';conversation.updated_at=workflow_now(datetime);lead.last_interaction_at=workflow_now(datetime)
-            db.add_all([run,conversation,lead]);db.commit()
+                        links,share_ids,offer,question,delivered=([],[],{},None,set()) if 'materials' in action_holds else _materials(db,scope,conversation,lead,run,outcome,previous_meta)
+                    material_question=question or ''
+                    if offer:metadata['material_offer']=offer
+                    if question:extra.append(question)
+                    if any(t.topic.value in {'catalog','inventory','pricing'} and t.source_message_id==inbound.id and t.status=='completed' for t in outcome.state.tasks):
+                        context=build_commercial_context(db,project=project,company_id=scope.company_id,lead_id=scope.lead_id,channel=conversation.channel)
+                        selected=outcome.state.selected_property_type_id
+                        broad=safe_u.permits('catalog')
+                        comparison=next((r.data for r in outcome.results if r.data.get('comparison_text')),None)
+                        if comparison is not None:
+                            ids=comparison['comparison_property_ids']
+                            if ids:metadata['property_catalog_offer']={'property_type_ids':ids}
+                            if comparison['comparison_unit_ids']:metadata['unit_catalog_offer']={'unit_ids':comparison['comparison_unit_ids']}
+                        else:
+                            shown=list(dict.fromkeys(p['id'] for result in outcome.results for p in result.data.get('property_types',[])))
+                            unit_ids=list(dict.fromkeys(p['id'] for result in outcome.results for p in result.data.get('units',[])))
+                            if shown:metadata['property_catalog_offer']={'property_type_ids':shown}
+                            if unit_ids:metadata['unit_catalog_offer']={'unit_ids':unit_ids}
+                        extra.append('Which property option would you like to explore in more detail?')
+                affected=sorted({t.topic.value for t in outcome.state.tasks if t.source_message_id==inbound.id} & action_holds)
+                if (affected or advisory in {'LEGAL_QUESTION','COMPLEX_NEGOTIATION'}) and not conversation.is_paused:
+                    from .escalation_policy import notify_sales
+                    decision={'reason':advisory if advisory in {'LEGAL_QUESTION','COMPLEX_NEGOTIATION'} else 'ACTION_POLICY_REVIEW','disposition':'notify_sales','held_topics':affected,'conversation_paused':False}
+                    notify_sales(db,conversation=conversation,lead=lead,decision=decision,event_id=inbound.id,evidence=inbound.content)
+                    metadata['review_notice']=decision
+                    extra.append('The Sales team needs to verify that part of your request. I can continue helping with other approved information. What else would you like to know?')
+                if next_enabled:
+                    from .wait_service import reconcile
+                    reconcile(db,scope,outcome.state,metadata)
+                if conversation.is_paused:
+                    metadata['expected_pause_reason']=conversation.pause_reason
+                    db.query(SalesFollowUpJob).filter(SalesFollowUpJob.conversation_id==conversation.id,SalesFollowUpJob.status.in_(['pending','processing'])).update({'status':'cancelled'},synchronize_session=False)
+                if safe_u.requests and all(r.topic.value=='other' for r in safe_u.requests) and not safe_u.requires_clarification and not protected and not exact_stop:
+                    text='How can I help: property options, materials, pricing, financing, or delivery timing?'
+                if (extra or links) and text=='I need clarification or verified information to answer this request.':
+                    text=''
+                if next_enabled:
+                    from .planning_reply import continuation
+                    question,offer_metadata=continuation(outcome,action_holds)
+                    if question:extra.append(question)
+                    reference_question=question
+                    reference_metadata=offer_metadata
+                    metadata.update(offer_metadata)
+                text='\n\n'.join(v for v in [text,*extra,*links] if v)
+                if not text:text='Which property or approved material would you like to review?'
+                if not conversation.is_paused and not lead.is_opt_out and not safe_u.requires_clarification:
+                    from .sales_policy import capture, next_question, missing_fields
+                    from app.modules.sales_crm.intelligence import update_lead_intelligence
+                    chosen=next((p for p in commercial['property_types'] if p['id']==outcome.state.selected_property_type_id),None)
+                    if next_enabled:
+                        from .lead_profile import capture as capture_profile
+                        plan=getattr(outcome,'plan',None) or {}
+                        interest=plan.get('interest_reference')
+                        refs=[r for i,r in enumerate(safe_u.references) if (r.id or 'legacy-'+str(i))==interest]
+                        capture_u=safe_u.model_copy(update={'references':refs})
+                        chosen_unit=next((v for v in commercial['inventory'] if v['id']==outcome.state.selected_unit_id and v.get('unit_code')),None)
+                        captured=capture_profile(db,scope,capture_u,inbound.id,
+                            selected_property={**chosen,'unit_id':outcome.state.selected_unit_id} if interest and chosen else None,
+                            selected_unit=chosen_unit if interest else None)
+                        from .lead_profile import optional_profile
+                        metadata['profile_capture']=[{'namespace':namespace,'field':field,'status':row['status']}
+                            for namespace,values in (('commercial',captured['current']),('optional',optional_profile(lead)['current']))
+                            for field,row in values.items() if (row.get('source_ref') or {}).get('message_id')==inbound.id]
+                    else:capture(lead,safe_u,inbound.id,selected_property=chosen)
+                    history=scoped_messages_query(db,conversation).filter(SalesMessage.created_at<=inbound.created_at).order_by(SalesMessage.created_at,SalesMessage.id).all()
+                    lead_text,count=live._lead_intelligence_input(history)
+                    config=db.query(AIConfiguration).filter_by(company_id=None).first()
+                    if next_enabled:
+                        # Reporting scores do not assign a persona or reinterpret
+                        # workflow state from a bag of form/history keywords.
+                        from .profile_intelligence import update as update_declared_intelligence
+                        from .lead_profile import qualification
+                        from .turn_configuration import published_configuration
+                        scoring_pack,_=published_configuration(db,scope.company_id)
+                        update_declared_intelligence(db,lead,commercial=commercial,message_count=count,scoring_config=scoring_pack.get('scoring_config',{}))
+                        metadata['qualification_missing']=qualification(lead,commercial['confirmed_project_facts'])[0]
+                    else:
+                        update_lead_intelligence(db,lead,inbound_text=inbound.content,conversation_text=lead_text,message_count=count,
+                            scoring_config=(config.agent_ventas or {}).get('scoring_config',{}) if config else {})
+                        metadata['qualification_missing']=missing_fields(lead,commercial['confirmed_project_facts'])
+                    if not safe_u.requests and safe_u.preferences:
+                        text='Thanks, I have recorded that information. What would you like to explore next?'
+                    if not next_enabled and safe_u.confidence>=.8 and not safe_u.permits('appointment') and not previous_meta.get('material_offer') and not links and not (
+                        next_enabled and (getattr(outcome,'plan',{}).get('questions') or outcome.stop_reason in {'step_limit','time_limit','round_limit','read_cost_limit','capacity_limit'})):
+                        if next_enabled:
+                            _,field,question=qualification(lead,commercial['confirmed_project_facts'],record_asked=True)
+                        else:field,question=next_question(lead,commercial['confirmed_project_facts'],record=True)
+                        if question:
+                            if not safe_u.requests and safe_u.preferences:
+                                text='Thanks, I have recorded that information.'
+                            text+='\n\n'+question
+                            metadata['qualification_offer']={'field':field,'question':question}
+                moderation_boundary=bool(moderation_decision and moderation_decision['disposition'] in {'warn','boundary'})
+                if moderation_boundary:
+                    from .moderation import WARNING,BOUNDARY,USE_WARNING
+                    text=(USE_WARNING if moderation_decision['category']=='unauthorized_use' else WARNING) if moderation_decision['disposition']=='warn' else BOUNDARY
+                if next_enabled and not exact_stop and not protected and not moderation_boundary and not (human_step and pure_human) and not terminal_only:
+                    from .commercial_composer import compose as compose_commercial
+                    # Replace stacked catalog/material/qualification questions with
+                    # one continuation authorized against the current results.
+                    priority=contact_text if human_step else reference_question or material_question
+                    priority_meta=reference_metadata if reference_question else {}
+                    if reference_question and metadata.get('material_offer'):
+                        metadata.pop('material_offer',None)
+                    release=next((v for v in extra if v.startswith('You previously asked')),None)
+                    if release and not priority:priority=release
+                    if safe_u.requires_clarification:
+                        from dataclasses import replace
+                        draft=replace(draft,text=draft.text.replace(safe_u.clarification_question or '', '').strip())
+                    details=[]
+                    if priority and appointment and '?' in appointment:
+                        # Keep a mixed request pending without putting two competing
+                        # acceptance questions/offers into the same outbound message.
+                        if metadata.get('cancellation_operation_id'):
+                            from .cancellation_service import OPTIONAL_REASON
+                            details.append(appointment.removesuffix(OPTIONAL_REASON))
+                            metadata.pop('cancellation_followup',None)
+                        elif metadata.get('booking_operation_id'):
+                            closing=' What else would you like to know?' if metadata.get('reschedule_operation_id') else ' What else would you like to know before your visit?'
+                            details.append(appointment.removesuffix(closing))
+                            metadata.pop('post_booking_question',None)
+                        else:
+                            metadata.pop('appointment_offer',None)
+                            metadata.pop('location_offer',None)
+                            metadata.pop('booking_confirmation',None)
+                            metadata.pop('reschedule_confirmation',None)
+                            metadata.pop('reschedule_offer',None)
+                            metadata.pop('reschedule_meeting_offer',None)
+                            metadata.pop('cancellation_confirmation',None)
+                            metadata.pop('cancellation_meeting_offer',None)
+                            metadata.pop('wait_offer',None)
+                            if metadata.pop('booking_property_question',None):metadata.pop('property_catalog_offer',None)
+                            details.append('Your visit request remains pending while we review the information request.')
+                    elif appointment:details.append(appointment)
+                    if metadata.get('review_notice'):
+                        details.append('The Sales team needs to verify the restricted part of your request. I can continue helping with other approved information.')
+                    details.extend(links)
+                    commercial_draft=await compose_commercial(db,scope,inbound=inbound,outcome=outcome,draft=draft,
+                        commercial=commercial,lead=lead,metadata=metadata,previous_meta=previous_meta,
+                        holds=action_holds,channel=conversation.channel,extra=details,
+                        priority=priority,priority_meta=priority_meta)
+                    if conversation.is_paused and not (metadata.get('meeting_id') and conversation.pause_reason=='Appointment confirmed'):
+                        raise PermissionError('Manual control interrupted composition.')
+                    # SessionLocal disables autoflush. Persist this turn's pending
+                    # Lead changes inside the existing transaction before the fresh
+                    # authorization read overwrites its identity-map attributes.
+                    # This is not a commit: interruption still rolls the turn back.
+                    db.flush([lead])
+                    conversation,lead,project=_current(db,scope,control=bool(metadata.get('meeting_id')))
+                    from .turn_configuration import digest
+                    from app.modules.projects.models import ProjectPropertyType,ProjectUnit
+                    for record_type in (ProjectPropertyType,ProjectUnit):
+                        db.query(record_type).filter_by(project_id=scope.project_id).populate_existing().all()
+                    refreshed=build_commercial_context(db,project=project,company_id=scope.company_id,
+                        lead_id=scope.lead_id,channel=conversation.channel)
+                    if digest(refreshed)!=digest(commercial):
+                        raise ValueError('Approved commercial information changed during composition.')
+                    from .reschedule_service import validate_prepared
+                    validate_prepared(db,scope,metadata)
+                    from .cancellation_service import validate_prepared as validate_cancellation
+                    validate_cancellation(db,scope,metadata)
+                    from .wait_service import validate_saved
+                    validate_saved(db,scope,metadata)
+                    text=commercial_draft.text
+                    metadata['composition']=commercial_draft.trace
+                    metadata.update(commercial_draft.trace['closing_metadata'])
+                    if metadata.get('qualification_offer'):
+                        from .lead_profile import qualification
+                        qualification(lead,commercial['confirmed_project_facts'],record_asked=True)
+                if draft.violations:
+                    text+='\n\nSome information could not be verified; no unsupported facts have been added.'
+                if next_enabled:
+                    from .language_policy import detect,scoped_names
+                    decision=detect(text,names=scoped_names(project,lead,commercial),output=True)
+                    if decision.needs_reentry:raise LanguageHold(decision,output=True)
+                    metadata['language_policy']={'version':decision.version,'output_language':'en'}
+                final_revision,state=save(db,scope,event_key='active-prepared:'+inbound.id,expected_revision=outcome.revision,state=outcome.state,
+                    metadata={'engine':ENGINE,'workflow_version':'sales-current/1.0','message_id':inbound.id,'draft':asdict(draft),'actions':actions,
+                        'share_ids':share_ids,'delivery_state':'prepared_not_delivered'})
+                interpretation=scope.query(db,SalesDialogueEvent).filter_by(event_key='active-understanding:'+inbound.id).first()
+                trace=interpretation.payload_json['metadata'] if interpretation else {
+                    'model':'deterministic-control','prompt_snapshot':{},'prompt_configuration_id':None}
+                run.model=trace['model'];run.prompt_snapshot=trace['prompt_snapshot'];run.prompt_configuration_id=trace['prompt_configuration_id']
+                if next_enabled:
+                    metadata['configuration_ref']=trace.get('configuration_ref')
+                    metadata['playbook_selection']=trace.get('playbook_selection')
+                    metadata['turn_context_version']=trace.get('turn_context_version')
+                    metadata['turn_context_sha256']=trace.get('turn_context_sha256')
+                run.input_snapshot={**run.input_snapshot,'understanding':safe_u.model_dump(mode='json'),'runtime_policy':policy.model_dump()}
+                run.output_snapshot={'engine':ENGINE,'workflow_version':'sales-current/1.0','reply_ready':True,'reply':text,'metadata':metadata,'proposed_actions':actions,
+                    'sales_asset_share_ids':share_ids,'delivered_task_ids':list(delivered),'state_revision':final_revision,
+                    'requires_human':metadata.get('control_outcome')=='handoff','policy_violations':[]}
+                run.status='prepared';conversation.updated_at=workflow_now(datetime);lead.last_interaction_at=workflow_now(datetime)
+                db.add_all([run,conversation,lead]);db.commit()
+            from .coordinator_graph import execute,reconsider_reason,safe_candidate
+            def assess_phase():
+                return not (protected or exact_stop or human_step or terminal_only) and reconsider_reason(u,inbound.content)
+            async def reconsider_phase():
+                nonlocal u,interpreted_revision,interpretation_audit,conversation,lead,project
+                reason=reconsider_reason(u,inbound.content)
+                if not reason:return
+                conversation,lead,project=_current(db,scope)
+                continuity.check_epoch(conversation,run.input_snapshot.get('continuity_epoch'))
+                result=await asyncio.wait_for(preview(db,scope,inbound_message_id=inbound.id,
+                    expected_revision=interpreted_revision,event_key='active-reconsideration:'+inbound.id,
+                    active=True,max_attempts=1,reconsideration={'reason':reason}),timeout=22)
+                interpreted_revision=result.revision
+                candidate=result.state.last_understanding
+                accepted=result.status=='accepted' and candidate is not None and safe_candidate(u,candidate)
+                if accepted:
+                    from .reference_resolution import Resolver
+                    resolver=Resolver(db,scope,result.state)
+                    expected=(result.state.selected_property_type_id,result.state.selected_unit_id)
+                    for ref in candidate.references:
+                        resolved=resolver.resolve(ref)
+                        if resolved.get('status')!='resolved' or (resolved['value'].get('property_id'),resolved['value'].get('unit_id'))!=expected:accepted=False
+                if accepted:u=candidate
+                event=scope.query(db,SalesDialogueEvent).filter_by(event_key='active-reconsideration:'+inbound.id).first()
+                attempts=((event.payload_json or {}).get('metadata') or {}).get('interpretation_attempts',[]) if event else []
+                run.input_snapshot={**run.input_snapshot,'bounded_reconsideration':{'reason':reason,'accepted':accepted,'outcome':result.status,'interpretation_attempts':attempts,'max_additional_calls':1,'effect_authorization':False}}
+                conversation,lead,project=_current(db,scope)
+                continuity.check_epoch(conversation,run.input_snapshot.get('continuity_epoch'))
+            graph_trace=await execute(scope,interpret=interpret_phase,assess=assess_phase,
+                reconsider=reconsider_phase,plan=plan_phase,fulfill=fulfill_phase)
+            run.input_snapshot={**run.input_snapshot,'coordinator_graph':graph_trace}
+            db.commit()
         except LanguageHold as hold:
             # Input holds occur before reference/task changes. Output rejection
             # rolls back all proposed effects before any external dispatch.

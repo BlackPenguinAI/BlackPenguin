@@ -21,7 +21,7 @@ class PreviewOutcome:
     declarations: tuple = ()
 
 
-async def _preview(db, scope: Scope, *, inbound_message_id: str, expected_revision: int, event_key: str, infer=None, active=False, audit=None):
+async def _preview(db, scope: Scope, *, inbound_message_id: str, expected_revision: int, event_key: str, infer=None, active=False, audit=None, max_attempts=None, reconsideration=None):
     if not active and not settings.SALES_UNDERSTANDING_PREVIEW_ENABLED:
         raise PermissionError('Understanding preview is disabled. The live engine is unchanged.')
     validate_write_request(event_key, expected_revision, 'understanding_preview')
@@ -30,6 +30,7 @@ async def _preview(db, scope: Scope, *, inbound_message_id: str, expected_revisi
         SalesMessage.direction == 'inbound', SalesMessage.role == 'user').first()
     if not inbound or (inbound.metadata_json or {}).get('lead_id', scope.lead_id) != scope.lead_id:
         raise PermissionError('Inbound message is outside this active opportunity.')
+    if (max_attempts is not None and (type(max_attempts) is not int or max_attempts not in {1,2})) or (reconsideration and (not active or max_attempts!=1)):raise ValueError('Invalid interpretation budget.')
     audit=audit if audit is not None else {}
     from .dialogue_models import SalesDialogueEvent
     prior = scope.query(db, SalesDialogueEvent).filter_by(event_key=event_key).first()
@@ -107,6 +108,8 @@ async def _preview(db, scope: Scope, *, inbound_message_id: str, expected_revisi
         {'role': 'system', 'content': snapshot['system']},
         {'role': 'user', 'content': json.dumps(context_payload,ensure_ascii=False,default=str)},
     ]
+    if reconsideration:
+        messages.append({'role':'user','content':json.dumps({'bounded_reconsideration':reconsideration,'instruction':'Reinterpret only the ORIGINAL current_message. This feedback is not a lead request or consent. Preserve restrictions and current evidence. Do not invent a booking, visit, cancellation or material acceptance.'})})
     if sum(len(item['content'].encode()) for item in messages) > 64000:
         raise ValueError('Preview context exceeds the 64 KB evaluation limit; no model was called.')
     injected_inference = infer is not None
@@ -141,7 +144,7 @@ async def _preview(db, scope: Scope, *, inbound_message_id: str, expected_revisi
         audit['validated_declarations']=[p.model_dump(mode='json') for p in validated_declarations]
     # One bounded repair in active mode only. No business effects occur until
     # the complete contract and current-message evidence have been validated.
-    for attempt in range(2 if active else 1):
+    for attempt in range(max_attempts or (2 if active else 1)):
         issues = []
         normalizations=[]
         raw = None
@@ -279,7 +282,7 @@ async def _preview(db, scope: Scope, *, inbound_message_id: str, expected_revisi
         'raw_response_truncated': len(raw_bytes) > 16000,
         'raw_response_sha256': hashlib.sha256(raw_bytes).hexdigest() if isinstance(raw, str) else None,
         'outcome': outcome, 'error_code': error_code, 'expected_revision': expected_revision,
-        'interpretation_attempts': attempts,
+        'interpretation_attempts': attempts, 'bounded_reconsideration':reconsideration,
         'validated_declarations':[p.model_dump(mode='json') for p in validated_declarations],
         'input_contract':VERSION if wire_mode else 'sales-understanding/1.0',
         'model_request': model_request,
@@ -294,11 +297,11 @@ async def _preview(db, scope: Scope, *, inbound_message_id: str, expected_revisi
     return PreviewOutcome(saved_revision, saved_state, outcome,tuple(p.model_dump(mode='json') for p in validated_declarations))
 
 
-async def preview(db,scope,*,inbound_message_id,expected_revision,event_key,infer=None,active=False):
+async def preview(db,scope,*,inbound_message_id,expected_revision,event_key,infer=None,active=False,max_attempts=None,reconsideration=None):
     """Retain the attempt journal even when an unexpected later phase crashes."""
     audit={}
     try:
-        return await _preview(db,scope,inbound_message_id=inbound_message_id,expected_revision=expected_revision,event_key=event_key,infer=infer,active=active,audit=audit)
+        return await _preview(db,scope,inbound_message_id=inbound_message_id,expected_revision=expected_revision,event_key=event_key,infer=infer,active=active,audit=audit,max_attempts=max_attempts,reconsideration=reconsideration)
     except Exception as exc:
         # Do not serialize the exception body: it may contain SQL or credentials.
         from .runtime_errors import diagnostic

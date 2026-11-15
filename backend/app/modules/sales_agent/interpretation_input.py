@@ -9,7 +9,7 @@ from pydantic import Field,create_model,StrictBool
 from .understanding_contract import (Understanding,StrictModel,Reference,Request,Constraint,Comparison,Subject)
 
 VERSION='sales-interpretation-input/2.0'
-SYSTEM_VERSION='sales-interpretation-system/2.2'
+SYSTEM_VERSION='sales-interpretation-system/2.3'
 class Target(StrictModel):
     kind:Literal['property','unit','appointment','location','material','ambiguous']
     expression:str=Field(min_length=1,max_length=300)
@@ -245,4 +245,4 @@ SYSTEM += "\nA request such as I am looking for a 2 bedroom home is catalog disc
 
 SYSTEM += "\nNever use comparison merely to filter homes by bedroom count. Comparison requires a comparison actually requested by the lead. Do not insert catalog names as comparison members when those names were not mentioned or referred to by the lead.\n"
 
-SYSTEM += "\nKeep intent and requests consistent: visit.action=request requires an appointment request or a focused clarification, even after repair. A current own in-person visit declaration is not a comparison. A property's name is the owner of its photos, not a material name. Generic words such as photos or floor_plan are material subjects, not named-file targets. Use target null when the selected property is implicit; do not quote its historical name as current evidence. Preserve the current owner on repeated photo requests. After a visit-or-photos question, interpret the lead's explicit in-person answer as a visit request, never a generic information question.\n"
+SYSTEM += "\nKeep intent and requests consistent: visit.action=request requires an appointment request or a focused clarification, even after repair. A current own in-person visit declaration is not a comparison. A property's name is the owner of its photos, not a material name. An interrogative request for pictures or blueprints is a materials request, never a comparison unless the current message actually asks to compare. Generic words such as photos or floor_plan are material subjects, not named-file targets. Use target null when the selected property is implicit; do not quote its historical name as current evidence. Preserve the current owner on repeated photo requests. After a visit-or-photos question, interpret the lead's explicit in-person answer as a visit request, never a generic information question.\n"

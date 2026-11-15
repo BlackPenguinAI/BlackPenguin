@@ -1,108 +1,112 @@
 {
-  "base_commit": "b9e3ceb4ea358527a2ff30ab650030c94f1df727",
-  "title": "Contextual materials and focused visit clarification",
+  "base_commit": "108846e96b4b319066980ca4bee023f86e1cc227",
+  "title": "Bounded graph experiments and scoped material recovery",
   "migrations": false,
   "deletions": [],
+  "production_mode": "classic",
   "validation": {
-    "passed": 3479,
+    "regression_passed": 3507,
     "skipped": 11,
     "failed": 0,
-    "acceptance_passed": 63,
-    "acceptance_live_pending": 1,
+    "additional_comparator_passed": 4,
     "model_quality_evaluated": false
   },
   "files": [
     {
       "path": "backend/app/modules/sales_agent/active_service.py",
-      "sha256": "40b2db691eb9a75955dfa53a640c38fa8cf8028b750ba0b8fd7c613b0d5dea78"
+      "sha256": "b7e9f6602f93470dabc16dab1236f21d1afd8f0c84c5c031236d03155ba5cd2c"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/coordinator_graph.py",
+      "sha256": "fab3d4aa3ffb6f379e4981764fe7fdc4460e4e58fe59fa821ae869511014122a"
     },
     {
       "path": "backend/app/modules/sales_agent/dialogue_continuity.py",
-      "sha256": "72b2a0af527e25fa0e8d045388b1f08c29cfb616e5b6b0a95c419154d12d4299"
+      "sha256": "2dea2e5e12ac49bc74b3e32cf8c03c0e4b224f8ff00216ef4b44650397f37fb4"
     },
     {
       "path": "backend/app/modules/sales_agent/interpretation_input.py",
-      "sha256": "dba0fa4bf62bd12a0949d7b93305ae41add746a159d362dcbab3a47567762322"
-    },
-    {
-      "path": "backend/app/modules/sales_agent/understanding_completeness.py",
-      "sha256": "514b941c10f1621d79a5ebfeb71fd2e3f3899ed0408ab52f13a297133eb69615"
+      "sha256": "a33de885cdc50fc70a546e31b6a35e124a82e35eeed6bbe475cf3a76684d7973"
     },
     {
       "path": "backend/app/modules/sales_agent/understanding_prompt.py",
-      "sha256": "0388bb8ffc8993e83ba40d084a77bc4511374a75ae217891effd3d5af2f01760"
+      "sha256": "22fc3a8d0988ee5e45511427bfc190e9ac422e7026970e98bb75a29cf111cc1e"
     },
     {
       "path": "backend/app/modules/sales_agent/understanding_semantics.py",
-      "sha256": "02339f54304155fcbad6d8b4e0c6aaaf0f4ed8b7479612c3040ae8d6c6555cc7"
+      "sha256": "d40ea2faef40f1ba057baacec42d2c187043eb381bccbed8c0dc72b0a6426a48"
     },
     {
       "path": "backend/app/modules/sales_agent/understanding_service.py",
-      "sha256": "a119da8842780e18469190afe5b29bffad4344ede5e629b44c7ace87f105cf23"
+      "sha256": "2eb6f34d81018d856f1942f2d36ca5f243787064a574511002fc8d30734d1a1f"
     },
     {
-      "path": "backend/tests/fixtures/sales_ai/coherence_server6_packets.json",
-      "sha256": "63ece5b3b3b8cd3b0c7e81d5845250411775d1cdd1539d6153f666eadf2ca5bb"
+      "path": "backend/tests/fixtures/sales_ai/material_server7_packets.json",
+      "sha256": "1babe55f7cb2d7bf1f01f53c398cf15306a6f094599e9b7d8454577f9999d68a"
     },
     {
       "path": "backend/tests/test_sales_continuity_repair1.py",
-      "sha256": "572fe9cfd16d890bf9e8a4992c8bc41fedfc4f635e5093973b7358ee98a16277"
+      "sha256": "8ec9fd745cbea81a2c754c4cb59d602f5a8f0ed958e19aaea70ea2baccc622db"
     },
     {
-      "path": "backend/tests/test_sales_interpretation_consistency.py",
-      "sha256": "0a47c5c4d263746cc6a8f1456c6f85474c8c06e38d0a7259fd485d88dc77de8e"
+      "path": "backend/tests/test_sales_coordinator_graph.py",
+      "sha256": "cfe61abb41b2be3361eb68acd3a5f4b76587f3d0e9e3383723a36015b2b9273d"
     },
     {
-      "path": "backend/tests/test_sales_subject_completeness.py",
-      "sha256": "914de1bca61196549f32a2e45dfb9ed3bcd440857954d428710bb703f357d537"
+      "path": "backend/tools/ci/test_durations.json",
+      "sha256": "f24d76e6412248b25fbd7dfdd1d35a98897bd5cbcd9b3614619718c20fb546ae"
+    },
+    {
+      "path": "backend/tools/sales_ai/booking_pilot_worker.py",
+      "sha256": "98d458e84f26e3f6ccfe7cde7879e67fb5093ddb4bdc31fe930e6b061cccdf2b"
+    },
+    {
+      "path": "backend/tools/sales_ai/compare_graph_runs.py",
+      "sha256": "fb9a4fd33a5a3f5594cda2b3726ff55b9e65eae8112c0b738275455cc4a3f275"
     },
     {
       "path": "backend/tools/sales_ai/continuity_battery.py",
-      "sha256": "137f0c3e9bec309afeaadf0b08e4187ededa8184019a1358b0ed69e75a16b4d3"
+      "sha256": "7b02f4ecbbac8f3017399bff4532320786014ee581d2208146432921ed448196"
     },
     {
-      "path": "docs/sales-agent/02-datos-de-prueba/variantes-retoma.json",
-      "sha256": "48a07daea8bc776101e320fcd604bd948c0be8212ddd0336dc625a999af42d94"
+      "path": "backend/tools/sales_ai/synthetic_lab.py",
+      "sha256": "0aebe643e4583d779dadcd98d5269c06ccbecaff71981b717c450200efb6c655"
     },
     {
-      "path": "docs/sales-agent/05-resultados-y-mejoras/materiales-aclaraciones-local/consumo-observado.png",
-      "sha256": "1cef9e52b39015ea66da409360f7abef9edc333ac2b2044f0703390c7a6e8438"
+      "path": "docs/sales-agent/05-resultados-y-mejoras/grafo-acotado-local/consumo-observado.png",
+      "sha256": "2ecb2a52263ae17ee31106863780d950dbcb05f911996c5d396c32d327170fcd"
     },
     {
-      "path": "docs/sales-agent/05-resultados-y-mejoras/materiales-aclaraciones-local/conversaciones.md",
-      "sha256": "e21a231cb89939550856f8c065fd47e81c0d64d371f358f14763e7936a5410fb"
+      "path": "docs/sales-agent/05-resultados-y-mejoras/grafo-acotado-local/conversaciones.md",
+      "sha256": "b6a3a7c0933e1f8b20fc147ed77fea753eeb4718ec9002e79acfafff175cddb4"
     },
     {
-      "path": "docs/sales-agent/05-resultados-y-mejoras/materiales-aclaraciones-local/evolucion-casos.png",
-      "sha256": "afae2c54975919ff881ee3c0d99d46f2780bccf87e9e17bb51232c34ac7ad327"
+      "path": "docs/sales-agent/05-resultados-y-mejoras/grafo-acotado-local/generar_consumo.py",
+      "sha256": "c2bcae78a2d66cd708004681a2d5645f8950e2663c0773424069cdb75ab6bc66"
     },
     {
-      "path": "docs/sales-agent/05-resultados-y-mejoras/materiales-aclaraciones-local/generar_figuras.py",
-      "sha256": "dc03462b159545921db21472b98a64529f102efa8de7412909192b6d875e8ee8"
+      "path": "docs/sales-agent/05-resultados-y-mejoras/grafo-acotado-local/resultado.json",
+      "sha256": "8d7ace90b885a136366240adc2ffdd76f46ea75df19f2e07e35c2decfbafaedb"
     },
     {
-      "path": "docs/sales-agent/05-resultados-y-mejoras/materiales-aclaraciones-local/resultado.json",
-      "sha256": "1312fad0bd486d49c812cd8e231f2707e739f2f99cd99d80c9e77e06e8378a14"
+      "path": "docs/sales-agent/05-resultados-y-mejoras/grafo-acotado-local/validacion.json",
+      "sha256": "57df0a0b1237bfc8130c16c2642465130e5c36bcd57d406a022fb69ab9c18587"
     },
     {
-      "path": "docs/sales-agent/05-resultados-y-mejoras/materiales-aclaraciones-local/validacion.json",
-      "sha256": "b0f4d5f5fb8cff7e722f1f168f3f99f8092eac4c1b4e5fb4edc3ad117071579d"
+      "path": "docs/sales-agent/05-resultados-y-mejoras/retoma-servidor-7/conversaciones.md",
+      "sha256": "23c9e03622fa3c681fd871e8d03e7c1b2976cc575fb91b8198edb884a7d91b2e"
     },
     {
-      "path": "docs/sales-agent/05-resultados-y-mejoras/retoma-servidor-6/conversaciones.md",
-      "sha256": "bb8cfb421443536ae7c86b859174b15146504b23a56eee064700b404670fce35"
+      "path": "docs/sales-agent/05-resultados-y-mejoras/retoma-servidor-7/resumen.json",
+      "sha256": "2427723180f145e20d9972e92c9e0f207e0ad4f2b79f259e71d37e051dbdce6d"
     },
     {
-      "path": "docs/sales-agent/05-resultados-y-mejoras/retoma-servidor-6/resumen.json",
-      "sha256": "4a867f7383921210680cf8ca74a6d1db24941e3ce0396c021bc8875963da198a"
-    },
-    {
-      "path": "docs/sales-agent/06-como-ejecutar-las-pruebas/ejecutar-materiales-aclaraciones.sh",
-      "sha256": "fe39a699fe14ba0f8f6dac8937fa61cbeb5522f0ab33f263fa0fdf9de3291371"
+      "path": "docs/sales-agent/06-como-ejecutar-las-pruebas/ejecutar-grafo-comparacion.sh",
+      "sha256": "1eea7ead3eaf381ec41d0ab3b668f02ae4ece8c521e888e0c71b0a5437838056"
     },
     {
       "path": "docs/sales-agent/README.md",
-      "sha256": "d47d7f77b1c96813b23744635c322ecb1984de45d62a5dd77f1cfbd1840c57a2"
+      "sha256": "0f16616fee3248f530d2701e0b80346f3816783dd2ed99bb1cc1304070988c4a"
     }
   ]
 }

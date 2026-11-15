@@ -1,0 +1,73 @@
+{
+  "base_commit": "108846e96b4b319066980ca4bee023f86e1cc227",
+  "runtime": "Python 3.12.14 with SQLite; GitHub candidate image and PostgreSQL run separately",
+  "production_mode": "classic",
+  "candidate_modes_require_scoped_simulation": true,
+  "graph_version": "sales-coordinator-graph/1.0",
+  "wire_system": "sales-interpretation-system/2.3",
+  "general_protocol": "sales-understanding-prompt/2.37",
+  "full_regression": {
+    "modules": 145,
+    "complete_module_coverage_verified": true,
+    "shards": [
+      {
+        "shard": 1,
+        "passed": 1190,
+        "skipped": 5,
+        "failed": 0
+      },
+      {
+        "shard": 2,
+        "passed": 1196,
+        "skipped": 6,
+        "failed": 0
+      },
+      {
+        "shard": 3,
+        "passed": 1121,
+        "skipped": 0,
+        "failed": 0
+      }
+    ],
+    "passed": 3507,
+    "skipped": 11,
+    "failed": 0
+  },
+  "junit_adapter": "Raw backend.tests.* names mapped to tests.* in separate copies only; outcomes and raw XML preserved.",
+  "partition_tests_passed": 8,
+  "acceptance": {
+    "PASS": 63,
+    "FAIL": 0,
+    "NOT_RUN": 1
+  },
+  "additional_comparator_tests_passed": 4,
+  "final_audit_cli_rechecks_passed": 6,
+  "graph_tests_passed_before_comparator": 28,
+  "graph_equivalence": {
+    "observed_scenarios": 3,
+    "autoflush_modes": 2,
+    "orchestrators": [
+      "classic",
+      "graph"
+    ],
+    "conversations_executed": 12,
+    "assertions": "Equal public messages and exact booked property/time, no early bookings."
+  },
+  "local_replay": {
+    "cases": 11,
+    "lead_turns": 76,
+    "simulated_bookings": 10,
+    "checks_passed": 670,
+    "checks_failed": 0
+  },
+  "cost_usd": 0,
+  "paid_calls": 0,
+  "model_quality_evaluated": false,
+  "production_database_writes": 0,
+  "lead_contacts": 0,
+  "limitations": [
+    "Optional reconsideration is tested with mocked provider responses, not a new paid-model run.",
+    "The candidate has a pre-plan interpretation retry, not a general post-tool LLM planning loop.",
+    "One eventual paired run is not statistical evidence of improvement."
+  ]
+}

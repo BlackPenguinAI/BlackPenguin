@@ -40,6 +40,7 @@ def main():
     parser.add_argument('--configuration-id')
     parser.add_argument('--suite',choices=['adaptive','booking-point','commercial-point','closing-point','compact-battery','needs-discovery','continuity-battery'],default='adaptive')
     parser.add_argument('--cases',nargs='+',help='Case IDs for compact, needs or continuity suites; omitted runs the suite defaults.')
+    parser.add_argument('--orchestrator',choices=['classic','graph','graph-reconsider'],default='classic',help='Candidate modes are available only in the isolated continuity lab.')
     parser.add_argument('--lead-model',help='Optional OpenRouter model for the synthetic buyer; sales model stays published.')
     parser.add_argument('--max-calls',type=int,default=180,help='Global inference-call cap, not a currency cap.')
     parser.add_argument('--max-turns',type=int,default=6)
@@ -65,6 +66,7 @@ def main():
     if args.suite=='commercial-point' and args.max_calls<8:parser.error('Commercial-point requires at least 8 calls.')
     if args.suite=='closing-point' and (args.max_calls<8 or args.max_turns<4):parser.error('Closing-point requires at least 8 calls and 4 turns.')
     if not 1<=args.max_calls<=600 or not 3<=args.max_turns<=20:parser.error('Use 1..600 calls and 3..20 turns.')
+    if args.orchestrator!='classic' and args.suite!='continuity-battery':parser.error('Candidate orchestration requires continuity-battery.')
     args.output.mkdir(parents=True,exist_ok=True,mode=0o700)
     if any(args.output.iterdir()):parser.error('Use a new empty output directory.')
     output=args.output.resolve()
@@ -73,7 +75,7 @@ def main():
         if not args.prepare_only:
             from app.db.postgres import engine
             credential=configuration(engine,args.configuration_id)
-        data={'suite':args.suite,'case_selection':args.cases,'credential':credential,'prepare_only':args.prepare_only,'lead_model':args.lead_model,
+        data={'orchestrator':args.orchestrator,'suite':args.suite,'case_selection':args.cases,'credential':credential,'prepare_only':args.prepare_only,'lead_model':args.lead_model,
               'max_calls':args.max_calls,'max_turns':args.max_turns,'judge':args.judge}
         path=Path(temporary)/'lab-options.json';path.write_text(json.dumps(data,default=encode));path.chmod(0o600)
         env=child_environment(temporary)

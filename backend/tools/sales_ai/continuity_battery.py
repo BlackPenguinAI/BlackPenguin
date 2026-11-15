@@ -97,6 +97,8 @@ async def evaluate_case(db,manifest,key,budget,max_turns):
         previous_meta=latest_meta
         before={m.id for m in db.query(SalesMessage).filter_by(conversation_id=conversation.id,direction='outbound')}
         event=f'continuity:{key}:{i}'
+        from time import monotonic
+        started=monotonic()
         await turn(db,company_id=lead.company_id,lead_id=lead.id,inbound_text=message,event_id=event,virtual_now=clock+timedelta(seconds=i*10))
         run=db.query(AgentRun).filter_by(event_id=event).one();meta=(run.output_snapshot or {}).get('metadata') or {};latest_meta=meta
         reply='\n\n'.join(m.content for m in db.query(SalesMessage).filter(SalesMessage.conversation_id==conversation.id,SalesMessage.direction=='outbound',~SalesMessage.id.in_(before)).order_by(SalesMessage.created_at,SalesMessage.id))
@@ -144,7 +146,7 @@ async def evaluate_case(db,manifest,key,budget,max_turns):
         from app.modules.sales_agent.dialogue_models import SalesDialogueEvent
         trace=db.query(SalesDialogueEvent).filter_by(conversation_id=conversation.id,event_key='active-understanding:'+str((run.input_snapshot or {}).get('message_id'))).first()
         attempts=(trace.payload_json.get('metadata') or {}).get('interpretation_attempts',[]) if trace else []
-        rows.append({'interpretation_attempts':attempts,'read_authorization':(run.input_snapshot or {}).get('dialogue_read_authorization'),'focused_visit_clarification':(run.input_snapshot or {}).get('focused_visit_clarification'),'turn':i+1,'action':action,'lead_message':message,'reply':reply,'understanding':(run.input_snapshot or {}).get('understanding'),'metadata':meta,'checks':checks})
+        rows.append({'coordinator_graph':(run.input_snapshot or {}).get('coordinator_graph'),'bounded_reconsideration':(run.input_snapshot or {}).get('bounded_reconsideration'),'elapsed_ms':round((monotonic()-started)*1000),'interpretation_attempts':attempts,'read_authorization':(run.input_snapshot or {}).get('dialogue_read_authorization'),'focused_visit_clarification':(run.input_snapshot or {}).get('focused_visit_clarification'),'turn':i+1,'action':action,'lead_message':message,'reply':reply,'understanding':(run.input_snapshot or {}).get('understanding'),'metadata':meta,'checks':checks})
         if meetings:stop='booked';break
         if spec['access']=='unassigned' and action=='visit':stop='unavailable';break
     meetings=db.query(Meeting).filter_by(lead_id=lead.id).all()
