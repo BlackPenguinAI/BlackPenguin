@@ -44,13 +44,16 @@ def reconcile_subject(state,original_interest,*,confirming_delivered_proposal=Fa
                 old.blocked_reason='property_selection_changed'
 
 
-def run(db,scope,*,message_id,understanding,expected_revision,event_key,max_steps,max_seconds,max_rounds,max_read_units,clock):
+def run(db,scope,*,message_id,understanding,expected_revision,event_key,max_steps,max_seconds,max_rounds,max_read_units,clock,prepare_only=False):
+    if prepare_only:
+        from .execution import simulated
+        if not simulated(scope):raise PermissionError('Preparation-only planning requires a sandbox.')
     conversation=check_scope(db,scope)
     message=scoped_messages_query(db,conversation).filter_by(id=message_id,direction='inbound',role='user').one()
     if (message.metadata_json or {}).get('lead_id',scope.lead_id)!=scope.lead_id:raise PermissionError('Foreign inbound evidence.')
     u=Understanding.model_validate(understanding.model_dump() if isinstance(understanding,Understanding) else understanding).check_evidence(message.content)
     fingerprint=digest({'version':VERSION,'message_id':message_id,'understanding':u.model_dump(mode='json'),
-        'expected_revision':expected_revision,'max_steps':max_steps,'max_seconds':max_seconds,'max_rounds':max_rounds,'max_read_units':max_read_units})
+        'expected_revision':expected_revision,'max_steps':max_steps,'max_seconds':max_seconds,'max_rounds':max_rounds,'max_read_units':max_read_units,**({'prepare_only':True} if prepare_only else {})})
     previous=scope.query(db,SalesDialogueEvent).filter_by(event_key=event_key).first()
     if previous:
         metadata=previous.payload_json['metadata']
@@ -140,6 +143,7 @@ def run(db,scope,*,message_id,understanding,expected_revision,event_key,max_step
           'limits':{'steps':max_steps,'rounds':max_rounds,'seconds':max_seconds,'read_units':max_read_units},
           'retired_tasks':[],'deferred_requests':[],'write_candidates_require_backend_authorization':[]}
     plan['interest_reference']=next((key for key,value in references.items() if value.get('value')==selection),None) if selection else None
+    if prepare_only:plan['original_interest']=list(original_interest)
     plan['resumed_requests']=resumed
     for c in state.property_constraints:
         if c.binding_status=='unresolved':plan['questions'].append({'request_id':None,'reason':'restriction_reference_clarification','options':resolver.options()})
@@ -204,7 +208,7 @@ def run(db,scope,*,message_id,understanding,expected_revision,event_key,max_step
     attempted=set();results=[];stop='finished';context_signature=digest({'context':resolver.context,
         'policy':policy_context(db,scope,resolver.context['confirmed_project_facts'])})
     current_commercial=any(r.polarity=='request' and r.topic.value not in WRITE_TOPICS|{'other'} for r in u.requests)
-    for round_index in range(max_rounds):
+    for round_index in range(0 if prepare_only else max_rounds):
         if u.requires_clarification:stop='clarification';break
         eligible=[]
         for task in sorted(state.tasks,key=lambda t:t.source_message_id!=message.id):

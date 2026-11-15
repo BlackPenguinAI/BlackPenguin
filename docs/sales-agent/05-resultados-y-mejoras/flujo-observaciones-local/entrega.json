@@ -1,0 +1,90 @@
+{
+  "base_commit": "83f3fb007381cbe157f8a2be30a05e6409b778f6",
+  "apply": "Extract ZIP at repository root after reviewing local changes. No migrations or deletions. Production remains classic.",
+  "changed_files": [
+    {
+      "path": "backend/app/modules/sales_agent/active_service.py",
+      "sha256": "9739c90595db8a88019591c6d7d3114f1585ed7a389428df360c52af42b0ff9f"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/coordinator_graph.py",
+      "sha256": "4a552f4b7a947cf79bc47713fb62b43e080839e0c932361c98fa3d302ca24473"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/dialogue_orchestrator.py",
+      "sha256": "ccb38dfc07bb985a834aac322fd4ea712303a31333fb30d9ebfede55a2fce41a"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/observation_loop.py",
+      "sha256": "da9ae7b638b9c0f90e193d05ef4f580606e1a6e060e22a8df9bc26e91fa7e111"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/turn_planner.py",
+      "sha256": "5dbdda9699d45629eab802f975c967d8f6d9b75b5ef2cba6c461a2c717e8f12a"
+    },
+    {
+      "path": "backend/tests/test_sales_observation_loop.py",
+      "sha256": "a641bec24dc095cb6c98cb965e67e0671ff0a4b75357d6d49e104b8c0fd96e4f"
+    },
+    {
+      "path": "backend/tools/ci/test_durations.json",
+      "sha256": "622abf032dc17da6b2bfb0805d99b5006a3d06f22721793c7db4691ee3fae09d"
+    },
+    {
+      "path": "backend/tools/sales_ai/booking_pilot_worker.py",
+      "sha256": "b1664f67c623519e8b072b740f42317a6f121ada745ac0150ea6dacbd729b994"
+    },
+    {
+      "path": "backend/tools/sales_ai/compare_graph_runs.py",
+      "sha256": "e7831e95fbe499270a4f91fc7d0f125b1a429e77466bfb8bb678881b153f0af7"
+    },
+    {
+      "path": "backend/tools/sales_ai/continuity_battery.py",
+      "sha256": "25746c30a5135f019ab0aea18fa4c3b94370a8255da6b64fe9122795da553b1a"
+    },
+    {
+      "path": "backend/tools/sales_ai/observation_battery.py",
+      "sha256": "c7c53518b07a9a7187888a374e8bde2d8f3bfa07453a96b91a6e4f0d649dffd6"
+    },
+    {
+      "path": "backend/tools/sales_ai/synthetic_lab.py",
+      "sha256": "01a64204c85388ce1e851e0dab6ae7c641cc763af957fb895514c4816509b275"
+    },
+    {
+      "path": "docs/sales-agent/02-datos-de-prueba/guiones-observaciones.json",
+      "sha256": "7fc99ba822564d645c61ebb0e40d6e70d5ed1f7cf827c63406f22fe02d3fce5a"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/flujo-observaciones-local/comparacion-anterior-reanalizada.json",
+      "sha256": "eabbfc5a4a763f4cbf111156353fcd789c9580aea1353ce6b6cedd8e53e3751e"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/flujo-observaciones-local/consumo-acumulado.png",
+      "sha256": "52224dba3fcb653aa52c59d86d6e54778e56414e5aeacd6617bbf0d684c38dfa"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/flujo-observaciones-local/conversaciones-locales.json",
+      "sha256": "54d43935c9e3784fdf3567aa33fc2f7ef6a602eb2f7c9b52cf9901772974e0d1"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/flujo-observaciones-local/conversaciones.md",
+      "sha256": "d9556e6909c1991f895c0e156539b5d4bd7b38280cc85e988ffbfab0d10f7bd6"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/flujo-observaciones-local/generar-curva.py",
+      "sha256": "043e9b9386043f03910bd5880541448e7f8ae9d3bef074f380cc0aee91339485"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/flujo-observaciones-local/validacion.json",
+      "sha256": "9f34eddefd72e996f60bec3c8d2da5ca392fa9faa4e3febc8529b813b3516818"
+    },
+    {
+      "path": "docs/sales-agent/06-como-ejecutar-las-pruebas/ejecutar-observaciones-comparacion.sh",
+      "sha256": "6b358fa5b39233327f5874a967f8355e470897a37a3f552cf9dd7d36d0122da3"
+    },
+    {
+      "path": "docs/sales-agent/README.md",
+      "sha256": "1b082fa1098a7678cb6fbdf5a7fd60e10836b1bec552b91e1e8e8751eaf35a23"
+    }
+  ]
+}

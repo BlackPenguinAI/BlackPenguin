@@ -7,13 +7,22 @@ def compare(reference,candidate):
     def load(path):
         with zipfile.ZipFile(path) as z:return json.loads(z.read('report.json')),json.loads(z.read('catalog.json'))
     a,ca=load(reference);b,cb=load(candidate)
+    # Asset identities are generated independently in each disposable database.
+    # Ignore ONLY this exact path; retain hashes, coverage and every other field.
+    import copy
+    def catalog(value):
+        value=copy.deepcopy(value)
+        for project in value.get('projects',[]):
+            for prop in project.get('properties',[]):
+                for asset in prop.get('resources',[]):asset.pop('asset_id',None)
+        return value
     reasons=[]
     for key in ('commit','version','sales_model','configuration_sha256','configuration_version'):
         if not a.get(key) or a.get(key)!=b.get(key):reasons.append('mismatch:'+key)
-    if ca!=cb:reasons.append('mismatch:synthetic_catalog')
+    if catalog(ca)!=catalog(cb):reasons.append('mismatch:synthetic_catalog')
     keys=lambda r:[c.get('case') for c in r.get('cases',[])]
     if not keys(a) or sorted(keys(a))!=sorted(keys(b)) or len(keys(a))!=len(set(keys(a))):reasons.append('mismatch:cases')
-    if a.get('coordinator_mode')!='classic' or b.get('coordinator_mode')!='graph-reconsider':reasons.append('unexpected_modes')
+    if a.get('coordinator_mode')!='classic' or b.get('coordinator_mode') not in {'graph-reconsider','graph-observe'}:reasons.append('unexpected_modes')
     def summary(r):
         turns=[t for c in r.get('cases',[]) for t in c.get('turns',[])]
         elapsed=[t['elapsed_ms'] for t in turns if 'elapsed_ms' in t]
@@ -24,14 +33,18 @@ def compare(reference,candidate):
             'cost_complete':r.get('cost_reporting_complete',False),'mean_turn_ms':round(statistics.mean(elapsed),1) if elapsed else None,
             'median_turn_ms':statistics.median(elapsed) if elapsed else None,
             'reconsiderations':sum((t.get('coordinator_graph') or {}).get('reconsiderations',0) for t in turns),
-            'accepted_reconsiderations':sum(bool((t.get('bounded_reconsideration') or {}).get('accepted')) for t in turns)}
+            'accepted_reconsiderations':sum(bool((t.get('bounded_reconsideration') or {}).get('accepted')) for t in turns),
+            'observation_decisions':sum(len((t.get('observation_loop') or {}).get('decisions',[])) for t in turns),
+            'observation_rounds':sum((t.get('observation_loop') or {}).get('rounds',0) for t in turns),
+            'observation_turns_incomplete':sum((t.get('observation_loop') or {}).get('status') in {'FAIL','PARTIAL'} for t in turns)}
     sa,sb=summary(a),summary(b)
+    complete=all(c.get('turns') and not c.get('instrumentation_error') for r in (a,b) for c in r.get('cases',[]))
     costs=[s['cost_usd'] for s in (sa,sb)]
-    return {'status':'NOT_COMPARABLE' if reasons else 'COMPARABLE','reasons':reasons,'decision':'REVIEW_REQUIRED',
-        'overall_dialogue_quality':'NOT_EVALUATED','commit':a.get('commit'),'reference':sa,'candidate':sb,
+    return {'status':'NOT_COMPARABLE' if reasons else 'COMPARABLE' if complete else 'INCOMPLETE_EVIDENCE','reasons':reasons,'decision':'REVIEW_REQUIRED',
+        'evidence_complete':complete,'catalog_comparison':{'ignored_fields':['projects[].properties[].resources[].asset_id'],'equal_after_identity_projection':catalog(ca)==catalog(cb)},'overall_dialogue_quality':'NOT_EVALUATED','commit':a.get('commit'),'reference':sa,'candidate':sb,
         'total_cost_complete':all(s['cost_complete'] for s in (sa,sb)),
         'total_cost_usd':round(sum(costs),8) if all(isinstance(c,(int,float)) for c in costs) and all(s['cost_complete'] for s in (sa,sb)) else None,
-        'limitations':['One pair of five cases is not a statistical estimate.','Zero reconsiderations do not evaluate that branch.','Provider delivery, Calendar and concurrent PostgreSQL bookings are not evaluated.']}
+        'limitations':['One pair of short scripted cases is not a statistical estimate.','Pre-plan reconsiderations and post-tool observation decisions are distinct; inspect actual traces.','Provider delivery, Calendar and concurrent PostgreSQL bookings are not evaluated.']}
 
 
 def main():

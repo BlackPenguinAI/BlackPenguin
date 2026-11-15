@@ -1,0 +1,55 @@
+{
+  "status": "INCOMPLETE_EVIDENCE",
+  "reasons": [],
+  "decision": "REVIEW_REQUIRED",
+  "evidence_complete": false,
+  "catalog_comparison": {
+    "ignored_fields": [
+      "projects[].properties[].resources[].asset_id"
+    ],
+    "equal_after_identity_projection": true
+  },
+  "overall_dialogue_quality": "NOT_EVALUATED",
+  "commit": "83f3fb007381cbe157f8a2be30a05e6409b778f6",
+  "reference": {
+    "mode": "classic",
+    "status": "FAIL",
+    "cases_passed": 4,
+    "cases": 5,
+    "bookings": 4,
+    "provider_calls": 94,
+    "cost_usd": 0.13637819999999995,
+    "cost_complete": true,
+    "mean_turn_ms": 9501.8,
+    "median_turn_ms": 8716.5,
+    "reconsiderations": 0,
+    "accepted_reconsiderations": 0,
+    "observation_decisions": 0,
+    "observation_rounds": 0,
+    "observation_turns_incomplete": 0
+  },
+  "candidate": {
+    "mode": "graph-reconsider",
+    "status": "PASS",
+    "cases_passed": 5,
+    "cases": 5,
+    "bookings": 5,
+    "provider_calls": 97,
+    "cost_usd": 0.13746524999999998,
+    "cost_complete": true,
+    "mean_turn_ms": 7901.8,
+    "median_turn_ms": 8362.0,
+    "reconsiderations": 1,
+    "accepted_reconsiderations": 0,
+    "observation_decisions": 0,
+    "observation_rounds": 0,
+    "observation_turns_incomplete": 0
+  },
+  "total_cost_complete": true,
+  "total_cost_usd": 0.27384345,
+  "limitations": [
+    "One pair of short scripted cases is not a statistical estimate.",
+    "Pre-plan reconsiderations and post-tool observation decisions are distinct; inspect actual traces.",
+    "Provider delivery, Calendar and concurrent PostgreSQL bookings are not evaluated."
+  ]
+}

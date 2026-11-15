@@ -1,0 +1,170 @@
+{
+  "version": "sales-observation-battery/1.0",
+  "lead_model": null,
+  "judge_model": null,
+  "sales_model": "published company configuration; observed openai/gpt-4o-mini version 8",
+  "cases": {
+    "obs_alternative": {
+      "project": 1,
+      "property": 1,
+      "access": "selected",
+      "material": "photos",
+      "date_style": "numeric",
+      "visit": "Can I visit {name}?",
+      "dialogue": [
+        [
+          "discover",
+          "I am looking for a 1 bedroom home."
+        ],
+        [
+          "choose",
+          "{name}"
+        ],
+        [
+          "material",
+          "Do you have photos of the property?"
+        ],
+        [
+          "accept_material",
+          "Please send the brochure instead."
+        ],
+        [
+          "visit",
+          "Can I visit {name}?"
+        ]
+      ]
+    },
+    "obs_mixed": {
+      "project": 0,
+      "property": 0,
+      "access": "all",
+      "material": "photos",
+      "date_style": "month_day",
+      "visit": "Can I visit {name}?",
+      "dialogue": [
+        [
+          "discover",
+          "I am looking for a 4 bedroom home."
+        ],
+        [
+          "choose",
+          "{name}"
+        ],
+        [
+          "material",
+          "Could you send photos or a brochure and explain the financing options?"
+        ],
+        [
+          "visit",
+          "Can I visit {name}?"
+        ]
+      ]
+    },
+    "obs_switch": {
+      "project": 1,
+      "property": 1,
+      "access": "selected",
+      "material": "floor_plan",
+      "date_style": "numeric",
+      "visit": "Can I visit {name}?",
+      "compare_switch": true,
+      "dialogue": [
+        [
+          "discover",
+          "I am looking for a 2 bedroom home."
+        ],
+        [
+          "choose",
+          "{first}"
+        ],
+        [
+          "switch",
+          "Actually I prefer {name} instead."
+        ],
+        [
+          "material",
+          "Please send the brochure for {name}."
+        ],
+        [
+          "visit",
+          "Can I visit {name}?"
+        ]
+      ]
+    },
+    "obs_interrupt": {
+      "project": 0,
+      "property": 0,
+      "access": "all",
+      "material": "photos",
+      "date_style": "month_day",
+      "visit": "Can I visit {name}?",
+      "dialogue": [
+        [
+          "discover",
+          "I am looking for a 4 bedroom home."
+        ],
+        [
+          "choose",
+          "{name}"
+        ],
+        [
+          "visit",
+          "Can I visit {name}?"
+        ],
+        [
+          "material",
+          "Before choosing a time, can you show me photos?"
+        ],
+        [
+          "visit",
+          "Can I visit {name}?"
+        ]
+      ]
+    },
+    "obs_time": {
+      "project": 0,
+      "property": 0,
+      "access": "all",
+      "material": "photos",
+      "date_style": "month_day",
+      "visit": "Can I visit {name}?",
+      "dialogue": [
+        [
+          "discover",
+          "I am looking for a 4 bedroom home."
+        ],
+        [
+          "choose",
+          "{name}"
+        ],
+        [
+          "visit",
+          "I would like a visit any morning in the next seven days; use the property's timezone."
+        ]
+      ]
+    },
+    "obs_no_seller": {
+      "project": 2,
+      "property": 0,
+      "access": "unassigned",
+      "material": "photos",
+      "date_style": "numeric",
+      "visit": "Can I visit {name}?",
+      "dialogue": [
+        [
+          "discover",
+          "I am looking for a 3 bedroom home."
+        ],
+        [
+          "choose",
+          "{name}"
+        ],
+        [
+          "visit",
+          "Can I visit {name}?"
+        ]
+      ]
+    }
+  },
+  "scope": "Six focused functional journeys, not all buyer segments; no cancellation or rescheduling."
+}

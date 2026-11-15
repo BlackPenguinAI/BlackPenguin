@@ -7,6 +7,13 @@ import sys
 from unittest.mock import patch
 
 
+def annotate_mode(case,mode):
+    from .evaluation_checks import check
+    turns=case.get('turns') or []
+    case.setdefault('checks',[]).append(check('requested_orchestrator_executed',bool(turns) and all((t.get('coordinator_graph') or {}).get('mode')==mode for t in turns)))
+    return case
+
+
 def run(options_path, output):
     import app.db.base
     from app.db.postgres import Base, engine, SessionLocal
@@ -22,7 +29,8 @@ def run(options_path, output):
     from .evaluation_worker import save_reports
     from .booking_pilot import CASES, evaluate_case, team
     path=Path(options_path);output=Path(output);options=json.loads(path.read_text())
-    continuity=options.get('suite')=='continuity-battery'
+    observation=options.get('suite')=='observation-battery'
+    continuity=options.get('suite') in {'continuity-battery','observation-battery'}
     needs=options.get('suite')=='needs-discovery'
     compact=options.get('suite')=='compact-battery'
     closing=options.get('suite')=='closing-point'
@@ -45,7 +53,8 @@ def run(options_path, output):
         if selection and (len(set(selection))!=len(selection) or set(selection)-set(CASES)):raise ValueError('Invalid needs discovery selection.')
         CASES=tuple(selection or CASES)
     if continuity:
-        from .continuity_battery import CASES,evaluate_case,VERSION,SPECS
+        if observation:from .observation_battery import CASES,evaluate_case,VERSION,SPECS
+        else:from .continuity_battery import CASES,evaluate_case,VERSION,SPECS
         selection=options.get('case_selection')
         if selection and (len(set(selection))!=len(selection) or set(selection)-set(CASES)):raise ValueError('Invalid continuity selection.')
         CASES=tuple(selection or CASES)
@@ -89,24 +98,33 @@ def run(options_path, output):
                 report.update(sales_model=credential['pack']['model'],configuration_version=credential['version_number'],configuration_sha256=digest(credential['pack']))
                 for scenario in CASES:
                     budget.maximum=budget.calls+options['max_calls']//len(CASES)
+                    case=None
                     try:
                         from app.modules.sales_agent.coordinator_graph import experiment
                         with experiment(mode),guard(budget),patch('app.integrations.openrouter_client.record_openrouter_usage',lambda **kw:None):
                             case=asyncio.run(evaluate_case(db,manifest,scenario,budget,options['max_turns']))
                         if continuity:
-                            case['checks'].append(check('requested_orchestrator_executed',all(t.get('coordinator_graph',{}).get('mode')==mode for t in case['turns'])))
+                            annotate_mode(case,mode)
                         report['cases'].append(case)
                     except Exception as exc:
-                        db.rollback();report['cases'].append({'case':scenario,'turns':[],'checks':[check('case_completed',False)],**error_details(exc)})
+                        db.rollback()
+                        case=case if case is not None else getattr(exc,'sales_partial_case',None)
+                        if case is not None:
+                            case.setdefault('checks',[]).append(check('case_instrumentation_completed',False))
+                            case['instrumentation_error']=error_details(exc)
+                            report['cases'].append(case)
+                        else:report['cases'].append({'case':scenario,'turns':[],'checks':[check('case_completed',False)],**error_details(exc)})
                 if compact:
                     report['actual_bookings']=sum(len(c.get('meetings',[])) for c in report['cases'])
                     report['case_results']=summarize(report['cases'])
                     report['cost_reporting_complete']=budget.usage['responses_with_cost']==budget.calls
                 if continuity:
                     turns=[t for c in report['cases'] for t in c.get('turns',[])]
-                    report['coordinator_summary']={'mode':mode,'turns':len(turns),'reconsiderations':sum((t.get('coordinator_graph') or {}).get('reconsiderations',0) for t in turns),'accepted_reconsiderations':sum(bool((t.get('bounded_reconsideration') or {}).get('accepted')) for t in turns),'elapsed_ms_total':sum(t.get('elapsed_ms',0) for t in turns)}
+                    report['coordinator_summary']={'mode':mode,'turns':len(turns),'reconsiderations':sum((t.get('coordinator_graph') or {}).get('reconsiderations',0) for t in turns),'accepted_reconsiderations':sum(bool((t.get('bounded_reconsideration') or {}).get('accepted')) for t in turns),'elapsed_ms_total':sum(t.get('elapsed_ms',0) for t in turns),
+                        'observation_decisions':sum(len((t.get('observation_loop') or {}).get('decisions',[])) for t in turns),
+                        'observation_rounds':sum((t.get('observation_loop') or {}).get('rounds',0) for t in turns)}
                     report.update(overall_dialogue_quality='NOT_EVALUATED',quality_scope='Continuity, material ownership and first-booking checks only; human review remains necessary.',cost_reporting_complete=budget.usage['responses_with_cost']==budget.calls)
-                    report['split_results']={split:{'cases':sum(c.get('split')==split for c in report['cases']),'passed':sum(c.get('split')==split and all(k['status']=='PASS' for t in c.get('turns',[]) for k in t.get('checks',[])) and all(k['status']=='PASS' for k in c.get('checks',[])) for c in report['cases'])} for split in ('development','transfer','resumption','contextual')}
+                    report['split_results']={split:{'cases':sum(c.get('split')==split for c in report['cases']),'passed':sum(c.get('split')==split and all(k['status']=='PASS' for t in c.get('turns',[]) for k in t.get('checks',[])) and all(k['status']=='PASS' for k in c.get('checks',[])) for c in report['cases'])} for split in ('development','transfer','resumption','contextual','observation')}
                 if needs:
                     report.update(overall_dialogue_quality='NOT_EVALUATED',quality_scope='Needs-first checks only; no integral dialogue certification.',cost_reporting_complete=budget.usage['responses_with_cost']==budget.calls)
                 report.update(provider_calls=budget.calls,provider_usage=budget.usage,scenario_count=len(report['cases']),

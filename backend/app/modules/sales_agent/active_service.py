@@ -546,6 +546,8 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
                     u=terminal_understanding(u,inbound.content) if next_enabled and not operation_context else u
                     u=confirmed_controls(u,inbound.content,pause_reason='HUMAN_REQUESTED' if human_step else protected)
                     interpreted_revision=interpreted.revision
+            from .coordinator_graph import _mode as coordinator_mode
+            observed=coordinator_mode.get()=='graph-observe'
             async def plan_phase():
                 nonlocal advisory, moderation_decision, outcome, protected, u
                 moderation_decision=None
@@ -591,7 +593,7 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
                     u=u.model_copy(update={'requires_clarification':True,'clarification_question':'The Sales team needs to review that legal or commercial exception. I can continue helping with approved property information.'})
                 outcome=run_turn(db,scope,message_id=inbound.id,understanding=u,expected_revision=interpreted_revision,
                     event_key='active-runtime:'+inbound.id,max_steps=policy.max_steps,max_seconds=policy.max_seconds,
-                    **({'max_rounds':policy.max_rounds,'max_read_units':policy.max_read_units} if next_enabled else {}))
+                    **({'max_rounds':policy.max_rounds,'max_read_units':policy.max_read_units,'prepare_only':observed} if next_enabled else {}))
             async def fulfill_phase():
                 nonlocal capture_profile, case, conversation, count, decision, detect, interpretation, lead, metadata, p, project, published_configuration, result, row, scoped_names, scoring_pack, state, t, task, trace, v
                 if next_enabled:
@@ -896,8 +898,17 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
                 run.input_snapshot={**run.input_snapshot,'bounded_reconsideration':{'reason':reason,'accepted':accepted,'outcome':result.status,'interpretation_attempts':attempts,'max_additional_calls':1,'effect_authorization':False}}
                 conversation,lead,project=_current(db,scope)
                 continuity.check_epoch(conversation,run.input_snapshot.get('continuity_epoch'))
+            async def observe_phase():
+                nonlocal outcome,interpreted_revision,u
+                from .observation_loop import run as observe_run
+                def authorize_read():
+                    _current(db,scope)
+                    continuity.check_epoch(conversation,run.input_snapshot.get('continuity_epoch'))
+                outcome,audit=await observe_run(db,scope,inbound=inbound,outcome=outcome,commercial=commercial,authorize=authorize_read)
+                u=outcome.state.last_understanding
+                run.input_snapshot={**run.input_snapshot,'observation_loop':audit}
             graph_trace=await execute(scope,interpret=interpret_phase,assess=assess_phase,
-                reconsider=reconsider_phase,plan=plan_phase,fulfill=fulfill_phase)
+                reconsider=reconsider_phase,plan=plan_phase,fulfill=fulfill_phase,observe=observe_phase)
             run.input_snapshot={**run.input_snapshot,'coordinator_graph':graph_trace}
             db.commit()
         except LanguageHold as hold:

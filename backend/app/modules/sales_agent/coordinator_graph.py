@@ -11,7 +11,7 @@ from langgraph.graph import StateGraph,START,END
 
 VERSION='sales-coordinator-graph/1.0'
 _mode=ContextVar('sales_coordinator_mode',default='classic')
-MODES=('classic','graph','graph-reconsider')
+MODES=('classic','graph','graph-reconsider','graph-observe')
 
 @contextmanager
 def experiment(mode):
@@ -25,7 +25,7 @@ class State(TypedDict):
     reconsiderations:int
     retry:bool
 
-async def execute(scope,*,interpret,assess,reconsider,plan,fulfill):
+async def execute(scope,*,interpret,assess,reconsider,plan,fulfill,observe=None):
     mode=_mode.get()
     if mode=='classic':
         await interpret();await plan();await fulfill()
@@ -48,7 +48,12 @@ async def execute(scope,*,interpret,assess,reconsider,plan,fulfill):
     g.add_node('reconsider',reconsider_node);g.add_node('plan',node('plan',plan));g.add_node('fulfill',node('fulfill',fulfill))
     g.add_edge(START,'interpret');g.add_edge('interpret','assess')
     g.add_conditional_edges('assess',lambda s:'reconsider' if s['retry'] else 'plan')
-    g.add_edge('reconsider','assess');g.add_edge('plan','fulfill');g.add_edge('fulfill',END)
+    g.add_edge('reconsider','assess')
+    if mode=='graph-observe':
+        if observe is None:raise ValueError('Observation mode requires a real observation callback.')
+        g.add_node('observe',node('observe',observe));g.add_edge('plan','observe');g.add_edge('observe','fulfill')
+    else:g.add_edge('plan','fulfill')
+    g.add_edge('fulfill',END)
     state=await g.compile().ainvoke({'trace':[],'reconsiderations':0,'retry':False},config={'recursion_limit':10})
     return {'version':VERSION,'mode':mode,'trace':state['trace'],'reconsiderations':state['reconsiderations']}
 

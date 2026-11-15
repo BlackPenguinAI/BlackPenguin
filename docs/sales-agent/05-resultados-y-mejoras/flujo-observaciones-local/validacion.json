@@ -1,0 +1,64 @@
+{
+  "date_utc": "2026-11-15",
+  "base_commit": "83f3fb007381cbe157f8a2be30a05e6409b778f6",
+  "production_default": "classic",
+  "candidate_scope": "Sandbox only; graph-observe",
+  "model_quality_evaluated": false,
+  "paid_calls": 0,
+  "regression": {
+    "passed": 3554,
+    "skipped": 11,
+    "failed": 0,
+    "modules": 146,
+    "shards": [
+      {
+        "shard": 1,
+        "passed": 1095,
+        "skipped": 5,
+        "raw_sha256": "9614d56f7109d59d35b3ba94cb764981c5218509eebaa0833d87be7b94f848ee"
+      },
+      {
+        "shard": 2,
+        "passed": 1324,
+        "skipped": 0,
+        "raw_sha256": "5eb3b8b7137e619d9214f04a395f0fc08d8ba2eaa3a9cbdce08dcb740e8ba118"
+      },
+      {
+        "shard": 3,
+        "passed": 1135,
+        "skipped": 6,
+        "raw_sha256": "779f83bbe461ee14c5fa692e353b95249bb752ae6075031f5147d5208ef73a66"
+      }
+    ],
+    "updated_shard": 3,
+    "junit_adapter": "Local classnames start backend.tests.; canonical copies remove only initial backend. Raw outcomes and source XML are unchanged."
+  },
+  "focused_new_tests": 43,
+  "acceptance": {
+    "PASS": 63,
+    "FAIL": 0,
+    "NOT_RUN": 1,
+    "note": "Live acceptance pending; no real provider quality claim."
+  },
+  "sharding_unit_tests": 8,
+  "cli_prepare_only": {
+    "scenarios": 6,
+    "projects": 3,
+    "properties": 6,
+    "provider_calls": 0
+  },
+  "local_examples": {
+    "cases": 12,
+    "turns": 70,
+    "meetings": 10,
+    "checks": 618,
+    "autoflush": false,
+    "providers": "Deterministic HTTP mocks; six journeys in two modes; also tested autoflush=True."
+  },
+  "limits": [
+    "No live transport or Google Calendar test.",
+    "SQLite does not prove PostgreSQL concurrency behavior.",
+    "The model-published comparison must still be run after deployment.",
+    "Six functional cases do not cover all eight buyer segments."
+  ]
+}

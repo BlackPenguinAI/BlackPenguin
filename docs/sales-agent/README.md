@@ -4,7 +4,7 @@
 
 **Métricas históricas del modelo: corte 11/11/2026. Revisión de criterios: 13/11/2026.** Se reúne el trabajo del ciclo reciente con data sintética: **21 corridas del servidor, 144 conversaciones ejecutadas y 47 IDs de escenario distintos por suite**. Las repeticiones son parte del trabajo, no escenarios adicionales. En la batería compacta 2, **13/16 conversaciones cumplieron los checks originales y se registraron 7/8 visitas esperadas**; eso no certifica la calidad integral de esos diálogos. En el último subconjunto, Repair 8, **2/3 conversaciones cumplieron sus checks y se registró 1/2 visitas**: vivienda mayor y fotos ausentes se recuperaron; diversificación falló con tiempos de espera del modelo. No se mezclan ambos conjuntos como si fueran una nueva batería completa.
 
-**Estado actual (15/11/2026).** La última corrida del servidor (`108846e`) agendó 5/5 visitas, pero solo 3/5 diálogos cumplieron todos los controles: persistieron dos aclaraciones genéricas al repetir pedidos de material. Esta entrega corrige esas rutas con evidencia y contexto verificados e incorpora un grafo LangGraph experimental. **Producción conserva el modo de referencia; la comparación con el modelo publicado queda pendiente.** Los resultados locales y reales se separan en 10.7.
+**Estado actual (15/11/2026).** La pareja del servidor consumió USD **0.27384345**. El candidato anterior completó 5/5 casos; a la referencia le falta la evidencia de un caso por un error del evaluador. Cuatro diálogos completos coinciden y ninguna reconsideración fue aceptada: **no hay mejora atribuible al grafo acreditada**. Esta entrega incorpora un ciclo real de decisiones posteriores a herramientas y seis guiones breves para contrastarlo. Producción sigue en `classic`; `graph-observe` solo funciona en el laboratorio. Detalles y costos en 10.8.
 
 La guía usa bloques con el mismo propósito: **qué se hizo → cómo funciona → qué evidencia hay → dónde están sus archivos**. Toda la explicación está aquí; los enlaces internos abren datos, código o carpetas de respaldo. Las referencias externas justifican la metodología, no sustituyen la evidencia del proyecto.
 
@@ -86,15 +86,15 @@ flowchart TD
     F --> Z
 ```
 
-**El grafo histórico no se modifica.** Las iteraciones anteriores afinaban el coordinador sin reconectar esos nodos. Esta entrega incorpora un grafo candidato separado que ejecuta las mismas etapas reales y una rama de reconsideración previa al plan; permanece restringido al laboratorio hasta revisar evidencia con el modelo publicado (10.7). No se entrena ningún peso del modelo.
+**El grafo histórico no se modifica.** Las iteraciones anteriores afinaban el coordinador sin reconectar esos nodos. Los candidatos separados incluyen la reconsideración previa al plan (10.7) y, ahora, decisiones tras observar resultados de herramientas (10.8); permanecen restringidos al laboratorio hasta revisar evidencia con el modelo publicado. No se entrena ningún peso del modelo.
 
-**Ruta de producción; candidato experimental descrito en 10.7.** El grafo anterior permanece como implementación histórica; no debe confundirse con el coordinador actual. `process_live_inbound` llama a `active_service.maybe_process_active` y rechaza el evento si este no lo atiende: no vuelve automáticamente al grafo antiguo. El simulador actual llama al mismo coordinador bajo aislamiento. Las trazas de las corridas muestran `workflow_version=sales-current/1.0` y `engine=sales-active/1.0`. Por tanto, los resultados sintéticos recientes evalúan ese core estructurado, **no una invocación de `build_sales_graph().ainvoke()` por cada turno**. El diagrama de secuencia anterior representa esta ruta actual.
+**Ruta de producción; candidatos experimentales descritos en 10.7–10.8.** El grafo anterior permanece como implementación histórica; no debe confundirse con el coordinador actual. `process_live_inbound` llama a `active_service.maybe_process_active` y rechaza el evento si este no lo atiende: no vuelve automáticamente al grafo antiguo. El simulador actual llama al mismo coordinador bajo aislamiento. Las trazas de las corridas muestran `workflow_version=sales-current/1.0` y `engine=sales-active/1.0`. Por tanto, los resultados sintéticos recientes evalúan ese core estructurado, **no una invocación de `build_sales_graph().ainvoke()` por cada turno**. El diagrama de secuencia anterior representa esta ruta actual.
 
 | Capa | Situación en este ciclo | Qué significa para el afinamiento |
 |---|---|---|
 | Grafo LangGraph histórico | Cinco nodos y sus conexiones conservados. | No es donde se aplicaron las últimas correcciones. |
 | Nuevo grafo candidato | Etapas reales y una reconsideración opcional, solo en laboratorio. | Se compara con el modo secuencial antes de activar cualquier cambio en conversaciones reales. |
-| Coordinador actual | Mantiene el recorrido interpretación → validación/estado → plan/herramientas → composición → registro/envío. | Se ajustan reglas dentro de esas etapas; la estructura general sigue siendo la misma. |
+| Coordinador actual | Mantiene el recorrido interpretación → validación/estado → plan/herramientas → composición → registro/envío. | Producción conserva esta estructura. El candidato 10.8 añade decisiones posteriores a herramientas únicamente en laboratorio. |
 | Instrucciones y contrato | Versionados, con ejemplos y exigencia de evidencia del mensaje actual. | Se corrigen interpretaciones, referencias y campos estructurados. |
 | Servicios del backend | Conservan autoridad sobre ámbitos, consentimiento y operaciones. | Se corrigen normalización, persistencia y presentación de resultados; nunca se concede una cita solo por una sugerencia del modelo. |
 | Experimentos | Reutilizan el core con transporte y efectos aislados. | Miden si esos ajustes mejoran diálogos; no reemplazan la arquitectura ni prueban el transporte real. |
@@ -116,7 +116,7 @@ Se contrastó el código con [Cambio de funcionamiento del agente](https://docs.
 | Corregir salidas incumplidas | Interpretación y composición admiten una reparación acotada con feedback verificable. | No hay una red de críticos ni una revisión semántica ilimitada. |
 | Backend controla efectos | Alcance, permisos, consentimiento, cobertura, integridad y confirmación se vuelven a verificar. | El modelo propone; no reserva, cancela ni comparte por su cuenta. |
 | Estrategias configurables | Se usa la configuración publicada y el playbook. | Varias reglas de interpretación, aclaración y redacción siguen fijadas/versionadas en código; no todo se cambia desde settings. |
-| Conservar LangGraph | El grafo histórico sigue presente. | Producción conserva el recorrido secuencial. En 10.7 se incorpora un nuevo `StateGraph` experimental, anterior a un posible despliegue para conversaciones reales; no implementa el ciclo general posterior a herramientas. |
+| Conservar LangGraph | El grafo histórico sigue presente. | Producción conserva el recorrido secuencial. 10.7 añadió un `StateGraph` con reconsideración previa. 10.8 añade un ciclo posterior a herramientas con lecturas autorizadas, aún sin activarlo para leads reales. |
 
 Por tanto, los ajustes recientes afinan un motor híbrido existente: no están añadiendo todavía el ciclo general de replanteamiento por LLM del documento. Las trazas y pruebas permiten separar un fallo de interpretación, referencia, planificación o presentación antes de atribuirlo al modelo o prometer una solución arquitectónica completa.
 
@@ -199,12 +199,13 @@ flowchart TD
 | Referencias y planificación | Se confundía el nombre de una propiedad con un material o se mostraba un catálogo demasiado amplio. | El backend resuelve nombres solo dentro del project. En Repair 6 vincula una elección explícita única con «sus fotos» en el mismo mensaje, conserva la confianza y elimina la visita inventada; ambigüedades y restricciones siguen bloqueando la acción. | Responder y compartir el recurso de la propiedad elegida. |
 | Estado y persistencia | Se perdían presupuesto y preferencia de contado tras un rollback. | Se ajustó la conservación y recuperación de declaraciones verificadas al restaurar el estado de la conversación. Repair 8 omite copias históricas verificadas de preferencias opcionales sin borrar las ya guardadas. Los tests comprueban que sobrevivan errores y no se vuelvan a preguntar datos conocidos. | Recordar lo ya dicho y mantener continuidad. |
 | Composición de respuesta | Bloques de evidencia en orden inválido provocaban rechazo y reintentos; Repair 6 también agotó tiempo al confirmar. | Se ajustaron las reglas de selección y orden de bloques completos autorizados. El LLM elige variantes de esa evidencia; el backend valida enlaces y hechos. En Repair 7 un comprobante de cita ya registrada, completo y sin otra decisión se presenta directamente, sin otra llamada al modelo. | Dar respuestas claras sin inventar condiciones ni perder confirmaciones reales. |
+| Ciclo posterior a herramientas, solo laboratorio | El modelo no podía elegir otra consulta después de ver el resultado. | Se añadió `observation_loop` con `StateGraph`: decisión estructurada, lectura autorizada, devolución de observaciones y nueva decisión, hasta dos rondas. El backend conserva restricciones y acciones. | Comprobar si la elección dinámica reduce vacíos y repreguntas; aún sin beneficio real acreditado. |
 | Controlador del lead sintético | El comprador LLM repetía objetivos o respondía como vendedor. | Se limitaron intentos por objetivo y se añadieron condiciones de terminación; después se adoptaron guiones A/B con elección de horarios basada en opciones públicas del agente. | Repetir pruebas válidas con menos consumo, sin escribir manualmente cada diálogo por WhatsApp. |
 | Evaluador y regresiones | Se marcaba como fallo una respuesta correcta por no llevar metadata de catálogo. | En Repair 6 el check acepta catálogo acotado o detalle con referencia resuelta a la propiedad esperada. Rechaza referencias erróneas, respuestas vagas o varias propiedades. Se conservaron paquetes reales y variantes negativas como pruebas repetibles. | Medir el comportamiento correcto sin borrar fallos históricos ni relajar el ámbito. |
 
-**Ejemplo de esta entrega.** “Actually I prefer Cedar Loft instead. Please send its photos.” se vincula a la elección explícita del mismo mensaje cuando es única y del ámbito permitido. Se elimina una visita no solicitada, sin elevar la confianza del modelo. Una negación, hipótesis, tercero, varios candidatos o una restricción siguen bloqueando esa recuperación.
+**Ejemplo de una corrección anterior.** “Actually I prefer Cedar Loft instead. Please send its photos.” se vincula a la elección explícita del mismo mensaje cuando es única y del ámbito permitido. Se elimina una visita no solicitada, sin elevar la confianza del modelo. Una negación, hipótesis, tercero, varios candidatos o una restricción siguen bloqueando esa recuperación.
 
-**Qué no se cambió para esta comparación:** modelo de ventas, configuración publicada 8, compañía y selección de tres casos. La corrección local se valida con paquetes reales grabados y con negativos; Repair 7 aprobó los tres casos seleccionados; falta ampliar y comprobar consistencia. Los tests de infraestructura y transporte son otra cobertura, no sustituyen calidad conversacional.
+**En la comparación de Repair 7 no cambiaron:** modelo de ventas, configuración publicada 8, compañía y selección de tres casos. La corrección local se valida con paquetes reales grabados y con negativos; Repair 7 aprobó los tres casos seleccionados; falta ampliar y comprobar consistencia. Los tests de infraestructura y transporte son otra cobertura, no sustituyen calidad conversacional.
 
 [Normalización](../../backend/app/modules/sales_agent/interpretation_consistency.py) · [Planner](../../backend/app/modules/sales_agent/turn_planner.py) · [Compositor](../../backend/app/modules/sales_agent/commercial_composer.py) · [Regresiones nuevas](../../backend/tests/test_sales_current_choice_materials.py).
 
@@ -773,7 +774,7 @@ El grafo tiene límite de recursión y contador de una reconsideración. **No es
 |---|---|---|
 | `classic` | Producción y laboratorio | Referencia con las dos correcciones comunes; ejecuta las etapas secuencialmente. |
 | `graph` | Solo laboratorio aislado | Ejecuta interpretación→evaluación→plan→cumplimiento mediante LangGraph, sin nueva inferencia. Prueba equivalencia. |
-| `graph-reconsider` | Solo laboratorio aislado | Mismo grafo, con una reconsideración opcional anterior al plan. Es el candidato de la comparación pagada. |
+| `graph-reconsider` | Solo laboratorio aislado | Mismo grafo, con una reconsideración opcional anterior al plan. Fue el candidato de la comparación recibida; 10.8 evalúa el ciclo posterior a herramientas. |
 
 **Separar arquitectura de calidad.** La corrección de materiales se aplica a ambos modos: una mejora compartida no se atribuye al grafo. Localmente se comparan tres escenarios observados, dos configuraciones de autoflush y ambos recorridos: doce conversaciones ejecutadas para equivalencia, con iguales mensajes públicos y citas. Otro caso fuerza únicamente en el proveedor simulado una primera respuesta de baja confianza y comprueba que haya una sola reconsideración y que planificación/cumplimiento no se repitan. No se cambia el modelo ni se añaden un lead LLM o juez. La instrucción efectiva pasa a `sales-interpretation-system/2.3` y el protocolo general a 2.37; la configuración publicada sigue siendo 8.
 
@@ -781,7 +782,7 @@ El grafo tiene límite de recursión y contador de una reconsideración. **No es
 
 **Replay local de la corrección común:** once recorridos, **76 turnos, diez citas simuladas y 670 controles PASS**. El caso restante finaliza sin cita por falta de vendedores. Las interpretaciones registradas se reproducen; composición y continuaciones no observadas se simulan. No hubo llamadas pagadas ni contactos. **Esto no es una nueva medición de calidad del modelo real.** [Conversaciones legibles](05-resultados-y-mejoras/grafo-acotado-local/conversaciones.md) · [JSON local](05-resultados-y-mejoras/grafo-acotado-local/resultado.json).
 
-**Diseño de la próxima comparación real.** Ejecutar los mismos cinco guiones primero con `classic` y luego con `graph-reconsider`, en bases SQLite privadas distintas, usando la configuración publicada. Comparar por caso: pertinencia, repreguntas, propiedad retenida, cita exacta y ausencia de reservas prematuras; además llamadas, tokens, costo, latencia por turno y reconsideraciones efectivamente ejecutadas/aceptadas. El reporte guarda modo solicitado y traza de nodos y falla si no corresponden. El comparador verifica que commit, modelo, configuración, catálogo y casos coincidan y conserva ambos ZIP originales junto con un resumen JSON y Markdown; comparabilidad no equivale a aprobación de calidad. Si no se activa ninguna reconsideración, la corrida no acredita calidad de esa rama. Una sola pareja no demuestra significancia ni estabilidad: repetir o ampliar únicamente tras revisar el resultado. No se activará el candidato en conversaciones reales por aprobar pruebas locales.
+**Diseño de la comparación anterior; resultados recibidos en 10.8.** Se propuso ejecutar los mismos cinco guiones primero con `classic` y luego con `graph-reconsider`, en bases SQLite privadas distintas, usando la configuración publicada. Comparar por caso: pertinencia, repreguntas, propiedad retenida, cita exacta y ausencia de reservas prematuras; además llamadas, tokens, costo, latencia por turno y reconsideraciones efectivamente ejecutadas/aceptadas. El reporte guarda modo solicitado y traza de nodos y falla si no corresponden. El comparador verifica que commit, modelo, configuración, catálogo y casos coincidan y conserva ambos ZIP originales junto con un resumen JSON y Markdown; comparabilidad no equivale a aprobación de calidad. Si no se activa ninguna reconsideración, la corrida no acredita calidad de esa rama. Una sola pareja no demuestra significancia ni estabilidad: repetir o ampliar únicamente tras revisar el resultado. No se activará el candidato en conversaciones reales por aprobar pruebas locales.
 
 | Consumo rastreado desde necesidades | Total USD observado | Llamadas con costo |
 |---|---:|---:|
@@ -795,18 +796,76 @@ El grafo tiene límite de recursión y contador de una reconsideración. **No es
 | **TOTAL OBSERVADO** | **1.07680110** | **748** |
 | Corrección, equivalencia y pruebas locales de esta entrega | **0.00000000** | **0 pagadas** |
 
-| Próxima ejecución, aún no corrida | Conversaciones / turnos previstos | Total USD estimado por fila |
+| Plan de la pareja anterior; resultados recibidos en 10.8 | Conversaciones / turnos previstos | Total USD estimado por fila |
 |---|---|---:|
 | Referencia `classic` | 5 / aproximadamente 39–41 | 0.15–0.25 |
 | Candidato `graph-reconsider` | 5 / aproximadamente 39–41, más llamadas selectivas | 0.15–0.25 |
 | **TOTAL estimado de la pareja** | **10 conversaciones** | **0.30–0.50** |
 | **Reserva sugerida para esa pareja** | No se suma al estimado base | **0.60** |
 
-El estimado parte de la última corrida (40 turnos y USD 0.15659055); no es una tarifa nueva ni un tope garantizado. Cada ejecución permite hasta 200 llamadas, 400 entre ambas; el límite es de llamadas, no de dólares. La comparación puede no mejorar calidad y añadir costo/latencia. Los importes futuros no se suman al gasto observado, que sigue excluyendo etapas anteriores a necesidades.
+Este estimado histórico partía de la corrida de 40 turnos y USD 0.15659055; no es una tarifa nueva ni un tope garantizado. Cada ejecución permite hasta 200 llamadas, 400 entre ambas; el límite es de llamadas, no de dólares. La comparación puede no mejorar calidad y añadir costo/latencia. Los importes futuros no se suman al gasto observado, que sigue excluyendo etapas anteriores a necesidades.
 
 ![Consumo observado desde necesidades](05-resultados-y-mejoras/grafo-acotado-local/consumo-observado.png)
 
 [Datos y guiones de continuidad](02-datos-de-prueba/variantes-retoma.json) · [Grafo ejecutable](../../backend/app/modules/sales_agent/coordinator_graph.py) · [Comandos de comparación y descarga](06-como-ejecutar-las-pruebas/ejecutar-grafo-comparacion.sh).
+
+## 10.8. Decisiones después de consultar herramientas: nueva iteración
+
+**Qué cambia.** Antes, el backend elegía las consultas y el modelo componía después. El candidato `graph-observe` ahora permite que el mismo modelo seleccione consultas autorizadas, vea sus resultados y decida otra consulta o pasar a responder. El backend sigue resolviendo identidades, restricciones y acciones. Es un ciclo LangGraph ejecutable; no se limita a envolver las mismas etapas ni a repetir la interpretación inicial. La documentación oficial diferencia precisamente los recorridos prefijados de las decisiones dinámicas sobre herramientas ([LangGraph](https://docs.langchain.com/oss/python/langgraph/workflows-agents)).
+
+```mermaid
+flowchart TD
+    I["Interpretar mensaje y recuperar contexto"] --> P["Backend prepara tareas y consultas permitidas"]
+    P --> D{"LLM decide con la evidencia disponible"}
+    D -->|"Consultar; máximo dos rondas"| T["Herramientas de lectura con alcance validado"]
+    T --> O["Observaciones: datos, vacíos y alternativas"]
+    O --> D
+    D -->|"Responder o aclarar"| C["Composición con evidencia aprobada"]
+    C --> B["Backend revalida y ejecuta acciones autorizadas"]
+```
+
+**Quién controla cada parte.** `active_service` sigue siendo la entrada común. El plan conserva tareas, propiedad y restricciones en los eventos de diálogo existentes; LangGraph no introduce una memoria paralela. El modelo elige IDs de consultas que prepara el backend, nunca SQL, IDs de otra company ni instrucciones de reserva. Las consultas ofrecen catálogo, detalles/comparación, materiales, financiación, precios, inventario, ubicación, entrega, amenities y disponibilidad para una petición explícita de visita. El resultado puede abrir una consulta de alternativas de material; descubrir un PDF no autoriza a enviarlo ni a afirmar que contiene fotos. Al agendar, la selección y confirmación explícitas y la revalidación transaccional siguen siendo necesarias.
+
+**Límites concretos.** Dos rondas de herramientas, hasta tres decisiones del modelo, 15 segundos por decisión, cuatro consultas elegidas por decisión y hasta seis lecturas según el presupuesto del plan. Contexto compacto máximo de 24 KB. No se repite una operación ya intentada; se revalida el alcance después de esperar al modelo y antes de leer. Una decisión inválida queda como FAIL; si se agotan rondas con solicitudes obligatorias pendientes, queda PARTIAL y se conservan las tareas. No se certifica como éxito solo porque haya respuesta o cita. Las restricciones, confirmaciones y controles finales siguen en el backend; las herramientas de este ciclo no envían archivos ni crean citas. La comprobación final de horarios puede repetir una lectura por seguridad: no se elimina esa revalidación para ahorrar consultas.
+
+| Guion breve | Situación y datos | Qué se exige |
+|---|---|---|
+| `obs_alternative` | Cedar Studio: fotos sin cobertura confirmada y PDF aprobado | Consultar alternativas tras observar el vacío; ofrecer PDF y esperar petición explícita. |
+| `obs_mixed` | Bay Residence: fotos **o** PDF, **y** financiación | Respetar OR entre materiales y responder también la consulta independiente de financiación. |
+| `obs_switch` | Cedar Loft → Cedar Studio → PDF → visita | Cambiar la propiedad activa y conservar el dueño correcto de material y cita. |
+| `obs_interrupt` | Visita → fotos antes de elegir hora → visita | Resolver la interrupción y retomar la agenda sin reservar prematuramente. |
+| `obs_time` | Visita una mañana en los próximos siete días, hora del proyecto | Resolver un rango natural sin exigir al lead escribir un código IANA; elegir y confirmar. |
+| `obs_no_seller` | Ridge: vendedor de la compañía sin asignación elegible al proyecto | Informar la falta de disponibilidad, sin cita ni promesa de aviso automático. |
+
+**Datos y modelo.** Reutilizamos la company sintética, sus tres projects y seis tipologías, con materiales y vendedores de alcance diferente descritos en el bloque 3. Los siete segmentos y el desconocido siguen documentados; estos seis guiones prueban funciones y **no representan una nueva cobertura de los ocho segmentos**. Lead guionado, sin costo de lead LLM ni juez. El agente usa el modelo y configuración publicados: en la evidencia recibida, `openai/gpt-4o-mini`, versión 8; el comando no los reemplaza. Cada ejecución prepara SQLite y recursos desechables privados. No se crean leads/citas productivos ni contactos por WhatsApp/SMS. [Guiones completos](02-datos-de-prueba/guiones-observaciones.json).
+
+**Cómo iteramos.** Primero se comparan exactamente estos seis casos en `classic` y `graph-observe`, con el mismo commit/modelo/configuración/catálogo. Se revisa solicitud por solicitud, propiedad retenida, alternativas, horarios, repreguntas, citas y la traza real de decisiones posteriores a herramientas. Se corrigen instrucciones, contratos o validaciones con el fallo observado y se repiten ambos recorridos antes de ampliar. Una mejora compartida no se atribuye al grafo; un aumento de costo sin mejor diálogo no justifica promoverlo. No hemos activado el candidato en canales reales ni afirmamos mejora del modelo antes de recibir esa corrida. Una intención mal interpretada aguas arriba puede seguir fallando: este ciclo decide sobre solicitudes validadas y no sustituye las pruebas de interpretación ni convierte cualquier mensaje en una acción.
+
+**Corrección de la medición anterior.** El comparador ignoraba incorrectamente que cada base privada genera nuevos `asset_id` para los mismos archivos: ahora excluye solo ese campo y conserva hash/contenido, cobertura y catálogo. Además, una traza `coordinator_graph=null` ya no borra la conversación por un `.get` inválido; se conserva el diálogo con un control FAIL. El resumen corregido de la pareja anterior es **INCOMPLETE_EVIDENCE**: el catálogo sí coincide, pero el caso perdido de la referencia no se puede reconstruir. Se conserva el resultado original, sin convertirlo en PASS. [Reanálisis sin llamadas al modelo](05-resultados-y-mejoras/flujo-observaciones-local/comparacion-anterior-reanalizada.json).
+
+| Evidencia del servidor recibida | Casos completos sin fallos | Citas registradas | Llamadas | Total USD por fila |
+|---|---:|---:|---:|---:|
+| Referencia `classic` | 4/5; falta evidencia del quinto | 4 exportadas | 94 | 0.13637820 |
+| Candidato previo `graph-reconsider` | 5/5 | 5 | 97 | 0.13746525 |
+| **TOTAL de esa pareja** | **No determina ganador** | **9 exportadas** | **191** | **0.27384345** |
+| Histórico anterior desde necesidades | Conjuntos distintos, no se agrega su tasa de éxito | — | 748 | 1.07680110 |
+| **TOTAL OBSERVADO desde necesidades** | **Excluye fases anteriores sin detalle de consumo aquí** | — | **939** | **1.35064455** |
+| Pruebas locales de esta entrega | Proveedores simulados; no miden calidad real | Solo simuladas | 0 pagadas | 0.00000000 |
+
+Cuatro conversaciones completas tuvieron los mismos textos públicos en ambos modos. Hubo una reconsideración previa, pero cero aceptadas. Los 5/5 del candidato anterior no acreditan una mejora causal. No se mezcla este resultado con `graph-observe`, que todavía no tiene corrida del modelo publicado.
+
+| Próxima pareja, aún no ejecutada | Conversaciones / límite por conversación | Total USD estimado por fila |
+|---|---|---:|
+| Referencia `classic` | 6 / hasta 10 turnos de lead | 0.15–0.30 |
+| Candidato `graph-observe` | 6 / hasta 10 turnos; decisiones adicionales | 0.25–0.50 |
+| **TOTAL ESTIMADO** | **12 / hasta 120 turnos** | **0.40–0.80** |
+| **Reserva sugerida** | Alternativa de presupuesto; no se suma al estimado | **1.00** |
+
+Estimación propia a partir de la pareja recibida y del contexto compacto adicional; no es tarifa garantizada ni compromiso de ahorro. Cada conversación suele terminar antes del límite cuando alcanza su objetivo o no hay vendedor. Los comandos permiten hasta 300 llamadas por recorrido (600 la pareja): **ese límite no es un tope en dólares**. Se contabilizarán tokens y cargos efectivamente reportados por OpenRouter. Una decisión del nuevo ciclo añade costo y latencia; el beneficio debe observarse en el diálogo, no inferirse de la arquitectura.
+
+![Consumo rastreado, con la última comparación](05-resultados-y-mejoras/flujo-observaciones-local/consumo-acumulado.png)
+
+**Validación local y lectura humana.** 3.554 pruebas de regresión aprobadas. 11 omisiones por condiciones de entorno y cero fallos; 146 módulos cubiertos exactamente una vez. El nuevo módulo aporta 43 pruebas. incluidos seis recorridos en dos modos y dos configuraciones de autoflush. decisiones inválidas. restricciones. comparación y límite de rondas. Además. ocho pruebas del particionado y 63 controles de aceptación aprobaron; uno de aceptación real sigue pendiente. Los ejemplos exportados de autoflush de producción reúnen 12 diálogos. 70 turnos. diez citas simuladas y 618 controles PASS. sin llamadas pagadas. Los ejemplos locales permiten inspeccionar lead, respuesta, observación y próxima consulta, pero no sustituyen el comportamiento del modelo publicado. [Conversaciones legibles](05-resultados-y-mejoras/flujo-observaciones-local/conversaciones.md) · [Datos locales](05-resultados-y-mejoras/flujo-observaciones-local/conversaciones-locales.json) · [Validación](05-resultados-y-mejoras/flujo-observaciones-local/validacion.json) · [Comandos de despliegue, comparación y descarga](06-como-ejecutar-las-pruebas/ejecutar-observaciones-comparacion.sh).
 
 ## 11. Trabajo futuro
 
@@ -822,7 +881,7 @@ El estimado parte de la última corrida (40 turnos y USD 0.15659055); no es una 
 
 **Totales futuros:** se sumaron los importes mostrados por fila; la reserva es una alternativa de presupuesto y **no se añade al estimado base**. Tampoco se suman estos USD al histórico ya ejecutado.
 
-**Cálculo y límites.** Base Repair 7: 13 turnos, 27 llamadas, 314.604 tokens y USD 0.04357335 completos: ≈2.08 llamadas y USD 0.00335 por turno. Se extrapola linealmente manteniendo guiones, sin juez y con el mismo modelo. La reserva 2× es planificación, no intervalo estadístico ni garantía: historia más larga, precios/proveedor o reparaciones pueden superarla. Límites de llamadas no son límites en dólares. [Tokens, llamadas y supuestos por etapa](05-resultados-y-mejoras/propuesta-ampliacion.json).
+**Cálculo y límites.** Estas ampliaciones usan el costo histórico de `classic`; si se promueve `graph-observe`, habrá que recalcularlas con el consumo observado de sus decisiones adicionales. Base Repair 7: 13 turnos, 27 llamadas, 314.604 tokens y USD 0.04357335 completos: ≈2.08 llamadas y USD 0.00335 por turno. Se extrapola linealmente manteniendo guiones, sin juez y con el mismo modelo. La reserva 2× es planificación, no intervalo estadístico ni garantía: historia más larga, precios/proveedor o reparaciones pueden superarla. Límites de llamadas no son límites en dólares. [Tokens, llamadas y supuestos por etapa](05-resultados-y-mejoras/propuesta-ampliacion.json).
 
 **Cuánto invertir.** No se encontró un promedio comparable de inversión total para este producto. Como escala histórica, τ-bench reportó USD 0,38 de GPT-4o agente + USD 0,23 de GPT-4 usuario por tarea en 2024: escalar ese ejemplo a 100–500 tareas da USD 61–305 por repetición, sin trabajo humano ([§5.1](https://arxiv.org/html/2406.12045v1#S5.SS1)). No es un precio actual de OpenRouter ni una norma del sector. Nuestro uso de guiones y `gpt-4o-mini` tiene otra escala. Se propone una bolsa inicial propia de USD 5 para primeras ampliaciones o USD 10 si incluye largos/repeticiones, revisada por bloques; no garantiza estabilización ni cubre horas de ingeniería/revisión.
 
