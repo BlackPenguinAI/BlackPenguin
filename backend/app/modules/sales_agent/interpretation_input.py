@@ -9,7 +9,7 @@ from pydantic import Field,create_model,StrictBool
 from .understanding_contract import (Understanding,StrictModel,Reference,Request,Constraint,Comparison,Subject)
 
 VERSION='sales-interpretation-input/2.0'
-SYSTEM_VERSION='sales-interpretation-system/2.9'
+SYSTEM_VERSION='sales-interpretation-system/2.10'
 class Target(StrictModel):
     kind:Literal['property','unit','appointment','location','material','ambiguous']
     expression:str=Field(min_length=1,max_length=300)
@@ -181,10 +181,13 @@ def legacy(data,text):
     return output,notes
 
 
-def compile_input(raw,text,*,historical_messages=()):
+def compile_input(raw,text,*,historical_messages=(),previous_reply='',previous_metadata=None):
     data=document(raw);notes=[]
     if data.get('version')=='sales-understanding/1.0':data,notes=legacy(data,text)
     value=Input.model_validate(data)
+    from .contextual_answers import repair as contextual_repair
+    fixed,context_notes=contextual_repair(value.model_dump(mode='json'),text,previous_reply,previous_metadata)
+    if context_notes:value=Input.model_validate(fixed);notes.extend(context_notes)
     from .interpretation_wire_repairs import literal_material,literal_visit,literal_property_choice,literal_social_or_need
     fixed,literal_notes=literal_social_or_need(value.model_dump(mode='json'),text)
     if literal_notes:value=Input.model_validate(fixed);notes.extend(literal_notes)

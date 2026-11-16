@@ -31,7 +31,7 @@ async def evaluate_case(db,manifest,key,budget,max_turns):
             policy=meta.get('material_continuity')
             t['material_continuity_evaluation']={'status':'POLICY_CHECKED' if policy else 'OTHER_CLOSING_OR_REVIEW_REQUIRED','policy':policy,'integral_dialogue_quality':'NOT_EVALUATED'}
             if policy:
-                t['checks'].append(check('material_continuity_policy_recorded',policy.get('decision') in {'allow_review','explore_current_property','offer_visit'}))
+                t['checks'].append(check('material_continuity_policy_recorded',policy.get('decision') in {'allow_review','explore_current_property','offer_visit','offer_complement'}))
                 t['checks'].append(check('material_continuity_one_question',t['reply'].count('?')<=1))
         if key=='obs_mixed' and t['action']=='material':
             t['checks'].append(check('independent_financing_answered',any(w in t['reply'].lower() for w in ('financing','mortgage','bank'))))

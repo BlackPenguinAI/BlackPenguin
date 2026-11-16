@@ -8,8 +8,8 @@ def context():
 
 def test_material_continuity_keeps_owner_preference_and_optional_silence():
     o,c,m,p=context();result=choices(o,c,m,p,set(),False)
-    assert [x['id'] for x in result]==['material_interest','material_visit','material_review']
-    assert '3 bedrooms' in result[0]['text'] and 'Juniper Home' in result[0]['text']
+    assert [x['id'] for x in result]==['material_visit','material_review']
+    assert 'Juniper Home' in result[0]['text'] and 'bedrooms' not in result[0]['text']
     assert result[-1]['text']=='' and all(x['text'].count('?')<=1 for x in result)
     assert all('book' not in x['metadata'] for x in result)
 
@@ -22,7 +22,7 @@ def test_material_does_not_repeat_or_pressure(reason):
     if reason=='scoped_decline':o.state.property_constraints=[N(topic=N(value='appointment'),binding_status='resolved',property_id='home')]
     if reason=='pending_visit':o.state.booking_search={'pending':True}
     if reason=='prior_invite':p['visit_invitation']=True
-    if reason=='previous_material':p['material_continuity']={'decision':'explore_current_property'}
+    if reason=='previous_material':p.update(material_continuity={'decision':'offer_visit'},visit_invitation=True)
     if reason=='unknown_owner':c['property_types']=[]
     assert [x['id'] for x in choices(o,c,m,p,holds,booked)]==['material_review']
 

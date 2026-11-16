@@ -106,10 +106,13 @@ def update(db, lead, *, commercial, message_count, scoring_config=None):
             (profile['current']['visit_readiness'].get('source_ref') or {}).get('intent')=='explicit_visit'
             or re.search(r'\b(?:yes|ready|want|would like|interested)\b',positive('visit_readiness'))) else 0,
     }
+    from app.modules.sales_crm.models import Meeting,MeetingStatus
+    confirmed=db.query(Meeting.id).filter(Meeting.lead_id==lead.id,Meeting.project_id==lead.project_id,Meeting.status==MeetingStatus.CONFIRMED).first()
+    if confirmed:factors['appointment_intent']=weight('appointment_intent',35)
     total = max(0,min(100,sum(factors.values())))
     tier = 'hot' if total >= weight('hot_threshold',70) else 'warm' if total >= weight('warm_threshold',40) else 'cold'
     snapshot = LeadScoreSnapshot(lead_id=lead.id,total_score=total,assigned_tier=tier,
-                                 factor_breakdown=factors,scoring_version=VERSION)
+                                 factor_breakdown=factors,scoring_version=VERSION+"/confirmed-booking-1" if confirmed else VERSION)
     lead.intent_score, lead.intent_tier = total/100, tier
     # Only current explicit buyer intent/motivation can select a playbook.
     # Ambiguous or withdrawn intent removes a previous assignment; no stale persona.

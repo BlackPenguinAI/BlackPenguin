@@ -474,6 +474,9 @@ async def compose(db, scope, *, inbound, outcome, draft, commercial, lead, metad
         blocks.append({'id':'commercial'+str(len(blocks)),'required':True,
             'wordings':dict.fromkeys(('direct','conversational','natural'),statement),'source':commercial_policy['version']})
     memory = build(db, scope, inbound_message_id=inbound.id)
+    from .complementary_material import build as complement
+    complement_choice=complement(db,scope,outcome.state,metadata,channel,holds) if metadata.get('material_bindings') else None
+    if complement_choice:metadata['complement_choice']=complement_choice
     choices = select_continuations(outcome=outcome, commercial=commercial, metadata=metadata,
         previous_meta=previous_meta, lead=lead, holds=holds, priority=priority, priority_meta=priority_meta,
         booked=bool(memory['appointments']['active']['count']))

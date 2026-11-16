@@ -217,8 +217,11 @@ def capture(db,scope,understanding,message_id,*,selected_property=None,selected_
     for pref in understanding.preferences:
         # Defense at the write boundary, including direct/injected callers.
         if unrelated_financial_evidence(pref,appointment_confirmation=confirming):continue
-        # Exact evidence is authoritative; model-normalized values never replace it.
-        put(PREFERENCE_KEYS[pref.key],pref.evidence,pref.evidence,status=pref.status)
+        # Preserve the quote as evidence; only the validated bedroom count is normalized.
+        if pref.key=='visit_readiness' and re.search(r'\balready (?:scheduled|booked)\b',pref.evidence,re.I):continue
+        if pref.key=='property' and selected_property:continue
+        value=pref.value if pref.key=='bedrooms' and str(pref.value).isdigit() else pref.evidence
+        put(PREFERENCE_KEYS[pref.key],value,pref.evidence,status=pref.status)
         if pref.key in {'buyer_type','motivation'} and pref.value in BUYER_SEGMENTS and pref.status=='declared' and own_statement(pref.evidence,own):
             # Semantic interpretation is finite and evidenced; it never uses a
             # demographic field, history keyword search or a score as its source.

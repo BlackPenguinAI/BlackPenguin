@@ -111,8 +111,19 @@
       "graph_calls": 127,
       "graph_cost_usd": 0.1041219,
       "source": "sales-context-budget.zip"
+    },
+    {
+      "label": "Materiales 1",
+      "commit": "c9a90be23bcca935bb832fa8a795a26701a4c73d",
+      "graph_cases_pass": 5,
+      "cases": 6,
+      "bookings": 4,
+      "expected_bookings": 5,
+      "graph_calls": 125,
+      "graph_cost_usd": 0.09906675,
+      "source": "sales-material-continuity.zip"
     }
   ],
-  "total_graph_calls": 1299,
-  "total_graph_cost_usd": 1.1814936
+  "total_graph_calls": 1424,
+  "total_graph_cost_usd": 1.28056035
 }

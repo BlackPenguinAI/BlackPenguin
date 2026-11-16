@@ -1,0 +1,27 @@
+{
+  "base_commit": "c9a90be23bcca935bb832fa8a795a26701a4c73d",
+  "policy": "sales-material-continuity/2.0",
+  "interpretation": "sales-interpretation-system/2.10",
+  "regression": {
+    "passed": 3917,
+    "skipped": 11,
+    "failed": 0,
+    "modules": 156,
+    "source": "Three full partitions, then final affected modules and production input compiler. Duplicate testcase IDs counted once; latest complete module rerun supersedes original status."
+  },
+  "superseded_failures": [
+    {
+      "report": "backend-junit-2.xml",
+      "test": "backend.tests.test_sales_material_continuity.test_material_continuity_keeps_owner_preference_and_optional_silence"
+    }
+  ],
+  "new_tests": 23,
+  "paid_local_calls": 0,
+  "real_model_quality_evaluated": false,
+  "limitations": [
+    "Providers simulated locally.",
+    "Existing real dialogue profile projections are not mass migrated.",
+    "Temporal morning constraints, reviewed PDF classification, UI timezone labels and reminders remain pending.",
+    "Requires server evaluation and human dialogue review."
+  ]
+}

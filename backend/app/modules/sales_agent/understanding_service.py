@@ -167,7 +167,10 @@ async def _preview(db, scope: Scope, *, inbound_message_id: str, expected_revisi
                 for p in declarations:by_key.setdefault(p.key,p)
                 validated_declarations=list(by_key.values())
                 audit['validated_declarations']=[p.model_dump(mode='json') for p in validated_declarations]
-                draft,compiled_notes=compile_input(raw,inbound.content,historical_messages=[m.content for m in history if m.direction=='inbound' and m.role=='user'])
+                previous=next((m for m in history if m.direction=='outbound'),None)
+                from .reference_resolution import accepted
+                previous=previous if previous and accepted(previous) else None
+                draft,compiled_notes=compile_input(raw,inbound.content,historical_messages=[m.content for m in history if m.direction=='inbound' and m.role=='user'],previous_reply=previous.content if previous else '',previous_metadata=previous.metadata_json if previous else None)
                 normalizations.extend(compiled_notes)
                 draft,declaration_notes=merge(draft,validated_declarations)
                 normalizations.extend(declaration_notes)

@@ -567,11 +567,15 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
                 literal_needs_read=bool(next_enabled and literal_read(u,inbound.content))
                 contextual_needs_read=bool(next_enabled and contextual_read(db,scope,u,inbound.content))
                 from .dialogue_continuity import catalog_choice_read,comparison_read,literal_greeting,named_choice_read,focused_visit_question,literal_material_read,focused_material_question,mixed_material_financing_read,offered_brochure_read
+                from .contextual_answers import authorized as contextual_authorized
+                prior=latest_outbound(db,scope.conversation_id)
+                from .reference_resolution import accepted
+                contextual_read_ok=bool(next_enabled and prior and accepted(prior) and contextual_authorized(u,inbound.content,prior.content,prior.metadata_json or {}))
                 mixed_read=bool(next_enabled and mixed_material_financing_read(db,scope,u,inbound.content))
                 offered_read=bool(next_enabled and offered_brochure_read(db,scope,u,inbound.content))
-                material_read=bool(next_enabled and literal_material_read(db,scope,u,inbound.content) or mixed_read or offered_read)
+                material_read=bool(next_enabled and literal_material_read(db,scope,u,inbound.content) or mixed_read or offered_read or contextual_read_ok)
                 if material_read:
-                    run.input_snapshot={**run.input_snapshot,'dialogue_read_authorization':{'basis':'literal_current_material_or_and_financing' if mixed_read else 'accepted_current_brochure_offer' if offered_read else 'literal_scoped_material_request','model_confidence':u.confidence,'effect_authorization':False,'share_requires_backend_validation':True}}
+                    run.input_snapshot={**run.input_snapshot,'dialogue_read_authorization':{'basis':'latest_question_contextual_answer' if contextual_read_ok else 'literal_current_material_or_and_financing' if mixed_read else 'accepted_current_brochure_offer' if offered_read else 'literal_scoped_material_request','model_confidence':u.confidence,'effect_authorization':False,'share_requires_backend_validation':True}}
                 greeting_read=bool(next_enabled and literal_greeting(u,inbound.content))
                 if greeting_read:
                     run.input_snapshot={**run.input_snapshot,'dialogue_read_authorization':{'basis':'literal_greeting_no_actions','model_confidence':u.confidence,'effect_authorization':False}}

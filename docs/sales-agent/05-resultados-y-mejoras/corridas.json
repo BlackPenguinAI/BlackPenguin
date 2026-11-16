@@ -2739,5 +2739,89 @@
       }
     ],
     "overall_dialogue_quality": "NOT_EVALUATED"
+  },
+  {
+    "run": "sales-material-continuity",
+    "execution_origin": "server_submitted_synthetic_run",
+    "archive": "sales-material-continuity.zip",
+    "sha256": "08b0b0abe7b534ee0839964d829df0005233ccff556d3d108941e2e2603aa080",
+    "archive_member": null,
+    "commit": "c9a90be23bcca935bb832fa8a795a26701a4c73d",
+    "suite": "observation",
+    "cohort": "fixed-six-observation-cases",
+    "selected_cases": [
+      "obs_alternative",
+      "obs_mixed",
+      "obs_switch",
+      "obs_interrupt",
+      "obs_time",
+      "obs_no_seller"
+    ],
+    "model": "openai/gpt-4o-mini",
+    "lead_model": null,
+    "configuration_version": 8,
+    "configuration_sha256": "51ff65376dad421328dab993a4fc71939489386f1ed173514cf13a244ac79f1c",
+    "status": "FAIL",
+    "cases": 6,
+    "approved_cases": 5,
+    "turns": 33,
+    "expected_bookings": 5,
+    "actual_bookings": 4,
+    "provider_calls": 125,
+    "prompt_tokens": 786105,
+    "completion_tokens": 11417,
+    "responses_with_cost": 123,
+    "cost_usd_recorded": 0.09906675,
+    "cost_complete": false,
+    "checks_summary": {
+      "PASS": 333,
+      "FAIL": 3,
+      "BLOCKED": 0
+    },
+    "case_results": [
+      {
+        "case": "obs_alternative",
+        "status": "aprobado",
+        "meetings": 1,
+        "turns": 7,
+        "failures": 0
+      },
+      {
+        "case": "obs_mixed",
+        "status": "aprobado",
+        "meetings": 1,
+        "turns": 6,
+        "failures": 0
+      },
+      {
+        "case": "obs_switch",
+        "status": "aprobado",
+        "meetings": 1,
+        "turns": 7,
+        "failures": 0
+      },
+      {
+        "case": "obs_interrupt",
+        "status": "aprobado",
+        "meetings": 1,
+        "turns": 7,
+        "failures": 0
+      },
+      {
+        "case": "obs_time",
+        "status": "fallido",
+        "meetings": 0,
+        "turns": 3,
+        "failures": 3
+      },
+      {
+        "case": "obs_no_seller",
+        "status": "aprobado",
+        "meetings": 0,
+        "turns": 3,
+        "failures": 0
+      }
+    ],
+    "overall_dialogue_quality": "NOT_EVALUATED"
   }
 ]

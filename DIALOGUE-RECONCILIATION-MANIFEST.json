@@ -1,0 +1,133 @@
+{
+  "base_commit": "c9a90be23bcca935bb832fa8a795a26701a4c73d",
+  "files": [
+    {
+      "path": "backend/app/modules/sales_agent/active_service.py",
+      "sha256": "ffaf960152af45c7404c5c911107135fcaf66c29ea755a286ed6275584a13c66"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/commercial_composer.py",
+      "sha256": "0779e4893cafe74296d22875c6cb110969a5ff2e26dadf14facb12e85238621d"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/complementary_material.py",
+      "sha256": "de4c3e6e368c08fc5af95e3b6abe325440e53576611c06b815a6ce91ad6580f2"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/contextual_answers.py",
+      "sha256": "6159b83182bf20847d93226ce5d0f1fc30c80a3d93a0e53be16be1cb8d8734ad"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/interpretation_input.py",
+      "sha256": "4d4fc385c322cab72a91cd4e8f08f8bb8e45838e8932e93542e41f8176280c8a"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/language_policy.py",
+      "sha256": "ed0d7fcecd3431f2f5823441d1dce4d166581e2c9c1980dbef9f3bf1504340a7"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/lead_profile.py",
+      "sha256": "c9070d76028ec308a9066e12bd16ee1693bea0d15c98be7eb5ff2610c85dc47f"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/material_continuity.py",
+      "sha256": "07b2fddb81ffcbb5b25eb1e9a60d376e7b35eb55a11067b037cfba925343ada4"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/profile_intelligence.py",
+      "sha256": "2fcc8a64472f1a4425817716b7e5ba5af0d3eaede4a8175184f8554b83e4f8ba"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/understanding_service.py",
+      "sha256": "f642a44d658bb3616a159f2a926b53be71708e8a39c3324e9e5125bfb5a8863a"
+    },
+    {
+      "path": "backend/tests/test_sales_contextual_answers.py",
+      "sha256": "9115ecf76bc586836dab92637f2d0dca7990edf72ab655898f60f8bcf5f961ad"
+    },
+    {
+      "path": "backend/tests/test_sales_material_continuity.py",
+      "sha256": "005032d5165e19300735761d3ba556d94fb08c7727cf3f16042ce2836c695e40"
+    },
+    {
+      "path": "backend/tools/sales_ai/observation_battery.py",
+      "sha256": "2f948d33b45610d3f05ad8483b40df77c787d16537ca54c4a845fb0ff413b1d6"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/corridas.json",
+      "sha256": "b763ff5c5ae16be3c4720aebd556966552af8e7fcddecf3bf7d9cd843eb7d7e5"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/figuras/consumo-global.png",
+      "sha256": "cf15224c9b12c8a8c5aa62ec889b7eebc67f8cbf552f61a06201d07e21fb6bfa"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/figuras/panorama-global.png",
+      "sha256": "215f1f47380ffdff17469b3759f8fcb3bdef80a5e2efbb29f6320e33e91a5166"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/langgraph-integrado/consumo-cuatro-corridas.png",
+      "sha256": "5bc99d0f75386b701c56ad0b3adb92198f23f4b7960f952089f8b4f7d78d8f87"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/langgraph-integrado/evolucion-seis-casos.png",
+      "sha256": "5699c8f4c3bf0bf76173a0ac8fe01c16ff9651db68ae08cb7c4f3f9150e4bb0c"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/langgraph-integrado/evolucion.py",
+      "sha256": "4a2ad0fd7e2cd376d003d771ed51da893fe5b3ba2ac3f7397d6bf4e3fea546cc"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/langgraph-integrado/historico-servidor.json",
+      "sha256": "e0c473a507829cfd8a225dbce2ac9443683a7e91109cd48b8f46813090fffb4e"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/metricas.csv",
+      "sha256": "ef936150923ab69ebc3ccfa96791a48d21768a7044cb2665f823b9542dce9304"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/reconciliacion-dialogo-local/backend-junit-1.xml",
+      "sha256": "c92e481dbeb675d05ec3dfdd44f232a65239eeff130cce32e11b06fd5adec135"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/reconciliacion-dialogo-local/backend-junit-2.xml",
+      "sha256": "1ef2486f0ef04548a0c9643342680d5589ec248941d8a10b78d1bd3b4f224c98"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/reconciliacion-dialogo-local/backend-junit-3.xml",
+      "sha256": "fe39c0e631ee9cd808860a3601e92b22838df9adaa7040b906b021658c5c5f2f"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/reconciliacion-dialogo-local/compiler-final.xml",
+      "sha256": "049c110c232988732dee2dd5e73953f88cb8ccdeb9b5607fa6f3400b3e85e60f"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/reconciliacion-dialogo-local/target-final.xml",
+      "sha256": "acecaf6851695195ee3b3aee3e00f15a930f39844b9dca51778a6b69aa0ea86e"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/reconciliacion-dialogo-local/validacion-local.json",
+      "sha256": "ac421ae218beefc9a8f6a1acff64319ab08b710d4c58be1fa2da29e18e151383"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/sales-material-continuity/conversaciones.md",
+      "sha256": "05bbd25102e239a1e62bc2416ad0b32b3ea1b9f8380b32227a56bec73ed09a77"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/sales-material-continuity/resultado.json",
+      "sha256": "5c48629172a704d67f52b59d3670da0adf16f6c0454f9f88e54a032351594484"
+    },
+    {
+      "path": "docs/sales-agent/06-como-ejecutar-las-pruebas/ejecutar-reconciliacion-dialogo.sh",
+      "sha256": "8328495d8b46c1e4583632095ef9ead4e900742fd85a51dd75eeeb47573657aa"
+    },
+    {
+      "path": "docs/sales-agent/06-como-ejecutar-las-pruebas/reconciliacion-dialogo.md",
+      "sha256": "44105d8bd6c8b1ef2fc9f3ec97b02e19176e2b6993db20485bb0212adafceb21"
+    },
+    {
+      "path": "docs/sales-agent/README.md",
+      "sha256": "123779b30061c7aae4e1f2ef43a9f72ec3f6ba5e2079e8e1c41e21b494a7d111"
+    }
+  ]
+}

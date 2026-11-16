@@ -30,3 +30,4 @@ sales-graph-repair-3,observation,fixed-six-observation-cases,6,6,35,5,5,133,9629
 sales-graph-stability-1,observation,fixed-six-observation-cases,6,5,35,5,5,129,935624,13070,129,0.11932800000000002,True
 sales-graph-stability-2,observation,fixed-six-observation-cases,6,6,35,5,5,133,965238,13851,133,0.1194099,True
 sales-context-budget,observation,fixed-six-observation-cases,6,5,33,5,4,127,825530,11762,127,0.10412190000000003,True
+sales-material-continuity,observation,fixed-six-observation-cases,6,5,33,5,4,125,786105,11417,123,0.09906675,False

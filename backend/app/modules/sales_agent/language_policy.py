@@ -12,7 +12,7 @@ ENGLISH=set('''a an the i you we me my your our it its they their this that thes
 am is are was were be been being do does did have has had can could would should will
 may might must please thanks thank hello hi hey yes no okay ok sure not dont dont want
 need like looking look for to of in on at by from with about and or but if what which
-who where when why how more most other another first second third next last one two
+who where when why how more most other another first second third next last pls one two
 three four five bedroom bedrooms bathroom bathrooms bed beds home homes house houses
 property properties apartment apartments condo condos unit units residence residences
 studio studios loft lofts penthouse available availability information info details detail
