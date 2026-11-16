@@ -1,0 +1,31 @@
+{
+  "base_commit": "14bb98bdc1abcc4e21b70aeb48017c735fc9393e",
+  "paid_local_calls": 0,
+  "real_model_quality_evaluated": false,
+  "regression": {
+    "passed": 3881,
+    "skipped": 11,
+    "failed": 0,
+    "modules": 154,
+    "note": "Complete three partitions plus the new replay module and final expanded budget module; repeated testcase IDs counted once. The foundation module was rerun after restoring the word limit in the oversized-context error; original evidence retained."
+  },
+  "new_tests": 20,
+  "budgets": {
+    "target": 48000,
+    "initial_max": 72000,
+    "repair_reserve": 24000,
+    "total_max": 96000
+  },
+  "history_window_messages": 20,
+  "synthetic_prior_history_sizes": [
+    20,
+    50,
+    100
+  ],
+  "limitations": [
+    "No new paid-model execution.",
+    "Long-history tests validate projection and required state preservation, not published-model dialogue quality.",
+    "12–16 live-model dialogue turns remain a future phase.",
+    "Profile panel projection is not fixed."
+  ]
+}

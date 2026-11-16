@@ -110,8 +110,9 @@ async def _preview(db, scope: Scope, *, inbound_message_id: str, expected_revisi
     ]
     if reconsideration:
         messages.append({'role':'user','content':json.dumps({'bounded_reconsideration':reconsideration,'instruction':'Reinterpret only the ORIGINAL current_message. This feedback is not a lead request or consent. Preserve restrictions and current evidence. Do not invent a booking, visit, cancellation or material acceptance.'})})
-    if sum(len(item['content'].encode()) for item in messages) > 64000:
-        raise ValueError('Preview context exceeds the 64 KB evaluation limit; no model was called.')
+    from .context_budget import compact, size, TOTAL_BYTES, REPAIR_BYTES
+    messages,budget_trace=compact(messages)
+    audit['context_budget']=budget_trace
     injected_inference = infer is not None
     if infer is None:
         from app.integrations.openrouter_client import generate_llm_response
@@ -265,8 +266,9 @@ async def _preview(db, scope: Scope, *, inbound_message_id: str, expected_revisi
             'current_turn_rule': 'Do not replay historical questions. Budget and payment declarations belong in preferences, not requests. Preserve independent current questions.',
             'exact_short_quote': inbound.content if len(inbound.content) <= 2000 else None,
             'quotation_rule': 'Do not append punctuation. Meaning may be normalized in value/expression, but evidence must be copied verbatim from current_message. Keep independent requests and negations.'}, ensure_ascii=False)}]
-        if sum(len(item['content'].encode()) for item in request_messages) > 64000:
-            break  # Never expand a near-limit context to run the optional repair.
+        if size(request_messages)-size(messages)>REPAIR_BYTES or size(request_messages)>TOTAL_BYTES:
+            audit['repair_budget_exceeded']=True
+            break  # Bounded repair; never discard consent or required state.
     # Group 4 will apply task transitions. Preview records only interpretation;
     # existing tasks, preferences and restrictions are never implicitly replaced.
     if outcome == 'accepted' and interpreted is not None:
@@ -275,7 +277,7 @@ async def _preview(db, scope: Scope, *, inbound_message_id: str, expected_revisi
         'response_format': {'type': 'json_schema', 'json_schema': {
             'name': 'sales_understanding', 'strict': True, 'schema': schema(inbound.content) if wire_mode else response_schema(inbound.content)}}}
     raw_bytes = raw.encode(errors='replace') if isinstance(raw, str) else b''
-    metadata = {'code_commit': settings.APP_COMMIT_SHA, 'model': model,
+    metadata = {'context_budget':audit.get('context_budget'),'repair_budget_exceeded':audit.get('repair_budget_exceeded',False), 'code_commit': settings.APP_COMMIT_SHA, 'model': model,
         'inference_mode': 'injected' if injected_inference else 'provider',
         'prompt_configuration_id': config.id, 'prompt_snapshot': snapshot,
         'inbound_message_id': inbound.id, 'raw_response': raw_bytes[:16000].decode(errors='replace') if isinstance(raw, str) else None,

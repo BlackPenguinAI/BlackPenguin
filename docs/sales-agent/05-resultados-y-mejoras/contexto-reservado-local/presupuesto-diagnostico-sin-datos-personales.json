@@ -1,0 +1,34 @@
+[
+  {
+    "version": "sales-context-budget/1.0",
+    "before_bytes": 62504,
+    "after_bytes": 43155,
+    "limit_bytes": 72000,
+    "repair_reserve_bytes": 24000,
+    "history_messages_omitted": 0
+  },
+  {
+    "version": "sales-context-budget/1.0",
+    "before_bytes": 62884,
+    "after_bytes": 43535,
+    "limit_bytes": 72000,
+    "repair_reserve_bytes": 24000,
+    "history_messages_omitted": 0
+  },
+  {
+    "version": "sales-context-budget/1.0",
+    "before_bytes": 62956,
+    "after_bytes": 43607,
+    "limit_bytes": 72000,
+    "repair_reserve_bytes": 24000,
+    "history_messages_omitted": 0
+  },
+  {
+    "version": "sales-context-budget/1.0",
+    "before_bytes": 63436,
+    "after_bytes": 44087,
+    "limit_bytes": 72000,
+    "repair_reserve_bytes": 24000,
+    "history_messages_omitted": 0
+  }
+]

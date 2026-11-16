@@ -78,8 +78,30 @@
       "graph_calls": 133,
       "graph_cost_usd": 0.12100455,
       "source": "sales-graph-repair-3.zip"
+    },
+    {
+      "label": "Estabilidad 1",
+      "commit": "14bb98bdc1abcc4e21b70aeb48017c735fc9393e",
+      "graph_cases_pass": 5,
+      "cases": 6,
+      "bookings": 5,
+      "expected_bookings": 5,
+      "graph_calls": 129,
+      "graph_cost_usd": 0.119328,
+      "source": "sales-graph-stability-1.zip"
+    },
+    {
+      "label": "Estabilidad 2",
+      "commit": "14bb98bdc1abcc4e21b70aeb48017c735fc9393e",
+      "graph_cases_pass": 6,
+      "cases": 6,
+      "bookings": 5,
+      "expected_bookings": 5,
+      "graph_calls": 133,
+      "graph_cost_usd": 0.1194099,
+      "source": "sales-graph-stability-2.zip"
     }
   ],
-  "total_graph_calls": 910,
-  "total_graph_cost_usd": 0.8386338
+  "total_graph_calls": 1172,
+  "total_graph_cost_usd": 1.0773717
 }

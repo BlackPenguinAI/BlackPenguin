@@ -274,3 +274,26 @@ def mixed_material_financing_read(db,scope,value,text):
     if any(q.reference_id or not q.evidence or q.evidence not in text for q in value.requests) or value.references:return False
     _,state=load(db,scope)
     return bool(not state.selected_unit_id and Resolver(db,scope,state).bound('property',state.selected_property_type_id))
+
+
+def offered_brochure_read(db,scope,value,text):
+    """Read capability for an explicit acceptance of one current backend offer."""
+    from types import SimpleNamespace
+    from .dialogue_store import check_scope,load
+    from .turn_context import latest_outbound
+    from .material_delivery import accepted_proposal
+    if not re.fullmatch(r'\s*(?:please )?(?:send|share)(?: me)? the (?:brochure|PDF)(?: instead)?[.!]?\s*',text,re.I):return False
+    if any(getattr(value,k) for k in ('comparison','constraints','alternatives','releases','visit','cancellation','reschedule','wait','moderation','appointment_query','preferences','personal_facts','preference_withdrawals','source_purposes','objections')):return False
+    if len(value.requests)!=1 or value.requests[0].topic.value!='materials' or value.requests[0].polarity!='request':return False
+    previous=latest_outbound(db,scope.conversation_id,skip_language_holds=True)
+    if not previous:return False
+    offer=(previous.metadata_json or {}).get('material_offer') or {}
+    if len(offer.get('items',[]))!=1:return False
+    item=offer['items'][0];binding=item.get('binding',{})
+    if 'brochure' not in binding.get('tags',[]):return False
+    _,state=load(db,scope)
+    if state.selected_unit_id or item.get('property_id')!=state.selected_property_type_id:return False
+    if any(ref.kind!='material' or ref.expression.casefold()!=str(binding.get('name','')).casefold() for ref in value.references):return False
+    outcome=SimpleNamespace(plan={'references':{'offer':{'status':'resolved','value':{'kind':'material','id':binding.get('asset_id')}}}})
+    proposal,error=accepted_proposal(db,check_scope(db,scope),previous.metadata_json,text,outcome)
+    return bool(proposal and not error)

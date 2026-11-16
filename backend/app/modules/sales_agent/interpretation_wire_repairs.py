@@ -68,3 +68,17 @@ def literal_property_choice(data,text):
            'preferences':[dict(key='property',value=owner,evidence=text,status='declared')],
            'selection':None,'visit':None,'requires_clarification':False,'clarification_question':None}
     return fixed,[dict(field='requests',action='literal_property_preference_not_visit_or_comparison',evidence=text,confidence_unchanged=data['confidence'],effect_authorization=False)]
+
+
+def literal_social_or_need(data,text):
+    """Complete current literal utterances cannot replay historical actions."""
+    greeting=re.fullmatch(r"\s*(?:hi|hello|hey|good morning|good afternoon|good evening)[!.]*\s*",text,re.I)
+    need=re.fullmatch(r"\s*(?:I am|I'm|I’m|We are) looking for (?:a |an )?(?P<count>[1-9])[- ]bedrooms?(?: (?:home|house|apartment|property))?[.!]?\s*",text,re.I)
+    if not greeting and not need:return data,[]
+    fixed={k:None if isinstance(v,dict) else [] if isinstance(v,list) else v for k,v in data.items()}
+    fixed.update(requests=[],alternatives=[],preferences=[],selection=None,visit=None,requires_clarification=False,clarification_question=None)
+    if greeting:fixed['courtesy']=dict(kind='greeting',evidence=text)
+    else:
+        fixed['requests']=[dict(topic='catalog',polarity='request',evidence=text,target=None)]
+        fixed['preferences']=[dict(key='bedrooms',value=need['count'],evidence=text,status='declared')]
+    return fixed,[dict(field='requests',action='literal_current_greeting_or_bedroom_need',confidence_unchanged=data['confidence'],effect_authorization=False)]

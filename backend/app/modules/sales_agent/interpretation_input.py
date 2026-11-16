@@ -9,7 +9,7 @@ from pydantic import Field,create_model,StrictBool
 from .understanding_contract import (Understanding,StrictModel,Reference,Request,Constraint,Comparison,Subject)
 
 VERSION='sales-interpretation-input/2.0'
-SYSTEM_VERSION='sales-interpretation-system/2.8'
+SYSTEM_VERSION='sales-interpretation-system/2.9'
 class Target(StrictModel):
     kind:Literal['property','unit','appointment','location','material','ambiguous']
     expression:str=Field(min_length=1,max_length=300)
@@ -185,7 +185,9 @@ def compile_input(raw,text,*,historical_messages=()):
     data=document(raw);notes=[]
     if data.get('version')=='sales-understanding/1.0':data,notes=legacy(data,text)
     value=Input.model_validate(data)
-    from .interpretation_wire_repairs import literal_material,literal_visit,literal_property_choice
+    from .interpretation_wire_repairs import literal_material,literal_visit,literal_property_choice,literal_social_or_need
+    fixed,literal_notes=literal_social_or_need(value.model_dump(mode='json'),text)
+    if literal_notes:value=Input.model_validate(fixed);notes.extend(literal_notes)
     fixed,read_notes=literal_material(value.model_dump(mode='json'),text)
     if read_notes:value=Input.model_validate(fixed);notes.extend(read_notes)
     fixed,visit_notes=literal_visit(value.model_dump(mode='json'),text)

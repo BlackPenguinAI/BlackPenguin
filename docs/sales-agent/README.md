@@ -4,11 +4,11 @@
 
 **Historial temprano: corte 11/11/2026; continuidad LangGraph recibida hasta el 16/11/2026.** Se reúne el trabajo del ciclo reciente con data sintética: **21 corridas del servidor, 144 conversaciones ejecutadas y 47 IDs de escenario distintos por suite**. Las repeticiones son parte del trabajo, no escenarios adicionales. En la batería compacta 2, **13/16 conversaciones cumplieron los checks originales y se registraron 7/8 visitas esperadas**; eso no certifica la calidad integral de esos diálogos. En el último subconjunto, Repair 8, **2/3 conversaciones cumplieron sus checks y se registró 1/2 visitas**: vivienda mayor y fotos ausentes se recuperaron; diversificación falló con tiempos de espera del modelo. No se mezclan ambos conjuntos como si fueran una nueva batería completa.
 
-**Estado actual · LangGraph integrado.** La corrida `94f72bc` registra **6/6 conversaciones sin controles fallidos y 5/5 citas esperadas**, con 352 controles PASS y ninguno FAIL. Se resolvieron el cambio explícito de propiedad y la consulta combinada de materiales y financiamiento. Es evidencia del modelo publicado en el laboratorio del servidor, no aprobación integral de diálogos reales. El siguiente paso son dos repeticiones idénticas, todavía pendientes; esta entrega documenta y prepara esa comprobación sin modificar el motor.
+**Estado actual.** Las dos repeticiones del servidor dieron **5/6 y 6/6**, con 10/10 citas previstas. La base anterior dio 6/6: aún no hay tres corridas consecutivas sin controles fallidos. El caso pendiente es aceptar un brochure ya ofrecido con confianza cero. Además, el diagnóstico de WhatsApp mostró que un contexto cercano a 64.000 bytes impedía el reintento. Esta entrega compacta la proyección del intérprete y reserva presupuesto; no borra conversaciones ni cambia el modelo. La validación del modelo publicado después del despliegue sigue pendiente.
 
 ![Evolución funcional de los mismos seis casos con LangGraph](05-resultados-y-mejoras/langgraph-integrado/evolucion-seis-casos.png)
 
-La curva conserva **4/6 → 5/6 → 6/6 → 4/6 → 5/6 → 4/6 → 6/6**, todos con los seis guiones de observaciones y el mismo modelo/configuración publicada. Evolucionaron criterios y contexto de ejecución; no es una estimación de conversión comercial. **Total de estas siete corridas LangGraph: 910 llamadas y USD 0.83863380**. La reparación local no añade un punto de éxito al gráfico. [Datos de la curva](05-resultados-y-mejoras/langgraph-integrado/historico-servidor.json).
+La curva conserva **4/6 → 5/6 → 6/6 → 4/6 → 5/6 → 4/6 → 6/6 → 5/6 → 6/6**, todos con los seis guiones de observaciones y el mismo modelo/configuración publicada. Evolucionaron criterios y contexto de ejecución; no es una estimación de conversión comercial. **Total de estas nueve corridas LangGraph: 1.172 llamadas y USD 1.07737170**. La reparación local no añade un punto de éxito al gráfico. [Datos de la curva](05-resultados-y-mejoras/langgraph-integrado/historico-servidor.json).
 
 | Corrida LangGraph | Conversaciones sin controles fallidos | Citas / esperadas | Llamadas | Total USD por fila |
 |---|---:|---:|---:|---:|
@@ -19,7 +19,9 @@ La curva conserva **4/6 → 5/6 → 6/6 → 4/6 → 5/6 → 4/6 → 6/6**, todos
 | Reparación integrada 1 · `91e902a` | 5/6 | 5/5 | 132 | 0.12615315 |
 | Reparación integrada 2 · `400593e` | 4/6 | 5/5 | 128 | 0.12411900 |
 | Reparación integrada 3 · `94f72bc` | 6/6 | 5/5 | 133 | 0.12100455 |
-| **TOTAL · siete corridas** | **34/42 ejecuciones; no calidad actual** | **No sumar como conversión** | **910** | **0.83863380** |
+| Estabilidad 1 · `14bb98b` | 5/6 | 5/5 | 129 | 0.11932800 |
+| Estabilidad 2 · `14bb98b` | 6/6 | 5/5 | 133 | 0.11940990 |
+| **TOTAL · nueve corridas** | **45/54 ejecuciones; no calidad actual** | **No sumar como conversión** | **1.172** | **1.07737170** |
 
 ![Consumo por corrida LangGraph y total](05-resultados-y-mejoras/langgraph-integrado/consumo-cuatro-corridas.png)
 
@@ -44,7 +46,7 @@ flowchart TD
     H --> K["Ofrecer visita, pedir confirmación o crear cita"]
 ```
 
-**Responsabilidades.** El LLM publicado, actualmente `openai/gpt-4o-mini` en la configuración evaluada, interpreta y decide entre consultas permitidas; recibe sus resultados antes de decidir nuevamente. El sistema de interpretación de esta reparación es `sales-interpretation-system/2.8` y el ciclo de observaciones `2.1`. El modelo efectivo siempre depende de la configuración publicada y queda registrado en la corrida. El backend conserva permisos, restricciones, catálogo aprobado, selección de propiedad, disponibilidad y confirmación de cita. LangGraph no es una nueva base de memoria: el estado y los recibos persistidos siguen siendo la fuente común. El ciclo permite dos rondas y hasta seis lecturas, con límite de contexto y tiempo por decisión. Las acciones de negocio se ejecutan después de sus validaciones, nunca desde la decisión de lectura.
+**Responsabilidades.** El LLM publicado, actualmente `openai/gpt-4o-mini` en la configuración evaluada, interpreta y decide entre consultas permitidas; recibe sus resultados antes de decidir nuevamente. El sistema de interpretación de esta reparación es `sales-interpretation-system/2.9` y el ciclo de observaciones `2.1`. El modelo efectivo siempre depende de la configuración publicada y queda registrado en la corrida. El backend conserva permisos, restricciones, catálogo aprobado, selección de propiedad, disponibilidad y confirmación de cita. LangGraph no es una nueva base de memoria: el estado y los recibos persistidos siguen siendo la fuente común. El ciclo permite dos rondas y hasta seis lecturas, con límite de contexto y tiempo por decisión. Las acciones de negocio se ejecutan después de sus validaciones, nunca desde la decisión de lectura.
 
 **Mensajes sin razonamiento comercial.** El saludo inicial, avisos y recordatorios deterministas siguen siendo servicios del backend; no necesitan llamar al modelo ni representan un segundo agente. La integración del grafo corresponde a los turnos entrantes de conversación. Una pausa manual, falta de consentimiento o un evento ya procesado puede impedir que un mensaje recorra el grafo.
 
@@ -119,7 +121,7 @@ sequenceDiagram
 | Composición | LLM / backend | El modelo selecciona variantes de evidencia; Repair 7 presenta directamente un comprobante de cita único ya validado. No escribe hechos libres. |
 | Compartir/agendar/enviar | Backend | Verifica permisos y efectos; seleccionar horario solo prepara el resumen. |
 
-**Límites.** Hay reparaciones acotadas; no se repite indefinidamente. Algunos turnos usan texto del backend, por lo que turno y llamada son unidades distintas. Los errores internos no se narran al lead. El protocolo actual es `sales-understanding-prompt/2.37` y el sistema de interpretación `sales-interpretation-system/2.8`; el contrato de entrada es `sales-interpretation-input/2.0` y el compositor `sales-commercial-composer/1.0` [R1–R3]. [Coordinador](../../backend/app/modules/sales_agent/active_service.py) · [Interpretación](../../backend/app/modules/sales_agent/understanding_service.py).
+**Límites.** Hay reparaciones acotadas; no se repite indefinidamente. Algunos turnos usan texto del backend, por lo que turno y llamada son unidades distintas. Los errores internos no se narran al lead. El protocolo actual es `sales-understanding-prompt/2.37` y el sistema de interpretación `sales-interpretation-system/2.9`; el contrato de entrada es `sales-interpretation-input/2.0` y el compositor `sales-commercial-composer/1.0` [R1–R3]. [Coordinador](../../backend/app/modules/sales_agent/active_service.py) · [Interpretación](../../backend/app/modules/sales_agent/understanding_service.py).
 
 ### Estructura de orquestación: qué está fijo y qué afinamos
 
@@ -279,7 +281,7 @@ flowchart TD
 
 ![Historia global y cobertura](05-resultados-y-mejoras/figuras/panorama-global.png)
 
-**Lectura correcta:** el gráfico global incorpora las 21 corridas tempranas y las siete corridas LangGraph, separadas por una línea: **28 corridas indexadas, 186 conversaciones ejecutadas y 53 IDs por suite**. No mezcla esos conjuntos en una tasa de calidad. El consumo de estas 28 corridas indexadas suma USD 2.37497595, parcial por cargos faltantes tempranos. No es un inventario de todas las fases intermedias, que se conservan en el bloque 10. No se suma este subtotal con el seguimiento desde necesidades: sus alcances se solapan. Dentro del bloque temprano, las 144 ejecuciones incluyen repeticiones; hay 47 IDs por suite. La subida acumulada mide cobertura y trabajo evaluado, no una curva única de calidad. Las 63 aprobaciones históricas pertenecen a sus controles originales: no se interpreta 63/144 como calidad actual. Para observar la mejora de los mismos casos se reconstruyó su subconjunto en las baterías anteriores, conservando los checks originales.
+**Lectura correcta:** el gráfico global incorpora las 21 corridas tempranas y las nueve corridas LangGraph, separadas por una línea: **30 corridas indexadas, 198 conversaciones ejecutadas y 53 IDs por suite**. No mezcla esos conjuntos en una tasa de calidad. El consumo de estas 30 corridas indexadas suma USD 2.61371385, parcial por cargos faltantes tempranos. No es un inventario de todas las fases intermedias, que se conservan en el bloque 10. No se suma este subtotal con el seguimiento desde necesidades: sus alcances se solapan. Dentro del bloque temprano, las 144 ejecuciones incluyen repeticiones; hay 47 IDs por suite. La subida acumulada mide cobertura y trabajo evaluado, no una curva única de calidad. Las 63 aprobaciones históricas pertenecen a sus controles originales: no se interpreta 63/144 como calidad actual. Para observar la mejora de los mismos casos se reconstruyó su subconjunto en las baterías anteriores, conservando los checks originales.
 
 ![Los mismos tres IDs desde la batería inicial](05-resultados-y-mejoras/figuras/casos-comunes-desde-la-bateria.png)
 
@@ -332,7 +334,7 @@ Para comprobar el traslado al canal real se registra un lead de prueba en la com
 
 ## 8. Consumo real y saldo de OpenRouter
 
-**Total registrado de las 28 corridas indexadas: USD 2.37497595** (aproximadamente **USD 2.37**). Son 2.044 llamadas, 19.000.621 tokens de entrada y 282.634 de salida. Hay importe informado para 2.036/2.044 llamadas: **el histórico sigue siendo parcial**. Este índice reúne el bloque temprano y las siete corridas LangGraph; otras fases y referencias están documentadas en el bloque 10. No es saldo consultado, factura ni gasto total del proyecto; excluye desarrollo, revisión, hosting y mensajería real.
+**Total registrado de las 30 corridas indexadas: USD 2.61371385** (aproximadamente **USD 2.61**). Son 2.306 llamadas, 20.901.483 tokens de entrada y 309.555 de salida. Hay importe informado para 2.298/2.306 llamadas: **el histórico sigue siendo parcial**. Este índice reúne el bloque temprano y las nueve corridas LangGraph; otras fases y referencias están documentadas en el bloque 10. No es saldo consultado, factura ni gasto total del proyecto; excluye desarrollo, revisión, hosting y mensajería real.
 
 | Etapa | Diálogos | Llamadas | Tokens entrada / salida | Costo total registrado de la etapa (USD) |
 |---|---:|---:|---:|---:|
@@ -341,8 +343,8 @@ Para comprobar el traslado al canal real se registra un lead de prueba en la com
 | Comercial | 16 | 69 | 770,886 / 8,539 | 0.09009390 |
 | Cierres/retoma | 8 | 15 | 173,013 / 2,114 | 0.02099955 |
 | Baterías/repairs | 66 | 556 | 6,467,384 / 106,761 | 0.85336740* |
-| LangGraph · siete corridas | 42 | 910 | 6,626,980 / 94,530 | 0.83863380 |
-| **TOTAL DEL ÍNDICE · 28 CORRIDAS** | **186** | **2.044** | **19,000,621 / 282,634** | **2.37497595*** |
+| LangGraph · nueve corridas | 54 | 1.172 | 8,527,842 / 121,451 | 1.07737170 |
+| **TOTAL DEL ÍNDICE · 30 CORRIDAS** | **198** | **2.306** | **20,901,483 / 309,555** | **2.61371385*** |
 
 \* Etapa con importes faltantes. Son las mismas corridas del bloque 6, no gasto adicional. Repair 8 registró **USD 0.03150990 parciales**, con costo para 21/24 llamadas. No se presenta como ahorro completo ni como costo uniforme por conversación.
 
@@ -1003,7 +1005,9 @@ La figura compara las mismas seis situaciones, con controles internos adicionale
 | Reparación integrada 1 `91e902a` | 132 | 0.12615315 | Completo para esta corrida. |
 | Reparación integrada 2 `400593e` | 128 | 0.12411900 | Completo para esta corrida. |
 | Reparación integrada 3 `94f72bc` | 133 | 0.12100455 | Completo para esta corrida. |
-| **SUMA HISTÓRICA INFORMADA** | **2.081** | **2.53054230** | **Parcial; excluye además fases previas no detalladas aquí.** |
+| Estabilidad 1 `14bb98b` | 129 | 0.11932800 | Completo para esta corrida. |
+| Estabilidad 2 `14bb98b` | 133 | 0.11940990 | Completo para esta corrida. |
+| **SUMA HISTÓRICA INFORMADA** | **2.343** | **2.76928020** | **Parcial; excluye además fases previas no detalladas aquí.** |
 | Reparación y pruebas locales | 0 pagadas | 0.00000000 | Sin llamadas a OpenRouter. |
 
 | Próxima repetición, todavía no ejecutada | Alcance | Total USD estimado por fila |
@@ -1094,12 +1098,32 @@ La siguiente ejecución repite los seis casos, hasta diez turnos y 300 llamadas.
 | Ejecución | Estado | Conversaciones / mensajes previstos | Consumo total USD por fila |
 |---|---|---:|---:|
 | Base `94f72bc` | Ejecutada; 6/6 controles de conversación | 6 / 35 | 0.12100455 real |
-| Repetición 1 | Pendiente | 6 / aproximadamente 35 | 0.12–0.20 estimado |
-| Repetición 2 | Pendiente | 6 / aproximadamente 35 | 0.12–0.20 estimado |
-| **TOTAL NUEVO POR EJECUTAR** | **Pendiente** | **12 / aproximadamente 70** | **0.24–0.40 estimado** |
-| **BASE + DOS REPETICIONES** | **Un resultado real y dos estimados** | **18 / aproximadamente 105** | **0.36100455–0.52100455 mixto** |
+| Repetición 1 | Ejecutada; 5/6 | 6 / 35 | 0.11932800 real |
+| Repetición 2 | Ejecutada; 6/6 | 6 / 35 | 0.11940990 real |
+| **TOTAL DE LAS DOS REPETICIONES** | **Ejecutadas; 11/12** | **12 / 70** | **0.23873790 real** |
+| **BASE + DOS REPETICIONES** | **Ejecutadas; 17/18** | **18 / 105** | **0.35974245 real** |
 
-El estimado se apoya en la última corrida, no es un límite de facturación. Cada ejecución limita 300 llamadas y diez mensajes por conversación; esos límites no equivalen a dólares. Si ambas repeticiones mantienen todos los controles, habrá **tres ejecuciones consecutivas favorables de esta batería**, sin que ello demuestre generalización a todos los leads. Entonces se propondrá ampliar las variantes y mejorar los criterios comerciales. [Comandos de servidor y descarga](06-como-ejecutar-las-pruebas/estabilidad-langgraph.md) · [Script Bash](06-como-ejecutar-las-pruebas/ejecutar-estabilidad-langgraph.sh).
+El plan original estimaba USD 0.24–0.40 para las dos repeticiones; el cuadro ahora muestra sus resultados reales. No es un límite de facturación. Cada ejecución limita 300 llamadas y diez mensajes por conversación; esos límites no equivalen a dólares. No hubo tres ejecuciones consecutivas favorables: la primera repetición falló al aceptar el brochure. Se corrige ese patrón y se cubre el contexto acumulado antes de ampliar segmentos. [Comandos de servidor y descarga](06-como-ejecutar-las-pruebas/estabilidad-langgraph.md) · [Script Bash](06-como-ejecutar-las-pruebas/ejecutar-estabilidad-langgraph.sh).
+
+## 10.15. Contexto acumulado y aceptación de material ofrecido
+
+**Resultado observado.** Las dos repeticiones, mismo commit `14bb98b`, modelo `openai/gpt-4o-mini` y configuración 8, dieron 5/6 y 6/6. Total nuevo: **262 llamadas y USD 0.23873790**, informado completo. Incluyendo la base: **395 llamadas y USD 0.35974245**. Las 15 citas previstas se lograron, pero una aceptación del folleto recibió otra pregunta en vez del archivo; no se etiqueta esa conversación como éxito integral. [Repetición 1 legible](05-resultados-y-mejoras/sales-graph-stability-1/conversaciones.md) · [JSON 1](05-resultados-y-mejoras/sales-graph-stability-1/resultado.json) · [Repetición 2 legible](05-resultados-y-mejoras/sales-graph-stability-2/conversaciones.md) · [JSON 2](05-resultados-y-mejoras/sales-graph-stability-2/resultado.json).
+
+**Diagnóstico real de WhatsApp.** Un saludo y una búsqueda de dos dormitorios arrastraban visitas/comparaciones del historial. El backend rechazaba citas textuales que no pertenecían al mensaje actual; los cuatro turnos fallidos no tenían segundo intento porque agregar reparación superaba 64.000 bytes (64.115–64.667). El problema ocurrió dentro de LangGraph, antes de consultar herramientas; los mensajes de respaldo sí fueron entregados. No se publica aquí el historial real con datos personales.
+
+| Ajuste | Qué cambia | Qué conserva |
+|---|---|---|
+| Presupuesto | Objetivo 48.000 bytes, primera solicitud máximo 72.000 y reserva 24.000; total máximo 96.000. | Mensaje actual, restricciones y estado de citas. Si lo indispensable no cabe, se rechaza sin recortarlo silenciosamente. |
+| Proyección del catálogo | El intérprete recibe identificadores y nombres; los hechos completos se obtienen con herramientas. | Datos originales y evidencia comercial del backend. |
+| Historial | Hasta 20 mensajes; se omiten los más antiguos de la proyección si es necesario para el presupuesto. | Transcripción completa guardada y memoria estructurada. |
+| Mensaje literal | Saludos puros y búsquedas explícitas por dormitorios no pueden reactivar visitas históricas inventadas. | Confianza original y validaciones de permisos posteriores. |
+| Brochure ofrecido | Una aceptación explícita permite consultar una única oferta vigente y recibida. | Caducidad, propietario, ámbito, aprobación del archivo y validaciones de envío; ningún permiso de agendamiento. |
+
+**Experimentos locales.** Contextos con 20, 50 y 100 mensajes sintéticos previos verifican el presupuesto y conservación del estado obligatorio. Se reproducen también las seis conversaciones de la repetición fallida, con interpretaciones registradas y proveedores simulados. No se ejecutan llamadas pagadas locales. Estas pruebas no equivalen a nuevas conversaciones del modelo publicado ni prueban todos los historiales extensos. Las conversaciones pagadas de 12–16 turnos quedan para una ampliación posterior; esta entrega mantiene la batería corta para comprobar primero la corrección.
+
+**Validación local:** 3,881 pruebas aprobadas, 11 omitidas, cero fallos pendientes y 154 módulos cubiertos. Las 20 pruebas nuevas están incluidas, sin sumar duplicados. La compactación de las cuatro solicitudes del diagnóstico redujo 62–63 KB a 43–44 KB sin omitir mensajes de su historial; no se volvió a llamar al modelo. [Validación](05-resultados-y-mejoras/contexto-reservado-local/validacion-local.json) · [Tamaños sin datos personales](05-resultados-y-mejoras/contexto-reservado-local/presupuesto-diagnostico-sin-datos-personales.json).
+
+**Siguiente comprobación.** Repetir los seis casos en el servidor, máximo diez turnos por caso y 300 llamadas; estimación total **USD 0.10–0.20**, sin límite monetario garantizado. Después repetir un saludo y una búsqueda de dormitorios en la conversación real existente y exportar su traza; no borrar su memoria. El panel de perfil desactualizado requiere revisión adicional y no se presenta como corregido en esta entrega.
 
 ## 11. Trabajo futuro
 
