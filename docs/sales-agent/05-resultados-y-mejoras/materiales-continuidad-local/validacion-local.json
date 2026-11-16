@@ -1,0 +1,20 @@
+{
+  "base_commit": "db92e4e51095f081adccbee2dca414fb6c49105b",
+  "policy": "sales-material-continuity/1.0",
+  "regression": {
+    "passed": 3894,
+    "skipped": 11,
+    "failed": 0,
+    "modules": 155,
+    "source": "Complete three partitions plus final precedence/composition/financing/replay checks; repeated testcase IDs counted once."
+  },
+  "new_policy_tests": 13,
+  "targeted_final_tests": 61,
+  "paid_local_calls": 0,
+  "real_model_quality_evaluated": false,
+  "limitations": [
+    "Local providers simulated.",
+    "Requires server measurement and human review of dialogue quality.",
+    "Temporal interpretation, contextual bedroom replies and file classification remain pending."
+  ]
+}

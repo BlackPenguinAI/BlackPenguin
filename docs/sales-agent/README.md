@@ -4,11 +4,11 @@
 
 **Historial temprano: corte 11/11/2026; continuidad LangGraph recibida hasta el 16/11/2026.** Se reúne el trabajo del ciclo reciente con data sintética: **21 corridas del servidor, 144 conversaciones ejecutadas y 47 IDs de escenario distintos por suite**. Las repeticiones son parte del trabajo, no escenarios adicionales. En la batería compacta 2, **13/16 conversaciones cumplieron los checks originales y se registraron 7/8 visitas esperadas**; eso no certifica la calidad integral de esos diálogos. En el último subconjunto, Repair 8, **2/3 conversaciones cumplieron sus checks y se registró 1/2 visitas**: vivienda mayor y fotos ausentes se recuperaron; diversificación falló con tiempos de espera del modelo. No se mezclan ambos conjuntos como si fueran una nueva batería completa.
 
-**Estado actual.** Las dos repeticiones del servidor dieron **5/6 y 6/6**, con 10/10 citas previstas. La base anterior dio 6/6: aún no hay tres corridas consecutivas sin controles fallidos. El caso pendiente es aceptar un brochure ya ofrecido con confianza cero. Además, el diagnóstico de WhatsApp mostró que un contexto cercano a 64.000 bytes impedía el reintento. Esta entrega compacta la proyección del intérprete y reserva presupuesto; no borra conversaciones ni cambia el modelo. La validación del modelo publicado después del despliegue sigue pendiente.
+**Estado actual.** La última corrida de contexto reservado (`db92e4e`) dio **5/6 casos y 4/5 citas**: la aceptación del brochure pasó y falló la preferencia «any morning». En WhatsApp se recuperaron saludo y búsqueda explícita; persisten una respuesta contextual no entendida y la clasificación incierta del plano. Esta entrega mejora la continuidad comercial después de entregar materiales; todavía no hay resultados del modelo publicado para este cambio.
 
 ![Evolución funcional de los mismos seis casos con LangGraph](05-resultados-y-mejoras/langgraph-integrado/evolucion-seis-casos.png)
 
-La curva conserva **4/6 → 5/6 → 6/6 → 4/6 → 5/6 → 4/6 → 6/6 → 5/6 → 6/6**, todos con los seis guiones de observaciones y el mismo modelo/configuración publicada. Evolucionaron criterios y contexto de ejecución; no es una estimación de conversión comercial. **Total de estas nueve corridas LangGraph: 1.172 llamadas y USD 1.07737170**. La reparación local no añade un punto de éxito al gráfico. [Datos de la curva](05-resultados-y-mejoras/langgraph-integrado/historico-servidor.json).
+La curva conserva **4/6 → 5/6 → 6/6 → 4/6 → 5/6 → 4/6 → 6/6 → 5/6 → 6/6 → 5/6**, todos con los seis guiones de observaciones y el mismo modelo/configuración publicada. Evolucionaron criterios y contexto de ejecución; no es una estimación de conversión comercial. **Total de estas diez corridas LangGraph: 1.299 llamadas y USD 1.18149360**. La reparación local no añade un punto de éxito al gráfico. [Datos de la curva](05-resultados-y-mejoras/langgraph-integrado/historico-servidor.json).
 
 | Corrida LangGraph | Conversaciones sin controles fallidos | Citas / esperadas | Llamadas | Total USD por fila |
 |---|---:|---:|---:|---:|
@@ -21,7 +21,8 @@ La curva conserva **4/6 → 5/6 → 6/6 → 4/6 → 5/6 → 4/6 → 6/6 → 5/6 
 | Reparación integrada 3 · `94f72bc` | 6/6 | 5/5 | 133 | 0.12100455 |
 | Estabilidad 1 · `14bb98b` | 5/6 | 5/5 | 129 | 0.11932800 |
 | Estabilidad 2 · `14bb98b` | 6/6 | 5/5 | 133 | 0.11940990 |
-| **TOTAL · nueve corridas** | **45/54 ejecuciones; no calidad actual** | **No sumar como conversión** | **1.172** | **1.07737170** |
+| Contexto reservado · `db92e4e` | 5/6 | 4/5 | 127 | 0.10412190 |
+| **TOTAL · diez corridas** | **50/60 ejecuciones; no calidad actual** | **No sumar como conversión** | **1.299** | **1.18149360** |
 
 ![Consumo por corrida LangGraph y total](05-resultados-y-mejoras/langgraph-integrado/consumo-cuatro-corridas.png)
 
@@ -281,7 +282,7 @@ flowchart TD
 
 ![Historia global y cobertura](05-resultados-y-mejoras/figuras/panorama-global.png)
 
-**Lectura correcta:** el gráfico global incorpora las 21 corridas tempranas y las nueve corridas LangGraph, separadas por una línea: **30 corridas indexadas, 198 conversaciones ejecutadas y 53 IDs por suite**. No mezcla esos conjuntos en una tasa de calidad. El consumo de estas 30 corridas indexadas suma USD 2.61371385, parcial por cargos faltantes tempranos. No es un inventario de todas las fases intermedias, que se conservan en el bloque 10. No se suma este subtotal con el seguimiento desde necesidades: sus alcances se solapan. Dentro del bloque temprano, las 144 ejecuciones incluyen repeticiones; hay 47 IDs por suite. La subida acumulada mide cobertura y trabajo evaluado, no una curva única de calidad. Las 63 aprobaciones históricas pertenecen a sus controles originales: no se interpreta 63/144 como calidad actual. Para observar la mejora de los mismos casos se reconstruyó su subconjunto en las baterías anteriores, conservando los checks originales.
+**Lectura correcta:** el gráfico global incorpora las 21 corridas tempranas y las diez corridas LangGraph, separadas por una línea: **31 corridas indexadas, 204 conversaciones ejecutadas y 53 IDs por suite**. No mezcla esos conjuntos en una tasa de calidad. El consumo de estas 31 corridas indexadas suma USD 2.71783575, parcial por cargos faltantes tempranos. No es un inventario de todas las fases intermedias, que se conservan en el bloque 10. No se suma este subtotal con el seguimiento desde necesidades: sus alcances se solapan. Dentro del bloque temprano, las 144 ejecuciones incluyen repeticiones; hay 47 IDs por suite. La subida acumulada mide cobertura y trabajo evaluado, no una curva única de calidad. Las 63 aprobaciones históricas pertenecen a sus controles originales: no se interpreta 63/144 como calidad actual. Para observar la mejora de los mismos casos se reconstruyó su subconjunto en las baterías anteriores, conservando los checks originales.
 
 ![Los mismos tres IDs desde la batería inicial](05-resultados-y-mejoras/figuras/casos-comunes-desde-la-bateria.png)
 
@@ -334,7 +335,7 @@ Para comprobar el traslado al canal real se registra un lead de prueba en la com
 
 ## 8. Consumo real y saldo de OpenRouter
 
-**Total registrado de las 30 corridas indexadas: USD 2.61371385** (aproximadamente **USD 2.61**). Son 2.306 llamadas, 20.901.483 tokens de entrada y 309.555 de salida. Hay importe informado para 2.298/2.306 llamadas: **el histórico sigue siendo parcial**. Este índice reúne el bloque temprano y las nueve corridas LangGraph; otras fases y referencias están documentadas en el bloque 10. No es saldo consultado, factura ni gasto total del proyecto; excluye desarrollo, revisión, hosting y mensajería real.
+**Total registrado de las 31 corridas indexadas: USD 2.71783575** (aproximadamente **USD 2.72**). Son 2.433 llamadas, 21.727.013 tokens de entrada y 321.317 de salida. Hay importe informado para 2.425/2.433 llamadas: **el histórico sigue siendo parcial**. Este índice reúne el bloque temprano y las diez corridas LangGraph; otras fases y referencias están documentadas en el bloque 10. No es saldo consultado, factura ni gasto total del proyecto; excluye desarrollo, revisión, hosting y mensajería real.
 
 | Etapa | Diálogos | Llamadas | Tokens entrada / salida | Costo total registrado de la etapa (USD) |
 |---|---:|---:|---:|---:|
@@ -343,8 +344,8 @@ Para comprobar el traslado al canal real se registra un lead de prueba en la com
 | Comercial | 16 | 69 | 770,886 / 8,539 | 0.09009390 |
 | Cierres/retoma | 8 | 15 | 173,013 / 2,114 | 0.02099955 |
 | Baterías/repairs | 66 | 556 | 6,467,384 / 106,761 | 0.85336740* |
-| LangGraph · nueve corridas | 54 | 1.172 | 8,527,842 / 121,451 | 1.07737170 |
-| **TOTAL DEL ÍNDICE · 30 CORRIDAS** | **198** | **2.306** | **20,901,483 / 309,555** | **2.61371385*** |
+| LangGraph · diez corridas | 60 | 1.299 | 9,353,372 / 133,213 | 1.18149360 |
+| **TOTAL DEL ÍNDICE · 31 CORRIDAS** | **204** | **2.433** | **21,727,013 / 321,317** | **2.71783575*** |
 
 \* Etapa con importes faltantes. Son las mismas corridas del bloque 6, no gasto adicional. Repair 8 registró **USD 0.03150990 parciales**, con costo para 21/24 llamadas. No se presenta como ahorro completo ni como costo uniforme por conversación.
 
@@ -1007,7 +1008,8 @@ La figura compara las mismas seis situaciones, con controles internos adicionale
 | Reparación integrada 3 `94f72bc` | 133 | 0.12100455 | Completo para esta corrida. |
 | Estabilidad 1 `14bb98b` | 129 | 0.11932800 | Completo para esta corrida. |
 | Estabilidad 2 `14bb98b` | 133 | 0.11940990 | Completo para esta corrida. |
-| **SUMA HISTÓRICA INFORMADA** | **2.343** | **2.76928020** | **Parcial; excluye además fases previas no detalladas aquí.** |
+| Contexto reservado `db92e4e` | 127 | 0.10412190 | Completo para esta corrida. |
+| **SUMA HISTÓRICA INFORMADA** | **2.470** | **2.87340210** | **Parcial; excluye además fases previas no detalladas aquí.** |
 | Reparación y pruebas locales | 0 pagadas | 0.00000000 | Sin llamadas a OpenRouter. |
 
 | Próxima repetición, todavía no ejecutada | Alcance | Total USD estimado por fila |
@@ -1124,6 +1126,30 @@ El plan original estimaba USD 0.24–0.40 para las dos repeticiones; el cuadro a
 **Validación local:** 3,881 pruebas aprobadas, 11 omitidas, cero fallos pendientes y 154 módulos cubiertos. Las 20 pruebas nuevas están incluidas, sin sumar duplicados. La compactación de las cuatro solicitudes del diagnóstico redujo 62–63 KB a 43–44 KB sin omitir mensajes de su historial; no se volvió a llamar al modelo. [Validación](05-resultados-y-mejoras/contexto-reservado-local/validacion-local.json) · [Tamaños sin datos personales](05-resultados-y-mejoras/contexto-reservado-local/presupuesto-diagnostico-sin-datos-personales.json).
 
 **Siguiente comprobación.** Repetir los seis casos en el servidor, máximo diez turnos por caso y 300 llamadas; estimación total **USD 0.10–0.20**, sin límite monetario garantizado. Después repetir un saludo y una búsqueda de dormitorios en la conversación real existente y exportar su traza; no borrar su memoria. El panel de perfil desactualizado requiere revisión adicional y no se presenta como corregido en esta entrega.
+
+## 10.16. Materiales con continuidad comercial
+
+**Última evidencia del servidor:** `sales-context-budget.zip`: 327 controles PASS y tres FAIL, concentrados en la visita por la mañana. Consumo completo de 127 llamadas: **USD 0.10412190 total**. [Diálogos legibles](05-resultados-y-mejoras/sales-context-budget/conversaciones.md) · [JSON original](05-resultados-y-mejoras/sales-context-budget/resultado.json).
+
+**Problema observado.** Entregar correctamente un enlace no basta para una conversación comercial. En la prueba real, el PDF y la galería de Madison se enviaron sin conectar la entrega con las necesidades del lead. La política nueva `sales-material-continuity/1.0` añade opciones de cierre autorizadas al compositor LLM existente, dentro del mismo motor LangGraph. No se cambia el modelo publicado ni se añade otro LLM.
+
+| Situación | Comportamiento autorizado | Protección |
+|---|---|---|
+| Archivo emitido, propiedad y dormitorios conocidos | Una pregunta sobre lo que importa al lead de esa propiedad. | Solo datos declarados; no deduce contenido del PDF ni características de la vivienda. |
+| Momento oportuno para visita | Puede preguntar si quiere ver la propiedad en persona. | No agenda; no ofrece ante rechazo, reserva existente o agenda en preparación. |
+| Archivo para revisar, invitación reciente o seguimiento de material anterior | Puede entregar y dejar espacio para revisar, sin otra pregunta. | Evita insistencia y cierres repetidos. |
+| Materiales más otra consulta | Conserva el tratamiento de la consulta independiente. | La continuidad del archivo no desplaza financiamiento, aclaraciones ni confirmaciones operativas. |
+| Material no disponible u oferta por aceptar | Conserva la pregunta específica de autorización o aclaración. | No promete envío ni utiliza el nuevo cierre para sustituir el consentimiento. |
+
+**Ejemplo ilustrativo, no una nueva respuesta observada del servidor:** «Here is the Madison PDF: [link]. You mentioned that 3 bedrooms would work for you. What matters most to you about Madison?» El compositor también puede elegir una invitación breve o ningún cierre adicional. No se obliga a preguntar en cada entrega y cada opción nueva contiene como máximo una pregunta.
+
+**Cómo se evalúa.** La batería pasa a `sales-observation-battery/1.3`: registra la entrega como `DELIVERY_RECORDED_NOT_INTEGRAL_DIALOGUE_SUCCESS` y separa la evaluación de política de continuidad. Verifica decisión registrada y número de preguntas cuando interviene esta política. Esto comprueba reglas observables, no persuasión ni naturalidad integral: el equipo revisará los diálogos del servidor. La traza conserva `material_continuity` con la decisión y propiedad; un enlace o un control PASS no se presenta como aprobación comercial completa.
+
+**Validación y límites.** Se prueban propiedad y preferencia activas, invitación opcional, silencio para revisión, rechazo global o por propiedad, cita existente/en preparación, invitación reciente, desconocimiento de propietario y consultas independientes. Se reproducen los seis recorridos cortos con proveedores simulados para comprobar que se puede seguir preguntando y llegar al agendamiento después del archivo. No hubo consumo local pagado. La clasificación real de Madison_Plan.pdf, la respuesta contextual «3 it’s good for me» y la reparación temporal de «any morning» siguen pendientes: esta entrega se concentra en continuidad tras materiales.
+
+**Resultado local:** 3,894 pruebas aprobadas, 11 omitidas y cero fallos pendientes en 155 módulos. Incluye 13 casos nuevos de política y 61 comprobaciones finales de composición, financiamiento y replay, sin sumar duplicados. [Validación local](05-resultados-y-mejoras/materiales-continuidad-local/validacion-local.json).
+
+**Siguiente evaluación del servidor:** seis casos, máximo diez mensajes del lead por caso y 300 llamadas. Estimación **USD 0.10–0.20 total**, no límite monetario garantizado. No se añade un punto de éxito al histórico hasta recibir esa evidencia. Después revisar la conversación real sin borrar memoria. [Comandos de servidor](06-como-ejecutar-las-pruebas/materiales-continuidad.md).
 
 ## 11. Trabajo futuro
 

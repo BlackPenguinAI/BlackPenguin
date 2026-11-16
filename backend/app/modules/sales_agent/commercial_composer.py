@@ -300,6 +300,9 @@ def select_continuations(*, outcome, commercial, metadata, previous_meta, lead, 
         if blocked and 'visit options' in closing:closing='Is there another property question I can help with?'
         add('commercial_next',closing)
         return choices
+    from .material_continuity import choices as material_choices
+    after_material=material_choices(outcome,commercial,metadata,previous_meta,holds,booked)
+    if after_material is not None:return after_material
     types = commercial['property_types']
     selected = outcome.state.selected_property_type_id
     topics = {r.topic.value for r in u.requests if r.polarity == 'request'}
@@ -566,3 +569,5 @@ async def compose(db, scope, *, inbound, outcome, draft, commercial, lead, metad
     trace['evidence_ids'] = [b.evidence_id for b in chosen.blocks]
     trace['response_sha256'] = digest(text)
     return CommercialDraft(text, {**trace, 'closing_metadata': closing_metadata})
+
+SYSTEM += '\nAfter material delivery, preserve the active property and declared needs. Choose at most one authorized relevant question. Do not repeat a recent visit invitation or a material follow-up. Choose material_review when the lead should review the file, has declined a visit, or is arranging one. File delivery alone is not proof of integral dialogue quality. Never infer file contents from its name.\n'

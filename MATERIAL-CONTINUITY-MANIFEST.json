@@ -1,0 +1,93 @@
+{
+  "base_commit": "db92e4e51095f081adccbee2dca414fb6c49105b",
+  "files": [
+    {
+      "path": "backend/app/modules/sales_agent/commercial_composer.py",
+      "sha256": "0e8c76fdbe8e89623fec50eef1dfb0d9389d0ffa8744ed5f073d6cbb4cf8d050"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/material_continuity.py",
+      "sha256": "b213cc5865b66693d121ae518e889e5b2673aff135ee90913155773f769613d4"
+    },
+    {
+      "path": "backend/tests/test_sales_material_continuity.py",
+      "sha256": "b05c71ddb071e2b22475e1fab36e5f2521261cba045b9e974d616a27ce796a6f"
+    },
+    {
+      "path": "backend/tools/sales_ai/observation_battery.py",
+      "sha256": "4bbc41aa7861bccf3a8f248a2f02adf063ad8f4f0ac1d15d941d0e59a6958518"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/corridas.json",
+      "sha256": "55cd55c00ec36e05b8d086788fcf3114fc144ba6d06b6195c5e24eb21392e462"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/figuras/consumo-global.png",
+      "sha256": "2c4f389ca969f9ea0db563d2fda9494e6d005cf8ac6f728c56b7baf5aafc696c"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/figuras/panorama-global.png",
+      "sha256": "4ad9a3e7417be13928bd5d7fb9e0b8ba6c67bb4887ca4c3ed2285fed2f73a708"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/langgraph-integrado/consumo-cuatro-corridas.png",
+      "sha256": "35a7eed6841e9b80065776918c75350bdf0305687532862994e2a708cd29aadc"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/langgraph-integrado/evolucion-seis-casos.png",
+      "sha256": "185d8e0678ee052c3ac2c44e816aa6b960ee97b3a78841bd92747a9632b6ee91"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/langgraph-integrado/evolucion.py",
+      "sha256": "5e3e272e3a5846d5c81f5b3c6669322490a797c32f8bb0c7f5bca4ce50b43fb1"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/langgraph-integrado/historico-servidor.json",
+      "sha256": "f97f3be3a14293f6c92be7c491c9c8a67418344a3f58087377171e2d92ef82df"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/materiales-continuidad-local/backend-junit-1.xml",
+      "sha256": "4a3564c0803f822305a58b6a884335024ccd38cecbded4f29cad21c620726aca"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/materiales-continuidad-local/backend-junit-2.xml",
+      "sha256": "262e4962d5dc6079229b12a6992b6ecadaad8eaa23d4f887d3497bff127c8a58"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/materiales-continuidad-local/backend-junit-3.xml",
+      "sha256": "4b069851eea01d0b1d648ef0a9ff6e84c826b91d95ba616a27129cba0f2e882f"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/materiales-continuidad-local/priority-final.xml",
+      "sha256": "a896879c3ebd80b4ce11bbc8b630a895091da8af4ac3e9a10e85d69abb0cc64a"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/materiales-continuidad-local/validacion-local.json",
+      "sha256": "570b6ecc5299b7510863c0b8e4d747a1f3ad2f2c449d6decfba15a846276fd50"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/metricas.csv",
+      "sha256": "c12137cd94c074b63b4ce260dfc892dc105de2528bf287188474c7febdb6e0c3"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/sales-context-budget/conversaciones.md",
+      "sha256": "5e6791c1b167d1b3e14ea85cc4a797aef92bac5acf95c8d4f222e1a3d998403c"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/sales-context-budget/resultado.json",
+      "sha256": "acae95f4dbbb4fc4e6a7169fd677d96482594d46802efa109c7cb72a123ec80f"
+    },
+    {
+      "path": "docs/sales-agent/06-como-ejecutar-las-pruebas/ejecutar-materiales-continuidad.sh",
+      "sha256": "99cf8a7fb7d7b5240a13d062a85ed4d8209d4e2fa31fc002ff6a9468cf30db88"
+    },
+    {
+      "path": "docs/sales-agent/06-como-ejecutar-las-pruebas/materiales-continuidad.md",
+      "sha256": "f01f258fe38c13afe09f88191d7c8bb3514e538486be0c2b370626d13f0bbcbd"
+    },
+    {
+      "path": "docs/sales-agent/README.md",
+      "sha256": "faf699675315851cf7fbf3558e64cea4a1b1996a62c8f4451809ffc5e321704f"
+    }
+  ]
+}

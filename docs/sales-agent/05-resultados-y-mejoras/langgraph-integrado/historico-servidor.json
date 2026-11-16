@@ -100,8 +100,19 @@
       "graph_calls": 133,
       "graph_cost_usd": 0.1194099,
       "source": "sales-graph-stability-2.zip"
+    },
+    {
+      "label": "Contexto reservado",
+      "commit": "db92e4e51095f081adccbee2dca414fb6c49105b",
+      "graph_cases_pass": 5,
+      "cases": 6,
+      "bookings": 4,
+      "expected_bookings": 5,
+      "graph_calls": 127,
+      "graph_cost_usd": 0.1041219,
+      "source": "sales-context-budget.zip"
     }
   ],
-  "total_graph_calls": 1172,
-  "total_graph_cost_usd": 1.0773717
+  "total_graph_calls": 1299,
+  "total_graph_cost_usd": 1.1814936
 }
