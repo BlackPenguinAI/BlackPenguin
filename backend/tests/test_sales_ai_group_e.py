@@ -176,12 +176,12 @@ def test_t06_actual_file_link_receipt_and_no_raw_token_sent_to_composer(agent,mo
 def test_t07_photo_fallback_accepts_exact_file_even_when_another_is_added(agent,model):
     chosen=material(agent,['brochure'],name='Related PDF')
     agent.turn('Send photos',understanding('Send photos','materials',subjects={0:'photos'}))
-    assert not agent.db.query(SalesAssetShare).count() and 'photo coverage is not confirmed' in agent.reply()
+    assert not agent.db.query(SalesAssetShare).count() and 'not sure whether it includes photos' in agent.reply()
     assert latest(agent).content.count('?')==1
     material(agent,['brochure'],name='New brochure')
     agent.turn('Yes',understanding('Yes','other'))
     assert [s.sales_asset_id for s in agent.db.query(SalesAssetShare)]==[chosen.id]
-    assert 'coverage is not confirmed' in latest(agent).content and not agent.conversation.is_paused
+    assert ('not sure whether this file includes photos' in latest(agent).content or 'Unit-specific details are not confirmed' in latest(agent).content or 'may not include the exact details' in latest(agent).content) and not agent.conversation.is_paused
 
 
 @pytest.mark.parametrize('change',['file','version','tags','name','scope','source','archived','expired','channel'])
@@ -421,7 +421,7 @@ def test_contextual_material_acceptance_uses_exact_offered_snapshot(agent,model,
     u=typed(text,[req('file','materials',text,ref='f')],[ref('f','material',expression)])
     agent.turn(text,u)
     assert [s.sales_asset_id for s in agent.db.query(SalesAssetShare)]==[chosen.id]
-    assert 'coverage is not confirmed' in latest(agent).content
+    assert ('not sure whether this file includes photos' in latest(agent).content or 'Unit-specific details are not confirmed' in latest(agent).content or 'may not include the exact details' in latest(agent).content)
 
 
 def test_new_explicit_material_name_does_not_send_other_unrequested_assets(agent,model):

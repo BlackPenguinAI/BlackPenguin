@@ -56,7 +56,8 @@ def scoped_subjects(value,text,commercial):
 
 
 def completeness_issues(value,text):
-    issues=[]
+    from .request_coverage import issues as coverage_issues
+    issues=coverage_issues(value,text)
     def add(field,code,message):issues.append({'location':[field],'type':code,'message':message})
     for clause in re.split(r'[.!?;\n]',text):
         if PURPOSE.search(clause) and not REPORTED.search(clause):

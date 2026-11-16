@@ -13,7 +13,7 @@ import pytest
 @pytest.fixture(autouse=True)
 def offline_graph_decision(request,monkeypatch):
     own={'test_sales_observation_loop.py','test_sales_observation_repair.py',
-         'test_sales_observation_repair2.py','test_sales_unified_graph.py'}
+         'test_sales_observation_repair2.py','test_sales_unified_graph.py','test_sales_graph_repair1.py'}
     if Path(str(request.fspath)).name in own:return
     from app.modules.sales_agent import observation_loop
     original=observation_loop.run

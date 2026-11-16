@@ -47,7 +47,8 @@ def test_repair5_recorded_dialogues_deliver_switch_material_and_preserve_visits(
         @classmethod
         def utcnow(cls):return cls(2026,11,11,6,34)
     budget=Budget(40)
-    with patch('tools.sales_ai.compact_battery.datetime',Frozen),patch.object(httpx,'AsyncClient',Client),guard(budget),patch('app.integrations.openrouter_client.record_openrouter_usage',lambda **kw:None):
+    from app.modules.sales_agent.first_booking import label as historical_label
+    with patch('app.modules.sales_agent.first_booking.public_label',historical_label),patch('tools.sales_ai.compact_battery.datetime',Frozen),patch.object(httpx,'AsyncClient',Client),guard(budget),patch('app.integrations.openrouter_client.record_openrouter_usage',lambda **kw:None):
         result=asyncio.run(evaluate_case(db,manifest,scenario,budget,8))
         if scenario=='move_up_B':
             from app.modules.sales_agent.current_simulation import turn

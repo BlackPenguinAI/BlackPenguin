@@ -200,6 +200,14 @@ def label(option,prefs):
     return value.strftime('%Y-%m-%d at %I:%M %p')+f" ({prefs['timezone']}, UTC{value.strftime('%z')}); {option['specialist_name']}"
 
 
+def public_label(option,prefs):
+    """Human-readable timezone; canonical label stays available for old receipts."""
+    value=datetime.fromisoformat(option['starts_at']).astimezone(ZoneInfo(prefs['timezone']))
+    city=prefs['timezone'].rsplit('/',1)[-1].replace('_',' ')
+    zone='UTC' if prefs['timezone'] in {'UTC','Etc/UTC','Etc/GMT'} else city+' local time'
+    return value.strftime('%Y-%m-%d at %I:%M %p')+f" ({zone}); {option['specialist_name']}"
+
+
 def exact_public_selection(text, offer):
     """Recover only a complete backend-rendered option explicitly chosen now.
 
@@ -212,7 +220,7 @@ def exact_public_selection(text, offer):
         rendered=label(option,offer['preferences'])
         pattern=(r"(?:The first time does not work for me\. )?"
                  r"(?:I would like|I'd like|I choose|I'll take) the "+ordinal+
-                 r" appointment: "+re.escape(rendered)+r"\.?")
+                 r" appointment: "+r'(?:'+re.escape(rendered)+'|'+re.escape(public_label(option,offer['preferences']))+r')'+r"\.?")
         if re.fullmatch(pattern,text,re.I):
             return {'kind':'appointment','id':option['starts_at']}
     return None
@@ -245,7 +253,7 @@ def confirmation(snapshot,option,prefs,*,booked=False):
     property_name=snapshot.get('property_type_name') or snapshot.get('project_name')
     if snapshot.get('unit_code'):property_name+=' / unit '+snapshot['unit_code']
     prefix='Your visit is confirmed' if booked else 'Please confirm your visit'
-    text=f"{prefix}: {property_name}; {label(option,prefs)}; {prefs['duration_minutes']} minutes; {snapshot['location']['label']}: {snapshot['location']['address']}."
+    text=f"{prefix}: {property_name}; {public_label(option,prefs)}; {prefs['duration_minutes']} minutes; {snapshot['location']['label']}: {snapshot['location']['address']}."
     return text+(' What else would you like to know before your visit?' if booked else ' Shall I book this exact visit?')
 
 
@@ -394,7 +402,7 @@ def handle(db,scope,conversation,lead,project,outcome,inbound):
     offer={'version':VERSION,'slots':[o['starts_at'] for o in options],'options':options,'preferences':prefs,'context':context,
         'property_type_id':property_id,'unit_id':unit_id,'visit_location':location,'duration_minutes':prefs['duration_minutes'],
         'project_timezone':project.timezone or 'UTC','expires_at':(utc(now)+timedelta(minutes=30)).isoformat()}
-    return 'Verified visit options:\n\n'+'\n\n'.join(f"{i}. {label(o,prefs)}" for i,o in enumerate(options,1))+'\n\nWhich time would you like me to prepare for confirmation?',{'appointment_offer':offer},[{'type':'request_available_slots'}]
+    return 'Verified visit options:\n\n'+'\n\n'.join(f"{i}. {public_label(o,prefs)}" for i,o in enumerate(options,1))+'\n\nWhich time would you like me to prepare for confirmation?',{'appointment_offer':offer},[{'type':'request_available_slots'}]
 
 
 def sync_calendar(db,operation_id):

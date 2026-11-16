@@ -1,19 +1,20 @@
-"""Historical six-case server runs; not commercial-quality certification."""
+"""Observed server data only; local repairs are never new measured points."""
 import json
 from pathlib import Path
 import numpy as np
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-root=Path(__file__).parent
-rows=[{'commit':'31023e0','graph_cases_pass':4,'cases':6,'graph_calls':127,'graph_cost_usd':0.11234655,'source':'sales-observation-comparison.zip'},
-      {'commit':'ba5c4c5','graph_cases_pass':5,'cases':6,'graph_calls':134,'graph_cost_usd':0.12726405,'source':'sales-observation-repair-1-comparison.zip'},
-      {'commit':'cb30201','graph_cases_pass':6,'cases':6,'graph_calls':130,'graph_cost_usd':0.11303685,'source':'sales-observation-repair-2-comparison.zip'}]
-(root/'historico-servidor.json').write_text(json.dumps({'scope':'six fixed scripted synthetic cases; graph-observe only','commercial_quality':'NOT_EVALUATED','rows':rows,'total_graph_calls':sum(r['graph_calls'] for r in rows),'total_graph_cost_usd':round(sum(r['graph_cost_usd'] for r in rows),8)},indent=2))
-x=np.arange(len(rows));passed=np.array([r['graph_cases_pass'] for r in rows])
-fig,ax=plt.subplots(figsize=(8,3.3),layout='constrained')
-ax.plot(x,passed,marker='o',linewidth=2.5,color='#b47e00')
-for i,y in enumerate(passed):ax.annotate(f'{y}/6',(i,y),xytext=(0,8),textcoords='offset points',ha='center',weight='bold')
-ax.set_xticks(x,['Observaciones','Reparación 1','Reparación 2']);ax.set_yticks(np.arange(0,7));ax.set_ylim(0,6.7)
-ax.set_ylabel('Casos con controles satisfechos');ax.set_title('LangGraph · los mismos seis casos en el servidor',loc='left',weight='bold');ax.grid(axis='y',alpha=.2)
+root=Path(__file__).parent;data=json.loads((root/'historico-servidor.json').read_text());rows=data['rows'];x=np.arange(len(rows))
+fig,axes=plt.subplots(1,2,figsize=(11,3.9),layout='constrained')
+for ax,key,total,title in [(axes[0],'graph_cases_pass',6,'Conversaciones con todos sus controles'),(axes[1],'bookings',5,'Visitas creadas / esperadas')]:
+ values=np.array([r[key] for r in rows]);ax.plot(x,values,marker='o',linewidth=2.5,color='#b47e00')
+ ax.scatter([x[-1]],[values[-1]],color='#bd604c',zorder=3)
+ for i,y in enumerate(values):ax.annotate(f'{y}/{total}',(i,y),xytext=(0,8),textcoords='offset points',ha='center',weight='bold')
+ ax.set_xticks(x,[r['label'] for r in rows]);ax.set_yticks(np.arange(total+1));ax.set_ylim(0,total+.7);ax.set_title(title,fontsize=11);ax.grid(axis='y',alpha=.2)
+fig.suptitle('LangGraph · mismos seis guiones · el historial incluye retrocesos',weight='bold')
 fig.savefig(root/'evolucion-seis-casos.png',dpi=170)
+fig,ax=plt.subplots(figsize=(8,3.3),layout='constrained');cost=np.array([r['graph_cost_usd'] for r in rows]);bars=ax.bar(x,cost,color='#176b87')
+for i,c in enumerate(cost):ax.annotate(f'${c:.8f}',(i,c),xytext=(0,5),textcoords='offset points',ha='center',fontsize=9)
+ax.set_xticks(x,[r['label'] for r in rows]);ax.set_ylim(0,float(cost.max())*1.3);ax.set_ylabel('USD por corrida');ax.set_title(f"Cuatro corridas LangGraph · total USD {data['total_graph_cost_usd']:.8f}",loc='left',fontsize=12)
+fig.savefig(root/'consumo-cuatro-corridas.png',dpi=170)

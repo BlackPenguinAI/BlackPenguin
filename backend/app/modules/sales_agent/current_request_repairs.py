@@ -75,6 +75,9 @@ def normalize(value,text,commercial):
             notes.append({'field':'preferences','action':'omit_meaningless_financing_question_value','evidence':pref['evidence']})
         else:kept.append(pref)
     data['preferences']=kept
+    from .request_coverage import normalize as cover
+    covered,coverage_notes=cover(Understanding.model_validate(data),text)
+    data=covered.model_dump(mode='json');notes.extend(coverage_notes)
     if not notes:return value,[]
     used={r['reference_id'] for r in data['requests']}|{c['reference_id'] for c in data['constraints']}|{data['selected_reference_id']}
     data['references']=[r for r in data['references'] if r['id'] in used]

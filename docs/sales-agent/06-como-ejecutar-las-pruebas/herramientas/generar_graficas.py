@@ -51,7 +51,7 @@ if early:
     save(fig,'primer-laboratorio-adaptativo.png')
 
 # Global history: executions and spending, not a pooled quality score.
-labels=[r['run'].replace('sales-synthetic-lab-','L').replace('sales-booking-point-','A').replace('sales-commercial-point-','C').replace('sales-closing-point-','D').replace('sales-compact-battery-','B').replace('sales-compact-repair-','R') for r in rows]
+labels=[r['run'].replace('sales-synthetic-lab-','L').replace('sales-booking-point-','A').replace('sales-commercial-point-','C').replace('sales-closing-point-','D').replace('sales-compact-battery-','B').replace('sales-compact-repair-','R').replace('sales-observation-graph-observe','G0').replace('sales-observation-repair-1-graph-observe','G1').replace('sales-observation-repair-2-graph-observe','G2').replace('sales-langgraph-integrated','GI') for r in rows]
 xx=np.arange(len(rows));approved=np.array([r['approved_cases'] for r in rows]);failed=np.array([sum(c['status']=='fallido' for c in r['case_results']) for r in rows]);blocked=np.array([sum(c['status']=='incompleto' for c in r['case_results']) for r in rows])
 fig,axes=plt.subplots(2,1,figsize=(13,7))
 axes[0].bar(xx,approved,label='Aprobadas por sus controles',color='#24775e');axes[0].bar(xx,failed,bottom=approved,label='Fallidas',color='#bd604c');axes[0].bar(xx,blocked,bottom=approved+failed,label='Incompletas',color='#bd933d')
@@ -60,7 +60,8 @@ axes[1].plot(xx,np.cumsum(np.array([r['cases'] for r in rows])),'o-',label='Ejec
 for r in rows:
     unique.update((r['suite'],c['case']) for c in r['case_results']);coverage.append(len(unique))
 axes[1].plot(xx,np.array(coverage),'s--',label='IDs de escenario distintos por suite');axes[1].set(xticks=xx,xticklabels=labels,ylabel='Cantidad acumulada',title='Cobertura e iteraciones; no es una curva única de calidad');axes[1].legend(fontsize=9)
-fig.suptitle('L: lead LLM · A: agenda · C: comercial · D: despedidas · B: batería · R: reparación',y=1.02);save(fig,'panorama-global.png')
+axes[0].axvline(20.5,color='#666',linestyle=':',alpha=.7);axes[1].axvline(20.5,color='#666',linestyle=':',alpha=.7)
+fig.suptitle('L: lead LLM · A: agenda · C: comercial · D: despedidas · B/R: baterías · G: LangGraph',y=1.02);save(fig,'panorama-global.png')
 fig,axes=plt.subplots(1,2,figsize=(13,4))
 costs=np.array([r['cost_usd_recorded'] or 0 for r in rows]);bars=axes[0].bar(xx,costs,color='#176b87')
 for i,r in enumerate(rows):
@@ -76,7 +77,7 @@ for r in rows:
     if r['suite']=='compact' and len(chosen)==3:
         series.append({'run':r['run'],'source_commit':r['commit'],'source_cases':r['cases'],'selected_cases':sorted(common),'approved_cases':sum(c['status']=='aprobado' for c in chosen),'bookings':sum(c['meetings'] for c in chosen)})
 (ROOT/'05-resultados-y-mejoras/seguimiento-casos-comunes.json').write_text(json.dumps({'analysis_kind':'retrospective_subset_not_new_execution','note':'Original checks retained; validators evolved. Not equivalent to a controlled current-version reevaluation.','series':series},indent=2)+'\n')
-fig,axes=plt.subplots(1,2,figsize=(11,3.6));xx=np.arange(len(series));names=[r['run'].replace('sales-compact-battery-','B').replace('sales-compact-repair-','R') for r in series]
+fig,axes=plt.subplots(1,2,figsize=(11,3.6));xx=np.arange(len(series));names=[r['run'].replace('sales-compact-battery-','B').replace('sales-compact-repair-','R').replace('sales-observation-graph-observe','G0').replace('sales-observation-repair-1-graph-observe','G1').replace('sales-observation-repair-2-graph-observe','G2').replace('sales-langgraph-integrated','GI') for r in series]
 for ax,key,denominator,title in [(axes[0],'approved_cases',3,'Conversaciones aprobadas de los mismos tres IDs'),(axes[1],'bookings',2,'Visitas observadas de esos dos casos de agenda')]:
     values=np.array([r[key] for r in series]);ax.plot(xx,values,'o-',color='#176b87');ax.set(xticks=xx,xticklabels=names,ylim=(-.1,denominator+.5),title=title,ylabel='Cantidad');ax.yaxis.set_major_locator(MaxNLocator(integer=True))
     for i,value in enumerate(values):ax.annotate(f'{value}/{denominator}',(i,value),ha='center',xytext=(0,8),textcoords='offset points')

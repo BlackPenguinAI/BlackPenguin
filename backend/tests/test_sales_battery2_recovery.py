@@ -56,7 +56,8 @@ def test_battery2_failed_cases_complete_without_retrying_the_lead(lab,scenario):
         @classmethod
         def utcnow(cls):return cls(2026,11,11,6,34)
     budget=Budget(40)
-    with patch('tools.sales_ai.compact_battery.datetime',Frozen),patch.object(httpx,'AsyncClient',Client),guard(budget),patch('app.integrations.openrouter_client.record_openrouter_usage',lambda **kw:None):
+    from app.modules.sales_agent.first_booking import label as historical_label
+    with patch('app.modules.sales_agent.first_booking.public_label',historical_label),patch('tools.sales_ai.compact_battery.datetime',Frozen),patch.object(httpx,'AsyncClient',Client),guard(budget),patch('app.integrations.openrouter_client.record_openrouter_usage',lambda **kw:None):
         result=asyncio.run(evaluate_case(db,manifest,scenario,budget,8))
 
     assert not [(t['action'],t.get('reply'),c) for t in result['turns'] for c in t['checks'] if c['status']=='FAIL']

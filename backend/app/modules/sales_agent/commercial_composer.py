@@ -433,8 +433,9 @@ async def compose(db, scope, *, inbound, outcome, draft, commercial, lead, metad
             if any(t.id == result.operation_id and t.topic.value == 'catalog' for t in outcome.state.tasks):
                 description = row.get('description')
                 features = row.get('features') or []
+                # Do not depend on a renderer heading to detect already-present facts.
                 value = '\n'.join(v for v in [description if isinstance(description, str) else '',
-                    '; '.join(f for f in features if isinstance(f, str))] if v)
+                    *[f for f in features if isinstance(f, str)]] if v and v not in draft.text)
                 if value:
                     blocks.append({'id': 'e' + str(len(blocks)), 'required': True,
                         'wordings': {'direct': value, 'conversational': value}, 'source': 'approved_single_property_details'})

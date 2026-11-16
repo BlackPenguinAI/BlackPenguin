@@ -1,0 +1,205 @@
+{
+  "base_commit": "14dfa6fdf13dc338ad44cf0c335b7ab3a1cb29e9",
+  "files": [
+    {
+      "path": "backend/app/modules/sales_agent/commercial_composer.py",
+      "sha256": "5962ec2f7bfac9c6160a4db75d046724e2b03aeb2ab6e8f407cba75a6cfed396"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/current_request_repairs.py",
+      "sha256": "7f6c3498d1397736a351fc6f1b4478f5cd0923522bb9a0dfe1a343ce6bfaeac8"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/first_booking.py",
+      "sha256": "eb08792c37b330ba45688f257463ec2d51b868c3c05a933eccacd8c604f3b6df"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/interpretation_input.py",
+      "sha256": "500672e7a7fb4629cb99977af37a5dbcca92cc9cab91f1b21bf227291f5c4a81"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/interpretation_wire_repairs.py",
+      "sha256": "424940b3906e09a1f502018be6ceaf992bea81450ed3aa6a0dd8bee2ca64997f"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/material_delivery.py",
+      "sha256": "a6156b2539e4d3f89aa810a52066ae97a69836ec4fda7174879f3405da96be0f"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/natural_reply.py",
+      "sha256": "9ecab2acaa68c4881c0ab3dde0c7d2102115b2df14d9f816daf14b9ec0bd8b64"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/observation_loop.py",
+      "sha256": "9fda05aacf41a5d61ae77be92bb225c534693031d49d4e2e1deb0294c154c20e"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/request_coverage.py",
+      "sha256": "c71305b4737e95759a93a2497a1fa1869438c9502aced1e08a696051cb9e18d0"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/understanding_completeness.py",
+      "sha256": "73dba6b7ac18463792c0ac5c046a920946d3656e3fdcc73e05b9354b18488a45"
+    },
+    {
+      "path": "backend/tests/conftest.py",
+      "sha256": "b79cb723d812bff0819b742ebf33dd551aad7e7a6b3ce798b66ebc1b09169773"
+    },
+    {
+      "path": "backend/tests/fixtures/sales_graph_repair1/server_frames.json",
+      "sha256": "c2d774d4c2b9ff8be809b101d71b30c4421656821788fd9c47f95ceb2ab0347a"
+    },
+    {
+      "path": "backend/tests/test_sales_action_grounding.py",
+      "sha256": "19c962890a6da4d0f3655d565bdf520c4303ae7d345d4d3ce405d5e747516f54"
+    },
+    {
+      "path": "backend/tests/test_sales_ai_group_e.py",
+      "sha256": "fc10d9bece31447162b03f2b4ed52aae3f83354148b5d84eb6e19237080d9fe3"
+    },
+    {
+      "path": "backend/tests/test_sales_ai_group_f.py",
+      "sha256": "47313e243cc34e25a3a4eaff2913d0a187db4ce24356f21cf46ef716dd94b9f2"
+    },
+    {
+      "path": "backend/tests/test_sales_battery2_recovery.py",
+      "sha256": "7d48105b3921306b0949b60be8ca259c6a7087f092b4208c57c01dccaac0932d"
+    },
+    {
+      "path": "backend/tests/test_sales_current_choice_materials.py",
+      "sha256": "f56b0e509b71b43edc30e64b8eae0989091b22f2ef8440aea2e51eddecc44d98"
+    },
+    {
+      "path": "backend/tests/test_sales_graph_repair1.py",
+      "sha256": "f4cbacb6ae0756ac85e7fb21e9bd315a0d91fb437180dbf690bfa1d858e862e7"
+    },
+    {
+      "path": "backend/tests/test_sales_scope_and_composer.py",
+      "sha256": "43ac4f0fd25e2667e58abd6e1819def308d109110583939e3d963e5d1e33dd31"
+    },
+    {
+      "path": "backend/tests/test_sales_visit_history_receipt.py",
+      "sha256": "d6ee0ef5d5253052f9cbe8381bfda4d0162e7e7e345925354ca5198cfa28fb46"
+    },
+    {
+      "path": "backend/tools/sales_ai/booking_pilot.py",
+      "sha256": "4114328bb6cb57b2d305faf7abdd02ea8d89b14082b89fa70424bb77ca970f20"
+    },
+    {
+      "path": "backend/tools/sales_ai/compact_battery.py",
+      "sha256": "03242bcae125ee67467023fab65200da0dd47c140ef3a8c461e15fafa737be18"
+    },
+    {
+      "path": "backend/tools/sales_ai/public_time.py",
+      "sha256": "e6d74f68b63d3cd5c090ccf70e6c50cfb31274ffb5aaecef5a5cabdf456b8a46"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/corridas.json",
+      "sha256": "e8ee49ab3a1e4f226de49081634fba877f766b8241a64533eb1c5d8c99259a23"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/figuras/consumo-global.png",
+      "sha256": "bb97d75d3fd089fbad89a53064af9c3508dcfcbe7cc3e255e5b94beca3008c8e"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/figuras/panorama-global.png",
+      "sha256": "5ee6eda00105458e11e1eee3622f6d736e33e4aea75c10894075de87be9a7c1e"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/langgraph-integrado-servidor/conversaciones.md",
+      "sha256": "2169cbcecaea3d83d233983c878cd0fc41e7c7c0cdb91ea1188c39af57197b92"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/langgraph-integrado-servidor/resultado.json",
+      "sha256": "869e735366927d977606358b5943fa65be74ccb60806c750586a0124269e8e04"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/langgraph-integrado/consumo-cuatro-corridas.png",
+      "sha256": "a7a891988ba0e0ce4d73d43a2e78b1747fa0190a5e7f6abc703901eb755c3132"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/langgraph-integrado/evolucion-seis-casos.png",
+      "sha256": "e07e90d968d9d10a5dcadfe83fd344ecc90d7fcec6430970dfef84cc229836e7"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/langgraph-integrado/evolucion.py",
+      "sha256": "09508abcecf595d492edce26f61f0b3826f158677026dfdce26221f929302b6b"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/langgraph-integrado/historico-servidor.json",
+      "sha256": "ffda6dc440e03985e27d8b9a2b2efbbf7d1df52ad68ed934cfbedc2ae654dcda"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/langgraph-reparacion-1-local/aceptacion-local.json",
+      "sha256": "e653d422f7435c70e75c08439fd3a9e6e3917ea9ffebcd3f872f9bbff454bcce"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/langgraph-reparacion-1-local/backend-junit-1.xml",
+      "sha256": "cbc1261188f19a203b553076cc42d553246d5e9899709838751c4eb17c2d8a88"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/langgraph-reparacion-1-local/backend-junit-2.xml",
+      "sha256": "45e2e662b64277a148555d0057e15a45465bf1037d8974ed3175799ed2be49b4"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/langgraph-reparacion-1-local/backend-junit-3.xml",
+      "sha256": "704abe00266c7304261776b137bde8a448d0f67e60de36d98b5f0eb0f765d2e4"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/langgraph-reparacion-1-local/conversaciones-locales.json",
+      "sha256": "8d615299f0f801a634255b32d60bc5df3d48ed2b1a6129278061a47fa4309fd8"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/langgraph-reparacion-1-local/conversaciones.md",
+      "sha256": "09fa103720eedd1bff74eb8facfae90b6d5dd859b3ee89000ae7c9511b3d3390"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/langgraph-reparacion-1-local/shard-1-manifest.json",
+      "sha256": "62107a392558bfe7239f87d0131c1092c493f14fa41d4852969c4ec3bce0b83d"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/langgraph-reparacion-1-local/shard-2-manifest.json",
+      "sha256": "96e0d3de49f76fb0a2aa1279fe0d408a69bff9a5fe05f815e609ef0a88d5fe41"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/langgraph-reparacion-1-local/shard-3-manifest.json",
+      "sha256": "20aeed05fe2f5b85a84fb3d2f4e7ad98eceb1a37b253ace3419846e28a3dd570"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/langgraph-reparacion-1-local/validacion-local.json",
+      "sha256": "e171b0b1b7c880babe7906998705bb0fab14584fe8e4fd2c274af71349b96281"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/metricas.csv",
+      "sha256": "d3c344659bcc088add37b35c419ff5dc202fbdabb2eeea71437c050683d88536"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/propuesta-ampliacion.json",
+      "sha256": "1521a3bc0c2db558672750dbe6394016d85bea562106e52c2a1fc2085f8722dd"
+    },
+    {
+      "path": "docs/sales-agent/06-como-ejecutar-las-pruebas/ejecutar-langgraph-integrado.sh",
+      "sha256": "dbf8eb2d382dab0576f9840d8b4c418ed1c1fbc5f48e866a1971037db880172b"
+    },
+    {
+      "path": "docs/sales-agent/06-como-ejecutar-las-pruebas/ejecutar-langgraph-reparacion-1.sh",
+      "sha256": "9bf0da5fbe570ad82fa35467afdfb1a9fc8083591289725599e1a50fe5c5b70f"
+    },
+    {
+      "path": "docs/sales-agent/06-como-ejecutar-las-pruebas/entrega-langgraph-integrado.md",
+      "sha256": "b11258117b275c54b9d129c1cdfa8238c51238c6f37aff89cf1523bf8eec710c"
+    },
+    {
+      "path": "docs/sales-agent/06-como-ejecutar-las-pruebas/herramientas/estimar_ampliacion.py",
+      "sha256": "8f010ae9ae6c521f98d2cb44e50af2b4af3358268a5262f332f0d224ad1ffc99"
+    },
+    {
+      "path": "docs/sales-agent/06-como-ejecutar-las-pruebas/herramientas/generar_graficas.py",
+      "sha256": "c62f1e4930da1f96ef9cc8568c77f39e4666bd8484be4019b50b11786b078713"
+    },
+    {
+      "path": "docs/sales-agent/README.md",
+      "sha256": "31bdfaf789d79a60d366f81e88dce8947d12d6c80381ef1ee3517c2073c4e3a1"
+    }
+  ]
+}

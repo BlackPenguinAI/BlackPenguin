@@ -2,6 +2,7 @@
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 import re
+from .public_time import public_selection_time
 
 CASES = ('all_projects', 'one_project', 'unassigned_with_slots',
          'no_eligible_sales', 'no_slots', 'alternative_slot')
@@ -105,9 +106,7 @@ async def evaluate_case(db, manifest, scenario, budget, max_turns):
         if action=='confirm' and not selected:stop='confirmation_without_selection';break
         confirmed |= action=='confirm';selected |= action in {'select','reject_first'}
         if action in {'select','reject_first'}:
-            match=re.search(r'(\d{4}-\d{2}-\d{2} at \d{2}:\d{2} [AP]M) \(([^,]+),',message)
-            if match:
-                selected_start=datetime.strptime(match[1],'%Y-%m-%d at %I:%M %p').replace(tzinfo=ZoneInfo(match[2])).astimezone(timezone.utc).replace(tzinfo=None)
+            selected_start=public_selection_time(message,project['timezone'])
         event_id='booking-pilot:'+scenario+':'+str(index)
         before_ids=[m.id for m in db.query(SalesMessage).filter_by(conversation_id=conversation.id,direction='outbound')]
         try:

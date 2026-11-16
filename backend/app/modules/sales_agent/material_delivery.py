@@ -230,9 +230,11 @@ def deliver(db, scope, conversation, lead, run, outcome, previous_meta):
             targets += [t for i in (proposal or {}).get('items',[]) if i['binding']==binding for t in i.get('targets',[])]
             pages=sorted({p for target in targets for row in covered(asset,property_id=target['property_id'],unit_id=target['unit_id'],subject=target['subject']) for p in row['pages']})
             if pages:label+=' (reviewed pages '+', '.join(map(str,pages[:8]))+(' and additional pages' if len(pages)>8 else '')+'; opens the whole file)'
-        if coverage != 'requested_tag':
-            label += ' (related material; requested coverage is not confirmed)'
-        links.append(f'{label}: {url}')
+        note=''
+        if coverage=='possible_embedded_photos':note='I’m not sure whether this file includes photos.'
+        elif coverage=='type_only_unit_unconfirmed':note='Unit-specific details are not confirmed in this file.'
+        elif coverage!='requested_tag':note='This is related material; it may not include the exact details you requested.'
+        links.append(f'{label}: {url}'+('\n'+note if note else ''))
         share_ids.append(share.id)
         fulfilled.update(tids)
         replaced=[tid for item in (proposal or {}).get('items',[]) if item['binding']==binding for tid in item.get('task_ids',[])]
@@ -279,7 +281,7 @@ def deliver(db, scope, conversation, lead, run, outcome, previous_meta):
         offer = {'version': VERSION, 'scope': scope.__dict__,
             'expires_at': (workflow_now(datetime).replace(tzinfo=timezone.utc) + timedelta(minutes=30)).isoformat(),
             'items': items, 'asset_ids': list(dict.fromkeys(i['binding']['asset_id'] for i in items))}
-        names = ', '.join(customer_label(i['binding']['name'])+(' ('+', '.join('photos' if t=='gallery_image' else t.replace('_',' ') for t in i.get('content_types',[]))+')' if i.get('content_types') else '') for i in items)
+        names = ', '.join(customer_label(i['binding']['name']) for i in items)
         unit = any(i.get('coverage') == 'type_only_unit_unconfirmed' for i in items)
         complementary=all(i.get('coverage','').startswith('complement_') for i in items)
         alternatives=all(i.get('coverage','').startswith('alternative_') for i in items)
@@ -288,7 +290,7 @@ def deliver(db, scope, conversation, lead, run, outcome, previous_meta):
         question = (f'The requested {missing} is not available for this property. I can offer {names} as related material. Would you like me to share it?' if alternatives else
             f'I also have {kind} for this option. Would you like me to share them?' if complementary else
             f'I have {names} as related Project or property type material. Coverage for the specific unit is not confirmed. Would you like those materials?'
-            if unit else f'I have {names}. It may contain useful related information, but the requested photo coverage is not confirmed. Would you like that file?')
+            if unit else f'I have {names}, but I’m not sure whether it includes photos. Would you like me to send it?')
         if repeated and alternatives:
             question=f"I understand you're looking for the {missing}. I still don't have it available to share for this property. I can offer {names} instead. Would you like me to share it?"
         if gap_subjects and not alternatives:question='I could not confirm the requested '+', '.join(sorted(gap_subjects))+' for this option. '+question

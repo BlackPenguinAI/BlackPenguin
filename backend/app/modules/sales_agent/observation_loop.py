@@ -16,7 +16,7 @@ from .execution import simulated,now
 
 class DecisionError(ValueError):pass
 
-VERSION='sales-observation-loop/2.0'
+VERSION='sales-observation-loop/2.1'
 READS={'catalog','property_details','materials','financing','pricing','inventory','location','delivery','amenities'}
 
 class Decision(BaseModel):
@@ -176,8 +176,10 @@ async def run(db,scope,*,inbound,outcome,commercial,infer=None,authorize=None):
     plan.update(tool_calls=len(trace),read_units=len(trace)*2,additional_model_calls=sum(d['status'] in {'accepted','decision_rejected'} for d in decisions),rounds=[{'round':i+1} for i in range(rounds)])
     unread=[t.id for t in current if is_read(t) and 'read_'+t.id not in attempted and t.status in {'pending','blocked','suspended','awaiting_user'} and not restricted(state,t)]
     clarification_needed=u.requires_clarification or any(t.binding_status=='unresolved' and t.status in {'pending','blocked','suspended','awaiting_user'} and not restricted(state,t) for t in current) or any(r.status=='uncertain' and r.data.get('needs_temporal_clarification') for r in results)
-    audit={'clarification_required':clarification_needed,'unread_required_tasks':unread,'observations':[compact(r) for r in results],'version':VERSION,'rounds':rounds,'max_rounds':2,'decisions':decisions,'tools':trace,'external_writes':0,
-           'status':'FAIL' if any(d['status']!='accepted' for d in decisions) else 'CLARIFICATION_REQUIRED' if clarification_needed else 'PARTIAL' if unread else 'PASS'}
+    from .request_coverage import issues as coverage_issues,financing_quotes
+    source_issues=coverage_issues(u,inbound.content)
+    audit={'source_request_coverage':{'scope':'literal_independent_financing_questions','required':bool(financing_quotes(inbound.content)),'issues':source_issues,'status':'FAIL' if source_issues else 'PASS'},'task_coverage_scope':'validated_tasks_only_not_integral_dialogue_quality','clarification_required':clarification_needed,'unread_required_tasks':unread,'observations':[compact(r) for r in results],'version':VERSION,'rounds':rounds,'max_rounds':2,'decisions':decisions,'tools':trace,'external_writes':0,
+           'status':'FAIL' if source_issues or any(d['status']!='accepted' for d in decisions) else 'CLARIFICATION_REQUIRED' if clarification_needed else 'PARTIAL' if unread else 'PASS'}
     revision,state=save(db,scope,event_key='active-observations:'+inbound.id,expected_revision=outcome.revision,state=state,
         metadata={'observation_loop':audit,'results':[r.model_dump(mode='json') for r in results],'message_id':inbound.id})
     stop_reason='read_cost_limit' if any(d['status']=='read_cost_limit' for d in decisions) else 'finished' if audit['status']=='PASS' else 'clarification_required' if audit['status']=='CLARIFICATION_REQUIRED' else 'observation_decision_failed'

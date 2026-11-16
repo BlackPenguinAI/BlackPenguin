@@ -52,7 +52,7 @@ def naturalize(outcome,draft,*,channel):
         low,high=row.get('area_min'),row.get('area_max')
         if low is not None and (not wanted or 'area' in wanted):
             facts.append(f'{low:g}'+(f'–{high:g}' if high is not None and low!=high else '')+' '+str(row.get('area_unit') or '(area unit unconfirmed)'))
-        line=f"{index}. {row['property_type']}"
+        line=(f"{index}. " if len(rows)>1 else "")+row['property_type']
         if facts:line+=' — '+', '.join(facts)
         if not wanted and allowed('pricing') and row.get('starting_price') is not None and row.get('currency'):line+=f". Published prices start at {row['starting_price']:,.2f} {row['currency']}"
         elif not wanted and allowed('pricing') and 'pricing' in topics:line+='. The price is not confirmed'
@@ -92,7 +92,7 @@ def naturalize(outcome,draft,*,channel):
         if 'area' in wanted and row.get('area') is None:text+=' Area details are not confirmed.'
         if 'inventory' in topics and row.get('status'):text+=' Last recorded status: '+row['status']+'.'
         blocks.append(text)
-    if rows:blocks.insert(0,'Here are the property options I can confirm:')
+    if rows:blocks.insert(0,('Here are the details for '+next(iter(rows.values()))['property_type']+':' if len(rows)==1 else 'Here are the property options I can confirm:'))
     if other.text!='I need clarification or verified information to answer this request.':blocks.append(other.text)
     text=render_channel_text('\n\n'.join(dict.fromkeys(blocks)),channel)
     return replace(draft,text=text,parts=tuple(split_channel_text(text,channel)))

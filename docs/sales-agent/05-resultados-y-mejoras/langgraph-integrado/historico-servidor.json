@@ -3,30 +3,50 @@
   "commercial_quality": "NOT_EVALUATED",
   "rows": [
     {
-      "commit": "31023e0",
+      "label": "Observaciones",
+      "commit": "31023e00ab56f196e2954025491bda77adf69da1",
       "graph_cases_pass": 4,
       "cases": 6,
+      "bookings": 4,
+      "expected_bookings": 5,
       "graph_calls": 127,
       "graph_cost_usd": 0.11234655,
       "source": "sales-observation-comparison.zip"
     },
     {
-      "commit": "ba5c4c5",
+      "label": "Reparaci\u00f3n 1",
+      "commit": "ba5c4c52cfbee55a715c5ca8ef52833e09c3bee8",
       "graph_cases_pass": 5,
       "cases": 6,
+      "bookings": 5,
+      "expected_bookings": 5,
       "graph_calls": 134,
       "graph_cost_usd": 0.12726405,
       "source": "sales-observation-repair-1-comparison.zip"
     },
     {
-      "commit": "cb30201",
+      "label": "Reparaci\u00f3n 2",
+      "commit": "cb302013b764f2102b7959eb195f35cba7a8212d",
       "graph_cases_pass": 6,
       "cases": 6,
+      "bookings": 5,
+      "expected_bookings": 5,
       "graph_calls": 130,
       "graph_cost_usd": 0.11303685,
       "source": "sales-observation-repair-2-comparison.zip"
+    },
+    {
+      "label": "Integrado",
+      "commit": "14dfa6fdf13dc338ad44cf0c335b7ab3a1cb29e9",
+      "graph_cases_pass": 4,
+      "cases": 6,
+      "bookings": 4,
+      "expected_bookings": 5,
+      "graph_calls": 126,
+      "graph_cost_usd": 0.11470965,
+      "source": "sales-langgraph-integrated.zip"
     }
   ],
-  "total_graph_calls": 391,
-  "total_graph_cost_usd": 0.35264745
+  "total_graph_calls": 517,
+  "total_graph_cost_usd": 0.4673571
 }

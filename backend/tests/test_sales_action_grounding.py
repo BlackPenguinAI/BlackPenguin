@@ -16,7 +16,7 @@ from tools.sales_ai.evaluation_guard import Budget,guard
 
 ROWS=json.loads((Path(__file__).parent/'fixtures/sales_ai/compact_repair_3_packets.json').read_text())['rows']
 @pytest.mark.parametrize('scenario',['first_time_A','move_up_B','unknown_A'])
-def test_recorded_server_attempt_sequences_reach_material_and_booking_outcomes(lab,scenario):
+def test_recorded_server_attempt_sequences_reach_material_and_booking_outcomes(lab,scenario,tmp_path):
     db,manifest=lab
     db.add(AIConfiguration(id='consistency-config',company_id=None,openrouter_api_key='OFFLINE',agent_ventas={'model':'test/offline'}))
     db.add(PromptVersion(company_id=None,agent_key='sales',version_number=1,is_published=True,configuration={'model':'test/offline'}));db.commit()
@@ -44,7 +44,9 @@ def test_recorded_server_attempt_sequences_reach_material_and_booking_outcomes(l
         @classmethod
         def utcnow(cls):return cls(2026,11,11,6,34)
     budget=Budget(40)
-    with patch('tools.sales_ai.compact_battery.datetime',Frozen),patch.object(httpx,'AsyncClient',Client),guard(budget),patch('app.integrations.openrouter_client.record_openrouter_usage',lambda **kw:None):result=asyncio.run(evaluate_case(db,manifest,scenario,budget,8))
+    from app.modules.sales_agent.first_booking import label as historical_label
+    with patch('app.modules.sales_agent.first_booking.public_label',historical_label),patch('tools.sales_ai.compact_battery.datetime',Frozen),patch.object(httpx,'AsyncClient',Client),guard(budget),patch('app.integrations.openrouter_client.record_openrouter_usage',lambda **kw:None):result=asyncio.run(evaluate_case(db,manifest,scenario,budget,8))
+    (tmp_path/'result.json').write_text(json.dumps(result,default=str,ensure_ascii=False,indent=2))
     assert not [(t['action'],t.get('reply'),c) for t in result['turns'] for c in t['checks'] if c['status']=='FAIL']
     assert not [c for c in result['checks'] if c['status']=='FAIL']
     assert len(result['meetings'])==int(scenario.endswith('_A'))

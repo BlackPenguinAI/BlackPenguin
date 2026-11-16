@@ -1899,5 +1899,341 @@
         "failures": 5
       }
     ]
+  },
+  {
+    "run": "sales-observation-graph-observe",
+    "execution_origin": "server_submitted_synthetic_run",
+    "archive": "sales-observation-comparison.zip",
+    "sha256": "c3557b8da3c2a2ae7136a350cbf09a03e47148236d93f65cd04d51c5ec5dc716",
+    "archive_member": "candidate.zip",
+    "commit": "31023e00ab56f196e2954025491bda77adf69da1",
+    "suite": "observation",
+    "cohort": "fixed-six-observation-cases",
+    "selected_cases": [
+      "obs_alternative",
+      "obs_mixed",
+      "obs_switch",
+      "obs_interrupt",
+      "obs_time",
+      "obs_no_seller"
+    ],
+    "model": "openai/gpt-4o-mini",
+    "lead_model": null,
+    "configuration_version": 8,
+    "configuration_sha256": "51ff65376dad421328dab993a4fc71939489386f1ed173514cf13a244ac79f1c",
+    "status": "FAIL",
+    "cases": 6,
+    "approved_cases": 4,
+    "turns": 33,
+    "expected_bookings": 5,
+    "actual_bookings": 4,
+    "provider_calls": 127,
+    "prompt_tokens": 907193,
+    "completion_tokens": 12814,
+    "responses_with_cost": 127,
+    "cost_usd_recorded": 0.11234654999999998,
+    "cost_complete": true,
+    "checks_summary": {
+      "PASS": 324,
+      "FAIL": 5,
+      "BLOCKED": 0
+    },
+    "case_results": [
+      {
+        "case": "obs_alternative",
+        "status": "aprobado",
+        "meetings": 1,
+        "turns": 7,
+        "failures": 0
+      },
+      {
+        "case": "obs_mixed",
+        "status": "fallido",
+        "meetings": 1,
+        "turns": 6,
+        "failures": 2
+      },
+      {
+        "case": "obs_switch",
+        "status": "aprobado",
+        "meetings": 1,
+        "turns": 7,
+        "failures": 0
+      },
+      {
+        "case": "obs_interrupt",
+        "status": "aprobado",
+        "meetings": 1,
+        "turns": 7,
+        "failures": 0
+      },
+      {
+        "case": "obs_time",
+        "status": "fallido",
+        "meetings": 0,
+        "turns": 3,
+        "failures": 3
+      },
+      {
+        "case": "obs_no_seller",
+        "status": "aprobado",
+        "meetings": 0,
+        "turns": 3,
+        "failures": 0
+      }
+    ],
+    "overall_dialogue_quality": "NOT_EVALUATED"
+  },
+  {
+    "run": "sales-observation-repair-1-graph-observe",
+    "execution_origin": "server_submitted_synthetic_run",
+    "archive": "sales-observation-repair-1-comparison.zip",
+    "sha256": "5b1ce99cf07ce4c6486cc313fd912a254a6c3521182623f4db714f41c50a8ed8",
+    "archive_member": "candidate.zip",
+    "commit": "ba5c4c52cfbee55a715c5ca8ef52833e09c3bee8",
+    "suite": "observation",
+    "cohort": "fixed-six-observation-cases",
+    "selected_cases": [
+      "obs_alternative",
+      "obs_mixed",
+      "obs_switch",
+      "obs_interrupt",
+      "obs_time",
+      "obs_no_seller"
+    ],
+    "model": "openai/gpt-4o-mini",
+    "lead_model": null,
+    "configuration_version": 8,
+    "configuration_sha256": "51ff65376dad421328dab993a4fc71939489386f1ed173514cf13a244ac79f1c",
+    "status": "FAIL",
+    "cases": 6,
+    "approved_cases": 5,
+    "turns": 35,
+    "expected_bookings": 5,
+    "actual_bookings": 5,
+    "provider_calls": 134,
+    "prompt_tokens": 1002375,
+    "completion_tokens": 14553,
+    "responses_with_cost": 134,
+    "cost_usd_recorded": 0.12726404999999996,
+    "cost_complete": true,
+    "checks_summary": {
+      "PASS": 349,
+      "FAIL": 3,
+      "BLOCKED": 0
+    },
+    "case_results": [
+      {
+        "case": "obs_alternative",
+        "status": "aprobado",
+        "meetings": 1,
+        "turns": 7,
+        "failures": 0
+      },
+      {
+        "case": "obs_mixed",
+        "status": "fallido",
+        "meetings": 1,
+        "turns": 6,
+        "failures": 3
+      },
+      {
+        "case": "obs_switch",
+        "status": "aprobado",
+        "meetings": 1,
+        "turns": 7,
+        "failures": 0
+      },
+      {
+        "case": "obs_interrupt",
+        "status": "aprobado",
+        "meetings": 1,
+        "turns": 7,
+        "failures": 0
+      },
+      {
+        "case": "obs_time",
+        "status": "aprobado",
+        "meetings": 1,
+        "turns": 5,
+        "failures": 0
+      },
+      {
+        "case": "obs_no_seller",
+        "status": "aprobado",
+        "meetings": 0,
+        "turns": 3,
+        "failures": 0
+      }
+    ],
+    "overall_dialogue_quality": "NOT_EVALUATED"
+  },
+  {
+    "run": "sales-observation-repair-2-graph-observe",
+    "execution_origin": "server_submitted_synthetic_run",
+    "archive": "sales-observation-repair-2-comparison.zip",
+    "sha256": "ecb62db5bb0ab04f0e7482442b13876894e73559852a9a018bd90323035550a2",
+    "archive_member": "candidate.zip",
+    "commit": "cb302013b764f2102b7959eb195f35cba7a8212d",
+    "suite": "observation",
+    "cohort": "fixed-six-observation-cases",
+    "selected_cases": [
+      "obs_alternative",
+      "obs_mixed",
+      "obs_switch",
+      "obs_interrupt",
+      "obs_time",
+      "obs_no_seller"
+    ],
+    "model": "openai/gpt-4o-mini",
+    "lead_model": null,
+    "configuration_version": 8,
+    "configuration_sha256": "51ff65376dad421328dab993a4fc71939489386f1ed173514cf13a244ac79f1c",
+    "status": "PASS",
+    "cases": 6,
+    "approved_cases": 6,
+    "turns": 35,
+    "expected_bookings": 5,
+    "actual_bookings": 5,
+    "provider_calls": 130,
+    "prompt_tokens": 919107,
+    "completion_tokens": 12762,
+    "responses_with_cost": 130,
+    "cost_usd_recorded": 0.11303684999999998,
+    "cost_complete": true,
+    "checks_summary": {
+      "PASS": 352,
+      "FAIL": 0,
+      "BLOCKED": 0
+    },
+    "case_results": [
+      {
+        "case": "obs_alternative",
+        "status": "aprobado",
+        "meetings": 1,
+        "turns": 7,
+        "failures": 0
+      },
+      {
+        "case": "obs_mixed",
+        "status": "aprobado",
+        "meetings": 1,
+        "turns": 6,
+        "failures": 0
+      },
+      {
+        "case": "obs_switch",
+        "status": "aprobado",
+        "meetings": 1,
+        "turns": 7,
+        "failures": 0
+      },
+      {
+        "case": "obs_interrupt",
+        "status": "aprobado",
+        "meetings": 1,
+        "turns": 7,
+        "failures": 0
+      },
+      {
+        "case": "obs_time",
+        "status": "aprobado",
+        "meetings": 1,
+        "turns": 5,
+        "failures": 0
+      },
+      {
+        "case": "obs_no_seller",
+        "status": "aprobado",
+        "meetings": 0,
+        "turns": 3,
+        "failures": 0
+      }
+    ],
+    "overall_dialogue_quality": "NOT_EVALUATED"
+  },
+  {
+    "run": "sales-langgraph-integrated",
+    "execution_origin": "server_submitted_synthetic_run",
+    "archive": "sales-langgraph-integrated.zip",
+    "sha256": "fd3bceaabfa438e1468e022c1bd2a377b92ca933e085e1517e403dfeafd0e008",
+    "archive_member": null,
+    "commit": "14dfa6fdf13dc338ad44cf0c335b7ab3a1cb29e9",
+    "suite": "observation",
+    "cohort": "fixed-six-observation-cases",
+    "selected_cases": [
+      "obs_alternative",
+      "obs_mixed",
+      "obs_switch",
+      "obs_interrupt",
+      "obs_time",
+      "obs_no_seller"
+    ],
+    "model": "openai/gpt-4o-mini",
+    "lead_model": null,
+    "configuration_version": 8,
+    "configuration_sha256": "51ff65376dad421328dab993a4fc71939489386f1ed173514cf13a244ac79f1c",
+    "status": "FAIL",
+    "cases": 6,
+    "approved_cases": 4,
+    "turns": 33,
+    "expected_bookings": 5,
+    "actual_bookings": 4,
+    "provider_calls": 126,
+    "prompt_tokens": 890431,
+    "completion_tokens": 12735,
+    "responses_with_cost": 126,
+    "cost_usd_recorded": 0.11470964999999995,
+    "cost_complete": true,
+    "checks_summary": {
+      "PASS": 327,
+      "FAIL": 5,
+      "BLOCKED": 0
+    },
+    "case_results": [
+      {
+        "case": "obs_alternative",
+        "status": "fallido",
+        "meetings": 0,
+        "turns": 5,
+        "failures": 4
+      },
+      {
+        "case": "obs_mixed",
+        "status": "fallido",
+        "meetings": 1,
+        "turns": 6,
+        "failures": 1
+      },
+      {
+        "case": "obs_switch",
+        "status": "aprobado",
+        "meetings": 1,
+        "turns": 7,
+        "failures": 0
+      },
+      {
+        "case": "obs_interrupt",
+        "status": "aprobado",
+        "meetings": 1,
+        "turns": 7,
+        "failures": 0
+      },
+      {
+        "case": "obs_time",
+        "status": "aprobado",
+        "meetings": 1,
+        "turns": 5,
+        "failures": 0
+      },
+      {
+        "case": "obs_no_seller",
+        "status": "aprobado",
+        "meetings": 0,
+        "turns": 3,
+        "failures": 0
+      }
+    ],
+    "overall_dialogue_quality": "NOT_EVALUATED"
   }
 ]

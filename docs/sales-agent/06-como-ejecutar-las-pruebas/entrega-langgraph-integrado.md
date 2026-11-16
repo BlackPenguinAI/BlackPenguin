@@ -13,7 +13,7 @@ Esperar a que GitHub Actions termine y comprobar API **y worker**:
 
 ```bash
 docker inspect --format '{{.Name}} revision={{index .Config.Labels "org.opencontainers.image.revision"}}' bp_api_prod bp_worker_prod
-curl -fsS --connect-timeout 3 --max-time 15 http://127.0.0.1:8000/api/v1/health/sales-engine
+docker exec -i -w /app bp_api_prod python -c 'import json; from app.modules.health.router import sales_engine; print(json.dumps(sales_engine(),indent=2))'
 curl -fsS --connect-timeout 3 --max-time 15 http://127.0.0.1:8000/api/v1/health/sales
 ```
 

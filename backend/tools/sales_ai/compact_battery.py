@@ -6,6 +6,7 @@ No buyer model, judge, production writes, transport or external calendar.
 from datetime import datetime,timedelta,timezone
 from zoneinfo import ZoneInfo
 import re
+from .public_time import public_selection_time
 
 VERSION='sales-compact-battery/1.0'
 GOODBYE='No other questions, thank you. Goodbye.'
@@ -125,6 +126,7 @@ def public_next(reply,history,name,choose=1):
     return visit(name),'clarify_visit'
 
 
+
 def resources(db,manifest,lead,property_id,rows):
     import hashlib
     from app.modules.projects import asset_share_service
@@ -198,8 +200,7 @@ async def evaluate_case(db,manifest,key,budget,max_turns):
         visit_requested |= action in {'request_visit','clarify_visit','clarify_property'}
         if action=='select':
             selected_label=message
-            match=re.search(r'(\d{4}-\d{2}-\d{2} at \d{2}:\d{2} [AP]M) \(([^,]+),',message)
-            if match:selected_start=datetime.strptime(match[1],'%Y-%m-%d at %I:%M %p').replace(tzinfo=ZoneInfo(match[2])).astimezone(timezone.utc).replace(tzinfo=None)
+            selected_start=public_selection_time(message,project['timezone'])
         if action=='confirm':confirmed=True
         last_event='compact:'+key+':'+str(index)
         before={m.id for m in db.query(SalesMessage).filter_by(conversation_id=conversation.id,direction='outbound')}
@@ -263,7 +264,7 @@ async def evaluate_case(db,manifest,key,budget,max_turns):
     if meetings:
         meeting=meetings[0]
         checks.extend([check('eligible_sales_user',meeting.assigned_sales_user_id in expected_eligible),check('correct_lead_and_project',meeting.lead_id==lead.id and meeting.project_id==project['id']),
-            check('time_matches_public_choice',meeting.meeting_time==selected_start),check('project_timezone_offered',project['timezone'] in (selected_label or '')),
+            check('time_matches_public_choice',meeting.meeting_time==selected_start),check('project_timezone_offered',project['timezone'] in (selected_label or '') or '('+project['timezone'].rsplit('/',1)[-1].replace('_',' ')+' local time)' in (selected_label or '')),
             check('location_recorded',f"{spec['project']+1} Synthetic Avenue" in (meeting.visit_address or '')),check('booked_property_matches_choice',meeting.visit_property_type_id==prop['id']),check('confirmation_stored',meeting.confirmation_status=='confirmed'),check('public_confirmation_matches_booking','Your visit is confirmed' in last)])
     material_receipts,material_checks=resources(db,manifest,lead,prop['id'],rows);checks+=material_checks
     if spec.get('material'):

@@ -1,0 +1,61 @@
+{
+  "base_commit": "14dfa6fdf13dc338ad44cf0c335b7ab3a1cb29e9",
+  "source_server_run": "sales-langgraph-integrated.zip",
+  "paid_calls": 0,
+  "paid_cost_usd": 0,
+  "real_model_quality_evaluated": false,
+  "orchestrator": "graph-observe",
+  "interpretation_system": "sales-interpretation-system/2.6",
+  "observation_loop": "sales-observation-loop/2.1",
+  "regression": {
+    "passed": 3762,
+    "skipped": 11,
+    "failed": 0,
+    "modules": 150,
+    "shards": [
+      {
+        "shard": 1,
+        "passed": 1336,
+        "skipped": 5
+      },
+      {
+        "shard": 2,
+        "passed": 1161,
+        "skipped": 1
+      },
+      {
+        "shard": 3,
+        "passed": 1265,
+        "skipped": 5
+      }
+    ],
+    "coverage_verifier": "PASS"
+  },
+  "acceptance": {
+    "PASS": 63,
+    "FAIL": 0,
+    "NOT_RUN": 1
+  },
+  "sharding_unit_tests": 8,
+  "targeted_tests": {
+    "passed": 72,
+    "replay_journeys": 14,
+    "variants_and_negative_checks": 58,
+    "scope": "Includes two failed wire responses for visit, both autoflush modes, independent financing coverage, negation, conditions, third-party speech, unknown owners and public timezone selection.",
+    "overlaps_regression": true
+  },
+  "exported_local_examples": {
+    "cases": 6,
+    "lead_turns": 35,
+    "bookings": 5,
+    "interpretations": "recorded server frames with simulated new continuations",
+    "decision_and_composition_providers": "simulated"
+  },
+  "limits": [
+    "Not a new published-model result. No local paid calls.",
+    "No live WhatsApp/SMS transport or Calendar delivery.",
+    "SQLite does not establish PostgreSQL concurrency correctness.",
+    "Literal source-question coverage is bounded, not a universal semantic completeness proof.",
+    "Commercial wording and compound closing questions still require review."
+  ]
+}

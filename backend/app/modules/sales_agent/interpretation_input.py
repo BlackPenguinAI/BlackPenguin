@@ -9,7 +9,7 @@ from pydantic import Field,create_model,StrictBool
 from .understanding_contract import (Understanding,StrictModel,Reference,Request,Constraint,Comparison,Subject)
 
 VERSION='sales-interpretation-input/2.0'
-SYSTEM_VERSION='sales-interpretation-system/2.5'
+SYSTEM_VERSION='sales-interpretation-system/2.6'
 class Target(StrictModel):
     kind:Literal['property','unit','appointment','location','material','ambiguous']
     expression:str=Field(min_length=1,max_length=300)
@@ -185,9 +185,11 @@ def compile_input(raw,text,*,historical_messages=()):
     data=document(raw);notes=[]
     if data.get('version')=='sales-understanding/1.0':data,notes=legacy(data,text)
     value=Input.model_validate(data)
-    from .interpretation_wire_repairs import literal_material
+    from .interpretation_wire_repairs import literal_material,literal_visit
     fixed,read_notes=literal_material(value.model_dump(mode='json'),text)
     if read_notes:value=Input.model_validate(fixed);notes.extend(read_notes)
+    fixed,visit_notes=literal_visit(value.model_dump(mode='json'),text)
+    if visit_notes:value=Input.model_validate(fixed);notes.extend(visit_notes)
     # Only omit affirmative standalone requests demonstrably replayed from this
     # conversation. Never discard restrictions, alternatives or unknown evidence.
     # A verified current visit is still validated/planned normally; no consent or
@@ -253,3 +255,5 @@ SYSTEM += "\nKeep intent and requests consistent: visit.action=request requires 
 SYSTEM += "\nDecompose formats and independent questions: 'send photos or a brochure and explain financing' means alternatives=[photos OR brochure] AND a separate financing request. Set material subject photos/brochure and target null for generic format words; financing options is not a property target. Inherit the selected owner through backend context, without fabricating current quotations of its name. AND formats remain independent; exclusions remain exclusions. For 'any morning/afternoon/evening in the next seven days', use time_relation morning/afternoon/evening, no literal clock in time_from_evidence, and the current date-range quotation. 'Use the property\'s timezone' means the approved project timezone, not a request for an IANA code. Preserve explicit clock limits and alternative or negative timing.\n"
 
 SYSTEM += "\nA missing target must be null; never emit punctuation such as '.', '/', '_' or '-' as a reference or financing preference. Do not use a material target for a financing question. 'Before choosing a time, can you show me photos?' is only materials/photos for the active subject: no comparison, visit or historical declarations. A bare acceptance of the latest complete booking summary has timing null and no clarification. Named unknown files or owners must remain unknown; never replace them with the active property.\n"
+
+SYSTEM += "\nBefore returning, reconcile every independent current question with requests. A financing-policy question must never be stored only as a financing preference or omitted after a malformed preference is removed. For a material OR plus financing, keep financing as an independent AND request. A pure request to visit one named property has one appointment request, visit.action=request and a current quoted target; do not create comparisons or alternatives from prior catalog entries. This is never final booking confirmation.\n"

@@ -302,7 +302,7 @@ def test_explicit_timezone_converts_time_correctly(agent):
     assert datetime.fromisoformat(offer['options'][0]['starts_at']).replace(tzinfo=None)==starts
     agent.turn('1',typed('1',[req('a','appointment','1',ref='s')],[ref('s','appointment','1')]))
     agent.turn('Yes',understanding('Yes','other'))
-    assert 'America/Lima' in latest(agent).content and agent.db.query(Meeting).one().meeting_time==starts
+    assert 'Lima local time' in latest(agent).content and agent.db.query(Meeting).one().meeting_time==starts
 
 
 def test_unit_and_location_details_are_pinned_in_first_booking(agent):
