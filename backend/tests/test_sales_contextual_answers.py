@@ -126,3 +126,5 @@ def test_real_turn_path_delivers_accepted_complement_without_reasking(agent):
     _,run=agent.turn('Yes',json.dumps(raw))
     assert run.status=='completed',run.output_snapshot
     assert {s.sales_asset_id for s in agent.db.query(SalesAssetShare)}=={gallery.id,pdf.id}
+    latest=agent.db.query(SalesMessage).filter_by(direction='outbound').order_by(SalesMessage.created_at.desc()).first()
+    assert not latest.metadata_json.get('material_offer') and latest.metadata_json.get('visit_invitation')

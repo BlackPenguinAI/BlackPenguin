@@ -283,7 +283,7 @@ flowchart TD
 
 ![Historia global y cobertura](05-resultados-y-mejoras/figuras/panorama-global.png)
 
-**Lectura correcta:** el gráfico global incorpora las 21 corridas tempranas y las doce corridas LangGraph, separadas por una línea: **33 corridas indexadas, 216 conversaciones ejecutadas y 53 IDs por suite**. No mezcla esos conjuntos en una tasa de calidad. El consumo de estas 33 corridas indexadas suma USD 2.92074480, parcial por cargos faltantes tempranos. No es un inventario de todas las fases intermedias, que se conservan en el bloque 10. No se suma este subtotal con el seguimiento desde necesidades: sus alcances se solapan. Dentro del bloque temprano, las 144 ejecuciones incluyen repeticiones; hay 47 IDs por suite. La subida acumulada mide cobertura y trabajo evaluado, no una curva única de calidad. Las 63 aprobaciones históricas pertenecen a sus controles originales: no se interpreta 63/144 como calidad actual. Para observar la mejora de los mismos casos se reconstruyó su subconjunto en las baterías anteriores, conservando los checks originales.
+**Lectura correcta:** el gráfico global incorpora las 21 corridas tempranas y las doce corridas LangGraph, separadas por una línea: **34 corridas indexadas, 231 conversaciones ejecutadas y 53 IDs por suite**. No mezcla esos conjuntos en una tasa de calidad. El consumo de estas 34 corridas indexadas suma USD 3.15005820, parcial por cargos faltantes tempranos. No es un inventario de todas las fases intermedias, que se conservan en el bloque 10. No se suma este subtotal con el seguimiento desde necesidades: sus alcances se solapan. Dentro del bloque temprano, las 144 ejecuciones incluyen repeticiones; hay 47 IDs por suite. La subida acumulada mide cobertura y trabajo evaluado, no una curva única de calidad. Las 63 aprobaciones históricas pertenecen a sus controles originales: no se interpreta 63/144 como calidad actual. Para observar la mejora de los mismos casos se reconstruyó su subconjunto en las baterías anteriores, conservando los checks originales.
 
 ![Los mismos tres IDs desde la batería inicial](05-resultados-y-mejoras/figuras/casos-comunes-desde-la-bateria.png)
 
@@ -336,7 +336,7 @@ Para comprobar el traslado al canal real se registra un lead de prueba en la com
 
 ## 8. Consumo real y saldo de OpenRouter
 
-**Total registrado de las 33 corridas indexadas: USD 2.92074480** (aproximadamente **USD 2.92**). Son 2.683 llamadas, 23.315.952 tokens de entrada y 344.424 de salida. Hay importe informado para 2.673/2.683 llamadas: **el histórico sigue siendo parcial**. Este índice reúne el bloque temprano y las doce corridas LangGraph; otras fases y referencias están documentadas en el bloque 10. No es saldo consultado, factura ni gasto total del proyecto; excluye desarrollo, revisión, hosting y mensajería real.
+**Total registrado de las 34 corridas indexadas: USD 3.15005820** (aproximadamente **USD 3.15**). Son 2.949 llamadas, 25.107.376 tokens de entrada y 371.845 de salida. Hay importe informado para 2.939/2.949 llamadas: **el histórico sigue siendo parcial**. Este índice reúne el bloque temprano y las doce corridas LangGraph; otras fases y referencias están documentadas en el bloque 10. No es saldo consultado, factura ni gasto total del proyecto; excluye desarrollo, revisión, hosting y mensajería real.
 
 | Etapa | Diálogos | Llamadas | Tokens entrada / salida | Costo total registrado de la etapa (USD) |
 |---|---:|---:|---:|---:|
@@ -346,7 +346,8 @@ Para comprobar el traslado al canal real se registra un lead de prueba en la com
 | Cierres/retoma | 8 | 15 | 173,013 / 2,114 | 0.02099955 |
 | Baterías/repairs | 66 | 556 | 6,467,384 / 106,761 | 0.85336740* |
 | LangGraph · doce corridas | 72 | 1.549 | 10,942,311 / 156,320 | 1.38440265 parcial |
-| **TOTAL DEL ÍNDICE · 33 CORRIDAS** | **216** | **2.683** | **23,315,952 / 344,424** | **2.92074480*** |
+| Batería ampliada · 15 guiones | 15 | 266 | 1,791,424 / 27,421 | 0.22931340 |
+| **TOTAL DEL ÍNDICE · 34 CORRIDAS** | **231** | **2.949** | **25,107,376 / 371,845** | **3.15005820*** |
 
 \* Etapa con importes faltantes. Son las mismas corridas del bloque 6, no gasto adicional. Repair 8 registró **USD 0.03150990 parciales**, con costo para 21/24 llamadas. No se presenta como ahorro completo ni como costo uniforme por conversación.
 
@@ -1194,6 +1195,20 @@ El plan original estimaba USD 0.24–0.40 para las dos repeticiones; el cuadro a
 Se conservan seis guiones originales y se añaden nueve para materiales, consultas mixtas, preferencias, agenda y continuidad. La entrega modifica el laboratorio compartido, no la política del motor ni los puntos ya medidos del histórico. Los resultados de `observation` y `expanded` se presentan separados. Se agregan controles estrictos para detectar entregas sin continuación, aceptaciones no atendidas, PDF o galería omitidos y alteración de una reserva durante consultas posteriores. No equivalen a una evaluación integral de persuasión ni a todos los casos del mapa global.
 
 [Guiones, límites y comandos de servidor](06-como-ejecutar-las-pruebas/bateria-15-guiones.md). [Validación local](05-resultados-y-mejoras/bateria-15-local/validacion.json): 67 pruebas focalizadas aprobadas y repetición final de 20 comprobaciones de ampliación, con solapamiento; preparación de 15 escenarios sin llamadas. No se hicieron llamadas pagadas locales. La medición del servidor de los nueve nuevos está pendiente.
+
+## 10.20. Primera medición de 15 guiones y corrección posterior
+
+Commit medido `69ae7fc6ed3df969ed362fad44fa1edac93e5cdc`: **4/6 originales, 3/9 añadidos, 7/15 según los controles originales**, 738 PASS y 24 FAIL, ocho citas creadas y 266 llamadas. Costo completo de esta corrida: **USD 0.22931340**, 1.791.424 tokens de entrada y 27.421 de salida. [JSON original](05-resultados-y-mejoras/sales-15-servidor/resultado.json) · [Diálogos originales](05-resultados-y-mejoras/sales-15-servidor/conversaciones.md).
+
+La revisión manual identifica falsos positivos: galería → PDF vuelve a ofrecer la galería ya enviada en dos guiones aprobados. El evaluador desconocía ese requisito. Además, el caso de financiamiento desconocido conservaba datos en la revisión publicada. No se cambia retrospectivamente el 7/15 original ni se presenta como calidad integral.
+
+La corrección consulta comprobantes de envío en mensajes del mismo ámbito además del outbox; prioriza continuación de materiales en consultas mixtas; elimina la opción silenciosa cuando corresponde invitar a visitar; amplía reparaciones literales de elección, materiales, cortesía y franjas sin elevar confianza ni crear consentimiento final. Noche se representa hasta 24:00, comprobando la duración de la visita. El laboratorio retira y restaura también la revisión publicada para su caso de información financiera ausente, y añade controles de recurso ya entregado y selección de la segunda propiedad.
+
+**Validación local:** 323 pruebas únicas focalizadas aprobadas, sin fallos pendientes, deduplicando repeticiones. Se conservan reportes iniciales y revalidaciones; tres expectativas antiguas de fin de noche a las 22:00 se actualizaron a las 24:00 solicitadas. No es una regresión completa del repositorio ni una nueva medición del modelo. [Validación](05-resultados-y-mejoras/reparacion-15-local/validacion.json) · [Comandos para repetir los 15](06-como-ejecutar-las-pruebas/repetir-15-corregidos.md).
+
+**Límite:** la reparación literal es acotada; no garantiza comprender todas las variantes naturales. Se requiere repetir los mismos 15 con el modelo desplegado. No se añaden puntos de rendimiento del código corregido sin una corrida real. Las consultas y materiales siguen requiriendo validación de ámbito, aprobación y disponibilidad.
+
+**Índice ampliado:** 34 corridas, 231 conversaciones ejecutadas y USD 3.15005820 registrado, todavía parcial por cargos históricos faltantes. El gráfico global incluye ahora la batería de 15 como cohorte distinta; la serie comparable de seis no incorpora el total de 15 como si fuera el mismo conjunto.
 
 ## 11. Trabajo futuro
 

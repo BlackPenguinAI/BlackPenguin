@@ -292,6 +292,9 @@ def select_continuations(*, outcome, commercial, metadata, previous_meta, lead, 
         from .conversation_closing import OTHER_QUESTION
         add('additional_help',OTHER_QUESTION)
         return choices
+    from .material_continuity import choices as material_choices
+    after_material=material_choices(outcome,commercial,metadata,previous_meta,holds,booked)
+    if after_material is not None:return after_material
     commercial_policy=metadata.get('commercial_policy') or {}
     if commercial_policy.get('closing'):
         closing=commercial_policy['closing']

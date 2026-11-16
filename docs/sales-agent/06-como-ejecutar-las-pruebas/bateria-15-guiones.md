@@ -1,6 +1,6 @@
 # Batería comercial de 15 guiones
 
-Versión `sales-observation-battery/2.0`. Los seis originales mantienen mensajes y controles; la ampliación tiene nueve guiones separados como `expanded-nine`. La topología y el motor comercial no se cambian en esta entrega. Los fallos actuales de continuidad o interpretación temporal se reportan como FAIL, sin relajar controles para hacer pasar el motor.
+Versión `sales-observation-battery/2.0`. Los seis originales mantienen mensajes y controles; la ampliación tiene nueve guiones separados como `expanded-nine`. Se mantiene la topología LangGraph compartida. La corrección posterior modifica interpretación acotada y continuación comercial; el histórico distingue código medido y pendiente de medir. Los fallos actuales de continuidad o interpretación temporal se reportan como FAIL, sin relajar controles para hacer pasar el motor.
 
 | Grupo | ID | Recorrido |
 |---|---|---|
@@ -20,7 +20,7 @@ Versión `sales-observation-battery/2.0`. Los seis originales mantienen mensajes
 | Continuidad | ext_booked_questions | Reservar, consultar materiales y financiamiento, despedirse sin cancelar. |
 | Continuidad | ext_long_recovery | 80 mensajes sintéticos anteriores con errores, retoma, materiales, aceptación breve y cita. |
 
-Las franjas se seleccionan explícitamente con `--period-variant afternoon` o `evening`; quedan registradas. Se preparan bloques de disponibilidad de prueba compatibles. La interpretación de noche hasta medianoche sigue siendo un requisito del motor pendiente de corregir: esta entrega amplía la medición.
+Las franjas se seleccionan explícitamente con `--period-variant afternoon` o `evening`; quedan registradas. Se preparan bloques de disponibilidad de prueba compatibles. La corrección posterior define noches como 18:00–24:00. Su comportamiento con el modelo desplegado requiere una nueva corrida.
 
 El historial largo está prefijado, identificado como semilla y no consume llamadas para generarlo. No representa todavía todos los cambios de preferencia y recursos ya enviados del mapa global. El guion de cita existente crea primero una reserva por el flujo normal y continúa después. Se registran puntuación, segmento, siguiente acción y motivo de parada de cadencia; las afirmaciones financieras y la pertinencia del segmento requieren revisión humana adicional.
 

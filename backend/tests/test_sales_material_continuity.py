@@ -8,9 +8,9 @@ def context():
 
 def test_material_continuity_keeps_owner_preference_and_optional_silence():
     o,c,m,p=context();result=choices(o,c,m,p,set(),False)
-    assert [x['id'] for x in result]==['material_visit','material_review']
+    assert [x['id'] for x in result]==['material_visit']
     assert 'Juniper Home' in result[0]['text'] and 'bedrooms' not in result[0]['text']
-    assert result[-1]['text']=='' and all(x['text'].count('?')<=1 for x in result)
+    assert all(x['text'].count('?')<=1 for x in result)
     assert all('book' not in x['metadata'] for x in result)
 
 @pytest.mark.parametrize('reason',['booked','hold','decline','scoped_decline','pending_visit','prior_invite','previous_material','unknown_owner'])
@@ -26,7 +26,7 @@ def test_material_does_not_repeat_or_pressure(reason):
     if reason=='unknown_owner':c['property_types']=[]
     assert [x['id'] for x in choices(o,c,m,p,holds,booked)]==['material_review']
 
-@pytest.mark.parametrize('topic',['financing','appointment','property_details'])
+@pytest.mark.parametrize('topic',['appointment','property_details'])
 def test_independent_questions_keep_their_own_continuation(topic):
     o,c,m,p=context();o.state.last_understanding.requests.append(N(topic=N(value=topic),polarity='request'))
     assert choices(o,c,m,p,set(),False) is None

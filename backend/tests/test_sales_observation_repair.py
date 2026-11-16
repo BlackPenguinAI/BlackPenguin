@@ -85,7 +85,7 @@ def test_and_formats_stay_independent_and_named_unknown_targets_survive():
     assert fixed.requests[0].reference_id=='fa'
 
 
-@pytest.mark.parametrize('part,expected',[('morning',('06:00','12:00')),('afternoon',('12:00','18:00')),('evening',('18:00','22:00'))])
+@pytest.mark.parametrize('part,expected',[('morning',('06:00','12:00')),('afternoon',('12:00','18:00')),('evening',('18:00','24:00'))])
 @pytest.mark.parametrize('zone',["use the property's timezone.","Please use the project timezone",'the property’s local time'])
 def test_natural_dayparts_and_project_timezone_variants(part,expected,zone):
     from app.modules.sales_agent.first_booking import normalize_timing

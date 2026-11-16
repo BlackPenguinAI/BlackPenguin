@@ -15,7 +15,7 @@ def turn_checks(row,key):
             offer=meta.get('material_offer') or {}
             add('pending_gallery_offered',any(i['binding'].get('type')=='gallery_image' for i in offer.get('items',[])))
     if action=='mixed_unknown':
-        add('unknown_financing_disclosed',any(w in reply.lower() for w in ('not available','not have','not confirmed',"don't have",'not published','not provided','unavailable')))
+        add('unknown_financing_disclosed',any(w in reply.lower() for w in ('not available','not have','not confirmed',"don't have",'not published','not provided','unavailable','do not have published')))
     if action in {'accept_material','accept_gallery'}:
         add('accepted_material_delivered',bool(bindings))
     if action=='post_material':
@@ -31,7 +31,16 @@ def turn_checks(row,key):
 def evaluate(db,manifest,result,spec):
     from app.modules.sales_crm.models import Lead,Meeting,MeetingStatus
     from app.modules.sales_agent.dialogue_store import Scope,load
-    for row in result['turns']:row['checks'].extend(turn_checks(row,result['case']))
+    sent=set()
+    for row in result['turns']:
+        row['checks'].extend(turn_checks(row,result['case']))
+        meta=row.get('metadata') or {}
+        sent.update(b['binding']['asset_id'] for b in meta.get('material_bindings',[]))
+        offered=set((meta.get('material_offer') or {}).get('asset_ids',[]))
+        row['checks'].append(check('no_offer_of_already_delivered_material',not offered&sent))
+        if result['case']=='ext_compare_layout' and row['action'] in {'choose_second','layout'}:
+            target=manifest['projects'][spec['project']]['properties'][spec['property']]['id']
+            row['checks'].append(check('second_property_remains_selected',meta.get('selected_property_type_id')==target))
     lead=db.get(Lead,result['lead_id'])
     if result['case']=='ext_bedroom_acceptance':
         _,state=load(db,Scope(manifest['company_id'],lead.project_id,result['conversation_id'],lead.id))

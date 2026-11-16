@@ -79,7 +79,12 @@ async def evaluate_case(db,manifest,key,budget,max_turns):
         from app.modules.projects.models import Project
         owner=db.get(Project,project['id']);data=deepcopy(owner.profile.profile_data or {})
         for field in ('payment_methods','financing','financing_options','payment_options'):data.pop(field,None)
-        owner.profile.profile_data=data;db.commit()
+        owner.profile.profile_data=data
+        published=deepcopy(owner.profile.published_snapshot or {})
+        for container in ('data','profile_data','facts'):
+            if isinstance(published.get(container),dict):
+                for field in ('payment_methods','financing','financing_options','payment_options'):published[container].pop(field,None)
+        owner.profile.published_snapshot=published;db.commit()
     if spec.get('long_history'):
         for n in range(80):
             db.add(SalesMessage(conversation_id=conversation.id,channel='simulation',direction='inbound' if n%2==0 else 'outbound',role='user' if n%2==0 else 'assistant',content='Earlier I was exploring another option.' if n%2==0 else 'I could not complete that request. Please try again.',status='received' if n%2==0 else 'delivered',metadata_json={'synthetic_context_seed':True},created_at=clock-timedelta(minutes=90-n)))

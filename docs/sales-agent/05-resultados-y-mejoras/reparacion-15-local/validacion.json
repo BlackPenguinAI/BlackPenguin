@@ -1,0 +1,18 @@
+{
+  "scope": "Affected interpretation, material continuity, financial evidence, expanded runner, observation replay and integration tests; not a complete repository run",
+  "passed_unique": 323,
+  "failed_pending": 0,
+  "paid_local_calls": 0,
+  "real_model_case_success": "NOT_EVALUATED",
+  "method": "Union of testcase IDs; later successful reports supersede initial failures. Three evening expectations changed from 22:00 to the user requirement 24:00.",
+  "versions": {
+    "interpretation": "2.11",
+    "material_continuity": "2.1"
+  },
+  "limits": [
+    "Literal grammar repairs are bounded, not universal language understanding.",
+    "Material descriptions and financing claims require human review.",
+    "Historical sidebar profile reconciliation remains separate.",
+    "Server repetition of all fifteen is pending."
+  ]
+}

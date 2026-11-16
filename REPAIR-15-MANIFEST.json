@@ -1,0 +1,137 @@
+{
+  "apply_after": "69ae7fc6ed3df969ed362fad44fa1edac93e5cdc",
+  "source_run": "sales-15.zip",
+  "source_sha256": "1752f578f821a9822ecd6537c8abb01f09434ea1009acf8d9947cab1e1ca01fb",
+  "validation": {
+    "scope": "Affected interpretation, material continuity, financial evidence, expanded runner, observation replay and integration tests; not a complete repository run",
+    "passed_unique": 323,
+    "failed_pending": 0,
+    "paid_local_calls": 0,
+    "real_model_case_success": "NOT_EVALUATED",
+    "method": "Union of testcase IDs; later successful reports supersede initial failures. Three evening expectations changed from 22:00 to the user requirement 24:00.",
+    "versions": {
+      "interpretation": "2.11",
+      "material_continuity": "2.1"
+    },
+    "limits": [
+      "Literal grammar repairs are bounded, not universal language understanding.",
+      "Material descriptions and financing claims require human review.",
+      "Historical sidebar profile reconciliation remains separate.",
+      "Server repetition of all fifteen is pending."
+    ]
+  },
+  "files": [
+    {
+      "path": "backend/app/modules/sales_agent/commercial_composer.py",
+      "sha256": "57d1a25b4f8bdf3df89fe26e81e31d6e080d3f6af27cea115389dfa4ef218ecc"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/complementary_material.py",
+      "sha256": "48b1677844cfddc04ff4b1f6d39c9787cdb149eb03693e0765d4dad7d17fcb95"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/contextual_answers.py",
+      "sha256": "34bfca11476cfb78dbc2e6da25b6d2770b261d3366d1909c89f713fe5f609113"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/first_booking.py",
+      "sha256": "390ab2c056e497b21c79a435f2e343b7a1c94ee724cd7c57b2f20338846fda56"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/interpretation_input.py",
+      "sha256": "820124bd77547e572d95d95b2f56c9f83c4720d2f860b3b45e9b7a65c9499709"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/material_continuity.py",
+      "sha256": "98d3ee884f5a1942212a0bb9acc52482fe388de236b468ee24de3b176bf4f26c"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/understanding_service.py",
+      "sha256": "3e4333685a97a89ef6ad648d517eb848737facf5516923111d9196f25e007f09"
+    },
+    {
+      "path": "backend/tests/test_sales_contextual_answers.py",
+      "sha256": "945ad07b716a7a626efcf37dcb0b3232f6e9a4d70091d5b86cbb342e289dab34"
+    },
+    {
+      "path": "backend/tests/test_sales_material_continuity.py",
+      "sha256": "d372c9e7a228ccacd3065d24e710191effb0a31d5768fa58637eee805aadba34"
+    },
+    {
+      "path": "backend/tests/test_sales_observation_repair.py",
+      "sha256": "7aceabe5e4c2768f8d48e258253923b85452e910f217e8e4f2869afb62cbf228"
+    },
+    {
+      "path": "backend/tests/test_sales_repair15.py",
+      "sha256": "b8b10813e5acbcc64da9274434ac2d4f6f5f018a41c53b1e1988f852a9405f2d"
+    },
+    {
+      "path": "backend/tools/sales_ai/continuity_battery.py",
+      "sha256": "1b4414e97c063cdb95c493bd90f3ad101ef648332d4e6966dc661117c775e4a1"
+    },
+    {
+      "path": "backend/tools/sales_ai/observation_battery.py",
+      "sha256": "98bc8897062dad44bec901de19fd362a95876d1b56571668bfbd8c8b854d2aa0"
+    },
+    {
+      "path": "backend/tools/sales_ai/observation_expanded_checks.py",
+      "sha256": "b02632735f8250f862a9373a6cca9cf74e6fb69d9a26ae9e7f14bf6859a36756"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/corridas.json",
+      "sha256": "8a08772afdbbe12bd2e310fb1f8e47955300b0dc45f56540e83ee5f617d3b430"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/figuras/consumo-global.png",
+      "sha256": "ed817916ced212ca22de3df7b8eff21c56e6cecf90a521a094f28bc197ee5441"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/figuras/panorama-global.png",
+      "sha256": "3c88eb0d439dc773f80f48f59c8abd822a270e5f1e858e231f83567a9983de8c"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/metricas.csv",
+      "sha256": "9098e4a1197ac0c6944a727885ebc3d68b4fd1197aabdb0e82ef8b32e25fed36"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/reparacion-15-local/repair15-last.xml",
+      "sha256": "500a1513559824ae26f5a666280ec1442af299428daa715a2514dfad160980c8"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/reparacion-15-local/repair15-night.xml",
+      "sha256": "20ca8b4ae0a61b9a66e681c6dcef4ebcfe42aec31719b5eba8a7e24c14a869f3"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/reparacion-15-local/repair15-verified.xml",
+      "sha256": "7f9de33a64d1bdffc0a731973793b2076035ac70a4e08abaae609f5021bb7f04"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/reparacion-15-local/repair15.xml",
+      "sha256": "18426f4f30e54d9ff21f6bf1020ca29c74ad6a27df491d7b89b1f8084c082784"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/reparacion-15-local/validacion.json",
+      "sha256": "6ea9cdfeeb3db40d55b684d6190b545756aa05f11ddab1dc72991d60c68937b6"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/sales-15-servidor/conversaciones.md",
+      "sha256": "f02676ff4ad8e4f13b3c2543ec2391ef03feda1a701fa63750e316a9b1b593d3"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/sales-15-servidor/resultado.json",
+      "sha256": "41c2196753b61e58888f1dc438463bf5f06bfd73d2ed6e1658bcffed393d66a1"
+    },
+    {
+      "path": "docs/sales-agent/06-como-ejecutar-las-pruebas/bateria-15-guiones.md",
+      "sha256": "cbc482c58b1e2ab1990d130c9d7fbb41d5f350f35c7eb9f2f2b1715d22a9ccd1"
+    },
+    {
+      "path": "docs/sales-agent/06-como-ejecutar-las-pruebas/repetir-15-corregidos.md",
+      "sha256": "3869612e967ca72aa2de9032b4b6c101bc6db02fba380ff483cd227a4d61940d"
+    },
+    {
+      "path": "docs/sales-agent/README.md",
+      "sha256": "36b160761f43dfe3f5e6e3815d7072e72f21e0467fbf8b326f869322a147a24d"
+    }
+  ]
+}

@@ -24,11 +24,12 @@ async def evaluate_case(db,manifest,key,budget,max_turns):
     from app.modules.projects.models import Project
     owner=db.get(Project,manifest['projects'][SPECS[key]['project']]['id'])
     original_profile=deepcopy(owner.profile.profile_data)
+    original_published=deepcopy(owner.profile.published_snapshot)
     base.SPECS[key]={**SPECS[key],'split':'observation' if key in BASELINE_CASES else 'expanded'}
     try:result=await base.evaluate_case(db,manifest,key,budget,max_turns)
     finally:
         if SPECS[key].get('unknown_financing'):
-            owner.profile.profile_data=original_profile;db.commit()
+            owner.profile.profile_data=original_profile;owner.profile.published_snapshot=original_published;db.commit()
         if prior is None:del base.SPECS[key]
         else:base.SPECS[key]=prior
     from .evaluation_checks import check

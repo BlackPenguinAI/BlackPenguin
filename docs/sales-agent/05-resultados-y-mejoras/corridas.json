@@ -2823,5 +2823,245 @@
       }
     ],
     "overall_dialogue_quality": "NOT_EVALUATED"
+  },
+  {
+    "run": "sales-dialogue-reconciliation",
+    "execution_origin": "server_submitted_synthetic_run",
+    "archive": "sales-dialogue-reconciliation.zip",
+    "sha256": "e4b00fb576feca8c729bf79a6b629072d354259111bc72ba2294b4ea8825bf85",
+    "archive_member": null,
+    "commit": "a31f75e3289717cefca45691179446e891591f42",
+    "suite": "observation",
+    "cohort": "fixed-six-observation-cases",
+    "selected_cases": [
+      "obs_alternative",
+      "obs_mixed",
+      "obs_switch",
+      "obs_interrupt",
+      "obs_time",
+      "obs_no_seller"
+    ],
+    "model": "openai/gpt-4o-mini",
+    "lead_model": null,
+    "configuration_version": 8,
+    "configuration_sha256": "51ff65376dad421328dab993a4fc71939489386f1ed173514cf13a244ac79f1c",
+    "status": "FAIL",
+    "cases": 6,
+    "approved_cases": 5,
+    "turns": 33,
+    "expected_bookings": 5,
+    "actual_bookings": 4,
+    "provider_calls": 125,
+    "prompt_tokens": 802834,
+    "completion_tokens": 11690,
+    "responses_with_cost": 125,
+    "cost_usd_recorded": 0.10384229999999998,
+    "cost_complete": true,
+    "checks_summary": {
+      "PASS": 333,
+      "FAIL": 3,
+      "BLOCKED": 0
+    },
+    "case_results": [
+      {
+        "case": "obs_alternative",
+        "status": "aprobado",
+        "meetings": 1,
+        "turns": 7,
+        "failures": 0
+      },
+      {
+        "case": "obs_mixed",
+        "status": "aprobado",
+        "meetings": 1,
+        "turns": 6,
+        "failures": 0
+      },
+      {
+        "case": "obs_switch",
+        "status": "aprobado",
+        "meetings": 1,
+        "turns": 7,
+        "failures": 0
+      },
+      {
+        "case": "obs_interrupt",
+        "status": "aprobado",
+        "meetings": 1,
+        "turns": 7,
+        "failures": 0
+      },
+      {
+        "case": "obs_time",
+        "status": "fallido",
+        "meetings": 0,
+        "turns": 3,
+        "failures": 3
+      },
+      {
+        "case": "obs_no_seller",
+        "status": "aprobado",
+        "meetings": 0,
+        "turns": 3,
+        "failures": 0
+      }
+    ],
+    "overall_dialogue_quality": "NOT_EVALUATED"
+  },
+  {
+    "run": "sales-15",
+    "execution_origin": "server_submitted_synthetic_run",
+    "archive": "sales-15.zip",
+    "sha256": "1752f578f821a9822ecd6537c8abb01f09434ea1009acf8d9947cab1e1ca01fb",
+    "archive_member": null,
+    "commit": "69ae7fc6ed3df969ed362fad44fa1edac93e5cdc",
+    "suite": "observation-expanded",
+    "cohort": "six-original-plus-nine-new",
+    "selected_cases": [
+      "obs_alternative",
+      "obs_mixed",
+      "obs_switch",
+      "obs_interrupt",
+      "obs_time",
+      "obs_no_seller",
+      "ext_gallery_pdf",
+      "ext_pdf_only",
+      "ext_pdf_financing",
+      "ext_unknown_financing",
+      "ext_bedroom_acceptance",
+      "ext_compare_layout",
+      "ext_period_ordinal",
+      "ext_booked_questions",
+      "ext_long_recovery"
+    ],
+    "model": "openai/gpt-4o-mini",
+    "lead_model": null,
+    "configuration_version": 8,
+    "configuration_sha256": "51ff65376dad421328dab993a4fc71939489386f1ed173514cf13a244ac79f1c",
+    "status": "FAIL",
+    "cases": 15,
+    "approved_cases": 7,
+    "turns": 73,
+    "expected_bookings": 9,
+    "actual_bookings": 8,
+    "provider_calls": 266,
+    "prompt_tokens": 1791424,
+    "completion_tokens": 27421,
+    "responses_with_cost": 266,
+    "cost_usd_recorded": 0.22931340000000003,
+    "cost_complete": true,
+    "checks_summary": {
+      "PASS": 738,
+      "FAIL": 24,
+      "BLOCKED": 0
+    },
+    "case_results": [
+      {
+        "case": "obs_alternative",
+        "status": "aprobado",
+        "meetings": 1,
+        "turns": 7,
+        "failures": 0
+      },
+      {
+        "case": "obs_mixed",
+        "status": "aprobado",
+        "meetings": 1,
+        "turns": 6,
+        "failures": 0
+      },
+      {
+        "case": "obs_switch",
+        "status": "fallido",
+        "meetings": 1,
+        "turns": 7,
+        "failures": 1
+      },
+      {
+        "case": "obs_interrupt",
+        "status": "aprobado",
+        "meetings": 1,
+        "turns": 7,
+        "failures": 0
+      },
+      {
+        "case": "obs_time",
+        "status": "fallido",
+        "meetings": 0,
+        "turns": 3,
+        "failures": 3
+      },
+      {
+        "case": "obs_no_seller",
+        "status": "aprobado",
+        "meetings": 0,
+        "turns": 3,
+        "failures": 0
+      },
+      {
+        "case": "ext_gallery_pdf",
+        "status": "aprobado",
+        "meetings": 1,
+        "turns": 7,
+        "failures": 0
+      },
+      {
+        "case": "ext_pdf_only",
+        "status": "fallido",
+        "meetings": 0,
+        "turns": 3,
+        "failures": 2
+      },
+      {
+        "case": "ext_pdf_financing",
+        "status": "fallido",
+        "meetings": 0,
+        "turns": 3,
+        "failures": 4
+      },
+      {
+        "case": "ext_unknown_financing",
+        "status": "fallido",
+        "meetings": 0,
+        "turns": 3,
+        "failures": 5
+      },
+      {
+        "case": "ext_bedroom_acceptance",
+        "status": "aprobado",
+        "meetings": 0,
+        "turns": 3,
+        "failures": 0
+      },
+      {
+        "case": "ext_compare_layout",
+        "status": "fallido",
+        "meetings": 0,
+        "turns": 4,
+        "failures": 5
+      },
+      {
+        "case": "ext_period_ordinal",
+        "status": "fallido",
+        "meetings": 1,
+        "turns": 4,
+        "failures": 2
+      },
+      {
+        "case": "ext_booked_questions",
+        "status": "fallido",
+        "meetings": 1,
+        "turns": 6,
+        "failures": 2
+      },
+      {
+        "case": "ext_long_recovery",
+        "status": "aprobado",
+        "meetings": 1,
+        "turns": 7,
+        "failures": 0
+      }
+    ],
+    "overall_dialogue_quality": "NOT_EVALUATED"
   }
 ]

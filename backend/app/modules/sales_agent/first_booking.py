@@ -113,7 +113,7 @@ def normalize_timing(u,text,project,now,previous):
             except ValueError:raise ValueError('Please specify the preferred local time, including AM or PM.')
         return result.strftime('%H:%M')
     relation=supplied.get('time_relation') or previous.get('time_relation','any')
-    if timing and relation in {'after','before','morning','afternoon','evening'} and not re.search(r'\b'+relation+(r's?\b' if relation in {'morning','afternoon','evening'} else r'\b'),text,re.I):
+    if timing and relation in {'after','before','morning','afternoon','evening'} and not re.search(r'\b'+('(?:evening|night)' if relation=='evening' else relation)+(r's?\b' if relation in {'morning','afternoon','evening'} else r'\b'),text,re.I):
         raise ValueError('Please clarify your preferred time of day or time range.')
     period_words={'morning':'morning','afternoon':'afternoon','evening':'evening'}
     lower_evidence=supplied.get('time_from_evidence')
@@ -121,7 +121,7 @@ def normalize_timing(u,text,project,now,previous):
     if part and relation=='any' and (not supplied.get('time_until_evidence') or re.fullmatch(r'(?:(?:any|the|in the) )?'+part+r's?',supplied['time_until_evidence'].strip(),re.I)) and not re.search(r'\b(?:after|before|between|or|not|never|except)\b|\b\d{1,2}:\d{2}\b|\b\d{1,2}\s*(?:am|pm)\b',text,re.I):
         relation=part
     if part==relation and re.search(r'\b'+part+r's?\b',text,re.I):lower_evidence=None
-    explicit_part=relation in period_words and re.search(r'\b'+relation+r's?\b',text,re.I)
+    explicit_part=relation in period_words and re.search(r'\b'+('(?:evening|night)' if relation=='evening' else relation)+r's?\b',text,re.I)
     lower=clock(lower_evidence) or (None if explicit_part else previous.get('time_from'))
     upper_evidence=supplied.get('time_until_evidence')
     if explicit_part and upper_evidence and re.fullmatch(r'(?:(?:any|the|in the) )?'+relation+r's?',upper_evidence.strip(),re.I):upper_evidence=None
@@ -129,7 +129,7 @@ def normalize_timing(u,text,project,now,previous):
     if not timing and _selected_time(text):lower=_selected_time(text).strftime('%H:%M');relation='exact'
     if relation=='morning':lower,upper=lower or '06:00',upper or '12:00'
     elif relation=='afternoon':lower,upper=lower or '12:00',upper or '18:00'
-    elif relation=='evening':lower,upper=lower or '18:00',upper or '22:00'
+    elif relation=='evening':lower,upper=lower or '18:00',upper or '24:00'
     if relation in {'exact','after','before','range'} and not lower:raise ValueError('Please specify the preferred local time, including AM or PM.')
     if relation=='range' and (not upper or upper<=lower):raise ValueError('Please specify a local time range whose end is after its start.')
     duration=previous.get('duration_minutes',45)
@@ -173,7 +173,10 @@ def search_slots(db,scope,prefs,now,*,excluded_meeting=None,allowed_user_ids=Non
         value=local_start.strftime('%H:%M');endvalue=local_end.strftime('%H:%M');kind=prefs['time_relation']
         lower,upper=prefs.get('time_from'),prefs.get('time_until')
         if kind=='exact' and value!=lower or kind=='after' and value<lower or kind=='before' and value>=lower:return False
-        if kind in {'range','morning','afternoon','evening'} and (value<lower or local_end.date()!=local_start.date() or endvalue>upper):return False
+        if kind in {'range','morning','afternoon','evening'}:
+            end_minutes=(local_end.date()-local_start.date()).days*1440+local_end.hour*60+local_end.minute
+            upper_minutes=int(upper[:2])*60+int(upper[3:])
+            if value<lower or end_minutes>upper_minutes:return False
         return True
     local=datetime.combine(first,time.min,tzinfo=zone)
     after=max(now,local.astimezone(timezone.utc).replace(tzinfo=None)-timedelta(microseconds=1))

@@ -11,6 +11,12 @@ def build(db,scope,state,metadata,channel,holds=()):
     current=[b['binding'] for b in metadata.get('material_bindings',[]) if b.get('binding')]
     if not current or not state.selected_property_type_id:return None
     sent={row[0] for row in db.query(SalesAssetShare.sales_asset_id).join(OutboundMessage,OutboundMessage.id==SalesAssetShare.outbound_message_id).filter(SalesAssetShare.company_id==scope.company_id,SalesAssetShare.project_id==scope.project_id,SalesAssetShare.lead_id==scope.lead_id,OutboundMessage.channel==channel,OutboundMessage.status.in_(['sent','delivered','read'])).all()}
+    # Simulation receipts and durable conversation metadata also record actual shares.
+    from .models import SalesMessage
+    from .conversation_scope import scoped_messages_query
+    from .dialogue_store import check_scope
+    for message in scoped_messages_query(db,check_scope(db,scope)).filter(SalesMessage.direction=='outbound',SalesMessage.status.in_(['sent','delivered','read'])).all():
+        sent.update(row['binding']['asset_id'] for row in (message.metadata_json or {}).get('material_bindings',[]) if row.get('binding'))
     sent.update(b['asset_id'] for b in current)
     want='brochure' if any(b['type']=='gallery_image' for b in current) else 'gallery_image'
     candidates=db.query(ProjectSalesAsset).filter_by(company_id=scope.company_id,project_id=scope.project_id,property_type_id=state.selected_property_type_id,asset_type=want).all()
@@ -34,5 +40,5 @@ def build(db,scope,state,metadata,channel,holds=()):
         description=asset.description
         if description:question=description.strip()+' '+question
         proposal=dict(version=VERSION,scope=scope.__dict__,expires_at=(now(datetime).replace(tzinfo=timezone.utc)+timedelta(minutes=30)).isoformat(),asset_ids=[asset.id],items=[dict(binding=binding,coverage='requested_tag',property_id=state.selected_property_type_id,task_ids=[],targets=[dict(property_id=state.selected_property_type_id,unit_id=None,subject='brochure' if want=='brochure' else 'photos')],content_types=[want])])
-        return dict(id='material_complement',text=question,metadata={'material_offer':proposal,'material_continuity':{'version':'sales-material-continuity/2.0','decision':'offer_complement','property_id':state.selected_property_type_id,'integral_dialogue_quality':'NOT_EVALUATED'}})
+        return dict(id='material_complement',text=question,metadata={'material_offer':proposal,'material_continuity':{'version':'sales-material-continuity/2.1','decision':'offer_complement','property_id':state.selected_property_type_id,'integral_dialogue_quality':'NOT_EVALUATED'}})
     return None
