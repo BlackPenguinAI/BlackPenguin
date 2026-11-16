@@ -83,7 +83,7 @@ def test_marker_does_not_hide_an_explicit_unknown_owner():
     assert fixed==u and not notes
 
 
-@pytest.mark.parametrize('part,bounds',[('morning',('06:00','12:00')),('afternoon',('12:00','18:00')),('evening',('18:00','22:00'))])
+@pytest.mark.parametrize('part,bounds',[('morning',('06:00','12:00')),('afternoon',('12:00','18:00')),('evening',('18:00','24:00'))])
 @pytest.mark.parametrize('relation',['any','part'])
 def test_repeated_daypart_in_both_clock_fields_is_a_single_range(part,bounds,relation):
     from app.modules.sales_agent.first_booking import normalize_timing
