@@ -113,18 +113,19 @@ def normalize(value,text,commercial,*,appointment_offer=None):
             data['visit']=None
             notes.append({'field':'visit','action':'property_information_is_not_visit_consent','evidence':quote})
     # Recover only a single, literal material instruction, not a mixed question.
-    material=re.fullmatch(r"\s*(?:Please )?(?:send|show)(?: me)? (?:the )?(brochure(?: PDF)?|PDF|photos?|pictures?|images?|floor plan) (?:for|of) (.+?)[.!]?\s*",own,re.I)
-    if material and own==text and not data['alternatives'] and not data['constraints']:
-        candidates=named(material[2])
-        if len(candidates)==1 and material[2].rstrip('.!').casefold()==candidates[0].casefold():
-            tag=material[1].casefold()
-            subject='brochure' if 'pdf' in tag or 'brochure' in tag else 'floor_plan' if 'floor' in tag else 'photos'
-            data.update(requests=[dict(id='explicit_material',topic='materials',subject=subject,polarity='request',evidence=text,reference_id=reference(candidates[0]))],
-                all_of=['explicit_material'],comparison=None,visit=None,appointment_query=None,selected_reference_id=None,
-                requires_clarification=False,clarification_question=None,cancellation=None,reschedule=None)
-            result=Understanding.model_validate(data).check_evidence(text)
-            if result==value:return value,[]
-            return result,[{'field':'requests','action':'preserve_literal_single_material_request','evidence':text}]
+    from .literal_material import named_request
+    material=named_request(text,commercial)
+    if material and not data['alternatives'] and not data['constraints'] and not data['releases'] and not data['wait'] and not data['moderation']:
+        name=material['quote'];key=reference(name)
+        data.update(requests=[dict(id='explicit_material',topic='materials',subject=material['subject'],polarity='request',evidence=text,reference_id=key)],
+            all_of=['explicit_material'],comparison=None,visit=None,appointment_query=None,selected_reference_id=None,
+            requires_clarification=False,clarification_question=None,cancellation=None,reschedule=None)
+        # This complete literal request has one owner and no remaining links.
+        # A replaced model reference is not a second unresolved business subject.
+        data['references']=[r for r in data['references'] if r['id']==key]
+        result=Understanding.model_validate(data).check_evidence(text)
+        if result==value:return value,notes
+        return result,[*notes,{'field':'requests','action':'preserve_literal_single_material_request','evidence':text,'confidence_unchanged':value.confidence}]
     for row in data['requests']:
         if row['topic']!='materials' or row['polarity']!='request' or row['evidence'] not in own or NEGATIVE.search(row['evidence']):continue
         candidates=named(row['evidence'])

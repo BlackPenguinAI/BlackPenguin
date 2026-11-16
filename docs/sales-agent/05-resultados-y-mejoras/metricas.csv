@@ -24,3 +24,4 @@ sales-observation-graph-observe,observation,fixed-six-observation-cases,6,4,33,5
 sales-observation-repair-1-graph-observe,observation,fixed-six-observation-cases,6,5,35,5,5,134,1002375,14553,134,0.12726404999999996,True
 sales-observation-repair-2-graph-observe,observation,fixed-six-observation-cases,6,6,35,5,5,130,919107,12762,130,0.11303684999999998,True
 sales-langgraph-integrated,observation,fixed-six-observation-cases,6,4,33,5,4,126,890431,12735,126,0.11470964999999995,True
+sales-graph-repair-1,observation,fixed-six-observation-cases,6,5,35,5,5,132,977657,14081,132,0.12615315000000002,True

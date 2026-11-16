@@ -9,7 +9,7 @@ from pydantic import Field,create_model,StrictBool
 from .understanding_contract import (Understanding,StrictModel,Reference,Request,Constraint,Comparison,Subject)
 
 VERSION='sales-interpretation-input/2.0'
-SYSTEM_VERSION='sales-interpretation-system/2.6'
+SYSTEM_VERSION='sales-interpretation-system/2.7'
 class Target(StrictModel):
     kind:Literal['property','unit','appointment','location','material','ambiguous']
     expression:str=Field(min_length=1,max_length=300)
@@ -257,3 +257,5 @@ SYSTEM += "\nDecompose formats and independent questions: 'send photos or a broc
 SYSTEM += "\nA missing target must be null; never emit punctuation such as '.', '/', '_' or '-' as a reference or financing preference. Do not use a material target for a financing question. 'Before choosing a time, can you show me photos?' is only materials/photos for the active subject: no comparison, visit or historical declarations. A bare acceptance of the latest complete booking summary has timing null and no clarification. Named unknown files or owners must remain unknown; never replace them with the active property.\n"
 
 SYSTEM += "\nBefore returning, reconcile every independent current question with requests. A financing-policy question must never be stored only as a financing preference or omitted after a malformed preference is removed. For a material OR plus financing, keep financing as an independent AND request. A pure request to visit one named property has one appointment request, visit.action=request and a current quoted target; do not create comparisons or alternatives from prior catalog entries. This is never final booking confirmation.\n"
+
+SYSTEM += "\nIn 'send the brochure for [property name]', the property is the owner, never the title of a material. Keep one current property target and the requested format; do not replay past profile fields or keep obsolete targets after rebinding. This read request is not a visit or booking confirmation.\n"

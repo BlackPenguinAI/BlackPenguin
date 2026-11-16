@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[2]
 rows=json.loads((ROOT/'05-resultados-y-mejoras/corridas.json').read_text())
-base=next(r for r in rows if r['run']=='sales-langgraph-integrated')
+base=next(r for r in rows if r['run']=='sales-graph-repair-1')
 assert base['cost_complete']
 per_turn={'calls':base['provider_calls']/base['turns'],'tokens':(base['prompt_tokens']+base['completion_tokens'])/base['turns'],'usd':base['cost_usd_recorded']/base['turns']}
 stages=[('repetir_subconjunto_referencia',3,4,8),('bateria_base',16,6,8),('variantes',32,8,12),('dialogos_largos',16,12,16),('consistencia_tres_repeticiones',48,8,12)]

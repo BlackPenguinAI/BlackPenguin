@@ -215,6 +215,19 @@ def literal_material_read(db,scope,value,text):
     if any(getattr(value,k) for k in ('visit','reschedule','cancellation','wait','moderation','appointment_query','preferences','personal_facts','preference_withdrawals','source_purposes','objections')):return False
     if len(value.requests)!=1:return False
     row=value.requests[0]
+    if row.id=='explicit_material' and row.topic.value=='materials' and row.polarity=='request' and row.evidence==text:
+        from app.modules.projects.models import Project
+        from .commercial_context import build_commercial_context
+        from .literal_material import named_request
+        from .dialogue_store import check_scope
+        conversation=check_scope(db,scope)
+        commercial=build_commercial_context(db,project=db.get(Project,scope.project_id),company_id=scope.company_id,lead_id=scope.lead_id,channel=conversation.channel)
+        target=named_request(text,commercial)
+        ref=next((r for r in value.references if r.id==row.reference_id),None)
+        if not target or not target['property_id'] or not ref or len(value.references)!=1 or ref.kind!='property' or row.subject!=target['subject']:return False
+        _,state=load(db,scope)
+        result=Resolver(db,scope,state).resolve(ref)
+        return bool(result.get('status')=='resolved' and result['value'].get('property_id')==target['property_id'] and not result['value'].get('unit_id'))
     if row.id!='current_material' or row.topic.value!='materials' or row.polarity!='request':return False
     if row.evidence!=text or row.subject not in {'photos','floor_plan'}:return False
     ref=next((r for r in value.references if r.id==row.reference_id),None)

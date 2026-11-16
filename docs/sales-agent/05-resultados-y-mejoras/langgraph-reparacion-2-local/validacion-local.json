@@ -1,0 +1,62 @@
+{
+  "base_commit": "91e902aab45e9602830dabd72778430241d6527c",
+  "source_server_run": "sales-graph-repair-1.zip",
+  "paid_calls": 0,
+  "paid_cost_usd": 0,
+  "real_model_quality_evaluated": false,
+  "orchestrator": "graph-observe",
+  "interpretation_system": "sales-interpretation-system/2.7",
+  "observation_loop": "sales-observation-loop/2.1",
+  "regression": {
+    "passed": 3796,
+    "skipped": 11,
+    "failed": 0,
+    "modules": 151,
+    "shards": [
+      {
+        "shard": 1,
+        "passed": 1164,
+        "skipped": 3
+      },
+      {
+        "shard": 2,
+        "passed": 1391,
+        "skipped": 5
+      },
+      {
+        "shard": 3,
+        "passed": 1241,
+        "skipped": 3
+      }
+    ],
+    "coverage_verifier": "PASS",
+    "note": "Shard 1 rerun after supporting name-only semantic contexts while still requiring a scoped property ID for actual read authorization."
+  },
+  "acceptance": {
+    "PASS": 63,
+    "FAIL": 0,
+    "NOT_RUN": 1
+  },
+  "sharding_unit_tests": 8,
+  "targeted_new_module": {
+    "passed": 34,
+    "replay_journeys": 12,
+    "variants_and_negative_cases": 22,
+    "overlaps_regression": true,
+    "scope": "Both autoflush modes, three names and four material phrasings; unknown owners, negation, hypothetical/reported speech, mixed actions, duplicate names and unit/asset title collisions."
+  },
+  "local_examples": {
+    "cases": 6,
+    "lead_turns": 35,
+    "bookings": 5,
+    "decision_and_composition_providers": "simulated",
+    "source_interpretations": "recorded from server"
+  },
+  "limits": [
+    "Not a new published-model result. No paid local calls.",
+    "No SMS/WhatsApp transport or external Calendar execution.",
+    "SQLite does not establish PostgreSQL concurrent booking correctness.",
+    "Literal read authorization is bounded and does not replace approved asset validation or final effect checks.",
+    "Remaining commercial phrasing and broader dialogue coverage require later evaluation."
+  ]
+}
