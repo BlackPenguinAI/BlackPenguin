@@ -45,6 +45,11 @@ async def evaluate_case(db,manifest,key,budget,max_turns):
         else:compact.SPECS[key]=original
     lead=Lead(company_id=manifest['company_id'],project_id=project['id'],full_name='Fictional continuity '+key,phone='+1555060'+str(1000+CASES.index(key) if key in CASES else 2000+int(__import__('hashlib').sha256(key.encode()).hexdigest()[:5],16)%8000),platform='evaluation',is_demo=True,is_test=True,consent_status='granted_simulation',preferred_channel='simulation',agent_status='simulation',pipeline_stage='S01_RESEARCH')
     db.add(lead);db.flush();conversation=SalesConversation(company_id=lead.company_id,project_id=lead.project_id,lead_id=lead.id,channel='simulation',provider='simulation',is_paused=False);db.add(conversation);db.commit()
+    if spec.get('ordinal'):
+        from app.modules.sales_crm.models import SalesAvailabilityBlock
+        for block in db.query(SalesAvailabilityBlock).all():
+            block.starts_at+=timedelta(hours=10 if spec.get('period_variant')=='evening' else 4);block.ends_at+=timedelta(hours=10 if spec.get('period_variant')=='evening' else 4)
+        db.commit()
     first=project['properties'][0] if spec.get('compare_switch') else prop
     initial=[('discover',f"I am looking for a {first['bedrooms']} bedroom home."),('choose',first['name']),('material','Do you have photos of the property?' if spec['material']=='photos' else 'Show me the property blueprints'),('visit',spec['visit'].format(name=prop['name']))]
     if spec.get('compare_switch'):
@@ -69,11 +74,24 @@ async def evaluate_case(db,manifest,key,budget,max_turns):
         initial=[row for row in initial if row[0] not in {'material','material_repeat'}]
     if spec.get('dialogue'):
         initial=[(a,t.format(name=prop['name'],first=first['name'])) for a,t in spec['dialogue']]
+    post=list(spec.get('post_booking') or []);post_index=0
+    if spec.get('unknown_financing'):
+        from app.modules.projects.models import Project
+        owner=db.get(Project,project['id']);data=deepcopy(owner.profile.profile_data or {})
+        for field in ('payment_methods','financing','financing_options','payment_options'):data.pop(field,None)
+        owner.profile.profile_data=data;db.commit()
+    if spec.get('long_history'):
+        for n in range(80):
+            db.add(SalesMessage(conversation_id=conversation.id,channel='simulation',direction='inbound' if n%2==0 else 'outbound',role='user' if n%2==0 else 'assistant',content='Earlier I was exploring another option.' if n%2==0 else 'I could not complete that request. Please try again.',status='received' if n%2==0 else 'delivered',metadata_json={'synthetic_context_seed':True},created_at=clock-timedelta(minutes=90-n)))
+        db.commit()
     rows=[];latest_meta={};selected=False;confirmed=False;stop='turn_limit';expected_start=None
     try:
         for i in range(max_turns):
             if budget.calls>=budget.maximum:stop='call_budget';break
             if i<len(initial):action,message=initial[i]
+            elif confirmed and post_index<len(post):
+                action,message=post[post_index];post_index+=1
+            elif spec.get('goal')=='discussion':stop='script_completed';break
             elif (spec.get('visit_invitation_context') and rows[-1]['action']=='visit'
                   and not latest_meta.get('appointment_offer') and '?' in rows[-1]['reply']
                   and any(w in rows[-1]['reply'].lower() for w in ('visit','viewing','in person'))):
@@ -84,10 +102,10 @@ async def evaluate_case(db,manifest,key,budget,max_turns):
             elif latest_meta.get('booking_confirmation'):
                 action,message='confirm','Yes';confirmed=True
             elif latest_meta.get('appointment_offer'):
-                offer=latest_meta['appointment_offer'];option=offer['options'][0];expected_start=option['starts_at']
+                offer=latest_meta['appointment_offer'];option=offer['options'][2 if spec.get('ordinal') and len(offer['options'])>=3 else 0];expected_start=option['starts_at']
                 local=datetime.fromisoformat(expected_start).astimezone(ZoneInfo(offer['preferences']['timezone']))
                 date=local.strftime('%d %B') if spec['date_style']=='day_month' else local.strftime('%d/%m') if spec['date_style']=='numeric' else local.strftime('%B %d')
-                action,message='select',date+', '+local.strftime('%I:%M%p').lstrip('0');selected=True
+                action,message='select',('Option 3' if spec.get('ordinal') and len(offer['options'])>=3 else date+', '+local.strftime('%I:%M%p').lstrip('0'));selected=True
             else:stop='missing_public_next_step';break
             if spec.get('visit_invitation_context') and action=='visit':
                 # Explicitly declared prior assistant context in this synthetic case.
@@ -149,14 +167,14 @@ async def evaluate_case(db,manifest,key,budget,max_turns):
             from app.modules.sales_agent.dialogue_models import SalesDialogueEvent
             trace=db.query(SalesDialogueEvent).filter_by(conversation_id=conversation.id,event_key='active-understanding:'+str((run.input_snapshot or {}).get('message_id'))).first()
             attempts=(trace.payload_json.get('metadata') or {}).get('interpretation_attempts',[]) if trace else []
-            rows.append({'booking_confirmation_authorization':(run.input_snapshot or {}).get('booking_confirmation_authorization'),'observation_loop':(run.input_snapshot or {}).get('observation_loop'),'runtime_error':run.error_code,'error_diagnostic':(run.output_snapshot or {}).get('error_diagnostic'),'coordinator_graph':(run.input_snapshot or {}).get('coordinator_graph'),'bounded_reconsideration':(run.input_snapshot or {}).get('bounded_reconsideration'),'elapsed_ms':round((monotonic()-started)*1000),'interpretation_attempts':attempts,'read_authorization':(run.input_snapshot or {}).get('dialogue_read_authorization'),'focused_visit_clarification':(run.input_snapshot or {}).get('focused_visit_clarification'),'turn':i+1,'action':action,'lead_message':message,'reply':reply,'understanding':(run.input_snapshot or {}).get('understanding'),'metadata':meta,'checks':checks})
-            if meetings:stop='booked';break
+            rows.append({'booking_confirmation_authorization':(run.input_snapshot or {}).get('booking_confirmation_authorization'),'observation_loop':(run.input_snapshot or {}).get('observation_loop'),'runtime_error':run.error_code,'error_diagnostic':(run.output_snapshot or {}).get('error_diagnostic'),'coordinator_graph':(run.input_snapshot or {}).get('coordinator_graph'),'bounded_reconsideration':(run.input_snapshot or {}).get('bounded_reconsideration'),'elapsed_ms':round((monotonic()-started)*1000),'interpretation_attempts':attempts,'read_authorization':(run.input_snapshot or {}).get('dialogue_read_authorization'),'focused_visit_clarification':(run.input_snapshot or {}).get('focused_visit_clarification'),'lead_projection':{'intent_score':lead.intent_score,'intent_tier':lead.intent_tier,'segment':lead.assigned_segment,'next_action_at':str(lead.next_action_at) if lead.next_action_at else None,'cadence_stop_reason':state.cadence_stop_reason},'meeting_ids':[m.id for m in meetings],'turn':i+1,'action':action,'lead_message':message,'reply':reply,'understanding':(run.input_snapshot or {}).get('understanding'),'metadata':meta,'checks':checks})
+            if meetings and (not post or post_index>=len(post)):stop='booked';break
             if spec['access']=='unassigned' and action=='visit':stop='unavailable';break
     except Exception as exc:
         exc.sales_partial_case={'case':key,'turns':rows,'checks':[check('case_completed',False)]}
         raise
     meetings=db.query(Meeting).filter_by(lead_id=lead.id).all()
-    final=[check('goal_reached',stop==('unavailable' if spec['access']=='unassigned' else 'booked')),check('at_most_one_booking',len(meetings)<=1),check('no_live_outbox',db.query(OutboundMessage).count()==0)]
+    final=[check('goal_reached',stop==('script_completed' if spec.get('goal')=='discussion' else 'unavailable' if spec['access']=='unassigned' else 'booked')),check('at_most_one_booking',len(meetings)<=1),check('no_live_outbox',db.query(OutboundMessage).count()==0)]
     if meetings:
         final.extend([check('correct_property_booked',meetings[0].visit_property_type_id==prop['id']),check('time_matches_selected_offer',meetings[0].meeting_time==datetime.fromisoformat(expected_start).replace(tzinfo=None))])
     return {'case':key,'script_version':VERSION,'context_seed':'explicit_visit_invitation' if spec.get('visit_invitation_context') else 'prior_unresolved_appointment' if spec.get('resume') else 'fresh','split':spec['split'],'lead_id':lead.id,'conversation_id':conversation.id,'turns':rows,'stop_reason':stop,'checks':final,'meetings':[{'id':m.id,'time':m.meeting_time,'property_id':m.visit_property_type_id} for m in meetings],'overall_dialogue_quality':'NOT_EVALUATED'}

@@ -44,12 +44,13 @@ def main():
     parser.add_argument('--lead-model',help='Optional OpenRouter model for the synthetic buyer; sales model stays published.')
     parser.add_argument('--max-calls',type=int,default=180,help='Global inference-call cap, not a currency cap.')
     parser.add_argument('--max-turns',type=int,default=6)
+    parser.add_argument('--period-variant',choices=['afternoon','evening'],default='afternoon',help='Recorded time-of-day variant for ext_period_ordinal.')
     parser.add_argument('--judge',action='store_true',help='Optional advisory LLM judge; also consumes call budget.')
     args=parser.parse_args()
     if args.suite in {'booking-point','commercial-point','closing-point','compact-battery','needs-discovery','continuity-battery','observation-battery'} and (args.judge or args.lead_model):parser.error('Focused suites use scripted leads and no judge.')
     if args.cases and args.suite not in {'compact-battery','needs-discovery','continuity-battery','observation-battery'}:parser.error('--cases is available only for compact-battery, needs-discovery and continuity-battery.')
     if args.suite in {'continuity-battery','observation-battery'}:
-        if args.suite=='observation-battery':from .observation_battery import CASES
+        if args.suite=='observation-battery':from .observation_battery import ALL_CASES as CASES
         else:from .continuity_battery import CASES
         if args.cases and (len(set(args.cases))!=len(args.cases) or set(args.cases)-set(CASES)):parser.error('Invalid continuity cases.')
         if args.max_turns<6:parser.error('Continuity requires at least six turns.')
@@ -75,7 +76,7 @@ def main():
         if not args.prepare_only:
             from app.db.postgres import engine
             credential=configuration(engine,args.configuration_id)
-        data={'orchestrator':args.orchestrator,'suite':args.suite,'case_selection':args.cases,'credential':credential,'prepare_only':args.prepare_only,'lead_model':args.lead_model,
+        data={'orchestrator':args.orchestrator,'suite':args.suite,'period_variant':args.period_variant,'case_selection':args.cases,'credential':credential,'prepare_only':args.prepare_only,'lead_model':args.lead_model,
               'max_calls':args.max_calls,'max_turns':args.max_turns,'judge':args.judge}
         path=Path(temporary)/'lab-options.json';path.write_text(json.dumps(data,default=encode));path.chmod(0o600)
         env=child_environment(temporary)

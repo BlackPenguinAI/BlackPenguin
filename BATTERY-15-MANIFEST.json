@@ -1,0 +1,54 @@
+{
+  "apply_after": "a31f75e reconciliation deployment and previous analysis documentation",
+  "scope": "Laboratory expansion only; runtime policy unchanged",
+  "files": [
+    {
+      "path": "backend/tests/test_sales_observation_expansion.py",
+      "sha256": "36bdea0080e239f1d8d2b7b149ce8057d93f8e8dd934d8d097ff1d3a180ffef9"
+    },
+    {
+      "path": "backend/tools/sales_ai/booking_pilot_worker.py",
+      "sha256": "dea540a30e6956a6ee48c98436fe0a11811a5068ab369d745cda0ae873d4251f"
+    },
+    {
+      "path": "backend/tools/sales_ai/continuity_battery.py",
+      "sha256": "00708943004fb063dd214f033c58ed40ecdecc51da2d03373e1024c0636836ca"
+    },
+    {
+      "path": "backend/tools/sales_ai/observation_battery.py",
+      "sha256": "43ee74a6c730e40d5a28c1a4f7e25236cb30948648789dbdf3989ab04e40e7e5"
+    },
+    {
+      "path": "backend/tools/sales_ai/observation_expanded_checks.py",
+      "sha256": "637c223c150f20d85191e60793bd59cd9ba201c353920b93e2a47badd17b462f"
+    },
+    {
+      "path": "backend/tools/sales_ai/observation_expansion.json",
+      "sha256": "eedf35dc6d98cfb0cab2204c500b9a04fa96f01bf69eca093b59a5b09fea8c02"
+    },
+    {
+      "path": "backend/tools/sales_ai/synthetic_lab.py",
+      "sha256": "dc4cb26464299e9de98f75edacba1c64c055bc294d287e324d925d1356a2098e"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/bateria-15-local/ampliacion-junit.xml",
+      "sha256": "e1437edc46361488ef213caf8f874dd23b4affa1df02cdcdae4e8daaa02a51b3"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/bateria-15-local/validacion.json",
+      "sha256": "c0524137d666a1a19c4160c350ccad9b9f058a559af8e22a392ecbf9e5b5707b"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/metricas.csv",
+      "sha256": "491171b780da3dadc79ee5a8d5154c9102d4e1971c58e65eee53bf4ce129b000"
+    },
+    {
+      "path": "docs/sales-agent/06-como-ejecutar-las-pruebas/bateria-15-guiones.md",
+      "sha256": "8719c72c16ddf2518b8bfde9e901409c986c23e11472690f2416a0591edc0ca9"
+    },
+    {
+      "path": "docs/sales-agent/README.md",
+      "sha256": "30703c5e9c87eb729c7cd31cb4f93973a61d91e8c52dd585954d3d68e1620ac7"
+    }
+  ]
+}

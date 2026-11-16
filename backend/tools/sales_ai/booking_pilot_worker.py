@@ -53,8 +53,15 @@ def run(options_path, output):
         if selection and (len(set(selection))!=len(selection) or set(selection)-set(CASES)):raise ValueError('Invalid needs discovery selection.')
         CASES=tuple(selection or CASES)
     if continuity:
-        if observation:from .observation_battery import CASES,evaluate_case,VERSION,SPECS
+        if observation:from .observation_battery import ALL_CASES as CASES,evaluate_case,VERSION,SPECS
         else:from .continuity_battery import CASES,evaluate_case,VERSION,SPECS
+        if observation:
+            from copy import deepcopy
+            SPECS['ext_period_ordinal']=deepcopy(SPECS['ext_period_ordinal'])
+            period=options.get('period_variant','afternoon')
+            if period not in {'afternoon','evening'}:raise ValueError('Invalid period variant.')
+            SPECS['ext_period_ordinal']['period_variant']=period
+            SPECS['ext_period_ordinal']['dialogue']=[(a,t.replace('any afternoon','any '+period)) for a,t in SPECS['ext_period_ordinal']['dialogue']]
         selection=options.get('case_selection')
         if selection and (len(set(selection))!=len(selection) or set(selection)-set(CASES)):raise ValueError('Invalid continuity selection.')
         CASES=tuple(selection or CASES)
@@ -124,7 +131,7 @@ def run(options_path, output):
                         'observation_decisions':sum(len((t.get('observation_loop') or {}).get('decisions',[])) for t in turns),
                         'observation_rounds':sum((t.get('observation_loop') or {}).get('rounds',0) for t in turns)}
                     report.update(overall_dialogue_quality='NOT_EVALUATED',quality_scope='Continuity, material ownership and first-booking checks only; human review remains necessary.',cost_reporting_complete=budget.usage['responses_with_cost']==budget.calls)
-                    report['split_results']={split:{'cases':sum(c.get('split')==split for c in report['cases']),'passed':sum(c.get('split')==split and all(k['status']=='PASS' for t in c.get('turns',[]) for k in t.get('checks',[])) and all(k['status']=='PASS' for k in c.get('checks',[])) for c in report['cases'])} for split in ('development','transfer','resumption','contextual','observation')}
+                    report['split_results']={split:{'cases':sum(c.get('split')==split for c in report['cases']),'passed':sum(c.get('split')==split and all(k['status']=='PASS' for t in c.get('turns',[]) for k in t.get('checks',[])) and all(k['status']=='PASS' for k in c.get('checks',[])) for c in report['cases'])} for split in ('development','transfer','resumption','contextual','observation','expanded')}
                 if needs:
                     report.update(overall_dialogue_quality='NOT_EVALUATED',quality_scope='Needs-first checks only; no integral dialogue certification.',cost_reporting_complete=budget.usage['responses_with_cost']==budget.calls)
                 report.update(provider_calls=budget.calls,provider_usage=budget.usage,scenario_count=len(report['cases']),

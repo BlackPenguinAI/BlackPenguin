@@ -1,0 +1,16 @@
+{
+  "suite": "sales-observation-battery/2.0",
+  "baseline_cases": 6,
+  "added_cases": 9,
+  "prepared_cases": 15,
+  "focused_tests_passed": 67,
+  "final_expansion_tests_passed": 20,
+  "counts_overlap": true,
+  "paid_local_calls": 0,
+  "commercial_case_success_measured": false,
+  "notes": [
+    "Mocks validate execution and strict FAIL reporting, not real-model quality.",
+    "Complete repository regression was not rerun for this laboratory-only change.",
+    "Runtime material policy and temporal defects remain unchanged."
+  ]
+}

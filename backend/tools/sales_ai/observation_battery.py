@@ -1,6 +1,6 @@
 """Six short scripted journeys exercising result-driven decisions, no buyer LLM."""
 from . import continuity_battery as base
-VERSION='sales-observation-battery/1.3'
+VERSION='sales-observation-battery/2.0'
 SPECS={
  'obs_alternative':dict(project=1,property=1,access='selected',material='photos',date_style='numeric',visit='Can I visit {name}?',dialogue=[('discover','I am looking for a 1 bedroom home.'),('choose','{name}'),('material','Do you have photos of the property?'),('accept_material','Please send the brochure instead.'),('visit','Can I visit {name}?')]),
  'obs_mixed':dict(project=0,property=0,access='all',material='photos',date_style='month_day',visit='Can I visit {name}?',dialogue=[('discover','I am looking for a 4 bedroom home.'),('choose','{name}'),('material','Could you send photos or a brochure and explain the financing options?'),('visit','Can I visit {name}?')]),
@@ -9,13 +9,26 @@ SPECS={
  'obs_time':dict(project=0,property=0,access='all',material='photos',date_style='month_day',visit='Can I visit {name}?',dialogue=[('discover','I am looking for a 4 bedroom home.'),('choose','{name}'),('visit',"I would like a visit any morning in the next seven days; use the property's timezone.")]),
  'obs_no_seller':dict(project=2,property=0,access='unassigned',material='photos',date_style='numeric',visit='Can I visit {name}?',dialogue=[('discover','I am looking for a 3 bedroom home.'),('choose','{name}'),('visit','Can I visit {name}?')]),
 }
-CASES=tuple(SPECS)
+BASELINE_CASES=tuple(SPECS)
+import json
+from pathlib import Path
+EXPANSION=json.loads(Path(__file__).with_name('observation_expansion.json').read_text())['cases']
+for key,spec in EXPANSION.items():
+    SPECS[key]=dict(access='all',material='brochure',date_style='numeric',visit='Can I visit {name}?',**spec)
+ALL_CASES=tuple(SPECS)
+CASES=BASELINE_CASES  # Stable original cohort for historical replay callers.
 
 async def evaluate_case(db,manifest,key,budget,max_turns):
     prior=base.SPECS.get(key)
-    base.SPECS[key]={**SPECS[key],'split':'observation'}
+    from copy import deepcopy
+    from app.modules.projects.models import Project
+    owner=db.get(Project,manifest['projects'][SPECS[key]['project']]['id'])
+    original_profile=deepcopy(owner.profile.profile_data)
+    base.SPECS[key]={**SPECS[key],'split':'observation' if key in BASELINE_CASES else 'expanded'}
     try:result=await base.evaluate_case(db,manifest,key,budget,max_turns)
     finally:
+        if SPECS[key].get('unknown_financing'):
+            owner.profile.profile_data=original_profile;db.commit()
         if prior is None:del base.SPECS[key]
         else:base.SPECS[key]=prior
     from .evaluation_checks import check
@@ -41,5 +54,11 @@ async def evaluate_case(db,manifest,key,budget,max_turns):
         from app.modules.sales_agent.wait_models import SalesWaitRequest
         pending=db.query(SalesWaitRequest).filter_by(company_id=manifest['company_id'],lead_id=result['lead_id']).count()
         result['checks'].append(check('no_wait_created_without_lead_consent',pending==0))
+    result['period_variant']=SPECS[key].get('period_variant')
+    result['cohort']='baseline-six' if key in BASELINE_CASES else 'expanded-nine'
+    result['capability_group']=SPECS[key].get('group','baseline')
+    if key in EXPANSION:
+        from .observation_expanded_checks import evaluate
+        evaluate(db,manifest,result,SPECS[key])
     result['script_version']=VERSION
     return result

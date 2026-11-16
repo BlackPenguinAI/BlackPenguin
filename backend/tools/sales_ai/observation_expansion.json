@@ -1,0 +1,211 @@
+{
+  "version": "sales-observation-expansion/1.0",
+  "cases": {
+    "ext_gallery_pdf": {
+      "group": "materials",
+      "project": 0,
+      "property": 0,
+      "goal": "booked",
+      "dialogue": [
+        [
+          "discover",
+          "I am looking for a 4 bedroom home."
+        ],
+        [
+          "choose",
+          "{name}"
+        ],
+        [
+          "material",
+          "Show me photos"
+        ],
+        [
+          "accept_material",
+          "Yes, send it"
+        ],
+        [
+          "visit",
+          "I would like to visit {name}."
+        ]
+      ]
+    },
+    "ext_pdf_only": {
+      "group": "materials",
+      "project": 1,
+      "property": 1,
+      "goal": "discussion",
+      "dialogue": [
+        [
+          "choose",
+          "{name}"
+        ],
+        [
+          "material",
+          "Send me the brochure"
+        ],
+        [
+          "followup",
+          "I prefer to ask questions before visiting. What is the layout like?"
+        ]
+      ]
+    },
+    "ext_pdf_financing": {
+      "group": "consultative",
+      "project": 0,
+      "property": 0,
+      "goal": "discussion",
+      "dialogue": [
+        [
+          "choose",
+          "{name}"
+        ],
+        [
+          "mixed",
+          "Send me the brochure and explain financing."
+        ],
+        [
+          "accept_gallery",
+          "Yes, send the gallery"
+        ]
+      ]
+    },
+    "ext_unknown_financing": {
+      "group": "consultative",
+      "project": 0,
+      "property": 0,
+      "goal": "discussion",
+      "unknown_financing": true,
+      "dialogue": [
+        [
+          "choose",
+          "{name}"
+        ],
+        [
+          "mixed_unknown",
+          "Send me the brochure and tell me the mortgage rates and monthly payments."
+        ],
+        [
+          "objection",
+          "That is too expensive. My budget is 500,000 USD. What alternatives do you have?"
+        ]
+      ]
+    },
+    "ext_bedroom_acceptance": {
+      "group": "preferences",
+      "project": 0,
+      "property": 0,
+      "goal": "discussion",
+      "dialogue": [
+        [
+          "discover",
+          "I am looking for a 2 bedroom home."
+        ],
+        [
+          "accept_bedrooms",
+          "4 it’s good for me"
+        ],
+        [
+          "choose",
+          "{name}"
+        ]
+      ]
+    },
+    "ext_compare_layout": {
+      "group": "preferences",
+      "project": 1,
+      "property": 1,
+      "goal": "discussion",
+      "compare_switch": true,
+      "dialogue": [
+        [
+          "discover",
+          "Show me the homes in this project"
+        ],
+        [
+          "compare",
+          "Compare the first two options"
+        ],
+        [
+          "choose_second",
+          "The second one"
+        ],
+        [
+          "layout",
+          "The layout of the rooms"
+        ]
+      ]
+    },
+    "ext_period_ordinal": {
+      "group": "appointment",
+      "project": 0,
+      "property": 0,
+      "goal": "booked",
+      "ordinal": true,
+      "dialogue": [
+        [
+          "choose",
+          "{name}"
+        ],
+        [
+          "visit",
+          "I would like to visit any afternoon in the next seven days, in the property timezone."
+        ]
+      ]
+    },
+    "ext_booked_questions": {
+      "group": "continuity",
+      "project": 0,
+      "property": 0,
+      "goal": "booked",
+      "post_booking": [
+        [
+          "post_material",
+          "Please send the brochure and explain financing"
+        ],
+        [
+          "farewell",
+          "No, it’s ok. Thanks, bye."
+        ]
+      ],
+      "dialogue": [
+        [
+          "choose",
+          "{name}"
+        ],
+        [
+          "visit",
+          "Can I visit {name}?"
+        ]
+      ]
+    },
+    "ext_long_recovery": {
+      "group": "continuity",
+      "project": 0,
+      "property": 0,
+      "goal": "booked",
+      "long_history": true,
+      "dialogue": [
+        [
+          "greeting",
+          "Hi"
+        ],
+        [
+          "choose",
+          "{name}"
+        ],
+        [
+          "material",
+          "Show me photos"
+        ],
+        [
+          "accept_material",
+          "Ok"
+        ],
+        [
+          "visit",
+          "I want to visit {name}"
+        ]
+      ]
+    }
+  }
+}

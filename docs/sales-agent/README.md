@@ -283,7 +283,7 @@ flowchart TD
 
 ![Historia global y cobertura](05-resultados-y-mejoras/figuras/panorama-global.png)
 
-**Lectura correcta:** el gráfico global incorpora las 21 corridas tempranas y las once corridas LangGraph, separadas por una línea: **32 corridas indexadas, 210 conversaciones ejecutadas y 53 IDs por suite**. No mezcla esos conjuntos en una tasa de calidad. El consumo de estas 32 corridas indexadas suma USD 2.81690250, parcial por cargos faltantes tempranos. No es un inventario de todas las fases intermedias, que se conservan en el bloque 10. No se suma este subtotal con el seguimiento desde necesidades: sus alcances se solapan. Dentro del bloque temprano, las 144 ejecuciones incluyen repeticiones; hay 47 IDs por suite. La subida acumulada mide cobertura y trabajo evaluado, no una curva única de calidad. Las 63 aprobaciones históricas pertenecen a sus controles originales: no se interpreta 63/144 como calidad actual. Para observar la mejora de los mismos casos se reconstruyó su subconjunto en las baterías anteriores, conservando los checks originales.
+**Lectura correcta:** el gráfico global incorpora las 21 corridas tempranas y las doce corridas LangGraph, separadas por una línea: **33 corridas indexadas, 216 conversaciones ejecutadas y 53 IDs por suite**. No mezcla esos conjuntos en una tasa de calidad. El consumo de estas 33 corridas indexadas suma USD 2.92074480, parcial por cargos faltantes tempranos. No es un inventario de todas las fases intermedias, que se conservan en el bloque 10. No se suma este subtotal con el seguimiento desde necesidades: sus alcances se solapan. Dentro del bloque temprano, las 144 ejecuciones incluyen repeticiones; hay 47 IDs por suite. La subida acumulada mide cobertura y trabajo evaluado, no una curva única de calidad. Las 63 aprobaciones históricas pertenecen a sus controles originales: no se interpreta 63/144 como calidad actual. Para observar la mejora de los mismos casos se reconstruyó su subconjunto en las baterías anteriores, conservando los checks originales.
 
 ![Los mismos tres IDs desde la batería inicial](05-resultados-y-mejoras/figuras/casos-comunes-desde-la-bateria.png)
 
@@ -336,7 +336,7 @@ Para comprobar el traslado al canal real se registra un lead de prueba en la com
 
 ## 8. Consumo real y saldo de OpenRouter
 
-**Total registrado de las 32 corridas indexadas: USD 2.81690250** (aproximadamente **USD 2.82**). Son 2.558 llamadas, 22.513.118 tokens de entrada y 332.734 de salida. Hay importe informado para 2.548/2.558 llamadas: **el histórico sigue siendo parcial**. Este índice reúne el bloque temprano y las once corridas LangGraph; otras fases y referencias están documentadas en el bloque 10. No es saldo consultado, factura ni gasto total del proyecto; excluye desarrollo, revisión, hosting y mensajería real.
+**Total registrado de las 33 corridas indexadas: USD 2.92074480** (aproximadamente **USD 2.92**). Son 2.683 llamadas, 23.315.952 tokens de entrada y 344.424 de salida. Hay importe informado para 2.673/2.683 llamadas: **el histórico sigue siendo parcial**. Este índice reúne el bloque temprano y las doce corridas LangGraph; otras fases y referencias están documentadas en el bloque 10. No es saldo consultado, factura ni gasto total del proyecto; excluye desarrollo, revisión, hosting y mensajería real.
 
 | Etapa | Diálogos | Llamadas | Tokens entrada / salida | Costo total registrado de la etapa (USD) |
 |---|---:|---:|---:|---:|
@@ -345,8 +345,8 @@ Para comprobar el traslado al canal real se registra un lead de prueba en la com
 | Comercial | 16 | 69 | 770,886 / 8,539 | 0.09009390 |
 | Cierres/retoma | 8 | 15 | 173,013 / 2,114 | 0.02099955 |
 | Baterías/repairs | 66 | 556 | 6,467,384 / 106,761 | 0.85336740* |
-| LangGraph · once corridas | 66 | 1.424 | 10,139,477 / 144,630 | 1.28056035 parcial |
-| **TOTAL DEL ÍNDICE · 32 CORRIDAS** | **210** | **2.558** | **22,513,118 / 332,734** | **2.81690250*** |
+| LangGraph · doce corridas | 72 | 1.549 | 10,942,311 / 156,320 | 1.38440265 parcial |
+| **TOTAL DEL ÍNDICE · 33 CORRIDAS** | **216** | **2.683** | **23,315,952 / 344,424** | **2.92074480*** |
 
 \* Etapa con importes faltantes. Son las mismas corridas del bloque 6, no gasto adicional. Repair 8 registró **USD 0.03150990 parciales**, con costo para 21/24 llamadas. No se presenta como ahorro completo ni como costo uniforme por conversación.
 
@@ -1011,7 +1011,8 @@ La figura compara las mismas seis situaciones, con controles internos adicionale
 | Estabilidad 2 `14bb98b` | 133 | 0.11940990 | Completo para esta corrida. |
 | Contexto reservado `db92e4e` | 127 | 0.10412190 | Completo para esta corrida. |
 | Materiales 1 `c9a90be` | 125 | 0.09906675 | Parcial: 123/125 cargos. |
-| **SUMA HISTÓRICA INFORMADA** | **2.595** | **2.97246885** | **Parcial; excluye además fases previas no detalladas aquí.** |
+| Reconciliación `a31f75e` | 125 | 0.10384230 | Completo: 125/125 cargos. |
+| **SUMA HISTÓRICA INFORMADA** | **2.720** | **3.07631115** | **Parcial; excluye además fases previas no detalladas aquí.** |
 | Reparación y pruebas locales | 0 pagadas | 0.00000000 | Sin llamadas a OpenRouter. |
 
 | Próxima repetición, todavía no ejecutada | Alcance | Total USD estimado por fila |
@@ -1173,6 +1174,26 @@ El plan original estimaba USD 0.24–0.40 para las dos repeticiones; el cuadro a
 **Validación local:** 3,917 pruebas aprobadas, 11 omitidas y cero fallos pendientes en 156 módulos. Incluye 23 pruebas nuevas; se deduplicaron ejecuciones repetidas. El primer barrido conservó una expectativa antigua del cierre; el módulo completo se repitió con la expectativa actualizada. [Resultados y reportes](05-resultados-y-mejoras/reconciliacion-dialogo-local/validacion-local.json). Los proveedores locales son simulados.
 
 **Consumo planificado:** próxima batería corta **USD 0.10–0.20 total estimado**, sin tope monetario garantizado. No se consumió saldo local del modelo. [Comandos de servidor y descarga](06-como-ejecutar-las-pruebas/reconciliacion-dialogo.md).
+
+## 10.18. Medición de reconciliación recibida del servidor
+
+`sales-dialogue-reconciliation.zip`, commit `a31f75e3289717cefca45691179446e891591f42`, LangGraph `graph-observe`, modelo `openai/gpt-4o-mini`, configuración publicada 8. Resultado: **5/6 casos**, **4/5 citas esperadas**, **333 PASS / 3 FAIL**, 33 turnos y 125 llamadas. Costo completo de esta corrida: **USD 0.10384230**, 802.834 tokens de entrada y 11.690 de salida. El histórico acumulado sigue siendo parcial. [Resultado original](05-resultados-y-mejoras/sales-dialogue-reconciliation/resultado.json) · [Diálogos legibles](05-resultados-y-mejoras/sales-dialogue-reconciliation/conversaciones.md).
+
+**Resultado objetivo:** no aumenta la tasa de casos aprobados frente a Materiales 1. Se observa una mejora puntual: al compartir la galería de Bay Residence se ofrece el PDF pendiente con una propuesta válida. En cambio, Cedar Studio termina dos envíos sin pregunta de continuación porque el compositor elige `material_review` / `allow_review`. Esa opción quedó demasiado permisiva para el comportamiento solicitado y necesita ajuste.
+
+**Consulta mixta:** el motor detecta una galería complementaria pendiente, pero el cierre de financiamiento prevalece y propone la visita. La respuesta contesta la consulta financiera; no aplica la secuencia de materiales pedida. Deben combinarse la respuesta independiente y una sola pregunta de continuación pertinente.
+
+**Fallo temporal:** los tres controles fallidos pertenecen a `obs_time`, no a tres leads diferentes. En el primer intento el modelo inventa `America/New_York` como cita de evidencia y omite la solicitud ejecutable de cita. En el segundo repite el mensaje completo en campos de fecha y hora; pasa la comprobación de cita textual, pero el lector temporal rechaza esa frase como hora. El motor pregunta AM/PM pese a que el lead ya pidió mañanas. No hubo una excepción final de ejecución; hubo una aclaración innecesaria y el guion se detuvo.
+
+**Límites de esta batería:** son seis guiones fijos. No incluye la aceptación breve del PDF ofrecido con «Yes/Ok», las selecciones ordinales breves, las despedidas después de reservar ni una aserción de puntuación/segmento/seguimiento del panel. Por tanto, no valida esas mejoras en el modelo desplegado. `overall_dialogue_quality` permanece `NOT_EVALUATED`. Transporte real, Calendar y concurrencia PostgreSQL tampoco se ejercitan.
+
+**Siguiente trabajo:** reparar la representación temporal sin convertir franjas válidas en exigencias de hora exacta; hacer obligatorio un cierre comercial pertinente tras materiales cuando no hay una razón real para omitirlo; ampliar las variantes de aceptación, ordinales, cortesía, historial largo y proyección de perfil. Mantener separados los resultados de los seis guiones originales y los de las variantes nuevas.
+
+## 10.19. Ampliación a 15 guiones, todavía sin medición del servidor
+
+Se conservan seis guiones originales y se añaden nueve para materiales, consultas mixtas, preferencias, agenda y continuidad. La entrega modifica el laboratorio compartido, no la política del motor ni los puntos ya medidos del histórico. Los resultados de `observation` y `expanded` se presentan separados. Se agregan controles estrictos para detectar entregas sin continuación, aceptaciones no atendidas, PDF o galería omitidos y alteración de una reserva durante consultas posteriores. No equivalen a una evaluación integral de persuasión ni a todos los casos del mapa global.
+
+[Guiones, límites y comandos de servidor](06-como-ejecutar-las-pruebas/bateria-15-guiones.md). [Validación local](05-resultados-y-mejoras/bateria-15-local/validacion.json): 67 pruebas focalizadas aprobadas y repetición final de 20 comprobaciones de ampliación, con solapamiento; preparación de 15 escenarios sin llamadas. No se hicieron llamadas pagadas locales. La medición del servidor de los nueve nuevos está pendiente.
 
 ## 11. Trabajo futuro
 
