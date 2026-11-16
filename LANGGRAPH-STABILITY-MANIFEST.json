@@ -1,0 +1,66 @@
+{
+  "base_commit": "94f72bc9849555460893ebfe45f699e16b37b22c",
+  "engine_changes": false,
+  "files": [
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/corridas.json",
+      "sha256": "b7b315816504cb68593a76a4bde3ba45cc7736883e7cc2be9a988173e17497b7"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/figuras/consumo-global.png",
+      "sha256": "f5040664defcca67b35094a8ff708d53ff12366dc322723dd97b1090ac3c4145"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/figuras/panorama-global.png",
+      "sha256": "adfd7ba848734f1453ba53588a4409449a4a4b883ffc5d15289397ce7af1d029"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/langgraph-integrado/consumo-cuatro-corridas.png",
+      "sha256": "ee30941b89b223925d2cefc38073f8140e149e21a49bc0c81861dcbdda92a821"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/langgraph-integrado/evolucion-seis-casos.png",
+      "sha256": "5be63546ed91713f6aac64819217e3e49c13baf04fd42485a74b229961f45200"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/langgraph-integrado/evolucion.py",
+      "sha256": "6d4ab6f36c169d30e2104b650bc4e5664c63cca156de505242d49c8695e1514a"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/langgraph-integrado/historico-servidor.json",
+      "sha256": "e90656771e7ec69a7cebfecc05cbf478c08fd12dc2a3c6f3796b9db85be61cb6"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/langgraph-reparacion-3-servidor/conversaciones.md",
+      "sha256": "a3afc84ef91f12c4adad38b07d6a2439bb6cb8363229caadb1b11a6aab01c308"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/langgraph-reparacion-3-servidor/resultado.json",
+      "sha256": "c27487a49ef155bf41d1f1bdfeae712b525968c26c64d6708497cdc4e7eb0d18"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/langgraph-reparacion-3-servidor/verificacion-documentacion.json",
+      "sha256": "a96dd21df8767a13986c28af771f5b2078b8d510d9a2b75d6041b34b7047b29c"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/metricas.csv",
+      "sha256": "71e43ac463f324e0f7e385a52ef7b57db8d84ce065fe30bcd9d6e4a152c261e9"
+    },
+    {
+      "path": "docs/sales-agent/06-como-ejecutar-las-pruebas/ejecutar-estabilidad-langgraph.sh",
+      "sha256": "24c8fba32c5563d3e8f7117c6f81e995998d46a2ab305b9e0d03e14f9f05c44c"
+    },
+    {
+      "path": "docs/sales-agent/06-como-ejecutar-las-pruebas/estabilidad-langgraph.md",
+      "sha256": "86a153644d7c0c3fc482b163ac524512dacc04325e204ac177c324e25de28ec0"
+    },
+    {
+      "path": "docs/sales-agent/06-como-ejecutar-las-pruebas/herramientas/generar_graficas.py",
+      "sha256": "cb1ffdd26c7750500bff7284b3b26aeee47b8b73ed95b9e3a1de348b92ccf6b1"
+    },
+    {
+      "path": "docs/sales-agent/README.md",
+      "sha256": "e2a0a1c5773a3185bbeb6637e51996b302f03e71d1c5d8fe05e6449190a3c511"
+    }
+  ]
+}

@@ -26,3 +26,4 @@ sales-observation-repair-2-graph-observe,observation,fixed-six-observation-cases
 sales-langgraph-integrated,observation,fixed-six-observation-cases,6,4,33,5,4,126,890431,12735,126,0.11470964999999995,True
 sales-graph-repair-1,observation,fixed-six-observation-cases,6,5,35,5,5,132,977657,14081,132,0.12615315000000002,True
 sales-graph-repair-2,observation,fixed-six-observation-cases,6,4,35,5,5,128,967248,13661,128,0.124119,True
+sales-graph-repair-3,observation,fixed-six-observation-cases,6,6,35,5,5,133,962969,13924,133,0.12100455000000002,True

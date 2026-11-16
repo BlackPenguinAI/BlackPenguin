@@ -2,13 +2,13 @@
 
 [Inicio del repositorio](../../README.md) · [Datos JSON](02-datos-de-prueba/) · [Conversaciones](04-conversaciones/) · [Evidencia de corridas](05-resultados-y-mejoras/)
 
-**Historial temprano: corte 11/11/2026; continuidad LangGraph recibida el 15/11/2026.** Se reúne el trabajo del ciclo reciente con data sintética: **21 corridas del servidor, 144 conversaciones ejecutadas y 47 IDs de escenario distintos por suite**. Las repeticiones son parte del trabajo, no escenarios adicionales. En la batería compacta 2, **13/16 conversaciones cumplieron los checks originales y se registraron 7/8 visitas esperadas**; eso no certifica la calidad integral de esos diálogos. En el último subconjunto, Repair 8, **2/3 conversaciones cumplieron sus checks y se registró 1/2 visitas**: vivienda mayor y fotos ausentes se recuperaron; diversificación falló con tiempos de espera del modelo. No se mezclan ambos conjuntos como si fueran una nueva batería completa.
+**Historial temprano: corte 11/11/2026; continuidad LangGraph recibida hasta el 16/11/2026.** Se reúne el trabajo del ciclo reciente con data sintética: **21 corridas del servidor, 144 conversaciones ejecutadas y 47 IDs de escenario distintos por suite**. Las repeticiones son parte del trabajo, no escenarios adicionales. En la batería compacta 2, **13/16 conversaciones cumplieron los checks originales y se registraron 7/8 visitas esperadas**; eso no certifica la calidad integral de esos diálogos. En el último subconjunto, Repair 8, **2/3 conversaciones cumplieron sus checks y se registró 1/2 visitas**: vivienda mayor y fotos ausentes se recuperaron; diversificación falló con tiempos de espera del modelo. No se mezclan ambos conjuntos como si fueran una nueva batería completa.
 
-**Estado actual · LangGraph integrado.** La corrida `400593e` registra **4/6 conversaciones sin controles fallidos y 5/5 citas esperadas**. El folleto explícito se entrega directamente; fallan el cambio de propiedad y la consulta combinada de materiales y financiamiento. Las citas posteriores no borran esos fallos. Esta entrega corrige esos dos patrones con variantes sintéticas; el resultado del modelo publicado después del despliegue sigue pendiente.
+**Estado actual · LangGraph integrado.** La corrida `94f72bc` registra **6/6 conversaciones sin controles fallidos y 5/5 citas esperadas**, con 352 controles PASS y ninguno FAIL. Se resolvieron el cambio explícito de propiedad y la consulta combinada de materiales y financiamiento. Es evidencia del modelo publicado en el laboratorio del servidor, no aprobación integral de diálogos reales. El siguiente paso son dos repeticiones idénticas, todavía pendientes; esta entrega documenta y prepara esa comprobación sin modificar el motor.
 
 ![Evolución funcional de los mismos seis casos con LangGraph](05-resultados-y-mejoras/langgraph-integrado/evolucion-seis-casos.png)
 
-La curva conserva **4/6 → 5/6 → 6/6 → 4/6 → 5/6 → 4/6**, todos con los seis guiones de observaciones y el mismo modelo/configuración publicada. Evolucionaron criterios y contexto de ejecución; no es una estimación de conversión comercial. **Total de estas seis corridas LangGraph: 777 llamadas y USD 0.71762925**. La reparación local no añade un punto de éxito al gráfico. [Datos de la curva](05-resultados-y-mejoras/langgraph-integrado/historico-servidor.json).
+La curva conserva **4/6 → 5/6 → 6/6 → 4/6 → 5/6 → 4/6 → 6/6**, todos con los seis guiones de observaciones y el mismo modelo/configuración publicada. Evolucionaron criterios y contexto de ejecución; no es una estimación de conversión comercial. **Total de estas siete corridas LangGraph: 910 llamadas y USD 0.83863380**. La reparación local no añade un punto de éxito al gráfico. [Datos de la curva](05-resultados-y-mejoras/langgraph-integrado/historico-servidor.json).
 
 | Corrida LangGraph | Conversaciones sin controles fallidos | Citas / esperadas | Llamadas | Total USD por fila |
 |---|---:|---:|---:|---:|
@@ -18,7 +18,8 @@ La curva conserva **4/6 → 5/6 → 6/6 → 4/6 → 5/6 → 4/6**, todos con los
 | Integrado · `14dfa6f` | 4/6 | 4/5 | 126 | 0.11470965 |
 | Reparación integrada 1 · `91e902a` | 5/6 | 5/5 | 132 | 0.12615315 |
 | Reparación integrada 2 · `400593e` | 4/6 | 5/5 | 128 | 0.12411900 |
-| **TOTAL · seis corridas** | **28/36 ejecuciones; no calidad actual** | **No sumar como conversión** | **777** | **0.71762925** |
+| Reparación integrada 3 · `94f72bc` | 6/6 | 5/5 | 133 | 0.12100455 |
+| **TOTAL · siete corridas** | **34/42 ejecuciones; no calidad actual** | **No sumar como conversión** | **910** | **0.83863380** |
 
 ![Consumo por corrida LangGraph y total](05-resultados-y-mejoras/langgraph-integrado/consumo-cuatro-corridas.png)
 
@@ -278,7 +279,7 @@ flowchart TD
 
 ![Historia global y cobertura](05-resultados-y-mejoras/figuras/panorama-global.png)
 
-**Lectura correcta:** el gráfico global incorpora las 21 corridas tempranas y las seis corridas LangGraph, separadas por una línea: **27 corridas indexadas, 180 conversaciones ejecutadas y 53 IDs por suite**. No mezcla esos conjuntos en una tasa de calidad. El consumo de estas 27 corridas indexadas suma USD 2.25397140, parcial por cargos faltantes tempranos. No es un inventario de todas las fases intermedias, que se conservan en el bloque 10. No se suma este subtotal con el seguimiento desde necesidades: sus alcances se solapan. Dentro del bloque temprano, las 144 ejecuciones incluyen repeticiones; hay 47 IDs por suite. La subida acumulada mide cobertura y trabajo evaluado, no una curva única de calidad. Las 63 aprobaciones históricas pertenecen a sus controles originales: no se interpreta 63/144 como calidad actual. Para observar la mejora de los mismos casos se reconstruyó su subconjunto en las baterías anteriores, conservando los checks originales.
+**Lectura correcta:** el gráfico global incorpora las 21 corridas tempranas y las siete corridas LangGraph, separadas por una línea: **28 corridas indexadas, 186 conversaciones ejecutadas y 53 IDs por suite**. No mezcla esos conjuntos en una tasa de calidad. El consumo de estas 28 corridas indexadas suma USD 2.37497595, parcial por cargos faltantes tempranos. No es un inventario de todas las fases intermedias, que se conservan en el bloque 10. No se suma este subtotal con el seguimiento desde necesidades: sus alcances se solapan. Dentro del bloque temprano, las 144 ejecuciones incluyen repeticiones; hay 47 IDs por suite. La subida acumulada mide cobertura y trabajo evaluado, no una curva única de calidad. Las 63 aprobaciones históricas pertenecen a sus controles originales: no se interpreta 63/144 como calidad actual. Para observar la mejora de los mismos casos se reconstruyó su subconjunto en las baterías anteriores, conservando los checks originales.
 
 ![Los mismos tres IDs desde la batería inicial](05-resultados-y-mejoras/figuras/casos-comunes-desde-la-bateria.png)
 
@@ -331,7 +332,7 @@ Para comprobar el traslado al canal real se registra un lead de prueba en la com
 
 ## 8. Consumo real y saldo de OpenRouter
 
-**Total registrado de las 27 corridas indexadas: USD 2.25397140** (aproximadamente **USD 2.25**). Son 1.911 llamadas, 18.037.652 tokens de entrada y 268.710 de salida. Hay importe informado para 1.903/1.911 llamadas: **el histórico sigue siendo parcial**. Este índice reúne el bloque temprano y las seis corridas LangGraph; otras fases y referencias están documentadas en el bloque 10. No es saldo consultado, factura ni gasto total del proyecto; excluye desarrollo, revisión, hosting y mensajería real.
+**Total registrado de las 28 corridas indexadas: USD 2.37497595** (aproximadamente **USD 2.37**). Son 2.044 llamadas, 19.000.621 tokens de entrada y 282.634 de salida. Hay importe informado para 2.036/2.044 llamadas: **el histórico sigue siendo parcial**. Este índice reúne el bloque temprano y las siete corridas LangGraph; otras fases y referencias están documentadas en el bloque 10. No es saldo consultado, factura ni gasto total del proyecto; excluye desarrollo, revisión, hosting y mensajería real.
 
 | Etapa | Diálogos | Llamadas | Tokens entrada / salida | Costo total registrado de la etapa (USD) |
 |---|---:|---:|---:|---:|
@@ -340,8 +341,8 @@ Para comprobar el traslado al canal real se registra un lead de prueba en la com
 | Comercial | 16 | 69 | 770,886 / 8,539 | 0.09009390 |
 | Cierres/retoma | 8 | 15 | 173,013 / 2,114 | 0.02099955 |
 | Baterías/repairs | 66 | 556 | 6,467,384 / 106,761 | 0.85336740* |
-| LangGraph · seis corridas | 36 | 777 | 5,664,011 / 80,606 | 0.71762925 |
-| **TOTAL DEL ÍNDICE · 27 CORRIDAS** | **180** | **1.911** | **18,037,652 / 268,710** | **2.25397140*** |
+| LangGraph · siete corridas | 42 | 910 | 6,626,980 / 94,530 | 0.83863380 |
+| **TOTAL DEL ÍNDICE · 28 CORRIDAS** | **186** | **2.044** | **19,000,621 / 282,634** | **2.37497595*** |
 
 \* Etapa con importes faltantes. Son las mismas corridas del bloque 6, no gasto adicional. Repair 8 registró **USD 0.03150990 parciales**, con costo para 21/24 llamadas. No se presenta como ahorro completo ni como costo uniforme por conversación.
 
@@ -1001,7 +1002,8 @@ La figura compara las mismas seis situaciones, con controles internos adicionale
 | LangGraph integrado `14dfa6f` | 126 | 0.11470965 | Completo para esta corrida. |
 | Reparación integrada 1 `91e902a` | 132 | 0.12615315 | Completo para esta corrida. |
 | Reparación integrada 2 `400593e` | 128 | 0.12411900 | Completo para esta corrida. |
-| **SUMA HISTÓRICA INFORMADA** | **1.948** | **2.40953775** | **Parcial; excluye además fases previas no detalladas aquí.** |
+| Reparación integrada 3 `94f72bc` | 133 | 0.12100455 | Completo para esta corrida. |
+| **SUMA HISTÓRICA INFORMADA** | **2.081** | **2.53054230** | **Parcial; excluye además fases previas no detalladas aquí.** |
 | Reparación y pruebas locales | 0 pagadas | 0.00000000 | Sin llamadas a OpenRouter. |
 
 | Próxima repetición, todavía no ejecutada | Alcance | Total USD estimado por fila |
@@ -1071,6 +1073,33 @@ La siguiente ejecución repite los seis casos, hasta diez turnos y 300 llamadas.
 **Replay local:** los seis recorridos superan sus controles, con 35 mensajes del lead y cinco citas en base desechable. El módulo específico suma 65 pruebas, incluidas variantes y negativos. [Conversaciones locales legibles](05-resultados-y-mejoras/langgraph-reparacion-3-local/conversaciones.md) · [JSON local](05-resultados-y-mejoras/langgraph-reparacion-3-local/conversaciones-locales.json).
 
 **Límites.** Un replay aprobado no es un resultado nuevo del modelo. No verifica transporte WhatsApp/SMS, Calendar externo ni concurrencia de PostgreSQL. La batería tampoco acredita todos los segmentos ni una calidad comercial integral. No se amplía todavía el espectro: primero se repiten estos seis casos tras desplegar. Estimación de consumo de la siguiente corrida: **USD 0.10–0.20 total**, sin garantía de tope monetario. [Comandos de despliegue, evaluación y descarga](06-como-ejecutar-las-pruebas/entrega-langgraph-reparacion-3.md).
+
+## 10.14. Primer 6/6 del motor integrado reparado y comprobación de estabilidad
+
+**Qué se midió.** `sales-graph-repair-3.zip`, commit `94f72bc`, `openai/gpt-4o-mini`, configuración publicada 8. Los 35 mensajes recorrieron `sales-langgraph/2.0`: seis conversaciones superaron sus controles, se crearon cinco citas en base temporal y el caso sin vendedor terminó sin reservar. No hubo errores finales de ejecución. El ciclo registró 53 decisiones y 28 rondas de lectura. Consumo completo de 133/133 llamadas: **962.969 tokens de entrada, 13.924 de salida, USD 0.12100455 total**. [Conversaciones del servidor, legibles](05-resultados-y-mejoras/langgraph-reparacion-3-servidor/conversaciones.md) · [JSON original](05-resultados-y-mejoras/langgraph-reparacion-3-servidor/resultado.json).
+
+| Flujo | Resultado observado | Límite de esta evidencia |
+|---|---|---|
+| Cambio de propiedad | La preferencia por Cedar Studio produce sus detalles; el folleto y la cita corresponden a ella. | No equivale a cambiar una cita existente. |
+| Materiales y financiamiento | Se entrega el folleto y se responde la consulta financiera en el mismo turno. | Esta vez la confianza del modelo fue alta; la confianza cero solo tiene replay local en este patrón. |
+| Material alternativo | Se ofrece el folleto sin asegurar que incluya fotos y se entrega después de aceptarlo. | No se inspecciona visualmente su contenido. |
+| Interrumpir la agenda | Se entregan fotos y se vuelve a agendar al pedirlo explícitamente. | No acredita retoma espontánea: el guion repite la petición de visita. |
+| Horario de visita | Se ofrecen mañanas en la zona de la propiedad, con selección y confirmación antes de reservar. | Calendar externo y concurrencia PostgreSQL no se ejercitan. |
+| Sin vendedor | Se informa indisponibilidad y se ofrece guardar interés. | No se crea una alerta sin consentimiento ni se prueba su entrega futura. |
+
+**Qué todavía requiere afinamiento.** Se registraron **15 intentos de interpretación inválidos**, recuperados con reintentos, y 35 interpretaciones finalmente aceptadas. No son 15 conversaciones fallidas: son errores intermedios que agregan trabajo y variabilidad. Tiempo medio registrado: **9,3 segundos por mensaje del lead**, no latencia de entrega por WhatsApp. La redacción aún repite características, utiliza encabezados mecánicos como “Verified visit options” y muestra `America/Denver` al no encontrar horarios. Estos puntos no están suficientemente penalizados por los controles funcionales actuales.
+
+**Experimento inmediato: repetir sin ajustar.** Se conserva la misma batería de seis guiones, catálogo, modelo y configuración; dos ejecuciones consecutivas y separadas, con nuevas bases temporales. Se mantiene fijo el contenedor durante ambas y se registran resultados aunque una falle. Las fechas disponibles dependen del reloj del laboratorio: por eso se conserva catálogo y plan de cada ejecución y no se presenta como comparación causal controlada. No se cambia entre corridas ni el prompt ni la redacción. Un nuevo fallo se diagnostica por turno y traza antes de ampliar segmentos.
+
+| Ejecución | Estado | Conversaciones / mensajes previstos | Consumo total USD por fila |
+|---|---|---:|---:|
+| Base `94f72bc` | Ejecutada; 6/6 controles de conversación | 6 / 35 | 0.12100455 real |
+| Repetición 1 | Pendiente | 6 / aproximadamente 35 | 0.12–0.20 estimado |
+| Repetición 2 | Pendiente | 6 / aproximadamente 35 | 0.12–0.20 estimado |
+| **TOTAL NUEVO POR EJECUTAR** | **Pendiente** | **12 / aproximadamente 70** | **0.24–0.40 estimado** |
+| **BASE + DOS REPETICIONES** | **Un resultado real y dos estimados** | **18 / aproximadamente 105** | **0.36100455–0.52100455 mixto** |
+
+El estimado se apoya en la última corrida, no es un límite de facturación. Cada ejecución limita 300 llamadas y diez mensajes por conversación; esos límites no equivalen a dólares. Si ambas repeticiones mantienen todos los controles, habrá **tres ejecuciones consecutivas favorables de esta batería**, sin que ello demuestre generalización a todos los leads. Entonces se propondrá ampliar las variantes y mejorar los criterios comerciales. [Comandos de servidor y descarga](06-como-ejecutar-las-pruebas/estabilidad-langgraph.md) · [Script Bash](06-como-ejecutar-las-pruebas/ejecutar-estabilidad-langgraph.sh).
 
 ## 11. Trabajo futuro
 

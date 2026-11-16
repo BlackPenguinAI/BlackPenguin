@@ -67,8 +67,19 @@
       "graph_calls": 128,
       "graph_cost_usd": 0.124119,
       "source": "sales-graph-repair-2.zip"
+    },
+    {
+      "label": "Reparaci\u00f3n integrada 3",
+      "commit": "94f72bc9849555460893ebfe45f699e16b37b22c",
+      "graph_cases_pass": 6,
+      "cases": 6,
+      "bookings": 5,
+      "expected_bookings": 5,
+      "graph_calls": 133,
+      "graph_cost_usd": 0.12100455,
+      "source": "sales-graph-repair-3.zip"
     }
   ],
-  "total_graph_calls": 777,
-  "total_graph_cost_usd": 0.71762925
+  "total_graph_calls": 910,
+  "total_graph_cost_usd": 0.8386338
 }

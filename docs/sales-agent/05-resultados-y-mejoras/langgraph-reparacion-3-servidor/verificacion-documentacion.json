@@ -1,0 +1,27 @@
+{
+  "base_commit": "94f72bc9849555460893ebfe45f699e16b37b22c",
+  "scope": "documentation, original server evidence and operator commands only",
+  "backend_changed": false,
+  "paid_local_calls": 0,
+  "new_server_runs_executed": false,
+  "checks": [
+    "historical figures and recorded totals reconciled",
+    "shell syntax bash -n",
+    "mocked Docker smoke preserves failed evaluation and collects second run",
+    "readme new evidence links exist"
+  ],
+  "measured": {
+    "cases_pass": 6,
+    "cases": 6,
+    "bookings": 5,
+    "expected_bookings": 5,
+    "cost_usd": 0.12100455
+  },
+  "pending": {
+    "repetitions": 2,
+    "estimated_new_cost_usd": [
+      0.24,
+      0.4
+    ]
+  }
+}
