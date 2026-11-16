@@ -134,3 +134,15 @@ def sales_readiness():
         raise HTTPException(503,detail={'status':'not_ready','reason':'sales_progress_unavailable'}) from exc
     if value['status']!='ready':raise HTTPException(503,detail=value)
     return value
+
+
+@router.get('/sales-engine')
+def sales_engine():
+    """Deployed topology identity; liveness/delivery remain separate checks."""
+    from app.modules.sales_agent.active_service import ENGINE
+    from app.modules.sales_agent.coordinator_graph import VERSION, MODE
+    from app.modules.sales_agent.observation_loop import VERSION as OBSERVATION_VERSION
+    return {'engine': ENGINE, 'orchestrator': MODE, 'coordinator_version': VERSION,
+            'observation_version': OBSERVATION_VERSION, 'channels': ['sms', 'whatsapp', 'simulation'],
+            'max_tool_rounds': 2, 'commit': settings.APP_COMMIT_SHA,
+            'note': 'Topology identity only; inspect each turn trace to verify execution and provider receipts for delivery.'}

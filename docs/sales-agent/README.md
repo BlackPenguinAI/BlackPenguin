@@ -4,7 +4,42 @@
 
 **Métricas históricas del modelo: corte 11/11/2026. Revisión de criterios: 13/11/2026.** Se reúne el trabajo del ciclo reciente con data sintética: **21 corridas del servidor, 144 conversaciones ejecutadas y 47 IDs de escenario distintos por suite**. Las repeticiones son parte del trabajo, no escenarios adicionales. En la batería compacta 2, **13/16 conversaciones cumplieron los checks originales y se registraron 7/8 visitas esperadas**; eso no certifica la calidad integral de esos diálogos. En el último subconjunto, Repair 8, **2/3 conversaciones cumplieron sus checks y se registró 1/2 visitas**: vivienda mayor y fotos ausentes se recuperaron; diversificación falló con tiempos de espera del modelo. No se mezclan ambos conjuntos como si fueran una nueva batería completa.
 
-**Estado actual (15/11/2026).** La última pareja del servidor (`ba5c4c5`) registra **5/6 casos sin controles fallidos y 5/5 citas esperadas en el candidato**, frente a 3/6 y 3/5 en `classic`. Persiste el pedido mixto de material/financiación por referencias sin significado; la referencia además falló una interrupción, una confirmación y una variante horaria. Esta entrega corrige esas causas y reproduce las interpretaciones registradas, sin ampliar los seis guiones ni cambiar el modelo. Producción sigue en `classic`; se exige otra comparación antes de promover el candidato. Detalles y observabilidad en 10.10.
+**Estado de esta entrega (15/11/2026): motor comercial único con LangGraph.** WhatsApp, SMS y los experimentos entran por `sales-langgraph/2.0`, coordinado con `graph-observe`. No hay selección de `classic` en la consola de experimentos ni una rama de ejecución clásica en el coordinador. Este estado describe el código de la entrega; el despliegue y su calidad con el modelo publicado requieren evidencia del servidor. La última corrida recibida, anterior a esta integración (`cb30201`), completó **6/6 casos y 5/5 citas esperadas tanto en la referencia como en el candidato**. Es evidencia funcional de esos guiones, no aprobación integral ni prueba de superioridad comercial.
+
+![Evolución funcional de los mismos seis casos con LangGraph](05-resultados-y-mejoras/langgraph-integrado/evolucion-seis-casos.png)
+
+La curva corresponde a corridas del servidor anteriores a esta entrega: 4/6 → 5/6 → 6/6 con el candidato LangGraph. Son los mismos seis guiones y criterios evolucionados de observabilidad; no es una tasa de éxito para todos los leads. **Consumo de esas tres corridas LangGraph: 391 llamadas y USD 0.35264745 en total**; no incluye sus referencias ni otras fases. [Datos de la curva](05-resultados-y-mejoras/langgraph-integrado/historico-servidor.json).
+
+**Validación técnica de esta entrega:** 3,689 pruebas aprobadas en 149 módulos, 11 omitidas y cero fallos; 63 controles de aceptación aprobados y uno en vivo pendiente. Las 11 pruebas específicas de fronteras se repitieron aparte y se solapan con la regresión; no se suman como conversaciones nuevas. Red y modelos simulados, consumo pagado USD 0.00. [Validación local](05-resultados-y-mejoras/langgraph-integrado/validacion-local.json).
+
+### Flujo integrado que reciben los leads
+
+```mermaid
+flowchart TD
+    A["Mensaje SMS, WhatsApp o sintético"] --> B["LangGraph: interpretar y recuperar contexto"]
+    B --> C["Preparar tareas y validar referencias"]
+    C --> D["LLM decide consulta o respuesta"]
+    D -->|Consulta autorizada| E["Backend consulta datos de la compañía y proyecto"]
+    E --> F["Observaciones verificadas"]
+    F --> D
+    D -->|Evidencia suficiente o límite alcanzado| G["Componer respuesta y validar acciones"]
+    G --> H{"¿Qué corresponde?"}
+    H --> I["Responder o aclarar una duda concreta"]
+    H --> J["Compartir material aprobado"]
+    H --> K["Ofrecer visita, pedir confirmación o crear cita"]
+```
+
+**Responsabilidades.** El LLM publicado, actualmente `openai/gpt-4o-mini` en la configuración evaluada, interpreta y decide entre consultas permitidas; recibe sus resultados antes de decidir nuevamente. El modelo efectivo siempre depende de la configuración publicada y queda registrado en la corrida. El backend conserva permisos, restricciones, catálogo aprobado, selección de propiedad, disponibilidad y confirmación de cita. LangGraph no es una nueva base de memoria: el estado y los recibos persistidos siguen siendo la fuente común. El ciclo permite dos rondas y hasta seis lecturas, con límite de contexto y tiempo por decisión. Las acciones de negocio se ejecutan después de sus validaciones, nunca desde la decisión de lectura.
+
+**Mensajes sin razonamiento comercial.** El saludo inicial, avisos y recordatorios deterministas siguen siendo servicios del backend; no necesitan llamar al modelo ni representan un segundo agente. La integración del grafo corresponde a los turnos entrantes de conversación. Una pausa manual, falta de consentimiento o un evento ya procesado puede impedir que un mensaje recorra el grafo.
+
+**Mismo motor, efectos diferentes.** Las simulaciones utilizan compañía, propiedades, vendedores y leads sintéticos en una base desechable; no contactan a personas ni crean eventos externos de Calendar. Las pruebas manuales usan los canales e integraciones reales. Las pruebas sintéticas no certifican transporte, concurrencia PostgreSQL ni entrega al teléfono. La simulación mantiene su adaptador de asignación de vendedor, indicado en las limitaciones de la corrida; no se confunde con la asignación concurrente real.
+
+**Observabilidad.** `/api/v1/health/sales-engine` identifica la versión desplegada y `/health/sales` informa del worker. Cada turno registra nodos completados, nodo en curso, interpretación, decisiones, herramientas y resultados. Un error conserva el nodo en que ocurrió. Las conversaciones históricas conservan la versión con la que se ejecutaron; desplegar una versión no transforma sus resultados. Las decisiones tienen un tiempo límite y se revalidan permisos después de la espera y antes de cada consulta. El estado del turno conserva su reversión transaccional si la respuesta final es rechazada. No se usa una derivación al equipo comercial como respuesta automática a fallos internos.
+
+**Cómo validar.** Ejecutar el [comando de evaluación](06-como-ejecutar-las-pruebas/ejecutar-langgraph-integrado.sh), revisar los seis diálogos y sus cinco citas esperadas y después repetir manualmente consultas, materiales y selección/confirmación de horario. El informe debe mostrar `coordinator_graph.mode=graph-observe`, versión `2.0` y la secuencia `interpret → plan → observe → fulfill`. Un `PASS` funcional no sustituye revisar pertinencia, continuidad y tono comercial. Se conservan los siete segmentos y el perfil desconocido; esta entrega integra el motor, no amplía aún la cobertura de perfiles ni resuelve por sí sola todos los errores de interpretación observados.
+
+**Consumo.** En la última corrida previa, referencia: **78 llamadas, $0.11470410**; LangGraph: **130 llamadas, $0.11303685**; **total: 208 llamadas, $0.22774095**. La próxima ejecución de seis guiones usa solamente LangGraph: estimación orientativa **$0.10–$0.20 por corrida**, no un tope monetario. `--max-calls 300` limita llamadas, no dólares. El costo real se registra en la evidencia; no se atribuyen consumos de esta integración al servidor antes de ejecutarla. El ajuste posterior modifica interpretación, uso de contexto, decisiones, validaciones y composición; no reentrena los pesos del modelo.
 
 La guía usa bloques con el mismo propósito: **qué se hizo → cómo funciona → qué evidencia hay → dónde están sus archivos**. Toda la explicación está aquí; los enlaces internos abren datos, código o carpetas de respaldo. Las referencias externas justifican la metodología, no sustituyen la evidencia del proyecto.
 
@@ -65,43 +100,28 @@ sequenceDiagram
 |---|---|---|
 | Interpretación | LLM | Identifica intención y sujeto con evidencia del mensaje actual. |
 | Validación y memoria | Backend | Comprueba datos, conserva preferencias y no inventa consentimiento. |
-| Plan y herramientas | Backend | Resuelve propiedad/unidad/recurso dentro de la company y project. |
+| Plan y herramientas | LangGraph / LLM / backend | El modelo decide consultas permitidas; el backend resuelve y consulta dentro de la compañía y proyecto. |
 | Composición | LLM / backend | El modelo selecciona variantes de evidencia; Repair 7 presenta directamente un comprobante de cita único ya validado. No escribe hechos libres. |
 | Compartir/agendar/enviar | Backend | Verifica permisos y efectos; seleccionar horario solo prepara el resumen. |
 
-**Límites.** Hay reparaciones acotadas; no se repite indefinidamente. Algunos turnos usan texto del backend, por lo que turno y llamada son unidades distintas. Los errores internos no se narran al lead. En esta entrega el prompt nuevo es `sales-understanding-prompt/2.29`; el contrato de entrada es `sales-interpretation-input/2.0` y el compositor `sales-commercial-composer/1.0` [R1–R3]. [Coordinador](../../backend/app/modules/sales_agent/active_service.py) · [Interpretación](../../backend/app/modules/sales_agent/understanding_service.py).
+**Límites.** Hay reparaciones acotadas; no se repite indefinidamente. Algunos turnos usan texto del backend, por lo que turno y llamada son unidades distintas. Los errores internos no se narran al lead. El protocolo actual es `sales-understanding-prompt/2.37` y el sistema de interpretación `sales-interpretation-system/2.5`; el contrato de entrada es `sales-interpretation-input/2.0` y el compositor `sales-commercial-composer/1.0` [R1–R3]. [Coordinador](../../backend/app/modules/sales_agent/active_service.py) · [Interpretación](../../backend/app/modules/sales_agent/understanding_service.py).
 
 ### Estructura de orquestación: qué está fijo y qué afinamos
 
-**Grafo conservado en el repositorio.** `graph.py` construye `StateGraph(SalesAgentState)`, versión `sales-turns-v5`, con estos nodos y conexiones. La rama corta el flujo cuando la validación inicial registra una infracción:
+**Un único motor comercial.** `process_live_inbound` y `current_simulation.turn` utilizan `active_service.maybe_process_active`. Este invoca el nuevo `StateGraph`: interpretación → preparación de tareas → ciclo de decisión/lecturas/observaciones → composición y acciones validadas. El grafo histórico `sales-turns-v5` sigue en el repositorio para trazabilidad, pero no procesa los mensajes nuevos. El coordinador ya no contiene una rama de ejecución `classic`.
 
-```mermaid
-flowchart TD
-    A["validate_event: validar evento"] --> B{"¿Validación permite continuar?"}
-    B -->|No| Z["Fin"]
-    B -->|Sí| C["load_context: cargar contexto"]
-    C --> D["resolve_prompt: resolver instrucciones"]
-    D --> E["reason: obtener salida del modelo"]
-    E --> F["validate_output: validar salida"]
-    F --> Z
-```
-
-**El grafo histórico no se modifica.** Las iteraciones anteriores afinaban el coordinador sin reconectar esos nodos. Los candidatos separados incluyen la reconsideración previa al plan (10.7) y, ahora, decisiones tras observar resultados de herramientas (10.8); permanecen restringidos al laboratorio hasta revisar evidencia con el modelo publicado. No se entrena ningún peso del modelo.
-
-**Ruta de producción; candidatos experimentales descritos en 10.7–10.8.** El grafo anterior permanece como implementación histórica; no debe confundirse con el coordinador actual. `process_live_inbound` llama a `active_service.maybe_process_active` y rechaza el evento si este no lo atiende: no vuelve automáticamente al grafo antiguo. El simulador actual llama al mismo coordinador bajo aislamiento. Las trazas de las corridas muestran `workflow_version=sales-current/1.0` y `engine=sales-active/1.0`. Por tanto, los resultados sintéticos recientes evalúan ese core estructurado, **no una invocación de `build_sales_graph().ainvoke()` por cada turno**. El diagrama de secuencia anterior representa esta ruta actual.
-
-| Capa | Situación en este ciclo | Qué significa para el afinamiento |
+| Capa | Función actual | Qué se afina |
 |---|---|---|
-| Grafo LangGraph histórico | Cinco nodos y sus conexiones conservados. | No es donde se aplicaron las últimas correcciones. |
-| Nuevo grafo candidato | Etapas reales y una reconsideración opcional, solo en laboratorio. | Se compara con el modo secuencial antes de activar cualquier cambio en conversaciones reales. |
-| Coordinador actual | Mantiene el recorrido interpretación → validación/estado → plan/herramientas → composición → registro/envío. | Producción conserva esta estructura. El candidato 10.8 añade decisiones posteriores a herramientas únicamente en laboratorio. |
-| Instrucciones y contrato | Versionados, con ejemplos y exigencia de evidencia del mensaje actual. | Se corrigen interpretaciones, referencias y campos estructurados. |
-| Servicios del backend | Conservan autoridad sobre ámbitos, consentimiento y operaciones. | Se corrigen normalización, persistencia y presentación de resultados; nunca se concede una cita solo por una sugerencia del modelo. |
-| Experimentos | Reutilizan el core con transporte y efectos aislados. | Miden si esos ajustes mejoran diálogos; no reemplazan la arquitectura ni prueban el transporte real. |
+| LangGraph `sales-coordinator-graph/2.0` | Mismo recorrido en canales reales y laboratorio. | Decisiones, límites y transición entre consulta y respuesta. |
+| Ciclo `sales-observation-loop/2.0` | El LLM consulta herramientas permitidas y revisa resultados en hasta dos rondas. | Cobertura de preguntas y selección de consultas sin repeticiones. |
+| Estado persistente | Propiedad, preferencias, restricciones, tareas y ofertas vigentes. | Referencias, interrupciones y cambios de intención. |
+| Instrucciones y contrato | Interpretación con evidencia y composición basada en hechos. | Ejemplos, normalización y tono comercial; no pesos del modelo. |
+| Backend transaccional | Permisos, materiales, vendedores, disponibilidad y confirmación. | Exactitud, idempotencia y presentación de resultados. |
+| Experimentos | Mismo motor con datos y efectos aislados. | Casos y variantes; los controles no sustituyen revisión comercial. |
 
-**Ejemplo:** evitar que «next seven days» se interprete como una hora fue un cambio de normalización; presentar una confirmación ya registrada sin otra llamada al LLM fue un cambio de composición. Ninguno exigió reconectar el grafo LangGraph. Los ajustes concretos están explicados en el bloque 5.
+La integración cambia la topología que se ejecuta en producción. Las iteraciones posteriores pueden ajustar sus componentes sin reconectar el grafo en cada entrega. Los apartados 10.7–10.10 conservan el historial experimental anterior y sus mediciones; las instrucciones antiguas de comparación corresponden a esas versiones.
 
-[Dependencias fijadas](../../backend/requirements.txt) · [Nodos y conexiones](../../backend/app/modules/sales_agent/graph.py) · [Estado del grafo histórico](../../backend/app/modules/sales_agent/state.py) · [Entrada real](../../backend/app/modules/sales_agent/live_service.py) · [Simulación actual](../../backend/app/modules/sales_agent/current_simulation.py) · [Cliente OpenRouter](../../backend/app/integrations/openrouter_client.py).
+[Coordinador LangGraph](../../backend/app/modules/sales_agent/coordinator_graph.py) · [Ciclo de observaciones](../../backend/app/modules/sales_agent/observation_loop.py) · [Entrada real](../../backend/app/modules/sales_agent/live_service.py) · [Simulación](../../backend/app/modules/sales_agent/current_simulation.py).
 
 ### Correspondencia con la propuesta original del flujo híbrido
 
@@ -116,9 +136,9 @@ Se contrastó el código con [Cambio de funcionamiento del agente](https://docs.
 | Corregir salidas incumplidas | Interpretación y composición admiten una reparación acotada con feedback verificable. | No hay una red de críticos ni una revisión semántica ilimitada. |
 | Backend controla efectos | Alcance, permisos, consentimiento, cobertura, integridad y confirmación se vuelven a verificar. | El modelo propone; no reserva, cancela ni comparte por su cuenta. |
 | Estrategias configurables | Se usa la configuración publicada y el playbook. | Varias reglas de interpretación, aclaración y redacción siguen fijadas/versionadas en código; no todo se cambia desde settings. |
-| Conservar LangGraph | El grafo histórico sigue presente. | Producción conserva el recorrido secuencial. 10.7 añadió un `StateGraph` con reconsideración previa. 10.8 añade un ciclo posterior a herramientas con lecturas autorizadas, aún sin activarlo para leads reales. |
+| Conservar LangGraph | El grafo histórico sigue presente. | Esta entrega utiliza el nuevo StateGraph y ciclo posterior a herramientas tanto en canales reales como en simulación; 10.7–10.10 documentan sus fases previas. |
 
-Por tanto, los ajustes recientes afinan un motor híbrido existente: no están añadiendo todavía el ciclo general de replanteamiento por LLM del documento. Las trazas y pruebas permiten separar un fallo de interpretación, referencia, planificación o presentación antes de atribuirlo al modelo o prometer una solución arquitectónica completa.
+El motor integrado permite replantear consultas después de observar herramientas dentro de un conjunto autorizado y acotado; no es un agente con acceso libre a herramientas o escrituras. Las trazas y pruebas permiten separar un fallo de interpretación, referencia, planificación o presentación antes de atribuirlo al modelo o prometer una solución arquitectónica completa.
 
 ## 3. Datos sintéticos
 
@@ -962,7 +982,8 @@ La figura compara las mismas seis situaciones, con controles internos adicionale
 |---|---:|---:|---|
 | Importes informados antes de esta pareja | 1.141 | 1.57204545 | Parcial: falta un cargo histórico. |
 | Pareja recibida `ba5c4c5` | 213 | 0.24476955 | Completo para esta pareja. |
-| **SUMA HISTÓRICA INFORMADA** | **1.354** | **1.81681500** | **Parcial; excluye además fases previas no detalladas aquí.** |
+| Pareja recibida `cb30201` | 208 | 0.22774095 | Completo para esta pareja. |
+| **SUMA HISTÓRICA INFORMADA** | **1.562** | **2.04455595** | **Parcial; excluye además fases previas no detalladas aquí.** |
 | Reparación y pruebas locales | 0 pagadas | 0.00000000 | Sin llamadas a OpenRouter. |
 
 | Próxima repetición, todavía no ejecutada | Alcance | Total USD estimado por fila |

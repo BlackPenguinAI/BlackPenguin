@@ -62,8 +62,8 @@ def run(options_path, output):
         raise PermissionError('Booking iteration requires its private SQLite database.')
     Base.metadata.create_all(engine)
     credential=options['credential'];budget=Budget(options['max_calls'])
-    mode=options.get('orchestrator','classic')
-    if mode!='classic' and not continuity:raise ValueError('Candidate orchestration requires continuity.')
+    mode=options.get('orchestrator','graph-observe')
+    if mode!='graph-observe':raise ValueError('Only the shared commercial LangGraph engine is supported.')
     report={'coordinator_mode':mode,'version':VERSION if compact or needs or continuity else 'sales-closing-point/1.0' if closing else 'sales-commercial-point/1.0' if commercial else 'sales-booking-point/1.0','synthetic_only':True,'production_database_writes':0,
         'lead_contacts':0,'provider_calls':0,'lead_model':None,'judge_model':None,'commit':settings.APP_COMMIT_SHA,'cases':[],
         'limitations':['Google Calendar integration and transport delivery are not exercised.',

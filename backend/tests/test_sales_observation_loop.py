@@ -38,7 +38,7 @@ def provider(request):
 
 
 @pytest.mark.parametrize('scenario',CASES)
-@pytest.mark.parametrize('mode',['classic','graph-observe'])
+@pytest.mark.parametrize('mode',['graph-observe'])
 def test_six_journeys_use_same_core_and_safe_booking_contract(lab,scenario,mode,tmp_path):
     db,manifest=lab
     db.add(AIConfiguration(id='obs-config',company_id=None,openrouter_api_key='OFFLINE',agent_ventas={'model':'test/offline'}))
@@ -154,11 +154,15 @@ def test_a_real_restriction_blocks_discovery_without_model_or_write(lab):
     assert audit['tools']==[] and audit['decisions']==[] and result.state.constraints
 
 
-def test_observation_candidate_is_not_available_for_live_traffic():
+def test_graph_executes_identical_topology_without_a_simulation_adapter():
     from app.modules.sales_agent.coordinator_graph import execute
-    async def forbidden():raise AssertionError('No live stage should execute.')
-    with experiment('graph-observe'),pytest.raises(PermissionError):
-        asyncio.run(execute(None,interpret=forbidden,assess=lambda:False,reconsider=forbidden,plan=forbidden,observe=forbidden,fulfill=forbidden))
+    seen=[]
+    def callback(name):
+        async def invoke():seen.append(name)
+        return invoke
+    result=asyncio.run(execute(None,interpret=callback('interpret'),plan=callback('plan'),observe=callback('observe'),fulfill=callback('fulfill')))
+    assert seen==result['trace']==['interpret','plan','observe','fulfill']
+    assert result['mode']=='graph-observe'
 
 
 def test_existing_comparison_gateway_remains_available_in_observation_loop(lab):

@@ -16,7 +16,7 @@ def response(db, conversation, run):
         failed.append(item)
     count = len(failed) + 1
     if count == 1:
-        return "Would you like me to connect you with the sales team to help with your question?", False, count
+        return "I couldn’t complete your request just now. Please try again in a moment.", False, count
     from app.modules.governance.services import enqueue_notification
     enqueue_notification(db, company_id=conversation.company_id, project_id=conversation.project_id,
         event_type='sales_processing_issue', entity_type='sales_conversation', entity_id=conversation.id,
@@ -25,7 +25,7 @@ def response(db, conversation, run):
                  'action_url':'/app/agent','recipient_roles':['admin','assistant'],
                  'conversation_id':conversation.id,'error_code':run.error_code},
         dedupe_key='sales-processing-issue:'+conversation.id+':'+(failed[-1].id if failed else run.id))
-    return ("Would you prefer to continue here or speak with the sales team?", False, count)
+    return ("I’m still unable to complete that request. Please try again shortly.", False, count)
 
 
 def diagnostic(exc):

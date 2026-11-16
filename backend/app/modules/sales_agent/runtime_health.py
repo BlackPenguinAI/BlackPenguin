@@ -31,7 +31,7 @@ def record(phase,*,error=None,completed=False,stop=False):
 
 def snapshot(db,*,now=None,instance_id=None):
     now=now or datetime.utcnow();row=db.get(SalesWorkerProgress,instance_id or INSTANCE_ID)
-    result={'workflow_version':'sales-current/1.0','commit':settings.APP_COMMIT_SHA,'worker_status':'not_started','attention_required':False}
+    result={'engine':'sales-langgraph/2.0','orchestrator':'graph-observe','coordinator_version':'sales-coordinator-graph/2.0','workflow_version':'sales-current/1.0','commit':settings.APP_COMMIT_SHA,'worker_status':'not_started','attention_required':False}
     if not row:return {**result,'status':'not_ready'}
     age=(now-row.last_progress_at).total_seconds();phases=row.progress_json or {}
     healthy=row.commit_sha==settings.APP_COMMIT_SHA and row.stopped_at is None and 0<=age<=180

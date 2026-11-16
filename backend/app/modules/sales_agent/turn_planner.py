@@ -45,9 +45,6 @@ def reconcile_subject(state,original_interest,*,confirming_delivered_proposal=Fa
 
 
 def run(db,scope,*,message_id,understanding,expected_revision,event_key,max_steps,max_seconds,max_rounds,max_read_units,clock,prepare_only=False):
-    if prepare_only:
-        from .execution import simulated
-        if not simulated(scope):raise PermissionError('Preparation-only planning requires a sandbox.')
     conversation=check_scope(db,scope)
     message=scoped_messages_query(db,conversation).filter_by(id=message_id,direction='inbound',role='user').one()
     if (message.metadata_json or {}).get('lead_id',scope.lead_id)!=scope.lead_id:raise PermissionError('Foreign inbound evidence.')

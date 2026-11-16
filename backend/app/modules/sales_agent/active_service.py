@@ -29,7 +29,7 @@ from .turn_context import choice_index, latest_outbound
 from .continuity_policy import explicit_opt_out, evidenced_pause_reason, dismissed_trigger, confirmed_controls
 from .language_policy import LanguageHold
 
-ENGINE='sales-active/1.0'
+ENGINE='sales-langgraph/2.0'
 
 
 def authorize_part(db,conversation,lead,metadata):
@@ -443,6 +443,8 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
         run.input_snapshot={**run.input_snapshot,'continuity_epoch':continuity.epoch(conversation)}
         db.commit()
         interpretation_audit={}
+        graph_progress={}
+        observation_audit={}
         try:
             action_holds = advisory = approved_policy = capture_profile = case = commercial = count = decision = detect = frame = human_fallback = human_step = interpretation = interpreted_revision = metadata = moderation_decision = next_enabled = next_selected = outcome = p = previous_meta = protected = published_configuration = pure_human = result = revision = row = scoped_names = scoring_pack = state = t = task = terminal_only = terminal_text = trace = u = v = None
             async def interpret_phase():
@@ -546,8 +548,7 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
                     u=terminal_understanding(u,inbound.content) if next_enabled and not operation_context else u
                     u=confirmed_controls(u,inbound.content,pause_reason='HUMAN_REQUESTED' if human_step else protected)
                     interpreted_revision=interpreted.revision
-            from .coordinator_graph import _mode as coordinator_mode
-            observed=coordinator_mode.get()=='graph-observe'
+            observed=True
             async def plan_phase():
                 nonlocal advisory, moderation_decision, outcome, protected, u
                 moderation_decision=None
@@ -626,7 +627,7 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
                 if next_enabled:
                     from dataclasses import replace
                     draft=replace(draft,text=text)
-                metadata={'engine':ENGINE,'workflow_version':'sales-current/1.0','inbound_message_id':inbound.id,'selected_property_type_id':outcome.state.selected_property_type_id}
+                metadata={'engine':ENGINE,'orchestrator':'graph-observe','coordinator_version':'sales-coordinator-graph/2.0','workflow_version':'sales-current/1.0','inbound_message_id':inbound.id,'selected_property_type_id':outcome.state.selected_property_type_id}
                 if next_enabled:metadata['selected_unit_id']=outcome.state.selected_unit_id
                 if human_fallback:metadata['human_contact_interpretation_fallback']=True
                 if moderation_decision:metadata['moderation']=moderation_decision
@@ -874,45 +875,27 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
                     'requires_human':metadata.get('control_outcome')=='handoff','policy_violations':[]}
                 run.status='prepared';conversation.updated_at=workflow_now(datetime);lead.last_interaction_at=workflow_now(datetime)
                 db.add_all([run,conversation,lead]);db.commit()
-            from .coordinator_graph import execute,reconsider_reason,safe_candidate
-            def assess_phase():
-                return not (protected or exact_stop or human_step or terminal_only) and reconsider_reason(u,inbound.content)
-            async def reconsider_phase():
-                nonlocal u,interpreted_revision,interpretation_audit,conversation,lead,project
-                reason=reconsider_reason(u,inbound.content)
-                if not reason:return
-                conversation,lead,project=_current(db,scope)
-                continuity.check_epoch(conversation,run.input_snapshot.get('continuity_epoch'))
-                result=await asyncio.wait_for(preview(db,scope,inbound_message_id=inbound.id,
-                    expected_revision=interpreted_revision,event_key='active-reconsideration:'+inbound.id,
-                    active=True,max_attempts=1,reconsideration={'reason':reason}),timeout=22)
-                interpreted_revision=result.revision
-                candidate=result.state.last_understanding
-                accepted=result.status=='accepted' and candidate is not None and safe_candidate(u,candidate)
-                if accepted:
-                    from .reference_resolution import Resolver
-                    resolver=Resolver(db,scope,result.state)
-                    expected=(result.state.selected_property_type_id,result.state.selected_unit_id)
-                    for ref in candidate.references:
-                        resolved=resolver.resolve(ref)
-                        if resolved.get('status')!='resolved' or (resolved['value'].get('property_id'),resolved['value'].get('unit_id'))!=expected:accepted=False
-                if accepted:u=candidate
-                event=scope.query(db,SalesDialogueEvent).filter_by(event_key='active-reconsideration:'+inbound.id).first()
-                attempts=((event.payload_json or {}).get('metadata') or {}).get('interpretation_attempts',[]) if event else []
-                run.input_snapshot={**run.input_snapshot,'bounded_reconsideration':{'reason':reason,'accepted':accepted,'outcome':result.status,'interpretation_attempts':attempts,'max_additional_calls':1,'effect_authorization':False}}
-                conversation,lead,project=_current(db,scope)
-                continuity.check_epoch(conversation,run.input_snapshot.get('continuity_epoch'))
+            from .coordinator_graph import execute
             async def observe_phase():
-                nonlocal outcome,interpreted_revision,u
+                nonlocal outcome,interpreted_revision,u,observation_audit
+                if not next_enabled:return  # Historical node-unit harness only; deployed next_flow is mandatory.
                 from .observation_loop import run as observe_run
                 def authorize_read():
                     _current(db,scope)
                     continuity.check_epoch(conversation,run.input_snapshot.get('continuity_epoch'))
                 outcome,audit=await observe_run(db,scope,inbound=inbound,outcome=outcome,commercial=commercial,authorize=authorize_read)
+                observation_audit=audit
                 u=outcome.state.last_understanding
                 run.input_snapshot={**run.input_snapshot,'observation_loop':audit}
-            graph_trace=await execute(scope,interpret=interpret_phase,assess=assess_phase,
-                reconsider=reconsider_phase,plan=plan_phase,fulfill=fulfill_phase,observe=observe_phase)
+                if not outcome.results and any(d['status'] in {'decision_rejected','context_limit'} for d in audit['decisions']):
+                    raise ValueError('Commercial observation decision unavailable.')
+            def record_stage(name,completed):
+                nonlocal graph_progress
+                graph_progress={'version':'sales-coordinator-graph/2.0','mode':'graph-observe',
+                    'trace':list(completed),'current_node':name,'status':'running'}
+                run.input_snapshot={**run.input_snapshot,'coordinator_graph':graph_progress}
+            graph_trace=await execute(scope,interpret=interpret_phase,plan=plan_phase,
+                fulfill=fulfill_phase,observe=observe_phase,on_stage=record_stage)
             run.input_snapshot={**run.input_snapshot,'coordinator_graph':graph_trace}
             db.commit()
         except LanguageHold as hold:
@@ -927,6 +910,7 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
             db.rollback()
             from .language_policy import REENTRY,OUTPUT_FALLBACK,VERSION
             run=db.query(AgentRun).filter_by(event_id=event_id).one()
+            run.input_snapshot={**run.input_snapshot,'coordinator_graph':{**graph_progress,'status':'blocked'}}
             run.model='deterministic-language-policy';run.prompt_configuration_id=None
             run.prompt_snapshot={'version':VERSION,'decision':hold.decision.metadata()}
             run.error_code='reply_language_rejected' if hold.output else None
@@ -950,6 +934,7 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
         except Exception as exc:
             db.rollback()
             run=db.query(AgentRun).filter_by(event_id=event_id).one()
+            run.input_snapshot={**run.input_snapshot,'coordinator_graph':{**graph_progress,'status':'failed'},'observation_loop':observation_audit}
             interpretation=scope.query(db,SalesDialogueEvent).filter_by(event_key='active-understanding:'+inbound.id).first()
             trace=(interpretation.payload_json.get('metadata') or {}) if interpretation else {}
             audit=getattr(exc,'sales_interpretation_audit',{}) or interpretation_audit

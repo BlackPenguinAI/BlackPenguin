@@ -18,25 +18,17 @@ from tools.sales_ai.synthetic_fixtures import seed
 from tools.sales_ai.continuity_battery import evaluate_case
 from tools.sales_ai.evaluation_guard import Budget,guard
 
-@pytest.mark.parametrize('mode', ['classic','graph','graph-reconsider'])
-def test_graph_runs_actions_once_and_reconsideration_at_most_once(mode):
-    from types import SimpleNamespace
-    calls=[]
-    def callback(name):
-        async def invoke():calls.append(name)
-        return invoke
-    with experiment(mode),patch('app.modules.sales_agent.execution.simulated',lambda scope:True):
-        result=asyncio.run(execute(SimpleNamespace(),interpret=callback('interpret'),assess=lambda:True,
-            reconsider=callback('reconsider'),plan=callback('plan'),fulfill=callback('fulfill')))
-    assert calls.count('plan')==calls.count('fulfill')==1
-    assert calls.count('reconsider')==int(mode=='graph-reconsider')
-    assert result['reconsiderations']==int(mode=='graph-reconsider')
+@pytest.mark.parametrize('mode',['classic','graph','graph-reconsider'])
+def test_obsolete_engine_names_are_rejected(mode):
+    with pytest.raises(ValueError,match='Only graph-observe'):
+        with experiment(mode):
+            raise AssertionError('An obsolete engine must never execute.')
 
 
-def test_candidate_cannot_be_selected_for_a_live_conversation():
-    async def no_op():raise AssertionError('No production stage may run.')
-    with experiment('graph'),pytest.raises(PermissionError):
-        asyncio.run(execute(None,interpret=no_op,assess=lambda:True,reconsider=no_op,plan=no_op,fulfill=no_op))
+def test_missing_observation_callback_cannot_silently_run_old_sequence():
+    async def forbidden():raise AssertionError('No callback should run.')
+    with pytest.raises(ValueError):
+        asyncio.run(execute(None,interpret=forbidden,plan=forbidden,fulfill=forbidden,observe=None))
 
 @pytest.mark.parametrize('text',['Do not send photos.','My friend said show me photos.','If I asked for photos, what then?'])
 def test_negative_or_reported_messages_do_not_get_optional_reconsideration(text):
@@ -49,64 +41,6 @@ def test_reconsideration_cannot_broaden_actions_or_raise_confidence_in_code():
     assert not safe_candidate(original,understanding('Could I get those?','appointment'))
     assert not safe_candidate(original,original)
     assert original.confidence==0
-
-@pytest.mark.parametrize('scenario',['resume_cedar_viewing','resume_bay_see','context_visit_see'])
-def test_graph_and_reference_have_identical_public_dialogue_and_booking(lab,scenario,tmp_path,monkeypatch):
-    original_db,_=lab;results=[]
-    for mode in ('classic','graph'):
-        upload=tmp_path/mode;monkeypatch.setattr(settings,'PROJECT_UPLOAD_ROOT',str(upload/'uploads'))
-        engine=create_engine('sqlite://');Base.metadata.create_all(engine)
-        with Session(engine,autoflush=original_db.autoflush) as db:
-            manifest=seed(db,upload/'materials')
-            db.add(AIConfiguration(id='graph-config',company_id=None,openrouter_api_key='OFFLINE',agent_ventas={'model':'test/offline'}))
-            db.add(PromptVersion(company_id=None,agent_key='sales',version_number=1,is_published=True,configuration={'model':'test/offline'}));db.commit()
-            original=httpx.AsyncClient
-            class Client(original):
-                def __init__(self,**kw):super().__init__(transport=httpx.MockTransport(replay_provider(scenario)),trust_env=False,**kw)
-            with experiment(mode),guard(Budget(60)),patch.object(httpx,'AsyncClient',Client),patch('app.integrations.openrouter_client.record_openrouter_usage',lambda **kw:None):
-                result=asyncio.run(evaluate_case(db,manifest,scenario,Budget(60),10))
-            assert not [c for t in result['turns'] for c in t['checks'] if c['status']!='PASS']
-            assert all(c['status']=='PASS' for c in result['checks'])
-            assert all(t['coordinator_graph']['mode']==mode for t in result['turns'])
-            public=[(t['action'],re.sub(r'https?://\S+','[material]',t['reply'])) for t in result['turns']]
-            results.append((public,[(m['property_id'],str(m['time'])) for m in result['meetings']]))
-        engine.dispose()
-    assert results[0]==results[1]
-
-
-def test_real_candidate_reconsiders_once_before_any_material_share_or_booking(lab,monkeypatch):
-    db,manifest=lab
-    from app.modules.sales_crm.models import Lead,Meeting
-    from app.modules.sales_agent.models import SalesConversation,AgentRun,OutboundMessage
-    from app.modules.sales_agent.current_simulation import turn
-    from app.modules.sales_agent.dialogue_store import Scope,save
-    from app.modules.sales_agent.understanding_contract import DialogueState
-    project=manifest['projects'][1];prop=project['properties'][0]
-    db.add(AIConfiguration(id='one-retry',company_id=None,openrouter_api_key='OFFLINE',agent_ventas={'model':'test/offline'}))
-    db.add(PromptVersion(company_id=None,agent_key='sales',version_number=1,is_published=True,configuration={'model':'test/offline'}))
-    lead=Lead(company_id=manifest['company_id'],project_id=project['id'],full_name='Synthetic Retry',phone='+15550103333',is_demo=True,is_test=True,platform='evaluation',consent_status='granted_simulation',agent_status='simulation',pipeline_stage='S01_RESEARCH');db.add(lead);db.flush()
-    conv=SalesConversation(company_id=lead.company_id,project_id=project['id'],lead_id=lead.id,channel='simulation',provider='simulation',is_paused=False);db.add(conv);db.flush()
-    save(db,Scope(lead.company_id,project['id'],conv.id,lead.id),event_key='interest',expected_revision=0,state=DialogueState(selected_property_type_id=prop['id']));db.commit()
-    text='Could I get those pictures?';seen=[];original=httpx.AsyncClient
-    def provider(req):
-        payload=json.loads(req.content)
-        if payload['response_format']['json_schema']['name']!='sales_understanding':return replay_provider('resume_cedar_viewing')(req)
-        assert db.query(Meeting).count()==db.query(OutboundMessage).count()==0
-        extra=any('bounded_reconsideration' in m.get('content','') for m in payload['messages'])
-        seen.append(extra)
-        data=understanding(text,'materials',confidence=1.0 if extra else 0,subjects={0:'photos'}).model_dump(mode='json')
-        return httpx.Response(200,json={'choices':[{'message':{'content':json.dumps(data)}}]})
-    class Client(original):
-        def __init__(self,**kw):super().__init__(transport=httpx.MockTransport(provider),trust_env=False,**kw)
-    with experiment('graph-reconsider'),guard(Budget(8)),patch.object(httpx,'AsyncClient',Client),patch('app.integrations.openrouter_client.record_openrouter_usage',lambda **kw:None):
-        asyncio.run(turn(db,company_id=lead.company_id,lead_id=lead.id,inbound_text=text,event_id='one-retry'))
-    run=db.query(AgentRun).filter_by(event_id='one-retry').one()
-    assert not run.error_code,run.output_snapshot
-    assert seen==[False,True]
-    assert run.input_snapshot['coordinator_graph']['trace']==['interpret','assess','reconsider','assess','plan','fulfill']
-    assert run.input_snapshot['bounded_reconsideration']['accepted'] is True
-    assert db.query(Meeting).count()==db.query(OutboundMessage).count()==0
-
 
 @pytest.mark.parametrize('text',['Can you show me pictures?','Could you send us images?','We would like to view blueprints.'])
 def test_literal_material_recovery_is_a_scoped_read_with_original_confidence(lab,text):
@@ -138,7 +72,7 @@ def test_failed_optional_reconsideration_falls_back_without_any_action(lab):
     assert u.confidence==0
 
 
-@pytest.mark.parametrize('mode',['classic','graph','graph-reconsider'])
+@pytest.mark.parametrize('mode',['graph-observe'])
 def test_cli_prepare_records_mode_without_contacting_a_model(mode,tmp_path):
     import subprocess,sys
     target=tmp_path/'prepared'
@@ -153,7 +87,7 @@ def test_cli_rejects_candidate_for_an_unrelated_suite_before_credential_read(tmp
     import subprocess,sys
     run=subprocess.run([sys.executable,'-m','tools.sales_ai.synthetic_lab','--suite','needs-discovery',
         '--orchestrator','graph','--prepare-only','--output',str(tmp_path/'bad')],capture_output=True,text=True)
-    assert run.returncode==2 and 'requires continuity-battery' in run.stderr
+    assert run.returncode==2 and 'invalid choice' in run.stderr
 
 
 @pytest.mark.parametrize('change',[None,'sales_model','configuration_sha256','commit'])

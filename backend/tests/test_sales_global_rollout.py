@@ -79,7 +79,7 @@ def test_global_engine_processes_a_new_company_without_republishing_ids(agent):
     agent.db.add(conversation);agent.db.commit()
     agent.company,agent.project,agent.lead,agent.conversation=company,project,lead,conversation
     _,run=agent.turn('Hello',understanding('Hello','other'))
-    assert run.graph_version=='sales-active/1.0'
+    assert run.graph_version=='sales-langgraph/2.0'
     agent.legacy.assert_not_called()
 
 

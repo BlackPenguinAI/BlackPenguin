@@ -1,0 +1,141 @@
+{
+  "base_commit": "cb302013b764f2102b7959eb195f35cba7a8212d",
+  "files": [
+    {
+      "path": "backend/app/modules/health/router.py",
+      "sha256": "fd4a586ca88713131413518210478422d84d0888c653c9e08193901fd72d59bb"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/active_service.py",
+      "sha256": "b98264a0c884b2ed471685ed4b5f62c6ba0ae7595241aa78ede007dccfcb7897"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/coordinator_graph.py",
+      "sha256": "42713316039e50744e0383f76d204ca30315d421db54626d0b707fc313472c50"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/observation_loop.py",
+      "sha256": "37668202c254e682b158ebaa429b00214fd162b874b7d78a6d18aa3c572b993f"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/runtime_errors.py",
+      "sha256": "e9dcdd1e33165fee1ba3fd90f56c9db79af35693d8ea8338bf2f2869913ad073"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/runtime_health.py",
+      "sha256": "ef6815273b6404b359132d0e908ae414921ec62342e18857024dc082bcf4921d"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/turn_planner.py",
+      "sha256": "b50166220cc32e571479fefff1f12fe818376484e66d990286562d06bdca04f6"
+    },
+    {
+      "path": "backend/tests/conftest.py",
+      "sha256": "34f2f67a4ae140a7026a54f3bcd5a2cf5295fdf684e7b048b02e1971b78244d0"
+    },
+    {
+      "path": "backend/tests/test_sales_coordinator_graph.py",
+      "sha256": "164c3cec0323a985c1b66400e452e1a5c7578340602f08a7d2d2dcaf0a81a6db"
+    },
+    {
+      "path": "backend/tests/test_sales_global_rollout.py",
+      "sha256": "1be3bca89cad57d621a95164ad16a765cd2ed08fed7622c062a8afe4bcd75b51"
+    },
+    {
+      "path": "backend/tests/test_sales_observation_loop.py",
+      "sha256": "ae68de185dafc02b00367a66672fd4b01310b7a9e6ecc535b5ceea8f5fd12135"
+    },
+    {
+      "path": "backend/tests/test_sales_observation_repair.py",
+      "sha256": "04b588148334107ce5b8ded1c5c3fa5e1e92be4b2efd0ef94ed79d06afab2123"
+    },
+    {
+      "path": "backend/tests/test_sales_observation_repair2.py",
+      "sha256": "402d11b34ac5450cf58df176d4e62d73921e99c92a0d8d4ff651957e921a1e32"
+    },
+    {
+      "path": "backend/tests/test_sales_understanding_recovery.py",
+      "sha256": "5b55e85083f3b3da5f57953fff9b664da32c2e04a330e5378e0b900bb5e06b2f"
+    },
+    {
+      "path": "backend/tests/test_sales_unified_graph.py",
+      "sha256": "06d9a2ecbdf660598b13359a8c22cbabeaee50f5c2c32473aa9ec3cd763c009c"
+    },
+    {
+      "path": "backend/tools/sales_ai/booking_pilot_worker.py",
+      "sha256": "0e6a587001d5af6f4b6d5d69b7921b0b0d32685f9ae66749eeb9dc01e7b9cde2"
+    },
+    {
+      "path": "backend/tools/sales_ai/inspect_commercial_graph.py",
+      "sha256": "da80a4e320cdfa5a7dd9666359ec2d912329090ed59e85bbcb826da72a94e2df"
+    },
+    {
+      "path": "backend/tools/sales_ai/synthetic_lab.py",
+      "sha256": "548b668f7bee010653954082444ef6b2e84984b7171334d0a6ee0a30faa7f8aa"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/langgraph-integrado/aceptacion-local.json",
+      "sha256": "b8e611d821dfe803f92ae3c51c3a0a4508c587afdf3934e6d169923027c8be7d"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/langgraph-integrado/backend-junit-1.xml",
+      "sha256": "a373c419c2e75264bcaf228a636b4a3a640920d54ce78b081784e9b2d8005d92"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/langgraph-integrado/backend-junit-2.xml",
+      "sha256": "079d4246e6b60f14e167eb62165db05038d560b2a086dfd42efadf89598e219f"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/langgraph-integrado/backend-junit-3.xml",
+      "sha256": "5aef1db4a0710a173cff1b402a0037355270c621ccb84f8bdc8b64f585d402c2"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/langgraph-integrado/evolucion-seis-casos.png",
+      "sha256": "f5ea88e5c51a6a629f4aec31ce86ecf62949b2f995fa6aacae59c70c8398b68d"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/langgraph-integrado/evolucion.py",
+      "sha256": "22d4cc7d8efaab6443567efcabdf6b16342195284953116487c1762778e8abc5"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/langgraph-integrado/fronteras-junit.xml",
+      "sha256": "c12af9b3ffd30ba98ffdd5a55f1d12bc578d551031c472b8014746382bd3f7cb"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/langgraph-integrado/historico-servidor.json",
+      "sha256": "c85581c185ea4a9a9c42740560ddadde8365d274650cbd5ef3534c4c61d2458a"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/langgraph-integrado/shard-1-manifest.json",
+      "sha256": "1a399a8a1bb63250da59e06c1e9683add9a1b237207f47b68afec9f4efa6cdfe"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/langgraph-integrado/shard-2-manifest.json",
+      "sha256": "2b6f06150589d68be2ef8bc1266f89fd8367dbb55d46217d6cf0b4a1f01dfd42"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/langgraph-integrado/shard-3-manifest.json",
+      "sha256": "68d63ce28eaa52c1096af92d4bf9d08623ca1ce641308457eb8e34760eacf451"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/langgraph-integrado/validacion-local.json",
+      "sha256": "7868f5221a62f705b782c83cd128001db706ec1603076dd7dd3a27110133cbfe"
+    },
+    {
+      "path": "docs/sales-agent/06-como-ejecutar-las-pruebas/ejecutar-langgraph-integrado.sh",
+      "sha256": "40dc9bae06cf548c7d096ece5471329c14684b823b9bdc0bd83b493168710895"
+    },
+    {
+      "path": "docs/sales-agent/06-como-ejecutar-las-pruebas/entrega-langgraph-integrado.md",
+      "sha256": "ab2b08a2447d9230922134e8ab9b1622556eb6a57dbc93375026260821f9f9d0"
+    },
+    {
+      "path": "docs/sales-agent/06-como-ejecutar-las-pruebas/exportar-conversacion-langgraph.sh",
+      "sha256": "908166140e5f1bc580901ba5718aa85350f011fa4426d5c01a83fd5d5113e879"
+    },
+    {
+      "path": "docs/sales-agent/README.md",
+      "sha256": "0851dd0e3eaa21b4ae88fdd8c4617e315e791a3e6d27efec5c114d5e45f19415"
+    }
+  ]
+}

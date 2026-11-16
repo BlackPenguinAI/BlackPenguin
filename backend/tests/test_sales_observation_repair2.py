@@ -32,7 +32,7 @@ def recorded_provider(recording,scenario):
 
 @pytest.mark.parametrize('scenario',CASES)
 @pytest.mark.parametrize('recording',['reference','candidate'])
-@pytest.mark.parametrize('mode',['classic','graph-observe'])
+@pytest.mark.parametrize('mode',['graph-observe'])
 def test_recorded_server_interpretations_complete_short_journeys(lab,scenario,recording,mode,tmp_path):
     from app.modules.ai_core.models import AIConfiguration,PromptVersion
     db,manifest=lab

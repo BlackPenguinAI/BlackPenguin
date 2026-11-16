@@ -1,4 +1,4 @@
-"""Sandbox-only model -> authorized read -> observation -> model loop.
+"""Shared live/synthetic model -> authorized read -> observation -> model loop.
 
 Existing scoped state is canonical. This module cannot reserve, share a file,
 change a restriction or reinterpret the lead. Results feed the existing composer.
@@ -16,7 +16,7 @@ from .execution import simulated,now
 
 class DecisionError(ValueError):pass
 
-VERSION='sales-observation-loop/1.2'
+VERSION='sales-observation-loop/2.0'
 READS={'catalog','property_details','materials','financing','pricing','inventory','location','delivery','amenities'}
 
 class Decision(BaseModel):
@@ -41,7 +41,6 @@ def compact(result):
 
 
 async def run(db,scope,*,inbound,outcome,commercial,infer=None,authorize=None):
-    if not simulated(scope):raise PermissionError('Observation-loop candidates require a scoped sandbox.')
     authorize=authorize or (lambda:check_scope(db,scope))
     authorize()
     state=outcome.state;u=state.last_understanding;plan=dict(outcome.plan or {})
@@ -60,10 +59,15 @@ async def run(db,scope,*,inbound,outcome,commercial,infer=None,authorize=None):
             return await generate_llm_response(config.openrouter_api_key,guidance['model'],messages,
                 response_format={'type':'json_schema','json_schema':{'name':'sales_observation_decision','strict':True,'schema':schema}},
                 temperature=0,raise_on_error=True,usage_context=LLMUsageContext(company_id=scope.company_id,project_id=scope.project_id,feature='sales_observation_loop'))
+    def is_read(task):
+        return task.topic.value in READS or task.topic.value=='appointment' and bool(u.appointment_query) and task.source_message_id==inbound.id
+    def read_blocked(task):
+        return restricted(state,task) and not (task.topic.value=='appointment' and u.appointment_query)
     def refresh():
         options.clear()
         for task in current:
-            if task.topic.value not in READS or task.status not in {'pending','suspended'} or restricted(state,task) or task.binding_status=='unresolved':continue
+            if not is_read(task) or task.status not in {'pending','suspended'} or read_blocked(task) or task.binding_status=='unresolved':continue
+            if not all(any(t.id==dep and t.status=='completed' for t in state.tasks) for dep in task.depends_on):continue
             key='read_'+task.id
             if key not in attempted:options[key]=('task',task,{'topic':task.topic.value,'subject':task.subject,'property_id':task.property_id,'unit_id':task.unit_id,'alternative_group':task.alternative_group})
         for result in results:
@@ -112,10 +116,10 @@ async def run(db,scope,*,inbound,outcome,commercial,infer=None,authorize=None):
         nonlocal availability_seen
         for key in s['selected']:
             if key in attempted:continue
-            if len(trace)>=min(6,(plan.get('limits') or {}).get('read_units',12)//2):
+            if len(trace)>=min(6,(plan.get('limits') or {}).get('steps',8),(plan.get('limits') or {}).get('read_units',12)//2):
                 decisions.append({'status':'read_cost_limit'});break
             attempted.add(key);kind,task,_=options[key];authorize()
-            if restricted(state,task) or kind=='task' and task.status not in {'pending','suspended'}:continue
+            if read_blocked(task) or kind=='task' and task.status not in {'pending','suspended'}:continue
             if kind=='availability':
                 from .first_booking import normalize_timing,search_slots
                 from app.modules.projects.models import Project
@@ -132,7 +136,7 @@ async def run(db,scope,*,inbound,outcome,commercial,infer=None,authorize=None):
                     task_id='alt_'+task.id[:45];operation_id=task_id;subject=None
                     derived=Task(id=task_id,topic='materials',subject=None,status='pending',property_id=task.property_id,unit_id=task.unit_id,binding_status=task.binding_status,source_message_id=inbound.id)
                     target_state=state.model_copy(deep=True);target_state.tasks.append(derived)
-                call=ToolCall(operation_id=operation_id,task_id=task_id,topic=task.topic,subject=subject,property_id=task.property_id,unit_id=task.unit_id)
+                call=ToolCall(operation_id=operation_id,task_id=task_id,topic=task.topic,subject=subject,property_id=task.property_id,unit_id=task.unit_id,appointment_query=u.appointment_query if task.topic.value=='appointment' else None)
                 if kind=='task' and u.comparison and u.comparison.request_id in task.request_ids:
                     from .property_comparison import ComparisonRead,Target
                     targets=[];unresolved=False
@@ -145,11 +149,17 @@ async def run(db,scope,*,inbound,outcome,commercial,infer=None,authorize=None):
                         if prop or unit:targets.append(Target(kind='unit' if unit else 'property',property_id=prop,unit_id=unit))
                         else:unresolved=True
                     call.comparison=ComparisonRead(directive=u.comparison,targets=targets,unresolved=unresolved)
-                result=gateway.execute(call,target_state)
+                try:result=gateway.execute(call,target_state)
+                except Exception as exc:result=ToolResult(operation_id=operation_id,status='error',safe_message=type(exc).__name__)
                 if kind=='alternatives':
                     result=result.model_copy(update={'data':{'material_alternatives':result.data.get('materials',[]),'discovery_only':True}})
                 else:
-                    record_result(state,task,result)
+                    group=task.alternative_group;task.alternative_group=None
+                    record_result(state,task,result);task.alternative_group=group
+                    match=task.topic.value!='materials' and task.status=='completed' or task.topic.value=='materials' and result.data.get('coverage_confirmed') and any(a.get('has_file') or a.get('links') for a in result.data.get('materials',[]))
+                    if group and match:
+                        for other in state.tasks:
+                            if other.id!=task.id and other.alternative_group==group:other.status='cancelled'
                     if call.comparison and result.status=='success':
                         state.pending_comparison=None;state.pending_comparison_references=[]
             results.append(result);trace.append({'tool_id':key,'status':result.status,'operation_id':result.operation_id,'arguments':options[key][2],'external_writes':0})
@@ -164,10 +174,11 @@ async def run(db,scope,*,inbound,outcome,commercial,infer=None,authorize=None):
     for task in current:
         if task.topic.value=='other':task.status='completed'
     plan.update(tool_calls=len(trace),read_units=len(trace)*2,additional_model_calls=sum(d['status'] in {'accepted','decision_rejected'} for d in decisions),rounds=[{'round':i+1} for i in range(rounds)])
-    unread=[t.id for t in current if t.topic.value in READS and 'read_'+t.id not in attempted and t.status in {'pending','blocked','suspended','awaiting_user'} and not restricted(state,t)]
+    unread=[t.id for t in current if is_read(t) and 'read_'+t.id not in attempted and t.status in {'pending','blocked','suspended','awaiting_user'} and not restricted(state,t)]
     clarification_needed=u.requires_clarification or any(t.binding_status=='unresolved' and t.status in {'pending','blocked','suspended','awaiting_user'} and not restricted(state,t) for t in current) or any(r.status=='uncertain' and r.data.get('needs_temporal_clarification') for r in results)
     audit={'clarification_required':clarification_needed,'unread_required_tasks':unread,'observations':[compact(r) for r in results],'version':VERSION,'rounds':rounds,'max_rounds':2,'decisions':decisions,'tools':trace,'external_writes':0,
            'status':'FAIL' if any(d['status']!='accepted' for d in decisions) else 'CLARIFICATION_REQUIRED' if clarification_needed else 'PARTIAL' if unread else 'PASS'}
     revision,state=save(db,scope,event_key='active-observations:'+inbound.id,expected_revision=outcome.revision,state=state,
         metadata={'observation_loop':audit,'results':[r.model_dump(mode='json') for r in results],'message_id':inbound.id})
-    return replace(outcome,revision=revision,state=state,results=tuple(results),plan=plan,stop_reason='finished' if audit['status']=='PASS' else 'clarification_required' if audit['status']=='CLARIFICATION_REQUIRED' else 'observation_decision_failed'),audit
+    stop_reason='read_cost_limit' if any(d['status']=='read_cost_limit' for d in decisions) else 'finished' if audit['status']=='PASS' else 'clarification_required' if audit['status']=='CLARIFICATION_REQUIRED' else 'observation_decision_failed'
+    return replace(outcome,revision=revision,state=state,results=tuple(results),plan=plan,stop_reason=stop_reason),audit

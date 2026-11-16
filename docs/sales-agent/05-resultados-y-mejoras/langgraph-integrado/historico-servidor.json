@@ -1,0 +1,32 @@
+{
+  "scope": "six fixed scripted synthetic cases; graph-observe only",
+  "commercial_quality": "NOT_EVALUATED",
+  "rows": [
+    {
+      "commit": "31023e0",
+      "graph_cases_pass": 4,
+      "cases": 6,
+      "graph_calls": 127,
+      "graph_cost_usd": 0.11234655,
+      "source": "sales-observation-comparison.zip"
+    },
+    {
+      "commit": "ba5c4c5",
+      "graph_cases_pass": 5,
+      "cases": 6,
+      "graph_calls": 134,
+      "graph_cost_usd": 0.12726405,
+      "source": "sales-observation-repair-1-comparison.zip"
+    },
+    {
+      "commit": "cb30201",
+      "graph_cases_pass": 6,
+      "cases": 6,
+      "graph_calls": 130,
+      "graph_cost_usd": 0.11303685,
+      "source": "sales-observation-repair-2-comparison.zip"
+    }
+  ],
+  "total_graph_calls": 391,
+  "total_graph_cost_usd": 0.35264745
+}

@@ -1,0 +1,53 @@
+{
+  "base_commit": "cb302013b764f2102b7959eb195f35cba7a8212d",
+  "paid_model_calls": 0,
+  "paid_cost_usd": 0,
+  "model_quality_evaluated": false,
+  "engine_after_deployment": "sales-langgraph/2.0",
+  "orchestrator": "graph-observe",
+  "graph_version": "sales-coordinator-graph/2.0",
+  "regression": {
+    "shards": [
+      {
+        "shard": 1,
+        "passed": 1197,
+        "skipped": 5
+      },
+      {
+        "shard": 2,
+        "passed": 1251,
+        "skipped": 2
+      },
+      {
+        "shard": 3,
+        "passed": 1241,
+        "skipped": 4
+      }
+    ],
+    "passed": 3689,
+    "skipped": 11,
+    "failed": 0,
+    "modules": 149,
+    "coverage_verifier": "PASS"
+  },
+  "targeted_boundary_retest": {
+    "passed": 11,
+    "failed": 0,
+    "scope": "SMS and WhatsApp entry, idempotency, permission revocation, read-only historical export, safe decision failure",
+    "overlaps_regression": true,
+    "not_added_to_regression_total": true
+  },
+  "acceptance": {
+    "PASS": 63,
+    "FAIL": 0,
+    "NOT_RUN": 1
+  },
+  "sharding_unit_tests": 8,
+  "limitations": [
+    "Offline providers only; no new production-model quality measurement.",
+    "No real SMS, WhatsApp or Calendar delivery executed.",
+    "PostgreSQL-specific tests skipped locally; deployment CI must complete its checks.",
+    "Same six synthetic scripts and five expected visits must run after deployment.",
+    "Historical comparison-only regression duplicates replaced with single-engine checks."
+  ]
+}

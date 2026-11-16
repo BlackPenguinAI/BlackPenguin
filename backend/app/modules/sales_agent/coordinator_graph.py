@@ -1,62 +1,46 @@
-"""Explicit experimental orchestration over the same production services.
+"""Single LangGraph coordinator for live and synthetic commercial turns.
 
-No checkpointer owns business state: existing scoped events/receipts remain
-canonical. Only a task-local sandbox may choose a candidate mode. Production
-uses the sequential reference until observed comparison has been reviewed.
+Scoped database events/receipts own state; the graph never bypasses effect
+permissions. Historical orchestration names are rejected, not fallback engines.
 """
-from contextvars import ContextVar
 from contextlib import contextmanager
 from typing import TypedDict
-from langgraph.graph import StateGraph,START,END
+from langgraph.graph import StateGraph, START, END
 
-VERSION='sales-coordinator-graph/1.0'
-_mode=ContextVar('sales_coordinator_mode',default='classic')
-MODES=('classic','graph','graph-reconsider','graph-observe')
+VERSION = 'sales-coordinator-graph/2.0'
+MODE = 'graph-observe'
+MODES = (MODE,)
 
 @contextmanager
-def experiment(mode):
-    if mode not in MODES:raise ValueError('Unknown coordinator mode.')
-    token=_mode.set(mode)
-    try:yield
-    finally:_mode.reset(token)
+def experiment(mode=MODE):
+    """Compatibility context for laboratory callers; no engine selector."""
+    if mode != MODE:
+        raise ValueError('Only graph-observe is supported for commercial conversations.')
+    yield
 
 class State(TypedDict):
-    trace:list[str]
-    reconsiderations:int
-    retry:bool
+    trace: list[str]
 
-async def execute(scope,*,interpret,assess,reconsider,plan,fulfill,observe=None):
-    mode=_mode.get()
-    if mode=='classic':
-        await interpret();await plan();await fulfill()
-        return {'version':VERSION,'mode':mode,'trace':['interpret','plan','fulfill'],'reconsiderations':0}
-    from .execution import simulated
-    if not simulated(scope):raise PermissionError('Candidate graphs require a scoped simulation.')
-    def node(name,callback):
+async def execute(scope, *, interpret, plan, fulfill, observe, assess=None, reconsider=None, on_stage=None):
+    """Same topology in live traffic and simulations, without a classic branch."""
+    if observe is None:
+        raise ValueError('The commercial graph requires an observation callback.')
+    def node(name, callback):
         async def invoke(state):
+            if on_stage is not None:on_stage(name, state['trace'])
             await callback()
-            return {'trace':[*state['trace'],name]}
+            return {'trace': [*state['trace'], name]}
         return invoke
-    async def assess_node(state):
-        retry=bool(mode=='graph-reconsider' and state['reconsiderations']==0 and assess())
-        return {'trace':[*state['trace'],'assess'],'retry':retry}
-    async def reconsider_node(state):
-        await reconsider()
-        return {'trace':[*state['trace'],'reconsider'],'reconsiderations':state['reconsiderations']+1}
-    g=StateGraph(State)
-    g.add_node('interpret',node('interpret',interpret));g.add_node('assess',assess_node)
-    g.add_node('reconsider',reconsider_node);g.add_node('plan',node('plan',plan));g.add_node('fulfill',node('fulfill',fulfill))
-    g.add_edge(START,'interpret');g.add_edge('interpret','assess')
-    g.add_conditional_edges('assess',lambda s:'reconsider' if s['retry'] else 'plan')
-    g.add_edge('reconsider','assess')
-    if mode=='graph-observe':
-        if observe is None:raise ValueError('Observation mode requires a real observation callback.')
-        g.add_node('observe',node('observe',observe));g.add_edge('plan','observe');g.add_edge('observe','fulfill')
-    else:g.add_edge('plan','fulfill')
-    g.add_edge('fulfill',END)
-    state=await g.compile().ainvoke({'trace':[],'reconsiderations':0,'retry':False},config={'recursion_limit':10})
-    return {'version':VERSION,'mode':mode,'trace':state['trace'],'reconsiderations':state['reconsiderations']}
-
+    graph = StateGraph(State)
+    stages = [('interpret', interpret), ('plan', plan), ('observe', observe), ('fulfill', fulfill)]
+    for name, callback in stages:
+        graph.add_node(name, node(name, callback))
+    graph.add_edge(START, 'interpret')
+    for (before, _), (after, _) in zip(stages, stages[1:]):
+        graph.add_edge(before, after)
+    graph.add_edge('fulfill', END)
+    state = await graph.compile().ainvoke({'trace': []}, config={'recursion_limit': 8})
+    return {'version': VERSION, 'mode': MODE, 'trace': state['trace'], 'reconsiderations': 0, 'status': 'completed'}
 
 def reconsider_reason(value,text):
     """Only a low-confidence, single informational material request can retry."""
