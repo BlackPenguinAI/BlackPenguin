@@ -254,3 +254,23 @@ def focused_material_question(value,text,state,commercial):
     if any(ref.kind not in {'property','material'} or ref.kind=='property' and
            ref.expression.casefold() not in {name.casefold(),'this property','the property','that property'} for ref in value.references):return None
     return 'Would you like '+labels[subject]+' of '+name+'?'
+
+
+def mixed_material_financing_read(db,scope,value,text):
+    """Exact independent reads for a resolved active owner, never visit consent."""
+    from app.modules.governance.services import request_attribution
+    from .dialogue_store import load
+    from .reference_resolution import Resolver
+    pattern=(r"\s*(?:(?:can|could|would) you |please )?(?:send|show|share)(?: me| us)? "
+             r"(?:the )?(?:photos|pictures|images) or (?:a |the )?(?:brochure|PDF) "
+             r"and (?:explain|describe) (?:the )?(?:financing|payment) options[?.!]?\s*")
+    if request_attribution(text)['current_text']!=text or not re.fullmatch(pattern,text,re.I):return False
+    if any(getattr(value,k) for k in ('comparison','constraints','releases','visit','reschedule','cancellation','wait','moderation','appointment_query','preferences','personal_facts','preference_withdrawals','source_purposes','objections')):return False
+    if len(value.requests)!=3 or len(value.alternatives)!=1:return False
+    materials=[q for q in value.requests if q.topic.value=='materials' and q.polarity=='request']
+    finance=[q for q in value.requests if q.topic.value=='financing' and q.polarity=='request']
+    if len(materials)!=2 or {q.subject for q in materials}!={'photos','brochure'} or len(finance)!=1:return False
+    if set(value.alternatives[0].request_ids)!={q.id for q in materials} or set(value.all_of)!={finance[0].id}:return False
+    if any(q.reference_id or not q.evidence or q.evidence not in text for q in value.requests) or value.references:return False
+    _,state=load(db,scope)
+    return bool(not state.selected_unit_id and Resolver(db,scope,state).bound('property',state.selected_property_type_id))

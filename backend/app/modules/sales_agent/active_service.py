@@ -566,10 +566,11 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
                 from .needs_search import literal_read,contextual_read, VERSION as NEEDS_VERSION
                 literal_needs_read=bool(next_enabled and literal_read(u,inbound.content))
                 contextual_needs_read=bool(next_enabled and contextual_read(db,scope,u,inbound.content))
-                from .dialogue_continuity import catalog_choice_read,comparison_read,literal_greeting,named_choice_read,focused_visit_question,literal_material_read,focused_material_question
-                material_read=bool(next_enabled and literal_material_read(db,scope,u,inbound.content))
+                from .dialogue_continuity import catalog_choice_read,comparison_read,literal_greeting,named_choice_read,focused_visit_question,literal_material_read,focused_material_question,mixed_material_financing_read
+                mixed_read=bool(next_enabled and mixed_material_financing_read(db,scope,u,inbound.content))
+                material_read=bool(next_enabled and literal_material_read(db,scope,u,inbound.content) or mixed_read)
                 if material_read:
-                    run.input_snapshot={**run.input_snapshot,'dialogue_read_authorization':{'basis':'literal_scoped_material_request','model_confidence':u.confidence,'effect_authorization':False,'share_requires_backend_validation':True}}
+                    run.input_snapshot={**run.input_snapshot,'dialogue_read_authorization':{'basis':'literal_current_material_or_and_financing' if mixed_read else 'literal_scoped_material_request','model_confidence':u.confidence,'effect_authorization':False,'share_requires_backend_validation':True}}
                 greeting_read=bool(next_enabled and literal_greeting(u,inbound.content))
                 if greeting_read:
                     run.input_snapshot={**run.input_snapshot,'dialogue_read_authorization':{'basis':'literal_greeting_no_actions','model_confidence':u.confidence,'effect_authorization':False}}

@@ -1,0 +1,52 @@
+{
+  "base_commit": "400593e05e379c4144e3269a69693a7e1ab25fb3",
+  "source_server_run": "sales-graph-repair-2.zip",
+  "paid_calls": 0,
+  "paid_cost_usd": 0,
+  "real_model_quality_evaluated": false,
+  "interpretation_system": "sales-interpretation-system/2.8",
+  "orchestrator": "graph-observe",
+  "regression": {
+    "passed": 3861,
+    "skipped": 11,
+    "failed": 0,
+    "modules": 152,
+    "shards": [
+      {
+        "shard": 1,
+        "passed": 1262,
+        "skipped": 5
+      },
+      {
+        "shard": 2,
+        "passed": 1285,
+        "skipped": 2
+      },
+      {
+        "shard": 3,
+        "passed": 1314,
+        "skipped": 4
+      }
+    ],
+    "coverage": "all modules once in final evidence",
+    "provenance": "Original full shards preserved. Only new module replaced with complete 65-test successful rerun after test-only JSON serialization and negative-contract fixture corrections. No failed business regression removed."
+  },
+  "acceptance": {
+    "PASS": 63,
+    "FAIL": 0,
+    "NOT_RUN": 1
+  },
+  "new_module_passed": 65,
+  "local_examples": {
+    "cases": 6,
+    "lead_turns": 35,
+    "bookings": 5,
+    "interpretations": "recorded server frames",
+    "decision_composition": "simulated"
+  },
+  "limitations": [
+    "Not a new published-model measurement.",
+    "No real transport or Calendar verification.",
+    "Does not establish PostgreSQL concurrent booking behavior."
+  ]
+}

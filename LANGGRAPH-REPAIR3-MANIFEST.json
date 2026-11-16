@@ -1,0 +1,145 @@
+{
+  "base_commit": "400593e05e379c4144e3269a69693a7e1ab25fb3",
+  "files": [
+    {
+      "path": "backend/app/modules/sales_agent/active_service.py",
+      "sha256": "8fdd2de100d83ca22c73f0a0d4e0eb22493804af8cfea36d61a277a7508fb005"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/dialogue_continuity.py",
+      "sha256": "93f76ebe7761047071149a496adafee50bc0b1d8e9e3062585610069ea66ea97"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/interpretation_input.py",
+      "sha256": "bc346483e6af8c5ca0b6de16095b961aea74543c67ceec1faa1a9d44b5d65317"
+    },
+    {
+      "path": "backend/app/modules/sales_agent/interpretation_wire_repairs.py",
+      "sha256": "6edfaff62f6c4d7538344de93a022fa5487ed669fdcb0468b6658f8cbe7e1eee"
+    },
+    {
+      "path": "backend/tests/conftest.py",
+      "sha256": "333276f64f080237e4b82b747c301aee0e8a8a5400024cb11afe11855d4c6a93"
+    },
+    {
+      "path": "backend/tests/fixtures/sales_graph_repair3/server_frames.json",
+      "sha256": "3999cebb8a5c88e6895da98b720aae06ff10200d9c1099aad72118151c7448d2"
+    },
+    {
+      "path": "backend/tests/test_sales_graph_repair3.py",
+      "sha256": "73b46ebc95e0fb5766a03738d1faffadd436e40b296c76ab57ec26826dc815c2"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/corridas.json",
+      "sha256": "f1bc852c2b2dee3985fa4e2c3f4aa3fc44db595210cc221e8db31c5952d10fbf"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/figuras/consumo-global.png",
+      "sha256": "4e8da2570460e35cb36160e4830b393649832d9b61c66d9a32518c4e7b5d694e"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/figuras/panorama-global.png",
+      "sha256": "2e6bf1bebfca7fba63daddc43ec868897b4661337bafb6c65928beae07a41bc4"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/langgraph-integrado/consumo-cuatro-corridas.png",
+      "sha256": "6b8a377d3d3803e8beab7228e5646d1c7d283f383982f79f9a17a838833dda5d"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/langgraph-integrado/evolucion-seis-casos.png",
+      "sha256": "3393546420cbe2fa699ec5da1e4af1b40f9c4d6cd8275854d04c4853d4f4d782"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/langgraph-integrado/evolucion.py",
+      "sha256": "73c81bcdb982206c9066f45831d9a47589ac9ce653c611b00c5af8515271edad"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/langgraph-integrado/historico-servidor.json",
+      "sha256": "4129938a6b9377ca237afa2c27df9dd72b236dcd5f781042dc9bfe91dd37be8b"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/langgraph-reparacion-2-servidor/conversaciones.md",
+      "sha256": "b8525b9afae14af6876a9d63442302a75af49ab3d0cfec7bcf930adbb98ac41f"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/langgraph-reparacion-2-servidor/resultado.json",
+      "sha256": "a4a1cb60687540f10d98a37dc65ec1706147ae91f0fa7900c218eae5950f9fee"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/langgraph-reparacion-3-local/conversaciones-locales.json",
+      "sha256": "7ee926732f330b02ac8020419320ea9ad5661fda2c8ab904914d4c9a863cb901"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/langgraph-reparacion-3-local/conversaciones.md",
+      "sha256": "4cd81f50b96701a0aabe1db0cf906f7f646441a48cdc4701ff783719ef150f30"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/langgraph-reparacion-3-local/validacion-local.json",
+      "sha256": "5f50c9b1523b0f1127ef214b87ddbc412508a0ae8690de71b7d8b886397bfe53"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/langgraph-reparacion-3-local/validacion/aceptacion.json",
+      "sha256": "6d70021b1ea99d8438b7d6cf84c600b31605f3916491a009112cd8142398275c"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/langgraph-reparacion-3-local/validacion/final/backend-junit-1.xml",
+      "sha256": "b0bf1cfe59f97c238a0b000abd4113e7876d37679ba00ef6f6e4e40561ca1ae4"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/langgraph-reparacion-3-local/validacion/final/backend-junit-2.xml",
+      "sha256": "3958c4e7f97a16f48a281ce0ec6f5494749975e53cf7cf715e4fbf3065df879d"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/langgraph-reparacion-3-local/validacion/final/backend-junit-3.xml",
+      "sha256": "e20f30e353ee3447b3ed3c884de32665c9cd245005d81d5b356099006d2fece9"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/langgraph-reparacion-3-local/validacion/final/shard-1-manifest.json",
+      "sha256": "519eeb725d12a6f20026879d4896c702e595ba372051e70cef5dbabff99607a7"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/langgraph-reparacion-3-local/validacion/final/shard-2-manifest.json",
+      "sha256": "6b0246374ff6f12d85636257104131a97b683b82fddbbe46789d6d998a736f55"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/langgraph-reparacion-3-local/validacion/final/shard-3-manifest.json",
+      "sha256": "391dadcabc034ca34a5cc913d0806889d9caf87bfcd2acae53e51d39ec1eb5d7"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/langgraph-reparacion-3-local/validacion/modulo-nuevo-repetido.xml",
+      "sha256": "7ea6200d3314c400da8353bf43723954ddecb026fcc957cd820a2b6880a7df6a"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/langgraph-reparacion-3-local/validacion/original-shard-1.xml",
+      "sha256": "213b958283ff9451404d09837a20b521b7d8645ab73b6042b81b981a079e6488"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/langgraph-reparacion-3-local/validacion/original-shard-2.xml",
+      "sha256": "b4738acbb84430b04d3bc0519b2dd3bb13bff3e88a86c883434798cca8323eab"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/langgraph-reparacion-3-local/validacion/original-shard-3.xml",
+      "sha256": "b02336491ac8ff5f920b489b5a4d3f7ce8fd45f71cefff2b38624f292cc78e3c"
+    },
+    {
+      "path": "docs/sales-agent/05-resultados-y-mejoras/metricas.csv",
+      "sha256": "4845406f582a3a8d09a9acd3bcf6ea256e8aaee4755f528be2af0b238572ce75"
+    },
+    {
+      "path": "docs/sales-agent/06-como-ejecutar-las-pruebas/ejecutar-langgraph-reparacion-3.sh",
+      "sha256": "42178f7a3406e01ec7933f274e8c3fbdfcc0a528928b9625d9e324c17d70f740"
+    },
+    {
+      "path": "docs/sales-agent/06-como-ejecutar-las-pruebas/entrega-langgraph-reparacion-3.md",
+      "sha256": "5978f62d608ff9032a15a61947f65867306e6a8167b49a62ba02575e4337e2ac"
+    },
+    {
+      "path": "docs/sales-agent/06-como-ejecutar-las-pruebas/herramientas/generar_graficas.py",
+      "sha256": "47fdadc9741e51bebec3c492b746931e3c0c8dee22268514af3e7954ba2f74d0"
+    },
+    {
+      "path": "docs/sales-agent/README.md",
+      "sha256": "312eb6e992fd8922bad0e79c60750d072f7d8cb55d40c2d119e4bca8fafa8a12"
+    }
+  ]
+}

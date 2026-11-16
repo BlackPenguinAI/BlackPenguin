@@ -48,3 +48,23 @@ def literal_visit(data,text):
         'visit':dict(action='request',evidence=text,timing=None),'requires_clarification':False,'clarification_question':None}
     fixed.pop('comparison',None)  # Not part of the wire Input schema.
     return fixed,[{'field':'requests','action':'literal_visit_not_comparison','evidence':text,'confidence_unchanged':data['confidence'],'effect_authorization':False}]
+
+
+def literal_property_choice(data,text):
+    """A complete own preference is not a visit or a comparison.
+
+    Only repair its wire shape; scoped names are resolved downstream. Existing
+    appointments are neither replaced nor confirmed by this commercial choice.
+    """
+    from app.modules.governance.services import request_attribution
+    if request_attribution(text)['current_text']!=text:return data,[]
+    match=re.fullmatch(r"\s*(?:Actually[, ]+)?(?:I (?:prefer|choose)|I['’]d prefer) (?P<owner>[\w -]+?)(?: instead)?[.!]?\s*",text,re.I)
+    if not match:return data,[]
+    owner=match['owner'].strip()
+    if re.search(r"\b(?:and|or|not|no|if|visit|view|book|cancel|reschedule|compare|tomorrow|today|at|instead)\b",owner,re.I):return data,[]
+    if any(data.get(k) for k in ('constraints','releases','alternatives','cancellation','reschedule','wait','moderation','appointment_query','personal_facts','preference_withdrawals','source_purposes','objections')):return data,[]
+    if any(q.get('topic') not in {'property_details','catalog','comparison','appointment','other'} or q.get('polarity')!='request' for q in data.get('requests',[])):return data,[]
+    fixed={**data,'requests':[dict(topic='property_details',polarity='request',evidence=text,target=dict(kind='property',expression=owner,evidence=owner))],
+           'preferences':[dict(key='property',value=owner,evidence=text,status='declared')],
+           'selection':None,'visit':None,'requires_clarification':False,'clarification_question':None}
+    return fixed,[dict(field='requests',action='literal_property_preference_not_visit_or_comparison',evidence=text,confidence_unchanged=data['confidence'],effect_authorization=False)]

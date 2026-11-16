@@ -1,0 +1,1213 @@
+{
+  "cases": [
+    {
+      "case": "obs_alternative",
+      "turns": [
+        {
+          "lead_message": "I am looking for a 1 bedroom home.",
+          "interpretation_attempts": [
+            {
+              "attempt": 1,
+              "outcome": "accepted",
+              "error_code": null,
+              "validation_issues": [],
+              "normalizations": [
+                {
+                  "field": "requests",
+                  "action": "literal_bedroom_need_is_catalog_search",
+                  "removed_unrequested_comparison": false,
+                  "model_confidence_preserved": 0.0,
+                  "bedrooms": 1,
+                  "evidence": "I am looking for a 1 bedroom home"
+                }
+              ],
+              "quotation_schema": "standard",
+              "repair_feedback": null,
+              "raw_response": "{\"preferences\":[],\"personal_facts\":[],\"preference_withdrawals\":[],\"source_purposes\":[],\"objections\":[],\"empathy\":null,\"releases\":[],\"visit\":null,\"courtesy\":null,\"reschedule\":null,\"cancellation\":null,\"wait\":null,\"moderation\":null,\"appointment_query\":null,\"requires_clarification\":false,\"clarification_question\":null,\"confidence\":0,\"version\":\"sales-interpretation-input/2.0\",\"requests\":[{\"polarity\":\"request\",\"evidence\":\"I am looking for a 1 bedroom home.\",\"target\":null,\"topic\":\"catalog\",\"subject\":null}],\"alternatives\":[],\"constraints\": []  ,\"selection\":null}",
+              "raw_response_sha256": "f5c0d6040a35dbfefa5db5477d445e075435bdf35d9a42ed6d42d8106620614c",
+              "raw_response_truncated": false
+            }
+          ]
+        },
+        {
+          "lead_message": "Cedar Studio",
+          "interpretation_attempts": [
+            {
+              "attempt": 1,
+              "outcome": "accepted",
+              "error_code": null,
+              "validation_issues": [],
+              "normalizations": [
+                {
+                  "field": "requests",
+                  "action": "named_property_is_selection_not_comparison"
+                }
+              ],
+              "quotation_schema": "standard",
+              "repair_feedback": null,
+              "raw_response": "{\"preferences\":[],\"personal_facts\":[],\"preference_withdrawals\":[],\"source_purposes\":[],\"objections\":[],\"empathy\":null,\"releases\":[],\"visit\":null,\"courtesy\":null,\"reschedule\":null,\"cancellation\":null,\"wait\":null,\"moderation\":null,\"appointment_query\":null,\"requires_clarification\":false,\"clarification_question\":null,\"confidence\":0.9,\"version\":\"sales-interpretation-input/2.0\",\"requests\":[{\"topic\":\"comparison\",\"polarity\":\"request\",\"evidence\":\"Cedar Studio\",\"members\":[{\"kind\":\"property\",\"expression\":\"Cedar Studio\",\"evidence\":\"Cedar Studio\"}],\"include_current\":false,\"include_all\":false,\"all_kind\":\"property\",\"criteria\":[\"general\"],\"feature\":null,\"operation\":\"compare\"}],\"alternatives\":[],\"constraints\": []  ,\"selection\":null}",
+              "raw_response_sha256": "2cb11782c976833c970fca23194bbb941471c48cfb8abedc16f67d2081f7be88",
+              "raw_response_truncated": false
+            }
+          ]
+        },
+        {
+          "lead_message": "Do you have photos of the property?",
+          "interpretation_attempts": [
+            {
+              "attempt": 1,
+              "outcome": "invalid_model_contract",
+              "error_code": "understanding_validation_failed",
+              "validation_issues": [
+                {
+                  "location": [],
+                  "type": "contract_value_error",
+                  "message": "Inline reference evidence must quote current_message."
+                }
+              ],
+              "normalizations": [],
+              "quotation_schema": "standard",
+              "repair_feedback": null,
+              "raw_response": "{\"preferences\":[],\"personal_facts\":[],\"preference_withdrawals\":[],\"source_purposes\":[],\"objections\":[],\"empathy\":null,\"releases\":[],\"visit\":null,\"courtesy\":null,\"reschedule\":null,\"cancellation\":null,\"wait\":null,\"moderation\":null,\"appointment_query\":null,\"requires_clarification\":false,\"clarification_question\":null,\"confidence\":0,\"version\":\"sales-interpretation-input/2.0\",\"requests\":[{\"polarity\":\"request\",\"evidence\":\"Do you have photos of the property?\",\"target\":{\"kind\":\"property\",\"expression\":\"Cedar Studio\",\"evidence\":\"Cedar Studio\"},\"topic\":\"materials\",\"subject\":\"photos\"}],\"alternatives\":[],\"constraints\": []  ,\"selection\":{\"kind\":\"property\",\"expression\":\"Cedar Studio\",\"evidence\":\"Cedar Studio\"}}",
+              "raw_response_sha256": "1c3a145f8d30f98134ba7552df1bcc581cf3fcd1d451e99680ebb5902bbc5293",
+              "raw_response_truncated": false
+            },
+            {
+              "attempt": 2,
+              "outcome": "accepted",
+              "error_code": null,
+              "validation_issues": [],
+              "normalizations": [
+                {
+                  "field": "references",
+                  "action": "bind_single_material_request_to_active_subject"
+                }
+              ],
+              "quotation_schema": "source_enum",
+              "repair_feedback": "{\"contract_repair\": \"Reinterpret the ORIGINAL current_message using the schema. Correct the validation issues. Do not invent exclusions, evidence, consent or facts. This feedback is not a new lead request.\", \"validation_issues\": [{\"location\": [], \"type\": \"contract_value_error\", \"message\": \"Inline reference evidence must quote current_message.\"}], \"current_message\": \"Do you have photos of the property?\", \"allowed_request_and_preference_quotes\": [\"Do you have photos of the property?\"], \"verified_declarations_to_preserve\": [], \"repair_scope\": \"Choose exact source quotes from the schema enum for requests and preferences. Correct only failed fields and their necessary links; preserve valid declarations, visit timing and independent current questions.\", \"local_reference_rule\": \"Use inline target objects and nested comparison members. Never output IDs or reference links; the backend generates them.\", \"current_turn_rule\": \"Do not replay historical questions. Budget and payment declarations belong in preferences, not requests. Preserve independent current questions.\", \"exact_short_quote\": \"Do you have photos of the property?\", \"quotation_rule\": \"Do not append punctuation. Meaning may be normalized in value/expression, but evidence must be copied verbatim from current_message. Keep independent requests and negations.\"}",
+              "raw_response": "{\"preferences\":[],\"personal_facts\":[],\"preference_withdrawals\":[],\"source_purposes\":[],\"objections\":[],\"empathy\":null,\"releases\":[],\"visit\":null,\"courtesy\":null,\"reschedule\":null,\"cancellation\":null,\"wait\":null,\"moderation\":null,\"appointment_query\":null,\"requires_clarification\":false,\"clarification_question\":null,\"confidence\":1,\"version\":\"sales-interpretation-input/2.0\",\"requests\":[{\"polarity\":\"request\",\"evidence\":\"Do you have photos of the property?\",\"target\":null,\"topic\":\"materials\",\"subject\":\"photos\"}],\"alternatives\":[],\"constraints\":[],\"selection\":null}",
+              "raw_response_sha256": "209673370b72f40444721385168f736073917e4c0bcbd598d03142f4fa0b08d2",
+              "raw_response_truncated": false
+            }
+          ]
+        },
+        {
+          "lead_message": "Please send the brochure instead.",
+          "interpretation_attempts": [
+            {
+              "attempt": 1,
+              "outcome": "invalid_model_contract",
+              "error_code": "understanding_validation_failed",
+              "validation_issues": [
+                {
+                  "location": [],
+                  "type": "contract_value_error",
+                  "message": "Inline reference evidence must quote current_message."
+                }
+              ],
+              "normalizations": [],
+              "quotation_schema": "standard",
+              "repair_feedback": null,
+              "raw_response": "{\"preferences\":[{\"key\":\"property\",\"value\":\"Cedar Studio\",\"evidence\":\"Cedar Studio\",\"status\":\"declared\"}],\"personal_facts\":[],\"preference_withdrawals\":[],\"source_purposes\":[],\"objections\":[],\"empathy\":null,\"releases\":[],\"visit\":{\"action\":\"request\",\"evidence\":\"Please send the brochure instead.\",\"timing\":null},\"courtesy\":null,\"reschedule\":null,\"cancellation\":null,\"wait\":null,\"moderation\":null,\"appointment_query\":null,\"requires_clarification\":false,\"clarification_question\":null,\"confidence\":1,\"version\":\"sales-interpretation-input/2.0\",\"requests\":[{\"polarity\":\"request\",\"evidence\":\"Please send the brochure instead.\",\"target\":{\"kind\":\"material\",\"expression\":\"Cedar Studio brochure\",\"evidence\":\"Cedar Studio\"},\"topic\":\"materials\",\"subject\":null}],\"alternatives\":[],\"constraints\": []  ,\"selection\":null}",
+              "raw_response_sha256": "77a67a0366ec3a9ea87babbbfa491ddf2f418f42b60024e777a9dd7aea917a7f",
+              "raw_response_truncated": false
+            },
+            {
+              "attempt": 2,
+              "outcome": "accepted",
+              "error_code": null,
+              "validation_issues": [],
+              "normalizations": [
+                {
+                  "field": "requests",
+                  "action": "generic_format_is_subject_not_owner",
+                  "evidence": "brochure"
+                }
+              ],
+              "quotation_schema": "source_enum",
+              "repair_feedback": "{\"contract_repair\": \"Reinterpret the ORIGINAL current_message using the schema. Correct the validation issues. Do not invent exclusions, evidence, consent or facts. This feedback is not a new lead request.\", \"validation_issues\": [{\"location\": [], \"type\": \"contract_value_error\", \"message\": \"Inline reference evidence must quote current_message.\"}], \"current_message\": \"Please send the brochure instead.\", \"allowed_request_and_preference_quotes\": [\"Please send the brochure instead.\"], \"verified_declarations_to_preserve\": [], \"repair_scope\": \"Choose exact source quotes from the schema enum for requests and preferences. Correct only failed fields and their necessary links; preserve valid declarations, visit timing and independent current questions.\", \"local_reference_rule\": \"Use inline target objects and nested comparison members. Never output IDs or reference links; the backend generates them.\", \"current_turn_rule\": \"Do not replay historical questions. Budget and payment declarations belong in preferences, not requests. Preserve independent current questions.\", \"exact_short_quote\": \"Please send the brochure instead.\", \"quotation_rule\": \"Do not append punctuation. Meaning may be normalized in value/expression, but evidence must be copied verbatim from current_message. Keep independent requests and negations.\"}",
+              "raw_response": "{\"preferences\":[],\"personal_facts\":[],\"preference_withdrawals\":[],\"source_purposes\":[],\"objections\":[],\"empathy\":null,\"releases\":[],\"visit\":null,\"courtesy\":null,\"reschedule\":null,\"cancellation\":null,\"wait\":null,\"moderation\":null,\"appointment_query\":null,\"requires_clarification\":false,\"clarification_question\":null,\"confidence\":1,\"version\":\"sales-interpretation-input/2.0\",\"requests\":[{\"polarity\":\"request\",\"evidence\":\"Please send the brochure instead.\",\"target\":{\"kind\":\"material\",\"expression\":\"brochure\",\"evidence\":\"Please send the brochure instead.\"},\"topic\":\"materials\",\"subject\":null}],\"alternatives\":[],\"constraints\": []  ,\"selection\":null}",
+              "raw_response_sha256": "4b237c30ddf321ea2d5ed4afcaca659ffb03ef31bb9b7185dcd92471cc7e4d24",
+              "raw_response_truncated": false
+            }
+          ]
+        },
+        {
+          "lead_message": "Can I visit Cedar Studio?",
+          "interpretation_attempts": [
+            {
+              "attempt": 1,
+              "outcome": "accepted",
+              "error_code": null,
+              "validation_issues": [],
+              "normalizations": [
+                {
+                  "field": "requests",
+                  "action": "literal_visit_not_comparison",
+                  "evidence": "Can I visit Cedar Studio?",
+                  "confidence_unchanged": 1.0,
+                  "effect_authorization": false
+                }
+              ],
+              "quotation_schema": "standard",
+              "repair_feedback": null,
+              "raw_response": "{\"preferences\":[],\"personal_facts\":[],\"preference_withdrawals\":[],\"source_purposes\":[],\"objections\":[],\"empathy\":null,\"releases\":[],\"visit\":{\"action\":\"request\",\"evidence\":\"Can I visit Cedar Studio?\",\"timing\":null},\"courtesy\":null,\"reschedule\":null,\"cancellation\":null,\"wait\":null,\"moderation\":null,\"appointment_query\":null,\"requires_clarification\":false,\"clarification_question\":null,\"confidence\":1,\"version\":\"sales-interpretation-input/2.0\",\"requests\":[{\"topic\":\"comparison\",\"polarity\":\"request\",\"evidence\":\"Can I visit Cedar Studio?\",\"members\":[{\"kind\":\"property\",\"expression\":\"Cedar Studio\",\"evidence\":\"Cedar Studio\"},{\"kind\":\"property\",\"expression\":\"Cedar Loft\",\"evidence\":\"Cedar Loft\"}],\"include_current\":true,\"include_all\":false,\"all_kind\":\"property\",\"criteria\":[\"general\"],\"feature\":null,\"operation\":\"compare\"}],\"alternatives\":[],\"constraints\": []  ,\"selection\":null}",
+              "raw_response_sha256": "1a8b4277b13b747da9ca466b395ce137679f99a1e5ae49e82b151a2e5d015b69",
+              "raw_response_truncated": false
+            }
+          ]
+        },
+        {
+          "lead_message": "18/11, 9:00AM",
+          "interpretation_attempts": [
+            {
+              "attempt": 1,
+              "outcome": "invalid_model_contract",
+              "error_code": "understanding_validation_failed",
+              "validation_issues": [
+                {
+                  "location": [],
+                  "type": "contract_value_error",
+                  "message": "Inline reference evidence must quote current_message."
+                }
+              ],
+              "normalizations": [],
+              "quotation_schema": "standard",
+              "repair_feedback": null,
+              "raw_response": "{\"preferences\":[{\"key\":\"property\",\"value\":\"Cedar Studio\",\"evidence\":\"Cedar Studio\",\"status\":\"declared\"},{\"key\":\"visit_readiness\",\"value\":\"Can I visit Cedar Studio?\",\"evidence\":\"Can I visit\",\"status\":\"declared\"}],\"personal_facts\":[],\"preference_withdrawals\":[],\"source_purposes\":[],\"objections\":[],\"empathy\":null,\"releases\":[],\"visit\":{\"action\":\"select\",\"evidence\":\"18/11, 9:00AM\",\"timing\":{\"date_from_evidence\":\"2026-11-18T09:00:00\",\"date_until_evidence\":null,\"time_from_evidence\":null,\"time_until_evidence\":null,\"time_relation\":\"exact\",\"timezone_evidence\":\"America/Chicago\",\"duration_evidence\":null}},\"courtesy\":null,\"reschedule\":null,\"cancellation\":null,\"wait\":null,\"moderation\":null,\"appointment_query\":null,\"requires_clarification\":false,\"clarification_question\":null,\"confidence\":1,\"version\":\"sales-interpretation-input/2.0\",\"requests\":[{\"topic\":\"comparison\",\"polarity\":\"request\",\"evidence\":\"Cedar Studio\",\"members\":[{\"kind\":\"property\",\"expression\":\"Cedar Studio\",\"evidence\":\"Cedar Studio\"}],\"include_current\":false,\"include_all\":false,\"all_kind\":\"property\",\"criteria\":[\"general\"],\"feature\":null,\"operation\":\"compare\"}],\"alternatives\":[],\"constraints\": []  ,\"selection\":null}",
+              "raw_response_sha256": "1622f838b387b2d4d3235852aa4535ae946ee3b8efc183e002aefc8884720e45",
+              "raw_response_truncated": false
+            },
+            {
+              "attempt": 2,
+              "outcome": "accepted",
+              "error_code": null,
+              "validation_issues": [],
+              "normalizations": [
+                {
+                  "field": "visit",
+                  "action": "select_exact_backend_public_option",
+                  "evidence": "18/11, 9:00AM"
+                }
+              ],
+              "quotation_schema": "source_enum",
+              "repair_feedback": "{\"contract_repair\": \"Reinterpret the ORIGINAL current_message using the schema. Correct the validation issues. Do not invent exclusions, evidence, consent or facts. This feedback is not a new lead request.\", \"validation_issues\": [{\"location\": [], \"type\": \"contract_value_error\", \"message\": \"Inline reference evidence must quote current_message.\"}], \"current_message\": \"18/11, 9:00AM\", \"allowed_request_and_preference_quotes\": [\"18/11, 9:00AM\", \"18/11,\", \"9:00AM\"], \"verified_declarations_to_preserve\": [], \"repair_scope\": \"Choose exact source quotes from the schema enum for requests and preferences. Correct only failed fields and their necessary links; preserve valid declarations, visit timing and independent current questions.\", \"local_reference_rule\": \"Use inline target objects and nested comparison members. Never output IDs or reference links; the backend generates them.\", \"current_turn_rule\": \"Do not replay historical questions. Budget and payment declarations belong in preferences, not requests. Preserve independent current questions.\", \"exact_short_quote\": \"18/11, 9:00AM\", \"quotation_rule\": \"Do not append punctuation. Meaning may be normalized in value/expression, but evidence must be copied verbatim from current_message. Keep independent requests and negations.\"}",
+              "raw_response": "{\"preferences\":[],\"personal_facts\":[],\"preference_withdrawals\":[],\"source_purposes\":[],\"objections\":[],\"empathy\":null,\"releases\":[],\"visit\":{\"action\":\"select\",\"evidence\":\"18/11, 9:00AM\",\"timing\":{\"date_from_evidence\":\"18/11, 9:00AM\",\"date_until_evidence\":null,\"time_from_evidence\":\"9:00AM\",\"time_until_evidence\":null,\"time_relation\":\"exact\",\"timezone_evidence\":null,\"duration_evidence\":null}},\"courtesy\":null,\"reschedule\":null,\"cancellation\":null,\"wait\":null,\"moderation\":null,\"appointment_query\":null,\"requires_clarification\":false,\"clarification_question\":null,\"confidence\":1,\"version\":\"sales-interpretation-input/2.0\",\"requests\":[],\"alternatives\":[],\"constraints\": []  ,\"selection\":null}",
+              "raw_response_sha256": "5f6152919320e872676813def52f8bae5b4a3278b32ee0ef678bcea24223b006",
+              "raw_response_truncated": false
+            }
+          ]
+        },
+        {
+          "lead_message": "Yes",
+          "interpretation_attempts": [
+            {
+              "attempt": 1,
+              "outcome": "invalid_model_contract",
+              "error_code": "understanding_validation_failed",
+              "validation_issues": [
+                {
+                  "location": [],
+                  "type": "contract_value_error",
+                  "message": "Inline reference evidence must quote current_message."
+                }
+              ],
+              "normalizations": [],
+              "quotation_schema": "standard",
+              "repair_feedback": null,
+              "raw_response": "{\"preferences\":[{\"key\":\"visit_readiness\",\"value\":\"18/11, 9:00AM\",\"evidence\":\"18/\",\"status\":\"declared\"}],\"personal_facts\":[],\"preference_withdrawals\":[],\"source_purposes\":[],\"objections\":[],\"empathy\":null,\"releases\":[],\"visit\":{\"action\":\"confirm\",\"evidence\":\"Yes\",\"timing\":{\"date_from_evidence\":\"2026-11-18T15:00:00+00:00\",\"date_until_evidence\":null,\"time_from_evidence\":\"09:00 AM\",\"time_until_evidence\":null,\"time_relation\":\"exact\",\"timezone_evidence\":\"America/Chicago\",\"duration_evidence\":\"45 minutes\"}},\"courtesy\":null,\"reschedule\":null,\"cancellation\":null,\"wait\":null,\"moderation\":null,\"appointment_query\":null,\"requires_clarification\":false,\"clarification_question\":null,\"confidence\":1,\"version\":\"sales-interpretation-input/2.0\",\"requests\":[{\"topic\":\"comparison\",\"polarity\":\"request\",\"evidence\":\"Yes\",\"members\":[{\"kind\":\"property\",\"expression\":\"Cedar Studio\",\"evidence\":\"Ced\"}],\"include_current\":false,\"include_all\":false,\"all_kind\":\"property\",\"criteria\":[\"general\"],\"feature\":null,\"operation\":\"compare\"}],\"alternatives\":[],\"constraints\":[],\"selection\":null}",
+              "raw_response_sha256": "7d871478d1b356a37f838d0ff1836eebc50eec1aa1f7f5e29fde61013994aa6b",
+              "raw_response_truncated": false
+            },
+            {
+              "attempt": 2,
+              "outcome": "accepted",
+              "error_code": null,
+              "validation_issues": [],
+              "normalizations": [
+                {
+                  "field": "visit.timing.timezone_evidence",
+                  "action": "omit_non_timezone_sentence"
+                },
+                {
+                  "field": "visit.timing.duration_evidence",
+                  "action": "omit_undeclared_duration"
+                }
+              ],
+              "quotation_schema": "source_enum",
+              "repair_feedback": "{\"contract_repair\": \"Reinterpret the ORIGINAL current_message using the schema. Correct the validation issues. Do not invent exclusions, evidence, consent or facts. This feedback is not a new lead request.\", \"validation_issues\": [{\"location\": [], \"type\": \"contract_value_error\", \"message\": \"Inline reference evidence must quote current_message.\"}], \"current_message\": \"Yes\", \"allowed_request_and_preference_quotes\": [\"Yes\"], \"verified_declarations_to_preserve\": [], \"repair_scope\": \"Choose exact source quotes from the schema enum for requests and preferences. Correct only failed fields and their necessary links; preserve valid declarations, visit timing and independent current questions.\", \"local_reference_rule\": \"Use inline target objects and nested comparison members. Never output IDs or reference links; the backend generates them.\", \"current_turn_rule\": \"Do not replay historical questions. Budget and payment declarations belong in preferences, not requests. Preserve independent current questions.\", \"exact_short_quote\": \"Yes\", \"quotation_rule\": \"Do not append punctuation. Meaning may be normalized in value/expression, but evidence must be copied verbatim from current_message. Keep independent requests and negations.\"}",
+              "raw_response": "{\"preferences\":[],\"personal_facts\":[],\"preference_withdrawals\":[],\"source_purposes\":[],\"objections\":[],\"empathy\":null,\"releases\":[],\"visit\":{\"action\":\"confirm\",\"evidence\":\"Yes\",\"timing\":{\"date_from_evidence\":\"Yes\",\"date_until_evidence\":\"Yes\",\"time_from_evidence\":\"Yes\",\"time_until_evidence\":\"Yes\",\"time_relation\":\"exact\",\"timezone_evidence\":\"Yes\",\"duration_evidence\":\"Yes\"}},\"courtesy\":null,\"reschedule\":null,\"cancellation\":null,\"wait\":null,\"moderation\":null,\"appointment_query\":null,\"requires_clarification\":false,\"clarification_question\":null,\"confidence\":1,\"version\":\"sales-interpretation-input/2.0\",\"requests\":[],\"alternatives\":[],\"constraints\": []  ,\"selection\":null}",
+              "raw_response_sha256": "f994d2d55a0832925794f99d1ef423bee5be160f19ef3c93bad9b33de22c5591",
+              "raw_response_truncated": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "obs_mixed",
+      "turns": [
+        {
+          "lead_message": "I am looking for a 4 bedroom home.",
+          "interpretation_attempts": [
+            {
+              "attempt": 1,
+              "outcome": "accepted",
+              "error_code": null,
+              "validation_issues": [],
+              "normalizations": [
+                {
+                  "field": "requests",
+                  "action": "literal_bedroom_need_is_catalog_search",
+                  "removed_unrequested_comparison": true,
+                  "model_confidence_preserved": 1.0,
+                  "bedrooms": 4,
+                  "evidence": "I am looking for a 4 bedroom home"
+                }
+              ],
+              "quotation_schema": "standard",
+              "repair_feedback": null,
+              "raw_response": "{\"preferences\":[{\"key\":\"bedrooms\",\"value\":\"4\",\"evidence\":\"I am looking for a 4 bedroom home.\",\"status\":\"declared\"}],\"personal_facts\":[],\"preference_withdrawals\":[],\"source_purposes\":[],\"objections\":[],\"empathy\":null,\"releases\":[],\"visit\":null,\"courtesy\":null,\"reschedule\":null,\"cancellation\":null,\"wait\":null,\"moderation\":null,\"appointment_query\":null,\"requires_clarification\":false,\"clarification_question\":null,\"confidence\":1,\"version\":\"sales-interpretation-input/2.0\",\"requests\":[{\"topic\":\"comparison\",\"polarity\":\"request\",\"evidence\":\"I am looking for a 4 bedroom home.\",\"members\":[{\"kind\":\"property\",\"expression\":\"Bay Residence\",\"evidence\":\"I am looking for a 4 bedroom home.\"}],\"include_current\":true,\"include_all\":false,\"all_kind\":\"property\",\"criteria\":[\"bedrooms\"],\"feature\":null,\"operation\":\"compare\"}],\"alternatives\":[],\"constraints\": []  ,\"selection\":null}",
+              "raw_response_sha256": "31847b66150b1a21f1dc8a31eb6cf686075ca13c07bc4f6d6c3ffe7b081dd4be",
+              "raw_response_truncated": false
+            }
+          ]
+        },
+        {
+          "lead_message": "Bay Residence",
+          "interpretation_attempts": [
+            {
+              "attempt": 1,
+              "outcome": "accepted",
+              "error_code": null,
+              "validation_issues": [],
+              "normalizations": [
+                {
+                  "field": "requests",
+                  "action": "named_property_is_selection_not_comparison"
+                }
+              ],
+              "quotation_schema": "standard",
+              "repair_feedback": null,
+              "raw_response": "{\"preferences\":[],\"personal_facts\":[],\"preference_withdrawals\":[],\"source_purposes\":[],\"objections\":[],\"empathy\":null,\"releases\":[],\"visit\":null,\"courtesy\":null,\"reschedule\":null,\"cancellation\":null,\"wait\":null,\"moderation\":null,\"appointment_query\":null,\"requires_clarification\":false,\"clarification_question\":null,\"confidence\":0,\"version\":\"sales-interpretation-input/2.0\",\"requests\":[{\"topic\":\"comparison\",\"polarity\":\"request\",\"evidence\":\"Bay Residence\",\"members\":[{\"kind\":\"property\",\"expression\":\"Bay Residence\",\"evidence\":\"Bay Residence\"}],\"include_current\":false,\"include_all\":false,\"all_kind\":\"property\",\"criteria\":[\"general\"],\"feature\":null,\"operation\":\"compare\"}],\"alternatives\":[],\"constraints\": []  ,\"selection\":null}",
+              "raw_response_sha256": "e76318e247b0e621ea3b23ca2d3b5d6febcf80e08a6453846a59accf6fb69091",
+              "raw_response_truncated": false
+            }
+          ]
+        },
+        {
+          "lead_message": "Could you send photos or a brochure and explain the financing options?",
+          "interpretation_attempts": [
+            {
+              "attempt": 1,
+              "outcome": "invalid_model_contract",
+              "error_code": "understanding_validation_failed",
+              "validation_issues": [
+                {
+                  "location": [],
+                  "type": "contract_value_error",
+                  "message": "Inline reference evidence must quote current_message."
+                }
+              ],
+              "normalizations": [],
+              "quotation_schema": "standard",
+              "repair_feedback": null,
+              "raw_response": "{\"preferences\":[{\"key\":\"property\",\"value\":\"Bay Residence\",\"evidence\":\"Bay Residence\",\"status\":\"declared\"},{\"key\":\"financing\",\"value\":\".\",\"evidence\":\"explain the financing options?\",\"status\":\"declared\"}],\"personal_facts\":[],\"preference_withdrawals\":[],\"source_purposes\":[],\"objections\":[],\"empathy\":null,\"releases\":[],\"visit\":null,\"courtesy\":null,\"reschedule\":null,\"cancellation\":null,\"wait\":null,\"moderation\":null,\"appointment_query\":null,\"requires_clarification\":false,\"clarification_question\":null,\"confidence\":1,\"version\":\"sales-interpretation-input/2.0\",\"requests\":[{\"polarity\":\"request\",\"evidence\":\"send photos or a brochure\",\"target\":{\"kind\":\"property\",\"expression\":\"Bay Residence\",\"evidence\":\"Bay Residence\"},\"topic\":\"materials\",\"subject\":\"photos\"},{\"polarity\":\"request\",\"evidence\":\"send photos or a brochure\",\"target\":{\"kind\":\"property\",\"expression\":\"Bay Residence\",\"evidence\":\"Bay Residence\"},\"topic\":\"materials\",\"subject\":\"brochure\"}],\"alternatives\":[],\"constraints\": []  ,\"selection\":null}",
+              "raw_response_sha256": "77328c94326425a4f21361a8635e84e47d6b4936d1931702c6c59a3c064b1d58",
+              "raw_response_truncated": false
+            },
+            {
+              "attempt": 2,
+              "outcome": "accepted",
+              "error_code": null,
+              "validation_issues": [],
+              "normalizations": [
+                {
+                  "field": "alternatives",
+                  "action": "literal_formats_are_alternatives",
+                  "evidence": "photos or a brochure",
+                  "request_ids": [
+                    "r0",
+                    "r1"
+                  ]
+                }
+              ],
+              "quotation_schema": "source_enum",
+              "repair_feedback": "{\"contract_repair\": \"Reinterpret the ORIGINAL current_message using the schema. Correct the validation issues. Do not invent exclusions, evidence, consent or facts. This feedback is not a new lead request.\", \"validation_issues\": [{\"location\": [], \"type\": \"contract_value_error\", \"message\": \"Inline reference evidence must quote current_message.\"}], \"current_message\": \"Could you send photos or a brochure and explain the financing options?\", \"allowed_request_and_preference_quotes\": [\"Could you send photos or a brochure and explain the financing options?\", \"send photos or a brochure\", \"explain the financing options?\"], \"verified_declarations_to_preserve\": [], \"repair_scope\": \"Choose exact source quotes from the schema enum for requests and preferences. Correct only failed fields and their necessary links; preserve valid declarations, visit timing and independent current questions.\", \"local_reference_rule\": \"Use inline target objects and nested comparison members. Never output IDs or reference links; the backend generates them.\", \"current_turn_rule\": \"Do not replay historical questions. Budget and payment declarations belong in preferences, not requests. Preserve independent current questions.\", \"exact_short_quote\": \"Could you send photos or a brochure and explain the financing options?\", \"quotation_rule\": \"Do not append punctuation. Meaning may be normalized in value/expression, but evidence must be copied verbatim from current_message. Keep independent requests and negations.\"}",
+              "raw_response": "{\"preferences\":[],\"personal_facts\":[],\"preference_withdrawals\":[],\"source_purposes\":[],\"objections\":[],\"empathy\":null,\"releases\":[],\"visit\":null,\"courtesy\":null,\"reschedule\":null,\"cancellation\":null,\"wait\":null,\"moderation\":null,\"appointment_query\":null,\"requires_clarification\":false,\"clarification_question\":null,\"confidence\":0,\"version\":\"sales-interpretation-input/2.0\",\"requests\":[{\"polarity\":\"request\",\"evidence\":\"Could you send photos or a brochure and explain the financing options?\",\"target\":null,\"topic\":\"materials\",\"subject\":\"photos\"},{\"polarity\":\"request\",\"evidence\":\"Could you send photos or a brochure and explain the financing options?\",\"target\":null,\"topic\":\"materials\",\"subject\":\"brochure\"},{\"polarity\":\"request\",\"evidence\":\"Could you send photos or a brochure and explain the financing options?\",\"target\":null,\"topic\":\"financing\",\"subject\":null}],\"alternatives\":[],\"constraints\": []  ,\"selection\":null}",
+              "raw_response_sha256": "1c10d4095259f3ff0e4c9bcf4355b6619738aa8f120095a8078471d7b48f7525",
+              "raw_response_truncated": false
+            }
+          ]
+        },
+        {
+          "lead_message": "Can I visit Bay Residence?",
+          "interpretation_attempts": [
+            {
+              "attempt": 1,
+              "outcome": "accepted",
+              "error_code": null,
+              "validation_issues": [],
+              "normalizations": [
+                {
+                  "field": "requests",
+                  "action": "literal_visit_not_comparison",
+                  "evidence": "Can I visit Bay Residence?",
+                  "confidence_unchanged": 1.0,
+                  "effect_authorization": false
+                }
+              ],
+              "quotation_schema": "standard",
+              "repair_feedback": null,
+              "raw_response": "{\"preferences\":[{\"key\":\"property\",\"value\":\"Bay Residence\",\"evidence\":\"Bay Residence\",\"status\":\"declared\"},{\"key\":\"visit_readiness\",\"value\":\"true\",\"evidence\":\"Can I visit Bay Residence?\",\"status\":\"declared\"}],\"personal_facts\":[],\"preference_withdrawals\":[],\"source_purposes\":[],\"objections\":[],\"empathy\":null,\"releases\":[],\"visit\":{\"action\":\"request\",\"evidence\":\"Can I visit Bay Residence?\",\"timing\":null},\"courtesy\":null,\"reschedule\":null,\"cancellation\":null,\"wait\":null,\"moderation\":null,\"appointment_query\":null,\"requires_clarification\":false,\"clarification_question\":null,\"confidence\":1,\"version\":\"sales-interpretation-input/2.0\",\"requests\":[{\"topic\":\"comparison\",\"polarity\":\"request\",\"evidence\":\"Can I visit Bay Residence?\",\"members\":[{\"kind\":\"property\",\"expression\":\"Bay Residence\",\"evidence\":\"Bay Residence\"}],\"include_current\":false,\"include_all\":false,\"all_kind\":\"property\",\"criteria\":[\"general\"],\"feature\":null,\"operation\":\"compare\"}],\"alternatives\":[],\"constraints\": []  ,\"selection\":null}",
+              "raw_response_sha256": "07e6fa8be45f3815fcc3fb31f00e37282ee6c4fcc20e290c53208dd38682d6dc",
+              "raw_response_truncated": false
+            }
+          ]
+        },
+        {
+          "lead_message": "November 18, 10:00AM",
+          "interpretation_attempts": [
+            {
+              "attempt": 1,
+              "outcome": "invalid_model_contract",
+              "error_code": "understanding_validation_failed",
+              "validation_issues": [
+                {
+                  "location": [],
+                  "type": "contract_value_error",
+                  "message": "Inline reference evidence must quote current_message."
+                }
+              ],
+              "normalizations": [],
+              "quotation_schema": "standard",
+              "repair_feedback": null,
+              "raw_response": "{\"preferences\":[{\"key\":\"visit_readiness\",\"value\":\"Can I visit Bay Residence?\",\"evidence\":\"Can I visit Bay \u00a0Res\",\"status\":\"declared\"}],\"personal_facts\":[],\"preference_withdrawals\":[],\"source_purposes\":[],\"objections\":[],\"empathy\":null,\"releases\":[],\"visit\":{\"action\":\"select\",\"evidence\":\"November 18, 10:00AM\",\"timing\":{\"date_from_evidence\":\"November 18, 10:00AM\",\"date_until_evidence\":null,\"time_from_evidence\":null,\"time_until_evidence\":null,\"time_relation\":\"exact\",\"timezone_evidence\":\"America/New_York\",\"duration_evidence\":null}},\"courtesy\":null,\"reschedule\":null,\"cancellation\":null,\"wait\":null,\"moderation\":null,\"appointment_query\":null,\"requires_clarification\":false,\"clarification_question\":null,\"confidence\":1,\"version\":\"sales-interpretation-input/2.0\",\"requests\":[{\"topic\":\"comparison\",\"polarity\":\"request\",\"evidence\":\"November 18, 10:00AM\",\"members\":[{\"kind\":\"property\",\"expression\":\"Bay Residence\",\"evidence\":\"Bay Residence\"}],\"include_current\":false,\"include_all\":false,\"all_kind\":\"property\",\"criteria\":[\"general\"],\"feature\":null,\"operation\":\"compare\"}],\"alternatives\":[],\"constraints\": [] \t,\"selection\":null}",
+              "raw_response_sha256": "b2dfd906d9b95992b87c097346a962cea5b62779b67191b3895ab8703f950f62",
+              "raw_response_truncated": false
+            },
+            {
+              "attempt": 2,
+              "outcome": "accepted",
+              "error_code": null,
+              "validation_issues": [],
+              "normalizations": [
+                {
+                  "field": "visit",
+                  "action": "select_exact_backend_public_option",
+                  "evidence": "November 18, 10:00AM"
+                }
+              ],
+              "quotation_schema": "source_enum",
+              "repair_feedback": "{\"contract_repair\": \"Reinterpret the ORIGINAL current_message using the schema. Correct the validation issues. Do not invent exclusions, evidence, consent or facts. This feedback is not a new lead request.\", \"validation_issues\": [{\"location\": [], \"type\": \"contract_value_error\", \"message\": \"Inline reference evidence must quote current_message.\"}], \"current_message\": \"November 18, 10:00AM\", \"allowed_request_and_preference_quotes\": [\"November 18, 10:00AM\", \"November 18,\", \"10:00AM\"], \"verified_declarations_to_preserve\": [], \"repair_scope\": \"Choose exact source quotes from the schema enum for requests and preferences. Correct only failed fields and their necessary links; preserve valid declarations, visit timing and independent current questions.\", \"local_reference_rule\": \"Use inline target objects and nested comparison members. Never output IDs or reference links; the backend generates them.\", \"current_turn_rule\": \"Do not replay historical questions. Budget and payment declarations belong in preferences, not requests. Preserve independent current questions.\", \"exact_short_quote\": \"November 18, 10:00AM\", \"quotation_rule\": \"Do not append punctuation. Meaning may be normalized in value/expression, but evidence must be copied verbatim from current_message. Keep independent requests and negations.\"}",
+              "raw_response": "{\"preferences\":[],\"personal_facts\":[],\"preference_withdrawals\":[],\"source_purposes\":[],\"objections\":[],\"empathy\":null,\"releases\":[],\"visit\":{\"action\":\"select\",\"evidence\":\"November 18, 10:00AM\",\"timing\":{\"date_from_evidence\":\"November 18, 10:00AM\",\"date_until_evidence\":null,\"time_from_evidence\":\"10:00AM\",\"time_until_evidence\":null,\"time_relation\":\"exact\",\"timezone_evidence\":null,\"duration_evidence\":null}},\"courtesy\":null,\"reschedule\":null,\"cancellation\":null,\"wait\":null,\"moderation\":null,\"appointment_query\":null,\"requires_clarification\":false,\"clarification_question\":null,\"confidence\":1,\"version\":\"sales-interpretation-input/2.0\",\"requests\":[],\"alternatives\":[], \"constraints\": []  ,\"selection\": null}",
+              "raw_response_sha256": "e8a490319d37e20af7420e17afabec10069b9a8e524ec231b3001d0cf8f5a9a4",
+              "raw_response_truncated": false
+            }
+          ]
+        },
+        {
+          "lead_message": "Yes",
+          "interpretation_attempts": [
+            {
+              "attempt": 1,
+              "outcome": "invalid_model_contract",
+              "error_code": "understanding_validation_failed",
+              "validation_issues": [
+                {
+                  "location": [],
+                  "type": "contract_value_error",
+                  "message": "Inline reference evidence must quote current_message."
+                }
+              ],
+              "normalizations": [],
+              "quotation_schema": "standard",
+              "repair_feedback": null,
+              "raw_response": "{\"preferences\":[{\"key\":\"visit_readiness\",\"value\":\"November 18, 10:00AM\",\"evidence\":\"Yes\",\"status\":\"declared\"}],\"personal_facts\":[],\"preference_withdrawals\":[],\"source_purposes\":[],\"objections\":[],\"empathy\":null,\"releases\":[],\"visit\":{\"action\":\"confirm\",\"evidence\":\"Yes\",\"timing\":{\"date_from_evidence\":\"2026-11-18T10:00:00-05:00\",\"date_until_evidence\":null,\"time_from_evidence\":null,\"time_until_evidence\":null,\"time_relation\":\"exact\",\"timezone_evidence\":\"America/New_York\",\"duration_evidence\":\"45 minutes\"}},\"courtesy\":null,\"reschedule\":null,\"cancellation\":null,\"wait\":null,\"moderation\":null,\"appointment_query\":null,\"requires_clarification\":false,\"clarification_question\":null,\"confidence\":1,\"version\":\"sales-interpretation-input/2.0\",\"requests\":[{\"topic\":\"comparison\",\"polarity\":\"request\",\"evidence\":\"Can\",\"members\":[{\"kind\":\"property\",\"expression\":\"Bay Residence\",\"evidence\":\"Bay\"}],\"include_current\":false,\"include_all\":false,\"all_kind\":\"property\",\"criteria\":[\"general\"],\"feature\":null,\"operation\":\"compare\"}],\"alternatives\":[],\"constraints\": []  ,\"selection\":null}",
+              "raw_response_sha256": "16d3f2a9d2f0851d31ad8f5a0fe7fb806a1f27134894710a7189a4959614b7fd",
+              "raw_response_truncated": false
+            },
+            {
+              "attempt": 2,
+              "outcome": "accepted",
+              "error_code": null,
+              "validation_issues": [],
+              "normalizations": [
+                {
+                  "field": "visit.timing.timezone_evidence",
+                  "action": "omit_non_timezone_sentence"
+                },
+                {
+                  "field": "visit.timing.duration_evidence",
+                  "action": "omit_undeclared_duration"
+                }
+              ],
+              "quotation_schema": "source_enum",
+              "repair_feedback": "{\"contract_repair\": \"Reinterpret the ORIGINAL current_message using the schema. Correct the validation issues. Do not invent exclusions, evidence, consent or facts. This feedback is not a new lead request.\", \"validation_issues\": [{\"location\": [], \"type\": \"contract_value_error\", \"message\": \"Inline reference evidence must quote current_message.\"}], \"current_message\": \"Yes\", \"allowed_request_and_preference_quotes\": [\"Yes\"], \"verified_declarations_to_preserve\": [], \"repair_scope\": \"Choose exact source quotes from the schema enum for requests and preferences. Correct only failed fields and their necessary links; preserve valid declarations, visit timing and independent current questions.\", \"local_reference_rule\": \"Use inline target objects and nested comparison members. Never output IDs or reference links; the backend generates them.\", \"current_turn_rule\": \"Do not replay historical questions. Budget and payment declarations belong in preferences, not requests. Preserve independent current questions.\", \"exact_short_quote\": \"Yes\", \"quotation_rule\": \"Do not append punctuation. Meaning may be normalized in value/expression, but evidence must be copied verbatim from current_message. Keep independent requests and negations.\"}",
+              "raw_response": "{\"preferences\":[],\"personal_facts\":[],\"preference_withdrawals\":[],\"source_purposes\":[],\"objections\":[],\"empathy\":null,\"releases\":[],\"visit\":{\"action\":\"confirm\",\"evidence\":\"Yes\",\"timing\":{\"date_from_evidence\":\"Yes\",\"date_until_evidence\":\"Yes\",\"time_from_evidence\":\"Yes\",\"time_until_evidence\":\"Yes\",\"time_relation\":\"exact\",\"timezone_evidence\":\"Yes\",\"duration_evidence\":\"Yes\"}},\"courtesy\":null,\"reschedule\":null,\"cancellation\":null,\"wait\":null,\"moderation\":null,\"appointment_query\":null,\"requires_clarification\":false,\"clarification_question\":null,\"confidence\":1,\"version\":\"sales-interpretation-input/2.0\",\"requests\":[],\"alternatives\":[],\"constraints\": []  ,\"selection\":null}",
+              "raw_response_sha256": "f994d2d55a0832925794f99d1ef423bee5be160f19ef3c93bad9b33de22c5591",
+              "raw_response_truncated": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "obs_switch",
+      "turns": [
+        {
+          "lead_message": "I am looking for a 2 bedroom home.",
+          "interpretation_attempts": [
+            {
+              "attempt": 1,
+              "outcome": "accepted",
+              "error_code": null,
+              "validation_issues": [],
+              "normalizations": [
+                {
+                  "field": "requests",
+                  "action": "literal_bedroom_need_is_catalog_search",
+                  "removed_unrequested_comparison": true,
+                  "model_confidence_preserved": 1.0,
+                  "bedrooms": 2,
+                  "evidence": "I am looking for a 2 bedroom home"
+                }
+              ],
+              "quotation_schema": "standard",
+              "repair_feedback": null,
+              "raw_response": "{\"preferences\":[{\"key\":\"bedrooms\",\"value\":\"2\",\"evidence\":\"I am looking for a 2 bedroom home.\",\"status\":\"declared\"}],\"personal_facts\":[],\"preference_withdrawals\":[],\"source_purposes\":[],\"objections\":[],\"empathy\":null,\"releases\":[],\"visit\":null,\"courtesy\":null,\"reschedule\":null,\"cancellation\":null,\"wait\":null,\"moderation\":null,\"appointment_query\":null,\"requires_clarification\":false,\"clarification_question\":null,\"confidence\":1,\"version\":\"sales-interpretation-input/2.0\",\"requests\":[{\"topic\":\"comparison\",\"polarity\":\"request\",\"evidence\":\"I am looking for a 2 bedroom home.\",\"members\":[{\"kind\":\"property\",\"expression\":\"Cedar Loft\",\"evidence\":\"I am looking for a 2 bedroom home.\"},{\"kind\":\"property\",\"expression\":\"Cedar Studio\",\"evidence\":\"I am looking for a 2 bedroom home.\"}],\"include_current\":false,\"include_all\":false,\"all_kind\":\"property\",\"criteria\":[\"bedrooms\"],\"feature\":null,\"operation\":\"compare\"}],\"alternatives\":[],\"constraints\": []  ,\"selection\":null}",
+              "raw_response_sha256": "4e62d06d7f6b68b959f36bd6a7156397e68483aeea0a4a738ac603dd257ed5c2",
+              "raw_response_truncated": false
+            }
+          ]
+        },
+        {
+          "lead_message": "Cedar Loft",
+          "interpretation_attempts": [
+            {
+              "attempt": 1,
+              "outcome": "invalid_model_contract",
+              "error_code": "understanding_validation_failed",
+              "validation_issues": [
+                {
+                  "location": [
+                    "preferences",
+                    0,
+                    "evidence"
+                  ],
+                  "type": "evidence_mismatch",
+                  "message": "Copy an exact non-empty quote from current_message for this field. Do not paraphrase, correct spelling, or quote history."
+                },
+                {
+                  "location": [
+                    "requests"
+                  ],
+                  "type": "visit_missing_executable_request",
+                  "message": "A visit request, selection or confirmation also needs a topic appointment request. Preserve its current evidence; do not infer final booking consent."
+                },
+                {
+                  "location": [
+                    "comparison"
+                  ],
+                  "type": "comparison_not_supported_by_action",
+                  "message": "This message requests material, a visit, or selects a time, not a comparison. Preserve the explicit action and omit the invented comparison. Never infer booking confirmation from a selection."
+                }
+              ],
+              "normalizations": [],
+              "quotation_schema": "standard",
+              "repair_feedback": null,
+              "raw_response": "{\"preferences\":[{\"key\":\"bedrooms\",\"value\":\"2\",\"evidence\":\"I am looki\",\"status\":\"declared\"}],\"personal_facts\":[],\"preference_withdrawals\":[],\"source_purposes\":[],\"objections\":[],\"empathy\":null,\"releases\":[],\"visit\":{\"action\":\"request\",\"evidence\":\"Cedar Loft\",\"timing\":null},\"courtesy\":null,\"reschedule\":null,\"cancellation\":null,\"wait\":null,\"moderation\":null,\"appointment_query\":null,\"requires_clarification\":false,\"clarification_question\":null,\"confidence\":1,\"version\":\"sales-interpretation-input/2.0\",\"requests\":[{\"topic\":\"comparison\",\"polarity\":\"request\",\"evidence\":\"Cedar Loft\",\"members\":[{\"kind\":\"property\",\"expression\":\"Cedar Loft\",\"evidence\":\"Cedar Loft\"}],\"include_current\":true,\"include_all\":false,\"all_kind\":\"property\",\"criteria\":[\"general\"],\"feature\":null,\"operation\":\"compare\"}],\"alternatives\":[],\"constraints\": []  ,\"selection\":null}",
+              "raw_response_sha256": "c665109fa57909bd2fd3f69246a9b1f9de84c6e2082c7ba0fb7fb3bb3e539740",
+              "raw_response_truncated": false
+            },
+            {
+              "attempt": 2,
+              "outcome": "accepted",
+              "error_code": null,
+              "validation_issues": [],
+              "normalizations": [
+                {
+                  "field": "requests",
+                  "action": "named_property_is_selection_not_comparison"
+                }
+              ],
+              "quotation_schema": "source_enum",
+              "repair_feedback": "{\"contract_repair\": \"Reinterpret the ORIGINAL current_message using the schema. Correct the validation issues. Do not invent exclusions, evidence, consent or facts. This feedback is not a new lead request.\", \"validation_issues\": [{\"location\": [\"preferences\", 0, \"evidence\"], \"type\": \"evidence_mismatch\", \"message\": \"Copy an exact non-empty quote from current_message for this field. Do not paraphrase, correct spelling, or quote history.\"}, {\"location\": [\"requests\"], \"type\": \"visit_missing_executable_request\", \"message\": \"A visit request, selection or confirmation also needs a topic appointment request. Preserve its current evidence; do not infer final booking consent.\"}, {\"location\": [\"comparison\"], \"type\": \"comparison_not_supported_by_action\", \"message\": \"This message requests material, a visit, or selects a time, not a comparison. Preserve the explicit action and omit the invented comparison. Never infer booking confirmation from a selection.\"}], \"current_message\": \"Cedar Loft\", \"allowed_request_and_preference_quotes\": [\"Cedar Loft\"], \"verified_declarations_to_preserve\": [], \"repair_scope\": \"Choose exact source quotes from the schema enum for requests and preferences. Correct only failed fields and their necessary links; preserve valid declarations, visit timing and independent current questions.\", \"local_reference_rule\": \"Use inline target objects and nested comparison members. Never output IDs or reference links; the backend generates them.\", \"current_turn_rule\": \"Do not replay historical questions. Budget and payment declarations belong in preferences, not requests. Preserve independent current questions.\", \"exact_short_quote\": \"Cedar Loft\", \"quotation_rule\": \"Do not append punctuation. Meaning may be normalized in value/expression, but evidence must be copied verbatim from current_message. Keep independent requests and negations.\"}",
+              "raw_response": "{\"preferences\":[],\"personal_facts\":[],\"preference_withdrawals\":[],\"source_purposes\":[],\"objections\":[],\"empathy\":null,\"releases\":[],\"visit\":{\"action\":\"request\",\"evidence\":\"Cedar Loft\",\"timing\":null},\"courtesy\":null,\"reschedule\":null,\"cancellation\":null,\"wait\":null,\"moderation\":null,\"appointment_query\":null,\"requires_clarification\":false,\"clarification_question\":null,\"confidence\":1,\"version\":\"sales-interpretation-input/2.0\",\"requests\":[{\"polarity\":\"request\",\"evidence\":\"Cedar Loft\",\"target\":{\"kind\":\"property\",\"expression\":\"Cedar Loft\",\"evidence\":\"Cedar Loft\"},\"topic\":\"property_details\",\"subject\":null,\"detail_fields\":[],\"feature\":null}],\"alternatives\":[],\"constraints\": []  ,\"selection\":{\"kind\":\"property\",\"expression\":\"Cedar Loft\",\"evidence\":\"Cedar Loft\"}}",
+              "raw_response_sha256": "35408e37772c9d05d332efb46dde22fef474f5db88450ea0848ef937b2205f5a",
+              "raw_response_truncated": false
+            }
+          ]
+        },
+        {
+          "lead_message": "Actually I prefer Cedar Studio instead.",
+          "interpretation_attempts": [
+            {
+              "attempt": 1,
+              "outcome": "invalid_model_contract",
+              "error_code": "understanding_validation_failed",
+              "validation_issues": [
+                {
+                  "location": [
+                    "requests"
+                  ],
+                  "type": "visit_missing_executable_request",
+                  "message": "A visit request, selection or confirmation also needs a topic appointment request. Preserve its current evidence; do not infer final booking consent."
+                }
+              ],
+              "normalizations": [],
+              "quotation_schema": "standard",
+              "repair_feedback": null,
+              "raw_response": "{\"preferences\":[{\"key\":\"property\",\"value\":\"Cedar Studio\",\"evidence\":\"Actually I prefer Cedar Studio instead.\",\"status\":\"declared\"}],\"personal_facts\":[],\"preference_withdrawals\":[],\"source_purposes\":[],\"objections\":[],\"empathy\":null,\"releases\":[],\"visit\":{\"action\":\"request\",\"evidence\":\"Actually I prefer Cedar Studio instead.\",\"timing\":null},\"courtesy\":null,\"reschedule\":null,\"cancellation\":null,\"wait\":null,\"moderation\":null,\"appointment_query\":null,\"requires_clarification\":false,\"clarification_question\":null,\"confidence\":1,\"version\":\"sales-interpretation-input/2.0\",\"requests\":[{\"polarity\":\"request\",\"evidence\":\"Actually I prefer Cedar Studio instead.\",\"target\":{\"kind\":\"property\",\"expression\":\"Cedar Studio\",\"evidence\":\"Actually I prefer Cedar Studio instead.\"},\"topic\":\"property_details\",\"subject\":null,\"detail_fields\":[],\"feature\":null}],\"alternatives\":[],\"constraints\": []  ,\"selection\":null}",
+              "raw_response_sha256": "6edfe027891195bc0259953ea751095cb70d8547c903c6984c22f8df903c66bf",
+              "raw_response_truncated": false
+            },
+            {
+              "attempt": 2,
+              "outcome": "invalid_model_contract",
+              "error_code": "understanding_validation_failed",
+              "validation_issues": [
+                {
+                  "location": [
+                    "requests"
+                  ],
+                  "type": "visit_missing_executable_request",
+                  "message": "A visit request, selection or confirmation also needs a topic appointment request. Preserve its current evidence; do not infer final booking consent."
+                },
+                {
+                  "location": [
+                    "comparison"
+                  ],
+                  "type": "comparison_not_supported_by_action",
+                  "message": "This message requests material, a visit, or selects a time, not a comparison. Preserve the explicit action and omit the invented comparison. Never infer booking confirmation from a selection."
+                }
+              ],
+              "normalizations": [],
+              "quotation_schema": "source_enum",
+              "repair_feedback": "{\"contract_repair\": \"Reinterpret the ORIGINAL current_message using the schema. Correct the validation issues. Do not invent exclusions, evidence, consent or facts. This feedback is not a new lead request.\", \"validation_issues\": [{\"location\": [\"requests\"], \"type\": \"visit_missing_executable_request\", \"message\": \"A visit request, selection or confirmation also needs a topic appointment request. Preserve its current evidence; do not infer final booking consent.\"}], \"current_message\": \"Actually I prefer Cedar Studio instead.\", \"allowed_request_and_preference_quotes\": [\"Actually I prefer Cedar Studio instead.\"], \"verified_declarations_to_preserve\": [], \"repair_scope\": \"Choose exact source quotes from the schema enum for requests and preferences. Correct only failed fields and their necessary links; preserve valid declarations, visit timing and independent current questions.\", \"local_reference_rule\": \"Use inline target objects and nested comparison members. Never output IDs or reference links; the backend generates them.\", \"current_turn_rule\": \"Do not replay historical questions. Budget and payment declarations belong in preferences, not requests. Preserve independent current questions.\", \"exact_short_quote\": \"Actually I prefer Cedar Studio instead.\", \"quotation_rule\": \"Do not append punctuation. Meaning may be normalized in value/expression, but evidence must be copied verbatim from current_message. Keep independent requests and negations.\"}",
+              "raw_response": "{\"preferences\":[],\"personal_facts\":[],\"preference_withdrawals\":[],\"source_purposes\":[],\"objections\":[],\"empathy\":null,\"releases\":[],\"visit\":{\"action\":\"request\",\"evidence\":\"Actually I prefer Cedar Studio instead.\",\"timing\":null},\"courtesy\":null,\"reschedule\":null,\"cancellation\":null,\"wait\":null,\"moderation\":null,\"appointment_query\":null,\"requires_clarification\":false,\"clarification_question\":null,\"confidence\":1,\"version\":\"sales-interpretation-input/2.0\",\"requests\":[{\"topic\":\"comparison\",\"polarity\":\"request\",\"evidence\":\"Actually I prefer Cedar Studio instead.\",\"members\":[{\"kind\":\"property\",\"expression\":\"Cedar Loft\",\"evidence\":\"Actually I prefer Cedar Studio instead.\"},{\"kind\":\"property\",\"expression\":\"Cedar Studio\",\"evidence\":\"Actually I prefer Cedar Studio instead.\"}],\"include_current\":false,\"include_all\":false,\"all_kind\":\"property\",\"criteria\":[\"general\"],\"feature\":null,\"operation\":\"compare\"}],\"alternatives\":[],\"constraints\": []  ,\"selection\":null}",
+              "raw_response_sha256": "4a4210e3aa209b4bb1ea13c2cc39092a260adf3280ce28379564cd36bcba098e",
+              "raw_response_truncated": false
+            }
+          ]
+        },
+        {
+          "lead_message": "Please send the brochure for Cedar Studio.",
+          "interpretation_attempts": [
+            {
+              "attempt": 1,
+              "outcome": "accepted",
+              "error_code": null,
+              "validation_issues": [],
+              "normalizations": [
+                {
+                  "field": "requests",
+                  "action": "preserve_literal_single_material_request",
+                  "evidence": "Please send the brochure for Cedar Studio.",
+                  "confidence_unchanged": 1.0
+                }
+              ],
+              "quotation_schema": "standard",
+              "repair_feedback": null,
+              "raw_response": "{\"preferences\":[{\"key\":\"property\",\"value\":\"Cedar Studio\",\"evidence\":\"Cedar Studio\",\"status\":\"declared\"}],\"personal_facts\":[],\"preference_withdrawals\":[],\"source_purposes\":[],\"objections\":[],\"empathy\":null,\"releases\":[],\"visit\":null,\"courtesy\":null,\"reschedule\":null,\"cancellation\":null,\"wait\":null,\"moderation\":null,\"appointment_query\":null,\"requires_clarification\":false,\"clarification_question\":null,\"confidence\":1,\"version\":\"sales-interpretation-input/2.0\",\"requests\":[{\"polarity\":\"request\",\"evidence\":\"Please send the brochure for Cedar Studio.\",\"target\":{\"kind\":\"property\",\"expression\":\"Cedar Studio\",\"evidence\":\"Cedar Studio\"},\"topic\":\"materials\",\"subject\":\"brochure\"}],\"alternatives\":[],\"constraints\": []  ,\"selection\":null}",
+              "raw_response_sha256": "13c67e62be6a14ebf58446cc805528457e4e6ea1af283bc4760bdc14dcf9eef4",
+              "raw_response_truncated": false
+            }
+          ]
+        },
+        {
+          "lead_message": "Can I visit Cedar Studio?",
+          "interpretation_attempts": [
+            {
+              "attempt": 1,
+              "outcome": "accepted",
+              "error_code": null,
+              "validation_issues": [],
+              "normalizations": [
+                {
+                  "field": "requests",
+                  "action": "literal_visit_not_comparison",
+                  "evidence": "Can I visit Cedar Studio?",
+                  "confidence_unchanged": 1.0,
+                  "effect_authorization": false
+                }
+              ],
+              "quotation_schema": "standard",
+              "repair_feedback": null,
+              "raw_response": "{\"preferences\":[{\"key\":\"property\",\"value\":\"Cedar Studio\",\"evidence\":\"Cedar Studio\",\"status\":\"declared\"},{\"key\":\"visit_readiness\",\"value\":\"true\",\"evidence\":\"Can I visit Cedar Studio?\",\"status\":\"declared\"}],\"personal_facts\":[],\"preference_withdrawals\":[],\"source_purposes\":[],\"objections\":[],\"empathy\":null,\"releases\":[],\"visit\":{\"action\":\"request\",\"evidence\":\"Can I visit Cedar Studio?\",\"timing\":null},\"courtesy\":null,\"reschedule\":null,\"cancellation\":null,\"wait\":null,\"moderation\":null,\"appointment_query\":null,\"requires_clarification\":false,\"clarification_question\":null,\"confidence\":1,\"version\":\"sales-interpretation-input/2.0\",\"requests\":[{\"topic\":\"comparison\",\"polarity\":\"request\",\"evidence\":\"Can I visit Cedar Studio?\",\"members\":[{\"kind\":\"property\",\"expression\":\"Cedar Studio\",\"evidence\":\"Cedar Studio\"}],\"include_current\":true,\"include_all\":false,\"all_kind\":\"property\",\"criteria\":[\"general\"],\"feature\":null,\"operation\":\"compare\"}],\"alternatives\":[],\"constraints\": []  ,\"selection\":null}",
+              "raw_response_sha256": "81a351e0113dc526be33dcf40dbb19221ebc32472d776b27b5226fcee045807d",
+              "raw_response_truncated": false
+            }
+          ]
+        },
+        {
+          "lead_message": "18/11, 9:00AM",
+          "interpretation_attempts": [
+            {
+              "attempt": 1,
+              "outcome": "invalid_model_contract",
+              "error_code": "understanding_validation_failed",
+              "validation_issues": [
+                {
+                  "location": [],
+                  "type": "contract_value_error",
+                  "message": "Inline reference evidence must quote current_message."
+                }
+              ],
+              "normalizations": [],
+              "quotation_schema": "standard",
+              "repair_feedback": null,
+              "raw_response": "{\"preferences\":[{\"key\":\"property\",\"value\":\"Cedar Studio\",\"evidence\":\"Actually I \u00a0C\",\"status\":\"declared\"},{\"key\":\"visit_readiness\",\"value\":\"Can I visit Cedar Studio?\",\"evidence\":\"Can I visit\",\"status\":\"declared\"}],\"personal_facts\":[],\"preference_withdrawals\":[],\"source_purposes\":[],\"objections\":[],\"empathy\":null,\"releases\":[],\"visit\":{\"action\":\"select\",\"evidence\":\"18/11, 9:00AM\",\"timing\":{\"date_from_evidence\":\"2026-11-18T09:00:00\",\"date_until_evidence\":\"2026-11-18T09:00:00\",\"time_from_evidence\":\"09:00 AM\",\"time_until_evidence\":\"09:00 AM\",\"time_relation\":\"exact\",\"timezone_evidence\":\"America/Chicago\",\"duration_evidence\":\"45 minutes\"}},\"courtesy\":null,\"reschedule\":null,\"cancellation\":null,\"wait\":null,\"moderation\":null,\"appointment_query\":null,\"requires_clarification\":false,\"clarification_question\":null,\"confidence\":1,\"version\":\"sales-interpretation-input/2.0\",\"requests\":[{\"topic\":\"comparison\",\"polarity\":\"request\",\"evidence\":\"Cedar Studio\",\"members\":[{\"kind\":\"property\",\"expression\":\"Cedar Studio\",\"evidence\":\"Cedar Studio\"}],\"include_current\":false,\"include_all\":false,\"all_kind\":\"property\",\"criteria\":[\"general\"],\"feature\":null,\"operation\":\"compare\"}],\"alternatives\":[],\"constraints\": []  ,\"selection\":null}",
+              "raw_response_sha256": "1292a0034bff2a51150ce0fafd508fac2276722924dabb91a210fe1094158bee",
+              "raw_response_truncated": false
+            },
+            {
+              "attempt": 2,
+              "outcome": "accepted",
+              "error_code": null,
+              "validation_issues": [],
+              "normalizations": [
+                {
+                  "field": "visit",
+                  "action": "select_exact_backend_public_option",
+                  "evidence": "18/11, 9:00AM"
+                }
+              ],
+              "quotation_schema": "source_enum",
+              "repair_feedback": "{\"contract_repair\": \"Reinterpret the ORIGINAL current_message using the schema. Correct the validation issues. Do not invent exclusions, evidence, consent or facts. This feedback is not a new lead request.\", \"validation_issues\": [{\"location\": [], \"type\": \"contract_value_error\", \"message\": \"Inline reference evidence must quote current_message.\"}], \"current_message\": \"18/11, 9:00AM\", \"allowed_request_and_preference_quotes\": [\"18/11, 9:00AM\", \"18/11,\", \"9:00AM\"], \"verified_declarations_to_preserve\": [], \"repair_scope\": \"Choose exact source quotes from the schema enum for requests and preferences. Correct only failed fields and their necessary links; preserve valid declarations, visit timing and independent current questions.\", \"local_reference_rule\": \"Use inline target objects and nested comparison members. Never output IDs or reference links; the backend generates them.\", \"current_turn_rule\": \"Do not replay historical questions. Budget and payment declarations belong in preferences, not requests. Preserve independent current questions.\", \"exact_short_quote\": \"18/11, 9:00AM\", \"quotation_rule\": \"Do not append punctuation. Meaning may be normalized in value/expression, but evidence must be copied verbatim from current_message. Keep independent requests and negations.\"}",
+              "raw_response": "{\"preferences\":[],\"personal_facts\":[],\"preference_withdrawals\":[],\"source_purposes\":[],\"objections\":[],\"empathy\":null,\"releases\":[],\"visit\":{\"action\":\"request\",\"evidence\":\"18/11, 9:00AM\",\"timing\":{\"date_from_evidence\":\"18/11, 9:00AM\",\"date_until_evidence\":null,\"time_from_evidence\":\"9:00AM\",\"time_until_evidence\":null,\"time_relation\":\"exact\",\"timezone_evidence\":null,\"duration_evidence\":null}},\"courtesy\":null,\"reschedule\":null,\"cancellation\":null,\"wait\":null,\"moderation\":null,\"appointment_query\":null,\"requires_clarification\":false,\"clarification_question\":null,\"confidence\":1,\"version\":\"sales-interpretation-input/2.0\",\"requests\":[],\"alternatives\":[],\"constraints\": []  ,\"selection\":null}",
+              "raw_response_sha256": "fa00af169615d94c5c706273d3ce0f7cbd0c2de432661741807855e07f0209ef",
+              "raw_response_truncated": false
+            }
+          ]
+        },
+        {
+          "lead_message": "Yes",
+          "interpretation_attempts": [
+            {
+              "attempt": 1,
+              "outcome": "invalid_model_contract",
+              "error_code": "understanding_validation_failed",
+              "validation_issues": [
+                {
+                  "location": [],
+                  "type": "contract_value_error",
+                  "message": "Inline reference evidence must quote current_message."
+                }
+              ],
+              "normalizations": [],
+              "quotation_schema": "standard",
+              "repair_feedback": null,
+              "raw_response": "{\"preferences\":[{\"key\":\"property\",\"value\":\"Cedar Studio\",\"evidence\":\"Ced\" ,\"status\":\"declared\"},{\"key\":\"visit_readiness\",\"value\":\"18/11, 9:00AM\",\"evidence\":\"18/\",\"status\":\"declared\"}],\"personal_facts\":[],\"preference_withdrawals\":[],\"source_purposes\":[],\"objections\":[],\"empathy\":null,\"releases\":[],\"visit\":{\"action\":\"confirm\",\"evidence\":\"Yes\",\"timing\":{\"date_from_evidence\":\"2026-11-18T15:00:00+00:00\",\"date_until_evidence\":null,\"time_from_evidence\":null,\"time_until_evidence\":null,\"time_relation\":\"exact\",\"timezone_evidence\":\"America/Chicago\",\"duration_evidence\":\"45 minutes\"}},\"courtesy\":null,\"reschedule\":null,\"cancellation\":null,\"wait\":null,\"moderation\":null,\"appointment_query\":null,\"requires_clarification\":false,\"clarification_question\":null,\"confidence\":1,\"version\":\"sales-interpretation-input/2.0\",\"requests\":[{\"topic\":\"comparison\",\"polarity\":\"request\",\"evidence\":\"C\",\"members\":[{\"kind\":\"property\",\"expression\":\"Cedar Loft\",\"evidence\":\"C\"},{\"kind\":\"property\",\"expression\":\"Cedar Studio\",\"evidence\":\"C\"}],\"include_current\":false,\"include_all\":false,\"all_kind\":\"property\",\"criteria\":[\"general\"],\"feature\":null,\"operation\":\"compare\"}],\"alternatives\":[],\"constraints\": []  ,\"selection\":null}",
+              "raw_response_sha256": "40a135c0bbc07a086b180689170d7accbf0ea380694ba2d7375bd21a6e60097d",
+              "raw_response_truncated": false
+            },
+            {
+              "attempt": 2,
+              "outcome": "accepted",
+              "error_code": null,
+              "validation_issues": [],
+              "normalizations": [
+                {
+                  "field": "visit.timing.timezone_evidence",
+                  "action": "omit_non_timezone_sentence"
+                },
+                {
+                  "field": "visit.timing.duration_evidence",
+                  "action": "omit_undeclared_duration"
+                }
+              ],
+              "quotation_schema": "source_enum",
+              "repair_feedback": "{\"contract_repair\": \"Reinterpret the ORIGINAL current_message using the schema. Correct the validation issues. Do not invent exclusions, evidence, consent or facts. This feedback is not a new lead request.\", \"validation_issues\": [{\"location\": [], \"type\": \"contract_value_error\", \"message\": \"Inline reference evidence must quote current_message.\"}], \"current_message\": \"Yes\", \"allowed_request_and_preference_quotes\": [\"Yes\"], \"verified_declarations_to_preserve\": [], \"repair_scope\": \"Choose exact source quotes from the schema enum for requests and preferences. Correct only failed fields and their necessary links; preserve valid declarations, visit timing and independent current questions.\", \"local_reference_rule\": \"Use inline target objects and nested comparison members. Never output IDs or reference links; the backend generates them.\", \"current_turn_rule\": \"Do not replay historical questions. Budget and payment declarations belong in preferences, not requests. Preserve independent current questions.\", \"exact_short_quote\": \"Yes\", \"quotation_rule\": \"Do not append punctuation. Meaning may be normalized in value/expression, but evidence must be copied verbatim from current_message. Keep independent requests and negations.\"}",
+              "raw_response": "{\"preferences\":[],\"personal_facts\":[],\"preference_withdrawals\":[],\"source_purposes\":[],\"objections\":[],\"empathy\":null,\"releases\":[],\"visit\":{\"action\":\"confirm\",\"evidence\":\"Yes\",\"timing\":{\"date_from_evidence\":\"Yes\",\"date_until_evidence\":\"Yes\",\"time_from_evidence\":\"Yes\",\"time_until_evidence\":\"Yes\",\"time_relation\":\"exact\",\"timezone_evidence\":\"Yes\",\"duration_evidence\":\"Yes\"}},\"courtesy\":null,\"reschedule\":null,\"cancellation\":null,\"wait\":null,\"moderation\":null,\"appointment_query\":null,\"requires_clarification\":false,\"clarification_question\":null,\"confidence\":1,\"version\":\"sales-interpretation-input/2.0\",\"requests\":[],\"alternatives\":[],\"constraints\": []  ,\"selection\":null}",
+              "raw_response_sha256": "f994d2d55a0832925794f99d1ef423bee5be160f19ef3c93bad9b33de22c5591",
+              "raw_response_truncated": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "obs_interrupt",
+      "turns": [
+        {
+          "lead_message": "I am looking for a 4 bedroom home.",
+          "interpretation_attempts": [
+            {
+              "attempt": 1,
+              "outcome": "accepted",
+              "error_code": null,
+              "validation_issues": [],
+              "normalizations": [
+                {
+                  "field": "requests",
+                  "action": "literal_bedroom_need_is_catalog_search",
+                  "removed_unrequested_comparison": true,
+                  "model_confidence_preserved": 1.0,
+                  "bedrooms": 4,
+                  "evidence": "I am looking for a 4 bedroom home"
+                }
+              ],
+              "quotation_schema": "standard",
+              "repair_feedback": null,
+              "raw_response": "{\"preferences\":[],\"personal_facts\":[],\"preference_withdrawals\":[],\"source_purposes\":[],\"objections\":[],\"empathy\":null,\"releases\":[],\"visit\":null,\"courtesy\":null,\"reschedule\":null,\"cancellation\":null,\"wait\":null,\"moderation\":null,\"appointment_query\":null,\"requires_clarification\":false,\"clarification_question\":null,\"confidence\":1,\"version\":\"sales-interpretation-input/2.0\",\"requests\":[{\"topic\":\"comparison\",\"polarity\":\"request\",\"evidence\":\"I am looking for a 4 bedroom home.\",\"members\":[{\"kind\":\"property\",\"expression\":\"Bay Residence\",\"evidence\":\"4 bedroom home\"}],\"include_current\":true,\"include_all\":false,\"all_kind\":\"property\",\"criteria\":[\"bedrooms\"],\"feature\":null,\"operation\":\"compare\"}],\"alternatives\":[],\"constraints\": []  ,\"selection\":null}",
+              "raw_response_sha256": "427ec2c665a12ff41aac2d41fbe9d819caa5a76498fc798567a0bb2f6df916e3",
+              "raw_response_truncated": false
+            }
+          ]
+        },
+        {
+          "lead_message": "Bay Residence",
+          "interpretation_attempts": [
+            {
+              "attempt": 1,
+              "outcome": "accepted",
+              "error_code": null,
+              "validation_issues": [],
+              "normalizations": [
+                {
+                  "field": "requests",
+                  "action": "named_property_is_selection_not_comparison"
+                }
+              ],
+              "quotation_schema": "standard",
+              "repair_feedback": null,
+              "raw_response": "{\"preferences\":[],\"personal_facts\":[],\"preference_withdrawals\":[],\"source_purposes\":[],\"objections\":[],\"empathy\":null,\"releases\":[],\"visit\":null,\"courtesy\":null,\"reschedule\":null,\"cancellation\":null,\"wait\":null,\"moderation\":null,\"appointment_query\":null,\"requires_clarification\":false,\"clarification_question\":null,\"confidence\":0,\"version\":\"sales-interpretation-input/2.0\",\"requests\":[{\"topic\":\"comparison\",\"polarity\":\"request\",\"evidence\":\"Bay Residence\",\"members\":[{\"kind\":\"property\",\"expression\":\"Bay Residence\",\"evidence\":\"Bay Residence\"}],\"include_current\":true,\"include_all\":false,\"all_kind\":\"property\",\"criteria\":[\"general\"],\"feature\":null,\"operation\":\"compare\"}],\"alternatives\":[],\"constraints\": []  ,\"selection\":null}",
+              "raw_response_sha256": "8afbc8e300d4553ff7d989894b3f8bba70c00898584325c603f1e9a33a6a9f40",
+              "raw_response_truncated": false
+            }
+          ]
+        },
+        {
+          "lead_message": "Can I visit Bay Residence?",
+          "interpretation_attempts": [
+            {
+              "attempt": 1,
+              "outcome": "accepted",
+              "error_code": null,
+              "validation_issues": [],
+              "normalizations": [
+                {
+                  "field": "requests",
+                  "action": "literal_visit_not_comparison",
+                  "evidence": "Can I visit Bay Residence?",
+                  "confidence_unchanged": 1.0,
+                  "effect_authorization": false
+                }
+              ],
+              "quotation_schema": "standard",
+              "repair_feedback": null,
+              "raw_response": "{\"preferences\":[],\"personal_facts\":[],\"preference_withdrawals\":[],\"source_purposes\":[],\"objections\":[],\"empathy\":null,\"releases\":[],\"visit\":{\"action\":\"request\",\"evidence\":\"Can I visit Bay Residence?\",\"timing\":null},\"courtesy\":null,\"reschedule\":null,\"cancellation\":null,\"wait\":null,\"moderation\":null,\"appointment_query\":null,\"requires_clarification\":false,\"clarification_question\":null,\"confidence\":1,\"version\":\"sales-interpretation-input/2.0\",\"requests\":[{\"topic\":\"comparison\",\"polarity\":\"request\",\"evidence\":\"Can I visit Bay Residence?\",\"members\":[{\"kind\":\"property\",\"expression\":\"Bay Residence\",\"evidence\":\"Bay Residence\"}],\"include_current\":false,\"include_all\":false,\"all_kind\":\"property\",\"criteria\":[\"general\"],\"feature\":null,\"operation\":\"compare\"}],\"alternatives\":[],\"constraints\": []  ,\"selection\":null}",
+              "raw_response_sha256": "87f0a7d1e145db91da4af94253aa2d24b6a102a1101973a8ab3e152be0d1429d",
+              "raw_response_truncated": false
+            }
+          ]
+        },
+        {
+          "lead_message": "Before choosing a time, can you show me photos?",
+          "interpretation_attempts": [
+            {
+              "attempt": 1,
+              "outcome": "accepted",
+              "error_code": null,
+              "validation_issues": [],
+              "normalizations": [
+                {
+                  "field": "requests",
+                  "action": "literal_material_read_not_comparison",
+                  "evidence": "Before choosing a time, can you show me photos?",
+                  "subject": "photos",
+                  "confidence_unchanged": 1.0
+                },
+                {
+                  "field": "property",
+                  "action": "omit_verified_historical_optional_preference"
+                },
+                {
+                  "field": "visit_readiness",
+                  "action": "omit_verified_historical_optional_preference"
+                }
+              ],
+              "quotation_schema": "standard",
+              "repair_feedback": null,
+              "raw_response": "{\"preferences\":[{\"key\":\"property\",\"value\":\"Bay Residence\",\"evidence\":\"Bay Residence\",\"status\":\"declared\"},{\"key\":\"visit_readiness\",\"value\":\"Can I visit Bay Residence?\",\"evidence\":\"Can I visit Bay Residence?\",\"status\":\"declared\"}],\"personal_facts\":[],\"preference_withdrawals\":[],\"source_purposes\":[],\"objections\":[],\"empathy\":null,\"releases\":[],\"visit\":{\"action\":\"request\",\"evidence\":\"Can I visit Bay Residence?\",\"timing\":null},\"courtesy\":null,\"reschedule\":null,\"cancellation\":null,\"wait\":null,\"moderation\":null,\"appointment_query\":null,\"requires_clarification\":false,\"clarification_question\":null,\"confidence\":1,\"version\":\"sales-interpretation-input/2.0\",\"requests\":[{\"topic\":\"comparison\",\"polarity\":\"request\",\"evidence\":\"can you show me photos?\",\"members\":[{\"kind\":\"property\",\"expression\":\"Bay Residence\",\"evidence\":\"Bay Residence\"}],\"include_current\":true,\"include_all\":false,\"all_kind\":\"property\",\"criteria\":[\"general\"],\"feature\":null,\"operation\":\"compare\"}],\"alternatives\":[],\"constraints\": []  ,\"selection\":null}",
+              "raw_response_sha256": "ea7ac21e321c3b5f78b905c16d07eb741a7836c0e136e4aa3b3a4e0219672a0e",
+              "raw_response_truncated": false
+            }
+          ]
+        },
+        {
+          "lead_message": "Can I visit Bay Residence?",
+          "interpretation_attempts": [
+            {
+              "attempt": 1,
+              "outcome": "accepted",
+              "error_code": null,
+              "validation_issues": [],
+              "normalizations": [
+                {
+                  "field": "requests",
+                  "action": "literal_visit_not_comparison",
+                  "evidence": "Can I visit Bay Residence?",
+                  "confidence_unchanged": 1.0,
+                  "effect_authorization": false
+                }
+              ],
+              "quotation_schema": "standard",
+              "repair_feedback": null,
+              "raw_response": "{\"preferences\":[{\"key\":\"visit_readiness\",\"value\":\"Can I visit Bay Residence?\",\"evidence\":\"Can I visit Bay Residence?\",\"status\":\"declared\"}],\"personal_facts\":[],\"preference_withdrawals\":[],\"source_purposes\":[],\"objections\":[],\"empathy\":null,\"releases\":[],\"visit\":{\"action\":\"request\",\"evidence\":\"Can I visit Bay Residence?\",\"timing\":null},\"courtesy\":null,\"reschedule\":null,\"cancellation\":null,\"wait\":null,\"moderation\":null,\"appointment_query\":null,\"requires_clarification\":false,\"clarification_question\":null,\"confidence\":1,\"version\":\"sales-interpretation-input/2.0\",\"requests\":[{\"topic\":\"comparison\",\"polarity\":\"request\",\"evidence\":\"Can I visit Bay Residence?\",\"members\":[{\"kind\":\"property\",\"expression\":\"Bay Residence\",\"evidence\":\"Bay Residence\"}],\"include_current\":false,\"include_all\":false,\"all_kind\":\"property\",\"criteria\":[\"general\"],\"feature\":null,\"operation\":\"compare\"}],\"alternatives\":[],\"constraints\": []  ,\"selection\":null}",
+              "raw_response_sha256": "a62df55e01f9c53964a3d4397d4ef0bbf35ad60e6a9fd28f46d188b00c0f5531",
+              "raw_response_truncated": false
+            }
+          ]
+        },
+        {
+          "lead_message": "November 18, 10:00AM",
+          "interpretation_attempts": [
+            {
+              "attempt": 1,
+              "outcome": "invalid_model_contract",
+              "error_code": "understanding_validation_failed",
+              "validation_issues": [
+                {
+                  "location": [],
+                  "type": "contract_value_error",
+                  "message": "Inline reference evidence must quote current_message."
+                }
+              ],
+              "normalizations": [],
+              "quotation_schema": "standard",
+              "repair_feedback": null,
+              "raw_response": "{\"preferences\":[{\"key\":\"visit_readiness\",\"value\":\"Can I visit Bay Residence?\",\"evidence\":\"Can I visit Bay \u00a0Res\",\"status\":\"declared\"},{\"key\":\"property\",\"value\":\"Bay Residence\",\"evidence\":\"Bay Residence\",\"status\":\"declared\"}],\"personal_facts\":[],\"preference_withdrawals\":[],\"source_purposes\":[],\"objections\":[],\"empathy\":null,\"releases\":[],\"visit\":{\"action\":\"select\",\"evidence\":\"November 18, 10:00AM\",\"timing\":{\"date_from_evidence\":\"November 18, 10:00AM\",\"date_until_evidence\":null,\"time_from_evidence\":null,\"time_until_evidence\":null,\"time_relation\":\"exact\",\"timezone_evidence\":\"America/New_York\",\"duration_evidence\":null}},\"courtesy\":null,\"reschedule\":null,\"cancellation\":null,\"wait\":null,\"moderation\":null,\"appointment_query\":null,\"requires_clarification\":false,\"clarification_question\":null,\"confidence\":1,\"version\":\"sales-interpretation-input/2.0\",\"requests\":[{\"topic\":\"comparison\",\"polarity\":\"request\",\"evidence\":\"Can I visit Bay \u00a0Res\",\"members\":[{\"kind\":\"property\",\"expression\":\"Bay Residence\",\"evidence\":\"Bay Residence\"}],\"include_current\":false,\"include_all\":false,\"all_kind\":\"property\",\"criteria\":[\"general\"],\"feature\":null,\"operation\":\"compare\"}],\"alternatives\":[],\"constraints\": []  ,\"selection\":null}",
+              "raw_response_sha256": "37e88134232efd0fd2fc077efc3c7066ef332bfbca1ee3f135594cdf291c4c07",
+              "raw_response_truncated": false
+            },
+            {
+              "attempt": 2,
+              "outcome": "accepted",
+              "error_code": null,
+              "validation_issues": [],
+              "normalizations": [
+                {
+                  "field": "visit",
+                  "action": "select_exact_backend_public_option",
+                  "evidence": "November 18, 10:00AM"
+                }
+              ],
+              "quotation_schema": "source_enum",
+              "repair_feedback": "{\"contract_repair\": \"Reinterpret the ORIGINAL current_message using the schema. Correct the validation issues. Do not invent exclusions, evidence, consent or facts. This feedback is not a new lead request.\", \"validation_issues\": [{\"location\": [], \"type\": \"contract_value_error\", \"message\": \"Inline reference evidence must quote current_message.\"}], \"current_message\": \"November 18, 10:00AM\", \"allowed_request_and_preference_quotes\": [\"November 18, 10:00AM\", \"November 18,\", \"10:00AM\"], \"verified_declarations_to_preserve\": [], \"repair_scope\": \"Choose exact source quotes from the schema enum for requests and preferences. Correct only failed fields and their necessary links; preserve valid declarations, visit timing and independent current questions.\", \"local_reference_rule\": \"Use inline target objects and nested comparison members. Never output IDs or reference links; the backend generates them.\", \"current_turn_rule\": \"Do not replay historical questions. Budget and payment declarations belong in preferences, not requests. Preserve independent current questions.\", \"exact_short_quote\": \"November 18, 10:00AM\", \"quotation_rule\": \"Do not append punctuation. Meaning may be normalized in value/expression, but evidence must be copied verbatim from current_message. Keep independent requests and negations.\"}",
+              "raw_response": "{\"preferences\":[],\"personal_facts\":[],\"preference_withdrawals\":[],\"source_purposes\":[],\"objections\":[],\"empathy\":null,\"releases\":[],\"visit\":{\"action\":\"select\",\"evidence\":\"November 18, 10:00AM\",\"timing\":{\"date_from_evidence\":\"November 18, 10:00AM\",\"date_until_evidence\":null,\"time_from_evidence\":\"10:00AM\",\"time_until_evidence\":null,\"time_relation\":\"exact\",\"timezone_evidence\":null,\"duration_evidence\":null}},\"courtesy\":null,\"reschedule\":null,\"cancellation\":null,\"wait\":null,\"moderation\":null,\"appointment_query\":null,\"requires_clarification\":false,\"clarification_question\":null,\"confidence\":1,\"version\":\"sales-interpretation-input/2.0\",\"requests\":[],\"alternatives\":[],\"constraints\": []  ,\"selection\":null}",
+              "raw_response_sha256": "ffa4c1f91bb381b5ee08955c7851b19625ed33c5015927708a31cec9e8ae611c",
+              "raw_response_truncated": false
+            }
+          ]
+        },
+        {
+          "lead_message": "Yes",
+          "interpretation_attempts": [
+            {
+              "attempt": 1,
+              "outcome": "invalid_model_contract",
+              "error_code": "understanding_validation_failed",
+              "validation_issues": [
+                {
+                  "location": [],
+                  "type": "contract_value_error",
+                  "message": "Inline reference evidence must quote current_message."
+                }
+              ],
+              "normalizations": [],
+              "quotation_schema": "standard",
+              "repair_feedback": null,
+              "raw_response": "{\"preferences\":[{\"key\":\"visit_readiness\",\"value\":\"November 18, 10:00AM\",\"evidence\":\"Yes\",\"status\":\"declared\"}],\"personal_facts\":[],\"preference_withdrawals\":[],\"source_purposes\":[],\"objections\":[],\"empathy\":null,\"releases\":[],\"visit\":{\"action\":\"confirm\",\"evidence\":\"Yes\",\"timing\":{\"date_from_evidence\":\"2026-11-18T10:00:00-05:00\",\"date_until_evidence\":null,\"time_from_evidence\":null,\"time_until_evidence\":null,\"time_relation\":\"exact\",\"timezone_evidence\":\"America/New_York\",\"duration_evidence\":\"45 minutes\"}},\"courtesy\":null,\"reschedule\":null,\"cancellation\":null,\"wait\":null,\"moderation\":null,\"appointment_query\":null,\"requires_clarification\":false,\"clarification_question\":null,\"confidence\":1,\"version\":\"sales-interpretation-input/2.0\",\"requests\":[{\"topic\":\"comparison\",\"polarity\":\"request\",\"evidence\":\"Yes\",\"members\":[{\"kind\":\"property\",\"expression\":\"Bay Residence\",\"evidence\":\"Bay\"}],\"include_current\":false,\"include_all\":false,\"all_kind\":\"property\",\"criteria\":[\"general\"],\"feature\":null,\"operation\":\"compare\"}],\"alternatives\":[],\"constraints\":[],\"selection\":null}",
+              "raw_response_sha256": "d63305878c8026ea303a9928350b90e8a0a3d5c030d6347a626f92b6e5348328",
+              "raw_response_truncated": false
+            },
+            {
+              "attempt": 2,
+              "outcome": "accepted",
+              "error_code": null,
+              "validation_issues": [],
+              "normalizations": [
+                {
+                  "field": "visit.timing.timezone_evidence",
+                  "action": "omit_non_timezone_sentence"
+                },
+                {
+                  "field": "visit.timing.duration_evidence",
+                  "action": "omit_undeclared_duration"
+                }
+              ],
+              "quotation_schema": "source_enum",
+              "repair_feedback": "{\"contract_repair\": \"Reinterpret the ORIGINAL current_message using the schema. Correct the validation issues. Do not invent exclusions, evidence, consent or facts. This feedback is not a new lead request.\", \"validation_issues\": [{\"location\": [], \"type\": \"contract_value_error\", \"message\": \"Inline reference evidence must quote current_message.\"}], \"current_message\": \"Yes\", \"allowed_request_and_preference_quotes\": [\"Yes\"], \"verified_declarations_to_preserve\": [], \"repair_scope\": \"Choose exact source quotes from the schema enum for requests and preferences. Correct only failed fields and their necessary links; preserve valid declarations, visit timing and independent current questions.\", \"local_reference_rule\": \"Use inline target objects and nested comparison members. Never output IDs or reference links; the backend generates them.\", \"current_turn_rule\": \"Do not replay historical questions. Budget and payment declarations belong in preferences, not requests. Preserve independent current questions.\", \"exact_short_quote\": \"Yes\", \"quotation_rule\": \"Do not append punctuation. Meaning may be normalized in value/expression, but evidence must be copied verbatim from current_message. Keep independent requests and negations.\"}",
+              "raw_response": "{\"preferences\":[],\"personal_facts\":[],\"preference_withdrawals\":[],\"source_purposes\":[],\"objections\":[],\"empathy\":null,\"releases\":[],\"visit\":{\"action\":\"confirm\",\"evidence\":\"Yes\",\"timing\":{\"date_from_evidence\":\"Yes\",\"date_until_evidence\":\"Yes\",\"time_from_evidence\":\"Yes\",\"time_until_evidence\":\"Yes\",\"time_relation\":\"exact\",\"timezone_evidence\":\"Yes\",\"duration_evidence\":\"Yes\"}},\"courtesy\":null,\"reschedule\":null,\"cancellation\":null,\"wait\":null,\"moderation\":null,\"appointment_query\":null,\"requires_clarification\":false,\"clarification_question\":null,\"confidence\":1,\"version\":\"sales-interpretation-input/2.0\",\"requests\":[],\"alternatives\":[], \"constraints\": []  ,\"selection\": null}",
+              "raw_response_sha256": "c43938c49bc98a3e4b86c13d2863d5b3874a7eaa103486fc8fdd37b7a78be8f5",
+              "raw_response_truncated": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "obs_time",
+      "turns": [
+        {
+          "lead_message": "I am looking for a 4 bedroom home.",
+          "interpretation_attempts": [
+            {
+              "attempt": 1,
+              "outcome": "accepted",
+              "error_code": null,
+              "validation_issues": [],
+              "normalizations": [
+                {
+                  "field": "requests",
+                  "action": "literal_bedroom_need_is_catalog_search",
+                  "removed_unrequested_comparison": true,
+                  "model_confidence_preserved": 1.0,
+                  "bedrooms": 4,
+                  "evidence": "I am looking for a 4 bedroom home"
+                }
+              ],
+              "quotation_schema": "standard",
+              "repair_feedback": null,
+              "raw_response": "{\"preferences\":[],\"personal_facts\":[],\"preference_withdrawals\":[],\"source_purposes\":[],\"objections\":[],\"empathy\":null,\"releases\":[],\"visit\":null,\"courtesy\":null,\"reschedule\":null,\"cancellation\":null,\"wait\":null,\"moderation\":null,\"appointment_query\":null,\"requires_clarification\":false,\"clarification_question\":null,\"confidence\":1,\"version\":\"sales-interpretation-input/2.0\",\"requests\":[{\"topic\":\"comparison\",\"polarity\":\"request\",\"evidence\":\"I am looking for a 4 bedroom home.\",\"members\":[{\"kind\":\"property\",\"expression\":\"Bay Residence\",\"evidence\":\"4 bedroom home\"}],\"include_current\":true,\"include_all\":false,\"all_kind\":\"property\",\"criteria\":[\"bedrooms\"],\"feature\":null,\"operation\":\"compare\"}],\"alternatives\":[],\"constraints\": []  ,\"selection\":null}",
+              "raw_response_sha256": "427ec2c665a12ff41aac2d41fbe9d819caa5a76498fc798567a0bb2f6df916e3",
+              "raw_response_truncated": false
+            }
+          ]
+        },
+        {
+          "lead_message": "Bay Residence",
+          "interpretation_attempts": [
+            {
+              "attempt": 1,
+              "outcome": "accepted",
+              "error_code": null,
+              "validation_issues": [],
+              "normalizations": [
+                {
+                  "field": "requests",
+                  "action": "named_property_is_selection_not_comparison"
+                }
+              ],
+              "quotation_schema": "standard",
+              "repair_feedback": null,
+              "raw_response": "{\"preferences\":[],\"personal_facts\":[],\"preference_withdrawals\":[],\"source_purposes\":[],\"objections\":[],\"empathy\":null,\"releases\":[],\"visit\":null,\"courtesy\":null,\"reschedule\":null,\"cancellation\":null,\"wait\":null,\"moderation\":null,\"appointment_query\":null,\"requires_clarification\":false,\"clarification_question\":null,\"confidence\":0,\"version\":\"sales-interpretation-input/2.0\",\"requests\":[{\"topic\":\"comparison\",\"polarity\":\"request\",\"evidence\":\"Bay Residence\",\"members\":[{\"kind\":\"property\",\"expression\":\"Bay Residence\",\"evidence\":\"Bay Residence\"}],\"include_current\":true,\"include_all\":false,\"all_kind\":\"property\",\"criteria\":[\"general\"],\"feature\":null,\"operation\":\"compare\"}],\"alternatives\":[],\"constraints\": []  ,\"selection\":null}",
+              "raw_response_sha256": "8afbc8e300d4553ff7d989894b3f8bba70c00898584325c603f1e9a33a6a9f40",
+              "raw_response_truncated": false
+            }
+          ]
+        },
+        {
+          "lead_message": "I would like a visit any morning in the next seven days; use the property's timezone.",
+          "interpretation_attempts": [
+            {
+              "attempt": 1,
+              "outcome": "invalid_model_contract",
+              "error_code": "understanding_validation_failed",
+              "validation_issues": [
+                {
+                  "location": [],
+                  "type": "contract_value_error",
+                  "message": "Inline reference evidence must quote current_message."
+                }
+              ],
+              "normalizations": [],
+              "quotation_schema": "standard",
+              "repair_feedback": null,
+              "raw_response": "{\"preferences\":[{\"key\":\"visit_readiness\",\"value\":\"any morning in the next seven days\",\"evidence\":\"any morning in the next seven days\",\"status\":\"declared\"}],\"personal_facts\":[],\"preference_withdrawals\":[],\"source_purposes\":[],\"objections\":[],\"empathy\":null,\"releases\":[],\"visit\":{\"action\":\"request\",\"evidence\":\"I would like a visit any morning in the next seven days; use the property's timezone.\",\"timing\":{\"date_from_evidence\":\"next seven days\",\"date_until_evidence\":null,\"time_from_evidence\":\"morning\",\"time_until_evidence\":null,\"time_relation\":\"morning\",\"timezone_evidence\":\"use the property's timezone\",\"duration_evidence\":null}},\"courtesy\":null,\"reschedule\":null,\"cancellation\":null,\"wait\":null,\"moderation\":null,\"appointment_query\":null,\"requires_clarification\":false,\"clarification_question\":null,\"confidence\":1,\"version\":\"sales-interpretation-input/2.0\",\"requests\":[{\"topic\":\"comparison\",\"polarity\":\"request\",\"evidence\":\"I would like a visit any morning in the next seven days; use the property's timezone.\",\"members\":[{\"kind\":\"property\",\"expression\":\"Bay Residence\",\"evidence\":\"Bay Residence\"}],\"include_current\":true,\"include_all\":false,\"all_kind\":\"property\",\"criteria\":[\"general\"],\"feature\":null,\"operation\":\"compare\"}],\"alternatives\":[],\"constraints\": []  ,\"selection\":null}",
+              "raw_response_sha256": "06775e004d26c5cc14000d3b71756941d68dce9c63737d0bb0a271768c560e3b",
+              "raw_response_truncated": false
+            },
+            {
+              "attempt": 2,
+              "outcome": "accepted",
+              "error_code": null,
+              "validation_issues": [],
+              "normalizations": [
+                {
+                  "field": "requests",
+                  "action": "preserve_explicit_new_visit_request",
+                  "evidence": "I would like a visit any morning in the next seven days; use the property's timezone."
+                }
+              ],
+              "quotation_schema": "source_enum",
+              "repair_feedback": "{\"contract_repair\": \"Reinterpret the ORIGINAL current_message using the schema. Correct the validation issues. Do not invent exclusions, evidence, consent or facts. This feedback is not a new lead request.\", \"validation_issues\": [{\"location\": [], \"type\": \"contract_value_error\", \"message\": \"Inline reference evidence must quote current_message.\"}], \"current_message\": \"I would like a visit any morning in the next seven days; use the property's timezone.\", \"allowed_request_and_preference_quotes\": [\"I would like a visit any morning in the next seven days; use the property's timezone.\", \"any morning in the next seven days\", \"next seven days\", \"morning\", \"use the property's timezone\", \"I would like a visit any morning in the next seven days;\", \"use the property's timezone.\"], \"verified_declarations_to_preserve\": [], \"repair_scope\": \"Choose exact source quotes from the schema enum for requests and preferences. Correct only failed fields and their necessary links; preserve valid declarations, visit timing and independent current questions.\", \"local_reference_rule\": \"Use inline target objects and nested comparison members. Never output IDs or reference links; the backend generates them.\", \"current_turn_rule\": \"Do not replay historical questions. Budget and payment declarations belong in preferences, not requests. Preserve independent current questions.\", \"exact_short_quote\": \"I would like a visit any morning in the next seven days; use the property's timezone.\", \"quotation_rule\": \"Do not append punctuation. Meaning may be normalized in value/expression, but evidence must be copied verbatim from current_message. Keep independent requests and negations.\"}",
+              "raw_response": "{\"preferences\":[],\"personal_facts\":[],\"preference_withdrawals\":[],\"source_purposes\":[],\"objections\":[],\"empathy\":null,\"releases\":[],\"visit\":{\"action\":\"request\",\"evidence\":\"I would like a visit any morning in the next seven days; use the property's timezone.\",\"timing\":{\"date_from_evidence\":\"any morning in the next seven days\",\"date_until_evidence\":\"next seven days\",\"time_from_evidence\":\"morning\",\"time_until_evidence\":null,\"time_relation\":\"morning\",\"timezone_evidence\":\"use the property's timezone\",\"duration_evidence\":null}},\"courtesy\":null,\"reschedule\":null,\"cancellation\":null,\"wait\":null,\"moderation\":null,\"appointment_query\":null,\"requires_clarification\":false,\"clarification_question\":null,\"confidence\":1,\"version\":\"sales-interpretation-input/2.0\",\"requests\":[],\"alternatives\":[],\"constraints\":[], \"selection\":null}",
+              "raw_response_sha256": "9a83c435719fedf10a5b42c9cff17b208fa0e5f82a3820ceb32562fddbd34265",
+              "raw_response_truncated": false
+            }
+          ]
+        },
+        {
+          "lead_message": "November 18, 10:00AM",
+          "interpretation_attempts": [
+            {
+              "attempt": 1,
+              "outcome": "invalid_model_contract",
+              "error_code": "understanding_validation_failed",
+              "validation_issues": [
+                {
+                  "location": [],
+                  "type": "contract_value_error",
+                  "message": "Inline reference evidence must quote current_message."
+                }
+              ],
+              "normalizations": [],
+              "quotation_schema": "standard",
+              "repair_feedback": null,
+              "raw_response": "{\"preferences\":[{\"key\":\"visit_readiness\",\"value\":\"November 18, 10:00AM\",\"evidence\":\"November 18, 10:00AM\",\"status\":\"declared\"}],\"personal_facts\":[],\"preference_withdrawals\":[],\"source_purposes\":[],\"objections\":[],\"empathy\":null,\"releases\":[],\"visit\":{\"action\":\"select\",\"evidence\":\"November 18, 10:00AM\",\"timing\":{\"date_from_evidence\":\"November 18, 10:00AM\",\"date_until_evidence\":null,\"time_from_evidence\":\"10:00AM\",\"time_until_evidence\":null,\"time_relation\":\"exact\",\"timezone_evidence\":\"use the property's timezone\",\"duration_evidence\":null}},\"courtesy\":null,\"reschedule\":null,\"cancellation\":null,\"wait\":null,\"moderation\":null,\"appointment_query\":null,\"requires_clarification\":false,\"clarification_question\":null,\"confidence\":1,\"version\":\"sales-interpretation-input/2.0\",\"requests\":[{\"topic\":\"comparison\",\"polarity\":\"request\",\"evidence\":\"I would like a visit\",\"members\":[{\"kind\":\"property\",\"expression\":\"Bay Residence\",\"evidence\":\"Bay Residence\"}],\"include_current\":false,\"include_all\":false,\"all_kind\":\"property\",\"criteria\":[\"general\"],\"feature\":null,\"operation\":\"compare\"}],\"alternatives\":[],\"constraints\":[],\"selection\":null}",
+              "raw_response_sha256": "9736ac3d68605ada70c88093dcb0a6edb2feaafe77bb2f373fa179e5efc48cad",
+              "raw_response_truncated": false
+            },
+            {
+              "attempt": 2,
+              "outcome": "accepted",
+              "error_code": null,
+              "validation_issues": [],
+              "normalizations": [
+                {
+                  "field": "visit.timing.timezone_evidence",
+                  "action": "omit_non_timezone_sentence"
+                },
+                {
+                  "field": "visit",
+                  "action": "select_exact_backend_public_option",
+                  "evidence": "November 18, 10:00AM"
+                }
+              ],
+              "quotation_schema": "source_enum",
+              "repair_feedback": "{\"contract_repair\": \"Reinterpret the ORIGINAL current_message using the schema. Correct the validation issues. Do not invent exclusions, evidence, consent or facts. This feedback is not a new lead request.\", \"validation_issues\": [{\"location\": [], \"type\": \"contract_value_error\", \"message\": \"Inline reference evidence must quote current_message.\"}], \"current_message\": \"November 18, 10:00AM\", \"allowed_request_and_preference_quotes\": [\"November 18, 10:00AM\", \"10:00AM\", \"November 18,\"], \"verified_declarations_to_preserve\": [], \"repair_scope\": \"Choose exact source quotes from the schema enum for requests and preferences. Correct only failed fields and their necessary links; preserve valid declarations, visit timing and independent current questions.\", \"local_reference_rule\": \"Use inline target objects and nested comparison members. Never output IDs or reference links; the backend generates them.\", \"current_turn_rule\": \"Do not replay historical questions. Budget and payment declarations belong in preferences, not requests. Preserve independent current questions.\", \"exact_short_quote\": \"November 18, 10:00AM\", \"quotation_rule\": \"Do not append punctuation. Meaning may be normalized in value/expression, but evidence must be copied verbatim from current_message. Keep independent requests and negations.\"}",
+              "raw_response": "{\"preferences\":[],\"personal_facts\":[],\"preference_withdrawals\":[],\"source_purposes\":[],\"objections\":[],\"empathy\":null,\"releases\":[],\"visit\":{\"action\":\"request\",\"evidence\":\"November 18, 10:00AM\",\"timing\":{\"date_from_evidence\":\"November 18, 10:00AM\",\"date_until_evidence\":\"November 18, 10:00AM\",\"time_from_evidence\":\"10:00AM\",\"time_until_evidence\":\"10:00AM\",\"time_relation\":\"exact\",\"timezone_evidence\":\"November 18, 10:00AM\",\"duration_evidence\":null}},\"courtesy\":null,\"reschedule\":null,\"cancellation\":null,\"wait\":null,\"moderation\":null,\"appointment_query\":null,\"requires_clarification\":false,\"clarification_question\":null,\"confidence\":1,\"version\":\"sales-interpretation-input/2.0\",\"requests\":[],\"alternatives\":[],\"constraints\": []  ,\"selection\":null}",
+              "raw_response_sha256": "7aca594894be81f99a0d63fea53a42885e7e63b9f772ae8733f63df8effb45e6",
+              "raw_response_truncated": false
+            }
+          ]
+        },
+        {
+          "lead_message": "Yes",
+          "interpretation_attempts": [
+            {
+              "attempt": 1,
+              "outcome": "invalid_model_contract",
+              "error_code": "understanding_validation_failed",
+              "validation_issues": [
+                {
+                  "location": [],
+                  "type": "contract_value_error",
+                  "message": "Inline reference evidence must quote current_message."
+                }
+              ],
+              "normalizations": [],
+              "quotation_schema": "standard",
+              "repair_feedback": null,
+              "raw_response": "{\"preferences\":[{\"key\":\"visit_readiness\",\"value\":\"November 18, 10:00AM\",\"evidence\":\"Yes\",\"status\":\"declared\"}],\"personal_facts\":[],\"preference_withdrawals\":[],\"source_purposes\":[],\"objections\":[],\"empathy\":null,\"releases\":[],\"visit\":{\"action\":\"confirm\",\"evidence\":\"Yes\",\"timing\":{\"date_from_evidence\":\"2026-11-18T10:00:00-05:00\",\"date_until_evidence\":null,\"time_from_evidence\":null,\"time_until_evidence\":null,\"time_relation\":\"exact\",\"timezone_evidence\":\"America/New_York\",\"duration_evidence\":\"45 minutes\"}},\"courtesy\":null,\"reschedule\":null,\"cancellation\":null,\"wait\":null,\"moderation\":null,\"appointment_query\":null,\"requires_clarification\":false,\"clarification_question\":null,\"confidence\":1,\"version\":\"sales-interpretation-input/2.0\",\"requests\":[{\"topic\":\"comparison\",\"polarity\":\"request\",\"evidence\":\"Yes\",\"members\":[{\"kind\":\"property\",\"expression\":\"Bay Residence\",\"evidence\":\"Bay\"}],\"include_current\":false,\"include_all\":false,\"all_kind\":\"property\",\"criteria\":[\"general\"],\"feature\":null,\"operation\":\"compare\"}],\"alternatives\":[],\"constraints\": []  ,\"selection\":null}",
+              "raw_response_sha256": "1b08ac267a6f06cfaee8a26f42bc8f177b512d847e97de4dc77d0d9e3f212b80",
+              "raw_response_truncated": false
+            },
+            {
+              "attempt": 2,
+              "outcome": "accepted",
+              "error_code": null,
+              "validation_issues": [],
+              "normalizations": [
+                {
+                  "field": "visit.timing.timezone_evidence",
+                  "action": "omit_non_timezone_sentence"
+                },
+                {
+                  "field": "visit.timing.duration_evidence",
+                  "action": "omit_undeclared_duration"
+                }
+              ],
+              "quotation_schema": "source_enum",
+              "repair_feedback": "{\"contract_repair\": \"Reinterpret the ORIGINAL current_message using the schema. Correct the validation issues. Do not invent exclusions, evidence, consent or facts. This feedback is not a new lead request.\", \"validation_issues\": [{\"location\": [], \"type\": \"contract_value_error\", \"message\": \"Inline reference evidence must quote current_message.\"}], \"current_message\": \"Yes\", \"allowed_request_and_preference_quotes\": [\"Yes\"], \"verified_declarations_to_preserve\": [], \"repair_scope\": \"Choose exact source quotes from the schema enum for requests and preferences. Correct only failed fields and their necessary links; preserve valid declarations, visit timing and independent current questions.\", \"local_reference_rule\": \"Use inline target objects and nested comparison members. Never output IDs or reference links; the backend generates them.\", \"current_turn_rule\": \"Do not replay historical questions. Budget and payment declarations belong in preferences, not requests. Preserve independent current questions.\", \"exact_short_quote\": \"Yes\", \"quotation_rule\": \"Do not append punctuation. Meaning may be normalized in value/expression, but evidence must be copied verbatim from current_message. Keep independent requests and negations.\"}",
+              "raw_response": "{\"preferences\":[],\"personal_facts\":[],\"preference_withdrawals\":[],\"source_purposes\":[],\"objections\":[],\"empathy\":null,\"releases\":[],\"visit\":{\"action\":\"confirm\",\"evidence\":\"Yes\",\"timing\":{\"date_from_evidence\":\"Yes\",\"date_until_evidence\":\"Yes\",\"time_from_evidence\":\"Yes\",\"time_until_evidence\":\"Yes\",\"time_relation\":\"exact\",\"timezone_evidence\":\"Yes\",\"duration_evidence\":\"Yes\"}},\"courtesy\":null,\"reschedule\":null,\"cancellation\":null,\"wait\":null,\"moderation\":null,\"appointment_query\":null,\"requires_clarification\":false,\"clarification_question\":null,\"confidence\":1,\"version\":\"sales-interpretation-input/2.0\",\"requests\":[],\"alternatives\":[],\"constraints\": [] \t,\"selection\":null}",
+              "raw_response_sha256": "bdf4e20ba8da96c958f81362b4b470ee405f2472670533ea2c3d717fb0dedda4",
+              "raw_response_truncated": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "obs_no_seller",
+      "turns": [
+        {
+          "lead_message": "I am looking for a 3 bedroom home.",
+          "interpretation_attempts": [
+            {
+              "attempt": 1,
+              "outcome": "accepted",
+              "error_code": null,
+              "validation_issues": [],
+              "normalizations": [
+                {
+                  "field": "requests",
+                  "action": "literal_bedroom_need_is_catalog_search",
+                  "removed_unrequested_comparison": true,
+                  "model_confidence_preserved": 1.0,
+                  "bedrooms": 3,
+                  "evidence": "I am looking for a 3 bedroom home"
+                }
+              ],
+              "quotation_schema": "standard",
+              "repair_feedback": null,
+              "raw_response": "{\"preferences\":[{\"key\":\"bedrooms\",\"value\":\"3\",\"evidence\":\"I am looking for a 3 bedroom home.\",\"status\":\"declared\"}],\"personal_facts\":[],\"preference_withdrawals\":[],\"source_purposes\":[],\"objections\":[],\"empathy\":null,\"releases\":[],\"visit\":null,\"courtesy\":null,\"reschedule\":null,\"cancellation\":null,\"wait\":null,\"moderation\":null,\"appointment_query\":null,\"requires_clarification\":false,\"clarification_question\":null,\"confidence\":1,\"version\":\"sales-interpretation-input/2.0\",\"requests\":[{\"topic\":\"comparison\",\"polarity\":\"request\",\"evidence\":\"I am looking for a 3 bedroom home.\",\"members\":[{\"kind\":\"property\",\"expression\":\"Ridge Townhome\",\"evidence\":\"I am looking for a 3 bedroom home.\"},{\"kind\":\"property\",\"expression\":\"Summit Villa\",\"evidence\":\"I am looking for a 3 bedroom home.\"}],\"include_current\":false,\"include_all\":false,\"all_kind\":\"property\",\"criteria\":[\"bedrooms\"],\"feature\":null,\"operation\":\"compare\"}],\"alternatives\":[],\"constraints\": []  ,\"selection\":null}",
+              "raw_response_sha256": "2603c77644c03ad7c88f70cb4337db11fa23debe283f182ce5587d715766f64a",
+              "raw_response_truncated": false
+            }
+          ]
+        },
+        {
+          "lead_message": "Ridge Townhome",
+          "interpretation_attempts": [
+            {
+              "attempt": 1,
+              "outcome": "accepted",
+              "error_code": null,
+              "validation_issues": [],
+              "normalizations": [
+                {
+                  "field": "requests",
+                  "action": "named_property_is_selection_not_comparison"
+                }
+              ],
+              "quotation_schema": "standard",
+              "repair_feedback": null,
+              "raw_response": "{\"preferences\":[],\"personal_facts\":[],\"preference_withdrawals\":[],\"source_purposes\":[],\"objections\":[],\"empathy\":null,\"releases\":[],\"visit\":{\"action\":\"request\",\"evidence\":\"Ridge Townhome\",\"timing\":null},\"courtesy\":null,\"reschedule\":null,\"cancellation\":null,\"wait\":null,\"moderation\":null,\"appointment_query\":null,\"requires_clarification\":false,\"clarification_question\":null,\"confidence\":1,\"version\":\"sales-interpretation-input/2.0\",\"requests\":[{\"topic\":\"comparison\",\"polarity\":\"request\",\"evidence\":\"Ridge Townhome\",\"members\":[{\"kind\":\"property\",\"expression\":\"Ridge Townhome\",\"evidence\":\"Ridge Townhome\"}],\"include_current\":true,\"include_all\":false,\"all_kind\":\"property\",\"criteria\":[\"general\"],\"feature\":null,\"operation\":\"compare\"}],\"alternatives\":[],\"constraints\": []  ,\"selection\":null}",
+              "raw_response_sha256": "41ee6b3deada74fd0a3624a3c67599caeda77daeec1a159a3a9ef807a2a48628",
+              "raw_response_truncated": false
+            }
+          ]
+        },
+        {
+          "lead_message": "Can I visit Ridge Townhome?",
+          "interpretation_attempts": [
+            {
+              "attempt": 1,
+              "outcome": "accepted",
+              "error_code": null,
+              "validation_issues": [],
+              "normalizations": [
+                {
+                  "field": "requests",
+                  "action": "literal_visit_not_comparison",
+                  "evidence": "Can I visit Ridge Townhome?",
+                  "confidence_unchanged": 1.0,
+                  "effect_authorization": false
+                }
+              ],
+              "quotation_schema": "standard",
+              "repair_feedback": null,
+              "raw_response": "{\"preferences\":[{\"key\":\"property\",\"value\":\"Ridge Townhome\",\"evidence\":\"Ridge Townhome\",\"status\":\"declared\"},{\"key\":\"visit_readiness\",\"value\":\"ready\",\"evidence\":\"Can I visit Ridge Townhome?\",\"status\":\"declared\"}],\"personal_facts\":[],\"preference_withdrawals\":[],\"source_purposes\":[],\"objections\":[],\"empathy\":null,\"releases\":[],\"visit\":{\"action\":\"request\",\"evidence\":\"Can I visit Ridge Townhome?\",\"timing\":null},\"courtesy\":null,\"reschedule\":null,\"cancellation\":null,\"wait\":null,\"moderation\":null,\"appointment_query\":null,\"requires_clarification\":false,\"clarification_question\":null,\"confidence\":1,\"version\":\"sales-interpretation-input/2.0\",\"requests\":[{\"topic\":\"comparison\",\"polarity\":\"request\",\"evidence\":\"Can I visit Ridge Townhome?\",\"members\":[{\"kind\":\"property\",\"expression\":\"Ridge Townhome\",\"evidence\":\"Ridge Townhome\"}],\"include_current\":true,\"include_all\":false,\"all_kind\":\"property\",\"criteria\":[\"general\"],\"feature\":null,\"operation\":\"compare\"}],\"alternatives\":[],\"constraints\": []  ,\"selection\":null}",
+              "raw_response_sha256": "a5fbeea1410a91da86ec0cd64002171aedb2344588c9cb84ae796fc337a6e611",
+              "raw_response_truncated": false
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
