@@ -48,6 +48,27 @@ def qualifies(*, plain_assent, proposal, metadata, scope, accepted, now,
     return True
 
 
+def deterministic_audit_metadata(inbound_message_id, expected_revision):
+    """Identify an authorized backend decision; no LLM prompt was sent."""
+    return {
+        'model': 'deterministic-booking-acceptance',
+        'inference_mode': 'deterministic',
+        'prompt_snapshot': {
+            'version': VERSION,
+            'model_invoked': False,
+            'system': None,
+        },
+        'prompt_configuration_id': None,
+        'inbound_message_id': inbound_message_id,
+        'expected_revision': expected_revision,
+        'outcome': 'accepted', 'error_code': None,
+        'input_contract': VERSION,
+        'interpretation_attempts': [],
+        'validated_declarations': [],
+        'decision': 'verified_current_booking_confirmation',
+    }
+
+
 def try_preview(db, scope, conversation, inbound, *, state, previous_meta,
                 expected_revision, event_key, action_holds=()):
     """Save an accepted preview without calling a model when explicitly safe.
@@ -89,16 +110,6 @@ def try_preview(db, scope, conversation, inbound, *, state, previous_meta,
     revision, saved_state = save(db, scope, event_key=event_key,
                                  expected_revision=expected_revision,
                                  state=prepared, kind='understanding_preview',
-                                 metadata={
-                                     'model': 'deterministic-booking-acceptance',
-                                     'prompt_snapshot': {},
-                                     'prompt_configuration_id': None,
-                                     'inbound_message_id': inbound.id,
-                                     'expected_revision': expected_revision,
-                                     'outcome': 'accepted', 'error_code': None,
-                                     'input_contract': VERSION,
-                                     'interpretation_attempts': [],
-                                     'validated_declarations': [],
-                                     'decision': 'verified_current_booking_confirmation',
-                                 })
+                                 metadata=deterministic_audit_metadata(
+                                     inbound.id, expected_revision))
     return PreviewOutcome(revision, saved_state, 'accepted', ())

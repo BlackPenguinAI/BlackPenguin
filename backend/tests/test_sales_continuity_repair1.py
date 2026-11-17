@@ -49,7 +49,18 @@ def test_server_frames_pass_continuity_and_booking_checks(lab,scenario,tmp_path)
     from app.modules.sales_agent.dialogue_models import SalesDialogueEvent
     from app.modules.sales_agent.interpretation_input import SYSTEM_VERSION
     for event in db.query(SalesDialogueEvent).filter(SalesDialogueEvent.conversation_id==r['conversation_id'],SalesDialogueEvent.event_key.like('active-understanding:%')):
-        assert event.payload_json['metadata']['prompt_snapshot']['input_system_version']==SYSTEM_VERSION
+        metadata=event.payload_json['metadata']
+        snapshot=metadata['prompt_snapshot']
+        if metadata.get('inference_mode')=='deterministic':
+            # This is a verified delivered booking acceptance, not an LLM turn.
+            # Do not invent a wire-system prompt that was never sent.
+            from app.modules.sales_agent.booking_fastpath import VERSION as BOOKING_VERSION
+            assert metadata['model']=='deterministic-booking-acceptance'
+            assert metadata['input_contract']==BOOKING_VERSION
+            assert snapshot=={'version':BOOKING_VERSION,'model_invoked':False,'system':None}
+            assert metadata['interpretation_attempts']==[]
+        else:
+            assert snapshot['input_system_version']==SYSTEM_VERSION
     bad=[(t['action'],t['reply'],c) for t in r['turns'] for c in t['checks'] if c['status']!='PASS']+[c for c in r['checks'] if c['status']!='PASS']
     assert not bad,bad
     if scenario=='context_visit_see':

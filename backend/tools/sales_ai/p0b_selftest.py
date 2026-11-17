@@ -6,7 +6,7 @@ Run inside the deployed container:
 import unittest
 from datetime import datetime, timedelta, timezone
 from app.modules.sales_agent.booking_intent import canonicalize_new_visit
-from app.modules.sales_agent.booking_fastpath import qualifies
+from app.modules.sales_agent.booking_fastpath import qualifies, deterministic_audit_metadata, VERSION
 from app.modules.sales_agent.turn_configuration import digest
 
 SYNTHETIC = ('I am interested in Bay Residence at Harbor Gardens and would like '
@@ -113,6 +113,18 @@ class TestSyntheticBookingAcceptance(unittest.TestCase):
                        now=self.now,digest_fn=digest,action_holds=())
         arguments.update(changes)
         return qualifies(**arguments)
+
+    def test_deterministic_audit_does_not_claim_llm_prompt(self):
+        metadata=deterministic_audit_metadata('synthetic-inbound',7)
+        self.assertEqual(metadata['inbound_message_id'],'synthetic-inbound')
+        self.assertEqual(metadata['expected_revision'],7)
+        self.assertEqual(metadata['inference_mode'],'deterministic')
+        self.assertEqual(metadata['input_contract'],VERSION)
+        self.assertEqual(metadata['interpretation_attempts'],[])
+        self.assertEqual(metadata['prompt_snapshot'],{
+            'version':VERSION,'model_invoked':False,'system':None,
+        })
+        self.assertNotIn('input_system_version',metadata['prompt_snapshot'])
 
     def test_valid_delivered_exact_confirmation(self):
         self.assertTrue(self.check())
