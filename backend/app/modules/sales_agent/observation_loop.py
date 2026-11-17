@@ -13,10 +13,11 @@ from .dialogue_tasks import restricted,record_result
 from .understanding_contract import Task,ToolResult
 from .dialogue_store import check_scope,save
 from .execution import simulated,now
+from .observation_budget import for_turn, complete_information_batch, VERSION as BUDGET_VERSION
 
 class DecisionError(ValueError):pass
 
-VERSION='sales-observation-loop/2.1'
+VERSION='sales-observation-loop/2.2'
 READS={'catalog','property_details','materials','financing','pricing','inventory','location','delivery','amenities'}
 
 class Decision(BaseModel):
@@ -40,12 +41,14 @@ def compact(result):
     return {'operation_id':result.operation_id,'status':result.status,'data':clean(result.data),'safe_message':result.safe_message}
 
 
-async def run(db,scope,*,inbound,outcome,commercial,infer=None,authorize=None):
+async def run(db,scope,*,inbound,outcome,commercial,infer=None,authorize=None,observation_kind='mixed'):
     authorize=authorize or (lambda:check_scope(db,scope))
     authorize()
     state=outcome.state;u=state.last_understanding;plan=dict(outcome.plan or {})
     gateway=ReadTools(db,scope);results=[];attempted=set();options={};trace=[];decisions=[];availability_seen=False
     current=[t for t in state.tasks if t.source_message_id==inbound.id]
+    budget=for_turn(observation_kind,current,plan,u)
+    skipped_decision_calls=0;decision_prompt_bytes=[]
     # Transactional services still require the current explicit intent and final
     # confirmation; the loop never creates or executes a write candidate itself.
     plan['write_candidates_require_backend_authorization']=[t.id for t in current if t.topic.value in {'appointment','human','opt_out'} and t.status in {'pending','blocked','suspended','awaiting_user'} and not restricted(state,t)]
@@ -79,7 +82,13 @@ async def run(db,scope,*,inbound,outcome,commercial,infer=None,authorize=None):
             task=next((t for t in current if t.topic.value=='appointment' and t.status=='pending' and not restricted(state,t) and t.binding_status!='unresolved'),None)
             if task:options['visit_availability']=('availability',task,{'topic':'appointment','purpose':'Read eligible visit times only; cannot book.'})
     async def decide(s):
+        nonlocal skipped_decision_calls
         refresh()
+        if complete_information_batch(budget,rounds=s['rounds'],current_tasks=current,
+                                      available_tools=options,decisions=decisions,
+                                      results=results,understanding=u):
+            skipped_decision_calls+=1
+            return {'done':True,'selected':[]}
         if u.requires_clarification or not options and s['rounds']==0:return {'done':True,'selected':[]}
         schema=Decision.model_json_schema();schema['properties']['tool_ids']['items']={'type':'string','enum':list(options)}
         
@@ -96,6 +105,7 @@ async def run(db,scope,*,inbound,outcome,commercial,infer=None,authorize=None):
         if sum(len(m['content'].encode()) for m in messages)>24000:
             decisions.append({'status':'context_limit'});return {'done':True,'selected':[]}
         try:
+            decision_prompt_bytes.append(sum(len(m['content'].encode()) for m in messages))
             raw=await asyncio.wait_for(infer(messages,schema),timeout=15)
             authorize()
             choice=Decision.model_validate_json(raw)
@@ -116,7 +126,7 @@ async def run(db,scope,*,inbound,outcome,commercial,infer=None,authorize=None):
         nonlocal availability_seen
         for key in s['selected']:
             if key in attempted:continue
-            if len(trace)>=min(6,(plan.get('limits') or {}).get('steps',8),(plan.get('limits') or {}).get('read_units',12)//2):
+            if len(trace)>=budget.max_reads:
                 decisions.append({'status':'read_cost_limit'});break
             attempted.add(key);kind,task,_=options[key];authorize()
             if read_blocked(task) or kind=='task' and task.status not in {'pending','suspended'}:continue
@@ -180,6 +190,12 @@ async def run(db,scope,*,inbound,outcome,commercial,infer=None,authorize=None):
     source_issues=coverage_issues(u,inbound.content)
     audit={'source_request_coverage':{'scope':'literal_independent_financing_questions','required':bool(financing_quotes(inbound.content)),'issues':source_issues,'status':'FAIL' if source_issues else 'PASS'},'task_coverage_scope':'validated_tasks_only_not_integral_dialogue_quality','clarification_required':clarification_needed,'unread_required_tasks':unread,'observations':[compact(r) for r in results],'version':VERSION,'rounds':rounds,'max_rounds':2,'decisions':decisions,'tools':trace,'external_writes':0,
            'status':'FAIL' if source_issues or any(d['status']!='accepted' for d in decisions) else 'CLARIFICATION_REQUIRED' if clarification_needed else 'PARTIAL' if unread else 'PASS'}
+    audit['read_budget']={'version':BUDGET_VERSION,'requested_kind':budget.requested_kind,
+        'effective_kind':budget.effective_kind,'max_reads':budget.max_reads,
+        'legacy_max_reads':budget.legacy_max_reads,
+        'saved_decision_calls':skipped_decision_calls,
+        'decision_prompt_bytes':decision_prompt_bytes,
+        'total_decision_prompt_bytes':sum(decision_prompt_bytes)}
     revision,state=save(db,scope,event_key='active-observations:'+inbound.id,expected_revision=outcome.revision,state=state,
         metadata={'observation_loop':audit,'results':[r.model_dump(mode='json') for r in results],'message_id':inbound.id})
     stop_reason='read_cost_limit' if any(d['status']=='read_cost_limit' for d in decisions) else 'finished' if audit['status']=='PASS' else 'clarification_required' if audit['status']=='CLARIFICATION_REQUIRED' else 'observation_decision_failed'

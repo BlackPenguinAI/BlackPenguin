@@ -909,7 +909,8 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
                 def authorize_read():
                     _current(db,scope)
                     continuity.check_epoch(conversation,run.input_snapshot.get('continuity_epoch'))
-                outcome,audit=await observe_run(db,scope,inbound=inbound,outcome=outcome,commercial=commercial,authorize=authorize_read)
+                route_kind=(graph_progress.get('observation_route') or {}).get('kind','mixed')
+                outcome,audit=await observe_run(db,scope,inbound=inbound,outcome=outcome,commercial=commercial,authorize=authorize_read,observation_kind=route_kind)
                 observation_audit=audit
                 u=outcome.state.last_understanding
                 run.input_snapshot={**run.input_snapshot,'observation_loop':audit}
