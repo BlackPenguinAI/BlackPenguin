@@ -202,6 +202,11 @@ def compile_input(raw,text,*,historical_messages=(),previous_reply='',previous_m
     from .mixed_human_visit import omit_spurious_visit
     fixed,human_notes=omit_spurious_visit(value.model_dump(mode='json'),text)
     if human_notes:value=Input.model_validate(fixed);notes.extend(human_notes)
+    # A single literal price question is not a multi-property comparison. This
+    # repairs only the wire schema, never promotes confidence or authorizes effects.
+    from .mixed_human_pricing import normalize_misread_price_comparison
+    fixed,price_notes=normalize_misread_price_comparison(value.model_dump(mode='json'),text,approved_names)
+    if price_notes:value=Input.model_validate(fixed);notes.extend(price_notes)
     # One bounded wire-contract normalization, before compiling model-owned refs.
     from .booking_intent import canonicalize_new_visit
     fixed,canonical_notes=canonicalize_new_visit(value.model_dump(mode='json'),text,approved_names)
