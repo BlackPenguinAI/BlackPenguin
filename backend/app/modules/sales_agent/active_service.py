@@ -508,8 +508,16 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
                         u=terminal_understanding(u,inbound.content)
                     interpreted_revision=revision
                 else:
-                    interpreted=await asyncio.wait_for(preview(db,scope,inbound_message_id=inbound.id,expected_revision=revision,
-                        event_key='active-understanding:'+inbound.id,active=True),timeout=45)
+                    # Plain acceptance of a single delivered booking summary is
+                    # an authorized continuation, not a fresh generative task.
+                    from .booking_fastpath import try_preview as booking_confirmation_preview
+                    interpreted=(booking_confirmation_preview(db,scope,conversation,inbound,
+                        state=state,previous_meta=previous_meta,expected_revision=revision,
+                        event_key='active-understanding:'+inbound.id,action_holds=action_holds)
+                        if next_enabled and not human_step and not hard_moderation else None)
+                    if interpreted is None:
+                        interpreted=await asyncio.wait_for(preview(db,scope,inbound_message_id=inbound.id,expected_revision=revision,
+                            event_key='active-understanding:'+inbound.id,active=True),timeout=45)
                     preview_event=scope.query(db,SalesDialogueEvent).filter_by(event_key='active-understanding:'+inbound.id).first()
                     if preview_event:
                         from copy import deepcopy
