@@ -641,7 +641,7 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
                 if next_enabled:
                     from dataclasses import replace
                     draft=replace(draft,text=text)
-                metadata={'engine':ENGINE,'orchestrator':'graph-observe','coordinator_version':'sales-coordinator-graph/2.0','workflow_version':'sales-current/1.0','inbound_message_id':inbound.id,'selected_property_type_id':outcome.state.selected_property_type_id}
+                metadata={'engine':ENGINE,'orchestrator':'graph-observe','coordinator_version':'sales-coordinator-graph/3.0','workflow_version':'sales-current/1.0','inbound_message_id':inbound.id,'selected_property_type_id':outcome.state.selected_property_type_id}
                 if next_enabled:metadata['selected_unit_id']=outcome.state.selected_unit_id
                 if human_fallback:metadata['human_contact_interpretation_fallback']=True
                 if moderation_decision:metadata['moderation']=moderation_decision
@@ -889,7 +889,7 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
                     'requires_human':metadata.get('control_outcome')=='handoff','policy_violations':[]}
                 run.status='prepared';conversation.updated_at=workflow_now(datetime);lead.last_interaction_at=workflow_now(datetime)
                 db.add_all([run,conversation,lead]);db.commit()
-            from .coordinator_graph import execute
+            from .coordinator_graph import execute,control_route,VERSION as GRAPH_VERSION
             async def observe_phase():
                 nonlocal outcome,interpreted_revision,u,observation_audit
                 if not next_enabled:return  # Historical node-unit harness only; deployed next_flow is mandatory.
@@ -905,11 +905,23 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
                     raise ValueError('Commercial observation decision unavailable.')
             def record_stage(name,completed):
                 nonlocal graph_progress
-                graph_progress={'version':'sales-coordinator-graph/2.0','mode':'graph-observe',
+                graph_progress={**graph_progress,'version':GRAPH_VERSION,'mode':'graph-observe',
                     'trace':list(completed),'current_node':name,'status':'running'}
                 run.input_snapshot={**run.input_snapshot,'coordinator_graph':graph_progress}
+            def route_after_plan():
+                # Only previously authorized control-only state may skip reads.
+                # New visits, selections, confirmations and all mixed commercial
+                # requests continue through the unchanged observation engine.
+                return control_route(active=bool(next_enabled),outcome=outcome,
+                    inbound_id=inbound.id,exact_stop=bool(exact_stop),
+                    protected=bool(protected),pure_human=bool(human_step and pure_human))
+            def record_route(decision):
+                nonlocal graph_progress
+                graph_progress={**graph_progress,'route':{'after_plan':decision.next_stage,'reason':decision.reason}}
+                run.input_snapshot={**run.input_snapshot,'coordinator_graph':graph_progress}
             graph_trace=await execute(scope,interpret=interpret_phase,plan=plan_phase,
-                fulfill=fulfill_phase,observe=observe_phase,on_stage=record_stage)
+                fulfill=fulfill_phase,observe=observe_phase,on_stage=record_stage,
+                route_after_plan=route_after_plan,on_route=record_route)
             run.input_snapshot={**run.input_snapshot,'coordinator_graph':graph_trace}
             db.commit()
         except LanguageHold as hold:

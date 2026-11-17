@@ -1,15 +1,23 @@
-"""Single LangGraph coordinator for live and synthetic commercial turns.
+"""State-routed LangGraph coordinator for live and synthetic sales turns.
 
 Scoped database events/receipts own state; the graph never bypasses effect
 permissions. Historical orchestration names are rejected, not fallback engines.
+Only audited, read-free control turns may bypass observation. Commercial
+requests retain the proven observation and authorization pipeline.
 """
 from contextlib import contextmanager
-from typing import TypedDict
+from dataclasses import dataclass
+from typing import Literal, TypedDict
 from langgraph.graph import StateGraph, START, END
 
-VERSION = 'sales-coordinator-graph/2.0'
+VERSION = 'sales-coordinator-graph/3.0'
 MODE = 'graph-observe'
 MODES = (MODE,)
+ROUTES = frozenset({'observe', 'fulfill'})
+REASONS = frozenset({'default_observation', 'commercial_observation', 'unsafe_control_observation',
+                     'verified_opt_out', 'protected_handoff', 'pure_human_handoff'})
+CONTROL_TOPICS = frozenset({'opt_out', 'human'})
+
 
 @contextmanager
 def experiment(mode=MODE):
@@ -18,29 +26,105 @@ def experiment(mode=MODE):
         raise ValueError('Only graph-observe is supported for commercial conversations.')
     yield
 
+
+@dataclass(frozen=True)
+class RouteDecision:
+    next_stage: Literal['observe', 'fulfill']
+    reason: str
+
+
 class State(TypedDict):
     trace: list[str]
+    route: str
+    route_reason: str
 
-async def execute(scope, *, interpret, plan, fulfill, observe, assess=None, reconsider=None, on_stage=None):
-    """Same topology in live traffic and simulations, without a classic branch."""
+
+def control_route(*, active, outcome, inbound_id, exact_stop=False,
+                  protected=False, pure_human=False):
+    """Conservative, backend-state-only routing; never infers user intent.
+
+    A control bypass cannot be requested by a model or by a lead message.
+    Interpret and plan have already run, and fulfill still performs every
+    existing scope, policy, consent and transaction check. A mixed commercial
+    request, an unresolved interpretation or a pending non-control task must
+    go through normal observation.
+    """
+    if not active or not (exact_stop or protected or pure_human):
+        return RouteDecision('observe', 'commercial_observation')
+    state = getattr(outcome, 'state', None)
+    u = getattr(state, 'last_understanding', None)
+    if state is None or u is None or u.requires_clarification or getattr(outcome, 'results', ()):
+        return RouteDecision('observe', 'unsafe_control_observation')
+    topics = {request.topic.value for request in u.requests}
+    if (not topics or not topics.issubset(CONTROL_TOPICS) or
+            any(getattr(u, field, None) for field in
+                ('visit', 'reschedule', 'cancellation', 'wait', 'appointment_query',
+                 'constraints', 'releases', 'alternatives'))):
+        return RouteDecision('observe', 'unsafe_control_observation')
+    if any(task.topic.value not in CONTROL_TOPICS for task in state.tasks
+           if task.source_message_id == inbound_id):
+        return RouteDecision('observe', 'unsafe_control_observation')
+    # A control signal and its scoped interpreted topic must agree.
+    if (exact_stop and topics != {'opt_out'}) or (
+            not exact_stop and (protected or pure_human) and topics != {'human'}):
+        return RouteDecision('observe', 'unsafe_control_observation')
+    if exact_stop:
+        return RouteDecision('fulfill', 'verified_opt_out')
+    if protected:
+        return RouteDecision('fulfill', 'protected_handoff')
+    return RouteDecision('fulfill', 'pure_human_handoff')
+
+
+async def execute(scope, *, interpret, plan, fulfill, observe, assess=None,
+                  reconsider=None, on_stage=None, route_after_plan=None,
+                  on_route=None):
+    """Run the shared graph with an explicit conditional edge after planning.
+
+    Default remains the established observe path. Invalid decisions fail
+    closed before fulfillment. No task authorizations depend on this graph.
+    """
     if observe is None:
         raise ValueError('The commercial graph requires an observation callback.')
+
     def node(name, callback):
         async def invoke(state):
-            if on_stage is not None:on_stage(name, state['trace'])
+            if on_stage is not None:
+                on_stage(name, state['trace'])
             await callback()
             return {'trace': [*state['trace'], name]}
         return invoke
+
+    async def choose_route(state):
+        decision = (route_after_plan() if route_after_plan is not None
+                    else RouteDecision('observe', 'default_observation'))
+        if (type(decision) is not RouteDecision or decision.next_stage not in ROUTES
+                or decision.reason not in REASONS
+                or (decision.next_stage == 'fulfill' and decision.reason not in
+                    {'verified_opt_out', 'protected_handoff', 'pure_human_handoff'})):
+            raise ValueError('Invalid coordinator routing decision; fulfillment blocked.')
+        if on_route is not None:
+            on_route(decision)
+        return {'route': decision.next_stage, 'route_reason': decision.reason}
+
     graph = StateGraph(State)
-    stages = [('interpret', interpret), ('plan', plan), ('observe', observe), ('fulfill', fulfill)]
-    for name, callback in stages:
+    for name, callback in [('interpret', interpret), ('plan', plan),
+                           ('observe', observe), ('fulfill', fulfill)]:
         graph.add_node(name, node(name, callback))
+    graph.add_node('route', choose_route)
     graph.add_edge(START, 'interpret')
-    for (before, _), (after, _) in zip(stages, stages[1:]):
-        graph.add_edge(before, after)
+    graph.add_edge('interpret', 'plan')
+    graph.add_edge('plan', 'route')
+    graph.add_conditional_edges('route', lambda state: state['route'],
+                                {'observe': 'observe', 'fulfill': 'fulfill'})
+    graph.add_edge('observe', 'fulfill')
     graph.add_edge('fulfill', END)
-    state = await graph.compile().ainvoke({'trace': []}, config={'recursion_limit': 8})
-    return {'version': VERSION, 'mode': MODE, 'trace': state['trace'], 'reconsiderations': 0, 'status': 'completed'}
+    state = await graph.compile().ainvoke(
+        {'trace': [], 'route': 'observe', 'route_reason': 'default_observation'},
+        config={'recursion_limit': 10})
+    return {'version': VERSION, 'mode': MODE, 'trace': state['trace'],
+            'route': {'after_plan': state['route'], 'reason': state['route_reason']},
+            'reconsiderations': 0, 'status': 'completed'}
+
 
 def reconsider_reason(value,text):
     """Only a low-confidence, single informational material request can retry."""
