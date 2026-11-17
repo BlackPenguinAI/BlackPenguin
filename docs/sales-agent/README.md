@@ -1210,6 +1210,50 @@ La corrección consulta comprobantes de envío en mensajes del mismo ámbito ade
 
 **Índice ampliado:** 34 corridas, 231 conversaciones ejecutadas y USD 3.15005820 registrado, todavía parcial por cargos históricos faltantes. El gráfico global incluye ahora la batería de 15 como cohorte distinta; la serie comparable de seis no incorpora el total de 15 como si fuera el mismo conjunto.
 
+## 10.21. P1-A, P1-B y P1-B.2: calidad, enrutamiento y consumo medidos (17/11/2026)
+
+**Corte nuevo, independiente del histórico 10.1–10.20.** Las corridas siguientes son simulaciones de leads guionados, compañía/proyectos de laboratorio y `openai/gpt-4o-mini` mediante OpenRouter. No equivalen a pruebas reales de WhatsApp/SMS, Google Calendar ni bloqueo concurrente en PostgreSQL. Un control `PASS` certifica solamente la aserción que ejecutó; la calidad integral del diálogo mantiene estado `NOT_EVALUATED` salvo revisión humana adicional. Se documentan las revisiones exactas para no atribuir a código anterior resultados de versiones posteriores.
+
+| Iteración y cohorte | Commit | Controles PASS/FAIL/BLOCKED | Turnos | Llamadas | Tokens de entrada | Coste USD |
+|---|---|---:|---:|---:|---:|---:|
+| P1-A · `closing-point`, 8 casos | `32e044e` | 404 / 0 / 0 | 25 | 27 | 169.857 | 0.02247975 |
+| P1-B · `closing-point`, 8 casos | `8f0a745` | 404 / 0 / 0 | 25 | 26 | 132.934 | 0.01731810 |
+| P1-B · `booking-point`, 6 casos | `8f0a745` | 245 / 0 / 3 | 15 | 39* | 274.378 | 0.03503130 |
+| P1-B.2 · `observation-battery`, 6 casos | `150cd89` | 360 / 0 / 0 | 35 | 107 | 712.751 | 0.09021765 |
+| P1-B.2 · `closing-point`, 8 casos | `150cd89` | 404 / 0 / 0 | 25 | 21 | 130.890 | 0.01633470 |
+| P1-B.2 · `booking-point`, 6 casos | `150cd89` | 245 / 0 / 3 | 15 | 39 | 281.284 | 0.03529440 |
+| **P1-B.2 · suma de tres suites** | `150cd89` | **1.009 / 0 / 3** | **75** | **167** | **1.124.925** | **0.14184675** |
+
+\* En P1-B `booking-point` el resumen reportó 39 llamadas y la métrica de coste contabilizó 38 respuestas; no se presupone un precio completo por cada llamada sin desglose. En P1-B.2 se contabilizaron 167/167 respuestas con coste. Los tres `BLOCKED` de reservas exigen revisión humana de lenguaje sobre disponibilidad futura: **no son PASS ni fallos de código resueltos**. En P1-B.2 se conservaron tres reservas correctas en `booking-point`, ocho cierres correctos y cinco reservas en la batería de observación (el caso sin vendedor produjo cero, como correspondía).
+
+**Intensidad de tokens por turno (P1-B.2).** En las 75 intervenciones sintéticas se reportaron **1.124.925 tokens de entrada y 17.324 de salida**: promedios de **14.999 tokens de entrada/turno** y **USD 0.00189129/turno** sumando las tres suites. No se presupone que todos los turnos tengan la misma complejidad: observación gastó unos 20.364 tokens de entrada por turno, cierres 5.236 y reservas 18.752. Estos valores son la **línea base para P1-B.3**; la reducción porcentual se calculará solo comparando la misma cohorte tras desplegar el cambio.
+
+**Comparación condicionada.** Con los mismos ocho casos de `closing-point`, P1-B.2 pasó de 26 a 21 llamadas (−19,2 %) y de USD 0.01731810 a USD 0.01633470 (−5,7 %). **Tres decisiones** de observación fueron omitidas según `read_budget.saved_decision_calls`; la diferencia de cinco llamadas entre corridas **no se atribuye íntegramente** a P1-B.2 porque el proveedor puede variar. En `booking-point`, llamadas 39 → 39 y costo USD 0.03503130 → 0.03529440: no se afirma ahorro. La medición de observación P1-B disponible corresponde a tres guiones seleccionados, no a los seis de P1-B.2; por ello no calculamos un porcentaje entre ambos conjuntos.
+
+**Ahorro instrumentado P1-B.2:** 13 decisiones omitidas en 13 turnos `information` de `observation-battery`, tres adicionales en cierres y ninguna en reservas: **16 llamadas de decisión evitadas dentro de las tres corridas**. Esto no representa 16 llamadas facturadas restadas de un experimento A/B controlado ni una reducción verificada del total de tokens. El ahorro económico real se informa por separado con `provider_usage`, y el número de llamadas evitadas proviene de `read_budget`.
+
+**Calidad pendiente de mejorar.** Se observaron cuatro decisiones internas rechazadas por `unnecessary_clarification` ya existentes antes de P1-B.2; el hecho de que la batería externa pase no convierte esos rechazos en respuestas ideales. En un turno de `mixed_human_price` se verificó el precio de Bay Residence, pero la petición humana inicial merece una prueba adicional de captura simultánea de intención, sin esperar una insistencia. Tampoco se ha ejercitado `clarification` en una cohorte pagada end-to-end. P1-B introdujo rutas `information`, `materials`, `appointments`, `clarification` y `mixed`, preservando restricciones y autorizaciones transaccionales; P1-B.2 añadió límites por especialista y el atajo exclusivo de información completa.
+
+**Evidencia auditable y sin datos de leads:** [agregados + SHA-256 de los ZIP originales](05-resultados-y-mejoras/p1b2-mediciones-2026-11-17.json) · [enrutador](../../backend/app/modules/sales_agent/commercial_routing.py) · [presupuestos](../../backend/app/modules/sales_agent/observation_budget.py) · [análisis reproducible de costos](../../backend/tools/sales_ai/p1b3_cost_report.py). Los ZIP incluyen conversaciones; no se almacenan diálogos privados en este JSON agregado. La ejecución local de selftests no consume saldo de OpenRouter.
+
+## 10.22. P1-B.3: proyección del contexto de composición y medición de tokens (pendiente de servidor)
+
+**Hipótesis y alcance.** La interpretación ya compacta el catálogo con `sales-context-budget/1.0`, pero el compositor recibía de nuevo árboles completos de `planning`, datos extensos de `validated_results` y hasta 20 mensajes históricos del turno. El LLM del compositor **no escribe hechos**: selecciona IDs de bloques cuya redacción verificable ya preparó el backend y una de las continuaciones autorizadas. Por eso P1-B.3 introduce `sales-composition-context/1.0`: una **proyección solo para el prompt**, sin modificar la memoria persistida, los resultados de herramientas, las propuestas, los comprobantes ni el control de acceso.
+
+| Campo de composición | Política nueva | Motivo de seguridad y calidad |
+|---|---|---|
+| `evidence_blocks`, `continuations`, `published_guidance`, `current_message`, `style` | Se preservan completos, sin reinterpretación ni truncamiento. | No perder precios, incertidumbre, alternativas permitidas, tono ni la petición actual. |
+| `turn_context` | Mantiene restricciones globales/de propiedad, citas, preferencias/perfil, memoria estructurada, tareas pendientes y propuestas; historial conversacional reducido a **ocho mensajes recientes** solo en este prompt. | El backend conserva el historial completo; el LLM no reejecuta instrucciones históricas. |
+| `validated_results` | Se proyectan `version`, `operation_id`, `status` y `safe_message`; los datos de lectura extensos ya están representados por bloques autorizados. | Evitar duplicación del catálogo y de recibos, sin borrar evidencias utilizadas para redactar. |
+| `planning` | Conserva preguntas, cobertura de solicitudes, temas pendientes, diferidos y acciones que requieren autorización; elimina árboles de referencias, rondas y hashes redundantes. | El LLM no planifica nuevas acciones; el backend ya decidió los permisos. |
+| Contrato desconocido o estructura no compatible | Conserva el prompt anterior y registra `preserved_unknown_contract`. | No perder silenciosamente un campo nuevo antes de revisar el contrato. |
+
+**Instrumentación nueva (no confundir bytes con tokens).** Cada composición registra `context_projection.version/mode/before_bytes/after_bytes/saved_bytes/history_messages_omitted`. El hash completo `context_sha256` sigue calculándose con los datos anteriores a la proyección, y `request_sha256` identifica el prompt realmente enviado. `before_bytes`/`after_bytes` miden JSON UTF-8 del bloque de usuario *después de redactar enlaces*, **no tokens facturados**: los tokens y USD reales se contrastan con `provider_usage.prompt_tokens`, `completion_tokens` y `cost_usd` del reporte del servidor. El compositor sigue validando contra el mismo esquema de bloques e IDs y conserva la reparación acotada y el fallback seguro.
+
+**Evaluación y compuerta de publicación.** El diferencial incluye pruebas offline de preservación de evidencia, restricciones, propuestas, historial, privacidad, determinismo y compatibilidad con contratos nuevos, además del analizador seguro `python -m tools.sales_ai.p1b3_cost_report <zip-1> <zip-2> ...`. Tras pasar CI, repetir `observation-battery` (seis casos, `--max-turns 7`), `closing-point` (ocho casos) y `booking-point` (seis casos), comparando cada cohorte con P1-B.2. Objetivo: **0 FAIL nuevo, reservas y precio correctos, sin cambios en permisos ni escrituras externas**. En reservas pueden continuar tres `BLOCKED` manuales preexistentes. Verificar además que `composition_context_projected_turns > 0` y `composition_prompt_bytes_saved > 0`; **no se anticipa un porcentaje concreto de tokens o USD antes de medirlo en el servidor**.
+
+**Límites.** Esta entrega optimiza únicamente el contexto del compositor, no el número de llamadas de interpretación, los precios de OpenRouter ni las fuentes del RAG. Acortar el historial visible puede cambiar el estilo o la continuidad: los checks automáticos no sustituyen revisar manualmente los diálogos del servidor, especialmente rechazos, conversaciones largas, solicitudes mixtas, tratamientos humanos y materiales. El futuro RAG deberá recuperar exclusivamente datos aprobados, con procedencia, control de empresa/proyecto, vigencia y evaluación de relevancia; **documentos recuperados nunca autorizan visitas ni envíos**. El resultado de P1-B.3 queda **PENDIENTE** hasta adjuntar esa nueva evidencia.
+
 ## 11. Trabajo futuro
 
 **Más casos y conversaciones más largas, no nuevas funciones de canal.** Se avanza por etapas, corrigiendo y repitiendo antes de ampliar. Se incluyen compradores que rechazan o abandonan: no toda conversación correcta termina con cita [R4–R6].

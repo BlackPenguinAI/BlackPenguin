@@ -498,7 +498,8 @@ async def compose(db, scope, *, inbound, outcome, draft, commercial, lead, metad
         if isinstance(value, list):return [redact(v) for v in value]
         if isinstance(value, dict):return {k:redact(v) for k,v in value.items()}
         return value
-    model_payload = redact(payload)
+    from .composition_context import project
+    model_payload, projection_trace = project(redact(payload))
     messages = [{'role': 'system', 'content': SYSTEM}, {'role': 'user', 'content': json.dumps(model_payload, ensure_ascii=False, default=str)}]
     # Schema is fully closed, with required fields, suitable for strict structured output.
     schema = response_schema(blocks,choices)
@@ -507,7 +508,8 @@ async def compose(db, scope, *, inbound, outcome, draft, commercial, lead, metad
         'request_sha256': digest({'messages': messages, 'schema': schema}), 'attempts': [],
         'authority': 'evidence_wordings_only_no_free_text_facts', 'status': 'safe_fallback',
         'external_actions': 0, 'credential_values_recorded': False,
-        'reference_contract':reference_contract(blocks,choices)}
+        'reference_contract':reference_contract(blocks,choices),
+        'context_projection': projection_trace}
     # A recorded booking with one complete receipt and no continuation choice
     # has no model decision left. Render the verified receipt without another
     # provider round trip. Mixed questions/extra evidence keep normal composition.
