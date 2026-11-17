@@ -1,11 +1,12 @@
 """Full backend replay of the provider output from closing-point."""
+import json
 from tools.sales_ai.p1a_price_comparison_selftest import MESSAGE, RECORDED, CATALOG
 from app.modules.sales_agent.interpretation_input import compile_input
 from app.modules.sales_agent.mixed_human_pricing import verified_mixed_price_read
 
 
 def test_recorded_output_compiles_to_scoped_pricing_read_without_confidence_promotion():
-    interpreted, notes = compile_input(RECORDED, MESSAGE, approved_names=['Bay Residence'])
+    interpreted, notes = compile_input(json.dumps(RECORDED), MESSAGE, approved_names=['Bay Residence'])
     assert interpreted.visit is None
     assert interpreted.comparison is None
     assert interpreted.confidence == 0
