@@ -4,13 +4,16 @@ Scoped database events/receipts own state; the graph never bypasses effect
 permissions. Historical orchestration names are rejected, not fallback engines.
 Only audited, read-free control turns may bypass observation. Commercial
 requests retain the proven observation and authorization pipeline.
+P1-B selects specialized read-only graph nodes from the current persisted tasks;
+every node delegates to the same bounded observation engine.
 """
 from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Literal, TypedDict
 from langgraph.graph import StateGraph, START, END
+from .commercial_routing import ObservationDecision, BASES as OBSERVATION_BASES, VERSION as OBSERVATION_VERSION
 
-VERSION = 'sales-coordinator-graph/3.0'
+VERSION = 'sales-coordinator-graph/4.0'
 MODE = 'graph-observe'
 MODES = (MODE,)
 ROUTES = frozenset({'observe', 'fulfill'})
@@ -37,6 +40,8 @@ class State(TypedDict):
     trace: list[str]
     route: str
     route_reason: str
+    observation_kind: str
+    observation_basis: str
 
 
 def control_route(*, active, outcome, inbound_id, exact_stop=False,
@@ -77,7 +82,8 @@ def control_route(*, active, outcome, inbound_id, exact_stop=False,
 
 async def execute(scope, *, interpret, plan, fulfill, observe, assess=None,
                   reconsider=None, on_stage=None, route_after_plan=None,
-                  on_route=None):
+                  on_route=None, observation_after_plan=None,
+                  on_observation_route=None):
     """Run the shared graph with an explicit conditional edge after planning.
 
     Default remains the established observe path. Invalid decisions fail
@@ -106,23 +112,48 @@ async def execute(scope, *, interpret, plan, fulfill, observe, assess=None,
             on_route(decision)
         return {'route': decision.next_stage, 'route_reason': decision.reason}
 
+    async def choose_observation(state):
+        # An invalid observation label must never cause a silent bypass.
+        # No capability is granted here: all branches call the same observer.
+        decision = (observation_after_plan() if observation_after_plan is not None
+                    else ObservationDecision('mixed', OBSERVATION_BASES['mixed']))
+        if (type(decision) is not ObservationDecision or
+                OBSERVATION_BASES.get(decision.kind) != decision.basis):
+            raise ValueError('Invalid commercial observation route; fulfillment blocked.')
+        if on_observation_route is not None:
+            on_observation_route(decision)
+        return {'observation_kind': decision.kind, 'observation_basis': decision.basis}
+
     graph = StateGraph(State)
     for name, callback in [('interpret', interpret), ('plan', plan),
-                           ('observe', observe), ('fulfill', fulfill)]:
+                           ('fulfill', fulfill)]:
         graph.add_node(name, node(name, callback))
     graph.add_node('route', choose_route)
+    graph.add_node('route_observation', choose_observation)
+    # Physical specialist nodes are separate LangGraph paths. Their execution
+    # boundary is intentionally identical to the proven observation loop.
+    # Logical trace/on_stage contracts still report the name 'observe'.
+    for kind in OBSERVATION_BASES:
+        graph.add_node('observe_' + kind, node('observe', observe))
+        graph.add_edge('observe_' + kind, 'fulfill')
     graph.add_edge(START, 'interpret')
     graph.add_edge('interpret', 'plan')
     graph.add_edge('plan', 'route')
     graph.add_conditional_edges('route', lambda state: state['route'],
-                                {'observe': 'observe', 'fulfill': 'fulfill'})
-    graph.add_edge('observe', 'fulfill')
+                                {'observe': 'route_observation', 'fulfill': 'fulfill'})
+    graph.add_conditional_edges('route_observation',
+                                lambda state: state['observation_kind'],
+                                {kind: 'observe_' + kind for kind in OBSERVATION_BASES})
     graph.add_edge('fulfill', END)
     state = await graph.compile().ainvoke(
-        {'trace': [], 'route': 'observe', 'route_reason': 'default_observation'},
+        {'trace': [], 'route': 'observe', 'route_reason': 'default_observation',
+         'observation_kind': 'mixed', 'observation_basis': OBSERVATION_BASES['mixed']},
         config={'recursion_limit': 10})
     return {'version': VERSION, 'mode': MODE, 'trace': state['trace'],
             'route': {'after_plan': state['route'], 'reason': state['route_reason']},
+            'observation_route': ({'version': OBSERVATION_VERSION,
+                'kind': state['observation_kind'], 'basis': state['observation_basis']}
+                if state['route'] == 'observe' else None),
             'reconsiderations': 0, 'status': 'completed'}
 
 

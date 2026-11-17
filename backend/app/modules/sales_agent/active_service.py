@@ -901,6 +901,7 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
                 run.status='prepared';conversation.updated_at=workflow_now(datetime);lead.last_interaction_at=workflow_now(datetime)
                 db.add_all([run,conversation,lead]);db.commit()
             from .coordinator_graph import execute,control_route,VERSION as GRAPH_VERSION
+            from .commercial_routing import classify as classify_observation, VERSION as OBS_ROUTING_VERSION
             async def observe_phase():
                 nonlocal outcome,interpreted_revision,u,observation_audit
                 if not next_enabled:return  # Historical node-unit harness only; deployed next_flow is mandatory.
@@ -930,9 +931,20 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
                 nonlocal graph_progress
                 graph_progress={**graph_progress,'route':{'after_plan':decision.next_stage,'reason':decision.reason}}
                 run.input_snapshot={**run.input_snapshot,'coordinator_graph':graph_progress}
+            def observation_after_plan():
+                # Classify the validated current tasks, not message keywords.
+                # Every graph specialist still calls the same bounded read loop.
+                return classify_observation(outcome,inbound.id,active=bool(next_enabled))
+            def record_observation_route(decision):
+                nonlocal graph_progress
+                graph_progress={**graph_progress,'observation_route':{
+                    'version':OBS_ROUTING_VERSION,'kind':decision.kind,'basis':decision.basis}}
+                run.input_snapshot={**run.input_snapshot,'coordinator_graph':graph_progress}
             graph_trace=await execute(scope,interpret=interpret_phase,plan=plan_phase,
                 fulfill=fulfill_phase,observe=observe_phase,on_stage=record_stage,
-                route_after_plan=route_after_plan,on_route=record_route)
+                route_after_plan=route_after_plan,on_route=record_route,
+                observation_after_plan=observation_after_plan,
+                on_observation_route=record_observation_route)
             run.input_snapshot={**run.input_snapshot,'coordinator_graph':graph_trace}
             db.commit()
         except LanguageHold as hold:
