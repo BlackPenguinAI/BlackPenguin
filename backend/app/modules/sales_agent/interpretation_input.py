@@ -198,6 +198,10 @@ def compile_input(raw,text,*,historical_messages=(),previous_reply='',previous_m
     if visit_notes:value=Input.model_validate(fixed);notes.extend(visit_notes)
     fixed,choice_notes=literal_property_choice(value.model_dump(mode='json'),text)
     if choice_notes:value=Input.model_validate(fixed);notes.extend(choice_notes)
+    # Human contact is not evidence of consent to a physical viewing.
+    from .mixed_human_visit import omit_spurious_visit
+    fixed,human_notes=omit_spurious_visit(value.model_dump(mode='json'),text)
+    if human_notes:value=Input.model_validate(fixed);notes.extend(human_notes)
     # One bounded wire-contract normalization, before compiling model-owned refs.
     from .booking_intent import canonicalize_new_visit
     fixed,canonical_notes=canonicalize_new_visit(value.model_dump(mode='json'),text,approved_names)
