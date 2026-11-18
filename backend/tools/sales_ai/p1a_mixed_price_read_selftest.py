@@ -2,6 +2,7 @@
 Run in the deployed API container:
     python -m tools.sales_ai.p1a_mixed_price_read_selftest
 """
+import ast
 import unittest
 from pathlib import Path
 from types import SimpleNamespace as NS
@@ -78,8 +79,32 @@ class TestVerifiedMixedPriceRead(unittest.TestCase):
         self.assertIn('pricing_read=bool(',content)
         self.assertIn('verified_mixed_price_read(u,inbound.content,commercial,',content)
         self.assertIn("'basis':'literal_scoped_mixed_human_price'",content)
-        self.assertIn('or material_read or pricing_read or confirmation_ready',content)
-        self.assertIn('if material_read or pricing_read or contextual_needs_read',content)
+        # Do not depend on adjacent source text: adding an independently
+        # authorized read gate must not invalidate the mixed-price regression.
+        # Verify both paths structurally, without weakening the confidence guard.
+        tree=ast.parse(content)
+        guards=[node for node in ast.walk(tree) if isinstance(node,ast.If)]
+        def identifiers(expr):
+            return {node.id for node in ast.walk(expr) if isinstance(node,ast.Name)}
+        self.assertTrue(any(
+            {'material_read','pricing_read','financing_read','confirmation_ready'} <= identifiers(guard.test)
+            and any(isinstance(node,ast.Attribute) and node.attr=='confidence'
+                    for node in ast.walk(guard.test))
+            and any(isinstance(node,ast.UnaryOp) and isinstance(node.op,ast.Not)
+                    and {'pricing_read','financing_read'} <= identifiers(node.operand)
+                    for node in ast.walk(guard.test))
+            for guard in guards), 'Low-confidence fallback must retain both read-only gates.')
+        self.assertTrue(any(
+            {'material_read','pricing_read','financing_read','contextual_needs_read'} <= identifiers(guard.test)
+            and any(isinstance(node,ast.Call) and isinstance(node.func,ast.Attribute)
+                    and node.func.attr=='model_copy'
+                    and any(kw.arg=='update' and isinstance(kw.value,ast.Dict)
+                            and any(isinstance(key,ast.Constant) and key.value=='requires_clarification'
+                                    and isinstance(value,ast.Constant) and value.value is False
+                                    for key,value in zip(kw.value.keys,kw.value.values))
+                            for kw in node.keywords)
+                    for stmt in guard.body for node in ast.walk(stmt))
+            for guard in guards), 'Verified read gate must clear clarification without promoting confidence.')
 
 
 if __name__=='__main__':
