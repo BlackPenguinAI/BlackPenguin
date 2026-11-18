@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 
 VERSION = 'sales-live-visit-continuity/1.0'
 COMPETING = ('material_offer', 'release_offer', 'booking_confirmation',
-             'control_confirmation', 'location_offer', 'reschedule_confirmation',
+             'visit_day_offer', 'control_confirmation', 'location_offer', 'reschedule_confirmation',
              'cancellation_confirmation', 'wait_offer')
 
 

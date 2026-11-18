@@ -47,6 +47,9 @@ def next_message(reply, history, *, alternative=False):
     """Read only public seller text, never private offer IDs or database slots."""
     if re.search(r'please confirm your visit',reply,re.I):
         return 'Yes', 'confirm'
+    # The buyer only sees the displayed date labels; choosing a day is not booking consent.
+    days=re.findall(r'^\s*\d+\.\s*(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),\s*\w+\s+\d{1,2}\s*$',reply,re.M|re.I)
+    if days:return '1','select_day'
     options=re.findall(r'^\s*\d+\.\s*(\d{4}-\d{2}-\d{2} at [^\n]+)',reply,re.M)
     if options:
         if alternative and not any(item['action']=='reject_first' for item in history):

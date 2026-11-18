@@ -145,4 +145,5 @@ def build(db,scope,*,inbound_message_id,now=None):
             'property_constraints':[{**c.model_dump(mode='json'),'evidence':c.evidence[:200]} for c in state.property_constraints],
             'change_proposals':proposal_context(db,scope,state,now=now),
             'qualification_offer':(previous.metadata_json or {}).get('qualification_offer') if previous else None,
+            'visit_day_offer':(previous.metadata_json or {}).get('visit_day_offer') if previous else None,
             'rule':'Current interest is independent from booked visits. Appointment reads, summaries and proposals never authorize booking, cancellation or rescheduling.'}

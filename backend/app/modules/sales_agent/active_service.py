@@ -459,7 +459,7 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
                         language_context=build_commercial_context(db,project=project,company_id=scope.company_id,lead_id=scope.lead_id,channel=conversation.channel)
                         previous=latest_outbound(db,conversation.id,skip_language_holds=True)
                         previous_data=(previous.metadata_json or {}) if previous else {}
-                        contextual=any(previous_data.get(k) for k in ('qualification_offer','material_offer','appointment_offer','control_confirmation','release_offer','property_catalog_offer'))
+                        contextual=any(previous_data.get(k) for k in ('qualification_offer','material_offer','appointment_offer','visit_day_offer','control_confirmation','release_offer','property_catalog_offer'))
                         decision=detect(inbound.content,names=scoped_names(project,lead,language_context),contextual_answer=contextual)
                         if decision.needs_reentry:raise LanguageHold(decision)
                 revision,state=load(db,scope)
@@ -513,6 +513,11 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
                         state=state,previous_meta=previous_meta,expected_revision=revision,
                         event_key='active-understanding:'+inbound.id,action_holds=action_holds)
                         if next_enabled and not human_step and not hard_moderation else None)
+                    if interpreted is None and next_enabled and not human_step and not hard_moderation:
+                        from .visit_day_funnel import try_preview as contextual_day_preview
+                        interpreted=contextual_day_preview(db,scope,conversation,inbound,
+                            state=state,previous_meta=previous_meta,expected_revision=revision,
+                            event_key='active-understanding:'+inbound.id,action_holds=action_holds)
                     if interpreted is None and next_enabled and not human_step and not hard_moderation:
                         from .live_property_continuity import try_preview as contextual_property_preview
                         interpreted=contextual_property_preview(db,scope,conversation,inbound,

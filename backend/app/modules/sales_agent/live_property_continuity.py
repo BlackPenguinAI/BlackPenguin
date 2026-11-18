@@ -7,7 +7,7 @@ catalogs are intentionally not accepted here.
 import re
 
 VERSION = 'sales-live-property-choice/1.0'
-COMPETING = ('appointment_offer', 'booking_confirmation', 'material_offer',
+COMPETING = ('appointment_offer', 'visit_day_offer', 'booking_confirmation', 'material_offer',
              'location_offer', 'release_offer', 'control_confirmation',
              'qualification_offer', 'reschedule_confirmation',
              'cancellation_confirmation', 'wait_offer')

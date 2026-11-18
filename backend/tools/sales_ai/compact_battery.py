@@ -118,6 +118,9 @@ def public_next(reply,history,name,choose=1):
         if len(chosen)!=2 or chosen[1].rstrip('.') not in reply or name not in reply:
             return None,'confirmation_changed_public_selection'
         return 'Yes','confirm'
+    # P3-B stage 1: the day comes from the actual outbound list, not private fixtures.
+    days=re.findall(r'^\s*\d+\.\s*(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),\s*\w+\s+\d{1,2}\s*$',reply,re.M|re.I)
+    if days and name.casefold() in reply.casefold():return '1','select_day'
     options=re.findall(r'^\s*\d+\.\s*(\d{4}-\d{2}-\d{2} at [^\n]+)',reply,re.M)
     if options:
         if len(options)<choose:return None,'preferred_option_not_offered'

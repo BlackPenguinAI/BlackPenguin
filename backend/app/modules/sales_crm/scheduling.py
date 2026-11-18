@@ -355,6 +355,7 @@ def available_slots(
     limit: int = 12,
     slot_predicate=None,
     include_sales_user_ids: bool = False,
+    distinct_local_days_timezone: str | None = None,
     allowed_sales_user_ids: set[str] | None = None,
     excluded_meeting: Meeting | None = None,
 ) -> list[dict]:
@@ -381,6 +382,9 @@ def available_slots(
             if connection else []
         )
     result = []
+    # Only the optional day-discovery view skips the remaining candidates after
+    # an actually eligible start. All existing exact-slot callers are unchanged.
+    distinct_zone = _zone(distinct_local_days_timezone) if distinct_local_days_timezone else None
     while cursor < end and len(result) < limit:
         if slot_predicate is not None and not slot_predicate(cursor, cursor + timedelta(minutes=duration_minutes)):
             cursor += timedelta(minutes=30)
@@ -402,6 +406,12 @@ def available_slots(
                 "eligible_sales_users": len(user_ids),
                 **({"eligible_sales_user_ids": user_ids} if include_sales_user_ids else {}),
             })
+            if distinct_zone:
+                # Aware local midnight handles daylight-saving transitions.
+                local_day = cursor.replace(tzinfo=timezone.utc).astimezone(distinct_zone).date()
+                cursor = datetime.combine(local_day + timedelta(days=1), time.min,
+                                          tzinfo=distinct_zone).astimezone(timezone.utc).replace(tzinfo=None)
+                continue
         cursor += timedelta(minutes=30)
     return result
 

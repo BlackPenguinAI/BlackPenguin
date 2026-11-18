@@ -156,7 +156,7 @@ def choose_user(db,project_id,ids):
     return values[(values.index(last)+1)%len(values)] if last in values else values[0] if values else None
 
 
-def search_slots(db,scope,prefs,now,*,excluded_meeting=None,allowed_user_ids=None):
+def search_slots(db,scope,prefs,now,*,excluded_meeting=None,allowed_user_ids=None,days_only=False):
     from datetime import date
     from app.modules.sales_crm.scheduling import available_slots,eligible_users_for_slot
     if not eligible_appointment_assignments(db,scope.project_id):return []
@@ -183,10 +183,15 @@ def search_slots(db,scope,prefs,now,*,excluded_meeting=None,allowed_user_ids=Non
     # One availability scan and one FreeBusy range per connected specialist.
     # One extra UTC day covers local daylight-saving offsets; the predicate clips the range.
     slots=available_slots(db,project_id=scope.project_id,after=after,duration_minutes=prefs['duration_minutes'],
-        days=(last-first).days+2,limit=3,slot_predicate=matches,include_sales_user_ids=True,
+        days=(last-first).days+2,limit=3 if days_only else 32,
+        slot_predicate=matches,include_sales_user_ids=True,
+        **({'distinct_local_days_timezone':prefs['timezone']} if days_only else {}),
         **({'allowed_sales_user_ids':allowed_user_ids} if allowed_user_ids is not None else {}),
         **({'excluded_meeting':excluded_meeting} if excluded_meeting else {}))
-    for slot in slots:
+    if days_only:
+        return [utc(slot['start_at']).astimezone(zone).date().isoformat() for slot in slots]
+    from .visit_day_funnel import spread_slots
+    for slot in spread_slots(slots):
         starts=slot['start_at']
         ids=slot.get('eligible_sales_user_ids')
         if ids is None:ids=eligible_users_for_slot(db,project_id=scope.project_id,starts_at=starts,duration_minutes=prefs['duration_minutes'])
@@ -371,8 +376,15 @@ def handle(db,scope,conversation,lead,project,outcome,inbound):
     if assent:
         return 'Please choose a current visit time before confirming a booking.',{},[]
     previous=state.booking_search
-    try:prefs=normalize_timing(u,inbound.content,project,now,previous)
-    except ValueError as exc:return str(exc),{},[]
+    if previous.get('day_offer_selection_message_id')==inbound.id:
+        # A one-turn, accepted and nonexpired day offer already identified the
+        # exact date. Avoid re-parsing 'Saturday' into a different weekend.
+        prefs={key:previous.get(key) for key in (
+            'timezone','date_from','date_until','time_relation','time_from',
+            'time_until','duration_minutes','source_evidence','source')}
+    else:
+        try:prefs=normalize_timing(u,inbound.content,project,now,previous)
+        except ValueError as exc:return str(exc),{},[]
     property_id=state.selected_property_type_id or previous.get('property_type_id')
     unit_id=state.selected_unit_id if state.selected_unit_id else previous.get('unit_id') if property_id==previous.get('property_type_id') else None
     from .commercial_context import build_commercial_context
@@ -392,12 +404,32 @@ def handle(db,scope,conversation,lead,project,outcome,inbound):
         locations=locations_for_project(project)
         if not locations:return 'A visit location needs to be approved before I can offer times. What property information would help meanwhile?',{},[]
         return 'Which location would you like to visit?\n\n'+'\n'.join(f"{i}. {r['label']}: {r['address']}" for i,r in enumerate(locations,1)),{'location_offer':{'option_ids':[r['address'] for r in locations],'pending':True}},[]
-    try:options=search_slots(db,scope,prefs,now)
-    except ValueError as exc:return str(exc),{},[]
     try:context=context_snapshot(db,scope,project,state,location)
     except (PermissionError,ValueError):
         state.booking_search={**prefs,'property_type_id':None,'unit_id':None,'location':location}
         return 'The property details need to be verified before I can offer that visit. Which property would you like to review?',{},[]
+    try:
+        # First ask for a day when more than one day has verified openings.
+        # An explicitly selected date bypasses this funnel entirely.
+        selected_day=bool(prefs.get('date_from') and prefs.get('date_from')==prefs.get('date_until'))
+        if not selected_day:
+            days=search_slots(db,scope,prefs,now,days_only=True)
+            if len(days)>1:
+                from .visit_day_funnel import VERSION as DAY_VERSION, day_labels, message as days_message
+                name=context.get('property_type_name') or next(
+                    (r['property_type'] for r in catalog['property_types'] if r['id']==property_id),None)
+                if not name:
+                    return 'The property needs to be verified before I can offer visit dates.',{},[]
+                entries=day_labels(days)
+                offer={'version':DAY_VERSION,'days':entries,'property_type_id':property_id,
+                       'unit_id':unit_id,'timezone':prefs['timezone'],
+                       'expires_at':(utc(now)+timedelta(minutes=30)).isoformat()}
+                return days_message(name,entries,prefs['timezone']),{'visit_day_offer':offer},[]
+            if len(days)==1:
+                prefs={**prefs,'date_from':days[0],'date_until':days[0]}
+                state.booking_search={**state.booking_search,**prefs}
+        options=search_slots(db,scope,prefs,now)
+    except ValueError as exc:return str(exc),{},[]
     if not options:
         from .wait_service import wait_offer
         try:return wait_offer(db,scope,outcome,context,prefs)
