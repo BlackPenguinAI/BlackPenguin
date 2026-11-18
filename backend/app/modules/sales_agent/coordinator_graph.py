@@ -9,8 +9,10 @@ every node delegates to the same bounded observation engine.
 """
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Literal, TypedDict
+from threading import Lock
+from typing import Awaitable, Callable, Literal, TypedDict
 from langgraph.graph import StateGraph, START, END
+from langgraph.runtime import Runtime
 from .commercial_routing import ObservationDecision, BASES as OBSERVATION_BASES, VERSION as OBSERVATION_VERSION
 
 VERSION = 'sales-coordinator-graph/4.0'
@@ -80,61 +82,69 @@ def control_route(*, active, outcome, inbound_id, exact_stop=False,
     return RouteDecision('fulfill', 'pure_human_handoff')
 
 
-async def execute(scope, *, interpret, plan, fulfill, observe, assess=None,
-                  reconsider=None, on_stage=None, route_after_plan=None,
-                  on_route=None, observation_after_plan=None,
-                  on_observation_route=None):
-    """Run the shared graph with an explicit conditional edge after planning.
+@dataclass(frozen=True)
+class TurnCallbacks:
+    """Per-invocation dependencies, not graph state or process-global handlers.
 
-    Default remains the established observe path. Invalid decisions fail
-    closed before fulfillment. No task authorizations depend on this graph.
+    The callbacks may close over a conversation's SQLAlchemy session and scoped
+    records. They must only be accessed through the current LangGraph Runtime.
+    Never put this object in State or retain it on the compiled graph.
     """
-    if observe is None:
-        raise ValueError('The commercial graph requires an observation callback.')
+    interpret: Callable[[], Awaitable[None]]
+    plan: Callable[[], Awaitable[None]]
+    observe: Callable[[], Awaitable[None]]
+    fulfill: Callable[[], Awaitable[None]]
+    on_stage: Callable[[str, list[str]], None] | None = None
+    route_after_plan: Callable[[], RouteDecision] | None = None
+    on_route: Callable[[RouteDecision], None] | None = None
+    observation_after_plan: Callable[[], ObservationDecision] | None = None
+    on_observation_route: Callable[[ObservationDecision], None] | None = None
 
-    def node(name, callback):
-        async def invoke(state):
-            if on_stage is not None:
-                on_stage(name, state['trace'])
-            await callback()
+
+def _build_compiled_graph():
+    """Define the stable topology and compile it without capturing turn data."""
+    def node(name):
+        async def invoke(state: State, runtime: Runtime[TurnCallbacks]):
+            callbacks = runtime.context
+            if callbacks.on_stage is not None:
+                callbacks.on_stage(name, state['trace'])
+            await getattr(callbacks, name)()
             return {'trace': [*state['trace'], name]}
         return invoke
 
-    async def choose_route(state):
-        decision = (route_after_plan() if route_after_plan is not None
+    async def choose_route(state: State, runtime: Runtime[TurnCallbacks]):
+        callbacks = runtime.context
+        decision = (callbacks.route_after_plan() if callbacks.route_after_plan is not None
                     else RouteDecision('observe', 'default_observation'))
         if (type(decision) is not RouteDecision or decision.next_stage not in ROUTES
                 or decision.reason not in REASONS
                 or (decision.next_stage == 'fulfill' and decision.reason not in
                     {'verified_opt_out', 'protected_handoff', 'pure_human_handoff'})):
             raise ValueError('Invalid coordinator routing decision; fulfillment blocked.')
-        if on_route is not None:
-            on_route(decision)
+        if callbacks.on_route is not None:
+            callbacks.on_route(decision)
         return {'route': decision.next_stage, 'route_reason': decision.reason}
 
-    async def choose_observation(state):
-        # An invalid observation label must never cause a silent bypass.
-        # No capability is granted here: all branches call the same observer.
-        decision = (observation_after_plan() if observation_after_plan is not None
+    async def choose_observation(state: State, runtime: Runtime[TurnCallbacks]):
+        # Invalid labels still fail closed. All specialists use the same guarded
+        # observation engine; routing never grants a business capability.
+        callbacks = runtime.context
+        decision = (callbacks.observation_after_plan() if callbacks.observation_after_plan is not None
                     else ObservationDecision('mixed', OBSERVATION_BASES['mixed']))
         if (type(decision) is not ObservationDecision or
                 OBSERVATION_BASES.get(decision.kind) != decision.basis):
             raise ValueError('Invalid commercial observation route; fulfillment blocked.')
-        if on_observation_route is not None:
-            on_observation_route(decision)
+        if callbacks.on_observation_route is not None:
+            callbacks.on_observation_route(decision)
         return {'observation_kind': decision.kind, 'observation_basis': decision.basis}
 
-    graph = StateGraph(State)
-    for name, callback in [('interpret', interpret), ('plan', plan),
-                           ('fulfill', fulfill)]:
-        graph.add_node(name, node(name, callback))
+    graph = StateGraph(State, context_schema=TurnCallbacks)
+    for name in ('interpret', 'plan', 'fulfill'):
+        graph.add_node(name, node(name))
     graph.add_node('route', choose_route)
     graph.add_node('route_observation', choose_observation)
-    # Physical specialist nodes are separate LangGraph paths. Their execution
-    # boundary is intentionally identical to the proven observation loop.
-    # Logical trace/on_stage contracts still report the name 'observe'.
     for kind in OBSERVATION_BASES:
-        graph.add_node('observe_' + kind, node('observe', observe))
+        graph.add_node('observe_' + kind, node('observe'))
         graph.add_edge('observe_' + kind, 'fulfill')
     graph.add_edge(START, 'interpret')
     graph.add_edge('interpret', 'plan')
@@ -145,10 +155,44 @@ async def execute(scope, *, interpret, plan, fulfill, observe, assess=None,
                                 lambda state: state['observation_kind'],
                                 {kind: 'observe_' + kind for kind in OBSERVATION_BASES})
     graph.add_edge('fulfill', END)
-    state = await graph.compile().ainvoke(
+    return graph.compile()
+
+
+# Each API/worker process owns its own immutable topology. The lock ensures a
+# concurrent cold start cannot compile more than once in the same process.
+_COMPILE_LOCK = Lock()
+_COMPILED_GRAPH = None
+
+
+def compiled_graph():
+    global _COMPILED_GRAPH
+    if _COMPILED_GRAPH is None:
+        with _COMPILE_LOCK:
+            if _COMPILED_GRAPH is None:
+                _COMPILED_GRAPH = _build_compiled_graph()
+    return _COMPILED_GRAPH
+
+
+async def execute(scope, *, interpret, plan, fulfill, observe, assess=None,
+                  reconsider=None, on_stage=None, route_after_plan=None,
+                  on_route=None, observation_after_plan=None,
+                  on_observation_route=None):
+    """Invoke the process-cached topology with isolated callbacks for this turn.
+
+    The public signature, route/trace metadata and authorization boundaries are
+    unchanged. The unused compatibility arguments do not enter graph context.
+    """
+    if observe is None:
+        raise ValueError('The commercial graph requires an observation callback.')
+    callbacks = TurnCallbacks(
+        interpret=interpret, plan=plan, observe=observe, fulfill=fulfill,
+        on_stage=on_stage, route_after_plan=route_after_plan, on_route=on_route,
+        observation_after_plan=observation_after_plan,
+        on_observation_route=on_observation_route)
+    state = await compiled_graph().ainvoke(
         {'trace': [], 'route': 'observe', 'route_reason': 'default_observation',
          'observation_kind': 'mixed', 'observation_basis': OBSERVATION_BASES['mixed']},
-        config={'recursion_limit': 10})
+        context=callbacks, config={'recursion_limit': 10})
     return {'version': VERSION, 'mode': MODE, 'trace': state['trace'],
             'route': {'after_plan': state['route'], 'reason': state['route_reason']},
             'observation_route': ({'version': OBSERVATION_VERSION,
