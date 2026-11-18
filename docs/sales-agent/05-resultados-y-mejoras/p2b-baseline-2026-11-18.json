@@ -1,0 +1,281 @@
+{
+  "version": "sales-p2b-repair-audit/1.0",
+  "source": "synthetic_traces_only",
+  "run_count": 6,
+  "turn_count": 150,
+  "interpretation_attempts": 45,
+  "interpretation_retries": 3,
+  "repair_actions": {
+    "declining_a_visit_is_not_cancellation": 6,
+    "derive_appointment_from_current_visit": 4,
+    "omit_historical_declaration": 12,
+    "omit_human_contact_misread_as_visit": 6,
+    "omit_verified_historical_optional_preference": 4,
+    "preserve_independently_validated_current_declaration": 6,
+    "reject_unrequested_comparison": 4
+  },
+  "repair_stages": {
+    "booking_intent.canonicalize_new_visit": 8,
+    "current_declarations.merge": 6,
+    "interpretation_consistency.normalize": 6,
+    "interpretation_input.compile_input": 16,
+    "mixed_human_visit.omit_spurious_visit": 6
+  },
+  "focused_gate_blocked_runs": 3,
+  "active_protected_stages": [
+    "booking_intent.canonicalize_new_visit",
+    "current_declarations.merge",
+    "interpretation_consistency.normalize",
+    "interpretation_input.compile_input",
+    "mixed_human_visit.omit_spurious_visit"
+  ],
+  "decision": "NO_AUTOMATIC_REMOVAL",
+  "reason": "A zero trigger count never demonstrates that a repair is redundant. Current synthetic runs share scenarios and lack complete provider-context replay.",
+  "privacy": "No raw lead text, model responses, evidence quotations or credentials in this report.",
+  "runs": [
+    {
+      "label": "run_1",
+      "commit": "929ba17dbe492d701102d8a89347ad75756da1e0",
+      "configuration_sha256": "51ff65376dad421328dab993a4fc71939489386f1ed173514cf13a244ac79f1c",
+      "model": "openai/gpt-4o-mini",
+      "scenarios": 8,
+      "turns": 25,
+      "checks": {
+        "PASS": 404,
+        "FAIL": 0,
+        "BLOCKED": 0
+      },
+      "provider_calls": 22,
+      "prompt_tokens": 129277,
+      "completion_tokens": 1992,
+      "cost_usd": 0.016756349999999996,
+      "interpretation_attempts": 7,
+      "interpretation_retries": 0,
+      "truncated_raw_packets": 0,
+      "internal_observation_failures": 0,
+      "financing_queries": 4,
+      "financing_reads_verified": 4,
+      "visit_queries": 1,
+      "visit_availability_verified": 1,
+      "focused_functional_gate": "PASS_FOCUSED",
+      "repair_actions": {
+        "declining_a_visit_is_not_cancellation": 1,
+        "derive_appointment_from_current_visit": 1,
+        "omit_historical_declaration": 2,
+        "omit_human_contact_misread_as_visit": 1,
+        "preserve_independently_validated_current_declaration": 1,
+        "reject_unrequested_comparison": 1
+      },
+      "repair_stages": {
+        "booking_intent.canonicalize_new_visit": 2,
+        "current_declarations.merge": 1,
+        "interpretation_consistency.normalize": 1,
+        "interpretation_input.compile_input": 2,
+        "mixed_human_visit.omit_spurious_visit": 1
+      }
+    },
+    {
+      "label": "run_2",
+      "commit": "929ba17dbe492d701102d8a89347ad75756da1e0",
+      "configuration_sha256": "51ff65376dad421328dab993a4fc71939489386f1ed173514cf13a244ac79f1c",
+      "model": "openai/gpt-4o-mini",
+      "scenarios": 8,
+      "turns": 25,
+      "checks": {
+        "PASS": 404,
+        "FAIL": 0,
+        "BLOCKED": 0
+      },
+      "provider_calls": 21,
+      "prompt_tokens": 128970,
+      "completion_tokens": 1894,
+      "cost_usd": 0.0150291,
+      "interpretation_attempts": 7,
+      "interpretation_retries": 0,
+      "truncated_raw_packets": 0,
+      "internal_observation_failures": 0,
+      "financing_queries": 4,
+      "financing_reads_verified": 3,
+      "visit_queries": 1,
+      "visit_availability_verified": 1,
+      "focused_functional_gate": "BLOCKED_FOCUSED",
+      "repair_actions": {
+        "declining_a_visit_is_not_cancellation": 1,
+        "derive_appointment_from_current_visit": 1,
+        "omit_historical_declaration": 2,
+        "omit_human_contact_misread_as_visit": 1,
+        "preserve_independently_validated_current_declaration": 1,
+        "reject_unrequested_comparison": 1
+      },
+      "repair_stages": {
+        "booking_intent.canonicalize_new_visit": 2,
+        "current_declarations.merge": 1,
+        "interpretation_consistency.normalize": 1,
+        "interpretation_input.compile_input": 2,
+        "mixed_human_visit.omit_spurious_visit": 1
+      }
+    },
+    {
+      "label": "run_3",
+      "commit": "929ba17dbe492d701102d8a89347ad75756da1e0",
+      "configuration_sha256": "51ff65376dad421328dab993a4fc71939489386f1ed173514cf13a244ac79f1c",
+      "model": "openai/gpt-4o-mini",
+      "scenarios": 8,
+      "turns": 25,
+      "checks": {
+        "PASS": 404,
+        "FAIL": 0,
+        "BLOCKED": 0
+      },
+      "provider_calls": 22,
+      "prompt_tokens": 129232,
+      "completion_tokens": 1975,
+      "cost_usd": 0.014656199999999998,
+      "interpretation_attempts": 7,
+      "interpretation_retries": 0,
+      "truncated_raw_packets": 0,
+      "internal_observation_failures": 1,
+      "financing_queries": 4,
+      "financing_reads_verified": 4,
+      "visit_queries": 1,
+      "visit_availability_verified": 0,
+      "focused_functional_gate": "BLOCKED_FOCUSED",
+      "repair_actions": {
+        "declining_a_visit_is_not_cancellation": 1,
+        "derive_appointment_from_current_visit": 1,
+        "omit_historical_declaration": 2,
+        "omit_human_contact_misread_as_visit": 1,
+        "omit_verified_historical_optional_preference": 1,
+        "preserve_independently_validated_current_declaration": 1,
+        "reject_unrequested_comparison": 1
+      },
+      "repair_stages": {
+        "booking_intent.canonicalize_new_visit": 2,
+        "current_declarations.merge": 1,
+        "interpretation_consistency.normalize": 1,
+        "interpretation_input.compile_input": 3,
+        "mixed_human_visit.omit_spurious_visit": 1
+      }
+    },
+    {
+      "label": "run_4",
+      "commit": "8e2649f5ea5de95409439663753d64256c6bbf0d",
+      "configuration_sha256": "51ff65376dad421328dab993a4fc71939489386f1ed173514cf13a244ac79f1c",
+      "model": "openai/gpt-4o-mini",
+      "scenarios": 8,
+      "turns": 25,
+      "checks": {
+        "PASS": 404,
+        "FAIL": 0,
+        "BLOCKED": 0
+      },
+      "provider_calls": 16,
+      "prompt_tokens": 127167,
+      "completion_tokens": 1882,
+      "cost_usd": 0.016143449999999997,
+      "interpretation_attempts": 7,
+      "interpretation_retries": 0,
+      "truncated_raw_packets": 0,
+      "internal_observation_failures": 0,
+      "financing_queries": 4,
+      "financing_reads_verified": 1,
+      "visit_queries": 1,
+      "visit_availability_verified": 0,
+      "focused_functional_gate": "BLOCKED_FOCUSED",
+      "repair_actions": {
+        "declining_a_visit_is_not_cancellation": 1,
+        "omit_historical_declaration": 2,
+        "omit_human_contact_misread_as_visit": 1,
+        "omit_verified_historical_optional_preference": 1,
+        "preserve_independently_validated_current_declaration": 1
+      },
+      "repair_stages": {
+        "current_declarations.merge": 1,
+        "interpretation_consistency.normalize": 1,
+        "interpretation_input.compile_input": 3,
+        "mixed_human_visit.omit_spurious_visit": 1
+      }
+    },
+    {
+      "label": "run_5",
+      "commit": "f1fb3e983658684ea670b624f8278e83dd7acd57",
+      "configuration_sha256": "51ff65376dad421328dab993a4fc71939489386f1ed173514cf13a244ac79f1c",
+      "model": "openai/gpt-4o-mini",
+      "scenarios": 8,
+      "turns": 25,
+      "checks": {
+        "PASS": 443,
+        "FAIL": 0,
+        "BLOCKED": 0
+      },
+      "provider_calls": 22,
+      "prompt_tokens": 129456,
+      "completion_tokens": 1995,
+      "cost_usd": 0.016554600000000003,
+      "interpretation_attempts": 7,
+      "interpretation_retries": 0,
+      "truncated_raw_packets": 0,
+      "internal_observation_failures": 0,
+      "financing_queries": 4,
+      "financing_reads_verified": 4,
+      "visit_queries": 1,
+      "visit_availability_verified": 1,
+      "focused_functional_gate": "PASS_FOCUSED",
+      "repair_actions": {
+        "declining_a_visit_is_not_cancellation": 1,
+        "omit_historical_declaration": 2,
+        "omit_human_contact_misread_as_visit": 1,
+        "omit_verified_historical_optional_preference": 1,
+        "preserve_independently_validated_current_declaration": 1
+      },
+      "repair_stages": {
+        "current_declarations.merge": 1,
+        "interpretation_consistency.normalize": 1,
+        "interpretation_input.compile_input": 3,
+        "mixed_human_visit.omit_spurious_visit": 1
+      }
+    },
+    {
+      "label": "run_6",
+      "commit": "a5108ef31deb66856d0bb9ada12d9f259ee9c043",
+      "configuration_sha256": "51ff65376dad421328dab993a4fc71939489386f1ed173514cf13a244ac79f1c",
+      "model": "openai/gpt-4o-mini",
+      "scenarios": 8,
+      "turns": 25,
+      "checks": {
+        "PASS": 404,
+        "FAIL": 0,
+        "BLOCKED": 0
+      },
+      "provider_calls": 25,
+      "prompt_tokens": 165512,
+      "completion_tokens": 2668,
+      "cost_usd": 0.021665999999999998,
+      "interpretation_attempts": 10,
+      "interpretation_retries": 3,
+      "truncated_raw_packets": 0,
+      "internal_observation_failures": 0,
+      "financing_queries": 4,
+      "financing_reads_verified": 4,
+      "visit_queries": 1,
+      "visit_availability_verified": 1,
+      "focused_functional_gate": "PASS_FOCUSED",
+      "repair_actions": {
+        "declining_a_visit_is_not_cancellation": 1,
+        "derive_appointment_from_current_visit": 1,
+        "omit_historical_declaration": 2,
+        "omit_human_contact_misread_as_visit": 1,
+        "omit_verified_historical_optional_preference": 1,
+        "preserve_independently_validated_current_declaration": 1,
+        "reject_unrequested_comparison": 1
+      },
+      "repair_stages": {
+        "booking_intent.canonicalize_new_visit": 2,
+        "current_declarations.merge": 1,
+        "interpretation_consistency.normalize": 1,
+        "interpretation_input.compile_input": 3,
+        "mixed_human_visit.omit_spurious_visit": 1
+      }
+    }
+  ]
+}
