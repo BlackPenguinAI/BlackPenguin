@@ -133,6 +133,10 @@ def deliver(db, scope, conversation, lead, run, outcome, previous_meta):
         return [], [], None, error, set(), bindings
     material_tasks = [t for t in tasks.values() if t.source_message_id == inbound.id and t.topic.value == 'materials'
         and t.status not in {'cancelled', 'completed'} and not restricted(outcome.state, t)]
+    from .property_reply_anchor import material_scope_ok
+    if not material_scope_ok(material_tasks,outcome.state.selected_property_type_id):
+        return [], [], None, ('Please confirm which property you want materials for. '
+                              'I cannot share an unverified property document.'), set(), bindings
     current_context=request_context(outcome,inbound.id)
     repeated=bool(current_context and current_context==previous_meta.get('material_request_context'))
     refs=outcome.plan.get('references') or {}

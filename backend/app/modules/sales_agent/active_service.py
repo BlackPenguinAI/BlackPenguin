@@ -514,6 +514,11 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
                         event_key='active-understanding:'+inbound.id,action_holds=action_holds)
                         if next_enabled and not human_step and not hard_moderation else None)
                     if interpreted is None and next_enabled and not human_step and not hard_moderation:
+                        from .live_property_continuity import try_preview as contextual_property_preview
+                        interpreted=contextual_property_preview(db,scope,conversation,inbound,
+                            state=state,previous_meta=previous_meta,expected_revision=revision,
+                            event_key='active-understanding:'+inbound.id)
+                    if interpreted is None and next_enabled and not human_step and not hard_moderation:
                         from .live_visit_continuity import try_preview as contextual_visit_preview
                         interpreted=contextual_visit_preview(db,scope,conversation,inbound,
                             state=state,previous_meta=previous_meta,expected_revision=revision,
@@ -891,6 +896,13 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
                         qualification(lead,commercial['confirmed_project_facts'],record_asked=True)
                 if recovery_text and not protected and not human_step and not moderation_boundary:
                     text=recovery_text
+                if next_enabled and not (protected or exact_stop or human_step or moderation_boundary or recovery_text or terminal_only):
+                    from .property_reply_anchor import anchor as anchor_property_reply
+                    text,anchor_audit=anchor_property_reply(text,outcome.state.selected_property_type_id,
+                        commercial.get('property_types',[]),topics=metadata.get('requested_topics',[]),
+                        property_catalog=bool(metadata.get('property_catalog_offer')),
+                        material_shared=bool(share_ids),booking_answer=bool(appointment))
+                    if anchor_audit:metadata['property_reply_anchor']=anchor_audit
                 if draft.violations:
                     text+='\n\nSome information could not be verified; no unsupported facts have been added.'
                 if next_enabled:
