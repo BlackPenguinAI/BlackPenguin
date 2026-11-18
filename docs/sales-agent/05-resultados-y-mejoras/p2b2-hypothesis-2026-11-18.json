@@ -1,0 +1,21 @@
+{
+  "version": "sales-p2b2-hypothesis/1.0",
+  "reference_commit": "929cad5f5bbf23749b7a28a8a03802049588b250",
+  "source": "Prior P2-B.1 sanitized audit and ablation, plus source inspection",
+  "previous_replay": {
+    "scenario_count": 8,
+    "turn_count": 25,
+    "accepted_unique_packets": 7,
+    "normalizer": "mixed_human_pricing.normalize_misread_price_comparison",
+    "equal": 7,
+    "different": 0,
+    "conclusion": "NOT_PROVEN_REDUNDANT"
+  },
+  "targeted_hypothesis": "A valid v3 one-member comparison misread for a mixed human-contact and price question still requires the narrow normalizer.",
+  "test_matrix_size": 18,
+  "expected_targeted_misread_differences": 4,
+  "expected_decision": "KEEP_REPAIR",
+  "production_changes": false,
+  "model_calls": 0,
+  "notes": "Historical packets do not prove absence of a safety-relevant misread; targeted cases exercise the missing branch. The planner tests require isolated SQLite fixtures."
+}
