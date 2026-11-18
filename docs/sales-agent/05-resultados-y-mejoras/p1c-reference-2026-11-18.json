@@ -1,0 +1,24 @@
+{
+  "version": "sales-interpretation-reference/1.0",
+  "description": "P2-A closing-point, synthetic, pre-P1-C. Aggregated evidence from bp-p2a-closing-validation.tar.gz; no raw messages.",
+  "run": {
+    "label": "P2-A closing-point baseline",
+    "commit": "a5108ef31deb66856d0bb9ada12d9f259ee9c043",
+    "configuration_sha256": "51ff65376dad421328dab993a4fc71939489386f1ed173514cf13a244ac79f1c",
+    "model": "openai/gpt-4o-mini",
+    "scenarios": ["decline_visit_questions", "farewell_then_reopen", "human_insists", "human_record_then_question", "human_then_question", "human_withdrawal", "mixed_human_price", "unavailable_then_close"],
+    "scenario_count": 8,
+    "turn_count": 25,
+    "checks": {"PASS": 404, "FAIL": 0, "BLOCKED": 0},
+    "provider_calls": 25,
+    "prompt_tokens": 165512,
+    "completion_tokens": 2668,
+    "cost_usd": 0.021666,
+    "responses_with_cost": 25,
+    "recorded_interpretation_attempts": 10,
+    "recorded_interpretation_retries": 3,
+    "invalid_interpretation_attempts": 3,
+    "invalid_interpretation_issue_types": {"contract_value_error": 1, "independent_financing_question_missing": 2},
+    "quality_scope": "focused_automated_checks_not_integral_dialogue_evaluation"
+  }
+}

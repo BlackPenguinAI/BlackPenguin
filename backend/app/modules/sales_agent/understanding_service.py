@@ -101,8 +101,8 @@ async def _preview(db, scope: Scope, *, inbound_message_id: str, expected_revisi
             'selected_unit_id':state.selected_unit_id,'offers':[o.model_dump(mode='json') for o in state.offers]}
     wire_mode=next_enabled and infer is None
     if wire_mode:
-        from .interpretation_input import SYSTEM,VERSION,SYSTEM_VERSION
-        snapshot={**snapshot,'system':SYSTEM,'input_contract':VERSION,'input_system_version':SYSTEM_VERSION}
+        from .interpretation_input import SYSTEM,PROVIDER_VERSION,SYSTEM_VERSION
+        snapshot={**snapshot,'system':SYSTEM,'input_contract':PROVIDER_VERSION,'input_system_version':SYSTEM_VERSION}
     else:snapshot = {**snapshot, 'system': snapshot['system'] + TURN_RULES}
     messages = [
         {'role': 'system', 'content': snapshot['system']},
@@ -289,7 +289,7 @@ async def _preview(db, scope: Scope, *, inbound_message_id: str, expected_revisi
         'outcome': outcome, 'error_code': error_code, 'expected_revision': expected_revision,
         'interpretation_attempts': attempts, 'bounded_reconsideration':reconsideration,
         'validated_declarations':[p.model_dump(mode='json') for p in validated_declarations],
-        'input_contract':VERSION if wire_mode else 'sales-understanding/1.0',
+        'input_contract':PROVIDER_VERSION if wire_mode else 'sales-understanding/1.0',
         'model_request': model_request,
         'model_request_sha256': hashlib.sha256(json.dumps(model_request, sort_keys=True).encode()).hexdigest()}
     if 'configuration_ref' in snapshot:
