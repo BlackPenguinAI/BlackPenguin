@@ -5,6 +5,7 @@ from .lead_profile import resolve, known
 from app.modules.sales_crm.models import LeadScoreSnapshot, LeadSegmentAssignment
 
 VERSION = 'sales-declared-signals/1.0'
+CONFIRMED_SCORING_VERSION = VERSION + '/booked-1'  # <= persisted VARCHAR(40)
 NEGATIVE = re.compile(r"\b(?:no|not|never|don't|do not|isn't|wasn't|cannot|can't|unsure|maybe|might|if)\b", re.I)
 
 
@@ -112,7 +113,7 @@ def update(db, lead, *, commercial, message_count, scoring_config=None):
     total = max(0,min(100,sum(factors.values())))
     tier = 'hot' if total >= weight('hot_threshold',70) else 'warm' if total >= weight('warm_threshold',40) else 'cold'
     snapshot = LeadScoreSnapshot(lead_id=lead.id,total_score=total,assigned_tier=tier,
-                                 factor_breakdown=factors,scoring_version=VERSION+"/confirmed-booking-1" if confirmed else VERSION)
+                                 factor_breakdown=factors,scoring_version=CONFIRMED_SCORING_VERSION if confirmed else VERSION)
     lead.intent_score, lead.intent_tier = total/100, tier
     # Only current explicit buyer intent/motivation can select a playbook.
     # Ambiguous or withdrawn intent removes a previous assignment; no stale persona.
