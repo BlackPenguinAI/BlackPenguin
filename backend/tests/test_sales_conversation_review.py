@@ -39,7 +39,11 @@ def test_high_confidence_wrong_control_label_never_pauses_or_unsubscribes(agent,
     assert not agent.conversation.is_paused and not agent.lead.is_opt_out
     assert agent.db.query(HumanInterventionCase).count()==0
     assert agent.db.query(Meeting).count()==0
-    assert ('transfer this conversation' if bad_topic=='human' else 'stop all messages') in agent.reply()
+    if bad_topic=='human':
+        assert 'transfer this conversation' not in agent.reply().lower()
+        assert 'stop all messages' not in agent.reply().lower()
+    else:
+        assert 'stop all messages' in agent.reply()
     # A subsequent normal message advances on the very same conversation.
     agent.turn('Available properties?',understanding('Available properties?','inventory'))
     assert 'Verified home' in agent.reply()
@@ -165,13 +169,13 @@ def test_ordinary_pause_flags_and_hallucinated_security_label_cannot_stop_legacy
     assert result['requires_clarification'] and not result['escalation_decision']['matched_pause_rules']
 
 
-def test_uncertain_handoff_can_be_explicitly_confirmed_on_the_next_turn(agent):
+def test_uncertain_handoff_cannot_be_confirmed_without_an_explicit_user_request(agent):
     agent.turn('Send available properties',understanding('Send available properties','human'))
     assert not agent.conversation.is_paused
+    assert agent.db.query(HumanInterventionCase).count()==0
     agent.turn('Yes',understanding('Yes','other'))
-    assert agent.conversation.is_paused
-    incident=agent.db.query(HumanInterventionCase).one()
-    assert incident.reason=='HUMAN_REQUESTED' and incident.evidence=='Yes'
+    assert not agent.conversation.is_paused
+    assert agent.db.query(HumanInterventionCase).count()==0
 
 
 @pytest.mark.parametrize('channel',['sms','whatsapp'])

@@ -537,10 +537,12 @@ async def compose(db, scope, *, inbound, outcome, draft, commercial, lead, metad
                 response_format={'type': 'json_schema', 'json_schema': {'name': 'sales_commercial_composition', 'strict': True, 'schema': contract}},
                 temperature=.2, timeout_seconds=12, max_tokens=2048, raise_on_error=True,
                 usage_context=LLMUsageContext(company_id=scope.company_id, project_id=scope.project_id, feature='sales_commercial_composition'))
-    # On a provider timeout, prefer no extra question where the backend has
-    # authorized it. Required facts and operation-specific one-choice prompts
-    # are still rendered; only optional follow-ups are suppressed.
-    fallback_continuation=next((c['id'] for c in choices if c['id']=='none'),choices[0]['id'])
+    # Preserve one useful backend-approved question on degraded catalog replies,
+    # but never invent an optional visit invitation when composition times out.
+    safe_followup=next((c['id'] for c in choices if c['id'] not in
+        {'visit','optional_visit','none'}),None)
+    fallback_continuation=safe_followup or next(
+        (c['id'] for c in choices if c['id']=='none'),choices[0]['id'])
     fallback = Composition.model_construct(version=VERSION, opening='direct',paragraphs=[],
         blocks=[BlockChoice(evidence_id=b['id'], wording='natural') for b in blocks if b['required']], continuation_id=fallback_continuation)
     chosen = fallback

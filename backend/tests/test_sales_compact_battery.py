@@ -64,7 +64,9 @@ def test_compact_scripts_exercise_real_core_and_assert_observable_outcomes(lab,s
     failures=[(t.get('action'),t.get('reply'),[c for c in t.get('checks',[]) if c['status']!='PASS']) for t in result['turns'] if any(c['status']!='PASS' for c in t.get('checks',[]))]
     final=[c for c in result['checks'] if c['status']!='PASS']
     assert not failures and not final,{'turns':failures,'final':final}
-    assert 3<=len(result['turns'])<=8
+    assert (2 if scenario=='unknown_B' else 3)<=len(result['turns'])<=8
+    if scenario=='unknown_B':
+        assert result['stop_reason']=='human_control'
     if scenario=='first_time_A':
         from app.core.config import settings
         from app.modules.sales_crm.models import Lead

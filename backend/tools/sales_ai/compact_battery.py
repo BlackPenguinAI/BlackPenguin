@@ -66,7 +66,8 @@ def definitions():
         ('reservation','Can I reserve Bay Residence and pay the deposit here?'),('decline','I do not want a visit yet.'),('farewell',GOODBYE)],budget=500000,cash=False,financing=True)
     b('portfolio',1,0,[('information','My budget is 400,000 USD, paying cash. Please compare Cedar Loft and Cedar Studio.'),
         ('request_visit',visit('Cedar Loft'))],goal_override='unavailable',access_override='no_slots')
-    b('unknown',0,0,[('human','I want to speak to a human'),('human_insist','I still want to speak to a human'),('farewell',GOODBYE)],budget=None,cash=False,human=True)
+    b('unknown',0,0,[('human','I want to speak to a human'),('human_insist','I still want to speak to a human')],
+      budget=None,cash=False,human=True,goal_override='human_control')
     for spec in specs.values():
         spec['goal']=spec.pop('goal_override',spec['goal']);spec['access']=spec.pop('access_override',spec['access'])
     return specs
@@ -171,7 +172,7 @@ async def evaluate_case(db,manifest,key,budget,max_turns):
     from app.modules.sales_agent.lead_profile import resolve
     from app.modules.sales_agent.profile_intelligence import segment_for,budget_cap
     from app.modules.project_team.service import eligible_appointment_assignments
-    from app.modules.governance.models import HumanInterventionCase
+    from app.modules.governance.models import HumanInterventionCase,NotificationOutbox
     from .evaluation_checks import check,error_details,internal_process_narration
     from .commercial_pilot import quality_checks
     from .booking_pilot import explains_unavailability
@@ -247,12 +248,19 @@ async def evaluate_case(db,manifest,key,budget,max_turns):
             if action=='decline' and not meetings:
                 row_checks.append(check('decline_not_misread_as_existing_visit_change',not re.search(r'cancel the current visit|request a different visit|which .*visit.*cancel',last,re.I)))
             if action=='farewell':row_checks.append(check('no_question_after_goodbye','?' not in last))
-            if spec.get('human') and action in {'human_insist','farewell'}:
-                count=db.query(HumanInterventionCase).filter_by(company_id=lead.company_id,project_id=lead.project_id,lead_id=lead.id,conversation_id=conversation.id,reason='HUMAN_CONTACT_REQUEST',status='open').count()
+            if spec.get('human') and action=='human_insist':
+                count=db.query(HumanInterventionCase).filter_by(company_id=lead.company_id,project_id=lead.project_id,
+                    lead_id=lead.id,conversation_id=conversation.id,reason='HUMAN_REQUESTED',status='open').count()
                 row_checks.append(check('human_request_saved_once',count==1))
+                row_checks.append(check('human_takeover_pauses_ai',conversation.is_paused and fresh.agent_status=='human_control'))
+                row_checks.append(check('company_notification_enqueued',
+                    db.query(NotificationOutbox).filter_by(company_id=lead.company_id,project_id=lead.project_id,
+                        entity_type='lead',entity_id=lead.id,event_type='human_intervention').count()==1))
             rows.append({'turn':index+1,'action':action,'lead_message':message,'reply':last,'profile':profile,'assigned_segment':assigned,
                 'understanding':frame,'interpretation_attempts':attempts,'input_trace':run.input_snapshot,'output':run.output_snapshot,'error_code':run.error_code,'checks':row_checks})
             if meetings:stop='booked';break
+            if spec.get('human') and action=='human_insist' and conversation.is_paused:
+                stop='human_control';break
             if action=='decline' and not meetings:
                 row_checks.append(check('decline_not_misread_as_existing_visit_change',not re.search(r'cancel the current visit|request a different visit|which .*visit.*cancel',last,re.I)))
             if action=='farewell':stop='closed';break
@@ -260,7 +268,8 @@ async def evaluate_case(db,manifest,key,budget,max_turns):
             db.rollback();rows.append({'turn':index+1,'action':action,'lead_message':message,**error_details(exc),'checks':[check('engine_turn_completed',False)]});stop='engine_error';break
     meetings=db.query(Meeting).filter_by(lead_id=lead.id).all()
     checks.extend([check('expected_booking_outcome',len(meetings)==(1 if spec['goal']=='booked' else 0)),check('no_provider_outbox',db.query(OutboundMessage).count()==0),
-        check('dialogue_reached_terminal_outcome',stop=='booked' if spec['goal']=='booked' else stop=='closed')])
+        check('dialogue_reached_terminal_outcome',
+            stop==('booked' if spec['goal']=='booked' else 'human_control' if spec['goal']=='human_control' else 'closed'))])
     if meetings:
         meeting=meetings[0]
         checks.extend([check('eligible_sales_user',meeting.assigned_sales_user_id in expected_eligible),check('correct_lead_and_project',meeting.lead_id==lead.id and meeting.project_id==project['id']),

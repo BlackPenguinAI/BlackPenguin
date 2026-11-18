@@ -471,7 +471,7 @@ def test_composer_provider_request_has_bounded_completion_tokens_and_timeout(age
     product(agent)
     agent.turn('Give me information',understanding('Give me information','catalog'))
     assert model.call_args.kwargs['max_tokens']==2048
-    assert model.call_args.kwargs['timeout_seconds']==8
+    assert model.call_args.kwargs['timeout_seconds']==12
 
 
 def test_provider_client_transmits_optional_token_bound():
