@@ -60,14 +60,25 @@ def dismissed_trigger(lead, conversation_id, reason, evidence):
 
 
 def confirmed_controls(understanding, text, *, pause_reason=None):
-    """An ungrounded human/opt-out classification asks instead of executing."""
-    suspicious = any(r.polarity == 'request' and (
-        r.topic.value == 'human' and not pause_reason or
-        r.topic.value == 'opt_out' and not explicit_opt_out(text)) for r in understanding.requests)
-    if not suspicious:
-        return understanding
-    return understanding.model_copy(update={
-        'requires_clarification': True,
-        'clarification_question': ('Would you like me to transfer this conversation to the Sales team?' if any(r.topic.value=='human' and r.polarity=='request' for r in understanding.requests)
-                                   else 'Do you want to stop all messages from us, or continue with the property information? Reply STOP to unsubscribe.'),
-    })
+    """Never turn an unsupported model label into a human takeover question.
+
+    Human escalation requires independently verified CURRENT-message evidence.
+    Preserve the other independent requests, and let their ordinary low-confidence
+    gates run without granting an action or escalating the conversation.
+    """
+    ungrounded_human = any(r.topic.value == 'human' and r.polarity == 'request'
+                           for r in understanding.requests) and pause_reason != 'HUMAN_REQUESTED'
+    if ungrounded_human:
+        from .understanding_contract import Topic
+        requests = [r.model_copy(update={'topic': Topic.other})
+                    if r.topic.value == 'human' and r.polarity == 'request' else r
+                    for r in understanding.requests]
+        understanding = understanding.model_copy(update={
+            'requests': requests, 'requires_clarification': False,
+            'clarification_question': None})
+    if any(r.topic.value == 'opt_out' and r.polarity == 'request'
+           for r in understanding.requests) and not explicit_opt_out(text):
+        return understanding.model_copy(update={
+            'requires_clarification': True,
+            'clarification_question': 'Do you want to stop all messages from us, or continue with the property information? Reply STOP to unsubscribe.'})
+    return understanding

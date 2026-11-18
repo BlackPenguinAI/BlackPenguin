@@ -12,9 +12,12 @@ from .models import SalesMessage,SalesFollowUpJob
 from app.modules.governance.models import HumanInterventionCase
 
 VERSION='sales-human-contact/1.0'
-REASON='HUMAN_CONTACT_REQUEST'
-FIRST='I can help with questions about the property, pricing and visits. What would you like to ask?'
-RECORDED="I've saved your request to speak with the Sales team. Is there another property question I can help with? If not, thank you for your interest and have a good day."
+REASON='HUMAN_REQUESTED'
+FIRST=('I can help with property details, prices, materials and visits here. '
+       'Do you still want to request a human review and pause automated replies? '
+       'Reply Yes to confirm, or ask me another property question.')
+RECORDED=('Your human-review request has been recorded. Automated replies are paused '
+          'while an administrator reviews this conversation.')
 
 
 def _state(conversation):
@@ -25,7 +28,8 @@ def _state(conversation):
 
 def cases(db,scope):
     return db.query(HumanInterventionCase).filter_by(company_id=scope.company_id,
-        project_id=scope.project_id,conversation_id=scope.conversation_id,lead_id=scope.lead_id,reason=REASON)
+        project_id=scope.project_id,conversation_id=scope.conversation_id,lead_id=scope.lead_id).filter(
+            HumanInterventionCase.reason.in_([REASON, 'HUMAN_CONTACT_REQUEST']))
 
 
 def withdrawal(text):
@@ -35,12 +39,17 @@ def withdrawal(text):
 
 
 def stage(db,scope,conversation,text,previous_meta):
-    if withdrawal(text) and (_state(conversation).get('stage') in {'asked','recorded'} or cases(db,scope).filter_by(status='open').first()):return 'withdraw'
-    if previous_meta.get('control_confirmation')=='human':
-        from .service import _affirmative_slot_reply
-        if _affirmative_slot_reply(text):return 'record'
-    if evidenced_pause_reason(text)!='HUMAN_REQUESTED':return None
     prior=_state(conversation)
+    if withdrawal(text) and (prior.get('stage') in {'asked','recorded'} or cases(db,scope).filter_by(status='open').first()):return 'withdraw'
+    # "Yes" may confirm only the explicit, delivered human-review question;
+    # an LLM-generated transfer suggestion is NOT such an authorization.
+    if (prior.get('stage')=='asked' and prior.get('inbound_id')
+            and previous_meta.get('human_contact_prompt_inbound_id')==prior['inbound_id']):
+        from .first_booking import accepted_outbound
+        from .service import _affirmative_slot_reply
+        if accepted_outbound(db,conversation,'human_contact_prompt_inbound_id') and _affirmative_slot_reply(text):
+            return 'record'
+    if evidenced_pause_reason(text)!='HUMAN_REQUESTED':return None
     if prior.get('stage')=='recorded' and cases(db,scope).filter_by(id=prior.get('case_id'),status='open').first():return 'record'
     prompted=scoped_messages_query(db,conversation).filter_by(direction='outbound',role='assistant').all()
     if prior.get('stage')=='asked' and any(continuity.accepted(m) and
@@ -74,19 +83,15 @@ def apply(db,scope,conversation,lead,outcome,inbound,step):
         if any(r.status in {'success','partial'} and any(t.id==r.operation_id and t.topic.value not in {'human','other'} for t in outcome.state.tasks) for r in outcome.results):
             message='I can help with property questions here. Is there another question I can help with?'
     else:
-        row=cases(db,scope).filter_by(status='open').first()
-        if row is None:
-            # A resolved request releases the unique open-request key, retaining
-            # its historical row. Never reuse a case from another opportunity.
-            key='human-contact:'+scope.lead_id+':open'
-            for old in cases(db,scope).filter_by(dedupe_key=key).all():old.dedupe_key=key+':closed:'+old.id
-            db.flush()
-            row=HumanInterventionCase(company_id=scope.company_id,project_id=scope.project_id,
-                conversation_id=scope.conversation_id,lead_id=scope.lead_id,reason=REASON,
-                evidence=inbound.content,dedupe_key=key,status='open')
-            db.add(row);db.flush()
+        # Reuse the established protected intervention path: it atomically
+        # opens the scoped case, pauses AI, cancels pending cadence and enqueues
+        # the company's administrator notification. No separate handoff mode.
+        from app.modules.governance.services import create_intervention_case
+        row=create_intervention_case(db,conversation=conversation,lead=lead,
+                                     reason='HUMAN_REQUESTED',evidence=inbound.content)
         value['human_contact']={'epoch':value['epoch'],'stage':'recorded','inbound_id':inbound.id,'case_id':row.id}
-        meta.update(human_contact_request_id=row.id,human_contact_stage='recorded')
+        meta.update(human_contact_request_id=row.id,human_contact_stage='recorded',
+                    human_intervention_case_id=row.id,control_outcome='handoff',reason='HUMAN_REQUESTED')
         from .first_booking import stop_cadence
         stop_cadence(db,conversation,lead,outcome.state,'declined')
         # Cancel marketing/inactivity work, not meetings or appointment reminders.
@@ -94,7 +99,7 @@ def apply(db,scope,conversation,lead,outcome,inbound,step):
             if job.kind=='inactivity' or job.reason.endswith('_cadence'):job.status='cancelled'
         message=RECORDED
         if re.search(r'(?:^|[.!?;])\s*(?:no (?:other|more|further) questions|nothing else)\b',inbound.content,re.I):
-            message="I've saved your request to speak with the Sales team. Thank you for your interest and have a good day."
+            message=RECORDED
     conversation.continuity_json=value
     for task in outcome.state.tasks:
         if task.source_message_id==inbound.id and task.topic.value=='human':task.status='completed'

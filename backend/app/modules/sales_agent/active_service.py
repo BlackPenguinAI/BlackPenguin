@@ -475,8 +475,6 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
                 if next_enabled and protected in {None,'HUMAN_REQUESTED'}:
                     from .language_policy import credential_request
                     if credential_request(inbound.content):protected='SECURITY'
-                if previous_meta.get('control_confirmation')=='human' and live._affirmative_slot_reply(inbound.content):
-                    protected='HUMAN_REQUESTED'
                 if next_enabled and protected=='HUMAN_REQUESTED':
                     from app.modules.governance.services import request_attribution
                     import re
@@ -515,6 +513,11 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
                         state=state,previous_meta=previous_meta,expected_revision=revision,
                         event_key='active-understanding:'+inbound.id,action_holds=action_holds)
                         if next_enabled and not human_step and not hard_moderation else None)
+                    if interpreted is None and next_enabled and not human_step and not hard_moderation:
+                        from .live_visit_continuity import try_preview as contextual_visit_preview
+                        interpreted=contextual_visit_preview(db,scope,conversation,inbound,
+                            state=state,previous_meta=previous_meta,expected_revision=revision,
+                            event_key='active-understanding:'+inbound.id,action_holds=action_holds)
                     if interpreted is None:
                         interpreted=await asyncio.wait_for(preview(db,scope,inbound_message_id=inbound.id,expected_revision=revision,
                             event_key='active-understanding:'+inbound.id,active=True),timeout=45)
@@ -660,6 +663,10 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
                     from dataclasses import replace
                     draft=replace(draft,text=text)
                 metadata={'engine':ENGINE,'orchestrator':'graph-observe','coordinator_version':'sales-coordinator-graph/3.0','workflow_version':'sales-current/1.0','inbound_message_id':inbound.id,'selected_property_type_id':outcome.state.selected_property_type_id}
+                from .live_failure_continuity import explanation as failed_turn_explanation
+                previous_reply=latest_outbound(db,conversation.id,skip_language_holds=True)
+                recovery_text=failed_turn_explanation(inbound.content,previous_reply.content if previous_reply else None)
+                if recovery_text:metadata['previous_failure_explanation']=True
                 if next_enabled:metadata['selected_unit_id']=outcome.state.selected_unit_id
                 if human_fallback:metadata['human_contact_interpretation_fallback']=True
                 if moderation_decision:metadata['moderation']=moderation_decision
@@ -745,7 +752,7 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
                 if conversation.is_paused:
                     metadata['expected_pause_reason']=conversation.pause_reason
                     db.query(SalesFollowUpJob).filter(SalesFollowUpJob.conversation_id==conversation.id,SalesFollowUpJob.status.in_(['pending','processing'])).update({'status':'cancelled'},synchronize_session=False)
-                if safe_u.requests and all(r.topic.value=='other' for r in safe_u.requests) and not safe_u.requires_clarification and not protected and not exact_stop:
+                if safe_u.requests and all(r.topic.value=='other' for r in safe_u.requests) and not safe_u.requires_clarification and not protected and not exact_stop and not human_step:
                     text='How can I help: property options, materials, pricing, financing, or delivery timing?'
                 if (extra or links) and text=='I need clarification or verified information to answer this request.':
                     text=''
@@ -809,7 +816,7 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
                 if moderation_boundary:
                     from .moderation import WARNING,BOUNDARY,USE_WARNING
                     text=(USE_WARNING if moderation_decision['category']=='unauthorized_use' else WARNING) if moderation_decision['disposition']=='warn' else BOUNDARY
-                if next_enabled and not exact_stop and not protected and not moderation_boundary and not (human_step and pure_human) and not terminal_only:
+                if next_enabled and not exact_stop and not protected and not moderation_boundary and not (human_step and pure_human) and human_step!='record' and not recovery_text and not terminal_only:
                     from .commercial_composer import compose as compose_commercial
                     # Replace stacked catalog/material/qualification questions with
                     # one continuation authorized against the current results.
@@ -882,6 +889,8 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
                     if metadata.get('qualification_offer'):
                         from .lead_profile import qualification
                         qualification(lead,commercial['confirmed_project_facts'],record_asked=True)
+                if recovery_text and not protected and not human_step and not moderation_boundary:
+                    text=recovery_text
                 if draft.violations:
                     text+='\n\nSome information could not be verified; no unsupported facts have been added.'
                 if next_enabled:

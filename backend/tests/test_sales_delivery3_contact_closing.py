@@ -24,16 +24,18 @@ def test_request_once_offers_help_then_insistence_is_recorded_without_callback_p
     agent.infer.side_effect=AssertionError('Pure requests must not need inference')
     first='I want to speak to a human'
     agent.turn(first,understanding(first,'human'))
-    assert 'What would you like to ask?' in latest(agent).content
+    assert 'Do you still want to request a human review' in latest(agent).content
     assert not agent.conversation.is_paused and not agent.db.query(HumanInterventionCase).count()
     second='Please, I still want to speak to a human'
     inbound,run=agent.turn(second,understanding(second,'human'))
     case=agent.db.query(HumanInterventionCase).one()
-    assert case.reason=='HUMAN_CONTACT_REQUEST' and case.status=='open'
+    assert case.reason=='HUMAN_REQUESTED' and case.status=='open'
     assert case.company_id==agent.company.id and case.project_id==agent.project.id and case.lead_id==agent.lead.id
-    assert "saved your request" in latest(agent).content and 'another property question' in latest(agent).content
-    assert not agent.conversation.is_paused and agent.lead.agent_status!='human_control'
+    assert 'human-review request has been recorded' in latest(agent).content
+    assert agent.conversation.is_paused and agent.lead.agent_status=='human_control'
     assert not any(word in latest(agent).content.lower() for word in ['will contact','will call','within','transferred'])
+    from app.modules.governance.models import NotificationOutbox
+    assert agent.db.query(NotificationOutbox).filter_by(event_type='human_intervention').count()==1
     assert load(agent.db,agent.scope)[1].cadence_stop_reason=='declined'
     agent.retry(inbound)
     assert agent.db.query(HumanInterventionCase).count()==1
@@ -48,26 +50,31 @@ def test_undelivered_help_prompt_cannot_be_used_as_insistence(agent):
     row=latest(agent);row.status='delivery_failed';agent.db.commit()
     agent.turn(text,understanding(text,'human'))
     assert not agent.db.query(HumanInterventionCase).count()
-    assert 'What would you like to ask?' in latest(agent).content
+    assert 'Do you still want to request a human review' in latest(agent).content
 
 
 def test_contact_request_can_be_withdrawn_and_opt_out_still_wins(agent):
-    for text in ['I want to speak to a human','I still want to speak to a human']:
-        agent.turn(text,understanding(text,'human'))
+    first='I want to speak to a human'
+    agent.turn(first,understanding(first,'human'))
+    # Withdrawal before a confirmed handoff keeps AI active; no case exists.
     text="I no longer need a human"
     agent.turn(text,understanding(text,'other'))
-    assert agent.db.query(HumanInterventionCase).one().status=='cancelled'
+    assert not agent.db.query(HumanInterventionCase).count()
+    assert not agent.conversation.is_paused
     agent.turn('STOP',understanding('STOP','other'))
     assert agent.lead.is_opt_out and agent.conversation.is_paused
 
 
-def test_questions_after_saved_request_remain_answerable_without_restarting_cadence(agent,model):
-    for text in ['I want to speak to a human','I still want to speak to a human']:
-        agent.turn(text,understanding(text,'human'))
+def test_first_human_question_allows_financing_but_confirmed_review_pauses(agent,model):
+    first='I want to speak to a human'
+    agent.turn(first,understanding(first,'human'))
     agent.project.profile.profile_data={'payment_methods':['Bank financing']}
     agent.project.profile.field_states={'payment_methods':{'status':'confirmed'}};agent.db.commit()
     agent.turn('What financing options do you offer?',understanding('What financing options do you offer?','financing'))
     assert 'Bank financing' in latest(agent).content and not agent.conversation.is_paused
+    second='I still want to speak to a human'
+    agent.turn(second,understanding(second,'human'))
+    assert agent.conversation.is_paused
     assert agent.db.query(HumanInterventionCase).count()==1
     assert not agent.db.query(SalesFollowUpJob).filter_by(status='pending').count()
 
@@ -109,7 +116,7 @@ def test_human_request_survives_failed_interpretation_of_a_mixed_question(agent,
     text='I want to speak to a human. What is the price of the property?'
     _,run=agent.turn(text,understanding(text,'human','pricing'))
     assert run.error_code is None,run.output_snapshot
-    assert 'What would you like to ask?' in latest(agent).content
+    assert 'Do you still want to request a human review' in latest(agent).content
     assert not agent.conversation.is_paused
 
 
@@ -133,7 +140,7 @@ def test_first_request_does_not_reuse_another_company_contact_case(agent):
     agent.db.add(foreign);agent.db.commit()
     text='I want to speak to a human'
     agent.turn(text,understanding(text,'human'))
-    assert 'What would you like to ask?' in latest(agent).content
+    assert 'Do you still want to request a human review' in latest(agent).content
     agent.turn(text,understanding(text,'human'))
     own=agent.db.query(HumanInterventionCase).filter_by(company_id=agent.company.id).one()
     assert own.id!=foreign.id
@@ -147,11 +154,16 @@ def test_initial_negated_human_request_is_not_a_cancellation_receipt(agent,model
 
 
 
-def test_withdrawn_request_can_be_requested_again_without_reusing_cancelled_case(agent):
-    for text in ['I want to speak to a human','I still want to speak to a human','I no longer need a human','I want to speak to a human','I still want to speak to a human']:
+def test_withdrawn_unconfirmed_request_requires_fresh_explicit_confirmation(agent):
+    for text in ['I want to speak to a human','I no longer need a human','I want to speak to a human']:
         agent.turn(text,understanding(text,'human'))
+    assert not agent.db.query(HumanInterventionCase).count()
+    assert not agent.conversation.is_paused
+    last='I still want to speak to a human'
+    agent.turn(last,understanding(last,'human'))
     rows=agent.db.query(HumanInterventionCase).all()
-    assert len(rows)==2 and {r.status for r in rows}=={'open','cancelled'}
+    assert len(rows)==1 and rows[0].status=='open'
+    assert agent.conversation.is_paused
 
 
 def test_manual_pause_cannot_be_overridden_by_a_human_request(agent):

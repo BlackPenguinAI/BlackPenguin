@@ -535,10 +535,14 @@ async def compose(db, scope, *, inbound, outcome, draft, commercial, lead, metad
                 raise ValueError('No model credential is configured.')
             return await generate_llm_response(config.openrouter_api_key, model, prompts,
                 response_format={'type': 'json_schema', 'json_schema': {'name': 'sales_commercial_composition', 'strict': True, 'schema': contract}},
-                temperature=.2, timeout_seconds=8, max_tokens=2048, raise_on_error=True,
+                temperature=.2, timeout_seconds=12, max_tokens=2048, raise_on_error=True,
                 usage_context=LLMUsageContext(company_id=scope.company_id, project_id=scope.project_id, feature='sales_commercial_composition'))
+    # On a provider timeout, prefer no extra question where the backend has
+    # authorized it. Required facts and operation-specific one-choice prompts
+    # are still rendered; only optional follow-ups are suppressed.
+    fallback_continuation=next((c['id'] for c in choices if c['id']=='none'),choices[0]['id'])
     fallback = Composition.model_construct(version=VERSION, opening='direct',paragraphs=[],
-        blocks=[BlockChoice(evidence_id=b['id'], wording='natural') for b in blocks if b['required']], continuation_id=choices[0]['id'])
+        blocks=[BlockChoice(evidence_id=b['id'], wording='natural') for b in blocks if b['required']], continuation_id=fallback_continuation)
     chosen = fallback
     started = monotonic()
     # Total wall budget covers primary inference and one contract repair; no tools rerun.
@@ -546,13 +550,13 @@ async def compose(db, scope, *, inbound, outcome, draft, commercial, lead, metad
         if sum(len(m['content'].encode()) for m in messages) > 64000 or len(blocks) > 120:
             trace['stop_reason'] = 'context_limit'
             break
-        remaining = 10 - (monotonic() - started)
+        remaining = 14 - (monotonic() - started)
         if remaining <= 0:
             trace['stop_reason'] = 'time_limit'
             break
         raw = None
         try:
-            raw = await asyncio.wait_for(infer(guidance['model'], messages, schema), timeout=min(8, remaining))
+            raw = await asyncio.wait_for(infer(guidance['model'], messages, schema), timeout=min(12, remaining))
             if not isinstance(raw, str) or len(raw.encode()) > 16000:
                 raise CompositionViolation('response_size')
             chosen,normalizations = validate_ordered(Composition.model_validate_json(raw), blocks, choices)
