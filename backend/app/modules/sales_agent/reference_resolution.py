@@ -16,6 +16,22 @@ def normalized(value):
     return re.sub(r'\s+',' ',unicodedata.normalize('NFKC',value).casefold().replace('’',"'")).strip()
 
 
+def scoped_compound_property(expression, project_name, *, demo=False):
+    """Bind '<property> at <project>' only against this verified scoped project.
+
+    Synthetic laboratory projects may use the explicit SYNTHETIC prefix in
+    storage. It is never stripped for a real project or used across tenants.
+    This only returns a candidate label; the resolver still requires exactly
+    one matching approved property type.
+    """
+    left,sep,right=normalized(expression).rpartition(' at ')
+    if not sep or not left or not right:return None
+    name=normalized(project_name)
+    aliases={name}
+    if demo and name.startswith('synthetic '):aliases.add(name[len('synthetic '):])
+    return left if right in aliases else None
+
+
 def accepted(message):
     return message.role=='assistant' and (message.status in {'sent','delivered','read','accepted'} or
         message.status in {'queued','sending','scheduled'} and bool(message.provider_message_id))
@@ -85,6 +101,14 @@ class Resolver:
             label='unit_code' if kind=='unit' else 'property_type'
             names=[key for key,row in rows.items() if normalized(str(row[label]))==expression]
             if len(names)==1:return {'status':'resolved','value':self.bound(kind,names[0])}
+            if kind=='property':
+                project=self.db.get(Project,self.scope.project_id)
+                compound=scoped_compound_property(reference.expression,
+                    project.name if project else '',demo=bool(project and project.is_demo))
+                if compound:
+                    matched=[key for key,row in rows.items() if normalized(str(row[label]))==compound]
+                    if len(matched)==1:
+                        return {'status':'resolved','value':self.bound(kind,matched[0])}
             if expression in {'it','this one','that one','this property','that property','the property','this unit','that unit','the unit','the same one'}:
                 chosen=self.state.selected_unit_id if kind=='unit' else self.state.selected_property_type_id
                 value=self.bound(kind,chosen) if chosen else None

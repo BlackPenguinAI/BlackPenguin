@@ -36,6 +36,30 @@ def extra_checks(db,lead,row,index,scenario):
     if scenario=='mixed_human_price' and index==0:checks.append(check('mixed_price_answered','780,000.00 USD' in row['reply']))
     if scenario=='decline_visit_questions' and index==0:checks.append(check('decline_does_not_reinvite_visit','Would you like to review visit options' not in row['reply']))
     if scenario=='unavailable_then_close' and index==1:checks.append(check('unavailability_closure_invites_other_question','another property question' in row['reply']))
+    # External reply checks alone hid missing financing reads in P1-C v3.
+    # Verify actual read execution and no unfinished mandatory work.
+    trace=row.get('input_trace') or {}
+    loop=trace.get('observation_loop') or {}
+    understanding=row.get('understanding') or {}
+    if loop:
+        checks.append(check('no_internal_observation_failure',loop.get('status')!='FAIL'))
+    if 'What financing options do you offer?' in row['lead_message']:
+        finance_reads=[tool for tool in loop.get('tools',[]) if
+            (tool.get('arguments') or {}).get('topic')=='financing' and tool.get('status')=='success']
+        checks.extend([
+            check('financing_question_does_not_require_clarification',not understanding.get('requires_clarification')),
+            check('financing_observation_completes',loop.get('status')=='PASS'),
+            check('financing_was_read_from_approved_source',bool(finance_reads)),
+            check('financing_has_no_unread_required_tasks',not loop.get('unread_required_tasks')),
+            check('no_redundant_financing_clarification','Could you clarify whether' not in row['reply']),
+        ])
+    if scenario=='unavailable_then_close' and index==0:
+        metadata=(row.get('output') or {}).get('metadata') or {}
+        checks.extend([
+            check('scoped_visit_does_not_require_reference_clarification',not metadata.get('reference_question')),
+            check('scoped_visit_search_completes',loop.get('status')=='PASS'),
+            check('scoped_visit_availability_was_checked',any(o.get('operation_id')=='visit_availability' for o in loop.get('observations',[]))),
+        ])
     return checks
 
 

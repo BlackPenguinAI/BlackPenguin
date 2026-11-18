@@ -595,6 +595,13 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
                     run.input_snapshot={**run.input_snapshot,'dialogue_read_authorization':{
                         'basis':'literal_scoped_mixed_human_price',
                         'model_confidence':u.confidence,'effect_authorization':False}}
+                from .financing_read import verified_financing_policy_read
+                financing_read=bool(next_enabled and not protected and not exact_stop and
+                    verified_financing_policy_read(u,inbound.content,holds=action_holds))
+                if financing_read:
+                    run.input_snapshot={**run.input_snapshot,'dialogue_read_authorization':{
+                        'basis':'literal_independent_financing_policy_question',
+                        'model_confidence':u.confidence,'effect_authorization':False}}
                 greeting_read=bool(next_enabled and literal_greeting(u,inbound.content))
                 if greeting_read:
                     run.input_snapshot={**run.input_snapshot,'dialogue_read_authorization':{'basis':'literal_greeting_no_actions','model_confidence':u.confidence,'effect_authorization':False}}
@@ -605,14 +612,14 @@ async def maybe_process_active(db,conversation,inbound,*,event_id_override=None)
                     run.input_snapshot={**run.input_snapshot,'dialogue_read_authorization':{'basis':'explicit_scoped_comparison','model_confidence':u.confidence,'effect_authorization':False}}
                 if choice_read:
                     run.input_snapshot={**run.input_snapshot,'dialogue_read_authorization':{'basis':'current_named_catalog_choice' if named_read else 'current_numbered_catalog_choice','model_confidence':u.confidence,'effect_authorization':False}}
-                if material_read or pricing_read or contextual_needs_read or choice_read or compare_read or greeting_read:u=u.model_copy(update={'requires_clarification':False,'clarification_question':None})
+                if material_read or pricing_read or financing_read or contextual_needs_read or choice_read or compare_read or greeting_read:u=u.model_copy(update={'requires_clarification':False,'clarification_question':None})
                 if literal_needs_read or contextual_needs_read:
                     run.input_snapshot={**run.input_snapshot,'needs_read_authorization':{'version':NEEDS_VERSION,'basis':'accepted_current_unknown_listing_offer' if contextual_needs_read else 'validated_current_literal_catalog_request','model_confidence':u.confidence,'effect_authorization':False}}
                 from .first_booking import contextual_confirmation_ready
                 confirmation_ready=bool(next_enabled and contextual_confirmation_ready(db,scope,u,inbound.content))
                 if confirmation_ready:
                     run.input_snapshot={**run.input_snapshot,'booking_confirmation_authorization':{'basis':'current_complete_accepted_backend_summary','model_confidence':u.confidence,'effect_authorization':False,'transaction_revalidation_required':True}}
-                if u.confidence < .8 and not u.requires_clarification and not (literal_needs_read or contextual_needs_read or choice_read or compare_read or greeting_read or material_read or pricing_read or confirmation_ready):
+                if u.confidence < .8 and not u.requires_clarification and not (literal_needs_read or contextual_needs_read or choice_read or compare_read or greeting_read or material_read or pricing_read or financing_read or confirmation_ready):
                     visit_question=focused_visit_question(u,inbound.content,commercial) if next_enabled else None
                     focused=visit_question or (focused_material_question(u,inbound.content,state,commercial) if next_enabled else None)
                     u=u.model_copy(update={'requires_clarification':True,'clarification_question':focused or 'Could you clarify whether you want property details, materials, financing, or a visit?'})
