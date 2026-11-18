@@ -30,7 +30,7 @@ def decision(text, metadata, offered_ids, names, displayed_text):
         match = re.fullmatch(
             r"\s*(?:(?:the|la|el)\s+)?(?:(?:option|opci[oó]n)\s+)?"
             r"(first|second|third|fourth|fifth|1st|2nd|3rd|4th|5th)"
-            r"(?:\s+(?:option|opci[oó]n))?"
+            r"(?:\s+(?:option|opci[oó]n|one))?"
             r"(?:\s+(?:of|from)\s+(?:the|that)\s+(?:list|options))?[.!]?\s*",
             text, re.I)
         words = {'first':0, 'second':1, 'third':2, 'fourth':3,
@@ -59,7 +59,7 @@ def decision(text, metadata, offered_ids, names, displayed_text):
     for number, identifier in enumerate(ids, 1):
         label = names[identifier]
         # A visible entry can contain bedrooms/prices after the exact label.
-        if not re.match(r'^' + re.escape(label) + r'(?=$|[\s,;:–—-])',
+        if not re.match(r'^' + re.escape(label) + r'(?=$|[\s,;:–—.()-])',
                         numbered[number], re.I):
             return ('clarify', None)
     return ('select', ids[idx])

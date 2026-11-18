@@ -22,6 +22,22 @@ def test_second_option_is_cleveland_from_the_last_visible_catalog():
     assert decision('Fourth option',META,IDS,NAMES,VISIBLE)==('select',IDS[3])
 
 
+
+def test_punctuated_legacy_catalog_survives_language_hold():
+    # A language-hold response must not replace the last accepted catalog.
+    # Older naturalized rows can end with a full stop: '2. Loft.'.
+    old_ids=['property-studio','property-loft']
+    old_names=dict(zip(old_ids, ('Studio','Loft')))
+    old_meta={'property_catalog_offer':{'property_type_ids':old_ids}}
+    rendered=('Here are the property options I can confirm:\n\n'
+              '1. Studio.\n\n2. Loft.\n\n'
+              'Which property option would you like to explore?')
+    assert decision('2',old_meta,old_ids,old_names,rendered)==('select',old_ids[1])
+    assert decision('the second one',old_meta,old_ids,old_names,rendered)==('select',old_ids[1])
+    assert decision('2',old_meta,old_ids,old_names,rendered.replace('2. Loft.', '2. Studio.'))==('clarify',None)
+    assert decision('Second option',old_meta,old_ids,old_names,rendered.replace('2. Loft.', '2. Unapproved.'))==('clarify',None)
+
+
 def test_ordinal_does_not_bind_unknown_or_reordered_catalog():
     assert decision('Second option',META,IDS,NAMES,VISIBLE.replace('2. Cleveland','2. Madison'))==('clarify',None)
     assert decision('Second option',META,list(reversed(IDS)),NAMES,VISIBLE)==('clarify',None)
