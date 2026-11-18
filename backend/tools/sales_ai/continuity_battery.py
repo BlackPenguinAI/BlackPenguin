@@ -91,7 +91,9 @@ async def evaluate_case(db,manifest,key,budget,max_turns):
         db.commit()
     rows=[];latest_meta={};selected=False;confirmed=False;stop='turn_limit';expected_start=None
     try:
-        for i in range(max_turns):
+        # P3-B adds one deliberate day choice to a previously bounded visit
+        # journey. Keep the original budget for business turns plus that step.
+        for i in range(max_turns+1):
             if budget.calls>=budget.maximum:stop='call_budget';break
             if i<len(initial):action,message=initial[i]
             elif confirmed and post_index<len(post):
@@ -106,6 +108,20 @@ async def evaluate_case(db,manifest,key,budget,max_turns):
                 action,message='visit_search_accepted',f"Yes, please check available visit times for {prop['name']}."
             elif latest_meta.get('booking_confirmation'):
                 action,message='confirm','Yes';confirmed=True
+            elif latest_meta.get('visit_day_offer'):
+                # Follow only the dates actually printed to the synthetic buyer.
+                # Do not use private availability fixtures as a buyer oracle.
+                import re
+                offered=latest_meta['visit_day_offer']
+                visible=re.findall(
+                    r'^\s*([1-3])\.\s*([A-Za-z]+, [A-Za-z]+ \d{1,2})\s*$',
+                    rows[-1]['reply'], re.M)
+                if len(visible)!=len(offered['days']) or any(
+                    int(index)!=position or label!=offered['days'][position-1]['label']
+                    for position,(index,label) in enumerate(visible,1)):
+                    stop='day_offer_receipt_mismatch';break
+                day_index=2 if spec.get('ordinal') and len(visible)>=3 else 0
+                action,message='select_day',visible[day_index][1]
             elif latest_meta.get('appointment_offer'):
                 offer=latest_meta['appointment_offer'];option=offer['options'][2 if spec.get('ordinal') and len(offer['options'])>=3 else 0];expected_start=option['starts_at']
                 local=datetime.fromisoformat(expected_start).astimezone(ZoneInfo(offer['preferences']['timezone']))
@@ -130,7 +146,7 @@ async def evaluate_case(db,manifest,key,budget,max_turns):
             reply='\n\n'.join(m.content for m in db.query(SalesMessage).filter(SalesMessage.conversation_id==conversation.id,SalesMessage.direction=='outbound',~SalesMessage.id.in_(before)).order_by(SalesMessage.created_at,SalesMessage.id))
             revision,state=load(db,Scope(lead.company_id,lead.project_id,conversation.id,lead.id));meetings=db.query(Meeting).filter_by(lead_id=lead.id).all()
             checks=[check('turn_completed',not run.error_code),check('reply_present',bool(reply)),check('english_reply_not_rejected',not meta.get('language_hold')),check('no_internal_narration',not internal_process_narration(reply) and 'in this query' not in reply.lower() and 'approved, accessible' not in reply.lower() and not any(marker in reply.lower() for marker in ('synthetic property for testing','only the listed features are confirmed','isolated sales-agent evaluation'))),check('no_booking_before_selection_and_final_confirmation',not meetings or selected and confirmed)]
-            if action in {'choose','compare','switch','material','visit','select','confirm','material_repeat','accept_material','visit_clarified','visit_search_accepted'}:
+            if action in {'choose','compare','switch','material','visit','select_day','select','confirm','material_repeat','accept_material','visit_clarified','visit_search_accepted'}:
                 expected_property=first['id'] if action in {'choose','compare'} else prop['id']
                 checks.append(check('active_property_retained',state.selected_property_type_id==expected_property))
             if action=='choose':
@@ -164,9 +180,12 @@ async def evaluate_case(db,manifest,key,budget,max_turns):
                 search_question=bool((run.input_snapshot or {}).get('focused_visit_clarification') and
                     reply.startswith('Would you like me to check available visit times for ') and reply.rstrip().endswith('?') and
                     not meta.get('appointment_offer') and not meta.get('meeting_id') and not meetings)
-                checks.append(check('visit_reaches_options_or_unavailability',bool(meta.get('appointment_offer')) or explains_unavailability(reply) or focused_clarification or search_question))
+                checks.append(check('visit_reaches_options_or_unavailability',bool(meta.get('visit_day_offer')) or bool(meta.get('appointment_offer')) or explains_unavailability(reply) or focused_clarification or search_question))
                 if (run.input_snapshot or {}).get('focused_visit_clarification'):
                     checks.append(check('focused_search_question_has_no_effects',search_question))
+            if action=='select_day':
+                checks.append(check('day_selection_is_read_only',not meetings and not meta.get('booking_confirmation')))
+                checks.append(check('selected_day_returns_verified_times',bool(meta.get('appointment_offer')) or explains_unavailability(reply)))
             if action=='select':checks.append(check('selection_prepares_summary',bool(meta.get('booking_confirmation')) and not meetings))
             if action=='confirm':checks.append(check('confirmation_books_current_summary',len(meetings)==1 and bool(meta.get('meeting_id'))))
             from app.modules.sales_agent.dialogue_models import SalesDialogueEvent

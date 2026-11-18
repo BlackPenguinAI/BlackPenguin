@@ -94,6 +94,11 @@ def reconcile(db,scope,state,metadata):
     if metadata.get('cancellation_operation_id'):close_for_lead(db,scope,'appointment_cancelled');return
     for row in db.query(SalesWaitRequest).filter_by(company_id=scope.company_id,conversation_id=scope.conversation_id).filter(SalesWaitRequest.status.in_(list(OPEN))).all():
         if row.snapshot_json['interest']!=interest(state):close(row,'interest_changed')
+        elif any(metadata.get(key) for key in ('visit_day_offer','appointment_offer','booking_confirmation')):
+            # Browsing verified days/times for a separate visit is not a request
+            # to replace or cancel the previously consented availability alert.
+            # The alert is closed as 'booked' only after a meeting is committed.
+            continue
         elif not search_matches(row.snapshot_json,state):close(row,'preferences_changed')
 
 

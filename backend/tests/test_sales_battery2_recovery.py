@@ -63,7 +63,10 @@ def test_battery2_failed_cases_complete_without_retrying_the_lead(lab,scenario):
     assert not [(t['action'],t.get('reply'),c) for t in result['turns'] for c in t['checks'] if c['status']=='FAIL']
     assert not [c for c in result['checks'] if c['status']=='FAIL'], [(t['action'],t['reply']) for t in result['turns']]
     assert len(result['meetings'])==int(scenario.endswith('_A'))
-    if scenario=='move_up_A':assert len(result['turns'])==5
+    if scenario=='move_up_A':
+        assert len(result['turns'])==6  # P3-B adds one verified day choice.
+        assert sum(row['action']=='select_day' for row in result['turns'])==1
+        assert result['turns'][-1]['action']=='confirm'
     if scenario=='downsizing_B':
         row=next(t for t in result['turns'] if t['action']=='missing_material')
         assert len(row['interpretation_attempts'])==1

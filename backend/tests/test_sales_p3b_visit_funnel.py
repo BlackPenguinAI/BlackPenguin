@@ -150,6 +150,23 @@ def test_scripted_buyers_select_day_from_outbound_text_not_hidden_offer():
     assert public_next(reply,[],'Cleveland',2)[1] == 'clarify_visit'
 
 
+def test_continuity_buyer_chooses_only_delivered_day_and_not_booking_consent():
+    from tools.sales_ai.booking_pilot import next_message
+    from tools.sales_ai.compact_battery import public_next
+    reply = ('For Cleveland, I found visit availability on these days '
+             '(Denver local time):\n\n'
+             '1. Friday, November 20\n2. Saturday, November 21\n\n'
+             'Which day works best for your visit to Cleveland?')
+    assert next_message(reply,[]) == ('1','select_day')
+    assert public_next(reply,[],'Cleveland') == ('1','select_day')
+    assert funnel.choose('Friday, November 20',{
+        'version':funnel.VERSION,
+        'days':funnel.day_labels(['2026-11-20','2026-11-21']),
+        'property_type_id':'cleveland','timezone':'America/Denver',
+        'expires_at':'2026-11-21T00:00:00+00:00'},'cleveland',
+        now=datetime(2026,11,18,12,0,tzinfo=timezone.utc)) == '2026-11-20'
+
+
 import pytest
 
 
@@ -198,7 +215,7 @@ def test_first_booking_funnels_only_when_multiple_verified_days(
                  'sales_user_id':'seller','specialist_name':'Verified Specialist'}]
     monkeypatch.setattr(first_booking,'search_slots',search)
     reply,meta,actions=first_booking.handle(
-        NS(),scope,NS(),NS(),project,outcome,NS(id='in',content=text))
+        NS(),scope,NS(channel='simulation'),NS(),project,outcome,NS(id='in',content=text))
     assert expected_kind in meta
     assert 'Cleveland' in reply
     assert not any(a.get('type')=='appointment_confirmed' for a in actions)

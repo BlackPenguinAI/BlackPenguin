@@ -72,7 +72,9 @@ def test_repair6_recorded_dialogues_do_not_replay_history_or_recompose_receipts(
         assert final['output']['metadata']['composition']['status']=='backend_rendered'
         assert final['output']['metadata']['composition']['attempts']==[]
     if scenario=='first_time_A':
-        assert len(result['turns'])==5  # request advances immediately, no repeated lead turn
+        assert len(result['turns'])==6  # P3-B: one delivered day choice, then real hours.
+        assert sum(t['action']=='select_day' for t in result['turns'])==1
+        assert result['turns'][-1]['action']=='confirm'
         visit=next(t for t in result['turns'] if t['action']=='request_visit')
         assert len(visit['interpretation_attempts'])==1
         assert len([n for n in visit['interpretation_attempts'][0]['normalizations'] if n['action']=='omit_verified_historical_request'])==2

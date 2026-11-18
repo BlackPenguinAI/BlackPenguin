@@ -52,13 +52,18 @@ def test_server_frames_pass_continuity_and_booking_checks(lab,scenario,tmp_path)
         metadata=event.payload_json['metadata']
         snapshot=metadata['prompt_snapshot']
         if metadata.get('inference_mode')=='deterministic':
-            # This is a verified delivered booking acceptance, not an LLM turn.
-            # Do not invent a wire-system prompt that was never sent.
+            # Only the exact scoped receipt types skip a model request.
+            # A day choice searches availability; it NEVER authorizes booking.
             from app.modules.sales_agent.booking_fastpath import VERSION as BOOKING_VERSION
-            assert metadata['model']=='deterministic-booking-acceptance'
-            assert metadata['input_contract']==BOOKING_VERSION
-            assert snapshot=={'version':BOOKING_VERSION,'model_invoked':False,'system':None}
+            from app.modules.sales_agent.visit_day_funnel import VERSION as DAY_VERSION
+            contracts={'deterministic-booking-acceptance':BOOKING_VERSION,
+                       'deterministic-visit-day':DAY_VERSION}
+            assert metadata['model'] in contracts
+            expected=contracts[metadata['model']]
+            assert metadata['input_contract']==expected
+            assert snapshot=={'version':expected,'model_invoked':False,'system':None}
             assert metadata['interpretation_attempts']==[]
+            if expected==DAY_VERSION:assert metadata['effect_authorization'] is False
         else:
             assert snapshot['input_system_version']==SYSTEM_VERSION
     bad=[(t['action'],t['reply'],c) for t in r['turns'] for c in t['checks'] if c['status']!='PASS']+[c for c in r['checks'] if c['status']!='PASS']
