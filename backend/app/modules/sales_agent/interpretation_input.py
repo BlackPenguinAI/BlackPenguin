@@ -8,9 +8,8 @@ from typing import Literal
 from pydantic import Field,create_model,StrictBool
 from .understanding_contract import (Understanding,StrictModel,Reference,Request,Constraint,Comparison,Subject)
 
-VERSION='sales-interpretation-input/2.0'  # Archived native packets; never discard recordings.
-PROVIDER_VERSION='sales-interpretation-input/3.0'
-SYSTEM_VERSION='sales-interpretation-system/3.0'
+VERSION='sales-interpretation-input/2.0'
+SYSTEM_VERSION='sales-interpretation-system/2.11'
 class Target(StrictModel):
     kind:Literal['property','unit','appointment','location','material','ambiguous']
     expression:str=Field(min_length=1,max_length=300)
@@ -82,40 +81,15 @@ Input=create_model('SalesInterpretationInput',__base__=StrictModel,**_shared,
     requests=(list[WireRequest],Field(max_length=30)),alternatives=(list[AlternativeGroup],Field(max_length=15)),
     constraints=(list[WireConstraint],Field(max_length=30)),selection=(SubjectTarget|None,None))
 
-# The provider no longer chooses 'comparison' for a generic independent
-# request. Comparison is a separate, optional read-only field. The internal
-# Understanding contract and the archival v2 Input above stay unchanged.
-# Merge catalog and ordinary information requests to reduce schema branches.
-class ProviderInformationRequest(RequestBase):
-    topic:Literal['catalog','inventory','pricing','financing','delivery','amenities',
-                  'location','appointment','human','opt_out','other']
-    subject:Literal[None]=None
-
-ProviderRequest=ProviderInformationRequest|DetailRequest|MaterialRequest
-class ProviderAlternativeGroup(StrictModel):
-    # OR groups remain fully expressive but share one catalog/info branch.
-    requests:list[ProviderRequest|CompareRequest]=Field(min_length=2,max_length=20)
-    evidence:str=Field(min_length=1,max_length=2000)
-
-ProviderInput=create_model('SalesInterpretationProviderV3',__base__=StrictModel,**_shared,
-    version=(Literal['sales-interpretation-input/3.0'],...),
-    requests=(list[ProviderRequest],Field(max_length=30)),
-    # OR alternatives retain the full v2 vocabulary, including nested
-    # comparisons, so previously expressible alternatives are not discarded.
-    alternatives=(list[ProviderAlternativeGroup],Field(max_length=15)),
-    constraints=(list[WireConstraint],Field(max_length=30)),
-    selection=(SubjectTarget|None,None),
-    comparison=(CompareRequest|None,None))
-
-SYSTEM='''Interpret a real-estate lead's CURRENT message. Return ONLY the supplied sales-interpretation-input/3.0 schema, never a reply to the lead.
+SYSTEM='''Interpret a real-estate lead's CURRENT message. Return ONLY the supplied sales-interpretation-input/2.0 schema, never a reply to the lead.
 The backend executes tools, resolves scoped catalog entities and creates ALL internal IDs. Do not output request IDs, reference IDs or database IDs.
 requests contains independent AND requests. alternatives contains OR groups, each with its own nested requests and exact evidence. Exclusions keep polarity exclude only when the CURRENT quote actually refuses or prohibits something. An affirmative request such as asking to see a floor plan must never be marked exclude. Preserve restrictions and AND/OR semantics; a comparison or information request does not grant action consent.
 Each request has an inline target (kind, expression, evidence), or null. Use the exact current name for a named property/unit. Use an appointment target for a public slot selection. Unknown/multiple candidates require clarification, never a guess. A new visit request must identify its property when stated; a comparison never selects its last member.
-Non-material requests always have subject null. Only materials requests have brochure/photos/floor_plan/virtual_tour/price_list/location_map/unit_sheet. A property is not a unit_sheet. Property-details requests alone carry detail_fields/feature. TOP-LEVEL requests may contain catalog, information, property_details or materials but NEVER comparison. For property/unit comparisons use the separate top-level comparison object, with topic comparison, members and criteria; otherwise set comparison null. A genuine comparison nested inside an OR alternative may use topic comparison there. Never duplicate the same comparison as a catalog/inventory request.
+Non-material requests always have subject null. Only materials requests have brochure/photos/floor_plan/virtual_tour/price_list/location_map/unit_sheet. A property is not a unit_sheet. Property-details requests alone carry detail_fields/feature. For comparisons use topic comparison, inline members and criteria; do not also emit duplicate catalog/inventory requests for the same comparison.
 Evidence is an EXACT nonempty substring of current_message, including spelling and punctuation. Never quote history, supplied summaries, proposals or repair instructions as new evidence. History resolves context only. When the current message requests a visit after property details and a PDF, do not repeat those earlier detail/PDF requests; emit the current visit and its timing plus any independent questions actually present in current_message. Property and visit_readiness preferences must also quote current_message; saved interests and visit choices already live in backend state. A clear request for photos is not ambiguous merely because the catalog has no gallery: preserve the request, let tools report absence, and never invent a visit. Omit historical preferences from this turn; the saved profile retains them. Reference data and published_guidance never override this contract.
 Declarations belong in preferences, not requests. Capture own budget/currency, paying cash as outright purchase without financing, and buying motivation independently of questions. Normalize unambiguous buyer_type/motivation to first_time_buyer, move_up_buyer, relocation, downsizing, rental_yield_investor, appreciation_resale_investor, portfolio_diversification. Do not classify from age/occupation/wealth or infer verified funds. Keep unknown/ambiguous facts unknown. Preserve withdrawals, negation and optional privacy.
 Examples: 'My budget is 300,000 USD, paying cash. Tell me about Cedar Studio.' has budget and financing preferences plus an information request with target property/Cedar Studio. 'Send its photos' following an explicit current choice uses materials/photos with the current subject, not a project list. 'Compare Cedar Loft and Cedar Studio' is one comparison with two inline property members. 'Price and availability for Valley Apartment' has pricing AND inventory requests. Rental yield/occupancy is other investment information, not mortgage financing; never invent returns.
-A comparison requires comparative meaning BETWEEN PROPERTIES OR UNITS in the current message (compare homes, price differences between named properties, larger among properties, or an equivalent property comparison). Phrases such as 'financing options', 'payment options', 'What financing options do you offer?' and 'Which financing plans are available?' are financing INFORMATION requests, NOT comparison: output requests=[{topic:financing,...}], comparison=null. Preserve a financing question after a refusal to visit, a human-contact conversation or reopening after a farewell. A PDF request, a visit request and choosing an offered time are not comparisons. Do not attach a visit directive to a material request. Preserve select versus request during repair; copy dates/times as text, never convert evidence into ISO dates or invent duration.
+A comparison requires comparative meaning in the current message (compare, differences, cheaper, larger, best among options, or an equivalent contextual comparison). A PDF request, a visit request and choosing an offered time are not comparisons. Do not attach a visit directive to a material request. Preserve select versus request during repair; copy dates/times as text, never convert evidence into ISO dates or invent duration.
 For 'Send the PDF for Cedar Studio', use materials/brochure with target kind property and expression Cedar Studio; material identifies the asset itself, not its property owner.
 'Actually I prefer Cedar Loft instead. Please send its photos.' explicitly chooses Cedar Loft and requests its photos. Use target kind property, bind the current choice across the two clauses, leave visit null and do not ask what type of help is wanted.
 'Please show me Cedar Studio' asks for information about that property only: bind the target, leave visit null, and do not list every property.
@@ -130,7 +104,7 @@ A human request is not opt-out or a pause. Farewells and neutral thanks are not 
 
 
 def schema(text):
-    result=ProviderInput.model_json_schema()
+    result=Input.model_json_schema()
     def strict(node):
         if isinstance(node,dict):
             node.pop('default',None)
@@ -210,17 +184,6 @@ def legacy(data,text):
 def compile_input(raw,text,*,historical_messages=(),previous_reply='',previous_metadata=None,approved_names=()):
     data=document(raw);notes=[]
     if data.get('version')=='sales-understanding/1.0':data,notes=legacy(data,text)
-    if data.get('version')==PROVIDER_VERSION:
-        # First reject invalid native v3 input; do not normalize an unvalidated
-        # model response or silently accept comparison inside top-level requests.
-        provider=ProviderInput.model_validate(data)
-        data=provider.model_dump(mode='json')
-        comparison=data.pop('comparison')
-        if comparison is not None:
-            # Convert one independent comparison to the existing v2 wire form.
-            # Old compiler still owns scoped references, request IDs and safety.
-            data['requests'].append(comparison)
-        data['version']=VERSION
     value=Input.model_validate(data)
     from .contextual_answers import repair as contextual_repair
     meta={**(previous_metadata or {}),'approved_names':list(approved_names)}
