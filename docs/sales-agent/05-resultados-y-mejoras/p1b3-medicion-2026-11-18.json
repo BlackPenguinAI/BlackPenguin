@@ -1,0 +1,292 @@
+{
+  "measurement": "P1-B.3 vs P1-B.2, 20 scripted scenarios across three suites",
+  "date_utc": "2026-11-18",
+  "base_commit": "150cd898056d44b8de3901f7a2699d878278a571",
+  "experiment_commit": "2e44ca663f0a02ff487e5f001f4ee52c318cbf2f",
+  "config_sha256": "51ff65376dad421328dab993a4fc71939489386f1ed173514cf13a244ac79f1c",
+  "model": "openai/gpt-4o-mini",
+  "p1b2_totals": {
+    "provider_calls": 167,
+    "prompt_tokens": 1124925,
+    "completion_tokens": 17324,
+    "cost_usd": 0.14184675,
+    "turns": 75,
+    "observation_decisions_saved": 16
+  },
+  "p1b3_totals": {
+    "provider_calls": 172,
+    "prompt_tokens": 1150856,
+    "completion_tokens": 18778,
+    "cost_usd": 0.144756,
+    "turns": 75,
+    "observation_decisions_saved": 17
+  },
+  "totals_delta": {
+    "provider_calls": 5,
+    "prompt_tokens": 25931,
+    "completion_tokens": 1454,
+    "cost_usd": 0.00290925,
+    "prompt_tokens_pct": 2.3051,
+    "cost_usd_pct": 2.051
+  },
+  "p1b3_projection": {
+    "turns": 57,
+    "saved_bytes": 71454,
+    "before_bytes": 1408999,
+    "after_bytes": 1337545,
+    "reduction_pct_of_projected_input_bytes": 5.0713
+  },
+  "quality": {
+    "PASS": 1009,
+    "FAIL": 0,
+    "BLOCKED": 3,
+    "not_integral_dialogue_assessment": true
+  },
+  "source_runs": {
+    "p1b2_observation": {
+      "suite": "sales-observation-battery/2.0",
+      "commit": "150cd898056d44b8de3901f7a2699d878278a571",
+      "status": "PASS",
+      "scenario_count": 6,
+      "turns": 35,
+      "checks": {
+        "PASS": 360,
+        "FAIL": 0,
+        "BLOCKED": 0
+      },
+      "provider_calls": 107,
+      "prompt_tokens": 712751,
+      "completion_tokens": 10063,
+      "cost_usd": 0.09021765,
+      "responses_with_cost": 107,
+      "observation_decisions_saved": 13,
+      "interpretation_attempts": 37,
+      "observation_decisions": 40,
+      "composition_projection": {
+        "turns": 0,
+        "saved_bytes": 0,
+        "before_bytes": 0,
+        "after_bytes": 0
+      },
+      "invalid_interpretation_retried": [],
+      "synthetic_only": true,
+      "production_database_writes": 0,
+      "lead_contacts": 0,
+      "sales_model": "openai/gpt-4o-mini",
+      "configuration_sha256": "51ff65376dad421328dab993a4fc71939489386f1ed173514cf13a244ac79f1c",
+      "source_zip_sha256": "d1d2c8ea68e8e95a5d0fe7d6b6438c7f8a0e9e278cc859819919a7de0b1463b6"
+    },
+    "p1b2_closing": {
+      "suite": "sales-closing-point/1.0",
+      "commit": "150cd898056d44b8de3901f7a2699d878278a571",
+      "status": "PASS",
+      "scenario_count": 8,
+      "turns": 25,
+      "checks": {
+        "PASS": 404,
+        "FAIL": 0,
+        "BLOCKED": 0
+      },
+      "provider_calls": 21,
+      "prompt_tokens": 130890,
+      "completion_tokens": 1910,
+      "cost_usd": 0.0163347,
+      "responses_with_cost": 21,
+      "observation_decisions_saved": 3,
+      "interpretation_attempts": 7,
+      "observation_decisions": 7,
+      "composition_projection": {
+        "turns": 0,
+        "saved_bytes": 0,
+        "before_bytes": 0,
+        "after_bytes": 0
+      },
+      "invalid_interpretation_retried": [],
+      "synthetic_only": true,
+      "production_database_writes": 0,
+      "lead_contacts": 0,
+      "sales_model": "openai/gpt-4o-mini",
+      "configuration_sha256": "51ff65376dad421328dab993a4fc71939489386f1ed173514cf13a244ac79f1c",
+      "source_zip_sha256": "140fb3328fa4d1d9af9984bf030ef3eb213401b94df27a3c7789a840388c5c98"
+    },
+    "p1b2_booking": {
+      "suite": "sales-booking-point/1.0",
+      "commit": "150cd898056d44b8de3901f7a2699d878278a571",
+      "status": "INCOMPLETE",
+      "scenario_count": 6,
+      "turns": 15,
+      "checks": {
+        "PASS": 245,
+        "FAIL": 0,
+        "BLOCKED": 3
+      },
+      "provider_calls": 39,
+      "prompt_tokens": 281284,
+      "completion_tokens": 5351,
+      "cost_usd": 0.0352944,
+      "responses_with_cost": 39,
+      "observation_decisions_saved": 0,
+      "interpretation_attempts": 15,
+      "observation_decisions": 12,
+      "composition_projection": {
+        "turns": 0,
+        "saved_bytes": 0,
+        "before_bytes": 0,
+        "after_bytes": 0
+      },
+      "invalid_interpretation_retried": [],
+      "synthetic_only": true,
+      "production_database_writes": 0,
+      "lead_contacts": 0,
+      "sales_model": "openai/gpt-4o-mini",
+      "configuration_sha256": "51ff65376dad421328dab993a4fc71939489386f1ed173514cf13a244ac79f1c",
+      "source_zip_sha256": "2f165c46306c286855423e2bd35af314743f0d5e0e11d85cfc9239ce08c18bbf"
+    },
+    "p1b3_observation": {
+      "suite": "sales-observation-battery/2.0",
+      "commit": "2e44ca663f0a02ff487e5f001f4ee52c318cbf2f",
+      "status": "PASS",
+      "scenario_count": 6,
+      "turns": 35,
+      "checks": {
+        "PASS": 360,
+        "FAIL": 0,
+        "BLOCKED": 0
+      },
+      "provider_calls": 107,
+      "prompt_tokens": 696782,
+      "completion_tokens": 10393,
+      "cost_usd": 0.0878667,
+      "responses_with_cost": 107,
+      "observation_decisions_saved": 13,
+      "interpretation_attempts": 37,
+      "observation_decisions": 40,
+      "composition_projection": {
+        "turns": 35,
+        "saved_bytes": 53224,
+        "before_bytes": 886082,
+        "after_bytes": 832858
+      },
+      "invalid_interpretation_retried": [],
+      "synthetic_only": true,
+      "production_database_writes": 0,
+      "lead_contacts": 0,
+      "sales_model": "openai/gpt-4o-mini",
+      "configuration_sha256": "51ff65376dad421328dab993a4fc71939489386f1ed173514cf13a244ac79f1c",
+      "source_zip_sha256": "74a6c05f97f19c4a95c72a0523ebb6844816bd2ac6d7be44304d57a4dc48c068"
+    },
+    "p1b3_closing": {
+      "suite": "sales-closing-point/1.0",
+      "commit": "2e44ca663f0a02ff487e5f001f4ee52c318cbf2f",
+      "status": "PASS",
+      "scenario_count": 8,
+      "turns": 25,
+      "checks": {
+        "PASS": 404,
+        "FAIL": 0,
+        "BLOCKED": 0
+      },
+      "provider_calls": 26,
+      "prompt_tokens": 176889,
+      "completion_tokens": 2671,
+      "cost_usd": 0.02213595,
+      "responses_with_cost": 26,
+      "observation_decisions_saved": 4,
+      "interpretation_attempts": 11,
+      "observation_decisions": 8,
+      "composition_projection": {
+        "turns": 7,
+        "saved_bytes": 5532,
+        "before_bytes": 158086,
+        "after_bytes": 152554
+      },
+      "invalid_interpretation_retried": [
+        {
+          "case": "decline_visit_questions",
+          "turn": 1,
+          "attempts": 2,
+          "error_codes": [
+            "understanding_validation_failed"
+          ]
+        },
+        {
+          "case": "human_then_question",
+          "turn": 2,
+          "attempts": 2,
+          "error_codes": [
+            "understanding_validation_failed"
+          ]
+        },
+        {
+          "case": "human_record_then_question",
+          "turn": 3,
+          "attempts": 2,
+          "error_codes": [
+            "understanding_validation_failed"
+          ]
+        },
+        {
+          "case": "farewell_then_reopen",
+          "turn": 2,
+          "attempts": 2,
+          "error_codes": [
+            "understanding_validation_failed"
+          ]
+        }
+      ],
+      "synthetic_only": true,
+      "production_database_writes": 0,
+      "lead_contacts": 0,
+      "sales_model": "openai/gpt-4o-mini",
+      "configuration_sha256": "51ff65376dad421328dab993a4fc71939489386f1ed173514cf13a244ac79f1c",
+      "source_zip_sha256": "8d552de9a519437a528bfe3a260e0ab534d9ae667f6f9d895583639d21a9a841"
+    },
+    "p1b3_booking": {
+      "suite": "sales-booking-point/1.0",
+      "commit": "2e44ca663f0a02ff487e5f001f4ee52c318cbf2f",
+      "status": "INCOMPLETE",
+      "scenario_count": 6,
+      "turns": 15,
+      "checks": {
+        "PASS": 245,
+        "FAIL": 0,
+        "BLOCKED": 3
+      },
+      "provider_calls": 39,
+      "prompt_tokens": 277185,
+      "completion_tokens": 5714,
+      "cost_usd": 0.03475335,
+      "responses_with_cost": 39,
+      "observation_decisions_saved": 0,
+      "interpretation_attempts": 15,
+      "observation_decisions": 12,
+      "composition_projection": {
+        "turns": 15,
+        "saved_bytes": 12698,
+        "before_bytes": 364831,
+        "after_bytes": 352133
+      },
+      "invalid_interpretation_retried": [],
+      "synthetic_only": true,
+      "production_database_writes": 0,
+      "lead_contacts": 0,
+      "sales_model": "openai/gpt-4o-mini",
+      "configuration_sha256": "51ff65376dad421328dab993a4fc71939489386f1ed173514cf13a244ac79f1c",
+      "source_zip_sha256": "f003d1ef522078d73625bbce6dc7e4ab1e0da31c45e020b134452e862e4e9a8e"
+    }
+  },
+  "interpretation": {
+    "global_cost_saving_demonstrated": false,
+    "no_automated_check_regressions": true,
+    "closing_extra_calls": 5,
+    "closing_extra_interpretation_attempts": 4,
+    "closing_extra_observation_decisions": 1,
+    "interpretation_retries_are_observed_not_causally_attributed_to_projection": true,
+    "suites_have_identical_scenario_ids_but_not_identical_raw_scripted_text_for_all_suites": true
+  },
+  "privacy": {
+    "source_archives_contain_synthetic_messages": true,
+    "this_aggregate_includes_raw_lead_messages": false,
+    "this_aggregate_includes_credentials": false
+  }
+}
