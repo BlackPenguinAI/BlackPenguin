@@ -71,7 +71,15 @@ def test_server_frames_pass_continuity_and_booking_checks(lab,scenario,tmp_path)
     if scenario=='context_visit_see':
         clarified=next(t for t in r['turns'] if t['action']=='visit_clarified')
         assert clarified['understanding']['confidence']==1
-        assert clarified['metadata'].get('appointment_offer') and not clarified['metadata'].get('meeting_id')
+        # P3-B may return a verified day offer before slot options. The
+        # scripted buyer must advance day -> slots -> explicit confirmation.
+        day_offer=clarified['metadata'].get('visit_day_offer')
+        slot_offer=clarified['metadata'].get('appointment_offer')
+        assert (day_offer or slot_offer) and not clarified['metadata'].get('meeting_id')
+        if day_offer:
+            day_turn=next(t for t in r['turns'] if t['action']=='select_day')
+            assert day_turn['metadata'].get('appointment_offer')
+            assert not day_turn['meeting_ids']
     if scenario=='transfer_cedar':
         comparison=next(t for t in r['turns'] if t['action']=='compare')
         assert comparison['understanding']['confidence']==0

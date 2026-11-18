@@ -437,7 +437,12 @@ def handle(db,scope,conversation,lead,project,outcome,inbound):
     offer={'version':VERSION,'slots':[o['starts_at'] for o in options],'options':options,'preferences':prefs,'context':context,
         'property_type_id':property_id,'unit_id':unit_id,'visit_location':location,'duration_minutes':prefs['duration_minutes'],
         'project_timezone':project.timezone or 'UTC','expires_at':(utc(now)+timedelta(minutes=30)).isoformat()}
-    return 'Verified visit options:\n\n'+'\n\n'.join(f"{i}. {public_label(o,prefs)}" for i,o in enumerate(options,1))+'\n\nWhich time would you like me to prepare for confirmation?',{'appointment_offer':offer},[{'type':'request_available_slots'}]
+    # A selected, verified property must remain explicit even when availability
+    # narrows directly to times on one day (without a preceding day offer).
+    visit_name=context.get('property_type_name') or context.get('unit_code') or context.get('project_name')
+    if not visit_name:
+        return 'The visit details need to be verified before I can offer times.',{},[]
+    return 'Verified visit options:\n\nFor '+visit_name+':\n\n'+'\n\n'.join(f"{i}. {public_label(o,prefs)}" for i,o in enumerate(options,1))+'\n\nWhich time would you like me to prepare for confirmation?',{'appointment_offer':offer},[{'type':'request_available_slots'}]
 
 
 def sync_calendar(db,operation_id):
