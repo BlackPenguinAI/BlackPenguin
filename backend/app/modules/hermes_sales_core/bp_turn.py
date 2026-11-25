@@ -139,10 +139,10 @@ def commit_simulation_receipt(db, prepared: PreparedHermesTurn, *,
         raise PermissionError('Only the exact delivered simulation reply may commit Hermes state')
     state = deepcopy(prepared.proposed_state)
     state['last_assistant_reply'] = outbound.content
-    # P04 will persist a new *typed*, backend-verified menu when its delivery
-    # receipt confirms that the numbered choices were actually sent. For now
-    # do not infer selection authority from arbitrary model-generated prose.
-    state['last_presented_choice_set'] = None
+    # P04 may supply a typed, verified delivered menu. The ordinary P03 path
+    # keeps this field None: hidden tool results never create choice authority.
+    if state.get('last_presented_choice_set') is None:
+        state['last_presented_choice_set'] = None
     state['choice_set_initialized'] = True
     return save(db, prepared.scope, expected_revision=prepared.expected_revision,
                 event_key='hermes:sim:' + prepared.inbound_message_id,

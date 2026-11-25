@@ -58,12 +58,19 @@ class HermesSalesRuntime:
     The actual AIAgent call can be tested with a fake SDK without API secrets.
     """
     def __init__(self, settings: HermesSettings, tool_port: ToolPort, *,
-                 state_draft_tools: frozenset[str] = frozenset()):
+                 state_draft_tools: frozenset[str] = frozenset(),
+                 operational_draft_tools: frozenset[str] = frozenset()):
         if not state_draft_tools.issubset(P02_STATE_DRAFT_TOOLS):
             raise ValueError('Only P02 safe state-draft tools may be enabled')
+        from .bp_operational_port import P04_TOOL_NAMES
+        if not operational_draft_tools.issubset(P04_TOOL_NAMES):
+            raise ValueError('Only P04 audited draft-only operational tools can be enabled')
+        if operational_draft_tools and not getattr(tool_port, 'P04_DRAFT_ONLY', False):
+            raise PermissionError('P04 operational tools require the scoped draft-only port')
         self._settings = settings
         self._port = tool_port
         self._state_draft_tools = state_draft_tools
+        self._operational_draft_tools = operational_draft_tools
 
     def process_turn(self, request: TurnRequest) -> TurnResult:
         """Synchronize tool registration and conversation invocation per process."""
@@ -87,7 +94,7 @@ class HermesSalesRuntime:
             def handler(args: dict, _name=name, **_kwargs: Any) -> str:
                 if not isinstance(args, dict):
                     outcome: dict[str, Any] = {'error': 'Expected object arguments.', 'error_code': 'TOOL_ARGUMENT_INVALID'}
-                elif _name in P01_DENIED_TOOLS and _name not in self._state_draft_tools:
+                elif _name in P01_DENIED_TOOLS and _name not in (self._state_draft_tools | self._operational_draft_tools):
                     outcome = {'error': 'This operation is unavailable in the read-only P01 integration.',
                                'error_code': 'P01_EFFECTS_DISABLED'}
                 else:

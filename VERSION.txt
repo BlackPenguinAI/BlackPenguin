@@ -1,8 +1,11 @@
-BP-HERMES-P23 Upload Ready — Delivery 2 (P2 + P3)
+BP-HERMES-P04 Upload Ready — Delivery 3 (P4)
 Date: 2026-11-25
-BlackPenguin baseline: 6a684a2846c08a0788e8b1e00fc6dc75e3c1a6b8
+BlackPenguin baseline: ba65b830acb1fd721465c65afd8985de7309b6bb
 Hermes v13.3.3 baseline: 9ac4c8703d28eb3ca39fc762df0dd67c7196e324
-Runtime activation: OFF
-External actions: OFF
-SQL migration: ADDITIVE; applied by existing deploy workflow when merged to main
-Local isolated regression tests: 96 passed
+Conversation engine activation in production: OFF
+External messaging: OFF
+Google Calendar writes: OFF
+CRM writes from Hermes: OFF
+Operational effects: SIMULATION ONLY with scoped, idempotent SQL receipts
+New SQL migration: ADDITIVE hermes_sales_operations
+Local isolated regression tests: 155 passed

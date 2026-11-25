@@ -128,8 +128,62 @@ def _validate_references(db, scope: TurnScope, state: dict) -> None:
         refs = state.get(key) or []
         if not isinstance(refs, list) or any(not isinstance(x, str) or x not in units | types for x in refs):
             raise PermissionError('Hermes selection contains a foreign or unknown property')
+    offer = state.get('last_slot_search')
+    if offer is not None:
+        if not isinstance(offer,dict) or offer.get('project_id') != scope.project_id:
+            raise PermissionError('Hermes slot offer belongs to another project')
+        offered_unit = offer.get('unit_id')
+        if offered_unit and str(offered_unit) not in units | types:
+            raise PermissionError('Hermes slot offer references foreign inventory')
+        candidates = offer.get('options') or []
+        if not isinstance(candidates,list) or len(candidates)>80:
+            raise ValueError('Hermes slot list is invalid')
+        for item in candidates:
+            if not isinstance(item,dict) or set(item) - {'date','start_time','starts_at_utc'}:
+                raise ValueError('Hermes slot offer contains unexpected values')
+        reply_id = offer.get('source_reply_message_id')
+        if reply_id:
+            published=db.query(SalesMessage).filter_by(
+                id=reply_id, conversation_id=scope.conversation_id,
+                direction='outbound',role='assistant').one_or_none()
+            if (not published or published.status not in {'sent','delivered','accepted'} or
+                    (published.metadata_json or {}).get('lead_id',scope.lead_id)!=scope.lead_id):
+                raise PermissionError('Hermes slot offer must be tied to an actual delivered reply')
+    confirmation = state.get('confirmation_request')
+    if confirmation is not None:
+        if not isinstance(confirmation,dict) or confirmation.get('kind') not in ('book','cancel','reschedule','handoff'):
+            raise ValueError('Invalid Hermes confirmation request')
+        if confirmation.get('unit_id') and str(confirmation['unit_id']) not in units | types:
+            raise PermissionError('Hermes confirmation refers to foreign inventory')
+        recap_id=confirmation.get('recap_message_id')
+        if recap_id:
+            recap=db.query(SalesMessage).filter_by(
+                id=recap_id,conversation_id=scope.conversation_id,
+                direction='outbound',role='assistant').one_or_none()
+            if (not recap or recap.status not in {'sent','delivered','accepted'} or
+                    (recap.metadata_json or {}).get('lead_id',scope.lead_id)!=scope.lead_id):
+                raise PermissionError('Hermes confirmation recap was not actually delivered')
+            from .bp_operation_receipts import recap_visible
+            if not recap_visible(recap.content,confirmation):
+                raise PermissionError('Hermes confirmation recap did not state exact appointment details')
+    asset_request = (state.get('offered_assets') or {}).get('pending_request')
+    if asset_request:
+        if not isinstance(asset_request,dict) or str(asset_request.get('unit_id')) not in units | types:
+            raise PermissionError('Hermes material request references unapproved inventory')
+        from app.modules.projects.models import ProjectSalesAsset
+        ids=asset_request.get('asset_ids') or []
+        if not isinstance(ids,list) or len(ids)>20 or len(set(ids))!=len(ids):
+            raise ValueError('Hermes material asset list is invalid')
+        if db.query(ProjectSalesAsset.id).filter(
+                ProjectSalesAsset.company_id == scope.company_id,
+                ProjectSalesAsset.project_id == scope.project_id,
+                ProjectSalesAsset.id.in_(ids)).count()!=len(ids):
+            raise PermissionError('Hermes material request contains foreign asset IDs')
     draft = state.get('visit_draft') or {}
-    if draft.get('unit_id') and str(draft['unit_id']) not in units:
+    # A visit may target a published property type when the Project has no
+    # individual units. The demo's field is named unit_id, but BlackPenguin
+    # supports either an approved type ID or a verified unit reference.
+    if draft.get('unit_id') and str(draft['unit_id']) not in units | types:
         raise PermissionError('Hermes draft visit references another inventory')
     menu = state.get('last_presented_choice_set')
     if menu:
@@ -161,6 +215,10 @@ def _validate_references(db, scope: TurnScope, state: dict) -> None:
                 raise ValueError('Hermes menu numbering must be exact and ordered')
             if index not in visible:
                 raise PermissionError('Hermes menu was not numbered in the delivered reply')
+            if menu['type'] in ('visit_day','visit_time'):
+                label=str(item.get('label') or '').strip().casefold()
+                if not label or label not in visible[index]:
+                    raise PermissionError('Hermes visit choice label was not visible in the reply')
             if menu['type'] == 'property':
                 ref = str(item.get('unit_id') or '')
                 if ref not in units | types:
@@ -189,7 +247,7 @@ def save(db, scope: TurnScope, *, expected_revision: int, event_key: str,
         raise ValueError('Expected revision must be a nonnegative integer')
     if not isinstance(event_key, str) or not 1 <= len(event_key) <= 120:
         raise ValueError('Event key must contain 1–120 characters')
-    if event_type not in {'state_update', 'outbound_choice_receipt', 'simulation_receipt'}:
+    if event_type not in {'state_update', 'outbound_choice_receipt', 'simulation_receipt', 'simulation_operation'}:
         raise ValueError('Unsupported Hermes state event type')
     require_scoped_entities(db, scope)
     data, digest = _normalized(scope, state)
