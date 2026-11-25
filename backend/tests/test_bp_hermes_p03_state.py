@@ -27,10 +27,17 @@ def orm():
     base = declarative_base()
     postgres = types.ModuleType('app.db.postgres')
     postgres.Base = base
-    # In the full repository app.db.base may have imported these already.
-    # Temporarily remove cached Hermes modules and restore them after this module.
-    for key in ('app.modules.hermes_sales_core.bp_state_store',
-                'app.modules.hermes_sales_core.bp_models'):
+    # The full test suite imports SQLAlchemy models before this fixture.
+    # All Hermes modules that bind a declarative Base (and the effect executor
+    # that imports them) must be evicted before swapping app.db.postgres.
+    # MonkeyPatch restores any pre-existing production modules at teardown.
+    hermes_orm_modules = (
+        'app.modules.hermes_sales_core.bp_effect_executor',
+        'app.modules.hermes_sales_core.bp_operation_models',
+        'app.modules.hermes_sales_core.bp_state_store',
+        'app.modules.hermes_sales_core.bp_models',
+    )
+    for key in hermes_orm_modules:
         mp.delitem(sys.modules, key, raising=False)
     mp.setitem(sys.modules,'app.db.postgres',postgres)
 
@@ -126,10 +133,10 @@ def orm():
         SalesMessage=SalesMessage,ProjectUnit=ProjectUnit,ProjectPropertyType=ProjectPropertyType,
         models=models,store=store,context=context,CompanyProfile=CompanyProfile,CompanyMediaAsset=CompanyMediaAsset,
     )
-    # Restore any original modules that the full BlackPenguin test harness had
-    # already loaded; do not contaminate other test shards.
-    for name in ('app.modules.hermes_sales_core.bp_state_store','app.modules.hermes_sales_core.bp_models'):
-        sys.modules.pop(name,None)
+    # Drop only the fixture-bound modules, then restore any preloaded modules
+    # through MonkeyPatch. This keeps subsequent test modules on their own Base.
+    for name in hermes_orm_modules:
+        sys.modules.pop(name, None)
     mp.undo()
 
 
