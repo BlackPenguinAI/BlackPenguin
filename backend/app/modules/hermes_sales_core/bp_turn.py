@@ -53,7 +53,8 @@ def _approved_history(db, scope: TurnScope, inbound):
 
 
 def prepare_offline_turn(db, scope: TurnScope, *, inbound_message_id: str,
-                         settings: HermesSettings) -> PreparedHermesTurn:
+                         settings: HermesSettings,
+                         enabled_tools: frozenset[str] | None = None) -> PreparedHermesTurn:
     """Read-only preparation for deterministic integration testing.
 
     SDK/model invocation is synchronous (as in P01) and can take time; a future
@@ -92,7 +93,8 @@ def prepare_offline_turn(db, scope: TurnScope, *, inbound_message_id: str,
     port = BlackPenguinReadPort(snapshot, state=working, buyer_message=inbound.content,
                                 enable_preference_drafts=True)
     result = HermesSalesRuntime(settings, port, state_draft_tools=frozenset(
-        {'update_search_preferences'})).process_turn(TurnRequest(
+        {'update_search_preferences'}),
+        **({'enabled_tools': enabled_tools} if enabled_tools is not None else {})).process_turn(TurnRequest(
             scope=scope, message=inbound.content, history=history,
             channel=conversation.channel, verified_context=context,
         ))

@@ -29,7 +29,8 @@ class P04PreparedTurn:
 
 def prepare_p04_simulation_turn(db, scope: TurnScope, *, inbound_message_id: str,
                                 settings: HermesSettings, now=None,
-                                port_factory=BPOperationalDraftPort) -> P04PreparedTurn:
+                                port_factory=BPOperationalDraftPort,
+                                enabled_tools: frozenset[str] | None = None) -> P04PreparedTurn:
     """Explicit test/simulation entrypoint, not wired to the live worker."""
     _, _, _, conversation = require_scoped_entities(db, scope)
     if conversation.channel != 'simulation':
@@ -65,6 +66,7 @@ def prepare_p04_simulation_turn(db, scope: TurnScope, *, inbound_message_id: str
         settings, port,
         state_draft_tools=frozenset({'update_search_preferences'}),
         operational_draft_tools=P04_TOOL_NAMES,
+        **({'enabled_tools': enabled_tools} if enabled_tools is not None else {}),
     ).process_turn(TurnRequest(scope=scope, message=inbound.content,
                                history=history, verified_context=context,
                                channel='simulation'))

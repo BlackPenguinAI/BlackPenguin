@@ -59,7 +59,18 @@ class HermesSalesRuntime:
     """
     def __init__(self, settings: HermesSettings, tool_port: ToolPort, *,
                  state_draft_tools: frozenset[str] = frozenset(),
-                 operational_draft_tools: frozenset[str] = frozenset()):
+                 operational_draft_tools: frozenset[str] = frozenset(),
+                 enabled_tools: frozenset[str] | None = None):
+        # P07: the Staff-published global tool policy is enforced at the SDK
+        # registry AND the authorization handler, not merely documented in a
+        # prompt. `None` preserves the pinned P01-P04 default for old callers.
+        if enabled_tools is not None:
+            if isinstance(enabled_tools, (str, bytes)):
+                raise ValueError('Hermes tool policy must be a collection of tool names')
+            enabled_tools = frozenset(enabled_tools)
+            if not enabled_tools.issubset(SCHEMAS):
+                raise ValueError('Global Hermes policy includes an unknown tool')
+        self._enabled_tools = enabled_tools if enabled_tools is not None else frozenset(SCHEMAS)
         if not state_draft_tools.issubset(P02_STATE_DRAFT_TOOLS):
             raise ValueError('Only P02 safe state-draft tools may be enabled')
         from .bp_operational_port import P04_TOOL_NAMES
@@ -90,10 +101,32 @@ class HermesSalesRuntime:
         observations: list[dict[str, Any]] = []
         rejected: dict[str, dict[str, Any]] = {}
 
-        for name, schema in SCHEMAS.items():
+        # The pinned Nous SDK caches the FIRST tool's check_fn as the
+        # toolset-level availability check. Purge our previous turn's names
+        # before registering this turn to prevent a stale global allowlist;
+        # never delete a colliding tool owned by a different toolset.
+        get_entry = getattr(registry, 'get_entry', None)
+        deregister = getattr(registry, 'deregister', None)
+        if callable(get_entry) and callable(deregister):
+            for name in SCHEMAS:
+                entry = get_entry(name)
+                if entry is not None and getattr(entry, 'toolset', None) != TOOLSET:
+                    raise RuntimeError('Hermes business tool collides with another toolset: ' + name)
+            for name in SCHEMAS:
+                if get_entry(name) is not None:
+                    deregister(name)
+        # Register permitted tools first so the SDK toolset check is not
+        # derived from a disabled tool. Individual disabled handlers remain
+        # registered ONLY to return a hard authorization denial if invoked.
+        registration_order = sorted(SCHEMAS, key=lambda name: name not in self._enabled_tools)
+        for name in registration_order:
+            schema = SCHEMAS[name]
             def handler(args: dict, _name=name, **_kwargs: Any) -> str:
                 if not isinstance(args, dict):
                     outcome: dict[str, Any] = {'error': 'Expected object arguments.', 'error_code': 'TOOL_ARGUMENT_INVALID'}
+                elif _name not in self._enabled_tools:
+                    outcome = {'error': 'This tool is disabled by the published global Hermes policy.',
+                               'error_code': 'GLOBAL_TOOL_DISABLED'}
                 elif _name in P01_DENIED_TOOLS and _name not in (self._state_draft_tools | self._operational_draft_tools):
                     outcome = {'error': 'This operation is unavailable in the read-only P01 integration.',
                                'error_code': 'P01_EFFECTS_DISABLED'}
@@ -125,7 +158,7 @@ class HermesSalesRuntime:
 
             registry.register(name=name, toolset=TOOLSET,
                               schema={'name': name, **schema}, handler=handler,
-                              check_fn=lambda: True)
+                              check_fn=lambda _name=name: _name in self._enabled_tools)
 
         agent = AIAgent(
             model=self._settings.model,
@@ -141,7 +174,7 @@ class HermesSalesRuntime:
             max_iterations=self._settings.max_iterations,
             save_trajectories=False,
         )
-        allowed = set(SCHEMAS)
+        allowed = set(self._enabled_tools)
         loaded = set(agent.valid_tool_names)
         if allowed != loaded:
             raise RuntimeError('Hermes tool allowlist mismatch: ' + repr(sorted(allowed ^ loaded)))

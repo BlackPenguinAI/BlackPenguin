@@ -34,8 +34,10 @@ def unit():
     class User(base):
         __tablename__ = 'users'
         id = Column(String(36), primary_key=True)
-    from app.modules.hermes_sales_core import staff_config as control
-    from app.modules.hermes_sales_core import staff_models as models
+    # importlib bypasses stale package attributes kept by previous pytest
+    # fixtures; each temporary Base must receive freshly mapped ORM classes.
+    models = importlib.import_module('app.modules.hermes_sales_core.staff_models')
+    control = importlib.import_module('app.modules.hermes_sales_core.staff_config')
     yield SimpleNamespace(Base=base, User=User, control=control, models=models)
     for name in targets:
         sys.modules.pop(name, None)
