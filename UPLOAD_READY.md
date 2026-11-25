@@ -1,15 +1,14 @@
-# BP-HERMES-P07 · Upload Ready differential
+# BlackPenguin Hermes — Delivery 6 (P08 staged, NOT live cutover)
 
-This archive contains complete changed/new files in **BlackPenguin repository-relative paths**. Extract it and upload the directory contents via GitHub **Upload files**; do not upload the ZIP itself as a repository file.
+**IMPORTANT: P07 WAS NOT INSTALLED.** GitHub commit `0ef0c23a` (message mentions P07) contains **zero file modifications** and no workflow runs. This package **re-includes the full P07 code changes** along with the new P08 isolated simulation/SDK preflight lane.
 
-Baseline: `BlackPenguinAI/BlackPenguin` `3df05579e36524eb51b225b45174546f4615f6d7` (P05/P06). No code must be run before upload. No GitHub or production server change has been performed by the package creator.
+- Extract and upload the archive CONTENTS preserving the repository-relative directories.
+- Do NOT upload only the ZIP. No scripts or commands are required BEFORE upload.
+- Prefer a branch; merging to main starts the existing DigitalOcean production workflow. New P08 Hermes SDK staging CI builds a container **without deploying it**.
+- This release does **not** change live inbound routing, SMS/WhatsApp, Calendar delivery or LangGraph dependencies.
+- Run and inspect full GitHub Actions. The existing deployment workflow should require P07 PostgreSQL **14/14 passed, 0 skipped**. The new independent Hermes SDK smoke must pass too.
+- Neither P07 completion nor real P08 cutover should be claimed until these independent results are available. Real provider/Calendar E2E and production-worker implementation are still BLOCKED.
 
-- P07 SDK registered-tool allowlist enforced and checked; callbacks for disabled tools reject invocation even if bypassed.
-- P07 pinned SDK toolset-cache isolation and tests, P05 fixture import isolation.
-- 3 new isolated PostgreSQL acceptance tests included in existing predeployment Postgres runner.
-- Existing production LangGraph Sales Core and outbound providers remain unchanged.
-- No new migration and no live-runtime activation.
+Detailed explanation: `docs/hermes-integration/P08_CUTOVER_READINESS.md`.
 
-**Local result:** 181 Python tests PASSED; 3 PostgreSQL-only tests SKIPPED locally because no PostgreSQL server is available. The new GitHub predeployment PG gate must run **14/14, 0 skipped** before accepting this release. Live SDK/OpenRouter, real provider delivery and multi-company E2E remain NOT RUN (see `P07_ACCEPTANCE_REPORT.md`). Do not treat P07 as approval to perform P08 cutover until all blocking tests are verified.
-
-Suggested commit: `test(hermes): enforce published tool policy and add PostgreSQL P07 gates`
+Recommended commit: `feat(hermes): restore P07 gates and add isolated P08 simulation lane`

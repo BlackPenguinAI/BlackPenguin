@@ -1,3 +1,4 @@
-BP-HERMES-P07
-Baseline: 3df05579e36524eb51b225b45174546f4615f6d7
-Phase: P07 validation (partial; P08 blocked)
+BP-HERMES-P08-STAGING / P07-RECOVERY
+Baseline: 0ef0c23a4a96fa61763f22d23a64c7a0de83d9bc
+2026-11-25
+No live cutover
