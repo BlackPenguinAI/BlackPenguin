@@ -1,11 +1,4 @@
-BP-HERMES-P04 Upload Ready — Delivery 3 (P4)
-Date: 2026-11-25
-BlackPenguin baseline: ba65b830acb1fd721465c65afd8985de7309b6bb
-Hermes v13.3.3 baseline: 9ac4c8703d28eb3ca39fc762df0dd67c7196e324
-Conversation engine activation in production: OFF
-External messaging: OFF
-Google Calendar writes: OFF
-CRM writes from Hermes: OFF
-Operational effects: SIMULATION ONLY with scoped, idempotent SQL receipts
-New SQL migration: ADDITIVE hermes_sales_operations
-Local isolated regression tests: 155 passed
+BP-HERMES-P56
+Source BlackPenguin main: c4e6551375eecd787e3da1f84f3d01971b8fe4a6
+Previous prerequisite: P04 CI hotfix applied
+New Alembic head: 20261125_hermes_sales_p05

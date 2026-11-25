@@ -17,10 +17,13 @@ export class StaffMonitorComponent implements OnDestroy {
   messages: any[] = []; cursor = ''; paused = false; pauseReason = '';
   operationalContext:any=null;
   dialogueEvents: any[] = [];
+  // P06: scoped, staff-only Hermes context without touching the live worker.
+  hermesContext:any=null; hermesError=''; hermesBusy=false;
   error = ''; busy = false; exporting = false; companiesMore = false; leadsMore = false;
   lastRefresh = ''; private generation = 0; private timer?: ReturnType<typeof setInterval>;
   private requests = new Subscription();
   private base = (isDevMode() ? 'http://localhost:8000' : '') + '/api/v1/monitor';
+  private hermesBase = (isDevMode() ? 'http://localhost:8000' : '') + '/api/v1/ai/hermes';
   constructor(private http: HttpClient, @Inject(PLATFORM_ID) platform: object) {
     if (isPlatformBrowser(platform)) {
       this.loadCompanies(); this.timer = setInterval(() => this.refresh(), 5000);
@@ -37,7 +40,7 @@ export class StaffMonitorComponent implements OnDestroy {
   loadCompanies() {
     this.get('/companies?offset=' + this.companies.length, data => { this.companies.push(...data.items); this.companiesMore = data.has_more; });
   }
-  private reset() { this.generation++; this.messages = []; this.dialogueEvents = []; this.operationalContext=null; this.cursor = ''; this.conversation = ''; this.conversations = []; this.error = ''; this.busy = false; this.exporting = false; this.paused = false; this.pauseReason = ''; this.lastRefresh = ''; }
+  private reset() { this.generation++; this.messages = []; this.dialogueEvents = []; this.operationalContext=null; this.hermesContext=null; this.hermesError=''; this.hermesBusy=false; this.cursor = ''; this.conversation = ''; this.conversations = []; this.error = ''; this.busy = false; this.exporting = false; this.paused = false; this.pauseReason = ''; this.lastRefresh = ''; }
   companyChanged() { this.reset(); this.project = ''; this.lead = ''; this.projects = []; this.leads = []; this.leadsMore = false; if (this.company) this.get('/projects?company_id=' + encodeURIComponent(this.company), d => this.projects = d); }
   projectChanged() { this.reset(); this.lead = ''; this.leads = []; this.leadsMore = false; if (this.project) this.loadLeads(); }
   loadLeads() { this.get('/leads?' + this.scope(false) + '&offset=' + this.leads.length, d => { this.leads.push(...d.items); this.leadsMore = d.has_more; }); }
@@ -59,6 +62,19 @@ export class StaffMonitorComponent implements OnDestroy {
       this.lastRefresh = new Date().toISOString(); this.error = ''; this.busy = false;
       if (d.has_more) this.refresh();
     }, error: e => { if (version === this.generation) { this.busy = false; this.failed(e); } } }));
+  }
+  loadHermesContext() {
+    if (!this.conversation || this.hermesBusy) return;
+    this.hermesBusy = true;
+    const version = this.generation;
+    const url = `${this.hermesBase}/staff/conversations/${encodeURIComponent(this.conversation)}/context?${this.scope()}`;
+    this.requests.add(this.http.get<any>(url).subscribe({next: data => {
+      if (version !== this.generation) return;
+      this.hermesContext = data; this.hermesError=''; this.hermesBusy=false;
+    }, error: err => {
+      if (version !== this.generation) return;
+      this.hermesBusy=false; this.hermesError= typeof err.error?.detail==='string' ? err.error.detail : 'Hermes diagnostics could not be loaded.';
+    }}));
   }
   download() {
     if (!this.conversation || this.exporting) return;

@@ -18,6 +18,27 @@
       <p class="whitespace-pre-wrap break-words">{{m.content}}</p><footer class="mt-3 break-all text-xs text-gray-500">Message {{m.id}}</footer>
     </article>
     <app-agent-context *ngIf="operationalContext" [context]="operationalContext"></app-agent-context>
+    <!-- P06: Hermes state is diagnostic only. No controls to trigger actions. -->
+    <section class="mt-8 rounded-xl border border-white/20 p-4" aria-label="Hermes Sales Core diagnostic context">
+      <div class="flex flex-wrap items-center justify-between gap-3"><h2 class="text-xl">Hermes Sales Core · Context</h2><button (click)="loadHermesContext()" [disabled]="hermesBusy" class="rounded border px-3 py-1.5 text-xs">Refresh Hermes</button></div>
+      <p class="mb-3 text-xs text-gray-400">Read-only · Staged integration · Global settings do not enable production routing</p>
+      <p *ngIf="hermesBusy && !hermesContext" class="text-sm text-gray-400">Loading Hermes context…</p>
+      <p *ngIf="hermesError" role="alert" class="text-sm text-red-300">{{hermesError}}</p>
+      <ng-container *ngIf="hermesContext as h">
+        <p *ngIf="!h.has_state" class="text-sm text-gray-400">No Hermes state has been persisted for this conversation. The existing sales engine remains authoritative.</p>
+        <ng-container *ngIf="h.has_state">
+          <div class="mb-4 flex flex-wrap gap-4 text-sm"><span>Revision: {{h.revision}}</span><span>Engine: {{h.engine_version}}</span><span>Phase: {{h.state?.phase || 'Unspecified'}}</span><span>Choice set: {{h.state?.choice_set?.kind || 'None'}} ({{h.state?.choice_set?.count || 0}} options)</span></div>
+          <div class="grid gap-3 md:grid-cols-2">
+            <div class="rounded border border-white/10 p-3"><h3 class="mb-2 text-sm font-semibold">Current property focus</h3><pre class="whitespace-pre-wrap break-words text-xs">{{h.state?.focus | json}}</pre></div>
+            <div class="rounded border border-white/10 p-3"><h3 class="mb-2 text-sm font-semibold">Primary preferences</h3><pre class="whitespace-pre-wrap break-words text-xs">{{h.state?.primary_preferences | json}}</pre></div>
+            <div class="rounded border border-white/10 p-3"><h3 class="mb-2 text-sm font-semibold">Temporary search filters</h3><pre class="whitespace-pre-wrap break-words text-xs">{{h.state?.temporary_filters | json}}</pre></div>
+            <div class="rounded border border-white/10 p-3"><h3 class="mb-2 text-sm font-semibold">Visit draft (not a confirmed booking)</h3><pre class="whitespace-pre-wrap break-words text-xs">{{h.state?.visit_draft | json}}</pre></div>
+          </div>
+          <details class="mt-4"><summary class="cursor-pointer text-sm">Recent Hermes state events ({{h.recent_events?.length || 0}})</summary><pre class="mt-2 whitespace-pre-wrap break-words text-xs">{{h.recent_events | json}}</pre></details>
+          <details class="mt-3"><summary class="cursor-pointer text-sm">Hermes operation receipts ({{h.operations?.length || 0}})</summary><pre class="mt-2 whitespace-pre-wrap break-words text-xs">{{h.operations | json}}</pre></details>
+        </ng-container>
+      </ng-container>
+    </section>
     <section class="mt-8" aria-label="Staged dialogue diagnostics">
       <h2 class="text-xl">Dialogue engine diagnostics</h2>
       <p class="text-sm text-gray-400">Latest 20 events. Shadow drafts are not sent. Active events distinguish preparation from provider acceptance; acceptance is not confirmed delivery. Full history is included in the audited JSON export.</p>

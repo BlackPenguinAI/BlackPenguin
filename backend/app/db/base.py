@@ -1,9 +1,7 @@
 # backend/app/db/base.py
 from app.db.postgres import Base
 
-# 🚀 IMPORTAMOS TODOS LOS MODELOS DE LOS MICRO-MÓDULOS DDD
-# Esto es vital para que SQLAlchemy cree todas las tablas con Base.metadata.create_all()
-
+# All SQLAlchemy models used for migrations and initial schema creation.
 from app.modules.waitlist.models import WaitlistEntry
 from app.modules.subscriptions.models import SubscriptionPlan
 from app.modules.companies.models import Company
@@ -61,6 +59,8 @@ from app.modules.sales_agent.cancellation_models import SalesCancellationOperati
 from app.modules.sales_agent.wait_models import SalesWaitRequest
 from app.modules.sales_agent.moderation_models import SalesModerationIncident
 
-# Hermes Sales Core P03: additive PostgreSQL state, not connected to live routes.
+# Hermes P03/P04 tables remain separate from the legacy LangGraph state.
 from app.modules.hermes_sales_core.bp_models import HermesSalesState, HermesSalesStateEvent
 from app.modules.hermes_sales_core.bp_operation_models import HermesSalesOperation
+# P05: a single Staff-owned global configuration, not per-Company settings.
+from app.modules.hermes_sales_core.staff_models import HermesGlobalSettings, HermesGlobalVersion

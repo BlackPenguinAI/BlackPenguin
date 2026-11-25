@@ -33,4 +33,22 @@
     <details *ngIf="c.tasks?.length"><summary>Conversation tasks ({{c.tasks.length}})</summary><p *ngFor="let t of c.tasks">{{label(t.topic)}} · {{label(t.status)}}<ng-container *ngIf="t.blocked_reason"> · {{t.blocked_reason}}</ng-container></p></details>
     <details *ngIf="c.trace?.engine"><summary>Validated trace</summary><p>{{c.trace.engine}} · {{c.trace.model||'Model unavailable'}} · {{label(c.trace.run_status)}}</p><p *ngIf="c.trace.error_code" class="alert">Processing error: {{c.trace.error_code}}. Review or retry the affected turn; the conversation status is shown above.</p><p>Last response: {{label(c.trace.last_message_status)}}</p><small>Provider acceptance does not confirm delivery to the phone. Private model reasoning and credentials are excluded.</small><h4>Configuration reference</h4><pre>{{c.trace.configuration|json}}</pre><h4>Language validation</h4><pre>{{c.trace.language_validation|json}}</pre><h4>Approved action policy</h4><pre>{{c.trace.action_policy|json}}</pre></details>
   </ng-container>
+  <!-- P06: same shared component is used by Agent and Schedule; the extra
+       request is opt-in, scoped and cannot execute any operation. -->
+  <section *ngIf="(conversationId || meetingId) && !context" class="mt-4 rounded-lg border border-white/20 p-3" aria-label="Hermes conversation snapshot">
+    <div class="flex flex-wrap items-center justify-between gap-3"><h4>Hermes Sales Core context</h4><button type="button" (click)="refreshHermes()" [disabled]="hermesLoading">{{hermesLoading ? 'Loading…' : 'View Hermes state'}}</button></div>
+    <small>Read-only · Current production Sales workflow is unchanged during P06.</small>
+    <p *ngIf="hermesError" class="alert" role="alert">{{hermesError}}</p>
+    <ng-container *ngIf="hermesOpen && hermesData as h">
+      <p *ngIf="!h.has_state" class="notice">No Hermes context recorded for this selection. {{h.reason || 'The current Sales workflow remains active.'}}</p>
+      <ng-container *ngIf="h.has_state">
+        <p>Revision {{h.revision}} · {{h.engine_version}} · {{h.state?.phase || 'Exploration'}}</p>
+        <div class="property-grid">
+          <article><h4>Focused property</h4><pre class="whitespace-pre-wrap break-words text-xs">{{h.state?.focus | json}}</pre></article>
+          <article><h4>Primary buyer preferences</h4><pre class="whitespace-pre-wrap break-words text-xs">{{h.state?.primary_preferences | json}}</pre></article>
+        </div>
+        <details><summary>Temporary search and visit draft</summary><pre class="whitespace-pre-wrap break-words text-xs">{{h.state?.temporary_filters | json}}</pre><pre class="whitespace-pre-wrap break-words text-xs">{{h.state?.visit_draft | json}}</pre></details>
+      </ng-container>
+    </ng-container>
+  </section>
 </section>
