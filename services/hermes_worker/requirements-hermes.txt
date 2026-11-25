@@ -1,0 +1,3 @@
+# Same pinned Hermes Agent commit as the validated v13.3.3 demo.
+# Install in an isolated Python 3.12 image during P3/P4; do NOT add to the BP API yet.
+hermes-agent @ git+https://github.com/NousResearch/hermes-agent.git@b94cb8e2c4ebf2a8c7688cf676c3cf9899584adb

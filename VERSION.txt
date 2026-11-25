@@ -1,0 +1,5 @@
+BP-HERMES-P01
+Source: BlackPenguinAI/BlackPenguin@0ab19e793540737626c259d8a20883330fa65143
+Hermes demo: jorgektch/testing-hermes-agent@9ac4c8703d28eb3ca39fc762df0dd67c7196e324
+Agent SDK: NousResearch/hermes-agent@b94cb8e2c4ebf2a8c7688cf676c3cf9899584adb
+Scope: Additive standalone Hermes Core foundation, no live activation
