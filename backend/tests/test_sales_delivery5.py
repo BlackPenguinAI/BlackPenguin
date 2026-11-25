@@ -181,7 +181,9 @@ def test_64_case_registry_rejects_paths_outside_test_scope():
 
 
 def test_postgres_runner_refuses_unrelated_image_revision_before_starting_any_database(tmp_path):
-    from tools.sales_ai.postgres_checks import run
+    from tools.sales_ai.postgres_checks import run, EXPECTED_CASES, TESTS
+    assert EXPECTED_CASES == 14
+    assert 'test_bp_hermes_p07_postgres.py' in TESTS
     with patch('tools.sales_ai.postgres_checks.subprocess.check_output',return_value='other-commit\n'),patch('tools.sales_ai.postgres_checks.subprocess.run') as docker:
         with pytest.raises(ValueError):run('candidate-image','a'*40,Path(__file__).parent,tmp_path/'result.json')
         docker.assert_not_called()
@@ -192,11 +194,11 @@ def test_postgres_runner_refuses_unrelated_image_revision_before_starting_any_da
         if '--junitxml=/evidence/junit.xml' in command:
             mount=next(v for v in command if v.endswith(':/evidence'))
             directory=Path(mount[:-len(':/evidence')])
-            (directory/'junit.xml').write_text('<testsuites><testsuite>'+''.join('<testcase name="synthetic"/>' for _ in range(11))+'</testsuite></testsuites>')
+            (directory/'junit.xml').write_text('<testsuites><testsuite>'+''.join('<testcase name="synthetic"/>' for _ in range(EXPECTED_CASES))+'</testsuite></testsuites>')
         return SimpleNamespace(returncode=0)
     with patch('tools.sales_ai.postgres_checks.subprocess.check_output',return_value='a'*40+'\n'),patch('tools.sales_ai.postgres_checks.subprocess.run',side_effect=isolated):
         result=run('candidate-image','a'*40,Path(__file__).parent,tmp_path/'isolated.json')
-    assert result['status']=='PASS' and result['total']==11 and result['production_database_used'] is False
+    assert result['status']=='PASS' and result['total']==EXPECTED_CASES and result['production_database_used'] is False
     assert any(c[:4]==['docker','network','create','--internal'] for c in commands)
     assert not any('backend/.env' in arg or 'bp_api_prod' in arg for command in commands for arg in command)
     assert any(c[:3]==['docker','rm','-f'] for c in commands) and commands[-1][:3]==['docker','network','rm']
