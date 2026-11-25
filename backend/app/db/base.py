@@ -60,3 +60,6 @@ from app.modules.sales_agent.reschedule_models import SalesRescheduleOperation
 from app.modules.sales_agent.cancellation_models import SalesCancellationOperation
 from app.modules.sales_agent.wait_models import SalesWaitRequest
 from app.modules.sales_agent.moderation_models import SalesModerationIncident
+
+# Hermes Sales Core P03: additive PostgreSQL state, not connected to live routes.
+from app.modules.hermes_sales_core.bp_models import HermesSalesState, HermesSalesStateEvent

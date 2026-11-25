@@ -23,6 +23,9 @@ from .config import HermesSettings
 from .contracts import ToolPort, TurnRequest, TurnResult
 from .tool_schemas import P01_DENIED_TOOLS, SCHEMAS, TOOLSET
 
+# Only proof-of-declaration state drafts are opt-in in P02; live effects stay denied.
+P02_STATE_DRAFT_TOOLS = frozenset({'update_search_preferences'})
+
 _HERMES_AGENT_LOCK = threading.RLock()
 
 
@@ -54,9 +57,13 @@ class HermesSalesRuntime:
     ToolPort is the only extension point. P01 never calls its write-capable tools.
     The actual AIAgent call can be tested with a fake SDK without API secrets.
     """
-    def __init__(self, settings: HermesSettings, tool_port: ToolPort):
+    def __init__(self, settings: HermesSettings, tool_port: ToolPort, *,
+                 state_draft_tools: frozenset[str] = frozenset()):
+        if not state_draft_tools.issubset(P02_STATE_DRAFT_TOOLS):
+            raise ValueError('Only P02 safe state-draft tools may be enabled')
         self._settings = settings
         self._port = tool_port
+        self._state_draft_tools = state_draft_tools
 
     def process_turn(self, request: TurnRequest) -> TurnResult:
         """Synchronize tool registration and conversation invocation per process."""
@@ -80,7 +87,7 @@ class HermesSalesRuntime:
             def handler(args: dict, _name=name, **_kwargs: Any) -> str:
                 if not isinstance(args, dict):
                     outcome: dict[str, Any] = {'error': 'Expected object arguments.', 'error_code': 'TOOL_ARGUMENT_INVALID'}
-                elif _name in P01_DENIED_TOOLS:
+                elif _name in P01_DENIED_TOOLS and _name not in self._state_draft_tools:
                     outcome = {'error': 'This operation is unavailable in the read-only P01 integration.',
                                'error_code': 'P01_EFFECTS_DISABLED'}
                 else:

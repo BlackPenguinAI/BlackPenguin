@@ -1,5 +1,8 @@
-BP-HERMES-P01
-Source: BlackPenguinAI/BlackPenguin@0ab19e793540737626c259d8a20883330fa65143
-Hermes demo: jorgektch/testing-hermes-agent@9ac4c8703d28eb3ca39fc762df0dd67c7196e324
-Agent SDK: NousResearch/hermes-agent@b94cb8e2c4ebf2a8c7688cf676c3cf9899584adb
-Scope: Additive standalone Hermes Core foundation, no live activation
+BP-HERMES-P23 Upload Ready — Delivery 2 (P2 + P3)
+Date: 2026-11-25
+BlackPenguin baseline: 6a684a2846c08a0788e8b1e00fc6dc75e3c1a6b8
+Hermes v13.3.3 baseline: 9ac4c8703d28eb3ca39fc762df0dd67c7196e324
+Runtime activation: OFF
+External actions: OFF
+SQL migration: ADDITIVE; applied by existing deploy workflow when merged to main
+Local isolated regression tests: 96 passed
