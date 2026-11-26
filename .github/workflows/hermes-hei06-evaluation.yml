@@ -1,0 +1,206 @@
+name: Hermes HEI-06 isolated evaluation
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_openrouter:
+        description: 'Run paid model inference on synthetic fixtures using HEI06_OPENROUTER_API_KEY'
+        type: boolean
+        required: true
+        default: false
+  push:
+    branches: [main]
+    paths:
+      - 'services/hermes_worker/**'
+      - 'backend/app/modules/hermes_sales_core/**'
+      - 'backend/app/modules/sales_agent/**'
+      - 'backend/app/modules/sales_crm/**'
+      - 'backend/app/modules/projects/**'
+      - 'backend/tests/test_bp_hei*.py'
+      - 'backend/requirements.txt'
+      - 'frontend/src/app/**'
+      - 'frontend/package*.json'
+      - '.github/workflows/hermes-hei06-evaluation.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hei06-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: false
+
+# Independent from deploy.yml. This workflow never contacts DigitalOcean,
+# changes the global selector, uses a production DB or sends real messages.
+# The only real external API inference is the explicit workflow_dispatch job.
+
+env:
+  HEI06_IMAGE: bp-hermes-hei06:${{ github.sha }}
+
+jobs:
+  sdk-and-postgres:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build pinned SDK candidate
+        run: docker build -f services/hermes_worker/Dockerfile -t "$HEI06_IMAGE" .
+      - name: Prepare isolated test environment
+        run: |
+          mkdir -p evidence-hei06
+          chmod 777 evidence-hei06
+          umask 077
+          cat > "$RUNNER_TEMP/hei06-test.env" <<'ENV'
+          SECRET_KEY=hei06-synthetic-only-not-a-real-secret
+          ACCESS_TOKEN_EXPIRE_MINUTES=30
+          DATABASE_URL=sqlite://
+          ENVIRONMENT=test
+          FIRST_SUPERADMIN_EMAIL=hei06@example.invalid
+          FIRST_SUPERADMIN_PASSWORD=test-only
+          META_ACCESS_TOKEN=test-only
+          OPENROUTER_API_KEY=test-only
+          PYTHONPATH=/opt/blackpenguin:/opt/bp-tests:/opt/evaluation
+          ENV
+      - name: Offline SDK import and private entrypoint smoke
+        run: |
+          docker run --rm --network none --env-file "$RUNNER_TEMP/hei06-test.env" --entrypoint python "$HEI06_IMAGE" /opt/hermes-worker/sdk_smoke.py
+          docker run --rm --network none --env-file "$RUNNER_TEMP/hei06-test.env" --entrypoint python "$HEI06_IMAGE" /opt/hermes-worker/run_staged_simulation.py --help
+      - name: Offline E2E fixture (no model or provider network)
+        run: |
+          docker run --rm --network none --env-file "$RUNNER_TEMP/hei06-test.env" \
+            -v "$GITHUB_WORKSPACE/backend/tests:/opt/bp-tests:ro" \
+            -v "$GITHUB_WORKSPACE/services/hermes_worker/evaluation:/opt/evaluation:ro" \
+            -v "$GITHUB_WORKSPACE/evidence-hei06:/evidence" --entrypoint python "$HEI06_IMAGE" \
+            /opt/evaluation/run_lane.py --lane offline_harness --commit "$GITHUB_SHA" --output /evidence/offline-harness.json
+      - name: Actual ORM and worker on disposable PostgreSQL 16
+        shell: bash
+        run: |
+          set -euo pipefail
+          network="hei06-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          pg="${network}-postgres"
+          password="$(openssl rand -hex 24)"
+          trap 'docker rm -f "$pg" >/dev/null 2>&1 || true; docker network rm "$network" >/dev/null 2>&1 || true' EXIT
+          docker network create --internal "$network" >/dev/null
+          docker run -d --name "$pg" --network "$network" --network-alias hei06-postgres \
+            -e POSTGRES_DB=bp_hei06_test -e POSTGRES_USER=bp_hei06_test -e POSTGRES_PASSWORD="$password" postgres:16 >/dev/null
+          for i in {1..60}; do
+            if docker exec "$pg" pg_isready -U bp_hei06_test -d bp_hei06_test >/dev/null 2>&1; then break; fi
+            sleep 1
+          done
+          docker exec "$pg" pg_isready -U bp_hei06_test -d bp_hei06_test
+          HEI06_POSTGRES_URL="postgresql+psycopg2://bp_hei06_test:${password}@hei06-postgres:5432/bp_hei06_test"
+          export HEI06_POSTGRES_URL
+          docker run --rm --network "$network" --env-file "$RUNNER_TEMP/hei06-test.env" -e HEI06_POSTGRES_URL \
+            -v "$GITHUB_WORKSPACE/backend/tests:/opt/bp-tests:ro" \
+            -v "$GITHUB_WORKSPACE/services/hermes_worker/evaluation:/opt/evaluation:ro" \
+            -v "$GITHUB_WORKSPACE/evidence-hei06:/evidence" --entrypoint python "$HEI06_IMAGE" \
+            /opt/evaluation/run_lane.py --lane postgres_worker --commit "$GITHUB_SHA" --output /evidence/postgres-worker.json
+      - name: Retain sanitized evaluation reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hei06-offline-postgres-${{ github.sha }}
+          path: evidence-hei06/*.json
+          if-no-files-found: ignore
+          retention-days: 14
+
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - name: Run inspector and dual-engine tests (14 cases)
+        run: |
+          mkdir -p ../evidence-hei06
+          TZ=UTC npx --no-install vitest run --environment jsdom \
+            src/app/shared/ui/agent-context/hermes-inspector.spec.ts \
+            src/app/features/admin-panel/sales-engine-control/sales-engine-control.spec.ts \
+            --reporter=default --reporter=junit --outputFile.junit=../evidence-hei06/frontend-junit.xml
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          from xml.etree import ElementTree as E
+          cases=list(E.parse('../evidence-hei06/frontend-junit.xml').iter('testcase'))
+          failed=sum(c.find('error') is not None or c.find('failure') is not None for c in cases)
+          skipped=sum(c.find('skipped') is not None for c in cases)
+          ok=len(cases)==14 and failed==0 and skipped==0
+          Path('../evidence-hei06/frontend.json').write_text(json.dumps({'schema':'hei06-lane/1','lane':'frontend','candidate_commit':os.environ['GITHUB_SHA'],'status':'PASS' if ok else 'FAIL','total':len(cases),'failed':failed,'skipped':skipped},indent=2))
+          raise SystemExit(0 if ok else 2)
+          PY
+      - name: Angular production compilation (offline CI configuration)
+        run: npm run build -- --configuration=production,offline-ci
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hei06-frontend-${{ github.sha }}
+          path: evidence-hei06/*
+          if-no-files-found: ignore
+          retention-days: 14
+
+  openrouter-real-sdk:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_openrouter }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build same pinned SDK candidate
+        run: docker build -f services/hermes_worker/Dockerfile -t "$HEI06_IMAGE" .
+      - name: Evaluate synthetic multi-turn conversations with actual SDK and OpenRouter
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.HEI06_OPENROUTER_API_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "$OPENROUTER_API_KEY" ]; then
+            echo 'NOT_RUN: configure dedicated HEI06_OPENROUTER_API_KEY repository secret'
+            exit 2
+          fi
+          mkdir -p evidence-hei06
+          chmod 777 evidence-hei06
+          docker run --rm \
+            -e OPENROUTER_API_KEY -e HEI06_RUN_MODEL=1 \
+            -e ENVIRONMENT=test -e DATABASE_URL=sqlite:// \
+            -e SECRET_KEY=hei06-synthetic-only-not-a-real-secret \
+            -e ACCESS_TOKEN_EXPIRE_MINUTES=30 -e FIRST_SUPERADMIN_EMAIL=hei06@example.invalid \
+            -e FIRST_SUPERADMIN_PASSWORD=test-only -e META_ACCESS_TOKEN=test-only \
+            -e PYTHONPATH=/opt/blackpenguin:/opt/bp-tests:/opt/evaluation \
+            -v "$GITHUB_WORKSPACE/backend/tests:/opt/bp-tests:ro" \
+            -v "$GITHUB_WORKSPACE/services/hermes_worker/evaluation:/opt/evaluation:ro" \
+            -v "$GITHUB_WORKSPACE/evidence-hei06:/evidence" --entrypoint python "$HEI06_IMAGE" \
+            /opt/evaluation/run_lane.py --lane openrouter_sdk --commit "$GITHUB_SHA" --output /evidence/openrouter-sdk.json
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hei06-openrouter-${{ github.sha }}
+          path: evidence-hei06/*.json
+          if-no-files-found: ignore
+          retention-days: 14
+
+  certification-summary:
+    if: always()
+    needs: [sdk-and-postgres, frontend, openrouter-real-sdk]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Summarize evidence without activating the runtime
+        env:
+          OFFLINE: ${{ needs.sdk-and-postgres.result }}
+          FRONTEND: ${{ needs.frontend.result }}
+          MODEL: ${{ needs.openrouter-real-sdk.result }}
+        run: |
+          {
+            echo "## HEI-06 evaluation — $GITHUB_SHA"
+            echo "- Pinned SDK build/import, fixture, real PostgreSQL worker: $OFFLINE"
+            echo "- Frontend tests and compilation: $FRONTEND"
+            echo "- Actual SDK inference on synthetic data: $MODEL"
+            echo "- Real Telnyx SMS/WhatsApp and Google Calendar: NOT_RUN (separate controlled staging validation)"
+            echo "- Private HTTP service, actual published policy, rollout and rollback: not certified by this workflow"
+            echo "- Production readiness: CLOSED. No automatic engine activation or fallback."
+          } >> "$GITHUB_STEP_SUMMARY"
