@@ -25,29 +25,60 @@ function saved(lead='lead'): HermesInspectorView {
 beforeAll(()=>TestBed.initTestEnvironment(BrowserTestingModule,platformBrowserTesting()));
 afterEach(()=>{TestBed.resetTestingModule();vi.useRealTimers();});
 
+// Angular 21 runs TestBed zoneless by default. Use the actual template event
+// handlers and wait for their scheduled rendering instead of writing bound
+// fields directly (which bypasses Angular's change notification).
+function clickTab(element: HTMLElement, label: string): void {
+  const button = Array.from(element.querySelectorAll<HTMLButtonElement>('.tabs button'))
+    .find(item => item.textContent?.trim() === label);
+  expect(button).toBeDefined();
+  button!.click();
+}
+
 describe('HEI-04 inspector',()=>{
   it('renders preferences and distinguishes temporary search and evidence',async()=>{
     await TestBed.configureTestingModule({imports:[HermesInspectorComponent]}).compileComponents();
     const fixture=TestBed.createComponent(HermesInspectorComponent);
-    fixture.componentRef.setInput('conversationId','c');fixture.componentRef.setInput('inspector',saved());fixture.detectChanges();
+    fixture.componentRef.setInput('conversationId','c');fixture.componentRef.setInput('inspector',saved());
+    await fixture.whenStable();
     const element=fixture.nativeElement as HTMLElement;
     expect(element.textContent).toContain('350,000');expect(element.textContent).toContain('Exactly 3');
     expect(element.textContent).toContain('Primary preferences preserved');
     expect(element.textContent).toContain('13:02:15');
-    fixture.componentInstance.showEvidence('inbound');fixture.detectChanges();
+    const evidence = element.querySelector<HTMLButtonElement>('button.evidence');
+    expect(evidence?.textContent).toContain('Last preference update');
+    evidence!.click();
+    await fixture.whenStable();
+    expect(element.querySelector('.tabs button[aria-pressed="true"]')?.textContent?.trim()).toBe('Activity');
     expect(element.querySelector('a[href="#agent-message-inbound"]')).not.toBeNull();
     expect(element.querySelector('.highlight')).not.toBeNull();
   });
   it('renders property, recorded visits and provider status separately',async()=>{
     await TestBed.configureTestingModule({imports:[HermesInspectorComponent]}).compileComponents();
     const fixture=TestBed.createComponent(HermesInspectorComponent);
-    fixture.componentRef.setInput('conversationId','c');fixture.componentRef.setInput('inspector',saved());fixture.detectChanges();
-    fixture.componentInstance.tab='property';fixture.detectChanges();
+    fixture.componentRef.setInput('conversationId','c');fixture.componentRef.setInput('inspector',saved());
+    await fixture.whenStable();
+    const element = fixture.nativeElement as HTMLElement;
+    clickTab(element, 'Property');
+    await fixture.whenStable();
+    expect(element.querySelector('.tabs button[aria-pressed="true"]')?.textContent?.trim()).toBe('Property');
     expect(fixture.nativeElement.textContent).toContain('Van Buren');
     expect(fixture.nativeElement.textContent).toContain('Provider accepted · delivery not confirmed');
     expect(fixture.nativeElement.textContent).not.toContain('Oakwood');
-    fixture.componentInstance.tab='visits';fixture.detectChanges();
+    clickTab(element, 'Visits');
+    await fixture.whenStable();
+    expect(element.querySelector('.tabs button[aria-pressed="true"]')?.textContent?.trim()).toBe('Visits');
     expect(fixture.nativeElement.textContent).toContain('Oakwood');expect(fixture.nativeElement.textContent).toContain('Calendar: pending');
+    // A new projection of the same opportunity must not interrupt navigation.
+    fixture.componentRef.setInput('inspector',{...saved(),revision:9});
+    await fixture.whenStable();
+    expect(element.querySelector('.tabs button[aria-pressed="true"]')?.textContent?.trim()).toBe('Visits');
+    expect(element.textContent).toContain('Oakwood');
+    // A reassigned conversation must return to Profile, not the prior lead's tab.
+    fixture.componentRef.setInput('inspector',saved('new-lead'));
+    await fixture.whenStable();
+    expect(element.querySelector('.tabs button[aria-pressed="true"]')?.textContent?.trim()).toBe('Profile');
+    expect(element.textContent).not.toContain('Oakwood');
   });
   it('resets evidence when the same conversation is assigned to another lead',()=>{
     const c=new HermesInspectorComponent();c.conversationId='c';c.inspector=saved();c.ngOnChanges();
