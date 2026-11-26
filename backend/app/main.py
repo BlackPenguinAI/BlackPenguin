@@ -1,6 +1,6 @@
 import asyncio
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.middleware import MultiTenantMiddleware
@@ -24,6 +24,7 @@ from app.modules.dashboard.router import router as dashboard_router
 from app.modules.dashboard.legacy_router import router as legacy_dashboard_router
 from app.modules.health.router import router as health_router
 from app.modules.project_team.router import router as project_team_router
+from app.modules.sales_agent.p091_visibility import router as p091_visibility_router, guard_active_conversation
 from app.modules.sales_agent.router import router as sales_agent_router
 from app.modules.meta_leads.router import router as meta_leads_router
 from app.modules.sales_agent.provider_router import telnyx_router, twilio_router
@@ -89,7 +90,8 @@ app.include_router(dashboard_router, prefix=f"{settings.API_V1_STR}/dashboard", 
 app.include_router(legacy_dashboard_router, prefix=f"{settings.API_V1_STR}/tenants", tags=["12. Dashboard"])
 app.include_router(health_router, prefix=f"{settings.API_V1_STR}/health", tags=["Health"])
 app.include_router(project_team_router, prefix=f"{settings.API_V1_STR}/projects", tags=["Project Team & Routing"])
-app.include_router(sales_agent_router, prefix=f"{settings.API_V1_STR}/sales-agent", tags=["Sales Agent"])
+app.include_router(p091_visibility_router, prefix=f"{settings.API_V1_STR}/sales-agent", tags=["Sales Agent"])
+app.include_router(sales_agent_router, prefix=f"{settings.API_V1_STR}/sales-agent", tags=["Sales Agent"], dependencies=[Depends(guard_active_conversation)])
 from app.modules.sales_agent.monitor import router as monitor_router
 app.include_router(monitor_router, prefix=f"{settings.API_V1_STR}/monitor", tags=["Staff Monitor"])
 app.include_router(meta_leads_router, prefix=f"{settings.API_V1_STR}/webhooks", tags=["Meta Lead Ads"])

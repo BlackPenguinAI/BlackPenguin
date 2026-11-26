@@ -56,7 +56,7 @@ export const routes: Routes = [
       {path: 'leads', canActivate: [roleGuard], data: {roles: ['superadmin', 'admin', 'assistant']}, loadComponent: () => import('./pages/client/leads/leads').then(m => m.LeadsComponent)},
       {path: 'schedule', canActivate: [roleGuard], data: {roles: ['admin', 'assistant', 'sales']}, loadComponent: () => import('./pages/client/sales/sales').then(m => m.SalesComponent)},
       {path: 'sales', redirectTo: 'schedule', pathMatch: 'full'},
-      {path: 'agent', canActivate: [roleGuard], data: {roles: ['admin', 'assistant', 'mkt']}, loadComponent: () => import('./pages/client/agent/agent').then(m => m.AgentComponent)},
+      {path: 'agent', canActivate: [roleGuard], data: {roles: ['admin', 'assistant', 'mkt']}, loadComponent: () => import('./pages/client/agent/agent-p091').then(m => m.AgentP091Component)},
       {path: 'agent-settings', redirectTo: 'agent', pathMatch: 'full'},
       {path: 'notifications', canActivate: [roleGuard], data: {roles: ['admin', 'assistant', 'mkt', 'sales']}, loadComponent: () => import('./pages/client/notifications/notifications').then(m => m.NotificationsComponent)},
       {path: 'projects/new', canActivate: [roleGuard], data: {roles: ['admin', 'assistant']}, loadComponent: () => import('./pages/client/projects/project-new/project-new').then(m => m.ProjectNewComponent)},
