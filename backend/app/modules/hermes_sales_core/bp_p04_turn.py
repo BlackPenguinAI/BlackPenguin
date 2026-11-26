@@ -19,17 +19,20 @@ from .choice_state import record_delivered_menu, resolve_visible_choice
 from .config import HermesSettings
 from .contracts import TurnRequest, TurnScope
 from .runtime import HermesSalesRuntime
+from .conversation_parity import (ParityOperationalPort, scoped_dialogue,
+                                  invalidate_stale_choice, commit_property_menu)
 
 
 @dataclass(frozen=True)
 class P04PreparedTurn:
     prepared: PreparedHermesTurn
     proposed_menus: list[dict]
+    presented_media_offer: dict | None = None
 
 
 def prepare_p04_simulation_turn(db, scope: TurnScope, *, inbound_message_id: str,
                                 settings: HermesSettings, now=None,
-                                port_factory=BPOperationalDraftPort,
+                                port_factory=ParityOperationalPort,
                                 enabled_tools: frozenset[str] | None = None) -> P04PreparedTurn:
     """Explicit test/simulation entrypoint, not wired to the live worker."""
     _, _, _, conversation = require_scoped_entities(db, scope)
@@ -38,15 +41,17 @@ def prepare_p04_simulation_turn(db, scope: TurnScope, *, inbound_message_id: str
     from app.modules.sales_agent.models import SalesMessage
     inbound = db.query(SalesMessage).filter_by(
         id=inbound_message_id, conversation_id=scope.conversation_id,
-        direction='inbound', role='user',
+        direction='inbound', role='user', channel='simulation',
     ).one_or_none()
-    if not inbound or (inbound.metadata_json or {}).get('lead_id', scope.lead_id) != scope.lead_id:
+    if (not inbound or (inbound.metadata_json or {}).get('lead_id', scope.lead_id) != scope.lead_id
+            or (inbound.metadata_json or {}).get('project_id', scope.project_id) != scope.project_id):
         raise PermissionError('An authenticated, persisted lead inbound is required')
     with db.no_autoflush:
         snapshot = build_bp_snapshot(db, scope, channel='simulation')
         loaded = load(db, scope)
-        history = _approved_history(db, scope, inbound)
+        history, latest = scoped_dialogue(db, scope, conversation, inbound)
     working = deepcopy(loaded.data)
+    invalidate_stale_choice(working, latest)
     working['_active_source_message_id'] = inbound.id
     selection = resolve_visible_choice(working, inbound.content)
     context = snapshot.for_hermes()
@@ -62,6 +67,8 @@ def prepare_p04_simulation_turn(db, scope: TurnScope, *, inbound_message_id: str
     })
     port = port_factory(db, snapshot, state=working, buyer_message=inbound.content,
                         inbound_message_id=inbound.id, now=now)
+    if isinstance(port, ParityOperationalPort):
+        port.prepare_context(context)
     result = HermesSalesRuntime(
         settings, port,
         state_draft_tools=frozenset({'update_search_preferences'}),
@@ -70,12 +77,15 @@ def prepare_p04_simulation_turn(db, scope: TurnScope, *, inbound_message_id: str
     ).process_turn(TurnRequest(scope=scope, message=inbound.content,
                                history=history, verified_context=context,
                                channel='simulation'))
+    if isinstance(port, ParityOperationalPort):
+        result = replace(result, reply=port.finalize_reply(result.reply))
     working.pop('_active_source_message_id', None)
     return P04PreparedTurn(
         prepared=PreparedHermesTurn(scope=scope, inbound_message_id=inbound.id,
                                     expected_revision=loaded.revision, result=result,
                                     proposed_state=working),
         proposed_menus=deepcopy(port.menus),
+        presented_media_offer=deepcopy(getattr(port, 'offered_media', None)),
     )
 
 
@@ -108,6 +118,8 @@ def commit_p04_simulation_receipt(db, turn: P04PreparedTurn, *,
         # Only the last actual tool menu that matches that exact offer may
         # become selectable. Do not persist hidden tool results as options.
         for menu in reversed(turn.proposed_menus):
+            if menu.get('type') not in ('visit_day', 'visit_time'):
+                continue
             if (menu.get('proposal_id') not in (None, offered['proposal_id']) or
                     menu.get('unit_id') != offered['unit_id']):
                 continue
@@ -116,6 +128,13 @@ def commit_p04_simulation_receipt(db, turn: P04PreparedTurn, *,
                     state, menu=menu, outbound_message_id=outbound.id)
                 offered['source_reply_message_id']=outbound.id
                 break
+    if state['last_presented_choice_set'] is None:
+        commit_property_menu(state, turn.proposed_menus, outbound.content, outbound.id)
+    # A verified offer is attached to the exact visible reply, not a raw tool result.
+    offers = state.setdefault('offered_assets', {})
+    offers.pop('presented_offer', None)
+    if turn.presented_media_offer:
+        offers['presented_offer'] = {**turn.presented_media_offer, 'source_reply_message_id': outbound.id}
     proposal = state.get('confirmation_request')
     if (isinstance(proposal,dict) and proposal.get('status')=='recap_required' and
             proposal.get('selected_inbound_message_id')==prepared.inbound_message_id and
