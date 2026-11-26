@@ -311,18 +311,22 @@ def messages(
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES, UserRole.MKT, UserRole.SALES])),
 ):
-    conversation = db.query(SalesConversation).filter(
-        SalesConversation.id == conversation_id,
-        SalesConversation.company_id == current_user.company_id,
-    ).first()
-    if not conversation:
-        raise HTTPException(status_code=404, detail="Conversation not found.")
-    require_project_access(db, current_user, conversation.project_id)
-    from .operational_context import safe_message
-    return [safe_message(message) for message in conversation_messages(
-        db, company_id=current_user.company_id, conversation_id=conversation_id,
-        sales_user_id=current_user.id if current_user.role == UserRole.SALES else None,
-    )]
+    from sqlalchemy import case
+    from .models import SalesMessage
+    from .operational_context import scoped_conversation, safe_message
+    from app.modules.hermes_sales_core.conversation_inspector import scoped_query, verified_run_labels
+    conversation = scoped_conversation(db,current_user,conversation_id)
+    rows=scoped_query(db,conversation).order_by(SalesMessage.created_at.asc(),
+        case((SalesMessage.direction=='inbound',0),else_=1),SalesMessage.id.asc()).all()
+    labels=verified_run_labels(db,conversation,rows)
+    result=[]
+    for row in rows:
+        data=safe_message(row)
+        data['metadata_json']={**(data.get('metadata_json') or {}),
+            'inspector_engine':labels[row.id],
+            'inspector_scope':{'lead_id':conversation.lead_id,'project_id':conversation.project_id}}
+        result.append(data)
+    return result
 
 
 @router.post("/conversations/{conversation_id}/action", response_model=ConversationSummary)
@@ -418,7 +422,22 @@ def decide_draft(
 def operational_context(conversation_id: str,response: Response,db: Session = Depends(get_db),current_user: User = Depends(RoleChecker([*TENANT_MANAGER_ROLES,UserRole.MKT,UserRole.SALES]))):
     from .operational_context import scoped_conversation,snapshot
     response.headers['Cache-Control']='no-store'
-    return snapshot(db,scoped_conversation(db,current_user,conversation_id),allowed_projects=project_ids_for_user(db,current_user))
+    conversation=scoped_conversation(db,current_user,conversation_id)
+    result=snapshot(db,conversation,allowed_projects=project_ids_for_user(db,current_user))
+    result['inspector_scope']={'conversation_id':conversation.id,'lead_id':conversation.lead_id,'project_id':conversation.project_id}
+    # Same polling request, independent read-only Hermes projection. Preserve
+    # the existing LangGraph context if optional diagnostics are unavailable.
+    from app.modules.hermes_sales_core.conversation_inspector import inspect_conversation
+    try:
+        result['hermes_inspector']=inspect_conversation(db,conversation)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        import logging
+        db.rollback()
+        logging.getLogger(__name__).warning('Hermes inspector unavailable: %s',type(exc).__name__)
+        result['hermes_inspector_error']='HERMES_INSPECTOR_UNAVAILABLE'
+    return result
 
 
 @router.get('/meetings/{meeting_id}/operational-context')

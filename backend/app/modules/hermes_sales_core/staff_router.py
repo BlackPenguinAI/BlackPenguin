@@ -115,23 +115,14 @@ tenant_reader = RoleChecker([UserRole.ADMIN, UserRole.ASSISTANT, UserRole.MKT, U
 
 
 def _tenant_projection(db: Session, conversation):
-    from .bp_models import HermesSalesState
-    scope = dict(company_id=conversation.company_id, project_id=conversation.project_id,
-                 conversation_id=conversation.id, lead_id=conversation.lead_id)
-    row = db.query(HermesSalesState).filter_by(**scope).one_or_none()
-    if not row:
-        return {'has_state': False, 'read_only': True, 'live_routing_enabled': False}
-    state = row.state_json if isinstance(row.state_json, dict) else {}
-    # Treat stored state as untrusted: allowlist small, non-secret UI fields only.
-    return {'has_state': True, 'revision': row.revision, 'engine_version': row.engine_version,
-            'read_only': True, 'live_routing_enabled': False,
-            'state': {'phase': state.get('conversation_phase'),
-                      'focus': state.get('conversation_focus'),
-                      'primary_preferences': state.get('search_preferences'),
-                      'temporary_filters': state.get('property_filters'),
-                      'last_presented_units': state.get('last_presented_units'),
-                      'visit_draft': {k: v for k, v in (state.get('visit_draft') or {}).items()
-                                      if k in {'status', 'unit_id', 'property_type_id', 'project_id', 'date', 'start_time', 'timezone'}}}}
+    from .conversation_inspector import inspect_conversation
+    view = inspect_conversation(db, conversation)
+    # Preserve the old P06 envelope for older UI clients, but never raw state.
+    view['state'] = {'phase':view['phase'], 'focus':view['focus'],
+                     'primary_preferences':view['primary_preferences'],
+                     'temporary_filters':view['property_filters'], 'visit_draft':view['visit_draft'],
+                     'last_presented_units':[p['reference'] for p in view['presented_properties']]} if view['has_state'] else None
+    return view
 
 
 @router.get('/conversations/{conversation_id}/context', dependencies=[Depends(no_cache)])
@@ -149,7 +140,10 @@ def tenant_meeting_context(meeting_id: str, db: Session = Depends(get_db),
     from app.modules.sales_crm.models import Meeting
     from app.modules.sales_agent.models import SalesConversation
     # Existing policy handles project access and Sales ownership.
-    meeting_context(db, actor, meeting_id)
+    permitted = meeting_context(db, actor, meeting_id)
+    if permitted.get('scope_limited'):
+        return {'has_state': False, 'read_only': True, 'scope_limited': True,
+                'reason': 'Only the selected appointment is accessible.'}
     meeting = db.get(Meeting, meeting_id)
     conversations = db.query(SalesConversation).filter_by(
         company_id=actor.company_id, project_id=meeting.project_id,
@@ -157,4 +151,5 @@ def tenant_meeting_context(meeting_id: str, db: Session = Depends(get_db),
     if len(conversations) != 1:
         return {'has_state': False, 'read_only': True, 'live_routing_enabled': False,
                 'reason': 'Multiple or no conversations; select a specific conversation to view Hermes context.'}
-    return _tenant_projection(db, conversations[0])
+    from app.modules.sales_agent.operational_context import scoped_conversation
+    return _tenant_projection(db, scoped_conversation(db, actor, conversations[0].id))

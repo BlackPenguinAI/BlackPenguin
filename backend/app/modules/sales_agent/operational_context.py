@@ -20,7 +20,10 @@ def scoped_conversation(db,actor,identifier):
     row=db.query(SalesConversation).filter_by(id=identifier,company_id=actor.company_id).first()
     if not row:raise HTTPException(404,'Conversation not found.')
     require_project_access(db,actor,row.project_id)
-    lead=db.get(Lead,row.lead_id)
+    lead=db.query(Lead).filter_by(id=row.lead_id,company_id=row.company_id,project_id=row.project_id,deleted_at=None).first()
+    if not lead:raise HTTPException(404,'Conversation not found.')
+    try:check_scope(db,Scope(row.company_id,row.project_id,row.id,row.lead_id))
+    except PermissionError as exc:raise HTTPException(404,'Conversation not found.') from exc
     if actor.role==UserRole.SALES and lead.assigned_sales_user_id!=actor.id:raise HTTPException(404,'Conversation not found.')
     return row
 

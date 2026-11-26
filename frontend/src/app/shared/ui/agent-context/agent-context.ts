@@ -3,43 +3,38 @@ import { ChangeDetectorRef, Component, Input, OnChanges, OnDestroy } from '@angu
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { Subscription } from 'rxjs';
+import { HermesInspectorComponent } from './hermes-inspector';
 import { API_V1_URL } from '../../../core/config/api.config';
 
-@Component({selector:'app-agent-context',standalone:true,imports:[CommonModule,FormsModule],
+@Component({selector:'app-agent-context',standalone:true,imports:[CommonModule,FormsModule,HermesInspectorComponent],
   templateUrl:'./agent-context.html',styleUrl:'./agent-context.scss'})
 export class AgentContextComponent implements OnChanges,OnDestroy {
   @Input() conversationId='';
+  @Input() leadId='';
+  @Input() projectId='';
   @Input() meetingId='';
   @Input() context:any=null;
   @Input() canManage=false;
   data:any=null;error='';notice='';loading=false;retrying=false;note='';
-  // Hermes view is opt-in and read-only. It never starts or retries an agent.
-  hermesData:any=null;hermesError='';hermesLoading=false;hermesOpen=false;
-  private generation=0;private request?:Subscription;private action?:Subscription;private hermesRequest?:Subscription;
+  private generation=0;private request?:Subscription;private action?:Subscription;
   private timer?:ReturnType<typeof setInterval>;
   constructor(private http:HttpClient,private cdr?:ChangeDetectorRef){}
   ngOnChanges():void {
-    this.generation++;this.request?.unsubscribe();this.action?.unsubscribe();this.hermesRequest?.unsubscribe();if(this.timer)clearInterval(this.timer);
+    this.generation++;this.request?.unsubscribe();this.action?.unsubscribe();if(this.timer)clearInterval(this.timer);
     this.data=this.context;this.error='';this.notice='';this.note='';this.retrying=false;this.loading=false;
-    this.hermesData=null;this.hermesError='';this.hermesLoading=false;this.hermesOpen=false;
     if(!this.context&&(this.conversationId||this.meetingId)){this.refresh();this.timer=setInterval(()=>this.refresh(),10000);}
   }
-  ngOnDestroy():void{this.generation++;this.request?.unsubscribe();this.action?.unsubscribe();this.hermesRequest?.unsubscribe();if(this.timer)clearInterval(this.timer);}
+  ngOnDestroy():void{this.generation++;this.request?.unsubscribe();this.action?.unsubscribe();if(this.timer)clearInterval(this.timer);}
   refresh():void{
     if(this.context||(!this.conversationId&&!this.meetingId)||this.loading)return;
     this.loading=true;const version=this.generation;
     const path=this.meetingId?`meetings/${encodeURIComponent(this.meetingId)}`:`conversations/${encodeURIComponent(this.conversationId)}`;
     this.request=this.http.get<any>(`${API_V1_URL}/sales-agent/${path}/operational-context`).subscribe({next:d=>{
-      if(version!==this.generation)return;this.data=d;this.loading=false;this.error='';this.cdr?.markForCheck();
-    },error:()=>{if(version!==this.generation)return;this.loading=false;this.error='Context could not be loaded. Check access and refresh.';this.cdr?.markForCheck();}});
-  }
-  refreshHermes():void {
-    if ((!this.conversationId&&!this.meetingId)||this.hermesLoading)return;
-    this.hermesOpen=true;this.hermesLoading=true;this.hermesError='';const version=this.generation;
-    const path=this.meetingId?`meetings/${encodeURIComponent(this.meetingId)}`:`conversations/${encodeURIComponent(this.conversationId)}`;
-    this.hermesRequest=this.http.get<any>(`${API_V1_URL}/ai/hermes/${path}/context`).subscribe({next:d=>{
-      if(version!==this.generation)return;this.hermesData=d;this.hermesLoading=false;this.cdr?.markForCheck();
-    },error:()=>{if(version!==this.generation)return;this.hermesError='Hermes context could not be loaded for this selection.';this.hermesLoading=false;this.cdr?.markForCheck();}});
+      if(version!==this.generation)return;
+      const scope=d?.inspector_scope;
+      if(this.conversationId&&!this.meetingId&&(this.leadId||this.projectId)&&(!scope||scope.conversation_id!==this.conversationId||(this.leadId&&scope.lead_id!==this.leadId)||(this.projectId&&scope.project_id!==this.projectId))){this.data=null;this.loading=false;this.error='Conversation selection changed. Refresh the selected opportunity.';this.cdr?.markForCheck();return;}
+      this.data=d;this.loading=false;this.error='';this.cdr?.markForCheck();
+    },error:()=>{if(version!==this.generation)return;this.data=null;this.loading=false;this.error='Context could not be loaded. Check access and refresh.';this.cdr?.markForCheck();}});
   }
   utc(value:string|undefined):string|undefined{return value&&!/[zZ]$|[+-]\d\d:\d\d$/.test(value)?value+'Z':value;}
   label(value:any):string{return String(value||'unknown').replaceAll('_',' ');}

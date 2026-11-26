@@ -277,7 +277,7 @@
         ><span
           ><strong>{{ row.lead_name }} <em *ngIf="!row.simulation_id && row.platform === 'manual'" class="test-badge">MANUAL</em><em *ngIf="!row.simulation_id && row.platform?.startsWith('meta')" class="test-badge">META</em><em *ngIf="row.simulation_id" class="test-badge">SIMULATION</em></strong
           ><small>{{ row.last_message || 'No messages yet' }}</small></span
-        ><time>{{ asUtcDate(row.last_message_at) | date: 'shortTime' }}</time>
+        ><time>{{ asUtcDate(row.last_message_at) | date: 'HH:mm:ss':'UTC' }}</time>
       </button>
       <div class="empty" *ngIf="!loading && !visible.length">
         <p>No lead conversations for this Project yet.</p>
@@ -343,22 +343,24 @@
           <div><strong>{{ selected.agent_turn_status === 'retry' ? 'Agent retry scheduled' : 'AI sales agent is responding' }}</strong><small>The inbound message is safely stored and processed in conversation order.</small></div>
         </div>
         <ng-container *ngFor="let message of messages">
-          <div *ngIf="isReminder(message); else smsBubble" class="my-2 ml-auto flex max-w-[72%] items-start gap-2 rounded-lg border border-dashed border-[#6b5206] bg-[#151104] px-3 py-2 text-[#a98b31]">
+          <ng-container *ngIf="!message.metadata_json?.inspector_scope || ((!selected.lead_id || message.metadata_json.inspector_scope.lead_id === selected.lead_id) && (!selected.project_id || message.metadata_json.inspector_scope.project_id === selected.project_id))">
+          <div [attr.id]="'agent-message-'+message.id" *ngIf="isReminder(message); else smsBubble" class="my-2 ml-auto flex max-w-[72%] items-start gap-2 rounded-lg border border-dashed border-[#6b5206] bg-[#151104] px-3 py-2 text-[#a98b31]">
             <span class="material-symbols-outlined text-base">schedule</span>
             <div class="min-w-0 flex-1"><strong class="block text-[9px]">{{ reminderLabel(message) }}</strong><p class="my-1 overflow-hidden text-ellipsis whitespace-nowrap text-[11px] text-[#9a9589]">{{ message.content }}</p></div>
-            <time class="whitespace-nowrap text-[9px]">{{ asUtcDate(message.created_at) | date: 'short' }}</time>
+            <time class="whitespace-nowrap text-[9px]">{{ asUtcDate(message.created_at) | date: 'yyyy-MM-dd HH:mm:ss':'UTC' }} UTC</time>
           </div>
           <ng-template #smsBubble>
-            <div class="bubble-row" [class.agent]="message.role === 'assistant' || message.role === 'human'" [class.human]="message.role === 'human'">
+            <div class="bubble-row" [attr.id]="'agent-message-'+message.id" [class.agent]="message.role === 'assistant' || message.role === 'human'" [class.human]="message.role === 'human'">
               <div class="bubble" [class.unsupported]="message.metadata_json?.content_supported === false">
-                <small>{{ message.metadata_json?.resume_context ? 'Resume context · combined pending messages (internal)' : (message.role === 'assistant' ? 'AI sales agent' : (message.role === 'human' ? 'Company team · manual ' + channelLabel : selected.lead_name)) }}</small>
+                <small>{{ message.metadata_json?.resume_context ? 'Resume context · combined pending messages (internal)' : (message.role === 'assistant' ? (message.metadata_json?.inspector_engine === 'hermes' ? 'Hermes' : message.metadata_json?.inspector_engine === 'langgraph' ? 'LangGraph' : message.metadata_json?.inspector_engine === 'hermes_control' ? 'Hermes · control' : message.metadata_json?.inspector_engine === 'hermes_scheduled' ? 'Hermes · scheduled' : 'AI sales agent · engine not attributed') : (message.role === 'human' ? 'Company team · manual ' + channelLabel : selected.lead_name)) }}</small>
                 <span *ngIf="message.metadata_json?.delivery_kind === 'whatsapp_template'" class="message-kind">WHATSAPP TEMPLATE · {{message.metadata_json?.template_language}}</span>
                 <span *ngIf="message.metadata_json?.content_supported === false" class="message-kind warning">NOT SENT TO AI</span>
-                <p><ng-container *ngFor="let part of messageParts(message.content)"><a *ngIf="part.url; else plainMessagePart" class="break-all text-[#e9ad00] underline underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#e9ad00]" [href]="part.url" target="_blank" rel="noopener noreferrer">{{ part.text }}</a><ng-template #plainMessagePart>{{ part.text }}</ng-template></ng-container></p>
-                <time>{{ asUtcDate(message.created_at) | date: 'short' }} · {{ message.status }}</time>
+                <p class="whitespace-pre-wrap break-words"><ng-container *ngFor="let part of messageParts(message.content)"><a *ngIf="part.url; else plainMessagePart" class="break-all text-[#e9ad00] underline underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#e9ad00]" [href]="part.url" target="_blank" rel="noopener noreferrer">{{ part.text }}</a><ng-template #plainMessagePart>{{ part.text }}</ng-template></ng-container></p>
+                <time>{{ asUtcDate(message.created_at) | date: 'yyyy-MM-dd HH:mm:ss':'UTC' }} UTC · {{ message.status }}</time>
               </div>
             </div>
           </ng-template>
+          </ng-container>
         </ng-container>
         <div class="bubble-row agent agent-typing" *ngIf="sending && !isLive" aria-live="polite">
           <div class="bubble"><small>AI sales agent</small><p><span></span><span></span><span></span></p><time>Preparing a grounded response…</time></div>
@@ -430,7 +432,7 @@
         <ng-container *ngIf="!isLive"><dt>Protocol review</dt><dd>{{ selected.approval_status || 'pending' }}</dd></ng-container>
         <ng-container *ngIf="selected.pause_reason"><dt>Pause reason</dt><dd>{{ selected.pause_reason }}</dd></ng-container>
       </dl>
-      <app-agent-context *ngIf="isLive && selected" [conversationId]="selected.id" [canManage]="role==='admin'||role==='assistant'"></app-agent-context>
+      <app-agent-context *ngIf="selected" [conversationId]="selected.id" [leadId]="selected.lead_id || ''" [projectId]="selected.project_id || ''" [canManage]="isLive && (role==='admin'||role==='assistant')"></app-agent-context>
       <details *ngIf="selected.intervention_cases?.length" class="conversation-review m-3 max-h-[38vh] shrink-0 overflow-auto rounded-xl border border-amber-700 bg-amber-950/30 p-3 text-xs text-amber-100">
         <summary>Intervention history</summary>
         <article class="mt-3 break-words border-t border-amber-900 pt-2" *ngFor="let incident of selected.intervention_cases">
