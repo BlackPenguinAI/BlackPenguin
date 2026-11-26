@@ -14,10 +14,10 @@ import os
 from .engine_selection import HERMES, require_selectable
 from .production_tools import ProductionToolError, LIVE_ENGINE_VERSION
 
-# Cancellation/rescheduling and arbitrary CRM updates remain explicitly denied
-# until their production executors and consent contracts are implemented.
-LIVE_DRAFT_TOOLS = frozenset({'get_unit_media','select_visit_time','book_onsite_visit','track_property_interest'})
-BLOCKED = frozenset({'cancel_onsite_visit','reschedule_onsite_visit','update_lead_profile'})
+# Live appointment changes are read-only drafts until native receipt authorization.
+# Arbitrary CRM updates remain explicitly denied.
+LIVE_DRAFT_TOOLS = frozenset({'get_unit_media','select_visit_time','book_onsite_visit','track_property_interest','cancel_onsite_visit','reschedule_onsite_visit'})
+BLOCKED = frozenset({'update_lead_profile'})
 
 
 def _live_scope(db,scope,inbound_id):
@@ -148,10 +148,20 @@ def _live_port(db,snapshot,working,inbound,holds):
                 outcome['next_action']='Ask for explicit confirmation of exact property reference, date, HH:MM, timezone and visit address.'
             return outcome
 
-        def _active_meeting(self,meeting_id):
-            # Cancel/reschedule are disabled in this live candidate. Never
-            # query a demo appointment for a production opportunity.
-            return None
+        def _media_request(self,args):
+            from .conversation_parity import media_tags
+            from .live_multi_material import draft_multi_material
+            if len(media_tags(self.message))>1:
+                return draft_multi_material(self,args)
+            return super()._media_request(args)
+
+        def _cancel_request(self,args):
+            from .live_changes import draft_change
+            return draft_change(self,'cancel',args)
+
+        def _reschedule_request(self,args):
+            from .live_changes import draft_change
+            return draft_change(self,'reschedule',args)
     return LiveDraftPort()
 
 
@@ -189,6 +199,10 @@ def prepare_live_turn(db,scope,*,inbound_message_id,run_id):
     loaded=load(db,scope);working=deepcopy(loaded.data)
     history,latest=scoped_dialogue(db,scope,conversation,inbound)
     invalidate_stale_choice(working,latest)
+    from .live_changes import CHANGE_VERSION, active_visits
+    pending_change=working.get('confirmation_request') or {}
+    if pending_change.get('live_change_version')==CHANGE_VERSION and pending_change.get('status')=='awaiting_confirmation' and (latest is None or latest.id!=pending_change.get('recap_message_id')):
+        working['confirmation_request']=None
     working['_active_source_message_id']=inbound.id
     holds=compliance_action_holds(policy_context(db,scope,confirmed_profile_facts(project.profile)))
     if holds:
@@ -201,7 +215,9 @@ def prepare_live_turn(db,scope,*,inbound_message_id,run_id):
         'visit_draft':deepcopy(working.get('visit_draft')),
         'last_slot_search':deepcopy(working.get('last_slot_search')),
         'confirmation_request':deepcopy(working.get('confirmation_request')),
-        'state_revision':loaded.revision})
+        'state_revision':loaded.revision,
+        'active_visits':active_visits(db,scope,now=datetime.now(timezone.utc)),
+        'visit_change_guidance':'Use the active visit ID for cancellation or same-property time replacement. For a change, call the matching tool to produce a recap, never claim success. A later explicit yes may confirm only that exact recap. For replacement request an exact offered date and hour.'})
     port=_live_port(db,data,working,inbound,holds);port.prepare_context(context)
     # Copy ORM data needed for output validation before releasing locks.
     from types import SimpleNamespace
@@ -220,7 +236,12 @@ def prepare_live_turn(db,scope,*,inbound_message_id,run_id):
     if material_now and booking_now:
         raise ProductionToolError('Concurrent commercial effects need separate turns.')
     if material_now:reply='I found the requested material. I still need to validate the share before sending it.'
-    elif booking_now:reply='I will check whether your selected visit can be confirmed. It is not booked yet.'
+    elif booking_now:
+        reply={'cancel':'I will check your cancellation. Your visit is not cancelled yet.',
+               'reschedule':'I will check the replacement. Your original visit is unchanged for now.'}.get(booking.get('kind'),'I will check whether your selected visit can be confirmed. It is not booked yet.')
+    elif booking.get('live_change_version')==CHANGE_VERSION and booking.get('status')=='recap_required' and booking.get('selected_inbound_message_id')==inbound_message_id:
+        from .live_changes import change_recap
+        reply=change_recap(booking)
     from app.modules.sales_agent.response_policy import render_channel_text,split_channel_text
     from app.modules.sales_agent.monetary_policy import validate_monetary_reply
     from app.modules.sales_agent.language_policy import detect,scoped_names

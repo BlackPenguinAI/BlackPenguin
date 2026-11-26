@@ -218,7 +218,7 @@ def validate_prepared(db,scope,metadata):
     if fresh!=context or not user:raise ValueError('Replacement approval changed before commit.')
 
 
-def replace_visit(db,scope,conversation,lead,outcome,inbound,proposal):
+def replace_visit(db,scope,conversation,lead,outcome,inbound,proposal,*,authorize_change=None):
     now=workflow_now(datetime);state=outcome.state
     from .first_booking import SalesBookingOperation as Booking
     # The F effect worker locks its receipt before its Meeting. Keep the same order.
@@ -228,7 +228,7 @@ def replace_visit(db,scope,conversation,lead,outcome,inbound,proposal):
     if not old or old.status not in {MeetingStatus.CONFIRMED,MeetingStatus.SCHEDULED} or old.meeting_time<=now or reservation_version(old)!=proposal['original']['booking_sha256']:
         state.reschedule_proposal=None
         return 'The original visit changed or is no longer eligible. Nothing else has been changed. Please review the current visit first.',{},[]
-    project,target_scope=authorize_target(db,scope,proposal['target_context']['project_id'])
+    project,target_scope=(authorize_change or authorize_target)(db,scope,proposal['target_context']['project_id'])
     context=proposal['target_context'];fresh=target_context(db,scope,project,context['property_type_id'],context['unit_id'],resolve_visit_location(project,context['location']),context['duration_minutes'])
     if fresh!=context or not fresh['location']:raise ValueError('The proposed visit details changed. Your original visit is unchanged.')
     option=proposal['option'];starts=datetime.fromisoformat(option['starts_at']).astimezone(timezone.utc).replace(tzinfo=None)

@@ -81,6 +81,11 @@ def state_for_accepted_reply(turn, row):
                 and recap_visible(row.content,proposal)):
             proposal['status'] = 'awaiting_confirmation'
             proposal['recap_message_id'] = row.id
+    from .live_changes import recap_matches
+    if (proposal.get('status')=='recap_required' and proposal.get('selected_inbound_message_id')==prepared.inbound_message_id
+            and recap_matches(row.content,proposal)):
+        proposal['status']='awaiting_confirmation'
+        proposal['recap_message_id']=row.id
     state['last_assistant_reply'] = row.content
     return state
 

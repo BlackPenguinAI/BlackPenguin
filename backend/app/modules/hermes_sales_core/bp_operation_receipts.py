@@ -29,6 +29,9 @@ def recap_visible(reply: str, request: dict) -> bool:
     """
     if not isinstance(reply,str) or len(reply)>4000:
         return False
+    if request.get('live_change_version'):
+        from .live_changes import recap_matches
+        return recap_matches(reply,request)
     required=[request.get('unit_id'),request.get('date'),request.get('start_time')]
     if not all(isinstance(x,str) and x and x.casefold() in reply.casefold() for x in required):
         return False

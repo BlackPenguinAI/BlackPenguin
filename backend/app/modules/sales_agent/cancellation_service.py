@@ -99,7 +99,7 @@ def collect_cleanup(db,row):
     return targets,operations,bool(db.query(SalesRescheduleOperation).filter_by(replacement_meeting_id=current).first())
 
 
-def cancel(db,scope,conversation,lead,outcome,inbound,proposal):
+def cancel(db,scope,conversation,lead,outcome,inbound,proposal,*,authorize_change=None):
     db.query(Lead).filter_by(id=scope.lead_id,company_id=scope.company_id,project_id=scope.project_id).populate_existing().with_for_update().one()
     db.query(SalesBookingOperation).filter_by(meeting_id=proposal['appointment']['id']).with_for_update().all()
     row=db.query(Meeting).filter_by(id=proposal['appointment']['id'],lead_id=scope.lead_id,is_demo=conversation.channel == 'simulation').populate_existing().with_for_update().one_or_none()
@@ -107,7 +107,7 @@ def cancel(db,scope,conversation,lead,outcome,inbound,proposal):
     if not row or row.status not in {MeetingStatus.CONFIRMED,MeetingStatus.SCHEDULED} or row.meeting_time<=workflow_now(datetime) or reservation_version(row)!=proposal['appointment']['booking_sha256']:
         state.cancellation_proposal=None
         return 'That visit changed or is no longer eligible for this cancellation. No other reservation has been changed. Please review the current visit.',{'cancellation_context_question':True},[]
-    authorize(db,scope,row.project_id)
+    (authorize_change or authorize)(db,scope,row.project_id)
     if lead.deleted_at or lead.is_opt_out or not permitted(lead) or lead.agent_status=='human_control':raise PermissionError('Lead permissions changed.')
     if row.assigned_sales_user_id:db.query(User).filter_by(id=row.assigned_sales_user_id).with_for_update().all()
     targets,previous,chain_limit=collect_cleanup(db,row)

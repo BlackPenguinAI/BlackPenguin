@@ -45,7 +45,7 @@ def verify_plan_part(plan, metadata, content, key):
 
 def build_plan(key, kind, content, channel, *, share_hashes=None, operation_id=None):
     from app.modules.sales_agent.response_policy import render_channel_text, split_channel_text
-    if kind not in {'reply', 'material', 'booking'} or not isinstance(key,str) or not key.startswith('hermes:'):
+    if kind not in {'reply', 'material', 'booking', 'cancel', 'reschedule'} or not isinstance(key,str) or not key.startswith('hermes:'):
         raise ProductionToolError('Unsupported Hermes delivery plan.')
     canonical = render_channel_text(content, channel)
     parts = split_channel_text(canonical, channel)
@@ -200,6 +200,16 @@ def authorize_part(db, conversation, lead, metadata, content, key, agent_run_id)
                 or meeting.duration_minutes!=context.get('duration_minutes')
                 or meeting.visit_address!=(context.get('location') or {}).get('address')):
             raise ProductionToolError('Booking snapshot changed before confirmation.')
+        return
+    if plan['kind'] in {'cancel','reschedule'}:
+        from .live_changes import TOOLS,verified_change
+        from .production_tools import _authorize_tool
+        from app.modules.sales_agent.response_policy import render_channel_text
+        if plan['kind']!=op.operation_type:
+            raise ProductionToolError('Change receipt type mismatch.')
+        _authorize_tool(db,run,TOOLS[op.operation_type])
+        if content!=render_channel_text(verified_change(db,scope,op),conversation.channel):
+            raise ProductionToolError('Change confirmation does not match native receipt.')
         return
     if plan['kind']!='material' or op.operation_type!='material' or op.status!='pending_delivery':
         raise ProductionToolError('Material operation is not awaiting delivery.')

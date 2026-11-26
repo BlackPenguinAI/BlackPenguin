@@ -327,13 +327,11 @@ def _material_batch(db, scope, project, channel, draft, now):
     from app.modules.projects.asset_coverage import matches
     from app.modules.sales_agent.material_delivery import snapshot
     from .bp_operational_port import _fresh
+    from .live_multi_material import subject_mapping
     ids=draft.get('asset_ids')
-    tag=draft.get('subject')
-    if (channel not in {'sms','whatsapp'} or not _fresh(draft,now)
-            or tag not in {'brochure','floor_plan','gallery_image','unit_sheet'}
-            or not isinstance(ids,list) or not 1<=len(ids)<=20
-            or any(not isinstance(x,str) or not x for x in ids) or len(ids)!=len(set(ids))):
+    if channel not in {'sms','whatsapp'} or not _fresh(draft,now):
         raise ProductionToolError('Invalid or expired requested material batch.')
+    subjects=subject_mapping(draft)
     prop,unit,_=_resolve_property(db,scope,project,draft.get('unit_id'),channel)
     approved={a.id for a in approved_for_turn(db,project_id=scope.project_id,company_id=scope.company_id,channel=channel)}
     if not set(ids)<=approved:
@@ -342,8 +340,8 @@ def _material_batch(db, scope, project, channel, draft, now):
     for asset_id in ids:
         asset=db.query(ProjectSalesAsset).filter_by(id=asset_id,company_id=scope.company_id,
             project_id=scope.project_id).populate_existing().with_for_update().one_or_none()
-        if not asset or not any(x.get('coverage')=='requested_tag' for x in matches(asset,
-                property_id=prop,unit_id=unit,subject='photos' if tag=='gallery_image' else tag)):
+        if not asset or not all(any(x.get('coverage')=='requested_tag' for x in matches(asset,
+                property_id=prop,unit_id=unit,subject='photos' if tag=='gallery_image' else tag)) for tag in subjects[asset_id]):
             raise ProductionToolError('Material does not cover the requested property and subject.')
         bindings.append(snapshot(asset,channel=channel))
     return bindings
@@ -362,7 +360,11 @@ def prepare_live_material_batch(db, scope, *, inbound_message_id):
     # type; a bare assent must be handled by a future delivered-offer contract.
     from .conversation_parity import media_tags
     tags=media_tags(inbound.content)
-    if tags!=[draft.get('subject')] and not (not tags and re.search(r'\bpdf\b',inbound.content,re.I)
+    if draft.get('subjects') is not None:
+        from .live_multi_material import explicit_multi_subjects
+        if explicit_multi_subjects(inbound.content)!=draft.get('subjects'):
+            raise ProductionToolError('Explicit multi-subject material evidence is required.')
+    elif tags!=[draft.get('subject')] and not (not tags and re.search(r'\bpdf\b',inbound.content,re.I)
             and draft.get('subject')!='gallery_image' and len(draft.get('asset_ids') or [])==1):
         raise ProductionToolError('Explicit material evidence is required.')
     bindings=_material_batch(db,scope,project,conversation.channel,draft,datetime.now(timezone.utc))

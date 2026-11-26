@@ -227,6 +227,20 @@ async def run_job(db,job_id,*,prepare=request_sdk_draft):
         output=dict(run.output_snapshot or {});effect=dict(output.get('native_live_booking') or {})
         effect.update(delivery='provider_accepted',confirmation_message_id=last_id)
         output['native_live_booking']=effect;run.output_snapshot=output;db.flush();db.commit()
+    elif selected['kind'] in {'cancel','reschedule'}:
+        from .live_changes import execute_live_change,verified_change
+        op=execute_live_change(db,scope,inbound_message_id=inbound_id)
+        kind=op.operation_type;op_id=op.id
+        delivery={'content':verified_change(db,scope,op),'idempotency_key':'hermes:'+kind+':'+run.id+':'+op_id,
+            'metadata':{'engine':ENGINE,'agent_run_id':run.id,'lead_id':scope.lead_id,'project_id':scope.project_id,
+                'hermes_inbound_message_id':inbound_id,'continuity_epoch':run.input_snapshot['continuity_epoch']}}
+        delivery,plan=record_plan(db,run,conversation,delivery,kind=kind,operation_id=op_id)
+        db.commit()
+        ids=await dispatch_or_reconcile(db,scope,conversation,lead,run_id,inbound_id,plan,delivery)
+        last_id=ids[-1];db.expire_all();run=db.get(AgentRun,run_id)
+        output=dict(run.output_snapshot or {});effect=dict(output.get('native_live_change') or {})
+        effect.update(delivery='provider_accepted',confirmation_message_id=last_id)
+        output['native_live_change']=effect;run.output_snapshot=output;db.commit()
     elif selected['kind']=='material':
         draft=(receipt.state_after.get('offered_assets') or {}).get('pending_request') or {}
         previous=db.query(HermesSalesOperation).filter_by(**scope.__dict__,request_id=draft.get('id'),

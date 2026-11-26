@@ -117,8 +117,11 @@ def next_native_effect(state,inbound_id):
     kinds=[]
     if material.get('source_inbound_message_id')==inbound_id:kinds.append('material')
     if booking.get('confirmed_inbound_message_id')==inbound_id and booking.get('status') in {'execution_requested','committed'}:
-        if booking.get('kind')!='book':raise ProductionToolError('Live change of existing booking is not certified.')
-        kinds.append('book')
+        kind=booking.get('kind')
+        from .live_changes import CHANGE_VERSION
+        if kind!='book' and (kind not in {'cancel','reschedule'} or booking.get('live_change_version')!=CHANGE_VERSION):
+            raise ProductionToolError('Live change of existing booking is not certified.')
+        kinds.append(kind)
     if len(kinds)>1:raise ProductionToolError('Multiple commercial effects require separate turns.')
     return {'kind':kinds[0] if kinds else None,'preferences':prefs.get('last_source_message_id')==inbound_id}
 
@@ -143,6 +146,10 @@ def advance_live_effects(db,scope,*,inbound_message_id):
         result['profile']=persist_live_preferences(db,scope,inbound_message_id=inbound.id)
     if selected['kind']=='book':
         result['effect']=execute_first_live_booking(db,scope,inbound_message_id=inbound.id)
+    elif selected['kind'] in {'cancel','reschedule'}:
+        from .live_changes import execute_live_change
+        operation=execute_live_change(db,scope,inbound_message_id=inbound.id)
+        result['effect']={**operation.result_json,'operation_id':operation.id}
     elif selected['kind']=='material':
         result['effect']=issue_live_material_batch(db,scope,inbound_message_id=inbound.id)
     return result

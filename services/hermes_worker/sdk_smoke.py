@@ -31,7 +31,10 @@ def main():
     assert callable(process_hermes_inbound_job) and callable(authorize_part)
     assert {route.path for route in private_app.routes} == {'/internal/prepare'}
     assert not live_hermes_ready(), 'The live gate must remain closed before certification'
-    print('HEI-03B continuation SDK offline import smoke: PASS (no model/provider calls)')
+    from app.modules.hermes_sales_core.live_changes import execute_live_change, draft_change, verified_change
+    from app.modules.hermes_sales_core.live_multi_material import draft_multi_material, subject_mapping
+    assert all(callable(x) for x in (execute_live_change, draft_change, verified_change, draft_multi_material, subject_mapping))
+    print('HEI-03B.4 SDK offline import smoke: PASS (no model/provider calls)')
 
 
 if __name__ == '__main__':
