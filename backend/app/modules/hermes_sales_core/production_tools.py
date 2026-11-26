@@ -320,7 +320,7 @@ def _material_batch(db, scope, project, channel, draft, now):
 
     Does not mint access tokens. The future dispatch coordinator must bind each
     share to the durable outbox and revalidate snapshots before every send.
-    External URL galleries are not silently mapped to local files.
+    URL-only galleries use exact reviewed HTTPS targets; no remote fetch.
     """
     from app.modules.projects.models import ProjectSalesAsset
     from app.modules.projects.sales_asset_service import approved_for_turn
@@ -343,7 +343,21 @@ def _material_batch(db, scope, project, channel, draft, now):
         if not asset or not all(any(x.get('coverage')=='requested_tag' for x in matches(asset,
                 property_id=prop,unit_id=unit,subject='photos' if tag=='gallery_image' else tag)) for tag in subjects[asset_id]):
             raise ProductionToolError('Material does not cover the requested property and subject.')
-        bindings.append(snapshot(asset,channel=channel))
+        source=getattr(asset,'source',None)
+        if source is not None and not source.storage_path:
+            if subjects[asset_id]!=['gallery_image']:
+                raise ProductionToolError('External resources must be reviewed gallery targets.')
+            from app.modules.sales_agent.commercial_context import _safe_asset_links
+            from urllib.parse import urlsplit
+            targets=sorted({item['url'] for item in _safe_asset_links(asset)
+                            if item['kind'] in {'photos','gallery_image'} and urlsplit(item['url']).scheme=='https'})
+            if not targets:
+                raise ProductionToolError('No approved external gallery target is available.')
+            bindings.extend(snapshot(asset,channel=channel,target_url=target) for target in targets)
+        else:
+            bindings.append(snapshot(asset,channel=channel))
+        if len(bindings)>20:
+            raise ProductionToolError('Material resource limit exceeded; narrow the request.')
     return bindings
 
 

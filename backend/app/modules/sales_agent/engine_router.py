@@ -188,6 +188,15 @@ async def route_live_job(job_id: str, *, inbound: bool,
                 handler = candidate_handler
             else:
                 handler = legacy_handler
+            # A legacy-only opportunity remains unchanged. Once Hermes owns
+            # the scope, invalidate transient authorizations on engine change.
+            continuity_json=getattr(conversation,'continuity_json',None)
+            if isinstance(continuity_json,dict) and (pin['engine']==HERMES or continuity_json.get('sales_engine_boundary')):
+                from app.modules.hermes_sales_core.engine_boundary import transition,check_scheduled
+                if inbound:
+                    transition(db,conversation,message,pin)
+                else:
+                    check_scheduled(conversation,pin,kind)
         except (EngineSelectionError, EngineUnavailable) as exc:
             code = 'HERMES_NOT_READY' if isinstance(exc, EngineUnavailable) else 'ENGINE_SELECTION_REVIEW'
             job.status = 'review'

@@ -60,8 +60,11 @@ def issue_live_material_batch(db,scope,*,inbound_message_id):
     if checked['request_id']!=request_id:
         raise ProductionToolError('Material request changed before issuance.')
     bindings=checked['bindings']
-    if not isinstance(bindings,list) or not 1<=len(bindings)<=20 or [b['asset_id'] for b in bindings]!=draft.get('asset_ids'):
+    if not isinstance(bindings,list) or not 1<=len(bindings)<=20 or list(dict.fromkeys(b['asset_id'] for b in bindings))!=draft.get('asset_ids'):
         raise ProductionToolError('Material bindings differ from authorized draft.')
+    identities=[(b['asset_id'],b.get('target_url')) for b in bindings]
+    if len(set(identities))!=len(identities):
+        raise ProductionToolError('Duplicate material targets are not permitted.')
     issued=[]; entries=[]
     for binding in bindings:
         url,share=issue(db,company_id=scope.company_id,project_id=scope.project_id,
@@ -70,6 +73,7 @@ def issue_live_material_batch(db,scope,*,inbound_message_id):
         if (not share.id or share.sales_asset_id!=binding['asset_id'] or share.source_id!=binding['source_id']
                 or share.company_id!=scope.company_id or share.project_id!=scope.project_id or share.lead_id!=scope.lead_id
                 or share.agent_run_id!=run.id or share.channel!=conversation.channel
+                or getattr(share,'target_url',None)!=binding.get('target_url')
                 or share.token_hash!=sha256(urlsplit(url).path.rsplit('/',1)[-1].encode()).hexdigest()):
             raise ProductionToolError('Share service returned a mismatched scope.')
         issued.append({'url':url,'name':binding['name']})
@@ -139,7 +143,12 @@ def complete_live_material_batch(db,scope,*,inbound_message_id,message_ids):
     for sid in prior['share_ids']:
         share=db.get(SalesAssetShare,sid)
         if not share:raise ProductionToolError('Missing issued share.')
-        shared[share.sales_asset_id]={'share_id':sid,'source_message_id':inbound.id}
+        entry=shared.get(share.sales_asset_id) or {}
+        previous=entry.get('share_ids') or ([entry['share_id']] if entry.get('share_id') else [])
+        if entry.get('source_message_id')!=inbound.id:previous=[]
+        ids=list(dict.fromkeys([*previous,sid]))
+        shared[share.sales_asset_id]={'share_id':sid,'source_message_id':inbound.id,
+            **({'share_ids':ids} if len(ids)>1 else {})}
     committed=save(db,scope,expected_revision=loaded.revision,event_key='hei03b:material:'+op.request_id,
         state=state,event_type='state_update')
     op.status='completed';op.result_json={**prior,'status':result['status'],'message_ids':message_ids,

@@ -77,68 +77,34 @@ def scoped_job(db, job_id):
 
 
 def resume_original(db, job, scope, conversation):
-    """Release an untouched original inbound into the existing FIFO worker."""
+    """Release the latest original inbound, preserving all earlier pending sources."""
     from app.modules.sales_agent import continuity
-    from app.modules.sales_agent.models import AgentRun, SalesInboundJob, SalesMessage, OutboundMessage
-    from app.modules.sales_agent.conversation_scope import scoped_messages_query
-    from app.modules.sales_agent.engine_router import PIN_KEY, event_scope
-    from app.modules.sales_agent.continuity_policy import explicit_opt_out, evidenced_pause_reason
-    from app.modules.sales_agent.moderation import precheck
+    from app.modules.sales_agent.models import SalesInboundJob
+    from app.modules.sales_agent.engine_router import PIN_KEY
+    from .resume_batch import bind_inputs
     data=job.payload_json or {}
     inputs=continuity.pending(db,conversation)
     if [m.id for m in inputs]!=data.get('input_message_ids'):
         raise ScheduledObsolete('Pending set changed; a new resume episode is required.')
     if not inputs:
         raise ScheduledObsolete('No pending inbound remains.')
-    if len(inputs)!=1 or data.get('context_message_id'):
-        raise ProductionToolError('Multi-input or derived resume needs explicit reconciliation.')
-    inbound=inputs[0];meta=inbound.metadata_json or {}
-    if (inbound.id!=continuity.state(conversation).get('last_inbound_message_id') or not inbound.provider_message_id or
-            inbound.channel!=conversation.channel or inbound.status not in {'received','processed'} or
-            meta.get('lead_id')!=scope.lead_id or meta.get('project_id')!=scope.project_id or
-            not meta.get('continuity_recorded') or not meta.get('awaiting_resume') or meta.get('handled_by_message_id') or
-            meta.get('resume_context') or meta.get('hermes_control')):
-        raise ProductionToolError('Original pending inbound cannot be safely requeued.')
-    if explicit_opt_out(inbound.content) or evidenced_pause_reason(inbound.content) or precheck(inbound.content):
-        raise ProductionToolError('Pending control requires staff reconciliation before resume.')
-    event=f'{conversation.provider}:{inbound.provider_message_id}'
-    if db.query(AgentRun).filter_by(event_id=event).first() or db.query(AgentRun).filter_by(event_id='resume:'+job.id).first():
-        raise ProductionToolError('Original event already has an execution; do not reinterpret it.')
-    # Reject any earlier response/outbox after this inbound, even if unhandled.
-    # Human failed replies and unknown provider receipts may have reached the lead.
-    q=scoped_messages_query(db,conversation)
-    from sqlalchemy import or_,and_
-    if q.filter(SalesMessage.direction=='outbound',or_(SalesMessage.created_at>inbound.created_at,
-            and_(SalesMessage.created_at==inbound.created_at,SalesMessage.id>inbound.id))).first():
-        raise ProductionToolError('An intervening outbound requires review.')
-    if db.query(OutboundMessage).filter(OutboundMessage.conversation_id==conversation.id,
-            OutboundMessage.created_at>=inbound.created_at).first():
-        raise ProductionToolError('An existing outbox requires review.')
-    original=db.query(SalesInboundJob).filter_by(conversation_id=conversation.id,message_id=inbound.id).populate_existing().with_for_update().one_or_none()
-    if original is not None and original.status!='awaiting_resume':
-        raise ProductionToolError('Original inbound is not waiting for explicit resume.')
-    if db.query(SalesInboundJob).filter(SalesInboundJob.conversation_id==conversation.id,
-            SalesInboundJob.message_id!=inbound.id,SalesInboundJob.status.in_(['pending','retry','processing','review','failed'])).first():
-        raise ProductionToolError('Another inbound requires reconciliation.')
-    pinned=meta.get(PIN_KEY)
-    candidate={**event_scope(conversation,event),'engine':HERMES,'policy_version_id':data[PIN_KEY]['policy_version_id']}
-    if pinned is not None:
-        if any(pinned.get(k)!=v for k,v in candidate.items() if k!='policy_version_id') or not pinned.get('policy_version_id'):
-            raise ProductionToolError('Original event belongs to another engine or scope.')
-        from .staged_runtime import _policy
-        _policy(db,pinned['policy_version_id']);candidate=pinned
-    inbound.metadata_json={**meta,PIN_KEY:candidate,'awaiting_resume':False,'agent_turn_status':'pending',
-        'agent_turn_error':None,'hermes_resume_job_id':job.id}
+    if data.get('context_message_id'):
+        raise ProductionToolError('Derived resume needs explicit reconciliation.')
+    bindings,batch=bind_inputs(db,scope,conversation,inputs,policy_version_id=data[PIN_KEY]['policy_version_id'],resume_job_id=job.id)
+    inbound,original,_=bindings[-1]
+    for row,_,pin in bindings:
+        extra={'hermes_resume_batch':batch} if len(bindings)>1 else {}
+        row.metadata_json={**(row.metadata_json or {}),PIN_KEY:pin,**extra,'awaiting_resume':row.id!=inbound.id,
+            'agent_turn_status':'pending' if row.id==inbound.id else 'awaiting_resume','agent_turn_error':None,'hermes_resume_job_id':job.id}
     if original is None:
-        # The authenticated webhook deliberately leaves paused inputs without
-        # inbound jobs. Requeue the existing message, never mint another ID.
         original=SalesInboundJob(conversation_id=conversation.id,message_id=inbound.id,attempt_number=0)
         db.add(original)
     original.status='pending';original.claimed_at=None;original.processed_at=None;original.scheduled_at=now()
     original.error_code=original.error_message=None
     db.flush()
     job.status='processed';job.reason='hermes_resume_requeued';job.processed_at=now()
-    job.payload_json={**data,'requeued_inbound_job_id':original.id,'requeued_message_id':inbound.id}
+    job.payload_json={**data,'requeued_inbound_job_id':original.id,'requeued_message_id':inbound.id,
+        **({'hermes_resume_batch':batch} if len(bindings)>1 else {})}
     db.commit()
 
 

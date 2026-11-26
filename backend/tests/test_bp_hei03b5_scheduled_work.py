@@ -143,8 +143,8 @@ def test_resume_requeues_original_without_fabricated_message(real_lane):
     assert l.db.get(l.Job,'job').status=='processed' and len(l.calls)==len(l.sdk_calls)==1
 
 
-@pytest.mark.parametrize('case',['legacy_pin','previous_run','missing_provider','previous_outbox','stop','multiple'])
-def test_resume_requires_untouched_single_authenticated_inbound(real_lane,case):
+@pytest.mark.parametrize('case',['legacy_pin','previous_run','missing_provider','previous_outbox','stop','multiple_missing_provider'])
+def test_resume_requires_untouched_authenticated_inputs(real_lane,case):
     from app.modules.hermes_sales_core.scheduled_work import now
     l=real_lane;jid=resume(l);msg=l.db.get(l.Message,'inbound');job=follow(l,jid)
     if case=='legacy_pin':msg.metadata_json={**msg.metadata_json,'sales_engine_pin':{**msg.metadata_json['sales_engine_pin'],'engine':'langgraph'}}
@@ -153,7 +153,7 @@ def test_resume_requires_untouched_single_authenticated_inbound(real_lane,case):
     elif case=='previous_outbox':l.db.add(l.Out(conversation_id='conversation',idempotency_key='previous',channel='sms',provider='telnyx',content='uncertain',status='delivery_unknown'))
     elif case=='stop':msg.content='STOP'
     else:
-        l.db.add(l.Message(id='other',conversation_id='conversation',channel='sms',direction='inbound',role='user',content='Another question',status='received',provider_message_id='other-provider',created_at=msg.created_at-timedelta(seconds=1),metadata_json={'lead_id':'lead','project_id':'project','awaiting_resume':True,'continuity_recorded':True}))
+        l.db.add(l.Message(id='other',conversation_id='conversation',channel='sms',direction='inbound',role='user',content='Another question',status='received',provider_message_id=None,created_at=msg.created_at-timedelta(seconds=1),metadata_json={'lead_id':'lead','project_id':'project','awaiting_resume':True,'continuity_recorded':True}))
         job.payload_json={**job.payload_json,'input_message_ids':['other','inbound']}
     l.db.commit()
     with pytest.raises(PermissionError):execute(l,jid)

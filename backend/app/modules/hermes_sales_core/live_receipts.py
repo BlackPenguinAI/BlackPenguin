@@ -13,7 +13,7 @@ from .engine_selection import HERMES, require_selectable
 from .production_tools import LIVE_ENGINE_VERSION, LIVE_RECEIPT_PREFIX, ProductionToolError
 
 
-def validate_binding(scope, inbound, run, pin, row, out):
+def validate_binding(scope, inbound, run, pin, row, out, *, group=None):
     """Pure structural proof; caller independently loads scoped provider rows."""
     meta = row.metadata_json or {}
     imeta = inbound.metadata_json or {}
@@ -34,10 +34,18 @@ def validate_binding(scope, inbound, run, pin, row, out):
             or meta.get('engine') != 'hermes-agent' or meta.get('agent_run_id') != run.id
             or out.agent_run_id != run.id or (row.created_at,row.id) <= (inbound.created_at,inbound.id)):
         raise ProductionToolError('The accepted reply is not attributable to this inbound.')
-    group = meta.get('delivery_group') or {}
-    if group.get('total') != 1 or group.get('part') != 1 or not group.get('key'):
-        raise ProductionToolError('Live state requires a complete single-part delivery.')
-    if out.idempotency_key != group['key']:
+    actual = meta.get('delivery_group') or {}
+    if group is None:
+        if actual.get('total') != 1 or actual.get('part') != 1 or not actual.get('key'):
+            raise ProductionToolError('Live state requires an exact delivered group.')
+        expected_key=actual['key']
+    else:
+        key,index,total=group
+        if actual!={'key':key,'part':index,'total':total} or total<2:
+            raise ProductionToolError('Multipart delivery group changed.')
+        from .provider_delivery import part_key
+        expected_key=part_key(key,index,total)
+    if out.idempotency_key != expected_key:
         raise ProductionToolError('Delivery group does not match the outbox key.')
 
 
@@ -121,18 +129,27 @@ def commit_live_receipt(db, turn, *, run_id: str, outbound_message_id: str):
     row = q.filter_by(id=outbound_message_id).one()
     run = db.query(AgentRun).filter_by(id=run_id,conversation_id=conversation.id).populate_existing().with_for_update().one()
     pin = (inbound.metadata_json or {}).get('sales_engine_pin')
-    out = _verify_provider_receipt(db,row,scope,conversation.channel)
-    validate_binding(scope,inbound,run,pin,row,out)
+    from .resume_batch import verify_resume_batch
+    verify_resume_batch(db,scope,conversation,inbound,run=run)
+    from .multipart_reply import reply_parts,verified_group,state_for_group
+    parts=reply_parts(turn,conversation.channel)
+    if len(parts)>1:
+        ids=verified_group(db,scope,conversation,inbound,run,turn,row.id)
+    else:
+        out = _verify_provider_receipt(db,row,scope,conversation.channel)
+        validate_binding(scope,inbound,run,pin,row,out)
+        ids=[row.id]
     check_epoch(conversation,run.input_snapshot['continuity_epoch'])
     from .live_coordinator import draft_envelope
     if (run.output_snapshot or {}).get('live_draft') != draft_envelope(turn):
         raise ProductionToolError('Receipt must match the immutable prepared draft.')
-    state = state_for_accepted_reply(turn,row)
+    state = state_for_group(turn) if len(ids)>1 else state_for_accepted_reply(turn,row)
     key = LIVE_RECEIPT_PREFIX+inbound.id
     prior = db.query(HermesSalesStateEvent).filter_by(**scope.__dict__,event_key=key).one_or_none()
     if prior:
         meta = (run.output_snapshot or {}).get('metadata') or {}
         if (run.status!='completed' or meta.get('message_id')!=row.id or meta.get('state_revision')!=prior.revision
+                or meta.get('message_ids',[row.id])!=ids
                 or prior.event_type!='outbound_choice_receipt' or prior.state_after!=state
                 or prior.payload_hash!=_hash(state)):
             raise ProductionToolError('Existing live state receipt is inconsistent.')
@@ -147,8 +164,9 @@ def commit_live_receipt(db, turn, *, run_id: str, outbound_message_id: str):
         raise ProductionToolError('A newer response supersedes this receipt.')
     committed = save(db,scope,expected_revision=prepared.expected_revision,event_key=key,
         state=state,event_type='outbound_choice_receipt')
-    run.output_snapshot = {**(run.output_snapshot or {}),'reply':row.content,
+    run.output_snapshot = {**(run.output_snapshot or {}),'reply':prepared.result.reply,
         'metadata':{'engine':'hermes','runtime_lane':'live','message_id':row.id,
+                    **({'message_ids':ids} if len(ids)>1 else {}),
                     'state_revision':committed.revision,'delivery':'provider_accepted'},
         'tool_observations':_safe_observations(prepared.result.tool_observations)}
     run.status='completed';run.error_code=None;run.completed_at=datetime.now(timezone.utc).replace(tzinfo=None)

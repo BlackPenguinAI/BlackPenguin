@@ -135,6 +135,14 @@ def resolve(db: Session, token: str) -> tuple[ProjectOnboardingSource, SalesAsse
         from app.modules.sales_agent.models import AgentRun
         run = db.get(AgentRun, share.agent_run_id)
         metadata = ((run.output_snapshot or {}).get('metadata') or {}) if run else {}
+        if share.target_url and run and run.mode=='live' and run.graph_version.startswith('hermes/'):
+            # Hermes uses the exact per-part binding on its existing outbox,
+            # not the legacy run metadata. Recheck approval and URL on access.
+            from app.modules.hermes_sales_core.external_gallery import verify_external_share
+            try:
+                verify_external_share(db,share,run)
+            except (PermissionError,ValueError,TypeError,KeyError):
+                raise HTTPException(status_code=404, detail='This shared sales material changed or is unavailable.')
         if metadata.get('material_delivery_version'):
             from app.modules.sales_agent.material_delivery import validate_shares
             from app.modules.sales_agent.dialogue_store import Scope

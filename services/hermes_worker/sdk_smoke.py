@@ -37,7 +37,13 @@ def main():
     from app.modules.hermes_sales_core.scheduled_work import (
         process_hermes_scheduled_job, schedule_after_reply, authorize_scheduled, resume_original)
     assert all(callable(x) for x in (process_hermes_scheduled_job, schedule_after_reply, authorize_scheduled, resume_original))
-    print('HEI-03B.5 SDK offline import smoke: PASS (no model/provider calls)')
+    from app.modules.hermes_sales_core.resume_batch import bind_inputs, verify_resume_batch
+    from app.modules.hermes_sales_core.multipart_reply import reply_parts, verified_group
+    from app.modules.hermes_sales_core.external_gallery import verify_external_share
+    from app.modules.hermes_sales_core.engine_boundary import transition, check_scheduled
+    assert all(callable(x) for x in (bind_inputs, verify_resume_batch, reply_parts, verified_group,
+        verify_external_share, transition, check_scheduled))
+    print('HEI-03B.6 SDK offline import smoke: PASS (no model/provider calls)')
 
 
 if __name__ == '__main__':

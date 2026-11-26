@@ -55,6 +55,8 @@ def _live_scope(db,scope,inbound_id):
     # opt-out / escalation path must be wired before production activation.
     if explicit_opt_out(inbound.content) or evidenced_pause_reason(inbound.content) or precheck(inbound.content):
         raise ProductionToolError('Deterministic control handling required before inference.')
+    from .resume_batch import verify_resume_batch
+    verify_resume_batch(db,scope,conversation,inbound)
     return project,lead,conversation,inbound
 
 
@@ -77,8 +79,9 @@ def reserve_live_run(db,scope,*,inbound_message_id):
         raise ProductionToolError('Hermes configuration is disabled.')
     policy=_policy(db,pin['policy_version_id'])
     run=db.query(AgentRun).filter_by(event_id=event).populate_existing().with_for_update().one_or_none()
+    batch=(inbound.metadata_json or {}).get('hermes_resume_batch')
     if run:
-        if (run.conversation_id!=conversation.id or run.mode!='live' or run.graph_version!=LIVE_ENGINE_VERSION
+        if ((run.input_snapshot or {}).get('hermes_resume_batch')!=batch or run.conversation_id!=conversation.id or run.mode!='live' or run.graph_version!=LIVE_ENGINE_VERSION
                 or run.prompt_configuration_id!=pin['policy_version_id'] or (run.input_snapshot or {}).get(PIN_KEY)!=pin
                 or (run.input_snapshot or {}).get('message_id')!=inbound.id
                 or (run.input_snapshot or {}).get('continuity_epoch')!=epoch(conversation)):
@@ -87,7 +90,7 @@ def reserve_live_run(db,scope,*,inbound_message_id):
     run=AgentRun(conversation_id=conversation.id,event_id=event,mode='live',status='running',
         graph_version=LIVE_ENGINE_VERSION,toolset_version='hermes-tools/1.0',model=policy.model,
         prompt_configuration_id=pin['policy_version_id'],prompt_snapshot={'published_version_id':pin['policy_version_id']},
-        input_snapshot={'message_id':inbound.id,PIN_KEY:pin,'continuity_epoch':epoch(conversation),'runtime_lane':'live'},
+        input_snapshot={'message_id':inbound.id,PIN_KEY:pin,'continuity_epoch':epoch(conversation),'runtime_lane':'live',**({'hermes_resume_batch':deepcopy(batch)} if batch else {})},
         output_snapshot={})
     db.add(run);db.flush()
     return run
@@ -198,6 +201,14 @@ def prepare_live_turn(db,scope,*,inbound_message_id,run_id):
     data=build_bp_snapshot(db,scope,channel=conversation.channel)
     loaded=load(db,scope);working=deepcopy(loaded.data)
     history,latest=scoped_dialogue(db,scope,conversation,inbound)
+    from .resume_batch import verify_resume_batch
+    sources=verify_resume_batch(db,scope,conversation,inbound,run=run)
+    if len(sources)>1:
+        # The prior genuine messages are already present in chronological
+        # scoped history. Ensure no truncation or missing source is hidden.
+        expected=[{'role':'user','content':r.content} for r in sources[:-1]]
+        if history[-len(expected):]!=expected:
+            raise ProductionToolError('The complete pending context is not visible to the SDK.')
     invalidate_stale_choice(working,latest)
     from .scheduled_work import invalidate_boundary
     invalidate_boundary(working,latest,conversation)
@@ -220,6 +231,10 @@ def prepare_live_turn(db,scope,*,inbound_message_id,run_id):
         'state_revision':loaded.revision,
         'active_visits':active_visits(db,scope,now=datetime.now(timezone.utc)),
         'visit_change_guidance':'Use the active visit ID for cancellation or same-property time replacement. For a change, call the matching tool to produce a recap, never claim success. A later explicit yes may confirm only that exact recap. For replacement request an exact offered date and hour.'})
+    if len(sources)>1:
+        context['resume_guidance'] = ('The last '+str(len(sources))+' buyer messages are unanswered originals from a resumed conversation. '
+            'Address them together. Earlier messages are context, not current authorization. '
+            'Do not claim an operation occurred; ask for a fresh explicit instruction when needed.')
     port=_live_port(db,data,working,inbound,holds);port.prepare_context(context)
     # Copy ORM data needed for output validation before releasing locks.
     from types import SimpleNamespace
@@ -253,9 +268,10 @@ def prepare_live_turn(db,scope,*,inbound_message_id,run_id):
         raise ProductionToolError('Reply requires monetary reconciliation before dispatch.')
     if detect(reply,names=scoped_names(project_view,lead_view,data.commercial),output=True).needs_reentry:
         raise ProductionToolError('Reply requires language reconciliation before dispatch.')
-    if split_channel_text(reply,channel)!=[reply]:
-        raise ProductionToolError('Provisional live reply must fit a single unchanged message.')
     working.pop('_active_source_message_id',None)
-    return P04PreparedTurn(prepared=PreparedHermesTurn(scope=scope,inbound_message_id=inbound_message_id,
+    turn=P04PreparedTurn(prepared=PreparedHermesTurn(scope=scope,inbound_message_id=inbound_message_id,
         expected_revision=loaded.revision,result=replace(result,reply=reply),proposed_state=working),
         proposed_menus=deepcopy(port.menus),presented_media_offer=deepcopy(port.offered_media))
+    from .multipart_reply import reply_parts
+    reply_parts(turn,channel)
+    return turn

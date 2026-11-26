@@ -138,8 +138,16 @@ def finish_job(db,job_id,scope,inbound_id,message_id):
     from app.modules.sales_agent.continuity import check_epoch
     check_epoch(conversation,(row.metadata_json or {}).get('continuity_epoch'))
     _verify_provider_receipt(db,row,scope,conversation.channel)
-    if not continuity.mark_handled(db,conversation,row,[inbound.id]):
+    from .resume_batch import verify_resume_batch
+    from app.modules.sales_agent.models import AgentRun
+    run_id=(row.metadata_json or {}).get('agent_run_id')
+    run=db.get(AgentRun,run_id) if run_id else None
+    sources=verify_resume_batch(db,scope,conversation,inbound,run=run)
+    if not continuity.mark_handled(db,conversation,row,[source.id for source in sources]):
         raise ProductionToolError('Final message has not been accepted.')
+    db.flush()
+    if len(sources)>1 and not continuity.pending(db,conversation) and not conversation.is_paused:
+        value=continuity.state(conversation);value['waiting_for_lead']=value.get('last_inbound_message_id')==inbound.id;conversation.continuity_json=value
     if conversation.is_paused:
         value=continuity.state(conversation);value['waiting_for_lead']=False;conversation.continuity_json=value
     job.status='processed';job.processed_at=now();job.error_code=job.error_message=None
@@ -215,9 +223,16 @@ async def run_job(db,job_id,*,prepare=request_sdk_draft):
         delivery=provisional_delivery_plan(run,scope,inbound_id)
         delivery,plan=record_plan(db,run,conversation,delivery,kind='reply')
         ids=await dispatch_or_reconcile(db,scope,conversation,lead,run_id,inbound_id,plan,delivery)
-        reconcile_live_reply(db,scope,inbound_message_id=inbound_id,run_id=run_id,outbound_message_id=ids[0])
+        reconcile_live_reply(db,scope,inbound_message_id=inbound_id,run_id=run_id,outbound_message_id=ids[-1])
         db.commit()
     elif run.status!='completed':raise ProductionToolError('Runtime reservation requires review.')
+    # A completed informational group is reconciled from every original
+    # accepted part. Native writes deliberately require the single-part lane.
+    db.expire_all();run=db.get(AgentRun,run_id)
+    group_ids=((run.output_snapshot or {}).get('metadata') or {}).get('message_ids') or []
+    if len(group_ids)>1:
+        reconcile_live_reply(db,scope,inbound_message_id=inbound_id,run_id=run_id,outbound_message_id=group_ids[-1])
+        finish_job(db,job_id,scope,inbound_id,group_ids[-1]);return
     conversation,project,lead,inbound,run,reply,receipt,loaded=_load_live_turn(db,scope,inbound_id)
     last_id=reply.id;selected=next_native_effect(receipt.state_after,inbound.id)
     if selected['preferences'] and not (run.output_snapshot or {}).get('native_live_profile'):

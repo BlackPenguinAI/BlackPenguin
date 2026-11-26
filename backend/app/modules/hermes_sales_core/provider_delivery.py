@@ -49,7 +49,7 @@ def build_plan(key, kind, content, channel, *, share_hashes=None, operation_id=N
         raise ProductionToolError('Unsupported Hermes delivery plan.')
     canonical = render_channel_text(content, channel)
     parts = split_channel_text(canonical, channel)
-    if not parts or len(parts)>40 or (kind != 'material' and parts != [canonical]):
+    if not parts or len(parts)>40 or (kind not in {'material','reply'} and parts != [canonical]):
         raise ProductionToolError('Unsupported Hermes delivery partition.')
     share_hashes = share_hashes or {}
     if kind != 'material' and share_hashes:
@@ -78,6 +78,15 @@ def record_plan(db, run, conversation, delivery, *, kind, operation_id=None):
         raise ProductionToolError('Share scope changed before dispatch planning.')
     content,plan=build_plan(delivery['idempotency_key'],kind,delivery['content'],conversation.channel,
         share_hashes={s.id:s.token_hash for s in shares},operation_id=operation_id)
+    if kind=='reply' and len(plan['parts'])>1:
+        from .live_coordinator import restore_draft
+        from .multipart_reply import reply_parts
+        from .contracts import TurnScope
+        scope=TurnScope(conversation.company_id,conversation.project_id,conversation.id,conversation.lead_id)
+        turn=restore_draft((run.output_snapshot or {}).get('live_draft'),scope,(run.input_snapshot or {}).get('message_id'))
+        reply_parts(turn,conversation.channel)
+        if content!=turn.prepared.result.reply:
+            raise ProductionToolError('Multipart content changed before planning.')
     output=deepcopy(run.output_snapshot or {}); plans=output.setdefault('hermes_delivery_plans',{})
     if plan['key'] in plans and plans[plan['key']]!=plan:
         raise ProductionToolError('Immutable delivery plan changed.')
@@ -159,6 +168,8 @@ def authorize_part(db, conversation, lead, metadata, content, key, agent_run_id)
             or run.prompt_configuration_id!=pin.get('policy_version_id') or rmeta.get('sales_engine_pin')!=pin
             or rmeta.get('message_id')!=inbound.id or rmeta.get('continuity_epoch')!=metadata['continuity_epoch']):
         raise ProductionToolError('Run pin changed before provider send.')
+    from .resume_batch import verify_resume_batch
+    verify_resume_batch(db,scope,conversation,inbound,run=run)
     current=snapshot(db);policy=_policy(db,run.prompt_configuration_id)
     if not current['configuration'].get('enabled') or not current['published_version_id']:
         raise ProductionToolError('Hermes is no longer enabled.')
@@ -174,7 +185,10 @@ def authorize_part(db, conversation, lead, metadata, content, key, agent_run_id)
     if plan['kind']=='reply':
         from .live_coordinator import restore_draft
         turn=restore_draft((run.output_snapshot or {}).get('live_draft'),scope,inbound.id)
-        if run.status!='running' or content!=turn.prepared.result.reply:
+        from .multipart_reply import reply_parts
+        parts=reply_parts(turn,conversation.channel)
+        index=metadata['delivery_group']['part']
+        if run.status!='running' or len(parts)!=len(plan['parts']) or content!=parts[index-1]:
             raise ProductionToolError('Provisional reply no longer matches its draft.')
         observations=turn.prepared.result.tool_observations
         used={x['tool'] for x in observations if x.get('status')=='executed'}
