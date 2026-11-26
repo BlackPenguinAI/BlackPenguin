@@ -288,7 +288,8 @@ async def _dispatch(
     details = dict(metadata or {})
     details.setdefault("proposed_reply_before_format", content)
     from app.modules.hermes_sales_core.provider_delivery import ENGINE as HERMES_ENGINE, CONTROL_ENGINE
-    hermes = details.get("engine") in {HERMES_ENGINE, CONTROL_ENGINE}
+    from app.modules.hermes_sales_core.scheduled_work import SCHEDULED_ENGINE
+    hermes = details.get("engine") in {HERMES_ENGINE, CONTROL_ENGINE, SCHEDULED_ENGINE}
     exact_content = content
     template = details.get("event_kind") in {"meta_lead_first_contact", "manual_lead_first_contact"}
     automatic = role == "assistant" and not author_user_id and not template
@@ -383,7 +384,8 @@ async def _dispatch_part(
 ) -> SalesMessage:
     from .execution import simulated
     from app.modules.hermes_sales_core.provider_delivery import ENGINE as HERMES_ENGINE, CONTROL_ENGINE, authorize_part as authorize_hermes_part
-    hermes = (metadata or {}).get("engine") in {HERMES_ENGINE, CONTROL_ENGINE}
+    from app.modules.hermes_sales_core.scheduled_work import SCHEDULED_ENGINE
+    hermes = (metadata or {}).get("engine") in {HERMES_ENGINE, CONTROL_ENGINE, SCHEDULED_ENGINE}
     if hermes and (conversation.channel not in {"sms", "whatsapp"} or role != "assistant" or author_user_id
             or (metadata or {}).get("event_kind") in {"meta_lead_first_contact", "manual_lead_first_contact"}):
         raise PermissionError("Invalid Hermes delivery lane.")

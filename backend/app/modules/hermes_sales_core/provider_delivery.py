@@ -120,6 +120,9 @@ def _base(db, conversation, lead, metadata):
 
 def authorize_part(db, conversation, lead, metadata, content, key, agent_run_id):
     """Called twice by live_service: before durable enqueue and before provider."""
+    from .scheduled_work import SCHEDULED_ENGINE, authorize_scheduled
+    if metadata.get("engine")==SCHEDULED_ENGINE:
+        return authorize_scheduled(db,conversation,lead,metadata,content,key,agent_run_id)
     from app.modules.sales_agent.models import AgentRun
     from app.modules.sales_agent.continuity import state as continuity_state
     from app.modules.onboarding_versions import require_capability,active_approved

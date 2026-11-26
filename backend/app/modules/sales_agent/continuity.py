@@ -114,6 +114,9 @@ def queue_resume(db,conversation):
     cancel_jobs(db,conversation)
     value=state(conversation);value.update(epoch=value['epoch']+1,waiting_for_lead=False,offer_barrier=True)
     conversation.continuity_json=value
+    # SessionLocal disables autoflush. Include an inbound that just became
+    # pending before replacing an existing resume episode.
+    db.flush()
     inputs=pending(db,conversation)
     clear_offers(db,conversation,'resume-boundary:'+str(uuid.uuid4()))
     if not inputs:return None

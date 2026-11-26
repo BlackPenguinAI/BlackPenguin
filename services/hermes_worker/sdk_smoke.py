@@ -34,7 +34,10 @@ def main():
     from app.modules.hermes_sales_core.live_changes import execute_live_change, draft_change, verified_change
     from app.modules.hermes_sales_core.live_multi_material import draft_multi_material, subject_mapping
     assert all(callable(x) for x in (execute_live_change, draft_change, verified_change, draft_multi_material, subject_mapping))
-    print('HEI-03B.4 SDK offline import smoke: PASS (no model/provider calls)')
+    from app.modules.hermes_sales_core.scheduled_work import (
+        process_hermes_scheduled_job, schedule_after_reply, authorize_scheduled, resume_original)
+    assert all(callable(x) for x in (process_hermes_scheduled_job, schedule_after_reply, authorize_scheduled, resume_original))
+    print('HEI-03B.5 SDK offline import smoke: PASS (no model/provider calls)')
 
 
 if __name__ == '__main__':

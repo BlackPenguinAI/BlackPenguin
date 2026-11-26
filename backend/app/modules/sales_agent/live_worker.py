@@ -55,7 +55,8 @@ def _recover_stale_inbound_jobs() -> None:
     db = SessionLocal()
     try:
         cutoff = datetime.utcnow() - timedelta(minutes=10)
-        db.query(SalesFollowUpJob).filter(SalesFollowUpJob.status=='processing',SalesFollowUpJob.kind.in_(['resume','inactivity']),SalesFollowUpJob.claimed_at<cutoff).update({
+        db.query(SalesFollowUpJob).filter(SalesFollowUpJob.status=='processing',or_(SalesFollowUpJob.kind.in_(['resume','inactivity']),
+            SalesFollowUpJob.payload_json['hermes_scheduled'].as_boolean().is_(True)),SalesFollowUpJob.claimed_at<cutoff).update({
             SalesFollowUpJob.status:'pending',SalesFollowUpJob.claimed_at:None},synchronize_session=False)
         db.query(SalesInboundJob).filter(
             SalesInboundJob.status == "processing",
@@ -139,7 +140,9 @@ async def _routed_inbound_job(job_id):
 
 async def _routed_followup_job(job_id):
     from .engine_router import route_live_job
-    return await route_live_job(job_id, inbound=False, legacy_handler=process_live_followup_job)
+    from app.modules.hermes_sales_core.scheduled_work import process_hermes_scheduled_job
+    return await route_live_job(job_id, inbound=False, legacy_handler=process_live_followup_job,
+                                hermes_scheduled_handler=process_hermes_scheduled_job)
 
 
 async def run_live_followup_worker(stop_event: asyncio.Event) -> None:

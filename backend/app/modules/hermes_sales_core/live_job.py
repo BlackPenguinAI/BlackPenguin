@@ -148,6 +148,15 @@ def finish_job(db,job_id,scope,inbound_id,message_id):
     if meta.get('webhook_event_id'):
         event=db.query(ExternalWebhookEvent).filter_by(platform=meta.get('provider'),external_event_id=meta['webhook_event_id']).first()
         if event:event.status='processed';event.processed_at=now()
+    from .scheduled_work import schedule_after_reply
+    # Optional scheduling must never undo an already accepted inbound receipt.
+    # Preserve failures as explicit diagnostic metadata, with no blind re-send.
+    from fastapi import HTTPException
+    try:
+        with db.begin_nested():
+            schedule_after_reply(db,scope,conversation,lead,inbound,row)
+    except (ValueError, HTTPException):
+        inbound.metadata_json={**(inbound.metadata_json or {}),'hermes_scheduling_status':'review'}
     db.commit()
 
 

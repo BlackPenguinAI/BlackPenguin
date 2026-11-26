@@ -107,7 +107,8 @@ def resolve(db, conversation, event_id: str, *, pin: dict | None = None, run=Non
 
 async def route_live_job(job_id: str, *, inbound: bool,
                          legacy_handler: Callable[[str], Awaitable[None]],
-                         hermes_handler: Callable[[str], Awaitable[None]] | None = None) -> bool:
+                         hermes_handler: Callable[[str], Awaitable[None]] | None = None,
+                         hermes_scheduled_handler: Callable[[str], Awaitable[None]] | None = None) -> bool:
     """Route the existing claimed worker job; never run an SDK in the API.
 
     Pin in the already persisted message/job JSON before the old handler starts.
@@ -181,9 +182,10 @@ async def route_live_job(job_id: str, *, inbound: bool,
             if pin['engine'] == HERMES:
                 # A readiness change alone must never activate an SDK lane.
                 # A certified worker explicitly supplies a handler; no fallback.
-                if hermes_handler is None or not inbound:
+                candidate_handler = hermes_handler if inbound else hermes_scheduled_handler
+                if candidate_handler is None:
                     raise EngineUnavailable('No certified Hermes handler for this job type is installed.')
-                handler = hermes_handler
+                handler = candidate_handler
             else:
                 handler = legacy_handler
         except (EngineSelectionError, EngineUnavailable) as exc:

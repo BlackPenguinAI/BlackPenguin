@@ -199,6 +199,8 @@ def prepare_live_turn(db,scope,*,inbound_message_id,run_id):
     loaded=load(db,scope);working=deepcopy(loaded.data)
     history,latest=scoped_dialogue(db,scope,conversation,inbound)
     invalidate_stale_choice(working,latest)
+    from .scheduled_work import invalidate_boundary
+    invalidate_boundary(working,latest,conversation)
     from .live_changes import CHANGE_VERSION, active_visits
     pending_change=working.get('confirmation_request') or {}
     if pending_change.get('live_change_version')==CHANGE_VERSION and pending_change.get('status')=='awaiting_confirmation' and (latest is None or latest.id!=pending_change.get('recap_message_id')):
