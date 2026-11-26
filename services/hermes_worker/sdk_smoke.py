@@ -12,11 +12,14 @@ def main():
     from app.modules.hermes_sales_core.staged_runtime import execute_isolated_turn
     from app.modules.hermes_sales_core.engine_selection import live_hermes_ready
     from app.modules.hermes_sales_core.native_effects import execute_native_effect
+    from app.modules.hermes_sales_core.production_tools import (
+        execute_first_live_booking, persist_live_preferences, prepare_live_material_batch, material_delivery_receipt)
+    assert all(callable(x) for x in (execute_first_live_booking, persist_live_preferences, prepare_live_material_batch, material_delivery_receipt))
     assert callable(execute_staged_simulation)
     assert callable(execute_isolated_turn)
     assert callable(execute_native_effect)
-    assert not live_hermes_ready(), 'HEI-03A must not enable production Hermes'
-    print('HEI-03A SDK offline import smoke: PASS (no model/provider calls)')
+    assert not live_hermes_ready(), 'HEI-03B must not enable production Hermes'
+    print('HEI-03B SDK offline import smoke: PASS (no model/provider calls)')
 
 
 if __name__ == '__main__':
