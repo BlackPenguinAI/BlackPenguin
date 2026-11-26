@@ -34,7 +34,7 @@ def engine_from_run(graph_version: str) -> str:
     return HERMES if graph_version.lower().startswith('hermes') else LANGGRAPH
 
 
-def decide(*, scope: dict[str, str], status: dict[str, Any],
+def _decide(*, staged: bool, scope: dict[str, str], status: dict[str, Any],
            pin: dict | None = None, run=None) -> dict[str, Any]:
     """Return a validated, stable event pin; an existing run/pin wins over a switch.
 
@@ -58,11 +58,42 @@ def decide(*, scope: dict[str, str], status: dict[str, Any],
     if not isinstance(engine, str) or engine not in ENGINES:
         raise EngineSelectionError('No valid sales engine selected; staff review required.')
     # Existing events are never silently replayed through another engine.
-    require_selectable(engine)
+    if staged:
+        if engine != HERMES:
+            raise EngineSelectionError('Staged Hermes cannot take over another engine event.')
+    else:
+        require_selectable(engine)
     policy_version = (pin or {}).get('policy_version_id') if pin is not None else (
         getattr(run, 'prompt_configuration_id', None) if run is not None else
         status.get('published_version_id') if engine == HERMES else None)
     return {**scope, 'engine': engine, 'policy_version_id': policy_version}
+
+
+def decide(*, scope: dict[str, str], status: dict[str, Any],
+           pin: dict | None = None, run=None) -> dict[str, Any]:
+    """Normal dispatch always obeys the production readiness gate."""
+    return _decide(staged=False, scope=scope, status=status, pin=pin, run=run)
+
+
+def decide_staged_hermes(conversation, event_id: str, *, published_version_id: str | None,
+                         pin: dict | None = None, run=None) -> dict[str, Any]:
+    """Explicit isolated SDK lane; never a live/global engine selection.
+
+    The isolated runner independently checks environment, scoped consent and
+    persistence. Only it may call this function. Normal workers use decide().
+    """
+    if conversation.channel != 'simulation':
+        raise EngineSelectionError('Staged Hermes requires a simulation conversation.')
+    result = _decide(staged=True, scope=event_scope(conversation, event_id),
+                     status={'active_sales_engine': HERMES,
+                             'published_version_id': published_version_id},
+                     pin=pin, run=run)
+    version = result['policy_version_id']
+    if not isinstance(version, str) or not version:
+        raise EngineSelectionError('Staged Hermes requires a pinned published policy.')
+    if run is not None and run.prompt_configuration_id != version:
+        raise EngineSelectionError('Engine pin conflicts with the recorded policy version.')
+    return result
 
 
 def resolve(db, conversation, event_id: str, *, pin: dict | None = None, run=None):
