@@ -13,7 +13,7 @@ import pytest
 
 
 @pytest.fixture
-def real_lane(monkeypatch):
+def real_lane(monkeypatch, request):
     from sqlalchemy import create_engine
     from sqlalchemy.orm import Session
     from app.db.postgres import Base
@@ -33,19 +33,21 @@ def real_lane(monkeypatch):
     from app.modules.hermes_sales_core.live_coordinator import persist_live_draft
     from app.modules.hermes_sales_core.live_preparation import reserve_live_run
     from app.modules.sales_agent.engine_router import event_scope
-    engine=create_engine('sqlite:///:memory:')
+    external_engine = 'hei06_lane_engine' in request.fixturenames
+    engine = request.getfixturevalue('hei06_lane_engine') if external_engine else create_engine('sqlite:///:memory:')
     Base.metadata.create_all(engine)
     db=Session(engine,autoflush=False)
     scope=TurnScope('co','project','conversation','lead')
     timestamp=datetime.now(timezone.utc).replace(tzinfo=None)-timedelta(seconds=2)
     policy={**baseline(),'enabled':True}
-    db.add_all([Company(id='co',name='Test Company',country_code='US',is_active=True),
-        Project(id='project',company_id='co',name='Test Homes',city='Test City',country='US',timezone='America/Lima',is_active=True,is_demo=False),
-        ProjectProfile(id='profile',project_id='project',final_approved=True,profile_data={},field_states={}),
+    db.add(Company(id='co',name='Test Company',country_code='US',is_active=True));db.flush()
+    db.add(Project(id='project',company_id='co',name='Test Homes',city='Test City',country='US',timezone='America/Lima',is_active=True,is_demo=False));db.flush()
+    db.add_all([ProjectProfile(id='profile',project_id='project',final_approved=True,profile_data={},field_states={}),
         Lead(id='lead',company_id='co',project_id='project',full_name='Test Buyer',phone='+15550000001',
              consent_status='granted',is_opt_out=False,agent_status='active',is_demo=False),
         HermesGlobalVersion(id='version',version=1,configuration=policy,is_published=True,published_at=timestamp),
         HermesGlobalSettings(id='global',last_version=1,published_version_id='version',configuration={**policy,'active_sales_engine':'hermes'})])
+    db.flush()
     conversation=SalesConversation(id='conversation',company_id='co',project_id='project',lead_id='lead',
         provider='telnyx',channel='sms',is_paused=False,continuity_json={'lead_id':'lead','project_id':'project','epoch':1,'last_inbound_message_id':'inbound'})
     pin={**event_scope(conversation,'telnyx:provider-in'),'engine':'hermes','policy_version_id':'version'}
@@ -53,7 +55,7 @@ def real_lane(monkeypatch):
         content='Tell me about the property.',status='received',provider_message_id='provider-in',created_at=timestamp,
         metadata_json={'lead_id':'lead','project_id':'project','continuity_recorded':True,'sales_engine_pin':pin})
     job=SalesInboundJob(id='job',conversation_id='conversation',message_id='inbound',status='processing',attempt_number=1)
-    db.add_all([conversation,inbound,job]);db.commit()
+    db.add(conversation);db.flush();db.add(inbound);db.flush();db.add(job);db.commit()
     monkeypatch.setattr(engine_selection,'live_hermes_ready',lambda:True)
     calls=[];sdk_calls=[];status=['sent']
     async def fake_provider(*args,**kwargs):
@@ -75,7 +77,9 @@ def real_lane(monkeypatch):
             job=live_job,delivery=provider_delivery,service=live_service,sdk_service=sdk_service,
             Conversation=SalesConversation,Message=SalesMessage,Job=SalesInboundJob,Lead=Lead,Run=AgentRun,Out=OutboundMessage,
             selection=engine_selection,load=load)
-    finally:db.close();engine.dispose()
+    finally:
+        db.close()
+        if not external_engine:engine.dispose()
 
 
 def run(lane):
@@ -206,7 +210,7 @@ def test_real_material_issue_dispatch_and_receipt(real_lane,tmp_path,monkeypatch
     l=real_lane;db=l.db
     monkeypatch.setattr(settings,'PROJECT_UPLOAD_ROOT',str(tmp_path))
     monkeypatch.setattr(settings,'PUBLIC_APP_URL','https://example.invalid')
-    db.add(ProjectPropertyType(id='type-a',project_id='project',name='Van Buren',review_status='confirmed',bedrooms=3))
+    db.add(ProjectPropertyType(id='type-a',project_id='project',name='Van Buren',review_status='confirmed',bedrooms=3));db.flush()
     db.get(l.Message,'inbound').content='Please send me the brochure for Van Buren.'
     asset_ids=[]
     for i in range(2):
@@ -215,7 +219,7 @@ def test_real_material_issue_dispatch_and_receipt(real_lane,tmp_path,monkeypatch
         source=ProjectOnboardingSource(id=f'source-{i}',project_id='project',kind=ProjectSourceKind.UPLOADED_FILE,
             status=ProjectSourceStatus.READY,name=f'Brochure {i}',mime_type='application/pdf',storage_path=f'{i}.pdf',
             is_encrypted=False,content_hash=sha256(payload).hexdigest())
-        db.add(source)
+        db.add(source);db.flush()
         asset=ProjectSalesAsset(id=f'asset-{i}',company_id='co',project_id='project',property_type_id='type-a',source_id=source.id,
             asset_type='brochure',content_tags=['brochure'],display_name=f'Brochure {i}',approval_status='approved',
             approved_at=datetime.now(timezone.utc).replace(tzinfo=None),allowed_channels=['sms','whatsapp'])
@@ -266,8 +270,9 @@ def test_real_booking_effect_and_confirmation(real_lane):
     db.add_all([ProjectPropertyType(id='type-a',project_id='project',name='Van Buren',review_status='confirmed',
                 available_units=1,inventory_updated_at=clock.replace(tzinfo=None)),
         User(id='advisor',company_id='co',first_name='Test',last_name='Advisor',email='advisor@example.invalid',
-             hashed_password='not-a-real-password',role=UserRole.SALES,is_active=True),
-        ProjectUserAssignment(id='assignment',project_id='project',user_id='advisor',responsibility='sales',
+             hashed_password='not-a-real-password',role=UserRole.SALES,is_active=True)])
+    db.flush()
+    db.add_all([ProjectUserAssignment(id='assignment',project_id='project',user_id='advisor',responsibility='sales',
             sales_enabled=True,accepts_appointments=True,is_active=True),
         SalesAvailabilityBlock(id='slot',user_id='advisor',starts_at=starts.replace(tzinfo=None),
             ends_at=(starts+timedelta(hours=1)).replace(tzinfo=None),timezone='America/Lima')])

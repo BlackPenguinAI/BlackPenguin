@@ -20,9 +20,11 @@ def setup_visit(l, kind):
     local=replacement.astimezone(zone);date=local.date().isoformat();hour=local.strftime('%H:%M')
     db.get(Project,'project').address='123 Main Street'
     db.add_all([ProjectPropertyType(id='type-a',project_id='project',name='Van Buren',review_status='confirmed',available_units=1,inventory_updated_at=clock.replace(tzinfo=None)),
-        User(id='advisor',company_id='co',first_name='Test',last_name='Advisor',email='advisor@example.invalid',hashed_password='fake',role=UserRole.SALES,is_active=True),
-        ProjectUserAssignment(id='assignment',project_id='project',user_id='advisor',responsibility='sales',sales_enabled=True,accepts_appointments=True,is_active=True),
+        User(id='advisor',company_id='co',first_name='Test',last_name='Advisor',email='advisor@example.invalid',hashed_password='fake',role=UserRole.SALES,is_active=True)])
+    db.flush()
+    db.add_all([ProjectUserAssignment(id='assignment',project_id='project',user_id='advisor',responsibility='sales',sales_enabled=True,accepts_appointments=True,is_active=True),
         SalesAvailabilityBlock(id='slot',user_id='advisor',starts_at=replacement.replace(tzinfo=None),ends_at=(replacement+timedelta(hours=1)).replace(tzinfo=None),timezone='America/Lima')])
+    db.flush()
     db.add(Meeting(id='original',project_id='project',lead_id='lead',assigned_sales_user_id='advisor',meeting_time=original.replace(tzinfo=None),duration_minutes=60,
         modality='showroom',status=MeetingStatus.CONFIRMED,confirmation_status='confirmed',is_demo=False,visit_property_type_id='type-a',visit_address='123 Main Street',visit_location_label='Visit location',
         visit_context={'project_id':'project','project_name':'Test Homes','property_type_id':'type-a','property_type_name':'Van Buren','unit_id':None,'unit_code':None,'timezone':'America/Lima'}))

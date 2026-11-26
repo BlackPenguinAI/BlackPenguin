@@ -1,0 +1,110 @@
+{
+  "acceptance": {
+    "artifact_id": 15146904587,
+    "model_quality_evaluated": false,
+    "production_acceptance_proven": false,
+    "provider_calls": 0,
+    "pytest_passed": 136,
+    "sha256": "a37b2bce60723f11ce27c556b4eb80c4e2617eb45a32ba560b7f498a70f01d17",
+    "status": "REGRESSION_COMPLETE_LIVE_ACCEPTANCE_PENDING",
+    "summary": {
+      "FAIL": 0,
+      "NOT_RUN": 1,
+      "PASS": 63
+    }
+  },
+  "backend_regression": {
+    "count_discrepancy": 119,
+    "junit_header": {
+      "errors": 0,
+      "failures": 0,
+      "skipped": 14,
+      "tests": 4772
+    },
+    "shards": [
+      {
+        "artifact_id": 15148385662,
+        "junit_header": {
+          "errors": 0,
+          "failures": 0,
+          "skipped": 9,
+          "tests": 1449
+        },
+        "sha256": "80b3b4238dca544ac6c5d4ff849060821532b07b0c54f19a950744ab1bdbb5fc",
+        "shard": 1,
+        "testcase_nodes": {
+          "failed": 0,
+          "passed": 1429,
+          "skipped": 9,
+          "total": 1438
+        }
+      },
+      {
+        "artifact_id": 15147822288,
+        "junit_header": {
+          "errors": 0,
+          "failures": 0,
+          "skipped": 5,
+          "tests": 1674
+        },
+        "sha256": "03d5d934591022cc5b7dc99a24e70f1a32f22ea276823b17ca524050651ad20a",
+        "shard": 2,
+        "testcase_nodes": {
+          "failed": 0,
+          "passed": 1597,
+          "skipped": 5,
+          "total": 1602
+        }
+      },
+      {
+        "artifact_id": 15148895248,
+        "junit_header": {
+          "errors": 0,
+          "failures": 0,
+          "skipped": 0,
+          "tests": 1649
+        },
+        "sha256": "4683ef2cd72e656d9fae594b1ec47d7a25d42b27eddbd077e9c72f7e73e2df56",
+        "shard": 3,
+        "testcase_nodes": {
+          "failed": 0,
+          "passed": 1613,
+          "skipped": 0,
+          "total": 1613
+        }
+      }
+    ],
+    "test_plan_sha256": "35950938f5539f5131767e30ea57bca0e75309e38bc9cb094b1a277785729459",
+    "testcase_nodes": {
+      "failed": 0,
+      "passed": 4639,
+      "skipped": 14,
+      "total": 4653
+    }
+  },
+  "candidate_commit": "f00049e61673e287bb7240cf73ca162cbcc39fa8",
+  "frontend_build": "PASS",
+  "frontend_hei04_hei05_vitest": "NOT_VERIFIED_BY_DEPLOY_WORKFLOW",
+  "hei_regression": {
+    "failed": 0,
+    "passed": 318,
+    "skipped": 0,
+    "total": 318
+  },
+  "openrouter_real_sdk": "NOT_RUN",
+  "pinned_sdk_import": "NOT_RUN",
+  "postgres": {
+    "failed": 0,
+    "scope": "11 historical Sales tests plus 3 P07 Hermes state/migration contract tests",
+    "skipped": 0,
+    "status": "PASS",
+    "total": 14
+  },
+  "production_readiness": "CLOSED",
+  "real_google_calendar": "NOT_RUN",
+  "real_telnyx_sms_whatsapp": "NOT_RUN",
+  "schema": "hei06-baseline-evidence/1",
+  "scope": "BASELINE_HEI05_ONLY_NOT_NEW_HEI06_CANDIDATE",
+  "workflow_run_id": 45880949169,
+  "workflow_url": "https://github.com/BlackPenguinAI/BlackPenguin/actions/runs/45880949169"
+}
