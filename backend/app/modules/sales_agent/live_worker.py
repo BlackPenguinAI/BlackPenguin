@@ -127,7 +127,17 @@ def _isolated_job(handler, job_id):
     Its private event loop can finish model/network awaits even while a webhook
     waits for a row. SQL waits in this job do not block the API event loop.
     """
-    asyncio.run(handler(job_id))
+    return asyncio.run(handler(job_id))
+
+
+async def _routed_inbound_job(job_id):
+    from .engine_router import route_live_job
+    return await route_live_job(job_id, inbound=True, legacy_handler=process_live_inbound_job)
+
+
+async def _routed_followup_job(job_id):
+    from .engine_router import route_live_job
+    return await route_live_job(job_id, inbound=False, legacy_handler=process_live_followup_job)
 
 
 async def run_live_followup_worker(stop_event: asyncio.Event) -> None:
@@ -174,8 +184,8 @@ async def _run_live_followup_worker(stop_event: asyncio.Event) -> None:
             inbound_ids = []
         for job_id in inbound_ids:
             try:
-                await asyncio.to_thread(_isolated_job, process_live_inbound_job, job_id)
-                await asyncio.to_thread(_progress,'inbound',completed=True)
+                routed = await asyncio.to_thread(_isolated_job, _routed_inbound_job, job_id)
+                await asyncio.to_thread(_progress,'inbound',completed=routed is not False)
             except Exception:
                 logger.exception("Live inbound agent turn failed", extra={"job_id": job_id})
         try:
@@ -187,8 +197,8 @@ async def _run_live_followup_worker(stop_event: asyncio.Event) -> None:
             due_ids=[]
         for job_id in due_ids:
             try:
-                await asyncio.to_thread(_isolated_job, process_live_followup_job, job_id)
-                await asyncio.to_thread(_progress,'followup',completed=True)
+                routed = await asyncio.to_thread(_isolated_job, _routed_followup_job, job_id)
+                await asyncio.to_thread(_progress,'followup',completed=routed is not False)
             except Exception:
                 logger.exception("Live SMS follow-up failed", extra={"job_id": job_id})
         try:

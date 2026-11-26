@@ -107,3 +107,7 @@ def get_api_consumption(
 # retained for onboarding/legacy compatibility and DO NOT configure Hermes.
 from app.modules.hermes_sales_core.staff_router import router as hermes_staff_router
 router.include_router(hermes_staff_router)
+
+# HEI-01A: explicit global engine selection, separate from prompt publishing.
+from app.modules.hermes_sales_core.engine_staff_router import router as engine_staff_router
+router.include_router(engine_staff_router)

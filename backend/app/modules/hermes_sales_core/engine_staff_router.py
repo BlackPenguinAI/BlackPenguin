@@ -1,0 +1,46 @@
+"""HEI-01A Staff-only selection API. No inference or business side effects."""
+from typing import Literal
+
+from fastapi import APIRouter, Depends, HTTPException, Response
+from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy.orm import Session
+
+from app.db.postgres import get_db
+from app.modules.auth.deps import RoleChecker
+from app.modules.users.models import User, UserRole
+from . import staff_config
+from .engine_selection import EngineSelectionError, EngineUnavailable
+
+router = APIRouter(prefix='/hermes', tags=['Hermes Staff Control'])
+staff_only = RoleChecker([UserRole.SUPERADMIN])
+
+
+class SelectionRequest(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    active_sales_engine: Literal['hermes', 'langgraph']
+    change_note: str = Field(min_length=1, max_length=400)
+
+
+def no_cache(response: Response) -> None:
+    response.headers['Cache-Control'] = 'no-store'
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+
+
+@router.get('/engine', dependencies=[Depends(no_cache)])
+def get_engine(db: Session = Depends(get_db), actor: User = Depends(staff_only)):
+    return staff_config.engine_status(db)
+
+
+@router.put('/engine', dependencies=[Depends(no_cache)])
+def update_engine(payload: SelectionRequest, db: Session = Depends(get_db),
+                  actor: User = Depends(staff_only)):
+    try:
+        return staff_config.select_sales_engine(db, engine=payload.active_sales_engine,
+            note=payload.change_note, actor_id=actor.id)
+    except EngineUnavailable as exc:
+        db.rollback()
+        raise HTTPException(status_code=409, detail={'code': 'HERMES_NOT_READY',
+            'message': str(exc)}) from exc
+    except (EngineSelectionError, ValueError) as exc:
+        db.rollback()
+        raise HTTPException(status_code=422, detail='Invalid sales engine selection or policy.') from exc

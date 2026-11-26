@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from .config import HermesSettings, PROMPT_PATH
 from .tool_schemas import SCHEMAS
 from .staff_models import HermesGlobalSettings, HermesGlobalVersion
+from . import engine_selection as routing
 
 DEFAULT_MODEL = 'openai/gpt-4o-mini'
 # Staff can *disable* a tool but never enable tools outside the pinned SDK
@@ -89,7 +90,8 @@ def normalized(value: dict[str, Any]) -> dict[str, Any]:
 def snapshot(db: Session) -> dict[str, Any]:
     settings = db.get(HermesGlobalSettings, 'global')
     return {
-        'configuration': deepcopy(settings.configuration) if settings and settings.published_version_id else baseline(),
+        'configuration': routing.prompt_policy(settings.configuration) if settings and settings.published_version_id else baseline(),
+        'engine_selection': routing.routing_status(settings.configuration if settings else None),
         'published_version_id': settings.published_version_id if settings else None,
         'revision': settings.last_version if settings else 0,
         'configuration_scope': 'global',
@@ -120,7 +122,9 @@ def serialize_version(value: HermesGlobalVersion, *, include_config: bool = Fals
               'created_at': value.created_at, 'published_at': value.published_at,
               'change_note': value.change_note, 'created_by_user_id': value.created_by_user_id}
     if include_config:
-        result['configuration'] = deepcopy(value.configuration)
+        result['configuration'] = routing.prompt_policy(value.configuration)
+        if routing.SELECTION_KEY in value.configuration:
+            result['active_sales_engine_at_change'] = value.configuration[routing.SELECTION_KEY]
     return result
 
 
@@ -147,13 +151,16 @@ def publish(db: Session, *, version_id: str, actor_id: str) -> dict:
     row = _locked_settings(db)
     version = find_version(db, version_id)
     # Validate even previously stored data; never allow a malformed draft.
-    policy = normalized(version.configuration)
+    policy = normalized(routing.prompt_policy(version.configuration))
+    selected_engine = routing.read_engine(row.configuration)
+    stored_selection = ({routing.SELECTION_KEY: selected_engine}
+                        if routing.SELECTION_KEY in row.configuration else {})
     db.query(HermesGlobalVersion).filter(HermesGlobalVersion.is_published.is_(True)).update(
         {HermesGlobalVersion.is_published: False}, synchronize_session=False)
     version.is_published = True
     version.published_at = datetime.now(timezone.utc)
     row.published_version_id = version.id
-    row.configuration = policy
+    row.configuration = {**policy, **stored_selection}
     row.updated_at = datetime.now(timezone.utc)
     db.commit()
     return snapshot(db)
@@ -162,7 +169,10 @@ def publish(db: Session, *, version_id: str, actor_id: str) -> dict:
 def restore(db: Session, *, version_id: str, actor_id: str) -> dict:
     row = _locked_settings(db)
     source = find_version(db, version_id)
-    policy = normalized(source.configuration)
+    policy = normalized(routing.prompt_policy(source.configuration))
+    selected_engine = routing.read_engine(row.configuration)
+    stored_selection = ({routing.SELECTION_KEY: selected_engine}
+                        if routing.SELECTION_KEY in row.configuration else {})
     row.last_version += 1
     db.query(HermesGlobalVersion).filter(HermesGlobalVersion.is_published.is_(True)).update(
         {HermesGlobalVersion.is_published: False}, synchronize_session=False)
@@ -172,7 +182,7 @@ def restore(db: Session, *, version_id: str, actor_id: str) -> dict:
     db.add(new)
     db.flush()
     row.published_version_id = new.id
-    row.configuration = policy
+    row.configuration = {**policy, **stored_selection}
     row.updated_at = datetime.now(timezone.utc)
     db.commit()
     return snapshot(db)
@@ -192,3 +202,49 @@ def settings_for_turn(db: Session) -> tuple[HermesSettings, str | None, frozense
                               model=policy.model, max_iterations=policy.max_iterations,
                               prompt=policy.system_prompt)
     return settings, current['published_version_id'], frozenset(policy.enabled_tools)
+
+
+def engine_status(db: Session) -> dict[str, Any]:
+    """Read the actual selector, without loading credentials or the SDK."""
+    row = db.get(HermesGlobalSettings, 'global')
+    return {**routing.routing_status(row.configuration if row else None),
+            'published_version_id': row.published_version_id if row else None,
+            'revision': row.last_version if row else 0}
+
+
+def select_sales_engine(db: Session, *, engine: str, note: str, actor_id: str) -> dict[str, Any]:
+    """Explicit audited change; prompt publish/restore cannot change the engine.
+
+    Uses existing P05 tables only. In HEI-01A Hermes activation is denied, even
+    when an older Hermes prompt version was published with enabled=True.
+    """
+    routing.require_selectable(engine)
+    if not isinstance(note, str) or not note.strip() or len(note) > 400:
+        raise ValueError('A change note of 1–400 characters is required.')
+    row = _locked_settings(db)
+    try:
+        previous = routing.read_engine(row.configuration)
+    except routing.EngineSelectionError:
+        previous = None
+    if previous == engine:
+        # No-op, not a synthetic version or a hidden prompt publication.
+        db.rollback()
+        return engine_status(db)
+    policy = normalized(routing.prompt_policy(row.configuration))
+    if engine == routing.HERMES and (not row.published_version_id or not policy['enabled']):
+        raise routing.EngineUnavailable('Publish an enabled Hermes policy before selecting Hermes.')
+    row.last_version += 1
+    now = datetime.now(timezone.utc)
+    db.query(HermesGlobalVersion).filter(HermesGlobalVersion.is_published.is_(True)).update(
+        {HermesGlobalVersion.is_published: False}, synchronize_session=False)
+    config = {**policy, routing.SELECTION_KEY: engine}
+    change = HermesGlobalVersion(version=row.last_version, configuration=deepcopy(config),
+        change_note=f'Sales engine {previous or "invalid"} -> {engine}: {note.strip()}',
+        created_by_user_id=actor_id, published_at=now, is_published=True)
+    db.add(change)
+    db.flush()
+    row.published_version_id = change.id
+    row.configuration = config
+    row.updated_at = now
+    db.commit()
+    return engine_status(db)

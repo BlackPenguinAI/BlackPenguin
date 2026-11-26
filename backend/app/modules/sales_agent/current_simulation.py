@@ -12,6 +12,9 @@ async def turn(db, *, company_id, lead_id, inbound_text, event_id=None,
                virtual_now=None, actor_user_id=None):
     from . import active_service as active, live_service as live
     from .service import get_or_create_conversation, _response
+    from .engine_router import resolve, PIN_KEY
+    from app.modules.hermes_sales_core.engine_selection import (
+        LANGGRAPH, EngineSelectionError, EngineUnavailable)
     lead = db.query(Lead).filter_by(id=lead_id, company_id=company_id, deleted_at=None).first()
     if not lead:
         raise HTTPException(404, 'Lead not found.')
@@ -28,6 +31,20 @@ async def turn(db, *, company_id, lead_id, inbound_text, event_id=None,
             return _response(previous, previous.output_snapshot or {})
     if lead.is_opt_out or (conversation.is_paused and conversation.pause_reason != 'Simulation/draft mode'):
         raise HTTPException(409, 'Review and resume the paused conversation before continuing.')
+    # HEI-01A selection precedes execution/unpause. P08 stays a separate isolated
+    # staging runner; do not silently route this UI simulation to legacy if
+    # a future Hermes engine selection has no executable adapter.
+    existing_inbound = db.query(SalesMessage).filter_by(
+        conversation_id=conversation.id, provider_message_id=event_id,
+        direction='inbound').first() if record_inbound else None
+    try:
+        pin = resolve(db, conversation, event_id, run=previous,
+                      pin=(existing_inbound.metadata_json or {}).get(PIN_KEY) if existing_inbound else None)
+        if pin['engine'] != LANGGRAPH:
+            raise EngineUnavailable('No certified Hermes simulator is connected.')
+    except (EngineSelectionError, EngineUnavailable) as exc:
+        db.rollback()
+        raise HTTPException(409, 'Sales engine routing requires staff review: ' + str(exc)) from exc
     simulation = db.query(SalesAgentSimulation).filter_by(conversation_id=conversation.id).first()
     clock = virtual_now or (simulation.virtual_now if simulation else datetime.utcnow())
     if clock.tzinfo:
@@ -46,14 +63,17 @@ async def turn(db, *, company_id, lead_id, inbound_text, event_id=None,
             if not inbound:
                 inbound = SalesMessage(conversation_id=conversation.id, channel='simulation', direction='inbound',
                     role='user', content=inbound_text, status='received', provider_message_id=event_id,
-                    created_at=clock, metadata_json={'lead_id':lead.id,'simulation':True})
+                    created_at=clock, metadata_json={'lead_id':lead.id,'simulation':True, PIN_KEY:pin})
                 db.add(inbound); db.commit()
+            elif (inbound.metadata_json or {}).get(PIN_KEY) != pin:
+                inbound.metadata_json = {**(inbound.metadata_json or {}), PIN_KEY: pin}
+                db.commit()
             await active.maybe_process_active(db, conversation, inbound, event_id_override=event_id)
             run = db.query(AgentRun).filter_by(event_id=event_id).one()
         else:
             run = previous or AgentRun(conversation_id=conversation.id, event_id=event_id, mode='simulation',
                 graph_version=active.ENGINE, toolset_version='sales-actions/1.0', model='deterministic/current',
-                prompt_snapshot={}, input_snapshot={'event_kind':event_kind})
+                prompt_snapshot={}, input_snapshot={'event_kind':event_kind, PIN_KEY:pin})
             if event_kind == 'follow_up':
                 if active.active_followup_requires_review(db,conversation):
                     run.status='blocked';run.output_snapshot={'reply':None,'intent':'scheduled_follow_up','proposed_actions':[]};db.add(run);db.commit()
