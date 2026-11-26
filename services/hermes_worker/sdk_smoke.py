@@ -11,10 +11,12 @@ def main():
     from app.modules.hermes_sales_core.p08_simulation import execute_staged_simulation
     from app.modules.hermes_sales_core.staged_runtime import execute_isolated_turn
     from app.modules.hermes_sales_core.engine_selection import live_hermes_ready
+    from app.modules.hermes_sales_core.native_effects import execute_native_effect
     assert callable(execute_staged_simulation)
     assert callable(execute_isolated_turn)
-    assert not live_hermes_ready(), 'HEI-01B must not enable production Hermes'
-    print('HEI-01B SDK offline import smoke: PASS (no model/provider calls)')
+    assert callable(execute_native_effect)
+    assert not live_hermes_ready(), 'HEI-03A must not enable production Hermes'
+    print('HEI-03A SDK offline import smoke: PASS (no model/provider calls)')
 
 
 if __name__ == '__main__':

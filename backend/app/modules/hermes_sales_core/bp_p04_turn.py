@@ -79,6 +79,8 @@ def prepare_p04_simulation_turn(db, scope: TurnScope, *, inbound_message_id: str
                                channel='simulation'))
     if isinstance(port, ParityOperationalPort):
         result = replace(result, reply=port.finalize_reply(result.reply))
+    from .native_effects import pending_reply
+    result = replace(result, reply=pending_reply(working, inbound.id, result.reply))
     working.pop('_active_source_message_id', None)
     return P04PreparedTurn(
         prepared=PreparedHermesTurn(scope=scope, inbound_message_id=inbound.id,
