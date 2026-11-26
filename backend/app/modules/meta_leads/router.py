@@ -16,11 +16,11 @@ from app.db.postgres import get_db
 from app.modules.projects.models import MetaConnection, Project, ProjectCampaign
 from app.modules.projects.meta_service import decrypt_connection_token
 from app.modules.sales_agent.models import ExternalWebhookEvent
-from app.modules.sales_agent.live_service import start_live_lead
+from app.modules.sales_agent.p09_live_entry import start_live_lead
+from app.integrations.messaging_gateway import destination_channel
 from app.modules.sales_crm.models import Lead, LeadConsentEvent
 from app.modules.system_settings import services as system_settings
 from app.modules.governance.services import enqueue_notification
-
 
 router = APIRouter()
 
@@ -162,6 +162,8 @@ async def receive(
                 project = campaign.project
                 phone = fields.get("phone_number") or fields.get("phone") or ""
                 full_name = fields.get("full_name") or fields.get("name") or "Meta Lead"
+                # The country route is resolved when delivery begins; Meta must
+                # not pin every phone number to SMS before country validation.
                 lead = Lead(
                     company_id=project.company_id,
                     project_id=project.id,
@@ -172,7 +174,7 @@ async def receive(
                     source="Meta Lead Ads",
                     platform="meta",
                     external_lead_id=str(leadgen_id),
-                    preferred_channel="sms" if phone else "email",
+                    preferred_channel=None,
                     channel_address=phone or fields.get("email"),
                     consent_status="captured_by_source",
                     consent_captured_at=datetime.utcnow(),
@@ -201,10 +203,17 @@ async def receive(
                     },
                     dedupe_key=f"new-meta-lead:{lead.id}",
                 )
-                db.add(LeadConsentEvent(
-                    lead_id=lead.id, channel="sms", action="consent_captured",
-                    source="meta_lead_form", evidence="Captured by configured Meta lead form.",
-                ))
+                # Capture source evidence under the geographically selected
+                # channel; it must not silently label every form as SMS.
+                # This is evidence of the source form, not a waiver of the
+                # provider or channel-specific consent policy.
+                captured_channel = destination_channel(phone)
+                if captured_channel:
+                    db.add(LeadConsentEvent(
+                        lead_id=lead.id, channel=captured_channel,
+                        action="consent_captured", source="meta_lead_form",
+                        evidence="Captured by configured Meta lead form; channel policy applies.",
+                    ))
                 event.status = "processed"
                 event.processed_at = datetime.utcnow()
                 db.commit()

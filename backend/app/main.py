@@ -1,7 +1,7 @@
 import asyncio
 
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware 
+from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.middleware import MultiTenantMiddleware
 
@@ -19,6 +19,7 @@ from app.modules.company_onboarding.router import router as company_onboarding_r
 from app.modules.projects.router import router as projects_router
 from app.modules.brokers.router import router as brokers_router
 from app.modules.sales_crm.router import router as sales_crm_router
+from app.modules.sales_crm.p09_delete import router as p09_delete_router
 from app.modules.dashboard.router import router as dashboard_router
 from app.modules.dashboard.legacy_router import router as legacy_dashboard_router
 from app.modules.health.router import router as health_router
@@ -34,7 +35,7 @@ from sqlalchemy import text
 from app.db.postgres import engine
 
 app = FastAPI(
-    title=settings.PROJECT_NAME, 
+    title=settings.PROJECT_NAME,
     version=settings.VERSION,
     description="Black Penguin Core API v2 - DDD Flat Architecture.",
 )
@@ -43,13 +44,13 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:4200",         
-        "https://blackpenguin.ai",       
-        "https://www.blackpenguin.ai"    
-    ], 
+        "http://localhost:4200",
+        "https://blackpenguin.ai",
+        "https://www.blackpenguin.ai"
+    ],
     allow_credentials=True,
-    allow_methods=["*"], 
-    allow_headers=["*"], 
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # 🚀 MIDDLEWARE MULTI-TENANT
@@ -83,6 +84,7 @@ app.include_router(brokers_router, prefix=f"{settings.API_V1_STR}/brokers", tags
 
 # 5. CRM, Agente de Ventas y Citas
 app.include_router(sales_crm_router, prefix=f"{settings.API_V1_STR}/sales", tags=["11. CRM & Ventas"])
+app.include_router(p09_delete_router, prefix=f"{settings.API_V1_STR}/sales", tags=["P09 Staff deletion preflight"])
 app.include_router(dashboard_router, prefix=f"{settings.API_V1_STR}/dashboard", tags=["12. Dashboard"])
 app.include_router(legacy_dashboard_router, prefix=f"{settings.API_V1_STR}/tenants", tags=["12. Dashboard"])
 app.include_router(health_router, prefix=f"{settings.API_V1_STR}/health", tags=["Health"])

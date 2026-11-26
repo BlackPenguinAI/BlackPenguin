@@ -9,13 +9,14 @@ from app.modules.system_settings.services import (
     get_messaging_routing_config, get_telnyx_company_config, get_twilio_config, provider_is_ready,
 )
 
-
 DESTINATION_PREFIXES = (
     ("+52", "MX"),
     ("+51", "PE"),
     ("+54", "AR"),
     ("+1", "US"),
 )
+
+COUNTRY_CHANNELS = {"US": "sms", "PE": "whatsapp", "MX": "whatsapp", "AR": "whatsapp"}
 
 
 def destination_country_code(phone_number: str | None) -> str | None:
@@ -25,6 +26,11 @@ def destination_country_code(phone_number: str | None) -> str | None:
     digits = "".join(character for character in phone_number if character.isdigit())
     normalized = f"+{digits}"
     return next((country for prefix, country in DESTINATION_PREFIXES if normalized.startswith(prefix)), None)
+
+
+def destination_channel(phone_number: str | None) -> str | None:
+    """The buyer's destination determines SMS versus WhatsApp, never a fallback."""
+    return COUNTRY_CHANNELS.get(destination_country_code(phone_number))
 
 
 def _channel_is_ready(db: Session, *, company_id: str, channel: str) -> bool:
@@ -59,43 +65,36 @@ def company_live_channel(
     db: Session, *, company_id: str, requested: str | None = None,
     destination_phone: str | None = None,
 ) -> str | None:
-    """Resolve only a verified channel owned by the Company."""
+    """Select a ready real channel scoped to Company and destination country.
+
+    A supplied destination is authoritative: even a legacy/requested ``sms``
+    value cannot force SMS for a Peru/Mexico/Argentina destination. With no
+    destination, keep compatibility for older internal callers (they must
+    migrate to passing the destination before activation).
+    """
+    if destination_phone is not None:
+        selected = destination_channel(destination_phone)
+        return selected if selected and _channel_is_ready(db, company_id=company_id, channel=selected) else None
     config = get_telnyx_company_config(db, company_id)
     policy = (config.primary_channel or "sms") if config else "sms"
-    if requested:
-        choices = [requested]
-    elif policy == "automatic":
-        country = destination_country_code(destination_phone)
-        choices = ["sms"] if country == "US" else (["whatsapp"] if country in {"MX", "PE", "AR"} else [])
-    else:
-        choices = [policy]
-    for channel in choices:
-        if _channel_is_ready(db, company_id=company_id, channel=channel):
-            return channel
-    return None
+    selected = requested if requested in {"sms", "whatsapp"} else (policy if policy in {"sms", "whatsapp"} else None)
+    return selected if selected and _channel_is_ready(db, company_id=company_id, channel=selected) else None
 
 
 def company_channel_preview(db: Session, *, company_id: str, destination_phone: str) -> dict:
-    """Explain the authoritative route before creating a live lead."""
+    """Explain the country route without making a simulated delivery."""
     config = get_telnyx_company_config(db, company_id)
     policy = (config.primary_channel or "sms") if config else "sms"
     country = destination_country_code(destination_phone)
-    expected = (
-        "sms" if policy == "automatic" and country == "US"
-        else "whatsapp" if policy == "automatic" and country in {"MX", "PE", "AR"}
-        else policy if policy in {"sms", "whatsapp"}
-        else None
-    )
-    channel = company_live_channel(
-        db, company_id=company_id, destination_phone=destination_phone,
-    )
+    expected = destination_channel(destination_phone)
+    channel = company_live_channel(db, company_id=company_id, destination_phone=destination_phone)
     labels = {"US": "United States", "MX": "Mexico", "PE": "Peru", "AR": "Argentina"}
-    if policy == "automatic" and not country:
-        detail = "This destination is not supported by the automatic SMS/WhatsApp routing policy."
-    elif expected and not channel:
-        detail = f"{expected.upper()} is required for this destination but is not verified and enabled for the Company."
+    if not expected:
+        detail = "No real messaging route is defined for this destination country. No message will be sent."
+    elif not channel:
+        detail = f"{expected.upper()} is required for this country but is not verified/enabled for this Company. No message will be sent."
     else:
-        detail = f"New conversations to this destination will use {channel.upper()}." if channel else "No live messaging route is available."
+        detail = f"New conversations to this destination will use live {channel.upper()}."
     return {
         "country_code": country,
         "country_name": labels.get(country),
