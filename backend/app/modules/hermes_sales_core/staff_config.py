@@ -204,6 +204,10 @@ def settings_for_turn(db: Session) -> tuple[HermesSettings, str | None, frozense
     return settings, current['published_version_id'], frozenset(policy.enabled_tools)
 
 
+class EngineSelectionConflict(RuntimeError):
+    """The administrator reviewed an older selector/publication snapshot."""
+
+
 def engine_status(db: Session) -> dict[str, Any]:
     """Read the actual selector, without loading credentials or the SDK."""
     row = db.get(HermesGlobalSettings, 'global')
@@ -212,7 +216,38 @@ def engine_status(db: Session) -> dict[str, Any]:
             'revision': row.last_version if row else 0}
 
 
-def select_sales_engine(db: Session, *, engine: str, note: str, actor_id: str) -> dict[str, Any]:
+def admin_engine_status(db: Session) -> dict[str, Any]:
+    """UI-only publication/readiness projection; never used on the turn hot path."""
+    row = db.get(HermesGlobalSettings, 'global')
+    status = routing.routing_status(row.configuration if row else None)
+    published_id = row.published_version_id if row else None
+    published = db.get(HermesGlobalVersion, published_id) if published_id else None
+    valid = enabled = False
+    model = None
+    if published is not None and published.is_published and isinstance(row.configuration, dict):
+        try:
+            policy = normalized(routing.prompt_policy(row.configuration))
+            # A policy shown as published must match the immutable version.
+            valid = policy == normalized(routing.prompt_policy(published.configuration))
+            if valid:
+                enabled = policy['enabled']
+                model = policy['model']
+        except (TypeError, ValueError, AttributeError):
+            pass
+    selectable = ['langgraph']
+    if status['hermes_live_ready'] and valid and enabled:
+        selectable.append('hermes')
+    return {**status, 'published_version_id': published_id,
+            'published_policy_version': published.version if published is not None else None,
+            'revision': row.last_version if row else 0,
+            'hermes_policy_published': bool(published is not None and published.is_published),
+            'hermes_policy_valid': valid, 'hermes_policy_enabled': enabled,
+            'hermes_policy_model': model, 'selectable_engines': selectable}
+
+
+def select_sales_engine(db: Session, *, engine: str, note: str, actor_id: str,
+                        expected_revision: int | None = None,
+                        expected_published_version_id: str | None = None) -> dict[str, Any]:
     """Explicit audited change; prompt publish/restore cannot change the engine.
 
     Uses existing P05 tables only. In HEI-01A Hermes activation is denied, even
@@ -222,6 +257,9 @@ def select_sales_engine(db: Session, *, engine: str, note: str, actor_id: str) -
     if not isinstance(note, str) or not note.strip() or len(note) > 400:
         raise ValueError('A change note of 1–400 characters is required.')
     row = _locked_settings(db)
+    if expected_revision is not None and (row.last_version != expected_revision
+            or row.published_version_id != expected_published_version_id):
+        raise EngineSelectionConflict('Sales routing or policy changed. Reload and review before selecting an engine.')
     try:
         previous = routing.read_engine(row.configuration)
     except routing.EngineSelectionError:
@@ -231,8 +269,11 @@ def select_sales_engine(db: Session, *, engine: str, note: str, actor_id: str) -
         db.rollback()
         return engine_status(db)
     policy = normalized(routing.prompt_policy(row.configuration))
-    if engine == routing.HERMES and (not row.published_version_id or not policy['enabled']):
-        raise routing.EngineUnavailable('Publish an enabled Hermes policy before selecting Hermes.')
+    if engine == routing.HERMES:
+        published = db.get(HermesGlobalVersion, row.published_version_id) if row.published_version_id else None
+        if (not published or not published.is_published or not policy['enabled']
+                or policy != normalized(routing.prompt_policy(published.configuration))):
+            raise routing.EngineUnavailable('Publish a valid, enabled Hermes policy before selecting Hermes.')
     row.last_version += 1
     now = datetime.now(timezone.utc)
     db.query(HermesGlobalVersion).filter(HermesGlobalVersion.is_published.is_(True)).update(

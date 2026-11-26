@@ -30,7 +30,7 @@ export const routes: Routes = [
       {path: 'data-export-audit', loadComponent: () => import('./features/admin-panel/export-audit/export-audit').then(m => m.ExportAuditComponent)},
       {path: 'plans', loadComponent: () => import('./features/admin-panel/plans/plans-page/plans-page').then(m => m.PlansPageComponent)},
       {path: 'ai-infrastructure', loadComponent: () => import('./features/admin-panel/ai-infrastructure/ai-infra-page/ai-infra-page').then(m => m.AiInfraPageComponent)},
-      {path: 'ai-settings', loadComponent: () => import('./features/admin-panel/ai-settings/ai-settings-page/ai-settings-page').then(m => m.AiSettingsPageComponent)},
+      {path: 'ai-settings', loadComponent: () => import('./features/admin-panel/sales-engine-control/legacy-settings-shell').then(m => m.LegacySettingsShellComponent)},
       // P05 is a separate Staff-only global control plane. No Company overrides.
       {path: 'ai-settings/hermes', loadComponent: () => import('./features/admin-panel/hermes-sales/hermes-sales').then(m => m.HermesSalesSettingsComponent)},
       {path: 'email-settings', loadComponent: () => import('./features/admin-panel/email-settings/email-settings-page/email-settings-page').then(m => m.EmailSettingsPageComponent)},
