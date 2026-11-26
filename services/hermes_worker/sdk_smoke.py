@@ -18,8 +18,14 @@ def main():
     assert callable(execute_staged_simulation)
     assert callable(execute_isolated_turn)
     assert callable(execute_native_effect)
-    assert not live_hermes_ready(), 'HEI-03B must not enable production Hermes'
-    print('HEI-03B SDK offline import smoke: PASS (no model/provider calls)')
+    from app.modules.hermes_sales_core.live_preparation import prepare_live_turn, reserve_live_run
+    from app.modules.hermes_sales_core.live_receipts import commit_live_receipt
+    from app.modules.hermes_sales_core.live_materials import issue_live_material_batch, complete_live_material_batch
+    from app.modules.hermes_sales_core.live_coordinator import persist_live_draft, reconcile_live_reply, advance_live_effects
+    assert all(callable(x) for x in (prepare_live_turn, reserve_live_run, commit_live_receipt,
+        issue_live_material_batch, complete_live_material_batch, persist_live_draft, reconcile_live_reply, advance_live_effects))
+    assert not live_hermes_ready(), 'HEI-03B continuation must not enable production Hermes'
+    print('HEI-03B continuation SDK offline import smoke: PASS (no model/provider calls)')
 
 
 if __name__ == '__main__':

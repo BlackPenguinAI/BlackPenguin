@@ -106,7 +106,8 @@ def resolve(db, conversation, event_id: str, *, pin: dict | None = None, run=Non
 
 
 async def route_live_job(job_id: str, *, inbound: bool,
-                         legacy_handler: Callable[[str], Awaitable[None]]) -> bool:
+                         legacy_handler: Callable[[str], Awaitable[None]],
+                         hermes_handler: Callable[[str], Awaitable[None]] | None = None) -> bool:
     """Route the existing claimed worker job; never run an SDK in the API.
 
     Pin in the already persisted message/job JSON before the old handler starts.
@@ -122,7 +123,7 @@ async def route_live_job(job_id: str, *, inbound: bool,
 
     db = bounded(SessionLocal())
     job_model = SalesInboundJob if inbound else SalesFollowUpJob
-    should_dispatch = False
+    handler = None
     try:
         # Read claimed job; lock conversation before job to align with provider
         # intake/continuity code. Recheck claim after locks are acquired.
@@ -177,10 +178,14 @@ async def route_live_job(job_id: str, *, inbound: bool,
                 return False
         try:
             pin = resolve(db, conversation, event_id, pin=payload.get(PIN_KEY))
-            if pin['engine'] != LANGGRAPH:
-                # Defense in depth: a future change to readiness is not itself
-                # a live handler. This package cannot dispatch Hermes yet.
-                raise EngineUnavailable('No certified Hermes live handler is installed.')
+            if pin['engine'] == HERMES:
+                # A readiness change alone must never activate an SDK lane.
+                # A certified worker explicitly supplies a handler; no fallback.
+                if hermes_handler is None or not inbound:
+                    raise EngineUnavailable('No certified Hermes handler for this job type is installed.')
+                handler = hermes_handler
+            else:
+                handler = legacy_handler
         except (EngineSelectionError, EngineUnavailable) as exc:
             code = 'HERMES_NOT_READY' if isinstance(exc, EngineUnavailable) else 'ENGINE_SELECTION_REVIEW'
             job.status = 'review'
@@ -200,13 +205,12 @@ async def route_live_job(job_id: str, *, inbound: bool,
         else:
             job.payload_json = {**payload, PIN_KEY: pin}
         db.commit()
-        should_dispatch = True
     except Exception:
         db.rollback()
         raise
     finally:
         db.close()
-    if should_dispatch:
-        await legacy_handler(job_id)
+    if handler is not None:
+        await handler(job_id)
         return True
     return False
