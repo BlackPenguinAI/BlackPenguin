@@ -287,11 +287,18 @@ async def _dispatch(
     """Validate once, format losslessly, then deliver stable ordered blocks."""
     details = dict(metadata or {})
     details.setdefault("proposed_reply_before_format", content)
+    from app.modules.hermes_sales_core.provider_delivery import ENGINE as HERMES_ENGINE, CONTROL_ENGINE
+    hermes = details.get("engine") in {HERMES_ENGINE, CONTROL_ENGINE}
+    exact_content = content
     template = details.get("event_kind") in {"meta_lead_first_contact", "manual_lead_first_contact"}
     automatic = role == "assistant" and not author_user_id and not template
     run = db.get(AgentRun, agent_run_id) if agent_run_id else None
     if run and run.conversation_id != conversation.id:
         raise HTTPException(409, "The agent run does not belong to this conversation.")
+    if run and conversation.channel in {"sms", "whatsapp"} and run.graph_version.startswith("hermes") and not hermes:
+        raise PermissionError("A Hermes run requires its explicit dispatch authorization.")
+    if hermes and (not automatic or conversation.channel not in {"sms", "whatsapp"}):
+        raise PermissionError("Hermes delivery must use the authorized live assistant lane.")
     if automatic:
         content = render_channel_text(content, conversation.channel)
         if agent_run_id:
@@ -306,14 +313,14 @@ async def _dispatch(
                 resources = [line for line in before.splitlines() if "/projects/a/" in line and "http" in line]
                 if resources: content += "\n\n" + "\n".join(resources)
             details["monetary_validation"] = evidence
-            if run:
+            if run and not hermes:
                 run.output_snapshot = {**(run.output_snapshot or {}), "reply_before_dispatch":before,
                                        "reply":content, "dispatch_monetary_validation":evidence}
         # Final automatic-message boundary also covers cadence replies. Active
         # turns validate before committing effects; this is a delivery backstop.
         from .next_flow import selected as next_selected
         scope = conversation
-        if next_selected(scope):
+        if next_selected(scope) and details.get("engine") != CONTROL_ENGINE:
             from .language_policy import detect, scoped_names, OUTPUT_FALLBACK
             language_project = db.query(Project).filter_by(id=scope.project_id, company_id=scope.company_id).one()
             language_context = build_commercial_context(db, project=language_project, company_id=scope.company_id,
@@ -322,16 +329,18 @@ async def _dispatch(
             details['dispatch_language_policy'] = decision.metadata()
             if decision.needs_reentry:
                 content = OUTPUT_FALLBACK
-            if run:
+            if run and not hermes:
                 run.output_snapshot = {**(run.output_snapshot or {}), 'reply':content,
                                        'dispatch_language_policy':decision.metadata()}
         parts = split_channel_text(content, conversation.channel)
     else:
         parts = [content]
+    if hermes and content != exact_content:
+        raise PermissionError("Hermes delivery changed after preparation; review instead of sending.")
     if not parts:
         raise HTTPException(422, "There is no message content to send.")
     group_key = idempotency_key or (f"agent-reply:{agent_run_id}" if agent_run_id else f"reply:{uuid.uuid4()}")
-    if run:
+    if run and not hermes:
         run.output_snapshot = {**(run.output_snapshot or {}), "delivery_group":{"key":group_key,"total":len(parts)}}
     deliveries = []
     last = None
@@ -347,7 +356,7 @@ async def _dispatch(
                                     metadata=part_metadata,
                                     idempotency_key=group_key if len(parts)==1 else f"{group_key}:part:{index+1}")
         deliveries.append({"message_id":last.id, "part":index+1, "status":last.status})
-        if run:
+        if run and not hermes:
             run.output_snapshot = {**(run.output_snapshot or {}), "delivery_parts":list(deliveries)}
             db.add(run); db.commit()
     return last
@@ -373,6 +382,14 @@ async def _dispatch_part(
     idempotency_key: str | None = None,
 ) -> SalesMessage:
     from .execution import simulated
+    from app.modules.hermes_sales_core.provider_delivery import ENGINE as HERMES_ENGINE, CONTROL_ENGINE, authorize_part as authorize_hermes_part
+    hermes = (metadata or {}).get("engine") in {HERMES_ENGINE, CONTROL_ENGINE}
+    if hermes and (conversation.channel not in {"sms", "whatsapp"} or role != "assistant" or author_user_id
+            or (metadata or {}).get("event_kind") in {"meta_lead_first_contact", "manual_lead_first_contact"}):
+        raise PermissionError("Invalid Hermes delivery lane.")
+    pinned_run = db.get(AgentRun, agent_run_id) if agent_run_id else None
+    if pinned_run and conversation.channel in {"sms", "whatsapp"} and pinned_run.graph_version.startswith("hermes") and not hermes:
+        raise PermissionError("A Hermes run cannot bypass provider authorization.")
     if conversation.channel == 'simulation':
         if not simulated(conversation):
             raise PermissionError('Simulation delivery requires its scoped adapter.')
@@ -398,6 +415,8 @@ async def _dispatch_part(
     if message_metadata.get('engine') == 'sales-active/1.0':
         from .active_service import authorize_part
         authorize_part(db, conversation, lead, message_metadata)
+    if hermes:
+        authorize_hermes_part(db, conversation, lead, message_metadata, content, idempotency_key, agent_run_id)
     proposed_content = message_metadata.get("proposed_reply_before_format", content)
     message_metadata.setdefault("lead_id", lead.id)
     message_metadata.setdefault("project_id", conversation.project_id)
@@ -472,6 +491,9 @@ async def _dispatch_part(
             OutboundMessage.idempotency_key == idempotency_key,
         ).first()
         if existing_outbound:
+            if hermes:
+                from .delivery_policy import DeliveryUncertainError
+                raise DeliveryUncertainError("Existing Hermes outbox must be reconciled; no automatic resend.")
             if existing_outbound.status=='delivery_unknown':
                 from .delivery_policy import DeliveryUncertainError
                 raise DeliveryUncertainError('Provider acceptance is uncertain; review the original receipt.')
@@ -561,6 +583,13 @@ async def _dispatch_part(
             db.refresh(closing)
             if closing.status!='processing' or (closing.payload_json or {}).get('inbound_message_id')!=state(conversation).get('last_inbound_message_id'):
                 raise PermissionError('The inactivity episode changed before provider dispatch.')
+    if hermes:
+        try:
+            authorize_hermes_part(db, conversation, lead, message_metadata, content, idempotency_key, agent_run_id)
+        except Exception:
+            outbound.status = message.status = "failed"
+            db.commit()
+            raise
     try:
         if conversation.channel == "sms":
             result = await send_sms(

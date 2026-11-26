@@ -132,7 +132,9 @@ def _isolated_job(handler, job_id):
 
 async def _routed_inbound_job(job_id):
     from .engine_router import route_live_job
-    return await route_live_job(job_id, inbound=True, legacy_handler=process_live_inbound_job)
+    from app.modules.hermes_sales_core.live_job import process_hermes_inbound_job
+    return await route_live_job(job_id, inbound=True, legacy_handler=process_live_inbound_job,
+                                hermes_handler=process_hermes_inbound_job)
 
 
 async def _routed_followup_job(job_id):

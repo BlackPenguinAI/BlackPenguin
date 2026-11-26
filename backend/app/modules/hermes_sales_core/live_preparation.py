@@ -37,7 +37,7 @@ def _live_scope(db,scope,inbound_id):
     db.query(Lead).filter_by(id=scope.lead_id,company_id=scope.company_id,project_id=scope.project_id
         ).populate_existing().with_for_update().one()
     _,project,lead,conversation=require_scoped_entities(db,scope)
-    if (conversation.channel not in {'sms','whatsapp'} or lead.is_demo or lead.deleted_at
+    if (conversation.channel not in {'sms','whatsapp'} or lead.is_demo or project.is_demo or lead.deleted_at
             or lead.is_opt_out or lead.consent_status!='granted' or conversation.is_paused
             or lead.agent_status=='human_control'):
         raise ProductionToolError('Live conversation is not authorized.')
@@ -95,6 +95,8 @@ def reserve_live_run(db,scope,*,inbound_message_id):
 
 def _live_port(db,snapshot,working,inbound,holds):
     from .conversation_parity import ParityOperationalPort
+    from types import SimpleNamespace
+    inbound = SimpleNamespace(id=inbound.id, content=inbound.content)
     from .bp_read_port import BlackPenguinReadPort
     from .production_tools import _material_batch
     from app.modules.projects.locations import resolve_visit_location
@@ -116,7 +118,11 @@ def _live_port(db,snapshot,working,inbound,holds):
             # A held commercial topic must not be disclosed by broad catalog tools.
             if holds:
                 return {'error':'Approved commercial restrictions require staff review.','error_code':'COMMERCIAL_POLICY_HOLD'}
-            return super().invoke(name,arguments,scope)
+            try:
+                return super().invoke(name,arguments,scope)
+            finally:
+                # Draft tools only read; release any read/asset lock between calls.
+                db.rollback()
 
         def _verified_material(self,asset_id,row,requested_tag):
             # Actual channel + exact coverage, no SMS assumption for WhatsApp.
@@ -197,14 +203,20 @@ def prepare_live_turn(db,scope,*,inbound_message_id,run_id):
         'confirmation_request':deepcopy(working.get('confirmation_request')),
         'state_revision':loaded.revision})
     port=_live_port(db,data,working,inbound,holds);port.prepare_context(context)
+    # Copy ORM data needed for output validation before releasing locks.
+    from types import SimpleNamespace
+    project_view=SimpleNamespace(name=project.name,city=project.city)
+    lead_view=SimpleNamespace(full_name=lead.full_name,lead_profile_data=deepcopy(lead.lead_profile_data))
+    buyer_message=inbound.content; channel=conversation.channel
+    db.commit()  # no row lock or open transaction during LLM inference
     result=HermesSalesRuntime(settings,port,state_draft_tools=frozenset({'update_search_preferences'}),
         operational_draft_tools=LIVE_DRAFT_TOOLS,enabled_tools=enabled).process_turn(TurnRequest(
-            scope=scope,message=inbound.content,history=history,verified_context=context,channel=conversation.channel))
+            scope=scope,message=buyer_message,history=history,verified_context=context,channel=channel))
     reply=port.finalize_reply(result.reply)
     pending=(working.get('offered_assets') or {}).get('pending_request') or {}
     booking=working.get('confirmation_request') or {}
-    material_now=pending.get('source_inbound_message_id')==inbound.id
-    booking_now=booking.get('status')=='execution_requested' and booking.get('confirmed_inbound_message_id')==inbound.id
+    material_now=pending.get('source_inbound_message_id')==inbound_message_id
+    booking_now=booking.get('status')=='execution_requested' and booking.get('confirmed_inbound_message_id')==inbound_message_id
     if material_now and booking_now:
         raise ProductionToolError('Concurrent commercial effects need separate turns.')
     if material_now:reply='I found the requested material. I still need to validate the share before sending it.'
@@ -212,15 +224,15 @@ def prepare_live_turn(db,scope,*,inbound_message_id,run_id):
     from app.modules.sales_agent.response_policy import render_channel_text,split_channel_text
     from app.modules.sales_agent.monetary_policy import validate_monetary_reply
     from app.modules.sales_agent.language_policy import detect,scoped_names
-    reply=render_channel_text(reply,conversation.channel)
-    checked,evidence=validate_monetary_reply(reply,data.commercial,lead_profile=lead.lead_profile_data)
+    reply=render_channel_text(reply,channel)
+    checked,evidence=validate_monetary_reply(reply,data.commercial,lead_profile=lead_view.lead_profile_data)
     if checked!=reply or evidence.get('replaced'):
         raise ProductionToolError('Reply requires monetary reconciliation before dispatch.')
-    if detect(reply,names=scoped_names(project,lead,data.commercial),output=True).needs_reentry:
+    if detect(reply,names=scoped_names(project_view,lead_view,data.commercial),output=True).needs_reentry:
         raise ProductionToolError('Reply requires language reconciliation before dispatch.')
-    if split_channel_text(reply,conversation.channel)!=[reply]:
+    if split_channel_text(reply,channel)!=[reply]:
         raise ProductionToolError('Provisional live reply must fit a single unchanged message.')
     working.pop('_active_source_message_id',None)
-    return P04PreparedTurn(prepared=PreparedHermesTurn(scope=scope,inbound_message_id=inbound.id,
+    return P04PreparedTurn(prepared=PreparedHermesTurn(scope=scope,inbound_message_id=inbound_message_id,
         expected_revision=loaded.revision,result=replace(result,reply=reply),proposed_state=working),
         proposed_menus=deepcopy(port.menus),presented_media_offer=deepcopy(port.offered_media))

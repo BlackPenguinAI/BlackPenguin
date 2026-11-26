@@ -211,6 +211,6 @@ async def route_live_job(job_id: str, *, inbound: bool,
     finally:
         db.close()
     if handler is not None:
-        await handler(job_id)
-        return True
+        result = await handler(job_id)
+        return result is not False
     return False

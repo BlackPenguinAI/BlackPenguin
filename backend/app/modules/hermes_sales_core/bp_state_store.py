@@ -146,7 +146,7 @@ def _validate_references(db, scope: TurnScope, state: dict) -> None:
             published=db.query(SalesMessage).filter_by(
                 id=reply_id, conversation_id=scope.conversation_id,
                 direction='outbound',role='assistant').one_or_none()
-            if (not published or published.status not in {'sent','delivered','accepted'} or
+            if (not published or published.status not in {'sent','delivered','accepted','read'} or
                     (published.metadata_json or {}).get('lead_id',scope.lead_id)!=scope.lead_id):
                 raise PermissionError('Hermes slot offer must be tied to an actual delivered reply')
     confirmation = state.get('confirmation_request')
@@ -160,7 +160,7 @@ def _validate_references(db, scope: TurnScope, state: dict) -> None:
             recap=db.query(SalesMessage).filter_by(
                 id=recap_id,conversation_id=scope.conversation_id,
                 direction='outbound',role='assistant').one_or_none()
-            if (not recap or recap.status not in {'sent','delivered','accepted'} or
+            if (not recap or recap.status not in {'sent','delivered','accepted','read'} or
                     (recap.metadata_json or {}).get('lead_id',scope.lead_id)!=scope.lead_id):
                 raise PermissionError('Hermes confirmation recap was not actually delivered')
             from .bp_operation_receipts import recap_visible
@@ -197,7 +197,7 @@ def _validate_references(db, scope: TurnScope, state: dict) -> None:
             SalesMessage.direction == 'outbound',
         ).one_or_none()
         if (source is None or (source.metadata_json or {}).get('lead_id', scope.lead_id) != scope.lead_id
-                or source.status not in {'sent', 'delivered', 'accepted'}):
+                or source.status not in {'sent', 'delivered', 'accepted', 'read'}):
             raise PermissionError('Hermes menu is not tied to a valid outbound message')
         opts = menu.get('options') or []
         if not isinstance(opts, list) or not 2 <= len(opts) <= 10:

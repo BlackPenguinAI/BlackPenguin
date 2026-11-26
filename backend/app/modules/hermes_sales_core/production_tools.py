@@ -80,7 +80,7 @@ def _load_live_turn(db, scope, inbound_id):
     from app.modules.sales_agent.engine_router import PIN_KEY, event_scope
     from app.modules.sales_agent.continuity import check_epoch
     from app.modules.sales_crm.models import Lead
-    from app.modules.onboarding_versions import require_capability
+    from app.modules.onboarding_versions import require_capability,active_approved
     from .bp_context import require_scoped_entities
     from .bp_models import HermesSalesState, HermesSalesStateEvent
     from .bp_state_store import load
@@ -93,9 +93,11 @@ def _load_live_turn(db, scope, inbound_id):
     db.query(Lead).filter_by(id=scope.lead_id, company_id=scope.company_id,
         project_id=scope.project_id).populate_existing().with_for_update().one()
     _, project, lead, conversation = require_scoped_entities(db, scope)
-    if (lead.is_demo or lead.deleted_at or lead.is_opt_out or lead.consent_status != 'granted'
+    if (lead.is_demo or project.is_demo or lead.deleted_at or lead.is_opt_out or lead.consent_status != 'granted'
             or lead.agent_status == 'human_control' or conversation.is_paused):
         raise ProductionToolError('Live buyer authorization is not active.')
+    if not active_approved(project.profile):
+        raise ProductionToolError('Project approval was withdrawn before commercial execution.')
     require_capability(project.profile)
     inbound = scoped_messages_query(db, conversation).filter_by(id=inbound_id,
         channel=conversation.channel, direction='inbound', role='user').one_or_none()

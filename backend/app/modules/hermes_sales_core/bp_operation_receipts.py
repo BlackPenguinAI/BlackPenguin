@@ -51,7 +51,7 @@ def evidence_live_inbound(db, scope, inbound_message_id: str, *, after_reply_mes
             id=after_reply_message_id, conversation_id=scope.conversation_id,
             direction='outbound', role='assistant',
         ).one_or_none()
-        if not recap or recap.status not in {'sent','delivered','accepted'} or (
+        if not recap or recap.status not in {'sent','delivered','accepted','read'} or (
             recap.metadata_json or {}).get('lead_id',scope.lead_id)!=scope.lead_id:
             raise PermissionError('A delivered same-lead confirmation recap is required')
         if (inbound.created_at, inbound.id) <= (recap.created_at, recap.id):

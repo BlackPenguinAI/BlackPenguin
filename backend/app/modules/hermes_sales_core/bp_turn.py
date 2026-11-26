@@ -43,7 +43,7 @@ def _approved_history(db, scope: TurnScope, inbound):
             continue
         if (row.metadata_json or {}).get('lead_id', scope.lead_id) != scope.lead_id:
             continue
-        if row.direction == 'outbound' and row.status not in ('sent','delivered','accepted'):
+        if row.direction == 'outbound' and row.status not in ('sent','delivered','accepted','read'):
             continue
         # Preserve actual public dialogue, not model tool calls, drafts or
         # reserialized state that could be mistaken for something the lead said.

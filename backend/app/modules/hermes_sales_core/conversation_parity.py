@@ -204,7 +204,7 @@ def scoped_dialogue(db, scope, conversation, inbound):
             continue
         if meta.get('resume_context') or not isinstance(row.content, str) or not row.content.strip():
             continue
-        if row.direction == 'outbound' and row.role == 'assistant' and row.status in {'sent','delivered','accepted'}:
+        if row.direction == 'outbound' and row.role == 'assistant' and row.status in {'sent','delivered','accepted','read'}:
             if latest is None:
                 latest = row
             role = 'assistant'
