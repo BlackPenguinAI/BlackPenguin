@@ -3,7 +3,7 @@
 Start only in the isolated pinned Hermes image, on a private container network
 with no published port. It accepts IDs, not prompts or arbitrary tool requests.
 It writes only the prepared turn to the existing reserved AgentRun. The API
-worker owns every real effect. Closed by default; HEI-07A permits a scoped pilot.
+worker owns every real effect. The private runtime requires a claimed, pinned live event.
 """
 from __future__ import annotations
 import hmac
@@ -77,7 +77,7 @@ def prepare(request: PrepareRequest, authorization: str | None=Header(default=No
     try:
         if requested():
             if os.getenv('HERMES_RUNTIME_ROLE') != 'sdk' or not ready():
-                raise EngineUnavailable('Pilot SDK is not ready.')
+                raise EngineUnavailable('Private SDK is not ready.')
         else:
             require_selectable(HERMES)
     except EngineUnavailable:raise HTTPException(503,'Hermes live preparation is not certified.') from None
@@ -109,6 +109,6 @@ def readiness(authorization: str | None=Header(default=None)):
 
 
 # Historical offline harnesses retain their original endpoint surface.
-from .production_release import requested as _pilot_requested
-if _pilot_requested():
+from .production_release import requested as _production_requested
+if _production_requested():
     app.add_api_route('/internal/readiness', readiness, methods=['GET'])

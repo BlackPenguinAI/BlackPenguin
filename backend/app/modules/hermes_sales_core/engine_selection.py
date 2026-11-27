@@ -1,4 +1,4 @@
-"""Sales-only engine selection. HEI-07A permits an explicit, verified pilot only.
+"""Sales-only engine selection. Hermes requires a verified private production runtime.
 
 The production release contract is independent of prompt publication.
 """
@@ -71,7 +71,7 @@ def require_selectable(engine: str) -> None:
     if not isinstance(engine, str) or engine not in ENGINES:
         raise EngineSelectionError('Unknown sales engine.')
     if engine == HERMES and not live_hermes_ready():
-        raise EngineUnavailable('Hermes production pilot is not ready.')
+        raise EngineUnavailable('Hermes private production runtime is not ready.')
     if engine == HERMES:
         from .production_release import requested, require_execution
         if requested():

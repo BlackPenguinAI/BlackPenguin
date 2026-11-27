@@ -23,9 +23,8 @@ export interface EngineStatus {
   hermes_policy_valid: boolean;
   hermes_policy_enabled: boolean;
   hermes_policy_model: string | null;
-  hermes_release_mode?: 'closed' | 'pilot';
-  hermes_pilot_scope_count?: number;
-  hermes_pilot_until?: string | null;
+  hermes_release_mode?: 'closed' | 'global';
+  hermes_routing_scope?: string;
   hermes_global_certified?: boolean;
 }
 
@@ -50,14 +49,10 @@ export interface EngineStatus {
       <p *ngIf="notice" class="rounded border border-emerald-700 p-3 text-sm text-emerald-300" role="status">{{notice}}</p>
       <p *ngIf="loading" class="text-sm text-gray-400" role="status">Reading authoritative routing status…</p>
       <ng-container *ngIf="!loading && status as s">
-        <div *ngIf="s.hermes_release_mode === 'pilot'" class="rounded border border-amber-700/60 p-3 text-sm" role="status">
-          <strong>Production pilot — {{s.hermes_pilot_scope_count || 0}} test opportunities</strong>
-          <p>Hermes applies only to authorized test leads. Other new sales events remain on LangGraph. Global Hermes activation is not certified.</p>
-          <p *ngIf="s.hermes_pilot_until">Pilot expires: {{s.hermes_pilot_until | date:'medium'}}</p>
-        </div>
+        <p *ngIf="s.hermes_release_mode === 'global'" class="text-sm text-gray-400">Selection applies to all eligible Sales Agent events. No deployment is required to switch engines. Real provider acceptance must be verified separately.</p>
         <div class="grid gap-3 sm:grid-cols-3">
           <article class="rounded-lg border border-white/10 bg-black/30 p-3"><p class="text-xs text-gray-400">Selected engine</p><strong>{{name(s.active_sales_engine)}}</strong></article>
-          <article class="rounded-lg border border-white/10 bg-black/30 p-3"><p class="text-xs text-gray-400">Effective routing</p><strong>{{s.hermes_release_mode==='pilot' && s.effective_sales_engine==='hermes' ? 'Hermes pilot / LangGraph' : name(s.effective_sales_engine)}}</strong><p class="mt-1 text-xs text-gray-400">Routing state, not a provider health check.</p></article>
+          <article class="rounded-lg border border-white/10 bg-black/30 p-3"><p class="text-xs text-gray-400">Effective routing</p><strong>{{name(s.effective_sales_engine)}}</strong><p class="mt-1 text-xs text-gray-400">Routing state, not a provider health check.</p></article>
           <article class="rounded-lg border border-white/10 bg-black/30 p-3"><p class="text-xs text-gray-400">Target default</p><strong>{{name(s.target_default_engine)}}</strong><p class="mt-1 text-xs text-gray-400">Planned after certification, not automatically activated.</p></article>
         </div>
         <p *ngIf="s.error_code" class="rounded border border-amber-700 bg-amber-950/20 p-3 text-sm text-amber-100">Routing requires review: {{s.error_code}}. No automatic fallback is performed.</p>
@@ -72,7 +67,7 @@ export interface EngineStatus {
             <h3 class="font-semibold">Hermes Agent</h3>
             <p class="text-xs text-gray-400">Nous Research SDK · Independent global system prompt, model and permitted tools.</p>
             <dl class="grid gap-1 text-xs">
-              <div>Live readiness: <strong>{{s.hermes_live_ready?'Private SDK ready for pilot':'Blocked — readiness required'}}</strong></div>
+              <div>Live readiness: <strong>{{s.hermes_live_ready?'Private SDK ready':'Blocked — readiness required'}}</strong></div>
               <div>Policy: {{!s.hermes_policy_published?'Not published':!s.hermes_policy_valid?'Requires review':s.hermes_policy_enabled?'Published and enabled':'Published but disabled'}}</div>
               <div *ngIf="s.published_policy_version!==null">Published version: {{s.published_policy_version}}</div>
               <div *ngIf="s.hermes_policy_model">Model: {{s.hermes_policy_model}}</div>
@@ -84,7 +79,7 @@ export interface EngineStatus {
         <p class="text-xs text-gray-400">Automatic fallback: {{s.automatic_fallback?'Enabled — review required':'Disabled'}}. In-flight events retain their pinned engine; a selection applies to new eligible events only.</p>
         <section *ngIf="pending as target" class="rounded-lg border border-amber-700/60 bg-amber-950/10 p-4 space-y-3" aria-label="Confirm global engine selection">
           <h3 class="font-semibold">Change Sales Agent routing to {{name(target)}}</h3>
-          <p class="text-xs text-gray-400">Hermes selection is restricted to the authorized pilot opportunities in this release. LangGraph remains the explicit route for other new events. Existing prompt configurations and conversation history remain preserved. The server rechecks version and readiness.</p>
+          <p class="text-xs text-gray-400">This is a global Sales Agent change for all Companies and Projects. New eligible events use the selected engine. Existing prompt configurations and conversation history remain preserved. The server rechecks version and readiness.</p>
           <label class="block text-sm">Change note (required)
             <input [(ngModel)]="note" [ngModelOptions]="{standalone:true}" maxlength="400" [disabled]="writing || locked" class="mt-1 w-full rounded border border-white/20 bg-black p-2 text-white" placeholder="Why is this routing change needed?" />
           </label>
@@ -123,7 +118,7 @@ export class SalesEngineControlComponent implements OnInit, OnChanges, OnDestroy
     return !!s && s.selectable_engines?.includes(engine) === true && (engine !== 'hermes' || (s.hermes_live_ready && s.hermes_policy_published && s.hermes_policy_valid && s.hermes_policy_enabled));
   }
   blockReason(s: EngineStatus): string {
-    if (!s.hermes_live_ready) return 'HEI-06/07 readiness gate is closed. Publishing a prompt cannot activate Hermes.';
+    if (!s.hermes_live_ready) return 'Private Hermes runtime is unavailable or incompatible. Publishing a prompt cannot activate it.';
     if (!s.hermes_policy_published || !s.hermes_policy_valid || !s.hermes_policy_enabled) return 'Publish a valid enabled Hermes policy before selecting this engine.';
     return 'Engine selection is unavailable. Refresh and review server status.';
   }

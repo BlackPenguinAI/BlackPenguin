@@ -1,9 +1,7 @@
-"""HEI-07A isolated authorization/routing tests; no provider or DB calls."""
-import json
+"""HEI-07A.1 production runtime authorization/routing tests; no provider or DB calls."""
 import os
 import sys
 import unittest
-from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace, ModuleType
 from unittest.mock import MagicMock, patch
 from uuid import UUID
@@ -17,23 +15,21 @@ def uid(n):
     return str(UUID(int=n))
 
 
-class PilotTests(unittest.TestCase):
+class ProductionRuntimeTests(unittest.TestCase):
     def setUp(self):
         self.scope = dict(zip(release.FIELDS, map(uid, range(1, 5))))
         self.other = {**self.scope, 'lead_id': uid(9)}
         self.phone = '+12025550101'
         self.status = {'active_sales_engine': 'hermes', 'published_version_id': 'p1'}
-        self.env = {'ENVIRONMENT': 'production', 'HERMES_RELEASE_MODE': 'pilot',
+        self.env = {'ENVIRONMENT': 'production', 
                     'APP_COMMIT_SHA': 'a'*40, 'HERMES_RELEASE_SHA': 'a'*40,
-                    'HERMES_RUNTIME_ROLE': 'api', 'HERMES_INTERNAL_TOKEN': 'b'*64,
-                    'HERMES_PILOT_SCOPES': json.dumps([{**self.scope,'test_phone': self.phone}]),
-                    'HERMES_PILOT_UNTIL': (datetime.now(timezone.utc)+timedelta(hours=1)).strftime('%Y-%m-%dT%H:%M:%SZ')}
+                    'HERMES_RUNTIME_ROLE': 'api', 'HERMES_INTERNAL_TOKEN': 'b'*64}
         p = patch.dict(os.environ, self.env, clear=True)
         p.start(); self.addCleanup(p.stop)
         release._health_cache = (None,0,False)
 
     def test_default_closed(self):
-        os.environ.pop('HERMES_RELEASE_MODE')
+        os.environ.pop('HERMES_RUNTIME_ROLE')
         self.assertFalse(selection.live_hermes_ready())
         self.assertEqual(selection.routing_status(None)['available_engines'], ['langgraph'])
 
@@ -41,9 +37,14 @@ class PilotTests(unittest.TestCase):
         os.environ['ENVIRONMENT']='staging'
         self.assertFalse(release.ready())
 
-    def test_global_not_supported(self):
-        os.environ['HERMES_RELEASE_MODE']='global'
-        self.assertFalse(release.ready())
+    def test_no_manual_pilot_variables_required(self):
+        self.assertIsNotNone(release.configuration())
+        self.assertEqual(release.status_fields()['hermes_release_mode'], 'global')
+        self.assertFalse(release.status_fields()['hermes_global_certified'])
+        os.environ['HERMES_RELEASE_MODE']='closed'
+        os.environ['HERMES_PILOT_SCOPES']='not-json'
+        os.environ['HERMES_PILOT_UNTIL']='2000-01-01T00:00:00Z'
+        self.assertIsNotNone(release.configuration())
 
     def test_bad_revision(self):
         os.environ['HERMES_RELEASE_SHA']='c'*40
@@ -53,23 +54,18 @@ class PilotTests(unittest.TestCase):
         os.environ['HERMES_INTERNAL_TOKEN']='short'
         self.assertIsNone(release.configuration())
 
-    def test_duplicate_scope(self):
-        rows=json.loads(self.env['HERMES_PILOT_SCOPES']);os.environ['HERMES_PILOT_SCOPES']=json.dumps(rows*2)
-        self.assertIsNone(release.configuration())
-
-    def test_expired(self):
-        os.environ['HERMES_PILOT_UNTIL']='2000-01-01T00:00:00Z'
-        self.assertFalse(release.ready())
-        with self.assertRaises(selection.EngineUnavailable):
-            with release.bind_scope(self.scope): pass
-
-    def test_max_expiry(self):
-        os.environ['HERMES_PILOT_UNTIL']='2099-01-01T00:00:00Z'
-        self.assertIsNone(release.configuration())
-
-    def test_scope_exact(self):
-        self.assertTrue(release.allowed(self.scope)); self.assertFalse(release.allowed(self.other))
+    def test_new_lead_scope_valid(self):
+        self.assertTrue(release.allowed(self.scope))
+        self.assertTrue(release.allowed(self.other))
         self.assertFalse(release.allowed({'lead_id':self.scope['lead_id']}))
+
+    def test_invalid_scope_denied(self):
+        with self.assertRaises(selection.EngineUnavailable):
+            with release.bind_scope({'lead_id':'invalid'}): pass
+
+    def test_invalid_role_denied(self):
+        os.environ['HERMES_RUNTIME_ROLE']='onboarding'
+        self.assertFalse(release.ready())
 
     def test_nested_scope_denied_and_reset(self):
         with release.bind_scope(self.scope):
@@ -84,13 +80,16 @@ class PilotTests(unittest.TestCase):
         with release.admin_selection():
             with self.assertRaises(selection.EngineUnavailable): release.require_execution()
 
-    def test_nonpilot_explicit_legacy(self):
-        with patch.object(selection,'live_hermes_ready',return_value=False):
-            self.assertEqual(router.decide(scope=self.other,status=self.status)['engine'],'langgraph')
+    def test_new_leads_follow_global_selection(self):
+        with patch.object(selection,'live_hermes_ready',return_value=True):
+            for scope in (self.scope,self.other):
+                self.assertEqual(router.decide(scope=scope,status=self.status)['engine'],'hermes')
 
-    def test_pinned_hermes_outside_denied(self):
-        with self.assertRaises(selection.EngineUnavailable):
-            router.decide(scope=self.other,status=self.status,pin={**self.other,'engine':'hermes','policy_version_id':'p1'})
+    def test_pinned_hermes_preserved_on_rollback(self):
+        with patch.object(selection,'live_hermes_ready',return_value=True):
+            result=router.decide(scope=self.other,status={'active_sales_engine':'langgraph'},
+                pin={**self.other,'engine':'hermes','policy_version_id':'p1'})
+        self.assertEqual((result['engine'],result['policy_version_id']),('hermes','p1'))
 
     def test_pinned_legacy_preserved(self):
         self.assertEqual(router.decide(scope=self.scope,status=self.status,pin={**self.scope,'engine':'langgraph'})['engine'],'langgraph')
@@ -98,12 +97,12 @@ class PilotTests(unittest.TestCase):
     def test_selected_legacy_preserved(self):
         self.assertEqual(router.decide(scope=self.scope,status={'active_sales_engine':'langgraph'})['engine'],'langgraph')
 
-    def test_pilot_hermes_routes(self):
+    def test_hermes_routes(self):
         with patch.object(selection,'live_hermes_ready',return_value=True):
             pin=router.decide(scope=self.scope,status=self.status)
         self.assertEqual((pin['engine'],pin['policy_version_id']),('hermes','p1'))
 
-    def test_pilot_not_ready_no_fallback(self):
+    def test_not_ready_no_fallback(self):
         with patch.object(selection,'live_hermes_ready',return_value=False):
             with self.assertRaises(selection.EngineUnavailable): router.decide(scope=self.scope,status=self.status)
 
@@ -112,7 +111,7 @@ class PilotTests(unittest.TestCase):
         import httpx
         with patch.object(httpx,'Client') as client:
             response=client.return_value.__enter__.return_value.get.return_value
-            response.status_code=200; response.json.return_value={'status':'ready','release':cfg.revision,'scope_fingerprint':cfg.fingerprint,'mode':'pilot','transport':'private-sdk'}
+            response.status_code=200; response.json.return_value={'status':'ready','release':cfg.revision,'mode':'global','transport':'private-sdk'}
             self.assertTrue(release.ready())
             client.return_value.__enter__.return_value.get.assert_called_once_with(release.READY_URL,headers={'Authorization':'Bearer '+'b'*64})
             release._health_cache=(None,0,False)
@@ -125,20 +124,41 @@ class PilotTests(unittest.TestCase):
         os.environ['OPENROUTER_API_KEY']='fixture-not-real'
         self.assertTrue(release.ready())
 
-    def test_target_requires_test_flag_and_phone(self):
-        lead=SimpleNamespace(id=self.scope['lead_id'],company_id=self.scope['company_id'],project_id=self.scope['project_id'],is_test=True,is_demo=False,deleted_at=None,phone=self.phone)
+    def test_target_allows_manual_lead_and_requires_phone(self):
+        lead=SimpleNamespace(id=self.scope['lead_id'],company_id=self.scope['company_id'],project_id=self.scope['project_id'],is_test=False,is_demo=False,deleted_at=None,phone=self.phone)
         conv=SimpleNamespace(**{k:v for k,v in self.scope.items() if k!='conversation_id'},id=self.scope['conversation_id'])
         db=MagicMock();db.query.return_value.filter_by.return_value.populate_existing.return_value.one_or_none.return_value=lead
         fake_lead=ModuleType('app.modules.sales_crm.models');fake_lead.Lead=object()
         fake_routes=ModuleType('app.modules.sales_agent.provider_routes');fake_routes.parts=lambda c:('+12025550100',self.phone)
         with patch.dict(sys.modules,{'app.modules.sales_crm.models':fake_lead,'app.modules.sales_agent.provider_routes':fake_routes}):
             self.assertIs(release.validate_target(db,conv),lead)
-            lead.is_test=False
+            lead.is_test=True
+            self.assertIs(release.validate_target(db,conv),lead)
+            lead.is_demo=True
             with self.assertRaises(selection.EngineUnavailable):release.validate_target(db,conv)
-            lead.is_test=True;lead.phone='+12025550109'
+            lead.is_demo=False;lead.phone='+12025550109'
             with self.assertRaises(selection.EngineUnavailable):release.validate_target(db,conv)
             lead.phone=self.phone;fake_routes.parts=lambda c:('+12025550100','+12025550109')
             with self.assertRaises(selection.EngineUnavailable):release.validate_target(db,conv)
+
+    def test_sdk_job_checks_exact_persisted_pin(self):
+        pin={**self.scope,'event_id':'telnyx:provider-event','engine':'hermes','policy_version_id':'p1'}
+        conv=SimpleNamespace(id=self.scope['conversation_id'])
+        inbound=SimpleNamespace(id=uid(10),metadata_json={'sales_engine_pin':pin})
+        run=SimpleNamespace(status='running',mode='live',conversation_id=conv.id,
+            event_id=pin['event_id'],graph_version='hermes-live/1',prompt_configuration_id='p1',
+            input_snapshot={'message_id':inbound.id,'sales_engine_pin':pin})
+        db=MagicMock();db.get.return_value=run
+        models=ModuleType('app.modules.sales_agent.models');models.AgentRun=object()
+        live=ModuleType('app.modules.hermes_sales_core.live_job')
+        live.lock_job=lambda db,job_id:(object(),SimpleNamespace(**self.scope),conv,object(),inbound)
+        with patch.dict(sys.modules,{'app.modules.sales_agent.models':models,
+                'app.modules.hermes_sales_core.live_job':live}), patch.object(release,'validate_target'):
+            self.assertEqual(release.authorize_sdk_job(db,'job','run'),self.scope)
+            run.event_id='other-event'
+            with self.assertRaises(selection.EngineUnavailable):release.authorize_sdk_job(db,'job','run')
+            run.event_id=pin['event_id'];run.input_snapshot={'message_id':uid(20),'sales_engine_pin':pin}
+            with self.assertRaises(selection.EngineUnavailable):release.authorize_sdk_job(db,'job','run')
 
 
 if __name__ == '__main__':

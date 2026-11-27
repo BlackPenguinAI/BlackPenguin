@@ -1,4 +1,4 @@
-"""HEI-01A Staff-only selection API. No inference or business side effects."""
+"""Staff-only Sales Agent selection API. No inference or business side effects."""
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Response

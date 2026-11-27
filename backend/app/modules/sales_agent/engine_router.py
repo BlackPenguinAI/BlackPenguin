@@ -1,7 +1,6 @@
 """HEI-01A Sales dispatch boundary. Does not execute Hermes or business effects.
 
-Production Hermes is gated until the runtime and real effect receipts are
-certified. Existing job handlers retain consent, scope, provider and effect
+Production Hermes requires a healthy private runtime. Existing job handlers retain consent, scope, provider and effect
 checks. A pin belongs to an event/opportunity, not the phone or entire thread.
 """
 from __future__ import annotations
@@ -65,19 +64,10 @@ def _decide(*, staged: bool, scope: dict[str, str], status: dict[str, Any],
         if engine != HERMES:
             raise EngineSelectionError('Staged Hermes cannot take over another engine event.')
     else:
-        from app.modules.hermes_sales_core.production_release import requested, configuration, allowed, bind_scope
+        from app.modules.hermes_sales_core.production_release import requested, bind_scope
         if engine == HERMES and requested():
-            config = configuration()
-            if config is None:
-                raise EngineUnavailable('Invalid production pilot configuration.')
-            if not allowed(scope, config):
-                if stored is not None:
-                    raise EngineUnavailable('Pinned Hermes event is outside the pilot scope.')
-                # Explicit policy for NEW non-pilot events, never an error fallback.
-                engine = LANGGRAPH
-            else:
-                with bind_scope(scope):
-                    require_selectable(engine)
+            with bind_scope(scope):
+                require_selectable(engine)
         else:
             require_selectable(engine)
     policy_version = (pin or {}).get('policy_version_id') if pin is not None else (

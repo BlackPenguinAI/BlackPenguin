@@ -11,7 +11,7 @@ HERMES_PREVIOUS_STOPPED=false
 HERMES_CANDIDATE_CREATED=false
 HERMES_NEW_ACTIVE=false
 HERMES_ROLLING_BACK=false
-HERMES_PREVIOUS_API_PILOT=false
+HERMES_PREVIOUS_API_CONFIGURED=false
 HERMES_TMP="$(mktemp -d "$HOME/.bp-hermes-deploy.XXXXXXXX")"
 chmod 700 "$HERMES_TMP"
 HERMES_API_ENV="$HERMES_TMP/api.env"
@@ -34,60 +34,76 @@ hermes_selected_langgraph() {
 }
 
 hermes_preflight() {
-  case "${HERMES_RELEASE_MODE:-closed}" in closed|pilot) ;; *) echo 'Only closed or pilot is supported.'; return 1;; esac
   # Save prior env privately before the existing deploy rewrites it.
   if [ -f backend/.env ]; then cp backend/.env "$HERMES_PREV_BASE_ENV"; chmod 600 "$HERMES_PREV_BASE_ENV"; HERMES_HAD_BASE_ENV=true; fi
   if hermes_exists bp-hermes; then
     hermes_owned bp-hermes || { echo 'Existing bp-hermes is not owned by this deployment.'; return 1; }
     HERMES_PREVIOUS_EXISTS=true
   fi
-  if [ "$HERMES_PREVIOUS_EXISTS" = true ] || [ "${HERMES_RELEASE_MODE:-closed}" = pilot ]; then
-    hermes_selected_langgraph
-  fi
-  # Preserve only prior pilot variables. No Docker environment is printed.
+  # First activation and subsequent release replacement require a deliberate
+  # maintenance selection, never an implicit database write by the deployer.
+  hermes_selected_langgraph
+  # Preserve the prior private runtime environment, including legacy pilot fields for rollback. No Docker environment is printed.
   if hermes_exists bp_api_prod; then
     docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' bp_api_prod | \
       awk '/^HERMES_(RELEASE_MODE|RELEASE_SHA|RUNTIME_ROLE|INTERNAL_TOKEN|PILOT_SCOPES|PILOT_UNTIL)=/' > "$HERMES_PREV_API_ENV"
     chmod 600 "$HERMES_PREV_API_ENV"
-    if grep -qx 'HERMES_RELEASE_MODE=pilot' "$HERMES_PREV_API_ENV"; then HERMES_PREVIOUS_API_PILOT=true; fi
-    if [ "$HERMES_PREVIOUS_API_PILOT" = true ]; then
+    if grep -qx 'HERMES_RUNTIME_ROLE=api' "$HERMES_PREV_API_ENV"; then HERMES_PREVIOUS_API_CONFIGURED=true; fi
+    if [ "$HERMES_PREVIOUS_API_CONFIGURED" = true ]; then
       hermes_selected_langgraph
-      [ "$HERMES_PREVIOUS_EXISTS" = true ] || { echo 'Previous pilot SDK is missing; reconcile before deployment.'; return 1; }
+      [ "$HERMES_PREVIOUS_EXISTS" = true ] || { echo 'Previous Hermes SDK is missing; reconcile before deployment.'; return 1; }
     fi
   fi
-  [ "${HERMES_RELEASE_MODE:-closed}" = pilot ] || return 0
   # Conservative initial resource floor; no changes to production if insufficient.
-  [ "$(nproc)" -ge 2 ] || { echo 'Pilot requires at least 2 host vCPU.'; return 1; }
-  [ "$(awk '/^MemAvailable:/{print $2}' /proc/meminfo)" -ge 2097152 ] || { echo 'Pilot preflight requires 2 GiB currently available RAM.'; return 1; }
+  [ "$(nproc)" -ge 2 ] || { echo 'Hermes requires at least 2 host vCPU.'; return 1; }
+  [ "$(awk '/^MemAvailable:/{print $2}' /proc/meminfo)" -ge 2097152 ] || { echo 'Hermes preflight requires 2 GiB currently available RAM.'; return 1; }
   local docker_root
   docker_root="$(docker info --format '{{.DockerRootDir}}')"
-  [ "$(df -Pk "$docker_root" | awk 'NR==2{print $4}')" -ge 6291456 ] || { echo 'Pilot preflight requires 6 GiB free in Docker storage.'; return 1; }
-  ! hermes_exists "$HERMES_CANDIDATE" && ! hermes_exists "$HERMES_PREVIOUS" || { echo 'Previous interrupted pilot deployment requires operator review.'; return 1; }
-  # Values are transported as envs, never interpolated as shell code. Reject
-  # newline injection in docker env-file. The candidate Python validates IDs.
-  for name in HERMES_INTERNAL_TOKEN HERMES_PILOT_SCOPES HERMES_PILOT_UNTIL; do
-    local value="${!name:-}"
-    [ -n "$value" ] && [[ "$value" != *$'\n'* && "$value" != *$'\r'* ]] || { echo "Missing or multiline $name."; return 1; }
-  done
-  [[ "$HERMES_INTERNAL_TOKEN" =~ ^[0-9a-f]{64}$ ]] || { echo 'HERMES_INTERNAL_TOKEN must be 64 lowercase hex characters.'; return 1; }
-  [ -n "${HERMES_MODEL_KEY:-}" ] && [[ "$HERMES_MODEL_KEY" != *$'\n'* && "$HERMES_MODEL_KEY" != *$'\r'* ]] || { echo 'Missing Hermes OpenRouter key.'; return 1; }
+  [ "$(df -Pk "$docker_root" | awk 'NR==2{print $4}')" -ge 6291456 ] || { echo 'Hermes preflight requires 6 GiB free in Docker storage.'; return 1; }
+  ! hermes_exists "$HERMES_CANDIDATE" && ! hermes_exists "$HERMES_PREVIOUS" || { echo 'Previous interrupted Hermes deployment requires operator review.'; return 1; }
+  # Deployment-owned stable credential: never printed or committed. Reject
+  # symlinks, weak file permissions and malformed existing credentials.
+  HERMES_INTERNAL_TOKEN="$(python3 - <<'TOKEN_PY'
+import os, re, secrets, stat
+from pathlib import Path
+p = Path.home() / '.blackpenguin-hermes-internal-token'
+try:
+    fd = os.open(p, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+except FileExistsError:
+    pass
+else:
+    with os.fdopen(fd, 'w') as out:
+        out.write(secrets.token_hex(32) + '\n')
+        out.flush()
+        os.fsync(out.fileno())
+fd = os.open(p, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+with os.fdopen(fd) as src:
+    st = os.fstat(src.fileno())
+    if not stat.S_ISREG(st.st_mode) or st.st_uid != os.getuid() or stat.S_IMODE(st.st_mode) != 0o600:
+        raise SystemExit('Unsafe Hermes credential file permissions or ownership.')
+    stored = src.read(67)
+if not re.fullmatch(r'[0-9a-f]{64}\n', stored):
+    raise SystemExit('Invalid stored Hermes credential.')
+print(stored.rstrip('\n'))
+TOKEN_PY
+)"
+  [ -n "${OPENROUTER_KEY:-}" ] && [[ "$OPENROUTER_KEY" != *$'\n'* && "$OPENROUTER_KEY" != *$'\r'* ]] || { echo 'Missing Hermes OpenRouter key.'; return 1; }
   [ -n "${DB_URL:-}" ] && [[ "$DB_URL" != *$'\n'* && "$DB_URL" != *$'\r'* ]] || { echo 'Invalid database connection configuration.'; return 1; }
   umask 077
   {
-    printf 'HERMES_RELEASE_MODE=pilot\nHERMES_RELEASE_SHA=%s\nHERMES_RUNTIME_ROLE=api\n' "$DEPLOY_SHA"
-    printf 'HERMES_INTERNAL_TOKEN=%s\nHERMES_PILOT_SCOPES=%s\nHERMES_PILOT_UNTIL=%s\n' "$HERMES_INTERNAL_TOKEN" "$HERMES_PILOT_SCOPES" "$HERMES_PILOT_UNTIL"
+    printf 'HERMES_RELEASE_SHA=%s\nHERMES_RUNTIME_ROLE=api\n' "$DEPLOY_SHA"
+    printf 'HERMES_INTERNAL_TOKEN=%s\n' "$HERMES_INTERNAL_TOKEN"
   } > "$HERMES_API_ENV"
   {
     printf 'ENVIRONMENT=production\nAPP_COMMIT_SHA=%s\n' "$DEPLOY_SHA"
     sed 's/^HERMES_RUNTIME_ROLE=api$/HERMES_RUNTIME_ROLE=sdk/' "$HERMES_API_ENV"
-    printf 'DATABASE_URL=%s\nOPENROUTER_API_KEY=%s\n' "$DB_URL" "$HERMES_MODEL_KEY"
+    printf 'DATABASE_URL=%s\nOPENROUTER_API_KEY=%s\n' "$DB_URL" "$OPENROUTER_KEY"
     # The private SDK imports Settings, not the public API/auth/onboarding app.
     printf 'SECRET_KEY=private-sdk-not-a-public-auth-service\nFIRST_SUPERADMIN_EMAIL=sdk@example.invalid\nFIRST_SUPERADMIN_PASSWORD=unused-private-sdk\nMETA_ACCESS_TOKEN=unused-private-sdk\nACCESS_TOKEN_EXPIRE_MINUTES=1\nSEED_MINTO_DEMO=false\nPROJECT_UPLOAD_ROOT=/tmp/bp-hermes-uploads\n'
   } > "$HERMES_SDK_ENV"
 }
 
 hermes_prepare_candidate() {
-  [ "${HERMES_RELEASE_MODE:-closed}" = pilot ] || return 0
   test "$(image_revision "$HERMES_IMAGE")" = "$DEPLOY_SHA"
   if docker network inspect "$HERMES_NETWORK" >/dev/null 2>&1; then
     test "$(docker network inspect --format '{{index .Labels "com.blackpenguin.hermes-pilot"}}' "$HERMES_NETWORK")" = true
@@ -108,14 +124,11 @@ hermes_prepare_candidate() {
     sleep 2
   done
   [ "$ok" = true ] || { echo 'Candidate SDK failed private readiness; existing production remains unchanged.'; return 1; }
-  # This imports the existing domain models and performs SELECT-only checks.
-  # Don't expose SQL/phone values if validation fails.
-  docker exec "$HERMES_CANDIDATE" python -c 'from app.modules.hermes_sales_core.production_release import validate_deployment_targets; print("authorized_test_opportunities="+str(validate_deployment_targets()))' 2>/dev/null || { echo 'Pilot test opportunity validation failed; verify consent, test flag, route, approved project and IDs.'; return 1; }
+  # Candidate readiness checked imports and DB access without provider calls.
   test "$(docker inspect --format '{{len .HostConfig.PortBindings}}' "$HERMES_CANDIDATE")" = 0
 }
 
 hermes_activate() {
-  [ "${HERMES_RELEASE_MODE:-closed}" = pilot ] || return 0
   if [ "$HERMES_PREVIOUS_EXISTS" = true ]; then
     docker stop bp-hermes >/dev/null
     HERMES_PREVIOUS_STOPPED=true
@@ -134,25 +147,24 @@ hermes_activate() {
 hermes_api_arguments() {
   HERMES_API_ARGS=()
   if [ "$HERMES_ROLLING_BACK" = true ]; then
-    if [ "$HERMES_PREVIOUS_API_PILOT" = true ]; then HERMES_API_ARGS=(--env-file "$HERMES_PREV_API_ENV"); fi
-  elif [ "${HERMES_RELEASE_MODE:-closed}" = pilot ]; then
+    if [ "$HERMES_PREVIOUS_API_CONFIGURED" = true ]; then HERMES_API_ARGS=(--env-file "$HERMES_PREV_API_ENV"); fi
+  else
     HERMES_API_ARGS=(--env-file "$HERMES_API_ENV")
   fi
 }
 
 hermes_connect_api() {
-  if { [ "$HERMES_ROLLING_BACK" = true ] && [ "$HERMES_PREVIOUS_API_PILOT" = true ]; } || \
-     { [ "$HERMES_ROLLING_BACK" != true ] && [ "${HERMES_RELEASE_MODE:-closed}" = pilot ]; }; then
+  if { [ "$HERMES_ROLLING_BACK" = true ] && [ "$HERMES_PREVIOUS_API_CONFIGURED" = true ]; } || \
+     [ "$HERMES_ROLLING_BACK" != true ]; then
     docker network connect "$HERMES_NETWORK" bp_api_prod
   fi
 }
 
 hermes_verify_api() {
-  [ "${HERMES_RELEASE_MODE:-closed}" = pilot ] || return 0
-  docker exec bp_api_prod python -c 'from app.modules.hermes_sales_core.production_release import ready; assert ready(), "Private Hermes readiness not confirmed"; print("hermes_pilot_transport=ready")'
+  docker exec bp_api_prod python -c 'from app.modules.hermes_sales_core.production_release import ready; assert ready(), "Private Hermes readiness not confirmed"; print("hermes_private_transport=ready")'
   hermes_selected_langgraph
   test "$(docker inspect --format '{{len .HostConfig.PortBindings}}' bp-hermes)" = 0
-  echo 'Hermes transport ready for scoped pilot. No automatic selection; real provider acceptance NOT_RUN.'
+  echo 'Hermes private transport ready. Select explicitly in Sales Agent; real provider acceptance NOT_RUN.'
 }
 
 hermes_restore() {
@@ -175,7 +187,6 @@ hermes_restore() {
 hermes_finish() {
   # Only the owned previous SDK is removed, after all production health checks.
   if [ "$HERMES_PREVIOUS_MOVED" = true ]; then hermes_remove_owned "$HERMES_PREVIOUS"; fi
-  if [ "${HERMES_RELEASE_MODE:-closed}" = closed ] && [ "$HERMES_PREVIOUS_EXISTS" = true ]; then hermes_remove_owned bp-hermes; fi
   rm -f "$HERMES_API_ENV" "$HERMES_SDK_ENV" "$HERMES_PREV_API_ENV" "$HERMES_PREV_BASE_ENV"
   rmdir "$HERMES_TMP" 2>/dev/null || true
 }

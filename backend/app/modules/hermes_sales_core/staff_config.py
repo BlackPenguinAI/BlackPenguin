@@ -1,6 +1,6 @@
 """Global-only Hermes policy and version store.
 
-This is a P05 control plane, not an activation of the runtime in live traffic.
+Policy publication is separate from explicit Sales Agent selection.
 All values are server validated; tenant/project overrides never enter the API.
 """
 from __future__ import annotations
@@ -89,13 +89,17 @@ def normalized(value: dict[str, Any]) -> dict[str, Any]:
 
 def snapshot(db: Session) -> dict[str, Any]:
     settings = db.get(HermesGlobalSettings, 'global')
+    configuration = routing.prompt_policy(settings.configuration) if settings and settings.published_version_id else baseline()
+    status = routing.routing_status(settings.configuration if settings else None)
     return {
-        'configuration': routing.prompt_policy(settings.configuration) if settings and settings.published_version_id else baseline(),
-        'engine_selection': routing.routing_status(settings.configuration if settings else None),
+        'configuration': configuration,
+        'engine_selection': status,
         'published_version_id': settings.published_version_id if settings else None,
         'revision': settings.last_version if settings else 0,
         'configuration_scope': 'global',
-        'runtime_connected_to_live': False,
+        'runtime_connected_to_live': bool(status['hermes_live_ready']
+            and status['effective_sales_engine'] == routing.HERMES
+            and settings and settings.published_version_id and configuration.get('enabled')),
         'available_tools': VISIBLE_TOOLS,
     }
 
@@ -250,8 +254,8 @@ def select_sales_engine(db: Session, *, engine: str, note: str, actor_id: str,
                         expected_published_version_id: str | None = None) -> dict[str, Any]:
     """Explicit audited change; prompt publish/restore cannot change the engine.
 
-    Uses existing P05 tables only. In HEI-01A Hermes activation is denied, even
-    when an older Hermes prompt version was published with enabled=True.
+    Uses existing P05 tables only. Hermes requires private transport readiness
+    and a valid enabled published policy.
     """
     routing.require_selectable(engine)
     if not isinstance(note, str) or not note.strip() or len(note) > 400:
