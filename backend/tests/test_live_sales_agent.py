@@ -535,7 +535,7 @@ def test_inbound_worker_claims_fifo_and_only_one_turn_per_conversation():
     assert claimed == expected
 
 
-def test_slot_scan_fetches_google_busy_ranges_once_per_sales_user():
+def test_slot_scan_uses_internal_availability_without_google_freebusy():
     db = _db()
     company = Company(name="Tenant")
     db.add(company); db.flush()
@@ -555,13 +555,19 @@ def test_slot_scan_fetches_google_busy_ranges_once_per_sales_user():
         access_token_ciphertext="encrypted", status="connected",
     ))
     db.commit()
-    with patch("app.modules.sales_crm.scheduling.calendar_busy_ranges", return_value=[]) as free_busy:
+    with patch(
+        "app.modules.sales_crm.scheduling.calendar_busy_ranges",
+        side_effect=AssertionError(
+            "Google FreeBusy must not be queried during slot discovery"
+        ),
+    ) as free_busy:
         slots = available_slots(
             db, project_id=project.id, after=datetime(2026, 8, 31, 12, 0),
             days=2, limit=12,
         )
     assert slots
-    assert free_busy.call_count == 1
+    assert all(slot["eligible_sales_users"] == 1 for slot in slots)
+    free_busy.assert_not_called()
 
 
 def test_cadence_is_shifted_into_project_local_contact_hours():
