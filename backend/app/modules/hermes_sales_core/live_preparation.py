@@ -20,7 +20,7 @@ LIVE_DRAFT_TOOLS = frozenset({'get_unit_media','select_visit_time','book_onsite_
 BLOCKED = frozenset({'update_lead_profile'})
 
 
-def _live_scope(db,scope,inbound_id):
+def _live_scope(db,scope,inbound_id,*,receipt_only=False):
     require_selectable(HERMES)
     from .bp_context import require_scoped_entities
     from app.modules.sales_agent.models import SalesConversation,SalesMessage
@@ -49,7 +49,7 @@ def _live_scope(db,scope,inbound_id):
     if (not inbound.provider_message_id or meta.get('lead_id')!=scope.lead_id
             or meta.get('project_id')!=scope.project_id or meta.get('awaiting_resume')
             or meta.get('resume_context') or not meta.get('continuity_recorded')
-            or continuity_state(conversation).get('last_inbound_message_id')!=inbound.id):
+            or (not receipt_only and continuity_state(conversation).get('last_inbound_message_id')!=inbound.id)):
         raise ProductionToolError('Current authenticated inbound evidence is required.')
     # Do not send controls into a generative lane. A shared deterministic
     # opt-out / escalation path must be wired before production activation.
@@ -60,7 +60,7 @@ def _live_scope(db,scope,inbound_id):
     return project,lead,conversation,inbound
 
 
-def reserve_live_run(db,scope,*,inbound_message_id):
+def reserve_live_run(db,scope,*,inbound_message_id,receipt_only=False):
     """Reserve the existing router pin before inference. Caller commits."""
     require_selectable(HERMES)
     from .staged_runtime import _policy
@@ -68,7 +68,7 @@ def reserve_live_run(db,scope,*,inbound_message_id):
     from app.modules.sales_agent.engine_router import event_scope,PIN_KEY
     from app.modules.sales_agent.models import AgentRun
     from app.modules.sales_agent.continuity import epoch
-    project,lead,conversation,inbound=_live_scope(db,scope,inbound_message_id)
+    project,lead,conversation,inbound=_live_scope(db,scope,inbound_message_id,receipt_only=receipt_only)
     pin=(inbound.metadata_json or {}).get(PIN_KEY)
     event=f'{conversation.provider}:{inbound.provider_message_id}'
     if (not isinstance(pin,dict) or any(pin.get(k)!=v for k,v in event_scope(conversation,event).items())
@@ -86,7 +86,11 @@ def reserve_live_run(db,scope,*,inbound_message_id):
                 or (run.input_snapshot or {}).get('message_id')!=inbound.id
                 or (run.input_snapshot or {}).get('continuity_epoch')!=epoch(conversation)):
             raise ProductionToolError('Existing run cannot be reassigned or replayed.')
+        if receipt_only and not ((run.output_snapshot or {}).get('live_draft') and (run.output_snapshot or {}).get('hermes_delivery_plans')):
+            raise ProductionToolError('Receipt-only reservation requires an existing delivery plan.')
         return run
+    if receipt_only:
+        raise ProductionToolError('Receipt-only reservation cannot create a run.')
     run=AgentRun(conversation_id=conversation.id,event_id=event,mode='live',status='running',
         graph_version=LIVE_ENGINE_VERSION,toolset_version='hermes-tools/1.0',model=policy.model,
         prompt_configuration_id=pin['policy_version_id'],prompt_snapshot={'published_version_id':pin['policy_version_id']},
@@ -101,7 +105,6 @@ def _live_port(db,snapshot,working,inbound,holds):
     from types import SimpleNamespace
     inbound = SimpleNamespace(id=inbound.id, content=inbound.content)
     from .bp_read_port import BlackPenguinReadPort
-    from .production_tools import _material_batch
     from app.modules.projects.locations import resolve_visit_location
     from .bp_context import require_scoped_entities
     # Only this explicit live draft adapter initializes the shared read base.
@@ -205,16 +208,15 @@ def _live_port(db,snapshot,working,inbound,holds):
             return result
 
         def _verified_material(self,asset_id,row,requested_tag):
-            # Actual channel + exact coverage, no SMS assumption for WhatsApp.
-            from datetime import timedelta
-            try:
-                _,project,_,_=require_scoped_entities(db,snapshot.scope)
-                _material_batch(db,snapshot.scope,project,snapshot.channel,{
-                    'asset_ids':[asset_id],'subject':requested_tag,'unit_id':row['reference'],
-                    'expires_at':(self.now+timedelta(minutes=1)).isoformat()},self.now)
-                return True
-            except (ProductionToolError,ValueError,OSError):
-                return False
+            from .live_domain_parity import approved_material_candidate
+            return approved_material_candidate(db,snapshot,asset_id,row,requested_tag)
+
+        def _preferences_draft(self,args):
+            evidence=getattr(self,'contextual_preference',None)
+            if evidence:
+                from . import sales_preferences
+                return sales_preferences.apply(self.state,evidence,source_message_id=self.inbound_id)
+            return super()._preferences_draft(args)
 
         def _select_time(self,args):
             _,project,_,_=require_scoped_entities(db,snapshot.scope)
@@ -313,6 +315,9 @@ def prepare_live_turn(db,scope,*,inbound_message_id,run_id):
             'Address them together. Earlier messages are context, not current authorization. '
             'Do not claim an operation occurred; ask for a fresh explicit instruction when needed.')
     port=_live_port(db,data,working,inbound,holds);port.prepare_context(context)
+    from .live_domain_parity import live_preference_context
+    port.contextual_preference = (live_preference_context(db,scope,conversation,inbound,loaded.data)
+                                  if len(sources)==1 else {})
     # Copy ORM data needed for output validation before releasing locks.
     from types import SimpleNamespace
     project_view=SimpleNamespace(name=project.name,city=project.city)
@@ -326,7 +331,14 @@ def prepare_live_turn(db,scope,*,inbound_message_id,run_id):
         # Demo begin_turn: capture only explicit self-declarations and resolve
         # only an actually delivered typed visit choice. Native port and policy
         # remain the sole authority; no provider effect can occur here.
-        primary_snapshot=capture_primary(port,enabled)
+        if port.contextual_preference and 'update_search_preferences' in enabled:
+            from .commercial_delivery import invoke_domain
+            outcome=invoke_domain(port,'update_search_preferences',{})
+            if not outcome.get('ok'):
+                raise ProductionToolError('Contextual preference capture requires reconciliation.')
+            primary_snapshot=deepcopy(working.get('search_preferences'))
+        else:
+            primary_snapshot=capture_primary(port,enabled)
         if ('update_search_preferences' in enabled and primary_declaration(buyer_message,working)
                 and primary_snapshot is None):
             raise ProductionToolError('Explicit preference capture requires reconciliation.')

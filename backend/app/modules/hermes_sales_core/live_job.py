@@ -6,7 +6,10 @@ in the existing BlackPenguin worker. The release readiness gate stays closed.
 """
 from __future__ import annotations
 from datetime import datetime, timedelta, timezone
+import logging
 import os
+import traceback
+from pathlib import PurePath
 
 from .contracts import TurnScope
 from .engine_selection import HERMES, require_selectable
@@ -16,6 +19,7 @@ from .provider_delivery import (ENGINE, CONTROL_ENGINE, STOP_REPLY, HANDOFF_REPL
 
 SDK_URL = 'http://bp-hermes:8080/internal/prepare'
 MAX_RECEIPT_ATTEMPTS = 10
+logger = logging.getLogger(__name__)
 
 
 def now():
@@ -75,6 +79,12 @@ async def dispatch_or_reconcile(db,scope,conversation,lead,run_id,inbound_id,pla
     if existing:return existing
     if delivery is None:
         raise ProductionToolError('An issued plan has no outbox; original access must be reviewed.')
+    # A new inbound may arrive while waiting on a prior provider receipt.
+    # Only receipt reconciliation is allowed for the earlier turn.
+    if run_id:
+        from app.modules.sales_agent.continuity import state as continuity_state
+        if continuity_state(conversation).get('last_inbound_message_id') != inbound_id:
+            raise ProductionToolError('A newer inbound supersedes an unsent delivery.')
     await _dispatch(db,conversation=conversation,lead=lead,content=delivery['content'],role='assistant',
         agent_run_id=run_id,metadata=delivery['metadata'],idempotency_key=delivery['idempotency_key'])
     db.expire_all()
@@ -194,10 +204,12 @@ async def run_job(db,job_id,*,prepare=request_sdk_draft):
     require_selectable(HERMES)
     from app.modules.sales_agent.models import AgentRun
     from .live_preparation import reserve_live_run
+    from .live_domain_parity import persist_contextual_preferences
     from .live_coordinator import provisional_delivery_plan,reconcile_live_reply,next_native_effect
     from .production_tools import _load_live_turn,persist_live_preferences,execute_first_live_booking
     from .bp_operation_models import HermesSalesOperation
     from .live_materials import issue_live_material_batch,complete_live_material_batch
+    db.info['hermes_checkpoint']='lock_job'
     job,scope,conversation,lead,inbound=lock_job(db,job_id)
     inbound_id=inbound.id
     control=control_delivery(db,job,scope,conversation,lead,inbound)
@@ -206,7 +218,14 @@ async def run_job(db,job_id,*,prepare=request_sdk_draft):
         control['content']=canonical
         ids=await dispatch_or_reconcile(db,scope,conversation,lead,None,inbound_id,plan,control)
         finish_job(db,job_id,scope,inbound_id,ids[-1]);return
-    run=reserve_live_run(db,scope,inbound_message_id=inbound_id);run_id=run.id
+    db.info['hermes_checkpoint']='reserve_run'
+    # Existing planned executions are receipt-only on retry. Do not reserve
+    # another model run, and do not require their inbound to remain latest.
+    pin=(inbound.metadata_json or {}).get('sales_engine_pin') or {}
+    existing=db.query(AgentRun).filter_by(event_id=pin.get('event_id'),conversation_id=scope.conversation_id).one_or_none()
+    receipt_only=bool(existing and (existing.output_snapshot or {}).get('live_draft')
+                      and (existing.output_snapshot or {}).get('hermes_delivery_plans'))
+    run=reserve_live_run(db,scope,inbound_message_id=inbound_id,receipt_only=receipt_only);run_id=run.id
     if run.status not in {'running','completed'}:
         raise ProductionToolError('Hermes run needs staff review.')
     ready=bool((run.output_snapshot or {}).get('live_draft'))
@@ -214,15 +233,20 @@ async def run_job(db,job_id,*,prepare=request_sdk_draft):
         raise ProductionToolError('Unexpected persisted runtime state.')
     db.commit()
     if not ready:
+        db.info['hermes_checkpoint']='sdk_prepare'
         await prepare(job_id,run_id)  # private SDK only, no open API transaction
     job,actual,conversation,lead,inbound=lock_job(db,job_id)
     if actual!=scope or inbound.id!=inbound_id:raise ProductionToolError('Job changed during preparation.')
-    run=reserve_live_run(db,scope,inbound_message_id=inbound_id)
+    db.info['hermes_checkpoint']='restore_run'
+    run=reserve_live_run(db,scope,inbound_message_id=inbound_id,receipt_only=receipt_only)
     if run.id!=run_id:raise ProductionToolError('Runtime reservation changed.')
     if run.status=='running':
+        db.info['hermes_checkpoint']='reply_plan'
         delivery=provisional_delivery_plan(run,scope,inbound_id)
         delivery,plan=record_plan(db,run,conversation,delivery,kind='reply')
-        ids=await dispatch_or_reconcile(db,scope,conversation,lead,run_id,inbound_id,plan,delivery)
+        db.info['hermes_checkpoint']='reply_provider_receipt'
+        ids=await dispatch_or_reconcile(db,scope,conversation,lead,run_id,inbound_id,plan,None if receipt_only else delivery)
+        db.info['hermes_checkpoint']='reply_state_commit'
         reconcile_live_reply(db,scope,inbound_message_id=inbound_id,run_id=run_id,outbound_message_id=ids[-1])
         db.commit()
     elif run.status!='completed':raise ProductionToolError('Runtime reservation requires review.')
@@ -233,11 +257,16 @@ async def run_job(db,job_id,*,prepare=request_sdk_draft):
     if len(group_ids)>1:
         reconcile_live_reply(db,scope,inbound_message_id=inbound_id,run_id=run_id,outbound_message_id=group_ids[-1])
         finish_job(db,job_id,scope,inbound_id,group_ids[-1]);return
+    db.info['hermes_checkpoint']='load_accepted_turn'
     conversation,project,lead,inbound,run,reply,receipt,loaded=_load_live_turn(db,scope,inbound_id)
     last_id=reply.id;selected=next_native_effect(receipt.state_after,inbound.id)
     if selected['preferences'] and not (run.output_snapshot or {}).get('native_live_profile'):
-        persist_live_preferences(db,scope,inbound_message_id=inbound_id);db.flush()
+        db.info['hermes_checkpoint']='crm_preferences'
+        if persist_contextual_preferences(db,scope,inbound_message_id=inbound_id) is None:
+            persist_live_preferences(db,scope,inbound_message_id=inbound_id)
+        db.flush()
     if selected['kind']=='book':
+        db.info['hermes_checkpoint']='native_booking'
         result=execute_first_live_booking(db,scope,inbound_message_id=inbound_id)
         delivery=booking_delivery(db,scope,conversation,run,inbound,result)
         delivery,plan=record_plan(db,run,conversation,delivery,kind='booking',operation_id=result['operation_id'])
@@ -252,6 +281,7 @@ async def run_job(db,job_id,*,prepare=request_sdk_draft):
         effect.update(delivery='provider_accepted',confirmation_message_id=last_id)
         output['native_live_booking']=effect;run.output_snapshot=output;db.flush();db.commit()
     elif selected['kind'] in {'cancel','reschedule'}:
+        db.info['hermes_checkpoint']='native_visit_change'
         from .live_changes import execute_live_change,verified_change
         op=execute_live_change(db,scope,inbound_message_id=inbound_id)
         kind=op.operation_type;op_id=op.id
@@ -266,6 +296,7 @@ async def run_job(db,job_id,*,prepare=request_sdk_draft):
         effect.update(delivery='provider_accepted',confirmation_message_id=last_id)
         output['native_live_change']=effect;run.output_snapshot=output;db.commit()
     elif selected['kind']=='material':
+        db.info['hermes_checkpoint']='material_authorization'
         draft=(receipt.state_after.get('offered_assets') or {}).get('pending_request') or {}
         previous=db.query(HermesSalesOperation).filter_by(**scope.__dict__,request_id=draft.get('id'),
             operation_type='material',inbound_message_id=inbound_id).one_or_none()
@@ -276,15 +307,29 @@ async def run_job(db,job_id,*,prepare=request_sdk_draft):
                 raise ProductionToolError('Issued material plan requires review.')
             delivery=None  # cannot reconstruct raw token, reconcile only
         else:
+            db.info['hermes_checkpoint']='material_storage_verification'
             delivery=issue_live_material_batch(db,scope,inbound_message_id=inbound_id)
             delivery,plan=record_plan(db,run,conversation,delivery,kind='material',operation_id=delivery['operation_id'])
         ids=await dispatch_or_reconcile(db,scope,conversation,lead,run_id,inbound_id,plan,delivery)
+        db.info['hermes_checkpoint']='material_delivery_receipt'
         complete_live_material_batch(db,scope,inbound_message_id=inbound_id,message_ids=ids)
         last_id=ids[-1];db.commit()
+    db.info['hermes_checkpoint']='finish_job'
     finish_job(db,job_id,scope,inbound_id,last_id)
 
 
-def mark_failure(db,job_id,*,pending=False):
+def failure_evidence(exc, checkpoint):
+    """No exception text, SQL statements, message content, URLs or credentials."""
+    result={'checkpoint':checkpoint or 'unknown','exception_type':type(exc).__name__,
+            'locations':[{'file':PurePath(f.filename).name,'line':f.lineno}
+                         for f in traceback.extract_tb(exc.__traceback__)[-6:]]}
+    sqlstate=getattr(getattr(exc,'orig',None),'pgcode',None) or getattr(getattr(exc,'orig',None),'sqlstate',None)
+    if isinstance(sqlstate,str) and len(sqlstate)==5 and sqlstate.isalnum():
+        result['sqlstate']=sqlstate
+    return result
+
+
+def mark_failure(db,job_id,*,pending=False,diagnostic=None):
     """No provider retry on uncertain, rejected, partial or superseded effects."""
     from app.modules.sales_agent.models import SalesInboundJob,SalesMessage,SalesConversation
     db.rollback()
@@ -295,12 +340,15 @@ def mark_failure(db,job_id,*,pending=False):
     if not job or job.status!='processing':return
     waiting=pending and (job.attempt_number or 0)<MAX_RECEIPT_ATTEMPTS
     job.status='retry' if waiting else 'review';job.claimed_at=None
-    job.scheduled_at=now()+timedelta(seconds=30)
+    job.scheduled_at=now()+timedelta(seconds=3 if waiting and (job.attempt_number or 0)<=3 else 30)
     job.error_code='HERMES_PROVIDER_PENDING' if waiting else 'HERMES_RECONCILIATION_REQUIRED'
     job.error_message='Waiting for the existing provider receipt.' if waiting else 'Hermes turn requires staff review; do not automatically resend.'
     if not waiting:job.processed_at=now()
     inbound=db.get(SalesMessage,job.message_id)
-    if inbound:inbound.metadata_json={**(inbound.metadata_json or {}),'agent_turn_status':job.status,'agent_turn_error':job.error_message}
+    if inbound:
+        inbound.metadata_json={**(inbound.metadata_json or {}),'agent_turn_status':job.status,
+                               'agent_turn_error':job.error_message,
+                               **({'hermes_failure_diagnostic':diagnostic} if diagnostic else {})}
     db.commit()
 
 
@@ -313,9 +361,12 @@ async def process_hermes_inbound_job(job_id):
     try:
         await run_job(db,job_id)
         return True
-    except ReceiptPending:
-        mark_failure(db,job_id,pending=True);return False
-    except Exception:
-        mark_failure(db,job_id);return False
+    except ReceiptPending as exc:
+        evidence=failure_evidence(exc,db.info.get('hermes_checkpoint'))
+        mark_failure(db,job_id,pending=True,diagnostic=evidence);return False
+    except Exception as exc:
+        evidence=failure_evidence(exc,db.info.get('hermes_checkpoint'))
+        logger.warning('Hermes inbound requires review: %s',evidence)
+        mark_failure(db,job_id,diagnostic=evidence);return False
     finally:
         db.close()
