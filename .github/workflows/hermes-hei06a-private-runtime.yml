@@ -1,0 +1,86 @@
+name: Hermes HEI-06A private runtime staging
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_openrouter:
+        description: 'After offline success, run one real SDK turn against disposable PostgreSQL'
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+concurrency:
+  group: hei06a-private-runtime-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  HEI06A_SDK_IMAGE: bp-hei06a-sdk:${{ github.sha }}
+  HEI06A_WORKER_IMAGE: bp-hei06a-worker:${{ github.sha }}
+
+jobs:
+  private-runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Confirm certified baseline and test-only changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Certify exactly the previously green implementation plus this harness.
+          baseline=92769b08ef8495bba711951594adcef26951752c
+          git merge-base --is-ancestor "$baseline" "$GITHUB_SHA"
+          python3 - "$baseline" "$GITHUB_SHA" <<'PY'
+          import subprocess, sys
+          paths=subprocess.check_output(['git','diff','--name-only','-z',sys.argv[1],sys.argv[2]]).decode().split('\0')
+          allowed_exact={'.github/workflows/hermes-hei06a-private-runtime.yml',
+                         'docs/hermes-integration/HEI_06A_PRIVATE_RUNTIME_STAGING.md'}
+          assert all(not path or path in allowed_exact or path.startswith('services/hermes_worker/staging/') for path in paths), 'Candidate differs outside HEI-06A evaluation files; recertify baseline'
+          PY
+          test "$(git hash-object backend/app/modules/hermes_sales_core/engine_selection.py)" = 26f3d1e46f45f8e945f98d7f8b7209ca4df51e00
+          python3 -m unittest discover -s services/hermes_worker/staging -p 'test_guard.py' -v
+          bash -n services/hermes_worker/staging/run.sh
+      - name: Build worker and pinned SDK from identical candidate
+        run: |
+          docker build -f services/hermes_worker/Dockerfile -t "$HEI06A_SDK_IMAGE" .
+          docker build -f backend/Dockerfile --build-arg APP_COMMIT_SHA="$GITHUB_SHA" -t "$HEI06A_WORKER_IMAGE" backend
+      - name: Cross-container PostgreSQL and SDK (offline)
+        run: bash services/hermes_worker/staging/run.sh offline
+      - name: Cross-container PostgreSQL and real OpenRouter SDK
+        if: ${{ inputs.run_openrouter }}
+        env:
+          HEI06_OPENROUTER_API_KEY: ${{ secrets.HEI06_OPENROUTER_API_KEY }}
+        run: bash services/hermes_worker/staging/run.sh model
+      - name: Retain sanitized evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hei06a-private-runtime-${{ github.sha }}
+          path: evidence-hei06a/**/*.json
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Scope of certification
+        if: always()
+        env:
+          JOB_STATUS: ${{ job.status }}
+          MODEL_REQUESTED: ${{ inputs.run_openrouter }}
+        run: |
+          {
+            echo "## HEI-06A — $GITHUB_SHA"
+            echo "- Job status: $JOB_STATUS"
+            echo "- Real OpenRouter requested: $MODEL_REQUESTED"
+            for lane in offline model; do
+              if test -f "evidence-hei06a/$lane/summary.json"; then
+                echo "- $lane: summary present (verify checks and cleanup in job log)"
+              else
+                echo "- $lane: no completed summary"
+              fi
+            done
+            echo "- Test-only process-local gate; no production authorization."
+            echo "- Real messaging, Calendar, and production policy: NOT_RUN."
+            echo "- Production readiness: CLOSED."
+          } >> "$GITHUB_STEP_SUMMARY"

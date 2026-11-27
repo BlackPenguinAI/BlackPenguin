@@ -1,0 +1,11 @@
+# Only the isolated SDK gets egress when the operator explicitly opts in.
+# This is a normal Docker egress bridge, not a hostname-level egress filter.
+services:
+  bp-hermes:
+    networks:
+      private: {}
+      model_egress: {}
+networks:
+  model_egress:
+    driver: bridge
+    internal: false

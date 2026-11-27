@@ -1,0 +1,81 @@
+# HEI-06A disposable CI topology. Do not merge with docker-compose.yml or deploy.yml.
+# No public API, customer data, real messaging/Calendar credentials, or host ports.
+x-test-env: &test-env
+  ENVIRONMENT: test
+  HEI06A_PURPOSE: hei06a-disposable-synthetic-only-v1
+  HEI06A_MODE: ${HEI06A_MODE:?required}
+  HEI06A_COMMIT: ${HEI06A_COMMIT:?required}
+  HERMES_INTERNAL_TOKEN: ${HEI06A_TOKEN:?required}
+  SECRET_KEY: hei06a-synthetic-only-not-a-real-secret
+  ACCESS_TOKEN_EXPIRE_MINUTES: '30'
+  DATABASE_URL: postgresql+psycopg2://bp_hei06a_test:${HEI06A_DB_PASSWORD:?required}@hei06a-postgres:5432/bp_hei06a_test
+  FIRST_SUPERADMIN_EMAIL: hei06a@example.invalid
+  FIRST_SUPERADMIN_PASSWORD: test-only
+  META_ACCESS_TOKEN: test-only
+  PUBLIC_APP_URL: https://example.invalid
+  PROJECT_UPLOAD_ROOT: /tmp/hei06a-uploads
+  PYTHONDONTWRITEBYTECODE: '1'
+  PYTHONUNBUFFERED: '1'
+  TWILIO_LIVE_SMS_ENABLED: 'false'
+  SALES_NEXT_FLOW_ENABLED: 'false'
+
+services:
+  hei06a-postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: bp_hei06a_test
+      POSTGRES_DB: bp_hei06a_test
+      POSTGRES_PASSWORD: ${HEI06A_DB_PASSWORD:?required}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/01-hei06a.sql:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -h 127.0.0.1 -U bp_hei06a_test -d bp_hei06a_test']
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    networks:
+      private: {}
+  bp-hermes:
+    image: ${HEI06A_SDK_IMAGE:?required}
+    user: '10001:10001'
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    environment:
+      <<: *test-env
+      OPENROUTER_API_KEY: ${HEI06A_MODEL_KEY:?required}
+      PYTHONPATH: /opt/blackpenguin:/opt/staging:/opt/evaluation
+      HERMES_HOME: /var/lib/hermes-agent
+    entrypoint: ['python', '/opt/staging/sdk_probe.py']
+    volumes:
+      - ./:/opt/staging:ro
+      - ../evaluation:/opt/evaluation:ro
+    depends_on:
+      hei06a-postgres:
+        condition: service_healthy
+    networks:
+      private: {}
+  worker:
+    image: ${HEI06A_WORKER_IMAGE:?required}
+    user: '10001:10001'
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    environment:
+      <<: *test-env
+      OPENROUTER_API_KEY: test-only
+      PYTHONPATH: /app:/opt/staging:/opt/evaluation
+      HOME: /tmp
+    entrypoint: ['python', '/opt/staging/worker_probe.py']
+    volumes:
+      - ./:/opt/staging:ro
+      - ../evaluation:/opt/evaluation:ro
+      - ${HEI06A_EVIDENCE_DIR:?required}:/evidence
+    networks:
+      private: {}
+
+networks:
+  private:
+    internal: true
+    driver: bridge
+volumes:
+  pgdata: {}
