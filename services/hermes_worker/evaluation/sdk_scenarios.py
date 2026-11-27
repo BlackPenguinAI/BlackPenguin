@@ -136,19 +136,29 @@ def tools_for(lane, message_id):
     return result
 
 
-def verify_material_and_replay(lane, mid, jid):
+def verify_material_and_replay(lane, mid, jid, trace=None):
+    step = trace.checkpoint if trace is not None else lambda _code: None
     from app.modules.projects.models import SalesAssetShare
     from app.modules.hermes_sales_core.bp_operation_models import HermesSalesOperation
+    step('pdf_share')
     shares = lane.db.query(SalesAssetShare).all()
     assert len(shares) == 1 and shares[0].sales_asset_id == 'brochure-van' and shares[0].outbound_message_id
+    step('pdf_operation_receipt')
     op = lane.db.query(HermesSalesOperation).filter_by(inbound_message_id=mid, operation_type='material').one()
     assert op.status == 'completed' and op.result_json['status'] == 'provider_accepted'
+    step('pdf_media_tool')
     assert 'get_unit_media' in tools_for(lane, mid)
+    step('pdf_outbound_link')
     assert '/projects/a/' in lane.calls[-1]
+    step('pdf_replay')
     calls, sdk_calls = len(lane.calls), len(lane.sdk_calls)
     lane.db.get(lane.Job, jid).status = 'processing'
     lane.db.commit()
     run_claimed(lane, jid)
-    assert len(lane.calls) == calls and len(lane.sdk_calls) == sdk_calls
+    step('pdf_no_duplicate_delivery')
+    assert len(lane.calls) == calls
+    step('pdf_no_duplicate_inference')
+    assert len(lane.sdk_calls) == sdk_calls
+    step('pdf_no_duplicate_share')
     assert lane.db.query(SalesAssetShare).count() == 1
     lane.db.commit()

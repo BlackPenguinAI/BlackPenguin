@@ -1,4 +1,4 @@
-"""Run one certification lane and export counts only, never raw SDK output.
+"""Run one certification lane and export counts and allowlisted scenario diagnostics, never raw SDK output.
 
 Explicit failure if skipped/missing tests, mismatched revision or missing SDK.
 The resulting report is evidence of this test lane, NOT an activation token.
@@ -14,6 +14,7 @@ import subprocess
 import sys
 import tempfile
 from xml.etree import ElementTree as ET
+from diagnostics import case_details
 
 PINNED_SDK = 'b94cb8e2c4ebf2a8c7688cf676c3cf9899584adb'
 LANES = {
@@ -73,8 +74,12 @@ def run(lane, commit, output):
             with (Path(tmp)/'pytest.log').open('w') as stream:
                 result=subprocess.run(args,env=env,stdout=stream,stderr=subprocess.STDOUT,timeout=900)
             report.update(counts(junit),exit_code=result.returncode)
+            if lane == 'openrouter_sdk':
+                report['diagnostics'] = case_details(junit)
             ok=(result.returncode==0 and report['total']==expected and report['passed']==expected
                 and report['failed']==report['skipped']==report['duplicate_cases']==0)
+            if lane == 'openrouter_sdk':
+                ok = ok and report['diagnostics']['complete']
             report['status']='PASS' if ok else 'FAIL'
             if not ok:report['reason']='TESTS_FAILED_OR_INCOMPLETE'
     except (Exception, KeyboardInterrupt) as exc:
