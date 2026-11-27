@@ -104,4 +104,100 @@ class ControlTests(unittest.TestCase):
         self.assertEqual(CONTINUOUS,'hei06a2b3-native-staging-v1')
 
 
+class BootstrapRegressionTests(unittest.TestCase):
+    @staticmethod
+    def unresolved_globals(source, filename):
+        # CPython's scope analysis understands nested functions, comprehensions,
+        # imports and closures. This deliberately checks only unresolved globals,
+        # not definite assignment or dynamic imports; no extra CI dependency.
+        import builtins
+        import symtable
+        table = symtable.symtable(source, filename, 'exec')
+        defined = {symbol.get_name() for symbol in table.get_symbols()
+                   if symbol.is_imported() or symbol.is_assigned() or symbol.is_namespace()}
+        defined |= set(dir(builtins)) | {
+            '__name__', '__file__', '__package__', '__doc__', '__spec__',
+            '__loader__', '__cached__', '__annotations__',
+        }
+        def walk(scope):
+            found = [(scope.get_name(), symbol.get_name())
+                     for symbol in scope.get_symbols()
+                     if symbol.is_global() and symbol.is_referenced()
+                     and symbol.get_name() not in defined]
+            for child in scope.get_children():
+                found.extend(walk(child))
+            return found
+        return walk(table)
+
+    def test_missing_global_checker_detects_original_defect(self):
+        source = ('from datetime import datetime, timezone\n'
+                  'def seed():\n'
+                  '    return datetime.now(timezone.utc)-timedelta(seconds=2)\n')
+        self.assertEqual(self.unresolved_globals(source, 'old_seed.py'),
+                         [('seed', 'timedelta')])
+
+    def test_continuous_modules_have_no_unresolved_globals(self):
+        base = Path(__file__).resolve().parent
+        for path in sorted(base.glob('continuous_*.py')):
+            with self.subTest(file=path.name):
+                self.assertEqual(self.unresolved_globals(path.read_text(), str(path)), [])
+
+    def test_seed_creates_fresh_inventory_and_grant(self):
+        # Exercise the actual seed body with DB/ORM doubles. No PostgreSQL,
+        # network or provider credentials are required for this regression.
+        from datetime import datetime, timezone, timedelta
+        import sys
+        from types import ModuleType, SimpleNamespace
+        from unittest.mock import MagicMock, patch
+        import continuous_scope as scope
+
+        def model(name):
+            return type(name, (SimpleNamespace,), {})
+
+        modules = {}
+        for module_name, names in {
+            'app.modules.companies.models': ('Company',),
+            'app.modules.projects.models': ('Project', 'ProjectProfile', 'ProjectPropertyType'),
+            'app.modules.sales_crm.models': ('Lead', 'Meeting'),
+            'app.modules.sales_agent.models': ('SalesConversation', 'SalesInboundJob', 'OutboundMessage', 'SalesFollowUpJob'),
+        }.items():
+            module = ModuleType(module_name)
+            for name in names:
+                setattr(module, name, model(name))
+            modules[module_name] = module
+        engine = MagicMock()
+        conn = engine.begin.return_value.__enter__.return_value
+        db = MagicMock()
+        db.query.return_value.count.return_value = 0
+        db.get.return_value = None
+        session = MagicMock()
+        session.return_value.__enter__.return_value = db
+        orm = ModuleType('sqlalchemy.orm')
+        orm.Session = session
+        modules['sqlalchemy.orm'] = orm
+        before = datetime.now(timezone.utc).replace(tzinfo=None)
+        with patch.dict(sys.modules, modules), \
+             patch.object(scope, 'attest'), \
+             patch.object(scope, 'sql') as sql, \
+             patch.object(scope, 'current_grant', return_value=None), \
+             patch.object(scope, 'published', return_value='policy-test'), \
+             patch.object(scope, 'checked_scope'):
+            result = scope.seed(engine, None)
+        after = datetime.now(timezone.utc).replace(tzinfo=None)
+        self.assertEqual(result, {'initialized': True, 'grant_active': True, 'policy_id': 'policy-test'})
+        session.assert_called_once_with(bind=conn, join_transaction_mode='rollback_only')
+        inventory = [call.args[0] for call in db.add.call_args_list
+                     if isinstance(call.args[0], modules['app.modules.projects.models'].ProjectPropertyType)]
+        self.assertEqual([item.name for item in inventory], ['Van Buren', 'Oakwood'])
+        self.assertEqual(inventory[0].inventory_updated_at, inventory[1].inventory_updated_at)
+        for item in inventory:
+            self.assertIsNone(item.inventory_updated_at.tzinfo)
+            self.assertLessEqual(before-timedelta(seconds=2), item.inventory_updated_at)
+            self.assertLessEqual(item.inventory_updated_at, after-timedelta(seconds=2))
+        grants = [call for call in sql.call_args_list if 'INSERT INTO hei06a2_live_grant' in call.args[1]]
+        self.assertEqual(len(grants), 1)
+        self.assertEqual(grants[0].kwargs['policy'], 'policy-test')
+        db.commit.assert_called_once()
+
+
 if __name__=='__main__':unittest.main()
