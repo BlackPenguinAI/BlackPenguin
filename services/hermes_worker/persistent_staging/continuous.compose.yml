@@ -1,0 +1,17 @@
+# Only combined with the certified persistent staging compose.yml.
+services:
+  api:
+    image: bp-hei06a2-continuous-api:${STAGE_COMMIT:?required}
+    environment:
+      HEI06A2_CONTINUOUS: hei06a2b3-native-staging-v1
+      HEI06A2_CONTINUOUS_ROLE: api
+    entrypoint: ['python','/opt/stage/continuous_entrypoint.py']
+    command: [api]
+  bp-hermes:
+    image: bp-hei06a2-continuous-sdk:${STAGE_COMMIT:?required}
+    environment:
+      HEI06A2_CONTINUOUS: hei06a2b3-native-staging-v1
+      HEI06A2_CONTINUOUS_ROLE: sdk
+      HEI06A2_CONTINUOUS_OPENROUTER_API_KEY: ${HEI06A2_CONTINUOUS_OPENROUTER_API_KEY:-}
+    entrypoint: ['python','/opt/stage/continuous_entrypoint.py']
+    command: [sdk]

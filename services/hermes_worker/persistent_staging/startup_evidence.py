@@ -5,7 +5,7 @@ import traceback
 from pathlib import PurePath
 
 PREFIX = 'HEI06A2_EVENT '
-PHASES = frozenset({'environment','database_import','production_gate','database_identity','register_orm','bootstrap','api_storage','api_import','api_schema','api_serve','api_lifespan','sdk_import','sdk_serve','health_http'})
+PHASES = frozenset({'environment','database_import','production_gate','database_identity','register_orm','bootstrap','api_storage','api_import','api_schema','api_serve','api_lifespan','sdk_import','sdk_serve','health_http','continuous_control','continuous_worker','continuous_sdk'})
 STATUS = frozenset({'BEGIN','PASS','FAIL'})
 REASONS = frozenset({'database_unavailable','schema_incompatible','http_error','connection_error','unexpected_response','startup_failed'})
 IDENT = re.compile(r'[A-Za-z_][A-Za-z0-9_]{0,79}\Z')
