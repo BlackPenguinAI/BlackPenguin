@@ -1,0 +1,143 @@
+name: Hermes HEI-06 controlled staging acceptance
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_openrouter:
+        description: 'Run 18 paid multi-turn synthetic conversations using HEI06_OPENROUTER_API_KEY'
+        type: boolean
+        required: true
+        default: false
+
+permissions:
+  contents: read
+concurrency:
+  group: hei06-controlled-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  HEI06_IMAGE: bp-hermes-controlled:${{ github.sha }}
+
+jobs:
+  transport-and-offline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build pinned candidate
+        run: docker build -f services/hermes_worker/Dockerfile -t "$HEI06_IMAGE" .
+      - name: Prepare test-only settings
+        run: |
+          mkdir -p evidence-controlled
+          chmod 777 evidence-controlled
+          umask 077
+          cat > "$RUNNER_TEMP/hei06-controlled.env" <<'ENV'
+          SECRET_KEY=hei06-synthetic-only-not-a-real-secret
+          ACCESS_TOKEN_EXPIRE_MINUTES=30
+          DATABASE_URL=sqlite://
+          ENVIRONMENT=test
+          FIRST_SUPERADMIN_EMAIL=hei06@example.invalid
+          FIRST_SUPERADMIN_PASSWORD=test-only
+          META_ACCESS_TOKEN=test-only
+          OPENROUTER_API_KEY=test-only
+          PYTHONPATH=/opt/blackpenguin:/opt/bp-tests:/opt/evaluation
+          ENV
+      - name: Closed-gate private container network (no public port or external network)
+        shell: bash
+        run: |
+          set -euo pipefail
+          network="hei06-private-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          service="${network}-sdk"
+          trap 'docker rm -f "$service" >/dev/null 2>&1 || true; docker network rm "$network" >/dev/null 2>&1 || true' EXIT
+          HERMES_INTERNAL_TOKEN="$(openssl rand -hex 32)"
+          export HERMES_INTERNAL_TOKEN
+          echo "::add-mask::$HERMES_INTERNAL_TOKEN"
+          docker network create --internal "$network" >/dev/null
+          docker run -d --name "$service" --network "$network" --network-alias bp-hermes \
+            --cap-drop ALL --security-opt no-new-privileges --env-file "$RUNNER_TEMP/hei06-controlled.env" \
+            -e HERMES_INTERNAL_TOKEN --entrypoint python "$HEI06_IMAGE" \
+            -m uvicorn app.modules.hermes_sales_core.sdk_service:app --host 0.0.0.0 --port 8080 --workers 1 --no-proxy-headers --no-access-log >/dev/null
+          test "$(docker network inspect "$network" --format '{{.Internal}}')" = true
+          test -z "$(docker port "$service")"
+          test "$(docker inspect "$service" --format '{{len .NetworkSettings.Networks}}')" = 1
+          docker run --rm --network "$network" --cap-drop ALL --security-opt no-new-privileges \
+            --env-file "$RUNNER_TEMP/hei06-controlled.env" -e HERMES_INTERNAL_TOKEN \
+            -v "$GITHUB_WORKSPACE/services/hermes_worker/evaluation:/opt/evaluation:ro" \
+            -v "$GITHUB_WORKSPACE/evidence-controlled:/evidence" --entrypoint python "$HEI06_IMAGE" \
+            /opt/evaluation/probe_private_network.py --commit "$GITHUB_SHA" --output /evidence/private-network.json
+      - name: Actual socket worker and expanded offline scenario harness (22 cases)
+        run: |
+          docker run --rm --network none --env-file "$RUNNER_TEMP/hei06-controlled.env" \
+            -v "$GITHUB_WORKSPACE/backend/tests:/opt/bp-tests:ro" \
+            -v "$GITHUB_WORKSPACE/services/hermes_worker/evaluation:/opt/evaluation:ro" \
+            -v "$GITHUB_WORKSPACE/evidence-controlled:/evidence" --entrypoint python "$HEI06_IMAGE" \
+            /opt/evaluation/run_staging.py --lane offline --commit "$GITHUB_SHA" --output /evidence/offline.json
+      - name: Evidence exporter and comparison checks (9 cases)
+        run: |
+          docker run --rm --network none --env-file "$RUNNER_TEMP/hei06-controlled.env" \
+            -v "$GITHUB_WORKSPACE/services/hermes_worker/evaluation:/opt/evaluation:ro" \
+            --entrypoint python "$HEI06_IMAGE" -m pytest -q --disable-warnings /opt/evaluation/test_staging_reporting.py
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hei06-controlled-offline-${{ github.sha }}
+          path: evidence-controlled/*.json
+          if-no-files-found: ignore
+          retention-days: 14
+
+  expanded-openrouter:
+    if: ${{ inputs.run_openrouter }}
+    needs: transport-and-offline
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build same pinned candidate
+        run: docker build -f services/hermes_worker/Dockerfile -t "$HEI06_IMAGE" .
+      - name: Six scenario families x three variants (actual SDK over TCP)
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.HEI06_OPENROUTER_API_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "$OPENROUTER_API_KEY" ]; then
+            echo 'NOT_RUN: dedicated HEI06_OPENROUTER_API_KEY required'
+            exit 2
+          fi
+          mkdir -p evidence-controlled
+          chmod 777 evidence-controlled
+          docker run --rm -e OPENROUTER_API_KEY -e HEI06_RUN_MODEL=1 \
+            -e ENVIRONMENT=test -e DATABASE_URL=sqlite:// \
+            -e SECRET_KEY=hei06-synthetic-only-not-a-real-secret -e ACCESS_TOKEN_EXPIRE_MINUTES=30 \
+            -e FIRST_SUPERADMIN_EMAIL=hei06@example.invalid -e FIRST_SUPERADMIN_PASSWORD=test-only \
+            -e META_ACCESS_TOKEN=test-only -e PYTHONPATH=/opt/blackpenguin:/opt/bp-tests:/opt/evaluation \
+            -v "$GITHUB_WORKSPACE/backend/tests:/opt/bp-tests:ro" \
+            -v "$GITHUB_WORKSPACE/services/hermes_worker/evaluation:/opt/evaluation:ro" \
+            -v "$GITHUB_WORKSPACE/evidence-controlled:/evidence" --entrypoint python "$HEI06_IMAGE" \
+            /opt/evaluation/run_staging.py --lane model --commit "$GITHUB_SHA" --output /evidence/model.json
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hei06-controlled-model-${{ github.sha }}
+          path: evidence-controlled/*.json
+          if-no-files-found: ignore
+          retention-days: 14
+
+  acceptance-summary:
+    if: always()
+    needs: [transport-and-offline, expanded-openrouter]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report scope without changing production selection
+        env:
+          OFFLINE: ${{ needs.transport-and-offline.result }}
+          MODEL: ${{ needs.expanded-openrouter.result }}
+        run: |
+          {
+            echo "## HEI-06 controlled acceptance — $GITHUB_SHA"
+            echo "- Private Docker network with unchanged CLOSED gate; loopback TCP and offline harness: $OFFLINE"
+            echo "- Expanded real SDK over loopback TCP (synthetic policy, SQLite, simulated providers): $MODEL"
+            echo "- Active private service across production containers, published production policy, real Telnyx and Calendar: NOT_RUN"
+            echo "- Production rollout and rollback: NOT_RUN"
+            echo "- Production readiness: CLOSED. This workflow cannot authorize a cutover."
+          } >> "$GITHUB_STEP_SUMMARY"
