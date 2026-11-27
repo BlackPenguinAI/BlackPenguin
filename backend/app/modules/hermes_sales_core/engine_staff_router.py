@@ -38,10 +38,14 @@ def get_engine(db: Session = Depends(get_db), actor: User = Depends(staff_only))
 def update_engine(payload: SelectionRequest, db: Session = Depends(get_db),
                   actor: User = Depends(staff_only)):
     try:
-        staff_config.select_sales_engine(db, engine=payload.active_sales_engine,
-            note=payload.change_note, actor_id=actor.id,
-            expected_revision=payload.expected_revision,
-            expected_published_version_id=payload.expected_published_version_id)
+        from .production_release import admin_selection, requested
+        if requested() and payload.active_sales_engine == 'hermes' and (payload.expected_revision is None or not payload.expected_published_version_id):
+            raise staff_config.EngineSelectionConflict('Refresh the published policy and confirm its revision.')
+        with admin_selection():
+            staff_config.select_sales_engine(db, engine=payload.active_sales_engine,
+                note=payload.change_note, actor_id=actor.id,
+                expected_revision=payload.expected_revision,
+                expected_published_version_id=payload.expected_published_version_id)
         return staff_config.admin_engine_status(db)
     except staff_config.EngineSelectionConflict as exc:
         db.rollback()

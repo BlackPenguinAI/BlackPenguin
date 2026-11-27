@@ -3,7 +3,7 @@
 Start only in the isolated pinned Hermes image, on a private container network
 with no published port. It accepts IDs, not prompts or arbitrary tool requests.
 It writes only the prepared turn to the existing reserved AgentRun. The API
-worker owns every real effect. The release readiness gate is still closed.
+worker owns every real effect. Closed by default; HEI-07A permits a scoped pilot.
 """
 from __future__ import annotations
 import hmac
@@ -32,6 +32,15 @@ def authorize(authorization):
 
 
 def prepare_reserved(db,request):
+    from .production_release import requested, authorize_sdk_job, bind_scope
+    if requested():
+        scope = authorize_sdk_job(db, request.job_id, request.run_id)
+        with bind_scope(scope):
+            return _prepare_reserved(db, request)
+    return _prepare_reserved(db, request)
+
+
+def _prepare_reserved(db,request):
     from .engine_selection import HERMES,require_selectable
     from .live_job import lock_job
     from .live_preparation import reserve_live_run,prepare_live_turn
@@ -64,7 +73,13 @@ def prepare_reserved(db,request):
 def prepare(request: PrepareRequest, authorization: str | None=Header(default=None)):
     authorize(authorization)
     from .engine_selection import HERMES,require_selectable,EngineUnavailable
-    try:require_selectable(HERMES)
+    from .production_release import requested, ready
+    try:
+        if requested():
+            if os.getenv('HERMES_RUNTIME_ROLE') != 'sdk' or not ready():
+                raise EngineUnavailable('Pilot SDK is not ready.')
+        else:
+            require_selectable(HERMES)
     except EngineUnavailable:raise HTTPException(503,'Hermes live preparation is not certified.') from None
     from app.db.postgres import SessionLocal
     from app.modules.sales_agent.concurrency import bounded
@@ -82,3 +97,18 @@ def prepare(request: PrepareRequest, authorization: str | None=Header(default=No
             raise HTTPException(409,'Hermes preparation requires review.') from None
         finally:db.close()
     finally:_PREPARE_LOCK.release()
+
+
+def readiness(authorization: str | None=Header(default=None)):
+    authorize(authorization)
+    from .production_release import sdk_readiness
+    try:
+        return sdk_readiness()
+    except Exception:
+        raise HTTPException(503, 'Private SDK readiness failed.') from None
+
+
+# Historical offline harnesses retain their original endpoint surface.
+from .production_release import requested as _pilot_requested
+if _pilot_requested():
+    app.add_api_route('/internal/readiness', readiness, methods=['GET'])

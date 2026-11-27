@@ -1,4 +1,4 @@
-import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { TranslateModule } from '@ngx-translate/core';
@@ -8,11 +8,12 @@ import { ToastService } from '../../../../core/services/toast';
 
 import { GlassCardComponent } from '../../../../shared/ui/glass-card/glass-card';
 import { ButtonComponent } from '../../../../shared/ui/button/button';
+import { SalesEngineControlComponent } from '../../sales-engine-control/sales-engine-control';
 
 @Component({
   selector: 'app-ai-settings-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, TranslateModule, GlassCardComponent, ButtonComponent],
+  imports: [CommonModule, FormsModule, TranslateModule, GlassCardComponent, ButtonComponent, SalesEngineControlComponent],
   templateUrl: './ai-settings-page.html'
 })
 export class AiSettingsPageComponent implements OnInit {
@@ -25,7 +26,9 @@ export class AiSettingsPageComponent implements OnInit {
     agent_reporteria: { model: '', system_prompt: '', protocol_prompt: '', guardrails_prompt: '' }
   };
   
+  @Input() initialTab = 'empresa';
   activeTab: string = 'empresa';
+  salesEngineWriting = false;
   isLoading: boolean = true;
   isSaving: boolean = false;
   promptVersions: any[] = [];
@@ -52,6 +55,7 @@ export class AiSettingsPageComponent implements OnInit {
   ) {}
 
   ngOnInit() {
+    if (this.initialTab === 'ventas') this.setTab('ventas');
     this.loadConfig();
   }
 
@@ -138,7 +142,7 @@ export class AiSettingsPageComponent implements OnInit {
   }
 
   setTab(tab: string) {
-    if (!['empresa', 'proyectos', 'ventas'].includes(tab)) return;
+    if (this.salesEngineWriting || !['empresa', 'proyectos', 'ventas'].includes(tab)) return;
     this.activeTab = tab;
     if (tab === 'ventas' && !this.promptVersionsLoaded && !this.promptVersionsLoading) {
       this.loadPromptVersions();
@@ -180,6 +184,7 @@ export class AiSettingsPageComponent implements OnInit {
   }
 
   saveSalesDraft(publish: boolean): void {
+    if (this.salesEngineWriting) return;
     this.isSaving = true;
     this.aiService.createSalesPromptDraft(this.config.agent_ventas, this.changeNote).subscribe({
       next: version => {

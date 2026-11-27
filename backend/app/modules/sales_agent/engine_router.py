@@ -18,9 +18,12 @@ PIN_KEY = 'sales_engine_pin'
 
 
 def event_scope(conversation, event_id: str) -> dict[str, str]:
-    return dict(event_id=event_id, conversation_id=conversation.id,
-                company_id=conversation.company_id, project_id=conversation.project_id,
-                lead_id=conversation.lead_id)
+    result = dict(event_id=event_id, conversation_id=conversation.id,
+                  company_id=conversation.company_id, project_id=conversation.project_id,
+                  lead_id=conversation.lead_id)
+    from app.modules.hermes_sales_core.production_release import assert_bound_scope
+    assert_bound_scope(result)
+    return result
 
 
 def engine_from_run(graph_version: str) -> str:
@@ -62,7 +65,21 @@ def _decide(*, staged: bool, scope: dict[str, str], status: dict[str, Any],
         if engine != HERMES:
             raise EngineSelectionError('Staged Hermes cannot take over another engine event.')
     else:
-        require_selectable(engine)
+        from app.modules.hermes_sales_core.production_release import requested, configuration, allowed, bind_scope
+        if engine == HERMES and requested():
+            config = configuration()
+            if config is None:
+                raise EngineUnavailable('Invalid production pilot configuration.')
+            if not allowed(scope, config):
+                if stored is not None:
+                    raise EngineUnavailable('Pinned Hermes event is outside the pilot scope.')
+                # Explicit policy for NEW non-pilot events, never an error fallback.
+                engine = LANGGRAPH
+            else:
+                with bind_scope(scope):
+                    require_selectable(engine)
+        else:
+            require_selectable(engine)
     policy_version = (pin or {}).get('policy_version_id') if pin is not None else (
         getattr(run, 'prompt_configuration_id', None) if run is not None else
         status.get('published_version_id') if engine == HERMES else None)
@@ -101,8 +118,12 @@ def resolve(db, conversation, event_id: str, *, pin: dict | None = None, run=Non
     from app.modules.hermes_sales_core.staff_config import engine_status
     if run is None:
         run = db.query(AgentRun).filter_by(event_id=event_id).first()
-    return decide(scope=event_scope(conversation, event_id), status=engine_status(db),
-                  pin=pin, run=run)
+    result = decide(scope=event_scope(conversation, event_id), status=engine_status(db),
+                    pin=pin, run=run)
+    from app.modules.hermes_sales_core.production_release import requested, validate_target
+    if requested() and result['engine'] == HERMES:
+        validate_target(db, conversation)
+    return result
 
 
 async def route_live_job(job_id: str, *, inbound: bool,
@@ -222,6 +243,11 @@ async def route_live_job(job_id: str, *, inbound: bool,
     finally:
         db.close()
     if handler is not None:
-        result = await handler(job_id)
+        if pin['engine'] == HERMES:
+            from app.modules.hermes_sales_core.production_release import bind_scope
+            with bind_scope(pin):
+                result = await handler(job_id)
+        else:
+            result = await handler(job_id)
         return result is not False
     return False

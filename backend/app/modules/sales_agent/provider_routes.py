@@ -32,6 +32,9 @@ def _sender(config,channel):
 
 
 def assert_dispatchable(db,conversation):
+    from app.modules.hermes_sales_core.production_release import is_bound, validate_target
+    if is_bound():
+        validate_target(db, conversation)
     if retired(conversation):raise HTTPException(409,'This sender route was retired. Start a new conversation under its current Company.')
     identity=parts(conversation)
     if not identity:return

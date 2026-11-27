@@ -1,7 +1,6 @@
-"""HEI-01A: explicit global Sales routing, independent of prompt policy.
+"""Sales-only engine selection. HEI-07A permits an explicit, verified pilot only.
 
-This release has no production Hermes handler. Do not replace the gate with an
-operator-controlled environment variable or infer readiness from P05.enabled.
+The production release contract is independent of prompt publication.
 """
 from __future__ import annotations
 
@@ -24,9 +23,8 @@ class EngineUnavailable(RuntimeError):
 
 
 def live_hermes_ready() -> bool:
-    # HEI-01B/03/06 must supply a certified executable production route.
-    # P08 simulation, enabled policy or a configured model are NOT readiness.
-    return False
+    from .production_release import ready
+    return ready()
 
 
 def read_engine(raw: dict | None) -> str:
@@ -49,6 +47,7 @@ def prompt_policy(raw: dict) -> dict:
 
 
 def routing_status(raw: dict | None) -> dict[str, Any]:
+    from .production_release import status_fields
     ready = live_hermes_ready()
     try:
         selected = read_engine(raw)
@@ -64,6 +63,7 @@ def routing_status(raw: dict | None) -> dict[str, Any]:
         'available_engines': [LANGGRAPH] + ([HERMES] if ready else []),
         'automatic_fallback': False,
         'error_code': error,
+        **status_fields(),
     }
 
 
@@ -71,4 +71,8 @@ def require_selectable(engine: str) -> None:
     if not isinstance(engine, str) or engine not in ENGINES:
         raise EngineSelectionError('Unknown sales engine.')
     if engine == HERMES and not live_hermes_ready():
-        raise EngineUnavailable('Hermes live routing is not certified in HEI-01A.')
+        raise EngineUnavailable('Hermes production pilot is not ready.')
+    if engine == HERMES:
+        from .production_release import requested, require_execution
+        if requested():
+            require_execution()

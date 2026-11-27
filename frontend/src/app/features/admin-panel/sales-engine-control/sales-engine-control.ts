@@ -23,6 +23,10 @@ export interface EngineStatus {
   hermes_policy_valid: boolean;
   hermes_policy_enabled: boolean;
   hermes_policy_model: string | null;
+  hermes_release_mode?: 'closed' | 'pilot';
+  hermes_pilot_scope_count?: number;
+  hermes_pilot_until?: string | null;
+  hermes_global_certified?: boolean;
 }
 
 @Component({
@@ -32,13 +36,13 @@ export interface EngineStatus {
   template: `
     <section class="rounded-xl border border-white/10 bg-white/5 p-5 space-y-4" aria-label="Global sales engine routing">
       <header class="flex flex-wrap items-start justify-between gap-3">
-        <div><p class="text-xs font-semibold uppercase tracking-widest text-secondary">Staff Superadmin · Global</p>
+        <div><p class="text-xs font-semibold uppercase tracking-widest text-secondary">Staff Superadmin · Sales Agent</p>
           <h2 class="mt-1 text-xl font-semibold">Sales engine control</h2>
-          <p class="mt-1 text-xs text-gray-400">All Companies and Projects · Engine routing is independent of prompt publication.</p></div>
+          <p class="mt-1 text-xs text-gray-400">Sales only · Company and Project Onboarding are independent.</p></div>
         <button type="button" (click)="load()" [disabled]="loading || writing" class="rounded border border-white/20 px-3 py-2 text-xs disabled:opacity-50">Refresh status</button>
       </header>
       <nav class="flex flex-wrap gap-2" aria-label="Sales engine configuration">
-        <a routerLink="/admin/ai-settings" [attr.aria-current]="editor==='langgraph'?'page':null" class="rounded-lg border px-3 py-2 text-sm" [ngClass]="editor==='langgraph'?'border-secondary text-secondary':'border-white/20 text-gray-300'">LangGraph &amp; onboarding settings</a>
+        <a routerLink="/admin/ai-settings" [queryParams]="{tab: 'ventas'}" [attr.aria-current]="editor==='langgraph'?'page':null" class="rounded-lg border px-3 py-2 text-sm" [ngClass]="editor==='langgraph'?'border-secondary text-secondary':'border-white/20 text-gray-300'">LangGraph sales settings</a>
         <a routerLink="/admin/ai-settings/hermes" [attr.aria-current]="editor==='hermes'?'page':null" class="rounded-lg border px-3 py-2 text-sm" [ngClass]="editor==='hermes'?'border-secondary text-secondary':'border-white/20 text-gray-300'">Hermes settings</a>
       </nav>
       <p class="text-xs text-gray-400">Each editor remains available regardless of the selected engine. Save any draft before navigating away.</p>
@@ -46,9 +50,14 @@ export interface EngineStatus {
       <p *ngIf="notice" class="rounded border border-emerald-700 p-3 text-sm text-emerald-300" role="status">{{notice}}</p>
       <p *ngIf="loading" class="text-sm text-gray-400" role="status">Reading authoritative routing status…</p>
       <ng-container *ngIf="!loading && status as s">
+        <div *ngIf="s.hermes_release_mode === 'pilot'" class="rounded border border-amber-700/60 p-3 text-sm" role="status">
+          <strong>Production pilot — {{s.hermes_pilot_scope_count || 0}} test opportunities</strong>
+          <p>Hermes applies only to authorized test leads. Other new sales events remain on LangGraph. Global Hermes activation is not certified.</p>
+          <p *ngIf="s.hermes_pilot_until">Pilot expires: {{s.hermes_pilot_until | date:'medium'}}</p>
+        </div>
         <div class="grid gap-3 sm:grid-cols-3">
           <article class="rounded-lg border border-white/10 bg-black/30 p-3"><p class="text-xs text-gray-400">Selected engine</p><strong>{{name(s.active_sales_engine)}}</strong></article>
-          <article class="rounded-lg border border-white/10 bg-black/30 p-3"><p class="text-xs text-gray-400">Effective routing</p><strong>{{name(s.effective_sales_engine)}}</strong><p class="mt-1 text-xs text-gray-400">Routing state, not a provider health check.</p></article>
+          <article class="rounded-lg border border-white/10 bg-black/30 p-3"><p class="text-xs text-gray-400">Effective routing</p><strong>{{s.hermes_release_mode==='pilot' && s.effective_sales_engine==='hermes' ? 'Hermes pilot / LangGraph' : name(s.effective_sales_engine)}}</strong><p class="mt-1 text-xs text-gray-400">Routing state, not a provider health check.</p></article>
           <article class="rounded-lg border border-white/10 bg-black/30 p-3"><p class="text-xs text-gray-400">Target default</p><strong>{{name(s.target_default_engine)}}</strong><p class="mt-1 text-xs text-gray-400">Planned after certification, not automatically activated.</p></article>
         </div>
         <p *ngIf="s.error_code" class="rounded border border-amber-700 bg-amber-950/20 p-3 text-sm text-amber-100">Routing requires review: {{s.error_code}}. No automatic fallback is performed.</p>
@@ -63,7 +72,7 @@ export interface EngineStatus {
             <h3 class="font-semibold">Hermes Agent</h3>
             <p class="text-xs text-gray-400">Nous Research SDK · Independent global system prompt, model and permitted tools.</p>
             <dl class="grid gap-1 text-xs">
-              <div>Live readiness: <strong>{{s.hermes_live_ready?'Certified gate open':'Blocked — certification required'}}</strong></div>
+              <div>Live readiness: <strong>{{s.hermes_live_ready?'Private SDK ready for pilot':'Blocked — readiness required'}}</strong></div>
               <div>Policy: {{!s.hermes_policy_published?'Not published':!s.hermes_policy_valid?'Requires review':s.hermes_policy_enabled?'Published and enabled':'Published but disabled'}}</div>
               <div *ngIf="s.published_policy_version!==null">Published version: {{s.published_policy_version}}</div>
               <div *ngIf="s.hermes_policy_model">Model: {{s.hermes_policy_model}}</div>
@@ -74,12 +83,12 @@ export interface EngineStatus {
         </div>
         <p class="text-xs text-gray-400">Automatic fallback: {{s.automatic_fallback?'Enabled — review required':'Disabled'}}. In-flight events retain their pinned engine; a selection applies to new eligible events only.</p>
         <section *ngIf="pending as target" class="rounded-lg border border-amber-700/60 bg-amber-950/10 p-4 space-y-3" aria-label="Confirm global engine selection">
-          <h3 class="font-semibold">Change global routing to {{name(target)}}</h3>
-          <p class="text-xs text-gray-400">This affects every Company and Project, not just this editor. Existing prompt configurations and conversation history remain preserved. The server rechecks the reviewed version and readiness.</p>
+          <h3 class="font-semibold">Change Sales Agent routing to {{name(target)}}</h3>
+          <p class="text-xs text-gray-400">Hermes selection is restricted to the authorized pilot opportunities in this release. LangGraph remains the explicit route for other new events. Existing prompt configurations and conversation history remain preserved. The server rechecks version and readiness.</p>
           <label class="block text-sm">Change note (required)
             <input [(ngModel)]="note" [ngModelOptions]="{standalone:true}" maxlength="400" [disabled]="writing || locked" class="mt-1 w-full rounded border border-white/20 bg-black p-2 text-white" placeholder="Why is this routing change needed?" />
           </label>
-          <label class="flex items-start gap-2 text-sm"><input type="checkbox" [(ngModel)]="confirmed" [ngModelOptions]="{standalone:true}" [disabled]="writing || locked" /> I confirm this global engine change.</label>
+          <label class="flex items-start gap-2 text-sm"><input type="checkbox" [(ngModel)]="confirmed" [ngModelOptions]="{standalone:true}" [disabled]="writing || locked" /> I confirm this Sales Agent engine change.</label>
           <div class="flex flex-wrap gap-2">
             <button type="button" (click)="apply()" [disabled]="!canApply" class="rounded bg-secondary px-4 py-2 font-semibold text-black disabled:opacity-50">{{writing?'Applying…':'Apply engine change'}}</button>
             <button type="button" (click)="cancel()" [disabled]="writing" class="rounded border border-white/20 px-4 py-2">Cancel</button>

@@ -1,17 +1,15 @@
 import { Component } from '@angular/core';
 import { AiSettingsPageComponent } from '../ai-settings/ai-settings-page/ai-settings-page';
-import { SalesEngineControlComponent } from './sales-engine-control';
+import { ActivatedRoute } from '@angular/router';
 
 /** Keep the complete original legacy/onboarding editor and its version history intact. */
 @Component({
   selector: 'app-legacy-settings-shell',
   standalone: true,
-  imports: [AiSettingsPageComponent, SalesEngineControlComponent],
-  template: `
-    <div class="bp-page__container bp-page__container--form py-6">
-      <app-sales-engine-control editor="langgraph"></app-sales-engine-control>
-    </div>
-    <app-ai-settings-page></app-ai-settings-page>
-  `
+  imports: [AiSettingsPageComponent],
+  template: `<app-ai-settings-page [initialTab]="initialTab"></app-ai-settings-page>`
 })
-export class LegacySettingsShellComponent {}
+export class LegacySettingsShellComponent {
+  constructor(private route: ActivatedRoute) {}
+  get initialTab(): string { return this.route.snapshot.queryParamMap.get('tab') === 'ventas' ? 'ventas' : 'empresa'; }
+}
