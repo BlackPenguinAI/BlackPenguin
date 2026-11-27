@@ -1,0 +1,114 @@
+# Independent closed staging. Do not combine with production Compose or .env.
+x-env: &env
+  ENVIRONMENT: staging
+  HEI06A2_PURPOSE: hei06a2-closed-persistent-v1
+  HEI06A2_INSTANCE: ${STAGE_INSTANCE:?required}
+  APP_COMMIT_SHA: ${STAGE_COMMIT:?required}
+  SECRET_KEY: ${STAGE_JWT:?required}
+  ACCESS_TOKEN_EXPIRE_MINUTES: '30'
+  HERMES_INTERNAL_TOKEN: ${STAGE_TOKEN:?required}
+  DATABASE_URL: postgresql+psycopg2://bp_hei06a2_staging:${STAGE_DB_PASSWORD:?required}@staging-postgres:5432/bp_hei06a2_staging
+  FIRST_SUPERADMIN_EMAIL: staging-admin@example.invalid
+  FIRST_SUPERADMIN_PASSWORD: ${STAGE_ADMIN_PASSWORD:?required}
+  META_ACCESS_TOKEN: test-only
+  OPENROUTER_API_KEY: test-only
+  PUBLIC_APP_URL: http://127.0.0.1:18082
+  PROJECT_UPLOAD_ROOT: /tmp/staging-uploads
+  TWILIO_LIVE_SMS_ENABLED: 'false'
+  PYTHONDONTWRITEBYTECODE: '1'
+  PYTHONUNBUFFERED: '1'
+services:
+  staging-postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: bp_hei06a2_staging
+      POSTGRES_USER: bp_hei06a2_staging
+      POSTGRES_PASSWORD: ${STAGE_DB_PASSWORD:?required}
+      HEI06A2_INSTANCE: ${STAGE_INSTANCE:?required}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./init-db.sh:/docker-entrypoint-initdb.d/01-staging.sh:ro
+    healthcheck:
+      test: ['CMD-SHELL','pg_isready -h 127.0.0.1 -U bp_hei06a2_staging -d bp_hei06a2_staging']
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    networks: [private]
+  api:
+    image: bp-hei06a2-api:${STAGE_COMMIT:?required}
+    build:
+      context: ../../../backend
+      args:
+        APP_COMMIT_SHA: ${STAGE_COMMIT:?required}
+    restart: unless-stopped
+    user: '10001:10001'
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    environment:
+      <<: *env
+      PYTHONPATH: /app:/opt/stage
+      HOME: /tmp
+    entrypoint: ['python','/opt/stage/entrypoint.py']
+    command: [api]
+    volumes:
+      - ./:/opt/stage:ro
+    networks: [private]
+    depends_on:
+      staging-postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD','python','-c','import urllib.request; urllib.request.urlopen("http://127.0.0.1:8000/api/v1/health/ready",timeout=3)']
+      interval: 5s
+      timeout: 5s
+      retries: 30
+  bp-hermes:
+    image: bp-hei06a2-sdk:${STAGE_COMMIT:?required}
+    build:
+      context: ../../..
+      dockerfile: services/hermes_worker/Dockerfile
+    restart: unless-stopped
+    user: '10001:10001'
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    environment:
+      <<: *env
+      PYTHONPATH: /opt/blackpenguin:/opt/stage
+    entrypoint: ['python','/opt/stage/entrypoint.py']
+    command: [sdk]
+    volumes:
+      - ./:/opt/stage:ro
+    networks: [private]
+    depends_on:
+      staging-postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD','python','-c','import socket; socket.create_connection(("127.0.0.1",8080),3).close()']
+      interval: 5s
+      timeout: 5s
+      retries: 30
+  frontend:
+    image: bp-hei06a2-frontend:${STAGE_COMMIT:?required}
+    build:
+      context: ../../..
+      dockerfile: services/hermes_worker/persistent_staging/frontend.Dockerfile
+      args:
+        APP_COMMIT_SHA: ${STAGE_COMMIT:?required}
+    restart: unless-stopped
+    ports: ['127.0.0.1:18082:8080']
+    networks: [private, ingress]
+    depends_on:
+      api:
+        condition: service_healthy
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: ['CMD','wget','-q','-O','/dev/null','http://127.0.0.1:8080/api/v1/health/ready']
+      interval: 5s
+      timeout: 5s
+      retries: 30
+networks:
+  private:
+    internal: true
+  ingress: {}
+volumes:
+  pgdata: {}
