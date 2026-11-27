@@ -160,8 +160,99 @@ hermes_connect_api() {
   fi
 }
 
+# Use the same application gate for acceptance. Longer diagnostic requests
+# never substitute for the native gate, even if their HTTP contract is valid.
+hermes_probe_readiness() {
+  local container="$1" mode="$2"
+  docker exec -i "$container" python - "$mode" <<'READINESS_PY'
+import json
+import os
+import socket
+import sys
+import time
+
+import httpx
+from app.modules.hermes_sales_core.production_release import configuration, ready
+
+mode = sys.argv[1]
+role = os.getenv('HERMES_RUNTIME_ROLE')
+config = configuration()
+
+
+def emit(**fields):
+    print(json.dumps({'probe': mode, **fields}, sort_keys=True), flush=True)
+
+
+def diagnose():
+    host = '127.0.0.1' if mode == 'sdk' else 'bp-hermes'
+    started = time.monotonic()
+    result = {'configuration_valid': config is not None, 'role_matches': role == mode}
+    try:
+        result['dns_address'] = socket.gethostbyname(host)
+    except Exception as exc:
+        result['dns_error'] = type(exc).__name__
+    try:
+        token = os.environ['HERMES_INTERNAL_TOKEN']
+        expected = {'status': 'ready', 'release': os.getenv('APP_COMMIT_SHA'),
+                    'mode': 'global', 'transport': 'private-sdk'}
+        with httpx.Client(timeout=httpx.Timeout(5.0, connect=3.0),
+                          follow_redirects=False, trust_env=False) as client:
+            response = client.get(f'http://{host}:8080/internal/readiness',
+                                  headers={'Authorization': 'Bearer ' + token})
+        result['http_status'] = response.status_code
+        try:
+            body = response.json()
+        except ValueError:
+            body = None
+        result['contract_matches'] = body == expected
+        result['release_matches'] = isinstance(body, dict) and body.get('release') == expected['release']
+    except Exception as exc:
+        result['exception_type'] = type(exc).__name__
+    result['elapsed_ms'] = round((time.monotonic() - started) * 1000)
+    emit(event='diagnostic', **result)
+
+
+if mode == 'sdk':
+    # Evidence only; this cannot authorize the release.
+    diagnose()
+    sys.exit(0)
+if mode != 'api' or role != 'api' or config is None:
+    emit(event='invalid_api_configuration', configuration_valid=config is not None, role_matches=role == 'api')
+    sys.exit(1)
+
+for attempt in range(1, 7):
+    started = time.monotonic()
+    accepted = False
+    try:
+        accepted = ready()
+    except Exception as exc:
+        emit(event='native_gate_exception', attempt=attempt, exception_type=type(exc).__name__)
+    emit(event='native_gate', attempt=attempt, accepted=bool(accepted),
+         elapsed_ms=round((time.monotonic() - started) * 1000))
+    if accepted:
+        print('hermes_private_transport=ready', flush=True)
+        sys.exit(0)
+    diagnose()
+    if attempt < 6:
+        # The native gate caches both successes and failures for two seconds.
+        time.sleep(3)
+print('Private Hermes readiness not confirmed after 6 attempts.', flush=True)
+sys.exit(1)
+READINESS_PY
+}
+
 hermes_verify_api() {
-  docker exec bp_api_prod python -c 'from app.modules.hermes_sales_core.production_release import ready; assert ready(), "Private Hermes readiness not confirmed"; print("hermes_private_transport=ready")'
+  local container
+  if ! hermes_probe_readiness bp_api_prod api; then
+    echo 'Private Hermes readiness failed; collecting evidence before rollback.'
+    docker network inspect "$HERMES_NETWORK" \
+      --format '{{range .Containers}}{{println .Name .IPv4Address}}{{end}}' || true
+    for container in bp_api_prod bp-hermes; do
+      docker inspect --format 'name={{.Name}} image={{.Config.Image}} running={{.State.Running}} restarts={{.RestartCount}}' "$container" || true
+    done
+    hermes_probe_readiness bp-hermes sdk || true
+    return 1
+  fi
   hermes_selected_langgraph
   test "$(docker inspect --format '{{len .HostConfig.PortBindings}}' bp-hermes)" = 0
   echo 'Hermes private transport ready. Select explicitly in Sales Agent; real provider acceptance NOT_RUN.'
