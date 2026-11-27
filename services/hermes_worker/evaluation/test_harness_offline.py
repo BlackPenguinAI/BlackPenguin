@@ -25,7 +25,7 @@ def test_harness_with_tool_driven_sdk_double(real_lane, monkeypatch, tmp_path):
         elif request.message.startswith('Show me'):
             tool = 'search_properties'
             args = {'scope':'temporary','criteria':{'bedrooms':3,'max_price_usd':350000}}
-            reply = '1. Van Buren — 3 bedrooms\n2. Oakwood — 3 bedrooms\nWhich property would you like to explore?'
+            reply = 'Here are the 3 bedroom houses under $350,000:\n1. Van Buren — $325k\n2. Oakwood — $340k\nWhich property would you like to explore?'
         elif request.message.startswith('The second'):
             tool = 'get_unit_details'
             args = {'unit_id':'oak'}
@@ -43,6 +43,13 @@ def test_harness_with_tool_driven_sdk_double(real_lane, monkeypatch, tmp_path):
     mid, jid = next_input(lane, 'Can you send me the PDF?')
     verify_material_and_replay(lane, mid, jid)
     mid, _ = next_input(lane, 'Show me the available 3 bedroom houses under $350,000 as a numbered list.')
+    # The original model reply would be rejected by the unchanged guard. The
+    # actual accepted SMS must contain both verified full prices, not the
+    # echoed buyer ceiling, and must retain the original numbered choice.
+    assert '1. Van Buren: starting price USD 325,000' in lane.calls[-1]
+    assert '2. Oakwood: starting price USD 340,000' in lane.calls[-1]
+    assert '$350,000' not in lane.calls[-1] and '$325k' not in lane.calls[-1]
+    assert 'search_properties' in tools_for(lane, mid)
     assert state(lane)['last_presented_choice_set']['options'][1]['unit_id'] == 'oak'
     next_input(lane, 'The second option. How many bathrooms does it have?')
     assert state(lane)['conversation_focus']['property_type_id'] == 'oak'

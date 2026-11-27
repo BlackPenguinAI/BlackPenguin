@@ -265,7 +265,23 @@ def prepare_live_turn(db,scope,*,inbound_message_id,run_id):
     reply=render_channel_text(reply,channel)
     checked,evidence=validate_monetary_reply(reply,data.commercial,lead_profile=lead_view.lead_profile_data)
     if checked!=reply or evidence.get('replaced'):
-        raise ProductionToolError('Reply requires monetary reconciliation before dispatch.')
+        # A rejected model-rendered price must never be dispatched. For a pure,
+        # already verified numbered catalog search, reconstruct the displayed
+        # subset/order from this turn's actual search result. Re-run the exact
+        # same guard; do not accept its generic fallback or new LLM inference.
+        from .numbered_catalog import reconcile_numbered_catalog
+        repair = None if material_now or booking_now or len(sources)>1 else reconcile_numbered_catalog(
+            reply,buyer_message=buyer_message,search_rows=port.search_rows,menus=port.menus,
+            observations=result.tool_observations,active_search=working.get('active_search'),
+            inbound_id=inbound_message_id,media_offer=port.offered_media,channel=channel)
+        if repair is None:
+            raise ProductionToolError('Reply requires monetary reconciliation before dispatch.')
+        candidate,menu=repair
+        checked,evidence=validate_monetary_reply(candidate,data.commercial,lead_profile=lead_view.lead_profile_data)
+        if checked!=candidate or not evidence.get('checked') or evidence.get('replaced'):
+            raise ProductionToolError('Reply requires monetary reconciliation before dispatch.')
+        reply=candidate
+        port.menus=[menu]
     if detect(reply,names=scoped_names(project_view,lead_view,data.commercial),output=True).needs_reentry:
         raise ProductionToolError('Reply requires language reconciliation before dispatch.')
     working.pop('_active_source_message_id',None)
