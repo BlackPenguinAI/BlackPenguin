@@ -91,3 +91,15 @@ def test_actual_pytest_junit_keeps_trace_after_assertion_failure(tmp_path):
     report=case_details(path)
     assert [(c['status'],c['last_checkpoint'],c['trace_status']) for c in report['cases']]==[('PASS','complete','RECORDED'),('FAIL','named_focus','RECORDED')]
     assert 'PRIVATE-KEY-TEST' not in json.dumps(report)
+
+
+def test_catalog_reconciliation_exports_only_fixed_reason_codes():
+    t=SafeTrace()
+    t.add('catalog_reconciliation', applied=False, search_batches=2,
+          reasons=['no_exact_criteria','unverified_inventory','PRIVATE-KEY-TEST',{'raw':'secret'}],
+          raw='PRIVATE-KEY-TEST')
+    assert t.events==[{'event':'catalog_reconciliation','applied':False,'search_batches':2,
+                      'reasons':['no_exact_criteria','unverified_inventory']}]
+    assert 'PRIVATE-KEY-TEST' not in t.serialized()
+    assert clean_event({'event':'catalog_reconciliation','applied':'secret','search_batches':10000,
+        'reasons':['canonical_rendered','secret']})=={'event':'catalog_reconciliation','reasons':['canonical_rendered']}

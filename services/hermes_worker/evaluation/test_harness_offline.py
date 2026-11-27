@@ -30,7 +30,7 @@ def test_harness_with_tool_driven_sdk_double(real_lane, monkeypatch, tmp_path):
         elif request.message.startswith('Show me'):
             tool = 'search_properties'
             args = {'scope':'temporary','criteria':{'bedrooms':3,'max_price_usd':350000}}
-            reply = 'Here are the 3 bedroom houses under $350,000:\n1. Van Buren — $325k\n2. Oakwood — $340k\nWhich property would you like to explore?'
+            reply = 'Here are the 3 bedroom houses under $350,000:\n**1.** **Van Buren** — $325k\n**2.** **Oakwood** — $340k\nWhich property would you like to explore?'
         elif request.message.startswith('The second'):
             tool = 'get_unit_details'
             args = {'unit_id':'oak'}
@@ -46,6 +46,11 @@ def test_harness_with_tool_driven_sdk_double(real_lane, monkeypatch, tmp_path):
             overview = runtime._port.invoke('get_project_overview', {}, request.scope)
             assert overview.get('ok'), overview
             observations.append({'tool':'get_project_overview','status':'executed','error_code':None})
+            # Later model refinement must not erase the exact earlier search.
+            narrower = runtime._port.invoke('search_properties', {'scope':'temporary',
+                'criteria':{'bedrooms':3,'max_price_usd':330000}},request.scope)
+            assert narrower.get('ok') and narrower['match_count']==1
+            observations.append({'tool':'search_properties','status':'executed','error_code':None})
         return TurnResult(reply, [], observations)
 
     monkeypatch.setattr(HermesSalesRuntime, 'process_turn', fake)
@@ -67,6 +72,8 @@ def test_harness_with_tool_driven_sdk_double(real_lane, monkeypatch, tmp_path):
     assert '$350,000' not in lane.calls[-1] and '$325k' not in lane.calls[-1]
     assert {'search_properties','get_project_overview'} <= tools_for(lane, mid)
     assert state(lane)['last_presented_choice_set']['options'][1]['unit_id'] == 'oak'
+    assert state(lane)['active_search']['criteria']['max_price_usd']==350000
+    assert state(lane)['active_search']['match_count']==2
     message = 'The second option. How many bathrooms does it have?'
     proof.expect(scope=lane.scope, message=message, ref='oak', name='Oakwood', field='bathrooms', value=2, ordinal=True)
     mid, _ = next_input(lane, message)

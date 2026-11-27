@@ -113,3 +113,99 @@ def test_overview_read_does_not_invalidate_current_verified_menu(names):
 ])
 def test_overview_exception_does_not_authorize_missing_search_or_other_tools(obs):
     assert repair(observations=obs) is None
+
+
+def direct_args(**updates):
+    rows=deepcopy(ROWS)
+    for row in rows:
+        row.update(availability_verified=True,available_units=2)
+    exact={'criteria':{'bedrooms':3,'max_price_usd':350000},'scope':'temporary',
+           'match_count':2,'source_inbound_message_id':'input'}
+    later={'criteria':{'bedrooms':3,'max_price_usd':330000},'scope':'temporary',
+           'match_count':1,'source_inbound_message_id':'input'}
+    args={'buyer_message':REQUEST,'search_batches':[{'rows':rows,'search':exact},
+          {'rows':rows[:1],'search':later}], 'menus':[],
+          'observations':[{'tool':'search_properties','status':'executed','error_code':None}]*2,
+          'active_search':deepcopy(later),'inbound_id':'input','media_offer':None,'channel':'sms'}
+    args.update(updates)
+    return args
+
+
+def test_exact_direct_search_survives_a_later_speculative_narrow_search():
+    from app.modules.hermes_sales_core.numbered_catalog import reconcile_direct_catalog
+    from app.modules.sales_agent.monetary_policy import validate_monetary_reply
+    args=direct_args()
+    original=deepcopy(args)
+    reply,menu,search=reconcile_direct_catalog(REPLY,**args)
+    assert args==original
+    assert [o['unit_id'] for o in menu['options']]==['oak','van']
+    assert search==args['search_batches'][0]['search']
+    assert validate_monetary_reply(reply,COMMERCIAL)[0]==reply
+
+
+@pytest.mark.parametrize('raw',[
+    'Homes under $350,000:\n**1.** **Van Buren** — $325k\n**2.** **Oakwood** — $340k',
+    'Homes under $350,000:\n1. House: Van Buren — $325k\n2. House: Oakwood — $340k',
+    'Homes under $350,000:\n1. Unknown property — $1\n2. Another invented property — $2',
+])
+def test_unbound_model_menu_is_replaced_not_delivered(raw):
+    from app.modules.hermes_sales_core.numbered_catalog import reconcile_direct_catalog
+    from app.modules.sales_agent.monetary_policy import validate_monetary_reply
+    reply,menu,search=reconcile_direct_catalog(raw,**direct_args())
+    assert [o['unit_id'] for o in menu['options']]==['van','oak']
+    assert 'Unknown property' not in reply and 'invented' not in reply
+    assert validate_monetary_reply(reply,COMMERCIAL)[0]==reply
+
+
+@pytest.mark.parametrize('mutation', ['no_exact','wrong_epoch_source','state_changed','no_search_observation',
+    'missing_observation','rejected_read','operation','mixed_request','unknown_availability','empty_inventory',
+    'incomplete','over_budget','wrong_currency','duplicate','unknown_bedrooms','unverified_feature','permanent',
+    'other_menu','media_offer','bad_channel','strict_cap'])
+def test_direct_list_remains_fail_closed(mutation):
+    from app.modules.hermes_sales_core.numbered_catalog import reconcile_direct_catalog
+    args=direct_args(); exact=args['search_batches'][0]; rows=exact['rows']
+    if mutation=='no_exact':exact['search']['criteria']['max_price_usd']=340000
+    if mutation=='wrong_epoch_source':exact['search']['source_inbound_message_id']='old'
+    if mutation=='state_changed':args['active_search']['match_count']=2
+    if mutation=='no_search_observation':args['observations']=[{'tool':'get_project_overview','status':'executed'}]
+    if mutation=='missing_observation':args['observations']=args['observations'][:1]
+    if mutation=='rejected_read':args['observations'].append({'tool':'get_project_overview','status':'rejected'})
+    if mutation=='operation':args['observations'].append({'tool':'get_unit_media','status':'executed'})
+    if mutation=='mixed_request':args['buyer_message']+=' Also send a PDF.'
+    if mutation=='unknown_availability':rows[1]['availability_verified']=False
+    if mutation=='empty_inventory':rows[1]['available_units']=0
+    if mutation=='incomplete':exact['search']['match_count']=21
+    if mutation=='over_budget':rows[1]['price']=360000
+    if mutation=='wrong_currency':rows[1]['currency']='MXN'
+    if mutation=='duplicate':rows[1]['reference']=rows[0]['reference']
+    if mutation=='unknown_bedrooms':rows[1]['bedrooms']=None
+    if mutation=='unverified_feature':exact['search']['criteria']['private_backyard']=True
+    if mutation=='permanent':exact['search']['scope']='permanent'
+    if mutation=='other_menu':args['menus']=[{'type':'visit_time'}]
+    if mutation=='media_offer':args['media_offer']={'unit_id':'van'}
+    if mutation=='bad_channel':args['channel']='simulation'
+    if mutation=='strict_cap':rows[1]['price']=350000
+    assert reconcile_direct_catalog(REPLY,**args) is None
+
+
+@pytest.mark.parametrize('criteria', [
+    {'bedrooms_min':3,'bedrooms_max':3,'max_price_usd':350000},
+    {'bedrooms_any':[3],'relative_price_lt':350000},
+    {'bedrooms':3,'bedrooms_min':3,'max_price_usd':350000},
+])
+def test_semantically_equivalent_exact_searches(criteria):
+    from app.modules.hermes_sales_core.numbered_catalog import reconcile_direct_catalog
+    args=direct_args();args['search_batches'][0]['search']['criteria']=criteria
+    audit={}
+    _,menu,search=reconcile_direct_catalog(REPLY,**args,audit=audit)
+    assert [o['unit_id'] for o in menu['options']]==['oak','van']
+    assert search['criteria']==criteria
+    assert audit['reasons']==['no_exact_criteria','canonical_rendered']
+
+
+def test_direct_repair_diagnostic_does_not_return_row_content():
+    from app.modules.hermes_sales_core.numbered_catalog import reconcile_direct_catalog
+    args=direct_args();args['search_batches'][0]['rows'][1]['currency']='INVALID_SECRET'
+    audit={}
+    assert reconcile_direct_catalog(REPLY,**args,audit=audit) is None
+    assert audit['reasons']==['no_exact_criteria','row_filter_conflict']

@@ -33,6 +33,15 @@ def trace(real_lane, monkeypatch, record_property):
     runtime_original = HermesSalesRuntime.process_turn
     prepare_original = real_lane.sdk_service.prepare_reserved
     worker_original = real_lane.job.run_job
+    from app.modules.hermes_sales_core import numbered_catalog
+    catalog_original = numbered_catalog.reconcile_direct_catalog
+
+    def observed_catalog(*args, **kwargs):
+        audit = {}
+        result = catalog_original(*args, **kwargs, audit=audit)
+        t.add('catalog_reconciliation', applied=result is not None,
+              search_batches=len(kwargs.get('search_batches') or []), reasons=audit.get('reasons',[]))
+        return result
 
     def observed_runtime(runtime, request):
         t.add('runtime_started')
@@ -72,6 +81,7 @@ def trace(real_lane, monkeypatch, record_property):
             t.reply(reply, 'outbound')
         return result
 
+    monkeypatch.setattr(numbered_catalog, 'reconcile_direct_catalog', observed_catalog)
     monkeypatch.setattr(HermesSalesRuntime, 'process_turn', observed_runtime)
     monkeypatch.setattr(real_lane.sdk_service, 'prepare_reserved', observed_prepare)
     monkeypatch.setattr(real_lane.job, 'run_job', observed_worker)

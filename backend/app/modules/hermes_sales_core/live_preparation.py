@@ -113,6 +113,7 @@ def _live_port(db,snapshot,working,inbound,holds):
             self.db=db;self.inbound_id=inbound.id;self.now=datetime.now(timezone.utc)
             self.menus=[];self._availability_search=None;self._meeting_reader=None;self._material_reader=None
             self.search_rows=None;self.choice=None;self.explicit_focus=None;self.discovered={};self.offered_media=None
+            self.search_batches=[]
 
         def invoke(self,name,arguments,scope):
             if scope!=snapshot.scope:raise PermissionError('Live tool scope mismatch.')
@@ -126,6 +127,15 @@ def _live_port(db,snapshot,working,inbound,holds):
             finally:
                 # Draft tools only read; release any read/asset lock between calls.
                 db.rollback()
+
+        def _search(self,args):
+            result=super()._search(args)
+            if result.get('ok'):
+                # Exact, turn-local copies from the authorized port, not the
+                # SDK's proposed text. No extra DB writes or retained history.
+                self.search_batches.append({'rows':deepcopy(self.search_rows),
+                    'search':deepcopy(self.state.get('active_search'))})
+            return result
 
         def _verified_material(self,asset_id,row,requested_tag):
             # Actual channel + exact coverage, no SMS assumption for WhatsApp.
@@ -264,7 +274,29 @@ def prepare_live_turn(db,scope,*,inbound_message_id,run_id):
     from app.modules.sales_agent.language_policy import detect,scoped_names
     reply=render_channel_text(reply,channel)
     checked,evidence=validate_monetary_reply(reply,data.commercial,lead_profile=lead_view.lead_profile_data)
-    if checked!=reply or evidence.get('replaced'):
+    from .numbered_catalog import reconcile_direct_catalog
+    # A direct, exact catalog-list request is a structured presentation
+    # contract even if the model happened to quote valid prices. Preserve its
+    # order when proven, and avoid letting a speculative search change the
+    # membership of the new menu. Non-eligible turns keep the ordinary path.
+    direct_repair = None
+    if not (material_now or booking_now or len(sources)>1) and port.search_batches:
+        direct_repair=reconcile_direct_catalog(reply,buyer_message=buyer_message,
+            search_batches=port.search_batches,menus=port.menus,observations=result.tool_observations,
+            active_search=working.get('active_search'),inbound_id=inbound_message_id,
+            media_offer=port.offered_media,channel=channel)
+    if direct_repair is not None:
+        candidate,menu,selected_search=direct_repair
+        checked,evidence=validate_monetary_reply(candidate,data.commercial,lead_profile=lead_view.lead_profile_data)
+        if checked!=candidate or not evidence.get('checked') or evidence.get('replaced'):
+            raise ProductionToolError('Reply requires monetary reconciliation before dispatch.')
+        reply=candidate
+        port.menus=[menu]
+        working['active_search']=deepcopy(selected_search)
+        # The accepted reply receipt will establish the actual menu and
+        # last_presented_units, not any speculative later search.
+        working['last_presented_units']=[]
+    elif checked!=reply or evidence.get('replaced'):
         # A rejected model-rendered price must never be dispatched. For a pure,
         # already verified numbered catalog search, reconstruct the displayed
         # subset/order from this turn's actual search result. Re-run the exact

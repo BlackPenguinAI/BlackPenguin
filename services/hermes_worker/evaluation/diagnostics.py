@@ -74,7 +74,12 @@ EXACT_ERRORS = {
 ERROR_REASONS = frozenset(EXACT_ERRORS.values()) | {'sdk_tool_allowlist_mismatch', 'unknown_reason'}
 EVENTS = frozenset({'checkpoint', 'runtime_started', 'runtime_returned', 'runtime_error',
                     'prepare_started', 'prepare_returned', 'prepare_error',
-                    'worker_started', 'worker_returned', 'worker_error', 'tool', 'reply_shape', 'fact_grounding'})
+                    'worker_started', 'worker_returned', 'worker_error', 'tool', 'reply_shape', 'fact_grounding',
+                    'catalog_reconciliation'})
+CATALOG_REASONS = frozenset({'request_or_tool_evidence','unsupported_criteria','ledger_mismatch',
+    'search_scope_or_criteria','no_exact_criteria','incomplete_or_single_result','unverified_inventory',
+    'row_filter_conflict','duplicate_reference','menu_unbound','renderer_rejected','invalid_catalog_row',
+    'canonical_rendered'})
 MAX_EVENTS = 256
 REPLY_FLAGS = frozenset({'van_buren', 'oakwood', 'three_bedrooms_plain', 'three_bedrooms_unformatted',
                          'two_bathrooms_plain', 'two_bathrooms_unformatted', 'share_path', 'question'})
@@ -121,6 +126,15 @@ def clean_event(raw):
         for flag in ('verified_context', 'details_tool_executed', 'details_tool_rejected'):
             if type(raw.get(flag)) is bool:
                 result[flag] = raw[flag]
+    elif kind == 'catalog_reconciliation':
+        if type(raw.get('applied')) is bool:
+            result['applied'] = raw['applied']
+        count = raw.get('search_batches')
+        if type(count) is int and 0 <= count <= 50:
+            result['search_batches'] = count
+        if isinstance(raw.get('reasons'),list):
+            result['reasons'] = sorted({v for v in raw['reasons'][:50]
+                if isinstance(v,str) and v in CATALOG_REASONS})
     elif kind == 'reply_shape':
         result['source'] = allowed(raw.get('source'), {'sdk', 'outbound'}, 'unknown_source')
         for flag in sorted(REPLY_FLAGS):
