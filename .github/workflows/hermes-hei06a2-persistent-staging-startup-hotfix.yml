@@ -1,0 +1,102 @@
+name: Hermes HEI-06A.2 persistent staging foundation
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: hei06a2-foundation-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  persistent-foundation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Confirm certified production baseline and local guard tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=a61178b09f1856d42a6698fd3f0eddf8e4ae0ab6
+          git merge-base --is-ancestor "$base" "$GITHUB_SHA"
+          python3 - "$base" "$GITHUB_SHA" <<'PY'
+          import subprocess, sys
+          paths=subprocess.check_output(['git','diff','--name-only','-z',sys.argv[1],sys.argv[2]]).decode().split('\0')
+          allowed={'.github/workflows/hermes-hei06a2-persistent-staging.yml','docs/hermes-integration/HEI_06A2_PERSISTENT_STAGING_FOUNDATION.md'}
+          assert all(not p or p in allowed or p.startswith('services/hermes_worker/persistent_staging/') for p in paths), 'Production baseline differs; recertify before extending staging'
+          PY
+          test "$(git hash-object backend/app/modules/hermes_sales_core/engine_selection.py)" = 26f3d1e46f45f8e945f98d7f8b7209ca4df51e00
+          python3 -m unittest discover -s services/hermes_worker/persistent_staging -p 'test_*.py' -v
+      - name: Start independent persistent topology
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/hei06a2-evidence"
+          python3 services/hermes_worker/persistent_staging/manage.py init "$RUNNER_TEMP/hei06a2-state"
+          python3 services/hermes_worker/persistent_staging/manage.py up "$RUNNER_TEMP/hei06a2-state"
+      - name: Real API, private SDK closed gate, publication and isolation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 services/hermes_worker/persistent_staging/manage.py probe "$RUNNER_TEMP/hei06a2-state" | tee "$RUNNER_TEMP/hei06a2-evidence/initial.json"
+          curl -fsS --max-time 10 http://127.0.0.1:18082/api/v1/health/ready >/dev/null
+      - name: Recreate containers without deleting volume
+        shell: bash
+        run: |
+          set -euo pipefail
+          tool=services/hermes_worker/persistent_staging/manage.py
+          state="$RUNNER_TEMP/hei06a2-state"
+          python3 "$tool" down "$state"
+          python3 "$tool" up "$state"
+          policy=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["policy_id"])' "$RUNNER_TEMP/hei06a2-evidence/initial.json")
+          python3 "$tool" probe "$state" --expected-policy "$policy" | tee "$RUNNER_TEMP/hei06a2-evidence/recreated.json"
+      - name: Confirm persistence and clean hosted CI only
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - "$RUNNER_TEMP/hei06a2-evidence" <<'PY'
+          import json, pathlib, sys
+          d=pathlib.Path(sys.argv[1]); a=json.loads((d/'initial.json').read_text()); b=json.loads((d/'recreated.json').read_text())
+          assert a['status']==b['status']=='PASS' and a['policy_id']==b['policy_id'] and a['candidate_commit']==b['candidate_commit']
+          assert all(a['checks'].values()) and all(b['checks'].values())
+          PY
+          python3 services/hermes_worker/persistent_staging/manage.py ci-clean "$RUNNER_TEMP/hei06a2-state"
+          python3 - "$RUNNER_TEMP/hei06a2-evidence" <<'PY'
+          import json,pathlib,sys
+          p=pathlib.Path(sys.argv[1]); a=json.loads((p/'initial.json').read_text())
+          (p/'summary.json').write_text(json.dumps({'status':'PASS','candidate_commit':a['candidate_commit'],'published_policy_preserved':True,'real_inference':'NOT_RUN','live_staging_authorization':'NOT_RUN','real_provider_acceptance':'NOT_RUN','production_readiness':'CLOSED'},indent=2)+'\n')
+          PY
+      - name: Capture sanitized startup evidence before cleanup
+        if: failure()
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/hei06a2-evidence"
+          if test -f "$RUNNER_TEMP/hei06a2-state/staging.env"; then
+            python3 services/hermes_worker/persistent_staging/manage.py diagnostics "$RUNNER_TEMP/hei06a2-state" | tee "$RUNNER_TEMP/hei06a2-evidence/startup-failure.json"
+          fi
+      - name: Cleanup if interrupted
+        if: always()
+        shell: bash
+        run: |
+          if test -f "$RUNNER_TEMP/hei06a2-state/staging.env"; then
+            python3 services/hermes_worker/persistent_staging/manage.py ci-clean "$RUNNER_TEMP/hei06a2-state"
+          fi
+      - name: Retain sanitized evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hei06a2-foundation-${{ github.sha }}
+          path: ${{ runner.temp }}/hei06a2-evidence/*.json
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Report exact scope
+        if: always()
+        run: |
+          echo '## HEI-06A.2 — closed persistent foundation' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Full live staging authorization, real inference and external providers: NOT_RUN.' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Production readiness: CLOSED.' >> "$GITHUB_STEP_SUMMARY"

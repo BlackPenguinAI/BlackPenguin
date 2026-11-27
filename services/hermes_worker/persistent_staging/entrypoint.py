@@ -2,6 +2,7 @@
 import os
 import sys
 from guard import validate, attest, require, allowed_route, ADMIN
+from startup_evidence import event
 
 
 def bootstrap(engine):
@@ -51,28 +52,69 @@ class ClosedIngress:
             await send({'type':'websocket.close','code':1008}); return
         if scope['type']=='http' and not allowed_route(scope['method'],scope['path']):
             await JSONResponse({'detail':'Blocked in closed persistent staging'},status_code=403)(scope,receive,send); return
+        if scope['type']=='lifespan':
+            event('api_lifespan','BEGIN')
+            async def observed_send(message):
+                if message['type']=='lifespan.startup.complete':event('api_lifespan','PASS')
+                elif message['type']=='lifespan.startup.failed':event('api_lifespan','FAIL',reason='startup_failed')
+                await send(message)
+            try:
+                await self.app(scope,receive,observed_send)
+            except Exception as exc:
+                event('api_lifespan','FAIL',exc=exc)
+                raise
+            return
         await self.app(scope,receive,send)
 
 
 def main():
     if len(sys.argv)!=2 or sys.argv[1] not in {'bootstrap','api','sdk'}: raise SystemExit(2)
-    mode=sys.argv[1]; validate()
-    from app.db.postgres import engine
-    from app.modules.hermes_sales_core.engine_selection import live_hermes_ready
-    require(live_hermes_ready() is False,'Production gate unexpectedly open')
-    with engine.connect() as c: attest(c,allow_fresh=mode=='bootstrap')
-    import app.db.base  # register all ORM models in every process
-    from sqlalchemy.orm import configure_mappers
-    configure_mappers()
-    if mode=='bootstrap': bootstrap(engine); return
-    import uvicorn
-    if mode=='api':
-        from app.main import app
-        # The existing API lifespan runs the real sales worker. Do NOT start
-        # another sales worker or the onboarding worker in this closed release.
-        uvicorn.run(ClosedIngress(app),host='0.0.0.0',port=8000,workers=1,proxy_headers=False,access_log=False)
-    else:
-        from app.modules.hermes_sales_core.sdk_service import app
-        uvicorn.run(app,host='0.0.0.0',port=8080,workers=1,proxy_headers=False,access_log=False)
+    mode=sys.argv[1]
+    phase='environment'
+    def begin(name):
+        nonlocal phase
+        phase=name;event(phase,'BEGIN')
+    def done():event(phase,'PASS')
+    try:
+        begin('environment');validate();done()
+        begin('database_import')
+        from app.db.postgres import engine
+        done()
+        begin('production_gate')
+        from app.modules.hermes_sales_core.engine_selection import live_hermes_ready
+        require(live_hermes_ready() is False,'Production gate unexpectedly open');done()
+        begin('database_identity')
+        with engine.connect() as c: attest(c,allow_fresh=mode=='bootstrap')
+        done()
+        begin('register_orm')
+        import app.db.base
+        from sqlalchemy.orm import configure_mappers
+        configure_mappers();done()
+        if mode=='bootstrap':
+            begin('bootstrap');bootstrap(engine);done();return
+        import uvicorn
+        if mode=='api':
+            begin('api_import')
+            from app.main import app
+            done()
+            # Exercise the exact application readiness function before binding.
+            # No schema bypass, no mocked health endpoint, no additional worker.
+            begin('api_schema')
+            from app.modules.health.router import readiness
+            readiness();done()
+            begin('api_serve')
+            uvicorn.run(ClosedIngress(app),host='0.0.0.0',port=8000,workers=1,proxy_headers=False,access_log=False,lifespan='on')
+        else:
+            begin('sdk_import')
+            from app.modules.hermes_sales_core.sdk_service import app
+            done();begin('sdk_serve')
+            uvicorn.run(app,host='0.0.0.0',port=8080,workers=1,proxy_headers=False,access_log=False,lifespan='on')
+    except Exception as exc:
+        reason=None
+        if phase=='api_schema':
+            detail=getattr(exc,'detail',None)
+            if isinstance(detail,dict):reason=detail.get('reason')
+        event(phase,'FAIL',exc=exc,reason=reason)
+        raise SystemExit(1) from None
 
 if __name__=='__main__':main()

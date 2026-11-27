@@ -59,7 +59,7 @@ def clean_env():
 
 def main():
     p=argparse.ArgumentParser(description=__doc__)
-    p.add_argument('action',choices=['init','up','stop','down','status','probe','ci-clean'])
+    p.add_argument('action',choices=['init','up','stop','down','status','probe','diagnostics','ci-clean'])
     p.add_argument('state_dir',type=Path)
     p.add_argument('--expected-policy',default='')
     a=p.parse_args()
@@ -103,6 +103,30 @@ def main():
         if command(['docker','network','inspect',project+'_private','--format','{{.Internal}}'],capture=True,env=env).strip()!='true':
             raise ValueError('Private network not internal')
         run('exec','-T','api','python','/opt/stage/probe.py',a.expected_policy)
+    elif a.action=='diagnostics':
+        # Only this Compose project's known services, and only sanitized fields.
+        import json
+        from startup_evidence import collect_events
+        report={'schema':'hei06a2-startup-evidence/1','candidate_commit':values['STAGE_COMMIT'],'production_readiness':'CLOSED','services':{}}
+        for service in ('staging-postgres','api','bp-hermes','frontend'):
+            info={'present':False}
+            report['services'][service]=info
+            try:
+                cid=run('ps','-a','-q',service,capture=True).strip()
+                if not cid:continue
+                if not re.fullmatch(r'[0-9a-f]{12,64}',cid):raise ValueError('Unexpected container identifier')
+                obj=json.loads(command(['docker','inspect',cid],capture=True,env=env))[0]
+                if obj['Config']['Labels'].get('com.docker.compose.project')!=project or obj['Config']['Labels'].get('com.docker.compose.service')!=service:
+                    raise ValueError('Unexpected container scope')
+                state=obj['State']; health=state.get('Health') or {}
+                info.update(present=True,running=state['Running'],exit_code=state['ExitCode'],oom_killed=state['OOMKilled'],restart_count=obj['RestartCount'],health=health.get('Status','none'),failing_streak=health.get('FailingStreak',0))
+                info['health_events']=collect_events('\n'.join(x.get('Output','') for x in health.get('Log',[])))
+                # Raw logs may contain credentials/SQL/etc. Never emit them.
+                logs=subprocess.run(['docker','logs','--tail','300',cid],cwd=ROOT,env=env,text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,check=True)
+                info['startup_events']=collect_events(logs.stdout)
+            except (ValueError,KeyError,IndexError,OSError,subprocess.CalledProcessError) as exc:
+                info['collection_error']=type(exc).__name__
+        print(json.dumps(report,sort_keys=True))
     elif a.action=='ci-clean':
         # Volume deletion is ONLY available to disposable hosted CI under RUNNER_TEMP.
         if os.environ.get('GITHUB_ACTIONS')!='true' or os.environ.get('RUNNER_ENVIRONMENT')!='github-hosted' or not os.environ.get('RUNNER_TEMP') or Path(os.environ['RUNNER_TEMP']).resolve() not in d.parents:

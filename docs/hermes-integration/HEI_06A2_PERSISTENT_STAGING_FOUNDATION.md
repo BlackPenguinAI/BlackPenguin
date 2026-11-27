@@ -76,3 +76,16 @@ python3 services/hermes_worker/persistent_staging/manage.py up "$HOME/.bp-hei06a
 - A.2a: closed persistent foundation — this package; pending CI and optional separate host provisioning.
 - A.2b: real staging-only authorization, not a global env flag or monkeypatch; scoped admission and revalidation at worker/SDK and before effects, emergency revocation, negative tests across company/project/lead, no production gate changes; real synthetic Hermes turn over the persistent stack and full inspector/browser acceptance. Dedicated OpenRouter egress design and budget must be reviewed.
 - B: real Telnyx with owned test numbers and explicit consent, callbacks and actual receipts. C: separate Google Calendar/test advisor, book/reschedule/cancel and rollback. Do not activate Hermes in production until those controls and real provider acceptance pass.
+
+
+## Startup evidence hotfix — base ecaab5d
+
+Run #1 (45977591412) successfully built all three images and initialized PostgreSQL, but the API became unhealthy approximately 2.5 seconds after starting. The original CI cleanup removed the containers before recording their internal startup diagnostics. The underlying exception is not confirmed.
+
+This differential adds structured startup checkpoints to the isolated entrypoint, calls the original application readiness function after schema initialization and before serving, explicitly enables ASGI lifespan, and retains the original HTTP readiness requirement (HTTP 200 and status ready). It does not change the production gate, application modules, provider credentials, data model or commercial logic.
+
+The failure-only workflow step runs before cleanup and records `startup-failure.json`: known service names, container state, exit code, OOM flag, restart count, health status, and allowlisted startup/health events. Exception messages, response bodies, environment variables, SQL and raw Docker logs are not exported. The startup phases distinguish `database_identity`, `register_orm`, `api_import`, `api_schema`, `api_lifespan`, and `health_http`. In case of failure share this artifact or its JSON, not raw environment or credentials. If the API dies before emitting any marker, the Docker state will still indicate whether the process exited or was OOM-killed.
+
+Re-run the existing manually dispatched workflow on main after uploading the complete files in the differential; do not start persistent staging on a server before acceptance. The workflow still requires initial and recreated probes and retains its cleanup step. A passing startup alone is not certification. No new secrets.
+
+Local validation: 20 standard-library unit tests (14 existing plus 6 diagnostics tests), Python compilation and YAML parse; full Docker/HTTP/PostgreSQL run remains pending GitHub Actions. This is a diagnostic hardening, not a verified correction of the unknown original startup exception.

@@ -69,6 +69,16 @@ jobs:
           p=pathlib.Path(sys.argv[1]); a=json.loads((p/'initial.json').read_text())
           (p/'summary.json').write_text(json.dumps({'status':'PASS','candidate_commit':a['candidate_commit'],'published_policy_preserved':True,'real_inference':'NOT_RUN','live_staging_authorization':'NOT_RUN','real_provider_acceptance':'NOT_RUN','production_readiness':'CLOSED'},indent=2)+'\n')
           PY
+      - name: Capture sanitized startup evidence before cleanup
+        if: failure()
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/hei06a2-evidence"
+          if test -f "$RUNNER_TEMP/hei06a2-state/staging.env"; then
+            python3 services/hermes_worker/persistent_staging/manage.py diagnostics "$RUNNER_TEMP/hei06a2-state" | tee "$RUNNER_TEMP/hei06a2-evidence/startup-failure.json"
+          fi
       - name: Cleanup if interrupted
         if: always()
         shell: bash
