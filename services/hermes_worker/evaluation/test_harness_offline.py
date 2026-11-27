@@ -34,7 +34,14 @@ def test_harness_with_tool_driven_sdk_double(real_lane, monkeypatch, tmp_path):
             raise AssertionError('Unexpected model invocation')
         outcome = runtime._port.invoke(tool, args, request.scope)
         assert outcome.get('ok'), outcome
-        return TurnResult(reply, [], [{'tool':tool,'status':'executed','error_code':None}])
+        observations = [{'tool':tool,'status':'executed','error_code':None}]
+        if tool == 'search_properties':
+            # Reproduce the real SDK's second numbered-choice repetition from
+            # HEI-06 run #8: a successful search followed by a scoped overview.
+            overview = runtime._port.invoke('get_project_overview', {}, request.scope)
+            assert overview.get('ok'), overview
+            observations.append({'tool':'get_project_overview','status':'executed','error_code':None})
+        return TurnResult(reply, [], observations)
 
     monkeypatch.setattr(HermesSalesRuntime, 'process_turn', fake)
     mid = first_input(lane, 'Tell me the number of bedrooms in Van Buren.')
@@ -49,7 +56,7 @@ def test_harness_with_tool_driven_sdk_double(real_lane, monkeypatch, tmp_path):
     assert '1. Van Buren: starting price USD 325,000' in lane.calls[-1]
     assert '2. Oakwood: starting price USD 340,000' in lane.calls[-1]
     assert '$350,000' not in lane.calls[-1] and '$325k' not in lane.calls[-1]
-    assert 'search_properties' in tools_for(lane, mid)
+    assert {'search_properties','get_project_overview'} <= tools_for(lane, mid)
     assert state(lane)['last_presented_choice_set']['options'][1]['unit_id'] == 'oak'
     next_input(lane, 'The second option. How many bathrooms does it have?')
     assert state(lane)['conversation_focus']['property_type_id'] == 'oak'

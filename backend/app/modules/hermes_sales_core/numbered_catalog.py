@@ -15,6 +15,10 @@ _OTHER_REQUEST = re.compile(
     r'book|cancel|reschedule|visit|appointment|tour|where|when|address|location|'
     r'how many|how much|why|financ\w*|mortgage|loan|payment|discount|'
     r'contact|call|email|text me|negotiat\w*|fee\w*|tax\w*)\b|[;\n]', re.I)
+# Project overview is a scoped, side-effect-free catalog read. It does not
+# change search_rows, menus, focus or drafts. Do not generalize this exception
+# to all read tools: some of those update conversational context.
+_RECONCILABLE_TOOLS = frozenset({'search_properties', 'get_project_overview'})
 _CURRENCIES = frozenset({'USD','MXN','PEN','EUR','COP','BRL','CLP','ARS','CAD','GBP'})
 
 
@@ -36,8 +40,10 @@ def reconcile_numbered_catalog(reply, *, buyer_message, search_rows, menus,
     if (not isinstance(buyer_message,str) or not search_request(buyer_message) or _OTHER_REQUEST.search(buyer_message)
             or requested_topics(buyer_message)-{'property_types','inventory','pricing'}
             or media_offer or not observations
-            or any(o.get('tool')!='search_properties' or o.get('status')!='executed'
-                   for o in observations)):
+            or any(not isinstance(o,dict) or o.get('tool') not in _RECONCILABLE_TOOLS
+                   or o.get('status')!='executed' or o.get('error_code') is not None
+                   for o in observations)
+            or not any(o.get('tool')=='search_properties' for o in observations)):
         return None
     if (not isinstance(active_search,dict) or active_search.get('source_inbound_message_id')!=inbound_id
             or not isinstance(search_rows,list) or len(menus)!=1 or menus[0].get('type')!='property'):

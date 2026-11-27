@@ -85,3 +85,31 @@ def test_natural_search_without_explicit_numbering_instruction():
     reply,menu=repair(buyer_message='Show me 3 bedroom homes under $350,000.')
     assert 'starting price USD 340,000' in reply
     assert [o['unit_id'] for o in menu['options']]==['oak','van']
+
+
+@pytest.mark.parametrize('names', [
+    ['search_properties','get_project_overview'],
+    ['get_project_overview','search_properties'],
+    ['search_properties','get_project_overview','search_properties'],
+])
+def test_overview_read_does_not_invalidate_current_verified_menu(names):
+    from app.modules.sales_agent.monetary_policy import validate_monetary_reply
+    obs=[{'tool':name,'status':'executed','error_code':None} for name in names]
+    reply, menu=repair(observations=obs)
+    assert [o['unit_id'] for o in menu['options']]==['oak','van']
+    assert 'starting price USD 340,000' in reply
+    assert 'starting price USD 325,000' in reply
+    assert validate_monetary_reply(reply,COMMERCIAL)[0]==reply
+
+
+@pytest.mark.parametrize('obs', [
+    [{'tool':'get_project_overview','status':'executed','error_code':None}],
+    [{'tool':'search_properties','status':'executed'}, {'tool':'get_project_overview','status':'rejected'}],
+    [{'tool':'search_properties','status':'executed'}, {'tool':'get_project_overview','status':'executed','error_code':'UNKNOWN'}],
+    [{'tool':'search_properties','status':'executed'}, {'tool':'get_unit_details','status':'executed'}],
+    [{'tool':'search_properties','status':'executed'}, {'tool':'update_search_preferences','status':'executed'}],
+    [{'tool':'search_properties','status':'executed'}, {'tool':'get_unit_media','status':'executed'}],
+    [{'tool':'search_properties','status':'executed'}, None],
+])
+def test_overview_exception_does_not_authorize_missing_search_or_other_tools(obs):
+    assert repair(observations=obs) is None
